@@ -6,6 +6,20 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`develop-next`'s registry fallback passes over a task blocked on another repository
+  (task 235).** A cross-repository blocker could only be written as free text, which the selector
+  never reads, so it selected T174 while T174 waited on tinker-city task.127 — and each run then
+  paid a full pipeline setup to reach the task's own Phase 0 HALT. A document may now carry
+  `blocked_on_external: "<condition>"`. The fallback checks it after the eligibility floor and
+  before dependencies, passes the row over with `externalBlock` and a reason naming the condition
+  and the document, and never selects it. A held row is never silent: the selected rationale now
+  counts rejections by cause (document status, dependencies, external precondition) and names
+  each held row, and the `roadmap-complete` detail names each held path. Placeholders (`none`,
+  `n/a`, `tbd`, `—`) and the YAML nulls `null` / `~` do not hold a row. The registry loader is now
+  the exported `makeRegistryLoader`, which reads each document once. The authoring rule in
+  `create-task` § 1.2 and the task registry say to set the field; task.174 carries it.
+  `--batch` and the roadmap path are unchanged.
+
 - **The review skills advance the pipeline lock only on a passing review, and task.164's
   follow-ups are closed (task 165).** `review-story`'s cooperation block advanced the lock to 3
   even on a NO-GO, after which `/develop-story` Step 2 HALTed with the lock already pointing at

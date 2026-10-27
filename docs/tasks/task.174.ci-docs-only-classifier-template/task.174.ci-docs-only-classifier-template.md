@@ -8,10 +8,11 @@ category: infrastructure
 status: planned
 priority: Low
 created: 2026-10-01
-updated: 2026-10-01
+updated: 2026-10-27
 assignee:
 estimated_effort_hours: 8
 github_issue: 541
+blocked_on_external: "tinker-city task.127 (#982) merged and run on a real PR"
 ---
 
 # Technical Task: Publish the docs-only CI classifier as an optional consumer template
@@ -294,15 +295,13 @@ None.
 - **Non-critical:** a docs-only push that still runs the full suite.
 
 ---
-
 <!-- change-log-start -->
-
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-01 | 1.0     | Initial draft | create-task |
-
+| 2026-10-27 |  | Frontmatter: `blocked_on_external:` set, so the develop-next registry fallback passes this task over until tinker-city task.127 lands (task.235). Phase 0 HALT unchanged. | develop |
 <!-- change-log-end -->
 
 ---

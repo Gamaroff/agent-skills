@@ -39,6 +39,8 @@ const {
   parseFrontmatterStatus,
   storyBranchModel,
   registryFrontier,
+  externalBlockOf,
+  makeRegistryLoader,
   parseDepCell,
   TASK_ELIGIBLE_STATUSES,
   BUG_ELIGIBLE_STATUSES,
@@ -3706,4 +3708,254 @@ test("epicRef reads doc-id's epic grammar: P.E, no leading zero, not a story id"
   assert.match(epicRef("Epic 01.2").error, /not an epic id P\.E/);
   assert.match(epicRef("Epic 1.2.3").error, /not an epic id P\.E/);
   assert.match(epicRef("Epic 7").error, /predates hierarchical numbering/);
+});
+
+// ── task.235: an external precondition holds a registry row ─────────────────
+//
+// A blocker in another repository is written as free text the selector never
+// reads, so the fallback selected T174 while it was blocked on tinker-city
+// task.127. `blocked_on_external:` gives that condition a form the fallback
+// reads. The fixtures deliberately use another repository name and phrasing
+// than T174's, a bug row as well as a task row, and correct rows the field must
+// leave alone — a test keyed on the motivating wording would pass on
+// recognition.
+
+// Build a document whose frontmatter carries `status:` and, when given,
+// `blocked_on_external:` (the raw value, spelled exactly as an author would).
+function docWith(status, external) {
+  const lines = ["---", "type: task", `status: ${status}`];
+  if (external !== undefined) lines.push(`blocked_on_external: ${external}`);
+  lines.push("---", "", "# Doc", "");
+  return lines.join("\n");
+}
+
+// The real loader over an in-memory tree, with every readFile counted per path.
+function memoryLoader({ bugs = [], tasks = [], files = {} } = {}) {
+  const tree = {
+    [REG_BUG_PATH]: bugRegistry(bugs),
+    [REG_TASK_PATH]: taskRegistry(tasks),
+    ...files,
+  };
+  const reads = {};
+  const readFile = (p) => {
+    reads[p] = (reads[p] || 0) + 1;
+    return Object.prototype.hasOwnProperty.call(tree, p) ? tree[p] : "";
+  };
+  const load = () =>
+    makeRegistryLoader(
+      { bugRegistry: REG_BUG_PATH, taskRegistry: REG_TASK_PATH },
+      readFile,
+    );
+  return { load, reads };
+}
+
+const T235_HOLD = "billing-service task.9 deployed to staging";
+
+test("235: a held task is not selected; the next eligible row is", () => {
+  const { load } = memoryLoader({
+    tasks: [
+      taskRow(40, "held", "planned", "High"),
+      taskRow(41, "free", "planned", "Medium"),
+    ],
+    files: {
+      "docs/tasks/task.40.held/task.40.held.md": docWith(
+        "planned",
+        `"${T235_HOLD}"`,
+      ),
+      "docs/tasks/task.41.free/task.41.free.md": docWith("planned"),
+    },
+  });
+  const f = registryFrontier(load(), { evaluateAll: true });
+
+  assert.equal(f.selected.id, "T41", "the held row must not be selected");
+  const held = f.passedOver.find((p) => p.n === 40);
+  assert.ok(held, "the held row must be recorded, never silently dropped");
+  assert.equal(held.eligible, false);
+  assert.equal(held.externalBlock, T235_HOLD);
+  assert.match(held.reason, /^blocked on an external precondition: /);
+  assert.ok(held.reason.includes(T235_HOLD), "the reason names the condition");
+  assert.ok(
+    held.reason.includes("docs/tasks/task.40.held/task.40.held.md"),
+    "the reason names the document to clear",
+  );
+});
+
+test("235: placeholders and YAML nulls never hold a row", () => {
+  const spellings = [
+    "—",
+    "-",
+    "none",
+    "N/A",
+    "tbd",
+    '""',
+    '"none"',
+    "null",
+    "~",
+    "NULL",
+    "",
+  ];
+  for (const v of spellings) {
+    assert.equal(
+      externalBlockOf(docWith("planned", v)),
+      null,
+      `blocked_on_external: ${v} must read as not blocked`,
+    );
+    const { load } = memoryLoader({
+      tasks: [taskRow(42, "placeholder", "planned")],
+      files: {
+        "docs/tasks/task.42.placeholder/task.42.placeholder.md": docWith(
+          "planned",
+          v,
+        ),
+      },
+    });
+    const f = registryFrontier(load());
+    assert.equal(
+      f.selected?.id,
+      "T42",
+      `a row whose field reads ${JSON.stringify(v)} must still be selected`,
+    );
+  }
+  // Absent field, and a real condition with a trailing comment, for contrast.
+  assert.equal(externalBlockOf(docWith("planned")), null);
+  assert.equal(
+    externalBlockOf(docWith("planned", "infra-repo PR 12 merged # chase ops")),
+    "infra-repo PR 12 merged",
+  );
+});
+
+test("235: an accepted or cancelled document reports its status, not the hold", () => {
+  for (const status of ["accepted", "cancelled"]) {
+    const { load } = memoryLoader({
+      tasks: [taskRow(43, "done", status)],
+      files: {
+        "docs/tasks/task.43.done/task.43.done.md": docWith(status, T235_HOLD),
+      },
+    });
+    const f = registryFrontier(load(), { evaluateAll: true });
+    const row = f.passedOver.find((p) => p.n === 43);
+    assert.match(row.reason, /outside the task eligibility floor/);
+    assert.equal(
+      row.externalBlock,
+      undefined,
+      `a ${status} document must report the floor, the nearer cause`,
+    );
+  }
+});
+
+test("235: a held row with an unaccepted dependency reports the hold", () => {
+  const { load } = memoryLoader({
+    tasks: [
+      taskRow(44, "base", "planned", "Low"),
+      taskRow(45, "both", "planned", "High", "task.44"),
+    ],
+    files: {
+      "docs/tasks/task.44.base/task.44.base.md": docWith("planned"),
+      "docs/tasks/task.45.both/task.45.both.md": docWith("planned", T235_HOLD),
+    },
+  });
+  const f = registryFrontier(load(), { evaluateAll: true });
+  const row = f.passedOver.find((p) => p.n === 45);
+  assert.equal(row.externalBlock, T235_HOLD);
+  assert.match(row.reason, /^blocked on an external precondition/);
+  assert.doesNotMatch(row.reason, /unaccepted dependency/);
+});
+
+test("235: a bug row carrying the field is held like a task row", () => {
+  const { load } = memoryLoader({
+    bugs: [bugRow(46, "leak", "new")],
+    tasks: [taskRow(47, "free", "planned")],
+    files: {
+      "docs/bugs/bug.46.leak/bug.46.leak.md": docWith(
+        "new",
+        "vendor-sdk 3.2 released",
+      ),
+      "docs/tasks/task.47.free/task.47.free.md": docWith("planned"),
+    },
+  });
+  const f = registryFrontier(load(), { evaluateAll: true });
+  // A bug outranks a task, so only the hold explains T47 winning.
+  assert.equal(f.selected.id, "T47");
+  const bug = f.passedOver.find((p) => p.kind === "bug" && p.n === 46);
+  assert.equal(bug.externalBlock, "vendor-sdk 3.2 released");
+});
+
+test("235: every row held → roadmap-complete, and the detail names each one", () => {
+  const { load } = memoryLoader({
+    bugs: [bugRow(48, "crash", "new")],
+    tasks: [taskRow(49, "held", "planned")],
+    files: {
+      "docs/bugs/bug.48.crash/bug.48.crash.md": docWith(
+        "new",
+        "mobile-app v4 shipped",
+      ),
+      "docs/tasks/task.49.held/task.49.held.md": docWith("planned", T235_HOLD),
+    },
+  });
+  const r = selectNext(parseRoadmap(EMPTY_ROADMAP), { loadRegistries: load });
+  assert.equal(r.status, "stop");
+  assert.equal(r.stopReason, "roadmap-complete");
+  assert.match(r.detail, /2 row\(s\) held on an external precondition/);
+  assert.ok(
+    r.detail.includes(
+      "docs/bugs/bug.48.crash/bug.48.crash.md (mobile-app v4 shipped)",
+    ),
+    r.detail,
+  );
+  assert.ok(
+    r.detail.includes(`docs/tasks/task.49.held/task.49.held.md (${T235_HOLD})`),
+    r.detail,
+  );
+});
+
+test("235: the selected rationale names a held row ranked above the selection", () => {
+  const { load } = memoryLoader({
+    tasks: [
+      taskRow(50, "held", "planned", "High"),
+      taskRow(51, "cancelled", "planned", "High"),
+      taskRow(52, "free", "planned", "Low"),
+    ],
+    files: {
+      "docs/tasks/task.50.held/task.50.held.md": docWith("planned", T235_HOLD),
+      "docs/tasks/task.51.cancelled/task.51.cancelled.md": docWith("cancelled"),
+      "docs/tasks/task.52.free/task.52.free.md": docWith("planned"),
+    },
+  });
+  const r = selectNext(parseRoadmap(EMPTY_ROADMAP), { loadRegistries: load });
+  assert.equal(r.item.id, "T52");
+  assert.match(r.rationale, /1 registry row\(s\) rejected on document status/);
+  assert.match(r.rationale, /1 held on an external precondition: T50 \(/);
+  assert.ok(r.rationale.includes(T235_HOLD), r.rationale);
+});
+
+test("235: the loader reads each document once for status, the field and a dependency lookup", () => {
+  const doc = "docs/tasks/task.53.dep/task.53.dep.md";
+  const { load, reads } = memoryLoader({
+    tasks: [
+      taskRow(53, "dep", "planned", "Low"),
+      taskRow(54, "dependent", "planned", "High", "task.53"),
+    ],
+    files: {
+      [doc]: docWith("planned"),
+      "docs/tasks/task.54.dependent/task.54.dependent.md": docWith("planned"),
+    },
+  });
+  const loader = load();
+  // T54 ranks first: its status, its field, then task.53 as a dependency —
+  // then T53's own status and field. Five reader calls, two documents.
+  registryFrontier(loader, { evaluateAll: true });
+  assert.equal(reads[doc], 1, `${doc} was read ${reads[doc]} times`);
+  assert.equal(reads["docs/tasks/task.54.dependent/task.54.dependent.md"], 1);
+  assert.equal(reads[REG_TASK_PATH], 1, "the registry itself is read once");
+});
+
+test("235: a loader without readExternalBlock selects exactly as before", () => {
+  const { opts } = registryOpts({
+    tasks: taskRegistry([taskRow(55, "x", "planned")]),
+    docs: { "docs/tasks/task.55.x/task.55.x.md": "planned" },
+  });
+  assert.equal(typeof opts.registries.readExternalBlock, "undefined");
+  const f = registryFrontier(opts.registries);
+  assert.equal(f.selected.id, "T55");
+  assert.ok(f.passedOver.every((p) => p.externalBlock === undefined));
 });

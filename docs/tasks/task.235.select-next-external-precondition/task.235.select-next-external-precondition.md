@@ -5,10 +5,10 @@ type: task
 description: "Give an external precondition a form the selector reads, and have the fallback pass over it with a stated reason instead of selecting it."
 tags: [develop-next, observation]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-10-26
-updated: 2026-10-26
+updated: 2026-10-27
 assignee:
 estimated_effort_hours: 16
 github_issue: 759
@@ -16,7 +16,9 @@ github_issue: 759
 
 # Technical Task: select-next registry fallback selects an item blocked on another repository
 
-**Status:** Planned
+**Status:** Ready for Review
+
+**Review**: ✅ All review recommendations from `task.235.review.1.select-next-external-precondition.md` implemented 2026-10-27
 
 **GitHub Issue**: [#759](https://github.com/Gamaroff/agent-skills/issues/759)
 
@@ -38,12 +40,16 @@ blocker, the task frontmatter schema, and task.174 (the one live instance).
 1. `registryFrontier` reads `blocked_on_external:` and passes over any document that carries a
    non-empty value, with reason `blocked on an external precondition: <value>`.
 2. A held row is never silent: the selected rationale and the `roadmap-complete` detail both name
-   every held row and its condition.
+   every held row **the frontier evaluated** and its condition. Selection short-circuits at the
+   first eligible row, so that is every held row ranked above the selection; when nothing is
+   selected (and under `--lint`) it is every held row.
 3. The authoring rule (`create-task` § 1.2, the task registry's rule list) says to write the field,
    and task.174 carries it.
 
-**Expected outcome**: `/develop-next` on today's tree no longer selects T174. It selects the next
-eligible item, or stops `roadmap-complete` with T174 named as held on tinker-city task.127.
+**Expected outcome**: once the registry fallback is reached, `/develop-next` no longer selects T174.
+It selects the next eligible item, or stops `roadmap-complete` with T174 named as held on
+tinker-city task.127. On today's tree the fallback is not reached (Phase 17 still holds T236), so
+the tree-level evidence is `--lint`, which evaluates every registry row.
 
 ---
 
@@ -58,13 +64,13 @@ eligible item, or stops `roadmap-complete` with T174 named as held on tinker-cit
 2. **The block is invisible by construction.** `parseDepCell` reads only the text before the first
    ` · ` / ` — ` separator (`DEP_NOTE_SEP_RE`, `select-next.mjs:1161`), and a cross-repository
    blocker must be written after ` — ` as free text so it does not bind to this registry's own
-   `task.127` (`docs/tasks/task-registry.md:24`; `skills/create-task/SKILL.md:265`).
+   `task.127` (`docs/tasks/task-registry.md:24`; `skills/create-task/SKILL.md:269`).
 3. **The only stop is the expensive one.** The authoring rule's backstop is the task's own Phase 0
    HALT. An unattended `/develop-next` (or `/loop /develop-next`) pays a full pipeline setup to
    reach it: branch, run-state file, lock, then a HALT. The run-state survives a HALT, so the next
    invocation resumes at the same item and halts again.
 4. **The rule text concedes the gap.** Both restatements say "the selector cannot see free text, so
-   the HALT is what stops it" (`docs/tasks/task-registry.md:24`, `skills/create-task/SKILL.md:265`).
+   the HALT is what stops it" (`docs/tasks/task-registry.md:24`, `skills/create-task/SKILL.md:269`).
    This states the defect as policy.
 
 ### Benefits of a machine-readable external precondition
@@ -73,8 +79,9 @@ eligible item, or stops `roadmap-complete` with T174 named as held on tinker-cit
    setup and HALT on every loop iteration.
 2. **The loop keeps moving**: the fallback selects the next eligible row past the held one, so
    one external blocker does not stall the whole frontier.
-3. **Never silent**: every held row and its condition are named in the rationale and in the
-   `roadmap-complete` detail, so a field nobody clears is seen on every run.
+3. **Never silent**: every held row the frontier evaluates is named with its condition in the
+   rationale or the `roadmap-complete` detail, so a field nobody clears is seen on every run that
+   could have selected it.
 4. **Frontmatter decides, as it already does**: the field sits beside `status:`, which the fallback
    already reads from the document (`roadmap-selection.md` §"Frontmatter decides; the registry row
    only nominates"). There is no new source of truth.
@@ -124,10 +131,20 @@ the frontier) and line 300 (a note). **T174 is the only live instance.** The bug
 
 ### Target Architecture
 
-- `main`'s injected reader also exposes `readExternalBlock(path)`: it reads the document once and
-  returns `frontmatterScalar(text, "blocked_on_external")`, or `null`. A value matching
-  `DEP_EMPTY_RE` (`—`, `none`, `n/a`, `tbd`) counts as **not** blocked, so a placeholder never
-  hides a row.
+- The registry loader moves out of `main` into an exported
+  `makeRegistryLoader({ bugRegistry, taskRegistry }, readFile)`, so its read count is testable;
+  `main` calls it with the existing `readOrEmpty`. It memoises each document's text per path, and
+  exposes `readExternalBlock(path)` beside `readStatus(path)`: both read the shared cached text, so
+  a document is read once. `readExternalBlock` returns `externalBlockOf(text)` — an exported pure
+  function over `frontmatterScalar(text, "blocked_on_external")` — or `null`.
+- **Placeholders never hold.** A value matching `DEP_EMPTY_RE` (`—`, `none`, `n/a`, `tbd`) **or a
+  YAML null (`null`, `~`)** counts as **not** blocked. The YAML nulls are not in `DEP_EMPTY_RE` and
+  must be tested separately: this repository writes an unset key as `null` (`github_issue: null`),
+  and without them `frontmatterScalar` returns the string `"null"`, which would hold the row on a
+  condition named "null". Measured at review:
+  `frontmatterScalar("---\nblocked_on_external: null\n---\n", "blocked_on_external")` → `"null"`,
+  and `DEP_EMPTY_RE.test("null")` → `false`. `DEP_EMPTY_RE` itself is not widened — it also reads
+  the `Depends on` cell, which is out of scope.
 - `registryFrontier` checks it **after** the eligibility floor and **before** the dependency check.
   The floor goes first so that a cancelled or accepted document still reports its nearer cause.
   The external check goes before the dependency check because it is the condition no in-repo action
@@ -137,7 +154,10 @@ the frontier) and line 300 (a note). **T174 is the only live instance.** The bug
 - A frontier with no `readExternalBlock` function behaves exactly as today: the default is
   `() => null`, as `readStatus` defaults today (`select-next.mjs:1521`).
 - `buildRegistryRationale` counts rows by cause: rejected on document status, blocked on
-  dependencies, held on an external precondition. Held rows are named with their condition.
+  dependencies, held on an external precondition. Held rows are named with their condition. Only
+  evaluated rows can be counted: rows ranked below the selection carry `eligible: null` and are
+  never read, so a held row there is not named — and need not be, since it could not have been
+  selected on this run.
 - When nothing is selected, the `roadmap-complete` detail appends
   `— N row(s) held on an external precondition: <path> (<value>), …`. The stop reason is unchanged.
 
@@ -170,7 +190,7 @@ the rationale counts and the `roadmap-complete` detail.
 ✅ **Tests**: unit tests in `evals/develop-next/unit/select-next.test.mjs` for every outcome below.
 ✅ **Docs**: `roadmap-selection.md` (new subsection, line 87 amended); the frontmatter table in
 `docs/standards/task-documents.md`; the rule at `docs/tasks/task-registry.md:24` and
-`skills/create-task/SKILL.md:265`.
+`skills/create-task/SKILL.md:269`.
 ✅ **Migration**: task.174's frontmatter gains `blocked_on_external:`.
 ✅ **CHANGELOG**: `[Unreleased]` entry.
 
@@ -204,33 +224,39 @@ None. The field is optional and additive. A document without it, and a loader wi
 
 **Files**: `evals/develop-next/unit/select-next.test.mjs`
 
-- [ ] Add a `registryFrontier` test: a `planned` task with `blocked_on_external: other-repo task.9 merged`
+- [x] Add a `registryFrontier` test: a `planned` task with `blocked_on_external: other-repo task.9 merged`
       and no other blocker is **not** selected; the next eligible row is.
-- [ ] Assert the held row's `passedOver` entry: `eligible: false`, `externalBlock` equal to the
+- [x] Assert the held row's `passedOver` entry: `eligible: false`, `externalBlock` equal to the
       value, reason naming the value and the path.
-- [ ] Run the file and record it red for the new tests, before any selector edit.
+- [x] Run the file and record it red for the new tests, before any selector edit.
 
 ### Phase 2: Read and honour the field (Risk: Medium)
 
 **Files**: `skills/develop-next/scripts/select-next.mjs`
 
-- [ ] `main`'s loader exposes `readExternalBlock(docPath)` via `frontmatterScalar(text, "blocked_on_external")`;
-      a `DEP_EMPTY_RE` value returns `null`.
-- [ ] `registryFrontier` defaults it to `() => null`, and checks it after the eligibility floor and
+- [x] Extract `main`'s `loadRegistries` into exported `makeRegistryLoader(paths, readFile)` with a
+      per-path text cache; `main` calls it with `readOrEmpty`. It exposes `readExternalBlock(docPath)`
+      via exported `externalBlockOf(text)`; a `DEP_EMPTY_RE` value, `null` or `~` returns `null`.
+- [x] `registryFrontier` defaults it to `() => null`, and checks it after the eligibility floor and
       before `registryDepBlockers`.
-- [ ] `buildRegistryRationale` reports the three rejection causes separately and names held rows.
-- [ ] The `roadmap-complete` detail names held rows and their conditions.
+- [x] `buildRegistryRationale` reports the three rejection causes separately and names held rows.
+- [x] The `roadmap-complete` detail names held rows and their conditions.
 
 ### Phase 3: Control and edge cases (Risk: Low)
 
 **Files**: `evals/develop-next/unit/select-next.test.mjs`
 
-- [ ] Placeholder values (`—`, `none`, `n/a`, `tbd`, empty) do not hold a row.
-- [ ] An `accepted` or `cancelled` document carrying the field reports its status cause, not the hold.
-- [ ] A held row that also has an unaccepted dependency reports the hold.
-- [ ] Every row held → `stop` / `roadmap-complete`, detail names each held row.
-- [ ] A loader without `readExternalBlock` selects exactly as before (the existing suite passes untouched).
-- [ ] `--batch` output is unchanged (the existing 15/SC10 test still passes).
+- [x] Placeholder values (`—`, `none`, `n/a`, `tbd`, empty, quoted `"none"`, and the YAML nulls
+      `null` and `~`) do not hold a row.
+- [x] Read count: `makeRegistryLoader` with a counting `readFile` reads each document path at most
+      once across `readStatus`, `readExternalBlock` and a dependency lookup of the same path.
+- [x] Selected rationale: with a held row ranked **above** the selected row, `rationale` names the
+      held row and its condition, and counts it as held, not as "rejected on document status".
+- [x] An `accepted` or `cancelled` document carrying the field reports its status cause, not the hold.
+- [x] A held row that also has an unaccepted dependency reports the hold.
+- [x] Every row held → `stop` / `roadmap-complete`, detail names each held row.
+- [x] A loader without `readExternalBlock` selects exactly as before (the existing suite passes untouched).
+- [x] `--batch` output is unchanged (the existing 15/SC10 test still passes).
 
 ### Phase 4: Docs, rule and migration (Risk: Low)
 
@@ -238,15 +264,17 @@ None. The field is optional and additive. A document without it, and a loader wi
 `docs/tasks/task-registry.md`, `skills/create-task/SKILL.md`,
 `docs/tasks/task.174.ci-docs-only-classifier-template/task.174.ci-docs-only-classifier-template.md`, `CHANGELOG.md`
 
-- [ ] `roadmap-selection.md`: a subsection "External preconditions" under §"Registry fallback frontier";
+- [x] `roadmap-selection.md`: a subsection "External preconditions" under §"Registry fallback frontier";
       amend line 87 to say why this is not a park value.
-- [ ] `task-documents.md`: a frontmatter row for `blocked_on_external`.
-- [ ] `task-registry.md:24` and `create-task/SKILL.md:265`: write the field as well as the free
+- [x] `task-documents.md`: a frontmatter row for `blocked_on_external`.
+- [x] `task-registry.md:24` and `create-task/SKILL.md:269`: write the field as well as the free
       text; drop "the selector cannot see free text".
-- [ ] task.174: add `blocked_on_external: "tinker-city task.127 (#982) merged and run on a real PR"`.
-- [ ] Run `command node skills/develop-next/scripts/select-next.mjs` on the tree: T174 is not selected.
-- [ ] `npm run bundle`, then `npm run ci` with the skills symlinks moved aside.
-- [ ] CHANGELOG `[Unreleased]`.
+- [x] task.174: add `blocked_on_external: "tinker-city task.127 (#982) merged and run on a real PR"`.
+- [x] Run `command node skills/develop-next/scripts/select-next.mjs --lint` on the tree: T174 is in
+      `registryFrontier.passedOver` with `eligible: false` and `externalBlock` set. (The plain
+      selector run picks a Phase 17 roadmap row on today's tree and never reaches the fallback.)
+- [x] `npm run bundle`, then `npm run ci` with the skills symlinks moved aside.
+- [x] CHANGELOG `[Unreleased]`.
 
 ---
 
@@ -265,7 +293,7 @@ None. The field is optional and additive. A document without it, and a loader wi
 3. ✅ `skills/develop-next/references/roadmap-selection.md`: new subsection; line 87 amended
 4. ✅ `docs/standards/task-documents.md`: frontmatter row
 5. ✅ `docs/tasks/task-registry.md`: rule at line 24
-6. ✅ `skills/create-task/SKILL.md`: § 1.2 rule at line 265
+6. ✅ `skills/create-task/SKILL.md`: § 1.2 rule at line 269
 7. ✅ `CHANGELOG.md`: `[Unreleased]`
 
 **Migration**
@@ -296,9 +324,10 @@ selected.
 
 ### Integration
 
-- Run the real selector on the tree after Phase 4: T174 must appear in `passedOver` with its
-  condition and must not be `selected`.
-- `--lint` lists T174 held.
+- Run `select-next.mjs --lint` on the tree after Phase 4: T174 must appear in
+  `registryFrontier.passedOver` with `eligible: false` and its condition in `externalBlock`. The
+  plain selector run is not evidence on today's tree: Phase 17 still holds T236, so the fallback is
+  never reached and the output carries no `registryFrontier`.
 
 ### Regression
 
@@ -311,34 +340,41 @@ selected.
 
 ### Functional
 
-- [ ] A `planned` task with a non-empty `blocked_on_external:` and no other blocker is not selected,
+- [x] A `planned` task with a non-empty `blocked_on_external:` and no other blocker is not selected,
       and the next eligible row is (Phase 2's frontier check).
-- [ ] The held row's `passedOver` entry has `eligible: false`, `externalBlock: <value>` and a reason
+- [x] The held row's `passedOver` entry has `eligible: false`, `externalBlock: <value>` and a reason
       naming the value and the document path.
-- [ ] `—`, `none`, `n/a`, `tbd` and an empty value do not hold a row.
-- [ ] An `accepted` or `cancelled` document with the field reports its status cause, not the hold
+- [x] `—`, `none`, `n/a`, `tbd`, an empty value and the YAML nulls `null` / `~` do not hold a row
+      (Phase 3 placeholder test).
+- [x] A held row ranked above the selected row is named, with its condition, in the selected
+      `rationale` (Phase 3 rationale test).
+- [x] An `accepted` or `cancelled` document with the field reports its status cause, not the hold
       (the floor runs first, Phase 2).
-- [ ] When every candidate is held, `selectNext` returns `stop` / `roadmap-complete` and the detail
+- [x] When every candidate is held, `selectNext` returns `stop` / `roadmap-complete` and the detail
       names each held row and its condition.
-- [ ] On the real tree after Phase 4, the selector does not select T174.
+- [x] On the real tree after Phase 4, `select-next.mjs --lint` lists T174 in
+      `registryFrontier.passedOver` with `eligible: false` and `externalBlock` set.
 
 ### Performance
 
-- [ ] Each candidate document is read at most once per run for both status and the field.
-- [ ] No measurable change to the existing suite's runtime (report before/after wall time).
+- [x] Each candidate document is read at most once per run for both status and the field — held
+      by the Phase 3 read-count test against `makeRegistryLoader` with a counting `readFile`.
+- [ ] The unit suite's wall time on the PR head is within 110% of `develop`'s, measured on the PR
+      head commit with `uptime; time command node --test evals/develop-next/unit/select-next.test.mjs`
+      run on each, and both figures recorded in the implementation report.
 
 ### Code Quality
 
-- [ ] `node:test` + `node:assert` only; Prettier clean.
-- [ ] Each new behaviour is mutation-proven: remove the check and a named test goes red.
-- [ ] `npm run bundle:check` clean; `npm run ci` green with `.agents/skills` and `.claude/skills` moved aside.
+- [x] `node:test` + `node:assert` only; Prettier clean.
+- [x] Each new behaviour is mutation-proven: remove the check and a named test goes red.
+- [x] `npm run bundle:check` clean; `npm run ci` green with `.agents/skills` and `.claude/skills` moved aside.
 
 ### Migration
 
-- [ ] task.174 carries the field, and its Phase 0 HALT is unchanged.
-- [ ] Both rule restatements say to write the field; the grep in § 7 returns no "cannot see free text" hit.
-- [ ] `roadmap-selection.md` explains why the field is not a park value.
-- [ ] CHANGELOG `[Unreleased]` records the change.
+- [x] task.174 carries the field, and its Phase 0 HALT is unchanged.
+- [x] Both rule restatements say to write the field; the grep in § 7 returns no "cannot see free text" hit.
+- [x] `roadmap-selection.md` explains why the field is not a park value.
+- [x] CHANGELOG `[Unreleased]` records the change.
 
 ---
 
@@ -354,8 +390,9 @@ None identified.
    - Risk: the other repository's blocker lands, nobody clears the field, and the task stays out of
      the frontier.
    - Probability: Medium. Impact: Medium (work delayed, not lost).
-   - Mitigation: the held row and its condition appear in every selected rationale and every
-     `roadmap-complete` detail, so the field is read on every run.
+   - Mitigation: the held row and its condition appear in every selected rationale that evaluated
+     it (every selection ranked below it) and every `roadmap-complete` detail, so the field is read
+     on every run that could have selected the row; `--lint` lists it on any run.
    - Rollback: delete the field from the document.
 
 2. **Check order changes a reported cause**
@@ -397,12 +434,56 @@ None identified.
 
 ---
 
+## Implementation Summary
+
+**Completion Date**: 2026-10-27
+
+**Approach**: Inline from the co-located plan (develop-task Step 3). In
+`skills/develop-next/scripts/select-next.mjs`: exported `externalBlockOf(text)` reads
+`blocked_on_external:` through `frontmatterScalar` and returns `null` for a `DEP_EMPTY_RE` spelling or
+a YAML null (`YAML_NULL_RE`, `/^(?:null|~)$/i`). `main`'s `loadRegistries` moved into exported
+`makeRegistryLoader(paths, readFile)`, which caches each document's text per path and exposes
+`readExternalBlock` beside `readStatus`. `registryFrontier` defaults `readExternalBlock` to
+`() => null` and checks it after the eligibility floor and before `registryDepBlockers`, pushing the
+row with `eligible: false`, `externalBlock` and a reason naming the condition and the path.
+`buildRegistryRationale` now counts rejections by cause (document status, dependencies, external
+precondition) and names held rows; the `roadmap-complete` detail names each held path. Docs:
+`roadmap-selection.md` § "External preconditions" and the park-value paragraph; a frontmatter row in
+`docs/standards/task-documents.md`; both rule sites (`create-task` § 1.2, `task-registry.md:24`); task.174
+carries the field. `npm run bundle`: no copy changed.
+
+**Testing Results**:
+
+- `command node --test evals/develop-next/unit/select-next.test.mjs`: 185 tests, 0 failures (was 176).
+  Nine new `235:` tests, written first: 8 red and the no-loader parity test green before any selector
+  edit.
+- Mutation proofs (each applied alone, suite run, file restored): frontier check disabled → 5 red;
+  check moved above the floor → the accepted/cancelled test red; `DEP_EMPTY_RE` test dropped → the
+  placeholder test red; `YAML_NULL_RE` test dropped → the placeholder test red; document cache dropped →
+  the read-count test red; held count dropped from the rationale → the rationale test red; detail
+  append dropped → the all-held test red.
+- Tree: `select-next.mjs --lint` lists T174 in `registryFrontier.passedOver` with `eligible: false` and
+  `externalBlock: "tinker-city task.127 (#982) merged and run on a real PR"`. The plain run selects
+  roadmap row T235 and does not reach the fallback.
+- `npm run ci:fast` with `.agents/skills` and `.claude/skills` moved aside: 6,415 tests, 6,400 pass,
+  1 fail — `doc-links.test.mjs`'s anchor corpus, because it reads the git index and the new
+  `#external-preconditions` heading was not yet staged. Staged; the file re-run passed 31/31.
+- `npm run ci` (ci:fast, eval:all, validate:all, check:generated, bundle:check, lint:shell,
+  lint:secrets) with the symlinks moved aside: 6,415 tests, 6,401 pass, 0 fail; exit 0.
+
+**Deferred Work**: `develop-task` Phase 0c could refuse a document carrying `blocked_on_external:` on a
+direct invocation (Notes § Future Improvements). Not in scope.
+
+---
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                               | Author      |
-| ---------- | ------- | ----------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
+|            |         | Status → ready-for-development            | review-task |
 | 2026-10-26 | 1.0     | Initial draft — cut from observation #103 | create-task |
+| 2026-10-27 | 1.1     | Review passed (8/10) after fixes — YAML nulls `null`/`~` no longer hold a row; tree evidence moved to `--lint` (fallback not reached on today's tree); read-once criterion held by an exported `makeRegistryLoader` test; wall-time bound stated; "every held row" scoped to evaluated rows | review-task |
+| 2026-10-27 |  | Implemented — 10 files, 9 tests | develop |
 <!-- change-log-end -->
 
 ---
@@ -410,16 +491,16 @@ None identified.
 ## Progress Tracking
 
 ### Phase 1: Failing tests first
-- [ ] Held-row test and `passedOver` assertions written and seen red
+- [x] Held-row test and `passedOver` assertions written and seen red
 
 ### Phase 2: Read and honour the field
-- [ ] Loader, frontier check, rationale, stop detail
+- [x] Loader, frontier check, rationale, stop detail
 
 ### Phase 3: Control and edge cases
-- [ ] Placeholders, floor order, dependency overlap, all-held stop, no-loader parity, batch parity
+- [x] Placeholders, floor order, dependency overlap, all-held stop, no-loader parity, batch parity
 
 ### Phase 4: Docs, rule and migration
-- [ ] Reference, standard, both rule sites, task.174, CHANGELOG, bundle, CI
+- [x] Reference, standard, both rule sites, task.174, CHANGELOG, bundle, CI
 
 ---
 
@@ -454,7 +535,7 @@ None identified.
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review
 
 **Next Steps**:
 
