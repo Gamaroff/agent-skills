@@ -5,10 +5,12 @@ type: task
 description: "When the 5c /review-pr returns APPROVE, apply its doc-only findings through the same classify-and-stage carry that CONCERNS already uses, so a documentation defect the pipeline found and judged safe to fix is not left for /finalise, which can only halt on it."
 tags: [develop-task, develop-story, qa-loop, review-pr, finalise, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-27
 updated: 2026-10-27
+completed_date: 2026-10-27
+pr_number: 767
 assignee:
 estimated_effort_hours: 4
 github_issue: 765
@@ -16,7 +18,7 @@ github_issue: 765
 
 # Technical Task: Apply 5c doc-only findings on APPROVE
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.237.review.1.carry-doc-only-findings-on-approve.md` implemented 2026-10-27
 **GitHub Issue**: [#765](https://github.com/Gamaroff/agent-skills/issues/765)
 
@@ -247,7 +249,7 @@ Not applicable. This is a prose and test change with no runtime path.
 
 - [x] Each new parity assertion is mutation-proved: removing the `APPROVE` row's clause, restoring "Classify on `CONCERNS`", and restoring the `APPROVE`-keyed `CARRY_FIXED` sentence each turn it red
 - [x] `npm run bundle:check` clean; `npm run validate -- skills/develop-task/ skills/develop-story/ skills/finalise/ skills/review-pr/` clean
-- [ ] `npm run ci:fast` green, and `npm run ci` green before merge (ci:fast green at Step 3; `npm run ci` runs on the PR before merge)
+- [x] `npm run ci:fast` green, and `npm run ci` green before merge (ci:fast green at Step 3; `npm run ci` runs on the PR before merge — PR #767 `test` check SUCCESS @ `6f382ee9a38a`)
 
 ### Migration
 
@@ -324,6 +326,30 @@ None identified.
 ### Key Findings
 TASK-237-BUG-2 and QA-3 are verified fixed. [TASK-237-BUG-2](./task.237.bug.2.carry-fixed-negative-guard-sentence-scope.md) is closed. The guard now judges the deciding clause: M7, M8, M10 and M11 are red, and M9 is green. One low-confidence advisory (a case-sensitive verdict check) is recorded as future.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.237.qa.3.carry-doc-only-findings-on-approve.md`
+**Gate File**: `task.237.gate.3.carry-doc-only-findings-on-approve.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Review (5c)**: `task.237.pr-review.1.carry-doc-only-findings-on-approve.md`, ✅ APPROVE with 0 findings
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 11/11 met. AC9 (`npm run ci` green) was confirmed by the PR's `test` check SUCCESS @ `6f382ee9a38a`.
+✅ **Tests:** Two parity tests in `pr-review-loop-parity.test.mjs`, each mutation-proved. `acceptance-commit-carries-5c.test.mjs` passes 24/24 and is unchanged.
+✅ **PR Review:** PR #767. The host requires no reviews, so the Step 5c `/review-pr` report (APPROVE) stands in. All 6 checks are green.
+✅ **Documentation:** CHANGELOG `[Unreleased]` cites (task 237). The six restatement sites and the nine bundled copies are updated.
+✅ **Security Review:** PASS. The deliverable is not a boundary, and the change is prose plus regex assertions.
+⚠️ **Compliance Review:** NOT_APPLICABLE
+
+**Task marked as ACCEPTED on:** 2026-10-27
+
+**Detailed Verification Log:** See `task.237.dod.1.carry-doc-only-findings-on-approve.md` for the full verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
@@ -338,6 +364,7 @@ TASK-237-BUG-2 and QA-3 are verified fixed. [TASK-237-BUG-2](./task.237.bug.2.ca
 | 2026-10-27 |  | QA gate CONCERNS (90/100) — 2 findings | qa-task |
 | 2026-10-27 |  | QA findings fixed — TASK-237-BUG-2 and QA-3, 2 iterations | qa-fix |
 | 2026-10-27 |  | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-10-27 | 1.2 | DoD passed — accepted (PR #767) | finalise |
 <!-- change-log-end -->
 
 ---
