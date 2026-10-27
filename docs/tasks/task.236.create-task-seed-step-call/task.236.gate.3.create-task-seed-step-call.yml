@@ -1,0 +1,61 @@
+schema: 2
+task: 'task.236.create-task-seed-step-call'
+task_title: 'create-task 1.1 omits the required taskId argument to seedFromObservations'
+gate: PASS
+status_reason: 'QA2-1 is fixed and mutation-proven: the seed block single-quotes the substituted values, and shell syntax reaches the node guard as typed and runs nothing. The shipped-file probe runs 18 cases (0 reproduced, 0 escaped). The scoped review raised no high-confidence bug; four low or cleanup findings are recorded as future work.'
+reviewer: 'QA Engineer'
+head: '7cb55772f522101e26b092e63a59242f8de66556'
+updated: '2026-10-27T06:52:26Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 50
+  phases_verified: 3/3
+  ci: 'not read — CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 18
+    escaped: 0
+    notes: 'Shipped-file fence probe, record task.236.qa.3.security.run.json: totals.executed 18, reproduced 0, escaped 0. Cases are substituted through the block''s own assignment lines, so the probe sees the quoting (proven: double quotes back in made 4 hostile cases accepted). Residual (CR-2, low/low): a single quote still ends the quotes; only the step''s prose rule (digits, commas, spaces) stops it, and the step says so.'
+  performance:
+    status: PASS
+    notes: 'seed-step-block.test.js real 4.408s and 4.275s on 7cb55772 at load 1.66 (bound < 5s). The margin is thin: the probe test is 2.3s, the worktree test 0.7s, the shell-syntax test 0.6s. It was 0.351s with the first-pass 2 tests.'
+  reliability:
+    status: PASS
+    notes: 'Worktree test uses a mkdtemp path; CR-3 (cleanup): the prune comment overstates what prune removes.'
+  maintainability:
+    status: PASS
+    notes: 'validate rc 0; Prettier clean; bundle:check clean at 5b. CR-4 (cleanup): the Implementation Record still reports the first-pass 2 tests.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (low, pre-existing): 19 other `NAME="{placeholder}"` assignments in executed SKILL.md blocks outside create-task double-quote substituted text (19 on origin/develop, so not introduced here). Follow-up task: enumerate with a grep and single-quote each site or record an exclusion.'
+      refs: ['skills/create-branch/SKILL.md', 'skills/review-pr/SKILL.md', 'skills/review-code/SKILL.md']
+    - action: 'CR-2 (low): a single quote is the one input the quoting leaves to the prose rule; add a test comment naming the gap, or bind through a delimiter the guard can see past.'
+      refs: ['skills/create-task/SKILL.md']
+    - action: 'Performance margin: seed-step-block.test.js runs at ~4.3s against a 5s bound; consider moving the probe test to its own file or trimming the closure it embeds per case.'
+      refs: ['skills/create-task/tests/seed-step-block.test.js', 'skills/create-task/tests/seed-block-probe.js']
+    - action: 'CR-3 (cleanup): reword the prune comment, or remove leftover seed-step-block-* worktrees before the add.'
+      refs: ['skills/create-task/tests/seed-step-block.test.js']
+    - action: 'CR-4 (cleanup): label the Implementation Record as the first-pass record.'
+      refs: ['docs/tasks/task.236.create-task-seed-step-call/task.236.create-task-seed-step-call.md']
+    - action: 'Carried: "matches 0 files" ambiguity (cycle 2 CR-3) and the duplicated scratch helper (cycle 2 CR-5).'
+      refs: ['skills/create-task/SKILL.md', 'skills/create-task/tests/seed-block-probe.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
