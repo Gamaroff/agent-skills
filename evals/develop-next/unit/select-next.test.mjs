@@ -3792,6 +3792,10 @@ test("235: placeholders and YAML nulls never hold a row", () => {
     "null",
     "~",
     "NULL",
+    "false",
+    "False",
+    "no",
+    "NO",
     "",
   ];
   for (const v of spellings) {
@@ -3986,6 +3990,26 @@ test("235 CR-1: a ` #` inside a quoted value is text; outside quotes it starts a
   );
   // A quoted placeholder followed by a comment still reads as unset.
   assert.equal(externalBlockOf(fm('"none"  # nothing yet')), null);
+  // An escaped quote does not end the value (CR2-1): `\"` inside double quotes,
+  // `''` inside single quotes, each read back as one quote character.
+  assert.equal(
+    externalBlockOf(fm('"billing \\"v2\\" live"')),
+    'billing "v2" live',
+  );
+  assert.equal(
+    externalBlockOf(fm('"billing \\"v2\\" live"  # see ops')),
+    'billing "v2" live',
+  );
+  assert.equal(
+    externalBlockOf(fm("'billing-service''s PR merged'")),
+    "billing-service's PR merged",
+  );
+  // `\\` is one backslash in double quotes; in single quotes a backslash is literal.
+  assert.equal(
+    externalBlockOf(fm('"share \\\\ops merged"')),
+    "share \\ops merged",
+  );
+  assert.equal(externalBlockOf(fm("'C:\\ops merged'")), "C:\\ops merged");
   // Status shares the reader: a quoted status keeps reading the same.
   assert.equal(
     parseFrontmatterStatus("---\nstatus: 'accepted'  # done\n---\n"),
