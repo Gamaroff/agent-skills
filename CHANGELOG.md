@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`create-task --from-observation` seeds on the first attempt (task 236, obs #104).** § 1.1 step 3
+  described the `seedFromObservations` call in prose and left out the required `taskId`, so
+  following it exactly threw `taskId is required`; it also said "for each entry", where the
+  function takes every entry in one call. The step is now one runnable block that reads the task
+  id first and makes the single call. A new test, `skills/create-task/tests/seed-step-block.test.js`,
+  extracts that block from `SKILL.md` and runs it against a scratch log, so the step and the
+  function can no longer disagree with the suite green.
+
 - **`develop-next` reads an escaped quote and `false` / `no` correctly in frontmatter (task 235
   follow-up).** The shared frontmatter reader ended a quoted value at the first matching quote, so
   `"billing \"v2\" live"` read as `billing \` and `'billing-service''s PR merged'` as

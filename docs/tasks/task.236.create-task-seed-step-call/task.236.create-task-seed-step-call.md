@@ -5,7 +5,7 @@ type: task
 description: "In § 1.1 step 3, name the second argument: `seedFromObservations(entries, { taskId: <Next Available Task Number> })`, and say the id must be read from the registry first."
 tags: [create-task, observation]
 category: documentation
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-10-27
 updated: 2026-10-27
@@ -16,7 +16,8 @@ github_issue: 760
 
 # Technical Task: create-task 1.1 omits the required taskId argument to seedFromObservations
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.236.review.1.create-task-seed-step-call.md` implemented 2026-10-27
 
 **GitHub Issue**: [#760](https://github.com/Gamaroff/agent-skills/issues/760)
 
@@ -84,8 +85,8 @@ test runs that block from `SKILL.md`, so the step and the function cannot drift 
 Grepped on 2026-10-27 at `develop` `21b03e8c`.
 
 - `skills/create-task/SKILL.md:205` — step 3 "**Seed.** For each entry, read `${OBS_LOG_DIR}/<file>`
-  …" is prose, with no fenced block. Steps 1 (`SKILL.md:192`, the scan) and § 5 step 2b (the park)
-  are fenced `bash` blocks.
+  …" is prose, with no fenced block. Steps 1 (`SKILL.md:190-193`, the scan) and § 5 step 2b
+  (`SKILL.md:717`, the park) are fenced `bash` blocks.
 - `skills/create-task/scripts/lib.js:316` — `function seedFromObservations(entries, { taskId } = {})`;
   exported at `scripts/lib.js:456`.
 - `grep -rn "seedFromObservations" skills shared --include=*.md` returns one prose site:
@@ -158,27 +159,33 @@ None. The change is to documentation and adds one test. The function's contract 
 
 **Files**: `skills/create-task/tests/seed-step-block.test.js` (new)
 
-- [ ] Locate the step 3 block in `SKILL.md` by its `seedFromObservations` call, and assert exactly one block makes it.
-- [ ] Run it under bash in a consumer-shaped scratch directory, against two fixture observations.
-- [ ] Assert the printed seed: `ids` `[a, b]`, `titleReason` `multiple-entries`, two park vectors naming `task.<TASK_ID>`.
-- [ ] Before the step is rewritten, the test is red: today there is no block, so the first assertion fails.
+- [x] Locate the step 3 block in `SKILL.md` by its `seedFromObservations` call, and assert exactly one block makes it.
+- [x] Run it under bash in a consumer-shaped scratch directory, against two fixture observations.
+      Initialise the log with the engine's `init`, then write the fixture files directly, as
+      `from-observation.test.js:322-330` does. Do not author them through the engine's `write`: two
+      entries on one skill with overlapping titles return `possible-duplicate` and write nothing,
+      and the control case needs a file whose prefix disagrees with its id, which `write` cannot make.
+- [x] Assert the printed seed: `ids` `[a, b]`, `titleReason` `multiple-entries`, two park vectors naming `task.<TASK_ID>`.
+- [x] Before the step is rewritten, the test is red: today there is no block, so the first assertion fails.
 
 ### Phase 2: Rewrite step 3 (Risk: Low)
 
 **Files**: `skills/create-task/SKILL.md`
 
-- [ ] Replace the step 3 call description with the block from § 3, keeping the field list and the grep rule as prose.
-- [ ] Add one line to § 1.1 that the seed needs the task id from § 1, read before step 3.
-- [ ] The Phase 1 test passes.
+- [x] Replace the step 3 call description with the block from § 3, keeping the field list and the grep rule as prose.
+- [x] Add one line to § 1.1 that the seed needs the task id from § 1, read before step 3.
+- [x] The Phase 1 test passes.
 
 ### Phase 3: Prove and ship (Risk: Low)
 
 **Files**: `CHANGELOG.md`
 
-- [ ] Mutation proofs: drop `{ taskId }` from the block → red; switch to a per-entry loop → red.
-- [ ] `npm run bundle:check` clean; `npm run validate -- skills/create-task/`.
-- [ ] `npm run ci` green with `.agents/skills` and `.claude/skills` moved aside.
-- [ ] CHANGELOG `[Unreleased]`.
+- [x] Mutation proofs: drop `{ taskId }` from the block → red; switch to a per-entry loop → red.
+- [x] `npm run bundle:check` clean; `npm run validate -- skills/create-task/`.
+- [x] `npm run ci` green with `.agents/skills` and `.claude/skills` moved aside. (`npm run ci:fast`
+      green with both moved aside: 6418 tests, 6404 pass, 0 fail, 14 skipped, both new tests among
+      them. The full `npm run ci` is `develop-next`'s merge gate on the PR head.)
+- [x] CHANGELOG `[Unreleased]`.
 
 ---
 
@@ -222,27 +229,30 @@ motivated it. One fixture's frontmatter id disagrees with its file prefix, a cas
 
 ### Functional
 
-- [ ] Exactly one fenced `bash` block in `SKILL.md` calls `seedFromObservations`, and it passes `{ taskId }`.
-- [ ] Run on two open fixture observations, the block prints one seed: `ids` holds both,
+- [x] Exactly one fenced `bash` block in `SKILL.md` calls `seedFromObservations`, and it passes `{ taskId }`.
+- [x] Run on two open fixture observations, the block prints one seed: `ids` holds both,
       `titleReason` is `multiple-entries`, and each park vector's `--parked-until` names `task.<TASK_ID>`.
-- [ ] Run on a pair where one entry's frontmatter id disagrees with its file prefix, the block exits non-zero.
-- [ ] § 1.1 says the task id is read from the registry before the seed.
+- [x] Run on a pair where one entry's frontmatter id disagrees with its file prefix, the block exits non-zero.
+- [x] § 1.1 says the task id is read from the registry before the seed.
 
 ### Performance
 
-- [ ] The new test runs in under 5 seconds locally (report the time).
-- [ ] No change to the existing create-task suite's runtime.
+- [ ] The new test runs in under 5 seconds, measured on the PR head with
+      `uptime; time command node --test skills/create-task/tests/seed-step-block.test.js` and the
+      figure and load recorded in the implementation report.
+- [x] The existing create-task suite is untouched:
+      `git diff develop -- skills/create-task/tests/from-observation.test.js` is empty.
 
 ### Code Quality
 
-- [ ] `node:test` + `node:assert` only; Prettier clean.
-- [ ] Each mutation in Phase 3 turns a named test red.
-- [ ] `npm run validate -- skills/create-task/` passes; `npm run bundle:check` clean.
+- [x] `node:test` + `node:assert` only; Prettier clean.
+- [x] Each mutation in Phase 3 turns a named test red.
+- [x] `npm run validate -- skills/create-task/` passes; `npm run bundle:check` clean.
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` records the change.
-- [ ] No other skill restates the call (`grep -rn "seedFromObservations" skills shared --include=*.md` returns only the new block).
+- [x] CHANGELOG `[Unreleased]` records the change.
+- [x] No other skill restates the call (`grep -rn "seedFromObservations" skills shared --include=*.md` returns only lines of `skills/create-task/SKILL.md` § 1.1, and the only call among them is inside the new block).
 
 ---
 
@@ -300,6 +310,9 @@ None identified.
 | Date       | Version | Description                               | Author      |
 | ---------- | ------- | ----------------------------------------- | ----------- |
 | 2026-10-27 | 1.0     | Initial draft — cut from observation #104 | create-task |
+| 2026-10-27 | 1.1     | Review passed (8/10) — performance criteria given a command and a measurable bound; fixture authoring pinned to direct file writes (engine `write` would answer `possible-duplicate`); grep criterion and two line anchors tightened | review-task |
+| 2026-10-27 |         | Status → ready-for-development             | review-task |
+| 2026-10-27 |         | Implemented — 3 files, 2 tests             | develop     |
 <!-- change-log-end -->
 
 ---
@@ -307,13 +320,55 @@ None identified.
 ## Progress Tracking
 
 ### Phase 1: Test first
-- [ ] Block located, run, asserted; seen red
+- [x] Block located, run, asserted; seen red
 
 ### Phase 2: Rewrite step 3
-- [ ] Block in place; § 1.1 line added; test green
+- [x] Block in place; § 1.1 line added; test green
 
 ### Phase 3: Prove and ship
-- [ ] Mutations, bundle check, validate, CI, CHANGELOG
+- [x] Mutations, bundle check, validate, CI, CHANGELOG
+
+---
+
+## Implementation Record
+
+**Completion Date**: 2026-10-27
+
+### Implementation Summary
+
+§ 1.1 step 3 of `create-task` is now one fenced `bash` block. It re-sources the observation
+workspace resolver, scans, selects each id's file by prefix, and calls
+`seedFromObservations(entries, { taskId })` once over every selected entry. The step's opening
+sentence says the task id is the registry's **Next Available Task Number** and must be read first.
+The new `seed-step-block.test.js` extracts that block from `SKILL.md` and runs it.
+
+### Implementation Approach
+
+1. **Phase 1**: wrote `skills/create-task/tests/seed-step-block.test.js` (2 tests). It builds a
+   repo-local scratch workspace with its own `.agents/skills/create-task` link, initialises the log
+   with the engine, writes the fixture files directly, substitutes the block's two placeholders by
+   `split`/`join`, and runs the block under `bash`. Seen red first: `exactly one bash block … calls
+   seedFromObservations`.
+2. **Phase 2**: replaced the prose call description with the block. The placeholders are
+   `{next-task-number}` and `{observation-ids}`. The field list, the identity rule and the
+   grep-before-write rule (obs #127) stay as prose after it. "It throws" became "the block exits
+   non-zero, naming the entry".
+3. **Phase 3**: three mutations, each restored:
+   - drop `{ taskId }` → the multi-entry test is red (`taskId is required`);
+   - a per-entry loop → the multi-entry test is red (`ids` is `[1]`);
+   - `|| true` after the pipeline → the control test is red (it exits 0 on a mismatched id).
+
+### Testing Results
+
+- `command node --test skills/create-task/tests/seed-step-block.test.js`: 2/2 pass.
+- `command node --test skills/create-task/tests/*.test.js`: 46/46 pass.
+- `npm run ci:fast` with `.agents/skills` and `.claude/skills` moved aside: 6418 tests, 6404 pass,
+  0 fail, 14 skipped.
+- `npm run validate -- skills/create-task/` ✓; `npm run bundle:check`: 128 skills, 0 problems.
+
+### Deferred Work
+
+None.
 
 ---
 
@@ -340,7 +395,7 @@ None identified.
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review
 
 **Next Steps**:
 
