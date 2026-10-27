@@ -20,7 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. No phase is open (Phase 16 closed 2026-10-23); selection falls through to the registries.
+chain, a human gate. Phase 17 is open (opened 2026-10-27); once it closes, selection falls through to the registries.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -66,6 +66,17 @@ Read only by `--batch`. Two rows conflict when they share a tag that **either** 
 | `mutation-proving` | `shared/resources/mutation-proving.md`                                  |
 | `docs-pipeline`    | `docs/runbooks/*`, `docs/concepts/*`, `docs/reference/pipeline-artifacts.md`, `docs/operations/workflows.md`, `skills/develop-*/README.md` |
 | `pipeline-lock`    | `shared/resources/advance-pipeline-lock.sh`, `advance-pipeline-lock.test.sh`  |
+
+## PHASE 17 — observation fixes from the T169 run (opened 2026-10-27)
+
+An **override**: without it the registry fallback selects T174, which is blocked on tinker-city
+task.127 and halts at its own Phase 0. The owner asked for these two ahead of every other story and
+task. T235 goes first: it teaches the fallback to pass over a task like T174, so the loop stops
+halting on it. T236 then fixes the `create-task` seed step. The two are independent and share only
+a soft edit to `create-task/SKILL.md` (§ 1.2 and § 1.1).
+
+- [ ] **T235** select-next registry fallback passes over an external precondition · deps: none · touches: selection!, templates~ · /develop-task docs/tasks/task.235.select-next-external-precondition/task.235.select-next-external-precondition.md
+- [ ] **T236** create-task 1.1 seed step makes a runnable call · deps: none · touches: templates~ · /develop-task docs/tasks/task.236.create-task-seed-step-call/task.236.create-task-seed-step-call.md
 
 ## Deferred / human-gated
 
@@ -207,3 +218,4 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-10-22 | **Phase 16 opened** with T230 (keep foreign sections out of the change-log block, cut from observation #91), ordered ahead of the registry fallback at the owner's request; without it T217 is selected first. |
 | 2026-10-23 | **T230 accepted + merged — PR #735 merged** (`31643ca4`). `change-log.js` no longer absorbs a section written inside the change-log markers: `partitionForeign` lifts it above the start marker (if it sat before the log) or below the end marker (if after), and `upsertChangeLog`, the new `foreignSections`/`liftForeignSections` exports and a new corpus guard (`change-log-foreign-section-corpus.test.mjs`, floor 100 blocks, 120 today) all read that one partition. The Deferred Work placement rule now anchors on the marker in finalise 7.4's words, and task.166, 170, 175 and 203 had their DoD sections moved out. Four QA cycles (FAIL 60 → CONCERNS 70 → CONCERNS 70 → PASS 95); cycles 1–3 each hardened how the log's own table is chosen (heading-anchored, own section first, a sign-off table is not a log), with 16 engine mutations proven. Two lows carried to Deferred Work (route 2b); 5c APPROVE; DoD 15/15, with AC8 re-measured on the PR head (0.941 s at load 2.35); merge gate `npm run ci` green (6237 pass, 0 fail). Issue #734 closed. |
 | 2026-10-23 | **Phase 16 closed and archived** to `roadmap-history.md` (T230). No phase is open; selection falls through to the registries (next: T217). |
+| 2026-10-27 | **Phase 17 opened** with T235 (select-next external precondition, cut from observation #103), then T236 (create-task seed step, cut from observation #104), ordered ahead of the registry fallback at the owner's request; without it T174 is selected first and halts on its tinker-city blocker. |
