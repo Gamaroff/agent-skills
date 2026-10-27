@@ -241,7 +241,7 @@ could forget: 9 entries had been parked by hand, each by whichever session remem
    point: a run with several entries returns `title: null` with `titleReason: multiple-entries`,
    one References list and one Change Log description, and a per-entry loop returns none of those.
    The seed is printed as JSON. It holds `ids`, `title` (the bare name, or `null` with `titleReason`),
-   `description` (or `null` with `descriptionReason: too-short`), `tags`,
+   `description` (or `null` with `descriptionReason`: `too-short` or `list-lead-in`), `tags`,
    `references`, `changeLogDescription` and the `park` vectors. The block exits non-zero, naming the
    input, on a task number or an observation id that is not digits, on a non-`open` entry and on
    an entry whose identity is uncertain: stop and report it.
@@ -253,7 +253,8 @@ could forget: 9 entries had been parked by hand, each by whichever session remem
 4. **Ask only what is still open.** Ask for the title only when `title` is `null`: `over-bound`
    (observation titles run long, and a title is a name, obs #128) or `multiple-entries`. Ask for
    the description only when `description` is `null` (`too-short`: an Improvement whose first
-   sentence is a fragment, obs #291). Also ask the
+   sentence is a fragment, obs #291; `list-lead-in`: an Improvement that opens "Choose one:" and
+   lists options, so which one the task takes is the author's call, obs #109). Also ask the
    tracker-sync question at 4.5, which stays opt-in. Take the rest as defaults and **report** each one
    in the completion message: priority `Medium`, the template's category, and effort from the rubric
    (§ 4.4). § 3.5 still runs in full. Its Critical items are about the document, not the author, and a
