@@ -5,7 +5,7 @@ type: task
 description: "When the 5c /review-pr returns APPROVE, apply its doc-only findings through the same classify-and-stage carry that CONCERNS already uses, so a documentation defect the pipeline found and judged safe to fix is not left for /finalise, which can only halt on it."
 tags: [develop-task, develop-story, qa-loop, review-pr, finalise, observation]
 category: refactoring
-status: ready-for-development
+status: ready-for-review
 priority: Medium
 created: 2026-10-27
 updated: 2026-10-27
@@ -16,7 +16,7 @@ github_issue: 765
 
 # Technical Task: Apply 5c doc-only findings on APPROVE
 
-**Status:** Ready for Development
+**Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.237.review.1.carry-doc-only-findings-on-approve.md` implemented 2026-10-27
 **GitHub Issue**: [#765](https://github.com/Gamaroff/agent-skills/issues/765)
 
@@ -139,20 +139,20 @@ None — API stable. The visible change is behavioural and additive. On an `APPR
 
 **Files:** `shared/resources/develop-pipeline-step-5-6-qa-loop.md`
 
-- [ ] `APPROVE` verdict row: add the doc-only carry clause the `CONCERNS` row has
-- [ ] Carry prose: "Classify on `CONCERNS`" → "Classify on `APPROVE` or `CONCERNS`"
-- [ ] The `CARRY_FIXED` sentence: keyed on what the classify block cleared, not on the verdict
-- [ ] One sentence stating why: an APPROVE carries low findings (`/review-pr` verdict table), and a doc-only one is the cheapest to fix here and the costliest to leave for `/finalise` (observation #109)
+- [x] `APPROVE` verdict row: add the doc-only carry clause the `CONCERNS` row has
+- [x] Carry prose: "Classify on `CONCERNS`" → "Classify on `APPROVE` or `CONCERNS`"
+- [x] The `CARRY_FIXED` sentence: keyed on what the classify block cleared, not on the verdict
+- [x] One sentence stating why: an APPROVE carries low findings (`/review-pr` verdict table), and a doc-only one is the cheapest to fix here and the costliest to leave for `/finalise` (observation #109)
 
 ### Phase 2: The restatements (Risk: Low)
 
 **Files:** `shared/resources/develop-pipeline-step-7-finalise.md`, `skills/finalise/SKILL.md`, `skills/develop-task/SKILL.md`, `skills/develop-story/SKILL.md`, `skills/review-pr/SKILL.md`
 
-- [ ] Re-run the § 3 population greps; edit every hit, and name any new one in the implementation report
-- [ ] Re-run the removed-literal test search (below); list every hit as a test to update. At review (2026-10-27) it found no test that pins a removed literal: the only hit, `pr-review-loop-parity.test.mjs:769`, is an assertion message over the QA loop doc's `**Do not block.**`
-- [ ] "doc-only `CONCERNS` fixes" → "doc-only fixes" at each site
-- [ ] The develop and review-pr SKILL.md summaries: APPROVE and CONCERNS both exit to Step 7, and doc-only findings are fixed when the carry clears them
-- [ ] `npm run bundle`, then `npm run bundle:check`
+- [x] Re-run the § 3 population greps; edit every hit, and name any new one in the implementation report
+- [x] Re-run the removed-literal test search (below); list every hit as a test to update. At review (2026-10-27) it found no test that pins a removed literal: the only hit, `pr-review-loop-parity.test.mjs:769`, is an assertion message over the QA loop doc's `**Do not block.**`
+- [x] "doc-only `CONCERNS` fixes" → "doc-only fixes" at each site
+- [x] The develop and review-pr SKILL.md summaries: APPROVE and CONCERNS both exit to Step 7, and doc-only findings are fixed when the carry clears them
+- [x] `npm run bundle`, then `npm run bundle:check`
 
 Removed-literal search:
 
@@ -165,9 +165,9 @@ git grep -n -e 'Classify on' -e 'CARRY_FIXED. empty' -e 'doc-only CONCERNS' -e '
 
 **Files:** `evals/shared/tests/pr-review-loop-parity.test.mjs`, `CHANGELOG.md`
 
-- [ ] Parity assertions: both rows' action cells carry the doc-only clause; the Carry section says "Classify on `APPROVE` or `CONCERNS`"; no Carry-section sentence pairs `APPROVE` with an empty `CARRY_FIXED`
-- [ ] Mutation-prove each, one at a time: delete the clause from the `APPROVE` row → red; restore "Classify on `CONCERNS`" → red; restore "On `APPROVE`, or a `CONCERNS` with nothing doc-only, leave `CARRY_FIXED` empty" → red; restore all → green
-- [ ] `CHANGELOG.md` `[Unreleased]` entry citing `(task 237)`
+- [x] Parity assertions: both rows' action cells carry the doc-only clause; the Carry section says "Classify on `APPROVE` or `CONCERNS`"; no Carry-section sentence pairs `APPROVE` with an empty `CARRY_FIXED`
+- [x] Mutation-prove each, one at a time: delete the clause from the `APPROVE` row → red; restore "Classify on `CONCERNS`" → red; restore "On `APPROVE`, or a `CONCERNS` with nothing doc-only, leave `CARRY_FIXED` empty" → red; restore all → green
+- [x] `CHANGELOG.md` `[Unreleased]` entry citing `(task 237)`
 
 ---
 
@@ -233,26 +233,26 @@ Not applicable. This is a prose and test change with no runtime path.
 
 ### Functional
 
-- [ ] The `APPROVE` verdict row's action cell in `develop-pipeline-step-5-6-qa-loop.md` carries the doc-only carry clause, and the `CONCERNS` row still does (test: `pr-review-loop-parity.test.mjs`, the new parity case)
-- [ ] The carry prose names no verdict where it decides whether to fix: "Classify on `APPROVE` or `CONCERNS`", and `CARRY_FIXED` keyed on what the classify block cleared (test: `pr-review-loop-parity.test.mjs`, the carry-prose case)
-- [ ] Every site in § 3's restatement table, re-measured by its grep, no longer states a CONCERNS-only fix rule
-- [ ] Code findings and path-less findings are still recorded and not fixed on `APPROVE` (the § *Carry* prose says so, unchanged)
+- [x] The `APPROVE` verdict row's action cell in `develop-pipeline-step-5-6-qa-loop.md` carries the doc-only carry clause, and the `CONCERNS` row still does (test: `pr-review-loop-parity.test.mjs`, the new parity case)
+- [x] The carry prose names no verdict where it decides whether to fix: "Classify on `APPROVE` or `CONCERNS`", and `CARRY_FIXED` keyed on what the classify block cleared (test: `pr-review-loop-parity.test.mjs`, the carry-prose case)
+- [x] Every site in § 3's restatement table, re-measured by its grep, no longer states a CONCERNS-only fix rule
+- [x] Code findings and path-less findings are still recorded and not fixed on `APPROVE` (the § *Carry* prose says so, unchanged)
 
 ### Performance
 
-- [ ] No new pipeline step and no new commit. The doc fix rides the existing 6a acceptance commit (held by `acceptance-commit-carries-5c.test.mjs`: the stage block HALTs if `HEAD` moves)
-- [ ] `acceptance-commit-carries-5c.test.mjs` passes unchanged (the blocks were not touched)
+- [x] No new pipeline step and no new commit. The doc fix rides the existing 6a acceptance commit (held by `acceptance-commit-carries-5c.test.mjs`: the stage block HALTs if `HEAD` moves)
+- [x] `acceptance-commit-carries-5c.test.mjs` passes unchanged (the blocks were not touched)
 
 ### Code Quality
 
-- [ ] Each new parity assertion is mutation-proved: removing the `APPROVE` row's clause, restoring "Classify on `CONCERNS`", and restoring the `APPROVE`-keyed `CARRY_FIXED` sentence each turn it red
-- [ ] `npm run bundle:check` clean; `npm run validate -- skills/develop-task/ skills/develop-story/ skills/finalise/ skills/review-pr/` clean
-- [ ] `npm run ci:fast` green, and `npm run ci` green before merge
+- [x] Each new parity assertion is mutation-proved: removing the `APPROVE` row's clause, restoring "Classify on `CONCERNS`", and restoring the `APPROVE`-keyed `CARRY_FIXED` sentence each turn it red
+- [x] `npm run bundle:check` clean; `npm run validate -- skills/develop-task/ skills/develop-story/ skills/finalise/ skills/review-pr/` clean
+- [ ] `npm run ci:fast` green, and `npm run ci` green before merge (ci:fast green at Step 3; `npm run ci` runs on the PR before merge)
 
 ### Migration
 
-- [ ] `CHANGELOG.md` `[Unreleased]` entry cites `(task 237)`
-- [ ] No consumer action beyond `setup-consumer.sh --update`
+- [x] `CHANGELOG.md` `[Unreleased]` entry cites `(task 237)`
+- [x] No consumer action beyond `setup-consumer.sh --update`
 
 ---
 
@@ -311,6 +311,7 @@ None identified.
 | 2026-10-27 | 1.0 | Initial draft — cut from observation #109 | create-task |
 | 2026-10-27 | 1.1 | Review passed (8/10) — guard extended to the carry prose (:1496, :1602); review-pr SKILL.md:1072 added as a restatement site; removed-literal test search recorded | review-task |
 | 2026-10-27 |  | Status → ready-for-development | review-task |
+| 2026-10-27 |  | Implemented — 6 source files (+ 9 bundled copies), 2 parity tests, 3 mutations | develop |
 <!-- change-log-end -->
 
 ---
@@ -319,19 +320,70 @@ None identified.
 
 ### Phase 1: The rule
 
-- [ ] APPROVE row
-- [ ] Carry prose
+- [x] APPROVE row
+- [x] Carry prose
 
 ### Phase 2: The restatements
 
-- [ ] Restatements: step-7-finalise, finalise, develop-task, develop-story, review-pr
-- [ ] Removed-literal test search
-- [ ] Bundle
+- [x] Restatements: step-7-finalise, finalise, develop-task, develop-story, review-pr
+- [x] Removed-literal test search
+- [x] Bundle
 
 ### Phase 3: Guard and record
 
-- [ ] Parity tests (rows + carry prose), each mutation-proved
-- [ ] CHANGELOG
+- [x] Parity tests (rows + carry prose), each mutation-proved
+- [x] CHANGELOG
+
+---
+
+## Implementation Record
+
+**Completion Date**: 2026-10-27
+
+### Implementation Summary
+
+Step 5c's `APPROVE` row now carries the same clause as `CONCERNS`: "(below; doc-only findings may be
+fixed there)". The Carry section classifies on `APPROVE` or `CONCERNS`, and gives the reason in one
+sentence. The `CARRY_FIXED` sentence is now keyed on what the classify block cleared, not on the
+verdict. The classify and stage blocks are byte-identical. Five restatements now say "doc-only fixes"
+with no verdict. Two parity tests pin both rows and both carry-prose sentences.
+
+### Implementation Approach
+
+1. **Phase 1**: `shared/resources/develop-pipeline-step-5-6-qa-loop.md`. The APPROVE row (`:1464`),
+   "Classify on `APPROVE` or `CONCERNS`" plus the rationale (`:1496`–`:1500`), and the `CARRY_FIXED`
+   sentence (`:1606`–`:1607`).
+2. **Phase 2**: the population greps were re-run before and after editing. They found exactly the
+   six sites in § 3, and none of them states the old rule after the edit. Edited files:
+   `develop-pipeline-step-7-finalise.md:147`, `skills/finalise/SKILL.md:1491`,
+   `skills/develop-task/SKILL.md:239`, `skills/develop-story/SKILL.md:252` and
+   `skills/review-pr/SKILL.md:1072`. The removed-literal test search hit only
+   `pr-review-loop-parity.test.mjs:769`, an assertion message over `**Do not block.**`, which is
+   unaffected, and an unrelated comment in `ci-gate-parity.test.mjs:320`. Mentions of "doc-only
+   fixes staged" that name no verdict (resume contract, pause doc, finalise `:2856`/`:2893`/`:2897`)
+   were left alone. `npm run bundle` regenerated 9 copies.
+3. **Phase 3**: two tests were added to `evals/shared/tests/pr-review-loop-parity.test.mjs`. The
+   negative pattern is `leave\s+`CARRY_FIXED`\s+empty`, so a reverted sentence re-wrapped
+   between "leave" and `CARRY_FIXED` still trips it. Three mutations were each run alone and restored:
+   - APPROVE clause deleted → red at "APPROVE and CONCERNS both carry doc-only findings…";
+   - "Classify on `CONCERNS`" restored → red at "the carry prose names no verdict…";
+   - "On `APPROVE`, or a `CONCERNS` with nothing doc-only, leave `CARRY_FIXED` empty" restored → red
+     at the same test (only its `doesNotMatch` can fail with the other two lines intact);
+   - all restored (`cmp` identical) → green.
+
+### Testing Results
+
+- `pr-review-loop-parity.test.mjs`: 33/33 pass.
+- `acceptance-commit-carries-5c.test.mjs`: 24/24 pass, unchanged.
+- `npm run ci:fast`, with `.agents/skills` and `.claude/skills` moved aside: 6433 tests, 6419 pass,
+  0 fail, 14 skipped.
+- `quick_validate.py` passes on develop-task, develop-story, finalise and review-pr.
+  `npm run bundle:check`: 128 skills, 0 problems.
+
+### Deferred Work
+
+None. Observation #109's option 2 (a finalise docs `severity`, and an 8a proof for doc paths) is out
+of scope by decision.
 
 ---
 

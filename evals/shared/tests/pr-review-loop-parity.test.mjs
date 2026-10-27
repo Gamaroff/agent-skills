@@ -770,6 +770,41 @@ test("APPROVE and CONCERNS exit the loop, and CONCERNS does not block", () => {
   );
 });
 
+// Task 237: the doc-only carry is invoked by BOTH exiting verdicts. The rule lives in three places —
+// the two rows, the "Classify on …" sentence and the CARRY_FIXED sentence — and the last is the one
+// task.179's run obeyed when it left an APPROVE's doc-only finding for /finalise to halt on. Pinning
+// the rows alone would leave that sentence free to revert.
+test("APPROVE and CONCERNS both carry doc-only findings into the acceptance commit (task.237)", () => {
+  for (const v of ["APPROVE", "CONCERNS"]) {
+    assert.match(
+      verdictRow(v),
+      /doc-only findings may be fixed there/,
+      `the ${v} row must carry the doc-only clause — an APPROVE carries low findings, and a doc-only one left unfixed halts /finalise (observation #109)`,
+    );
+  }
+});
+
+test("the carry prose names no verdict where it decides whether to fix (task.237)", () => {
+  const s5c = section5c();
+  const start = s5c.indexOf("#### Carry the review into the acceptance commit");
+  assert.ok(
+    start > -1,
+    "the Carry section heading moved — acceptance-commit-carries-5c.test.mjs locates its blocks by it",
+  );
+  const end = s5c.indexOf("\n#### ", start + 1);
+  const carry = s5c.slice(start, end < 0 ? undefined : end);
+  assert.match(
+    carry,
+    /Classify on `APPROVE` or `CONCERNS`/,
+    "the Carry section must classify on APPROVE as well as CONCERNS",
+  );
+  assert.doesNotMatch(
+    carry,
+    /`APPROVE`[^.]*leave\s+`CARRY_FIXED`\s+empty/,
+    "no Carry-section sentence may key an empty CARRY_FIXED on APPROVE — that sentence is what left task.179's doc-only finding unfixed",
+  );
+});
+
 test("the 5-cycle bound covers 5c rather than being extended by it", () => {
   const s5c = section5c();
   assert.match(
