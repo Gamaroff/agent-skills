@@ -1059,6 +1059,11 @@ export function makeRegistryLoader(paths, readFile) {
  * deliberately minimal reading as `parseFrontmatterStatus`: trailing comment
  * and surrounding quotes stripped, case preserved. Null when absent.
  *
+ * A quoted value ends at its closing quote, so a ` #` inside it is text, not a
+ * comment — `blocked_on_external: "billing-service PR #982 merged"` is one
+ * condition, not `billing-service PR` (task.235 CR-1). Outside quotes ` #` starts a
+ * comment, as YAML has it. An unbalanced quote falls through to the plain rule.
+ *
  * @param {string} text
  * @param {string} key
  * @returns {string|null}
@@ -1071,6 +1076,11 @@ function frontmatterScalar(text, key) {
   const line = m[1].split(/\r?\n/).find((l) => keyRe.test(l));
   if (!line) return null;
   let v = line.replace(keyRe, "").trim();
+  const quote = v[0];
+  if (quote === '"' || quote === "'") {
+    const end = v.indexOf(quote, 1);
+    if (end > 0) return v.slice(1, end).trim() || null;
+  }
   v = v.replace(/\s+#.*$/, "").trim(); // strip a trailing comment
   v = v.replace(/^['"]|['"]$/g, "").trim();
   return v || null;

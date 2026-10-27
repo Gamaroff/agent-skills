@@ -103,12 +103,13 @@ A registry is an index, and indexes drift from what they index. Three rows of th
 A blocker in **another repository** cannot be written in the `Depends on` cell — `task.127` there binds to this registry's own task.127 — so it is written as free text after ` — `, which the selector does not read. The document's frontmatter carries it instead (task.235):
 
 ```yaml
-blocked_on_external: "tinker-city task.127 (#982) merged and run on a real PR"
+blocked_on_external: "billing-service task.127 (#982) merged and run on a real PR"
 ```
 
 A document with a non-empty value is **held**: passed over with `eligible: false`, `externalBlock: <value>` and the reason `blocked on an external precondition: <value> — clear blocked_on_external in <path> when it is met`. It is never selected while the field is set.
 
 - **Placeholders never hold.** `—`, `-`, `none`, `n/a`, `tbd` (the `Depends on` cell's empty spellings), an empty value and the YAML nulls `null` and `~` all read as not blocked — this repository writes an unset key as `null`.
+- **Quote the value.** Inside quotes a ` #` is part of the condition (`"billing-service PR #982 merged"`); unquoted, ` #` starts a YAML comment and the condition ends before it.
 - **Check order.** After the eligibility floor, so an `accepted` or `cancelled` document still reports its status, the nearer cause. Before the dependency check, because no in-repo action can clear it.
 - **Named on every run that evaluates it.** The selected rationale counts rejections by cause (document status, dependencies, external precondition) and names each held row with its condition; the `roadmap-complete` detail names each held path. Selection short-circuits, so a held row ranked **below** the selection is not read and not named — it could not have been selected on that run. `--lint` names every held row.
 - **A human clears it.** The selector does not check the other repository: there is no network in a deterministic selector. When the condition is met, delete the field.

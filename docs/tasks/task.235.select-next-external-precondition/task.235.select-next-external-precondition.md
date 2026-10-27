@@ -475,6 +475,32 @@ carries the field. `npm run bundle`: no copy changed.
 direct invocation (Notes § Future Improvements). Not in scope.
 
 ---
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-27
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [task.235.qa.1.select-next-external-precondition.md](./task.235.qa.1.select-next-external-precondition.md)
+- **Gate File**: [task.235.gate.1.select-next-external-precondition.yml](./task.235.gate.1.select-next-external-precondition.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 185
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+No critical issues. One open LOW (TASK-235-CR-1): a quoted `blocked_on_external:` value containing
+` #` is truncated by the comment rule. Wall time 102.7% of develop; the boundary probe engages
+(16 executed, 0 escaped).
 <!-- change-log-start -->
 ## Change Log
 
@@ -484,6 +510,8 @@ direct invocation (Notes § Future Improvements). Not in scope.
 | 2026-10-26 | 1.0     | Initial draft — cut from observation #103 | create-task |
 | 2026-10-27 | 1.1     | Review passed (8/10) after fixes — YAML nulls `null`/`~` no longer hold a row; tree evidence moved to `--lint` (fallback not reached on today's tree); read-once criterion held by an exported `makeRegistryLoader` test; wall-time bound stated; "every held row" scoped to evaluated rows | review-task |
 | 2026-10-27 |  | Implemented — 10 files, 9 tests | develop |
+| 2026-10-27 |  | QA gate PASS (100/100) — 1 finding | qa-task |
+| 2026-10-27 |  | QA findings fixed — cycle 1, 1 finding (CR-1 quoted ` #`) | qa-fix |
 <!-- change-log-end -->
 
 ---

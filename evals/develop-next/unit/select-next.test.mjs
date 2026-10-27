@@ -3959,3 +3959,36 @@ test("235: a loader without readExternalBlock selects exactly as before", () => 
   assert.equal(f.selected.id, "T55");
   assert.ok(f.passedOver.every((p) => p.externalBlock === undefined));
 });
+
+test("235 CR-1: a ` #` inside a quoted value is text; outside quotes it starts a comment", () => {
+  const fm = (v) => `---\nstatus: planned\nblocked_on_external: ${v}\n---\n`;
+  // Same condition: quoted, with and without a trailing comment, in either quote style.
+  assert.equal(
+    externalBlockOf(fm('"billing-service PR #982 merged"')),
+    "billing-service PR #982 merged",
+  );
+  assert.equal(
+    externalBlockOf(fm("'billing-service PR #982 merged'")),
+    "billing-service PR #982 merged",
+  );
+  assert.equal(
+    externalBlockOf(fm('"billing-service PR #982 merged"  # see the task')),
+    "billing-service PR #982 merged",
+  );
+  // Different condition: a plain scalar's ` #` is a YAML comment, as before.
+  assert.equal(
+    externalBlockOf(fm("billing-service PR #982 merged")),
+    "billing-service PR",
+  );
+  assert.equal(
+    externalBlockOf(fm("billing v2 live  # owner: ops")),
+    "billing v2 live",
+  );
+  // A quoted placeholder followed by a comment still reads as unset.
+  assert.equal(externalBlockOf(fm('"none"  # nothing yet')), null);
+  // Status shares the reader: a quoted status keeps reading the same.
+  assert.equal(
+    parseFrontmatterStatus("---\nstatus: 'accepted'  # done\n---\n"),
+    "accepted",
+  );
+});
