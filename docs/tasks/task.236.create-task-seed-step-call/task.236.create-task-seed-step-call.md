@@ -316,8 +316,8 @@ None identified.
 **Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.236.qa.3.create-task-seed-step-call.md](./task.236.qa.3.create-task-seed-step-call.md)
-- **Gate File**: [task.236.gate.3.create-task-seed-step-call.yml](./task.236.gate.3.create-task-seed-step-call.yml)
+- **Full Report**: [task.236.qa.4.create-task-seed-step-call.md](./task.236.qa.4.create-task-seed-step-call.md)
+- **Gate File**: [task.236.gate.4.create-task-seed-step-call.yml](./task.236.gate.4.create-task-seed-step-call.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 50
@@ -326,7 +326,7 @@ None identified.
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-No open finding above low after three cycles. The seed block single-quotes its substituted values. The shipped-file probe runs 18 cases: 0 reproduced, 0 escaped. Future work: 19 double-quoted placeholder sites in other skills (pre-existing), and a thin performance margin (4.3 s against 5 s).
+Cycle 4 closes the finalise DoD gap. The probe count is now asserted per shell, and is mutation-proven against a two-shell run (the CI failure, `36 !== 18`, reproduced locally). The scoped review found nothing new. Future work: the thin performance margin (4.5 s against 5 s locally; about 12 s for the probe test under two shells in CI).
 
 ## Definition of Done - Gaps Identified
 
@@ -355,7 +355,6 @@ No open finding above low after three cycles. The seed block single-quotes its s
 **QA Gate Reference**: See `task.236.gate.3.create-task-seed-step-call.yml` for full details
 
 **Detailed Verification Log:** See `task.236.dod.1.create-task-seed-step-call.md` for complete verification evidence and timestamps.
-
 <!-- change-log-start -->
 ## Change Log
 
@@ -371,6 +370,7 @@ No open finding above low after three cycles. The seed block single-quotes its s
 | 2026-10-27 |         | QA findings fixed — cycle 2, 1 finding     | qa-fix      |
 | 2026-10-27 |         | QA gate PASS (100/100) — 0 findings        | qa-task     |
 | 2026-10-27 |  | DoD incomplete — 1 gap identified (CI test red) | finalise |
+| 2026-10-27 |  | QA gate PASS (100/100) — 0 findings | qa-task |
 <!-- change-log-end -->
 
 ---
