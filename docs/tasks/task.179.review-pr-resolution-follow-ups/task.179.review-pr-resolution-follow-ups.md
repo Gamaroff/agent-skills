@@ -382,18 +382,42 @@ None.
 ### Key Findings
 No critical issues identified. One advisory low-severity finding: `JIRA_URL=#bare` reads as unset, but a shell reads it as `#bare` (gate `recommendations.future`).
 
-<!-- change-log-start -->
+## Definition of Done - Gaps Identified
 
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.179.qa.1.review-pr-resolution-follow-ups.md`
+**Gate File**: `task.179.gate.1.review-pr-resolution-follow-ups.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+### Missing Criteria:
+
+1. **Documentation:**
+   - [ ] `CHANGELOG.md:17` says "two stale test comments and a test title were corrected"; the diff, §4 Scope and the Implementation Summary show three stale comments.
+
+### Next Steps:
+
+- [ ] Change "two" to "three" on `CHANGELOG.md:17`, commit and push, then re-run `/finalise` (document-only — no QA re-entry)
+
+**Estimated Effort:** Small (one word)
+
+**Gap Report Generated:** 2026-10-27
+
+**Detailed Verification Log:** See `task.179.dod.1.review-pr-resolution-follow-ups.md` for complete verification evidence and timestamps.
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                              | Author      |
-| ---------- | ------- | -------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-03 | 1.0     | Initial draft — task.177 follow-ups CR-1, CR-2, CR3-1 to CR3-4 | create-task |
 | 2026-10-27 | 1.1     | Review passed (9/10) — Breaking Changes names the `x@github.com` branch → PR change and its differential cases; §0a intro names all five callers (task.178 merged); host_of criterion names its test; anchors re-measured; zsh-in-CI note; lint:secrets | review-task |
 | 2026-10-27 |         | Status → ready-for-development                           | review-task |
 | 2026-10-27 |         | Implemented — 13 files (4 authored, 6 bundled copies, CHANGELOG, task docs), 7 tests | develop |
 | 2026-10-27 |         | QA gate PASS (100/100) — 0 blocking, 1 advisory finding | qa-task |
-
+| 2026-10-27 |  | DoD incomplete — 1 gap identified (CHANGELOG count) | finalise |
 <!-- change-log-end -->
 
 ---
