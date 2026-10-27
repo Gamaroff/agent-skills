@@ -3,7 +3,7 @@
 **Task**: `task.236.create-task-seed-step-call.md`
 **Run Number**: 1
 **Started**: 2026-10-27 06:02
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -37,8 +37,8 @@ Replace the prose call description in `create-task` § 1.1 step 3 with one runna
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; 3/3 phases; 2 new tests; ci:fast 6404/0 fail (symlinks aside) | —                    | 2026-10-27T06:08Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #763: https://github.com/Gamaroff/agent-skills/pull/763 | —                    | 2026-10-27T06:10Z |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.236.qa.{N}.*.md`; `task.236.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 3 cycles; gate.3 PASS 100; 5c APPROVE (`task.236.pr-review.1.*`) | —                    | 2026-10-27T07:02Z |
-| 7. finalise                | ❌ Failed  | `task.236.dod.{N}.*.md`; task `status: accepted`                       | DoD gaps: CI `test` red on PR head (`seed-step-block.test.js:355`, 36 !== 18 under bash + zsh); `task.236.dod.1.*`; status unchanged | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 7. finalise                | ✅ Done    | `task.236.dod.{N}.*.md`; task `status: accepted`                       | Run 1 gaps (CI `test` red, 36 !== 18; `task.236.dod.1.*`). Fixed by `1689d7cb`, QA cycle 4. Run 2 ACCEPTED: `task.236.dod.2.*`, acceptance commit `d3a9f952` | —                    | 2026-10-27T07:45Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Implementation report committed and pushed | —                    | 2026-10-27T07:46Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -105,6 +105,20 @@ Replace the prose call description in `create-task` § 1.1 step 3 with one runna
 - `/finalise` ran: DoD `task.236.dod.1.create-task-seed-step-call.md`. AC 11/11 (AC5 re-measured on `f525123a`: 4.207 s / 4.554 s at load 2.49), security PASS (probe plan from the shipped harness: 18 executed, 0 reproduced, 0 escaped, bash only; record `task.236.dod.1.security.run.json`), compliance N/A, docs PASS.
 - CI reading 1: FAILURE @ `f525123ac3dd` — `test` red (run 40463965574); every other check SUCCESS. Decision: NOT ACCEPTED, 1 gap. Step 8a not applicable (its CI exception is the docs link checker only). Gaps PR comment issuecomment-6435921402; Change Log gaps row written; lock held at 7 by the advance helper.
 - The 4 DoD agents were dispatched with the prompt file path and substitutions rather than the template pasted inline.
+- HALT commit `9b4074e1` pushed. The HALT rule's snapshot-and-remove-lock step was missed at the HALT and run late, at the start of the resume: `last-halt.json` has `halt_step` 7 and `halt_reason` dod-gaps.
+
+### Resume — finalise gap closed by a code change (2026-10-27)
+
+- Operator approved the fix. `1689d7cb fix(task.236): count probe runs per shell, not per case` asserts `executed === caseCount * shells.length` plus `shells` includes `bash`. Mutation proof: a stand-in `zsh` on PATH (it execs bash) makes the engine run two shells. The reverted assertion fails with `36 !== 18`, the CI failure reproduced locally. The fixed assertion passes with one shell and with two. The whole file is 6/6 in 4.80 s.
+- `reenter-qa-after-finalise.sh` accepted (1 code commit since gate head `7cb55772`) and re-entered at step 5, `qa_phase` 5a, `qa_max_cycles` 5 (base 3).
+
+### Step 7 — finalise, run 2 (2026-10-27)
+
+- `/finalise` re-ran after QA cycle 4: DoD `task.236.dod.2.create-task-seed-step-call.md`, **ACCEPTED**. AC 11/11 (AC5 measured on `1689d7cb` at 4.504 s, load 5.15; the commits since are docs-only). Security PASS: probe plan from the shipped harness, 18 executed, 0 reproduced, 0 escaped, 0 refusals, bash only; record `task.236.dod.2.security.run.json`. Cases file under `.claude/state/` (the DoD 1 deviation, repeated). Compliance N/A, docs PASS. The Tests & PR column was satisfied by the 5c report `task.236.pr-review.2` (APPROVE), because `reviewDecision` is null on this single-maintainer repo.
+- CI reading 1: SUCCESS @ `c00b86fc21af` over 6 checks. CI reading 2: SUCCESS (tree-equivalent to `c00b86fc21af`) @ `d3a9f9525352` over 6 checks after 30 s. The acceptance commit is docs-only, so the docs-only rule settled the reading while that head's own `test` was still running.
+- Acceptance commit `d3a9f952` carried the task document, DoD 2 and its probe record, the sprint review, the ticked registry row (`planned` → `accepted`) and the 5c carry (`task.236.pr-review.2`). Pushed; 6b assertions passed; 6d found `(task 236)` under `[Unreleased]`.
+- The run-1 gap section in the task body is retitled historical/superseded, and its CI item and re-run step are ticked. The DoD PASSED section sits before the change-log block. Change Log row `1.2 DoD passed — accepted (PR #763)`.
+- Side-effects after the boundary: canonical PR comment issuecomment-6436482871; tracker `done` comment posted; issue #760 closed (state CLOSED); board `done` → `already` (Done). The Document link was already on `develop`. Lock 7 → 8 by `advance-pipeline-lock.sh --skill finalise`.
 
 ---
 
@@ -168,14 +182,29 @@ _Track each QA review/fix cycle._
 - 5c: `/review-pr --effort medium --comment --no-code` → APPROVE, report `task.236.pr-review.1.create-task-seed-step-call.md`. Conformance lens 63419 ms; 2 low findings, both doc-only and fixed in the carry: PC-1 (Implementation Record test counts, now first-pass and PR-head) and PC-2 (`seed-block-probe.js` added to § 4 In Scope and § 7 Files Summary). Anchors 2/2 verified. PR comment issuecomment-6435781418. `ready-for-merge` signalled.
 - Scoped to files changed since gate 2 (head 68048996b01c; 9 files). Reviewer 06:48:33Z, 129243 ms; anchors 4/4 ok. Shipped-file probe 18 executed, 0 reproduced, 0 escaped. Mutation spot-check (OBS_IDS double-quoted) covered. `classifyLoopRoute` → `continue` (no-open-residue: route 1's clean gate). PR comment issuecomment-6435725234; tracker `qa-gate-3` posted.
 
+### QA Cycle 4 — 2026-10-27
+**Gate Result**: PASS (100/100)
+**Issues Found**: none open. This cycle re-entered after the finalise DoD gap. Its fix (`1689d7cb`) counts probe runs per shell. Advisory: the performance margin (4.5 s against 5 s locally; ~12 s under two shells in CI), carried CR-1/CR-2/CR-3, and observation #107.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+**Carried to 6a**: docs/tasks/task.236.create-task-seed-step-call/task.236.pr-review.2.create-task-seed-step-call.md docs/tasks/task.236.create-task-seed-step-call/task.236.create-task-seed-step-call.md
+- 5c: `/review-pr 763 --effort medium --comment --no-code` → APPROVE, report `task.236.pr-review.2.create-task-seed-step-call.md` (`reviewed_gate` gate.4). Conformance lens 75804 ms. 4 low findings, all doc-only on the task document, all fixed in the carry: PC-1 qualifies the 5 s bound as single-shell; PC-2 adds a post-gap Implementation Record entry; PC-3 marks the gap's fix steps done; PC-4 adds a Change Log row for `1689d7cb`. Anchors 4/4 ok against `c00b86fc`. The marker comment was updated in place (issuecomment-6435781418). `ready-for-merge` → `stage-disabled`. Lock 5 → 7.
+- Deviation: the four doc edits were made before the classify block ran. To classify on a clean tree, the edited copy was set aside, the document restored to `HEAD` (clean, verified), the classifier run (all 4 doc-only, path cleared), and the edits put back. The classify script also skips appending a path that is already listed.
+- Scoped to files changed since gate 3 (head 7cb55772f522; 11 files, 1 of them code). Reviewer dispatched 07:24:15Z, 52756 ms, 0 findings. Mutation proofs: the reverted assertion under a stand-in zsh → red `36 !== 18` (covered); the fixed assertion passes under one shell and two (covered). Shipped-file probe: 18 executed, 0 reproduced, 0 escaped; record `task.236.qa.4.security.run.json`. ci:fast with symlinks aside: 6422 tests, 0 fail. CI on `1689d7cb` at gate time: `test` pending, other checks pass. Commit `c00b86fc`. PR comment issuecomment-6436249615; tracker `qa-gate-4` posted. `classifyLoopRoute` → `continue` (no-open-residue).
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-10-27T07:46Z
+**Final Status**: Completed
 **Branch**: feature/task.236.create-task-seed-step-call
 **PR**: https://github.com/Gamaroff/agent-skills/pull/763
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 4
+**DoD Summary**: `task.236.dod.2.create-task-seed-step-call.md` (ACCEPTED); run 1 `task.236.dod.1.create-task-seed-step-call.md` (gaps, superseded)
+**Tracker debt**: none
+
+**Completion Summary**: `create-task` § 1.1 step 3 is now one runnable block. It reads the task id from the registry, single-quotes and validates both values, and calls `seedFromObservations(entries, { taskId })` once. `seed-step-block.test.js` executes that block from `SKILL.md`, and `seed-block-probe.js` builds the fence probe that QA and finalise both run. The work took four QA cycles. Cycles 1 and 2 fixed four findings: a worktree-unsafe test, an unvalidated task number, a block the probe could not reach, and double-quoted substitutions. The first `/finalise` stopped on a red CI lane that QA had not read: CI has zsh, and the probe count test assumed one shell. That fix (`1689d7cb`) re-entered QA as cycle 4, and the second `/finalise` accepted. Observation #107 records the CI-read gap in qa-task.
