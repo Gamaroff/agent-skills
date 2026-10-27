@@ -81,18 +81,19 @@ reading → the two bypass cases go red.
 - Test: the Step 0b block in a consumer repo with `.env` `JIRA_URL= # prod` and target
   `https://acme.atlassian.net/browse/RAPP-702` → stdout matches
   `/JIRA_URL is not set .* not checked/`, never `/differs/`.
-- Test comments `review-pr.test.js:880`, `:886`, `:891-892` → the known-host rule. Rename the test at
-  `:2242` to "the present branch prints an empty DOC_FILE and ignores an inherited one" (or chain
+- Test comments `review-pr.test.js:935`, `:941`, `:946-947` → the known-host rule. Rename the test at
+  `:2305` to "the present branch prints an empty DOC_FILE and ignores an inherited one" (or chain
   `lookupBlock()` after the guard in a docs fixture, if the handover is worth an executed test).
 
 ## Phase 3: §0a contract, bundle, CHANGELOG
 
 In `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` § Key → document lookup:
 
-- intro (`:102`): "The one lookup from a key — a tracker key, an issue number or a PR number — to its
-  work-item document."
-- comment (`:106`): `# KEY_FIELD: jira_key | github_issue | pr_number.`
-- `:?` message (`:116`): `bind KEY_FIELD (jira_key, github_issue or pr_number)`.
+- intro (`:133`): "The one lookup from a key — a tracker key, an issue number or a PR number — to its
+  work-item document." The caller sentence after it names all five: `develop-story`,
+  `develop-task`, `/review-pr`, `review-task` and `review-story` (the last two since task.178).
+- comment (`:137`): `# KEY_FIELD: jira_key | github_issue | pr_number.`
+- `:?` message (`:147`): `bind KEY_FIELD (jira_key, github_issue or pr_number)`.
 
 Then `npm run bundle` and `npm run bundle:check`. Edit the shared source only — a fix applied to a
 bundled `references/` copy is reverted by the next bundle run.

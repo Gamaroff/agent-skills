@@ -1,0 +1,111 @@
+# Implementation Report: /review-pr resolution follow-ups
+
+**Task**: `task.179.review-pr-resolution-follow-ups.md`
+**Run Number**: 1
+**Started**: 2026-10-27 08:16
+**Status**: In Progress
+
+---
+
+## Summary
+
+Close task.177's six low-severity `/review-pr` follow-ups: one `host_of` reading for both parser arms, known-host prose, the comment-only `.env` value, stale test comments and title, and §0a's KEY_FIELD contract.
+
+---
+
+## Pipeline Configuration
+
+| Setting             | Value                                                                      |
+| ------------------- | -------------------------------------------------------------------------- |
+| Feature branch base | develop                                                                    |
+| PR target           | develop                                                                    |
+| qa-planning gate    | skipped (auto)                                                             |
+| Task risk level     | not set                                                                    |
+| Pipeline mode       | standard                                                                   |
+| Always-load files   | 3 files — docs/architecture/concepts/coding-standards.md, docs/architecture/concepts/tech-stack.md, docs/architecture/concepts/source-tree.md |
+| Tracker Issue       | #558 (GitHub)                                                              |
+| Board status        | In Progress ✅ (work-started: transitioned; Priority already P3 Low — left) |
+
+---
+
+## Pipeline Progress
+
+| Step                       | Status     | Required Artifacts                                                     | Notes | Subagent summary ref | Completed (UTC) |
+| -------------------------- | ---------- | ---------------------------------------------------------------------- | ----- | -------------------- | --------------- |
+| 1. create-branch           | ✅ Done    | Branch `feature/task.179.*` exists in git                              | Branch created at `0839a5c9` | —                    | 2026-10-27T08:17Z |
+| 2. review-task             | ✅ Done    | `task.179.review.{N}.{name}.md` exists (or skip logged)                | `task.179.review.1.review-pr-resolution-follow-ups.md` — READY TO IMPLEMENT 9/10; Planned → Ready for Development | —                    | 2026-10-27T08:21Z |
+| 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline from the plan; 1 iteration; audit 10/10, `ready-for-review`; `ci:fast` green on the 5th run (prettier, banned key, tmp leak, 1 overlapped run) | `.summaries/step-3-test-triage-1.json` | 2026-10-27T08:36Z |
+| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.179.qa.{N}.*.md`; `task.179.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
+| 7. finalise                | ⏳ Pending | `task.179.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
+| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+
+> The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
+>
+> `Completed (UTC)` is the moment the step's row went `✅` — `date -u +%Y-%m-%dT%H:%MZ` — written once by the Step Transition Protocol and never overwritten on resume (task.201). Leave it empty for a step that has not finished.
+
+---
+
+## Decisions Log
+
+### Pipeline Startup — 2026-10-27
+
+- Invoked by `/develop-next` (task-registry fallback, T179) with `--defaults`; autonomous run.
+- Feature branch base: develop — source: recommended (`--defaults`; on `develop`)
+- PR target branch: develop — source: recommended (`--defaults`)
+- Mode: standard — source: detector (Phase 0 run inline, no Agent 3: risk_level absent → risk_ok true; phase_count 3 → not < 3; single_module false — `skills/review-pr/` plus `shared/resources/`)
+- Skips: none; refused: none; questions asked: 0 (`--defaults`, no conflict)
+- qa-planning gate: skipped (auto — no prompt)
+- Task status at start: `planned` — proceeding; Step 2 `/review-task` validates and promotes.
+- Always-load files resolved: 3 files — from `skills-config.yaml` `devLoadAlwaysFiles`, all present.
+- Tracker: GitHub, issue #558.
+- Branch: `feature/task.179.review-pr-resolution-follow-ups` from `develop` (`0839a5c9`), pushed; report stashed and restored around branch creation.
+- Work-started: comment `posted`; GitHub board: work-started → transitioned (In Progress).
+
+### Step 2 — review-task
+
+- No review report existed; status `Planned` → ran `/review-task` (output: Comprehensive report — required for pipeline audit trail).
+- Review report: `docs/tasks/task.179.review-pr-resolution-follow-ups/task.179.review.1.review-pr-resolution-follow-ups.md` — READY TO IMPLEMENT, 9/10, 0 critical / 3 important / 3 optional.
+- review-task Step 8.5 auto-answered: Yes, apply all critical + important fixes — pipeline proceeds autonomously. All 6 applied (task doc + plan anchors).
+- review-task Step 9 auto-answered: Yes, fixes complete — Planned promoted to Ready for Development by review-task.
+- Pre-pass: Agent B `aligned` (source `architecture`, 2 low notes); Agent C `not-implemented`.
+- Notable finding: `x@github.com/o/r/pull/1` is a branch today and becomes PR 1 under `host_of` — Breaking Changes now names it with its differential cases.
+- Review outcome comment skipped — review-task reported `posted` (stage `review-task`). Tracker key unchanged (#558).
+
+### Step 3 — develop
+
+- Pre-develop surface map: 20 items identified in `skills/review-pr/` (parser, SKILL.md, tests), §0a shared source + 6 bundled copies, CHANGELOG.
+- Plan file found: `docs/tasks/task.179.review-pr-resolution-follow-ups/task.179.plan.review-pr-resolution-follow-ups.md` — included as implementation context for /develop.
+- Step 3 inline — /develop not invoked: the plan names every hunk and the surface map was recorded; both facts the inline route requires are above.
+- Fast gate: `develop.fastGateCommand` unset → `npm run ci:fast` (defined; precondition passed).
+- Added beyond the plan: a parser test "no target makes a network or git call" (stubs `gh`/`curl`/`wget`/`git`), because the Performance criterion's "existing gating pin" names no findable test. Calibrated: a `curl` injected into `host_of` turns it red.
+- Mutation checks: raw first-segment reading → 4 parser cases + `shell-fn:` probe red; old `.env` strip → comment-only test red.
+- `review-pr.test.js` 172/172 (165 on `develop`'s copy). `shellcheck`, `validate -- skills/review-pr/`, `bundle:check`, `lint:secrets`, `lint:shell` green. `ci:fast`: 6415 pass, 0 fail, 14 skipped, tmp-leak ratchet ok.
+- Loop audit iter 1: `ready-for-review`, 10/10. Development completion comment posted to github issue 558.
+
+---
+
+## Issues Log
+
+_Problems encountered and how they were resolved or escalated._
+
+- **zsh is not installed on this machine** (`zsh: command not found`, 2026-10-27). The review-pr suite drops its zsh variant when zsh is absent, so every local run here is bash-only; the zsh half of each criterion is held by CI (`test.yml` installs zsh).
+- **Step 3 fast gate failed four times before it passed.** (1) `prettier --check` on the new tests → `prettier --write`. (2) A run overlapped a deliberate `curl` mutation, so it was discarded. (3) Triage (`real`): the new Step 0b tests used `RAPP-702`, copied from the plan, a consumer key that `tests/no-consumer-names.test.js` bans → `PROJ-702`. Logged as observation #108 (review does not check plan literals against that guard). (4) The offline test leaked its `mkdtemp` dir (tmp-leak guard, new prefix `parser-net`) → `t.after` cleanup; 3 leftover dirs from earlier runs removed.
+
+---
+
+## QA Iteration History
+
+_Track each QA review/fix cycle._
+
+---
+
+## Completion
+
+**Finished**: {populated at end}
+**Final Status**: {Completed / Failed / Escalated}
+**Branch**: `feature/task.179.review-pr-resolution-follow-ups`
+**PR**: {populated after Step 4}
+**QA Iterations**: {populated at end}
+**DoD Summary**: {populated after Step 7}
+**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
