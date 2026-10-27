@@ -303,6 +303,27 @@ None identified.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-27
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.237.qa.1.carry-doc-only-findings-on-approve.md](./task.237.qa.1.carry-doc-only-findings-on-approve.md)
+- **Gate File**: [task.237.gate.1.carry-doc-only-findings-on-approve.yml](./task.237.gate.1.carry-doc-only-findings-on-approve.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 57
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+QA-1 (MEDIUM): the classify-keyed `CARRY_FIXED` sentence is not pinned. Deleting it, or reverting it with a period before "leave", leaves the suite green ([TASK-237-BUG-1](./task.237.bug.1.carry-fixed-sentence-not-pinned.md)).
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -312,6 +333,8 @@ None identified.
 | 2026-10-27 | 1.1 | Review passed (8/10) — guard extended to the carry prose (:1496, :1602); review-pr SKILL.md:1072 added as a restatement site; removed-literal test search recorded | review-task |
 | 2026-10-27 |  | Status → ready-for-development | review-task |
 | 2026-10-27 |  | Implemented — 6 source files (+ 9 bundled copies), 2 parity tests, 3 mutations | develop |
+| 2026-10-27 |  | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-10-27 |  | QA findings fixed — TASK-237-BUG-1, 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---
@@ -370,6 +393,15 @@ with no verdict. Two parity tests pin both rows and both carry-prose sentences.
    - "On `APPROVE`, or a `CONCERNS` with nothing doc-only, leave `CARRY_FIXED` empty" restored → red
      at the same test (only its `doesNotMatch` can fail with the other two lines intact);
    - all restored (`cmp` identical) → green.
+4. **QA cycle 1 fix (TASK-237-BUG-1)**. The carry-prose test now pins the classify-keyed
+   sentence positively ("When the classify block cleared no path, leave `CARRY_FIXED` empty"). Its
+   negative pattern now ends a sentence only at a period followed by whitespace, so a `task.179`
+   inside a reverted sentence no longer hides the `APPROVE` key. These mutations were added:
+   - the sentence deleted (M4) → red;
+   - the sentence replaced by "On `APPROVE` (as task.179 did), leave `CARRY_FIXED` empty" (M5) → red;
+   - that sentence added beside the kept classify-keyed one (M6), so only the negative can fail → red.
+     The old pattern reads this text as no match, and the new one as a match.
+   - M1–M3 stay red, and the restored suite is 33/33.
 
 ### Testing Results
 

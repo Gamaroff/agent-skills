@@ -798,9 +798,16 @@ test("the carry prose names no verdict where it decides whether to fix (task.237
     /Classify on `APPROVE` or `CONCERNS`/,
     "the Carry section must classify on APPROVE as well as CONCERNS",
   );
+  assert.match(
+    carry,
+    /When the classify block cleared no path, leave\s+`CARRY_FIXED`\s+empty/,
+    "the Carry section must key an empty CARRY_FIXED on what the classify block cleared, not on a verdict",
+  );
+  // A sentence ends at a period followed by whitespace, so "task.179" inside a reverted sentence
+  // does not end it and hide the APPROVE key from the pattern (TASK-237-BUG-1).
   assert.doesNotMatch(
     carry,
-    /`APPROVE`[^.]*leave\s+`CARRY_FIXED`\s+empty/,
+    /`APPROVE`(?:[^.]|\.(?!\s))*leave\s+`CARRY_FIXED`\s+empty/,
     "no Carry-section sentence may key an empty CARRY_FIXED on APPROVE — that sentence is what left task.179's doc-only finding unfixed",
   );
 });
