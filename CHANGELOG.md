@@ -14,7 +14,7 @@ All notable changes to this project will be documented in this file. Format foll
   `https://` form does. A `.env` line whose `JIRA_URL` is only a comment (`JIRA_URL= # prod`) now
   reads as unset rather than warning "differs from JIRA_URL # prod". The parser header, Step 0b, the
   KIND table and the `target` row say which URLs may omit `https://`; §0a's lookup contract names
-  `pr_number` and all five callers; two stale test comments and a test title were corrected.
+  `pr_number` and all five callers; three stale test comments and a test title were corrected.
 
 - **`create-task --from-observation` seeds on the first attempt (task 236, obs #104).** § 1.1 step 3
   described the `seedFromObservations` call in prose and left out the required `taskId`, so
