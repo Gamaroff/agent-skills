@@ -5,10 +5,12 @@ type: task
 description: "Give an external precondition a form the selector reads, and have the fallback pass over it with a stated reason instead of selecting it."
 tags: [develop-next, observation]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-26
 updated: 2026-10-27
+completed_date: 2026-10-27
+pr_number: 761
 assignee:
 estimated_effort_hours: 16
 github_issue: 759
@@ -16,7 +18,7 @@ github_issue: 759
 
 # Technical Task: select-next registry fallback selects an item blocked on another repository
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.235.review.1.select-next-external-precondition.md` implemented 2026-10-27
 
@@ -359,7 +361,7 @@ selected.
 
 - [x] Each candidate document is read at most once per run for both status and the field — held
       by the Phase 3 read-count test against `makeRegistryLoader` with a counting `readFile`.
-- [ ] The unit suite's wall time on the PR head is within 110% of `develop`'s, measured on the PR
+- [x] The unit suite's wall time on the PR head is within 110% of `develop`'s, measured on the PR
       head commit with `uptime; time command node --test evals/develop-next/unit/select-next.test.mjs`
       run on each, and both figures recorded in the implementation report.
 
@@ -503,6 +505,30 @@ Cycle 2 refute pass: cycle 1 CR-1 is fixed. One promoted LOW, TASK-235-CR2-1: an
 
 - **TASK-235-CR2-1** (LOW) — carried to gate 2 `recommendations.future` (route 2b, cycle 2): `frontmatterScalar` ends a quoted value at an escaped (`\"`) or doubled (`''`) quote; 0 of 522 tracked frontmatter values carry the shape.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.235.qa.2.select-next-external-precondition.md`
+**Gate File**: `task.235.gate.2.select-next-external-precondition.yml`
+**PR Review**: `task.235.pr-review.1.select-next-external-precondition.md` (✅ APPROVE)
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 16/16 — functional, performance (104.5% of develop on bf03f4ec), code quality, documentation
+✅ **Unit Tests:** 186/186 in `evals/develop-next/unit/select-next.test.mjs`; each new behaviour mutation-proven
+✅ **PR Review:** PR #761, Step 5c `/review-pr` APPROVE; CI reading 1 SUCCESS over 6 checks
+✅ **Documentation:** selection reference, task standard, both rule sites, task.174, CHANGELOG
+✅ **Security Review:** ✅ PASS — `externalBlockOf` probed, 29 executed, 0 reproduced, 0 escaped
+✅ **Compliance Review:** not applicable (internal developer tooling)
+
+**Task marked as ACCEPTED on:** 2026-10-27
+
+**Detailed Verification Log:** See `task.235.dod.1.select-next-external-precondition.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
@@ -515,6 +541,7 @@ Cycle 2 refute pass: cycle 1 CR-1 is fixed. One promoted LOW, TASK-235-CR2-1: an
 | 2026-10-27 |  | QA gate PASS (100/100) — 1 finding | qa-task |
 | 2026-10-27 |  | QA findings fixed — cycle 1, 1 finding (CR-1 quoted ` #`) | qa-fix |
 | 2026-10-27 |  | QA gate PASS (100/100) — 1 finding | qa-task |
+| 2026-10-27 | 1.2 | DoD passed — accepted (PR #761) | finalise |
 <!-- change-log-end -->
 
 ---

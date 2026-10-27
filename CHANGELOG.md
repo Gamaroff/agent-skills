@@ -18,7 +18,9 @@ All notable changes to this project will be documented in this file. Format foll
   `n/a`, `tbd`, `—`) and the YAML nulls `null` / `~` do not hold a row. The registry loader is now
   the exported `makeRegistryLoader`, which reads each document once. The authoring rule in
   `create-task` § 1.2 and the task registry say to set the field; task.174 carries it.
-  `--batch` and the roadmap path are unchanged.
+  `--batch` and the roadmap path are unchanged. The shared frontmatter reader now keeps a ` #`
+  inside a quoted value, which reaches all five fields it reads (`status`, `epic`, `epic_source`,
+  `branch_model` and the new field); old and new readings agree on all 522 tracked values.
 
 - **The review skills advance the pipeline lock only on a passing review, and task.164's
   follow-ups are closed (task 165).** `review-story`'s cooperation block advanced the lock to 3
