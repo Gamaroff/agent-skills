@@ -207,14 +207,17 @@ could forget: 9 entries had been parked by hand, each by whichever session remem
 
 3. **Seed.** The seed needs the task id, because each park condition names it: read the registry's
    **Next Available Task Number** (§ 1) **before** this step, and put it in `{next-task-number}`.
-   Put the selected ids in `{observation-ids}`. Run the block as it stands, from the repository root,
-   in one shell. It re-sources the resolver, because `OBS_LOG_DIR` is what locates each entry's file,
-   and it calls `seedFromObservations` **once**, with every selected entry:
+   Put the selected ids in `{observation-ids}`. **Substitute only digits, commas and spaces**, and
+   refuse the run on anything else before substituting: the two values sit in single quotes, which
+   stop the shell expanding `$`, backticks and `"`, and only a `'` can end them. Run the block as it
+   stands, from the repository root, in one shell. It re-sources the resolver, because `OBS_LOG_DIR`
+   is what locates each entry's file, and it calls `seedFromObservations` **once**, with every
+   selected entry:
 
    ```bash
    source .agents/skills/create-task/references/resolve-observation-workspace.sh || exit 1
-   TASK_ID="{next-task-number}"
-   OBS_IDS="{observation-ids}"
+   TASK_ID='{next-task-number}'
+   OBS_IDS='{observation-ids}'
    command node .agents/skills/create-task/references/observation-log.js scan --json \
      | command node -e '
    const fs = require("fs"), path = require("path");

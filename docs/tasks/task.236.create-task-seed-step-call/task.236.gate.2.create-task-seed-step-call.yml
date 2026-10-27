@@ -1,0 +1,69 @@
+schema: 2
+task: 'task.236.create-task-seed-step-call'
+task_title: 'create-task 1.1 omits the required taskId argument to seedFromObservations'
+gate: CONCERNS
+status_reason: 'All three cycle-1 findings are fixed and mutation-proven, and the shipped-file probe now runs 13/13 cases. The refute pass found that the block''s two assignments are double-quoted, so ids the agent substitutes are expanded by bash before the node guard reads them: `$(...)` is silently accepted and a double quote runs a command (reproduced). One medium finding, no high.'
+reviewer: 'QA Engineer'
+head: '68048996b01ca084e29d7a8f2995ac1202f13928'
+updated: '2026-10-27T06:40:20Z'
+
+top_issues:
+  - id: 'QA2-1'
+    severity: medium
+    file: 'skills/create-task/SKILL.md'
+    finding: 'CR-1, reproduced on the shipped block: `TASK_ID="{next-task-number}"` and `OBS_IDS="{observation-ids}"` are double-quoted, so bash expands what the agent substitutes before the node guard sees it. Ids `1,$(echo 2)` and `1,`echo 2`` exit 0 seeding [1,2]; `1"; touch <marker>; "` exits 0 seeding [1] and writes the marker; `$HOME` is refused as `not an observation id: /home/...`, naming the expansion, not the input. The block is new on this branch (base has no OBS_IDS).'
+    suggested_action: 'Make the raw text reach a check before any shell reads it: single-quote both assignments and have the step refuse an input containing a single quote, or have the step check the task number (digits) and the ids (digits, commas, spaces) before substituting, with a committed test that substitutes `$(...)`, a backtick and a double quote the way an agent would.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 49
+  phases_verified: 3/3
+  ci: 'not read — CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 13
+    escaped: 0
+    notes: 'Shipped-file fence probe, record task.236.qa.2.security.run.json: totals.executed 13, reproduced 0, escaped 0. The probe writes both assignment lines itself, so it cannot see the substitution step (CR-2); the injection there was reproduced by hand (QA2-1), which does not count toward probes_executed.'
+  performance:
+    status: PASS
+    notes: 'seed-step-block.test.js real 2.930s on 68048996 at load 1.93 (bound < 5s); the probe test is 2.1s of it.'
+  reliability:
+    status: PASS
+    notes: 'Whole file plus from-observation runs 20/20 from a linked worktree (QA-1 fixed). CR-4 (low): a run killed between worktree add and its finally leaves a pid-named worktree behind.'
+  maintainability:
+    status: PASS
+    notes: 'CR-5 (cleanup): mainCheckout/scratchBase restate observation-log.test.mjs:72-94. validate rc 0, Prettier clean.'
+
+recommendations:
+  immediate:
+    - action: 'QA2-1: quote or pre-check the substituted inputs so bash cannot expand them, with a committed test.'
+      refs: ['skills/create-task/SKILL.md']
+  future:
+    - action: 'CR-2 (low): add probe cases that substitute through the block''s own assignment form, or say in the probe header that the substitution step is not covered.'
+      refs: ['skills/create-task/tests/seed-block-probe.js']
+    - action: 'CR-3 (low, carried from cycle 1): "matches 0 files" does not tell a missing file from an unparseable one; consult scan.unparseable.'
+      refs: ['skills/create-task/SKILL.md']
+    - action: 'CR-4 (low): mkdtemp the worktree path and prune before the add.'
+      refs: ['skills/create-task/tests/seed-step-block.test.js']
+    - action: 'CR-5 (cleanup): one shared main-checkout scratch helper, or cross-reference comments.'
+      refs: ['skills/create-task/tests/seed-block-probe.js']
+    - action: 'Step 4b (advisory): the changed block is refused as mutating, so qa-execute-snippets does not run it; seed-step-block.test.js and the fence probe run it from disk.'
+      refs: ['skills/create-task/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'QA2-1 fixed and re-gated.'

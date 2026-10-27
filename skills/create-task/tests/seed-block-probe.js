@@ -43,7 +43,7 @@ const engine = require(
 
 const HEADING = "Steps 3 to 6: seed, ask, cite and park";
 // As the engine reads it: the block keeps the list item's three-space indent.
-const SLOT = 'TASK_ID="{next-task-number}"\n   OBS_IDS="{observation-ids}"';
+const SLOT = "TASK_ID='{next-task-number}'\n   OBS_IDS='{observation-ids}'";
 
 // The main checkout's root. From a linked worktree that is NOT the tree the
 // code runs from, which is the point: the resolver refuses a workspace inside a
@@ -118,8 +118,15 @@ function closure() {
   return files;
 }
 
-// One input fills both assignment lines.
-const args = (task, ids) => `TASK_ID="${task}"\nOBS_IDS="${ids}"`;
+// One input fills both assignment lines, substituted into the block's own
+// lines the way an agent substitutes the placeholders, so a case sees the
+// block's quoting (QA cycle 2, CR-2). split/join: a String.replace
+// replacement string treats `$'` and `$&` as patterns.
+const args = (task, ids) =>
+  SLOT.split("{next-task-number}")
+    .join(task)
+    .split("{observation-ids}")
+    .join(ids);
 
 function cases(fixture) {
   const legit = (id, task, ids, why) => ({
@@ -207,6 +214,43 @@ function cases(fixture) {
       "0x1",
       "a hex literal",
       "not an observation id: 0x1\n",
+    ),
+    // Shell syntax an agent could paste into the quotes: each must reach the
+    // node guard unexpanded and be named as typed (QA cycle 2, QA2-1).
+    refuse(
+      "ids-command-substitution",
+      "9001",
+      "1,$(echo 2)",
+      "a command substitution",
+      "not an observation id: $(echo 2)\n",
+    ),
+    refuse(
+      "ids-backtick",
+      "9001",
+      "1,`echo 2`",
+      "a backtick substitution",
+      "not an observation id: `echo 2`\n",
+    ),
+    refuse(
+      "ids-double-quote",
+      "9001",
+      '1"2',
+      "a double quote",
+      'not an observation id: 1"2\n',
+    ),
+    refuse(
+      "ids-variable",
+      "9001",
+      "$HOME",
+      "a variable reference",
+      "not an observation id: $HOME\n",
+    ),
+    refuse(
+      "task-command-substitution",
+      "$(echo 9001)",
+      "1,2",
+      "a command substitution",
+      "not a task number: $(echo 9001)\n",
     ),
     refuse(
       "ids-missing",

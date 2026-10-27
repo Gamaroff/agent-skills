@@ -231,9 +231,61 @@ test("a task number that is not digits is refused before the seed is built", asy
   }
 });
 
+test("shell syntax substituted into the placeholders reaches the guard unexpanded and runs nothing", async () => {
+  const code = await seedBlock();
+  const marker = path.join(
+    SCRATCH_ROOT,
+    `seed-step-block-marker-${process.pid}`,
+  );
+  const files = {
+    "0001-alpha-step.md": fixture(
+      1,
+      "alpha",
+      "create-task: alpha step is prose",
+    ),
+    "0002-beta-step.md": fixture(
+      2,
+      "beta",
+      "create-task: beta step drops an argument",
+    ),
+  };
+  // Under double quotes `1,$(echo 2)` seeded [1,2] at exit 0, and a quote in
+  // the ids ran a command (QA cycle 2, QA2-1). Each value is substituted the
+  // way an agent substitutes it: into the block's own assignment lines.
+  const cases = [
+    ["9001", "1,$(echo 2)", "not an observation id: $(echo 2)\n"],
+    ["9001", "1,`echo 2`", "not an observation id: `echo 2`\n"],
+    ["9001", "$HOME", "not an observation id: $HOME\n"],
+    ["9001", `1"; touch "${marker}"; "`, null],
+    [
+      `$(touch "${marker}")`,
+      "1,2",
+      `not a task number: $(touch "${marker}")\n`,
+    ],
+  ];
+  try {
+    for (const [taskId, ids, stderr] of cases) {
+      fs.rmSync(marker, { force: true });
+      const r = runBlock(code, files, ids, taskId);
+      const what = `task ${JSON.stringify(taskId)}, ids ${JSON.stringify(ids)}`;
+      assert.notEqual(r.status, 0, `${what} was accepted: ${r.stdout}`);
+      assert.equal(r.stdout, "", `no seed is printed for ${what}`);
+      if (stderr !== null) assert.equal(r.stderr, stderr, what);
+      else assert.match(r.stderr, /^not an observation id: /, what);
+      assert.ok(!fs.existsSync(marker), `${what} ran a command`);
+    }
+  } finally {
+    fs.rmSync(marker, { force: true });
+  }
+});
+
 test("from a linked worktree the scratch base is the main checkout's, which the resolver accepts", () => {
   const main = mainCheckout(REPO);
-  const wt = path.join(main, ".worktrees", `seed-step-block-${process.pid}`);
+  // mkdtemp, and a prune first: a run killed before its `finally` leaves a
+  // worktree registered, and a fixed name would block every retry (QA cycle 2, CR-4).
+  spawnSync("git", ["worktree", "prune"], { cwd: main });
+  fs.mkdirSync(path.join(main, ".worktrees"), { recursive: true });
+  const wt = fs.mkdtempSync(path.join(main, ".worktrees", "seed-step-block-"));
   const added = spawnSync("git", ["worktree", "add", "--detach", wt, "HEAD"], {
     cwd: main,
     encoding: "utf8",

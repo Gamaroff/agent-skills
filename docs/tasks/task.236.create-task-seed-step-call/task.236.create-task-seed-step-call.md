@@ -309,21 +309,21 @@ None identified.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-27
-**Quality Score**: 70/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.236.qa.1.create-task-seed-step-call.md](./task.236.qa.1.create-task-seed-step-call.md)
-- **Gate File**: [task.236.gate.1.create-task-seed-step-call.yml](./task.236.gate.1.create-task-seed-step-call.yml)
+- **Full Report**: [task.236.qa.2.create-task-seed-step-call.md](./task.236.qa.2.create-task-seed-step-call.md)
+- **Gate File**: [task.236.gate.2.create-task-seed-step-call.yml](./task.236.gate.2.create-task-seed-step-call.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 46
+- **Tests Executed**: 49
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-No high findings. Three medium: the new test fails from a linked worktree (QA-1); the block accepts a non-numeric task id (QA-2); the probe engine cannot reach the block in the shipped file (QA-3).
+Cycle 1's three findings are fixed and mutation-proven. One new medium (QA2-1): the block double-quotes the substituted task number and ids, so bash expands `$(...)` and a double quote can run a command before the node guard reads the text.
 
 <!-- change-log-start -->
 ## Change Log
@@ -336,6 +336,8 @@ No high findings. Three medium: the new test fails from a linked worktree (QA-1)
 | 2026-10-27 |         | Implemented — 3 files, 2 tests             | develop     |
 | 2026-10-27 |         | QA gate CONCERNS (70/100) — 3 findings     | qa-task     |
 | 2026-10-27 |         | QA findings fixed — cycle 1, 3 findings    | qa-fix      |
+| 2026-10-27 |         | QA gate CONCERNS (90/100) — 1 finding      | qa-task     |
+| 2026-10-27 |         | QA findings fixed — cycle 2, 1 finding     | qa-fix      |
 <!-- change-log-end -->
 
 ---
