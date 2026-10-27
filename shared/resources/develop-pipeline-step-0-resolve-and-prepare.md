@@ -130,11 +130,12 @@ LOCAL_PATH=$(echo "$DOC_URL" | sed 's|https://github\.com/[^/]*/[^/]*/blob/[^/]*
 
 ### Key → document lookup
 
-The one lookup from a tracker key to its work-item document. `develop-story`, `develop-task` and
-`/review-pr` all run it from here; do not restate the grep at a call site.
+The one lookup from a key — a tracker key, an issue number or a PR number — to its work-item
+document. `develop-story`, `develop-task`, `/review-pr`, `review-task` and `review-story` all run it
+from here; do not restate the grep at a call site.
 
 ```bash
-# KEY_FIELD: jira_key | github_issue.  KEY_VALUE: the Jira key or the issue number.
+# KEY_FIELD: jira_key | github_issue | pr_number.  KEY_VALUE: the Jira key, the issue number or the PR number.
 # Anchored at both ends, so PROJ-70 does not match PROJ-702 and issue 5 does not match 55.
 # Quote-tolerant: jira_key is written quoted ('PROJ-702' or "PROJ-702") in most consumer docs.
 # Recursive grep, not a docs/**/ glob — ** needs globstar in bash and matches one level without it.
@@ -144,7 +145,7 @@ The one lookup from a tracker key to its work-item document. `develop-story`, `d
 # finalise's sprint-review summary is dropped, because artifacts copy the item's key. Only the
 # basename is read, so a directory such as epic.1.4.qa.tools/ excludes nothing.
 # An empty KEY_VALUE would match every blank key field, so both inputs must be bound.
-: "${KEY_FIELD:?bind KEY_FIELD (jira_key or github_issue)}" "${KEY_VALUE:?bind KEY_VALUE (the key or issue number)}"
+: "${KEY_FIELD:?bind KEY_FIELD (jira_key, github_issue or pr_number)}" "${KEY_VALUE:?bind KEY_VALUE (the key, issue number or PR number)}"
 # A missing or unreadable docs/ (the wrong cwd) is its own HALT, never "no document has this key".
 [ -d docs ] && [ -r docs ] || { DOC_STATUS=unreadable; echo "HALT: docs/ not found or unreadable in $(pwd) — run from the repository root"; exit 1; }
 DOC_MATCHES=$(grep -rlE "^${KEY_FIELD}:[[:space:]]*['\"]?${KEY_VALUE}['\"]?[[:space:]]*$" docs/ 2>/dev/null \

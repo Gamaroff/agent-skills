@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`/review-pr` reads a target's host once, for both parser arms (task 179).** The scheme-less arm
+  matched the known-host list against the raw first segment while the URL arm stripped `?…`, `#…`,
+  `user@` and `:port` first, so `ghe.corp#.atlassian.net/o/r/pull/7` passed the check and parsed as
+  PR 7 on host `ghe.corp`. Both arms now call one `host_of`: that target and
+  `github.com:1@evil.com/…` stay branches, and `x@github.com/o/r/pull/1` parses as PR 1, as its
+  `https://` form does. A `.env` line whose `JIRA_URL` is only a comment (`JIRA_URL= # prod`) now
+  reads as unset rather than warning "differs from JIRA_URL # prod". The parser header, Step 0b, the
+  KIND table and the `target` row say which URLs may omit `https://`; §0a's lookup contract names
+  `pr_number` and all five callers; two stale test comments and a test title were corrected.
+
 - **`create-task --from-observation` seeds on the first attempt (task 236, obs #104).** § 1.1 step 3
   described the `seedFromObservations` call in prose and left out the required `taskId`, so
   following it exactly threw `taskId is required`; it also said "for each entry", where the

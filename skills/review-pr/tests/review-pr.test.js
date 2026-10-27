@@ -932,19 +932,19 @@ const PARSER_CASES = [
     "jane.doe/fix/issues/42-login-crash",
     { kind: "branch", branch: "jane.doe/fix/issues/42-login-crash" },
   ],
-  // Real branch names stay branches: no known host, and no dotted FIRST segment before a marker.
+  // Real branch names stay branches: their first segment is not a known platform host.
   ["feature/task.1.x", { kind: "branch", branch: "feature/task.1.x" }],
   ["release/v1.2", { kind: "branch", branch: "release/v1.2" }],
   ["hotfix/v1.2.1", { kind: "branch", branch: "hotfix/v1.2.1" }],
   ["v1.2/pull/3", { kind: "branch", branch: "v1.2/pull/3" }],
   ["release/v1.2/pull/3", { kind: "branch", branch: "release/v1.2/pull/3" }],
-  // Matches a marker pattern, but the dot is not in the first segment — the inner guard keeps it a branch.
+  // Carries a marker (`/pull/3`), but the first segment is not a known platform host — a branch.
   [
     "release/v1.2/x/pull/3",
     { kind: "branch", branch: "release/v1.2/x/pull/3" },
   ],
-  // QA cycle 1, CR-3: a version-shaped first segment is not a host — its last label is not two or
-  // more letters. These were branches before task.177 and must stay branches.
+  // QA cycle 1, CR-3: a version-shaped first segment is not a known platform host. These were
+  // branches before task.177 and must stay branches.
   ["v1.2/x/pull/3", { kind: "branch", branch: "v1.2/x/pull/3" }],
   ["v2.0/browse/x", { kind: "branch", branch: "v2.0/browse/x" }],
   ["5.x/fix/issues/12", { kind: "branch", branch: "5.x/fix/issues/12" }],
@@ -957,6 +957,26 @@ const PARSER_CASES = [
     "jira.corp.example/browse/AB-1",
     { kind: "branch", branch: "jira.corp.example/browse/AB-1" },
   ],
+  // task.179 (task.177 PR review CR-1): the known-host check reads the host the URL arm reads —
+  // `?…`, `#…`, `user@` and `:port` stripped — so a raw first segment cannot pass it and then
+  // parse as another host. `ghe.corp#.atlassian.net` used to parse as PR 7 on host ghe.corp.
+  [
+    "ghe.corp#.atlassian.net/o/r/pull/7",
+    { kind: "branch", branch: "ghe.corp#.atlassian.net/o/r/pull/7" },
+  ],
+  [
+    "ghe.corp?.atlassian.net/browse/AB-1",
+    { kind: "branch", branch: "ghe.corp?.atlassian.net/browse/AB-1" },
+  ],
+  [
+    "github.com:1@evil.com/o/r/pull/3",
+    { kind: "branch", branch: "github.com:1@evil.com/o/r/pull/3" },
+  ],
+  // The one shape the single reading admits: userinfo before a known host, as the https:// form.
+  [
+    "x@github.com/o/r/pull/1",
+    { kind: "pr", pr: "1", host: "github.com", repo: "o/r" },
+  ],
 ];
 
 for (const shell of SHELLS) {
@@ -968,6 +988,34 @@ for (const shell of SHELLS) {
       assert.ok(out.stdout.startsWith("kind="), "kind is the first line");
     });
   }
+
+  // task.179 performance criterion: host_of adds no network call. The parser is offline for
+  // every target — gh, curl, wget and git are shadowed by stubs that log, and none is called.
+  test(`parser (${shell}): no target makes a network or git call`, (t) => {
+    const stubs = fs.mkdtempSync(path.join(os.tmpdir(), "parser-net-"));
+    t.after(() => fs.rmSync(stubs, { recursive: true, force: true }));
+    const log = path.join(stubs, "calls.log");
+    for (const tool of ["gh", "curl", "wget", "git"]) {
+      fs.writeFileSync(
+        path.join(stubs, tool),
+        `#!/bin/sh\necho "${tool} $*" >> "${log}"\n`,
+        { mode: 0o755 },
+      );
+    }
+    const env = { ...process.env, PATH: `${stubs}:${process.env.PATH}` };
+    for (const [input] of PARSER_CASES) {
+      const r = spawnSync(shell, shArgv(shell, [PARSER, input]), {
+        encoding: "utf8",
+        env,
+      });
+      assert.equal(r.status, 0, `${input}: ${r.stderr}`);
+    }
+    assert.equal(
+      fs.existsSync(log) ? fs.readFileSync(log, "utf8") : "",
+      "",
+      "the parser called no network tool and no git",
+    );
+  });
 
   for (const [input, reason] of [
     ["https://example.com/foo", "url-no-target"],
@@ -2076,6 +2124,32 @@ const PARSER_PROBE_CASES = [
       exit: 0,
     },
   ],
+  // task.179 (CR-1): a scheme-less target whose raw first segment ends like a known host, but
+  // whose host (as the URL arm reads it) is self-hosted, stays a branch.
+  [
+    "pt.schemeless-fragment-host-bypass",
+    "ghe.corp#.atlassian.net/o/r/pull/7",
+    "hostile",
+    {
+      stdout: kv({
+        kind: "branch",
+        branch: "ghe.corp#.atlassian.net/o/r/pull/7",
+      }),
+      exit: 0,
+    },
+  ],
+  [
+    "pt.schemeless-query-host-bypass",
+    "ghe.corp?.atlassian.net/browse/AB-1",
+    "hostile",
+    {
+      stdout: kv({
+        kind: "branch",
+        branch: "ghe.corp?.atlassian.net/browse/AB-1",
+      }),
+      exit: 0,
+    },
+  ],
   // legitimate — every accepted form still parses
   [
     "pt.legit-github-pr",
@@ -2291,6 +2365,59 @@ for (const shell of SHELLS) {
     );
   });
 
+  // task.179 (task.177 gate 3, CR3-1): a value that is only a comment is unset, as a shell reads it.
+  // The extracting sed has already eaten the space before `#`, so the strip must also match `#` at
+  // the start of the value; otherwise `# prod` is read as a host and the run warns "differs".
+  test(`Step 0b (${shell}): a comment-only .env JIRA_URL reads as unset, never "differs"`, () => {
+    for (const line of [
+      "JIRA_URL= # prod",
+      "JIRA_URL=   # set me",
+      "JIRA_URL=#bare",
+    ]) {
+      const { dir, bin } = consumerRepo("git@bitbucket.org:ws/repo.git");
+      fs.writeFileSync(path.join(dir, ".env"), `${line}\n`);
+      fs.writeFileSync(path.join(bin, "gh"), "#!/bin/sh\n", { mode: 0o755 });
+      const r = runScript(shell, step0bBlock(), {
+        cwd: dir,
+        env: blockEnv(bin, {
+          TARGET: "https://acme.atlassian.net/browse/PROJ-702",
+          TRACKER: "jira",
+        }),
+      });
+      assert.equal(r.status, 0, `${line}: ${r.stdout}${r.stderr}`);
+      assert.match(
+        r.stdout,
+        /⚠️ JIRA_URL is not set .* not checked/,
+        `${line}: reads as unset`,
+      );
+      assert.doesNotMatch(r.stdout, /differs/, `${line}: never "differs"`);
+    }
+  });
+
+  // Control for the comment strip: a `#` with no whitespace before it is part of the value.
+  test(`Step 0b (${shell}): a .env JIRA_URL with a #fragment keeps it (control)`, () => {
+    const { dir, bin } = consumerRepo("git@bitbucket.org:ws/repo.git");
+    fs.writeFileSync(
+      path.join(dir, ".env"),
+      "JIRA_URL=https://other.atlassian.net#frag\n",
+    );
+    fs.writeFileSync(path.join(bin, "gh"), "#!/bin/sh\n", { mode: 0o755 });
+    const r = runScript(
+      shell,
+      step0bBlock() + '\necho "SEEN=$JIRA_URL_SEEN"\n',
+      {
+        cwd: dir,
+        env: blockEnv(bin, {
+          TARGET: "https://acme.atlassian.net/browse/PROJ-702",
+          TRACKER: "jira",
+        }),
+      },
+    );
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /^SEEN=https:\/\/other\.atlassian\.net#frag$/m);
+    assert.doesNotMatch(r.stdout, /is not set/);
+  });
+
   test(`docs guard (${shell}): a repository with no docs/ binds DOC_FILE="" and does not halt`, () => {
     const { dir } = consumerRepo("git@github.com:o/r.git");
     const sub = path.join(dir, "src");
@@ -2302,7 +2429,7 @@ for (const shell of SHELLS) {
     assert.doesNotMatch(r.stdout, /HALT/);
   });
 
-  test(`docs guard (${shell}): with docs/ present it hands over to §0a`, () => {
+  test(`docs guard (${shell}): the present branch prints an empty DOC_FILE and ignores an inherited one`, () => {
     const { dir } = consumerRepo("git@github.com:o/r.git");
     fs.mkdirSync(path.join(dir, "docs"));
     // QA cycle 1, CR-5: an inherited DOC_FILE must not leak into the guard's output.

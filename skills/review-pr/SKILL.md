@@ -37,7 +37,7 @@ Invoke as `/review-pr [target] [--effort LEVEL] [--comment] [--inline] [--no-cod
 
 | Arg | Values | Default | Meaning |
 | --- | --- | --- | --- |
-| `target` | _(none)_ \| `<PR-number>` \| `<PR-URL>` \| `<branch>` \| `<JIRA-KEY>` \| `<Jira-URL>` \| `#<issue>` \| `<GitHub-issue-URL>` | open PR for the current branch | Which PR to review. A Jira key (`PROJ-702`), a Jira `/browse/` URL, a Jira board URL carrying `?selectedIssue=`, a Jira Cloud `…/issues/KEY` URL, a GitHub issue URL or `#N` names the **work item**; Step 1a resolves it to its PR |
+| `target` | _(none)_ \| `<PR-number>` \| `<PR-URL>` \| `<branch>` \| `<JIRA-KEY>` \| `<Jira-URL>` \| `#<issue>` \| `<GitHub-issue-URL>` | open PR for the current branch | Which PR to review. A Jira key (`PROJ-702`), a Jira `/browse/` URL, a Jira board URL carrying `?selectedIssue=`, a Jira Cloud `…/issues/KEY` URL, a GitHub issue URL or `#N` names the **work item**; Step 1a resolves it to its PR. A GitHub, Bitbucket or `*.atlassian.net` URL may omit `https://`; a self-hosted one may not |
 | `--effort` | `low` \| `medium` \| `high` \| `max` | `medium` | Breadth vs. precision, for **both** lenses |
 | `--comment` | flag | off | Post one summary comment to the PR |
 | `--inline` | flag | off | Additionally post each finding as an inline comment on its own line. Implies `--comment` |
@@ -102,8 +102,9 @@ REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
 BRANCH=$(git branch --show-current)
 PR="" KIND="" JIRA_KEY="" ISSUE_NUM="" TARGET_HOST="" TARGET_REPO=""
 # A refusal (malformed URL, `#abc`, a control character) exits 2 with its reason on
-# stderr — HALT and show it. A URL never falls through to the branch arm: that is how
-# a pasted Jira link used to become "no pull request found for https://…".
+# stderr — HALT and show it. A URL with a scheme, or a scheme-less URL on a known platform
+# host, never falls through to the branch arm: that is how a pasted Jira link used to become
+# "no pull request found for https://…". A scheme-less self-hosted URL is a branch.
 PARSED=$(bash .agents/skills/review-pr/scripts/parse-target.sh "${TARGET:-}") || exit 1
 while IFS='=' read -r k v; do
   case "$k" in
@@ -133,7 +134,7 @@ REMOTE_REPO=$(repo_of "$REMOTE_URL")
 JIRA_URL_SEEN="$JIRA_URL"
 # .env by the resolver's rules: optional `export`, CR stripped, last wins. Then the value: a quoted
 # one is the inside of its first quote pair, verbatim; an unquoted one loses a ` #…` comment tail and
-# trailing space.
+# trailing space, and a value that is only a comment (`JIRA_URL= # prod`) reads as unset.
 # Without that, `JIRA_URL="https://acme.atlassian.net" # prod` kept its comment and warned falsely.
 # Each `t` is its own -e: BSD sed reads `…; t; …` as a label named by the rest of the script.
 # The space after `=` is stripped by the FIRST sed, never the second: any earlier `s` that matches
@@ -141,7 +142,7 @@ JIRA_URL_SEEN="$JIRA_URL"
 [ -n "$JIRA_URL_SEEN" ] || JIRA_URL_SEEN=$(sed -nE 's/^[[:space:]]*(export[[:space:]]+)?JIRA_URL=[[:space:]]*//p' "$(git rev-parse --show-toplevel 2>/dev/null)/.env" 2>/dev/null \
   | tr -d '\r' | tail -1 \
   | sed -E -e "s/^\"([^\"]*)\".*\$/\1/" -e t -e "s/^'([^']*)'.*\$/\1/" -e t \
-        -e 's/[[:space:]]+#.*$//' -e 's/[[:space:]]+$//')
+        -e 's/(^|[[:space:]]+)#.*$//' -e 's/[[:space:]]+$//')
 case "$KIND" in
   pr)
     if [ -n "$TARGET_HOST" ]; then                     # a bare number has no host to check
@@ -201,7 +202,7 @@ printf 'KIND=%s PR=%s BRANCH=%s JIRA_KEY=%s ISSUE_NUM=%s TARGET_HOST=%s TARGET_R
 | --- | --- | --- |
 | `pr-for-current-branch` | no argument | Step 1b, PR for `$BRANCH` |
 | `pr` | a bare number; a GitHub `/pull/N`, Bitbucket web `/pull-requests/N` or API `/pullrequests/N` URL (`…/pull/12/files` is PR 12) | Step 1b |
-| `branch` | anything else that is not a URL | Step 1b |
+| `branch` | anything else — including a scheme-less URL whose host is not a known platform host | Step 1b |
 | `jira` | a bare key (`PROJ-702`), `/browse/KEY`, a board URL's `selectedIssue=KEY`, Jira Cloud `…/issues/KEY` | Step 1a |
 | `github-issue` | `#N`, a GitHub `/issues/N` URL | Step 1a |
 
