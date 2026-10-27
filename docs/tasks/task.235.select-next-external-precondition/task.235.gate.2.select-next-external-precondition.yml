@@ -1,0 +1,64 @@
+schema: 2
+task: 'task.235.select-next-external-precondition'
+task_title: 'select-next honours an external precondition'
+gate: PASS
+status_reason: 'Cycle 2 refute pass over the whole branch diff: cycle 1 CR-1 verified fixed, 186/186 unit tests and npm run ci:fast green, boundary probe engages (21 executed, 0 escaped). One promoted low-severity code-review bug (CR-1): the cycle 1 quote fix ends a quoted value at an escaped or doubled quote.'
+reviewer: 'QA Engineer'
+head: '6f9acd1fc4cc10c94bcb91247122c75b499e22cc'
+updated: '2026-10-27T04:24:14Z'
+
+top_issues:
+  - id: 'TASK-235-CR2-1'
+    severity: low
+    file: 'skills/develop-next/scripts/select-next.mjs'
+    finding: 'frontmatterScalar (cycle 1 fix) ends a quoted value at the first matching quote character, so a YAML escaped quote or doubled quote cuts the value short: "a \"b\" merged" returns a backslash-terminated stub and single-quoted repo-doubled-quote-s PR merged returns "repo" (reproduced). Shared by all five callers; 0 of 522 tracked frontmatter values are affected.'
+    suggested_action: 'When scanning for the closing quote, skip a backslash-escaped quote inside double quotes and a doubled quote inside single quotes, unescaping both; add both inputs to the 235 CR-1 test.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 186
+  phases_verified: 4/4
+  ci: 'not read at gate time'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 21
+    escaped: 0
+    notes: 'boundary: true — externalBlockOf, re-probed at 6f9acd1f because it reads through the changed frontmatterScalar. 21 cases (cycle 1 set plus 3 hostile quoted-placeholder/empty-quote and 2 legitimate quoted space-hash inputs): verdict engages, 0 reproduced, 0 escaped. Record: task.235.qa.2.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'Not re-measured this cycle; cycle 1 measured 102.7% of develop (bound 110%). The fix adds one indexOf per quoted scalar.'
+  reliability:
+    status: PASS
+    notes: 'Old and new frontmatterScalar agree on all 522 tracked frontmatter values (reviewer measurement). Rollback is a revert.'
+  maintainability:
+    status: PASS
+    notes: 'Neutral example names keep develop-batch consumer-fact test green. CR-2 and CR-3 advisory.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'TASK-235-CR2-1 (LOW, carried): frontmatterScalar ends a quoted value at an escaped or doubled quote. Skip a backslash-escaped quote inside double quotes and a doubled quote inside single quotes when scanning for the closing quote, unescaping both; add both inputs to the 235 CR-1 test.'
+      refs: ['skills/develop-next/scripts/select-next.mjs']
+      carried_from: top_issues (route 2b, cycle 2)
+    - action: 'CR-2 (advisory, medium confidence): blocked_on_external: false or no holds the row on a condition named false; consider treating YAML false/no as unset or rejecting it as a filing error.'
+      refs: ['skills/develop-next/scripts/select-next.mjs']
+    - action: 'CR-3 (advisory cleanup, also cycle 1 CR-2): the rationale''s document-status count is a remainder, so malformed registry rows are counted there; count causes on a positive marker.'
+      refs: ['skills/develop-next/scripts/select-next.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

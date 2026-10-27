@@ -486,21 +486,23 @@ direct invocation (Notes § Future Improvements). Not in scope.
 
 ### QA Report
 
-- **Full Report**: [task.235.qa.1.select-next-external-precondition.md](./task.235.qa.1.select-next-external-precondition.md)
-- **Gate File**: [task.235.gate.1.select-next-external-precondition.yml](./task.235.gate.1.select-next-external-precondition.yml)
+- **Full Report**: [task.235.qa.2.select-next-external-precondition.md](./task.235.qa.2.select-next-external-precondition.md)
+- **Gate File**: [task.235.gate.2.select-next-external-precondition.yml](./task.235.gate.2.select-next-external-precondition.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 185
+- **Tests Executed**: 186
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-No critical issues. One open LOW (TASK-235-CR-1): a quoted `blocked_on_external:` value containing
-` #` is truncated by the comment rule. Wall time 102.7% of develop; the boundary probe engages
-(16 executed, 0 escaped).
+Cycle 2 refute pass: cycle 1 CR-1 is fixed. One promoted LOW, TASK-235-CR2-1: an escaped or doubled quote ends a quoted value early. Two findings stay advisory: CR-2 (`false`/`no` as a value) and CR-3 (rationale count is a remainder).
+## Deferred Work
+
+- **TASK-235-CR2-1** (LOW) — carried to gate 2 `recommendations.future` (route 2b, cycle 2): `frontmatterScalar` ends a quoted value at an escaped (`\"`) or doubled (`''`) quote; 0 of 522 tracked frontmatter values carry the shape.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -512,6 +514,7 @@ No critical issues. One open LOW (TASK-235-CR-1): a quoted `blocked_on_external:
 | 2026-10-27 |  | Implemented — 10 files, 9 tests | develop |
 | 2026-10-27 |  | QA gate PASS (100/100) — 1 finding | qa-task |
 | 2026-10-27 |  | QA findings fixed — cycle 1, 1 finding (CR-1 quoted ` #`) | qa-fix |
+| 2026-10-27 |  | QA gate PASS (100/100) — 1 finding | qa-task |
 <!-- change-log-end -->
 
 ---
