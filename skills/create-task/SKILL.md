@@ -265,9 +265,12 @@ are one task.
 **A blocker in another repository is never written `task.N`.** The registry reads `task.N` in the
 `Depends on` cell as a task in *this* registry, so another repository's task.127 binds to this
 repository's unrelated task.127. Write it as free text after ` — `, naming the repository
-(`— blocked on <other-repo> task.127`), and give the task a Phase 0 that HALTs until the blocker is
-met. The selector does not parse free text and may pick the task, so the Phase 0 HALT is what stops
-it (obs #243).
+(`— blocked on <other-repo> task.127`), **and** set `blocked_on_external:` in the task's frontmatter
+to the same condition (`blocked_on_external: "<other-repo> task.127 merged"`). While the field is set,
+`develop-next`'s registry fallback passes the task over and names the condition on every run that
+evaluates it; a human deletes the field when the condition is met. Still give the task a Phase 0 that
+HALTs until the blocker is met — that is the backstop for a direct `/develop-task` run, which never
+goes through the selector (obs #243, task.235).
 
 ### 1.5 Analyse Git History for Technical Context
 

@@ -58,13 +58,16 @@ file and record which tests fail before any selector change.
 
 **File**: `skills/develop-next/scripts/select-next.mjs`
 
-1. **Loader (`main`, near `readStatus: (docPath) =>`).** Read each document once. Cache the text
-   per path inside `loadRegistries`, so `readStatus` and `readExternalBlock` share one read:
+1. **Loader (`main`, near `readStatus: (docPath) =>`).** Move `loadRegistries` out of `main` into an
+   exported `makeRegistryLoader({ bugRegistry, taskRegistry }, readFile)`; `main` calls it with
+   `readOrEmpty`. Exporting it is what lets the read-once criterion be held by a test (a counting
+   `readFile`); `main` itself is not exported. Read each document once: cache the text per path, so
+   `readStatus`, `readExternalBlock` and dependency lookups share one read:
 
    ```js
    const docCache = new Map();
    const docText = (p) => {
-     if (!docCache.has(p)) docCache.set(p, readOrEmpty(p));
+     if (!docCache.has(p)) docCache.set(p, readFile(p));
      return docCache.get(p);
    };
    // …
@@ -80,9 +83,15 @@ file and record which tests fail before any selector change.
    ```js
    export function externalBlockOf(text) {
      const v = frontmatterScalar(text, "blocked_on_external");
-     return v && !DEP_EMPTY_RE.test(v) ? v : null;
+     return v && !DEP_EMPTY_RE.test(v) && !YAML_NULL_RE.test(v) ? v : null;
    }
+   const YAML_NULL_RE = /^(?:null|~)$/i;
    ```
+
+   `YAML_NULL_RE` is required, not tidiness: this repository writes an unset key as `null`, and
+   `frontmatterScalar` returns the string `"null"` for it, which `DEP_EMPTY_RE` does not match — so
+   without it `blocked_on_external: null` holds the row (measured at review). Do not widen
+   `DEP_EMPTY_RE` itself; it also reads the `Depends on` cell.
 
    `DEP_EMPTY_RE` is declared later in the file (line 1165) as a `const`. It is read only at call
    time, after module evaluation, so the order does not matter. Do not move it.
@@ -129,7 +138,7 @@ file and record which tests fail before any selector change.
 
 Same file and pattern as Phase 1:
 
-- placeholders: `—`, `none`, `N/A`, `tbd`, `""`, plus a quoted `"none"`. Assert that
+- placeholders: `—`, `none`, `N/A`, `tbd`, `""`, a quoted `"none"`, and the YAML nulls `null` and `~`. Assert that
   `externalBlockOf` returns `null` for each, and that a row carrying one is selected.
 - an `accepted` and a `cancelled` document with the field: the reason matches the floor
   (`/outside the task eligibility floor/`), and `externalBlock` is absent.
@@ -137,19 +146,23 @@ Same file and pattern as Phase 1:
 - a **bug** row (`new`) carrying the field is held too. The fallback treats both kinds alike.
 - every row held: `selectNext(model, { loadRegistries })` on an all-ticked roadmap returns
   `stop` / `roadmap-complete`, and `detail` names each held path.
+- read count: `makeRegistryLoader(paths, countingReadFile)`; call `readStatus`, `readExternalBlock`
+  and `readStatus` again (a dependency lookup) on one path — `readFile` was called once for it.
+- selected rationale: a held task row ranked above an eligible one — `rationale` names the held row
+  and its condition and counts it as held, not "rejected on document status".
 - no `readExternalBlock` in the loader: the existing suite is the parity proof. Do not edit any
   existing test to make it pass.
 
 **Mutation proofs** (record each in the implementation report): delete the frontier check, so the
 held-row tests go red. Move it above the floor, so the accepted/cancelled test goes red. Drop the
-`DEP_EMPTY_RE` test from `externalBlockOf`, so the placeholder test goes red. Remove the detail
+`DEP_EMPTY_RE` test (and, separately, the `YAML_NULL_RE` test) from `externalBlockOf`, so the placeholder test goes red. Drop the cache, so the read-count test goes red. Drop the held count from `buildRegistryRationale`, so the rationale test goes red. Remove the detail
 append, so the all-held test goes red.
 
 ### Phase 4: Docs, rule and migration
 
 - `skills/develop-next/references/roadmap-selection.md`: add `### External preconditions` after
   §"Frontmatter decides; the registry row only nominates". It covers the field, its placeholder
-  spellings, the check order, that a held row is named on every run, and that a human clears it.
+  spellings, the check order, that a held row is named on every run that evaluates it (rows ranked below a selection are not read), and that a human clears it.
   At line 87 ("There is no park value, by decision"), add one sentence explaining why
   `blocked_on_external:` is not a park value: it names a condition outside the repository, and it
   is never silent.
@@ -176,7 +189,9 @@ append, so the all-held test goes red.
 ## Testing Approach
 
 - `command node --test evals/develop-next/unit/select-next.test.mjs`. Each new test is red before Phase 2.
-- `command node skills/develop-next/scripts/select-next.mjs` on the tree after Phase 4: T174 is in
-  `registryFrontier.passedOver` with `externalBlock`, and is not `item`.
-- `command node skills/develop-next/scripts/select-next.mjs --lint` lists T174 held.
+- `command node skills/develop-next/scripts/select-next.mjs --lint` on the tree after Phase 4: T174 is
+  in `registryFrontier.passedOver` with `eligible: false` and `externalBlock`. A plain run is not
+  evidence on today's tree: Phase 17 still holds T236, so the fallback is not reached.
+- Wall time: `uptime; time command node --test evals/develop-next/unit/select-next.test.mjs` on
+  `develop` and on the PR head; head within 110% of base.
 - `npm run ci` with `.agents/skills` and `.claude/skills` moved aside.

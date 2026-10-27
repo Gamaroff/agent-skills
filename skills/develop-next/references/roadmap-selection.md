@@ -86,6 +86,8 @@ The relation was a one-directional `⊆` until task.71, and equality is the stri
 
 **There is no park value, by decision.** An earlier version of this section argued that the floor *was* the opt-out — that a `draft` task was speculative and out of the frontier by construction, which is stronger than a marker because there is nothing to remember. That argument is overturned, not merely edited around ([task.71](../../../docs/tasks/task.71.selection-floor-matches-dispatcher/task.71.selection-floor-matches-dispatcher.md) §2). The opt-out was never free: it parked speculative filings at no cost to their author and charged every real filing a manual promotion step. And the review gate it stood in for did not disappear — it moved to where it belongs, `develop-task` Step 2, which reviews a `draft` before any code is written and HALTs on NEEDS REVISION or REQUIRES REWORK. A speculative task now costs one visible, recoverable cycle; under the old floor a real task cost indefinite silence. A filing that should not be worked is `cancelled`, or is not filed; adding `deferred` to the lifecycle would re-import the "something new to remember" cost the old argument correctly warned about.
 
+`blocked_on_external:` (see [External preconditions](#external-preconditions)) is **not** a park value, and differs on both counts the decision above weighed. It names a condition outside this repository, checkable yes or no, rather than a judgement that the work can wait. And it is never silent: every held row the frontier evaluates is named, with its condition, in the selected rationale or the `roadmap-complete` detail, so a field nobody clears is read on every run that could have selected the row.
+
 **The bug axis diverges, and task.72 pinned the gap exactly.** `develop-bug` proceeds on `new`, `reopened`, `in-progress` and `ready-for-qa`, while the bug floor is `new`, `reopened` — a real two-status gap, asserted as that exact set rather than as a subset. `⊆` held for every possible widening of the dispatcher, so it was silent about precisely the drift it existed to catch; the exact assertion fails in both directions, and closing the gap now requires a deliberate edit rather than happening as a side effect.
 
 **Why the task axis's equality rule does not transfer.** It is not a universal law the bug axis has failed to obey. `develop-task`'s pre-work statuses mean *"this is unstarted work and the pipeline will start it"* — nominating such a task is exactly right, which is why task.71 made that floor equal the dispatcher's set. `develop-bug`'s two extra statuses mean something else: `in-progress` is *"a prior run may have started; resume-aware"* and `ready-for-qa` is *"proceed toward verification if a fix already exists"*. Those are **resume affordances**, written so a re-invoked pipeline does not HALT on its own half-finished work — not claims that work is waiting to be picked up. Selecting on them would hand an unattended loop a bug a human may be actively holding, or one whose fix is written and only awaiting verification. The gap may still be closed deliberately; the assertion failing is how that decision gets recorded.
@@ -95,6 +97,24 @@ The relation was a one-directional `⊆` until task.71, and equality is the stri
 ### Frontmatter decides; the registry row only nominates
 
 A registry is an index, and indexes drift from what they index. Three rows of this repo's own task registry read `draft` while their documents read `accepted` — that is the current state of the file, not a hypothetical. So a row is a candidate only when **the document it points at** puts it inside its kind's eligible set, whatever the row says. This holds in both directions: a stale-**open** row with a terminal document is not selected, and a stale-**closed** row with an open document **is**. A document that is missing or carries no readable `status:` is not a candidate.
+
+### External preconditions
+
+A blocker in **another repository** cannot be written in the `Depends on` cell — `task.127` there binds to this registry's own task.127 — so it is written as free text after ` — `, which the selector does not read. The document's frontmatter carries it instead (task.235):
+
+```yaml
+blocked_on_external: "billing-service task.127 (#982) merged and run on a real PR"
+```
+
+A document with a non-empty value is **held**: passed over with `eligible: false`, `externalBlock: <value>` and the reason `blocked on an external precondition: <value> — clear blocked_on_external in <path> when it is met`. It is never selected while the field is set.
+
+- **Placeholders never hold.** `—`, `-`, `none`, `n/a`, `tbd` (the `Depends on` cell's empty spellings), an empty value and the YAML nulls `null` and `~` all read as not blocked — this repository writes an unset key as `null`.
+- **Quote the value.** Inside quotes a ` #` is part of the condition (`"billing-service PR #982 merged"`); unquoted, ` #` starts a YAML comment and the condition ends before it.
+- **Check order.** After the eligibility floor, so an `accepted` or `cancelled` document still reports its status, the nearer cause. Before the dependency check, because no in-repo action can clear it.
+- **Named on every run that evaluates it.** The selected rationale counts rejections by cause (document status, dependencies, external precondition) and names each held row with its condition; the `roadmap-complete` detail names each held path. Selection short-circuits, so a held row ranked **below** the selection is not read and not named — it could not have been selected on that run. `--lint` names every held row.
+- **A human clears it.** The selector does not check the other repository: there is no network in a deterministic selector. When the condition is met, delete the field.
+- **The task's own Phase 0 HALT stays**, for a direct `/develop-task` run that never goes through the selector.
+- **The roadmap path does not read it.** A roadmap row's `⛔` annotation already blocks on free text; `--batch` is registry-free and unaffected.
 
 ### Ordering
 
@@ -128,7 +148,7 @@ A consumer repo may have neither registry. An absent, empty, header-only or tabl
 
 ### Visibility — out of the frontier, never invisible
 
-`select-next.mjs --lint` emits a `registryFrontier` section listing **every** registry row the fallback considered, with the reason each was passed over (`document status draft — outside the task eligibility floor …`, `… is not a member of the bug lifecycle …`, `blocked on unaccepted dependency: task.83 (planned)`, `document missing or unreadable: …`, `malformed row — …`, `eligible, but T3 ranked higher`). An item may be out of the frontier, but it must never be invisible — invisibility is the exact failure this mechanism exists to remove, and an escape hatch that reintroduced it silently would be the same bug wearing different clothes. Selection short-circuits at the first eligible row (so it reads at most one document per candidate up to the hit); `--lint` evaluates every row.
+`select-next.mjs --lint` emits a `registryFrontier` section listing **every** registry row the fallback considered, with the reason each was passed over (`document status draft — outside the task eligibility floor …`, `… is not a member of the bug lifecycle …`, `blocked on unaccepted dependency: task.83 (planned)`, `blocked on an external precondition: …`, `document missing or unreadable: …`, `malformed row — …`, `eligible, but T3 ranked higher`). An item may be out of the frontier, but it must never be invisible — invisibility is the exact failure this mechanism exists to remove, and an escape hatch that reintroduced it silently would be the same bug wearing different clothes. Selection short-circuits at the first eligible row (so it reads at most one document per candidate up to the hit); `--lint` evaluates every row.
 
 **A status outside the lifecycle is reported as a filing error, not as a finished item** (bug.8). The eligibility floor answers "should this be nominated now?"; the lifecycle answers "is this a status at all?". They are different sets on purpose, and until both were consulted, `closed` (valid, terminal) and `open` (a typo) produced the identical passed-over sentence — so a misfiled bug hid among the ~98 correctly-terminal rows this repo's own corpus produces. A row whose document status is not a member of `BUG_LIFECYCLE_STATUSES` / `TASK_LIFECYCLE_STATUSES` now gets:
 

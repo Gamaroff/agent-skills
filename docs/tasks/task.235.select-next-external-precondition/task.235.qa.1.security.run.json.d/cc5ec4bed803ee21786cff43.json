@@ -1,0 +1,23 @@
+{
+  "sink": "markdown-structure",
+  "entry": "skills/develop-next/scripts/select-next.mjs#externalBlockOf",
+  "name": "externalBlockOf",
+  "call_site": "skills/develop-next/scripts/select-next.mjs:1021",
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 16,
+  "passed": 16,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-27T04:11:07.209Z"
+}

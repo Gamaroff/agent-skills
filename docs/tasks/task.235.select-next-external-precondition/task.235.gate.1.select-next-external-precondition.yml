@@ -1,0 +1,58 @@
+schema: 2
+task: 'task.235.select-next-external-precondition'
+task_title: 'select-next honours an external precondition'
+gate: PASS
+status_reason: 'All four phases verified, 185/185 unit tests and npm run ci green, wall time 102.7% of develop, boundary probe engages (16 executed, 0 escaped). One promoted low-severity code-review bug (CR-1): a quoted condition containing " #" is truncated.'
+reviewer: 'QA Engineer'
+head: '92e9a4a375d7ac8e9b419ee0f95def5fad18b19c'
+updated: '2026-10-27T04:11:34Z'
+
+top_issues:
+  - id: 'TASK-235-CR-1'
+    severity: low
+    file: 'skills/develop-next/scripts/select-next.mjs'
+    finding: 'externalBlockOf reads the value through frontmatterScalar, which strips everything from any whitespace-then-# even inside a quoted value, so blocked_on_external: "tinker-city PR #982 merged" holds the row on the truncated condition "tinker-city PR" and the reason and rationale name the wrong precondition (reproduced).'
+    suggested_action: 'Treat " #" as a comment only outside a quoted value for this key (strip a balanced quote pair before the comment rule), and add a test with a quoted value containing " #NNN".'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 185
+  phases_verified: 4/4
+  ci: 'pending @ 92e9a4a3 (4 pass, 1 pending at gate time)'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 16
+    escaped: 0
+    notes: 'boundary: true — externalBlockOf is a hold classifier (non-null prevents selection). security-probe.mjs --entry select-next.mjs#externalBlockOf with a 16-case file (12 hostile placeholder/null/lookalike/body-key inputs must read null, 4 legitimate conditions must hold): verdict engages, 0 reproduced, 0 escaped. Record: task.235.qa.1.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'Unit suite wall time, median of 3 interleaved runs at load 0.33-0.39: develop 0.857s, PR head 0.880s = 102.7% (bound 110%). makeRegistryLoader reads each document once (read-count test).'
+  reliability:
+    status: PASS
+    notes: 'No-loader parity test holds: registryFrontier without readExternalBlock behaves exactly as before. Rollback is a revert.'
+  maintainability:
+    status: PASS
+    notes: 'Docs, rule sites and the standards row updated together; CR-2 (dependency count keyed on reason text) is an advisory cleanup.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-2 (advisory): count dependency-blocked rows on a structured marker rather than matching the reason text.'
+      refs: ['skills/develop-next/scripts/select-next.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

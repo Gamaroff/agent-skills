@@ -1,0 +1,234 @@
+[
+  {
+    "id": "ext-h1",
+    "sink": "markdown-structure",
+    "input": "---\nstatus: planned\nblocked_on_external: none\n---\n# T\n",
+    "why": "placeholder spelling",
+    "correct": "REJECT (null): none is not a hold",
+    "direction": "hostile"
+  },
+  {
+    "id": "ext-h2",
+    "sink": "markdown-structure",
+    "input": "---\nstatus: planned\nblocked_on_external: —\n---\n",
+    "why": "em-dash placeholder",
+    "correct": "REJECT (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "ext-h3",
+    "sink": "markdown-structure",
+    "input": "---\nstatus: planned\nblocked_on_external: null\n---\n",
+    "why": "YAML null",
+    "correct": "REJECT (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "ext-h4",
+    "sink": "markdown-structure",
+    "input": "---\nstatus: planned\nblocked_on_external: ~\n---\n",
+    "why": "YAML tilde null",
+    "correct": "REJECT (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "ext-h5",
+    "sink": "markdown-structure",
+    "input": "---\nstatus: planned\nblocked_on_external: NULL\n---\n",
+    "why": "uppercase YAML null",
+    "correct": "REJECT (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "ext-h6",
+    "sink": "markdown-structure",
+    "input": "---\nstatus: planned\nblocked_on_external:\n---\n",
+    "why": "empty value",
+    "correct": "REJECT (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "ext-h7",
+    "sink": "markdown-structure",
+    "input": "---\nstatus: planned\nblocked_on_external: \"\"\n---\n",
+    "why": "empty quoted value",
+    "correct": "REJECT (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "ext-h8",
+    "sink": "markdown-structure",
+    "input": "---\nstatus: planned\n---\n\nblocked_on_external: tinker-city task.127\n",
+    "why": "key in the body, not the frontmatter",
+    "correct": "REJECT (null): only frontmatter decides",
+    "direction": "hostile"
+  },
+  {
+    "id": "ext-h9",
+    "sink": "markdown-structure",
+    "input": "---\nstatus: planned\nblocked_on_external_note: tinker-city task.127\n---\n",
+    "why": "lookalike key with a suffix",
+    "correct": "REJECT (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "ext-h10",
+    "sink": "markdown-structure",
+    "input": "# No frontmatter\n\nblocked_on_external: x\n",
+    "why": "no frontmatter at all",
+    "correct": "REJECT (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "ext-h11",
+    "sink": "markdown-structure",
+    "input": "---\nstatus: planned\nblocked_on_external: n/a  # nothing yet\n---\n",
+    "why": "placeholder with trailing comment",
+    "correct": "REJECT (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "ext-h12",
+    "sink": "markdown-structure",
+    "input": "",
+    "why": "empty document",
+    "correct": "REJECT (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "ext-h13",
+    "sink": "markdown-structure",
+    "input": "---\nstatus: planned\nblocked_on_external: \"none\"  # nothing yet\n---\n",
+    "why": "quoted placeholder + trailing comment",
+    "correct": "REJECT (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "ext-h14",
+    "sink": "markdown-structure",
+    "input": "---\nstatus: planned\nblocked_on_external: \"\"  # none\n---\n",
+    "why": "empty quoted + comment",
+    "correct": "REJECT (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "ext-h15",
+    "sink": "markdown-structure",
+    "input": "---\nstatus: planned\nblocked_on_external: 'n/a'\n---\n",
+    "why": "single-quoted placeholder through the quote-aware early return",
+    "correct": "REJECT (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "ext-h16",
+    "sink": "markdown-structure",
+    "input": "---\nstatus: planned\nblocked_on_external: \"   \"\n---\n",
+    "why": "whitespace-only quoted value",
+    "correct": "REJECT (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "ext-h17",
+    "sink": "markdown-structure",
+    "input": "---\nstatus: planned\nblocked_on_external: \"none\n---\n",
+    "why": "unbalanced quote around a placeholder",
+    "correct": "REJECT (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "ext-h18",
+    "sink": "markdown-structure",
+    "input": "---\nstatus: planned\nblocked_on_external: \"~\"\n---\n",
+    "why": "quoted YAML tilde null",
+    "correct": "REJECT (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "ext-h19",
+    "sink": "markdown-structure",
+    "input": "---\nstatus: planned\nparent:\n  blocked_on_external: tinker-city task.127\n---\n",
+    "why": "nested (indented) key is not a top-level scalar",
+    "correct": "REJECT (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "ext-h20",
+    "sink": "markdown-structure",
+    "input": "---\nstatus: planned\nblocked_on_external: TBD\n---\n",
+    "why": "uppercase tbd placeholder",
+    "correct": "REJECT (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "ext-h21",
+    "sink": "markdown-structure",
+    "input": "---\nstatus: planned\nblocked_on_external: –\n---\n",
+    "why": "en-dash placeholder",
+    "correct": "REJECT (null)",
+    "direction": "hostile"
+  },
+  {
+    "id": "ext-l1",
+    "sink": "markdown-structure",
+    "input": "---\nstatus: planned\nblocked_on_external: tinker-city task.127 merged\n---\n",
+    "why": "plain condition",
+    "correct": "ACCEPT: returns the condition",
+    "direction": "legitimate"
+  },
+  {
+    "id": "ext-l2",
+    "sink": "markdown-structure",
+    "input": "---\nstatus: planned\nblocked_on_external: \"tinker-city task.127 (#982) merged and run on a real PR\"\n---\n",
+    "why": "the task.174 spelling",
+    "correct": "ACCEPT",
+    "direction": "legitimate"
+  },
+  {
+    "id": "ext-l3",
+    "sink": "markdown-structure",
+    "input": "---\r\nstatus: planned\r\nblocked_on_external: billing-service task.9 deployed\r\n---\r\n",
+    "why": "CRLF line endings",
+    "correct": "ACCEPT",
+    "direction": "legitimate"
+  },
+  {
+    "id": "ext-l4",
+    "sink": "markdown-structure",
+    "input": "---\nstatus: planned\nblocked_on_external: 'staging: billing v2 live'\n---\n",
+    "why": "single-quoted value with a colon",
+    "correct": "ACCEPT",
+    "direction": "legitimate"
+  },
+  {
+    "id": "ext-l5",
+    "sink": "markdown-structure",
+    "input": "---\nstatus: planned\nblocked_on_external: \"billing-service PR #982 merged\"\n---\n",
+    "why": "quoted value containing space-hash",
+    "correct": "ACCEPT",
+    "direction": "legitimate"
+  },
+  {
+    "id": "ext-l6",
+    "sink": "markdown-structure",
+    "input": "---\nstatus: planned\nblocked_on_external: 'a #1 b'  # note\n---\n",
+    "why": "single-quoted space-hash + comment",
+    "correct": "ACCEPT",
+    "direction": "legitimate"
+  },
+  {
+    "id": "ext-l7",
+    "sink": "markdown-structure",
+    "input": "---\nstatus: planned\nblocked_on_external: \"none of the above shipped\"\n---\n",
+    "why": "real condition starting with a placeholder word",
+    "correct": "ACCEPT",
+    "direction": "legitimate"
+  },
+  {
+    "id": "ext-l8",
+    "sink": "markdown-structure",
+    "input": "---\nstatus: planned\nblocked_on_external: nullable-api v2 live\n---\n",
+    "why": "real condition starting with 'null'",
+    "correct": "ACCEPT",
+    "direction": "legitimate"
+  }
+]
