@@ -1,8 +1,8 @@
 # Task Registry
 
 **Purpose:** Central tracking for all task numbers in this repo.
-**Last Updated:** 2026-10-26
-**Next Available Task Number:** **236**
+**Last Updated:** 2026-10-27
+**Next Available Task Number:** **237**
 
 ## How to use
 
@@ -277,6 +277,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 233 | [Done lead claims a merge that has not happened](task.233.done-lead-claims-merge/task.233.done-lead-claims-merge.md) | accepted | refactoring | Medium | 2026-10-26 | [#749](https://github.com/Gamaroff/agent-skills/issues/749) | — cut from observation #98 (T232 run: the `done` lead said "now part of the product" on PR #748 before it merged) · PR #751 merged |
 | 234 | [Probe sandbox teardown and process-group reap](task.234.probe-teardown-and-reap-hardening/task.234.probe-teardown-and-reap-hardening.md) | planned | testing | Low | 2026-10-26 | [#750](https://github.com/Gamaroff/agent-skills/issues/750) | — cut from task.232 QA gate 3 `recommendations.future` (CR-1 to CR-4 plus gate 2 CR-2) |
 | 235 | [select-next registry fallback selects an item blocked on another repository](task.235.select-next-external-precondition/task.235.select-next-external-precondition.md) | planned | infrastructure | Medium | 2026-10-26 | [#759](https://github.com/Gamaroff/agent-skills/issues/759) | — cut from observation #103 (T169 run: the fallback selected T174, blocked on tinker-city task.127) |
+| 236 | [create-task 1.1 omits the required taskId argument to seedFromObservations](task.236.create-task-seed-step-call/task.236.create-task-seed-step-call.md) | planned | documentation | Medium | 2026-10-27 | [#760](https://github.com/Gamaroff/agent-skills/issues/760) | — cut from observation #104 (task.235 run: § 1.1 step 3's call threw without `taskId`) |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
