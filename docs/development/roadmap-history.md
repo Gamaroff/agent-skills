@@ -303,3 +303,14 @@ lowest-numbered task. T230 fixes observation #91 while the T229 run that found i
 task.166, 170, 175 and 203 already carry a DoD section there.
 
 - [x] **T230** Keep foreign sections out of the change-log block · deps: none · touches: change-log!, pipeline-steps~, bundles~ · /develop-task docs/tasks/task.230.change-log-block-foreign-sections/task.230.change-log-block-foreign-sections.md — ✅ **accepted + merged** ([PR #735](https://github.com/Gamaroff/agent-skills/pull/735), `31643ca4`; QA PASS 95/100 after 4 cycles, DoD accepted on run 1, CI 6/6). `change-log.js` lifts a sibling section written inside the change-log markers back out — above them if it sat before the log, below them if after — through one partition the writer and a new corpus guard share; task.166, 170, 175 and 203 repaired
+
+## PHASE 17 — observation fixes from the T169 run (opened 2026-10-27, closed 2026-10-27)
+
+An **override**: without it the registry fallback selects T174, which is blocked on tinker-city
+task.127 and halts at its own Phase 0. The owner asked for these two ahead of every other story and
+task. T235 goes first: it teaches the fallback to pass over a task like T174, so the loop stops
+halting on it. T236 then fixes the `create-task` seed step. The two are independent and share only
+a soft edit to `create-task/SKILL.md` (§ 1.2 and § 1.1).
+
+- [x] **T235** select-next registry fallback passes over an external precondition · deps: none · touches: selection!, templates~ · /develop-task docs/tasks/task.235.select-next-external-precondition/task.235.select-next-external-precondition.md — ✅ **accepted + merged** ([PR #761](https://github.com/Gamaroff/agent-skills/pull/761), `d8e1b270`; QA PASS 100/100 after 2 cycles, DoD accepted on run 1, CI 6/6). A task may carry `blocked_on_external: "<condition>"`; the registry fallback passes it over with the condition named, and T174 now reads as held instead of being selected
+- [x] **T236** create-task 1.1 seed step makes a runnable call · deps: none · touches: templates~ · /develop-task docs/tasks/task.236.create-task-seed-step-call/task.236.create-task-seed-step-call.md — ✅ **accepted + merged** ([PR #763](https://github.com/Gamaroff/agent-skills/pull/763), `86de1a42`; QA PASS 100/100 after 4 cycles, DoD accepted on run 2, CI 6/6). § 1.1 step 3 is one runnable block that passes `{ taskId }` to `seedFromObservations`, and a test executes that block from `SKILL.md`

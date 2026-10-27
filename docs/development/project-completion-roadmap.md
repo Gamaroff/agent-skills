@@ -5,7 +5,7 @@ How to use this document: work top to bottom. Only `[ ]` rows are candidates; `[
 [`roadmap-history.md`](./roadmap-history.md), so a `deps:` entry naming no current row means
 _already shipped_, not an error. Resolve any such reference there.
 
-**Phases 1 through 16 are complete and archived** to
+**Phases 1 through 17 are complete and archived** to
 [`roadmap-history.md`](./roadmap-history.md) — resolve any `deps:` naming a row you cannot find here
 against that file. The rows under "Deferred / human-gated" remain invisible to selection.
 
@@ -20,7 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. Phase 17 is open (opened 2026-10-27); once it closes, selection falls through to the registries.
+chain, a human gate. No phase is open (Phase 17 closed 2026-10-27); selection falls through to the registries.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -67,17 +67,6 @@ Read only by `--batch`. Two rows conflict when they share a tag that **either** 
 | `docs-pipeline`    | `docs/runbooks/*`, `docs/concepts/*`, `docs/reference/pipeline-artifacts.md`, `docs/operations/workflows.md`, `skills/develop-*/README.md` |
 | `pipeline-lock`    | `shared/resources/advance-pipeline-lock.sh`, `advance-pipeline-lock.test.sh`  |
 
-## PHASE 17 — observation fixes from the T169 run (opened 2026-10-27)
-
-An **override**: without it the registry fallback selects T174, which is blocked on tinker-city
-task.127 and halts at its own Phase 0. The owner asked for these two ahead of every other story and
-task. T235 goes first: it teaches the fallback to pass over a task like T174, so the loop stops
-halting on it. T236 then fixes the `create-task` seed step. The two are independent and share only
-a soft edit to `create-task/SKILL.md` (§ 1.2 and § 1.1).
-
-- [x] **T235** select-next registry fallback passes over an external precondition · deps: none · touches: selection!, templates~ · /develop-task docs/tasks/task.235.select-next-external-precondition/task.235.select-next-external-precondition.md — ✅ **accepted + merged** ([PR #761](https://github.com/Gamaroff/agent-skills/pull/761), `d8e1b270`; QA PASS 100/100 after 2 cycles, DoD accepted on run 1, CI 6/6). A task may carry `blocked_on_external: "<condition>"`; the registry fallback passes it over with the condition named, and T174 now reads as held instead of being selected
-- [ ] **T236** create-task 1.1 seed step makes a runnable call · deps: none · touches: templates~ · /develop-task docs/tasks/task.236.create-task-seed-step-call/task.236.create-task-seed-step-call.md
-
 ## Deferred / human-gated
 
 Rows here are invisible to selection. Move a row up into a phase when it becomes actionable.
@@ -89,7 +78,7 @@ Rows here are invisible to selection. Move a row up into a phase when it becomes
 
 ## Housekeeping
 
-- [x] Archive accepted rows to `roadmap-history.md` at each phase close — Phase 5 archived 2026-09-12; Phases 6, 7 and 8 archived 2026-10-06; Phases 9 and 10 archived 2026-10-11; Phase 11 archived 2026-10-16; Phase 12 archived 2026-10-20; Phase 13 archived 2026-10-21; Phases 14 and 15 archived 2026-10-22; Phase 16 archived 2026-10-23
+- [x] Archive accepted rows to `roadmap-history.md` at each phase close — Phase 5 archived 2026-09-12; Phases 6, 7 and 8 archived 2026-10-06; Phases 9 and 10 archived 2026-10-11; Phase 11 archived 2026-10-16; Phase 12 archived 2026-10-20; Phase 13 archived 2026-10-21; Phases 14 and 15 archived 2026-10-22; Phase 16 archived 2026-10-23; Phase 17 archived 2026-10-27
 - [ ] If a phase is ever re-opened: tick its rows `[x]` as each item is accepted — an unticked row for an accepted item is still selected and stalls the loop
 
 **Registry-selected items need no row here.** When selection falls through to the registries (the
@@ -220,3 +209,5 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-10-23 | **Phase 16 closed and archived** to `roadmap-history.md` (T230). No phase is open; selection falls through to the registries (next: T217). |
 | 2026-10-27 | **Phase 17 opened** with T235 (select-next external precondition, cut from observation #103), then T236 (create-task seed step, cut from observation #104), ordered ahead of the registry fallback at the owner's request; without it T174 is selected first and halts on its tinker-city blocker. |
 | 2026-10-27 | **T235 accepted + merged — PR #761 merged** (`d8e1b270`). `select-next.mjs` reads a new `blocked_on_external:` frontmatter field: the registry fallback checks it after the eligibility floor and before dependencies, passes the row over with `externalBlock` and a reason naming the condition, counts rejections by cause in the selected rationale and names each held row in the `roadmap-complete` detail. Placeholders and the YAML nulls do not hold a row; the loader became the exported, read-once `makeRegistryLoader`; task.174 carries the field. Two QA cycles (PASS 100 → PASS 100): cycle 1 made the shared `frontmatterScalar` quote-aware (a quoted ` #` stays in the value); cycle 2's one low (TASK-235-CR2-1, an escaped or doubled quote ends a value early, 0 of 522 tracked values) carried to Deferred Work (route 2b). 5c APPROVE, its two lows closed at finalise; DoD 16/16 with the wall time re-measured on the PR head (104.5% of develop); security probe 29 executed, 0 reproduced; merge gate `npm run ci` green (6416 tests, 0 fail). Issue #759 closed. **Next: T236.** |
+| 2026-10-27 | **T236 accepted + merged — PR #763 merged** (`86de1a42`). `create-task` § 1.1 step 3 is now one runnable block. It reads the task id from the registry, single-quotes the task number and ids and checks both against their digit rules, and calls `seedFromObservations(entries, { taskId })` once. `seed-step-block.test.js` executes that block from `SKILL.md`; `seed-block-probe.js` builds the fence probe QA and finalise both run. Four QA cycles (CONCERNS 70 → CONCERNS 90 → PASS 100 → PASS 100): cycles 1–2 fixed a worktree-unsafe test, an unvalidated task number, a block the probe could not reach and double-quoted substitutions. DoD run 1 stopped on a red CI `test` QA had not read: CI has zsh, so the probe ran 36 times, not 18. `1689d7cb` asserts the count per shell (mutation-proven with a stand-in zsh), re-entered QA as cycle 4, and DoD run 2 accepted 11/11. Security probe 18 executed, 0 reproduced; 5c APPROVE twice; merge gate `npm run ci` green (6422 tests, 0 fail); CI 6/6. Issue #760 closed. Observation #107 records the CI-read gap in qa-task. |
+| 2026-10-27 | **Phase 17 closed and archived** to `roadmap-history.md` (T235 and T236). No phase is open; selection falls through to the registries (next: T179; T174 is held on its external precondition). |
