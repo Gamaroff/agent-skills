@@ -12,7 +12,11 @@ All notable changes to this project will be documented in this file. Format foll
   function takes every entry in one call. The step is now one runnable block that reads the task
   id first and makes the single call. A new test, `skills/create-task/tests/seed-step-block.test.js`,
   extracts that block from `SKILL.md` and runs it against a scratch log, so the step and the
-  function can no longer disagree with the suite green.
+  function can no longer disagree with the suite green. The block refuses a task number that is not
+  digits (`task.236` had seeded `task.task.236 merged to develop`), and it has its own heading, so the
+  `fence:` probe reaches it; `seed-block-probe.js` builds that probe, and the test runs its 13 cases
+  on every PR. The test's scratch log lives under the main checkout, so it also passes from a linked
+  worktree.
 
 - **`develop-next` reads an escaped quote and `false` / `no` correctly in frontmatter (task 235
   follow-up).** The shared frontmatter reader ended a quoted value at the first matching quote, so

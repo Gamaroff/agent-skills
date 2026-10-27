@@ -202,6 +202,9 @@ could forget: 9 entries had been parked by hand, each by whichever session remem
    the entry's `status` is not `open`, and name the id, the files and the status. A parked or
    actioned entry already has a home, and a second task cut from it is the duplicate this entry
    prevents.
+
+#### Steps 3 to 6: seed, ask, cite and park
+
 3. **Seed.** The seed needs the task id, because each park condition names it: read the registry's
    **Next Available Task Number** (§ 1) **before** this step, and put it in `{next-task-number}`.
    Put the selected ids in `{observation-ids}`. Run the block as it stands, from the repository root,
@@ -217,6 +220,7 @@ could forget: 9 entries had been parked by hand, each by whichever session remem
    const fs = require("fs"), path = require("path");
    const lib = require(path.resolve(".agents/skills/create-task/scripts/lib.js"));
    const scan = JSON.parse(fs.readFileSync(0, "utf8"));
+   if (!/^[0-9]+$/.test(process.argv[1])) { console.error("not a task number: " + process.argv[1]); process.exit(1); }
    if (scan.reason !== "ok") { console.error("scan: " + scan.reason); process.exit(1); }
    const entries = process.argv[2].split(",").map((s) => s.trim()).map((id) => {
      if (!/^[0-9]+$/.test(id)) { console.error("not an observation id: " + id); process.exit(1); }
@@ -226,16 +230,18 @@ could forget: 9 entries had been parked by hand, each by whichever session remem
      return { frontmatter: hit[0], body };
    });
    console.log(JSON.stringify(lib.seedFromObservations(entries, { taskId: process.argv[1] }), null, 2));
-   ' "$TASK_ID" "$OBS_IDS"
+   ' -- "$TASK_ID" "$OBS_IDS"
    ```
 
-   Under `node -e`, `process.argv[1]` is the first argument after the program. One call is the
+   Under `node -e`, `process.argv[1]` is the first argument after the `--`, and the `--` keeps a
+   value that starts with `-` from being read as a node option. One call is the
    point: a run with several entries returns `title: null` with `titleReason: multiple-entries`,
    one References list and one Change Log description, and a per-entry loop returns none of those.
    The seed is printed as JSON. It holds `ids`, `title` (the bare name, or `null` with `titleReason`),
    `description` (or `null` with `descriptionReason: too-short`), `tags`,
    `references`, `changeLogDescription` and the `park` vectors. The block exits non-zero, naming the
-   entry, on a non-`open` entry and on an entry whose identity is uncertain: stop and report it.
+   input, on a task number or an observation id that is not digits, on a non-`open` entry and on
+   an entry whose identity is uncertain: stop and report it.
    Identity is the scan entry's `file` prefix, which is what
    `set-status --id` resolves, and the frontmatter id must agree with it.
    The Improvement sections seed Target Architecture and the Implementation Plan. The Issue sections

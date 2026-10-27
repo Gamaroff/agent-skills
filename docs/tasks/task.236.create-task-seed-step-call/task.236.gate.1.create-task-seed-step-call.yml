@@ -1,0 +1,81 @@
+schema: 2
+task: 'task.236.create-task-seed-step-call'
+task_title: 'create-task 1.1 omits the required taskId argument to seedFromObservations'
+gate: CONCERNS
+status_reason: 'The step 3 block is correct on valid input and refuses every hostile id, but its new test fails in a linked worktree, the block accepts a non-numeric task id, and the block cannot be reached by the probe engine on the shipped file. Three medium findings, no high.'
+reviewer: 'QA Engineer'
+head: '78905e63b9bfcc0ce152ce2dd096cbb2e84ffbf1'
+updated: '2026-10-27T06:20:01Z'
+
+top_issues:
+  - id: 'QA-1'
+    severity: medium
+    file: 'skills/create-task/tests/seed-step-block.test.js'
+    finding: 'platform-variance (CR-1): SCRATCH_ROOT is built under the checkout, and resolve-observation-workspace.sh refuses any path inside a linked git worktree, so both tests fail when the suite runs from a worktree (reproduced: 0 pass / 2 fail, "observation workspace refused: path is inside a linked git worktree"; from-observation.test.js passes 15/15 in the same worktree).'
+    suggested_action: 'Build the scratch base under the main checkout (parent of `git rev-parse --path-format=absolute --git-common-dir`), as scratchRoot() in shared/resources/tests/observation-log.test.mjs does, and add the module-load SCRATCH_REFUSAL guard from-observation.test.js uses.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-2'
+    severity: medium
+    file: 'skills/create-task/SKILL.md'
+    finding: 'CR-2, reproduced by the fence probe: the block checks every observation id against /^[0-9]+$/ but never checks TASK_ID, so `task.236` and an unsubstituted `{next-task-number}` both exit 0 and print park conditions `task.task.236 merged to develop` and `task.{next-task-number} merged to develop`, which step 6 would write onto the entries.'
+    suggested_action: 'In the node program, refuse a process.argv[1] that does not match /^[0-9]+$/ with a one-line message naming it, before calling seedFromObservations, and add a committed test case for it.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-3'
+    severity: medium
+    file: 'skills/create-task/SKILL.md'
+    finding: 'The block is a boundary (it refuses on repository state), but the fence: probe form takes the FIRST bash block under a heading, and the seed block is the second under § 1.1 (the scan block at line 190 is first), so the shipped-file probe declines with bad-slot and records probes_executed 0, which /finalise''s zero-guard will fail.'
+    suggested_action: 'Give the seed block a heading of its own so `fence:skills/create-task/SKILL.md#<heading>` reaches it (a scratch copy with one inserted heading ran 9/9 id cases, 7 hostile refused, 0 escapes), and commit the probe cases so the next cycle can run them against the shipped file.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 46
+  phases_verified: 3/3
+  ci: 'not read — CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'Shipped-file probe declined (bad-slot, QA-3); record task.236.qa.1.security.run.json, totals.executed 0. Against a scratch copy with the block under its own heading: ids slot 9 executed, 9 scored as their direction requires, 0 escapes; task-number slot 4 executed, 2 hostile accepted (QA-2). Those runs are of a copy, so they are not counted here.'
+  performance:
+    status: PASS
+    notes: 'New test real 0.351s on 78905e63 at load 1.15 (bound < 5s).'
+  reliability:
+    status: CONCERNS
+    notes: 'QA-1: the new test fails from a linked worktree, the layout /develop-batch dispatches into.'
+  maintainability:
+    status: PASS
+    notes: 'One block, one call, placeholders substituted by split/join in the test; Prettier clean; validate and bundle:check clean.'
+
+recommendations:
+  immediate:
+    - action: 'QA-1: scratch base under the main checkout, with the SCRATCH_REFUSAL guard.'
+      refs: ['skills/create-task/tests/seed-step-block.test.js']
+    - action: 'QA-2: validate TASK_ID in the block.'
+      refs: ['skills/create-task/SKILL.md']
+    - action: 'QA-3: make the block reachable by fence: and commit its probe cases.'
+      refs: ['skills/create-task/SKILL.md']
+  future:
+    - action: 'CR-3 (low, advisory): a 0-hit id prints "matches 0 files" whether the file is missing or unparseable; consult scan.unparseable to tell them apart.'
+      refs: ['skills/create-task/SKILL.md']
+    - action: 'Step 4b (advisory): the changed block was refused as mutating (the resolver helper sources a non-literal path), so qa-execute-snippets did not run it; seed-step-block.test.js runs it instead.'
+      refs: ['skills/create-task/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'QA-1, QA-2 and QA-3 fixed and re-gated.'

@@ -10,8 +10,10 @@
  * SKILL.md that calls `seedFromObservations`, runs it under bash in a
  * consumer-shaped scratch tree, and asserts the seed it prints.
  *
- * The scratch tree is REPO-LOCAL (the engine refuses `/tmp` as ephemeral) and
- * carries its own `.agents/skills/create-task` link to this skill, so the
+ * The scratch tree lives under the MAIN checkout. The resolver refuses `/tmp`,
+ * and any path inside a linked git worktree, as ephemeral, so a base under the
+ * tree the test runs from failed every run from a worktree (QA cycle 1, QA-1).
+ * The tree carries its own `.agents/skills/create-task` link to this skill, so the
  * block's paths resolve without the gitignored local symlink CI does not have.
  * The fixtures are written as files, not through the engine's `write`: two
  * entries on one skill would answer `possible-duplicate`, and the control pair
@@ -41,9 +43,27 @@ const SNIPPETS = path.join(
 const engine = require(
   path.join(REPO, "shared", "resources", "observation-log.js"),
 );
+const RESOLVER = path.join(
+  REPO,
+  "skills",
+  "create-task",
+  "references",
+  "resolve-observation-workspace.sh",
+);
+const {
+  buildSeedProbe,
+  scratchBase,
+  mainCheckout,
+} = require("./seed-block-probe.js");
 
-const SCRATCH_ROOT = path.join(REPO, ".observation-log-test-tmp");
+const SCRATCH_ROOT = scratchBase(REPO);
 fs.mkdirSync(SCRATCH_ROOT, { recursive: true });
+const SCRATCH_REFUSAL = engine.ephemeralReason(fs.realpathSync(SCRATCH_ROOT));
+if (SCRATCH_REFUSAL) {
+  throw new Error(
+    `scratch base ${SCRATCH_ROOT} is classified ephemeral (${SCRATCH_REFUSAL}) — the block would be refused for a reason unrelated to what it asserts`,
+  );
+}
 
 // The block's two placeholders, substituted by split/join: a replacement
 // string passed to String.replace treats `$'` and `$&` as patterns.
@@ -90,7 +110,7 @@ function fixture(id, slug, title) {
 }
 
 // files: { "0001-name.md": "<text>" }. Returns the bash result.
-function runBlock(code, files, ids) {
+function runBlock(code, files, ids, taskId = TASK_ID) {
   const ws = fs.mkdtempSync(path.join(SCRATCH_ROOT, "seed-step-block-"));
   try {
     assert.equal(engine.run(["init", "--workspace", ws, "--json"]).exitCode, 0);
@@ -106,11 +126,7 @@ function runBlock(code, files, ids) {
       code.includes(TASK_SLOT) && code.includes(IDS_SLOT),
       "the block carries both placeholders",
     );
-    const script = code
-      .split(TASK_SLOT)
-      .join(TASK_ID)
-      .split(IDS_SLOT)
-      .join(ids);
+    const script = code.split(TASK_SLOT).join(taskId).split(IDS_SLOT).join(ids);
     const env = { ...process.env, OBS_WORKSPACE: ws };
     delete env.SKILLS_CONFIG_FILE;
     return spawnSync("bash", ["-c", script], {
@@ -189,4 +205,106 @@ test("control: an entry whose frontmatter id disagrees with its file prefix make
     /0003-gamma-step\.md has frontmatter id 2, which does not match its file id 3/,
   );
   assert.equal(r.stdout.trim(), "", "no seed is printed for a refused pair");
+});
+
+test("a task number that is not digits is refused before the seed is built", async () => {
+  const code = await seedBlock();
+  const files = {
+    "0001-alpha-step.md": fixture(
+      1,
+      "alpha",
+      "create-task: alpha step is prose",
+    ),
+    "0002-beta-step.md": fixture(
+      2,
+      "beta",
+      "create-task: beta step drops an argument",
+    ),
+  };
+  // `task.236` printed `task.task.236 merged to develop`, and an unsubstituted
+  // placeholder printed `task.{next-task-number} merged to develop` (QA-2).
+  for (const taskId of ["task.236", TASK_SLOT]) {
+    const r = runBlock(code, files, "1,2", taskId);
+    assert.notEqual(r.status, 0, `task number ${taskId} was accepted`);
+    assert.equal(r.stderr, `not a task number: ${taskId}\n`);
+    assert.equal(r.stdout, "", `no seed is printed for task number ${taskId}`);
+  }
+});
+
+test("from a linked worktree the scratch base is the main checkout's, which the resolver accepts", () => {
+  const main = mainCheckout(REPO);
+  const wt = path.join(main, ".worktrees", `seed-step-block-${process.pid}`);
+  const added = spawnSync("git", ["worktree", "add", "--detach", wt, "HEAD"], {
+    cwd: main,
+    encoding: "utf8",
+  });
+  // A sandbox that cannot create worktrees must not silently pass this test.
+  assert.equal(added.status, 0, `git worktree add failed: ${added.stderr}`);
+  const dirs = [];
+  try {
+    const resolve = (dir) => {
+      const env = { ...process.env, OBS_WORKSPACE: dir };
+      delete env.SKILLS_CONFIG_FILE;
+      return spawnSync("bash", ["-c", 'source "$0" || exit 1', RESOLVER], {
+        cwd: dir,
+        env,
+        encoding: "utf8",
+      });
+    };
+    assert.equal(scratchBase(wt), SCRATCH_ROOT);
+    // Control: the base the test used to build, under the worktree, is refused.
+    const inTree = path.join(wt, ".observation-log-test-tmp");
+    fs.mkdirSync(inTree, { recursive: true });
+    const refused = resolve(
+      fs.mkdtempSync(path.join(inTree, "seed-step-block-")),
+    );
+    assert.notEqual(
+      refused.status,
+      0,
+      "the resolver accepted a workspace inside a linked worktree",
+    );
+    assert.match(refused.stderr, /inside a linked git worktree/);
+    const accepted = fs.mkdtempSync(
+      path.join(scratchBase(wt), "seed-step-block-"),
+    );
+    dirs.push(accepted);
+    const ok = resolve(accepted);
+    assert.equal(
+      ok.status,
+      0,
+      `the resolver refused the main-checkout base: ${ok.stderr}`,
+    );
+  } finally {
+    for (const d of dirs) fs.rmSync(d, { recursive: true, force: true });
+    spawnSync("git", ["worktree", "remove", "--force", wt], { cwd: main });
+    spawnSync("git", ["worktree", "prune"], { cwd: main });
+  }
+});
+
+test("the probe engine scores every seed-block case as its direction requires", () => {
+  const probe = buildSeedProbe();
+  try {
+    const r = spawnSync(process.execPath, [...probe.argv, "--json"], {
+      cwd: REPO,
+      encoding: "utf8",
+    });
+    const out = JSON.parse(r.stdout);
+    const wrong = out.cases
+      .filter(
+        (c) =>
+          !(
+            (c.direction === "hostile" && c.outcome === "rejected") ||
+            (c.direction === "legitimate" && c.outcome === "accepted")
+          ),
+      )
+      .map((c) => `${c.id}: ${c.outcome} — ${c.detail}`);
+    assert.deepEqual(wrong, [], "every case scores as its direction requires");
+    assert.deepEqual(out.declined, [], "no case was declined");
+    assert.equal(out.executed, probe.caseCount, "every case executed");
+    assert.deepEqual(out.escapes, [], "no case wrote outside its sandbox");
+    assert.equal(r.status, 0, `probe exited ${r.status}: ${r.stderr}`);
+  } finally {
+    for (const p of probe.cleanup)
+      fs.rmSync(p, { recursive: true, force: true });
+  }
 });

@@ -237,7 +237,7 @@ motivated it. One fixture's frontmatter id disagrees with its file prefix, a cas
 
 ### Performance
 
-- [ ] The new test runs in under 5 seconds, measured on the PR head with
+- [x] The new test runs in under 5 seconds, measured on the PR head with
       `uptime; time command node --test skills/create-task/tests/seed-step-block.test.js` and the
       figure and load recorded in the implementation report.
 - [x] The existing create-task suite is untouched:
@@ -304,6 +304,27 @@ None identified.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-27
+**Quality Score**: 70/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.236.qa.1.create-task-seed-step-call.md](./task.236.qa.1.create-task-seed-step-call.md)
+- **Gate File**: [task.236.gate.1.create-task-seed-step-call.yml](./task.236.gate.1.create-task-seed-step-call.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 46
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+No high findings. Three medium: the new test fails from a linked worktree (QA-1); the block accepts a non-numeric task id (QA-2); the probe engine cannot reach the block in the shipped file (QA-3).
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -313,6 +334,8 @@ None identified.
 | 2026-10-27 | 1.1     | Review passed (8/10) — performance criteria given a command and a measurable bound; fixture authoring pinned to direct file writes (engine `write` would answer `possible-duplicate`); grep criterion and two line anchors tightened | review-task |
 | 2026-10-27 |         | Status → ready-for-development             | review-task |
 | 2026-10-27 |         | Implemented — 3 files, 2 tests             | develop     |
+| 2026-10-27 |         | QA gate CONCERNS (70/100) — 3 findings     | qa-task     |
+| 2026-10-27 |         | QA findings fixed — cycle 1, 3 findings    | qa-fix      |
 <!-- change-log-end -->
 
 ---
