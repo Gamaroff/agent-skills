@@ -133,6 +133,8 @@ grep-before-write rule (obs #127).
 ✅ **Step doc**: `skills/create-task/SKILL.md` § 1.1 step 3. § 1.1 also gains one line saying the
 seed needs the task id from § 1.
 ✅ **Test**: a new `skills/create-task/tests/seed-step-block.test.js`.
+✅ **Probe harness**: a new `skills/create-task/tests/seed-block-probe.js`, which runs the shipped
+block against hostile inputs. Added in qa-fix cycle 1 for QA-3.
 ✅ **CHANGELOG**: `[Unreleased]` entry.
 
 ### Out of Scope
@@ -199,6 +201,7 @@ None. The change is to documentation and adds one test. The function's contract 
 **Tests**
 
 3. ✅ `skills/create-task/tests/seed-step-block.test.js`: new
+4. ✅ `skills/create-task/tests/seed-block-probe.js`: new (qa-fix cycle 1, QA-3)
 
 ---
 
@@ -325,11 +328,39 @@ None identified.
 ### Key Findings
 No open finding above low after three cycles. The seed block single-quotes its substituted values. The shipped-file probe runs 18 cases: 0 reproduced, 0 escaped. Future work: 19 double-quoted placeholder sites in other skills (pre-existing), and a thin performance margin (4.3 s against 5 s).
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.236.qa.3.create-task-seed-step-call.md`
+**Gate File**: `task.236.gate.3.create-task-seed-step-call.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+### Missing Criteria:
+
+1. **CI green on the PR head:**
+   - [ ] CI `test` is red on `f525123a`: `seed-step-block.test.js:355` asserts 18 probe cases executed, but CI has zsh and the engine runs each case under bash and zsh (36). The zsh run itself scored every case correctly.
+
+### Next Steps:
+
+- [ ] Assert `executed === caseCount × shells.length` and that `shells` includes `bash`; mutation-prove it with a two-shell count
+- [ ] Re-enter QA at 5a, then re-run `/finalise` once CI is green on the fix head
+
+**Estimated Effort:** Small
+
+**Gap Report Generated:** 2026-10-27
+**QA Gate Reference**: See `task.236.gate.3.create-task-seed-step-call.yml` for full details
+
+**Detailed Verification Log:** See `task.236.dod.1.create-task-seed-step-call.md` for complete verification evidence and timestamps.
+
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                               | Author      |
-| ---------- | ------- | ----------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-27 | 1.0     | Initial draft — cut from observation #104 | create-task |
 | 2026-10-27 | 1.1     | Review passed (8/10) — performance criteria given a command and a measurable bound; fixture authoring pinned to direct file writes (engine `write` would answer `possible-duplicate`); grep criterion and two line anchors tightened | review-task |
 | 2026-10-27 |         | Status → ready-for-development             | review-task |
@@ -339,6 +370,7 @@ No open finding above low after three cycles. The seed block single-quotes its s
 | 2026-10-27 |         | QA gate CONCERNS (90/100) — 1 finding      | qa-task     |
 | 2026-10-27 |         | QA findings fixed — cycle 2, 1 finding     | qa-fix      |
 | 2026-10-27 |         | QA gate PASS (100/100) — 0 findings        | qa-task     |
+| 2026-10-27 |  | DoD incomplete — 1 gap identified (CI test red) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -386,10 +418,18 @@ The new `seed-step-block.test.js` extracts that block from `SKILL.md` and runs i
 
 ### Testing Results
 
+First pass (before QA):
+
 - `command node --test skills/create-task/tests/seed-step-block.test.js`: 2/2 pass.
 - `command node --test skills/create-task/tests/*.test.js`: 46/46 pass.
 - `npm run ci:fast` with `.agents/skills` and `.claude/skills` moved aside: 6418 tests, 6404 pass,
   0 fail, 14 skipped.
+
+After the two qa-fix cycles (PR head):
+
+- `seed-step-block.test.js`: 6/6 pass, in 4.3–4.4 s against the 5 s bound (thin margin; gate 3).
+- `command node --test skills/create-task/tests/*.test.js`: 50/50 pass.
+- `npm run ci:fast` with both moved aside: 6422 tests, 6408 pass, 0 fail, 14 skipped.
 - `npm run validate -- skills/create-task/` ✓; `npm run bundle:check`: 128 skills, 0 problems.
 
 ### Deferred Work
