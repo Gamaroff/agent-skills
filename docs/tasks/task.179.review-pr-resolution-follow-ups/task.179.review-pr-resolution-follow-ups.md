@@ -5,10 +5,12 @@ type: task
 description: "Close the six low-severity follow-ups task.177's QA and PR review recorded: one host reading for both parser arms, prose that describes the known-host scheme-less rule, a comment-only .env value, stale test comments, §0a's KEY_FIELD contract, and a mis-titled docs-guard test."
 tags: [review-pr, input-resolution, follow-up]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Low
 created: 2026-10-03
 updated: 2026-10-27
+completed_date: 2026-10-27
+pr_number: 764
 assignee:
 estimated_effort_hours: 4
 github_issue: 558
@@ -16,7 +18,7 @@ github_issue: 558
 
 # Technical Task: /review-pr resolution follow-ups
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.179.review.1.review-pr-resolution-follow-ups.md` implemented 2026-10-27
 **GitHub Issue**: [#558](https://github.com/Gamaroff/agent-skills/issues/558)
 
@@ -382,9 +384,11 @@ None.
 ### Key Findings
 No critical issues identified. One advisory low-severity finding: `JIRA_URL=#bare` reads as unset, but a shell reads it as `#bare` (gate `recommendations.future`).
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded)
 
-**Status:** IN PROGRESS
+> Superseded by DoD run 2, below. The one gap was closed in `5c4cf010`.
+
+**Status:** IN PROGRESS (run 1)
 
 ### QA Gate Status
 
@@ -396,17 +400,41 @@ No critical issues identified. One advisory low-severity finding: `JIRA_URL=#bar
 ### Missing Criteria:
 
 1. **Documentation:**
-   - [ ] `CHANGELOG.md:17` says "two stale test comments and a test title were corrected"; the diff, §4 Scope and the Implementation Summary show three stale comments.
+   - [x] `CHANGELOG.md:17` says "two stale test comments and a test title were corrected"; the diff, §4 Scope and the Implementation Summary show three stale comments.
 
 ### Next Steps:
 
-- [ ] Change "two" to "three" on `CHANGELOG.md:17`, commit and push, then re-run `/finalise` (document-only — no QA re-entry)
+- [x] Change "two" to "three" on `CHANGELOG.md:17`, commit and push, then re-run `/finalise` (document-only — no QA re-entry)
 
 **Estimated Effort:** Small (one word)
 
 **Gap Report Generated:** 2026-10-27
 
 **Detailed Verification Log:** See `task.179.dod.1.review-pr-resolution-follow-ups.md` for complete verification evidence and timestamps.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.179.qa.1.review-pr-resolution-follow-ups.md`
+**Gate File**: `task.179.gate.1.review-pr-resolution-follow-ups.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Review**: `task.179.pr-review.1.review-pr-resolution-follow-ups.md`. Verdict APPROVE. Its one low finding, PC-1, was fixed in `5c4cf010`.
+
+All Definition of Done criteria have been verified (DoD run 2):
+
+✅ **Acceptance Criteria:** 9/9 met. Seven cite tests in per-PR CI lanes (bash and zsh). Two are documentation criteria, checked by reading the text.
+✅ **PR & CI:** PR #764. CI reading 1 was SUCCESS on `5c4cf010` across 6 checks.
+✅ **Documentation:** The CHANGELOG `(task 179)` entry is accurate and now says "three". The SKILL.md prose, the §0a contract and all six bundled copies are updated.
+✅ **Security Review:** PASS. A boundary probe of `parse-target.sh#parse_target` ran 25 cases: 25 executed, 0 reproduced, 0 escapes.
+✅ **Compliance Review:** N/A. Internal skill refactor; no personal, payment or health data.
+
+**Task marked as ACCEPTED on:** 2026-10-27
+
+**Detailed Verification Log:** See `task.179.dod.2.review-pr-resolution-follow-ups.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
@@ -418,6 +446,7 @@ No critical issues identified. One advisory low-severity finding: `JIRA_URL=#bar
 | 2026-10-27 |         | Implemented — 13 files (4 authored, 6 bundled copies, CHANGELOG, task docs), 7 tests | develop |
 | 2026-10-27 |         | QA gate PASS (100/100) — 0 blocking, 1 advisory finding | qa-task |
 | 2026-10-27 |  | DoD incomplete — 1 gap identified (CHANGELOG count) | finalise |
+| 2026-10-27 | 1.2 | DoD run 2 — accepted (PR #764); run-1 CHANGELOG gap closed | finalise |
 <!-- change-log-end -->
 
 ---
