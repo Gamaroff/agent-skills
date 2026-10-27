@@ -249,7 +249,9 @@ See `references/develop-pipeline-step-5-6-qa-loop.md` for the full Steps 5–6 p
 `WAIVED` hands to 5c, which runs `/review-pr --effort {medium|low} --comment --no-code` over the open PR —
 the conformance lens only, since the QA step already ran the code reviewer.
 `REQUEST CHANGES` routes back to 5b `/qa-fix` and consumes a cycle from the **shared** 5-cycle
-budget; `CONCERNS` records findings without blocking; `APPROVE` exits to Step 7. The
+budget; `APPROVE` and `CONCERNS` exit to Step 7, with `CONCERNS` findings recorded rather than
+blocking; on either, doc-only findings are fixed when the carry clears them, and ride the
+acceptance commit. The
 `ready-for-merge` stage fires there, after the review clears — not on the QA gate. `/review-pr`
 stays advisory throughout: it writes no gate file and never edits code, and this orchestrator is
 what acts on its verdict. Lite mode degrades it to `--effort low` and never skips it. It leaves

@@ -770,6 +770,60 @@ test("APPROVE and CONCERNS exit the loop, and CONCERNS does not block", () => {
   );
 });
 
+// Task 237: the doc-only carry is invoked by BOTH exiting verdicts. The rule lives in three places —
+// the two rows, the "Classify on …" sentence and the CARRY_FIXED sentence — and the last is the one
+// task.179's run obeyed when it left an APPROVE's doc-only finding for /finalise to halt on. Pinning
+// the rows alone would leave that sentence free to revert.
+test("APPROVE and CONCERNS both carry doc-only findings into the acceptance commit (task.237)", () => {
+  for (const v of ["APPROVE", "CONCERNS"]) {
+    assert.match(
+      verdictRow(v),
+      /doc-only findings may be fixed there/,
+      `the ${v} row must carry the doc-only clause — an APPROVE carries low findings, and a doc-only one left unfixed halts /finalise (observation #109)`,
+    );
+  }
+});
+
+test("the carry prose names no verdict where it decides whether to fix (task.237)", () => {
+  const s5c = section5c();
+  const start = s5c.indexOf("#### Carry the review into the acceptance commit");
+  assert.ok(
+    start > -1,
+    "the Carry section heading moved — acceptance-commit-carries-5c.test.mjs locates its blocks by it",
+  );
+  const carry = sectionBetween(
+    "#### Carry the review into the acceptance commit",
+    "\n#### ",
+  );
+  assert.match(
+    carry,
+    /Classify on `APPROVE` or `CONCERNS`/,
+    "the Carry section must classify on APPROVE as well as CONCERNS",
+  );
+  assert.match(
+    carry,
+    /[Ww]hen the classify block cleared no path, or no\s+fix changed a cleared path, leave\s+`CARRY_FIXED`\s+empty/,
+    "the Carry section must key an empty CARRY_FIXED on what was cleared and changed, not on a verdict",
+  );
+  // Judge the clause that decides, not a span scanned from a verdict (TASK-237-BUG-2). A clause
+  // ends at a semicolon, or at a period followed by a capital, backtick, `*` or `(` — so "task.179"
+  // and "e.g. a" do not end one, and a verdict in a neighbouring clause is not read as this one's.
+  const deciding = carry
+    .split(/;\s+|\.\s+(?=[A-Z`*(])/)
+    .filter((clause) => /leave\s+`CARRY_FIXED`\s+empty/i.test(clause));
+  assert.ok(
+    deciding.length > 0,
+    "no clause says when to leave CARRY_FIXED empty, so the verdict check below reads nothing",
+  );
+  for (const clause of deciding) {
+    assert.doesNotMatch(
+      clause,
+      /APPROVE|CONCERNS/,
+      `a clause that decides an empty CARRY_FIXED names a verdict — that is what left task.179's doc-only finding unfixed: ${clause.replace(/\s+/g, " ")}`,
+    );
+  }
+});
+
 test("the 5-cycle bound covers 5c rather than being extended by it", () => {
   const s5c = section5c();
   assert.match(

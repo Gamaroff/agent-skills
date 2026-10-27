@@ -1488,7 +1488,7 @@ standalone.
    # The implementation report is NOT staged here — the orchestrator's Step 8 owns its final
    # commit, and staging it would split its history.
    # The commit below carries the FULL INDEX, not only these paths: in a develop pipeline, 5c
-   # stages the PR review report and any doc-only CONCERNS fixes and commits nothing, so they ride
+   # stages the PR review report and any doc-only fixes and commits nothing, so they ride
    # this commit (task.173; develop-pipeline-step-5-6-qa-loop.md § "Carry the review into the
    # acceptance commit"). The message says so when it happens — CARRY_SUFFIX below.
    # The DoD path is resolved FIRST, zsh-safe and by number, and checked — a bare glob inside

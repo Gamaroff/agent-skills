@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Changed
+
+- **Step 5c applies doc-only findings on `APPROVE`, not only on `CONCERNS` (task 237).** An `APPROVE`
+  carries only low findings, and a low finding is most often a one-word documentation fix — yet the
+  carry fixed doc-only findings on `CONCERNS` alone, so an `APPROVE`'s went unfixed to `/finalise`,
+  whose docs agent can only halt on it (task.179 halted at Step 7 this way; observation #109). Both
+  verdicts now run the same classify and stage blocks, which are unchanged: code and path-less
+  findings are still recorded and not fixed. The restatements in the finalise step doc, `/finalise`,
+  `/develop-task`, `/develop-story` and `/review-pr` now say "doc-only fixes" with no verdict, and
+  `pr-review-loop-parity.test.mjs` pins both verdict rows and both carry-prose sentences.
+
 ### Fixed
 
 - **`/create-task --from-observation` no longer seeds a fragment as the description (obs #101, #109).**

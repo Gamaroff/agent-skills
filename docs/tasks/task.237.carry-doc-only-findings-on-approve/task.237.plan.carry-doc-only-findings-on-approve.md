@@ -11,7 +11,7 @@ task-ref: task.237.carry-doc-only-findings-on-approve.md
 
 ## Overview
 
-This is a prose change in one shared step doc, plus four restatements and one parity test. The classify and stage blocks are verdict-agnostic and stay byte-identical. Only the instruction that names the verdicts which invoke them changes.
+This is a prose change in one shared step doc, plus five restatement files and two parity tests. The classify and stage blocks are verdict-agnostic and stay byte-identical. Only the instruction that names the verdicts which invoke them changes.
 
 ## Phase-by-Phase Implementation Guide
 
@@ -41,22 +41,30 @@ Re-run the population first and edit every hit:
 
 ```bash
 grep -rn 'doc-only' shared/resources/*.md skills/*/SKILL.md docs/reference/*.md | grep -i 'concerns\|approve'
-grep -n 'CONCERNS. records\|records findings without blocking' skills/develop-*/SKILL.md
+grep -n 'CONCERNS. records\|records findings without blocking' skills/*/SKILL.md
+```
+
+Then search the tests for every literal this task removes, and list each hit as a test to update. At review (2026-10-27) the only hit was the assertion message at `pr-review-loop-parity.test.mjs:769`, which reads the QA loop doc's `**Do not block.**` and is unaffected:
+
+```bash
+git grep -n -e 'Classify on' -e 'CARRY_FIXED. empty' -e 'doc-only CONCERNS' -e 'doc-only `CONCERNS`' \
+  -e 'records findings' -e 'exits to Step 7' -e 'acceptance commit (below)' -- '*.test.*' 'evals/**' 'tests/**'
 ```
 
 | Site | Edit |
 | --- | --- |
 | `shared/resources/develop-pipeline-step-7-finalise.md:147` | "any doc-only `CONCERNS` fixes" → "any doc-only fixes" |
 | `skills/finalise/SKILL.md:1491` (6a block comment) | "any doc-only CONCERNS fixes" → "any doc-only fixes" |
-| `skills/develop-task/SKILL.md:239`, `skills/develop-story/SKILL.md:252` | "`CONCERNS` records findings without blocking; `APPROVE` exits to Step 7" → "`APPROVE` and `CONCERNS` exit to Step 7, with `CONCERNS` findings recorded rather than blocking; on either, doc-only findings are fixed and ride the acceptance commit" |
+| `skills/develop-task/SKILL.md:239`, `skills/develop-story/SKILL.md:252` | "`CONCERNS` records findings without blocking; `APPROVE` exits to Step 7" → "`APPROVE` and `CONCERNS` exit to Step 7, with `CONCERNS` findings recorded rather than blocking; on either, doc-only findings are fixed when the carry clears them, and ride the acceptance commit" |
+| `skills/review-pr/SKILL.md:1072` | Same sentence, same edit. It states what the orchestrator does with the verdict, so it is a statement of the pipeline rule (review 1, Q1). Keep the surrounding lines that say `/review-pr` itself never edits code: that stays true |
 
-`skills/review-pr/SKILL.md:1072` carries the same summary sentence. Edit it too if it is a statement of the pipeline rule, or leave it if it describes only `/review-pr`'s own advisory role. Record the call in the implementation report.
+`CHANGELOG.md:4638` also matches the second grep. It is a released entry; leave it.
 
 Then run `npm run bundle` followed by `npm run bundle:check`. Never edit a `references/` copy by hand.
 
 ### Phase 3: Guard and record
 
-**`evals/shared/tests/pr-review-loop-parity.test.mjs`.** Add one test beside the existing *"APPROVE and CONCERNS exit the loop"* test (`:749`), using the file's `verdictRow(v)` helper (`:655`):
+**`evals/shared/tests/pr-review-loop-parity.test.mjs`.** Add two tests beside the existing *"APPROVE and CONCERNS exit the loop"* test (`:749`). The rule lives in three places — the verdict rows, the "Classify on …" sentence and the `CARRY_FIXED` sentence — and the last is the one task.179's run obeyed, so a test over the rows alone would let it revert unseen (review 1, Q2).
 
 ```js
 test("APPROVE and CONCERNS both carry doc-only findings into the acceptance commit (task.237)", () => {
@@ -66,9 +74,30 @@ test("APPROVE and CONCERNS both carry doc-only findings into the acceptance comm
       `the ${v} row must carry the doc-only clause — an APPROVE carries low findings, and a doc-only one left unfixed halts /finalise (observation #109)`);
   }
 });
+
+test("the carry prose names no verdict where it decides whether to fix (task.237)", () => {
+  const s5c = section5c();
+  const start = s5c.indexOf("#### Carry the review into the acceptance commit");
+  assert.ok(start >= 0, "the Carry section heading moved — acceptance-commit-carries-5c.test.mjs locates its blocks by it");
+  const end = s5c.indexOf("\n#### ", start + 1);
+  const carry = s5c.slice(start, end < 0 ? undefined : end);
+  assert.match(carry, /Classify on `APPROVE` or `CONCERNS`/,
+    "the Carry section must classify on APPROVE as well as CONCERNS");
+  assert.doesNotMatch(carry, /`APPROVE`[^.]*leave `CARRY_FIXED` empty/,
+    "no Carry-section sentence may key an empty CARRY_FIXED on APPROVE — that sentence is what left task.179's doc-only finding unfixed");
+});
 ```
 
-Mutation-prove the test. Delete the parenthetical's `; doc-only findings may be fixed there` from the `APPROVE` row and run the file: it must go red, naming `APPROVE`. Restore the clause, and it must go green. Record both runs in the implementation report.
+The second test's patterns were run at review against today's text: the positive one does not match (red, as it should be before Phase 1), the negative one matches the `:1602` sentence (red), and with that sentence replaced by Phase 1's wording it no longer matches. `[^.]` spans the hard line wrap and stops at the sentence's full stop.
+
+Mutation-prove each assertion separately, then together green:
+
+1. Delete `; doc-only findings may be fixed there` from the `APPROVE` row → red, naming `APPROVE`.
+2. Put back "Classify on `CONCERNS` before touching anything." → red.
+3. Put back "On `APPROVE`, or a `CONCERNS` with nothing doc-only, leave `CARRY_FIXED` empty" → red.
+4. Restore all → green.
+
+Record every run in the implementation report.
 
 **`CHANGELOG.md`.** Add a `[Unreleased] › Changed` entry citing `(task 237)`: 5c now applies doc-only findings on `APPROVE` as well as `CONCERNS`.
 

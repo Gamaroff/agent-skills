@@ -1,0 +1,60 @@
+schema: 2
+task: 'task.237.carry-doc-only-findings-on-approve'
+task_title: 'Apply 5c doc-only findings on APPROVE'
+gate: PASS
+status_reason: 'Cycle 2 fix verified. The CARRY_FIXED guard now judges the deciding clause: M7 (CONCERNS), M8 ("e.g."), M10 (reversed order), M11 (QA-3 wording reverted) and M5 are red, and M9 (a correct sentence after an APPROVE clause) is green. TASK-237-BUG-2 is closed. QA-3 is fixed: the sentence keys on what was cleared and changed. The scoped cycle-3 review found one low-confidence, low-severity advisory, recorded as future.'
+reviewer: 'QA Engineer'
+head: '7d5acc24d75c4cc3862c50dc02b7b10b2421ef59'
+updated: '2026-10-27T16:40:15Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 57
+  phases_verified: 3/3
+  ci: 'fast gate green on 7d5acc24 (6433 tests, 0 failed, 14 skipped)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false. The change is a test and one prose sentence, with no shipped predicate.'
+  performance:
+    status: PASS
+    notes: 'Clause split over one section; the suite runs in under a second.'
+  reliability:
+    status: PASS
+    notes: 'Classify and stage blocks unchanged; acceptance-commit-carries-5c 24/24.'
+  maintainability:
+    status: PASS
+    notes: 'The verdict guard reads the section through sectionBetween and has a non-vacuity floor.'
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-10-27'
+  total_iterations: 2
+  verification_method: 'Mutations M5, M7, M8, M9, M10 and M11 re-run against 7d5acc24: M9 green, the rest red'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'develop-pipeline-autonomous-defaults.md:34 still reads "APPROVE → exit to Step 7". It states no fix rule, but it is the arrow-form shape the population grep did not search (carried from gate 2, CR-3).'
+      refs: ['shared/resources/develop-pipeline-autonomous-defaults.md']
+    - action: 'The clause filter is case-insensitive, but the verdict check matches only the uppercase tokens, so a revert written as "on an approve" would pass. Not taken: lowercase "approve" and "concerns" are ordinary prose words, and every verdict in this document is a backticked uppercase token (cycle-3 CR-1, low and low confidence).'
+      refs: ['evals/shared/tests/pr-review-loop-parity.test.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

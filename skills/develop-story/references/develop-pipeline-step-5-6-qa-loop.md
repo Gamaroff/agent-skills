@@ -1462,7 +1462,7 @@ gate.
 | --- | --- |
 | 🚨 **REQUEST CHANGES** | Return to **5b** and run `/qa-fix` with the review's findings (see the invocation below). **Do not increment the counter here** — 5b's step 7 increments it on exit, exactly as on any other cycle. A review-driven fix is a cycle like any other, and it is counted in the same one place. |
 | ⚠️ **CONCERNS** | Record the findings in the QA Cycle entry and the implementation report. **Do not block.** Signal `ready-for-merge`, carry the review into the acceptance commit (below; doc-only findings may be fixed there), exit the loop, proceed to Step 7. |
-| ✅ **APPROVE** | Signal `ready-for-merge`, carry the review into the acceptance commit (below), exit the loop, proceed to Step 7. |
+| ✅ **APPROVE** | Signal `ready-for-merge`, carry the review into the acceptance commit (below; doc-only findings may be fixed there), exit the loop, proceed to Step 7. |
 | ❌ **Review failed** — `/review-pr` HALTed, could not resolve a PR, or errored | **Not a verdict, and not an exit.** Log it in the Issues Log, record `review failed` on the cycle's `**PR Review**` row, the gate and QA report are already committed by path 1 — do not commit again — and **HALT** naming the PR and the failure. Do **not** fall through to Step 7: 5c is the only exit, so a run that skips it silently finalises without the check this step exists to add. |
 
 > **Why the failure arm is spelled out.** A gate that reaches 5c from 5a (§5c routes 1, 2, 2b and 3) does so without entering 5b, so
@@ -1494,7 +1494,11 @@ by design at 5c (Step 8 owns it), and a fix that later fails a check is undone w
 `git checkout HEAD`. That command is safe only on a file that held no other work. A `ref` with no
 path (an `AC-n` id), a path outside the patterns, and a path that fails the second test are
 **recorded and not fixed**, exactly as before. A code change after the last QA cycle is what the loop
-exists to prevent. Classify on `CONCERNS` before touching anything.
+exists to prevent. Classify on `APPROVE` or `CONCERNS` before touching anything. The two verdicts
+differ in what is recorded, not in what may be fixed: an `APPROVE` carries only `severity: low`
+findings or none (`/review-pr`'s verdict table), a doc-only low finding is the cheapest fix the loop
+can make, and one left unfixed reaches `/finalise`, whose docs agent can only halt on it (task.237,
+observation #109 — task.179 halted at Step 7 on a one-word CHANGELOG fix its 5c `APPROVE` had found).
 
 **The eligible list is one record with one writer** (task.173 QA-3, consolidated):
 
@@ -1600,8 +1604,9 @@ report (`/review-pr` already staged it; staging again is a no-op) and each chang
 cleared, once it passes `doc-links.js`. A cleared path that fails the link check is restored to
 `HEAD`, which undoes only the 5c edit because the path was clean when cleared; its finding is
 recorded, not fixed. A path the classifier did **not** clear is a HALT and is left untouched: this
-block never discards work it cannot prove is its own. On `APPROVE`, or a `CONCERNS` with nothing
-doc-only, leave `CARRY_FIXED` empty: the block then only asserts the report is staged.
+block never discards work it cannot prove is its own. When the classify block cleared no path, or no
+fix changed a cleared path, leave `CARRY_FIXED` empty: the block then only asserts the report is
+staged.
 
 ```bash
 # INPUTS, bound in THIS block: the report, and every path the doc-only fixes changed (repo-relative).
