@@ -1,0 +1,29 @@
+{
+  "sink": "filename",
+  "entry": "fence:skills/create-task/SKILL.md#1.1 Entry from the Observation Log (`--from-observation`)",
+  "name": "seed-ids",
+  "call_site": null,
+  "verdict": "unverifiable",
+  "reason": "bad-slot",
+  "executed": 0,
+  "passed": 0,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 1,
+  "declined_cases": [
+    {
+      "id": "fence:skills/create-task/SKILL.md#1.1 Entry from the Observation Log (`--from-observation`)",
+      "reason": "bad-slot",
+      "detail": "slot \"{observation-ids}\" does not appear in the block under \"1.1 Entry from the Observation Log (`--from-observation`)\" (line 190) — a slot that substitutes nothing tests nothing"
+    }
+  ],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": null,
+  "slot": "{observation-ids}",
+  "fixture_setup": null,
+  "ran_at": "2026-10-27T06:19:47.192Z"
+}

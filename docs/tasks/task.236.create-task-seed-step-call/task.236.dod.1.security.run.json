@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "filename",
+      "entry": "fence:skills/create-task/SKILL.md#Steps 3 to 6: seed, ask, cite and park",
+      "name": "seed-args",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 18,
+      "passed": 18,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": [
+        "bash"
+      ],
+      "interpreter": null,
+      "fake_gh": "/home/gamaroff/Development/agent-skills/.observation-log-test-tmp/seed-block-probe-work-cKVlPv/gh-stub",
+      "argv": null,
+      "args": null,
+      "slot": "TASK_ID='{next-task-number}'\n   OBS_IDS='{observation-ids}'",
+      "fixture_setup": null,
+      "ran_at": "2026-10-27T07:06:01.368Z"
+    }
+  ],
+  "totals": {
+    "executed": 18,
+    "reproduced": 0,
+    "escaped": 0
+  },
+  "updated_at": "2026-10-27T07:06:01.368Z"
+}

@@ -50,8 +50,10 @@ relying on `.code`.
 - `<ws>/.agents/skills/create-task` → a symlink to `REPO/skills/create-task`, so the block's
   `.agents/skills/create-task/references/…` and `scripts/lib.js` paths resolve without the
   gitignored local symlink.
-- Initialise the log with the engine (`observation-log.js init --workspace <ws>`), then write two
-  fixtures with `write`, so their files and ids are the engine's own.
+- Initialise the log with the engine (`observation-log.js init --workspace <ws>`), then write the
+  two fixture files directly, as `from-observation.test.js:322-330` does. Not through `write`: two
+  entries on one skill with overlapping titles answer `possible-duplicate` and write nothing, and
+  the control pair needs a file prefix that disagrees with its id, which `write` never produces.
 - Run the block with `bash -c`, `cwd: <ws>`, env `OBS_WORKSPACE=<ws>`. There is no
   `skills-config.yaml` in `<ws>`, so the env var is what the resolver uses. Substitute the two
   placeholders (`{the registry's Next Available Task Number}`, `{the selected ids, comma-separated}`)
