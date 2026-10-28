@@ -5,10 +5,10 @@ type: task
 description: "Make the QA loop's escalation and its re-entry grant describe what the resumed run will actually do: label the option by its action, recommend only moves the third-strike rule permits, tell a stalled mechanism from a newly found one, and deliver the k cycles a grant promises."
 tags: [develop-task, develop-story, qa-loop, escalation, observation]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-10-27
-updated: 2026-10-27
+updated: 2026-10-28
 assignee:
 estimated_effort_hours: 8
 github_issue: 769
@@ -16,7 +16,8 @@ github_issue: 769
 
 # Technical Task: QA escalation and grant say what will run
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.239.review.1.qa-escalation-and-grant-say-what-runs.md` implemented 2026-10-28
 **GitHub Issue**: [#769](https://github.com/Gamaroff/agent-skills/issues/769)
 
 ---
@@ -42,8 +43,8 @@ When the QA loop escalates, a person decides how to resume it, and today's escal
 
 ### Current Problems
 
-- **The option names a phase the run does not enter (obs #70).** On task.215 (2026-10-19), a not-converging halt offered "Resume at 5a with {k} more cycles" (`skills/develop-task/SKILL.md:332`, `develop-pipeline-resume-contract.md:631`). `grant-qa-cycles.sh` printed `reenter_at=5b`. That is correct: a not-converging halt fires at 5a before 5b, so the next move is a fix (`grant-qa-cycles.sh:70`, *"the restored candidate's halt_reason is `not-converging`"*). The label hard-codes one branch of a decision the script owns.
-- **The escalation recommends a patch the next 5b forbids (obs #71).** task.215's escalation said "fix QA3-1 (guarded formatting, marker first)", a fourth patch to the crash-marker mechanism. That file had HIGH findings in gates 1–3. On re-entry the third-strike detector (`develop-pipeline-step-5-6-qa-loop.md:899`, *"#### Third-strike rule — replace, do not patch again"*) forbade exactly that move. The develop-task template (`:1912`, *"#### develop-task escalation template"*) never consults the detector.
+- **The option names a phase the run does not enter (obs #70).** On task.215 (2026-10-19), a not-converging halt offered "Resume at 5a with {k} more cycles" (`skills/develop-task/SKILL.md:334`, `develop-pipeline-resume-contract.md:634`). `grant-qa-cycles.sh` printed `reenter_at=5b`. That is correct: a not-converging halt fires at 5a before 5b, so the next move is a fix (`grant-qa-cycles.sh:70`, *"the restored candidate's halt_reason is `not-converging`"*). The label hard-codes one branch of a decision the script owns.
+- **The escalation recommends a patch the next 5b forbids (obs #71).** task.215's escalation said "fix QA3-1 (guarded formatting, marker first)", a fourth patch to the crash-marker mechanism. That file had HIGH findings in gates 1–3. On re-entry the third-strike detector (`develop-pipeline-step-5-6-qa-loop.md:900`, *"#### Third-strike rule — replace, do not patch again"*) forbade exactly that move. The develop-task template (`:2005`, *"#### develop-task escalation template"*) never consults the detector.
 - **A flat count reads the same for a stall and a discovery (obs #19).** task.180's gates 1–5 each raised 1 HIGH in `security-probe.mjs`. Gates 1–4 circled one mechanism (refusal scoring). Gate 5's HIGH was a new mechanism (sandbox containment) that the re-probe found after gate 4's fix held. The check (`:541`, *"### Convergence check (shared)"*, step 3: `HIGH_N >= HIGH_{N-1} >= HIGH_{N-2}`) escalated both alike, as "not converging". Cycle 6 then showed a real stall with the same numbers.
 - **A grant of k cycles delivers one fix (obs #72).** On task.215, a not-converging halt (HIGH 1, 1, 1) was granted 2 cycles (`qa_max_cycles=5`, `reenter_at=5b`). The check reads the per-cycle `**HIGH findings**` rows of the implementation report across the grant (step 2: *"that entry is what a resume reads the earlier counts back out of"*). It saw 1, 1, 1 again after cycle 4's review and escalated before cycle 4's fix.
 
@@ -62,8 +63,8 @@ When the QA loop escalates, a person decides how to resume it, and today's escal
 - **Grant.** `shared/resources/grant-qa-cycles.sh` is the one writer of `extra_cycles_granted`. It writes `qa_max_cycles` and `qa_phase` atomically and prints `grant-qa-cycles: QA_CYCLE=<base> extra_cycles_granted=<k> qa_max_cycles=<n> reenter_at=<5a|5b>` (`:252`). `qa_phase` is `5b` for a `not-converging` snapshot and `5a` otherwise (`:68`–`:75`). Suite: `shared/resources/grant-qa-cycles.test.sh`. Lock schema row: `develop-pipeline-pause.md:114` (*"`qa_max_cycles`, `extra_cycles_granted` | Optional."*). Field parity guard: `evals/shared/tests/qa-loop-lock-fields-parity.test.mjs`, which also asserts the label (`:724`, `/Resume at 5a with \{k\} more cycles/`).
 - **Convergence check.** Prose in step-5-6 `:541`–`:660`. `HIGH_N` comes from an awk over the latest gate. The sequence comes from `### QA Cycle` entries' `**HIGH findings**` lines. The trip runs from cycle 3 onward with three preconditions. No script computes the trip (`grep -l not-converging shared/resources/*.{js,mjs,sh}` returns only `grant-qa-cycles.sh` and its test).
 - **Third strike.** `high_files()` plus `comm -12` over the last three gates (step-5-6, the block ending *"# Files on their third consecutive strike"*). It keys on `file:`. The rule says to name the mechanism from the three `finding:` texts.
-- **Escalation templates.** `#### develop-story escalation template` (`:1876`) and `#### develop-task escalation template` (`:1912`). The fields are Final gate status, HIGH findings per cycle, Remaining issues, What was attempted, Likely root cause and Recommended next steps. The halt messages at `:1986` and `:2009` restate the label.
-- **Label sites.** Measured with `git grep -n 'Resume at 5a' -- ':!skills/*/references/*' ':!docs/tasks/*' ':!docs/prd/*' ':!CHANGELOG.md' ':!.agents/plans/*'` (2026-10-27): `skills/develop-task/SKILL.md:332`, `skills/develop-story/SKILL.md:345`, `develop-pipeline-resume-contract.md:631`, `develop-pipeline-step-5-6-qa-loop.md:1986` and `:2009`, `grant-qa-cycles.sh:6`, `skills/develop-task/README.md:136,137,361,414`, `skills/develop-story/README.md:143,144,376,429`, `docs/reference/troubleshooting.md:192`, `evals/develop-{task,story}/step-isolation/12-qa-reentry-after-loop-limit-with-grant/{answers.jsonl,scenario.json}`, and `evals/shared/tests/qa-loop-lock-fields-parity.test.mjs:724`. `CHANGELOG.md` and the past plans are history and are left alone.
+- **Escalation templates.** `#### develop-story escalation template` (`:1969`) and `#### develop-task escalation template` (`:2005`). The fields are Final gate status, HIGH findings per cycle, Remaining issues, What was attempted, Likely root cause and Recommended next steps. The halt messages at `:2079` and `:2102` restate the label.
+- **Label sites.** Measured with `git grep -n 'Resume at 5a' -- ':!skills/*/references/*' ':!docs/tasks/*' ':!docs/prd/*' ':!CHANGELOG.md' ':!.agents/plans/*'` (re-measured 2026-10-28, after task.238 merged): `skills/develop-task/SKILL.md:334`, `skills/develop-story/SKILL.md:347`, `develop-pipeline-resume-contract.md:634`, `develop-pipeline-step-5-6-qa-loop.md:2079` and `:2102`, `grant-qa-cycles.sh:6`, `skills/develop-task/README.md:136,137,361,414`, `skills/develop-story/README.md:143,144,376,429`, `docs/reference/troubleshooting.md:192`, `evals/develop-{task,story}/step-isolation/12-qa-reentry-after-loop-limit-with-grant/{answers.jsonl,scenario.json}`, and `evals/shared/tests/qa-loop-lock-fields-parity.test.mjs:724`. `CHANGELOG.md` and the past plans are history and are left alone.
 
 ### Target Architecture
 
@@ -77,6 +78,15 @@ When the QA loop escalates, a person decides how to resume it, and today's escal
 - **Why reset rather than relabel (obs #72).** The user chose to reset the window on 2026-10-27. The guard still applies to a granted run once three post-grant readings exist, so a person decides again at the next stall.
 - **The mechanism reading is the escalation author's judgment, recorded beside a checkable half.** The `file:` overlap is deterministic (`high_files`). The mechanism is read from the `finding:` texts, as the third-strike rule already requires. Neither changes the trip.
 - **`develop-bug` is not affected.** Its verify loop has no grant and no convergence escalation.
+- **The window governs the Convergence trip only.** The route classifier (`classifyLoopRoute` in `qa-diminishing-returns.js`: the Diminishing-returns and Cosmetic-residue exits) keeps reading the whole `**HIGH findings**` sequence. Those exits end a loop that has finished, so a pre-grant reading can only let a granted run exit cleanly sooner, never spend its budget.
+- **Reconstruction states the window must hold in.** `convergence_from_cycle` lives on the lock, and the lock is rebuilt on resume, so the rule must read correctly in each of these states:
+  1. **A lock written before this task** (no field): reads as `1`, today's behaviour (SC-12).
+  2. **A lock restored from a halt snapshot**: the snapshot is a superset of the lock and `advance-pipeline-lock.sh --restore` strips only the halt and pause fields, so an earlier grant's value survives the restore until the new grant overwrites it.
+  3. **A grant on a lock that already exists** (in-place continuation, no restore): the same write sets the field.
+  4. **A second grant**: the field is overwritten with the new `base + 1`. The base is reconstructed as max(highest gate on disk, report entries) and the script already refuses to lower the budget, so the window never moves backwards.
+  5. **A cycle run by hand outside the loop before the grant**: its gate is counted into the base, so its reading falls before the window, as the escalation it followed already judged it.
+  6. **The report ahead of or behind the gates**: the base rule above (max of the two) decides `QA_CYCLE`, and the window is derived from that base, never from either count alone.
+  7. **A Step 7 DoD-gaps re-entry** (`reenter-qa-after-finalise.sh`): it does not write the field. A value an earlier grant wrote is carried; absent stays `1`. See Out of Scope.
 
 ---
 
@@ -97,6 +107,7 @@ When the QA loop escalates, a person decides how to resume it, and today's escal
 ❌ **Loosening the convergence trip.** The obs #19 Improvement says a person still decides.
 ❌ **A scripted convergence engine.** The check stays prose plus awk. Moving it into an engine is a separate decision.
 ❌ **5a/5b signal handling and 5c routing.** That is task.238.
+❌ **`reenter-qa-after-finalise.sh` writing `convergence_from_cycle`.** It is the other writer of `qa_max_cycles`, but it re-enters QA after a loop that exited accept-eligible, so the readings before it already passed the guard. It is not a grant of k cycles after a stall, which is the case obs #72 measured. A later task can add the field there if a DoD re-entry is ever seen to trip on pre-re-entry readings.
 
 ---
 
@@ -115,9 +126,9 @@ When the QA loop escalates, a person decides how to resume it, and today's escal
 
 **Files:** `grant-qa-cycles.sh`, `grant-qa-cycles.test.sh`, `develop-pipeline-pause.md`, step-5-6 Convergence check, `qa-loop-lock-fields-parity.test.mjs`
 
-- [ ] `grant-qa-cycles.sh` writes and prints `convergence_from_cycle = base + 1` in the same atomic write
-- [ ] Convergence check step 3 counts readings from `convergence_from_cycle` (absent → 1), with a worked example of the task.215 sequence
-- [ ] Lock schema row and parity test know the field
+- [x] `grant-qa-cycles.sh` writes and prints `convergence_from_cycle = base + 1` in the same atomic write
+- [x] Convergence check step 3 counts readings from `convergence_from_cycle` (absent → 1), with a worked example of the task.215 sequence
+- [x] Lock schema row and parity test know the field
 
 **Dependencies:** none
 
@@ -125,8 +136,8 @@ When the QA loop escalates, a person decides how to resume it, and today's escal
 
 **Files:** the § 3 label sites
 
-- [ ] Replace the label at every live site
-- [ ] Phase 0b reports `reenter_at` from the script's output after the grant
+- [x] Replace the label at every live site
+- [x] Phase 0b reports `reenter_at` from the script's output after the grant
 
 **Dependencies:** none
 
@@ -134,16 +145,16 @@ When the QA loop escalates, a person decides how to resume it, and today's escal
 
 **Files:** step-5-6 escalation templates (story and task)
 
-- [ ] Run the third-strike comparison when the entry is written, and constrain recommended step 1 for a struck file
-- [ ] Add the `Flat-count reading` line to the not-converging variant
-- [ ] Mark the grant boundary in "HIGH findings per cycle"
+- [x] Run the third-strike comparison when the entry is written, and constrain recommended step 1 for a struck file
+- [x] Add the `Flat-count reading` line to the not-converging variant
+- [x] Mark the grant boundary in "HIGH findings per cycle"
 
 **Dependencies:** Phase 1, for the grant-boundary marker only
 
 ### Phase 4: Guards, bundle and record (Risk: Low)
 
-- [ ] Tests in § 8, each mutation-proved
-- [ ] `npm run bundle`; CHANGELOG `[Unreleased]`
+- [x] Tests in § 8, each mutation-proved
+- [x] `npm run bundle`; CHANGELOG `[Unreleased]`
 
 **Dependencies:** Phases 1–3
 
@@ -208,28 +219,28 @@ None.
 
 ### Functional
 
-- [ ] SC-1: `grant-qa-cycles.sh` writes `convergence_from_cycle = base + 1` in the same write as `qa_max_cycles` and `qa_phase`, and prints it on its result line, for both a not-converging and a loop-limit grant (`grant-qa-cycles.test.sh`)
-- [ ] SC-2: Convergence check step 3 counts only readings from cycles `>= convergence_from_cycle` (absent → 1). On the task.215 sequence it does not trip at cycle 4, and a lock without the field trips exactly as today (unit test with control)
-- [ ] SC-3: No live site in the § 3 list reads "Resume at 5a with {k} more cycles". Each reads "Resume the QA loop with {k} more cycles", and Phase 0b reports `reenter_at` from the script's output
-- [ ] SC-4: Both escalation templates run the third-strike comparison when written, and for a struck file their recommended step 1 is delete, replace or waive, naming the mechanism (template test)
-- [ ] SC-5: The not-converging variant of both templates carries a `**Flat-count reading**: {stall | discovery}` line, and the trip formula is unchanged (`git diff` of step 3's formula paragraph shows only the window clause)
+- [x] SC-1: `grant-qa-cycles.sh` writes `convergence_from_cycle = base + 1` in the same write as `qa_max_cycles` and `qa_phase`, and prints it on its result line, for both a not-converging and a loop-limit grant (`grant-qa-cycles.test.sh`)
+- [x] SC-2: Convergence check step 3 counts only readings from cycles `>= convergence_from_cycle` (absent → 1). On the task.215 sequence it does not trip at cycle 4, and a lock without the field trips exactly as today (unit test with control)
+- [x] SC-3: No live site in the § 3 list reads "Resume at 5a with {k} more cycles". Each reads "Resume the QA loop with {k} more cycles", and Phase 0b reports `reenter_at` from the script's output
+- [x] SC-4: Both escalation templates run the third-strike comparison when written, and for a struck file their recommended step 1 is delete, replace or waive, naming the mechanism (template test)
+- [x] SC-5: The not-converging variant of both templates carries a `**Flat-count reading**: {stall | discovery}` line, and the trip formula is unchanged (`git diff` of step 3's formula paragraph shows only the window clause)
 
 ### Performance
 
-- [ ] SC-6: The grant is still one script call. No new call is added to Phase 0b
-- [ ] SC-7: The escalation adds at most one `high_files` comparison per entry
+- [x] SC-6: The grant is still one script call. No new call is added to Phase 0b
+- [x] SC-7: The escalation adds at most one `high_files` comparison per entry
 
 ### Code Quality
 
-- [ ] SC-8: `npm run ci:fast` passes, including `grant-qa-cycles.test.sh`
-- [ ] SC-9: `npm run bundle:check` passes. No hand edit under `skills/*/references/` for a file with a `shared/resources/` source
-- [ ] SC-10: `npm run validate -- skills/develop-task/` and `skills/develop-story/` pass
-- [ ] SC-11: Every new guard is mutation-proved, and the commit message records the mutation
+- [x] SC-8: `npm run ci:fast` passes, including `grant-qa-cycles.test.sh`
+- [x] SC-9: `npm run bundle:check` passes. No hand edit under `skills/*/references/` for a file with a `shared/resources/` source
+- [x] SC-10: `npm run validate -- skills/develop-task/` and `skills/develop-story/` pass
+- [x] SC-11: Every new guard is mutation-proved, and the commit message records the mutation
 
 ### Migration
 
-- [ ] SC-12: A lock written before this task (no `convergence_from_cycle`) resumes with today's behaviour (SC-2's control case)
-- [ ] SC-13: The CHANGELOG `[Unreleased]` entry cites task.239 and names the label, the window, the third-strike constraint and the flat-count reading
+- [x] SC-12: A lock written before this task (no `convergence_from_cycle`) resumes with today's behaviour (SC-2's control case)
+- [x] SC-13: The CHANGELOG `[Unreleased]` entry cites task.239 and names the label, the window, the third-strike constraint and the flat-count reading
 
 ---
 
@@ -285,6 +296,9 @@ None.
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-10-27 | 1.0 | Initial draft — cut from observations #19, #70, #71, #72 | create-task |
+| 2026-10-28 | 1.1 | Review passed (8/10) — line anchors re-measured after task.238; reconstruction states listed; window scoped to the Convergence trip; `reenter-qa-after-finalise.sh` excluded with reason | review-task |
+| 2026-10-28 |  | Status → ready-for-development | review-task |
+| 2026-10-28 |  | Implemented — 17 files, 11 tests | develop |
 <!-- change-log-end -->
 
 ---
@@ -293,19 +307,19 @@ None.
 
 ### Phase 1: The grant window
 
-- [ ] Script, lock schema, Convergence check
+- [x] Script, lock schema, Convergence check
 
 ### Phase 2: The label
 
-- [ ] Every live site; Phase 0b reports `reenter_at`
+- [x] Every live site; Phase 0b reports `reenter_at`
 
 ### Phase 3: The escalation entry
 
-- [ ] Third strike at escalation; flat-count reading; grant boundary
+- [x] Third strike at escalation; flat-count reading; grant boundary
 
 ### Phase 4: Guards, bundle and record
 
-- [ ] Tests, bundle, CHANGELOG
+- [x] Tests, bundle, CHANGELOG
 
 ---
 
