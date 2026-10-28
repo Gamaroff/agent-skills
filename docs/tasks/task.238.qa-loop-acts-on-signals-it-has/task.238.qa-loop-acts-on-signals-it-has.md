@@ -358,22 +358,22 @@ None.
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-28
-**Quality Score**: 20/100
+**Quality Score**: 50/100
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.238.qa.4.qa-loop-acts-on-signals-it-has.md](./task.238.qa.4.qa-loop-acts-on-signals-it-has.md)
-- **Gate File**: [task.238.gate.4.qa-loop-acts-on-signals-it-has.yml](./task.238.gate.4.qa-loop-acts-on-signals-it-has.yml)
+- **Full Report**: [task.238.qa.5.qa-loop-acts-on-signals-it-has.md](./task.238.qa.5.qa-loop-acts-on-signals-it-has.md)
+- **Gate File**: [task.238.gate.5.qa-loop-acts-on-signals-it-has.yml](./task.238.gate.5.qa-loop-acts-on-signals-it-has.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 6507
+- **Tests Executed**: 6533
 - **Phases Verified**: 4/4
-- **Critical Issues**: 3
+- **Critical Issues**: 2
 - **NFR Status**: Security: FAIL, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- All 5 DoD 1 gaps are verified fixed in `adff39e2`, with their probes engaging
-- The safety re-probe found 3 HIGH defects that widen `pre-existing` (bug.5, bug.6, bug.7) and 2 MEDIUM (bug.8, bug.9)
+- All cycle 4 findings are verified fixed in `4ef29ed1`: bug.5 to bug.9 closed, plus CR4-8, CR4-9 and CR-6
+- The safety re-probe found 2 HIGH defects that still widen `pre-existing`: a leaf name shared across describes (bug.10), and node's own diagnostic errors never being looked for (bug.11). The probe engine found 1 MEDIUM: a second node summary resets the trailer check (bug.12)
 
 ## Definition of Done - Gaps Identified
 
@@ -429,6 +429,8 @@ The QA gate passed. The gaps below come from `/finalise`'s own checks: the secur
 | 2026-10-28 |  | DoD incomplete — 5 gaps identified (security probe 2 medium + 1 low; SC-10 two unheld guards) | finalise |
 | 2026-10-28 |  | QA gate FAIL (20/100) — 7 findings (3 high, 2 medium, 2 low); DoD 1 gaps verified fixed; status → in-progress | qa-task |
 | 2026-10-28 |  | QA findings fixed — gate 4 FAIL, 7 entries (bug.5–bug.9, CR4-8, CR4-9; advisory CR-6 too), 1 iteration; status → ready-for-review | qa-fix |
+| 2026-10-28 |  | QA gate FAIL (50/100) — 3 findings (2 high, 1 medium); bug.5–bug.9 verified and closed; status → in-progress | qa-task |
+| 2026-10-28 |  | QA findings fixed — gate 5 FAIL, 3 entries (bug.10–bug.12), 1 iteration; status → ready-for-review | qa-fix |
 <!-- change-log-end -->
 
 ---

@@ -1244,7 +1244,7 @@ After fixes are applied:
    | Outcome | How to tell | Action | QA Iteration History line |
    |---|---|---|---|
    | **not measured** | no `GATE_EXIT=` line in the log (background form: the run never finished), an exit of 124 (timeout), 137 (SIGKILL) or 143 (SIGTERM), or the `test-tmpdir` wrapper's own report that a signal interrupted or killed the suite | re-run the gate once. It is never green and never red, and it consumes no retry attempt | `Fast gate: not measured ({reason})` |
-   | **pre-existing red** | the **same tests fail** in a worktree at the PR base: every failing test the head log names — its file and its name — fails there too | record both runs, then commit and push as on green | `Fast gate: red, pre-existing on {base} ({tests}; head: {fastGateCommand}, base: node --test {files})` |
+   | **pre-existing red** | the **same tests fail** in a worktree at the PR base: every failing test the head log names — its file, line and column — fails there too | record both runs, then commit and push as on green | `Fast gate: red, pre-existing on {base} ({tests}; head: {fastGateCommand}, base: node --test {files})` |
    | **attributable red** | any other red, including `BASE_CHECK=unavailable` | the triage-and-retry path below, unchanged | unchanged — the failing output |
 
    One script decides it. Run it from the repository root, only on a non-green result:
@@ -1264,12 +1264,16 @@ After fixes are applied:
 
    **Pre-existing is the one outcome that widens what the gate lets through, so it is narrow by
    construction.** It needs a red base run in which every failing test the head names also fails — a
-   test is its file and its name, so a head-only red that shares a name with a base red in another
-   file does not match (task.238 bug.5) — and anything less falls to *attributable*: a failing test
-   the log names with no file, a failing file that does not exist at the base, a failing path that is
-   absolute, climbs out with `..` or starts with `-` (node would read it as an option), a base that
-   already contains `HEAD`, a log with any output after node's results other than npm's failure
-   report and a clean `tmp-leak` report (another step's red the base run cannot see — bug.6), a
+   test is where node says it is, its file, line and column, so a head-only red that shares a name
+   with a base red in another file (task.238 bug.5) or in another `describe` of the same file
+   (bug.10) does not match, and a test whose line moved reads attributable — and anything less falls
+   to *attributable*: a failing test the log names with no file, a failing file that does not exist
+   at the base, a failing path that is absolute, climbs out with `..` or starts with `-` (node would
+   read it as an option), a base that already contains `HEAD`, a log with any output after node's
+   results other than npm's failure report and a clean `tmp-leak` report (another step's red the base
+   run cannot see — bug.6), wherever a later node run's results follow it (bug.12), a diagnostic node
+   printed that is not its run summary or coverage report (a `--test-coverage-*` threshold's
+   `Error:`, which the plain base run never reproduces — bug.11), a
    base run where a different test fails, one that fails on
    `Cannot find module` or `command not found` (a fresh worktree has no `node_modules` of its own),
    one that fails for want of `.agents/skills` (gitignored, so never in a worktree), a base worktree

@@ -15,10 +15,13 @@ All notable changes to this project will be documented in this file. Format foll
   worktree — recorded, not fixed), or *attributable red* (everything else — the fix loop, as
   before); every check it cannot complete falls back to attributable, including a base run that
   outlasts its 90 s bound, and the base worktree and test processes are removed on every exit path
-  (obs #14). A test is its file and its name, so a head-only red that shares a name with a base
-  red stays attributable. So does any output after node's results other than npm's failure report
-  and a clean `tmp-leak` report, a failing file that is new on the head, a base that already
-  contains `HEAD`, and a failing path that is absolute, climbs out with `..` or starts with `-`. (3) **PR existence
+  (obs #14). A test is its file, line and column, so a head-only red that shares a name with a base
+  red — in another file, or in another `describe` of the same file — stays attributable. So does
+  any output after node's results other than npm's failure report and a clean `tmp-leak` report
+  (even when a later node run follows it), a diagnostic node printed that is not its summary or
+  coverage report (a coverage-threshold `Error:`), a failing file that is new on the head, a base
+  that already contains `HEAD`, and a failing path that is absolute, climbs out with `..` or starts
+  with `-`. (3) **PR existence
   and CI**: `/qa-task` and `/qa-story` find the PR on Bitbucket as well as GitHub, and read the PR's
   CI once at the gate step through `qa-ci-read.sh` — a failure on the head becomes a `medium`
   `top_issue`, a failure also red on the base goes to `recommendations.future` as pre-existing, and

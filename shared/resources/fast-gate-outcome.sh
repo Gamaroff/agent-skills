@@ -68,36 +68,37 @@ unavailable() {
 case "$BASE" in -*) unavailable "--base is not a branch name: $BASE" ;; esac
 git check-ref-format --branch "$BASE" >/dev/null 2>&1 || unavailable "--base is not a branch name: $BASE"
 
-# The failing tests a node --test log names, one `file<TAB>test` pair per line: the spec reporter's
-# summary (the default, also when redirected — a `test at` line, then its `✖ name`), or TAP (a
-# `not ok` line, then its `location:`). A test is its file and its name, never its name alone: a
-# head-only failure sharing a name with a base failure is not pre-existing (task.238 bug.5). $2 is
-# a path prefix to strip (the checkout, for an absolute location); a test with no file keeps an
-# empty first field, which the caller refuses.
+# The failing tests a node --test log names, one `file<TAB>line:column<TAB>test` line each: the spec
+# reporter's summary (the default, also when redirected — a `test at` line, then its `✖ name`), or
+# TAP (a `not ok` line, then its `location:`). A test is where it is, never its name alone: a
+# head-only failure sharing a name with a base failure in another file (task.238 bug.5), or in
+# another describe of the same file, whose name the spec summary leaves out (bug.10), is not
+# pre-existing. A test whose line moved reads attributable, the safe direction. $2 is a path prefix
+# to strip (the checkout, for an absolute location); a test with no file keeps an empty first field,
+# which the caller refuses.
 failing_pairs() {
   awk -v pre="$2" '
     function rel(p) { if (pre != "" && index(p, pre) == 1) p = substr(p, length(pre) + 1); return p }
-    /^✖ failing tests:/ { spec = 1; file = ""; next }
-    spec && /^test at .+:[0-9]+:[0-9]+$/ {
-      file = $0; sub(/^test at /, "", file); sub(/:[0-9]+:[0-9]+$/, "", file); file = rel(file); next
-    }
+    function at(loc) { match(loc, /:[0-9]+:[0-9]+$/); pos = substr(loc, RSTART + 1); file = rel(substr(loc, 1, RSTART - 1)) }
+    /^✖ failing tests:/ { spec = 1; file = ""; pos = ""; next }
+    spec && /^test at .+:[0-9]+:[0-9]+$/ { l = $0; sub(/^test at /, "", l); at(l); next }
     spec && /^[[:space:]]*location: \047.+:[0-9]+:[0-9]+\047$/ {
-      file = $0; sub(/^[[:space:]]*location: \047/, "", file); sub(/:[0-9]+:[0-9]+\047$/, "", file); file = rel(file); next
+      l = $0; sub(/^[[:space:]]*location: \047/, "", l); sub(/\047$/, "", l); at(l); next
     }
     spec && /^[[:space:]]*✖ .* \([0-9.]+m?s\)$/ {
       t = $0; sub(/^[[:space:]]*✖ /, "", t); sub(/ \([0-9.]+m?s\)$/, "", t)
-      print file "\t" t; file = ""; next
+      print file "\t" pos "\t" t; file = ""; pos = ""; next
     }
     spec { next }
     /^[[:space:]]*not ok [0-9]+ - / {
-      if (name != "") print "\t" name
+      if (name != "") print "\t\t" name
       name = $0; sub(/^[[:space:]]*not ok [0-9]+ - /, "", name); sub(/ # (SKIP|TODO).*$/, "", name); next
     }
     name != "" && /^[[:space:]]*location: \047.+:[0-9]+:[0-9]+\047$/ {
-      f = $0; sub(/^[[:space:]]*location: \047/, "", f); sub(/:[0-9]+:[0-9]+\047$/, "", f)
-      print rel(f) "\t" name; name = ""; next
+      l = $0; sub(/^[[:space:]]*location: \047/, "", l); sub(/\047$/, "", l); at(l)
+      print file "\t" pos "\t" name; name = ""; next
     }
-    END { if (name != "") print "\t" name }
+    END { if (name != "") print "\t\t" name }
   ' "$1"
 }
 
@@ -105,11 +106,12 @@ failing_pairs() {
 # the gate's exit line or a clean tmp-leak report — empty when there is none. A red is pre-existing
 # only when node's results end the log: anything after them may be another step's red, which the
 # base comparison cannot see (task.238 bug.6). A tripped tmp-leak ratchet prints other tmp-leak
-# lines, and those are not allowed.
+# lines, and those are not allowed. The first such line counts for the whole log: a later node run's
+# summary does not excuse a red printed before it (bug.12).
 trailer() {
   awk '
-    /^✖ failing tests:/ { mode = "spec"; bad = ""; next }
-    mode != "spec" && (/^(not )?ok [0-9]+/ || /^1\.\.[0-9]+$/ || /^TAP version/) { mode = "tap"; bad = ""; next }
+    /^✖ failing tests:/ { mode = "spec"; next }
+    mode != "spec" && (/^(not )?ok [0-9]+/ || /^1\.\.[0-9]+$/ || /^TAP version/) { mode = "tap"; next }
     mode == "" { next }
     /^$/ || /^[[:space:]]/ || /^GATE_EXIT=/ || /^npm (error|ERR!) / { next }
     /^tmp-leak: [0-9]+ top-level entries under [0-9]+ prefixes left by the suite \(directory removed\)$/ { next }
@@ -117,6 +119,29 @@ trailer() {
     mode == "spec" && (/^test at / || /^✖ /) { next }
     mode == "tap" && /^# / { next }
     bad == "" { bad = $0 }
+    END { print bad }
+  ' "$1"
+}
+
+# The first diagnostic node itself printed that is not its run summary or its coverage report —
+# empty when there is none. node turns a run red for reasons that are no failing test (a
+# --test-coverage-* threshold prints `ℹ Error: …` / `# Error: …`), and the base run, a plain
+# node --test without the head's flags, never reproduces them (task.238 bug.11). Spec prints node's
+# diagnostics, and only those, as `ℹ ` lines. TAP prints them as `# ` lines after the run's final
+# top-level plan; before it a `# ` line is a test's own output.
+stray_diagnostic() {
+  awk '
+    function allowed(s) {
+      if (s ~ /^(tests|suites|pass|fail|cancelled|skipped|todo|duration_ms) [0-9.]+$/) return 1
+      if (s == "start of coverage report") { cov = 1; return 1 }
+      if (s == "end of coverage report") { cov = 0; return 1 }
+      return cov
+    }
+    bad != "" { next }
+    /^ℹ / { s = $0; sub(/^ℹ /, "", s); if (!allowed(s)) bad = $0; next }
+    /^1\.\.[0-9]+$/ { plan = 1; cov = 0; next }
+    /^(not )?ok [0-9]+/ || /^TAP version/ { plan = 0; next }
+    plan && /^# / { s = $0; sub(/^# /, "", s); if (!allowed(s)) bad = $0 }
     END { print bad }
   ' "$1"
 }
@@ -144,9 +169,11 @@ trap 'exit 129' HUP
 failing_pairs "$LOG" "$PWD/" | LC_ALL=C sort -u >"$WORK/head-fails"
 [ -s "$WORK/head-fails" ] || unavailable "the head log names no failing node --test test"
 grep -q "^$(printf '\t')" "$WORK/head-fails" &&
-  unavailable "a failing test names no file: $(sed -n "s/^$(printf '\t')//p" "$WORK/head-fails" | head -1)"
+  unavailable "a failing test names no file: $(cut -f3 "$WORK/head-fails" | head -1)"
 TRAILER=$(trailer "$LOG")
 [ -z "$TRAILER" ] || unavailable "the log has output after the node --test results: $TRAILER"
+DIAGNOSTIC=$(stray_diagnostic "$LOG")
+[ -z "$DIAGNOSTIC" ] || unavailable "node reported something that is not a test result: $DIAGNOSTIC"
 # The base runs the head log's own reporter: TAP lists a failing suite that spec leaves out, and
 # the pairs must be read the same way on both sides.
 REPORTER=()
@@ -218,4 +245,4 @@ grep -qE 'Cannot find module|ERR_MODULE_NOT_FOUND|command not found|\.agents/ski
 failing_pairs "$BASE_LOG" "$BASE_PREFIX" | LC_ALL=C sort -u >"$WORK/base-fails"
 ONLY_HEAD=$(LC_ALL=C comm -23 "$WORK/head-fails" "$WORK/base-fails")
 [ -z "$ONLY_HEAD" ] || unavailable "fails only on the head: $(printf '%s' "$ONLY_HEAD" | tr '\t\n' ' ;')"
-echo "GATE_OUTCOME=pre-existing ($(cut -f2 "$WORK/head-fails" | tr '\n' ';'))"
+echo "GATE_OUTCOME=pre-existing ($(cut -f3 "$WORK/head-fails" | tr '\n' ';'))"

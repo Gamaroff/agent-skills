@@ -687,6 +687,161 @@ test("attributable: a failing-test path that starts with - never reaches node as
   }
 });
 
+// Real node --test logs, not typed ones: the key is where node itself says a test is, and the
+// classifier must agree with node's own output in both reporters (task.238 bug.10, bug.11).
+function realLog(work, args) {
+  const r = spawnSync(process.execPath, ["--test", ...args, "t.test.mjs"], {
+    cwd: work,
+    env: env(),
+    encoding: "utf8",
+  });
+  assert.notEqual(
+    r.status,
+    0,
+    `the head run must be red:\n${r.stdout}${r.stderr}`,
+  );
+  return `${r.stdout}${r.stderr}GATE_EXIT=${r.status}\n`;
+}
+
+const LIB =
+  "export function used() {\n  return 1;\n}\nexport function unused() {\n  return 2;\n}\n";
+// GET is red on both sides; POST, which shares its leaf name, is red only when `postFails`. Lines
+// 1-4 are identical either way, so GET is at the same line:column at the base and the head. GET's
+// test prints a line that starts `Error:` — a test's own output, which is not node's diagnostic.
+const describes = (postFails) =>
+  [
+    'import { describe, it } from "node:test";',
+    'import assert from "node:assert/strict";',
+    'import { used } from "./lib.mjs";',
+    'describe("GET", () => { it("returns 200", () => { console.log("Error: logged by the test"); assert.fail("x" + used()); }); });',
+    `describe("POST", () => { it("returns 200", () => ${postFails ? 'assert.fail("y")' : "{}"}); });`,
+    "",
+  ].join("\n");
+const TAP = ["--test-reporter=tap"];
+// repoWithBase adds the base's files after feature/x branched, so the head checkout writes its own.
+function describesRepo(postFails) {
+  const fx = repoWithBase(describes(false), { "lib.mjs": LIB });
+  write(fx.work, "lib.mjs", LIB);
+  write(fx.work, "t.test.mjs", describes(postFails));
+  return fx;
+}
+
+test("attributable: a head-only failure that shares its leaf name with a base failure in another describe (bug.10)", () => {
+  const fx = describesRepo(true);
+  try {
+    for (const reporter of [[], TAP]) {
+      const { outcome, out } = classifyLog(fx.work, realLog(fx.work, reporter));
+      assert.equal(
+        outcome,
+        "attributable",
+        `${reporter.join(" ") || "spec"}:\n${out}`,
+      );
+      assert.match(out, /fails only on the head: t\.test\.mjs 5:/);
+    }
+  } finally {
+    cleanup(fx.dir);
+  }
+});
+
+test("pre-existing: the same nested test, red at the same place on both sides, in both reporters (bug.10 control)", () => {
+  const fx = describesRepo(false);
+  try {
+    for (const reporter of [[], TAP]) {
+      const { outcome, out } = classifyLog(fx.work, realLog(fx.work, reporter));
+      assert.equal(
+        outcome,
+        "pre-existing",
+        `${reporter.join(" ") || "spec"}:\n${out}`,
+      );
+    }
+  } finally {
+    cleanup(fx.dir);
+  }
+});
+
+test("attributable: node's own coverage-threshold error, which the base run never reproduces (bug.11)", () => {
+  const fx = describesRepo(false);
+  try {
+    const cov = ["--experimental-test-coverage", "--test-coverage-lines=100"];
+    for (const reporter of [[], TAP]) {
+      const { outcome, out } = classifyLog(
+        fx.work,
+        realLog(fx.work, [...reporter, ...cov]),
+      );
+      assert.equal(
+        outcome,
+        "attributable",
+        `${reporter.join(" ") || "spec"}:\n${out}`,
+      );
+      assert.match(out, /not a test result: (ℹ|#) Error: .*coverage/);
+      assert.doesNotMatch(out, /^BASE_EXIT=/m, "the base ran");
+    }
+  } finally {
+    cleanup(fx.dir);
+  }
+});
+
+test("pre-existing: a coverage report and a test's own `Error:` output are not node diagnostics (bug.11 control)", () => {
+  const fx = describesRepo(false);
+  try {
+    for (const reporter of [[], TAP]) {
+      const log = realLog(fx.work, [
+        ...reporter,
+        "--experimental-test-coverage",
+      ]);
+      assert.match(
+        log,
+        /start of coverage report/,
+        "the control must carry a coverage report",
+      );
+      assert.match(
+        log,
+        /Error: logged by the test/,
+        "the control must carry the test's own output",
+      );
+      const { outcome, out } = classifyLog(fx.work, log);
+      assert.equal(
+        outcome,
+        "pre-existing",
+        `${reporter.join(" ") || "spec"}:\n${out}`,
+      );
+    }
+  } finally {
+    cleanup(fx.dir);
+  }
+});
+
+// A later node run's results do not excuse a red printed before them (task.238 bug.12).
+test("attributable: another step's red between two node runs (bug.12)", () => {
+  const fx = repoWithBase(A_FAILS);
+  try {
+    const run = specLog(["t.test.mjs", "a"]).replace("GATE_EXIT=1\n", "");
+    const tapRun = [
+      "TAP version 13",
+      "not ok 1 - a",
+      "  ---",
+      "  location: 't.test.mjs:3:1'",
+      "  ...",
+      "1..1",
+      "# fail 1",
+      "",
+    ].join("\n");
+    for (const [label, first, second] of [
+      ["spec", run, run],
+      ["tap", tapRun, tapRun],
+    ]) {
+      const { outcome, out } = classifyLog(
+        fx.work,
+        `${first}lint: 3 errors\n${second}GATE_EXIT=1\n`,
+      );
+      assert.equal(outcome, "attributable", `${label}:\n${out}`);
+      assert.match(out, /after the node --test results: lint: 3 errors/);
+    }
+  } finally {
+    cleanup(fx.dir);
+  }
+});
+
 test("attributable: a base that already contains HEAD proves nothing (CR4-6)", () => {
   const fx = repoWithBase(A_PASSES);
   try {
@@ -751,7 +906,7 @@ test("pre-existing from a TAP log with a failing subtest: the base runs the head
       "# Subtest: s",
       "    not ok 1 - inner",
       "      ---",
-      `      location: '${real}/t.test.mjs:3:54'`,
+      `      location: '${real}/t.test.mjs:3:34'`, // node 26.8.2's own column for this subtest
       "      ...",
       "not ok 1 - s",
       "  ---",

@@ -1,0 +1,301 @@
+[
+  {
+    "id": "log-path-dotdot-test-at",
+    "sink": "shell-exec",
+    "input": "escape.log",
+    "direction": "hostile",
+    "why": "a failing-test path climbing out of the base worktree makes the base run execute the head checkout's copy; a head-only failure then reads as pre-existing and is committed and pushed red",
+    "correct": "refused before the base run (attributable); the head-copy file never executes",
+    "fixture": {
+      "files": {
+        "h.test.mjs": "import test from \"node:test\";\nimport assert from \"node:assert/strict\";\nimport { writeFileSync } from \"node:fs\";\ntest(\"a\", () => { writeFileSync(new URL(\"./RAN-OUTSIDE-BASE\", import.meta.url), \"\"); assert.fail(\"a\"); });\n",
+        "escape.log": "✖ failing tests:\n\ntest at ../../h.test.mjs:4:1\n✖ a (1.2ms)\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "absent": [
+        "RAN-OUTSIDE-BASE"
+      ]
+    }
+  },
+  {
+    "id": "log-path-dotdot-location",
+    "sink": "shell-exec",
+    "input": "escape-loc.log",
+    "direction": "hostile",
+    "why": "the same escape through the reporter's location: form",
+    "correct": "refused before the base run (attributable); the head-copy file never executes",
+    "fixture": {
+      "files": {
+        "h.test.mjs": "import test from \"node:test\";\nimport assert from \"node:assert/strict\";\nimport { writeFileSync } from \"node:fs\";\ntest(\"a\", () => { writeFileSync(new URL(\"./RAN-OUTSIDE-BASE\", import.meta.url), \"\"); assert.fail(\"a\"); });\n",
+        "escape-loc.log": "✖ failing tests:\n\n✖ a (1.2ms)\n  location: '../../h.test.mjs:4:1'\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "absent": [
+        "RAN-OUTSIDE-BASE"
+      ]
+    }
+  },
+  {
+    "id": "log-path-absolute",
+    "sink": "shell-exec",
+    "input": "abs.log",
+    "direction": "hostile",
+    "why": "an absolute failing-test path lies outside the checkout",
+    "correct": "refused by the existing guard: attributable",
+    "fixture": {
+      "files": {
+        "abs.log": "✖ failing tests:\n\ntest at /nonexistent/x.test.mjs:1:1\n✖ a (1.2ms)\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "BASE_CHECK=unavailable (a failing test file lies outside the checkout)\nGATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-path-repo-relative",
+    "sink": "shell-exec",
+    "input": ".claude/state/gate.log",
+    "direction": "legitimate",
+    "why": "the ordinary log shape: a repo-relative test that fails the same way at the base must still classify pre-existing",
+    "correct": "pre-existing",
+    "expected": {
+      "exit": 0,
+      "stdout": "BASE_EXIT=1 (node --test t.test.mjs at origin/develop; log .claude/state/gate.log.base)\nGATE_OUTCOME=pre-existing (a;)\n"
+    }
+  },
+  {
+    "id": "log-path-dotdot-midpath",
+    "sink": "shell-exec",
+    "input": "mid.log",
+    "direction": "hostile",
+    "why": "a .. segment after a real directory still climbs out of the base worktree",
+    "correct": "refused before the base run (attributable)",
+    "fixture": {
+      "files": {
+        "h.test.mjs": "import test from \"node:test\";\nimport assert from \"node:assert/strict\";\nimport { writeFileSync } from \"node:fs\";\ntest(\"a\", () => { writeFileSync(new URL(\"./RAN-OUTSIDE-BASE\", import.meta.url), \"\"); assert.fail(\"a\"); });",
+        "mid.log": "✖ failing tests:\n\ntest at sub/../../../h.test.mjs:4:1\n✖ a (1.2ms)\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "absent": [
+        "RAN-OUTSIDE-BASE"
+      ],
+      "stdout": "BASE_CHECK=unavailable (a failing test file lies outside the checkout)\nGATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-path-dot-dotdot",
+    "sink": "shell-exec",
+    "input": "dot.log",
+    "direction": "hostile",
+    "why": "a leading ./ before .. is the same escape",
+    "correct": "refused before the base run: the test names no file",
+    "fixture": {
+      "files": {
+        "h.test.mjs": "import test from \"node:test\";\nimport assert from \"node:assert/strict\";\nimport { writeFileSync } from \"node:fs\";\ntest(\"a\", () => { writeFileSync(new URL(\"./RAN-OUTSIDE-BASE\", import.meta.url), \"\"); assert.fail(\"a\"); });",
+        "dot.log": "✖ failing tests:\n\n✖ a (1.2ms)\n  location: './../../h.test.mjs:4:1'\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "absent": [
+        "RAN-OUTSIDE-BASE"
+      ],
+      "stdout": "BASE_CHECK=unavailable (a failing test names no file: a)\nGATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-path-option-shaped",
+    "sink": "shell-exec",
+    "input": "opt.log",
+    "direction": "hostile",
+    "why": "a failing test whose file starts with - would reach node --test at the base as an option (bug.9)",
+    "correct": "refused before the base run (attributable)",
+    "fixture": {
+      "files": {
+        "opt.log": "✖ failing tests:\n\ntest at --test-reporter=tap:3:1\n✖ a (1.2ms)\n  AssertionError: x\n\ntest at t.test.mjs:3:1\n✖ a (1.2ms)\n  AssertionError: x\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "BASE_CHECK=unavailable (a failing test file lies outside the checkout)\nGATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-shared-test-name",
+    "sink": "shell-exec",
+    "input": "shared.log",
+    "direction": "hostile",
+    "why": "a head-only failure in o.test.mjs shares its name with t.test.mjs's base failure",
+    "correct": "attributable",
+    "fixture": {
+      "files": {
+        "shared.log": "✖ failing tests:\n\ntest at o.test.mjs:3:1\n✖ a (1.2ms)\n  AssertionError: x\n\ntest at t.test.mjs:3:1\n✖ a (1.2ms)\n  AssertionError: x\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "BASE_EXIT=1 (node --test o.test.mjs t.test.mjs at origin/develop; log shared.log.base)\nBASE_CHECK=unavailable (fails only on the head: o.test.mjs a)\nGATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-new-head-file",
+    "sink": "shell-exec",
+    "input": "new.log",
+    "direction": "hostile",
+    "why": "node passes over a named file that does not exist, so the base never reads it",
+    "correct": "attributable",
+    "fixture": {
+      "files": {
+        "new.log": "✖ failing tests:\n\ntest at n.test.mjs:3:1\n✖ a (1.2ms)\n  AssertionError: x\n",
+        "n.test.mjs": "import test from \"node:test\";\ntest(\"a\", () => { throw new Error(\"x\"); });\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "BASE_CHECK=unavailable (a failing test file does not exist at the base: n.test.mjs)\nGATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-test-without-file",
+    "sink": "shell-exec",
+    "input": "nofile.log",
+    "direction": "hostile",
+    "why": "a failing test the log names with no file cannot be compared",
+    "correct": "attributable",
+    "fixture": {
+      "files": {
+        "nofile.log": "✖ failing tests:\n\n✖ a (1.2ms)\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "BASE_CHECK=unavailable (a failing test names no file: a)\nGATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-trailer-other-step",
+    "sink": "shell-exec",
+    "input": "lint.log",
+    "direction": "hostile",
+    "why": "another step's red after node's results is not seen by the base run",
+    "correct": "attributable",
+    "fixture": {
+      "files": {
+        "lint.log": "✖ failing tests:\n\ntest at t.test.mjs:3:1\n✖ a (1.2ms)\n  AssertionError: x\nlint: 3 errors\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "BASE_CHECK=unavailable (the log has output after the node --test results: lint: 3 errors)\nGATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-trailer-tripped-ratchet",
+    "sink": "shell-exec",
+    "input": "ratchet.log",
+    "direction": "hostile",
+    "why": "a tripped tmp-leak ratchet is a red the base run cannot see",
+    "correct": "attributable",
+    "fixture": {
+      "files": {
+        "ratchet.log": "✖ failing tests:\n\ntest at t.test.mjs:3:1\n✖ a (1.2ms)\n  AssertionError: x\ntmp-leak: 9 top-level entries under 2 prefixes left by the suite (directory removed)\ntmp-leak: new prefix \"x-\" (4 entries) — git grep -n '\"x-'\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "BASE_CHECK=unavailable (the log has output after the node --test results: tmp-leak: new prefix \"x-\" (4 entries) — git grep -n '\"x-')\nGATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-trailer-between-two-runs",
+    "sink": "shell-exec",
+    "input": "two.log",
+    "direction": "hostile",
+    "why": "a non-node red between two node --test runs must not be forgotten when the second run's summary starts",
+    "correct": "attributable",
+    "fixture": {
+      "files": {
+        "two.log": "✖ failing tests:\n\ntest at t.test.mjs:3:1\n✖ a (1.2ms)\n  AssertionError: x\nlint: 3 errors\n✖ failing tests:\n\ntest at t.test.mjs:3:1\n✖ a (1.2ms)\n  AssertionError: x\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "BASE_CHECK=unavailable (the log has output after the node --test results: lint: 3 errors)\nGATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-crlf",
+    "sink": "shell-exec",
+    "input": "crlf.log",
+    "direction": "hostile",
+    "why": "a CRLF log the parser cannot read must not classify",
+    "correct": "attributable",
+    "fixture": {
+      "files": {
+        "crlf.log": "✖ failing tests:\r\n\r\ntest at t.test.mjs:3:1\r\n✖ a (1.2ms)\r\n  AssertionError: x\r\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "BASE_CHECK=unavailable (the head log names no failing node --test test)\nGATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-tap-absolute-outside",
+    "sink": "shell-exec",
+    "input": "tapout.log",
+    "direction": "hostile",
+    "why": "an absolute location outside the checkout must never be run",
+    "correct": "attributable",
+    "fixture": {
+      "files": {
+        "tapout.log": "TAP version 13\nnot ok 1 - a\n  ---\n  location: '/etc/x.test.mjs:3:1'\n  ...\n1..1\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "BASE_CHECK=unavailable (a failing test file lies outside the checkout)\nGATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-wrapper-signal",
+    "sink": "shell-exec",
+    "input": "sig.log",
+    "direction": "legitimate",
+    "why": "the wrapper reports the suite was interrupted",
+    "correct": "not-measured",
+    "fixture": {
+      "files": {
+        "sig.log": "✖ failing tests:\n\ntest at t.test.mjs:3:1\n✖ a (1.2ms)\n  AssertionError: x\ntest-tmpdir: interrupted by SIGINT — per-run directory removed\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=not-measured (the run was interrupted by a signal)\n"
+    }
+  },
+  {
+    "id": "log-clean-ratchet-npm",
+    "sink": "shell-exec",
+    "input": "clean.log",
+    "direction": "legitimate",
+    "why": "this repository's ordinary red: node's results, a clean ratchet, npm's report",
+    "correct": "pre-existing",
+    "fixture": {
+      "files": {
+        "clean.log": "✖ failing tests:\n\ntest at t.test.mjs:3:1\n✖ a (1.2ms)\n  AssertionError: x\ntmp-leak: 3 top-level entries under 1 prefixes left by the suite (directory removed)\ntmp-leak: ratchet ok\nnpm error code 1\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "BASE_EXIT=1 (node --test t.test.mjs at origin/develop; log clean.log.base)\nGATE_OUTCOME=pre-existing (a;)\n"
+    }
+  }
+]

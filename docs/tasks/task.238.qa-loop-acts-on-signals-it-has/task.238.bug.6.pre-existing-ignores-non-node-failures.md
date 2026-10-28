@@ -4,7 +4,7 @@
 **Bug ID**: TASK-238-BUG-6
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 4 safety re-probe, CR-2; raised as advisory cycle-1 CR-3)
 **Date Found**: 2026-10-28
 
@@ -86,3 +86,4 @@ gate was rejected because it takes minutes and breaks the 90 s bound.
 | 2026-10-28 | New | qa-task | Found in QA cycle 4 |
 | 2026-10-28 | In Progress | qa-fix | Investigation started |
 | 2026-10-28 | Ready for QA | qa-fix | Fix implemented (QA cycle 4 fix) |
+| 2026-10-28 | Closed | qa-task | Verified by task.238.qa.5.qa-loop-acts-on-signals-it-has.md |
