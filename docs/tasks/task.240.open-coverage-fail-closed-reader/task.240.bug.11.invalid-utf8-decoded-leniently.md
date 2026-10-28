@@ -4,7 +4,7 @@
 **Bug ID**: TASK-240-BUG-11
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 8 scoped review, CR-1; reproduced by QA)
 **Date Found**: 2026-10-28
 
@@ -96,3 +96,4 @@ refused too, which is fail-closed. Corpus: 187 reports, the distribution unchang
 | 2026-10-28 | New | qa-task | Found by task.240.qa.8.open-coverage-fail-closed-reader.md (CR-1) |
 | 2026-10-28 | In Progress | qa-fix | Investigation started (qa-fix cycle 8) |
 | 2026-10-28 | Ready for QA | qa-fix | Fixed: strict UTF-8 decode inside the reader (qa-fix cycle 8) |
+| 2026-10-28 | Closed | qa-task | Verified by task.240.qa.9.open-coverage-fail-closed-reader.md |

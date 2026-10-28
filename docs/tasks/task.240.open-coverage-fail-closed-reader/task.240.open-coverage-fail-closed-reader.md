@@ -529,31 +529,27 @@ reader's header, which had drifted from the code. Results:
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-28
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
 
-- **Full Report**: [task.240.qa.8.open-coverage-fail-closed-reader.md](./task.240.qa.8.open-coverage-fail-closed-reader.md)
-- **Gate File**: [task.240.gate.8.open-coverage-fail-closed-reader.yml](./task.240.gate.8.open-coverage-fail-closed-reader.yml)
+- **Full Report**: [task.240.qa.9.open-coverage-fail-closed-reader.md](./task.240.qa.9.open-coverage-fail-closed-reader.md)
+- **Gate File**: [task.240.gate.9.open-coverage-fail-closed-reader.yml](./task.240.gate.9.open-coverage-fail-closed-reader.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 6705 (full `ci:fast`), plus the differential suite at 5 fresh seeds × 25,000 and a 54-shape PyYAML hand probe
+- **Tests Executed**: 6710 (full `ci:fast`), plus 3 differential seeds × 25,000 and the 54-shape PyYAML hand probe
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-BUG-9 and BUG-10 are fixed and closed. The allow-list parser gave no wrong count under any probe this cycle. One medium finding remains, in the CLI:
-
-- TASK-240-QA-14 ([bug.11](./task.240.bug.11.invalid-utf8-decoded-leniently.md)): an invalid UTF-8 byte is decoded to U+FFFD, and the block still counts where PyYAML refuses to read it.
-
-The count is the one the writer meant. 0 of 187 tracked reports hold invalid UTF-8.
+[bug.11](./task.240.bug.11.invalid-utf8-decoded-leniently.md) is fixed and closed: an invalid UTF-8 byte now reads `unreadable` (`bad-encoding`). No open finding. Two low cleanups are recorded for later: a non-view byte container reads `no-section`, and no test pins `ignoreBOM` on the bytes path.
 
 <!-- change-log-start -->
 ## Change Log
@@ -581,6 +577,7 @@ The count is the one the writer meant. 0 of 187 tracked reports hold invalid UTF
 | 2026-10-28 | 1.2     | Reader narrowed to one line per key after the QA loop escalation (author-approved): Overview, In Scope, Target Architecture, Breaking Changes and SC-2 amended; flow, nested, block-scalar, wrapped and plain `: ` shapes now read `unreadable` | Lorien Gamaroff |
 | 2026-10-28 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-10-28 |         | QA findings fixed — the report's bytes decoded strictly inside the reader, an invalid sequence refused as `bad-encoding` (bug.11), 1 iteration | qa-fix |
+| 2026-10-28 |         | QA gate PASS (100/100) — 0 findings | qa-task |
 <!-- change-log-end -->
 
 ---
