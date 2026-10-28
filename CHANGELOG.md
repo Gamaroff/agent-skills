@@ -6,6 +6,31 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **The QA loop acts on four signals it already had (task 238).** (1) **Gated log cleanup**: every
+  fast-gate site (5b step 0a, Step 3, `/develop`, the triage prompt, develop-bug 3a) now prints its
+  exit code and removes the log only when that exit is 0, foreground or background, so a red log is
+  never deleted before it is read (obs #41). (2) **A red fast gate is classified first**:
+  `fast-gate-outcome.sh` reads a non-green run as *not measured* (no exit, a timeout signal, or the
+  test wrapper's own signal report — re-run once, no retry spent) or *attributable red* (everything
+  else — the fix loop, as before) (obs #14). A third outcome, *pre-existing red*, compared failing
+  tests with a run at the PR base. It was deleted after QA cycles 4–6 each found another
+  `node --test` log shape it misread as pre-existing. A structured comparison is deferred work on
+  task 238. (3) **PR existence
+  and CI**: `/qa-task` and `/qa-story` find the PR on Bitbucket as well as GitHub, and read the PR's
+  CI once at the gate step through `qa-ci-read.sh` — a failure on the head becomes a `medium`
+  `top_issue`, a failure also red on the base goes to `recommendations.future` as pre-existing, and
+  a pending, cancelled or unreadable run adds nothing; it never polls (obs #45). On Bitbucket the
+  base reading is the same pipeline (selector type and pattern), and a rerun supersedes the run
+  before it. (4) **Coverage
+  findings route**: a 5c `CONCERNS` whose review holds an open `category: coverage` finding returns
+  to 5b like `REQUEST CHANGES`, `/qa-fix` gains a priority row for coverage findings at any severity,
+  the findings ingester now carries `category`, and the resume contract splits its exit row in three
+  (obs #8). The open-coverage check reads an allow-list of the line and value shapes review-pr
+  writes and prints `unreadable` for anything else, never `0` — a block cut short and an awk that
+  did not run included. `pr-review-loop-parity.test.mjs` runs the
+  open-coverage block against fixtures;
+  `qa-loop-fast-gate-outcomes.test.mjs` and `qa-ci-read.test.mjs` are new.
+
 - **Step 5c applies doc-only findings on `APPROVE`, not only on `CONCERNS` (task 237).** An `APPROVE`
   carries only low findings, and a low finding is most often a one-word documentation fix — yet the
   carry fixed doc-only findings on `CONCERNS` alone, so an `APPROVE`'s went unfixed to `/finalise`,

@@ -1,0 +1,25 @@
+{
+  "sink": "filename",
+  "entry": "fence:shared/resources/develop-pipeline-step-5-6-qa-loop.md#Verdict branching",
+  "name": "open-coverage-cr10-1",
+  "call_site": null,
+  "verdict": "absent",
+  "reason": "no-hostile-case-was-rejected",
+  "executed": 1,
+  "passed": 0,
+  "reproduced": 1,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": [
+    "bash"
+  ],
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": null,
+  "slot": "{the PR review report this cycle's 5c wrote}",
+  "fixture_setup": null,
+  "ran_at": "2026-10-28T09:08:12.318Z"
+}

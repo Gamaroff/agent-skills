@@ -1,0 +1,92 @@
+schema: 2
+task: 'task.238.qa-loop-acts-on-signals-it-has'
+task_title: 'QA loop acts on the signals it already has'
+gate: CONCERNS
+status_reason: 'The cycle 6 deletion of the pre-existing fast-gate outcome is verified at ad6fef33: bug.13 and bug.14 are closed, every former misread log shape now reads attributable with nothing run at the base, and the fast gate is green. The unscoped safety re-probe found two MEDIUM defects in the 5c open-coverage check, both reproduced by the probe engine: provenance matched in free text (CR7-1) and two valid YAML shapes read 0 instead of unreadable (CR7-2).'
+reviewer: 'QA Engineer'
+head: 'ad6fef33f68f5d75d286c712121029f473293521'
+updated: '2026-10-28T06:48:39Z'
+
+top_issues:
+  - id: 'TASK-238-CR7-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'The 5c open-coverage check (:1551) matches provenance: pre-existing anywhere on any line of an entry, including another key''s value, so a coverage finding whose free text quotes the token is dropped: OPEN_COVERAGE=0 and the CONCERNS exits to Step 7. Reproduced by probe oc-provenance-in-free-text. bug.15'
+    suggested_action: 'Match provenance: and category: only in key position (first key after "- ", an indented key at the entry key indent, or after { or , in flow form); add the free-text case to the open-coverage fixtures.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-238-CR7-2'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'The open-coverage non-vacuity floor (:1552) counts only entries opened by "- " at the first item indent, so a bare "-" item with keys on the following lines, and a flow sequence on the line after findings:, read OPEN_COVERAGE=0 for a coverage finding instead of unreadable. Reproduced by probes oc-bare-dash-item and oc-flow-sequence-next-line. bug.16'
+    suggested_action: 'Count every category: key inside findings: and print unreadable when it differs from the entries categorised, or when a non-blank line arrives under findings: with no entry open; add both shapes to the fixtures.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-238-PRB7-1'
+    severity: low
+    file: 'shared/resources/fast-gate-outcome.sh'
+    finding: 'A failing test whose own output prints the test-tmpdir wrapper''s signal sentence at the start of a line makes a real red read not-measured (:46), so the gate is re-run once without spending a retry. Bounded: a second not-measured counts as an attributable attempt (develop-pipeline-step-5-6-qa-loop.md:1269), and nothing is pushed. Reproduced by probe log-signal-printed-by-a-test.'
+    suggested_action: 'Accept the signal sentence only as the wrapper prints it (after node''s results, as the log''s last non-blank line), or have the wrapper print a marker no test output can carry.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 6511
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 74
+    escaped: 0
+    notes: 'task.238.qa.7.security.run.json: pr-argument 8/8, open-coverage-check 24/24 and exit-argument 13/13 engage; log-test-paths 24/25 (every former pre-existing shape reads attributable with nothing run at the base; log-signal-printed-by-a-test reproduced, PRB7-1, low); open-coverage-shapes 1/4 (CR7-1 and CR7-2 reproduced). The base-argument control is retired: --base is refused as an unknown argument.'
+  performance:
+    status: PASS
+    notes: 'The classifier no longer creates a worktree or runs anything a second time; it reads one log with one grep.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR7-4 (reviewer, medium confidence, reproduced by QA): the background read keys on the last GATE_EXIT line but the removal on any GATE_EXIT=0 line, so a red log whose output holds an earlier GATE_EXIT=0 line is deleted.'
+  maintainability:
+    status: PASS
+    notes: 'Deleting the comparison removed ~190 lines of shell and ~700 lines of tests. QA mutated two guards (--base silently accepted, exit 0 classified attributable); each turned its predicted test red.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR7-1 and CR7-2 (MEDIUM): bug.15 and bug.16, both in the 5c open-coverage check'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+  future:
+    - action: 'PRB7-1 (low): accept the wrapper signal sentence only as the wrapper prints it'
+      refs: ['shared/resources/fast-gate-outcome.sh']
+    - action: 'CR7-3 (medium confidence): the CI read marks a head failure pre-existing whenever the same-named base job is red for any reason; drop the base comparison (the rule cycle 6 adopted for the fast gate) or keep base-red failures as top_issues with the base evidence'
+      refs: ['shared/resources/qa-ci-read.sh']
+    - action: 'CR7-4 (low, medium confidence, reproduced): key the background-read log removal on the GATE_EXIT value read, not on any GATE_EXIT=0 line (QA loop, develop-bug 3a, develop loop TEST_EXIT)'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md', 'shared/resources/develop-pipeline-step-3-develop-loop.md']
+    - action: 'CR7-5 (cleanup): develop-bug restatement of not-measured omits the wrapper signal report'
+      refs: ['skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md']
+    - action: 'CR7-6 (cleanup): Bitbucket head pipeline beyond the 50 newest reads CI_STATE=NONE'
+      refs: ['shared/resources/qa-ci-read.sh']
+    - action: 'Carried from gate 6: CR6-3 (gh run list --event push), CR6-5 (open-coverage awk on a truncated block), CR6-7 (Bitbucket PR lookup HTTP status); CR6-2 and CR6-4 are moot or folded into CR7-3'
+      refs: ['shared/resources/qa-ci-read.sh', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'skills/qa-task/SKILL.md']
+    - action: 'Structured pre-existing comparison for the fast gate (task Deferred Work)'
+      refs: ['shared/resources/fast-gate-outcome.sh']
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_verified: ['task.238.bug.13', 'task.238.bug.14']
+  bugs_opened: ['task.238.bug.15', 'task.238.bug.16']
+  fix_date: '2026-10-28'
+  verification_method: 'Committed regression tests (each read pre-existing under 8c43db0c), 2 QA mutations each red, probe engine re-run (74 cases)'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['bug.15 and bug.16 fixed, or accepted as deferred work']

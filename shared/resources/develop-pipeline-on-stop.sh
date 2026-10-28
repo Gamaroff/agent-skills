@@ -192,16 +192,17 @@ else
     4) NEXT_NAME="CREATE PR";       NEXT_SKILL_STORY="/create-pr";     NEXT_SKILL_TASK="/create-pr" ;;
     5)
       # The loop exits to Step 7 — never to a "step 6" — and only when 5c returns
-      # APPROVE or CONCERNS; the sub-skill this arm names comes from `qa_phase`.
+      # APPROVE, or a CONCERNS whose review holds no open coverage finding (task.238);
+      # the sub-skill this arm names comes from `qa_phase`.
       # THEN_WHAT is the completion sentence for this sub-step. It replaces the
       # generic "mark Step N ✅ and advance" line, which on a 5a or 5b stall told the
       # orchestrator to leave the loop after the current sub-skill — skipping 5c, or
-      # 5b and 5c (task.123 QA cycle 1, CR-3). Only 5c's APPROVE/CONCERNS advances.
+      # 5b and 5c (task.123 QA cycle 1, CR-3). Only 5c's terminal verdict advances.
       case "$QA_PHASE" in
         5b) NEXT_NAME="QA FIX (qa_phase 5b)";                  NEXT_SKILL_STORY="/qa-fix";    NEXT_SKILL_TASK="/qa-fix"
             THEN_WHAT="Only once /qa-fix has actually completed: commit and push per 5b, write \`qa_phase\` 5a via \`bash .agents/skills/${SKILL}/references/set-qa-phase.sh 5a\` and return to 5a for the next gate — or, if the counter reads QA_MAX_CYCLES, go to Loop Escalation. Do NOT mark Step 5 ✅ and do NOT advance the lock here; the lock stays at 5 inside the loop." ;;
         5c) NEXT_NAME="PR CONFORMANCE REVIEW (qa_phase 5c)";   NEXT_SKILL_STORY="/review-pr"; NEXT_SKILL_TASK="/review-pr"
-            THEN_WHAT="Only once /review-pr has actually completed: on APPROVE or CONCERNS mark Step 5 ✅ in \`${REPORT}\` and advance the lock to 7; on REQUEST CHANGES write \`qa_phase\` 5b and re-enter 5b — the lock stays at 5." ;;
+            THEN_WHAT="Only once /review-pr has actually completed: on APPROVE, or on CONCERNS whose review holds no open coverage finding (§5c's OPEN_COVERAGE check), mark Step 5 ✅ in \`${REPORT}\` and advance the lock to 7; on REQUEST CHANGES, or on CONCERNS with an open coverage finding, write \`qa_phase\` 5b and re-enter 5b; if the check prints unreadable, HALT as a failed review — the lock stays at 5." ;;
         *)  NEXT_NAME="QA REVIEW (qa_phase 5a)";               NEXT_SKILL_STORY="/qa-story";  NEXT_SKILL_TASK="/qa-task"
             THEN_WHAT="Only once the QA review has actually completed: read the gate per the Outcome branching, write \`qa_phase\` via \`bash .agents/skills/${SKILL}/references/set-qa-phase.sh 5c\` (a gate that reaches 5c) or \`… set-qa-phase.sh 5b\` (an open finding), and continue the loop. Do NOT mark Step 5 ✅ and do NOT advance the lock here; the lock stays at 5 inside the loop." ;;
       esac

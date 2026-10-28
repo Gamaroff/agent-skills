@@ -77,7 +77,11 @@ Path: `<story-or-task-dir>/.summaries/step-3-test-triage-<ITER>.json`
 
 ## Log Cleanup Rule
 
-- `TEST_EXIT == 0` → `rm -f "$TEST_LOG"` — successful run, log no longer needed
-- `TEST_EXIT != 0` → retain `$TEST_LOG` for post-mortem debugging
+The removal is keyed on the result in the same statement that removes it —
+`[ "$TEST_EXIT" -eq 0 ] && rm -f "$TEST_LOG"` (foreground), or
+`grep -q '^TEST_EXIT=0$' "$TEST_LOG" && rm -f "$TEST_LOG"` (background, where the exit code lives in
+the log) — and is never a statement of its own. Reading the result and removing the log are separate
+decisions: a command that batches a read with a bare `rm -f` removes the red log it just read
+(task.238, obs #41). A non-zero run keeps `$TEST_LOG` for post-mortem debugging.
 
 Never delete the log on failure — it is the only raw evidence of what went wrong. The next successful run at the same iteration, or out-of-band rotation, cleans it up.

@@ -1,0 +1,117 @@
+[
+  {
+    "id": "vcs-unknown",
+    "sink": "shell-exec",
+    "input": "gitlab",
+    "direction": "hostile",
+    "why": "a VCS outside the github|bitbucket allow-list must be refused, never read as either",
+    "correct": "usage error before any gh or curl call",
+    "expected": {
+      "exit": 2,
+      "stdout": "",
+      "stderr": "qa-ci-read: --vcs must be github or bitbucket\n"
+    }
+  },
+  {
+    "id": "vcs-capitalised",
+    "sink": "shell-exec",
+    "input": "GitHub",
+    "direction": "hostile",
+    "why": "alternative spelling: the allow-list is case-exact",
+    "correct": "usage error",
+    "expected": {
+      "exit": 2,
+      "stdout": "",
+      "stderr": "qa-ci-read: --vcs must be github or bitbucket\n"
+    }
+  },
+  {
+    "id": "vcs-trailing-space",
+    "sink": "shell-exec",
+    "input": "github ",
+    "direction": "hostile",
+    "why": "alternative spelling: trailing whitespace",
+    "correct": "usage error",
+    "expected": {
+      "exit": 2,
+      "stdout": "",
+      "stderr": "qa-ci-read: --vcs must be github or bitbucket\n"
+    }
+  },
+  {
+    "id": "vcs-prefix",
+    "sink": "shell-exec",
+    "input": "githubx",
+    "direction": "hostile",
+    "why": "position: the allowed token as a prefix only",
+    "correct": "usage error",
+    "expected": {
+      "exit": 2,
+      "stdout": "",
+      "stderr": "qa-ci-read: --vcs must be github or bitbucket\n"
+    }
+  },
+  {
+    "id": "vcs-newline-composition",
+    "sink": "shell-exec",
+    "input": "github\nbitbucket",
+    "direction": "hostile",
+    "why": "composition: two allowed tokens joined by a newline in one argument",
+    "correct": "usage error",
+    "expected": {
+      "exit": 2,
+      "stdout": "",
+      "stderr": "qa-ci-read: --vcs must be github or bitbucket\n"
+    }
+  },
+  {
+    "id": "vcs-option-shaped",
+    "sink": "shell-exec",
+    "input": "--pr",
+    "direction": "hostile",
+    "why": "flag form: an option-shaped value consumed as the --vcs value",
+    "correct": "usage error",
+    "expected": {
+      "exit": 2,
+      "stdout": "",
+      "stderr": "qa-ci-read: --vcs must be github or bitbucket\n"
+    }
+  },
+  {
+    "id": "vcs-command-substitution",
+    "sink": "shell-exec",
+    "input": "$(touch PWNED)",
+    "direction": "hostile",
+    "why": "a value that would run if ever evaluated",
+    "correct": "usage error, nothing runs",
+    "expected": {
+      "exit": 2,
+      "stdout": "",
+      "stderr": "qa-ci-read: --vcs must be github or bitbucket\n",
+      "absent": [
+        "PWNED"
+      ]
+    }
+  },
+  {
+    "id": "vcs-empty",
+    "sink": "shell-exec",
+    "input": "",
+    "direction": "hostile",
+    "why": "the unparseable case: an unresolved VCS",
+    "correct": "usage error",
+    "expected": {
+      "exit": 2,
+      "stdout": "",
+      "stderr": "qa-ci-read: --vcs must be github or bitbucket\n"
+    }
+  },
+  {
+    "id": "vcs-github",
+    "sink": "shell-exec",
+    "input": "github",
+    "direction": "legitimate",
+    "why": "the GitHub value proceeds to a reading",
+    "correct": "a reading (exit 0; UNKNOWN under the fake gh)"
+  }
+]

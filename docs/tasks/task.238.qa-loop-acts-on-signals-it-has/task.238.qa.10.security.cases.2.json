@@ -1,0 +1,3 @@
+[
+  {"id":"oc10-second-findings-cut-short","sink":"filename","input":"r.md","direction":"hostile","why":"CR10-1: the first findings list is terminated by a top-level key, which sets term; a second findings: list is then cut short with no fence or key after it, and term is never cleared, so a cut-short block prints a count","correct":"unreadable","fixture":{"files":{"r.md":"# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nfindings: []\nreviewed_gate: g.yml\nfindings:\n  - id: PC-1\n    category: trail\n    severity: low\n"}},"expected":{"stdout":"OPEN_COVERAGE=unreadable\n"}}
+]

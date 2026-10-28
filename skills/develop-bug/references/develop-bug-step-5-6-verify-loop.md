@@ -194,11 +194,47 @@ Exit the loop and proceed to Step 7.
    FIX_LOG=".claude/state/bug-fix-gate-{N}-$(date +%s).log"
    <fastGateCommand> > "$FIX_LOG" 2>&1
    GATE_EXIT=$?
+   echo "GATE_EXIT=$GATE_EXIT FIX_LOG=$FIX_LOG"
+   [ "$GATE_EXIT" -eq 0 ] && rm -f "$FIX_LOG"   # a red log is never removed here
    ```
 
    `{N}` is this loop's fix cycle counter from **Loop Setup** — this document tracks it in prose and
    declares no shell variable, unlike the story/task QA loop's `${QA_CYCLE}`. Do not introduce one
    here just to name a log file.
+
+   **When the gate can outlive the tool timeout, start it with `run_in_background`** and let the log
+   carry the exit code: `<fastGateCommand> > "$FIX_LOG" 2>&1; echo "GATE_EXIT=$?" >> "$FIX_LOG"`.
+   Mark the wait before yielding —
+   `bash .agents/skills/develop-bug/references/set-waiting-on.sh "3a fast gate cycle {N}" --kind task --budget-minutes {M}`
+   (`develop-pipeline-hooks.md` §"waiting_on") — and on the notification `--clear` it and read the
+   result with this block, which is the background form's cleanup too:
+
+   ```bash
+   FIX_LOG="{the log the background gate wrote}"
+   GATE_EXIT=$(sed -n 's/^GATE_EXIT=//p' "$FIX_LOG" | tail -1)
+   echo "GATE_EXIT=${GATE_EXIT:-none} FIX_LOG=$FIX_LOG"
+   grep -q '^GATE_EXIT=0$' "$FIX_LOG" && rm -f "$FIX_LOG"   # a red or unfinished log is never removed here
+   ```
+
+   **Reading the result and removing the log are separate decisions.** The removal is keyed on the
+   result in the same statement, so a command that batches a read with cleanup cannot remove a red
+   log (task.238, obs #41). Never write a bare `rm -f "$FIX_LOG"`.
+
+   **Classify a non-green result before triaging it** — the same two outcomes as the story/task QA
+   loop's step 0a: **not measured** (no exit code, 124/137/143, or the `test-tmpdir` wrapper's own
+   report that a signal interrupted or killed the suite: re-run once, never green, never red, no
+   retry attempt consumed) and **attributable red** (anything else: the triage path below).
+   There is no pre-existing red: a red is never compared with the PR base (task.238). One script
+   decides it, from the repository root:
+
+   ```bash
+   bash .agents/skills/develop-bug/references/fast-gate-outcome.sh \
+     --log "{the gate log}" \
+     --exit "{the GATE_EXIT the run printed — empty when it printed none}"
+   ```
+
+   Act on its one `GATE_OUTCOME=` line, not its exit code. A second not-measured result is an
+   attributable red attempt that counts against the bound below.
 
    `<fastGateCommand>` is `develop.fastGateCommand` from `skills-config.yaml` — the same fast tier
    the develop loop runs (see
@@ -208,7 +244,7 @@ Exit the loop and proceed to Step 7.
    cycle runs the key has already been proven to name a real script. The slow tier stays out of this
    cycle by design; it runs once at `develop-next`'s merge gate.
 
-   **This is a gate on the commit, not a new halt.** On `GATE_EXIT != 0`, do **not** commit — a red
+   **This is a gate on the commit, not a new halt.** On an **attributable** red, do **not** commit — a red
    tree is exactly what the cycle machinery is for. Triage per the develop loop's test-failure
    triage — [`develop-pipeline-step-3-develop-loop.md`](develop-pipeline-step-3-develop-loop.md)
    §"Test Failure Triage" — feed the finding back into this cycle's fixes, and re-run the gate.
@@ -225,8 +261,6 @@ Exit the loop and proceed to Step 7.
    *cycles*, so an unbounded inner re-run would never reach it. Do not describe `MAX_ITER` as
    bounding this retry: it does not, and a stated guarantee that is not real is worse than an
    unstated one.
-
-   Cleanup: `GATE_EXIT == 0` → `rm -f "$FIX_LOG"`; non-zero → retain for post-mortem.
 
    > **Why the gate sits between 3 and 4, and not after the commit.** A fix cycle pushes to the PR
    > branch, so a red commit is a red PR the reviewer sees before the next cycle repairs it — and on

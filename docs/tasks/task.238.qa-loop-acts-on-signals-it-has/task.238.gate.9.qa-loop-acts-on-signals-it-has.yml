@@ -1,0 +1,85 @@
+schema: 2
+task: 'task.238.qa-loop-acts-on-signals-it-has'
+task_title: 'QA loop acts on the signals it already has'
+gate: CONCERNS
+status_reason: 'The cycle 8 fix is verified at 51dc912e: bug.17 is closed. Its value allow-list refuses every shape gate 8 named, and each of its four guards turns its committed fixture red under QA mutation. The suite (6529), bundle check, validate and PR CI are green. Two MEDIUMs remain in the same 5c open-coverage check. A failing awk prints an empty OPEN_COVERAGE that takes the Otherwise exit (CR9-1, bug.18). A block key after a flow entry is read as that entry''s, so an invalid-YAML exemption reads 0 (CR9-2, bug.19).'
+reviewer: 'QA Engineer'
+head: '51dc912e74a8cf807b83fc335c929ca90fde8485'
+updated: '2026-10-28T08:17:52Z'
+
+top_issues:
+  - id: 'TASK-238-CR9-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'The 5c open-coverage check (:1589) prints OPEN_COVERAGE= (empty) at exit 0 when awk fails (syntax error, missing binary, a variant that rejects the program). That value is neither unreadable nor above zero, so the routing prose takes the Otherwise exit to Step 7: "could not look" reads as "found none". Reviewer CR-1 (medium, high confidence). QA reproduced it with an awk stub that exits 2. Present since the block was written (develop has no such block), and in scope because the task names this class. bug.18'
+    suggested_action: 'After the awk pipeline, map any value that is not a count or unreadable (empty included) to unreadable, and add a fixture that runs the block with a failing awk on PATH.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-238-CR9-2'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'The 5c open-coverage check (:1582) leaves open set after a one-line flow entry, so a key line two columns deeper is read as that entry''s key. "- {id: PC-1, category: coverage}" followed by "    provenance: pre-existing" is invalid YAML (PyYAML: expected <block end>), and it prints 0 instead of unreadable. QA found it with the probe engine (oc9-flow-then-key-exempt, reproduced). The reviewer found it independently (CR-2, medium confidence). It reads the same at gate 8''s head. Measured plausibility: 1 of 184 tracked reports uses flow entries, and none uses this shape. Severity kept at medium for consistency with bug.16 and bug.17 (same class, measured 0), because the check''s documented guarantee is false either way. bug.19'
+    suggested_action: 'Flag an entry opened from a flow line, and treat any deeper line after it as unreadable until the next entry opens; add a RAW_CASES fixture expecting unreadable.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 6529
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 20
+    escaped: 0
+    notes: 'task.238.qa.9.security.run.json. open-coverage-shapes-9: 10/12. oc9-flow-then-key-exempt (CR9-2) and oc9-truncated-by-hash-heading (CR9-3, low) reproduced; all 5 legitimate controls pass. open-coverage-shapes-8 (gate 8 cases, re-run): 7/8. The 5 bug.17 shapes are now refused. oc8-provenance-continued prints unreadable, an outcome its case''s correct field accepts (its expected is 1), so it is not a reproduction. fast-gate-outcome.sh and qa-ci-read.sh are unchanged since gate 8, so their controls were not re-run.'
+  performance:
+    status: PASS
+    notes: 'Unchanged since gate 8. The value allow-list adds one regex match per category key.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR9-1: an awk failure is indistinguishable from a clean zero at the routing arm. CR7-4 is still carried (advisory).'
+  maintainability:
+    status: PASS
+    notes: 'QA mutated each of the four cycle 8 guards in a scratch worktree (category token allow-list, deeper line after category/provenance, flow " #", duplicate key). Each turned its predicted committed fixture red, 4 of 4 covered. The tracked-report corpus reads identically before and after the fix (184 reports, 0 changed).'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR9-1 (MEDIUM, bug.18): normalise a non-count OPEN_COVERAGE to unreadable'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'Fix CR9-2 (MEDIUM, bug.19): refuse a deeper line after a flow entry'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+  future:
+    - action: 'The open-coverage awk has now drawn findings in gates 1, 4, 7, 8 and 9 and in DoD 1 (bug.1, bug.8, the quoted-category gap, bug.15, bug.16, bug.17, bug.18, bug.19). Replace it with a bundled script that parses the block with a real YAML parser and carries the shape table and its tests (gate 8 recommendation, unchanged)'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'CR9-3 (low, medium confidence, reproduced by oc9-truncated-by-hash-heading): a findings list cut short by a column-0 "## " line inside the fence reads only its surviving entries; require a terminator before printing a count'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'CR9-4 (low, low confidence, not reproduced: no mawk or BWK awk on this host): run the open-coverage fixtures under each installed awk variant'
+      refs: ['evals/shared/tests/pr-review-loop-parity.test.mjs']
+    - action: 'CR9-5 (low, low confidence): enumerate every consumer of a 5c CONCERNS verdict (finalise/SKILL.md PR-approved column, develop-pipeline-step-7-finalise.md, the option-2 HALT note) and qualify each for open coverage'
+      refs: ['skills/finalise/SKILL.md', 'shared/resources/develop-pipeline-step-7-finalise.md']
+    - action: 'Task document: the Overview (three fast-gate outcomes) and the ticked Phase 1 checkbox (pre-existing red) still describe the outcome QA cycle 6 deleted; reword both to the amended SC-2 (LOW; same as the hand-run pr-review.2 PC-1 and PC-2)'
+      refs: ['docs/tasks/task.238.qa-loop-acts-on-signals-it-has/task.238.qa-loop-acts-on-signals-it-has.md']
+    - action: 'Carried from gates 6–8: CR7-3, CR7-4, CR7-6, CR6-3, CR6-5, CR6-7, and the structured pre-existing comparison for the fast gate (task Deferred Work)'
+      refs: ['shared/resources/qa-ci-read.sh', 'shared/resources/fast-gate-outcome.sh', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_verified: ['task.238.bug.17']
+  bugs_opened: ['task.238.bug.18', 'task.238.bug.19']
+  fix_date: '2026-10-28'
+  verification_method: 'Committed regression fixtures (8 new RAW_CASES), 4 QA mutations each red, probe engine re-run of the gate 8 cases (8) plus 12 new cases, corpus diff over 184 tracked reports'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['bug.18 and bug.19 fixed, or accepted as deferred work']

@@ -1,0 +1,81 @@
+schema: 2
+task: 'task.238.qa-loop-acts-on-signals-it-has'
+task_title: 'QA loop acts on the signals it already has'
+gate: FAIL
+status_reason: 'All cycle 4 findings (bug.5 to bug.9, CR4-8, CR4-9, CR-6) are verified fixed at 4ef29ed1. The unscoped safety re-probe found two more HIGH ways fast-gate-outcome.sh classes a head-only red as pre-existing: a test is keyed by its leaf name, which node''s spec summary shares across describes in one file (CR5-1), and node''s own non-test errors, such as a coverage threshold, are never looked for (CR5-2). Both reproduce on node 26.8.2. The probe engine found a third, MEDIUM: a second node summary resets the trailer check (PRB5-1).'
+reviewer: 'QA Engineer'
+head: '4ef29ed18b1167d3b357979bd495a28e17a9be36'
+updated: '2026-10-28T05:42:39Z'
+
+top_issues:
+  - id: 'TASK-238-CR5-1'
+    severity: high
+    file: 'shared/resources/fast-gate-outcome.sh'
+    finding: 'In spec mode a failing test is keyed by file and leaf name (:89), and node''s spec summary omits the parent describe. A head-only failure in describe POST > it "returns 200" collapses onto a base failure in describe GET > it "returns 200" in the same file and is classed pre-existing. Reproduced on node 26.8.2 with a real head log. bug.10'
+    suggested_action: 'Key each failure on its file plus line:column (the test at / location: line carries both), so two tests that share a leaf name never match; a test whose line moved reads attributable, the safe direction.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-238-CR5-2'
+    severity: high
+    file: 'shared/resources/fast-gate-outcome.sh'
+    finding: 'trailer() (:111) reads only what follows node''s results and accepts every # line in TAP mode, so a red node raises that is not a test failure passes: --test-coverage-lines prints ℹ Error: (spec, before the summary) or # Error: (TAP, after it). The plain base run never reproduces it, so a head-only coverage regression beside a base-red test is classed pre-existing. Reproduced on node 26.8.2 in both reporters. bug.11'
+    suggested_action: 'Refuse (attributable) when the log holds a node diagnostic line (ℹ Error: or # Error:) anywhere, and accept only node''s own summary keys among # lines after TAP results.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-238-PRB5-1'
+    severity: medium
+    file: 'shared/resources/fast-gate-outcome.sh'
+    finding: 'trailer() resets its first non-node line when a second ✖ failing tests: summary starts (:111), so a gate that runs node, then a failing lint step, then node again is classed pre-existing. Probe log-trailer-between-two-runs reproduced it (task.238.qa.5.security.run.json). This repository''s gate chains with && and cannot produce the log; a consumer gate that continues past a failure can. bug.12'
+    suggested_action: 'Keep the first non-node line found after any node summary for the whole log; do not reset it when a later summary starts.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 50
+
+evidence:
+  tests_reviewed: 6533
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 57
+    escaped: 0
+    notes: 'task.238.qa.5.security.run.json: base-argument 8/8, pr-argument 8/8 and open-coverage-check 24/24 engage, including all 12 new YAML shapes; log-test-paths 16/17 (the shared-name, new-file, no-file, trailer, ratchet, CRLF, absolute-TAP, signal and clean-ratchet cases held; log-trailer-between-two-runs reproduced). Two reviewer HIGHs (CR5-1, CR5-2) still let a head-only red be classed pre-existing.'
+  performance:
+    status: PASS
+    notes: 'No change to the bounded base run; the extra checks are single awk passes over the log.'
+  reliability:
+    status: CONCERNS
+    notes: 'PRB5-1. A non-node red printed before node''s results is not examined at all; the classifier relies on the gate stopping at its first failing step (future item).'
+  maintainability:
+    status: PASS
+    notes: 'Each cycle 4 fix is held by a committed test; QA spot-mutated three (bug.5, bug.7, bug.8) and each went red.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR5-1 and CR5-2 (HIGH) and PRB5-1 (MEDIUM): bug.10 to bug.12'
+      refs: ['shared/resources/fast-gate-outcome.sh']
+  future:
+    - action: 'CR-3 (cycle 5, medium confidence; cycle 4 CR-5): gh run list --branch also returns pull_request runs from a branch named like the base; add --event push'
+      refs: ['shared/resources/qa-ci-read.sh']
+    - action: 'A non-node red printed before node --test''s results (a gate that continues past a failing step) is never examined; document that the classifier relies on the gate stopping at its first failing step, or refuse any log with a known non-node error shape before the results'
+      refs: ['shared/resources/fast-gate-outcome.sh', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'A spec test at line with no ✖ line after it is dropped silently rather than refused (found re-expecting cycle 4 probe log-path-option-shaped)'
+      refs: ['shared/resources/fast-gate-outcome.sh']
+    - action: 'Step 4b: develop-pipeline-resume-contract.md:492 (develop-bug 2b resume, added in 8c80232b, #616) exits 2 in the snippet engine because the temp copy has no pipeline lock; pre-existing, not changed by this branch'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+    - action: 'Cycle 3 advisory, still open: CR-1 (bound covers the test run only), CR-3 (orphan can share $LOG.base), CR-4 (assertGone)'
+      refs: ['shared/resources/fast-gate-outcome.sh', 'evals/shared/tests/qa-loop-fast-gate-outcomes.test.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

@@ -34,8 +34,8 @@ which ends a loop whose HIGH findings are gone and whose `PASS` gate carries not
 entries; and, at the budget, the **Gate-the-last-fix half-cycle** (route 2c), which grants one
 review + gate to a fix the last budgeted cycle landed and no gate has read — its gate reaches 5c
 by the shape of route 1 or 3, and is named as its own route because of the moment it fires. None
-of these is an exit *around* 5c: `APPROVE` or `CONCERNS` from 5c remains the only thing that opens
-Step 7.
+of these is an exit *around* 5c: `APPROVE` or `CONCERNS` from 5c (a `CONCERNS` without an open
+coverage finding) remains the only thing that opens Step 7.
 
 There are **two ways it escalates** instead: the 5-cycle limit, and — from cycle 3 onward — the
 **Convergence check**, which halts the moment the loop stops reducing HIGH findings. The convergence
@@ -794,7 +794,8 @@ The record, as the first exit writes it:
    resume and files a trail defect at 5c.
 2. **Do not run 5b.**
 3. **Hand to 5c**, exactly as a `PASS` gate does. Since 5c became the loop's exit gate the only route
-   to Step 7 is 5c returning `APPROVE` or `CONCERNS`, and this must not become the one path that
+   to Step 7 is 5c returning `APPROVE` or `CONCERNS` (a `CONCERNS` without an open coverage
+   finding), and this must not become the one path that
    reaches Step 7 without a PR conformance review — that would make it a *weaker* exit than a clean
    gate takes, on a run that by construction has stopped finding blockers.
 4. **Carry the residue, by id, and close it in `top_issues[]`** — `ROUTE_JSON`'s `residueIds` names
@@ -1105,9 +1106,13 @@ ten minutes of runner time). It is that **every fix commit reached merge without
 of its own**, because a cycle's second push kept cancelling its own in-flight run.
 
 **CI and the QA loop — no cycle waits on CI.** QA cycles (5a/5b) and the 5c review do **not** wait
-for the PR's CI run. Each cycle pushes as above, and CI runs in the background as free information:
-read its latest state if it is to hand, never block on it. A cycle's suite evidence is the local fast
-gate (`develop.fastGateCommand`, step 0a) plus the diff review. **CI green is required exactly once,
+for the PR's CI run. Each cycle pushes as above, and CI runs in the background as free information.
+**5a reads it once per cycle**: `/qa-task` and `/qa-story` read the PR's CI state at their gate step
+(qa-task Step 10), just before composing the gate, without polling (task.238, obs #45). A completed
+failure on the judged head that is not also red on the PR base becomes a `severity: medium` gate
+finding, so it enters 5b's queue; a lane red on the base too is recorded as pre-existing and kept
+out of it; anything undecided changes nothing. Nothing ever blocks on CI.
+A cycle's suite evidence is the local fast gate (`develop.fastGateCommand`, step 0a) plus the diff review. **CI green is required exactly once,
 on the final commit, at `/finalise`** — its CI reading 1 (the acceptance decision) and CI reading 2
 (on the acceptance commit) are this pipeline's only CI gate.
 (`/develop-next`'s and `/develop-batch`'s merge step waits on CI again, on that same final head —
@@ -1197,6 +1202,8 @@ After fixes are applied:
    FIX_LOG=".claude/state/qa-fix-gate-${QA_CYCLE}-$(date +%s).log"
    <fastGateCommand> > "$FIX_LOG" 2>&1
    GATE_EXIT=$?
+   echo "GATE_EXIT=$GATE_EXIT FIX_LOG=$FIX_LOG"
+   [ "$GATE_EXIT" -eq 0 ] && rm -f "$FIX_LOG"   # a red log is never removed here
    ```
 
    **When the gate can outlive the tool timeout, start it with `run_in_background`** and let the log
@@ -1204,8 +1211,23 @@ After fixes are applied:
    Mark the wait before yielding —
    `bash .agents/skills/{develop-story|develop-task}/references/set-waiting-on.sh "5b fast gate cycle {N}" --kind task --budget-minutes {M}`
    (`develop-pipeline-hooks.md` §"waiting_on") — and on the notification `--clear` it and read the
-   `GATE_EXIT=` line (`grep '^GATE_EXIT=' "$FIX_LOG"`). A foreground
-   call killed at the timeout loses its exit code, and can leave a moved `.agents/skills` unrestored.
+   result with this block, which is the background form's cleanup too:
+
+   ```bash
+   FIX_LOG="{the log the background gate wrote}"
+   GATE_EXIT=$(sed -n 's/^GATE_EXIT=//p' "$FIX_LOG" | tail -1)
+   echo "GATE_EXIT=${GATE_EXIT:-none} FIX_LOG=$FIX_LOG"
+   grep -q '^GATE_EXIT=0$' "$FIX_LOG" && rm -f "$FIX_LOG"   # a red or unfinished log is never removed here
+   ```
+
+   A foreground call killed at the timeout loses its exit code, and can leave a moved
+   `.agents/skills` unrestored.
+
+   **Reading the result and removing the log are separate decisions.** The removal is keyed on the
+   result in the same statement, so a command that batches a read with cleanup cannot remove a red
+   log. Never write a bare `rm -f "$FIX_LOG"`: task.202 batched `grep … "$FIX_LOG"; …; rm -f "$FIX_LOG"`,
+   the red log was gone, and a second ~4-minute gate run spent the 2-attempt bound just to name the
+   failure (obs #41).
 
    `<fastGateCommand>` is `develop.fastGateCommand` from `skills-config.yaml` — the same fast tier
    the develop loop runs (see
@@ -1215,7 +1237,40 @@ After fixes are applied:
    cycle runs the key has already been proven to name a real script. The slow tier stays out of this
    cycle by design; it runs once at `develop-next`'s merge gate.
 
-   **This is a gate on the commit, not a new halt.** On `GATE_EXIT != 0`, do **not** commit yet — a
+   **Classify a non-green result before triaging it — a red gate has two outcomes, not one**
+   (task.238, obs #14). A green gate (`GATE_EXIT=0`) skips this entirely and goes straight to step 1.
+
+   | Outcome | How to tell | Action | QA Iteration History line |
+   |---|---|---|---|
+   | **not measured** | no `GATE_EXIT=` line in the log (background form: the run never finished), an exit of 124 (timeout), 137 (SIGKILL) or 143 (SIGTERM), or the `test-tmpdir` wrapper's own report that a signal interrupted or killed the suite | re-run the gate once. It is never green and never red, and it consumes no retry attempt | `Fast gate: not measured ({reason})` |
+   | **attributable red** | any other red | the triage-and-retry path below, unchanged | unchanged — the failing output |
+
+   One script decides it. Run it from the repository root, only on a non-green result:
+
+   ```bash
+   bash .agents/skills/{develop-story|develop-task}/references/fast-gate-outcome.sh \
+     --log "{the gate log}" \
+     --exit "{the GATE_EXIT the run printed — empty when it printed none}"
+   ```
+
+   It prints exactly one `GATE_OUTCOME=not-measured|attributable` line and exits 0 for every
+   outcome — act on the line, not the exit code. Engine source: `fast-gate-outcome.sh` (bundled
+   into each skill that runs it as `references/fast-gate-outcome.sh`); develop-bug's step 3a calls the
+   same script, so the rule has one definition.
+
+   **There is no pre-existing red.** A red is never compared with a run at the PR base, so a red that
+   is also red on the base spends a retry like any other. A third outcome once let such a red through
+   after comparing failing tests with a base run. QA cycles 4, 5 and 6 of task.238 each found another
+   `node --test` log shape the comparison misread, so that a head-only failure went through as
+   pre-existing (bug.5 to bug.14). At the third strike the comparison was deleted, not patched again.
+   A structured comparison, from runs the script controls rather than a parsed log, is deferred work
+   on task.238.
+
+   **A not-measured gate is re-run once, and the re-run is classified again.** Its result is what
+   counts. A second not-measured result is an attributable red attempt that counts against the
+   2-attempt bound below — two runs that never finished are not a reading, and they are not a pass.
+
+   **This is a gate on the commit, not a new halt.** On an **attributable** red, do **not** commit yet — a
    red tree is exactly what the cycle machinery is for. Triage per the step-3 pattern, feed the
    finding back into this cycle's fixes, and re-run the gate.
 
@@ -1232,8 +1287,6 @@ After fixes are applied:
    MAX_ITER — both of which count *cycles*, so an unbounded inner re-run would never reach either.
    An earlier revision of this block claimed "the MAX_ITER cap still bounds the loop"; it does not
    bound this retry, and a stated guarantee that is not real is worse than an unstated one.
-
-   Cleanup mirrors step 3: `GATE_EXIT == 0` → `rm -f "$FIX_LOG"`; non-zero → retain for post-mortem.
 
    > **Why the gate sits between 0 and 1, and not after the commit.** A qa-fix cycle pushes to the PR
    > branch, so a red commit is a red PR the reviewer sees before the next cycle repairs it — and on
@@ -1328,7 +1381,8 @@ After fixes are applied:
 ### 5c. PR Conformance Review (shared)
 
 **Lock**: `bash .agents/skills/{develop-story|develop-task}/references/set-qa-phase.sh 5c` before anything else in this sub-step. `current_step` stays `5`;
-it advances to `7` only at the Step 7 transition, on `APPROVE` or `CONCERNS`.
+it advances to `7` only at the Step 7 transition, on `APPROVE` or `CONCERNS` (a `CONCERNS` without
+an open coverage finding — one with returns to 5b, and the lock stays at `5`).
 
 Perform this step **before Step 7**, on any of the **five routes out of 5a**:
 
@@ -1460,9 +1514,93 @@ gate.
 | Verdict | Action |
 | --- | --- |
 | 🚨 **REQUEST CHANGES** | Return to **5b** and run `/qa-fix` with the review's findings (see the invocation below). **Do not increment the counter here** — 5b's step 7 increments it on exit, exactly as on any other cycle. A review-driven fix is a cycle like any other, and it is counted in the same one place. |
-| ⚠️ **CONCERNS** | Record the findings in the QA Cycle entry and the implementation report. **Do not block.** Signal `ready-for-merge`, carry the review into the acceptance commit (below; doc-only findings may be fixed there), exit the loop, proceed to Step 7. |
+| ⚠️ **CONCERNS** | **If the review's Machine-Readable Findings hold an open `category: coverage` entry** (one without `provenance: pre-existing` — the check below decides it, and an `unreadable` result is the **Review failed** arm, never an exit), take the **REQUEST CHANGES** arm: return to **5b** with the same invocation, the same Remaining Work Status block and the same cycle accounting. **Otherwise** record the findings in the QA Cycle entry and the implementation report. **Do not block.** Signal `ready-for-merge`, carry the review into the acceptance commit (below; doc-only findings may be fixed there), exit the loop, proceed to Step 7. |
 | ✅ **APPROVE** | Signal `ready-for-merge`, carry the review into the acceptance commit (below; doc-only findings may be fixed there), exit the loop, proceed to Step 7. |
-| ❌ **Review failed** — `/review-pr` HALTed, could not resolve a PR, or errored | **Not a verdict, and not an exit.** Log it in the Issues Log, record `review failed` on the cycle's `**PR Review**` row, the gate and QA report are already committed by path 1 — do not commit again — and **HALT** naming the PR and the failure. Do **not** fall through to Step 7: 5c is the only exit, so a run that skips it silently finalises without the check this step exists to add. |
+| ❌ **Review failed** — `/review-pr` HALTed, could not resolve a PR, or errored; or the open-coverage check below printed `unreadable` | **Not a verdict, and not an exit.** Log it in the Issues Log, record `review failed` on the cycle's `**PR Review**` row, the gate and QA report are already committed by path 1 — do not commit again — and **HALT** naming the PR and the failure. Do **not** fall through to Step 7: 5c is the only exit, so a run that skips it silently finalises without the check this step exists to add. |
+
+**An open coverage finding sends a `CONCERNS` back to 5b** (task.238, obs #8). A coverage finding
+is, by `/review-pr`'s definition, a gap between the PR and what its work item promised — exactly
+what `/finalise`'s acceptance-criteria agent checks. Passed forward as non-blocking, it failed that
+check after a full four-agent DoD pass (task.201, task.184), and the run paid a HALT and a re-entry
+for a gap the loop had already named. Decide it mechanically, from the review report the cycle's
+`**PR Review**` row names:
+
+```bash
+REVIEW="{the PR review report this cycle's 5c wrote}"
+# The Machine-Readable Findings block. The check reads an ALLOW-LIST of line shapes under
+# `findings:` and prints `unreadable` on any other line, so a shape it does not know is never read as
+# "no coverage" (task.238 bug.16):
+#   `- key: value`  opens an entry, at the first item's indent
+#   `- {k: v, …}`   opens a one-line flow entry; quoted values are read whole, so a comma or a
+#                   `provenance:` inside one is text, not a key. The entry is complete on its line:
+#                   any line after it but the next entry is refused (task.238 bug.19)
+#   `key: value`    a key of the open entry, two columns deeper than its dash
+#   deeper lines    a block scalar or nested value: text, never read for a key — but a deeper line
+#                   right after `category:` or `provenance:` continues THAT value, and is refused
+# Values are allow-listed too (task.238 bug.17): `category:` must be one of the six tokens review-pr
+# writes (coverage, scope, trail, consistency, bug, cleanup), so a tag, an anchor or a block-scalar
+# indicator is refused rather than read as a non-coverage category; a key given twice in one entry,
+# or a ` #` inside a flow value, is refused too. Keys are read only in key position, so
+# `provenance: pre-existing` quoted in a `finding:` does not exempt it (task.238 bug.15). An entry is
+# open coverage when its `category:` is `coverage` and its `provenance:` is not `pre-existing`
+# (review-pr emits no status field), read case-blind, bare or YAML-quoted, with a trailing
+# `# comment` stripped (`\047` is a single quote inside this single-quoted awk program). A report
+# that cannot be read, whose block has no `findings:` key, holds an inline list, or holds an entry
+# with no category prints `unreadable`, never 0: "found none" and "could not look" must not print the
+# same value (task.238 bug.1, bug.8). So does a list with no terminator — the closing fence or a
+# top-level key — after it, which is a block cut short (task.238 CR9-3), and so does any value
+# that is not a count, the empty one an awk that did not run leaves (task.238 bug.18).
+BLOCK=""
+[ -f "$REVIEW" ] && [ -r "$REVIEW" ] && BLOCK=$(sed -n '/^## Machine-Readable Findings/,/^## /p' "$REVIEW")
+if printf '%s\n' "$BLOCK" | grep -qE '^findings:'; then
+  OPEN_COVERAGE=$(printf '%s\n' "$BLOCK" \
+    | awk 'function done() { if (open) { e++; if (cat) c++; if (cov && !pre) n++ }; open = cat = cov = pre = fl = 0; lk = ""; split("", seen) }
+           function unq(v) { if (v ~ /^".*"$/ || v ~ /^\047.*\047$/) v = substr(v, 2, length(v) - 2); return v }
+           function key(k, v) { if (k == "category" || k == "provenance") { if (k in seen) bad = 1; seen[k] = 1 }
+                                if (k == "category") { cat = 1; if (v == "coverage") cov = 1
+                                                       if (v !~ /^(coverage|scope|trail|consistency|bug|cleanup)$/) bad = 1 }
+                                if (k == "provenance" && v == "pre-existing") pre = 1
+                                lk = k }
+           function pair(s,   k) { k = s; sub(/:.*$/, "", k); sub(/^[^:]*:[[:space:]]*/, "", s)
+                                    sub(/[[:space:]]+#.*$/, "", s); sub(/[[:space:]]+$/, "", s); key(k, unq(s)) }
+           function flow(s,   k, v) {
+             while (match(s, /^[[:space:]]*[a-z0-9_-]+:[[:space:]]*/)) {
+               k = substr(s, 1, RLENGTH); s = substr(s, RLENGTH + 1); sub(/^[[:space:]]*/, "", k); sub(/:.*$/, "", k)
+               if (match(s, /^"[^"]*"/) || match(s, /^\047[^\047]*\047/)) v = substr(s, 2, RLENGTH - 2)
+               else { match(s, /^[^,}"\047]*/); v = substr(s, 1, RLENGTH); sub(/[[:space:]]+$/, "", v)
+                      if (v ~ /[[:space:]]#/) return 0 }
+               s = substr(s, RLENGTH + 1); key(k, v)
+               if (match(s, /^[[:space:]]*}[[:space:]]*(#.*)?$/)) return 1
+               if (!match(s, /^[[:space:]]*,/)) return 0
+               s = substr(s, RLENGTH + 1)
+             }
+             return 0 }
+           /^findings:/ { inf = 1; r = $0; sub(/^findings:[[:space:]]*/, "", r); sub(/[[:space:]]*#.*$/, "", r)
+                          if (r != "" && r != "[]") bad = 1; next }
+           !inf || /^[[:space:]]*(#.*)?$/ { next }
+           /^[^[:space:]-]/ { if (inf && ($0 ~ /^\140\140\140/ || $0 ~ /^[a-z0-9_-]+:/)) term = 1; done(); inf = 0; next }
+           { l = tolower($0); match(l, /^ */); d = RLENGTH }
+           (ind == "" || d == ind) && match(l, /^ *- \{/) { ind = d; done(); open = fl = 1; if (!flow(substr(l, RLENGTH + 1))) bad = 1; next }
+           (ind == "" || d == ind) && l ~ /^ *- [a-z0-9_-]+:/ { ind = d; done(); open = 1; pair(substr(l, d + 3)); next }
+           fl { bad = 1; next }
+           open && d == ind + 2 && l ~ /^ *[a-z0-9_-]+:/ { pair(substr(l, d + 1)); next }
+           open && d > ind + 2 { if (lk == "category" || lk == "provenance") bad = 1; next }
+           { bad = 1 }
+           END { done(); if (bad || e != c || !term) print "unreadable"; else print n + 0 }')
+else
+  OPEN_COVERAGE=unreadable
+fi
+case "$OPEN_COVERAGE" in ''|*[!0-9]*) OPEN_COVERAGE=unreadable ;; esac
+echo "OPEN_COVERAGE=$OPEN_COVERAGE"
+```
+
+`OPEN_COVERAGE` above zero on a `CONCERNS` verdict → the REQUEST CHANGES arm. `unreadable` → the
+**Review failed** arm: the check could not look, so neither exit is decided, and HALT is the only
+arm that does not guess. Every coverage finding
+counts, whatever its severity and whatever its `ref` says: the `ref` is free-form, and no reliable
+reading of it says which ones name a criterion (task.238 § 3). `trail`, `scope` and `consistency`
+findings never route — they stay non-blocking, as before. `APPROVE` is unchanged: it carries only
+`severity: low` findings.
 
 > **Why the failure arm is spelled out.** A gate that reaches 5c from 5a (§5c routes 1, 2, 2b and 3) does so without entering 5b, so
 > it skips 5b step 5's mid-loop PR-state poll — which means a PR closed or merged underneath the run
@@ -1669,7 +1807,16 @@ therefore consumes a cycle it would not have consumed before, and can reach Loop
 run that previously exited clean. That is the gate working, not a regression — and the escalation
 path already exists.
 
-#### Invoking `/qa-fix` on a REQUEST CHANGES verdict
+#### Invoking `/qa-fix` on a REQUEST CHANGES verdict, or a CONCERNS with an open coverage finding
+
+Both arrive here and are handled identically: the same Remaining Work Status block, the same
+invocation with `pr_review=`, the same cycle accounting (5b's step 7 increments the counter). A
+coverage finding is often `medium` or `low`, and two things make sure it is worked rather than
+dropped: the findings ingester carries `severity` as-is (`qa-findings-ingester-prompt.md`), so it
+enters `/qa-fix`'s Findings Summary at its own severity, and `/qa-fix` Step 2 has a priority row for
+pr-review `coverage` findings **at any severity** (with the matching Step 1b sentence). Without that
+row a `medium` coverage finding had no place in the ladder, `/qa-fix` changed nothing, and 5b step
+0's no-change HALT fired on a gap that was real.
 
 **Remaining Work Status block (required, before re-entering 5b).** Emit the block with the
 position line `Steps 5–6/8 — QA LOOP ⏳ review requested changes, cycle {CYCLE}/5` before the
@@ -1715,7 +1862,8 @@ when in fact they were never delivered.
 
 #### Signal the `ready-for-merge` stage
 
-Only on **APPROVE** or **CONCERNS** — never on REQUEST CHANGES, which is still inside the loop.
+Only on **APPROVE** or a **CONCERNS** that exits — never on REQUEST CHANGES, or on a CONCERNS with
+an open coverage finding, both of which are still inside the loop.
 When `TRACKER_ISSUE` is set, branch on `TRACKER` — the same shape as the `changes-requested` signal
 in 5b, which has always covered both:
 

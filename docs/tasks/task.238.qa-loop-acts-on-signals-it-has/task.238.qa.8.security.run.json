@@ -1,0 +1,176 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "filename",
+      "entry": "fence:shared/resources/develop-pipeline-step-5-6-qa-loop.md#Verdict branching",
+      "name": "open-coverage-shapes-7",
+      "call_site": null,
+      "verdict": "present-but-inert",
+      "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+      "executed": 4,
+      "passed": 2,
+      "reproduced": 2,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": [
+        "bash"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": "{the PR review report this cycle's 5c wrote}",
+      "fixture_setup": null,
+      "ran_at": "2026-10-28T07:25:10.399Z"
+    },
+    {
+      "sink": "shell-exec",
+      "entry": "shell-argv:shared/resources/fast-gate-outcome.sh",
+      "name": "exit-argument",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 13,
+      "passed": 13,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": [
+        "bash"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "--log",
+        ".claude/state/gate.log",
+        "--exit",
+        "{input}"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": "/home/gamaroff/Development/agent-skills/docs/tasks/task.238.qa-loop-acts-on-signals-it-has/task.238.qa.5.security.setup.sh",
+      "ran_at": "2026-10-28T07:26:02.259Z"
+    },
+    {
+      "sink": "filename",
+      "entry": "fence:shared/resources/develop-pipeline-step-5-6-qa-loop.md#Verdict branching",
+      "name": "open-coverage-check",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 24,
+      "passed": 24,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": [
+        "bash"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": "{the PR review report this cycle's 5c wrote}",
+      "fixture_setup": null,
+      "ran_at": "2026-10-28T07:25:10.804Z"
+    },
+    {
+      "sink": "filename",
+      "entry": "fence:shared/resources/develop-pipeline-step-5-6-qa-loop.md#Verdict branching",
+      "name": "open-coverage-shapes-8",
+      "call_site": null,
+      "verdict": "present-but-inert",
+      "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+      "executed": 8,
+      "passed": 3,
+      "reproduced": 5,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": [
+        "bash"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": "{the PR review report this cycle's 5c wrote}",
+      "fixture_setup": null,
+      "ran_at": "2026-10-28T07:25:10.208Z"
+    },
+    {
+      "sink": "shell-exec",
+      "entry": "shell-argv:shared/resources/fast-gate-outcome.sh",
+      "name": "log-test-paths",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 25,
+      "passed": 25,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": [
+        "bash"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "--log",
+        "{input}",
+        "--exit",
+        "1"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": "/home/gamaroff/Development/agent-skills/docs/tasks/task.238.qa-loop-acts-on-signals-it-has/task.238.qa.5.security.setup.sh",
+      "ran_at": "2026-10-28T07:26:01.651Z"
+    },
+    {
+      "sink": "shell-exec",
+      "entry": "shell-argv:shared/resources/fast-gate-outcome.sh",
+      "name": "log-signal-8",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 7,
+      "passed": 7,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": [
+        "bash"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "--log",
+        "{input}",
+        "--exit",
+        "1"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": "/home/gamaroff/Development/agent-skills/docs/tasks/task.238.qa-loop-acts-on-signals-it-has/task.238.qa.5.security.setup.sh",
+      "ran_at": "2026-10-28T07:26:00.239Z"
+    }
+  ],
+  "totals": {
+    "executed": 81,
+    "reproduced": 7,
+    "escaped": 0
+  },
+  "updated_at": "2026-10-28T07:26:02.259Z"
+}

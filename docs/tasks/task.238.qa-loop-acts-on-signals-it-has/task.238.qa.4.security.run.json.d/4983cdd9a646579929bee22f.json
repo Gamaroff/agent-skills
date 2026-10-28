@@ -1,0 +1,30 @@
+{
+  "sink": "shell-exec",
+  "entry": "shell-argv:shared/resources/qa-ci-read.sh",
+  "name": "pr-argument",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 8,
+  "passed": 8,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": [
+    "bash"
+  ],
+  "interpreter": null,
+  "fake_gh": "/home/gamaroff/Development/agent-skills/tests/fixtures/fake-gh",
+  "argv": [
+    "--vcs",
+    "github",
+    "--pr",
+    "{input}"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": "/home/gamaroff/Development/agent-skills/docs/tasks/task.238.qa-loop-acts-on-signals-it-has/task.238.qa.2.security.setup.sh",
+  "ran_at": "2026-10-28T05:10:48.484Z"
+}

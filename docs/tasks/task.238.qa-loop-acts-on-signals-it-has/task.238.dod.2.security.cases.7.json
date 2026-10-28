@@ -1,0 +1,66 @@
+[
+  {
+    "id": "oc-provenance-in-free-text",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "CR7-1: an open coverage finding whose own text quotes `provenance: pre-existing,` must still count; dropped, a CONCERNS exits to Step 7 past it",
+    "correct": "counted: routes to 5b",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  - id: PC-1\n    category: coverage\n    severity: medium\n    finding: QA filed its CI red with provenance: pre-existing, which hid it\n```\n\n## Next\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=1\n"
+    }
+  },
+  {
+    "id": "oc-bare-dash-item",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "CR7-2: a bare `-` item with its keys on the following lines is valid YAML; the check must count it or say unreadable, never 0",
+    "correct": "counted or unreadable",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  -\n    id: PC-1\n    category: coverage\n    severity: medium\n    finding: criterion 3 is not met\n```\n\n## Next\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=unreadable\n"
+    }
+  },
+  {
+    "id": "oc-flow-sequence-next-line",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "CR7-2: a flow sequence on the line after `findings:` is valid YAML; the check must count it or say unreadable, never 0",
+    "correct": "counted or unreadable",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  [{id: PC-1, category: coverage, severity: medium, finding: criterion 3 is not met}]\n```\n\n## Next\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=unreadable\n"
+    }
+  },
+  {
+    "id": "oc-plain-control",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "legitimate",
+    "why": "control: a review with no coverage finding",
+    "correct": "0",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  - id: PC-1\n    category: trail\n    severity: low\n    finding: a row is missing\n```\n\n## Next\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=0\n"
+    }
+  }
+]

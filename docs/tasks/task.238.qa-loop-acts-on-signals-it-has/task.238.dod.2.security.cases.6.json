@@ -1,0 +1,381 @@
+[
+  {
+    "id": "oc-plain-coverage",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "an open coverage finding /finalise's AC agent will fail",
+    "correct": "counted: routes to 5b",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  - id: PC-1\n    category: coverage\n    severity: medium\n    ref: \"Success Criteria 3\"\n    finding: \"criterion 3 is not met\"\n```\n\n## Next\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=1\n"
+    }
+  },
+  {
+    "id": "oc-coverage-after-preexisting",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "position: a pre-existing entry before the open coverage entry must not mask it",
+    "correct": "counted: routes to 5b",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nfindings:\n  - id: PC-1\n    category: trail\n    severity: low\n    provenance: pre-existing\n  - id: PC-2\n    category: coverage\n    severity: low\n    ref: \"task §8\"\n```\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=1\n"
+    }
+  },
+  {
+    "id": "oc-coverage-quoted",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "alternative spelling: category: \"coverage\" is the same YAML value as the bare scalar",
+    "correct": "counted: routes to 5b",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nfindings:\n  - id: PC-1\n    category: \"coverage\"\n    severity: medium\n    ref: \"Success Criteria 3\"\n```\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=1\n"
+    }
+  },
+  {
+    "id": "oc-missing-report",
+    "sink": "filename",
+    "input": "absent.md",
+    "direction": "hostile",
+    "why": "the unparseable case: a report that cannot be read must not read as no findings (bug.1)",
+    "correct": "unreadable: Review failed arm",
+    "expected": {
+      "stdout": "OPEN_COVERAGE=unreadable\n"
+    }
+  },
+  {
+    "id": "oc-no-findings-key",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "a Machine-Readable Findings section with no findings: key is a report the check could not read (bug.1)",
+    "correct": "unreadable: Review failed arm",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\n```\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=unreadable\n"
+    }
+  },
+  {
+    "id": "oc-trail-only",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "legitimate",
+    "why": "trail, scope and consistency findings stay non-blocking",
+    "correct": "0: CONCERNS exits to Step 7",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nfindings:\n  - id: PC-1\n    category: trail\n    severity: low\n  - id: PC-2\n    category: scope\n    severity: medium\n```\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=0\n"
+    }
+  },
+  {
+    "id": "oc-preexisting-coverage",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "legitimate",
+    "why": "a coverage finding marked provenance: pre-existing is not open",
+    "correct": "0",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nfindings:\n  - id: PC-1\n    category: coverage\n    severity: medium\n    provenance: pre-existing\n```\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=0\n"
+    }
+  },
+  {
+    "id": "oc-empty-findings",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "legitimate",
+    "why": "a readable review with no findings",
+    "correct": "0",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nfindings: []\n```\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=0\n"
+    }
+  },
+  {
+    "id": "oc-coverage-single-quoted",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "single-quoted scalar is the same YAML value",
+    "correct": "counted",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nfindings:\n  - id: PC-1\n    category: 'coverage'\n    severity: medium\n```"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=1\n"
+    }
+  },
+  {
+    "id": "oc-coverage-trailing-comment",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "a YAML trailing comment leaves the value coverage",
+    "correct": "counted",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nfindings:\n  - id: PC-1\n    category: coverage   # criterion 3\n    severity: medium\n```"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=1\n"
+    }
+  },
+  {
+    "id": "oc-quoted-preexisting",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "legitimate",
+    "why": "a quoted provenance: pre-existing still exempts",
+    "correct": "not counted",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nfindings:\n  - id: PC-1\n    category: \"coverage\"\n    provenance: \"pre-existing\"\n```"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=0\n"
+    }
+  },
+  {
+    "id": "oc-coverage-prefix-only",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "a category value outside the six tokens review-pr writes is not a known category: since bug.17 the reader refuses it rather than read it as non-coverage",
+    "correct": "unreadable",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nfindings:\n  - id: PC-1\n    category: coverage-gap\n```"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=unreadable\n"
+    }
+  },
+  {
+    "id": "oc-list-first-key",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "category before id",
+    "correct": "OPEN_COVERAGE=1",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  - category: coverage\n    id: PC-1\ntruncated_count: 0\n```\n\n## Next\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=1\n"
+    }
+  },
+  {
+    "id": "oc-flow-form",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "flow mapping",
+    "correct": "OPEN_COVERAGE=1",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  - {id: PC-1, category: coverage}\ntruncated_count: 0\n```\n\n## Next\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=1\n"
+    }
+  },
+  {
+    "id": "oc-flow-preexisting",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "legitimate",
+    "why": "flow mapping, exempt",
+    "correct": "OPEN_COVERAGE=0",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  - {id: PC-1, category: coverage, provenance: pre-existing}\ntruncated_count: 0\n```\n\n## Next\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=0\n"
+    }
+  },
+  {
+    "id": "oc-capitalised",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "capitalised value",
+    "correct": "OPEN_COVERAGE=1",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  - id: PC-1\n    category: Coverage\ntruncated_count: 0\n```\n\n## Next\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=1\n"
+    }
+  },
+  {
+    "id": "oc-column-zero",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "list items at column 0",
+    "correct": "OPEN_COVERAGE=1",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n- id: PC-1\n  category: coverage\ntruncated_count: 0\n```\n\n## Next\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=1\n"
+    }
+  },
+  {
+    "id": "oc-nested-list",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "a nested list inside the entry",
+    "correct": "OPEN_COVERAGE=1",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  - id: PC-1\n    category: coverage\n    evidence:\n      - a.md\ntruncated_count: 0\n```\n\n## Next\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=1\n"
+    }
+  },
+  {
+    "id": "oc-commented-category",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "legitimate",
+    "why": "a commented-out line",
+    "correct": "OPEN_COVERAGE=0",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  - id: PC-1\n    category: trail\n    # category: coverage\ntruncated_count: 0\n```\n\n## Next\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=0\n"
+    }
+  },
+  {
+    "id": "oc-unreadable-entry",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "an entry with no readable category",
+    "correct": "OPEN_COVERAGE=unreadable",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  - id: PC-1\n    categry: coverage\ntruncated_count: 0\n```\n\n## Next\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=unreadable\n"
+    }
+  },
+  {
+    "id": "oc-inline-list",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "findings as an inline list",
+    "correct": "OPEN_COVERAGE=unreadable",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings: [{id: PC-1, category: coverage}]\ntruncated_count: 0\n```\n\n## Next\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=unreadable\n"
+    }
+  },
+  {
+    "id": "oc-crlf",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "CRLF line endings",
+    "correct": "OPEN_COVERAGE=1",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\r\n\r\n## Machine-Readable Findings\r\n\r\n```yaml\r\nreviewed_gate: g.yml\r\nfindings:\r\n  - id: PC-1\r\n    category: coverage\r\ntruncated_count: 0\r\n```\r\n\r\n## Next\r\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=1\n"
+    }
+  },
+  {
+    "id": "oc-hash-in-quoted-value",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "a # inside a quoted value",
+    "correct": "OPEN_COVERAGE=1",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  - id: PC-1\n    category: coverage\n    ref: \"AC #3\"\ntruncated_count: 0\n```\n\n## Next\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=1\n"
+    }
+  },
+  {
+    "id": "oc-block-scalar-mention",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "legitimate",
+    "why": "the word in a block scalar of a trail finding",
+    "correct": "OPEN_COVERAGE=0",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  - id: PC-1\n    category: trail\n    finding: |\n      category: coverage is not met\ntruncated_count: 0\n```\n\n## Next\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=0\n"
+    }
+  }
+]

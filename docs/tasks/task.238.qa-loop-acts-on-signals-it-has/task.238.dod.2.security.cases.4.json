@@ -1,0 +1,439 @@
+[
+  {
+    "id": "log-path-dotdot-test-at",
+    "sink": "shell-exec",
+    "input": "escape.log",
+    "direction": "hostile",
+    "why": "a failing-test path climbing out of the base worktree makes the base run execute the head checkout's copy; a head-only failure then reads as pre-existing and is committed and pushed red (cycle 7: `pre-existing` is deleted, so every red must read attributable and nothing runs at the base)",
+    "correct": "attributable; nothing runs at the base",
+    "fixture": {
+      "files": {
+        "h.test.mjs": "import test from \"node:test\";\nimport assert from \"node:assert/strict\";\nimport { writeFileSync } from \"node:fs\";\ntest(\"a\", () => { writeFileSync(new URL(\"./RAN-OUTSIDE-BASE\", import.meta.url), \"\"); assert.fail(\"a\"); });\n",
+        "escape.log": "✖ failing tests:\n\ntest at ../../h.test.mjs:4:1\n✖ a (1.2ms)\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=attributable\n",
+      "absent": [
+        "RAN-OUTSIDE-BASE"
+      ]
+    }
+  },
+  {
+    "id": "log-path-dotdot-location",
+    "sink": "shell-exec",
+    "input": "escape-loc.log",
+    "direction": "hostile",
+    "why": "the same escape through the reporter's location: form (cycle 7: `pre-existing` is deleted, so every red must read attributable and nothing runs at the base)",
+    "correct": "attributable; nothing runs at the base",
+    "fixture": {
+      "files": {
+        "h.test.mjs": "import test from \"node:test\";\nimport assert from \"node:assert/strict\";\nimport { writeFileSync } from \"node:fs\";\ntest(\"a\", () => { writeFileSync(new URL(\"./RAN-OUTSIDE-BASE\", import.meta.url), \"\"); assert.fail(\"a\"); });\n",
+        "escape-loc.log": "✖ failing tests:\n\n✖ a (1.2ms)\n  location: '../../h.test.mjs:4:1'\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=attributable\n",
+      "absent": [
+        "RAN-OUTSIDE-BASE"
+      ]
+    }
+  },
+  {
+    "id": "log-path-absolute",
+    "sink": "shell-exec",
+    "input": "abs.log",
+    "direction": "hostile",
+    "why": "an absolute failing-test path lies outside the checkout (cycle 7: `pre-existing` is deleted, so every red must read attributable and nothing runs at the base)",
+    "correct": "attributable; nothing runs at the base",
+    "fixture": {
+      "files": {
+        "abs.log": "✖ failing tests:\n\ntest at /nonexistent/x.test.mjs:1:1\n✖ a (1.2ms)\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-path-repo-relative",
+    "sink": "shell-exec",
+    "input": ".claude/state/gate.log",
+    "direction": "hostile",
+    "why": "the ordinary log shape: a repo-relative test that fails the same way at the base must still classify pre-existing (cycle 7: `pre-existing` is deleted, so every red must read attributable and nothing runs at the base)",
+    "correct": "attributable; nothing runs at the base",
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-path-dotdot-midpath",
+    "sink": "shell-exec",
+    "input": "mid.log",
+    "direction": "hostile",
+    "why": "a .. segment after a real directory still climbs out of the base worktree (cycle 7: `pre-existing` is deleted, so every red must read attributable and nothing runs at the base)",
+    "correct": "attributable; nothing runs at the base",
+    "fixture": {
+      "files": {
+        "h.test.mjs": "import test from \"node:test\";\nimport assert from \"node:assert/strict\";\nimport { writeFileSync } from \"node:fs\";\ntest(\"a\", () => { writeFileSync(new URL(\"./RAN-OUTSIDE-BASE\", import.meta.url), \"\"); assert.fail(\"a\"); });",
+        "mid.log": "✖ failing tests:\n\ntest at sub/../../../h.test.mjs:4:1\n✖ a (1.2ms)\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=attributable\n",
+      "absent": [
+        "RAN-OUTSIDE-BASE"
+      ]
+    }
+  },
+  {
+    "id": "log-path-dot-dotdot",
+    "sink": "shell-exec",
+    "input": "dot.log",
+    "direction": "hostile",
+    "why": "a leading ./ before .. is the same escape (cycle 7: `pre-existing` is deleted, so every red must read attributable and nothing runs at the base)",
+    "correct": "attributable; nothing runs at the base",
+    "fixture": {
+      "files": {
+        "h.test.mjs": "import test from \"node:test\";\nimport assert from \"node:assert/strict\";\nimport { writeFileSync } from \"node:fs\";\ntest(\"a\", () => { writeFileSync(new URL(\"./RAN-OUTSIDE-BASE\", import.meta.url), \"\"); assert.fail(\"a\"); });",
+        "dot.log": "✖ failing tests:\n\n✖ a (1.2ms)\n  location: './../../h.test.mjs:4:1'\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=attributable\n",
+      "absent": [
+        "RAN-OUTSIDE-BASE"
+      ]
+    }
+  },
+  {
+    "id": "log-path-option-shaped",
+    "sink": "shell-exec",
+    "input": "opt.log",
+    "direction": "hostile",
+    "why": "a failing test whose file starts with - would reach node --test at the base as an option (bug.9) (cycle 7: `pre-existing` is deleted, so every red must read attributable and nothing runs at the base)",
+    "correct": "attributable; nothing runs at the base",
+    "fixture": {
+      "files": {
+        "opt.log": "✖ failing tests:\n\ntest at --test-reporter=tap:3:1\n✖ a (1.2ms)\n  AssertionError: x\n\ntest at t.test.mjs:3:1\n✖ a (1.2ms)\n  AssertionError: x\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-shared-test-name",
+    "sink": "shell-exec",
+    "input": "shared.log",
+    "direction": "hostile",
+    "why": "a head-only failure in o.test.mjs shares its name with t.test.mjs's base failure (cycle 7: `pre-existing` is deleted, so every red must read attributable and nothing runs at the base)",
+    "correct": "attributable; nothing runs at the base",
+    "fixture": {
+      "files": {
+        "shared.log": "✖ failing tests:\n\ntest at o.test.mjs:3:1\n✖ a (1.2ms)\n  AssertionError: x\n\ntest at t.test.mjs:3:1\n✖ a (1.2ms)\n  AssertionError: x\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-new-head-file",
+    "sink": "shell-exec",
+    "input": "new.log",
+    "direction": "hostile",
+    "why": "node passes over a named file that does not exist, so the base never reads it (cycle 7: `pre-existing` is deleted, so every red must read attributable and nothing runs at the base)",
+    "correct": "attributable; nothing runs at the base",
+    "fixture": {
+      "files": {
+        "new.log": "✖ failing tests:\n\ntest at n.test.mjs:3:1\n✖ a (1.2ms)\n  AssertionError: x\n",
+        "n.test.mjs": "import test from \"node:test\";\ntest(\"a\", () => { throw new Error(\"x\"); });\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-test-without-file",
+    "sink": "shell-exec",
+    "input": "nofile.log",
+    "direction": "hostile",
+    "why": "a failing test the log names with no file cannot be compared (cycle 7: `pre-existing` is deleted, so every red must read attributable and nothing runs at the base)",
+    "correct": "attributable; nothing runs at the base",
+    "fixture": {
+      "files": {
+        "nofile.log": "✖ failing tests:\n\n✖ a (1.2ms)\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-trailer-other-step",
+    "sink": "shell-exec",
+    "input": "lint.log",
+    "direction": "hostile",
+    "why": "another step's red after node's results is not seen by the base run (cycle 7: `pre-existing` is deleted, so every red must read attributable and nothing runs at the base)",
+    "correct": "attributable; nothing runs at the base",
+    "fixture": {
+      "files": {
+        "lint.log": "✖ failing tests:\n\ntest at t.test.mjs:3:1\n✖ a (1.2ms)\n  AssertionError: x\nlint: 3 errors\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-trailer-tripped-ratchet",
+    "sink": "shell-exec",
+    "input": "ratchet.log",
+    "direction": "hostile",
+    "why": "a tripped tmp-leak ratchet is a red the base run cannot see (cycle 7: `pre-existing` is deleted, so every red must read attributable and nothing runs at the base)",
+    "correct": "attributable; nothing runs at the base",
+    "fixture": {
+      "files": {
+        "ratchet.log": "✖ failing tests:\n\ntest at t.test.mjs:3:1\n✖ a (1.2ms)\n  AssertionError: x\ntmp-leak: 9 top-level entries under 2 prefixes left by the suite (directory removed)\ntmp-leak: new prefix \"x-\" (4 entries) — git grep -n '\"x-'\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-trailer-between-two-runs",
+    "sink": "shell-exec",
+    "input": "two.log",
+    "direction": "hostile",
+    "why": "a non-node red between two node --test runs must not be forgotten when the second run's summary starts (cycle 7: `pre-existing` is deleted, so every red must read attributable and nothing runs at the base)",
+    "correct": "attributable; nothing runs at the base",
+    "fixture": {
+      "files": {
+        "two.log": "✖ failing tests:\n\ntest at t.test.mjs:3:1\n✖ a (1.2ms)\n  AssertionError: x\nlint: 3 errors\n✖ failing tests:\n\ntest at t.test.mjs:3:1\n✖ a (1.2ms)\n  AssertionError: x\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-crlf",
+    "sink": "shell-exec",
+    "input": "crlf.log",
+    "direction": "hostile",
+    "why": "a CRLF log the parser cannot read must not classify (cycle 7: `pre-existing` is deleted, so every red must read attributable and nothing runs at the base)",
+    "correct": "attributable; nothing runs at the base",
+    "fixture": {
+      "files": {
+        "crlf.log": "✖ failing tests:\r\n\r\ntest at t.test.mjs:3:1\r\n✖ a (1.2ms)\r\n  AssertionError: x\r\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-tap-absolute-outside",
+    "sink": "shell-exec",
+    "input": "tapout.log",
+    "direction": "hostile",
+    "why": "an absolute location outside the checkout must never be run (cycle 7: `pre-existing` is deleted, so every red must read attributable and nothing runs at the base)",
+    "correct": "attributable; nothing runs at the base",
+    "fixture": {
+      "files": {
+        "tapout.log": "TAP version 13\nnot ok 1 - a\n  ---\n  location: '/etc/x.test.mjs:3:1'\n  ...\n1..1\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-wrapper-signal",
+    "sink": "shell-exec",
+    "input": "sig.log",
+    "direction": "legitimate",
+    "why": "the wrapper reports the suite was interrupted",
+    "correct": "not-measured",
+    "fixture": {
+      "files": {
+        "sig.log": "✖ failing tests:\n\ntest at t.test.mjs:3:1\n✖ a (1.2ms)\n  AssertionError: x\ntest-tmpdir: interrupted by SIGINT — per-run directory removed\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=not-measured (the run was interrupted by a signal)\n"
+    }
+  },
+  {
+    "id": "log-clean-ratchet-npm",
+    "sink": "shell-exec",
+    "input": "clean.log",
+    "direction": "hostile",
+    "why": "this repository's ordinary red: node's results, a clean ratchet, npm's report (cycle 7: `pre-existing` is deleted, so every red must read attributable and nothing runs at the base)",
+    "correct": "attributable; nothing runs at the base",
+    "fixture": {
+      "files": {
+        "clean.log": "✖ failing tests:\n\ntest at t.test.mjs:3:1\n✖ a (1.2ms)\n  AssertionError: x\ntmp-leak: 3 top-level entries under 1 prefixes left by the suite (directory removed)\ntmp-leak: ratchet ok\nnpm error code 1\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-same-key-twice",
+    "sink": "shell-exec",
+    "input": "dup.log",
+    "direction": "hostile",
+    "why": "two failing tests at one file:line:column with one leaf name (a describe or it generated in a loop; spec omits the describe) collapse under sort -u onto the single base failure at that key, so a head-only failure reads pre-existing (cycle 7: `pre-existing` is deleted, so every red must read attributable and nothing runs at the base)",
+    "correct": "attributable; nothing runs at the base",
+    "fixture": {
+      "files": {
+        "dup.log": "✖ failing tests:\n\ntest at t.test.mjs:3:1\n✖ a (1.2ms)\n  AssertionError: a\n\ntest at t.test.mjs:3:1\n✖ a (0.3ms)\n  AssertionError: a\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-shared-leaf-other-line",
+    "sink": "shell-exec",
+    "input": "o.log",
+    "direction": "hostile",
+    "why": "bug.10: a head failure sharing its leaf name with the base failure in the same file, at another line (cycle 7: `pre-existing` is deleted, so every red must read attributable and nothing runs at the base)",
+    "correct": "attributable; nothing runs at the base",
+    "fixture": {
+      "files": {
+        "o.log": "✖ failing tests:\n\ntest at t.test.mjs:9:1\n✖ a (1.2ms)\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-spec-coverage-threshold",
+    "sink": "shell-exec",
+    "input": "s.log",
+    "direction": "hostile",
+    "why": "bug.11: a coverage-threshold Error printed by node in spec mode, before the failing-tests summary (cycle 7: `pre-existing` is deleted, so every red must read attributable and nothing runs at the base)",
+    "correct": "attributable; nothing runs at the base",
+    "fixture": {
+      "files": {
+        "s.log": "✖ a (1.2ms)\nℹ tests 1\nℹ pass 0\nℹ fail 1\nℹ start of coverage report\nℹ file | line % |\nℹ end of coverage report\nℹ Error: 40.00% line coverage does not meet threshold of 100%.\n\n✖ failing tests:\n\ntest at t.test.mjs:3:1\n✖ a (1.2ms)\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-tap-coverage-threshold",
+    "sink": "shell-exec",
+    "input": "t.log",
+    "direction": "hostile",
+    "why": "bug.11: a coverage-threshold # Error printed by node after the TAP plan (cycle 7: `pre-existing` is deleted, so every red must read attributable and nothing runs at the base)",
+    "correct": "attributable; nothing runs at the base",
+    "fixture": {
+      "files": {
+        "t.log": "TAP version 13\nnot ok 1 - a\n  ---\n  location: 't.test.mjs:3:1'\n  ...\n1..1\n# tests 1\n# fail 1\n# Error: 40.00% line coverage does not meet threshold of 100%.\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-signal-printed-by-a-test",
+    "sink": "shell-exec",
+    "input": "printed.log",
+    "direction": "hostile",
+    "why": "a failing test whose own output prints the wrapper's signal sentence at the start of a line; read as not-measured, a real red is re-run without spending a retry",
+    "correct": "attributable",
+    "fixture": {
+      "files": {
+        "printed.log": "✖ a (1.2ms)\ntest-tmpdir: interrupted by SIGINT — per-run directory removed\n✖ failing tests:\n\ntest at t.test.mjs:3:1\n✖ a (1.2ms)\n  AssertionError: x\nℹ fail 1\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-signal-indented",
+    "sink": "shell-exec",
+    "input": "indented.log",
+    "direction": "hostile",
+    "why": "the signal sentence indented, as a test's own diagnostic output prints it",
+    "correct": "attributable",
+    "fixture": {
+      "files": {
+        "indented.log": "✖ failing tests:\n\ntest at t.test.mjs:3:1\n✖ a (1.2ms)\n  AssertionError: x\n  test-tmpdir: interrupted by SIGINT — per-run directory removed\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-signal-lowercase-signal",
+    "sink": "shell-exec",
+    "input": "lower.log",
+    "direction": "hostile",
+    "why": "a sentence that only resembles the wrapper's (no SIG name)",
+    "correct": "attributable",
+    "fixture": {
+      "files": {
+        "lower.log": "✖ failing tests:\n\ntest at t.test.mjs:3:1\n✖ a (1.2ms)\n  AssertionError: x\ntest-tmpdir: interrupted by sigint\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-wrapper-killed",
+    "sink": "shell-exec",
+    "input": "killed.log",
+    "direction": "legitimate",
+    "why": "the wrapper's other signal report",
+    "correct": "not-measured",
+    "fixture": {
+      "files": {
+        "killed.log": "✖ failing tests:\n\ntest at t.test.mjs:3:1\n✖ a (1.2ms)\n  AssertionError: x\ntest-tmpdir: the suite was killed by SIGTERM\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=not-measured (the run was interrupted by a signal)\n"
+    }
+  }
+]

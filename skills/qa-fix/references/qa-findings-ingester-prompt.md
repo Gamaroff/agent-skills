@@ -74,7 +74,8 @@ field arrives somewhere the schema does not define:
 | `finding` | `description` | Verbatim. |
 | `suggested_action` | `suggested_fix_path` | Verbatim. Despite the field's name it holds a description of the fix approach, not a path. |
 | `ref` | `file` | Conditional — see below. |
-| `category` | — | **Dropped.** The output schema has no category field; `pr-review` findings are already distinguished by `source`. |
+| `category` | `category` | **Carried** (task.238). qa-fix's priority ladder works a `coverage` finding at any severity, and it can only do that if the category survives this summary. Emit it on `pr-review` entries only; other sources have no category. |
+| `provenance` | — | **An entry with `provenance: pre-existing` is skipped, not emitted.** `/review-pr` found it identical on the PR base and left it out of its verdict, so it is a follow-up for the base, not work for this branch. |
 | `confidence` | — | **Dropped.** The output schema carries no confidence. Do not fold it into `severity` — a `high`/`medium` finding stays `high`/`medium` whatever its confidence. |
 | — | `source` | Always the literal `pr-review` for every entry taken from this block. |
 
@@ -115,9 +116,11 @@ fields. Parse that shape:
   give an acceptance-criterion id (`AC-3`), a frontmatter field, a filename, or a section reference.
   Carry it verbatim as the finding's location and do not attempt to coerce it into `file:line`.
 - The next indented line is the finding; the line beginning `→` is the suggested action.
-- Treat a **`high`** severity finding as equivalent to a HIGH gate `top_issue`.
-- An `APPROVE` or `CONCERNS` report is advisory — surface its findings but do not treat them as
-  blocking, since neither verdict returns the run to qa-fix.
+- Treat a **`high`** severity finding as equivalent to a HIGH gate `top_issue`. Carry the
+  `{category}` field into the output's `category` in this shape too.
+- An `APPROVE` report is advisory — surface its findings but do not treat them as blocking. A
+  `CONCERNS` report reaches qa-fix only when it holds an open `coverage` finding (task.238); its
+  coverage findings are then the work, at any severity, and its other findings stay advisory.
 
 > **Both shapes are pinned by a test.** `evals/shared/tests/pr-review-loop-parity.test.mjs` asserts
 > that the block schema and the rendered header format described here match what
@@ -160,6 +163,7 @@ findings_summary:
     - id: F1
       severity: high|medium|low
       source: gate|report|pr-review|bug.<N>
+      category: coverage|scope|trail|consistency|bug|cleanup   # pr-review entries only; omit otherwise
       file: path/to/file.ts     # leave null if not file-specific
       description: <one-line description of the finding>
       suggested_fix_path: <one-line description of fix approach — NOT a file path>
