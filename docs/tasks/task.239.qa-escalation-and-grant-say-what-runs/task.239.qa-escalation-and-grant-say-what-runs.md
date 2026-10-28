@@ -228,7 +228,7 @@ None.
 ### Performance
 
 - [x] SC-6: The grant is still one script call. No new call is added to Phase 0b
-- [x] SC-7: The escalation adds at most one `high_files` comparison per entry
+- [x] SC-7: The escalation adds at most one `high_files` comparison per entry on a convergence stall, and at most two on a loop limit: the two-gate comparison the resumed 5b reads, and the three-gate one (task.239 bug.1, QA2-CR-3)
 
 ### Code Quality
 
@@ -310,9 +310,9 @@ None.
 ### Key Findings
 No critical issues identified. Cycle 4's fixes hold: every describer of the grant write set lists the four fields, and the window qualifier and its worked-example rows are bound to the rule by tests. Both bugs are closed. The last cycle's review asked for high-confidence, line-anchored defects only.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded)
 
-**Status:** IN PROGRESS
+**Status:** SUPERSEDED. Both gaps were closed on 2026-10-28. SC-7 was reworded to what shipped. The five guards were mutation-proved (M5–M9, each red and then restored green), and the mutations are recorded in the commit that rewords SC-7. Kept as history; the current verdict is the newest `task.239.dod.{N}` file.
 
 ### QA Gate Status
 
@@ -357,6 +357,7 @@ No critical issues identified. Cycle 4's fixes hold: every describer of the gran
 | 2026-10-28 |  | QA findings fixed — QA4-CR-1 to CR-4, 1 iteration | qa-fix |
 | 2026-10-28 |  | QA gate PASS (100/100) — no findings; both bugs closed | qa-task |
 | 2026-10-28 |  | DoD incomplete — 2 gaps identified (SC-7, SC-11) | finalise |
+| 2026-10-28 | 1.2 | SC-7 reworded to what shipped (one comparison on a stall, two on a loop limit, per bug.1); SC-11 closed by mutation-proving five guards (M5–M9) | orchestrator |
 <!-- change-log-end -->
 
 ---
