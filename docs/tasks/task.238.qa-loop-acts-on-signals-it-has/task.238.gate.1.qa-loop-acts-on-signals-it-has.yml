@@ -1,0 +1,82 @@
+schema: 2
+task: 'task.238.qa-loop-acts-on-signals-it-has'
+task_title: 'QA loop acts on the signals it already has'
+gate: FAIL
+status_reason: 'One HIGH: the new open-coverage check prints 0 for an unreadable or block-less review, so a CONCERNS it could not read exits to Step 7 (CR-1). Two MEDIUM: the Stop hook still advances every CONCERNS to Step 7 (CR-2), and fast-gate-outcome.sh passes --base to git fetch where an option-shaped value runs a command (QA-1). All 4 phases delivered; ci:fast 6491/0; PR CI green.'
+reviewer: 'QA Engineer'
+head: '12dfb4b62cb7c04f9c9d75fc67a7191f286355f1'
+updated: '2026-10-28T03:58:51Z'
+
+top_issues:
+  - id: 'TASK238-CR-1'
+    severity: high
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'OPEN_COVERAGE prints 0 for a review with no open coverage finding, for a missing report path, and for a report with no Machine-Readable Findings block — an unreadable CONCERNS review exits to Step 7 as if clean (line 1539; bug.1)'
+    suggested_action: 'Check the report is readable and carries the findings heading and a findings: key before counting; print a distinct value otherwise and route it to the failed-review arm; add both cases to the open-coverage fixtures'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK238-CR-2'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-on-stop.sh'
+    finding: 'The Stop hook 5c re-prompt still says "on APPROVE or CONCERNS mark Step 5 done and advance the lock to 7" (line 204) — the SC-12 sweep grepped *.md only (bug.2)'
+    suggested_action: 'Route a CONCERNS with an open coverage finding to 5b in THEN_WHAT and its test; re-run the sweep over .md/.sh/.js/.mjs and record what was searched'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK238-QA-1'
+    severity: medium
+    file: 'shared/resources/fast-gate-outcome.sh'
+    finding: 'git fetch -q origin "$BASE" (line 71) reads an option-shaped --base as an option; --upload-pack=<cmd> ran a command in a by-hand probe (bug.3)'
+    suggested_action: 'Refuse a --base starting with - or failing git check-ref-format --branch (attributable or exit 2); add the case to qa-loop-fast-gate-outcomes.test.mjs'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 6491
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'No corpus sink models a test-runner log, a CI API payload or a git ref; fast-gate-outcome.sh, qa-ci-read.sh and the OPEN_COVERAGE block recorded boundary: internal (reasons in the QA report). The one operator-supplied argument (--base) was probed by hand and is injectable (QA-1). By-hand probes do not count toward probes_executed.'
+  performance:
+    status: PASS
+    notes: 'The CI read is one call per cycle and never polls; the base worktree runs only on a red gate (SC-6 test).'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1: the coverage route fails open on an unreadable review. Advisory: CR-3 (pre-existing verdict ignores non-node failures), CR-4 (Bitbucket counts superseded failed runs).'
+  maintainability:
+    status: CONCERNS
+    notes: 'CR-2: one statement of the 5c exit rule (the Stop hook) was left stale; the restatement sweep had no population check over non-Markdown files.'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK238-CR-1, TASK238-CR-2 and TASK238-QA-1 (bug.1–bug.3), each with a test that goes red on the current code'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'shared/resources/develop-pipeline-on-stop.sh', 'shared/resources/fast-gate-outcome.sh']
+  future:
+    - action: 'CR-3: return pre-existing only when the node failure count accounts for the whole red (e.g. a tmp-leak ratchet failure is not a node test failure)'
+      refs: ['shared/resources/fast-gate-outcome.sh']
+    - action: 'CR-4: on Bitbucket keep only the newest run per pipeline selector before deciding FAILURE'
+      refs: ['shared/resources/qa-ci-read.sh']
+    - action: 'CR-5: tell "no open PR" apart from a failed read in the VCS-branched PR Existence Check (qa-task, qa-story)'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+    - action: 'CR-6: strip both $PWD and $(pwd -P) from TAP locations so a symlinked checkout can classify pre-existing'
+      refs: ['shared/resources/fast-gate-outcome.sh']
+    - action: 'Pre-existing (Step 4b): develop-pipeline-resume-contract.md:492 block reads a pipeline lock a temp copy lacks — needs a --copy fixture, not a prose fix (block dates from 2026-10-20, untouched here)'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+      provenance: pre-existing
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

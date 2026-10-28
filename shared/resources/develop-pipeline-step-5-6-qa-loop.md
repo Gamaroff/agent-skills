@@ -1521,9 +1521,9 @@ gate.
 | Verdict | Action |
 | --- | --- |
 | 🚨 **REQUEST CHANGES** | Return to **5b** and run `/qa-fix` with the review's findings (see the invocation below). **Do not increment the counter here** — 5b's step 7 increments it on exit, exactly as on any other cycle. A review-driven fix is a cycle like any other, and it is counted in the same one place. |
-| ⚠️ **CONCERNS** | **If the review's Machine-Readable Findings hold an open `category: coverage` entry** (one without `provenance: pre-existing` — the check below decides it), take the **REQUEST CHANGES** arm: return to **5b** with the same invocation, the same Remaining Work Status block and the same cycle accounting. **Otherwise** record the findings in the QA Cycle entry and the implementation report. **Do not block.** Signal `ready-for-merge`, carry the review into the acceptance commit (below; doc-only findings may be fixed there), exit the loop, proceed to Step 7. |
+| ⚠️ **CONCERNS** | **If the review's Machine-Readable Findings hold an open `category: coverage` entry** (one without `provenance: pre-existing` — the check below decides it, and an `unreadable` result is the **Review failed** arm, never an exit), take the **REQUEST CHANGES** arm: return to **5b** with the same invocation, the same Remaining Work Status block and the same cycle accounting. **Otherwise** record the findings in the QA Cycle entry and the implementation report. **Do not block.** Signal `ready-for-merge`, carry the review into the acceptance commit (below; doc-only findings may be fixed there), exit the loop, proceed to Step 7. |
 | ✅ **APPROVE** | Signal `ready-for-merge`, carry the review into the acceptance commit (below; doc-only findings may be fixed there), exit the loop, proceed to Step 7. |
-| ❌ **Review failed** — `/review-pr` HALTed, could not resolve a PR, or errored | **Not a verdict, and not an exit.** Log it in the Issues Log, record `review failed` on the cycle's `**PR Review**` row, the gate and QA report are already committed by path 1 — do not commit again — and **HALT** naming the PR and the failure. Do **not** fall through to Step 7: 5c is the only exit, so a run that skips it silently finalises without the check this step exists to add. |
+| ❌ **Review failed** — `/review-pr` HALTed, could not resolve a PR, or errored; or the open-coverage check below printed `unreadable` | **Not a verdict, and not an exit.** Log it in the Issues Log, record `review failed` on the cycle's `**PR Review**` row, the gate and QA report are already committed by path 1 — do not commit again — and **HALT** naming the PR and the failure. Do **not** fall through to Step 7: 5c is the only exit, so a run that skips it silently finalises without the check this step exists to add. |
 
 **An open coverage finding sends a `CONCERNS` back to 5b** (task.238, obs #8). A coverage finding
 is, by `/review-pr`'s definition, a gap between the PR and what its work item promised — exactly
@@ -1536,15 +1536,25 @@ for a gap the loop had already named. Decide it mechanically, from the review re
 REVIEW="{the PR review report this cycle's 5c wrote}"
 # The Machine-Readable Findings block: entries split on `- id:`; an entry is open coverage when it
 # carries `category: coverage` and no `provenance: pre-existing` (review-pr emits no status field).
-OPEN_COVERAGE=$(sed -n '/^## Machine-Readable Findings/,/^## /p' "$REVIEW" \
-  | awk '/^[[:space:]]*- id:/ { if (cov && !pre) n++; cov = 0; pre = 0 }
-         /^[[:space:]]*category:[[:space:]]*coverage[[:space:]]*$/ { cov = 1 }
-         /^[[:space:]]*provenance:[[:space:]]*pre-existing[[:space:]]*$/ { pre = 1 }
-         END { if (cov && !pre) n++; print n + 0 }')
+# A report that cannot be read, or whose block has no `findings:` key, prints `unreadable`, never 0:
+# "found none" and "could not look" must not print the same value (task.238 bug.1).
+BLOCK=""
+[ -f "$REVIEW" ] && [ -r "$REVIEW" ] && BLOCK=$(sed -n '/^## Machine-Readable Findings/,/^## /p' "$REVIEW")
+if printf '%s\n' "$BLOCK" | grep -qE '^findings:'; then
+  OPEN_COVERAGE=$(printf '%s\n' "$BLOCK" \
+    | awk '/^[[:space:]]*- id:/ { if (cov && !pre) n++; cov = 0; pre = 0 }
+           /^[[:space:]]*category:[[:space:]]*coverage[[:space:]]*$/ { cov = 1 }
+           /^[[:space:]]*provenance:[[:space:]]*pre-existing[[:space:]]*$/ { pre = 1 }
+           END { if (cov && !pre) n++; print n + 0 }')
+else
+  OPEN_COVERAGE=unreadable
+fi
 echo "OPEN_COVERAGE=$OPEN_COVERAGE"
 ```
 
-`OPEN_COVERAGE` above zero on a `CONCERNS` verdict → the REQUEST CHANGES arm. Every coverage finding
+`OPEN_COVERAGE` above zero on a `CONCERNS` verdict → the REQUEST CHANGES arm. `unreadable` → the
+**Review failed** arm: the check could not look, so neither exit is decided, and HALT is the only
+arm that does not guess. Every coverage finding
 counts, whatever its severity and whatever its `ref` says: the `ref` is free-form, and no reliable
 reading of it says which ones name a criterion (task.238 § 3). `trail`, `scope` and `consistency`
 findings never route — they stay non-blocking, as before. `APPROVE` is unchanged: it carries only

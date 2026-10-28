@@ -346,8 +346,14 @@ done
 d="$TMPDIR_TEST/qaphase-completion-5c"
 mklock "$d" '{"skill":"develop-story","current_step":5,"qa_phase":"5c","report_path":"r.md"}'
 R=$(reason_of "$(run_hook "$d")")
-if echo "$R" | grep -q "on APPROVE or CONCERNS mark Step 5 ✅ in \`r.md\` and advance the lock to 7" && echo "$R" | grep -q "on REQUEST CHANGES write"; then
-  pass "qa_phase 5c completion sentence conditions the 5 → 7 advance on APPROVE/CONCERNS and routes REQUEST CHANGES to 5b"
+# task.238 bug.2: a CONCERNS whose review holds an open coverage finding returns to 5b, and an
+# unreadable review HALTs — so "on APPROVE or CONCERNS … advance the lock to 7" is no longer true.
+if echo "$R" | grep -q "on APPROVE or CONCERNS mark Step 5"; then
+  fail "qa_phase 5c never advances every CONCERNS" "the unconditional sentence is back: $(echo "$R" | grep -i 'only once' | head -1)"
+elif echo "$R" | grep -q "on APPROVE, or on CONCERNS whose review holds no open coverage finding (§5c's OPEN_COVERAGE check), mark Step 5 ✅ in \`r.md\` and advance the lock to 7" \
+  && echo "$R" | grep -q "on REQUEST CHANGES, or on CONCERNS with an open coverage finding, write" \
+  && echo "$R" | grep -q "if the check prints unreadable, HALT"; then
+  pass "qa_phase 5c completion sentence conditions the 5 → 7 advance on APPROVE / a coverage-clean CONCERNS, routes REQUEST CHANGES and open coverage to 5b, HALTs on unreadable"
 else
   fail "qa_phase 5c completion sentence" "got: $(echo "$R" | grep -i 'only once' | head -1)"
 fi

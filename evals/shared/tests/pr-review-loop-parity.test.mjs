@@ -830,7 +830,9 @@ function reviewReport(findings) {
   return `# PR Review\n\n**Verdict:** CONCERNS\n\n## Machine-Readable Findings\n\n\`\`\`yaml\nreviewed_gate: task.1.gate.1.x.yml\nfindings:\n${entries}truncated_count: 0\n\`\`\`\n\n## Recommended Actions\n\n1. category: coverage (prose after the block must not count)\n`;
 }
 
-function openCoverage(findings) {
+// `body` is the report's text, or null for a path that does not exist. Returns the count, or the
+// literal `unreadable`.
+function openCoverageOf(body) {
   const blocks = extractBlocks(loopDoc).filter((b) =>
     b.code.includes("OPEN_COVERAGE=$("),
   );
@@ -842,18 +844,29 @@ function openCoverage(findings) {
   const dir = mkdtempSync(join(tmpdir(), "open-coverage-"));
   try {
     const report = join(dir, "task.1.pr-review.1.x.md");
-    writeFileSync(report, reviewReport(findings));
+    if (body !== null) writeFileSync(report, body);
     const code = blocks[0].code
       .split("{the PR review report this cycle's 5c wrote}")
       .join(report);
-    const r = spawnSync("bash", ["-c", code], { encoding: "utf8" });
-    assert.equal(r.status, 0, r.stderr);
-    const m = r.stdout.match(/^OPEN_COVERAGE=(\d+)$/m);
-    assert.ok(m, `no OPEN_COVERAGE line:\n${r.stdout}`);
-    return Number(m[1]);
+    const runIn = (sh) => {
+      const r = spawnSync(sh, ["-c", code], { encoding: "utf8" });
+      if (r.error?.code === "ENOENT") return undefined; // zsh absent on this runner
+      assert.equal(r.status, 0, `${sh}: ${r.stderr}`);
+      const m = r.stdout.match(/^OPEN_COVERAGE=(\d+|unreadable)$/m);
+      assert.ok(m, `${sh}: no OPEN_COVERAGE line:\n${r.stdout}`);
+      return m[1] === "unreadable" ? m[1] : Number(m[1]);
+    };
+    const got = runIn("bash");
+    const zsh = runIn("zsh");
+    if (zsh !== undefined) assert.equal(zsh, got, "bash and zsh disagree");
+    return got;
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+function openCoverage(findings) {
+  return openCoverageOf(reviewReport(findings));
 }
 
 const COVERAGE_CASES = [
@@ -895,6 +908,49 @@ for (const [label, findings, want] of COVERAGE_CASES) {
     assert.equal(openCoverage(findings), want);
   });
 }
+
+// "Found none" and "could not look" must not print the same value (task.238 bug.1): each of these
+// printed OPEN_COVERAGE=0 and exited the loop to Step 7.
+const UNREADABLE_CASES = [
+  ["a report path that does not exist", null],
+  [
+    "a report with no Machine-Readable Findings block",
+    "# PR Review\n\n**Verdict:** CONCERNS\n\n## Recommended Actions\n\n1. x\n",
+  ],
+  [
+    "a findings heading with no findings: key",
+    "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: none\n```\n\n## Recommended Actions\n",
+  ],
+];
+
+for (const [label, body] of UNREADABLE_CASES) {
+  test(`open-coverage check: ${label} → unreadable, never 0`, () => {
+    assert.equal(openCoverageOf(body), "unreadable");
+  });
+}
+
+test("open-coverage check: an empty findings list (`findings: []`) reads 0, not unreadable", () => {
+  assert.equal(
+    openCoverageOf(
+      "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: none\nfindings: []\ntruncated_count: 0\n```\n",
+    ),
+    0,
+  );
+});
+
+test("§5c routes an unreadable open-coverage check to the Review failed arm, never to Step 7", () => {
+  const sec = loopDoc.slice(loopDoc.indexOf("OPEN_COVERAGE=$("));
+  const prose = sec.slice(
+    sec.indexOf("```", 10),
+    sec.indexOf("> **Why the failure arm"),
+  );
+  assert.match(prose, /`unreadable`[^.]*\*\*Review failed\*\*/);
+  const row = loopDoc
+    .split("\n")
+    .find((l) => l.startsWith("| ❌ **Review failed**"));
+  assert.ok(row, "the Review failed row moved");
+  assert.match(row, /unreadable/);
+});
 
 test("SC-4a: /qa-fix's ladder works a pr-review coverage finding at any severity, and the ingester keeps its category", () => {
   // Routing a CONCERNS to 5b is only half the fix: a `medium` coverage finding had no row in qa-fix's
@@ -1745,7 +1801,9 @@ test("the 5c resume check reads the report, not the filesystem", () => {
   //
   // task.238 split the arm in three: one row keyed on `APPROVE`, and two on `CONCERNS` — one whose
   // review holds an open coverage finding (5c routed back, like REQUEST CHANGES: re-enter at 5b) and
-  // one whose review holds none (cleared: Step 7). Each is asserted by its own destination.
+  // one whose review holds none (cleared: Step 7). QA cycle 1 (bug.1) added a third: a check that
+  // printed `unreadable` could not look, so it re-runs 5c like `review failed` and never exits.
+  // Each is asserted by its own destination.
   const approveRows = subStateRows.filter((r) => r.key.includes("`APPROVE`"));
   assert.equal(
     approveRows.length,
@@ -1755,8 +1813,21 @@ test("the 5c resume check reads the report, not the filesystem", () => {
   const concernsRows = subStateRows.filter((r) => r.key.includes("`CONCERNS`"));
   assert.equal(
     concernsRows.length,
-    2,
-    `expected exactly TWO sub-state rows keyed on CONCERNS (with and without an open coverage finding). Rows present: ${subStateRows.map((r) => r.key).join(" / ")}`,
+    3,
+    `expected exactly THREE sub-state rows keyed on CONCERNS (open coverage, none, unreadable). Rows present: ${subStateRows.map((r) => r.key).join(" / ")}`,
+  );
+  const concernsUnreadable = concernsRows.find((r) =>
+    /prints `unreadable`/.test(r.key),
+  );
+  assert.ok(
+    concernsUnreadable,
+    "a CONCERNS row must key on an `unreadable` check",
+  );
+  assert.match(concernsUnreadable.action, /re-enter at \*\*5c\*\* once/);
+  assert.doesNotMatch(
+    concernsUnreadable.action,
+    /go to Step 7/,
+    "an unreadable review is not an exit — it could not look",
   );
   const concernsOpen = concernsRows.find((r) =>
     /holds an open coverage finding/.test(r.key),

@@ -47,6 +47,12 @@ unavailable() {
   exit 0
 }
 
+# --base reaches `git fetch` after the remote name, where git reads a leading `-` as an option:
+# `--upload-pack=<cmd>` runs <cmd> over a local or ssh transport. A branch name never starts with
+# `-`, so refuse anything that is not one before any git call (task.238 bug.3).
+case "$BASE" in -*) unavailable "--base is not a branch name: $BASE" ;; esac
+git check-ref-format --branch "$BASE" >/dev/null 2>&1 || unavailable "--base is not a branch name: $BASE"
+
 # The failing tests a node --test log names: the spec reporter's summary (the default, also when
 # redirected), or TAP `not ok` lines.
 failing_tests() {
@@ -69,7 +75,7 @@ grep -q '^/' "$WORK/files" && unavailable "a failing test file lies outside the 
 FILES=() # not mapfile: macOS ships bash 3.2
 while IFS= read -r f; do FILES+=("$f"); done <"$WORK/files"
 
-git fetch -q origin "$BASE" 2>/dev/null || unavailable "cannot fetch origin/$BASE"
+git fetch -q origin -- "$BASE" 2>/dev/null || unavailable "cannot fetch origin/$BASE"
 WT=".worktrees/base-check-$$"
 git worktree add -q --detach "$WT" "origin/$BASE" >/dev/null 2>&1 || unavailable "cannot create a base worktree"
 # A fresh worktree has no node_modules; borrow the checkout's so a missing dependency is not the reading.

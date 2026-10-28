@@ -347,6 +347,29 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-28
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.238.qa.1.qa-loop-acts-on-signals-it-has.md](./task.238.qa.1.qa-loop-acts-on-signals-it-has.md)
+- **Gate File**: [task.238.gate.1.qa-loop-acts-on-signals-it-has.yml](./task.238.gate.1.qa-loop-acts-on-signals-it-has.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 6491
+- **Phases Verified**: 4/4
+- **Critical Issues**: 1
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+
+### Key Findings
+- HIGH: the open-coverage check reads an unreadable review as clean (bug.1)
+- MEDIUM: the Stop hook still sends every CONCERNS to Step 7 (bug.2)
+- MEDIUM: `--base` reaches `git fetch` as an option (bug.3)
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -357,6 +380,8 @@ None.
 | 2026-10-28 | 1.1 | Review 1 (7/10, 14 Important, 0 Critical) — CI read moved to Step 10 with a base check; Bitbucket PR Existence Check added; qa-fix ladder row and resume-row split added; "open" coverage finding defined; pre-existing red requires the same failing tests, with a differential oracle (Phase 1 → Medium); jq gains ACTION_REQUIRED and a head-equality rule; test sites, cleanup sites and the SC-12 sweep refreshed; effort 8h → 13h | review-task |
 | 2026-10-28 |  | Status → ready-for-development | review-task |
 | 2026-10-28 |  | Implemented — 20 files (2 new scripts, 2 new test files), 77 new tests; status → ready-for-review | develop |
+| 2026-10-28 |  | QA gate FAIL (70/100) — 3 findings (1 high, 2 medium); status → in-progress | qa-task |
+| 2026-10-28 |  | QA findings fixed — gate 1 FAIL, 3 entries (bug.1–bug.3), 1 iteration; status → ready-for-review | qa-fix |
 <!-- change-log-end -->
 
 ---

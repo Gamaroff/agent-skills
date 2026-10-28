@@ -125,8 +125,8 @@ flowchart TD
     S5route -- route 2 / 2b exit --> S5c
     S5route -- fix --> S6[Step 6: qa-fix]
     S5c --> S5cv{Verdict}
-    S5cv -- REQUEST CHANGES<br/>commit only, push already spent --> S6
-    S5cv -- APPROVE / CONCERNS --> S5cm[signal ready-for-merge] --> S7
+    S5cv -- REQUEST CHANGES, or CONCERNS with open coverage<br/>commit only, push already spent --> S6
+    S5cv -- APPROVE / CONCERNS, no open coverage --> S5cm[signal ready-for-merge] --> S7
     S6 --> S6chg{Code changed?}
     S6chg -- no --> HALTNOFIX[HALT: qa-fix made no changes]
     S6chg -- yes --> S6commit[/commit-changes + push/]
@@ -326,14 +326,14 @@ sequenceDiagram
             H->>+PR: /review-pr --effort {medium|low} --comment --no-code<br/>Step 5c — the loop's exit gate
             PR->>FS: write story.{P}.{E}.{S}.pr-review.{n}.*.md
             PR-->>-H: verdict
-            alt verdict == REQUEST CHANGES
+            alt verdict == REQUEST CHANGES, or CONCERNS with an open coverage finding
                 note right of H: back to 5b — same cycle budget,<br/>counter incremented by 5b step 7
                 H->>+F: /qa-fix {gate} + {pr-review report}
                 F-->>-H: returns (commit only — push already spent)
-            else verdict == APPROVE / CONCERNS
+            else verdict == APPROVE / CONCERNS with no open coverage finding
                 H->>H: signal ready-for-merge
                 note right of H: EXIT loop → Step 7
-            else verdict == review failed
+            else verdict == review failed, or coverage check unreadable
                 H->>H: HALT — 5c could not run (do NOT fall through to Step 7)
             end
         else FAIL or open entries (convergence check and route classifier passed)
@@ -508,7 +508,7 @@ Every board move goes through a **moment** — a named point in the pipeline —
 | Step 4 (PR opened)             | `in-review`         | `/create-pr` passes `--base develop` and `--issue {N}` + `gh-stage.js --stage in-review`                                                                                                     |
 | Step 5 (QA start)              | `in-qa`             | `gh-stage.js --stage in-qa` — **once**, not per cycle. *Off by default.*                                                                                                                     |
 | Step 5b (entering a fix cycle) | `changes-requested` | `gh-stage.js --stage changes-requested` — **per cycle**, because it marks a state the card re-enters. *Off by default.*                                                                      |
-| Step 5c (APPROVE / CONCERNS)   | `ready-for-merge`   | `gh-stage.js --stage ready-for-merge`. *Off by default.*                                                                                                                                     |
+| Step 5c (loop-exit verdict)    | `ready-for-merge`   | `gh-stage.js --stage ready-for-merge`. *Off by default.*                                                                                                                                     |
 | Step 5b (post qa-fix push)     | —                   | tracker state poller checks `pr.state` is OPEN                                                                                                                                              |
 | Step 7 (finalise)              | `done`              | `gh issue close {N}` + `gh-stage.js --stage done` + DoD body posted as PR comment                                                                                                            |
 | Terminal HALT                  | `blocked`           | `gh-stage.js --stage blocked` — only for a real blockage, never an interruption. *Off by default.*                                                                                           |

@@ -480,6 +480,34 @@ test("attributable: a failing file outside the checkout is never run from the ba
   }
 });
 
+test("an option-shaped --base never reaches git fetch (task.238 bug.3)", () => {
+  // `git fetch origin --upload-pack=<cmd>` runs <cmd> over a local or ssh transport. The fixture's
+  // origin is a local path, so the injection would fire here; the marker proves it did not.
+  const fx = repoWithBase(A_FAILS);
+  try {
+    const mark = path.join(fx.dir, "INJECTED");
+    for (const base of [
+      `--upload-pack=touch ${mark}; git-upload-pack`,
+      "-develop",
+      "develop..x",
+    ]) {
+      const { outcome, out } = classify(fx.work, [
+        "--log",
+        headLog(fx.work),
+        "--exit",
+        "1",
+        "--base",
+        base,
+      ]);
+      assert.equal(outcome, "attributable", `${base}: ${out}`);
+      assert.match(out, /BASE_CHECK=unavailable \(--base is not a branch name/);
+      assert.equal(fs.existsSync(mark), false, `${base} ran a command`);
+    }
+  } finally {
+    cleanup(fx.dir);
+  }
+});
+
 test("usage errors exit 2 rather than guessing an outcome", () => {
   for (const args of [
     [],
