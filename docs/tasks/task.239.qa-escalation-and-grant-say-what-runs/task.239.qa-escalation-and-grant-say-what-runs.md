@@ -310,6 +310,26 @@ None.
 ### Key Findings
 No critical issues identified. Cycle 4's fixes hold: every describer of the grant write set lists the four fields, and the window qualifier and its worked-example rows are bound to the rule by tests. Both bugs are closed. The last cycle's review asked for high-confidence, line-anchored defects only.
 
+## Definition of Done - Gaps Identified — run 2 (historical, superseded)
+
+**Status:** SUPERSEDED. The gap was closed on 2026-10-28: mutations M10–M16 were run (each red, then restored green) and are recorded in the commit that adds this note. Kept as history; the current verdict is the newest `task.239.dod.{N}` file.
+
+### Missing Criteria:
+
+1. **Acceptance Criteria:**
+   - [ ] SC-11: six new assertion groups have no recorded mutation proof — `qa-loop-lock-fields-parity.test.mjs:824-828` (`reenter_at` report), `:138-142` (misspelling patterns), `:204-208` (same-jq-write regex); `qa-escalation-template.test.mjs:56-60` (Third-strike files field), `:67-71` ("never a patch"), `:77-82` (ordering)
+
+### Next Steps:
+
+- [ ] Record the mutations M10–M16 (already run, each red and then restored green) in a commit message
+- [ ] Re-run `/finalise`
+
+**Estimated Effort:** Small
+
+**Gap Report Generated:** 2026-10-28
+
+**Detailed Verification Log:** See `task.239.dod.2.qa-escalation-and-grant-say-what-runs.md`.
+
 ## Definition of Done - Gaps Identified — run 1 (historical, superseded)
 
 **Status:** SUPERSEDED. Both gaps were closed on 2026-10-28. SC-7 was reworded to what shipped. The five guards were mutation-proved (M5–M9, each red and then restored green), and the mutations are recorded in the commit that rewords SC-7. Kept as history; the current verdict is the newest `task.239.dod.{N}` file.
@@ -358,6 +378,7 @@ No critical issues identified. Cycle 4's fixes hold: every describer of the gran
 | 2026-10-28 |  | QA gate PASS (100/100) — no findings; both bugs closed | qa-task |
 | 2026-10-28 |  | DoD incomplete — 2 gaps identified (SC-7, SC-11) | finalise |
 | 2026-10-28 | 1.2 | SC-7 reworded to what shipped (one comparison on a stall, two on a loop limit, per bug.1); SC-11 closed by mutation-proving five guards (M5–M9) | orchestrator |
+| 2026-10-28 |  | DoD incomplete — 1 gap identified (SC-11, run 2) | finalise |
 <!-- change-log-end -->
 
 ---
