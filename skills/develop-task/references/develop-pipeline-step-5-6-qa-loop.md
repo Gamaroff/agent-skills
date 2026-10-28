@@ -1268,7 +1268,8 @@ After fixes are applied:
    anything less falls to *attributable*: a base run where a different test fails, one that fails on
    `Cannot find module` or `command not found` (a fresh worktree has no `node_modules` of its own),
    one that fails for want of `.agents/skills` (gitignored, so never in a worktree), a base worktree
-   that cannot be created, and a gate whose failures are not `node --test` tests at all (a formatting
+   that cannot be created, a base run that does not finish within its bound (90 s by default, so a
+   foreground call stays inside a 120 s tool timeout; `FAST_GATE_BASE_TIMEOUT` overrides), and a gate whose failures are not `node --test` tests at all (a formatting
    check, a shell suite). Those last ones cannot be compared, so they stay where they are today. This
    mirrors qa-task Step 3b item 5b, which runs a finding against the PR base before raising it. The
    head log and its `.base` sibling both stay on disk: they are the two measurements the history line

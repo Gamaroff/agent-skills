@@ -4,7 +4,7 @@
 **Bug ID**: TASK-238-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 1, by-hand probe of the operator-supplied argument)
 **Date Found**: 2026-10-28
 
@@ -84,3 +84,4 @@ the remote name, so a value starting with `-` is read as an option.
 | 2026-10-28 | New | qa-task | Found in QA cycle 1 |
 | 2026-10-28 | In Progress | qa-fix | Investigation started |
 | 2026-10-28 | Ready for QA | qa-fix | Fix implemented (QA cycle 1 fix) |
+| 2026-10-28 | Closed | qa-task | Verified by task.238.qa.2.qa-loop-acts-on-signals-it-has.md |

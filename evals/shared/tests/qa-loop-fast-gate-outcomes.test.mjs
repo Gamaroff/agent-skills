@@ -18,7 +18,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { extractBlocks } from "../../../shared/resources/qa-execute-snippets.mjs";
 import {
   ROOT,
@@ -32,6 +32,11 @@ import {
   run,
   cleanup,
 } from "../../../shared/resources/tests/lib/executed-prose.mjs";
+import { spawnBudget } from "../../../shared/resources/spawn-budget.mjs";
+
+const { timeoutMs: SPAWN_TIMEOUT_MS } = spawnBudget(
+  "qa-loop-fast-gate-outcomes",
+);
 
 const SCRIPT = path.join(ROOT, "shared/resources/fast-gate-outcome.sh");
 const QA_LOOP = "shared/resources/develop-pipeline-step-5-6-qa-loop.md";
@@ -508,6 +513,122 @@ test("an option-shaped --base never reaches git fetch (task.238 bug.3)", () => {
   }
 });
 
+// A base test that never settles, and writes the pid of the process running it first: the bound has
+// to reach that process, which node --test spawns, not only node itself (task.238 bug.4).
+const HANGS = `${HEADER}import fs from "node:fs";\ntest("a", async () => {\n  fs.writeFileSync(process.env.HANG_PID_FILE, String(process.pid));\n  await new Promise(() => setInterval(() => {}, 1000));\n});\n`;
+
+function alive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function assertGone(pid) {
+  // An orphan's zombie is reaped by init a moment after its group is killed.
+  for (let i = 0; i < 40 && alive(pid); i++) {
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  if (alive(pid)) process.kill(pid, "SIGKILL");
+  assert.equal(
+    alive(pid),
+    false,
+    `the hanging base test (pid ${pid}) outlived the classifier`,
+  );
+}
+
+test("a base run that hangs is bounded: attributable, its process killed, no worktree left (task.238 bug.4)", async () => {
+  const fx = repoWithBase(HANGS);
+  const pidFile = path.join(fx.dir, "hang.pid");
+  try {
+    // The spawn budget only stops a regression from hanging the suite; the bound itself is proven
+    // by the line below, which only the watchdog's timeout marker produces.
+    const r = spawnSync(
+      "bash",
+      [SCRIPT, "--log", headLog(fx.work), "--exit", "1", "--base", "develop"],
+      {
+        cwd: fx.work,
+        env: { ...env(), FAST_GATE_BASE_TIMEOUT: "2", HANG_PID_FILE: pidFile },
+        encoding: "utf8",
+        timeout: SPAWN_TIMEOUT_MS,
+      },
+    );
+    assert.equal(
+      r.status,
+      0,
+      `the classifier did not return:\n${r.stdout}${r.stderr}`,
+    );
+    assert.match(
+      r.stdout,
+      /^BASE_CHECK=unavailable \(the base run did not finish within 2s\)$/m,
+    );
+    assert.match(r.stdout, /^GATE_OUTCOME=attributable$/m);
+    assert.equal(r.stderr, "", "the watchdog's kill reached stderr");
+    assertNoWorktreeLeft(fx.work);
+    await assertGone(Number(fs.readFileSync(pidFile, "utf8")));
+  } finally {
+    cleanup(fx.dir);
+  }
+});
+
+test("a classifier killed mid-run leaves no worktree and no base process behind (task.238 bug.4)", async () => {
+  const fx = repoWithBase(HANGS);
+  const pidFile = path.join(fx.dir, "hang.pid");
+  try {
+    const child = spawn(
+      "bash",
+      [SCRIPT, "--log", headLog(fx.work), "--exit", "1", "--base", "develop"],
+      {
+        cwd: fx.work,
+        env: { ...env(), FAST_GATE_BASE_TIMEOUT: "60", HANG_PID_FILE: pidFile },
+        stdio: "ignore",
+      },
+    );
+    const exited = new Promise((r) => child.on("exit", (code) => r(code)));
+    for (let i = 0; i < 300 && !fs.existsSync(pidFile); i++) {
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    assert.ok(fs.existsSync(pidFile), "the base test never started");
+    child.kill("SIGTERM");
+    assert.equal(await exited, 143);
+    assertNoWorktreeLeft(fx.work);
+    await assertGone(Number(fs.readFileSync(pidFile, "utf8")));
+  } finally {
+    cleanup(fx.dir);
+  }
+});
+
+test("a worktree left by a SIGKILLed run is swept by the next one", () => {
+  const fx = repoWithBase(A_FAILS);
+  try {
+    const dead = spawnSync("true").pid; // exited: its pid names no live process
+    git(fx.work, "fetch", "-q", "origin", "develop");
+    git(
+      fx.work,
+      "worktree",
+      "add",
+      "-q",
+      "--detach",
+      `.worktrees/base-check-${dead}`,
+      "origin/develop",
+    );
+    const { outcome, out } = classify(fx.work, [
+      "--log",
+      headLog(fx.work),
+      "--exit",
+      "1",
+      "--base",
+      "develop",
+    ]);
+    assert.equal(outcome, "pre-existing", out);
+    assertNoWorktreeLeft(fx.work);
+  } finally {
+    cleanup(fx.dir);
+  }
+});
+
 test("usage errors exit 2 rather than guessing an outcome", () => {
   for (const args of [
     [],
@@ -520,6 +641,19 @@ test("usage errors exit 2 rather than guessing an outcome", () => {
       env: env(),
     });
     assert.equal(r.status, 2, `${args.join(" ")}: ${r.stdout}${r.stderr}`);
+    assert.doesNotMatch(r.stdout, /GATE_OUTCOME=/);
+  }
+  for (const bound of ["0", "abc", "-5"]) {
+    const r = spawnSync(
+      "bash",
+      [SCRIPT, "--log", SCRIPT, "--exit", "1", "--base", "develop"],
+      { encoding: "utf8", env: { ...env(), FAST_GATE_BASE_TIMEOUT: bound } },
+    );
+    assert.equal(
+      r.status,
+      2,
+      `FAST_GATE_BASE_TIMEOUT=${bound}: ${r.stdout}${r.stderr}`,
+    );
     assert.doesNotMatch(r.stdout, /GATE_OUTCOME=/);
   }
 });

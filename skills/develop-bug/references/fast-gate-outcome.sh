@@ -40,6 +40,15 @@ case "$EXIT_CODE" in
 esac
 [ -n "$BASE" ] || { echo "fast-gate-outcome: --base is required for a red gate" >&2; exit 2; }
 [ -f "$LOG" ] || { echo "fast-gate-outcome: no such log: $LOG" >&2; exit 2; }
+# The base run is bounded: a failing head test that hangs at the base would otherwise block this
+# script until its caller killed it (task.238 bug.4). Seconds; the default fits inside a 120s
+# foreground tool call.
+BASE_TIMEOUT="${FAST_GATE_BASE_TIMEOUT:-90}"
+case "$BASE_TIMEOUT" in "" | *[!0-9]* | 0)
+  echo "fast-gate-outcome: FAST_GATE_BASE_TIMEOUT must be a positive number of seconds, got: $BASE_TIMEOUT" >&2
+  exit 2
+  ;;
+esac
 
 unavailable() {
   echo "BASE_CHECK=unavailable ($1)"
@@ -61,7 +70,24 @@ failing_tests() {
 }
 
 WORK=$(mktemp -d "${TMPDIR:-/tmp}/fast-gate-outcome.XXXXXX") || unavailable "cannot create a scratch directory"
-trap 'rm -rf "$WORK"' EXIT
+# Every exit path cleans up, a killed run included: the base run's whole process group, its watchdog
+# and the base worktree, not only the scratch directory (task.238 bug.4). A caught TERM/INT/HUP
+# exits through the same trap; while the base runs the script sits in `wait`, which a trapped signal
+# interrupts at once.
+WT="" BASE_PID="" WATCH_PID=""
+cleanup() {
+  [ -z "$WATCH_PID" ] || kill -KILL -- -"$WATCH_PID" 2>/dev/null
+  [ -z "$BASE_PID" ] || kill -KILL -- -"$BASE_PID" 2>/dev/null
+  if [ -n "$WT" ]; then
+    git worktree remove --force "$WT" >/dev/null 2>&1 || rm -rf "$WT"
+    git worktree prune 2>/dev/null
+  fi
+  rm -rf "$WORK"
+}
+trap cleanup EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
+trap 'exit 129' HUP
 
 failing_tests "$LOG" | LC_ALL=C sort -u >"$WORK/head-fails"
 [ -s "$WORK/head-fails" ] || unavailable "the head log names no failing node --test test"
@@ -76,14 +102,43 @@ FILES=() # not mapfile: macOS ships bash 3.2
 while IFS= read -r f; do FILES+=("$f"); done <"$WORK/files"
 
 git fetch -q origin -- "$BASE" 2>/dev/null || unavailable "cannot fetch origin/$BASE"
+# SIGKILL runs no trap, so a predecessor killed that way left its worktree behind: remove any whose
+# process is gone before adding this run's.
+for d in .worktrees/base-check-*; do
+  [ -d "$d" ] || continue
+  kill -0 "${d##*-}" 2>/dev/null && continue
+  git worktree remove --force "$d" >/dev/null 2>&1 || rm -rf "$d"
+done
+git worktree prune 2>/dev/null
 WT=".worktrees/base-check-$$"
-git worktree add -q --detach "$WT" "origin/$BASE" >/dev/null 2>&1 || unavailable "cannot create a base worktree"
+git worktree add -q --detach "$WT" "origin/$BASE" >/dev/null 2>&1 || { WT=""; unavailable "cannot create a base worktree"; }
 # A fresh worktree has no node_modules; borrow the checkout's so a missing dependency is not the reading.
 [ -d node_modules ] && ln -s "$PWD/node_modules" "$WT/node_modules"
 BASE_LOG="$LOG.base"
-(cd "$WT" && command node --test "${FILES[@]}") >"$BASE_LOG" 2>&1
+# Job control puts each background job in its own process group, so one kill reaches the test
+# files node --test spawns, not only node itself. The watchdog marks a timeout before it kills.
+set -m
+(cd "$WT" && exec node --test "${FILES[@]}") >"$BASE_LOG" 2>&1 &
+BASE_PID=$!
+(
+  sleep "$BASE_TIMEOUT"
+  : >"$WORK/timed-out"
+  kill -TERM -- -"$BASE_PID"
+  sleep 5
+  kill -KILL -- -"$BASE_PID"
+) >/dev/null 2>&1 &
+WATCH_PID=$!
+disown "$WATCH_PID" # killed below; a disowned job draws no "Killed" notice on stderr
+set +m
+wait "$BASE_PID"
 BASE_EXIT=$?
+kill -KILL -- -"$WATCH_PID" 2>/dev/null
+kill -KILL -- -"$BASE_PID" 2>/dev/null # a test's own child that outlived node
+WATCH_PID="" BASE_PID=""
 git worktree remove --force "$WT" >/dev/null 2>&1 || rm -rf "$WT"
+git worktree prune 2>/dev/null
+WT=""
+[ ! -e "$WORK/timed-out" ] || unavailable "the base run did not finish within ${BASE_TIMEOUT}s"
 echo "BASE_EXIT=$BASE_EXIT (node --test ${FILES[*]} at origin/$BASE; log $BASE_LOG)"
 
 [ "$BASE_EXIT" -ne 0 ] || unavailable "green at the base"

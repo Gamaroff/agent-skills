@@ -13,7 +13,9 @@ All notable changes to this project will be documented in this file. Format foll
   `fast-gate-outcome.sh` classifies a run as *not measured* (no exit, or a timeout signal — re-run
   once), *pre-existing red* (the same tests also fail on the PR base, checked in a throwaway
   worktree — recorded, not fixed), or *attributable red* (everything else — the fix loop, as
-  before); every check it cannot complete falls back to attributable (obs #14). (3) **PR existence
+  before); every check it cannot complete falls back to attributable, including a base run that
+  outlasts its 90 s bound, and the base worktree and test processes are removed on every exit path
+  (obs #14). (3) **PR existence
   and CI**: `/qa-task` and `/qa-story` find the PR on Bitbucket as well as GitHub, and read the PR's
   CI once at the gate step through `qa-ci-read.sh` — a failure on the head becomes a `medium`
   `top_issue`, a failure also red on the base goes to `recommendations.future` as pre-existing, and

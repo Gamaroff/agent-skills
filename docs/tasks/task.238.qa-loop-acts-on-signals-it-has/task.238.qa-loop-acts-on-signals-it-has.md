@@ -349,26 +349,26 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-28
-**Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.238.qa.1.qa-loop-acts-on-signals-it-has.md](./task.238.qa.1.qa-loop-acts-on-signals-it-has.md)
-- **Gate File**: [task.238.gate.1.qa-loop-acts-on-signals-it-has.yml](./task.238.gate.1.qa-loop-acts-on-signals-it-has.yml)
+- **Full Report**: [task.238.qa.2.qa-loop-acts-on-signals-it-has.md](./task.238.qa.2.qa-loop-acts-on-signals-it-has.md)
+- **Gate File**: [task.238.gate.2.qa-loop-acts-on-signals-it-has.yml](./task.238.gate.2.qa-loop-acts-on-signals-it-has.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 6491
+- **Tests Executed**: 6497
 - **Phases Verified**: 4/4
-- **Critical Issues**: 1
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- HIGH: the open-coverage check reads an unreadable review as clean (bug.1)
-- MEDIUM: the Stop hook still sends every CONCERNS to Step 7 (bug.2)
-- MEDIUM: `--base` reaches `git fetch` as an option (bug.3)
+- Cycle 1's three findings are verified fixed (bug.1–bug.3 closed); the `--base` refusal is measured by the probe engine (8 cases, calibrated red on the pre-fix script)
+- MEDIUM: the base run in `fast-gate-outcome.sh` has no timeout, and a kill strands its worktree (bug.4)
+- Six advisory code-review findings recorded in the gate's `recommendations.future`
 
 ## Change Log
 
@@ -382,6 +382,8 @@ None.
 | 2026-10-28 |  | Implemented — 20 files (2 new scripts, 2 new test files), 77 new tests; status → ready-for-review | develop |
 | 2026-10-28 |  | QA gate FAIL (70/100) — 3 findings (1 high, 2 medium); status → in-progress | qa-task |
 | 2026-10-28 |  | QA findings fixed — gate 1 FAIL, 3 entries (bug.1–bug.3), 1 iteration; status → ready-for-review | qa-fix |
+| 2026-10-28 |  | QA gate CONCERNS (80/100) — 1 finding (1 medium); bug.1–bug.3 closed | qa-task |
+| 2026-10-28 |  | QA findings fixed — gate 2 CONCERNS, 1 entry (bug.4), 1 iteration; status stays ready-for-review | qa-fix |
 <!-- change-log-end -->
 
 ---

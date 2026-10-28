@@ -1,0 +1,74 @@
+schema: 2
+task: 'task.238.qa-loop-acts-on-signals-it-has'
+task_title: 'QA loop acts on the signals it already has'
+gate: CONCERNS
+status_reason: 'All three cycle-1 entries verified fixed (bug.1–bug.3 closed; the --base refusal probed 8/8 with the engine, calibrated red on the pre-fix script). The refute pass found one promoted MEDIUM: the base run in fast-gate-outcome.sh has no timeout and a kill strands its worktree (CR-1, reproduced). Six advisory findings recorded for follow-up.'
+reviewer: 'QA Engineer'
+head: '908d3713cb5ece207b7152b6df97a050c24029d1'
+updated: '2026-10-28T04:15:44Z'
+
+top_issues:
+  - id: 'TASK238-CR2-1'
+    severity: medium
+    file: 'shared/resources/fast-gate-outcome.sh'
+    finding: 'The base node --test (line 83) has no timeout and the EXIT trap removes only $WORK, so a base test that hangs blocks the classifier and a kill strands .worktrees/base-check-$$, still registered (reproduced: rc 124, worktree left; bug.4)'
+    suggested_action: 'Bound the base run with a process-group timeout read as unavailable, move the worktree removal into the EXIT trap, and add a hang test that leaves no .worktrees entry'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 6497
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 8
+    escaped: 0
+    notes: 'fast-gate-outcome.sh --base probed with the shell-argv form (sink shell-exec, task.238.qa.2.security.run.json): 6 hostile rejected, 2 legitimate accepted, verdict engages; calibrated against the pre-fix script, which accepted all 5 option- and ref-shaped bases. qa-ci-read.sh and the OPEN_COVERAGE block stay boundary: internal (reasons in the QA report).'
+  performance:
+    status: PASS
+    notes: 'The CI read is one call per cycle and never polls; the base worktree runs only on a red gate.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1 (promoted): an unbounded base run. Advisory: CR-2 and CR-5 (pre-existing can be over-claimed), cycle-1 CR-3/CR-4 still open.'
+  maintainability:
+    status: PASS
+    notes: 'The 5c exit rule is now consistent across the step doc, resume contract, Stop hook and READMEs (bug.2 closed). Advisory: CR-3 (the PR Review row names no report), CR-7 (an unreachable qualifier).'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK238-CR2-1 (bug.4) with a test that goes red on the current script'
+      refs: ['shared/resources/fast-gate-outcome.sh']
+  future:
+    - action: 'CR-2: require positive comparability evidence for pre-existing (a passing base test, or matching failure messages), not a four-string environment deny-list'
+      refs: ['shared/resources/fast-gate-outcome.sh']
+    - action: 'CR-5: key the head/base comparison on file and full test name path, not the leaf name'
+      refs: ['shared/resources/fast-gate-outcome.sh']
+    - action: 'CR-3: record the 5c review path (or a distinct value) on the PR Review row on both CONCERNS arms so the resume split has a report to read'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'CR-4: a low coverage finding exits under APPROVE but routes under CONCERNS — run the check on APPROVE too, or have review-pr raise open coverage to CONCERNS (the task kept APPROVE unchanged by design; needs a decision)'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'skills/review-pr/SKILL.md']
+    - action: 'CR-6: key the gated log removal on the parsed GATE_EXIT, not any GATE_EXIT=0 line (step-5-6, step-3, develop-bug verify loop)'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'shared/resources/develop-pipeline-step-3-develop-loop.md', 'skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md']
+    - action: 'CR-7: the coverage check excludes provenance: pre-existing, which review-pr never writes on coverage entries — drop the qualifier or extend the provenance pass'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'Cycle 1 advisory, still open: CR-3 (non-node failures), CR-4 (Bitbucket superseded runs), CR-5 (PR check read failure), CR-6 (symlinked checkout)'
+      refs: ['shared/resources/fast-gate-outcome.sh', 'shared/resources/qa-ci-read.sh', 'skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+    - action: 'Pre-existing (Step 4b): develop-pipeline-resume-contract.md:492 block reads a lock a temp copy lacks — a --copy fixture gap, untouched by this branch'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+      provenance: pre-existing
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK238-CR2-1 fixed']
