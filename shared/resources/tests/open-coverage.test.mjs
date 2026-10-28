@@ -34,7 +34,7 @@ const findings = (list) =>
     `reviewed_gate: task.1.gate.1.x.yml\nfindings:\n${list}truncated_count: 0\n`,
   );
 
-// Accepted shapes, each with the count it must read.
+// Accepted shapes, each with the count it must read. Every value sits on its key's line.
 const ACCEPTED = [
   [
     "no findings: findings: []",
@@ -46,19 +46,17 @@ const ACCEPTED = [
     report("findings:\ntruncated_count: 0\n"),
     0,
   ],
+  [
+    "findings: with a trailing comment, then the list",
+    report("findings: # one entry per finding\n  - category: coverage\n"),
+    1,
+  ],
   // Shapes the differential suite found (open-coverage-differential.test.mjs), each pinned here
   // so a regression names its rule rather than a seed.
   [
     "a capitalised Provenance: is not provenance: keys are case-sensitive, as in YAML",
     findings(
       "  - id: PC-1\n    category: coverage\n    Provenance: pre-existing\n",
-    ),
-    1,
-  ],
-  [
-    "free text holding `: ` is read to the end of its line (task.238 bug.15)",
-    findings(
-      "  - id: PC-1\n    category: coverage\n    finding: it reads: 0\n",
     ),
     1,
   ],
@@ -74,7 +72,7 @@ const ACCEPTED = [
     1,
   ],
   [
-    "a double-quoted value with escaped quotes (block style)",
+    "a double-quoted value with escaped quotes and backslashes",
     findings(
       '  - id: PC-1\n    category: coverage\n    finding: "the row reads \\"done\\" and \\\\ is literal"\n',
     ),
@@ -88,46 +86,39 @@ const ACCEPTED = [
     1,
   ],
   [
-    "a literal block scalar under finding:",
-    findings(
-      "  - id: PC-1\n    category: coverage\n    finding: |\n      line one\n      category: trail\n",
-    ),
+    "a quoted value followed by a comment",
+    findings('  - id: PC-1\n    ref: "a # b" # c\n    category: coverage\n'),
     1,
   ],
-  // Wrapped values under a key that decides nothing (task.240 bug.1); each reads as PyYAML does.
+  // The tracked reports' plain free text: a `#` after a space starts a comment and one with none
+  // is text, a colon not followed by a space is text, and a value may start with a non-ASCII mark.
   [
-    "a plain finding: wrapped onto deeper lines",
+    "plain free text as the tracked reports write it",
     findings(
-      "  - id: PC-1\n    category: coverage\n    finding: a long value\n      that wraps\n      twice\n",
-    ),
-    1,
-  ],
-  [
-    "a quoted finding: whose wrapped lines hold `#`",
-    findings(
-      '  - id: PC-1\n    finding: "text # not a comment\n      # still text\n      done"\n    category: coverage\n',
+      '  - id: PC-1\n    category: coverage\n    finding: PR #657 merged with a#b\n    suggested_action: § 3\'s bundle:check — use `x|y`, not "z"\n',
     ),
     1,
   ],
   [
-    "a quoted finding: closed on a deeper line, then a comment",
+    "a bracket in a plain value is text",
     findings(
-      '  - id: PC-1\n    finding: "a\n      b" # note\n    category: coverage\n',
-    ),
-    1,
-  ],
-  // A nested value under an empty key in plain text, apostrophes included (task.240 bug.3).
-  [
-    "a nested list of plain, keyed and apostrophe values",
-    findings(
-      "  - id: PC-1\n    category: coverage\n    evidence:\n      - a.md\n      - c: d\n      - it's plain\n      - don't stop\n",
+      "  - id: PC-1\n    category: coverage\n    finding: see [x] here\n",
     ),
     1,
   ],
   [
-    "a flow entry with a quoted comma",
-    findings('  - {id: PC-1, category: coverage, ref: "a, b"}\n'),
+    "an empty value is null, and the next key still reads",
+    findings(
+      "  - id: PC-1\n    finding:\n    category: coverage\n    provenance:\n",
+    ),
     1,
+  ],
+  [
+    "a trailing comment after a deciding value is not part of it",
+    findings(
+      "  - id: PC-1\n    category: coverage # was trail\n    provenance: pre-existing # was new\n",
+    ),
+    0,
   ],
   [
     "provenance compares case-blind",
@@ -137,56 +128,18 @@ const ACCEPTED = [
     0,
   ],
   [
-    "blank lines and an indented comment between entries",
+    "blank lines and indented comments, at any depth, between keys and entries",
     findings(
-      "  - id: PC-1\n    category: coverage\n\n  # a note\n  - id: PC-2\n    category: scope\n",
+      "  - id: PC-1\n    category: coverage\n\n  # a note\n        # deeper\n  - id: PC-2\n    category: scope\n",
     ),
     1,
   ],
-  // What bug.9 and bug.10's refusals must leave alone: a spaces-only blank line, and a bracket in a
-  // quoted flow value or a block plain value.
   [
     "a spaces-only blank line between entries is blank",
     findings(
       "  - id: PC-1\n    category: coverage\n   \n  - id: PC-2\n    category: coverage\n",
     ),
     2,
-  ],
-  [
-    "a bracket in a quoted flow value or a block plain value is text",
-    findings(
-      '  - {category: coverage, ref: "CHANGELOG.md [Unreleased]"}\n  - id: PC-2\n    category: coverage\n    finding: see [x] here\n',
-    ),
-    2,
-  ],
-  // What bug.6, bug.7 and CR-4's refusals must leave alone: YAML reads each of these.
-  [
-    "a comment between nested list items ends nothing",
-    findings(
-      "  - id: PC-1\n    category: coverage\n    evidence:\n      - a.md # c\n      # c\n      - b.md\n",
-    ),
-    1,
-  ],
-  [
-    "a wrapped value, then a comment, then the next key",
-    findings(
-      "  - id: PC-1\n    category: coverage\n    finding: a\n      more\n    # c\n    provenance: pre-existing\n",
-    ),
-    0,
-  ],
-  [
-    "a block scalar holding `#` and a tab is content",
-    findings(
-      "  - id: PC-1\n    category: coverage\n    finding: |\n      a # b\n      c\td\n",
-    ),
-    1,
-  ],
-  [
-    "a plain value starting with `-1` or `:x` is not an indicator",
-    findings(
-      "  - id: PC-1\n    category: coverage\n    finding: -1\n    suggested_action: :x\n",
-    ),
-    1,
   ],
   [
     "review-pr's SKILL.md example block (two entries, one coverage)",
@@ -217,7 +170,6 @@ const REFUSED = [
   ],
   ["no-findings-key", report("reviewed_gate: none\ntruncated_count: 0\n")],
   ["bad-line", report("verdict: CONCERNS\nfindings: []\n")],
-  ["bad-line", findings("  - id: PC-1\n\tcategory: coverage\n")],
   ["bad-line", findings("  -\n    id: PC-1\n    category: coverage\n")],
   // A line the reader cannot place must never be skipped: skipping this one reads `trail` and
   // prints a false 0 for a report whose author meant coverage.
@@ -228,183 +180,158 @@ const REFUSED = [
     ),
   ],
   ["bad-value", report("findings: [{id: PC-1, category: coverage}]\n")],
-  ["bad-value", findings("  - id: PC-1\n    category: &a coverage\n")],
-  [
-    "bad-value",
-    findings(
-      '  - id: PC-1\n    category: coverage\n    finding: "never closed\n',
-    ),
-  ],
-  // Wrapped values PyYAML rejects (task.240 bug.1): the wrap is accepted only where YAML reads it.
-  [
-    "bad-value",
-    findings(
-      "  - id: PC-1\n    category: trail\n    finding: a long value that\n      wraps: onto a key-shaped line\n",
-    ),
-  ],
-  [
-    "bad-value",
-    findings(
-      "  - id: PC-1\n    finding: a value # note\n      wraps on\n    category: trail\n",
-    ),
-  ],
-  [
-    "bad-value",
-    findings(
-      '  - id: PC-1\n    finding: "a\n      b" trailing\n    category: coverage\n',
-    ),
-  ],
-  [
-    "bad-value",
-    findings(
-      '  - id: PC-1\n    finding: "text\n    category: coverage"\n    category: trail\n',
-    ),
-  ],
-  ["bad-value", findings("  - id: PC-1\n    category: cover\n      age\n")],
-  // A quote still open when the block ends: no later line reaches the key-indent check.
-  [
-    "bad-value",
-    report(
-      'findings:\n  - id: PC-1\n    category: coverage\n    finding: "opened\n      never closed\n',
-    ),
-  ],
-  // A nested value that opens a quote or a flow collection and does not close it on that line
-  // (task.240 bug.2): YAML runs it over the key-indent lines below.
-  [
-    "bad-value",
-    findings(
-      "  - id: PC-1\n    category: coverage\n    evidence:\n      - sub: 'open\n    provenance: pre-existing'\n",
-    ),
-  ],
-  [
-    "bad-value",
-    findings(
-      "  - id: PC-1\n    category: coverage\n    evidence:\n      [a,\n    provenance: pre-existing]\n",
-    ),
-  ],
-  // Shapes the differential suite found, each a block YAML rejects or reads differently.
-  // A capitalised key is not the key: the entry has no category.
-  ["no-category", findings("  - id: PC-1\n    Category: coverage\n")],
-  // A flow key with no space after its colon is one plain scalar in YAML.
-  ["bad-line", findings("  - {id: PC-1, category:coverage}\n")],
-  // A plain value holding `: ` where the count reads it, or inside a flow entry.
-  ["bad-value", findings("  - id: PC-1\n    category: cover: age\n")],
-  ["bad-value", findings("  - {id: x: y, category: coverage}\n")],
-  // Free text read leniently past its `: ` may not wrap.
-  [
-    "bad-value",
-    findings(
-      "  - id: PC-1\n    category: coverage\n    finding: it reads: 0\n      more\n",
-    ),
-  ],
-  // A nested value is flat: one kind, one indent, one plain item per line.
-  ...[
-    "        - a.md\n      - b.md\n",
-    "      - a.md\n        - b.md\n",
-    "      - a.md\n      plain\n",
-  ].map((lines) => [
-    "bad-line",
-    findings(`  - id: PC-1\n    category: coverage\n    evidence:\n${lines}`),
-  ]),
-  ...["      - &a x\n", "      - k: x: y\n", "      - *a\n"].map((lines) => [
-    "bad-value",
-    findings(`  - id: PC-1\n    category: coverage\n    evidence:\n${lines}`),
-  ]),
-  // In a block scalar `#` is content and sets the indent; a comment shallower than the content
-  // ends the scalar, so nothing deeper may follow it.
-  [
-    "bad-line",
-    findings(
-      "  - id: PC-1\n    category: coverage\n    finding: |\n        # content\n      shallower\n",
-    ),
-  ],
-  [
-    "bad-value",
-    findings(
-      "  - id: PC-1\n    category: coverage\n    finding: |\n  # c\n      more\n",
-    ),
-  ],
-  // A key at `dash + 2` after a dash with wider spacing (task.240 bug.5): YAML rejects the block.
-  ...["  -  ", "  -   "].map((dash) => [
-    "bad-line",
-    findings(`${dash}category: coverage\n    provenance: pre-existing\n`),
-  ]),
-  // An escape in a value the count compares (task.240 bug.4): the reader does not decode escapes,
-  // so it refuses one rather than compare a value YAML would read differently.
-  ...[
-    '    category: coverage\n    provenance: "pr\\e-existing"\n',
-    '    category: coverage\n    provenance: "pre-exis\\ting"\n',
-    '    category: "cover\\age"\n',
-  ].map((lines) => ["bad-value", findings(`  - id: PC-1\n${lines}`)]),
-  // An opener behind a prefix or inside a flow collection (task.240 bug.3), and a closed one: a
-  // nested value may hold no quote or flow collection at all.
-  ...[
-    '[a, "b]',
-    '- - "open',
-    '- &a "open',
-    '- sub key: "open',
-    '- x: "closed"',
-    "- [x, y]",
-    "- {k: v}",
-    "- 'quoted'",
-  ].map((line) => [
-    "bad-value",
-    findings(
-      `  - id: PC-1\n    category: coverage\n    evidence:\n      ${line}\n    provenance: pre-existing\n`,
-    ),
-  ]),
+  ["bad-value", report("findings: []# c\n")],
   [
     "duplicate-key",
     findings("  - id: PC-1\n    category: coverage\n    id: PC-2\n"),
   ],
   ["duplicate-key", report("findings: []\nfindings: []\n")],
   ["bad-category", findings("  - id: PC-1\n    category: coverage-gap\n")],
+  // An empty category is YAML's null, not a token.
+  ["bad-category", findings("  - id: PC-1\n    category:\n")],
   ["no-category", findings("  - id: PC-1\n    severity: high\n")],
+  // A capitalised key is not the key: the entry has no category.
+  ["no-category", findings("  - id: PC-1\n    Category: coverage\n")],
   ["not-a-map", findings("  - just a sentence\n")],
-  // Control case (obs #176): a shape no task.238 bug names — `category:` given in a flow entry and
-  // again on the next line. The flow entry is complete on its line, so the second key is refused.
-  [
+  // A key at `dash + 2` after a dash with wider spacing (task.240 bug.5): YAML rejects the block.
+  ...["  -  ", "  -   "].map((dash) => [
     "bad-line",
-    findings("  - {id: PC-1, category: trail}\n    category: coverage\n"),
-  ],
-  // A comment ends a wrapped plain value or a nested plain scalar; YAML has nothing for a deeper
-  // line after it to continue (task.240 bug.6).
+    findings(`${dash}category: coverage\n    provenance: pre-existing\n`),
+  ]),
+
+  // One line per key. Every multi-line shape the first reader accepted — a wrapped value, a value
+  // quoted across lines, a nested list or map, a block scalar — and every shape it refused for
+  // what a deeper line held (task.240 bugs 1–3, 6), is now refused for being a deeper line.
   ...[
+    "    finding: a long value\n      that wraps\n",
+    "    finding: a long value that\n      wraps: onto a key-shaped line\n",
+    "    finding: a value # note\n      wraps on\n",
     "    finding: a\n      # c\n      more\n",
     "    finding: a\n      b # c\n      more\n",
+    "    finding: it reads, 0\n      more\n",
+    "    provenance: pre-existing\n      on the base only\n",
+    "    evidence:\n      - a.md\n      - it's plain\n",
+    "    evidence:\n      - a.md # c\n      # c\n      - b.md\n",
     "    evidence:\n      word\n      # c\n      more\n",
-    "    evidence:\n      word # c\n      more\n",
+    "    evidence:\n      - sub: 'open\n    provenance: pre-existing'\n",
+    "    evidence:\n      [a,\n    provenance: pre-existing]\n",
+    ...[
+      '[a, "b]',
+      '- - "open',
+      '- &a "open',
+      '- sub key: "open',
+      '- x: "closed"',
+      "- [x, y]",
+      "- {k: v}",
+      "- 'quoted'",
+      "- &a x",
+      "- k: x: y",
+      "- *a",
+    ].map(
+      (line) => `    evidence:\n      ${line}\n    provenance: pre-existing\n`,
+    ),
+  ].map((lines) => [
+    "bad-line",
+    findings(`  - id: PC-1\n    category: coverage\n${lines}`),
+  ]),
+  ["bad-line", findings("  - id: PC-1\n    category: cover\n      age\n")],
+  // A quoted value must close on its own line (task.240 bug.1): one that does not is refused there,
+  // before YAML could run it over the key-indent lines below.
+  ...[
+    '    finding: "never closed\n',
+    '    finding: "a\n      b"\n',
+    '    finding: "a\n      b" trailing\n',
+    '    finding: "text\n    category: coverage"\n    category: trail\n',
+    "    finding: 'it''s long\n      and wraps'\n",
   ].map((lines) => [
     "bad-value",
     findings(`  - id: PC-1\n    category: coverage\n${lines}`),
   ]),
-  // A YAML indicator, or a block-style `,`, at the start of a plain value (task.240 bug.7).
-  ...["`x` is missing", "@foo", "%x", ", x", "- x", "? x", ": x", "|x"].map(
-    (v) => [
-      "bad-value",
-      findings(`  - id: PC-1\n    category: coverage\n    finding: ${v}\n`),
-    ],
-  ),
-  // A tab anywhere outside a block scalar's content (gate 6 CR-4).
+  // A block scalar, an anchor, a tag or an alias (task.238 bug.17).
+  ...[
+    "    finding: |\n      line one\n",
+    "    finding: >-\n      line one\n",
+    "    category: &a coverage\n",
+    "    category: !!str coverage\n",
+    "    finding: *a\n",
+  ].map((lines) => ["bad-value", findings(`  - id: PC-1\n${lines}`)]),
+  // A flow entry, however it is written (task.240 bug.10 and the shapes before it).
+  ...[
+    "{id: PC-1, category: coverage}",
+    '{id: PC-1, category: coverage, ref: "a, b"}',
+    "{id: PC-1, category:coverage}",
+    "{id: x: y, category: coverage}",
+    "{category: coverage, provenance: pre-existing]}",
+  ].map((entry) => ["bad-line", findings(`  - ${entry}\n`)]),
+  // Control case (obs #176): `category:` given in a flow entry and again on the next line.
+  [
+    "bad-line",
+    findings("  - {id: PC-1, category: trail}\n    category: coverage\n"),
+  ],
+
+  // A plain value: no `: ` and no trailing `:`, under any key — task.238 bug.15's leniency for free
+  // text is gone — and in a top-level value too.
+  ...[
+    "    category: cover: age\n",
+    "    finding: it reads: 0\n",
+    "    finding: QA filed it with provenance: pre-existing\n",
+    "    finding: ends with:\n",
+  ].map((lines) => ["bad-value", findings(`  - id: PC-1\n${lines}`)]),
+  ["bad-value", report("reviewed_gate: a: b\nfindings: []\n")],
+  // A plain value starts with a letter, a digit or a non-ASCII character: a YAML indicator there
+  // (task.240 bug.7), and with it every ASCII mark, is refused.
+  ...[
+    "`x` is missing",
+    "@foo",
+    "%x",
+    ", x",
+    "- x",
+    "? x",
+    ": x",
+    "|x",
+    "-1",
+    ":x",
+    "(optional) x",
+  ].map((v) => [
+    "bad-value",
+    findings(`  - id: PC-1\n    category: coverage\n    finding: ${v}\n`),
+  ]),
+  // A quoted value: nothing after its closing quote but a comment set off by a space, and in a
+  // double-quoted one no escape but `\\` and `\"` (task.240 bug.4: kept literally, `pr\e-existing`
+  // read as pre-existing).
+  ...[
+    '    finding: "a"#c\n',
+    '    finding: "a" b\n',
+    "    finding: 'a'b\n",
+    '    provenance: "pr\\e-existing"\n',
+    '    provenance: "pre-exis\\ting"\n',
+    '    finding: "a\\/b"\n',
+    '    finding: "\\u0041"\n',
+  ].map((lines) => [
+    "bad-value",
+    findings(`  - id: PC-1\n    category: coverage\n${lines}`),
+  ]),
+  ["bad-value", findings('  - id: PC-1\n    category: "cover\\age"\n')],
+
+  // A character the block may not hold: a tab (task.240 CR-4, bug.9), a carriage return, a no-break
+  // or ideographic space, a line or paragraph separator, NEL, a BOM, a control character. The
+  // no-break space is the dangerous one: trimmed, `pre-existing` + U+00A0 read as pre-existing and
+  // printed a false 0, where YAML keeps it and reads the entry open.
   ...[
     "    category:\tcoverage\n",
-    "    category: \tcoverage\n",
     "    category: coverage\t# c\n",
     "    category: coverage\t\n",
+    "    category: coverage\n  \t\n",
+    "\tcategory: coverage\n",
+    "    category: coverage\r\n",
+    "    category: coverage\n    provenance: pre-existing\u00a0\n",
+    "    category: coverage\n    finding: a\u3000b\n",
+    "    category: coverage\n    finding: a\u2028b\n",
+    "    category: coverage\n    finding: a\u0085b\n",
+    "    category: coverage\n    finding: \ufeffa\n",
+    "    category: coverage\n    finding: a\u0000b\n",
+    "    category: coverage\n    finding: a\u001bb\n",
   ].map((lines) => ["bad-line", findings(`  - id: PC-1\n${lines}`)]),
-  // A whitespace-only line holding a tab, wherever it sits — between entries, at the end, inside a
-  // block scalar (task.240 bug.9).
-  ...[
-    "    category: coverage\n  \t\n  - id: PC-2\n    category: coverage\n",
-    "    category: coverage\n\t\n",
-    "    category: coverage\n    finding: |\n      x\n\t\n      y\n",
-  ].map((lines) => ["bad-line", findings(`  - id: PC-1\n${lines}`)]),
-  // A bracket inside a plain flow value (task.240 bug.10).
-  ...[
-    "{category: coverage, provenance: pre-existing]}",
-    "{category: coverage, id: a]b}",
-    "{category: coverage, id: a[b}",
-  ].map((entry) => ["bad-value", findings(`  - ${entry}\n`)]),
 ];
 
 // The title names the row by index: a fence string inside a template-literal expression blinds the

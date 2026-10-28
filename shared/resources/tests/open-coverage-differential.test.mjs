@@ -67,50 +67,65 @@ function generator(r) {
   const WORDS = {
     category: [...CATEGORIES, "coverage", "coverage", "Coverage"],
     provenance: ["pre-existing", "pre-existing", "new", "Pre-Existing"],
-    other: ["PC-1", "a", "it's here", "see #12", "a, b", "plain text"],
+    other: [
+      "PC-1",
+      "a",
+      "it's here",
+      "PR #12 merged",
+      "a, b",
+      "bundle:check",
+      "§ 3 Scope",
+      'use `x|y` — not "z"',
+      "a#b",
+    ],
   };
-  const ESCAPES = ["\\t", "\\e", '\\"', "\\\\", "\\x70", "\\u0041", "\\n"];
+  // Characters spliced into a value. The first group is ASCII the block may hold, each a YAML
+  // indicator somewhere; the second is what the block may not hold — tab, CR, NEL, NBSP, line and
+  // paragraph separators, a BOM, an ideographic space, controls; the third is non-ASCII it may.
+  const CHARS = [
+    ..."-?:,[]{}#&*!|>'\"%@`~\\ ",
+    ..."\t\r\u0085\u00a0\u2028\u2029\ufeff\u3000\u0000\u007f\u001b",
+    ..."§—→…é✅\u0301",
+  ];
+  const ESCAPES = [
+    "\\\\",
+    '\\"',
+    "\\t",
+    "\\e",
+    "\\x70",
+    "\\u0041",
+    "\\n",
+    "\\/",
+  ];
 
   // Each value is risky with this probability: a shape YAML may reject or read surprisingly.
   // The rest are shapes YAML reads, so the property is tested on counts and not only refusals.
-  const RISK = 0.2;
+  const RISK = 0.07;
   let risky = false;
-  // Lines deeper than the key column — or, when risky, level with it or short of it.
-  const deeperIndent = (col) =>
-    col + (risky ? pick([2, 4, 1, 0, -1]) : pick([2, 2, 4]));
-  const nestedItem = () =>
-    risky
-      ? pick([
-          '- "quoted"',
-          "- 'quoted'",
-          '- "open',
-          "- [x, y]",
-          "- {k: v}",
-          '- &a "open',
-          "- - b",
-          "plain",
-          "plain # c",
-          "# c",
-          "x: y",
-        ])
-      : pick(["- a.md", "- it's fine", "- k: v", "- see #12"]);
 
   /** A value: the text after `key: ` on the key line, and any deeper lines with their indents. */
   function value(key, col) {
     risky = chance(RISK);
-    const words = WORDS[key] || WORDS.other;
-    const w = risky && chance(0.3) ? "x: y" : pick(words);
+    let w = pick(WORDS[key] || WORDS.other);
+    // A character spliced in, or set at the start (task.240 bug.7: an indicator there).
+    if (risky && chance(0.5)) {
+      const at = chance(0.4) ? 0 : Math.floor(r() * (w.length + 1));
+      w = w.slice(0, at) + pick(CHARS) + w.slice(at);
+    }
     const form = risky
       ? pick([
+          "plain",
+          "single",
+          "double",
           "escape",
-          "empty",
+          "colon",
+          "openquote",
+          "afterquote",
+          "anchor",
           "block",
           "wrap",
-          "wrapquoted",
-          "openquote",
-          "anchor",
-          "hashnospace",
-          "indicator",
+          "nested",
+          "flow",
         ])
       : pick([
           "plain",
@@ -119,95 +134,63 @@ function generator(r) {
           "comment",
           "single",
           "double",
+          "escape",
           "empty",
-          "block",
-          "wrap",
         ]);
-    // One indent for the value's lines — or, when risky, a fresh one per line.
-    const lineIndent = deeperIndent(col);
     const deeper = (lines) =>
-      lines.map((t) => [risky ? deeperIndent(col) : lineIndent, t]);
+      lines.map((t) => [col + pick([2, 2, 4, 1, 0]), t]);
     switch (form) {
       case "plain":
         return { inline: w, lines: [] };
       case "comment":
         return { inline: `${w} # note`, lines: [] };
-      case "hashnospace":
-        return { inline: `${w}#note`, lines: [] };
       case "single":
         return { inline: `'${w.replace(/'/g, "''")}'`, lines: [] };
       case "double":
-        return { inline: `"${w}"`, lines: [] };
+        return { inline: `"${w.replace(/["\\]/g, "\\$&")}"`, lines: [] };
       case "escape": {
         const at = Math.floor(r() * (w.length + 1));
-        return {
-          inline: `"${w.slice(0, at)}${pick(ESCAPES)}${w.slice(at)}"`,
-          lines: [],
-        };
+        const e = risky ? pick(ESCAPES) : pick(ESCAPES.slice(0, 2));
+        const q = w.replace(/["\\]/g, "\\$&");
+        return { inline: `"${q.slice(0, at)}${e}${q.slice(at)}"`, lines: [] };
       }
       case "empty":
-        return {
-          inline: chance(0.2) ? "# note" : "",
-          lines: deeper(
-            Array.from({ length: 1 + Math.floor(r() * 2) }, nestedItem),
-          ),
-        };
-      case "block":
-        return {
-          inline: pick(["|", ">", "|-", ">-"]),
-          lines: deeper([
-            pick([w, "key: value", '"quote', "- item", "# not a comment"]),
-          ]),
-        };
-      case "wrap":
-        // One to three wrapped lines; when risky, a comment may cut the value between them
-        // (task.240 bug.6).
-        return {
-          inline: w,
-          lines: deeper(
-            Array.from({ length: 1 + Math.floor(r() * 3) }, () =>
-              risky
-                ? pick(["k: v", '"q', "# c", "more # c", "more"])
-                : pick(["more words", "it's"]),
-            ),
-          ),
-        };
-      case "wrapquoted":
-        return {
-          inline: `"${w}`,
-          lines: deeper([
-            pick(['more"', 'more" # c', 'more" x', "more", "k: v"]),
-          ]),
-        };
+        return { inline: chance(0.3) ? "# note" : "", lines: [] };
+      // `: ` mid-value or at the end, which made task.238 bug.15's leniency.
+      case "colon":
+        return { inline: pick([`${w}: x`, `${w}:`, `x: ${w}`]), lines: [] };
       case "openquote":
         return { inline: `${pick(['"', "'"])}${w}`, lines: [] };
-      case "anchor":
-        return { inline: pick([`&a ${w}`, `!!str ${w}`, "*a"]), lines: [] };
-      // A YAML indicator, or a `,` YAML reserves, at the start of a plain value (task.240 bug.7).
-      case "indicator":
+      case "afterquote":
         return {
-          inline: pick([
-            "`x` y",
-            "@foo",
-            "%x",
-            ", x",
-            "- x",
-            "? x",
-            ": x",
-            "|x",
-          ]),
+          inline: `"${w}"${pick(["#c", " x", "x", " # c", "  "])}`,
           lines: [],
         };
+      case "anchor":
+        return { inline: pick([`&a ${w}`, `!!str ${w}`, "*a"]), lines: [] };
+      // Multi-line shapes the first reader accepted (task.240 bugs 1–6): each is now refused.
+      case "block":
+        return { inline: pick(["|", ">-"]), lines: deeper([w]) };
+      case "wrap":
+        return { inline: w, lines: deeper(["more words"]) };
+      case "nested":
+        return {
+          inline: "",
+          lines: deeper([pick(["- a.md", "k: v", "word"])]),
+        };
+      case "flow":
+        return { inline: pick([`[${w}]`, `{k: ${w}}`, "[]"]), lines: [] };
     }
   }
 
   function keyName(k) {
-    return chance(0.04) ? k[0].toUpperCase() + k.slice(1) : k;
+    return chance(0.03) ? k[0].toUpperCase() + k.slice(1) : k;
   }
 
-  // The space after a key's colon — or, rarely, a tab, which YAML rejects there.
-  const separator = () => (chance(0.03) ? pick(["\t", " \t"]) : " ");
-  // A whitespace-only line — or, rarely, one holding a tab, which YAML rejects anywhere.
+  // The space after a key's colon — or, rarely, a tab, or none.
+  const separator = () =>
+    chance(0.02) ? pick(["\t", " \t", ""]) : pick([" ", " ", "  "]);
+  // A blank line — or, rarely, one holding a tab, which YAML rejects anywhere (task.240 bug.9).
   const blank = (ind) =>
     chance(0.1)
       ? pick(["\t\n", `${sp(ind)}\t\n`])
@@ -215,24 +198,16 @@ function generator(r) {
 
   function flowEntry(listIndent) {
     const keys = ["id", "category", ...(chance(0.6) ? ["provenance"] : [])];
-    const parts = keys.map((k) => {
-      const words = WORDS[k] || WORDS.other;
-      const w = pick(words).replace(/[,{}#]/g, "");
-      risky = chance(RISK);
-      const v = risky
-        ? pick([`"${w}\\t"`, "x: y", `${w} # c`, `'${w}`, `${w}]`, `a[${w}`])
-        : pick([w, w, `"${w}"`, `'${w.replace(/'/g, "''")}'`]);
-      return `${keyName(k)}:${risky && chance(0.5) ? "" : separator()}${v}`;
-    });
-    return `${sp(listIndent)}-${pick([" ", " ", "  "])}{${parts.join(pick([", ", ","]))}}\n`;
+    const parts = keys.map((k) => `${k}: ${pick(WORDS[k] || ["PC-1"])}`);
+    return `${sp(listIndent)}- {${parts.join(", ")}}\n`;
   }
 
   function blockEntry(listIndent) {
     const dash = pick([1, 1, 1, 1, 2, 3]);
     const col = listIndent + 1 + dash;
-    const pool = ["id", "category", "provenance", "finding", "evidence"];
+    const pool = ["id", "category", "provenance", "finding", "ref"];
     const keys = [];
-    if (chance(0.92)) keys.push("category");
+    if (chance(0.95)) keys.push("category");
     for (const k of pool) if (k !== "category" && chance(0.45)) keys.push(k);
     if (!keys.length) keys.push("id");
     // Shuffle so category is not always first.
@@ -246,15 +221,13 @@ function generator(r) {
       const head =
         i === 0
           ? `${sp(listIndent)}-${sp(dash)}`
-          : sp(chance(0.03) ? pick([col - 1, col + 1, listIndent + 2]) : col);
+          : sp(chance(0.02) ? pick([col - 1, col + 1, listIndent + 2]) : col);
       out += `${head}${keyName(k)}:${v.inline === "" ? "" : separator() + v.inline}\n`;
-      for (const [ind, text] of v.lines) {
-        out += `${sp(ind)}${text}\n`;
-        if (chance(0.03)) out += blank(ind);
-      }
+      for (const [ind, text] of v.lines) out += `${sp(ind)}${text}\n`;
       if (chance(0.05))
         out += pick([
           `${sp(col)}# a comment\n`,
+          `${sp(col + 2)}# deeper comment\n`,
           blank(col),
           `${sp(listIndent)}# c\n`,
         ]);
@@ -264,36 +237,16 @@ function generator(r) {
 
   return function block() {
     const listIndent = pick([0, 2, 2]);
-    let out = "reviewed_gate: none\nfindings:\n";
+    let out = `reviewed_gate: ${chance(0.03) ? pick(['"open', "& x", "a: b"]) : "none"}\n`;
+    out += chance(0.03)
+      ? pick(["findings: # c\n", "findings: []\n"])
+      : "findings:\n";
     const n = 1 + Math.floor(r() * 3);
     for (let i = 0; i < n; i++)
-      out += chance(0.15) ? flowEntry(listIndent) : blockEntry(listIndent);
+      out += chance(0.03) ? flowEntry(listIndent) : blockEntry(listIndent);
     if (chance(0.5)) out += "truncated_count: 0\n";
     return out;
   };
-}
-
-/**
- * The block as YAML would need it written for the reader's one leniency: a plain free-text value
- * holding `: ` single-quoted, its trailing comment kept. Nothing else changes.
- */
-function lenientFreeText(block) {
-  return block
-    .split("\n")
-    .map((line) => {
-      const m = line.match(
-        /^([ \t]*(?:-[ \t]+)?)([A-Za-z0-9_-]+):([ \t]+)(.*)$/,
-      );
-      if (!m || m[2] === "category" || m[2] === "provenance") return line;
-      const [, head, key, gap, v] = m;
-      if (/^["'[{|>&*!%@`#]/.test(v)) return line;
-      const hash = v.search(/[ \t]#/);
-      const body = hash < 0 ? v : v.slice(0, hash);
-      const comment = hash < 0 ? "" : v.slice(hash);
-      if (!/:(?:[ \t]|$)/.test(body)) return line;
-      return `${head}${key}:${gap}'${body.replace(/'/g, "''")}'${comment}`;
-    })
-    .join("\n");
 }
 
 /** PyYAML's reading of every block, in one process: a count, or null when it has none. */
@@ -343,7 +296,7 @@ test(`the reader prints unreadable or YAML's count — never another (seed ${SEE
   );
   const block = generator(prng(SEED));
   const blocks = Array.from({ length: N }, block);
-  const expected = yamlCounts(blocks.map(lenientFreeText));
+  const expected = yamlCounts(blocks);
   assert.equal(expected.length, N, "PyYAML returned one reading per block");
 
   const tally = {
@@ -382,18 +335,19 @@ test(`the reader prints unreadable or YAML's count — never another (seed ${SEE
   );
 
   // Non-vacuity: a generator that produced only refusals, or only one answer, would pass the
-  // property above while testing nothing. Each floor sits well under what every seed measured
-  // produces (seeds 1-9 and 240 at 25,000 blocks: counted ~16%, open ~6%, 0 ~9%, refused ~84%,
-  // YAML-rejected ~63%). `overRefused` — valid YAML the reader refuses — has no floor: refusing is
-  // allowed, and the tracked-corpus suite is what holds the reader to the shapes writers emit.
+  // property above while testing nothing. Each floor sits about half what every seed measured
+  // produces (seeds 1, 2, 3, 7, 11, 42 and 240 at 25,000 blocks: counted ~30%, open ~14%, 0 ~16%,
+  // refused ~70%, YAML-rejected ~51%). `overRefused` — valid YAML the reader refuses, ~19% — has no
+  // floor: refusing is allowed, and the tracked-corpus suite is what holds the reader to the shapes
+  // writers emit.
   const floor = (name, share) =>
     assert.ok(
       tally[name] >= N * share,
       `too few ${name} (floor ${share * 100}%): ${JSON.stringify(tally)}`,
     );
-  floor("counted", 0.1);
-  floor("open", 0.03);
-  floor("closed", 0.03);
-  floor("refused", 0.1);
-  floor("yamlRejects", 0.1);
+  floor("counted", 0.15);
+  floor("open", 0.07);
+  floor("closed", 0.07);
+  floor("refused", 0.35);
+  floor("yamlRejects", 0.25);
 });

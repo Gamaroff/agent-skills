@@ -11,27 +11,27 @@ All notable changes to this project will be documented in this file. Format foll
   `develop-story`. It parses the review's `## Machine-Readable Findings` block against the shape
   `/review-pr` emits and prints `unreadable` for anything it cannot place: the old awk listed the
   shapes it refused, so each shape it did not list was skipped and read as "no coverage", and
-  task 238's QA loop found one more per cycle. The printed contract, the routing and every existing
-  fixture are unchanged, and every tracked review report reads the same as before. A long value
-  may wrap onto deeper lines, as YAML allows. Where the awk read a count, the reader now prints
-  `unreadable` for three kinds of block. One is a block YAML itself rejects: a wrapped line that
-  reads as `key: `, or a quote that is never closed. Another is a nested value under an empty key
-  that holds a quote or a flow collection, open or closed. An open one would make YAML read the
-  key-indent lines after it as text. The third is a backslash escape in a quoted `category:` or
-  `provenance:` value. The reader does not decode escapes, so it refuses one rather than compare a
-  value YAML would read differently. A differential test now generates small blocks and checks
-  that the reader prints `unreadable` or exactly PyYAML's count, never another count. It found
-  more shapes the reader must refuse. Keys are case-sensitive, as in YAML: `Category:` is not
-  `category:`. A flow key needs a space after its colon. A plain `category:` or `provenance:`
-  value may not hold `: `. Free text that does is still read to the end of its line, but may not
-  wrap. A nested value must be one flat list, map or scalar at one indent. In a block scalar, `#`
-  is content. A comment ends a wrapped plain value, so no deeper line may follow it. A plain value
-  may not start with a YAML indicator (a backtick, `@`, `%`, `|`, `- `, `? `, `: `, or a `,`):
-  reviews quote their free text. A tab is refused anywhere outside a block scalar's content, and so
-  is a whitespace-only line holding one. A plain flow value may not hold `[` or `]`. No
-  tracked report holds any of these shapes. The shell
-  `case` guard stays as the backstop for a reader that does not run. `pr-review-current.js` now
-  exports its block extractor, so the two readers share one regex.
+  task 238's QA loop found one more per cycle. The printed contract and the routing are unchanged,
+  and every tracked review report reads the same as before.
+
+  The reader accepts one line per key, the shape review-pr's template emits and the only one the
+  tracked reports use. A value sits on its key's line: empty, plain, or single- or double-quoted,
+  with an optional trailing ` # comment`. A plain value starts with a letter, a digit or a
+  non-ASCII character and holds no `: `. A double-quoted value may escape only `\\` and `\"`. The
+  block may hold printable ASCII and, beyond ASCII, letters, marks, numbers, punctuation and
+  symbols, so a tab, a carriage return, a control character or a no-break space is refused.
+  Everything else reads `unreadable`: a value wrapped onto a deeper line, a nested list, a block
+  scalar, a flow entry `- {…}`, an anchor or a tag. Keys are case-sensitive, as in YAML.
+
+  An earlier version accepted most of YAML's block shapes and refused the ones known to break, and
+  each of seven QA cycles found one more shape it counted and YAML rejected. One read a no-break
+  space after `pre-existing` as `pre-existing` and printed a false 0. A differential test now
+  generates blocks and checks that the reader prints `unreadable` or exactly PyYAML's count, never
+  another count. Some fixtures from task 238 now read `unreadable` where they read a count: the flow
+  form, a nested list, a block scalar, a wrapped value, and plain free text holding `: `, which YAML
+  rejects. No fixture changed from one count to another. The shell `case` guard stays as the
+  backstop for a reader that does not run. `pr-review-current.js` now exports its block extractor,
+  so the two readers share one regex.
 
 - **`/finalise`'s changelog checks are opt-in (task 241).** Both checks — the docs subagent's
   "CHANGELOG.md updated" judgement and Step 7 action 6d's `no-changelog-entry` HALT — now run only

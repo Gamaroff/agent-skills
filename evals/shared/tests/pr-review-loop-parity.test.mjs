@@ -979,15 +979,17 @@ const RAW_CASES = [
     "  - category: coverage\n    id: PC-1\n  - category: trail\n    id: PC-2\n",
     1,
   ],
+  // The reader reads one key per line (task.240): the flow form, which no review-pr template or
+  // tracked report uses, is refused rather than parsed.
   [
     "the flow form",
     "  - {id: PC-1, category: coverage, severity: medium}\n",
-    1,
+    "unreadable",
   ],
   [
     "the flow form with provenance: pre-existing",
     "  - {id: PC-1, category: coverage, provenance: pre-existing}\n",
-    0,
+    "unreadable",
   ],
   ["a capitalised value", "  - id: PC-1\n    category: Coverage\n", 1],
   [
@@ -1008,9 +1010,9 @@ const RAW_CASES = [
     0,
   ],
   [
-    "a nested list inside an entry does not split it",
+    "a nested list inside an entry is a deeper line",
     "  - id: PC-1\n    category: coverage\n    evidence:\n      - a.md\n      - b.md\n",
-    1,
+    "unreadable",
   ],
   [
     "a commented-out category is not one",
@@ -1029,25 +1031,31 @@ const RAW_CASES = [
     (b) =>
       b.replace("findings:\n", "findings: [{id: PC-1, category: coverage}]\n"),
   ],
-  // Keys are read only in key position (task.238 bug.15): each of these printed 0.
+  // Keys are read only in key position (task.238 bug.15): each of these printed 0. Free text that
+  // holds `: ` is quoted; written plain it is a line YAML rejects, refused since task.240.
   [
     "provenance: pre-existing quoted in a finding's free text does not exempt it",
+    '  - id: PC-1\n    category: coverage\n    finding: "QA filed its CI red with provenance: pre-existing, which hid it"\n',
+    1,
+  ],
+  [
+    "the same free text written plain is refused",
     "  - id: PC-1\n    category: coverage\n    finding: QA filed its CI red with provenance: pre-existing, which hid it\n",
-    1,
+    "unreadable",
   ],
   [
-    "provenance: pre-existing inside a quoted flow value does not exempt it",
+    "provenance: pre-existing inside a quoted flow value is refused with the flow entry",
     '  - {id: PC-1, finding: "a, provenance: pre-existing", category: coverage}\n',
-    1,
+    "unreadable",
   ],
   [
-    "provenance: pre-existing in a block scalar does not exempt it",
+    "provenance: pre-existing in a block scalar is refused with the block scalar",
     "  - id: PC-1\n    category: coverage\n    finding: >-\n      the base read it as\n      provenance: pre-existing\n",
-    1,
+    "unreadable",
   ],
   [
     "category: coverage in another entry's free text is not a coverage finding",
-    "  - id: PC-1\n    category: trail\n    finding: unlike category: coverage, this one\n",
+    "  - id: PC-1\n    category: trail\n    finding: 'unlike category: coverage, this one'\n",
     0,
   ],
   // A shape outside the allow-list reads unreadable, never 0 (task.238 bug.16).
@@ -1108,10 +1116,10 @@ const RAW_CASES = [
     "unreadable",
   ],
   // review-pr's documented shape still reads: one exempted coverage entry, a trail entry and a
-  // block-scalar finding whose text names both keys.
+  // quoted finding whose text names both keys.
   [
     "review-pr's documented block, coverage exempted",
-    '  - id: PC-1\n    category: coverage\n    severity: medium\n    confidence: high\n    ref: "SC-3"\n    provenance: pre-existing\n    anchor_check: no-line\n    finding: >-\n      category: coverage, provenance: new\n    suggested_action: file a follow-up\n  - id: CR-1\n    category: bug\n    severity: low\n    ref: "x.js:3"\n    finding: a typo\n',
+    '  - id: PC-1\n    category: coverage\n    severity: medium\n    confidence: high\n    ref: "SC-3"\n    provenance: pre-existing\n    anchor_check: no-line\n    finding: "category: coverage, provenance: new"\n    suggested_action: file a follow-up\n  - id: CR-1\n    category: bug\n    severity: low\n    ref: "x.js:3"\n    finding: a typo\n',
     0,
   ],
   // A flow entry is complete on its line (task.238 bug.19): a key after it is invalid YAML, and it
@@ -1127,26 +1135,27 @@ const RAW_CASES = [
     "unreadable",
   ],
   [
-    "a flow entry followed by a block entry still reads",
+    "a flow entry before a block entry is refused with it",
     "  - {id: PC-1, category: trail}\n  - id: PC-2\n    category: coverage\n",
-    1,
+    "unreadable",
   ],
-  // A long value under a key that decides nothing may wrap onto deeper lines, as YAML allows; the
-  // awk read both shapes correctly and the first reader refused them (task.240 bug.1).
+  // A long value wrapped onto deeper lines is valid YAML, and task.240 bug.1 made the first reader
+  // accept it. Every later wrap shape YAML rejects was one more bug (bugs 2, 3, 6), so the reader
+  // now reads one line per key and refuses a wrap whatever it holds.
   [
     "a plain finding: value wrapped onto a deeper line",
     "  - id: PC-1\n    category: trail\n    finding: a long plain value that\n      wraps onto a deeper line\n",
-    0,
+    "unreadable",
   ],
   [
     "a double-quoted finding: value wrapped onto a deeper line",
     '  - id: PC-1\n    category: coverage\n    finding: "a long quoted value that\n      wraps onto a deeper line"\n',
-    1,
+    "unreadable",
   ],
   [
     "a single-quoted finding: value wrapped onto a deeper line",
     "  - id: PC-1\n    finding: 'it''s long\n      and wraps'\n    category: coverage\n",
-    1,
+    "unreadable",
   ],
   // The trap: a quote still open at the key indent. YAML reads `category: coverage` here as quoted
   // text; reading it as a key would count it, so the reader refuses rather than guess.

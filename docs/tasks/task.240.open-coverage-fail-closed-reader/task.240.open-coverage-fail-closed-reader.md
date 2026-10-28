@@ -39,7 +39,8 @@ does not change.
 - `shared/resources/open-coverage.js`: a pure reader plus CLI, bundled into `develop-task` and
   `develop-story`.
 - The §5c block calls it and keeps its shell-level non-count guard.
-- `pr-review-loop-parity.test.mjs` passes unchanged in its expectations: 82 cases.
+- `pr-review-loop-parity.test.mjs` passes. No case changes from one count to another; cases in
+  shapes outside the one-line grammar now read `unreadable` (amended 2026-10-28, see SC-2).
 - Every tracked `*.pr-review.*.md` reads the same before and after (SC-4).
 
 **Expected outcome**: a review shape the reader does not know reads `unreadable` by construction,
@@ -122,12 +123,18 @@ merges (Phase 0).
   (`command node open-coverage.js --file <report>`) that prints `OPEN_COVERAGE=<n|unreadable>` and
   exits 0. The `reason` goes to stderr only, so the printed contract is unchanged.
 - **A strict reader of review-pr's emitted shape, not a general YAML parser.**
-  - It accepts: a block list of maps, indented or at column 0; plain, single- or double-quoted
-    scalars (a block-style double-quoted value may carry `\"` and `\\` escapes, as four tracked
-    reports do); one-line flow maps (`- {id: PC-1, category: coverage}`); folded or literal block
-    scalars (`>-`, `|`) for long values; a key with an empty value followed by strictly deeper
-    lines, read as text; blank lines and indented full-line comments, skipped. `category` and
+  - It accepts: a block list of maps, indented or at column 0, one key per line; a value on its
+    key's line, empty, plain, or single- or double-quoted (a double-quoted value may carry `\"`
+    and `\\` escapes, as four tracked reports do, and no other), with an optional trailing
+    ` # comment`; blank lines and indented full-line comments, skipped. A plain value starts with
+    a letter, a digit or a non-ASCII character and holds no `: `. The block holds only printable
+    ASCII and non-ASCII letters, marks, numbers, punctuation and symbols. `category` and
     `provenance` values compare case-blind (`category: Coverage` is coverage).
+  - **Amended 2026-10-28 (author-approved, after the QA loop escalation).** As first written the
+    reader also accepted one-line flow maps, block scalars, and deeper lines under a key. Each of
+    seven QA cycles found one more shape among them that the reader counted and YAML rejected
+    (bugs 1–10), so the grammar was narrowed to the one line per key that review-pr's template
+    emits and every tracked report uses. Those shapes now read `unreadable`.
   - Anything else is `unreadable`: anchors, tags, aliases, a duplicate key, an entry with no
     `category`, a line it cannot place, a column-0 `#` line, a deeper line under `category:` or
     `provenance:`, an escaped quote inside a flow entry, a block with no terminator, a missing or
@@ -161,8 +168,8 @@ merges (Phase 0).
 
 ✅ `shared/resources/open-coverage.js` and its unit tests
 ✅ The §5c call site and its comments in `develop-pipeline-step-5-6-qa-loop.md`
-✅ `pr-review-loop-parity.test.mjs`: the harness keeps locating and running the block; every
-existing fixture keeps its expected value
+✅ `pr-review-loop-parity.test.mjs`: the harness keeps locating and running the block; no
+fixture changes from one count to another (amended 2026-10-28, see SC-2)
 ✅ Exporting the block extractor from `pr-review-current.js`
 ✅ Bundled copies (`npm run bundle`)
 ✅ The CHANGELOG entry
@@ -184,9 +191,15 @@ not the reader.
 
 ## 5. Breaking Changes
 
-None. The API is stable: the block still prints exactly one `OPEN_COVERAGE=<n|unreadable>` line,
-and every fixture keeps its expected value. A consumer now needs Node at §5c, which every pipeline
-step already requires (`command node` throughout `develop-pipeline-step-5-6-qa-loop.md`).
+The block still prints exactly one `OPEN_COVERAGE=<n|unreadable>` line, and no input changes from
+one count to another. A consumer now needs Node at §5c, which every pipeline step already requires
+(`command node` throughout `develop-pipeline-step-5-6-qa-loop.md`).
+
+**Amended 2026-10-28 (author-approved, after the QA loop escalation).** The reader accepts one line
+per key, so shapes the awk counted now read `unreadable`: a flow entry, a nested list, a block
+scalar, a value wrapped onto a deeper line, and plain free text holding `: ` (which YAML rejects).
+review-pr's template emits none of them and no tracked report uses one (SC-4). A review that does
+use one halts 5c at the **Review failed** arm; it is never counted wrong.
 
 ---
 
@@ -322,8 +335,11 @@ Not applicable. The check runs once per 5c on one file.
 - [x] SC-1: `countOpenCoverage` returns `unreadable` for every refusal shape in
       `RAW_CASES`/`UNREADABLE_CASES`, and the count for every `COVERAGE_CASES` shape. It has no
       skip branch: a mutation that skips an unparsed line turns a test red.
-- [x] SC-2: `pr-review-loop-parity.test.mjs` passes, with every pre-existing case keeping its
-      expected value, under bash and zsh.
+- [x] SC-2: `pr-review-loop-parity.test.mjs` passes under bash and zsh, and no pre-existing case
+      changes from one count to another. Amended 2026-10-28 (author-approved): cases outside the
+      one-line grammar — the flow form, a nested list, a block scalar, a wrapped value, plain free
+      text holding `: ` — now expect `unreadable`; it was "every pre-existing case keeping its
+      expected value".
 - [x] SC-3: a failing reader (a `node` stub that exits 2 on `PATH`) reads `unreadable`.
 - [x] SC-4: every tracked `*.pr-review.*.md` reads the same `OPEN_COVERAGE` before and after. The
       command and its distribution are in the implementation report.
@@ -564,6 +580,7 @@ In each case the count is the one the writer meant. YAML gives the block no coun
 | 2026-10-28 |         | QA findings fixed — differential generator widened first (bug.8), comment ends a wrap (bug.6), indicator-led values and tabs refused (bug.7, CR-4), 1 iteration | qa-fix |
 | 2026-10-28 |         | QA gate CONCERNS (90/100) — 3 findings | qa-task |
 | 2026-10-28 |         | QA findings fixed — generator widened first, then a tab-holding blank line (bug.9) and a bracket in a plain flow value (bug.10) refused, 1 iteration | qa-fix |
+| 2026-10-28 | 1.2     | Reader narrowed to one line per key after the QA loop escalation (author-approved): Overview, In Scope, Target Architecture, Breaking Changes and SC-2 amended; flow, nested, block-scalar, wrapped and plain `: ` shapes now read `unreadable` | Lorien Gamaroff |
 <!-- change-log-end -->
 
 ---

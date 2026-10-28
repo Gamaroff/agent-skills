@@ -17,26 +17,25 @@
  * that skips a line it did not understand; the only lines skipped are blank ones and indented
  * comments.
  *
- * Accepted (each pinned by a case in evals/shared/tests/pr-review-loop-parity.test.mjs):
+ * The first version of this reader still accepted most of YAML's block shapes — wrapped values,
+ * block scalars, nested values, flow entries — and refused the ones known to break. Each of seven
+ * QA cycles found one more shape it counted and YAML rejected (task.240 bugs 1–10). So the grammar
+ * is now one line per key: the shape review-pr's template emits, and the only one the tracked
+ * reports use. Accepted (each pinned by a case in tests/open-coverage.test.mjs or
+ * evals/shared/tests/pr-review-loop-parity.test.mjs):
  *   - top-level keys `reviewed_gate`, `findings`, `truncated_count`, each at most once;
  *   - `findings:` followed by a block list (indented, or at column 0), or `findings: []`;
- *   - an entry `- key: value` with its other keys at its first key's column, or a one-line flow
- *     entry `- {k: v, k: v}`;
- *   - plain, 'single'- or "double"-quoted values (a block-style double-quoted value may carry
- *     escapes, except under `category` or `provenance`; a flow one may not), a trailing
- *     ` # comment`, and `>`/`|` block scalars;
- *   - under any key but `category` and `provenance`, deeper lines after a block scalar indicator,
- *     read as text, and after an empty value, read as a nested value of plain text: a line that
- *     holds a quote or a flow collection is refused (task.240 bug.2, bug.3) — never for a key;
- *   - under the same keys, a value wrapped onto deeper lines: a plain one whose wrapped lines do
- *     not read as `key: `, or a quoted one whose closing quote is on a deeper line (task.240
- *     bug.1). A quote still open at the entry's key indent is refused, and so is a deeper line
- *     after a comment that ends a plain value (bug.6).
- * Refused besides: a plain value that starts with a YAML indicator (`` ` ``, `@`, `%`, `|`, `- `,
- * `? `, `: `, an anchor, alias or tag; in block style a `,`) (bug.7), a plain flow value holding
- * `[` or `]` (bug.10), a tab anywhere outside a block scalar's content, and a whitespace-only line
- * holding a tab, which YAML rejects even there (bug.9). Each is a line YAML rejects. The differential suite
- * (tests/open-coverage-differential.test.mjs) compares the reader with PyYAML.
+ *   - an entry `- key: value`, its other keys one per line at its first key's column;
+ *   - a value on the key's own line: empty, plain, 'single'- or "double"-quoted. A plain value
+ *     starts with a letter, a digit or a non-ASCII character, and holds no `: ` and no trailing
+ *     `:`. A double-quoted one may escape only `\\` and `\"`;
+ *   - a trailing ` # comment`, blank lines, and indented comment lines inside the list.
+ * Anything else is a refusal, including a line deeper than its entry's keys, a flow entry, a block
+ * scalar, an anchor and a tag. The block may hold only printable ASCII, newlines and, beyond ASCII,
+ * letters, marks, numbers, punctuation and symbols: no tab, carriage return, control or format
+ * character, and no space but U+0020. Each rule is one YAML states for a one-line value, so a block
+ * the reader counts is one YAML reads the same way; the differential suite
+ * (tests/open-coverage-differential.test.mjs) compares the two with PyYAML.
  * `category` and `provenance` values compare case-blind. `category` must be one of review-pr's six
  * tokens (review-pr SKILL.md Step 7).
  *
@@ -77,10 +76,11 @@ const CATEGORIES = Object.freeze([
 ]);
 
 const TOP_KEYS = new Set(["reviewed_gate", "findings", "truncated_count"]);
-// The two keys whose values decide the count: neither may take a block scalar or a deeper line.
-const DECIDING = new Set(["category", "provenance"]);
-const KEY_LINE = /^([A-Za-z0-9_-]+):(?:[ \t]+(.*)|[ \t]*)$/;
-const BLOCK_SCALAR = /^[>|][-+]?[ \t]*(?:#.*)?$/;
+// `key:`, then a space and the value or the end of the line.
+const KEY_LINE = /^([A-Za-z_][A-Za-z0-9_-]{0,63}):(?: +(.*)| *)$/;
+// Every character the block may hold. A tab, a carriage return, a control or format character and
+// a space other than U+0020 are each something YAML rejects or reads as a break (task.240 bug.9).
+const BLOCK_CHARS = /^[\n\x20-\x7e\p{L}\p{M}\p{N}\p{P}\p{S}]*$/u;
 
 class Refusal extends Error {
   constructor(reason, detail) {
@@ -93,198 +93,86 @@ const refuse = (reason, detail) => {
   throw new Refusal(reason, detail);
 };
 
-/**
- * One scalar from the start of `s`. Returns { value, rest }, where `rest` is what follows the
- * scalar. In a flow entry a plain scalar ends at `,` or `}`; in block style it runs to the end of
- * the line. Tags, anchors, aliases and nested flow collections are refusals.
- */
-function scalar(s, flow, strict = flow) {
-  if (s.startsWith('"') || s.startsWith("'")) {
-    const r = quoted(s[0], s.slice(1), strict);
-    if (r.closed) return { value: r.value, rest: r.rest };
-    refuse(
-      "bad-value",
-      `an unterminated ${s[0] === '"' ? "double" : "single"}-quoted value`,
-    );
-  }
-  // A YAML indicator — or, in block style, a `,` — cannot start a plain scalar: YAML rejects the
-  // line, so there is no value to read. Review reports quote their free text, and none starts with
-  // one (task.240 bug.7).
-  if (INDICATOR.test(s) || (!flow && s.startsWith(",")))
-    refuse("bad-value", `a value that starts with a YAML indicator: ${s}`);
-  if (/^[[{]/.test(s)) refuse("bad-value", `a nested flow collection: ${s}`);
-  // A plain scalar holding `: `, or ending in `:`, is one YAML rejects. A flow value or a value the
-  // count compares (`strict`) is refused. Block free text keeps the old leniency — read to the end
-  // of the line, colons included (task.238 bug.15 pins it: review-pr writes plain sentences) — and
-  // blockValue lets it no deeper line.
-  const plain = (value) => {
-    if (strict && /:(?:[ \t]|$)/.test(value))
-      refuse("bad-value", `a plain value that reads as a key: ${value}`);
-    return value;
-  };
-  if (flow) {
-    const m = s.match(/^[^,}]*/);
-    const value = m[0].replace(/[ \t]+$/, "");
-    if (/[ \t]#/.test(value) || value.startsWith("#"))
-      refuse("bad-value", "a comment inside a flow entry");
-    // Inside a flow collection `[` and `]` are indicators wherever they sit: YAML rejects a plain
-    // value holding one (task.240 bug.10).
-    if (/[[\]]/.test(value))
-      refuse("bad-value", `a bracket inside a plain flow value: ${value}`);
-    return { value: plain(value), rest: s.slice(m[0].length) };
-  }
-  return {
-    value: plain(s.replace(/[ \t]+#.*$/, "").replace(/[ \t]+$/, "")),
-    rest: "",
-  };
+/** Refuses a block holding any character outside BLOCK_CHARS, naming the first one. */
+function checkChars(block) {
+  if (BLOCK_CHARS.test(block)) return;
+  const lines = block.split("\n");
+  const n = lines.findIndex((l) => !BLOCK_CHARS.test(l));
+  const c = [...lines[n]].find((ch) => !BLOCK_CHARS.test(ch));
+  const code = c.codePointAt(0).toString(16).toUpperCase().padStart(4, "0");
+  refuse(
+    "bad-line",
+    `a character the block may not hold, U+${code} (line ${n + 1})`,
+  );
 }
 
 /**
- * Quoted text from just after its opening quote `q`, up to the closing one:
- * { value, rest, closed }. `closed` is false when the line ends first. An escape is skipped over,
- * not decoded: that finds the closing quote, but the value is not YAML's. So `strict` — a flow
- * entry, or a key in DECIDING, whose value the count compares — refuses an escape outright
- * (task.240 bug.4: `provenance: "pr\e-existing"` read as pre-existing).
+ * The value after `key: `, all of it on the key's line: a string, or null when it is empty. A
+ * comment after it is dropped. Anything else a one-line YAML value cannot be is a refusal.
  */
-function quoted(q, s, strict) {
-  let value = "";
-  for (let i = 0; i < s.length; i++) {
+function value(raw) {
+  const s = raw.replace(/ +$/, "");
+  if (s === "" || s.startsWith("#")) return null;
+  if (s[0] === "'" || s[0] === '"') {
+    const { text, rest } = quoted(s);
+    // After the closing quote: nothing, or a comment set off by a space.
+    if (!/^(?: +#.*)?$/.test(rest))
+      refuse("bad-value", `text after a quoted value: ${rest}`);
+    return text;
+  }
+  // Every YAML indicator is ASCII punctuation, so a plain value starting with none of it starts
+  // with no indicator (task.240 bug.7). Harmless marks such as `(` are refused with the rest.
+  if (!/^[A-Za-z0-9\u0080-\u{10FFFF}]/u.test(s))
+    refuse("bad-value", `a plain value that starts with ${s[0]}: ${s}`);
+  // ` #` starts a comment; a `#` with no space before it is text.
+  const v = s.replace(/ +#.*$/, "");
+  // `: ` or a trailing `:` reads as a mapping, which YAML rejects in a value. task.238 bug.15's
+  // leniency is gone: free text holding one is quoted, or the block is refused.
+  if (/:(?: |$)/.test(v))
+    refuse("bad-value", `a plain value that reads as a key: ${v}`);
+  return v;
+}
+
+/**
+ * A quoted value that closes on its own line: { text, rest }, where `rest` follows the closing
+ * quote. A double-quoted escape other than `\\` or `\"` is refused rather than decoded (task.240
+ * bug.4: `provenance: "pr\e-existing"` read as pre-existing).
+ */
+function quoted(s) {
+  const q = s[0];
+  let text = "";
+  for (let i = 1; i < s.length; i++) {
     const c = s[i];
     if (c === q) {
       if (q === "'" && s[i + 1] === "'") {
-        value += "'";
+        text += "'";
         i++;
         continue;
       }
-      return { value, rest: s.slice(i + 1), closed: true };
+      return { text, rest: s.slice(i + 1) };
     }
     if (q === '"' && c === "\\") {
-      if (strict)
+      if (s[i + 1] !== "\\" && s[i + 1] !== '"')
         refuse(
           "bad-value",
-          "an escape in a quoted value the count reads (a flow entry, category: or provenance:)",
+          `an escape the reader does not decode: \\${s[i + 1] ?? ""}`,
         );
-      if (i + 1 >= s.length) break;
-      value += s[++i];
+      text += s[++i];
       continue;
     }
-    value += c;
+    text += c;
   }
-  return { value, rest: "", closed: false };
-}
-
-/** What may follow a closed quoted scalar, or a flow entry's `}`: nothing but a comment. */
-function mustEnd(rest, what) {
-  if (!/^[ \t]*(?:#.*)?$/.test(rest))
-    refuse("bad-value", `text after ${what}: ${rest}`);
-}
-
-/**
- * A block-style value: { value, deeper }, where `deeper` says what a deeper line after it means:
- *   "text"   — anything (a block scalar's content);
- *   "nested" — a nested value under an empty key: plain text, with no quote or flow collection;
- *   "plain"  — the wrapped tail of a plain value, which may not read as a key;
- *   `"`/`'`  — the rest of a quoted value, up to its closing quote;
- *   "refuse" — nothing may follow.
- * A key in DECIDING never wraps: its value is refused rather than read across lines.
- */
-function blockValue(key, raw) {
-  const s = (raw || "").trim();
-  const deciding = DECIDING.has(key);
-  if (s === "" || s.startsWith("#"))
-    return { value: "", deeper: deciding ? "refuse" : "nested" };
-  if (BLOCK_SCALAR.test(s)) {
-    if (deciding) refuse("bad-value", `a block scalar under ${key}:`);
-    return { value: null, deeper: "text" };
-  }
-  const q = s[0];
-  if ((q === '"' || q === "'") && !deciding) {
-    const r = quoted(q, s.slice(1), false);
-    if (!r.closed) return { value: r.value, deeper: q };
-    mustEnd(r.rest, "a quoted value");
-    return { value: r.value, deeper: "refuse" };
-  }
-  const { value, rest } = scalar(s, false, deciding);
-  if (q === '"' || q === "'") {
-    mustEnd(rest, "a quoted value");
-    return { value, deeper: "refuse" };
-  }
-  // A comment ends a plain value: YAML has nothing a deeper line could continue. Nor may free text
-  // read leniently past a `: ` wrap — it is one line or nothing.
-  return {
-    value,
-    deeper:
-      deciding || /[ \t]#/.test(s) || /:(?:[ \t]|$)/.test(value)
-        ? "refuse"
-        : "plain",
-  };
-}
-
-/**
- * One line of a nested value under an empty key. In YAML only a quoted scalar or a flow collection
- * can run on over the lines below it, key-indent lines included, and the reader would read those
- * lines as keys (task.240 bug.2, bug.3); a plain or block scalar ends at a shallower line. So the
- * line may hold no double quote, no `[` or `{`, and no single quote but an apostrophe between two
- * word characters — wherever it sits. A rule over characters cannot be bypassed by a prefix (a
- * nested dash, an anchor, a key with a space), as a scan for openers was. A closed quote or flow
- * collection is refused with the rest: no report carries one here, and refusing costs a HALT
- * where a misread costs a false 0.
- */
-const NESTED_OPENER = /["[{]|(?<![\p{L}\p{N}])'|'(?![\p{L}\p{N}])/u;
-// A YAML indicator at the start of a scalar: an anchor, alias, tag, block scalar, reserved
-// character, or a dash, `?` or `:` that opens a structure.
-const INDICATOR = /^(?:[&*!|>%@`]|[-?:](?:[ \t]|$))/;
-function nestedLine(text, key, n) {
-  if (NESTED_OPENER.test(text))
-    refuse(
-      "bad-value",
-      `a quote or flow collection in a value nested under ${key}: (line ${n + 1})`,
-    );
-  // One optional item dash, then a plain scalar or one `key: plain` pair — nothing else.
-  const parts = text
-    .replace(/^-(?:[ \t]+|$)/, "")
-    .split(/:(?:[ \t]+|$)/)
-    .map((p) => p.trim());
-  if (parts.length > 2 || parts.some((p) => INDICATOR.test(p)))
-    refuse(
-      "bad-value",
-      `a nested line under ${key}: that is not one plain item (line ${n + 1})`,
-    );
-}
-
-/** A one-line flow entry, `{k: v, k: v}`, from just after its `- `. Returns its keys. */
-function flowEntry(s) {
-  const keys = new Map();
-  let rest = s.slice(1);
-  for (;;) {
-    rest = rest.replace(/^[ \t]+/, "");
-    // A flow key's colon is followed by a space, `,` or `}`: `{category:coverage}` is one plain
-    // scalar in YAML, not a category (task.240 CR-2).
-    const k = rest.match(/^([A-Za-z0-9_-]+):(?:[ \t]+|(?=[,}]))/);
-    if (!k) refuse("bad-line", `a flow entry the reader cannot tokenise: ${s}`);
-    const key = k[1];
-    if (keys.has(key))
-      refuse("duplicate-key", `${key} given twice in one entry`);
-    const { value, rest: after } = scalar(rest.slice(k[0].length), true);
-    keys.set(key, value);
-    rest = after.replace(/^[ \t]+/, "");
-    if (rest.startsWith("}")) {
-      mustEnd(rest.slice(1), "a flow entry");
-      return keys;
-    }
-    if (!rest.startsWith(","))
-      refuse("bad-line", `a flow entry the reader cannot tokenise: ${s}`);
-    rest = rest.slice(1);
-  }
+  refuse("bad-value", `a quoted value not closed on its line: ${s}`);
 }
 
 /** Parse the block's lines into its findings entries (Maps of key → value; keys case-sensitive). */
 function parseBlock(block) {
+  checkChars(block);
   const top = new Set();
   const entries = [];
   let inFindings = false;
   let listIndent = null;
-  let cur = null; // { keys, indent, flow, deeper }
+  let cur = null; // { keys, keyIndent }
 
   const close = () => {
     if (cur) entries.push(cur.keys);
@@ -294,219 +182,81 @@ function parseBlock(block) {
   const lines = block.split("\n");
   for (let n = 0; n < lines.length; n++) {
     const line = lines[n];
-    if (/^[ \t]*$/.test(line)) {
-      // A whitespace-only line holding a tab is one YAML rejects wherever it sits (task.240 bug.9).
-      if (line.includes("\t"))
+    if (/^ *$/.test(line)) continue;
+    const indent = line.match(/^ */)[0].length;
+    const text = line.slice(indent);
+    const at = `(line ${n + 1})`;
+    const dash = /^-(?: |$)/.test(text);
+
+    // Column 0 holds the top-level keys, and the entries of a list that starts there.
+    if (indent === 0 && !(inFindings && dash && (listIndent ?? 0) === 0)) {
+      if (text.startsWith("#"))
+        refuse("bad-line", `a column-0 \`#\` line ${at}`);
+      const k = text.match(KEY_LINE);
+      if (!k || !TOP_KEYS.has(k[1]))
         refuse(
           "bad-line",
-          `a whitespace-only line holding a tab (line ${n + 1})`,
+          `a column-0 line that is not a top-level key ${at}: ${text}`,
         );
+      close();
+      inFindings = false;
+      if (top.has(k[1])) refuse("duplicate-key", `${k[1]} given twice`);
+      top.add(k[1]);
+      const raw = (k[2] ?? "").replace(/ +$/, "");
+      if (k[1] !== "findings") value(raw);
+      else if (raw === "" || raw.startsWith("#")) {
+        inFindings = true;
+        listIndent = null;
+      } else if (!/^\[\](?: +#.*)?$/.test(raw))
+        refuse("bad-value", `findings: written inline ${at}`);
       continue;
-    }
-    const lead = line.match(/^[ \t]*/)[0];
-    if (lead.includes("\t"))
-      refuse("bad-line", `a tab in the indentation (line ${n + 1})`);
-    const indent = lead.length;
-    const text = line.slice(indent);
-
-    // An open quoted value continues on deeper lines, and only there: a line at the entry's key
-    // indent ends the entry's keys, so a quote still open by then is never closed (task.240 bug.1).
-    // Checked before the comment skip: a `#` inside quotes is text.
-    if (cur && (cur.deeper === '"' || cur.deeper === "'")) {
-      if (indent <= cur.keyIndent)
-        refuse(
-          "bad-value",
-          `an unterminated quoted value under ${cur.lastKey}: (line ${n + 1})`,
-        );
-      const r = quoted(cur.deeper, text, false);
-      if (r.closed) {
-        mustEnd(r.rest, "a quoted value");
-        cur.deeper = "refuse";
-      }
-      continue;
-    }
-
-    // A tab outside a block scalar's content — after a key's colon, before a comment, at the end
-    // of a line — is a line PyYAML rejects (gate 6 CR-4). A quoted value holding one is refused
-    // with the rest: no report carries a tab, and refusing costs a HALT, not a false count.
-    if (
-      text.includes("\t") &&
-      !(cur && !cur.flow && cur.deeper === "text" && indent > cur.keyIndent)
-    )
-      refuse("bad-line", `a tab outside a block scalar (line ${n + 1})`);
-
-    if (indent === 0) {
-      if (text.startsWith("#"))
-        refuse("bad-line", `a column-0 \`#\` line (line ${n + 1})`);
-      if (
-        inFindings &&
-        (text === "-" || text.startsWith("- ")) &&
-        (listIndent ?? 0) === 0
-      ) {
-        // A list entry at column 0 — handled with the indented ones below.
-      } else {
-        const k = text.match(KEY_LINE);
-        if (!k || !TOP_KEYS.has(k[1]))
-          refuse(
-            "bad-line",
-            `a column-0 line that is not a top-level key (line ${n + 1}): ${text}`,
-          );
-        close();
-        inFindings = false;
-        if (top.has(k[1])) refuse("duplicate-key", `${k[1]} given twice`);
-        top.add(k[1]);
-        const raw = (k[2] || "").replace(/[ \t]+#.*$/, "").trim();
-        if (k[1] === "findings") {
-          if (raw === "") {
-            inFindings = true;
-            listIndent = null;
-          } else if (raw !== "[]") {
-            refuse("bad-value", `findings: written inline (line ${n + 1})`);
-          }
-        } else if (raw !== "") {
-          const { rest } = scalar(raw, false);
-          if (/^["']/.test(raw)) mustEnd(rest, "a quoted value");
-        }
-        continue;
-      }
     }
 
     if (!inFindings)
-      refuse("bad-line", `an indented line outside findings: (line ${n + 1})`);
-    // An indented comment line — except inside a block scalar, where `#` is content and the line
-    // sets the scalar's indent like any other.
-    const inScalar =
-      cur && !cur.flow && cur.deeper === "text" && indent > cur.keyIndent;
-    if (text.startsWith("#") && !inScalar) {
-      // A comment ends a block scalar shallower than its content, a wrapped plain value, and a
-      // nested plain scalar: YAML has no scalar for a deeper line after it to belong to (task.240
-      // bug.6). Between nested list or map items it ends nothing.
-      if (cur && !cur.flow && endsAtComment(cur)) cur.deeper = "refuse";
-      continue;
-    }
+      refuse("bad-line", `an indented line outside findings: ${at}`);
+    // An indented comment line. No value here runs past its own line, so there is none for the
+    // comment to end, and YAML skips it wherever it sits.
+    if (text.startsWith("#")) continue;
 
-    // A line deeper than the open entry's keys belongs to the last key's value.
-    if (cur && !cur.flow && indent > cur.keyIndent) {
-      // A wrapped plain value may not hold `key: ` — YAML refuses that, and reading it as text
-      // would hide a key the author meant.
-      if (cur.deeper === "plain" && /:(?:[ \t]|$)/.test(text))
-        refuse(
-          "bad-value",
-          `a deeper line under ${cur.lastKey}: that reads as a key (line ${n + 1})`,
-        );
-      if (cur.deeper === "nested") nestedLine(text, cur.lastKey, n);
-      else if (cur.deeper !== "text" && cur.deeper !== "plain")
-        refuse(
-          "bad-value",
-          `a deeper line under ${cur.lastKey}: (line ${n + 1})`,
-        );
-      // A nested value or a block scalar takes its indent from its first line; a later line
-      // shallower than that but deeper than the keys belongs to nothing, and YAML rejects it.
-      if (cur.deeper === "nested" || cur.deeper === "text") {
-        if (cur.deeperIndent === null) cur.deeperIndent = indent;
-        else if (indent < cur.deeperIndent)
-          refuse(
-            "bad-line",
-            `a line under ${cur.lastKey}: shallower than the value's first line (line ${n + 1})`,
-          );
-        // A nested value is flat: one list, map or plain scalar at one indent. Anything deeper —
-        // an item's child, a continuation — is a structure the reader does not model, and no
-        // writer emits it.
-        else if (cur.deeper === "nested" && indent > cur.deeperIndent)
-          refuse(
-            "bad-line",
-            `a line under ${cur.lastKey}: deeper than the nested value's first line (line ${n + 1})`,
-          );
-      }
-      // A nested value is one node: a list, a map or a plain scalar. Lines at its own indent that
-      // switch kind (`- a` then `plain`) are a block YAML rejects.
-      if (cur.deeper === "nested" && indent === cur.deeperIndent) {
-        const kind = /^-(?:[ \t]|$)/.test(text)
-          ? "list"
-          : /:(?:[ \t]|$)/.test(text)
-            ? "map"
-            : "plain";
-        if (cur.deeperKind == null) cur.deeperKind = kind;
-        else if (kind !== cur.deeperKind)
-          refuse(
-            "bad-line",
-            `a ${kind} line in a nested ${cur.deeperKind} under ${cur.lastKey}: (line ${n + 1})`,
-          );
-      }
-      // A trailing comment ends a plain scalar as a comment line does (task.240 bug.6). In a block
-      // scalar it is content.
-      if (/[ \t]#/.test(text) && cur.deeper !== "text" && endsAtComment(cur))
-        cur.deeper = "refuse";
-      continue;
-    }
-    if (cur && cur.flow && indent > cur.indent)
-      refuse("bad-line", `a line after a one-line flow entry (line ${n + 1})`);
-
-    if (text === "-" || text.startsWith("- ")) {
+    if (dash) {
       if (listIndent === null) listIndent = indent;
       if (indent !== listIndent)
+        refuse("bad-line", `an entry at an indent no list owns ${at}`);
+      close();
+      const rest = text.slice(1).replace(/^ +/, "");
+      if (rest === "") refuse("bad-line", `a bare dash ${at}`);
+      if (rest.startsWith("{"))
         refuse(
           "bad-line",
-          `an entry at an indent no list owns (line ${n + 1})`,
+          `a flow entry: the reader reads one key per line ${at}`,
         );
-      close();
-      const rest = text.slice(1).replace(/^[ \t]+/, "");
-      if (rest === "") refuse("bad-line", `a bare dash (line ${n + 1})`);
-      if (rest.startsWith("{")) {
-        cur = { keys: flowEntry(rest), indent, flow: true };
-        continue;
-      }
       const k = rest.match(KEY_LINE);
-      if (!k)
-        refuse(
-          "not-a-map",
-          `an entry that is not a map (line ${n + 1}): ${rest}`,
-        );
-      // The entry's keys sit at its first key's column, wherever the dash's spacing puts it:
-      // assuming `dash + 2` read `-  category: x` / `    provenance: y` — which YAML rejects —
-      // as one entry and printed 0 (task.240 bug.5).
-      const keyIndent = indent + text.length - rest.length;
-      cur = { keys: new Map(), indent, keyIndent, flow: false };
-      setKey(cur, k[1], k[2], n);
+      if (!k) refuse("not-a-map", `an entry that is not a map ${at}: ${rest}`);
+      // The entry's keys sit at its first key's column, wherever the dash's spacing puts it
+      // (task.240 bug.5).
+      cur = { keys: new Map(), keyIndent: indent + text.length - rest.length };
+      setKey(cur, k, at);
       continue;
     }
 
+    // Every other line is the open entry's next key, at its keys' column. A deeper line would
+    // continue the last value onto a second line, which a value here never does.
     const k = text.match(KEY_LINE);
-    if (!cur || cur.flow || indent !== cur.keyIndent || !k)
-      refuse(
-        "bad-line",
-        `a line the reader cannot place (line ${n + 1}): ${text}`,
-      );
-    setKey(cur, k[1], k[2], n);
+    if (!cur || indent !== cur.keyIndent || !k)
+      refuse("bad-line", `a line the reader cannot place ${at}: ${text}`);
+    setKey(cur, k, at);
   }
-  if (cur && (cur.deeper === '"' || cur.deeper === "'"))
-    refuse("bad-value", `an unterminated quoted value under ${cur.lastKey}:`);
   close();
   if (!top.has("findings"))
     refuse("no-findings-key", "the block has no findings: key");
   return entries;
 }
 
-/** Whether a comment ends the open value: a block scalar, a wrapped plain value, a nested plain scalar. */
-function endsAtComment(cur) {
-  return (
-    cur.deeper === "text" ||
-    cur.deeper === "plain" ||
-    (cur.deeper === "nested" && cur.deeperKind === "plain")
-  );
-}
-
-function setKey(cur, rawKey, raw, n) {
+function setKey(cur, k, at) {
   // Keys are case-sensitive, as in YAML: `Category:` is not `category:` (task.240 CR-3).
-  const key = rawKey;
-  if (cur.keys.has(key))
-    refuse("duplicate-key", `${key} given twice in one entry (line ${n + 1})`);
-  const { value, deeper } = blockValue(key, raw);
-  cur.keys.set(key, value);
-  cur.lastKey = key;
-  cur.deeper = deeper;
-  cur.deeperIndent = null;
-  cur.deeperKind = null;
+  if (cur.keys.has(k[1]))
+    refuse("duplicate-key", `${k[1]} given twice in one entry ${at}`);
+  cur.keys.set(k[1], value(k[2] ?? ""));
 }
 
 /**
