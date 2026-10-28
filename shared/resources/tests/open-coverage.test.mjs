@@ -215,6 +215,13 @@ const REFUSED = [
       "  - id: PC-1\n    category: coverage\n    evidence:\n      [a,\n    provenance: pre-existing]\n",
     ),
   ],
+  // An escape in a value the count compares (task.240 bug.4): the reader does not decode escapes,
+  // so it refuses one rather than compare a value YAML would read differently.
+  ...[
+    '    category: coverage\n    provenance: "pr\\e-existing"\n',
+    '    category: coverage\n    provenance: "pre-exis\\ting"\n',
+    '    category: "cover\\age"\n',
+  ].map((lines) => ["bad-value", findings(`  - id: PC-1\n${lines}`)]),
   // An opener behind a prefix or inside a flow collection (task.240 bug.3), and a closed one: a
   // nested value may hold no quote or flow collection at all.
   ...[

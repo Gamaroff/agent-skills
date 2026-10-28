@@ -485,6 +485,15 @@ which fails closed. No tracked report has a nested value of this kind.
 | Corpus diff | 0 changes |
 | `ci:fast` | green: 6,634 pass, 0 fail |
 
+**QA fix cycle 4 (TASK-240-QA-5, bug.4).** `quoted()` skipped over an escape without decoding it.
+A `category:` or `provenance:` value with an escape could therefore read differently from YAML.
+Those two values now refuse an escape, using the same `strict` rule that flow entries already
+used. Results:
+
+- Mutation proofs: M16 and M17 each turned tests red.
+- Corpus: 0 changes.
+- `ci:fast`: green, 6,639 pass and 0 fail.
+
 ---
 
 <!--
@@ -503,23 +512,22 @@ which fails closed. No tracked report has a nested value of this kind.
 
 ### QA Report
 
-- **Full Report**: [task.240.qa.3.open-coverage-fail-closed-reader.md](./task.240.qa.3.open-coverage-fail-closed-reader.md)
-- **Gate File**: [task.240.gate.3.open-coverage-fail-closed-reader.yml](./task.240.gate.3.open-coverage-fail-closed-reader.yml)
+- **Full Report**: [task.240.qa.4.open-coverage-fail-closed-reader.md](./task.240.qa.4.open-coverage-fail-closed-reader.md)
+- **Gate File**: [task.240.gate.4.open-coverage-fail-closed-reader.yml](./task.240.gate.4.open-coverage-fail-closed-reader.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 172 (unit, parity, extractor and relationship lint)
+- **Tests Executed**: 184 (unit, parity, extractor and relationship lint)
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
 
-BUG-2 is fixed for its own shape. One medium remains (TASK-240-QA-3,
-[task.240.bug.3.nested-opener-check-bypassed.md](./task.240.bug.3.nested-opener-check-bypassed.md)).
-The nested opener check misses an opener that sits behind a prefix or inside a flow collection.
-Because this is the third medium finding on the same mechanism, the fix replaces the scan rather
-than patching it.
+BUG-3 is fixed. One medium finding remains: TASK-240-QA-5, described in
+[task.240.bug.4.escape-in-deciding-value-misread.md](./task.240.bug.4.escape-in-deciding-value-misread.md).
+The reader takes a backslash escape in a `category:` or `provenance:` value literally, but YAML
+decodes it. The two can therefore disagree on whether a finding is open.
 
 <!-- change-log-start -->
 ## Change Log
@@ -536,6 +544,8 @@ than patching it.
 | 2026-10-28 |         | QA findings fixed — nested openers must close on their line (bug.2), 1 iteration | qa-fix |
 | 2026-10-28 |         | QA gate CONCERNS (90/100) — 2 findings | qa-task |
 | 2026-10-28 |         | QA findings fixed — nested opener scan replaced by a character rule (bug.3), 1 iteration | qa-fix |
+| 2026-10-28 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-10-28 |         | QA findings fixed — escape refused in a deciding value (bug.4), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

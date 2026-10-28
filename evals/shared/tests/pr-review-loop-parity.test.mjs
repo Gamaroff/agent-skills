@@ -1150,6 +1150,18 @@ const RAW_CASES = [
     '  - id: PC-1\n    category: coverage\n    finding:\n      "open\n    provenance: pre-existing\n    note: end"\n',
     "unreadable",
   ],
+  // An escape in a deciding value (task.240 bug.4): kept literally, `pr\e-existing` read as
+  // pre-existing and printed 0; YAML decodes it and reads the entry open.
+  [
+    "an escape in a quoted provenance value",
+    '  - id: PC-1\n    category: coverage\n    provenance: "pr\\e-existing"\n',
+    "unreadable",
+  ],
+  [
+    "an escape in a quoted category value",
+    '  - id: PC-1\n    category: "cover\\age"\n',
+    "unreadable",
+  ],
   // The same trap behind a prefix the opener scan did not strip (task.240 bug.3): each printed 0.
   ...[
     ["inside a flow collection", '[a, "b]'],

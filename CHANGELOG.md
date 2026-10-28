@@ -14,10 +14,12 @@ All notable changes to this project will be documented in this file. Format foll
   task 238's QA loop found one more per cycle. The printed contract, the routing and every existing
   fixture are unchanged, and every tracked review report reads the same as before. A long value
   may wrap onto deeper lines, as YAML allows. Where the awk read a count, the reader now prints
-  `unreadable` for two kinds of block. One is a block YAML itself rejects: a wrapped line that
-  reads as `key: `, or a quote that is never closed. The other is a nested value under an empty key
+  `unreadable` for three kinds of block. One is a block YAML itself rejects: a wrapped line that
+  reads as `key: `, or a quote that is never closed. Another is a nested value under an empty key
   that holds a quote or a flow collection, open or closed. An open one would make YAML read the
-  key-indent lines after it as text. No tracked report holds either shape. The shell
+  key-indent lines after it as text. The third is a backslash escape in a quoted `category:` or
+  `provenance:` value. The reader does not decode escapes, so it refuses one rather than compare a
+  value YAML would read differently. No tracked report holds any of these shapes. The shell
   `case` guard stays as the backstop for a reader that does not run. `pr-review-current.js` now
   exports its block extractor, so the two readers share one regex.
 

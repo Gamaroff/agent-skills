@@ -90,9 +90,9 @@ const refuse = (reason, detail) => {
  * scalar. In a flow entry a plain scalar ends at `,` or `}`; in block style it runs to the end of
  * the line. Tags, anchors, aliases and nested flow collections are refusals.
  */
-function scalar(s, flow) {
+function scalar(s, flow, strict = flow) {
   if (s.startsWith('"') || s.startsWith("'")) {
-    const r = quoted(s[0], s.slice(1), flow);
+    const r = quoted(s[0], s.slice(1), strict);
     if (r.closed) return { value: r.value, rest: r.rest };
     refuse(
       "bad-value",
@@ -116,9 +116,12 @@ function scalar(s, flow) {
 
 /**
  * Quoted text from just after its opening quote `q`, up to the closing one:
- * { value, rest, closed }. `closed` is false when the line ends first.
+ * { value, rest, closed }. `closed` is false when the line ends first. An escape is skipped over,
+ * not decoded: that finds the closing quote, but the value is not YAML's. So `strict` — a flow
+ * entry, or a key in DECIDING, whose value the count compares — refuses an escape outright
+ * (task.240 bug.4: `provenance: "pr\e-existing"` read as pre-existing).
  */
-function quoted(q, s, flow) {
+function quoted(q, s, strict) {
   let value = "";
   for (let i = 0; i < s.length; i++) {
     const c = s[i];
@@ -131,8 +134,11 @@ function quoted(q, s, flow) {
       return { value, rest: s.slice(i + 1), closed: true };
     }
     if (q === '"' && c === "\\") {
-      // An escape inside a flow entry is refused: the parity suite pins it unreadable.
-      if (flow) refuse("bad-value", "an escaped quote inside a flow entry");
+      if (strict)
+        refuse(
+          "bad-value",
+          "an escape in a quoted value the count reads (a flow entry, category: or provenance:)",
+        );
       if (i + 1 >= s.length) break;
       value += s[++i];
       continue;
@@ -173,7 +179,7 @@ function blockValue(key, raw) {
     mustEnd(r.rest, "a quoted value");
     return { value: r.value, deeper: "refuse" };
   }
-  const { value, rest } = scalar(s, false);
+  const { value, rest } = scalar(s, false, deciding);
   if (q === '"' || q === "'") {
     mustEnd(rest, "a quoted value");
     return { value, deeper: "refuse" };
