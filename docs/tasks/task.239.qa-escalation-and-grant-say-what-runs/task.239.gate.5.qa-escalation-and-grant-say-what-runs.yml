@@ -1,0 +1,58 @@
+schema: 2
+task: 'task.239.qa-escalation-and-grant-say-what-runs'
+task_title: 'QA escalation and grant say what will run'
+gate: PASS
+status_reason: 'Cycle 4 fixed all four gate-4 lows by sweeping every describer of the grant write set. The scoped review re-derived both new table rows and every edited sentence against the trip rule and the jq write, re-ran the table-row parser against the doc, and found no defect. CI is green on the head. The review asked for high-confidence, line-anchored defects only, since this was the last cycle in budget; cycles 1-4 did not carry that instruction.'
+reviewer: 'QA Engineer'
+head: 'e265c5a8942a441c2d9a9b1c6d8ae22d047e0c1e'
+updated: '2026-10-28T20:44:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 16
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false. Cycle 4 changed prose, comments, a worked-example table and test code.'
+  performance:
+    status: PASS
+    notes: 'No runtime change.'
+  reliability:
+    status: PASS
+    notes: 'No behaviour change; the grant script change is comments only.'
+  maintainability:
+    status: PASS
+    notes: 'Every write-set describer lists the four fields and is held by the parity loop; the window qualifier is pinned to the doc and its worked-example rows to the rule.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Resume contract fenced block at line 492, and the detector prompt fenced block at line 69, fail under qa-execute-snippets for want of a lock fixture. Both fail identically on the merge base (pre-existing, harness seeding, not prose).'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/pipeline-resume-detector-prompt.md']
+      provenance: pre-existing
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-10-28'
+  total_iterations: 4
+  verification_method: 'Scoped reviewer re-ran the table-row parser and convergenceTrip against the doc; CI green on the head'
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []

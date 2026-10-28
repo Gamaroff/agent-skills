@@ -291,24 +291,24 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-28
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.239.qa.4.qa-escalation-and-grant-say-what-runs.md](./task.239.qa.4.qa-escalation-and-grant-say-what-runs.md)
-- **Gate File**: [task.239.gate.4.qa-escalation-and-grant-say-what-runs.yml](./task.239.gate.4.qa-escalation-and-grant-say-what-runs.yml)
+- **Full Report**: [task.239.qa.5.qa-escalation-and-grant-say-what-runs.md](./task.239.qa.5.qa-escalation-and-grant-say-what-runs.md)
+- **Gate File**: [task.239.gate.5.qa-escalation-and-grant-say-what-runs.yml](./task.239.gate.5.qa-escalation-and-grant-say-what-runs.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 16
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle 3's fixes hold: the reviewer confirmed the qualifier against the trip rule and the README write sets against the jq write. Four lows remain, all describers or tests the cycle-3 sweep missed: `qa_phase` in troubleshooting.md, two grant-script comments that miscount the fields, an ambiguous "that cycle", and new window cases that test only the in-test rule.
+No critical issues identified. Cycle 4's fixes hold: every describer of the grant write set lists the four fields, and the window qualifier and its worked-example rows are bound to the rule by tests. Both bugs are closed. The last cycle's review asked for high-confidence, line-anchored defects only.
 
 ## Change Log
 
@@ -328,6 +328,7 @@ Cycle 3's fixes hold: the reviewer confirmed the qualifier against the trip rule
 | 2026-10-28 |  | QA findings fixed — QA3-CR-1 to CR-4, 1 iteration | qa-fix |
 | 2026-10-28 |  | QA gate CONCERNS (90/100) — 4 findings (all low) | qa-task |
 | 2026-10-28 |  | QA findings fixed — QA4-CR-1 to CR-4, 1 iteration | qa-fix |
+| 2026-10-28 |  | QA gate PASS (100/100) — no findings; both bugs closed | qa-task |
 <!-- change-log-end -->
 
 ---
