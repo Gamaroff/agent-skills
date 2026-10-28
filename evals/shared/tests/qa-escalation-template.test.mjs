@@ -334,7 +334,7 @@ test("the step-5-6 Convergence check carries the window clause the function mirr
   assert.match(loopDoc, /jq -r '\.convergence_from_cycle \/\/ 1'/);
   assert.match(
     loopDoc,
-    /A grant restarts the three-reading rule, so "k more cycles" delivers k cycles unless the guard\s+re-arms first/,
+    /A grant restarts the three-reading rule, so "k more cycles" delivers k cycles unless the guard\s+re-arms first[\s\S]{0,200}HIGH present and not\s+falling\) escalate again at the 5a of the cycle that gives the third of those readings/,
   );
   assert.match(
     loopDoc,

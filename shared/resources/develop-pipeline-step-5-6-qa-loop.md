@@ -629,8 +629,8 @@ the pipeline noticed.
    A grant restarts the three-reading rule, so "k more cycles" delivers k cycles unless the guard
    re-arms first. It re-arms once three post-grant readings exist. From the third granted cycle on,
    any three consecutive post-grant readings that meet the condition below (HIGH present and not
-   falling) escalate again at that cycle's 5a, and the granted cycles after it do not run
-   (task.239, obs #72).
+   falling) escalate again at the 5a of the cycle that gives the third of those readings, and the
+   granted cycles after it do not run (task.239, obs #72; the table below has both shapes).
    **Within that window, from its third reading onward, if `HIGH_N > 0` AND `HIGH_{N-2} > 0` AND `HIGH_N >= HIGH_{N-1}` AND
    `HIGH_{N-1} >= HIGH_{N-2}` — i.e. HIGH findings were present at all three readings and the
    count has failed to strictly decrease across two consecutive cycles — the loop is not
@@ -673,6 +673,8 @@ the pipeline noticed.
    |---|---|---|---|
    | `1, 1, 1 \| 1` (cycles 1–4) | 4 | **no**, at cycle 4 | one post-grant reading; the task.215 case, where a grant of 2 escalated after one fix (obs #72) |
    | `1, 1, 1 \| 1, 1, 1` (cycles 1–6) | 4 | yes, at cycle 6 | three post-grant readings, flat: a person decides again |
+   | `1, 1, 1 \| 1, 2, 3` (cycles 1–6) | 4 | yes, at cycle 6 | rising is not falling: HIGH present and not falling trips, not only a flat count |
+   | `1, 1, 1 \| 3, 2, 2, 2` (cycles 1–7) | 4 | yes, at cycle 7 | the first post-grant trio falls; the trio ending at cycle 7 does not, so the trip comes at the fourth granted cycle |
    | `7, 7, 7` (cycles 1–3) | absent | yes, at cycle 3 | a lock written before task.239 reads `1`: unchanged |
 
    The window governs this trip only. The route classifier below (`classifyLoopRoute`) still reads

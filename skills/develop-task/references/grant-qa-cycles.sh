@@ -26,8 +26,9 @@
 #      deleted once restored) all live in --restore, so the two callers cannot
 #      drift. The never-lower guard below runs BEFORE the restore, so a refusal
 #      restores nothing and consumes nothing.
-#   3. WRITES both fields atomically — extra_cycles_granted = k (the record) and
-#      qa_max_cycles = QA_CYCLE + k (the absolute budget Loop Setup reads) — via
+#   3. WRITES four fields atomically — extra_cycles_granted = k (the record),
+#      qa_max_cycles = QA_CYCLE + k (the absolute budget Loop Setup reads), qa_phase
+#      (the re-entry point) and convergence_from_cycle = QA_CYCLE + 1 — via
 #      mktemp + mv, and removes the temp file on any failure.
 #
 # Usage:
@@ -222,7 +223,7 @@ if ! jq -e 'type == "object"' "$LOCK" >/dev/null 2>&1; then
   exit 1
 fi
 
-# 4. Write the three fields atomically. Every REFUSAL (bad k, no gates, never-lower) has
+# 4. Write the four fields atomically. Every REFUSAL (bad k, no gates, never-lower) has
 # already exited above, before the restore; the only failure left is a jq write failure,
 # and after a restore that CONSUMED its snapshot the lock is now the only copy of the
 # run's state — so it is kept, not removed. A lock at halt_step with no grant is a

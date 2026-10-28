@@ -298,8 +298,8 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.239.qa.3.qa-escalation-and-grant-say-what-runs.md](./task.239.qa.3.qa-escalation-and-grant-say-what-runs.md)
-- **Gate File**: [task.239.gate.3.qa-escalation-and-grant-say-what-runs.yml](./task.239.gate.3.qa-escalation-and-grant-say-what-runs.yml)
+- **Full Report**: [task.239.qa.4.qa-escalation-and-grant-say-what-runs.md](./task.239.qa.4.qa-escalation-and-grant-say-what-runs.md)
+- **Gate File**: [task.239.gate.4.qa-escalation-and-grant-say-what-runs.yml](./task.239.gate.4.qa-escalation-and-grant-say-what-runs.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 16
@@ -308,7 +308,7 @@ None.
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Cycle 2's seven fixes hold and TASK-239-BUG-2 is closed: a lock the Convergence check cannot read now HALTs, citing the resume contract's restore step. Four lows remain, all residues of the cycle-2 edits. The "k cycles" qualifier says "flat" where the trip is "HIGH present and not falling". The grant script's comment was not qualified. Two README note lines omit `qa_phase`. The flat-count template slot is singular.
+Cycle 3's fixes hold: the reviewer confirmed the qualifier against the trip rule and the README write sets against the jq write. Four lows remain, all describers or tests the cycle-3 sweep missed: `qa_phase` in troubleshooting.md, two grant-script comments that miscount the fields, an ambiguous "that cycle", and new window cases that test only the in-test rule.
 
 ## Change Log
 
@@ -326,6 +326,8 @@ Cycle 2's seven fixes hold and TASK-239-BUG-2 is closed: a lock the Convergence 
 | 2026-10-28 |  | QA findings fixed — QA2-CR-1 to CR-7 (bug.2 ready for QA), 1 iteration | qa-fix |
 | 2026-10-28 |  | QA gate CONCERNS (90/100) — 4 findings (all low); bug.2 closed | qa-task |
 | 2026-10-28 |  | QA findings fixed — QA3-CR-1 to CR-4, 1 iteration | qa-fix |
+| 2026-10-28 |  | QA gate CONCERNS (90/100) — 4 findings (all low) | qa-task |
+| 2026-10-28 |  | QA findings fixed — QA4-CR-1 to CR-4, 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

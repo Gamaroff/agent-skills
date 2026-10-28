@@ -96,6 +96,7 @@ const FILES = {
   hooksDoc: "shared/resources/develop-pipeline-hooks.md",
   grantScript: "shared/resources/grant-qa-cycles.sh",
   changelog: "CHANGELOG.md",
+  troubleshooting: "docs/reference/troubleshooting.md",
   setWaitingOn: "shared/resources/set-waiting-on.sh",
   pauseDoc: "shared/resources/develop-pipeline-pause.md",
   taskReadme: "skills/develop-task/README.md",
@@ -167,14 +168,20 @@ test("convergence_from_cycle: the writer, the reader and every describer name it
   }
   // A README that lists the grant's write set lists all of it: a file-level match is satisfied by
   // one line while another still names only the old fields (QA2-CR-6).
-  for (const name of ["taskReadme", "storyReadme"]) {
+  // Every describer that names the script beside its write set, with how many such lines it has
+  // (QA4-CR-1: troubleshooting.md listed three of the four and no check read it).
+  for (const [name, minLines] of [
+    ["taskReadme", 2],
+    ["storyReadme", 2],
+    ["troubleshooting", 1],
+  ]) {
     const writeSet = text[name]
       .split("\n")
       .filter(
         (l) => /grant-qa-cycles\.sh/.test(l) && /extra_cycles_granted/.test(l),
       );
     assert.ok(
-      writeSet.length >= 2,
+      writeSet.length >= minLines,
       `non-vacuity: ${name} lists the grant write set ${writeSet.length} time(s)`,
     );
     // Every field the grant writes, not only the new one (QA3-CR-3).
