@@ -18,6 +18,7 @@ import { spawnSync, execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
+import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -160,6 +161,11 @@ for (const [label, text, want] of ACCEPTED) {
 // (asserted below), so a reason no input can reach fails the suite rather than sitting dead.
 const REFUSED = [
   ["no-section", "# PR Review\n\n## Recommended Actions\n\n1. x\n"],
+  // Neither text nor bytes: never `no-section`, which means a report with no heading (gate 9 CR-1).
+  ...[undefined, null, 42, {}, ["## Machine-Readable Findings"]].map((v) => [
+    "not-text",
+    v,
+  ]),
   [
     "no-fence",
     "# PR Review\n\n## Machine-Readable Findings\n\n```\nfindings: []\n```\n",
@@ -355,11 +361,27 @@ test("valid UTF-8 bytes read as their text does", () => {
     findings(
       "  - id: PC-1\n    category: coverage\n    provenance: pre-existing\n",
     ),
-  ])
-    assert.deepEqual(
-      countOpenCoverage(Buffer.from(text)),
-      countOpenCoverage(text),
-    );
+    // A BOM before the heading stays in the text, so the heading is not at a line start and both
+    // read no-section. A decoder that strips the BOM would find the heading in the bytes only
+    // (gate 9 CR-2: this row pins ignoreBOM).
+    String.fromCharCode(0xfeff) +
+      "## Machine-Readable Findings\n\n```yaml\nfindings: []\n```\n",
+  ]) {
+    const bytes = Buffer.from(text);
+    const other = vm.runInNewContext("(b) => new Uint8Array(b)")(bytes);
+    // Every byte container, including a view from another realm, reads as the text does (CR-1).
+    for (const container of [
+      bytes,
+      new Uint8Array(bytes).buffer,
+      new DataView(new Uint8Array(bytes).buffer),
+      other,
+    ])
+      assert.deepEqual(
+        countOpenCoverage(container),
+        countOpenCoverage(text),
+        `${Object.prototype.toString.call(container)}: ${JSON.stringify(text.slice(0, 40))}`,
+      );
+  }
 });
 
 // The title names the row by index: a fence string inside a template-literal expression blinds the
@@ -399,8 +421,33 @@ test("CATEGORIES is review-pr's six tokens", () => {
 });
 
 test("a non-string input is a refusal, never a throw", () => {
-  assert.equal(countOpenCoverage(undefined).unreadable, "no-section");
-  assert.equal(countOpenCoverage(null).unreadable, "no-section");
+  assert.equal(countOpenCoverage(undefined).unreadable, "not-text");
+  assert.equal(countOpenCoverage(null).unreadable, "not-text");
+});
+
+// The template's free-text fields, filled with a sentence holding `: ` and both escapes, must
+// still count. Bare, such a sentence reads as a key and the block is unreadable (PR review PC-5).
+test("review-pr's template quotes finding and suggested_action, so free text holding `: ` counts", () => {
+  const skill = readFileSync(
+    path.join(ROOT, "skills", "review-pr", "SKILL.md"),
+    "utf8",
+  );
+  const start = skill.indexOf("## Machine-Readable Findings\n\n```yaml\n");
+  assert.ok(start > -1, "no Machine-Readable Findings template in review-pr");
+  const template = skill.slice(start, skill.indexOf("\n```\n", start));
+  const sentence =
+    'the 5c reader sees `x: y` as a key; see \\"Step 5c\\" and C:\\\\tmp';
+  const lines = ["finding", "suggested_action"].map((key) => {
+    const m = template.match(new RegExp(`^ {4}${key}: (.*)$`, "m"));
+    assert.ok(m, `no ${key}: line in the review-pr template`);
+    return `    ${key}: ${m[1].replace(/\{[^}]*\}/, () => sentence)}\n`;
+  });
+  assert.deepEqual(
+    countOpenCoverage(
+      findings(`  - id: PC-1\n    category: coverage\n${lines.join("")}`),
+    ),
+    { count: 1 },
+  );
 });
 
 // The CLI contract: exactly one line matching ^OPEN_COVERAGE=(\d+|unreadable)$, exit 0 on every

@@ -35,7 +35,8 @@
  * letters, marks, numbers, punctuation and symbols: no tab, carriage return, control or format
  * character, and no space but U+0020. The report must also be valid UTF-8: the CLI hands the reader
  * the file's bytes, and an invalid sequence is a refusal, never the U+FFFD a lenient decode would
- * put in its place (task.240 bug.11). Each rule is one YAML states for a one-line value, so a block
+ * put in its place (task.240 bug.11). Any byte container is decoded the same way; an input that is
+ * neither text nor bytes is refused as `not-text`. Each rule is one YAML states for a one-line value, so a block
  * the reader counts is one YAML reads the same way; the differential suite
  * (tests/open-coverage-differential.test.mjs) compares the two with PyYAML.
  * `category` and `provenance` values compare case-blind. `category` must be one of review-pr's six
@@ -51,6 +52,7 @@
 "use strict";
 
 const fs = require("fs");
+const { isAnyArrayBuffer } = require("util").types;
 const { extractFindingsBlock } = require("./pr-review-current.js");
 
 /** Every reason a report is refused. Fixed: the tests assert each one is reachable. */
@@ -66,6 +68,7 @@ const REASONS = Object.freeze([
   "unterminated",
   "not-a-map",
   "bad-encoding",
+  "not-text",
 ]);
 
 /** The category tokens review-pr writes: coverage|scope|trail|consistency for PC-*, bug|cleanup for CR-*. */
@@ -275,16 +278,25 @@ function decode(bytes) {
 }
 
 /**
+ * Whether `input` is bytes: a typed array, a DataView or an ArrayBuffer, from any realm. Both tests
+ * read internal slots, so a view built in another context passes, where `instanceof` would not.
+ */
+const isBytes = (input) => ArrayBuffer.isView(input) || isAnyArrayBuffer(input);
+
+/**
  * The open coverage findings in a review report — its text, or its bytes, which must be valid
  * UTF-8: { count } or { unreadable: reason, detail }. Never throws on input.
  */
 function countOpenCoverage(input) {
   try {
-    const text = input instanceof Uint8Array ? decode(input) : input;
-    if (
-      typeof text !== "string" ||
-      !/^## Machine-Readable Findings[ \t]*$/m.test(text)
-    )
+    const text = isBytes(input) ? decode(input) : input;
+    // Its own reason, so `no-section` only ever means a report with no heading (task.240 gate 9 CR-1).
+    if (typeof text !== "string")
+      refuse(
+        "not-text",
+        `the input is ${input === null ? "null" : typeof input}, not text or bytes`,
+      );
+    if (!/^## Machine-Readable Findings[ \t]*$/m.test(text))
       refuse("no-section", "no `## Machine-Readable Findings` heading");
     const block = extractFindingsBlock(text);
     if (block === null) {
