@@ -4,7 +4,7 @@
 **Bug ID**: TASK-238-BUG-13
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 6 probe engine, PRB6-1)
 **Date Found**: 2026-10-28
 
@@ -101,3 +101,4 @@ task.
 | 2026-10-28 | New | qa-task | Found by QA cycle 6 (`task.238.qa.6.qa-loop-acts-on-signals-it-has.md`) |
 | 2026-10-28 | In Progress | qa-fix | Investigation started; third strike on `fast-gate-outcome.sh` |
 | 2026-10-28 | Ready for QA | qa-fix | Fixed by deleting `pre-existing` (QA cycle 6 fix) |
+| 2026-10-28 | Closed | qa-task | Verified by task.238.qa.7.qa-loop-acts-on-signals-it-has.md |

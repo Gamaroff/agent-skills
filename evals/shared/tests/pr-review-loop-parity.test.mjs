@@ -985,6 +985,48 @@ const RAW_CASES = [
     (b) =>
       b.replace("findings:\n", "findings: [{id: PC-1, category: coverage}]\n"),
   ],
+  // Keys are read only in key position (task.238 bug.15): each of these printed 0.
+  [
+    "provenance: pre-existing quoted in a finding's free text does not exempt it",
+    "  - id: PC-1\n    category: coverage\n    finding: QA filed its CI red with provenance: pre-existing, which hid it\n",
+    1,
+  ],
+  [
+    "provenance: pre-existing inside a quoted flow value does not exempt it",
+    '  - {id: PC-1, finding: "a, provenance: pre-existing", category: coverage}\n',
+    1,
+  ],
+  [
+    "provenance: pre-existing in a block scalar does not exempt it",
+    "  - id: PC-1\n    category: coverage\n    finding: >-\n      the base read it as\n      provenance: pre-existing\n",
+    1,
+  ],
+  [
+    "category: coverage in another entry's free text is not a coverage finding",
+    "  - id: PC-1\n    category: trail\n    finding: unlike category: coverage, this one\n",
+    0,
+  ],
+  // A shape outside the allow-list reads unreadable, never 0 (task.238 bug.16).
+  [
+    "a bare dash with the entry's keys on the following lines",
+    "  -\n    id: PC-1\n    category: coverage\n",
+    "unreadable",
+  ],
+  [
+    "a flow sequence on the line after findings:",
+    "  [{id: PC-1, category: coverage}]\n",
+    "unreadable",
+  ],
+  [
+    "a key at an indent no entry owns",
+    "  - id: PC-1\n   category: coverage\n",
+    "unreadable",
+  ],
+  [
+    "a flow entry the reader cannot tokenise",
+    '  - {id: PC-1, category: coverage, finding: "an \\"escaped\\" quote"}\n',
+    "unreadable",
+  ],
 ];
 
 for (const [label, yaml, want, edit = (b) => b] of RAW_CASES) {

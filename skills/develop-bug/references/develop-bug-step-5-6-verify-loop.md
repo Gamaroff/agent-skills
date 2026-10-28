@@ -221,8 +221,9 @@ Exit the loop and proceed to Step 7.
    log (task.238, obs #41). Never write a bare `rm -f "$FIX_LOG"`.
 
    **Classify a non-green result before triaging it** — the same two outcomes as the story/task QA
-   loop's step 0a: **not measured** (no exit code, or 124/137/143: re-run once, never green, never
-   red, no retry attempt consumed) and **attributable red** (anything else: the triage path below).
+   loop's step 0a: **not measured** (no exit code, 124/137/143, or the `test-tmpdir` wrapper's own
+   report that a signal interrupted or killed the suite: re-run once, never green, never red, no
+   retry attempt consumed) and **attributable red** (anything else: the triage path below).
    There is no pre-existing red: a red is never compared with the PR base (task.238). One script
    decides it, from the repository root:
 

@@ -382,6 +382,35 @@ for (const line of [
   });
 }
 
+// A test that prints the wrapper's sentence does so before node's summary; the wrapper prints it
+// after the suite has ended (task.238 PRB7-1).
+for (const reporter of [
+  ["spec", "ℹ fail 1"],
+  ["tap", "# fail 1"],
+]) {
+  test(`attributable: the signal sentence printed by a test, before node's ${reporter[0]} summary (PRB7-1)`, () => {
+    const fx = repoWithBase(A_FAILS);
+    try {
+      const body = [
+        "✖ a (1.2ms)",
+        "test-tmpdir: interrupted by SIGINT — per-run directory removed",
+        reporter[1],
+        "GATE_EXIT=1",
+        "",
+      ].join("\n");
+      const { outcome, out } = classify(fx.work, [
+        "--log",
+        headLog(fx.work, body),
+        "--exit",
+        "1",
+      ]);
+      assert.equal(outcome, "attributable", out);
+    } finally {
+      cleanup(fx.dir);
+    }
+  });
+}
+
 test("a timed-out test (cancelled, fail 0) with no signal report stays measured (CR4-9 control)", () => {
   const fx = repoWithBase(A_FAILS);
   try {

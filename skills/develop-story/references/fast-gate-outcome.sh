@@ -44,7 +44,12 @@ esac
 # An interrupted node --test exits 1, not 130 or 143, and its summary (`fail 0`, `cancelled 1`)
 # reads exactly like a test that hit its timeout, which is a real red. Only the test-tmpdir wrapper's
 # own signal report tells the two apart, so only it makes a run not measured (task.238 CR4-9).
-if grep -qE '^test-tmpdir: (interrupted by|the suite was killed by) SIG[A-Z0-9]+' "$LOG"; then
+# The wrapper prints it after the suite has ended, so it counts only when no node summary line
+# (`ℹ fail 1`, `# tests 3`) follows it: a test that prints the same sentence does so before node's
+# summary, and its red stays attributable (task.238 PRB7-1).
+if awk '/^test-tmpdir: (interrupted by|the suite was killed by) SIG[A-Z0-9]+/ { s = NR }
+        /^(ℹ|#) (tests|suites|pass|fail|cancelled|skipped|todo|duration_ms) / { t = NR }
+        END { exit !(s && s > t) }' "$LOG"; then
   echo "GATE_OUTCOME=not-measured (the run was interrupted by a signal)"
   exit 0
 fi
