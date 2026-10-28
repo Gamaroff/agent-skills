@@ -14,7 +14,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, rmSync, copyFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -143,6 +143,39 @@ describe("changelog-enforce.sh names a config it could not read", () => {
     assert.equal(r.stdout, "off");
     assert.match(r.stderr, /is a block scalar/);
   });
+  // The documented second exception (CR2-3): the tiers split on `enforce:` nested below a child of
+  // `changelog:`. Pinned both ways so a change to either tier's nesting rule shows up here.
+  const DEEPER = "changelog:\n  rules:\n    enforce: true\n";
+  test("[awk] enforce nested deeper under changelog: → on (the shared reader matches any depth)", () => {
+    assert.equal(resolve(DEEPER, { tier: "awk" }).stdout, "on");
+  });
+  test("[python] enforce nested deeper under changelog: → off (no changelog.enforce)", (t) => {
+    if (!PYTHON_TIER)
+      return t.skip(
+        "tier python unavailable on this host (no python with pyyaml)",
+      );
+    assert.equal(resolve(DEEPER, { tier: "python" }).stdout, "off");
+  });
+});
+
+// A resolver that cannot load its own reader is a broken install, not an unset key: it answers
+// `unknown`, which /finalise's callers HALT on (task.241 QA cycle 2, CR2-1).
+test("a resolver with no read-config.sh beside it answers unknown, not off", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "changelog-enforce-"));
+  try {
+    copyFileSync(RESOLVER, path.join(dir, "changelog-enforce.sh"));
+    writeFileSync(path.join(dir, "skills-config.yaml"), enforce("true"));
+    const r = spawnSync("bash", [path.join(dir, "changelog-enforce.sh")], {
+      cwd: dir,
+      encoding: "utf8",
+      env: childEnv(),
+    });
+    assert.equal(r.status, 0);
+    assert.equal(r.stdout.trim(), "unknown");
+    assert.match(r.stderr, /could not load read-config\.sh/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 // Guarding changelog.enforce must not change how any other key reads (task.241, BUG-3). `enforce`

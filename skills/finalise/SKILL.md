@@ -494,7 +494,14 @@ resolved here, before the dispatch:
 
 ```bash
 CHANGELOG_ENFORCE=$(bash .agents/skills/finalise/references/changelog-enforce.sh)   # on | off
+case "$CHANGELOG_ENFORCE" in
+  on | off) ;;
+  *) echo "HALT: changelog-unknown — changelog-enforce.sh answered '${CHANGELOG_ENFORCE}', not on or off; check .agents/skills/finalise/references/ holds changelog-enforce.sh and read-config.sh, then re-run /finalise"; exit 1 ;;
+esac
 ```
+
+Exactly `on` or `off`, nothing else: an empty answer is a resolver that did not run, and reading it
+as off would drop an opted-in repository's changelog check with no line saying why.
 
 | Agent                | Prompt file                                    | Key substitutions                                            |
 | -------------------- | ---------------------------------------------- | ------------------------------------------------------------ |
@@ -1832,10 +1839,16 @@ POLLEOF
    # degenerated to one that matches any [Unreleased] text. The warning could never fire under
    # zsh, and nothing said so (task.115 QA cycle 1, CR-1). A capture-free `=~` is fine in both.
    # The opt-in is read FIRST: an unset key must never reach the file test or the grep below.
+   # Exactly on or off: an empty or `unknown` answer is a resolver that could not run, not an
+   # unset key, and must not read as "not enabled" (task.241 QA cycle 2, CR2-1).
    CL=$(bash .agents/skills/finalise/references/changelog-enforce.sh)
+   case "$CL" in
+     on | off) ;;
+     *) echo "HALT: changelog-unknown — changelog-enforce.sh answered '${CL}', not on or off; check .agents/skills/finalise/references/ holds changelog-enforce.sh and read-config.sh, then re-run /finalise"; exit 1 ;;
+   esac
    N=""
    case "$STEM" in task.*) N="${STEM#task.}" ;; esac
-   if [ "$CL" != on ]; then
+   if [ "$CL" = off ]; then
      echo "6d: changelog checks not enabled"
    elif [ ! -f CHANGELOG.md ]; then
      echo "6d: no CHANGELOG.md — not applicable"

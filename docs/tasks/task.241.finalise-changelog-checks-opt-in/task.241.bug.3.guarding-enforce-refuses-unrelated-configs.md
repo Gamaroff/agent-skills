@@ -4,7 +4,7 @@
 **Bug ID**: TASK-241-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 1, code review CR-3, confirmed as a regression against `origin/develop`)
 **Date Found**: 2026-10-28
 
@@ -95,3 +95,4 @@ cases.
 | 2026-10-28 | New | qa-task | Found in QA cycle 1 (`task.241.qa.1.finalise-changelog-checks-opt-in.md`) |
 | 2026-10-28 | In Progress | qa-fix | Investigation started (QA fix cycle 1) |
 | 2026-10-28 | Ready for QA | qa-fix | Guard scoped to changelog.enforce; both directions tested |
+| 2026-10-28 | Closed | qa-task | Verified by task.241.qa.2.finalise-changelog-checks-opt-in.md |

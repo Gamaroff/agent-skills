@@ -376,26 +376,23 @@ None.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-28
-**Quality Score**: 70/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.241.qa.1.finalise-changelog-checks-opt-in.md](./task.241.qa.1.finalise-changelog-checks-opt-in.md)
-- **Gate File**: [task.241.gate.1.finalise-changelog-checks-opt-in.yml](./task.241.gate.1.finalise-changelog-checks-opt-in.yml)
+- **Full Report**: [task.241.qa.2.finalise-changelog-checks-opt-in.md](./task.241.qa.2.finalise-changelog-checks-opt-in.md)
+- **Gate File**: [task.241.gate.2.finalise-changelog-checks-opt-in.yml](./task.241.gate.2.finalise-changelog-checks-opt-in.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 6,567 (`npm run ci:fast`), 32 of them new; 15 security probes
+- **Tests Executed**: 6,579 locally (CI: 7,086 pass; the job fails on the tmp-leak ratchet); 15 security probes
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 high, 3 medium, 1 low
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **Critical Issues**: 0 high, 1 medium, 4 low
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- **CR-1** (BUG-1): an unreadable config resolves to a silent `off`.
-- **CR-2** (BUG-2): `finalise-dod-ac-prompt.md` and `finalise-dod-fix-evidence-prompt.md` still read
-  `CHANGELOG.md` when the checks are off.
-- **CR-3** (BUG-3): guarding the bare key `enforce` makes the awk reader refuse unrelated consumer
-  configs. This is a regression against the base.
-- **PROBE-1** (low): a block-scalar value gets a different answer from each tier.
+- Cycle 1's BUG-1, BUG-2 and BUG-3 were verified fixed and are now closed.
+- **BUG-4** (medium): the 6d test helper leaks temp dirs, so CI's tmp-leak ratchet fails the `test` job.
+- Four low findings from the refute pass (CR2-1 to CR2-4).
 
 ## Change Log
 
@@ -409,6 +406,8 @@ None.
 | 2026-10-28 |  | Implemented — 11 source files + 51 bundled copies, 32 new tests; § 3 resolver rule corrected (YAML true spellings, not literal `true`); zsh arm unverified (no zsh host); Status → ready-for-review | develop |
 | 2026-10-28 |  | QA gate CONCERNS (70/100) — 3 medium, 1 low findings | qa-task |
 | 2026-10-28 |  | QA findings fixed — BUG-1 strict read + named warnings, BUG-2 agent 4 sole changelog owner + enumeration test, BUG-3 guard scoped to changelog.enforce, PROBE-1 block scalar named; 1 iteration | qa-fix |
+| 2026-10-28 |  | QA gate CONCERNS (90/100) — 1 medium (CI tmp-leak ratchet), 4 low findings | qa-task |
+| 2026-10-28 |  | QA findings fixed — BUG-4 6d temp dirs removed + ratchet entry deleted; CR2-1 3b/6d HALT `changelog-unknown` on a resolver that could not run; CR2-2/CR2-4 enumeration covers assets/ and any case; CR2-3 deeper nesting documented and pinned; 1 iteration | qa-fix |
 
 <!-- change-log-end -->
 

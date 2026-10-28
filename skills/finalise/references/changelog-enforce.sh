@@ -8,6 +8,11 @@
 # Prints `on` or `off` on stdout and always exits 0. Reads `changelog.enforce` from
 # skills-config.yaml (or $SKILLS_CONFIG_FILE) through read-config.sh, the shared reader.
 #
+# One more answer, `unknown`, when the resolver cannot load its own reader: a broken install is not
+# a project that never opted in. Callers accept exactly `on` or `off` and HALT on anything else —
+# `unknown`, or the empty stdout of a resolver that is missing altogether — so an opted-in
+# repository cannot lose its 6d HALT to an install defect (task.241 QA cycle 2, CR2-1).
+#
 # This is the ONE definition of "do the changelog checks apply here?". /finalise reads it in two
 # places — the Step 3 docs-subagent dispatch and Step 7 action 6d — and two checks of one condition
 # drift: 6d gained a no-CHANGELOG.md skip the docs subagent never got, and consumer repos were warned
@@ -26,6 +31,10 @@
 # "Same whichever tier ran" holds for a value written on the key's own line. A block scalar
 # (`enforce: |` with `true` on the next line) is the exception: PyYAML reads the body, the awk tier
 # sees only `|`. The awk tier says so on stderr and answers off; write the value on one line.
+# Nesting deeper than one level is the other: under `changelog:` / `rules:` / `enforce: true` PyYAML
+# finds no `changelog.enforce` (off), while the awk nested reader matches `enforce:` at any depth
+# under its parent (on) — measured 2026-10-28. That is the shared reader's rule for every nested
+# key, not this resolver's; write `enforce:` directly under `changelog:` (task.241 QA cycle 2, CR2-3).
 #
 # The STRICT reader, never the plain one. The plain reader answers "" both for a key that is not
 # set and for a config the awk tier refused to read (an anchor anywhere in the file, on a host
@@ -36,8 +45,8 @@
 _dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=read-config.sh
 if ! source "$_dir/read-config.sh"; then
-  echo "changelog-enforce: could not load read-config.sh beside $0 — treating changelog checks as off" >&2
-  echo off
+  echo "changelog-enforce: could not load read-config.sh beside $0 — the opt-in cannot be read; reinstall the skill" >&2
+  echo unknown
   exit 0
 fi
 

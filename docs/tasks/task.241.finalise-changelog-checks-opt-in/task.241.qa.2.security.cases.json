@@ -1,0 +1,257 @@
+[
+  {
+    "id": "on.true",
+    "sink": "path",
+    "input": "unused",
+    "why": "The documented opt-in.",
+    "correct": "Resolve to on.",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "changelog:\n  enforce: true\n"
+      }
+    },
+    "expected": {
+      "stdout": "on\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "on.yes",
+    "sink": "path",
+    "input": "unused",
+    "why": "YAML 1.1 true; python normalises it to true, so both tiers must say on.",
+    "correct": "Resolve to on.",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "changelog:\n  enforce: yes\n"
+      }
+    },
+    "expected": {
+      "stdout": "on\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "on.quoted-true",
+    "sink": "path",
+    "input": "unused",
+    "why": "A quoted true is the same opt-in.",
+    "correct": "Resolve to on.",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "changelog:\n  enforce: \"true\"\n"
+      }
+    },
+    "expected": {
+      "stdout": "on\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "on.trailing-comment",
+    "sink": "path",
+    "input": "unused",
+    "why": "A trailing comment is not part of the value.",
+    "correct": "Resolve to on.",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "changelog:\n  enforce: true # opt in\n"
+      }
+    },
+    "expected": {
+      "stdout": "on\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "off.typo",
+    "sink": "path",
+    "input": "unused",
+    "why": "A near-miss must not turn the checks on.",
+    "correct": "Resolve to off (stdout exactly off), never on.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "changelog:\n  enforce: tru\n"
+      }
+    },
+    "expected": {
+      "stdout": "off\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "off.numeric",
+    "sink": "path",
+    "input": "unused",
+    "why": "1 is not a YAML 1.1 boolean under either tier.",
+    "correct": "Resolve to off (stdout exactly off), never on.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "changelog:\n  enforce: 1\n"
+      }
+    },
+    "expected": {
+      "stdout": "off\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "off.enabled",
+    "sink": "path",
+    "input": "unused",
+    "why": "An unrecognised word is off with a warning.",
+    "correct": "Resolve to off (stdout exactly off), never on.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "changelog:\n  enforce: enabled\n"
+      }
+    },
+    "expected": {
+      "stdout": "off\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "off.cmd-subst",
+    "sink": "path",
+    "input": "unused",
+    "why": "A value carrying command substitution must be data, never executed.",
+    "correct": "Resolve to off (stdout exactly off), never on.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "changelog:\n  enforce: \"$(touch pwned)\"\n"
+      }
+    },
+    "expected": {
+      "stdout": "off\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "off.backticks",
+    "sink": "path",
+    "input": "unused",
+    "why": "Backticks in a value must not execute.",
+    "correct": "Resolve to off (stdout exactly off), never on.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "changelog:\n  enforce: \"`touch pwned2`\"\n"
+      }
+    },
+    "expected": {
+      "stdout": "off\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "off.flow-seq",
+    "sink": "path",
+    "input": "unused",
+    "why": "A sequence is not a boolean.",
+    "correct": "Resolve to off (stdout exactly off), never on.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "changelog:\n  enforce: [true]\n"
+      }
+    },
+    "expected": {
+      "stdout": "off\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "off.true-prefix",
+    "sink": "path",
+    "input": "unused",
+    "why": "A value that starts with true is not true.",
+    "correct": "Resolve to off (stdout exactly off), never on.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "changelog:\n  enforce: true-ish\n"
+      }
+    },
+    "expected": {
+      "stdout": "off\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "off.wrong-parent",
+    "sink": "path",
+    "input": "unused",
+    "why": "A top-level enforce is not changelog.enforce.",
+    "correct": "Resolve to off (stdout exactly off), never on.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "enforce: true\n"
+      }
+    },
+    "expected": {
+      "stdout": "off\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "off.block-scalar",
+    "sink": "path",
+    "input": "unused",
+    "why": "A block scalar holding true plus a newline is not the boolean.",
+    "correct": "Resolve to off (stdout exactly off), never on.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "changelog:\n  enforce: |\n    true\n"
+      }
+    },
+    "expected": {
+      "stdout": "off\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "off.false",
+    "sink": "path",
+    "input": "unused",
+    "why": "The explicit opt-out.",
+    "correct": "Resolve to off (stdout exactly off), never on.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "changelog:\n  enforce: false\n"
+      }
+    },
+    "expected": {
+      "stdout": "off\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "off.none",
+    "sink": "path",
+    "input": "unused",
+    "why": "No changelog block is off by default.",
+    "correct": "Resolve to off (stdout exactly off), never on.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ci:\n  docsOnly:\n    enabled: true\n"
+      }
+    },
+    "expected": {
+      "stdout": "off\n",
+      "exit": 0
+    }
+  }
+]

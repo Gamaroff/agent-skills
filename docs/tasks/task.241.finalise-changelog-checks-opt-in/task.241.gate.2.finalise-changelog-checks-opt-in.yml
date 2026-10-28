@@ -1,0 +1,93 @@
+schema: 2
+task: 'task.241.finalise-changelog-checks-opt-in'
+task_title: 'Make /finalise changelog checks opt-in'
+gate: CONCERNS
+status_reason: 'Cycle 1 fixed and verified all three medium findings (BUG-1..3 closed). This refute pass found no new medium code defect, but CI is red on the head: the tmp-leak ratchet trips because runSixD leaks a temp dir per call under bash and zsh (BUG-4, medium). Four low findings remain from the refute pass.'
+reviewer: 'QA Engineer'
+head: 'f530a5329124352829526de2040f86dbdd886b93'
+updated: '2026-10-28T10:45:54Z'
+
+top_issues:
+  - id: 'TASK-241-CI-1'
+    severity: medium
+    file: 'evals/shared/tests/finalise-publish-boundary.test.mjs'
+    finding: 'CI check test failed on f530a532 (https://github.com/Gamaroff/agent-skills/actions/runs/40673829397/job/122767043241); green on develop (run 40664077358). All 7086 tests pass; scripts/test-tmpdir.mjs fails the run because prefix "finalise-6d" is over its ratchet (20 > 10): runSixD creates a temp dir per call and never removes it, and this branch added 6d cases that CI runs under bash and zsh.'
+    suggested_action: 'Remove the temp dir in runSixD (try/finally rmSync) and delete the healed finalise-6d entry from tests/tmp-leak-ratchet.json; do not raise the count.'
+    suggested_owner: dev
+    bug_ref: 'task.241.bug.4.finalise-6d-test-leaks-temp-dirs.md'
+    status: open
+  - id: 'TASK-241-CR2-1'
+    severity: low
+    file: 'skills/finalise/SKILL.md'
+    finding: '6d (and Step 3b) treat any resolver answer other than on as "not enabled": a missing or unrunnable changelog-enforce.sh (bash exit 127, empty stdout) prints "6d: changelog checks not enabled" and continues, so an opted-in repository loses its HALT on a broken install. It is loud on stderr, unlike BUG-1. The reviewer rated it medium/medium; QA rated it low because bash prints the missing-file error.'
+    suggested_action: 'Accept only an exact on or off from the resolver in 6d and Step 3b, and HALT naming the resolver when the answer is anything else.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-241-CR2-2'
+    severity: low
+    file: 'skills/finalise/assets/bug-dod-template.md'
+    finding: 'The bug DoD template Step 4b (line 76) still asks for a "CHANGELOG.md entry under [Unreleased] citing (bug N), or the reason none is needed" and points to "Step 2 → Documentation", which never lists CHANGELOG; the text predates this branch, but after BUG-2 the answer comes only from agent 4, gated on the opt-in, and the template does not say so. The enumeration test covers only the dispatched prompts. The reviewer rated it medium/medium; QA rated it low because it is a placeholder filled from agent results, not a read instruction.'
+    suggested_action: 'Reword the placeholder to take agent 4 CHANGELOG.md item (NOT_APPLICABLE "changelog checks not enabled" when off), and widen the enumeration test to skills/finalise/assets/.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-241-CR2-3'
+    severity: low
+    file: 'shared/resources/changelog-enforce.sh'
+    finding: 'The header claims the same answer under every tier for a single-line value, but `changelog:` / `rules:` / `enforce: true` resolves on under awk and off under python (measured), because the awk nested reader matches the child at any depth under the parent (pre-existing reader behaviour; the claim is this branch).'
+    suggested_action: 'Name the deeper-nesting case beside the block-scalar exception in the header and pin it in the test under both tiers, or restrict the awk match to the first child indent.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-241-CR2-4'
+    severity: low
+    file: 'evals/shared/tests/finalise-publish-boundary.test.mjs'
+    finding: 'The enumeration test counts only upper-case CHANGELOG, so a lower-case reword of a real read ("check the project changelog", "grep changelog.md") passes as zero mentions.'
+    suggested_action: 'Match case-insensitively and allow-list only the `changelog.enforce` spelling explicitly.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 43
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 15
+    escaped: 0
+    notes: 'shell-argv probe of changelog-enforce.sh re-run on f530a532 (task.241.qa.2.security.run.json): 15 executed, 0 escaped; the 1 reproduced case (off.block-scalar under python) is the PROBE-1 residual scoped in cycle 1, now named on stderr under awk.'
+  performance:
+    status: PASS
+    notes: 'One extra config read per /finalise run.'
+  reliability:
+    status: CONCERNS
+    notes: 'BUG-4: CI red on the head (tmp-leak ratchet). BUG-1 and BUG-3 verified fixed.'
+  maintainability:
+    status: PASS
+    notes: 'BUG-2 verified fixed (agent 4 sole changelog owner, enumeration test); CR2-2/CR2-4 are low gaps in that test.'
+
+recommendations:
+  immediate:
+    - action: 'Fix BUG-4 (runSixD temp dir) so CI is green on the head.'
+      refs: ['evals/shared/tests/finalise-publish-boundary.test.mjs', 'tests/tmp-leak-ratchet.json']
+  future:
+    - action: 'qa-execute-snippets refuses an argument-less helper inside $( ) as "not a literal path" (pre-existing engine limit; see gate 1).'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+      provenance: pre-existing
+    - action: 'The zsh arm of the 6d tests is unverified locally (no zsh on the laptop or .249); CI runs it.'
+      refs: ['evals/shared/tests/finalise-publish-boundary.test.mjs']
+    - action: 'CR2-5 (cleanup): read-config.sh call-site comment lists changelog.enforce under read_nested_config_key; it now uses the strict reader.'
+      refs: ['shared/resources/read-config.sh']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['BUG-4 fixed and CI green on the head']

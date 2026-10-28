@@ -37,6 +37,7 @@ import {
   writeFileSync,
   mkdirSync,
   copyFileSync,
+  rmSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -570,24 +571,45 @@ const OPTED_IN = "changelog:\n  enforce: true\n";
  * the path rewritten. `config` is the skills-config.yaml text; null means the repo has none, which
  * is every consumer that never opted in (task.241).
  */
-function runSixD(shell, stem, changelog, config = OPTED_IN) {
-  const dir = mkdtempSync(path.join(tmpdir(), "finalise-6d-"));
-  const refs = path.join(dir, ".agents/skills/finalise/references");
-  mkdirSync(refs, { recursive: true });
-  for (const f of ["changelog-enforce.sh", "read-config.sh"])
-    copyFileSync(
-      path.join(REPO_ROOT, "skills/finalise/references", f),
-      path.join(refs, f),
-    );
-  if (config !== null)
-    writeFileSync(path.join(dir, "skills-config.yaml"), config);
-  if (changelog !== null)
-    writeFileSync(path.join(dir, "CHANGELOG.md"), changelog);
-  return spawnSync(shell, ["-c", `STEM='${stem}'\n${sixDBlock()}`], {
-    cwd: dir,
-    encoding: "utf8",
-    env: { PATH: process.env.PATH, HOME: process.env.HOME },
+function runSixD(
+  shell,
+  stem,
+  changelog,
+  config = OPTED_IN,
+  installed = ["changelog-enforce.sh", "read-config.sh"],
+) {
+  return runInConsumer(shell, `STEM='${stem}'\n${sixDBlock()}`, {
+    changelog,
+    config,
+    installed,
   });
+}
+
+/** Run a shipped block in the consumer-shaped temp repo runSixD describes. */
+function runInConsumer(shell, script, { changelog, config, installed }) {
+  // Removed on every path: CI runs each case under bash and zsh, and a leaked dir per call tripped
+  // the suite's tmp-leak ratchet (task.241 QA cycle 2, BUG-4).
+  const dir = mkdtempSync(path.join(tmpdir(), "finalise-6d-"));
+  try {
+    const refs = path.join(dir, ".agents/skills/finalise/references");
+    mkdirSync(refs, { recursive: true });
+    for (const f of installed)
+      copyFileSync(
+        path.join(REPO_ROOT, "skills/finalise/references", f),
+        path.join(refs, f),
+      );
+    if (config !== null)
+      writeFileSync(path.join(dir, "skills-config.yaml"), config);
+    if (changelog !== null)
+      writeFileSync(path.join(dir, "CHANGELOG.md"), changelog);
+    return spawnSync(shell, ["-c", script], {
+      cwd: dir,
+      encoding: "utf8",
+      env: { PATH: process.env.PATH, HOME: process.env.HOME },
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 const CHANGELOG_FIXTURE = [
@@ -681,6 +703,50 @@ for (const shell of SHELLS) {
     assert.match(r.stdout, /^6d: changelog checks not enabled$/m);
     assert.match(r.stderr, /changelog\.enforce is 'enabled'/);
   });
+
+  // An opted-in repository whose resolver cannot run must HALT, not read as "not enabled": the
+  // uncited task.303 is the oracle — a silent off would pass it (task.241 QA cycle 2, CR2-1).
+  for (const [label, installed] of [
+    ["the resolver is missing", ["read-config.sh"]],
+    ["the resolver cannot load read-config.sh", ["changelog-enforce.sh"]],
+  ]) {
+    test(`[${shell}] 6d HALTs \`changelog-unknown\` when ${label}`, () => {
+      const r = runSixD(
+        shell,
+        "task.303",
+        CHANGELOG_FIXTURE,
+        OPTED_IN,
+        installed,
+      );
+      assert.equal(r.status, 1, `${r.stdout}${r.stderr}`);
+      assert.match(r.stdout, /^HALT: changelog-unknown /m);
+      assert.doesNotMatch(r.stdout, /changelog checks not enabled/);
+    });
+  }
+}
+
+// Step 3b resolves the same answer for agent 4; it must refuse a resolver that could not run too.
+for (const shell of SHELLS) {
+  test(`[${shell}] Step 3b HALTs \`changelog-unknown\` when the resolver is missing, and binds on when installed`, () => {
+    const m = finalise.match(
+      /```bash\n(CHANGELOG_ENFORCE=\$\(bash [\s\S]*?)\n```/,
+    );
+    assert.ok(m, `${FINALISE} Step 3b: no CHANGELOG_ENFORCE bash block`);
+    const script = `${m[1]}\necho "bound=$CHANGELOG_ENFORCE"`;
+    const opts = { changelog: null, config: OPTED_IN };
+    const broken = runInConsumer(shell, script, {
+      ...opts,
+      installed: ["read-config.sh"],
+    });
+    assert.equal(broken.status, 1, `${broken.stdout}${broken.stderr}`);
+    assert.match(broken.stdout, /^HALT: changelog-unknown /m);
+    const ok = runInConsumer(shell, script, {
+      ...opts,
+      installed: ["changelog-enforce.sh", "read-config.sh"],
+    });
+    assert.equal(ok.status, 0, `${ok.stdout}${ok.stderr}`);
+    assert.match(ok.stdout, /^bound=on$/m);
+  });
 }
 
 test("/finalise passes the changelog opt-in to the docs subagent, which gates on it first", () => {
@@ -726,11 +792,19 @@ test("/finalise passes the changelog opt-in to the docs subagent, which gates on
 // task arm and its bug-mode fix-evidence check), so the claim "unset, /finalise never reads
 // CHANGELOG.md" shipped false (BUG-2). This enumerates every CHANGELOG line instead of naming sites.
 test("no dispatched DoD prompt but the gated docs prompt checks CHANGELOG.md", () => {
-  const dir = path.join(REPO_ROOT, "shared/resources");
-  const prompts = readdirSync(dir).filter((f) =>
-    /^finalise-dod-.*-prompt\.md$/.test(f),
-  );
+  // The dispatched prompts AND the templates /finalise fills in from their results: the bug DoD
+  // template's changelog placeholder sat outside a prompts-only scan (QA cycle 2, CR2-2).
+  const prompts = readdirSync(path.join(REPO_ROOT, "shared/resources"))
+    .filter((f) => /^finalise-dod-.*-prompt\.md$/.test(f))
+    .map((f) => `shared/resources/${f}`);
   assert.ok(prompts.length >= 5, `expected the DoD prompts, found: ${prompts}`);
+  const assets = readdirSync(path.join(REPO_ROOT, "skills/finalise/assets"))
+    .filter((f) => f.endsWith(".md"))
+    .map((f) => `skills/finalise/assets/${f}`);
+  assert.ok(
+    assets.includes("skills/finalise/assets/bug-dod-template.md"),
+    `expected the DoD templates, found: ${assets}`,
+  );
   // Each entry: a line shape that mentions the changelog without checking it, and why.
   const allowed = [
     // The work item's OWN criterion that names the changelog — driven by its criteria, not by us.
@@ -747,28 +821,50 @@ test("no dispatched DoD prompt but the gated docs prompt checks CHANGELOG.md", (
       /failed its CHANGELOG criterion for having no test/,
       "history of the documentation-criterion rule",
     ],
+    [
+      /A criterion of the work item's own that names the changelog is still checked above/,
+      "documentation-criterion pointer in the task arm",
+    ],
     // The deferral to agent 4, which is gated.
     [
       /Do not read `CHANGELOG\.md`/,
       "defers the check to the gated docs prompt",
     ],
+    [
+      /the changelog entry is agent 4's check/,
+      "names the gated owner in the task arm",
+    ],
+    // The bug DoD template copies agent 4's gated item; it reads nothing itself.
+    [
+      /Agent 4's changelog item, copied: .*?`⚠️ NOT_APPLICABLE — changelog checks not enabled`/,
+      "bug DoD template copies the gated docs result",
+    ],
+    [/^## Step 4b: Docs & Changelog$/, "bug DoD template section heading"],
+    // The opt-in's own name reads nothing.
+    [/changelog\.enforce/, "the opt-in key"],
   ];
   const used = new Set();
   const ungated = [];
-  for (const f of prompts) {
-    if (f === "finalise-dod-docs-prompt.md") continue; // gated; held by the test above
-    read(`shared/resources/${f}`)
+  for (const f of [...prompts, ...assets]) {
+    if (f === "shared/resources/finalise-dod-docs-prompt.md") continue; // gated; held above
+    read(f)
       .split("\n")
       .forEach((line, i) => {
-        // Upper case only: `CHANGELOG` names the file and the convention; the lower-case
-        // `changelog.enforce` names the opt-in and reads nothing. ONE mention per line, so an
-        // allowed phrase cannot carry a second, checking mention beside it (QA cycle 1 mutation).
-        const mentions = line.match(/CHANGELOG/g)?.length ?? 0;
-        if (mentions === 0) return;
-        const hit =
-          mentions === 1 ? allowed.findIndex(([re]) => re.test(line)) : -1;
-        if (hit < 0) ungated.push(`${f}:${i + 1}: ${line.trim()}`);
-        else used.add(hit);
+        // Every allowed span is cut out of the line, and any mention LEFT is ungated. Any case, so a
+        // lower-case reword of a real read ("check the project changelog") counts (QA cycle 2,
+        // CR2-4); cutting spans rather than allowing whole lines means an allowed phrase cannot
+        // carry a second, checking mention beside it (QA cycle 1 mutation).
+        if (!/changelog/i.test(line)) return;
+        let rest = line;
+        allowed.forEach(([re], k) => {
+          const g = new RegExp(re.source, "g");
+          if (g.test(rest)) {
+            used.add(k);
+            rest = rest.replace(g, "");
+          }
+        });
+        if (/changelog/i.test(rest))
+          ungated.push(`${f}:${i + 1}: ${line.trim()}`);
       });
   }
   assert.deepEqual(

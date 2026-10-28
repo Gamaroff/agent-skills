@@ -460,8 +460,8 @@ _CONFIG_SUBSET_VERDICT=""
 #   read_config_key                 tracker | vcs
 #   read_nested_config_key          prd.prdShardedLocation | architecture.architectureShardedLocation
 #                                   observations.workspace | subagents.wallClockMinutes (set-waiting-on.sh)
-#                                   changelog.enforce (changelog-enforce.sh)
 #   read_nested_config_key_strict   access.tracker | access.vcs
+#                                   changelog.enforce (changelog-enforce.sh)
 #   config_child_shape              access
 #
 # Widening the surface without widening this list would re-open the hole for the new key, quietly.
