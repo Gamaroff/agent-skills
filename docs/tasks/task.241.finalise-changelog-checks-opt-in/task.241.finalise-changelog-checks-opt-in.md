@@ -5,7 +5,7 @@ type: task
 description: "Gate both /finalise changelog checks behind skills-config.yaml changelog.enforce, off by default, so /finalise never reads a consumer's CHANGELOG.md unless the project opts in."
 tags: [finalise, changelog, skills-config, observation]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-10-28
 updated: 2026-10-28
@@ -16,7 +16,8 @@ github_issue: 772
 
 # Technical Task: Make /finalise changelog checks opt-in
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.241.review.1.finalise-changelog-checks-opt-in.md` implemented 2026-10-28
 **GitHub Issue**: [#772](https://github.com/Gamaroff/agent-skills/issues/772)
 
 ---
@@ -73,7 +74,7 @@ github_issue: 772
 | `false` | `false` | `false` |
 | key absent | empty | empty |
 
-The tiers disagree on `yes`. So the resolver accepts the literal `true` only, and warns on any other non-empty value that is not `false`.
+The tiers disagree on `yes`. A literal-`true`-only rule cannot remove that: under python `yes` already arrives as `true`, so `yes` would be on under python and off under awk. The resolver therefore takes the union. Every YAML 1.1 true spelling either tier can return (`true`, `yes`, `on`, any case) is on, every false spelling is off, and any other non-empty value is off with a warning on stderr. *(Corrected during implementation, 2026-10-28. The first draft said "literal `true` only", which this table contradicts.)*
 
 **Existing mechanisms of the same kind**: none. `/finalise` has no other changelog gate, and no existing helper decides whether a check applies from config. The new resolver sits beside `read-config.sh` and calls it. It does not replace it.
 
@@ -128,6 +129,8 @@ flowchart TD
 ✅ This repo's `skills-config.yaml`: `changelog.enforce: true`.
 ✅ `docs/reference/configuration.md`: schema block and key-reference row.
 ✅ `docs/contributing/releases.md` (the "owner" bullet) and `docs/runbooks/task-development.md` (both `/finalise` changelog entries): say the checks run only when `changelog.enforce: true`.
+
+**How the sweep list was found** (re-run it before Phase 3; a list without its search is recall): `git grep -n -l -E "no-changelog-entry|no CHANGELOG\.md|finalise-dod-docs-prompt|CHANGELOG\.md updated" -- ':!CHANGELOG.md' ':!docs/tasks' | grep -v /references/` (2026-10-28). It returned the in-scope files above plus `skills/create-pr/SKILL.md`, `skills/develop/SKILL.md`, the create-task/review-task templates and `sections-guide.md`, three historical DoD files under `docs/prd/`, and `tests/explore-prompts-no-write.test.js` (no-write only, unaffected). The rest are out of scope below.
 ✅ Tests: the resolver, the 6d block on and off, and the dispatch wiring.
 ✅ `CHANGELOG.md` `[Unreleased]` entry citing `(task 241)`, marked as a behaviour change for consumers.
 
@@ -172,9 +175,9 @@ flowchart TD
 
 **Files**: `shared/resources/changelog-enforce.sh`, `shared/resources/tests/changelog-enforce.test.mjs` (new)
 
-- [ ] Write `changelog-enforce.sh`: source sibling `read-config.sh`, read `changelog enforce`, print `on` / `off`, warn on stderr for any other value.
-- [ ] Test it under both tiers (`AGENT_SKILLS_CONFIG_TIER=python|awk`): absent file, absent key, `true`, `false`, `yes`, `on`. The test must SKIP loudly, not pass, when the python tier is unavailable.
-- [ ] Mutation-prove: make the script print `on` for any non-empty value; the `yes` case goes red.
+- [x] Write `changelog-enforce.sh`: source sibling `read-config.sh`, read `changelog enforce`, print `on` / `off`, warn on stderr for any other value.
+- [x] Test it under both tiers (`AGENT_SKILLS_CONFIG_TIER=python|awk`): absent file, absent key, `true`, `false`, `yes`, `on`. The test must SKIP loudly, not pass, when the python tier is unavailable.
+- [x] Mutation-prove: make the script print `on` for an unrecognised value; the `enabled` and `1` cases go red under both tiers (4 red). *(Was "the `yes` case": `yes` is on by design after the § 3 correction.)*
 
 **Dependencies**: none.
 
@@ -182,11 +185,11 @@ flowchart TD
 
 **Files**: `skills/finalise/SKILL.md`, `shared/resources/finalise-dod-docs-prompt.md`
 
-- [ ] 6d block: call the resolver first; when `off`, print `6d: changelog checks not enabled` and do nothing else. When `on`, run the existing block unchanged.
-- [ ] 6d prose: say the check runs only under `changelog.enforce: true`, and why (this repo's convention, opt-in).
-- [ ] Step 3 dispatch: resolve `CHANGELOG_ENFORCE` once before the four agents and add `<CHANGELOG_ENFORCE>` to row 4 of the substitution table.
-- [ ] Docs prompt Step 2: open with the `<CHANGELOG_ENFORCE>` gate (`off` -> `NOT_APPLICABLE`, note "changelog checks not enabled", no `ls`/`grep`), then the absent-file `NOT_APPLICABLE` when on. Add the placeholder to the frontmatter description and **Usage** line.
-- [ ] Completion checklist line for 6d: name the three outcomes (not enabled / no CHANGELOG.md / cited), otherwise HALT.
+- [x] 6d block: call the resolver first; when `off`, print `6d: changelog checks not enabled` and do nothing else. When `on`, run the existing block unchanged.
+- [x] 6d prose: say the check runs only under `changelog.enforce: true`, and why (this repo's convention, opt-in).
+- [x] Step 3 dispatch: resolve `CHANGELOG_ENFORCE` once before the four agents and add `<CHANGELOG_ENFORCE>` to row 4 of the substitution table.
+- [x] Docs prompt Step 2: open with the `<CHANGELOG_ENFORCE>` gate (`off` -> `NOT_APPLICABLE`, note "changelog checks not enabled", no `ls`/`grep`), then the absent-file `NOT_APPLICABLE` when on. Add the placeholder to the frontmatter description and **Usage** line.
+- [x] Completion checklist line for 6d: name the three outcomes (not enabled / no CHANGELOG.md / cited), otherwise HALT.
 
 **Dependencies**: Phase 1.
 
@@ -194,10 +197,10 @@ flowchart TD
 
 **Files**: `skills-config.yaml`, `docs/reference/configuration.md`, `docs/contributing/releases.md`, `docs/runbooks/task-development.md`, `CHANGELOG.md`
 
-- [ ] `skills-config.yaml`: add `changelog: enforce: true` with a comment pointing at the schema.
-- [ ] `configuration.md`: schema block entry and a `changelog.enforce` key-reference row (type boolean, default `false`, `true` only).
-- [ ] `releases.md` "The owner" bullet and both runbook entries: state the opt-in.
-- [ ] `CHANGELOG.md` `[Unreleased]`: a Changed entry citing `(task 241)` with the migration line.
+- [x] `skills-config.yaml`: add `changelog: enforce: true` with a comment pointing at the schema.
+- [x] `configuration.md`: schema block entry and a `changelog.enforce` key-reference row (type boolean, default `false`; any YAML true spelling is on, per § 3).
+- [x] `releases.md` "The owner" bullet and both runbook entries: state the opt-in.
+- [x] `CHANGELOG.md` `[Unreleased]`: a Changed entry citing `(task 241)` with the migration line.
 
 **Dependencies**: Phase 2.
 
@@ -205,14 +208,16 @@ flowchart TD
 
 **Files**: `evals/shared/tests/finalise-publish-boundary.test.mjs`, `skills/*/references/` (generated)
 
-- [ ] `runSixD` takes a config argument and lays out `.agents/skills/finalise/references/{changelog-enforce.sh,read-config.sh}` in its temp dir so the shipped block runs as written.
-- [ ] Existing 6d cases run with `enforce: true` and must still pass unchanged.
-- [ ] New cases: key unset with an uncited `CHANGELOG.md` -> exit 0, `6d: changelog checks not enabled`, no `HALT`. Same for `enforce: false`. `enforce: yes` -> off plus the warning.
-- [ ] Control case (obs #176): an unset key with a `CHANGELOG.md` that **does** cite the task also prints the not-enabled line, which shows the gate fires before the grep and not because of what the grep found.
-- [ ] This repo's own `skills-config.yaml` resolves to `on` (guards § 10's "this repo silently loses 6d").
-- [ ] Wiring test: the dispatch table row 4 and the prompt both name `<CHANGELOG_ENFORCE>`, and the prompt's Step 2 opens with the gate.
-- [ ] Mutation-prove 6d: delete the gate line; the unset-key case goes red with `HALT: no-changelog-entry`.
-- [ ] `npm run bundle`, `npm run bundle:check`, `npm run generate-catalog`, `npm test`.
+- [x] `runSixD` takes a config argument and lays out `.agents/skills/finalise/references/{changelog-enforce.sh,read-config.sh}` in its temp dir so the shipped block runs as written.
+- [x] Existing 6d cases run with `enforce: true` and must still pass unchanged.
+- [x] New cases: key unset with an uncited `CHANGELOG.md` -> exit 0, `6d: changelog checks not enabled`, no `HALT`. Same for `enforce: false`. An unrecognised value (`enforce: enabled`) -> off plus the warning. *(Was `enforce: yes`: on by design after the § 3 correction.)*
+- [x] Control case (obs #176): an unset key with a `CHANGELOG.md` that **does** cite the task also prints the not-enabled line, which shows the gate fires before the grep and not because of what the grep found.
+- [x] This repo's own `skills-config.yaml` resolves to `on` (guards § 10's "this repo silently loses 6d").
+- [x] Wiring test: the dispatch table row 4 and the prompt both name `<CHANGELOG_ENFORCE>`, and the prompt's Step 2 opens with the gate.
+- [x] Mutation-prove 6d: delete the gate line; the unset-key case goes red with `HALT: no-changelog-entry` (5 red). Dropping `<CHANGELOG_ENFORCE>` from row 4 turns the wiring test red (1 red).
+- [x] Keep `6d: no CHANGELOG.md — not applicable` byte-identical: `finalise-publish-boundary.test.mjs` asserts it (the only test literal the change touches; `git grep -n -E "CHANGELOG citation checked|4\. Docs & changelog|Check CHANGELOG\.md|6d: no CHANGELOG|CHANGELOG\.md updated" -- '*.test.*' 'evals/**' 'tests/**'`).
+- [x] Run the zsh arm locally and record the result in the implementation report — CI has no zsh lane. **Attempted, not runnable:** zsh is installed neither on this laptop nor on the `.249` server (checked 2026-10-28). The draft's "zsh is installed here" was wrong. The zsh arm is **unverified** for this change, which is a recorded residual. The new gate line uses only `[ "$CL" != on ]` and `echo`, constructs that behave the same in both shells.
+- [x] `npm run bundle`, `npm run bundle:check`, `npm run generate-catalog`, `npm test`.
 
 **Dependencies**: Phases 1–3.
 
@@ -230,11 +235,13 @@ flowchart TD
 3. `skills/finalise/SKILL.md`: Step 3 dispatch, 6d prose and block, completion checklist.
 4. `shared/resources/finalise-dod-docs-prompt.md`: Step 2 gate and absent-file rule.
 5. `skills-config.yaml`: `changelog.enforce: true`.
+5a. `shared/resources/read-config.sh`: `changelog|enforce` added to `_CONFIG_GUARDED_KEYS`, and the call-site comment updated. *(Found in implementation: `tracker-access.test.sh` § 44 pins the guarded list against every reader call site, and the new resolver is one.)*
 
 ### Files to Modify (Generated — `npm run bundle`)
 
 6. `skills/finalise/references/changelog-enforce.sh` (new copy)
 7. `skills/finalise/references/finalise-dod-docs-prompt.md`
+7a. `skills/*/references/read-config.sh`: the 49 bundled copies of 5a.
 
 ### Files to Modify (Tests)
 
@@ -264,7 +271,7 @@ None.
 ### Integration Tests
 
 - **Scope**: the shipped 6d block, run as extracted from `SKILL.md`, under each shell in `SHELLS` (bash and zsh).
-- **Cases**: on + cited (pass), on + uncited (HALT), on + released-only (HALT), on + story stem (pass), on + no file (not applicable), off/unset + uncited (not enabled, exit 0), off + cited (control: not enabled), `false`, `yes` (off + warning).
+- **Cases**: on + cited (pass), on + uncited (HALT), on + released-only (HALT), on + story stem (pass), on + no file (not applicable), off/unset + uncited (not enabled, exit 0), off + cited (control: not enabled), `false`, `enabled` (off + warning).
 - **Command**: `command node --test evals/shared/tests/finalise-publish-boundary.test.mjs`
 
 ### Performance Tests
@@ -282,28 +289,28 @@ Not applicable. One extra config read per `/finalise` run.
 
 ### Functional
 
-- [ ] With `changelog.enforce` unset, the shipped 6d block in a repo holding an uncited `CHANGELOG.md` exits 0 and prints `6d: changelog checks not enabled`, under bash and zsh.
-- [ ] With `changelog.enforce: true`, every existing 6d case passes unchanged.
-- [ ] `changelog-enforce.sh` prints `on` only for `true`, under both reader tiers, and warns on stderr for any non-empty value other than `true` / `false`.
-- [ ] The docs prompt's Step 2 returns `NOT_APPLICABLE` ("changelog checks not enabled") when `<CHANGELOG_ENFORCE>` is `off`, and `NOT_APPLICABLE` ("repository keeps no CHANGELOG.md") when on and the file is absent.
-- [ ] This repo's `/finalise` behaviour is unchanged (`skills-config.yaml` sets `enforce: true`).
+- [x] With `changelog.enforce` unset, the shipped 6d block in a repo holding an uncited `CHANGELOG.md` exits 0 and prints `6d: changelog checks not enabled` — held per PR under bash by `finalise-publish-boundary.test.mjs`; the zsh arm runs where zsh is installed (CI's `ubuntu-latest` has none, so `SHELLS` drops it). **zsh arm unverified:** no host available to this run has zsh (Phase 4).
+- [x] With `changelog.enforce: true`, every existing 6d case passes unchanged — the same file's existing cases, run with an `enforce: true` config fixture.
+- [x] `changelog-enforce.sh` prints the same answer under both reader tiers: `on` for any YAML true spelling, `off` for unset or any false spelling, and `off` plus a stderr warning for any other non-empty value — held by `shared/resources/tests/changelog-enforce.test.mjs` (§ 3 correction).
+- [x] The docs prompt's Step 2 instructs `NOT_APPLICABLE` ("changelog checks not enabled") when `<CHANGELOG_ENFORCE>` is `off`, and `NOT_APPLICABLE` ("repository keeps no CHANGELOG.md") when on and the file is absent; `/finalise` row 4 substitutes `<CHANGELOG_ENFORCE>` — a documentation criterion, held by the wiring test (the subagent itself cannot run offline).
+- [x] This repo's own `skills-config.yaml` resolves to `on` — held by the this-repo assertion in `shared/resources/tests/changelog-enforce.test.mjs` (placed beside the resolver's other tests rather than in `finalise-publish-boundary.test.mjs`).
 
 ### Performance
 
-- [ ] No measurable change: one config read added per run.
-- [ ] The `/finalise` agent count stays at four.
+- Not applicable: the change adds one config read per `/finalise` run and states no bound to hold.
+- [x] The `/finalise` Step 3 dispatch still names four agents (documentation criterion: the dispatch table has four rows — held by a test in `finalise-publish-boundary.test.mjs`).
 
 ### Code Quality
 
-- [ ] Both gates mutation-proved: removing the 6d gate turns the unset-key case red; making the resolver accept any value turns the `yes` case red.
-- [ ] `npm test`, `npm run bundle:check`, `npm run check:generated` and `npm run validate -- skills/finalise/` pass.
-- [ ] shellcheck clean on `changelog-enforce.sh`.
+- [x] Both gates mutation-proved: removing the 6d gate turns the unset-key cases red (5); making the resolver answer `on` for an unrecognised value turns the `enabled` / `1` cases red (4); dropping `<CHANGELOG_ENFORCE>` from row 4 turns the wiring test red (1).
+- [x] `npm test`, `npm run bundle:check`, `npm run check:generated` and `npm run validate -- skills/finalise/` pass (`npm run ci:fast`: 6,567 tests, 0 failures; `eval:all` green).
+- [x] shellcheck clean on `changelog-enforce.sh` at CI's `--severity=warning`.
 
 ### Migration
 
-- [ ] `configuration.md` documents `changelog.enforce` (schema block and key-reference row).
-- [ ] `CHANGELOG.md` `[Unreleased]` cites `(task 241)` and gives consumers the one-line opt-in.
-- [ ] `releases.md` and both runbook entries state the opt-in.
+- [x] `configuration.md` documents `changelog.enforce` (schema block and key-reference row).
+- [x] `CHANGELOG.md` `[Unreleased]` cites `(task 241)` and gives consumers the one-line opt-in.
+- [x] `releases.md` and both runbook entries state the opt-in.
 
 ---
 
@@ -327,6 +334,10 @@ None.
 3. **Consumers relying on the block lose it**
    - Risk: covered in § 5.
    - Mitigation: the `CHANGELOG.md` entry and the configuration reference carry the one-line opt-in.
+4. **The off-by-default gate widens what 6d lets through**
+   - Risk: the gate is an exemption to a refuse-by-default check, so a mistake in it could pass an uncited task even when enforcement is on.
+   - Probability: Low. Impact: Medium.
+   - Mitigation (differential oracle): with `enforce: true`, the uncited (`task.303`) and released-only (`task.302`) cases must still HALT, exactly as they do on `develop` today. Phase 4 runs them unchanged under the config fixture, so any shape the base refuses and the head admits turns the test red.
 
 ### Low Risk Areas
 
@@ -367,15 +378,31 @@ None.
 | Date | Version | Description | Author |
 | ---- | ------- | ----------- | ------ |
 | 2026-10-28 | 1.0 | Initial draft — cut from observation #118 | create-task |
+| 2026-10-28 | 1.1 | Review passed (8/10) — criteria re-scoped to what a per-PR test can hold (zsh arm local-only, docs prompt as a documentation criterion, performance bound marked not applicable), sweep search recorded, differential oracle named | review-task |
+| 2026-10-28 |  | Status → ready-for-development | review-task |
+| 2026-10-28 |  | Implemented — 11 source files + 51 bundled copies, 32 new tests; § 3 resolver rule corrected (YAML true spellings, not literal `true`); zsh arm unverified (no zsh host); Status → ready-for-review | develop |
 
 <!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 1: The resolver
-- [ ] Phase 2: Gate both call sites
-- [ ] Phase 3: Config and docs
-- [ ] Phase 4: Tests, bundle and record
+- [x] Phase 1: The resolver
+- [x] Phase 2: Gate both call sites
+- [x] Phase 3: Config and docs
+- [x] Phase 4: Tests, bundle and record
+
+### Implementation Summary (2026-10-28)
+
+- **Approach:** implemented inline from the plan file by `/develop-task` Step 3. A new resolver, `changelog-enforce.sh`, is the single answer, and both `/finalise` sites read it: 6d prints `6d: changelog checks not enabled`, and the docs subagent gets `<CHANGELOG_ENFORCE>`.
+- **Departures from the plan:**
+  - The resolver accepts every YAML true spelling, because the python tier normalises `yes` to `true` (§ 3).
+  - `read-config.sh`'s guarded-key list gained `changelog|enforce`, which `tracker-access.test.sh` § 44 required.
+  - The this-repo assertion sits in the resolver's own test file.
+- **Testing results:**
+  - `npm run ci:fast`: 6,567 tests, 0 failures, 14 skipped.
+  - `eval:all`, `bundle:check`, `check:generated` and `validate` all green.
+  - 3 mutation proofs, each red, then green once restored.
+- **Deferred / residual:** the zsh arm of the 6d tests is unverified, because neither the laptop nor `.249` has zsh.
 
 QA artifacts will land beside this file: `task.241.qa.{N}.finalise-changelog-checks-opt-in.md`, bug reports as `task.241.bug.{N}.{name}.md`, gates as `task.241.gate.{N}.finalise-changelog-checks-opt-in.yml`.
 
