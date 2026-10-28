@@ -3,7 +3,7 @@
 **Task**: `task.238.qa-loop-acts-on-signals-it-has.md`
 **Run Number**: 1
 **Started**: 2026-10-28 (UTC)
-**Status**: Escalated
+**Status**: Completed
 
 ---
 
@@ -36,9 +36,9 @@ Make the QA loop act on four signals it already holds (red CI on the PR, a pre-e
 | 2. review-task             | ✅ Done    | `task.238.review.{N}.{name}.md` exists (or skip logged)                | Skipped: Ready for Development + `task.238.review.1.…md` exists | —                    | 2026-10-28T03:25Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline; 4/4 phases; ci:fast 6491/0 | —                    | 2026-10-28T03:50Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #770: https://github.com/Gamaroff/agent-skills/pull/770 | —                    | 2026-10-28T03:58Z |
-| 5–6. qa-task / qa-fix loop | ❌ Halted | `task.238.qa.{N}.*.md`; `task.238.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 3 cycles: FAIL 70 → CONCERNS 80 → PASS 90, 5c APPROVE; re-entered after DoD gaps: FAIL 20 → FAIL 50; loop limit (5 of 5); +2 granted: FAIL 60 → CONCERNS 80; loop limit (7 of 7); +1 granted: CONCERNS 80; loop limit (8 of 8); +1 granted: CONCERNS 80; loop limit (9 of 9), cycle 9 fix `0df2880e` ungated | —                    | 2026-10-28T04:42Z |
-| 7. finalise                | ❌ Halted  | `task.238.dod.{N}.*.md`; task `status: accepted`                       | DoD gaps (5): security probe 2 medium + 1 low; SC-10 2 unheld guards — `task.238.dod.1` | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.238.qa.{N}.*.md`; `task.238.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 3 cycles: FAIL 70 → CONCERNS 80 → PASS 90, 5c APPROVE; re-entered after DoD gaps: FAIL 20 → FAIL 50; loop limit (5 of 5); +2 granted: FAIL 60 → CONCERNS 80; loop limit (7 of 7); +1 granted: CONCERNS 80; loop limit (8 of 8); +1 granted: CONCERNS 80; loop limit (9 of 9); +1 granted: gate 10 CONCERNS 90 on the cycle 9 fix, no open entry, 5c APPROVE (`task.238.pr-review.4`) | —                    | 2026-10-28T04:42Z |
+| 7. finalise                | ✅ Done    | `task.238.dod.{N}.*.md`; task `status: accepted`                       | Run 1: DoD gaps (5), all fixed in `adff39e2`. Run 2: ✅ ACCEPTED — `task.238.dod.2`; 15/15 criteria; probe 119 executed, 0 escaped, 1 reproduced (CR10-1, owner-deferred to task.240); acceptance commit `f8a41f7f` | —                    | 2026-10-28T09:16Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Implementation report only (acceptance artefacts rode `f8a41f7f`) | —                    | 2026-10-28T09:18Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -219,6 +219,24 @@ Make the QA loop act on four signals it already holds (red CI on the PR, a pre-e
   loop, so nothing was back-filled.
 - Owner decision: any new §5c open-coverage awk shape gap that gate 10 raises is recorded as
   deferred to task.240 (issue #771, which replaces the awk), not fixed again in this run.
+
+### Step 5c (cycle 10) and Step 7 — 2026-10-28
+
+- 5c `/review-pr 770 --no-code` → **APPROVE** (`task.238.pr-review.4`, 5 low findings). The carry
+  classifier cleared PC-3, PC-4 and PC-5 (task document) and recorded PC-1 and PC-2 (this report,
+  Step 8's). PC-4 and PC-5 were fixed. PC-3 was recorded, not fixed: no task document exists for the
+  structured pre-existing comparison, and creating one is outside this run. PC-1 and PC-2 are fixed
+  in this Step 8 edit. `ready-for-merge`: `stage-disabled`.
+- `/finalise` DoD run 2 → **ACCEPTED** (`task.238.dod.2`). Criteria 15/15, docs PASS, compliance
+  N/A. The probe ran 119 cases, 0 escaped, 0 refused, and 1 reproduced:
+  `oc10-second-findings-cut-short`, the same CR10-1 case gate 10 reproduced. Under a mechanical
+  reading that is a Security FAIL. It was accepted on the owner's recorded deferral to task.240.
+  Step 8a fix-and-recheck was not taken, because it would contradict that decision. The deviation
+  is recorded in the DoD's Step 5.
+- `CI reading 1: SUCCESS @ 934ce5db2a2d` (6 checks); `CI reading 2: SUCCESS (tree-equivalent to 934ce5db2a2d) @ f8a41f7f0c34` (6 checks, after 30 s; the acceptance commit is docs-only).
+- Acceptance commit `f8a41f7f` carried the document, the DoD, the sprint review, the registry tick,
+  the probe record and the 5c review. PR canonical comment issuecomment-6465159230 was posted. #768
+  got a `done` comment and was closed (state CLOSED, verified). Board `done`: `already`.
 
 ---
 
@@ -624,7 +642,7 @@ PR comment issuecomment-6464285328 and the #768 comment were posted.
 **Issues Found**: 0 open entries. bug.18 and bug.19 are verified and closed. Each of the three cycle 9 guards turns a committed fixture red under QA mutation (3 of 3). Security reads CONCERNS for one low gap in the same check, CR10-1 (reviewer CR-1, low/low). `term` is never cleared, so a second `findings:` list cut short reads `0`. QA reproduced it with the probe engine (`oc10-second-findings-cut-short`). By owner decision it is deferred to task.240 (task Deferred Work). Probes: 29 executed, 0 escaped. Parity 82/82. The hosted Test lane passed on identical code (`ded46852`). PR CI on `885debef` was pending at gate writing.
 **HIGH findings**: 0
 **MEDIUM findings**: 0
-**PR Review**: pending — 5c not yet run
+**PR Review**: APPROVE — `task.238.pr-review.4.qa-loop-acts-on-signals-it-has.md` (5 low findings, conformance lens only). Doc-only PC-4 and PC-5 were fixed in the task document and staged for the acceptance commit. PC-1 and PC-2 (this report) are Step 8's. PC-3 is recorded, not fixed: it needs a new follow-up task for the structured pre-existing comparison. `ready-for-merge`: `stage-disabled`
 **Loop exit**: route 3 — `CONCERNS` with no open entry in `top_issues[]`
 **Action**: Proceeding to 5c (PR conformance review)
 
@@ -632,10 +650,12 @@ PR comment issuecomment-6464285328 and the #768 comment were posted.
 
 ## Completion
 
-**Finished**: 2026-10-28T08:29Z (halted)
-**Final Status**: Escalated — QA loop limit reached (9 of 9, after 4 granted cycles)
+**Finished**: 2026-10-28T09:18Z
+**Final Status**: Completed — accepted (DoD run 2); QA loop exited at cycle 10 of 10 (route 3), 5c APPROVE
 **Branch**: feature/task.238.qa-loop-acts-on-signals-it-has
 **PR**: https://github.com/Gamaroff/agent-skills/pull/770
-**QA Iterations**: 7 (FAIL 70 → CONCERNS 80 → PASS 90, 5c APPROVE; DoD gaps; re-entry → FAIL 20 → FAIL 50; +2 granted → FAIL 60 → CONCERNS 80; +1 granted → CONCERNS 80; +1 granted → CONCERNS 80); cycle 9's fix `0df2880e` ungated
-**DoD Summary**: `task.238.dod.1.qa-loop-acts-on-signals-it-has.md` — ❌ GAPS IDENTIFIED (all 5 fixed in `adff39e2`)
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 10 (FAIL 70 → CONCERNS 80 → PASS 90, 5c APPROVE; DoD gaps; re-entry → FAIL 20 → FAIL 50; +2 granted → FAIL 60 → CONCERNS 80; +1 granted → CONCERNS 80; +1 granted → CONCERNS 80; +1 granted → CONCERNS 90, 5c APPROVE)
+**DoD Summary**: `task.238.dod.2.qa-loop-acts-on-signals-it-has.md` — ✅ ACCEPTED (run 1, `task.238.dod.1`, found 5 gaps, all fixed in `adff39e2`)
+**Tracker debt**: none
+
+**Completion Summary**: The QA loop now acts on four signals it already held. A red gate log survives for triage. A red fast gate is classified as *not measured* (one re-run) or *attributable*. `/qa-task` and `/qa-story` read the PR's CI once at Step 10, on GitHub and Bitbucket. A 5c `CONCERNS` with an open coverage finding goes back to 5b. The run took 10 QA cycles and 19 bug reports. QA cycle 6 deleted the `pre-existing red` outcome at its third strike, and its structured replacement is deferred. Cycles 7–10 hardened the §5c open-coverage reader shape by shape until the owner deferred the last low gap (CR10-1) to task.240, which replaces the awk with a fail-closed parser. The owner granted 4 extra cycles in total.
