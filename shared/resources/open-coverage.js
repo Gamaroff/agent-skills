@@ -24,8 +24,8 @@
  *   - plain, 'single'- or "double"-quoted values (a block-style double-quoted value may carry
  *     escapes; a flow one may not), a trailing ` # comment`, and `>`/`|` block scalars;
  *   - under any key but `category` and `provenance`, deeper lines after a block scalar indicator,
- *     read as text, and after an empty value, read as a nested value whose every quoted scalar or
- *     flow collection closes on the line it opens (task.240 bug.2) — never for a key;
+ *     read as text, and after an empty value, read as a nested value of plain text: a line that
+ *     holds a quote or a flow collection is refused (task.240 bug.2, bug.3) — never for a key;
  *   - under the same keys, a value wrapped onto deeper lines: a plain one whose wrapped lines do
  *     not read as `key: `, or a quoted one whose closing quote is on a deeper line (task.240
  *     bug.1). A quote still open at the entry's key indent is refused.
@@ -151,7 +151,7 @@ function mustEnd(rest, what) {
 /**
  * A block-style value: { value, deeper }, where `deeper` says what a deeper line after it means:
  *   "text"   — anything (a block scalar's content);
- *   "nested" — a nested value under an empty key: each line's own value must close on that line;
+ *   "nested" — a nested value under an empty key: plain text, with no quote or flow collection;
  *   "plain"  — the wrapped tail of a plain value, which may not read as a key;
  *   `"`/`'`  — the rest of a quoted value, up to its closing quote;
  *   "refuse" — nothing may follow.
@@ -183,27 +183,22 @@ function blockValue(key, raw) {
 }
 
 /**
- * One line of a nested value under an empty key. A quoted scalar or a flow collection that opens
- * here must close here: one left open runs, in YAML, over the lines below it — key-indent lines
- * included — and the reader would read those as keys (task.240 bug.2). The rule is an allow-list
- * for every opener, not quote tracking for the one shape a bug named.
+ * One line of a nested value under an empty key. In YAML only a quoted scalar or a flow collection
+ * can run on over the lines below it, key-indent lines included, and the reader would read those
+ * lines as keys (task.240 bug.2, bug.3); a plain or block scalar ends at a shallower line. So the
+ * line may hold no double quote, no `[` or `{`, and no single quote but an apostrophe between two
+ * word characters — wherever it sits. A rule over characters cannot be bypassed by a prefix (a
+ * nested dash, an anchor, a key with a space), as a scan for openers was. A closed quote or flow
+ * collection is refused with the rest: no report carries one here, and refusing costs a HALT
+ * where a misread costs a false 0.
  */
+const NESTED_OPENER = /["[{]|(?<![\p{L}\p{N}])'|'(?![\p{L}\p{N}])/u;
 function nestedLine(text, key, n) {
-  let s = text.replace(/^-(?:[ \t]+|$)/, "");
-  const k = s.match(KEY_LINE);
-  if (k) s = k[2] || "";
-  s = s.trim();
-  const unclosed = () =>
+  if (NESTED_OPENER.test(text))
     refuse(
       "bad-value",
-      `a value under ${key}: that opens on line ${n + 1} and does not close on it`,
+      `a quote or flow collection in a value nested under ${key}: (line ${n + 1})`,
     );
-  if (s.startsWith('"') || s.startsWith("'")) {
-    if (!quoted(s[0], s.slice(1), false).closed) unclosed();
-  } else if (s.startsWith("[") || s.startsWith("{")) {
-    const close = s[0] === "[" ? "]" : "}";
-    if (!s.replace(/[ \t]+#.*$/, "").endsWith(close)) unclosed();
-  }
 }
 
 /** A one-line flow entry, `{k: v, k: v}`, from just after its `- `. Returns its keys. */

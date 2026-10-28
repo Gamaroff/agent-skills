@@ -1150,6 +1150,17 @@ const RAW_CASES = [
     '  - id: PC-1\n    category: coverage\n    finding:\n      "open\n    provenance: pre-existing\n    note: end"\n',
     "unreadable",
   ],
+  // The same trap behind a prefix the opener scan did not strip (task.240 bug.3): each printed 0.
+  ...[
+    ["inside a flow collection", '[a, "b]'],
+    ["behind a nested dash", '- - "open'],
+    ["behind an anchor", '- &a "open'],
+    ["behind a key with a space", '- sub key: "open'],
+  ].map(([where, line]) => [
+    `a nested quote opened ${where}`,
+    `  - id: PC-1\n    category: coverage\n    evidence:\n      ${line}\n    provenance: pre-existing\n    note: x"]\n`,
+    "unreadable",
+  ]),
   // A list cut short reads unreadable, not the count of what survived (task.238 CR9-3): a column-0
   // `## ` line inside the fence ends the section the check reads.
   [

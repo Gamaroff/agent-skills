@@ -473,6 +473,18 @@ move (an allow-list), not as a second round of quote tracking. Results:
 - The corpus diff shows 0 changes over 187 reports.
 - `ci:fast` is green: 6,622 pass, 0 fail.
 
+**QA fix cycle 3 (TASK-240-QA-3, bug.3).** Cycle 2's opener scan looked at one position on the
+line, so an opener behind a prefix got past it. Cycle 3 replaced the scan with a rule over
+characters: a line nested under an empty key may not contain a double quote, a `[` or `{`, or a
+single quote other than an apostrophe. Closed quotes and flow collections are refused as well,
+which fails closed. No tracked report has a nested value of this kind.
+
+| Check | Result |
+| --- | --- |
+| Mutation proofs | M9 and M12–M15 each turned at least one test red |
+| Corpus diff | 0 changes |
+| `ci:fast` | green: 6,634 pass, 0 fail |
+
 ---
 
 <!--
@@ -491,22 +503,23 @@ move (an allow-list), not as a second round of quote tracking. Results:
 
 ### QA Report
 
-- **Full Report**: [task.240.qa.2.open-coverage-fail-closed-reader.md](./task.240.qa.2.open-coverage-fail-closed-reader.md)
-- **Gate File**: [task.240.gate.2.open-coverage-fail-closed-reader.yml](./task.240.gate.2.open-coverage-fail-closed-reader.yml)
+- **Full Report**: [task.240.qa.3.open-coverage-fail-closed-reader.md](./task.240.qa.3.open-coverage-fail-closed-reader.md)
+- **Gate File**: [task.240.gate.3.open-coverage-fail-closed-reader.yml](./task.240.gate.3.open-coverage-fail-closed-reader.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 168 (unit, parity, extractor and relationship lint), plus a 187-report corpus diff and CI (green on `a98f5470`)
+- **Tests Executed**: 172 (unit, parity, extractor and relationship lint)
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Key Findings
 
-BUG-1 is fixed and verified. One medium false 0 remains (TASK-240-QA-2,
-[task.240.bug.2.quoted-value-after-empty-value-hides-key.md](./task.240.bug.2.quoted-value-after-empty-value-hides-key.md)).
-When an empty `finding:` value is followed by a quoted value on the next line, a key line inside
-the quoted value is read as a key.
+BUG-2 is fixed for its own shape. One medium remains (TASK-240-QA-3,
+[task.240.bug.3.nested-opener-check-bypassed.md](./task.240.bug.3.nested-opener-check-bypassed.md)).
+The nested opener check misses an opener that sits behind a prefix or inside a flow collection.
+Because this is the third medium finding on the same mechanism, the fix replaces the scan rather
+than patching it.
 
 <!-- change-log-start -->
 ## Change Log
@@ -521,6 +534,8 @@ the quoted value is read as a key.
 | 2026-10-28 |         | QA findings fixed — wrapped values under non-deciding keys accepted (bug.1), 1 iteration | qa-fix |
 | 2026-10-28 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-10-28 |         | QA findings fixed — nested openers must close on their line (bug.2), 1 iteration | qa-fix |
+| 2026-10-28 |         | QA gate CONCERNS (90/100) — 2 findings | qa-task |
+| 2026-10-28 |         | QA findings fixed — nested opener scan replaced by a character rule (bug.3), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

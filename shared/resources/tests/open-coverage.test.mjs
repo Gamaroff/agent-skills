@@ -94,11 +94,11 @@ const ACCEPTED = [
     ),
     1,
   ],
-  // A nested value under an empty key whose quotes and flow collections close on their own line.
+  // A nested value under an empty key in plain text, apostrophes included (task.240 bug.3).
   [
-    "a nested list of closed quoted, keyed and flow values",
+    "a nested list of plain, keyed and apostrophe values",
     findings(
-      '  - id: PC-1\n    category: coverage\n    evidence:\n      - "a, b"\n      - c: "d"\n      - [x, y]\n      - {k: v}\n      - it\'s plain\n',
+      "  - id: PC-1\n    category: coverage\n    evidence:\n      - a.md\n      - c: d\n      - it's plain\n      - don't stop\n",
     ),
     1,
   ],
@@ -215,6 +215,23 @@ const REFUSED = [
       "  - id: PC-1\n    category: coverage\n    evidence:\n      [a,\n    provenance: pre-existing]\n",
     ),
   ],
+  // An opener behind a prefix or inside a flow collection (task.240 bug.3), and a closed one: a
+  // nested value may hold no quote or flow collection at all.
+  ...[
+    '[a, "b]',
+    '- - "open',
+    '- &a "open',
+    '- sub key: "open',
+    '- x: "closed"',
+    "- [x, y]",
+    "- {k: v}",
+    "- 'quoted'",
+  ].map((line) => [
+    "bad-value",
+    findings(
+      `  - id: PC-1\n    category: coverage\n    evidence:\n      ${line}\n    provenance: pre-existing\n`,
+    ),
+  ]),
   [
     "duplicate-key",
     findings("  - id: PC-1\n    category: coverage\n    id: PC-2\n"),
