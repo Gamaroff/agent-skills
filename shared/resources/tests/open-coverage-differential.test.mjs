@@ -89,6 +89,8 @@ function generator(r) {
           '- &a "open',
           "- - b",
           "plain",
+          "plain # c",
+          "# c",
           "x: y",
         ])
       : pick(["- a.md", "- it's fine", "- k: v", "- see #12"]);
@@ -108,6 +110,7 @@ function generator(r) {
           "openquote",
           "anchor",
           "hashnospace",
+          "indicator",
         ])
       : pick([
           "plain",
@@ -157,11 +160,17 @@ function generator(r) {
           ]),
         };
       case "wrap":
+        // One to three wrapped lines; when risky, a comment may cut the value between them
+        // (task.240 bug.6).
         return {
           inline: w,
-          lines: deeper([
-            risky ? pick(["k: v", '"q', "# c"]) : pick(["more words", "it's"]),
-          ]),
+          lines: deeper(
+            Array.from({ length: 1 + Math.floor(r() * 3) }, () =>
+              risky
+                ? pick(["k: v", '"q', "# c", "more # c", "more"])
+                : pick(["more words", "it's"]),
+            ),
+          ),
         };
       case "wrapquoted":
         return {
@@ -174,12 +183,30 @@ function generator(r) {
         return { inline: `${pick(['"', "'"])}${w}`, lines: [] };
       case "anchor":
         return { inline: pick([`&a ${w}`, `!!str ${w}`, "*a"]), lines: [] };
+      // A YAML indicator, or a `,` YAML reserves, at the start of a plain value (task.240 bug.7).
+      case "indicator":
+        return {
+          inline: pick([
+            "`x` y",
+            "@foo",
+            "%x",
+            ", x",
+            "- x",
+            "? x",
+            ": x",
+            "|x",
+          ]),
+          lines: [],
+        };
     }
   }
 
   function keyName(k) {
     return chance(0.04) ? k[0].toUpperCase() + k.slice(1) : k;
   }
+
+  // The space after a key's colon — or, rarely, a tab, which YAML rejects there.
+  const separator = () => (chance(0.03) ? pick(["\t", " \t"]) : " ");
 
   function flowEntry(listIndent) {
     const keys = ["id", "category", ...(chance(0.6) ? ["provenance"] : [])];
@@ -190,7 +217,7 @@ function generator(r) {
       const v = risky
         ? pick([`"${w}\\t"`, "x: y", `${w} # c`, `'${w}`])
         : pick([w, w, `"${w}"`, `'${w.replace(/'/g, "''")}'`]);
-      return `${keyName(k)}:${risky && chance(0.5) ? "" : " "}${v}`;
+      return `${keyName(k)}:${risky && chance(0.5) ? "" : separator()}${v}`;
     });
     return `${sp(listIndent)}-${pick([" ", " ", "  "])}{${parts.join(pick([", ", ","]))}}\n`;
   }
@@ -215,7 +242,7 @@ function generator(r) {
         i === 0
           ? `${sp(listIndent)}-${sp(dash)}`
           : sp(chance(0.03) ? pick([col - 1, col + 1, listIndent + 2]) : col);
-      out += `${head}${keyName(k)}:${v.inline === "" ? "" : " " + v.inline}\n`;
+      out += `${head}${keyName(k)}:${v.inline === "" ? "" : separator() + v.inline}\n`;
       for (const [ind, text] of v.lines) out += `${sp(ind)}${text}\n`;
       if (chance(0.05))
         out += pick([
@@ -301,6 +328,11 @@ json.dump(out, sys.stdout)
 }
 
 test(`the reader prints unreadable or YAML's count — never another (seed ${SEED}, ${N} blocks)`, () => {
+  // The floors below are shares of N, so a tiny N would pass them on nothing (gate 6 CR-5).
+  assert.ok(
+    N >= 1000,
+    `OPEN_COVERAGE_DIFF_N=${N} is too small to test anything (minimum 1000)`,
+  );
   const block = generator(prng(SEED));
   const blocks = Array.from({ length: N }, block);
   const expected = yamlCounts(blocks.map(lenientFreeText));

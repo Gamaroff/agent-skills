@@ -143,6 +143,35 @@ const ACCEPTED = [
     ),
     1,
   ],
+  // What bug.6, bug.7 and CR-4's refusals must leave alone: YAML reads each of these.
+  [
+    "a comment between nested list items ends nothing",
+    findings(
+      "  - id: PC-1\n    category: coverage\n    evidence:\n      - a.md # c\n      # c\n      - b.md\n",
+    ),
+    1,
+  ],
+  [
+    "a wrapped value, then a comment, then the next key",
+    findings(
+      "  - id: PC-1\n    category: coverage\n    finding: a\n      more\n    # c\n    provenance: pre-existing\n",
+    ),
+    0,
+  ],
+  [
+    "a block scalar holding `#` and a tab is content",
+    findings(
+      "  - id: PC-1\n    category: coverage\n    finding: |\n      a # b\n      c\td\n",
+    ),
+    1,
+  ],
+  [
+    "a plain value starting with `-1` or `:x` is not an indicator",
+    findings(
+      "  - id: PC-1\n    category: coverage\n    finding: -1\n    suggested_action: :x\n",
+    ),
+    1,
+  ],
   [
     "review-pr's SKILL.md example block (two entries, one coverage)",
     report(
@@ -322,6 +351,31 @@ const REFUSED = [
     "bad-line",
     findings("  - {id: PC-1, category: trail}\n    category: coverage\n"),
   ],
+  // A comment ends a wrapped plain value or a nested plain scalar; YAML has nothing for a deeper
+  // line after it to continue (task.240 bug.6).
+  ...[
+    "    finding: a\n      # c\n      more\n",
+    "    finding: a\n      b # c\n      more\n",
+    "    evidence:\n      word\n      # c\n      more\n",
+    "    evidence:\n      word # c\n      more\n",
+  ].map((lines) => [
+    "bad-value",
+    findings(`  - id: PC-1\n    category: coverage\n${lines}`),
+  ]),
+  // A YAML indicator, or a block-style `,`, at the start of a plain value (task.240 bug.7).
+  ...["`x` is missing", "@foo", "%x", ", x", "- x", "? x", ": x", "|x"].map(
+    (v) => [
+      "bad-value",
+      findings(`  - id: PC-1\n    category: coverage\n    finding: ${v}\n`),
+    ],
+  ),
+  // A tab anywhere outside a block scalar's content (gate 6 CR-4).
+  ...[
+    "    category:\tcoverage\n",
+    "    category: \tcoverage\n",
+    "    category: coverage\t# c\n",
+    "    category: coverage\t\n",
+  ].map((lines) => ["bad-line", findings(`  - id: PC-1\n${lines}`)]),
 ];
 
 // The title names the row by index: a fence string inside a template-literal expression blinds the

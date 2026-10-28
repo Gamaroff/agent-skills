@@ -29,7 +29,12 @@
  *     holds a quote or a flow collection is refused (task.240 bug.2, bug.3) — never for a key;
  *   - under the same keys, a value wrapped onto deeper lines: a plain one whose wrapped lines do
  *     not read as `key: `, or a quoted one whose closing quote is on a deeper line (task.240
- *     bug.1). A quote still open at the entry's key indent is refused.
+ *     bug.1). A quote still open at the entry's key indent is refused, and so is a deeper line
+ *     after a comment that ends a plain value (bug.6).
+ * Refused besides: a plain value that starts with a YAML indicator (`` ` ``, `@`, `%`, `|`, `- `,
+ * `? `, `: `, an anchor, alias or tag; in block style a `,`) (bug.7), and a tab anywhere outside a
+ * block scalar's content. Each is a line YAML rejects. The differential suite
+ * (tests/open-coverage-differential.test.mjs) compares the reader with PyYAML.
  * `category` and `provenance` values compare case-blind. `category` must be one of review-pr's six
  * tokens (review-pr SKILL.md Step 7).
  *
@@ -100,7 +105,11 @@ function scalar(s, flow, strict = flow) {
       `an unterminated ${s[0] === '"' ? "double" : "single"}-quoted value`,
     );
   }
-  if (/^[!&*]/.test(s)) refuse("bad-value", `a tag, anchor or alias: ${s}`);
+  // A YAML indicator — or, in block style, a `,` — cannot start a plain scalar: YAML rejects the
+  // line, so there is no value to read. Review reports quote their free text, and none starts with
+  // one (task.240 bug.7).
+  if (INDICATOR.test(s) || (!flow && s.startsWith(",")))
+    refuse("bad-value", `a value that starts with a YAML indicator: ${s}`);
   if (/^[[{]/.test(s)) refuse("bad-value", `a nested flow collection: ${s}`);
   // A plain scalar holding `: `, or ending in `:`, is one YAML rejects. A flow value or a value the
   // count compares (`strict`) is refused. Block free text keeps the old leniency — read to the end
@@ -218,7 +227,7 @@ function blockValue(key, raw) {
 const NESTED_OPENER = /["[{]|(?<![\p{L}\p{N}])'|'(?![\p{L}\p{N}])/u;
 // A YAML indicator at the start of a scalar: an anchor, alias, tag, block scalar, reserved
 // character, or a dash, `?` or `:` that opens a structure.
-const NESTED_INDICATOR = /^(?:[&*!|>%@`]|[-?:](?:[ \t]|$))/;
+const INDICATOR = /^(?:[&*!|>%@`]|[-?:](?:[ \t]|$))/;
 function nestedLine(text, key, n) {
   if (NESTED_OPENER.test(text))
     refuse(
@@ -230,7 +239,7 @@ function nestedLine(text, key, n) {
     .replace(/^-(?:[ \t]+|$)/, "")
     .split(/:(?:[ \t]+|$)/)
     .map((p) => p.trim());
-  if (parts.length > 2 || parts.some((p) => NESTED_INDICATOR.test(p)))
+  if (parts.length > 2 || parts.some((p) => INDICATOR.test(p)))
     refuse(
       "bad-value",
       `a nested line under ${key}: that is not one plain item (line ${n + 1})`,
@@ -303,6 +312,15 @@ function parseBlock(block) {
       continue;
     }
 
+    // A tab outside a block scalar's content — after a key's colon, before a comment, at the end
+    // of a line — is a line PyYAML rejects (gate 6 CR-4). A quoted value holding one is refused
+    // with the rest: no report carries a tab, and refusing costs a HALT, not a false count.
+    if (
+      text.includes("\t") &&
+      !(cur && !cur.flow && cur.deeper === "text" && indent > cur.keyIndent)
+    )
+      refuse("bad-line", `a tab outside a block scalar (line ${n + 1})`);
+
     if (indent === 0) {
       if (text.startsWith("#"))
         refuse("bad-line", `a column-0 \`#\` line (line ${n + 1})`);
@@ -346,9 +364,10 @@ function parseBlock(block) {
     const inScalar =
       cur && !cur.flow && cur.deeper === "text" && indent > cur.keyIndent;
     if (text.startsWith("#") && !inScalar) {
-      // A comment shallower than a block scalar's content ends it: YAML has no scalar for a
-      // deeper line after it to belong to.
-      if (cur && !cur.flow && cur.deeper === "text") cur.deeper = "refuse";
+      // A comment ends a block scalar shallower than its content, a wrapped plain value, and a
+      // nested plain scalar: YAML has no scalar for a deeper line after it to belong to (task.240
+      // bug.6). Between nested list or map items it ends nothing.
+      if (cur && !cur.flow && endsAtComment(cur)) cur.deeper = "refuse";
       continue;
     }
 
@@ -400,6 +419,10 @@ function parseBlock(block) {
             `a ${kind} line in a nested ${cur.deeperKind} under ${cur.lastKey}: (line ${n + 1})`,
           );
       }
+      // A trailing comment ends a plain scalar as a comment line does (task.240 bug.6). In a block
+      // scalar it is content.
+      if (/[ \t]#/.test(text) && cur.deeper !== "text" && endsAtComment(cur))
+        cur.deeper = "refuse";
       continue;
     }
     if (cur && cur.flow && indent > cur.indent)
@@ -448,6 +471,15 @@ function parseBlock(block) {
   if (!top.has("findings"))
     refuse("no-findings-key", "the block has no findings: key");
   return entries;
+}
+
+/** Whether a comment ends the open value: a block scalar, a wrapped plain value, a nested plain scalar. */
+function endsAtComment(cur) {
+  return (
+    cur.deeper === "text" ||
+    cur.deeper === "plain" ||
+    (cur.deeper === "nested" && cur.deeperKind === "plain")
+  );
 }
 
 function setKey(cur, rawKey, raw, n) {

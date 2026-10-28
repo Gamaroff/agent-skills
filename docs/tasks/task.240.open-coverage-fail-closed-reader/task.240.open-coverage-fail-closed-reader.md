@@ -521,22 +521,25 @@ reader's header, which had drifted from the code. Results:
 
 ### QA Report
 
-- **Full Report**: [task.240.qa.5.open-coverage-fail-closed-reader.md](./task.240.qa.5.open-coverage-fail-closed-reader.md)
-- **Gate File**: [task.240.gate.5.open-coverage-fail-closed-reader.yml](./task.240.gate.5.open-coverage-fail-closed-reader.yml)
+- **Full Report**: [task.240.qa.6.open-coverage-fail-closed-reader.md](./task.240.qa.6.open-coverage-fail-closed-reader.md)
+- **Gate File**: [task.240.gate.6.open-coverage-fail-closed-reader.yml](./task.240.gate.6.open-coverage-fail-closed-reader.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 189 (unit, parity, extractor and relationship lint)
+- **Tests Executed**: 6660 (full `ci:fast`), plus the targeted suites under 2 mutations
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
 
-BUG-4 is fixed. One medium finding remains, TASK-240-QA-6 (bug report:
-[task.240.bug.5.wide-dash-spacing-misplaces-keys.md](./task.240.bug.5.wide-dash-spacing-misplaces-keys.md)).
-The reader assumes an entry's keys sit two columns after the dash, even when more than one space
-follows it. As a result, a block that YAML rejects reads as 0.
+BUG-5 is fixed and the PyYAML differential test has landed. Three medium findings remain:
+
+- TASK-240-QA-8 ([bug.6](./task.240.bug.6.comment-inside-wrapped-value-accepted.md)): a comment inside a wrapped plain value is accepted.
+- TASK-240-QA-9 ([bug.7](./task.240.bug.7.indicator-leading-value-accepted.md)): a value that starts with a YAML indicator is read as plain text.
+- TASK-240-QA-10 ([bug.8](./task.240.bug.8.differential-generator-misses-shapes.md)): the differential generator cannot produce either shape.
+
+In each case the count is the one the writer meant. YAML gives the block no count.
 
 <!-- change-log-start -->
 ## Change Log
@@ -557,6 +560,8 @@ follows it. As a result, a block that YAML rejects reads as 0.
 | 2026-10-28 |         | QA findings fixed — escape refused in a deciding value (bug.4), 1 iteration | qa-fix |
 | 2026-10-28 |         | QA gate CONCERNS (90/100) — 2 findings | qa-task |
 | 2026-10-28 |         | QA findings fixed — entry key column measured (bug.5), header drift (QA-7), 1 iteration | qa-fix |
+| 2026-10-28 |         | QA gate CONCERNS (90/100) — 3 findings | qa-task |
+| 2026-10-28 |         | QA findings fixed — differential generator widened first (bug.8), comment ends a wrap (bug.6), indicator-led values and tabs refused (bug.7, CR-4), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

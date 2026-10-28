@@ -4,7 +4,7 @@
 **Bug ID**: TASK-240-BUG-5
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 5 scoped review, CR-1; reproduced by QA)
 **Date Found**: 2026-10-28
 
@@ -104,3 +104,4 @@ print `OPEN_COVERAGE=unreadable`.
 | 2026-10-28 | New | qa-task | Found in QA cycle 5 (task.240.qa.5.open-coverage-fail-closed-reader.md) |
 | 2026-10-28 | In Progress | qa-fix | Investigation started |
 | 2026-10-28 | Ready for QA | qa-fix | Key column measured (keyIndent); M18 mutation-proven |
+| 2026-10-28 | Closed | qa-task | Verified by task.240.qa.6.open-coverage-fail-closed-reader.md |
