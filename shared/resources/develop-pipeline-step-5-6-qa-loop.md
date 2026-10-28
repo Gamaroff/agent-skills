@@ -1536,7 +1536,8 @@ for a gap the loop had already named. Decide it mechanically, from the review re
 ```bash
 REVIEW="{the PR review report this cycle's 5c wrote}"
 # The Machine-Readable Findings block: entries split on `- id:`; an entry is open coverage when it
-# carries `category: coverage` and no `provenance: pre-existing` (review-pr emits no status field).
+# carries `category: coverage` and no `provenance: pre-existing` (review-pr emits no status field),
+# either value bare or YAML-quoted (`\047` is a single quote inside this single-quoted awk program).
 # A report that cannot be read, or whose block has no `findings:` key, prints `unreadable`, never 0:
 # "found none" and "could not look" must not print the same value (task.238 bug.1).
 BLOCK=""
@@ -1544,8 +1545,8 @@ BLOCK=""
 if printf '%s\n' "$BLOCK" | grep -qE '^findings:'; then
   OPEN_COVERAGE=$(printf '%s\n' "$BLOCK" \
     | awk '/^[[:space:]]*- id:/ { if (cov && !pre) n++; cov = 0; pre = 0 }
-           /^[[:space:]]*category:[[:space:]]*coverage[[:space:]]*$/ { cov = 1 }
-           /^[[:space:]]*provenance:[[:space:]]*pre-existing[[:space:]]*$/ { pre = 1 }
+           /^[[:space:]]*category:[[:space:]]*["\047]?coverage["\047]?[[:space:]]*$/ { cov = 1 }
+           /^[[:space:]]*provenance:[[:space:]]*["\047]?pre-existing["\047]?[[:space:]]*$/ { pre = 1 }
            END { if (cov && !pre) n++; print n + 0 }')
 else
   OPEN_COVERAGE=unreadable

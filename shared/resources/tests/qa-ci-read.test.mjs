@@ -395,16 +395,19 @@ test("the engine never waits: no sleep, --watch or until loop", () => {
 });
 
 test("usage errors exit 2", () => {
-  for (const args of [
-    [],
-    ["--vcs", "gitlab", "--pr", "1"],
-    ["--vcs", "github"],
-    ["--vcs", "github", "--pr", "x"],
+  // Each case asserts its own message: os.tmpdir() is not a git checkout, so with a validation
+  // removed the case still exits 2 at `git rev-parse` — exit 2 alone held nothing (task.238 DoD 1).
+  for (const [args, message] of [
+    [[], /--vcs must be github or bitbucket/],
+    [["--vcs", "gitlab", "--pr", "1"], /--vcs must be github or bitbucket/],
+    [["--vcs", "github"], /--pr must be a PR number/],
+    [["--vcs", "github", "--pr", "x"], /--pr must be a PR number/],
   ]) {
     const r = spawnSync("bash", [SCRIPT, ...args], {
       cwd: os.tmpdir(),
       encoding: "utf8",
     });
     assert.equal(r.status, 2, `${args.join(" ")}: ${r.stdout}${r.stderr}`);
+    assert.match(r.stderr, message, args.join(" "));
   }
 });

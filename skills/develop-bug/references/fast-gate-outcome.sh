@@ -98,6 +98,8 @@ sed -nE "s/^test at (.+):[0-9]+:[0-9]+$/\1/p; s/^[[:space:]]*location: '(.+):[0-
   sed "s|^$PWD/||" | LC_ALL=C sort -u >"$WORK/files"
 [ -s "$WORK/files" ] || unavailable "the head log names no failing test file"
 grep -q '^/' "$WORK/files" && unavailable "a failing test file lies outside the checkout"
+# A `..` segment climbs out of the base worktree into the head checkout (task.238 DoD 1).
+grep -qE '(^|/)\.\.(/|$)' "$WORK/files" && unavailable "a failing test file lies outside the checkout"
 FILES=() # not mapfile: macOS ships bash 3.2
 while IFS= read -r f; do FILES+=("$f"); done <"$WORK/files"
 

@@ -823,7 +823,9 @@ function reviewReport(findings) {
     .map(
       (f, i) =>
         `  - id: PC-${i + 1}\n    category: ${f.category}\n    severity: ${f.severity ?? "medium"}\n    confidence: high\n    ref: "Success Criteria ${i + 1}"\n` +
-        (f.pre ? "    provenance: pre-existing\n" : "") +
+        (f.pre
+          ? `    provenance: ${f.pre === true ? "pre-existing" : f.pre}\n`
+          : "") +
         `    finding: x\n    suggested_action: y\n`,
     )
     .join("");
@@ -892,6 +894,27 @@ const COVERAGE_CASES = [
     0,
   ],
   ["no findings → Step 7", [], 0],
+  // YAML allows a quoted scalar; a bare-only match read it as no coverage (task.238 DoD 1).
+  [
+    'a double-quoted category: "coverage" still routes',
+    [{ category: '"coverage"' }],
+    1,
+  ],
+  [
+    "a single-quoted category: 'coverage' still routes",
+    [{ category: "'coverage'" }],
+    1,
+  ],
+  [
+    'a quoted provenance: "pre-existing" still exempts',
+    [{ category: '"coverage"', pre: '"pre-existing"' }],
+    0,
+  ],
+  [
+    "a category that only contains the word is not coverage",
+    [{ category: "coverage-gap" }],
+    0,
+  ],
   [
     "the last entry is read too (no trailing `- id:` closes it)",
     [

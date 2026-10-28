@@ -485,6 +485,63 @@ test("attributable: a failing file outside the checkout is never run from the ba
   }
 });
 
+// A `..` segment climbs out of `.worktrees/base-check-*` into the head checkout, so the base run
+// would execute the head's copy and a head-only red would read as pre-existing (task.238 DoD 1).
+const HEAD_COPY = `${HEADER}import { writeFileSync } from "node:fs";\ntest("a", () => { writeFileSync(new URL("./RAN-OUTSIDE-BASE", import.meta.url), ""); assert.fail("a"); });\n`;
+for (const [form, line] of [
+  ["test at", "test at ../../h.test.mjs:4:1"],
+  ["location:", "  location: '../../h.test.mjs:4:1'"],
+]) {
+  test(`attributable: a \`..\` failing-test path (${form} form) never runs the head's copy from the base`, () => {
+    const fx = repoWithBase(A_FAILS);
+    try {
+      write(fx.work, "h.test.mjs", HEAD_COPY);
+      const log = headLog(
+        fx.work,
+        ["✖ failing tests:", "", line, "✖ a (1.2ms)", ""].join("\n"),
+      );
+      const { outcome, out } = classify(fx.work, [
+        "--log",
+        log,
+        "--exit",
+        "1",
+        "--base",
+        "develop",
+      ]);
+      assert.equal(outcome, "attributable", out);
+      assert.match(out, /outside the checkout/);
+      assert.equal(
+        fs.existsSync(path.join(fx.work, "RAN-OUTSIDE-BASE")),
+        false,
+        "the head checkout's copy ran",
+      );
+    } finally {
+      cleanup(fx.dir);
+    }
+  });
+}
+
+test("a file name that merely contains `..` is not refused", () => {
+  const fx = repoWithBase(A_FAILS, { "a..b.test.mjs": A_FAILS });
+  try {
+    const log = headLog(
+      fx.work,
+      SPEC_HEAD_LOG.replace("test at t.test.mjs", "test at a..b.test.mjs"),
+    );
+    const { outcome, out } = classify(fx.work, [
+      "--log",
+      log,
+      "--exit",
+      "1",
+      "--base",
+      "develop",
+    ]);
+    assert.equal(outcome, "pre-existing", out);
+  } finally {
+    cleanup(fx.dir);
+  }
+});
+
 test("an option-shaped --base never reaches git fetch (task.238 bug.3)", () => {
   // `git fetch origin --upload-pack=<cmd>` runs <cmd> over a local or ssh transport. The fixture's
   // origin is a local path, so the injection would fire here; the marker proves it did not.
@@ -630,11 +687,16 @@ test("a worktree left by a SIGKILLed run is swept by the next one", () => {
 });
 
 test("usage errors exit 2 rather than guessing an outcome", () => {
-  for (const args of [
-    [],
-    ["--log", "x"],
-    ["--log", "x", "--exit", "abc", "--base", "develop"],
-    ["--bogus"],
+  // Each case asserts its own message: `--exit abc` against a missing log still exits 2 at
+  // "no such log" with the number check removed — exit 2 alone held nothing (task.238 DoD 1).
+  for (const [args, message] of [
+    [[], /--log is required/],
+    [["--log", "x"], /--exit is required/],
+    [
+      ["--log", "x", "--exit", "abc", "--base", "develop"],
+      /--exit must be a number or empty, got: abc/,
+    ],
+    [["--bogus"], /unknown argument: --bogus/],
   ]) {
     const r = spawnSync("bash", [SCRIPT, ...args], {
       encoding: "utf8",
@@ -642,6 +704,7 @@ test("usage errors exit 2 rather than guessing an outcome", () => {
     });
     assert.equal(r.status, 2, `${args.join(" ")}: ${r.stdout}${r.stderr}`);
     assert.doesNotMatch(r.stdout, /GATE_OUTCOME=/);
+    assert.match(r.stderr, message, args.join(" "));
   }
   for (const bound of ["0", "abc", "-5"]) {
     const r = spawnSync(
