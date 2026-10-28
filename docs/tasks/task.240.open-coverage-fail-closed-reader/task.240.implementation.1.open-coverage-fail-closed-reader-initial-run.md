@@ -36,7 +36,7 @@ Replace the §5c open-coverage awk with a bundled Node reader (`open-coverage.js
 | 2. review-task             | ✅ Done    | `task.240.review.{N}.{name}.md` exists (or skip logged)                | `task.240.review.1.open-coverage-fail-closed-reader.md` — READY 8/10; Planned → Ready for Development | —                    | 2026-10-28T14:07Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (iter 1); 15/15 phases; ci:fast green on iter 2 | `.summaries/step-3-iteration-audit-1.json` | 2026-10-28T14:34Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #776: https://github.com/Gamaroff/agent-skills/pull/776 | —                    | 2026-10-28T14:36Z |
-| 5–6. qa-task / qa-fix loop | ⚠️ Escalated | `task.240.qa.{N}.*.md`; `task.240.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | Loop limit: 5 cycles, all CONCERNS with HIGH 0 and MEDIUM 1; route 2c declined (medium-not-falling) | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ⚠️ Escalated | `task.240.qa.{N}.*.md`; `task.240.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | Escalated at loop limit (5 cycles, all CONCERNS, HIGH 0, MEDIUM 1); re-entered at 5a with 2 extra cycles (budget 7); escalated again at 7 cycles (MEDIUM 3, 2; route 2c declined) | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.240.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
@@ -120,6 +120,15 @@ Replace the §5c open-coverage awk with a bundled Node reader (`open-coverage.js
 - qa-fix cycle 4: the fast gate was green on attempt 1 (6,639 pass, 0 fail). Commit `0c11216f` carries the fix plus gate.4, qa.4 and bug.4. Pushed once; the PR is OPEN at `0c11216f`.
 - qa-fix cycle 3: the fast gate was green on attempt 1 (6,634 pass, 0 fail). Commit `32065fbf` carries the fix plus gate.3, qa.3 and bug.3. Pushed once; PR state OPEN at `32065fbf`.
 - qa-fix cycle 2: the fast gate was green on attempt 1 (6,622 pass, 0 fail). Commit `46146a35` carries the fix plus gate.2, qa.2, bug.2 and bug.1 (now closed). Pushed once. PR state: OPEN.
+- QA loop re-entry (2026-10-28, user-approved): 2 extra cycles granted; 0 cycle(s) run outside the loop back-filled from disk. `grant-qa-cycles.sh` → `QA_CYCLE=5 extra_cycles_granted=2 qa_max_cycles=7 reenter_at=5a`. Between the halt and the re-entry, the operator applied the escalation's recommended step 1 by hand: commit `22bdc3e9` adds the PyYAML differential test (CR-6) and six more refusals. It wrote no gate, so it is not a cycle. The halt had not removed the lock and wrote no snapshot; the lock's stale `waiting_on` (5a qa-task code review, since 15:24Z) was cleared with `set-waiting-on.sh --clear`. Gate 6 reads `195ea1d9` + `22bdc3e9`.
+- Gate 6 (scoped: 12 files since `0c11216f`; reviewer ran 16:21:56Z–16:26:36Z): CONCERNS, HIGH 0 and MEDIUM 3. All three promoted findings were reproduced against PyYAML 6.0.3, and corpus hits were 0 of 168 readable blocks. Severities were kept: review-pr is a model writer, so "no writer emits it" does not hold. In every finding the reader prints the count the writer meant; what breaks is the fail-closed contract. Convergence check: HIGH sequence all zeros, not tripped. Route classifier: `continue` (`not-a-pass-gate`; route 2 declined with `product-defect-signal`) → 5b.
+- QA Cycle 6 — changes-requested: `stage-disabled`.
+- Narrowing offer: not signalled (`medium-files-differ`). The MEDIUMs over cycles 5–6 name `open-coverage.js` and `open-coverage-differential.test.mjs`.
+- Third-strike rule: not applicable (HIGH 0).
+- qa-fix cycle 6: the fast gate was green on attempt 1 (6,680 pass, 0 fail). Commit `5f69c201` carries the fix, gate.6, qa.6 and bugs 5–8. Pushed once; the PR is OPEN. BUG-7 was fixed by refusing an indicator-led value under every key, the reverse of the bug's first recommendation. The reason was a measurement: about 1,140 free-text values, 1,092 quoted, none indicator-led.
+- Gate 7 (scoped: 13 files since `22bdc3e9`; the reviewer was dispatched at 16:44:42Z, `duration_ms` 210,496): CONCERNS, HIGH 0, MEDIUM 2. The QA hand probe (34 shapes) found BUG-9. The reviewer's CR-1 became BUG-10, and its CR-2 is the low. Both were reproduced against PyYAML, with 0 corpus hits. BUG-6, BUG-7 and BUG-8 were closed. CI pending at 5f69c201. Convergence: not tripped. Route: `continue` (`not-a-pass-gate`). Narrowing: not signalled (`medium-files-differ`).
+- qa-fix cycle 7: the generator was widened first, red on 92 of 25,000. The fast gate was green on attempt 1 (6,688 pass, 0 fail). Commit `443e4f6d` carries the fix, gate.7, qa.7 and bugs 6–10. Pushed once; the PR is OPEN.
+- Loop limit at cycle 7: route 2c declined (`medium-not-falling`, 1, 3, 2), so the loop escalated (Issues Log, second entry).
 
 ---
 
@@ -161,6 +170,38 @@ The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS.
 1. Add a differential test (CR-6). It would generate small findings blocks (spacing, quoting, escapes, nesting, flow), compare the reader with PyYAML, and assert that the reader never prints a count PyYAML disagrees with. Fix what it finds, then re-run `/develop-task` and resume at 5a. One more gate would read cycle 5's fix.
 2. Or accept the current state: run `/review-pr --effort medium --comment --no-code`, then `/finalise`. Record the residual risk as "contrived YAML shapes no writer emits".
 3. Decide the pre-existing items routed to future (case-blind keys, a flow key with no space after the colon), which the base awk shares.
+
+### QA Loop Limit Reached — 2026-10-28 (after the granted re-entry, cycles 6–7)
+
+The pipeline completed 7 qa-task/qa-fix cycles (5 plus 2 granted) without a clean PASS.
+
+**Final gate status**: CONCERNS (gate 7, head `5f69c201`; cycle 7's fix `443e4f6d` is ungated)
+**HIGH findings per cycle**: 0, 0, 0, 0, 0, 0, 0 (medium 1, 1, 1, 1, 1, 3, 2)
+
+**Remaining issues** (from gate 7; all fixed in `443e4f6d`, not yet gated):
+
+- TASK-240-QA-11, medium, `shared/resources/open-coverage.js`. A whitespace-only line holding a tab was skipped as blank (bug.9, now Ready for QA).
+- TASK-240-QA-12, medium, `shared/resources/open-coverage.js`. A plain flow value holding a bracket was accepted (bug.10, now Ready for QA).
+- TASK-240-QA-13, low, `shared/resources/tests/open-coverage-differential.test.mjs`. The flow generator emitted no bracket (bug.10).
+
+**What was attempted per cycle** (cycles 1–5 are in the entry above):
+
+| Cycle | Bug | What was wrong | Fix |
+| --- | --- | --- | --- |
+| 6 | bug.6–8 | A comment inside a wrapped value and an indicator-led value got a count; the generator reached neither | Generator widened first (red on 542 of 25,000), then both refused, and tabs refused (`5f69c201`) |
+| 7 | bug.9–10 | A tab-holding blank line and a bracket in a plain flow value got a count | Generator widened first (red on 92 of 25,000), then both refused (`443e4f6d`) |
+
+- Route 2c was considered again and declined: `medium-not-falling`, with MEDIUM at 1, 3, 2 over cycles 5–7.
+- The narrowing-residue offer was not signalled at cycle 6 or 7 (`medium-files-differ`).
+- The differential test recommended by the first escalation now exists and works. It caught every shape class it was taught, and each fix was red before it landed. But both granted cycles still found new classes outside its grammar: the hand probe found one, the code reviewer another.
+
+**Likely root cause**: the reader is a deny-list. It accepts a YAML subset and refuses each shape someone names, and so does its generator. Ten bugs, each in a different shape class, show that this tail does not end on review. Two facts bound the risk. First, every wrong count matched what the writer meant: no bug misplaced a deciding key in a block a real writer produced. Second, none of the ten shapes occurs in the 187 tracked review reports, where free text is quoted (1,092 of about 1,140 values).
+
+**Recommended next steps**:
+
+1. **Structural move (recommended): turn the deny-list into an allow-list.** Accept a plain value only from a narrow character set, such as `[A-Za-z0-9 _./()'-]`, and only in the line shapes review-pr's template emits. Everything else, including quoted text, takes the quoted path or reads `unreadable`. Then a new shape class fails closed by construction, and the differential suite checks the narrow grammar instead of chasing its tail. Measure first that every tracked report still reads the same. Do this as its own task, or as a re-entry.
+2. Accept the current state: run `/review-pr --effort medium --comment --no-code`, then `/finalise`. Record the residual risk as "YAML shapes no writer emits". The cycle-7 fix is ungated, but it is mutation-proven and CI runs on it.
+3. Re-run `/develop-task` with more cycles. This is not recommended: the evidence says each cycle finds one more class.
 
 ---
 
@@ -223,6 +264,28 @@ _Track each QA review/fix cycle._
 **Fixes Applied**: the key column is now measured (`keyIndent`) and the header is reworded. Added 1 accepted case, 2 refused cases and 2 parity rows. M18 turns 5 tests red. Corpus: 0 changes. `ci:fast`: green. No gate reads this fix, because the budget is spent.
 **Commit**: `195ea1d9`
 
+### QA Cycle 6 — 2026-10-28
+**Gate Result**: CONCERNS
+**Issues Found**: 3 medium. TASK-240-QA-8: a comment inside a wrapped plain value is accepted (BUG-6). TASK-240-QA-9: a value starting with an indicator is read as plain (BUG-7). TASK-240-QA-10: the differential generator cannot produce either shape (BUG-8). Plus 3 low items in `future` (CR-4, CR-5, CR-6). BUG-5 verified fixed and closed.
+**HIGH findings**: 0
+**MEDIUM findings**: 3
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 6 of 7)
+**Fixes Applied**: The differential generator was widened first (BUG-8). The unchanged reader then disagreed with PyYAML on 542 of 25,000 blocks, in all three classes. Reader changes: a comment ends a wrapped plain value or a nested plain scalar (BUG-6). A value that starts with an indicator is refused under every key, the reverse of the bug's first recommendation, decided after measuring the corpus: 0 such values, 1,092 of about 1,140 free-text values quoted (BUG-7). A tab outside a block scalar is refused (CR-4). A floor of N ≥ 1000 (CR-5). Added 16 refused and 4 accepted unit rows. M19–M25 each red. Differential suite: 5 seeds × 25,000, 0 disagreements. `ci:fast`: 6,680 pass. CR-6 (`python3 -I`) remains in `future`.
+**Commit**: `5f69c201`
+
+### QA Cycle 7 — 2026-10-28
+**Gate Result**: CONCERNS
+**Issues Found**: 2 medium, 1 low. TASK-240-QA-11: a whitespace-only line holding a tab is skipped as blank (BUG-9, from the QA hand probe). TASK-240-QA-12: a plain flow value holding a bracket is accepted (BUG-10, code review CR-1). TASK-240-QA-13 (low): the flow generator never emits a bracket (CR-2). BUG-6, BUG-7 and BUG-8 are verified fixed and closed.
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop limit reached
+**Fixes Applied**: The generator was widened first: whitespace-only lines, 10% of them holding a tab, and flow values with a bracket. On the unchanged reader it was red on 92 of 25,000 blocks. Then the reader refuses a tab-holding blank line (BUG-9) and a bracket in a plain flow value (BUG-10). Added 6 refused and 2 accepted unit rows. M26 and M27 each red. Differential: 7 seeds × 25,000, 0 disagreements. `ci:fast`: 6,688 pass. Route 2c declined (`medium-not-falling`). No gate reads this fix.
+**Commit**: `443e4f6d`
+
 ---
 
 ## Completion
@@ -231,6 +294,6 @@ _Track each QA review/fix cycle._
 **Final Status**: Escalated
 **Branch**: feature/task.240.open-coverage-fail-closed-reader
 **PR**: #776 — https://github.com/Gamaroff/agent-skills/pull/776
-**QA Iterations**: 5 (loop limit)
+**QA Iterations**: 7 (loop limit, after 2 granted cycles)
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
