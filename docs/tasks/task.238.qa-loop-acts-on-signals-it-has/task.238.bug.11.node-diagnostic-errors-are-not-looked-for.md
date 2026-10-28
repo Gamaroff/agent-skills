@@ -4,7 +4,7 @@
 **Bug ID**: TASK-238-BUG-11
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 5 safety re-probe, CR-2)
 **Date Found**: 2026-10-28
 
@@ -104,3 +104,4 @@ the first node diagnostic that is not the run summary or the coverage report.
 | 2026-10-28 | New | qa-task | Found in QA cycle 5 |
 | 2026-10-28 | In Progress | qa-fix | Investigation started |
 | 2026-10-28 | Ready for QA | qa-fix | Fix implemented (QA cycle 5 fix) |
+| 2026-10-28 | Closed | qa-task | Verified by task.238.qa.6.qa-loop-acts-on-signals-it-has.md |

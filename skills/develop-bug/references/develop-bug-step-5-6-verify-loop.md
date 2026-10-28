@@ -220,18 +220,16 @@ Exit the loop and proceed to Step 7.
    result in the same statement, so a command that batches a read with cleanup cannot remove a red
    log (task.238, obs #41). Never write a bare `rm -f "$FIX_LOG"`.
 
-   **Classify a non-green result before triaging it** — the same three outcomes as the story/task QA
+   **Classify a non-green result before triaging it** — the same two outcomes as the story/task QA
    loop's step 0a: **not measured** (no exit code, or 124/137/143: re-run once, never green, never
-   red, no retry attempt consumed), **pre-existing red** (the same failing tests fail at the PR base:
-   record both runs in the Verify Cycle entry's **Fast gate** field, then commit and push as on green)
-   and **attributable red** (anything else, including `BASE_CHECK=unavailable`: the triage path
-   below). One script decides it, from the repository root:
+   red, no retry attempt consumed) and **attributable red** (anything else: the triage path below).
+   There is no pre-existing red: a red is never compared with the PR base (task.238). One script
+   decides it, from the repository root:
 
    ```bash
    bash .agents/skills/develop-bug/references/fast-gate-outcome.sh \
      --log "{the gate log}" \
-     --exit "{the GATE_EXIT the run printed — empty when it printed none}" \
-     --base "{the bug's PR target branch}"
+     --exit "{the GATE_EXIT the run printed — empty when it printed none}"
    ```
 
    Act on its one `GATE_OUTCOME=` line, not its exit code. A second not-measured result is an

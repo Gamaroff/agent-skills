@@ -1,0 +1,92 @@
+schema: 2
+task: 'task.238.qa-loop-acts-on-signals-it-has'
+task_title: 'QA loop acts on the signals it already has'
+gate: FAIL
+status_reason: 'bug.10 to bug.12 are verified fixed at 8c43db0c, and each fix is held by a test that a mutation turned red. The unscoped safety re-probe found two more HIGH ways fast-gate-outcome.sh classes a head-only red as pre-existing. Tests generated at one position share a key, which sort -u folds into one (PRB6-1). A file load failure is compared without its cause (CR6-1). Both reproduce on node 26.8.2.'
+reviewer: 'QA Engineer'
+head: '8c43db0c261cd6588506eb665bf669681da86e88'
+updated: '2026-10-28T06:11:43Z'
+
+top_issues:
+  - id: 'TASK-238-PRB6-1'
+    severity: high
+    file: 'shared/resources/fast-gate-outcome.sh'
+    finding: 'Tests generated in a loop share file, line:column and leaf name, and the spec summary omits the describe, so their failures print one key. sort -u (:169, :245) folds them into one line, and one base failure at that key matches any number of head failures there: a head-only failure reads pre-existing. Reproduced on node 26.8.2 (describe(m) over GET/POST, head breaks POST: pre-existing in spec, attributable in TAP) and by probe log-same-key-twice. bug.13'
+    suggested_action: 'Compare multiplicities (drop -u so comm pairs duplicates), and treat a key that names more than one test as ambiguous, so attributable (a TAP base run carries location: for passing tests too).'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-238-CR6-1'
+    severity: high
+    file: 'shared/resources/fast-gate-outcome.sh'
+    finding: 'A test file that fails to load is keyed as file, 1:1 and the file path, with no cause, and compared at :246, so a head-only load failure matches any base load failure whose cause the Cannot find module guard misses. Reproduced by QA: a head SyntaxError in an imported lib.mjs against a base ENOENT on a gitignored local.json gave GATE_OUTCOME=pre-existing (x.test.mjs;). bug.14'
+    suggested_action: 'Do not compare a file-level failure on either side; when the head log names one, return unavailable (attributable).'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-238-CR6-6'
+    severity: low
+    file: 'shared/resources/fast-gate-outcome.sh'
+    finding: 'platform-variance: the head prefix is the logical $PWD (:169), but node resolves symlinks in TAP location: paths, so in a checkout reached through a symlink (macOS /var to /private/var, a symlinked home) the prefix is never stripped and pre-existing cannot fire; the tests build the fixture from realpathSync and so never meet it.'
+    suggested_action: 'Strip $(pwd -P)/ as well as $PWD/ on the head and base sides, and add a test that runs from a symlinked cwd.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 6538
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 61
+    escaped: 0
+    notes: 'task.238.qa.6.security.run.json: base-argument 8/8, pr-argument 8/8 and open-coverage-check 24/24 engage; log-test-paths 20/21 (bug.10 other-line, bug.11 spec and TAP thresholds and bug.12 between-runs hold; log-same-key-twice reproduced). log-shared-test-name was re-expected for the cycle 5 message format (it now names 3:1). Two HIGHs (PRB6-1, CR6-1) still let a head-only red be classed pre-existing.'
+  performance:
+    status: PASS
+    notes: 'The diagnostic check is one more awk pass over the log; the base run is unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR6-2 (reviewer, medium confidence): a non-node red printed before node results is still never examined (gate 5 future item, reproduced again by the reviewer with prettier warnings before a base-red run).'
+  maintainability:
+    status: PASS
+    notes: 'Each cycle 5 fix is held by a committed test; QA mutated four (bug.10, bug.11 spec, bug.11 TAP, bug.12) and each turned its predicted test red.'
+
+recommendations:
+  immediate:
+    - action: 'Fix PRB6-1 and CR6-1 (HIGH): bug.13 and bug.14. fast-gate-outcome.sh now has HIGH findings in gates 4, 5 and 6, so the third-strike rule applies: replace the comparison with an allow-list of the log shapes it can read unambiguously, rather than add another deny rule'
+      refs: ['shared/resources/fast-gate-outcome.sh']
+    - action: 'CR6-6 (low): strip the physical cwd as well as $PWD'
+      refs: ['shared/resources/fast-gate-outcome.sh']
+  future:
+    - action: 'CR6-2 (medium confidence): output before node results is never examined; a continue-on-error gate can push another step red as pre-existing'
+      refs: ['shared/resources/fast-gate-outcome.sh']
+    - action: 'CR6-3 (medium confidence; cycle 4 CR-5 and cycle 5 CR-3, third time): gh run list --branch also returns pull_request runs from a branch named like the base; add --event push'
+      refs: ['shared/resources/qa-ci-read.sh']
+    - action: 'CR6-4 (medium confidence): a CI lane already red on the base marks any head red in that lane pre-existing, whatever fails; compare failing steps or tests, not lanes'
+      refs: ['shared/resources/qa-ci-read.sh']
+    - action: 'CR6-5 (medium confidence): the open-coverage awk prints 0 when truncated_count is non-zero or findings: is bare; print unreadable'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'CR6-7 (medium confidence): the Bitbucket PR lookup in qa-task and qa-story reads no HTTP status, so a 401/403 reports "no pull request found"'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+    - action: 'Carried from gate 5: a spec test at line with no ✖ line after it is dropped silently; develop-pipeline-resume-contract.md:492 exits 2 in the snippet engine (pre-existing, #616); cycle 3 CR-1, CR-3, CR-4'
+      refs: ['shared/resources/fast-gate-outcome.sh', 'shared/resources/develop-pipeline-resume-contract.md']
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_verified: ['task.238.bug.10', 'task.238.bug.11', 'task.238.bug.12']
+  bugs_opened: ['task.238.bug.13', 'task.238.bug.14']
+  fix_date: '2026-10-28'
+  verification_method: 'Committed tests, 4 QA mutations each red, probe engine re-run (61 cases)'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

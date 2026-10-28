@@ -9,19 +9,13 @@ All notable changes to this project will be documented in this file. Format foll
 - **The QA loop acts on four signals it already had (task 238).** (1) **Gated log cleanup**: every
   fast-gate site (5b step 0a, Step 3, `/develop`, the triage prompt, develop-bug 3a) now prints its
   exit code and removes the log only when that exit is 0, foreground or background, so a red log is
-  never deleted before it is read (obs #41). (2) **Three fast-gate outcomes**:
-  `fast-gate-outcome.sh` classifies a run as *not measured* (no exit, or a timeout signal — re-run
-  once), *pre-existing red* (the same tests also fail on the PR base, checked in a throwaway
-  worktree — recorded, not fixed), or *attributable red* (everything else — the fix loop, as
-  before); every check it cannot complete falls back to attributable, including a base run that
-  outlasts its 90 s bound, and the base worktree and test processes are removed on every exit path
-  (obs #14). A test is its file, line and column, so a head-only red that shares a name with a base
-  red — in another file, or in another `describe` of the same file — stays attributable. So does
-  any output after node's results other than npm's failure report and a clean `tmp-leak` report
-  (even when a later node run follows it), a diagnostic node printed that is not its summary or
-  coverage report (a coverage-threshold `Error:`), a failing file that is new on the head, a base
-  that already contains `HEAD`, and a failing path that is absolute, climbs out with `..` or starts
-  with `-`. (3) **PR existence
+  never deleted before it is read (obs #41). (2) **A red fast gate is classified first**:
+  `fast-gate-outcome.sh` reads a non-green run as *not measured* (no exit, a timeout signal, or the
+  test wrapper's own signal report — re-run once, no retry spent) or *attributable red* (everything
+  else — the fix loop, as before) (obs #14). A third outcome, *pre-existing red*, compared failing
+  tests with a run at the PR base. It was deleted after QA cycles 4–6 each found another
+  `node --test` log shape it misread as pre-existing. A structured comparison is deferred work on
+  task 238. (3) **PR existence
   and CI**: `/qa-task` and `/qa-story` find the PR on Bitbucket as well as GitHub, and read the PR's
   CI once at the gate step through `qa-ci-read.sh` — a failure on the head becomes a `medium`
   `top_issue`, a failure also red on the base goes to `recommendations.future` as pre-existing, and

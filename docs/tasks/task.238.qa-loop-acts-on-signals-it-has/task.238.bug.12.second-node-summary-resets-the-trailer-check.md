@@ -4,7 +4,7 @@
 **Bug ID**: TASK-238-BUG-12
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 5 probe engine, PRB5-1)
 **Date Found**: 2026-10-28
 
@@ -76,3 +76,4 @@ The first non-node line after any node results counts for the whole log.
 | 2026-10-28 | New | qa-task | Found in QA cycle 5 |
 | 2026-10-28 | In Progress | qa-fix | Investigation started |
 | 2026-10-28 | Ready for QA | qa-fix | Fix implemented (QA cycle 5 fix) |
+| 2026-10-28 | Closed | qa-task | Verified by task.238.qa.6.qa-loop-acts-on-signals-it-has.md |

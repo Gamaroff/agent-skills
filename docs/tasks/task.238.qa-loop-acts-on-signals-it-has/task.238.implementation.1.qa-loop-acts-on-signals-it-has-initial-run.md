@@ -144,6 +144,17 @@ Make the QA loop act on four signals it already holds (red CI on the PR, a pre-e
 - bug.11 design: the TAP check starts at the final top-level plan. Node 26.8.2 prints a test's own stdout and stderr as `#` lines before it, so checking every `#` line would refuse any chatty suite. That variant was mutation-tested and turned the control red.
 - Cycle 5 is the last of `qa_max_cycles` 5: after 5b commits, Loop Escalation's loop-limit trigger runs (route 2c is evaluated first; it requires HIGH 0 on the last gate, so it declines).
 
+### QA loop re-entry — 2026-10-28
+
+- QA loop re-entry: 2 extra cycles granted; 0 cycle(s) run outside the loop back-filled from disk. The user chose "Resume at 5a with 2 more cycles" at invocation. `grant-qa-cycles.sh` restored the lock from the halt snapshot: `QA_CYCLE=5`, `qa_max_cycles=7`, `reenter_at=5a`. Cycle 6 gates the cycle 5 fix `8345b798`.
+
+### QA cycle 6 routing — 2026-10-28
+
+- Traceability mapper skipped, as on cycles 1–5: §9 Success Criteria is a checklist (`HAS_SUCCESS_CRITERIA_TABLE=false`).
+- Gate 6 FAIL. HIGH sequence `1, 0, 0, 3, 2, 2`. Convergence check: no trip (`HIGH_{N-1}` 2 ≥ `HIGH_{N-2}` 3 is false). Route classifier: `continue` (`not-a-pass-gate`; route 2 declined: `high-findings-remain`). Narrowing offer: not signalled (`high-findings-remain`).
+- QA Cycle 6 — changes-requested: stage-disabled.
+- **Third strike:** `shared/resources/fast-gate-outcome.sh` is the subject of HIGH findings in gates 4, 5 and 6 (`high_files` comm over the three gates). The struck mechanism, named from the three gates' findings, is the head-vs-base comparison of failing-test keys parsed from node's log. That covers the key (`failing_pairs` + `sort -u` + `comm`) and the deny rules around it (`trailer`, `stray_diagnostic`, the environment greps). Each cycle found another log shape the comparison misread as `pre-existing`. `/qa-fix` may not patch that mechanism again. It may delete it, replace it, or waive the finding with a documented reason. CR6-6 (prefix stripping) does not touch the struck mechanism's decision and is fixed as usual.
+
 ---
 
 ## Issues Log
@@ -282,6 +293,27 @@ Evidence:
 - Fast gate: attempt 1 was red on prettier (the new test file); attempt 2 was green, 6538 tests, 0 fail.
 
 **Commit**: `8345b798`
+
+### QA Cycle 6 — 2026-10-28
+**Gate Result**: FAIL (60/100)
+**Issues Found**: 3. Two HIGH: bug.13 (PRB6-1, tests generated at one position fold into one key under `sort -u`; probe-reproduced and reproduced on node 26.8.2) and bug.14 (CR6-1, a file load failure is compared without its cause; QA-reproduced). One LOW: CR6-6 (`$PWD` against symlink-resolved TAP paths). bug.10–bug.12 verified, mutation-proven (4/4) and closed. Advisory: CR6-2..CR6-5, CR6-7. Probes 61 executed, 1 reproduced, 0 escaped. Fast gate green (6538/0); PR CI green on `8c43db0c`.
+**HIGH findings**: 2
+**MEDIUM findings**: 0
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 6 of 7)
+**Fixes Applied**:
+- **Struck mechanism:** the `pre-existing` base comparison in `fast-gate-outcome.sh`, with HIGH findings in gates 4, 5 and 6.
+- **Move: delete** (owner's choice at the third-strike question). The script now answers `green`, `not-measured` or `attributable`; `--base` is refused as an unknown argument. Both step docs, develop-bug's SKILL.md, the CHANGELOG, SC-2, SC-6 and § 8 now say "two outcomes for a red". A structured comparison is recorded as Deferred Work on the task.
+- **bug.13, bug.14:** fixed by the deletion. Each keeps a regression test that read `pre-existing` under the `8c43db0c` script (checked by running that script on the same fixtures) and now reads attributable, with the base untouched.
+- **CR6-6:** moot — the `$PWD` comparison it named was deleted.
+
+Evidence:
+- `qa-loop-fast-gate-outcomes.test.mjs` is rewritten (1153 → ~460 lines), 20/20.
+- 3 mutations were each red: re-adding a base worktree (5 tests), printing `pre-existing` for a red (8), and ignoring the wrapper's signal report (2).
+- The Step 3.5 probe for `pre-existing red`, `pre-existing on`, `GATE_OUTCOME=pre-existing`, `base worktree`, `fast-gate-outcome`, `BASE_CHECK` and `FAST_GATE_BASE_TIMEOUT` found only the edited files; `docs/` outside tasks has no hit.
+- `bundle:check` 0 problems; `validate` develop-bug ✓.
+- Fast gate: attempt 1 green, 6511 tests, 0 fail.
 
 ---
 

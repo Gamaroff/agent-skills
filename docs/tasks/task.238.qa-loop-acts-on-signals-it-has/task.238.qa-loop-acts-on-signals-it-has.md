@@ -248,11 +248,10 @@ None.
 ### Integration Tests
 
 - Execute the 5b step 0a block (via the existing extractor, `shared/resources/tests/lib/executed-prose.mjs`) against these fake gates:
-  - a red whose same test is red at base → pre-existing
-  - a red that is green at base → attributable
+  - a red whose same test is red at base → attributable, and nothing runs at the base *(amended in QA cycle 6: was pre-existing)*
+  - the log shapes QA cycles 4–6 found the old comparison misreading (bug.6, bug.11, bug.13, bug.14) → attributable
   - a killed process with no `GATE_EXIT=` line, and a foreground exit of 137 → not measured
-  - **differential oracle:** a base run where a different test fails, and a base run that fails with `Cannot find module` → both attributable, never pre-existing
-  - **SC-6:** a green gate → one gate run, no base worktree created
+  - **SC-6:** a green gate → one gate run, no worktree created
 
   Assert the recorded outcome for each.
 
@@ -272,7 +271,7 @@ None.
 ### Functional
 
 - [ ] SC-1: Executing each fast-gate block in files 1–3 with a gate that exits non-zero leaves its log file on disk. With exit 0, the log is removed (test in § 8, red on today's blocks)
-- [ ] SC-2: 5b step 0a states three outcomes (not measured, pre-existing red, attributable red), each with its action and QA Iteration History wording. The integration test in § 8 records the three outcomes for the three fake gates
+- [ ] SC-2: 5b step 0a states two outcomes for a red gate (not measured, attributable red), each with its action and QA Iteration History wording. A red is never compared with the PR base: a red that is also red at the base reads attributable and runs nothing a second time. The integration test in § 8 records each outcome. *(Amended 2026-10-28, QA cycle 6: the `pre-existing red` outcome was deleted at the third strike on `fast-gate-outcome.sh`; see Deferred Work.)*
 - [ ] SC-3: `/qa-task` and `/qa-story` each read the PR's CI state once per cycle, at Step 10, without waiting, on GitHub and on Bitbucket, and only for a PR head equal to the local `HEAD`. A completed failing check that is green (or absent) on the PR base becomes a `severity: medium` `top_issues[]` entry. One that is also red on the base becomes a `recommendations.future` entry with `provenance: pre-existing`. An undecided state changes nothing in the gate (unit tests in § 8, GitHub and Bitbucket fixtures)
 - [ ] SC-3a: On `VCS=bitbucket`, the PR Existence Check finds the open PR through the REST API and never calls `gh pr view`. On `VCS=github` it is unchanged (unit test in § 8)
 - [ ] SC-4: The 5c verdict table routes a `CONCERNS` verdict with an open `category: coverage` finding (one without `provenance: pre-existing`) to 5b through the `REQUEST CHANGES` arm. A `CONCERNS` verdict without one proceeds to Step 7 as today (`pr-review-loop-parity.test.mjs`, including the control case)
@@ -282,7 +281,7 @@ None.
 ### Performance
 
 - [ ] SC-5: The QA loop still adds no CI wait. The CI-read blocks added to `skills/qa-task/SKILL.md` and `skills/qa-story/SKILL.md` contain no `sleep`, `--watch` or `until` (a documentation criterion: file F does not say S)
-- [ ] SC-6: The base-worktree run fires only when the head run was red. A green gate runs the gate once and creates no base worktree (integration test in § 8, the green-gate case)
+- [ ] SC-6: Classifying a gate never runs anything a second time. A green gate runs the gate once and creates no worktree (integration test in § 8, the green-gate case). *(Amended 2026-10-28, QA cycle 6: there is no base-worktree run left to bound.)*
 
 ### Code Quality
 
@@ -358,22 +357,22 @@ None.
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-28
-**Quality Score**: 50/100
+**Quality Score**: 60/100
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.238.qa.5.qa-loop-acts-on-signals-it-has.md](./task.238.qa.5.qa-loop-acts-on-signals-it-has.md)
-- **Gate File**: [task.238.gate.5.qa-loop-acts-on-signals-it-has.yml](./task.238.gate.5.qa-loop-acts-on-signals-it-has.yml)
+- **Full Report**: [task.238.qa.6.qa-loop-acts-on-signals-it-has.md](./task.238.qa.6.qa-loop-acts-on-signals-it-has.md)
+- **Gate File**: [task.238.gate.6.qa-loop-acts-on-signals-it-has.yml](./task.238.gate.6.qa-loop-acts-on-signals-it-has.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 6533
+- **Tests Executed**: 6538
 - **Phases Verified**: 4/4
 - **Critical Issues**: 2
 - **NFR Status**: Security: FAIL, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- All cycle 4 findings are verified fixed in `4ef29ed1`: bug.5 to bug.9 closed, plus CR4-8, CR4-9 and CR-6
-- The safety re-probe found 2 HIGH defects that still widen `pre-existing`: a leaf name shared across describes (bug.10), and node's own diagnostic errors never being looked for (bug.11). The probe engine found 1 MEDIUM: a second node summary resets the trailer check (bug.12)
+- The cycle 5 fixes in `8345b798` are verified: bug.10 to bug.12 are closed, and each is held by a test that a mutation turned red
+- The safety re-probe found 2 HIGH defects that still widen `pre-existing`. Tests generated at one position fold into one key (bug.13), and a file load failure is compared without its cause (bug.14). `fast-gate-outcome.sh` has now had HIGH findings in gates 4, 5 and 6
 
 ## Definition of Done - Gaps Identified
 
@@ -412,6 +411,11 @@ The QA gate passed. The gaps below come from `/finalise`'s own checks: the secur
 **Gap Report Generated:** 2026-10-28
 
 **Detailed Verification Log:** See `task.238.dod.1.qa-loop-acts-on-signals-it-has.md` for complete verification evidence and timestamps.
+
+## Deferred Work
+
+- **Structured pre-existing comparison** (QA cycle 6, third strike on `fast-gate-outcome.sh`): the `pre-existing red` outcome was deleted rather than patched a fourth time. Gates 4, 5 and 6 each found another `node --test` log shape the comparison misread (bug.5–bug.14). A replacement must compare structured results from runs it controls (for example `--test-reporter=tap` written to a file on both sides, keyed on node's own test identity), not parse a gate log. Needs its own task document.
+- **Gate 6 advisory items** carried to `recommendations.future`: CR6-2 (output before node's results), CR6-3 (`gh run list --event push`), CR6-4 (pre-existing decided per CI lane), CR6-5 (open-coverage awk on a truncated block), CR6-7 (Bitbucket PR lookup HTTP status). CR6-6 is moot: the code it named was deleted.
 <!-- change-log-start -->
 ## Change Log
 
@@ -431,6 +435,8 @@ The QA gate passed. The gaps below come from `/finalise`'s own checks: the secur
 | 2026-10-28 |  | QA findings fixed — gate 4 FAIL, 7 entries (bug.5–bug.9, CR4-8, CR4-9; advisory CR-6 too), 1 iteration; status → ready-for-review | qa-fix |
 | 2026-10-28 |  | QA gate FAIL (50/100) — 3 findings (2 high, 1 medium); bug.5–bug.9 verified and closed; status → in-progress | qa-task |
 | 2026-10-28 |  | QA findings fixed — gate 5 FAIL, 3 entries (bug.10–bug.12), 1 iteration; status → ready-for-review | qa-fix |
+| 2026-10-28 |  | QA gate FAIL (60/100) — 3 findings (2 high, 1 low); bug.10–bug.12 verified and closed; status → in-progress | qa-task |
+| 2026-10-28 | 1.2 | QA findings fixed — gate 6 FAIL, 3 entries (bug.13, bug.14, CR6-6), 1 iteration; third strike on `fast-gate-outcome.sh`: `pre-existing red` deleted, SC-2 and SC-6 amended, structured comparison deferred; status → ready-for-review | qa-fix |
 <!-- change-log-end -->
 
 ---
@@ -440,7 +446,7 @@ The QA gate passed. The gaps below come from `/finalise`'s own checks: the secur
 ### Phase 1: Fast-gate outcomes and gated cleanup
 
 - [x] Gated cleanup at every site in § 3's site list
-- [x] Three outcomes in 5b step 0a and develop-bug, with the differential oracle
+- [x] Fast-gate outcomes in 5b step 0a and develop-bug (two for a red since QA cycle 6; `pre-existing` deleted)
 
 ### Phase 2: PR Existence Check and CI read at Step 10
 

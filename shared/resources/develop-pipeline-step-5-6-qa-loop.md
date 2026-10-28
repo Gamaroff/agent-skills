@@ -1237,52 +1237,34 @@ After fixes are applied:
    cycle runs the key has already been proven to name a real script. The slow tier stays out of this
    cycle by design; it runs once at `develop-next`'s merge gate.
 
-   **Classify a non-green result before triaging it — a gate has three outcomes, not two** (task.238,
-   obs #14). A green gate (`GATE_EXIT=0`) skips this entirely and goes straight to step 1: no base
-   worktree, no second run.
+   **Classify a non-green result before triaging it — a red gate has two outcomes, not one**
+   (task.238, obs #14). A green gate (`GATE_EXIT=0`) skips this entirely and goes straight to step 1.
 
    | Outcome | How to tell | Action | QA Iteration History line |
    |---|---|---|---|
    | **not measured** | no `GATE_EXIT=` line in the log (background form: the run never finished), an exit of 124 (timeout), 137 (SIGKILL) or 143 (SIGTERM), or the `test-tmpdir` wrapper's own report that a signal interrupted or killed the suite | re-run the gate once. It is never green and never red, and it consumes no retry attempt | `Fast gate: not measured ({reason})` |
-   | **pre-existing red** | the **same tests fail** in a worktree at the PR base: every failing test the head log names — its file, line and column — fails there too | record both runs, then commit and push as on green | `Fast gate: red, pre-existing on {base} ({tests}; head: {fastGateCommand}, base: node --test {files})` |
-   | **attributable red** | any other red, including `BASE_CHECK=unavailable` | the triage-and-retry path below, unchanged | unchanged — the failing output |
+   | **attributable red** | any other red | the triage-and-retry path below, unchanged | unchanged — the failing output |
 
    One script decides it. Run it from the repository root, only on a non-green result:
 
    ```bash
    bash .agents/skills/{develop-story|develop-task}/references/fast-gate-outcome.sh \
      --log "{the gate log}" \
-     --exit "{the GATE_EXIT the run printed — empty when it printed none}" \
-     --base "{the PR target branch — Q2's answer}"
+     --exit "{the GATE_EXIT the run printed — empty when it printed none}"
    ```
 
-   It prints `BASE_CHECK=…` / `BASE_EXIT=…` detail lines and exactly one
-   `GATE_OUTCOME=not-measured|pre-existing|attributable` line, and exits 0 for every outcome — act on
-   the line, not the exit code. Engine source: `fast-gate-outcome.sh` (bundled into each skill that
-   runs it as `references/fast-gate-outcome.sh`); develop-bug's step 3a calls the same script, so the
-   rule has one definition.
+   It prints exactly one `GATE_OUTCOME=not-measured|attributable` line and exits 0 for every
+   outcome — act on the line, not the exit code. Engine source: `fast-gate-outcome.sh` (bundled
+   into each skill that runs it as `references/fast-gate-outcome.sh`); develop-bug's step 3a calls the
+   same script, so the rule has one definition.
 
-   **Pre-existing is the one outcome that widens what the gate lets through, so it is narrow by
-   construction.** It needs a red base run in which every failing test the head names also fails — a
-   test is where node says it is, its file, line and column, so a head-only red that shares a name
-   with a base red in another file (task.238 bug.5) or in another `describe` of the same file
-   (bug.10) does not match, and a test whose line moved reads attributable — and anything less falls
-   to *attributable*: a failing test the log names with no file, a failing file that does not exist
-   at the base, a failing path that is absolute, climbs out with `..` or starts with `-` (node would
-   read it as an option), a base that already contains `HEAD`, a log with any output after node's
-   results other than npm's failure report and a clean `tmp-leak` report (another step's red the base
-   run cannot see — bug.6), wherever a later node run's results follow it (bug.12), a diagnostic node
-   printed that is not its run summary or coverage report (a `--test-coverage-*` threshold's
-   `Error:`, which the plain base run never reproduces — bug.11), a
-   base run where a different test fails, one that fails on
-   `Cannot find module` or `command not found` (a fresh worktree has no `node_modules` of its own),
-   one that fails for want of `.agents/skills` (gitignored, so never in a worktree), a base worktree
-   that cannot be created, a base run that does not finish within its bound (90 s by default, so a
-   foreground call stays inside a 120 s tool timeout; `FAST_GATE_BASE_TIMEOUT` overrides), and a gate whose failures are not `node --test` tests at all (a formatting
-   check, a shell suite). Those last ones cannot be compared, so they stay where they are today. This
-   mirrors qa-task Step 3b item 5b, which runs a finding against the PR base before raising it. The
-   head log and its `.base` sibling both stay on disk: they are the two measurements the history line
-   records.
+   **There is no pre-existing red.** A red is never compared with a run at the PR base, so a red that
+   is also red on the base spends a retry like any other. A third outcome once let such a red through
+   after comparing failing tests with a base run. QA cycles 4, 5 and 6 of task.238 each found another
+   `node --test` log shape the comparison misread, so that a head-only failure went through as
+   pre-existing (bug.5 to bug.14). At the third strike the comparison was deleted, not patched again.
+   A structured comparison, from runs the script controls rather than a parsed log, is deferred work
+   on task.238.
 
    **A not-measured gate is re-run once, and the re-run is classified again.** Its result is what
    counts. A second not-measured result is an attributable red attempt that counts against the
