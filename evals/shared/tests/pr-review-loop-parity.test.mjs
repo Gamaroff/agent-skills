@@ -1119,6 +1119,30 @@ const RAW_CASES = [
     "  - {id: PC-1, category: trail}\n  - id: PC-2\n    category: coverage\n",
     1,
   ],
+  // A long value under a key that decides nothing may wrap onto deeper lines, as YAML allows; the
+  // awk read both shapes correctly and the first reader refused them (task.240 bug.1).
+  [
+    "a plain finding: value wrapped onto a deeper line",
+    "  - id: PC-1\n    category: trail\n    finding: a long plain value that\n      wraps onto a deeper line\n",
+    0,
+  ],
+  [
+    "a double-quoted finding: value wrapped onto a deeper line",
+    '  - id: PC-1\n    category: coverage\n    finding: "a long quoted value that\n      wraps onto a deeper line"\n',
+    1,
+  ],
+  [
+    "a single-quoted finding: value wrapped onto a deeper line",
+    "  - id: PC-1\n    finding: 'it''s long\n      and wraps'\n    category: coverage\n",
+    1,
+  ],
+  // The trap: a quote still open at the key indent. YAML reads `category: coverage` here as quoted
+  // text; reading it as a key would count it, so the reader refuses rather than guess.
+  [
+    "a quoted value still open at the entry's key indent",
+    '  - id: PC-1\n    finding: "text\n    category: coverage"\n    category: trail\n',
+    "unreadable",
+  ],
   // A list cut short reads unreadable, not the count of what survived (task.238 CR9-3): a column-0
   // `## ` line inside the fence ends the section the check reads.
   [

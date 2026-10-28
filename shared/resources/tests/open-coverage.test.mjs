@@ -72,6 +72,28 @@ const ACCEPTED = [
     ),
     1,
   ],
+  // Wrapped values under a key that decides nothing (task.240 bug.1); each reads as PyYAML does.
+  [
+    "a plain finding: wrapped onto deeper lines",
+    findings(
+      "  - id: PC-1\n    category: coverage\n    finding: a long value\n      that wraps\n      twice\n",
+    ),
+    1,
+  ],
+  [
+    "a quoted finding: whose wrapped lines hold `#`",
+    findings(
+      '  - id: PC-1\n    finding: "text # not a comment\n      # still text\n      done"\n    category: coverage\n',
+    ),
+    1,
+  ],
+  [
+    "a quoted finding: closed on a deeper line, then a comment",
+    findings(
+      '  - id: PC-1\n    finding: "a\n      b" # note\n    category: coverage\n',
+    ),
+    1,
+  ],
   [
     "a flow entry with a quoted comma",
     findings('  - {id: PC-1, category: coverage, ref: "a, b"}\n'),
@@ -136,6 +158,39 @@ const REFUSED = [
     "bad-value",
     findings(
       '  - id: PC-1\n    category: coverage\n    finding: "never closed\n',
+    ),
+  ],
+  // Wrapped values PyYAML rejects (task.240 bug.1): the wrap is accepted only where YAML reads it.
+  [
+    "bad-value",
+    findings(
+      "  - id: PC-1\n    category: trail\n    finding: a long value that\n      wraps: onto a key-shaped line\n",
+    ),
+  ],
+  [
+    "bad-value",
+    findings(
+      "  - id: PC-1\n    finding: a value # note\n      wraps on\n    category: trail\n",
+    ),
+  ],
+  [
+    "bad-value",
+    findings(
+      '  - id: PC-1\n    finding: "a\n      b" trailing\n    category: coverage\n',
+    ),
+  ],
+  [
+    "bad-value",
+    findings(
+      '  - id: PC-1\n    finding: "text\n    category: coverage"\n    category: trail\n',
+    ),
+  ],
+  ["bad-value", findings("  - id: PC-1\n    category: cover\n      age\n")],
+  // A quote still open when the block ends: no later line reaches the key-indent check.
+  [
+    "bad-value",
+    report(
+      'findings:\n  - id: PC-1\n    category: coverage\n    finding: "opened\n      never closed\n',
     ),
   ],
   [

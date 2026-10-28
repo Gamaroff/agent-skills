@@ -452,6 +452,18 @@ prose), `develop-pipeline-on-stop.sh:195,205` and its test `:349,353,354`,
 **Deferred work**: none from this task. CR7-3, CR7-4, CR9-5 and the structured pre-existing
 comparison stay out of scope as § 4 states.
 
+**QA fix cycle 1 (TASK-240-QA-1, bug.1).** The reader now accepts a value that wraps onto deeper
+lines under any key except `category` and `provenance`. A plain value may wrap unless a wrapped line
+reads as `key: `. A quoted value may wrap until its closing quote, which must be on a deeper line.
+Each shape was checked against PyYAML 6.0.3. The accepted list in § 3 Target Architecture predates
+this fix and is narrower than what ships; the reader's header is now the list. Results:
+
+- Mutation proofs M5–M8 each turned at least one test red.
+- The corpus diff shows 0 changes over 187 reports.
+- `ci:fast` is green: 6,618 pass, 0 fail.
+
+Details are in the bug report.
+
 ---
 
 <!--
@@ -459,6 +471,33 @@ comparison stay out of scope as § 4 states.
   references/document-change-log.md.
   EVERY new row bumps frontmatter `updated:` in the same edit.
 -->
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-28
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.240.qa.1.open-coverage-fail-closed-reader.md](./task.240.qa.1.open-coverage-fail-closed-reader.md)
+- **Gate File**: [task.240.gate.1.open-coverage-fail-closed-reader.yml](./task.240.gate.1.open-coverage-fail-closed-reader.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 155 (unit, parity, extractor, relationship lint) plus a 187-report corpus diff
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+
+One medium regression (TASK-240-QA-1,
+[task.240.bug.1.wrapped-value-reads-unreadable.md](./task.240.bug.1.wrapped-value-reads-unreadable.md)):
+a value under `finding:` that wraps onto a deeper line, valid YAML that the awk read correctly, now
+reads `unreadable`.
 
 <!-- change-log-start -->
 ## Change Log
@@ -469,6 +508,8 @@ comparison stay out of scope as § 4 states.
 | 2026-10-28 | 1.1     | Review passed (8/10) — parser rules aligned with six pinned parity expectations (case-blind values, column-0 entries, nested values and comments, `no-category`, escapes); SC-5 given a test; "184" count dropped | review-task |
 | 2026-10-28 |         | Status → ready-for-development | review-task |
 | 2026-10-28 |         | Implemented — 5 source files (1 new reader, 1 new unit suite), 32 unit tests + 1 new parity test; status → ready-for-review | develop |
+| 2026-10-28 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-10-28 |         | QA findings fixed — wrapped values under non-deciding keys accepted (bug.1), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

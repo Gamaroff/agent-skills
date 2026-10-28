@@ -12,7 +12,9 @@ All notable changes to this project will be documented in this file. Format foll
   `/review-pr` emits and prints `unreadable` for anything it cannot place: the old awk listed the
   shapes it refused, so each shape it did not list was skipped and read as "no coverage", and
   task 238's QA loop found one more per cycle. The printed contract, the routing and every existing
-  fixture are unchanged, and every tracked review report reads the same as before. The shell
+  fixture are unchanged, and every tracked review report reads the same as before. A long value
+  may wrap onto deeper lines, as YAML allows; a block YAML itself rejects (a wrapped line that
+  reads as `key: `, a quote never closed) now reads `unreadable` where the awk read a count. The shell
   `case` guard stays as the backstop for a reader that does not run. `pr-review-current.js` now
   exports its block extractor, so the two readers share one regex.
 

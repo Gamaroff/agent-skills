@@ -24,7 +24,10 @@
  *   - plain, 'single'- or "double"-quoted values (a block-style double-quoted value may carry
  *     escapes; a flow one may not), a trailing ` # comment`, and `>`/`|` block scalars;
  *   - under any key but `category` and `provenance`, deeper lines after an empty value or a block
- *     scalar indicator, read as text and never for a key.
+ *     scalar indicator, read as text and never for a key;
+ *   - under the same keys, a value wrapped onto deeper lines: a plain one whose wrapped lines do
+ *     not read as `key: `, or a quoted one whose closing quote is on a deeper line (task.240
+ *     bug.1). A quote still open at the entry's key indent is refused.
  * `category` and `provenance` values compare case-blind. `category` must be one of review-pr's six
  * tokens (review-pr SKILL.md Step 7).
  *
@@ -87,36 +90,13 @@ const refuse = (reason, detail) => {
  * the line. Tags, anchors, aliases and nested flow collections are refusals.
  */
 function scalar(s, flow) {
-  if (s.startsWith('"')) {
-    let value = "";
-    for (let i = 1; i < s.length; i++) {
-      const c = s[i];
-      if (c === '"') return { value, rest: s.slice(i + 1) };
-      if (c === "\\") {
-        // An escape inside a flow entry is refused: the parity suite pins it unreadable.
-        if (flow) refuse("bad-value", "an escaped quote inside a flow entry");
-        if (i + 1 >= s.length) break;
-        value += s[++i];
-        continue;
-      }
-      value += c;
-    }
-    refuse("bad-value", "an unterminated double-quoted value");
-  }
-  if (s.startsWith("'")) {
-    let value = "";
-    for (let i = 1; i < s.length; i++) {
-      if (s[i] === "'") {
-        if (s[i + 1] === "'") {
-          value += "'";
-          i++;
-          continue;
-        }
-        return { value, rest: s.slice(i + 1) };
-      }
-      value += s[i];
-    }
-    refuse("bad-value", "an unterminated single-quoted value");
+  if (s.startsWith('"') || s.startsWith("'")) {
+    const r = quoted(s[0], s.slice(1), flow);
+    if (r.closed) return { value: r.value, rest: r.rest };
+    refuse(
+      "bad-value",
+      `an unterminated ${s[0] === '"' ? "double" : "single"}-quoted value`,
+    );
   }
   if (/^[!&*]/.test(s)) refuse("bad-value", `a tag, anchor or alias: ${s}`);
   if (/^[[{]/.test(s)) refuse("bad-value", `a nested flow collection: ${s}`);
@@ -133,24 +113,71 @@ function scalar(s, flow) {
   };
 }
 
+/**
+ * Quoted text from just after its opening quote `q`, up to the closing one:
+ * { value, rest, closed }. `closed` is false when the line ends first.
+ */
+function quoted(q, s, flow) {
+  let value = "";
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === q) {
+      if (q === "'" && s[i + 1] === "'") {
+        value += "'";
+        i++;
+        continue;
+      }
+      return { value, rest: s.slice(i + 1), closed: true };
+    }
+    if (q === '"' && c === "\\") {
+      // An escape inside a flow entry is refused: the parity suite pins it unreadable.
+      if (flow) refuse("bad-value", "an escaped quote inside a flow entry");
+      if (i + 1 >= s.length) break;
+      value += s[++i];
+      continue;
+    }
+    value += c;
+  }
+  return { value, rest: "", closed: false };
+}
+
 /** What may follow a closed quoted scalar, or a flow entry's `}`: nothing but a comment. */
 function mustEnd(rest, what) {
   if (!/^[ \t]*(?:#.*)?$/.test(rest))
     refuse("bad-value", `text after ${what}: ${rest}`);
 }
 
-/** A block-style value: { value, deeper }, where `deeper` says what a deeper line after it means. */
+/**
+ * A block-style value: { value, deeper }, where `deeper` says what a deeper line after it means:
+ *   "text"   — anything (an empty value or a block scalar);
+ *   "plain"  — the wrapped tail of a plain value, which may not read as a key;
+ *   `"`/`'`  — the rest of a quoted value, up to its closing quote;
+ *   "refuse" — nothing may follow.
+ * A key in DECIDING never wraps: its value is refused rather than read across lines.
+ */
 function blockValue(key, raw) {
   const s = (raw || "").trim();
+  const deciding = DECIDING.has(key);
   if (s === "" || s.startsWith("#"))
-    return { value: "", deeper: DECIDING.has(key) ? "refuse" : "text" };
+    return { value: "", deeper: deciding ? "refuse" : "text" };
   if (BLOCK_SCALAR.test(s)) {
-    if (DECIDING.has(key)) refuse("bad-value", `a block scalar under ${key}:`);
+    if (deciding) refuse("bad-value", `a block scalar under ${key}:`);
     return { value: null, deeper: "text" };
   }
+  const q = s[0];
+  if ((q === '"' || q === "'") && !deciding) {
+    const r = quoted(q, s.slice(1), false);
+    if (!r.closed) return { value: r.value, deeper: q };
+    mustEnd(r.rest, "a quoted value");
+    return { value: r.value, deeper: "refuse" };
+  }
   const { value, rest } = scalar(s, false);
-  if (s.startsWith('"') || s.startsWith("'")) mustEnd(rest, "a quoted value");
-  return { value, deeper: "refuse" };
+  if (q === '"' || q === "'") {
+    mustEnd(rest, "a quoted value");
+    return { value, deeper: "refuse" };
+  }
+  // A comment ends a plain value: YAML has nothing a deeper line could continue.
+  return { value, deeper: deciding || /[ \t]#/.test(s) ? "refuse" : "plain" };
 }
 
 /** A one-line flow entry, `{k: v, k: v}`, from just after its `- `. Returns its keys. */
@@ -200,6 +227,23 @@ function parseBlock(block) {
     const indent = lead.length;
     const text = line.slice(indent);
 
+    // An open quoted value continues on deeper lines, and only there: a line at the entry's key
+    // indent ends the entry's keys, so a quote still open by then is never closed (task.240 bug.1).
+    // Checked before the comment skip: a `#` inside quotes is text.
+    if (cur && (cur.deeper === '"' || cur.deeper === "'")) {
+      if (indent <= cur.indent + 2)
+        refuse(
+          "bad-value",
+          `an unterminated quoted value under ${cur.lastKey}: (line ${n + 1})`,
+        );
+      const r = quoted(cur.deeper, text, false);
+      if (r.closed) {
+        mustEnd(r.rest, "a quoted value");
+        cur.deeper = "refuse";
+      }
+      continue;
+    }
+
     if (indent === 0) {
       if (text.startsWith("#"))
         refuse("bad-line", `a column-0 \`#\` line (line ${n + 1})`);
@@ -242,7 +286,14 @@ function parseBlock(block) {
 
     // A line deeper than the open entry's keys belongs to the last key's value.
     if (cur && !cur.flow && indent > cur.indent + 2) {
-      if (cur.deeper !== "text")
+      // A wrapped plain value may not hold `key: ` — YAML refuses that, and reading it as text
+      // would hide a key the author meant.
+      if (cur.deeper === "plain" && /:(?:[ \t]|$)/.test(text))
+        refuse(
+          "bad-value",
+          `a deeper line under ${cur.lastKey}: that reads as a key (line ${n + 1})`,
+        );
+      if (cur.deeper !== "text" && cur.deeper !== "plain")
         refuse(
           "bad-value",
           `a deeper line under ${cur.lastKey}: (line ${n + 1})`,
@@ -285,6 +336,8 @@ function parseBlock(block) {
       );
     setKey(cur, k[1], k[2], n);
   }
+  if (cur && (cur.deeper === '"' || cur.deeper === "'"))
+    refuse("bad-value", `an unterminated quoted value under ${cur.lastKey}:`);
   close();
   if (!top.has("findings"))
     refuse("no-findings-key", "the block has no findings: key");
