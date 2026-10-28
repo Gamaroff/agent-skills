@@ -25,8 +25,8 @@ All notable changes to this project will be documented in this file. Format foll
   findings route**: a 5c `CONCERNS` whose review holds an open `category: coverage` finding returns
   to 5b like `REQUEST CHANGES`, `/qa-fix` gains a priority row for coverage findings at any severity,
   the findings ingester now carries `category`, and the resume contract splits its exit row in three
-  (obs #8). The open-coverage check reads every YAML spelling of a finding and prints
-  `unreadable` for a block it cannot account for. `pr-review-loop-parity.test.mjs` runs the
+  (obs #8). The open-coverage check reads an allow-list of the line and value shapes review-pr
+  writes and prints `unreadable` for anything else, never `0`. `pr-review-loop-parity.test.mjs` runs the
   open-coverage block against fixtures;
   `qa-loop-fast-gate-outcomes.test.mjs` and `qa-ci-read.test.mjs` are new.
 

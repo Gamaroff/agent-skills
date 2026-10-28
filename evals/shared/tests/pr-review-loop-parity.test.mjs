@@ -911,9 +911,11 @@ const COVERAGE_CASES = [
     0,
   ],
   [
-    "a category that only contains the word is not coverage",
+    // Was 0 until bug.17: review-pr writes six category tokens, and any other is refused rather
+    // than read as "a category, not coverage".
+    "a category that only contains the word is a token review-pr does not write",
     [{ category: "coverage-gap" }],
-    0,
+    "unreadable",
   ],
   [
     "the last entry is read too (no trailing `- id:` closes it)",
@@ -1026,6 +1028,49 @@ const RAW_CASES = [
     "a flow entry the reader cannot tokenise",
     '  - {id: PC-1, category: coverage, finding: "an \\"escaped\\" quote"}\n',
     "unreadable",
+  ],
+  // Values are allow-listed as well as lines (task.238 bug.17): each of these printed 0.
+  [
+    "a block-scalar category",
+    "  - id: PC-1\n    category: >-\n      coverage\n",
+    "unreadable",
+  ],
+  [
+    "a tagged category",
+    "  - id: PC-1\n    category: !!str coverage\n",
+    "unreadable",
+  ],
+  [
+    "an anchored category",
+    "  - id: PC-1\n    category: &c coverage\n",
+    "unreadable",
+  ],
+  [
+    "a provenance value continued on a deeper line",
+    "  - id: PC-1\n    category: coverage\n    provenance: pre-existing\n      on the base only\n",
+    "unreadable",
+  ],
+  [
+    "provenance given twice in one entry",
+    "  - id: PC-1\n    category: coverage\n    provenance: pre-existing\n    provenance: new\n",
+    "unreadable",
+  ],
+  [
+    "a comment inside a flow entry, which swallows its closing brace",
+    "  - {id: PC-1, category: coverage #x}\n",
+    "unreadable",
+  ],
+  [
+    "a comment inside a flow entry before a readable category",
+    "  - {id: PC-1 #x, category: trail}\n",
+    "unreadable",
+  ],
+  // review-pr's documented shape still reads: one exempted coverage entry, a trail entry and a
+  // block-scalar finding whose text names both keys.
+  [
+    "review-pr's documented block, coverage exempted",
+    '  - id: PC-1\n    category: coverage\n    severity: medium\n    confidence: high\n    ref: "SC-3"\n    provenance: pre-existing\n    anchor_check: no-line\n    finding: >-\n      category: coverage, provenance: new\n    suggested_action: file a follow-up\n  - id: CR-1\n    category: bug\n    severity: low\n    ref: "x.js:3"\n    finding: a typo\n',
+    0,
   ],
 ];
 

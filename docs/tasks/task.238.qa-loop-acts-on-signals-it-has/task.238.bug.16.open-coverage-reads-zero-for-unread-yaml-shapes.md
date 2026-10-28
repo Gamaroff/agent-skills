@@ -4,7 +4,7 @@
 **Bug ID**: TASK-238-BUG-16
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 7 diff review, CR7-2; reproduced by the probe engine)
 **Date Found**: 2026-10-28
 
@@ -91,3 +91,4 @@ review reports read the same value as before, so no shape the corpus uses is ref
 | 2026-10-28 | New | qa-task | Found by QA cycle 7 (`task.238.qa.7.qa-loop-acts-on-signals-it-has.md`) |
 | 2026-10-28 | In Progress | qa-fix | Investigation started (QA cycle 7 fix) |
 | 2026-10-28 | Ready for QA | qa-fix | Allow-list of line shapes; any other line reads `unreadable` |
+| 2026-10-28 | Closed | qa-task | Verified by task.238.qa.8.qa-loop-acts-on-signals-it-has.md |

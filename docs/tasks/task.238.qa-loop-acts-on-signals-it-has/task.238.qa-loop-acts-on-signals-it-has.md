@@ -361,18 +361,18 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.238.qa.7.qa-loop-acts-on-signals-it-has.md](./task.238.qa.7.qa-loop-acts-on-signals-it-has.md)
-- **Gate File**: [task.238.gate.7.qa-loop-acts-on-signals-it-has.yml](./task.238.gate.7.qa-loop-acts-on-signals-it-has.yml)
+- **Full Report**: [task.238.qa.8.qa-loop-acts-on-signals-it-has.md](./task.238.qa.8.qa-loop-acts-on-signals-it-has.md)
+- **Gate File**: [task.238.gate.8.qa-loop-acts-on-signals-it-has.yml](./task.238.gate.8.qa-loop-acts-on-signals-it-has.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 6511
+- **Tests Executed**: 6521
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- The cycle 6 deletion of the `pre-existing` fast-gate outcome holds. bug.13 and bug.14 are closed, and every former misread log shape reads attributable with nothing run at the base
-- The safety re-probe found 2 MEDIUM defects in the §5c open-coverage check, both reproduced by the probe engine. Provenance is matched in free text (bug.15), and two valid YAML shapes read `0` (bug.16)
+- The cycle 7 fixes hold: bug.15, bug.16 and PRB7-1 are closed, and both guards are mutation-proved. Fast gate and PR CI are green
+- One MEDIUM in the §5c open-coverage check (bug.17): its allow-list checks line shapes but not values, so a tagged, anchored or block-scalar category, a continued provenance value and a malformed flow entry read `0`
 
 ## Definition of Done - Gaps Identified
 
@@ -439,6 +439,8 @@ The QA gate passed. The gaps below come from `/finalise`'s own checks: the secur
 | 2026-10-28 | 1.2 | QA findings fixed — gate 6 FAIL, 3 entries (bug.13, bug.14, CR6-6), 1 iteration; third strike on `fast-gate-outcome.sh`: `pre-existing red` deleted, SC-2 and SC-6 amended, structured comparison deferred; status → ready-for-review | qa-fix |
 | 2026-10-28 |  | QA gate CONCERNS (80/100) — 3 findings (2 medium, 1 low); bug.13–bug.14 verified and closed | qa-task |
 | 2026-10-28 |  | QA findings fixed — gate 7 CONCERNS, 3 entries (bug.15, bug.16, PRB7-1) plus cleanup CR7-5, 1 iteration; the §5c open-coverage check now reads an allow-list of line shapes; the wrapper's signal sentence counts only after node's summary | qa-fix |
+| 2026-10-28 |  | QA gate CONCERNS (80/100) — 1 finding (1 medium); bug.15–bug.16 verified and closed | qa-task |
+| 2026-10-28 |  | QA findings fixed — gate 8 CONCERNS, 1 entry (bug.17), 1 iteration; the §5c open-coverage check now allow-lists values as well as lines (review-pr's six category tokens; a continued, repeated or commented value reads `unreadable`) | qa-fix |
 <!-- change-log-end -->
 
 ---

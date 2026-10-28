@@ -1535,29 +1535,38 @@ REVIEW="{the PR review report this cycle's 5c wrote}"
 #   `- {k: v, …}`   opens a one-line flow entry; quoted values are read whole, so a comma or a
 #                   `provenance:` inside one is text, not a key
 #   `key: value`    a key of the open entry, two columns deeper than its dash
-#   deeper lines    a block scalar or nested value: text, never read for a key
-# Keys are read only in key position, so `provenance: pre-existing` quoted in a `finding:` does not
-# exempt it (task.238 bug.15). An entry is open coverage when its `category:` is `coverage` and its
-# `provenance:` is not `pre-existing` (review-pr emits no status field), read case-blind, bare or
-# YAML-quoted, with a trailing `# comment` stripped (`\047` is a single quote inside this
-# single-quoted awk program). A report that cannot be read, whose block has no `findings:` key,
-# holds an inline list, or holds an entry with no category prints `unreadable`, never 0: "found none"
-# and "could not look" must not print the same value (task.238 bug.1, bug.8).
+#   deeper lines    a block scalar or nested value: text, never read for a key — but a deeper line
+#                   right after `category:` or `provenance:` continues THAT value, and is refused
+# Values are allow-listed too (task.238 bug.17): `category:` must be one of the six tokens review-pr
+# writes (coverage, scope, trail, consistency, bug, cleanup), so a tag, an anchor or a block-scalar
+# indicator is refused rather than read as a non-coverage category; a key given twice in one entry,
+# or a ` #` inside a flow value, is refused too. Keys are read only in key position, so
+# `provenance: pre-existing` quoted in a `finding:` does not exempt it (task.238 bug.15). An entry is
+# open coverage when its `category:` is `coverage` and its `provenance:` is not `pre-existing`
+# (review-pr emits no status field), read case-blind, bare or YAML-quoted, with a trailing
+# `# comment` stripped (`\047` is a single quote inside this single-quoted awk program). A report
+# that cannot be read, whose block has no `findings:` key, holds an inline list, or holds an entry
+# with no category prints `unreadable`, never 0: "found none" and "could not look" must not print the
+# same value (task.238 bug.1, bug.8).
 BLOCK=""
 [ -f "$REVIEW" ] && [ -r "$REVIEW" ] && BLOCK=$(sed -n '/^## Machine-Readable Findings/,/^## /p' "$REVIEW")
 if printf '%s\n' "$BLOCK" | grep -qE '^findings:'; then
   OPEN_COVERAGE=$(printf '%s\n' "$BLOCK" \
-    | awk 'function done() { if (open) { e++; if (cat) c++; if (cov && !pre) n++ }; open = cat = cov = pre = 0 }
+    | awk 'function done() { if (open) { e++; if (cat) c++; if (cov && !pre) n++ }; open = cat = cov = pre = 0; lk = ""; split("", seen) }
            function unq(v) { if (v ~ /^".*"$/ || v ~ /^\047.*\047$/) v = substr(v, 2, length(v) - 2); return v }
-           function key(k, v) { if (k == "category") { if (v != "") cat = 1; if (v == "coverage") cov = 1 }
-                                if (k == "provenance" && v == "pre-existing") pre = 1 }
+           function key(k, v) { if (k == "category" || k == "provenance") { if (k in seen) bad = 1; seen[k] = 1 }
+                                if (k == "category") { cat = 1; if (v == "coverage") cov = 1
+                                                       if (v !~ /^(coverage|scope|trail|consistency|bug|cleanup)$/) bad = 1 }
+                                if (k == "provenance" && v == "pre-existing") pre = 1
+                                lk = k }
            function pair(s,   k) { k = s; sub(/:.*$/, "", k); sub(/^[^:]*:[[:space:]]*/, "", s)
                                     sub(/[[:space:]]+#.*$/, "", s); sub(/[[:space:]]+$/, "", s); key(k, unq(s)) }
            function flow(s,   k, v) {
              while (match(s, /^[[:space:]]*[a-z0-9_-]+:[[:space:]]*/)) {
                k = substr(s, 1, RLENGTH); s = substr(s, RLENGTH + 1); sub(/^[[:space:]]*/, "", k); sub(/:.*$/, "", k)
                if (match(s, /^"[^"]*"/) || match(s, /^\047[^\047]*\047/)) v = substr(s, 2, RLENGTH - 2)
-               else { match(s, /^[^,}"\047]*/); v = substr(s, 1, RLENGTH); sub(/[[:space:]]+$/, "", v) }
+               else { match(s, /^[^,}"\047]*/); v = substr(s, 1, RLENGTH); sub(/[[:space:]]+$/, "", v)
+                      if (v ~ /[[:space:]]#/) return 0 }
                s = substr(s, RLENGTH + 1); key(k, v)
                if (match(s, /^[[:space:]]*}[[:space:]]*(#.*)?$/)) return 1
                if (!match(s, /^[[:space:]]*,/)) return 0
@@ -1572,7 +1581,7 @@ if printf '%s\n' "$BLOCK" | grep -qE '^findings:'; then
            (ind == "" || d == ind) && match(l, /^ *- \{/) { ind = d; done(); open = 1; if (!flow(substr(l, RLENGTH + 1))) bad = 1; next }
            (ind == "" || d == ind) && l ~ /^ *- [a-z0-9_-]+:/ { ind = d; done(); open = 1; pair(substr(l, d + 3)); next }
            open && d == ind + 2 && l ~ /^ *[a-z0-9_-]+:/ { pair(substr(l, d + 1)); next }
-           open && d > ind + 2 { next }
+           open && d > ind + 2 { if (lk == "category" || lk == "provenance") bad = 1; next }
            { bad = 1 }
            END { done(); if (bad || e != c) print "unreadable"; else print n + 0 }')
 else
