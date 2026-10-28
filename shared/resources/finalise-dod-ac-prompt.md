@@ -63,7 +63,7 @@ Based on `<STORY_TYPE>`:
 - **api / backend**: Is there an updated OpenAPI/Swagger spec, or API docs file? Search for `.yaml`/`.json` files with `paths:` or `swagger:` content, or `docs/api/`.
 - **ui / frontend**: Are there updated screenshots or user guide markdown files in `docs/`?
 - **data**: Is schema documentation updated? Search `docs/` for ERD or schema doc mentions.
-- **refactoring / task**: Are any README or skill files updated where behaviour changed? Check `CHANGELOG.md` for an entry matching this story/task.
+- **refactoring / task**: Are any README or skill files updated where behaviour changed? Do not read `CHANGELOG.md` for this: the changelog entry is agent 4's check (`finalise-dod-docs-prompt.md`), which runs only when the project opts in (`changelog.enforce`, task.241). A criterion of the work item's own that names the changelog is still checked above, as a documentation criterion.
 
 If no documentation update is required for the story type (e.g. pure internal refactor): mark `NOT_APPLICABLE` with a note citing the reason from the story file.
 

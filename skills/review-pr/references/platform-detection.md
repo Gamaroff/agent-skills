@@ -267,7 +267,7 @@ consumes resolves to, relative to what its own line says?* Two answers, with dif
 | | Constructs | Radius |
 | --- | --- | --- |
 | **Non-local** | anchor, alias, merge key, flow mapping spanning lines, explicit tag, BOM, document separator | **the whole file** — each can move or reinterpret content declared elsewhere, and a line scanner cannot bound which key it reaches |
-| **Local** | quoted key, space before the colon, explicit `? key`, **duplicate key** | **that key only** — refused when it spells a key this reader consumes (`access`, `tracker`, `vcs`, `prd`, `architecture`, `prdShardedLocation`, `architectureShardedLocation`), or when quoting hides an escape a parser would resolve |
+| **Local** | quoted key, space before the colon, explicit `? key`, **duplicate key** | **that key only** — refused when it spells a key this reader consumes (`_CONFIG_GUARDED_KEYS` in read-config.sh, pinned against the call sites; `changelog` counts only as a top-level key and `enforce` only under `changelog:`, per `_CONFIG_GUARDED_SCOPES`), or when quoting hides an escape a parser would resolve |
 
 Everything else is read from its own line and cannot mislead. That is a closed rule over a closed
 key set — a grammar, rather than one more spelling patched shut each cycle.

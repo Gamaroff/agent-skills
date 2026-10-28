@@ -71,7 +71,7 @@ Before cutting a repo release:
 >   acceptance the author knows what changed and why it matters; at release time someone reconstructs
 >   it from commit subjects. **It runs only because this repository opts in** with
 >   `changelog.enforce: true` in its `skills-config.yaml`. The key is off by default, so a consumer
->   repository's `CHANGELOG.md` is never read; remove the key here and 6d stops guarding this
+>   repository's `CHANGELOG.md` is never read unless its own work item's criteria name it; remove the key here and 6d stops guarding this
 >   convention, with only the post-merge drift test left (task.241).
 >
 > The one-liner that used to sit here is what the test runs; keep it for a by-hand read of the bugs:

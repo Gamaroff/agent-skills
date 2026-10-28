@@ -31,6 +31,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   readFileSync,
+  readdirSync,
   existsSync,
   mkdtempSync,
   writeFileSync,
@@ -717,6 +718,70 @@ test("/finalise passes the changelog opt-in to the docs subagent, which gates on
   );
   assert.match(step2, /changelog checks not enabled/);
   assert.match(step2, /repository keeps no CHANGELOG\.md/);
+});
+
+// The docs prompt's Step 2 is the ONE changelog check /finalise's agents make, and it is gated on
+// the opt-in (the test above). Every other prompt /finalise dispatches must not read CHANGELOG.md on
+// its own initiative. task.241 gated the two sites it named and left two more ungated (agent 1's
+// task arm and its bug-mode fix-evidence check), so the claim "unset, /finalise never reads
+// CHANGELOG.md" shipped false (BUG-2). This enumerates every CHANGELOG line instead of naming sites.
+test("no dispatched DoD prompt but the gated docs prompt checks CHANGELOG.md", () => {
+  const dir = path.join(REPO_ROOT, "shared/resources");
+  const prompts = readdirSync(dir).filter((f) =>
+    /^finalise-dod-.*-prompt\.md$/.test(f),
+  );
+  assert.ok(prompts.length >= 5, `expected the DoD prompts, found: ${prompts}`);
+  // Each entry: a line shape that mentions the changelog without checking it, and why.
+  const allowed = [
+    // The work item's OWN criterion that names the changelog — driven by its criteria, not by us.
+    [
+      /a CHANGELOG entry cites the work item/,
+      "documentation-criterion definition",
+    ],
+    [/e\.g\. `CHANGELOG\.md:309`/, "documentation-criterion citation example"],
+    [
+      /for a CHANGELOG citation, the repository's changelog corpus guard/,
+      "documentation-criterion test citation",
+    ],
+    [
+      /failed its CHANGELOG criterion for having no test/,
+      "history of the documentation-criterion rule",
+    ],
+    // The deferral to agent 4, which is gated.
+    [
+      /Do not read `CHANGELOG\.md`/,
+      "defers the check to the gated docs prompt",
+    ],
+  ];
+  const used = new Set();
+  const ungated = [];
+  for (const f of prompts) {
+    if (f === "finalise-dod-docs-prompt.md") continue; // gated; held by the test above
+    read(`shared/resources/${f}`)
+      .split("\n")
+      .forEach((line, i) => {
+        // Upper case only: `CHANGELOG` names the file and the convention; the lower-case
+        // `changelog.enforce` names the opt-in and reads nothing. ONE mention per line, so an
+        // allowed phrase cannot carry a second, checking mention beside it (QA cycle 1 mutation).
+        const mentions = line.match(/CHANGELOG/g)?.length ?? 0;
+        if (mentions === 0) return;
+        const hit =
+          mentions === 1 ? allowed.findIndex(([re]) => re.test(line)) : -1;
+        if (hit < 0) ungated.push(`${f}:${i + 1}: ${line.trim()}`);
+        else used.add(hit);
+      });
+  }
+  assert.deepEqual(
+    ungated,
+    [],
+    "a DoD prompt checks CHANGELOG.md outside the opt-in gate",
+  );
+  const stale = allowed.filter((_, i) => !used.has(i)).map(([, why]) => why);
+  assert.deepEqual(
+    stale,
+    [],
+    "an allow-list entry matches nothing — remove it",
+  );
 });
 
 test("/finalise still dispatches four DoD agents", () => {

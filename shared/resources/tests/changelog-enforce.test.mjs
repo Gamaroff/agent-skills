@@ -110,6 +110,101 @@ describe("changelog-enforce.sh gives the same answer under every tier", () => {
   }
 });
 
+// "Could not read" is not "not set" (task.241, BUG-1). The plain reader answered "" for both, so an
+// anchor anywhere in an opted-in config turned the checks off on the awk tier with nothing printed.
+// Each case is a config that opts in; the awk tier cannot read it, and must say so.
+describe("changelog-enforce.sh names a config it could not read", () => {
+  const ANCHOR_ELSEWHERE =
+    "defaults: &d\n  x: 1\nchangelog:\n  enforce: true\n";
+  test("[awk] an anchor elsewhere in an opted-in config → off, naming __UNSUPPORTED__", () => {
+    const r = resolve(ANCHOR_ELSEWHERE, { tier: "awk" });
+    assert.equal(r.status, 0);
+    assert.equal(r.stdout, "off");
+    assert.match(r.stderr, /could not read .*__UNSUPPORTED__/);
+  });
+  test("[python] the same config reads, and resolves on", (t) => {
+    if (!PYTHON_TIER)
+      return t.skip(
+        "tier python unavailable on this host (no python with pyyaml)",
+      );
+    const r = resolve(ANCHOR_ELSEWHERE, { tier: "python" });
+    assert.equal(r.stdout, "on");
+    assert.equal(r.stderr, "");
+  });
+  for (const tier of TIERS) {
+    test(`[${tier}] enforce holding a mapping → off, naming the mapping`, () => {
+      const r = resolve("changelog:\n  enforce:\n    value: true\n", { tier });
+      assert.equal(r.stdout, "off");
+      assert.match(r.stderr, /holds a mapping/);
+    });
+  }
+  test("[awk] a block scalar → off, saying it is a block scalar", () => {
+    const r = resolve("changelog:\n  enforce: |\n    true\n", { tier: "awk" });
+    assert.equal(r.stdout, "off");
+    assert.match(r.stderr, /is a block scalar/);
+  });
+});
+
+// Guarding changelog.enforce must not change how any other key reads (task.241, BUG-3). `enforce`
+// is a generic leaf name: guarded at any depth, a quoted `"enforce":` under an unrelated block made
+// the awk subset scan refuse the whole file, so `tracker` read __UNSUPPORTED__ where develop read
+// `github`. Both directions are held: refused under `changelog:`, readable anywhere else.
+describe("the changelog guard is scoped to changelog.enforce (awk tier)", () => {
+  function readTracker(config) {
+    const dir = mkdtempSync(path.join(tmpdir(), "changelog-guard-"));
+    try {
+      writeFileSync(path.join(dir, "skills-config.yaml"), config);
+      return spawnSync(
+        "bash",
+        ["-c", `source "${READ_CONFIG}" && read_config_key tracker`],
+        {
+          cwd: dir,
+          encoding: "utf8",
+          env: childEnv({ AGENT_SKILLS_CONFIG_TIER: "awk" }),
+        },
+      ).stdout.trim();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+  for (const [label, config, expected] of [
+    [
+      'a quoted "enforce": under another block',
+      'tracker: github\nother:\n  "enforce": 1\n',
+      "github",
+    ],
+    [
+      "a spaced `enforce :` under another block",
+      "tracker: github\nother:\n  enforce : 1\n",
+      "github",
+    ],
+    [
+      'a quoted "changelog": nested under another block',
+      'tracker: github\nother:\n  "changelog": 1\n',
+      "github",
+    ],
+    [
+      'a quoted "enforce": under changelog:',
+      'tracker: github\nchangelog:\n  "enforce": true\n',
+      "__UNSUPPORTED__",
+    ],
+    [
+      "a spaced `enforce :` under changelog:",
+      "tracker: github\nchangelog:\n  enforce : true\n",
+      "__UNSUPPORTED__",
+    ],
+    [
+      'a quoted top-level "changelog":',
+      'tracker: github\n"changelog":\n  enforce: true\n',
+      "__UNSUPPORTED__",
+    ],
+  ]) {
+    test(`${label} → tracker reads ${expected}`, () => {
+      assert.equal(readTracker(config), expected);
+    });
+  }
+});
+
 test("this repository opts in: its own skills-config.yaml resolves to on", () => {
   const r = spawnSync("bash", [RESOLVER], {
     cwd: REPO_ROOT,

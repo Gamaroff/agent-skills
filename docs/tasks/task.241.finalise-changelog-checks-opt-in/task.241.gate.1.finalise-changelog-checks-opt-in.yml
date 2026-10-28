@@ -1,0 +1,86 @@
+schema: 2
+task: 'task.241.finalise-changelog-checks-opt-in'
+task_title: 'Make /finalise changelog checks opt-in'
+gate: CONCERNS
+status_reason: 'All four phases are delivered and every committed test is green. Three medium findings remain: an unreadable config silently resolves to off (CR-1), two dispatched DoD prompts still read CHANGELOG.md when the checks are off, which contradicts the task claim (CR-2), and guarding the bare key enforce makes the awk tier refuse unrelated consumer configs (CR-3, a regression against the base).'
+reviewer: 'QA Engineer'
+head: '4ade4faf8faa4e94cb1b4a919ffbf568cba3edbb'
+updated: '2026-10-28T10:27:56Z'
+
+top_issues:
+  - id: 'TASK-241-CR-1'
+    severity: medium
+    file: 'shared/resources/changelog-enforce.sh'
+    finding: 'The non-strict read_nested_config_key returns empty both for an unset key and for a config the awk-tier subset scan refused, and the resolver maps both to a silent off. An anchor anywhere in an opted-in config, on a host without pyyaml, disables the 6d HALT with no warning (reproduced).'
+    suggested_action: 'Read with read_nested_config_key_strict, handle __UNSUPPORTED__, __UNREADABLE__ and __MAP__ separately with a stderr line, decide whether to fail closed, and add an anchor-elsewhere test case forced to the awk tier.'
+    suggested_owner: dev
+    bug_ref: 'task.241.bug.1.unreadable-config-reads-as-unset.md'
+    status: open
+  - id: 'TASK-241-CR-2'
+    severity: medium
+    file: 'shared/resources/finalise-dod-ac-prompt.md'
+    finding: 'finalise-dod-ac-prompt.md:66 and finalise-dod-fix-evidence-prompt.md:87 still instruct a CHANGELOG.md read with changelog.enforce unset, so the claim that unset /finalise never reads CHANGELOG.md is false and consumers are still judged on this convention.'
+    suggested_action: 'Pass <CHANGELOG_ENFORCE> to agent 1 in both modes and gate those lines on it, then add an enumeration test with a non-vacuity floor over every CHANGELOG line in finalise-dod-*-prompt.md.'
+    suggested_owner: dev
+    bug_ref: 'task.241.bug.2.two-dispatched-prompts-still-read-changelog.md'
+    status: open
+  - id: 'TASK-241-CR-3'
+    severity: medium
+    file: 'shared/resources/read-config.sh'
+    finding: 'Adding the bare leaf enforce to _CONFIG_GUARDED_KEYS makes the awk-tier subset scan refuse any config with a quoted "enforce": under any block. tracker then reads __UNSUPPORTED__ where origin/develop reads github (reproduced). The reviewer rated this low; QA raised it to medium as a confirmed regression.'
+    suggested_action: 'Scope the local rules for enforce to the changelog parent (guard parent.child pairs), and add a regression test comparing a non-changelog parent.'
+    suggested_owner: dev
+    bug_ref: 'task.241.bug.3.guarding-enforce-refuses-unrelated-configs.md'
+    status: open
+  - id: 'TASK-241-PROBE-1'
+    severity: low
+    file: 'shared/resources/changelog-enforce.sh'
+    finding: 'Probe case off.block-scalar (enforce: | true): the python tier reads true and resolves on, while the awk tier reads | and resolves off with a warning, so the resolver''s "same answer under every tier" property fails for a block-scalar value.'
+    suggested_action: 'Treat a value the awk tier returns as a block indicator (|, >) as unreadable, or document block scalars as unsupported for this key; this is low-plausibility input.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 32
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 15
+    escaped: 0
+    notes: 'shell-argv probe of changelog-enforce.sh over 15 config fixtures (task.241.qa.1.security.run.json): command substitution and backticks in the value are inert data, 0 escapes; 1 reproduced case is a tier-consistency defect (PROBE-1), not an injection.'
+  performance:
+    status: PASS
+    notes: 'One extra config read per /finalise run; no bound stated.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1: an unreadable config is indistinguishable from unset. CR-3: a regression where unrelated consumer configs are refused on the awk tier.'
+  maintainability:
+    status: CONCERNS
+    notes: 'CR-2: the population of CHANGELOG readers was not enumerated, and the shipped docs claim more than the code does.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1, CR-2 and CR-3 (bug reports 1-3).'
+      refs: ['shared/resources/changelog-enforce.sh', 'shared/resources/finalise-dod-ac-prompt.md', 'shared/resources/finalise-dod-fix-evidence-prompt.md', 'shared/resources/read-config.sh']
+  future:
+    - action: 'qa-execute-snippets refuses a helper called with no arguments inside $( ), because it reads the path as "…sh)" ("not a literal path"), so Step 4b could not execute the two changed blocks (6d, Step 3b). Pre-existing in the engine: reproduced with qa-cycle.sh on a probe file, and the same call with an argument is runnable. The 6d block is executed per PR by finalise-publish-boundary.test.mjs.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+      provenance: pre-existing
+    - action: 'The zsh arm of the 6d tests is unverified for this change: no host available (laptop, .249) has zsh, and CI SHELLS drops it.'
+      refs: ['evals/shared/tests/finalise-publish-boundary.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1, CR-2 and CR-3 fixed and re-reviewed']

@@ -26,7 +26,7 @@ Changelog checks: `<CHANGELOG_ENFORCE>`.
 
 1. **If that value is `off`** (or anything but `on`): mark `CHANGELOG.md updated` as `NOT_APPLICABLE` with the note "changelog checks not enabled" and skip the rest of this step. Do not `ls`, read or grep `CHANGELOG.md`. The project has not opted in (`changelog.enforce` in `skills-config.yaml`), and a changelog it keeps — generated, or in its own format — is its own business. `/finalise` 6d reads the same opt-in.
 2. Check if `CHANGELOG.md` exists at the repo root: `ls CHANGELOG.md 2>/dev/null`. **If it does not, mark `CHANGELOG.md updated` as `NOT_APPLICABLE` with the note "repository keeps no CHANGELOG.md" and skip the rest of this step**, whatever the change type: a project that keeps no changelog cannot record an entry in one.
-3. If it exists, grep for: the PR number `#<PR_NUMBER>`, or the story/task title (key words), or the current date (YYYY-MM-DD).
+3. If it exists, grep for: the PR number `#<PR_NUMBER>`, the work item's citation (`(task N)`, or `(bug N)` when `<STORY_TYPE>` is `bug`), the story/task title (key words), or the current date (YYYY-MM-DD). This is the only changelog check `/finalise`'s agents make: agent 1 (both the AC and the fix-evidence prompt) leaves it to this step.
 4. Determine if a CHANGELOG entry is required:
    - **Required**: public-facing API changes, new features, removed features, breaking changes, UI behaviour changes, schema changes visible to users/clients.
    - **Not required** (mark `NOT_APPLICABLE`): pure internal refactoring with no observable external change, skill file edits, test-only changes. Cite the reason from the story file if marking NOT_APPLICABLE.
