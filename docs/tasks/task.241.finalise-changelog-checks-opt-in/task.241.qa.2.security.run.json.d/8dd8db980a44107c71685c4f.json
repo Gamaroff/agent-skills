@@ -1,0 +1,27 @@
+{
+  "sink": "path",
+  "entry": "shell-argv:shared/resources/changelog-enforce.sh",
+  "name": null,
+  "call_site": null,
+  "verdict": "present-but-inert",
+  "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+  "executed": 15,
+  "passed": 14,
+  "reproduced": 1,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": [
+    "bash"
+  ],
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": [
+    "{input}"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-28T10:40:29.885Z"
+}

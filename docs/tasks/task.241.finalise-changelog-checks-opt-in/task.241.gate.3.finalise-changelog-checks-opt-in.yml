@@ -1,0 +1,75 @@
+schema: 2
+task: 'task.241.finalise-changelog-checks-opt-in'
+task_title: 'Make /finalise changelog checks opt-in'
+gate: PASS
+status_reason: 'Cycle 2 fixes verified: CI green on 93fb2108 (BUG-4 closed; tmp-leak ratchet ok), 3b/6d HALT changelog-unknown on an unrunnable resolver, enumeration covers assets/ and any case. The scoped re-review found 2 low findings and nothing medium or high.'
+reviewer: 'QA Engineer'
+head: '93fb210830f0698549512a16c24adb89aade8b93'
+updated: '2026-10-28T11:49:57Z'
+
+top_issues:
+  - id: 'TASK-241-CR3-1'
+    severity: low
+    file: 'evals/shared/tests/finalise-publish-boundary.test.mjs'
+    finding: 'The bug-template allow-list span uses `.*?` between its two anchors, so a real changelog read inserted between them would be cut out with the span and pass.'
+    suggested_action: 'Replace `.*?` with the template''s literal middle text so the span covers only fixed wording.'
+    suggested_owner: dev
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+  - id: 'TASK-241-CR3-2'
+    severity: low
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The new 6d HALT token `changelog-unknown` is not named in the 6d heading (SKILL.md:1820), the completion checklist (SKILL.md:2482) or the runbook (docs/runbooks/task-development.md:261), which list only `no-changelog-entry`; no test checks that every 6d HALT token is listed.'
+    suggested_action: 'Name `changelog-unknown` in the 6d heading, checklist and runbook, and extend the 6d HALT-naming test to cover every `HALT:` token in the block.'
+    suggested_owner: dev
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+
+waiver:
+  active: false
+
+quality_score: 96
+
+evidence:
+  tests_reviewed: 75
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 15
+    escaped: 0
+    notes: 'Cycle 2 probe record (task.241.qa.2.security.run.json) stands; the resolver change since adds only the `unknown` answer on a failed source, which takes no input.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'CI green on the head, including the zsh arm and the tmp-leak ratchet; a broken resolver install now HALTs instead of disabling the check.'
+  maintainability:
+    status: PASS
+    notes: 'CR3-1 and CR3-2 are low.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'qa-execute-snippets refuses an argument-less helper inside $( ) as "not a literal path" (pre-existing engine limit; see gate 1).'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+      provenance: pre-existing
+    - id: 'TASK-241-CR3-1'
+      action: 'The bug-template allow-list span uses `.*?` between its two anchors, so a real changelog read inserted between them would be cut out with the span and pass. Replace `.*?` with the template''s literal middle text.'
+      refs: ['evals/shared/tests/finalise-publish-boundary.test.mjs']
+      carried_from: 'top_issues (route 2b, cycle 3)'
+    - id: 'TASK-241-CR3-2'
+      action: 'The 6d HALT token `changelog-unknown` is not named in the 6d heading, the completion checklist or the runbook. Name it there and extend the 6d HALT-naming test to cover every `HALT:` token in the block.'
+      refs: ['skills/finalise/SKILL.md', 'docs/runbooks/task-development.md']
+      carried_from: 'top_issues (route 2b, cycle 3)'
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []

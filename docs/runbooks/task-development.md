@@ -250,10 +250,11 @@ _Provenance: `docs/prd/onboarding/prd.1.onboarding/epics/epic.1.1.quickstart-and
 ### `/finalise` flags "CHANGELOG.md not updated"
 
 **You see:** DoD gap: `CHANGELOG.md entry missing`.
-**Cause:** `/develop` skipped CHANGELOG for a task marked internal; `/finalise` enforces it when public behaviour changed.
+**Cause:** `/develop` skipped CHANGELOG for a task marked internal; `/finalise` enforces it when public behaviour changed. This check runs only when `skills-config.yaml` sets `changelog.enforce: true`; unset, `/finalise` never reads `CHANGELOG.md` and the item reads `NOT_APPLICABLE`.
 **Fix:**
 1. Add an entry to `CHANGELOG.md` under the current version heading.
 2. Re-invoke `/finalise` — it detects the entry and clears the gap.
+3. If your project does not keep its changelog this way, remove `changelog.enforce` instead.
 
 _Provenance: `docs/prd/onboarding/prd.1.onboarding/epics/epic.1.1.quickstart-and-decision-tree-entry-point/stories/story.1.1.5.readme-start-here-callout/story.1.1.5.implementation.1.readme-start-here-callout-initial-run.md` (same DoD check)_
 
@@ -261,7 +262,9 @@ _Provenance: `docs/prd/onboarding/prd.1.onboarding/epics/epic.1.1.quickstart-and
 
 **You see:** `HALT: no-changelog-entry — CHANGELOG.md [Unreleased] does not cite (task N)` after
 the acceptance commit is pushed, with no PR comment posted and no tracker close.
-**Cause:** Step 7 action 6d found no `(task N)` citation under `## [Unreleased]`.
+**Cause:** Step 7 action 6d found no `(task N)` citation under `## [Unreleased]`. 6d runs only when
+`skills-config.yaml` sets `changelog.enforce: true`; if your project does not cite tasks this way,
+remove the key and 6d prints `6d: changelog checks not enabled` instead.
 **Fix:**
 1. Add a real entry under `## [Unreleased]` that names `(task N)` (convention:
    [`docs/contributing/releases.md`](../contributing/releases.md)). Commit and push it.

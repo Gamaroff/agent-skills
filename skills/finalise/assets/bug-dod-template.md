@@ -73,7 +73,7 @@
 
 ## Step 4b: Docs & Changelog
 
-**Overall Docs Status:** {✅ PASS | ❌ FAIL} (see Step 2 → Documentation). {Repository `CHANGELOG.md` entry under `## [Unreleased]` citing `(bug N)`, or the reason none is needed}; `{bug registry | parent story/task Bug Reports}` row flips to `closed` in Part B.
+**Overall Docs Status:** {✅ PASS | ❌ FAIL} (see Step 2 → Documentation). {Agent 4's changelog item, copied: the `(bug N)` entry it found under `## [Unreleased]`, or `⚠️ NOT_APPLICABLE — changelog checks not enabled` when `changelog.enforce` is off — never a read of your own}; `{bug registry | parent story/task Bug Reports}` row flips to `closed` in Part B.
 
 ---
 

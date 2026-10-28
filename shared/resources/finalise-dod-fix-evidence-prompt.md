@@ -84,8 +84,9 @@ and a test that exists but sits in a lane the per-PR job does not run.
   (bug reports are barred from carrying one). A count above 0 is a `FAIL` with the line cited.
 - **Behaviour docs**: for each file in the diff whose behaviour is restated in a `SKILL.md`,
   `references/*.md`, runbook or `AGENTS.md`, check that restatement moved with it.
-- **CHANGELOG.md**: an entry under `## [Unreleased]` citing `(bug N)` when the fix changes observable
-  behaviour; `NOT_APPLICABLE` with the reason otherwise.
+
+Do not read `CHANGELOG.md`. The `(bug N)` entry is agent 4's check (`finalise-dod-docs-prompt.md`),
+which runs only when the project opts in (`changelog.enforce`, task.241).
 
 ---
 
@@ -136,10 +137,6 @@ fix_evidence:
     - item: "behaviour docs"
       status: PASS | FAIL | NOT_APPLICABLE
       citation: "path:NN"
-      note: "required if NOT_APPLICABLE"
-    - item: "CHANGELOG.md"
-      status: PASS | FAIL | NOT_APPLICABLE
-      citation: "CHANGELOG.md:NN"
       note: "required if NOT_APPLICABLE"
   overall: PASS | FAIL | PARTIAL
   summary: "one-line summary of the fix evidence"

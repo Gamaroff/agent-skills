@@ -488,14 +488,27 @@ takes no PR argument, and inside a pipeline the branch rung answers. Record
 
 **CRITICAL**: Send all 4 Agent tool calls in a **single message**. Do not send them sequentially.
 
-Read each prompt file to get the template, substitute the placeholder values, then dispatch:
+Read each prompt file to get the template, substitute the placeholder values, then dispatch.
+Agent 4's `<CHANGELOG_ENFORCE>` is the project's changelog opt-in — the same answer 6d reads —
+resolved here, before the dispatch:
+
+```bash
+CHANGELOG_ENFORCE=$(bash .agents/skills/finalise/references/changelog-enforce.sh)   # on | off
+case "$CHANGELOG_ENFORCE" in
+  on | off) ;;
+  *) echo "HALT: changelog-unknown — changelog-enforce.sh answered '${CHANGELOG_ENFORCE}', not on or off; check .agents/skills/finalise/references/ holds changelog-enforce.sh and read-config.sh, then re-run /finalise"; exit 1 ;;
+esac
+```
+
+Exactly `on` or `off`, nothing else: an empty answer is a resolver that did not run, and reading it
+as off would drop an opted-in repository's changelog check with no line saying why.
 
 | Agent                | Prompt file                                    | Key substitutions                                            |
 | -------------------- | ---------------------------------------------- | ------------------------------------------------------------ |
 | 1. AC traceability   | `references/finalise-dod-ac-prompt.md`         | `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`, `<DIFF_FILE>` |
 | 2. Security review   | `references/finalise-dod-security-prompt.md`   | `<STORY_FILE>`, `<STORY_TYPE>`, `<DOD_N>` (Step 0's `$DOD_N`) |
 | 3. Compliance review | `references/finalise-dod-compliance-prompt.md` | `<STORY_FILE>`                                               |
-| 4. Docs & changelog  | `references/finalise-dod-docs-prompt.md`       | `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`, `<DIFF_FILE>` |
+| 4. Docs & changelog  | `references/finalise-dod-docs-prompt.md`       | `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`, `<DIFF_FILE>`, `<CHANGELOG_ENFORCE>` |
 
 Each agent returns YAML. Capture: `AC_RESULT`, `SECURITY_RESULT`, `COMPLIANCE_RESULT`, `DOCS_RESULT`.
 
@@ -1806,10 +1819,16 @@ POLLEOF
 
 6d. **CHANGELOG citation check (blocking — HALT `no-changelog-entry`).** Every accepted work item
    must be cited in `CHANGELOG.md` under `## [Unreleased]` as `(task N)` / `(bug N)` — the
-   convention in `docs/contributing/releases.md`. **A repository with no `CHANGELOG.md` is not
+   convention in `docs/contributing/releases.md`. **It runs only when the project opts in** with
+   `changelog.enforce: true` in `skills-config.yaml`; otherwise the block prints
+   `6d: changelog checks not enabled` and continues without reading `CHANGELOG.md` at all. The
+   `(task N)` convention is one repository's release practice, and a consumer's changelog — absent,
+   generated, or citing Jira keys — is its own business. `references/changelog-enforce.sh` is the one
+   answer, and Step 3's docs-subagent dispatch reads the same one, so the two checks cannot disagree
+   again (task.241, obs #118). **When on, a repository with no `CHANGELOG.md` is still not
    applicable**: the block prints `6d: no CHANGELOG.md — not applicable` and continues, because a
-   project that keeps no changelog cannot cite anything in one, and halting there would stop every
-   task in it. A `CHANGELOG.md` that exists but does not cite the task still HALTs. Until task.115 this was the one release-checklist
+   project that keeps no changelog cannot cite anything in one. A `CHANGELOG.md` that exists but does
+   not cite the task HALTs. Until task.115 this was the one release-checklist
    item with no mechanism behind it, and it drifted on five consecutive merges (obs #59).
 
    ```bash
@@ -1819,9 +1838,19 @@ POLLEOF
    # leaves BASH_REMATCH unset (it populates $match), so N was empty there and the grep pattern
    # degenerated to one that matches any [Unreleased] text. The warning could never fire under
    # zsh, and nothing said so (task.115 QA cycle 1, CR-1). A capture-free `=~` is fine in both.
+   # The opt-in is read FIRST: an unset key must never reach the file test or the grep below.
+   # Exactly on or off: an empty or `unknown` answer is a resolver that could not run, not an
+   # unset key, and must not read as "not enabled" (task.241 QA cycle 2, CR2-1).
+   CL=$(bash .agents/skills/finalise/references/changelog-enforce.sh)
+   case "$CL" in
+     on | off) ;;
+     *) echo "HALT: changelog-unknown — changelog-enforce.sh answered '${CL}', not on or off; check .agents/skills/finalise/references/ holds changelog-enforce.sh and read-config.sh, then re-run /finalise"; exit 1 ;;
+   esac
    N=""
    case "$STEM" in task.*) N="${STEM#task.}" ;; esac
-   if [ ! -f CHANGELOG.md ]; then
+   if [ "$CL" = off ]; then
+     echo "6d: changelog checks not enabled"
+   elif [ ! -f CHANGELOG.md ]; then
      echo "6d: no CHANGELOG.md — not applicable"
    elif [ -n "$N" ] && [[ "$N" =~ ^[0-9]+$ ]]; then
      awk '/^## \[Unreleased\]/{p=1;next} /^## \[/{p=0} p' CHANGELOG.md \
@@ -2450,7 +2479,7 @@ EOF
 - [ ] Sprint Review summary file created at `{story-directory}/sprint-review-summary.md`
 - [ ] **Publish boundary (6a–6c) crossed before any side-effect**: acceptance commit made with output and exit status read (never suppressed), pushed; document, DoD summary and sprint review asserted **tracked and on `origin/<branch>`** (`git ls-files --error-unmatch` + `git show origin/<branch>:<path>`), not merely present; PR head equals the pushed head; **CI reading 2 read `SUCCESS` on that head** — anything else is HALT `ci-not-green-on-acceptance-head`, with no comment, close or board move issued
 - [ ] Both CI readings recorded with their heads — reading 1 in the running summary (Step 6), reading 2 on the PR canonical comment and in the implementation report
-- [ ] CHANGELOG citation checked (6d) — `(task N)` present under `[Unreleased]`, or `6d: no CHANGELOG.md — not applicable` when the repository has no `CHANGELOG.md`; otherwise HALT `no-changelog-entry` before the PR comment
+- [ ] CHANGELOG citation checked (6d) — `6d: changelog checks not enabled` when `changelog.enforce` is not `true`; otherwise `(task N)` present under `[Unreleased]`, or `6d: no CHANGELOG.md — not applicable` when the repository has no `CHANGELOG.md`; otherwise HALT `no-changelog-entry` before the PR comment
 - [ ] PR comment posted (GitHub: `gh pr comment`, Bitbucket: REST API) — **after** 6a–6c
 - [ ] Tracker issue closed: Jira issue transitioned via MCP (`transitionJiraIssue`) **OR** GitHub issue closed via `gh issue close` + closure confirmed with `gh issue view --json state` **OR** warning comment posted (if close failed after retry)
 - [ ] **Jira only — terminal status RE-READ after the Document-link re-point**, and re-asserted if the
