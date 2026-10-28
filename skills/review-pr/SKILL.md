@@ -789,8 +789,8 @@ findings:
     confidence: {low|medium|high}
     ref: {the same ref rendered after the em-dash, quoted}
     anchor_check: {ok|unchecked-text|no-line|no-such-file|out-of-range|text-mismatch|unparseable}
-    finding: {one sentence: what is wrong}
-    suggested_action: {one sentence: the fix approach}
+    finding: "{one sentence: what is wrong}"
+    suggested_action: "{one sentence: the fix approach}"
 truncated_count: {integer — the two lenses' counts summed}
 ```
 
@@ -800,7 +800,7 @@ truncated_count: {integer — the two lenses' counts summed}
 ````
 
 **About the machine-readable block.** It is what `/qa-fix`'s findings ingester reads; the rendered
-sections above it are for humans. Six rules, each of which has a way of going wrong:
+sections above it are for humans. Seven rules, each of which has a way of going wrong:
 
 - **`reviewed_gate` names the gate Step 3 read**, never a guess. `/qa-fix` ingests this report only
   while no higher-numbered gate exists (`pr-review-current.js`, bundled with `/qa-fix`, decides).
@@ -817,6 +817,11 @@ sections above it are for humans. Six rules, each of which has a way of going wr
 - **`anchor_check` beside every `ref`**, the checker's verdict from Step 6. The `ref` keeps the
   reviewer's value even when it is wrong, so `anchor_check` is what tells `/qa-fix` a verified
   location from an unverified one.
+- **Double-quote `finding` and `suggested_action`**, each on its key's line, escaping only `\"` and
+  `\\`. They are free text, and a bare sentence holding `: ` reads as a key: Step 5c's reader
+  (`open-coverage.js`) refuses the whole block, and the develop pipeline halts at **Review failed**
+  on a review it could have routed. Write every other character as itself; `\n`, `\t` and any
+  other escape are refused, not decoded (task.240 PR review PC-5).
 - **Always emit the section, even with nothing to report** — as `findings: []` with
   `truncated_count: 0`. If a findings-free report omitted it, an absent section would mean both
   "report written before this existed" and "no findings", and the ingester's legacy fallback would

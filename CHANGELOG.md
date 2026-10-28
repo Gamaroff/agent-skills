@@ -35,6 +35,15 @@ All notable changes to this project will be documented in this file. Format foll
   backstop for a reader that does not run. `pr-review-current.js` now exports its block extractor,
   so the two readers share one regex.
 
+- **`/review-pr` quotes the free text in its machine-readable block (task 240 follow-up).** The
+  report template now writes `finding:` and `suggested_action:` double-quoted, escaping only `\"`
+  and `\\`, and a new rule beside it says why: a bare sentence holding `: ` reads as a key, so §5c's
+  reader refused the whole block and the develop pipeline halted at **Review failed** on a review
+  it could have routed. A test fills the template with such a sentence and checks that it counts.
+  `open-coverage.js` now decodes any byte container (a typed array, a DataView or an ArrayBuffer,
+  from any realm), and refuses an input that is neither text nor bytes as `not-text`, so
+  `no-section` only ever means a report with no heading. A test now pins `ignoreBOM`.
+
 - **`/finalise`'s changelog checks are opt-in (task 241).** Both checks — the docs subagent's
   "CHANGELOG.md updated" judgement and Step 7 action 6d's `no-changelog-entry` HALT — now run only
   when `skills-config.yaml` sets `changelog.enforce: true`. Unset, `/finalise` never reads
