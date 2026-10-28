@@ -5,7 +5,7 @@ How to use this document: work top to bottom. Only `[ ]` rows are candidates; `[
 [`roadmap-history.md`](./roadmap-history.md), so a `deps:` entry naming no current row means
 _already shipped_, not an error. Resolve any such reference there.
 
-**Phases 1 through 17 are complete and archived** to
+**Phases 1 through 18 are complete and archived** to
 [`roadmap-history.md`](./roadmap-history.md) — resolve any `deps:` naming a row you cannot find here
 against that file. The rows under "Deferred / human-gated" remain invisible to selection.
 
@@ -20,7 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. Phase 18 is open (opened 2026-10-28); once it closes, selection falls through to the registries.
+chain, a human gate. No phase is open (Phase 18 closed 2026-10-28); selection falls through to the registries.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -67,17 +67,6 @@ Read only by `--batch`. Two rows conflict when they share a tag that **either** 
 | `docs-pipeline`    | `docs/runbooks/*`, `docs/concepts/*`, `docs/reference/pipeline-artifacts.md`, `docs/operations/workflows.md`, `skills/develop-*/README.md` |
 | `pipeline-lock`    | `shared/resources/advance-pipeline-lock.sh`, `advance-pipeline-lock.test.sh`  |
 
-## PHASE 18 — fail-closed open-coverage reader (opened 2026-10-28)
-
-An **override**: the owner asked for T240 ahead of every other story and task. T240 replaces the
-§5c open-coverage awk that task.238's QA loop escalated on after 9 cycles. It edits that block, so
-it cannot start until T238 has merged. T238 sits here as a `manual` row: it is waiting on the
-owner's acceptance decision (PR #770), and the loop stops at it rather than resuming that run.
-Tick T238 when PR #770 merges; T240 is selected next.
-
-- [x] **T238** QA loop acts on the signals it already has · deps: none · touches: pipeline-steps!, qa-skills~, bundles~ · /develop-task docs/tasks/task.238.qa-loop-acts-on-signals-it-has/task.238.qa-loop-acts-on-signals-it-has.md — ✅ **accepted + merged** ([PR #770](https://github.com/Gamaroff/agent-skills/pull/770), `780ac732`; QA CONCERNS 90/100 after 10 cycles with 4 owner-granted, DoD accepted on run 2, CI 6/6). The QA loop keeps a red gate log, classifies a red fast gate, reads PR CI once at Step 10 on GitHub and Bitbucket, and sends a 5c `CONCERNS` with an open coverage finding back to 5b. CR10-1 deferred to T240
-- [x] **T240** Fail-closed reader for the 5c open-coverage check · deps: T238 · touches: pipeline-steps!, bundles~ · /develop-task docs/tasks/task.240.open-coverage-fail-closed-reader/task.240.open-coverage-fail-closed-reader.md — ✅ **accepted + merged** ([PR #776](https://github.com/Gamaroff/agent-skills/pull/776), `d820f8f2`; QA PASS 100/100 after 9 cycles, DoD accepted, CI 6/6). §5c's open-coverage count comes from `open-coverage.js`, a strict Node reader that answers `unreadable` (and halts) on anything it cannot place, in place of a 35-line awk
-
 ## Deferred / human-gated
 
 Rows here are invisible to selection. Move a row up into a phase when it becomes actionable.
@@ -89,7 +78,7 @@ Rows here are invisible to selection. Move a row up into a phase when it becomes
 
 ## Housekeeping
 
-- [x] Archive accepted rows to `roadmap-history.md` at each phase close — Phase 5 archived 2026-09-12; Phases 6, 7 and 8 archived 2026-10-06; Phases 9 and 10 archived 2026-10-11; Phase 11 archived 2026-10-16; Phase 12 archived 2026-10-20; Phase 13 archived 2026-10-21; Phases 14 and 15 archived 2026-10-22; Phase 16 archived 2026-10-23; Phase 17 archived 2026-10-27
+- [x] Archive accepted rows to `roadmap-history.md` at each phase close — Phase 5 archived 2026-09-12; Phases 6, 7 and 8 archived 2026-10-06; Phases 9 and 10 archived 2026-10-11; Phase 11 archived 2026-10-16; Phase 12 archived 2026-10-20; Phase 13 archived 2026-10-21; Phases 14 and 15 archived 2026-10-22; Phase 16 archived 2026-10-23; Phase 17 archived 2026-10-27; Phase 18 archived 2026-10-28
 - [ ] If a phase is ever re-opened: tick its rows `[x]` as each item is accepted — an unticked row for an accepted item is still selected and stalls the loop
 
 **Registry-selected items need no row here.** When selection falls through to the registries (the
@@ -225,3 +214,4 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-10-28 | **Phase 18 opened** with T238 (`manual`: PR #770 escalated at the QA loop limit and awaits the owner's acceptance decision) then T240 (fail-closed open-coverage reader, `deps: T238`), ordered ahead of the registry fallback at the owner's request. |
 | 2026-10-28 | **T238 accepted + merged — PR #770 merged** (`780ac732`). The QA loop acts on four signals it already held. A red gate log is kept, not deleted (obs #41). A red fast gate is classified `not measured` (one re-run) or `attributable` by `fast-gate-outcome.sh` (obs #14). `/qa-task` and `/qa-story` read PR CI once at Step 10 through `qa-ci-read.sh`, on GitHub and Bitbucket (obs #45). A 5c `CONCERNS` with an open `category: coverage` finding returns to 5b, with a qa-fix ladder row and a resume split (obs #8). Ten QA cycles, four of them owner-granted (FAIL 70 → CONCERNS 80 → PASS 90; DoD run 1 gaps; FAIL 20 → FAIL 50 → FAIL 60 → CONCERNS 80 ×3 → CONCERNS 90). Cycle 6 deleted the `pre-existing red` outcome at its third strike, with the structured replacement deferred. Cycles 7–10 hardened the §5c open-coverage reader. 19 bug reports, all closed. 5c APPROVE; DoD run 2 accepted 15/15; security probe 119 executed, 0 escaped, 1 reproduced (CR10-1, owner-deferred to T240); CI 6/6. Issue #768 closed. **Next: T240.** |
 | 2026-10-28 | **T240 accepted + merged — PR #776 merged** (`d820f8f2`). The §5c open-coverage count now comes from `shared/resources/open-coverage.js`, one `command node` call plus a `case` backstop in place of a 35-line awk. The reader reads one line per key over an allow-listed character set, decodes bytes strictly (invalid UTF-8 is `bad-encoding`), and answers `unreadable` on every shape it cannot place, so the loop halts rather than printing a wrong count; a failing `node` reads `unreadable` too. All 187 tracked review reports read as before; a PyYAML differential test compares it with YAML on random blocks. Nine QA cycles (CONCERNS 90 ×8 → PASS 100), 11 bug reports, all closed; every guard mutation-proven (M1–M37). 5c CONCERNS with `OPEN_COVERAGE=0`, PC-4 and PC-7 recorded; DoD accepted 11/11; CI 6/6 on `966aba75`. Follow-ups PR #777 and #778 merged after. Issue #771 closed. **Phase 18 is complete**; selection falls through to the registries. |
+| 2026-10-28 | **Phase 18 closed and archived** to `roadmap-history.md` (T238 and T240). No phase is open; selection falls through to the registries (next: T239). |
