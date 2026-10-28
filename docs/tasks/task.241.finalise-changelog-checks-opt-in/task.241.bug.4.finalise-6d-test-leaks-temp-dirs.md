@@ -4,7 +4,7 @@
 **Bug ID**: TASK-241-BUG-4
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 2, CI read on `f530a532`)
 **Date Found**: 2026-10-28
 
@@ -72,3 +72,4 @@ there.
 | ---- | ------ | ---------- | ----- |
 | 2026-10-28 | New | qa-task | Found in QA cycle 2 (`task.241.qa.2.finalise-changelog-checks-opt-in.md`) |
 | 2026-10-28 | Ready for QA | qa-fix | Temp dir removed in `finally`; ratchet entry deleted; mutation-proven |
+| 2026-10-28 | Closed | qa-task | Verified by task.241.qa.3.finalise-changelog-checks-opt-in.md — CI green on 93fb2108, ratchet ok |
