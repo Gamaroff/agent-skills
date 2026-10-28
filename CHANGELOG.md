@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **The QA loop's open-coverage check reads with a parser, not an awk (task 240).** §5c's
+  `OPEN_COVERAGE=` line now comes from `open-coverage.js`, bundled into `develop-task` and
+  `develop-story`. It parses the review's `## Machine-Readable Findings` block against the shape
+  `/review-pr` emits and prints `unreadable` for anything it cannot place: the old awk listed the
+  shapes it refused, so each shape it did not list was skipped and read as "no coverage", and
+  task 238's QA loop found one more per cycle. The printed contract, the routing and every existing
+  fixture are unchanged, and every tracked review report reads the same as before. The shell
+  `case` guard stays as the backstop for a reader that does not run. `pr-review-current.js` now
+  exports its block extractor, so the two readers share one regex.
+
 - **`/finalise`'s changelog checks are opt-in (task 241).** Both checks — the docs subagent's
   "CHANGELOG.md updated" judgement and Step 7 action 6d's `no-changelog-entry` HALT — now run only
   when `skills-config.yaml` sets `changelog.enforce: true`. Unset, `/finalise` never reads

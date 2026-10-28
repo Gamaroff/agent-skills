@@ -27,16 +27,23 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { extractBlocks } from "../../../shared/resources/qa-execute-snippets.mjs";
+
+const { countOpenCoverage } = createRequire(import.meta.url)(
+  "../../../shared/resources/open-coverage.js",
+);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..", "..", "..");
@@ -847,11 +854,25 @@ function openCoverageOf(body, env = process.env) {
   try {
     const report = join(dir, "task.1.pr-review.1.x.md");
     if (body !== null) writeFileSync(report, body);
+    // The block calls the reader at its consumer path. Run it from a consumer-shaped cwd whose
+    // `.agents/skills/develop-task` is the tracked skill, so the test reads the bundled copy and
+    // never leans on a local, gitignored `.agents/skills` symlink (task.240).
+    mkdirSync(join(dir, ".agents", "skills"), { recursive: true });
+    symlinkSync(
+      join(repoRoot, "skills", "develop-task"),
+      join(dir, ".agents", "skills", "develop-task"),
+    );
     const code = blocks[0].code
       .split("{the PR review report this cycle's 5c wrote}")
-      .join(report);
+      .join(report)
+      .split("{develop-story|develop-task}")
+      .join("develop-task");
     const runIn = (sh) => {
-      const r = spawnSync(sh, ["-c", code], { encoding: "utf8", env });
+      const r = spawnSync(sh, ["-c", code], {
+        encoding: "utf8",
+        env,
+        cwd: dir,
+      });
       if (r.error?.code === "ENOENT") return undefined; // zsh absent on this runner
       assert.equal(r.status, 0, `${sh}: ${r.stderr}`);
       const m = r.stdout.match(/^OPEN_COVERAGE=(\d+|unreadable)$/m);
@@ -928,9 +949,18 @@ const COVERAGE_CASES = [
   ],
 ];
 
+// The same tables, two harnesses (task.240 SC-1): every case also runs straight through the reader
+// the §5c block calls, so a shape the pure function gets wrong is named here, not only as a shell
+// value.
+const readerSays = (text) => {
+  const r = countOpenCoverage(text);
+  return "count" in r ? r.count : "unreadable";
+};
+
 for (const [label, findings, want] of COVERAGE_CASES) {
   test(`open-coverage check: ${label}`, () => {
     assert.equal(openCoverage(findings), want);
+    assert.equal(readerSays(reviewReport(findings)), want, "countOpenCoverage");
   });
 }
 
@@ -1101,6 +1131,7 @@ const RAW_CASES = [
 for (const [label, yaml, want, edit = (b) => b] of RAW_CASES) {
   test(`open-coverage check: ${label} → ${want}`, () => {
     assert.equal(openCoverageOf(edit(rawReport(yaml))), want);
+    assert.equal(readerSays(edit(rawReport(yaml))), want, "countOpenCoverage");
   });
 }
 
@@ -1125,15 +1156,18 @@ const UNREADABLE_CASES = [
 for (const [label, body] of UNREADABLE_CASES) {
   test(`open-coverage check: ${label} → unreadable, never 0`, () => {
     assert.equal(openCoverageOf(body), "unreadable");
+    if (body !== null)
+      assert.equal(readerSays(body), "unreadable", "countOpenCoverage");
   });
 }
 
-// An awk that does not run prints nothing, and an empty value took the Otherwise exit to Step 7
-// (task.238 bug.18). A stub awk that exits 2 stands in for a missing binary or a rejected program.
-test("open-coverage check: an awk that fails → unreadable, never an empty value", () => {
-  const bin = mkdtempSync(join(tmpdir(), "failing-awk-"));
+// A reader that does not run prints nothing, and an empty value took the Otherwise exit to Step 7
+// (task.238 bug.18). A stub `node` that exits 2 stands in for a missing binary or a crashed reader
+// (task.240: the reader is open-coverage.js, so the stub moved from awk to node).
+test("open-coverage check: a reader that fails → unreadable, never an empty value", () => {
+  const bin = mkdtempSync(join(tmpdir(), "failing-node-"));
   try {
-    writeFileSync(join(bin, "awk"), "#!/bin/sh\nexit 2\n", { mode: 0o755 });
+    writeFileSync(join(bin, "node"), "#!/bin/sh\nexit 2\n", { mode: 0o755 });
     const env = { ...process.env, PATH: `${bin}:${process.env.PATH}` };
     assert.equal(
       openCoverageOf(rawReport("  - id: PC-1\n    category: coverage\n"), env),
@@ -1142,6 +1176,16 @@ test("open-coverage check: an awk that fails → unreadable, never an empty valu
   } finally {
     rmSync(bin, { recursive: true, force: true });
   }
+});
+
+// SC-5 (task.240): the check costs one `node` call and nothing else — no awk program comes back.
+test("open-coverage check: the §5c block runs exactly one `command node` call and no awk", () => {
+  const [block] = extractBlocks(loopDoc).filter((b) =>
+    b.code.includes("OPEN_COVERAGE=$("),
+  );
+  assert.ok(block, "the open-coverage block moved");
+  assert.equal(block.code.match(/\bcommand node\b/g)?.length ?? 0, 1);
+  assert.doesNotMatch(block.code, /\bawk\b/);
 });
 
 test("open-coverage check: an empty findings list (`findings: []`) reads 0, not unreadable", () => {
