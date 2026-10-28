@@ -29,7 +29,14 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import {
+  readFileSync,
+  existsSync,
+  mkdtempSync,
+  writeFileSync,
+  mkdirSync,
+  copyFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -553,13 +560,32 @@ function sixDBlock() {
   return lines.map((l) => l.slice(indent)).join("\n");
 }
 
-function runSixD(shell, stem, changelog) {
+const OPTED_IN = "changelog:\n  enforce: true\n";
+
+/**
+ * Run the shipped 6d block in a consumer-shaped temp repo. 6d calls
+ * `.agents/skills/finalise/references/changelog-enforce.sh`, so the bundled resolver and the reader
+ * it sources are laid out at that exact path — the test runs the block as written, not a copy with
+ * the path rewritten. `config` is the skills-config.yaml text; null means the repo has none, which
+ * is every consumer that never opted in (task.241).
+ */
+function runSixD(shell, stem, changelog, config = OPTED_IN) {
   const dir = mkdtempSync(path.join(tmpdir(), "finalise-6d-"));
+  const refs = path.join(dir, ".agents/skills/finalise/references");
+  mkdirSync(refs, { recursive: true });
+  for (const f of ["changelog-enforce.sh", "read-config.sh"])
+    copyFileSync(
+      path.join(REPO_ROOT, "skills/finalise/references", f),
+      path.join(refs, f),
+    );
+  if (config !== null)
+    writeFileSync(path.join(dir, "skills-config.yaml"), config);
   if (changelog !== null)
     writeFileSync(path.join(dir, "CHANGELOG.md"), changelog);
   return spawnSync(shell, ["-c", `STEM='${stem}'\n${sixDBlock()}`], {
     cwd: dir,
     encoding: "utf8",
+    env: { PATH: process.env.PATH, HOME: process.env.HOME },
   });
 }
 
@@ -612,7 +638,96 @@ for (const shell of SHELLS) {
     assert.match(absent.stdout, /^6d: no CHANGELOG\.md — not applicable$/m);
     assert.doesNotMatch(absent.stdout, /HALT/);
   });
+
+  // task.241: a project that has not opted in never has its CHANGELOG.md read. The uncited task.303
+  // HALTs above under `enforce: true` — that is the differential oracle — and must pass here.
+  for (const [label, config] of [
+    ["no skills-config.yaml", null],
+    [
+      "a skills-config.yaml with no changelog key",
+      "ci:\n  docsOnly:\n    enabled: true\n",
+    ],
+    ["changelog.enforce: false", "changelog:\n  enforce: false\n"],
+  ]) {
+    test(`[${shell}] 6d does not read CHANGELOG.md when the project has not opted in (${label})`, () => {
+      const r = runSixD(shell, "task.303", CHANGELOG_FIXTURE, config);
+      assert.equal(
+        r.status,
+        0,
+        `an uncited task must pass when changelog checks are off: ${r.stdout}${r.stderr}`,
+      );
+      assert.match(r.stdout, /^6d: changelog checks not enabled$/m);
+      assert.doesNotMatch(r.stdout, /HALT/);
+    });
+  }
+
+  test(`[${shell}] 6d's opt-in is read before the grep: a CITED task also reports not enabled`, () => {
+    // Control: if the gate sat after the grep, a cited task would pass silently and look the same
+    // as an off gate. Only the not-enabled line shows the grep never ran.
+    const r = runSixD(shell, "task.301", CHANGELOG_FIXTURE, null);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /^6d: changelog checks not enabled$/m);
+  });
+
+  test(`[${shell}] 6d treats an unrecognised changelog.enforce as off, and says so`, () => {
+    const r = runSixD(
+      shell,
+      "task.303",
+      CHANGELOG_FIXTURE,
+      "changelog:\n  enforce: enabled\n",
+    );
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /^6d: changelog checks not enabled$/m);
+    assert.match(r.stderr, /changelog\.enforce is 'enabled'/);
+  });
 }
+
+test("/finalise passes the changelog opt-in to the docs subagent, which gates on it first", () => {
+  const row = finalise
+    .split("\n")
+    .find((l) => l.startsWith("| 4. Docs & changelog"));
+  assert.ok(row, `${FINALISE}: no dispatch row for agent 4`);
+  assert.match(
+    row,
+    /<CHANGELOG_ENFORCE>/,
+    "row 4 must substitute <CHANGELOG_ENFORCE>",
+  );
+  assert.match(
+    finalise,
+    /CHANGELOG_ENFORCE=\$\(bash \.agents\/skills\/finalise\/references\/changelog-enforce\.sh\)/,
+    `${FINALISE} must resolve CHANGELOG_ENFORCE with the shared resolver before the dispatch`,
+  );
+
+  const prompt = read("shared/resources/finalise-dod-docs-prompt.md");
+  const step2 = between(
+    prompt,
+    "### Step 2: Check CHANGELOG.md",
+    "### Step 3",
+    "finalise-dod-docs-prompt.md",
+  );
+  const gate = step2.indexOf("<CHANGELOG_ENFORCE>");
+  const firstRead = step2.indexOf("ls CHANGELOG.md");
+  assert.ok(
+    gate >= 0,
+    "the docs prompt's Step 2 must read <CHANGELOG_ENFORCE>",
+  );
+  assert.ok(
+    firstRead > gate,
+    "the opt-in must be read before CHANGELOG.md is touched",
+  );
+  assert.match(step2, /changelog checks not enabled/);
+  assert.match(step2, /repository keeps no CHANGELOG\.md/);
+});
+
+test("/finalise still dispatches four DoD agents", () => {
+  const rows = finalise
+    .split("\n")
+    .filter(
+      (l) =>
+        /^\| [1-9]\. [A-Z]/.test(l) && l.includes("references/finalise-dod-"),
+    );
+  assert.equal(rows.length, 4, rows.join("\n"));
+});
 
 test("/finalise 6d names `no-changelog-entry` as a HALT, and the release docs name the test", () => {
   const sixD = between(

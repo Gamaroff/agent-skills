@@ -59,3 +59,9 @@ ci: # the docs-only rule at the pipeline's CI waits — schema: docs/reference/c
     # Kept under the 600 s tool timeout: /finalise reading 1 and the merge arms run the engine in the
     # foreground. A check that needs longer is killed and the finding is check-failed, which waits for CI.
     checkTimeoutSeconds: 570
+
+changelog: # /finalise's CHANGELOG checks — schema: docs/reference/configuration.md
+  # This repository's release convention: every accepted task is cited under [Unreleased] as
+  # (task N) (docs/contributing/releases.md), and /finalise 6d HALTs when it is not. Off by
+  # default for consumers, so their own CHANGELOG.md is never read (task.241).
+  enforce: true

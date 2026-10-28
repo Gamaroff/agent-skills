@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **`/finalise`'s changelog checks are opt-in (task 241).** Both checks — the docs subagent's
+  "CHANGELOG.md updated" judgement and Step 7 action 6d's `no-changelog-entry` HALT — now run only
+  when `skills-config.yaml` sets `changelog.enforce: true`. Unset, `/finalise` never reads
+  `CHANGELOG.md`: the subagent reports `NOT_APPLICABLE` and 6d prints
+  `6d: changelog checks not enabled`. Consumer repositories were being warned about, or halted on, a
+  `(task N)` citation convention that is this repository's own; one resolver,
+  `changelog-enforce.sh`, now answers for both checks so they cannot disagree again (obs #118). With
+  the key on, a missing `CHANGELOG.md` is now `NOT_APPLICABLE` in the docs check too, matching 6d.
+  **Breaking for consumers that relied on the 6d HALT**: add `changelog:` / `enforce: true` to keep
+  it. This repository sets it.
 - **The QA loop acts on four signals it already had (task 238).** (1) **Gated log cleanup**: every
   fast-gate site (5b step 0a, Step 3, `/develop`, the triage prompt, develop-bug 3a) now prints its
   exit code and removes the log only when that exit is 0, foreground or background, so a red log is
