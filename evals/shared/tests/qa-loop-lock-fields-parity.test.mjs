@@ -177,12 +177,20 @@ test("convergence_from_cycle: the writer, the reader and every describer name it
       writeSet.length >= 2,
       `non-vacuity: ${name} lists the grant write set ${writeSet.length} time(s)`,
     );
+    // Every field the grant writes, not only the new one (QA3-CR-3).
     for (const line of writeSet) {
-      assert.match(
-        line,
-        /\bconvergence_from_cycle\b/,
-        `${name}: write-set line omits the field: ${line.trim()}`,
-      );
+      for (const field of [
+        "extra_cycles_granted",
+        "qa_max_cycles",
+        "convergence_from_cycle",
+        "qa_phase",
+      ]) {
+        assert.match(
+          line,
+          new RegExp(`\\b${field}\\b`),
+          `${name}: write-set line omits ${field}: ${line.trim()}`,
+        );
+      }
     }
   }
   // The writer sets it in the SAME jq write as the budget, never in a second call.

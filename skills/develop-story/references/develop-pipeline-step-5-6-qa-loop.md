@@ -628,9 +628,10 @@ the pipeline noticed.
    reopen the window over the pre-grant readings and trip on the first post-grant gate.
 
    A grant restarts the three-reading rule, so "k more cycles" delivers k cycles unless the guard
-   re-arms first. It re-arms once three post-grant readings exist. A grant of 3 or more whose first
-   three readings are flat escalates again at the 5a of the third granted cycle, and the cycles
-   after it do not run (task.239, obs #72).
+   re-arms first. It re-arms once three post-grant readings exist. From the third granted cycle on,
+   any three consecutive post-grant readings that meet the condition below (HIGH present and not
+   falling) escalate again at that cycle's 5a, and the granted cycles after it do not run
+   (task.239, obs #72).
    **Within that window, from its third reading onward, if `HIGH_N > 0` AND `HIGH_{N-2} > 0` AND `HIGH_N >= HIGH_{N-1}` AND
    `HIGH_{N-1} >= HIGH_{N-2}` — i.e. HIGH findings were present at all three readings and the
    count has failed to strictly decrease across two consecutive cycles — the loop is not
@@ -2013,7 +2014,7 @@ a contradiction to whoever picks it up.
 **HIGH findings per cycle**: {HIGH_1}, {HIGH_2}, … {HIGH_N} — {flat from cycle {i} onward / still rising}
                     {when the lock has convergence_from_cycle: {HIGH_1}, … {HIGH_b} | {HIGH_b+1}, … {HIGH_N} — grant at cycle {b}}
 {Convergence stall only:
-**Flat-count reading**: {stall | discovery} — {file}: {mechanism}, cycle {N-1} vs cycle {N}}
+**Flat-count reading**: {stall | discovery} — {file}: {mechanism}[; {file}: {mechanism} …], cycle {N-1} vs cycle {N}}
 **Remaining issues** (from final gate file):
 {List each top_issue: description, severity, file (from the entry's `file:` key)}
 
@@ -2059,7 +2060,7 @@ mechanism read from its `finding:` texts — or "none"}
 **HIGH findings per cycle**: {HIGH_1}, {HIGH_2}, … {HIGH_N} — {flat from cycle {i} onward / still rising}
                     {when the lock has convergence_from_cycle: {HIGH_1}, … {HIGH_b} | {HIGH_b+1}, … {HIGH_N} — grant at cycle {b}}
 {Convergence stall only:
-**Flat-count reading**: {stall | discovery} — {file}: {mechanism}, cycle {N-1} vs cycle {N}}
+**Flat-count reading**: {stall | discovery} — {file}: {mechanism}[; {file}: {mechanism} …], cycle {N-1} vs cycle {N}}
 **Remaining issues** (from final gate file):
 {List each top_issue: description, severity, file (from the entry's `file:` key)}
 

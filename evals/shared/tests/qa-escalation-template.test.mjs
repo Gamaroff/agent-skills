@@ -50,7 +50,7 @@ test("both escalation templates carry the flat-count reading, the third-strike f
   for (const [kind, body] of Object.entries(TEMPLATES)) {
     assert.match(
       body,
-      /\*\*Flat-count reading\*\*: \{stall \| discovery\} — \{file\}: \{mechanism\}, cycle \{N-1\} vs cycle \{N\}/,
+      /\*\*Flat-count reading\*\*: \{stall \| discovery\} — \{file\}: \{mechanism\}\[; \{file\}: \{mechanism\} …\], cycle \{N-1\} vs cycle \{N\}/,
       `${kind} template must carry the Flat-count reading line`,
     );
     assert.match(
@@ -254,6 +254,23 @@ test("window rule: a grant restarts the three-reading rule (task.215 / obs #72)"
     convergenceTrip([1, 1, 1, 1]),
     3,
     "without the window the pre-grant readings trip it",
+  );
+  // The re-arm condition is "HIGH present and not falling", not "flat" (QA3-CR-1): rising trips,
+  // zero never does, and a trio that starts later trips later than the third granted cycle.
+  assert.equal(
+    convergenceTrip([1, 1, 1, 1, 2, 3], 4),
+    6,
+    "rising 1,2,3 | after the grant trips",
+  );
+  assert.equal(
+    convergenceTrip([1, 1, 1, 0, 0, 0], 4),
+    null,
+    "flat zeros never trip",
+  );
+  assert.equal(
+    convergenceTrip([1, 1, 1, 3, 2, 2, 2], 4),
+    7,
+    "3,2,2,2 trips at the fourth granted cycle",
   );
   // The guard re-arms once three post-grant readings exist.
   assert.equal(

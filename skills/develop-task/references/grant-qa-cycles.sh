@@ -232,7 +232,8 @@ fi
 # reads the snapshot's phase and names the wrong step (obs #228).
 # convergence_from_cycle in the SAME write — base + 1, the first cycle whose reading the grant
 # pays for. The Convergence check counts readings only from it, so "k more cycles" runs k cycles
-# instead of tripping on the pre-grant readings it was granted past (task.239, obs #72).
+# instead of tripping on the pre-grant readings it was granted past (task.239, obs #72). It can
+# still trip from the third granted cycle on, when HIGH stays present and stops falling.
 undo_restore() { [ -n "$RESTORED" ] && echo "grant-qa-cycles: lock restored from $RESTORED is kept (its snapshot was consumed); the grant was not written" >&2; return 0; }
 TMP=$(mktemp "$(dirname "$LOCK")/.grant-qa-cycles.XXXXXX") || { undo_restore; exit 1; }
 REENTER=5a

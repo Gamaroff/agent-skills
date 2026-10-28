@@ -358,7 +358,7 @@ sequenceDiagram
         CC-->>-H: hash
         H->>GH: git push origin HEAD
         H->>H: HALT — QA loop limit reached
-        note right of H: resume offers "Resume the QA loop with {k} more cycles"<br/>(grant-qa-cycles.sh writes extra_cycles_granted, qa_max_cycles, convergence_from_cycle)
+        note right of H: resume offers "Resume the QA loop with {k} more cycles"<br/>(grant-qa-cycles.sh writes extra_cycles_granted, qa_max_cycles, convergence_from_cycle, qa_phase)
     end
 ```
 

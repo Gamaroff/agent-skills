@@ -4,7 +4,7 @@
 **Bug ID**: TASK-239-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-10-28
 
@@ -98,3 +98,4 @@ confirms no other site says the lock is "restored first".
 | 2026-10-28 | New | QA Engineer | QA cycle 2 refute pass. Code-review finding CR-1, confirmed by reading `restore_lock` in `advance-pipeline-lock.sh` |
 | 2026-10-28 | In Progress | qa-fix | Investigation, QA cycle 2 |
 | 2026-10-28 | Ready for QA | qa-fix | Consolidated: HALT plus a citation of the resume contract's restore step |
+| 2026-10-28 | Closed | QA Engineer | QA cycle 3: step 3 checked against `restore_lock` and the resume contract's restore section; no finding raised |

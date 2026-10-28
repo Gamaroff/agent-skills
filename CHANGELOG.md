@@ -18,8 +18,8 @@ All notable changes to this project will be documented in this file. Format foll
   - **A grant opens a fresh Convergence window.** `grant-qa-cycles.sh` now writes
     `convergence_from_cycle = base + 1` in the same atomic write as `qa_max_cycles` and `qa_phase`,
     and prints it after `reenter_at=`. The Convergence check counts readings only from that cycle,
-    so a grant of k runs k cycles, unless three post-grant readings are flat, in which case it
-    escalates again at the third. On task 215, a grant of 2 escalated after one cycle because the
+    so a grant of k runs k cycles, unless HIGH findings stay present and stop falling over three
+    consecutive post-grant readings, in which case it escalates again at the third of them. On task 215, a grant of 2 escalated after one cycle because the
     check counted three pre-grant readings (obs #72). A lock without the field reads `1`, which is
     the old behaviour. The route classifier still reads the whole sequence, so route 2c's MEDIUM
     window can still hold a pre-grant gate.
@@ -28,8 +28,9 @@ All notable changes to this project will be documented in this file. Format foll
     stall that covers the last three gates. After a loop limit it covers the last two, because the
     grant reviews before it fixes. For each file it prints, step 1 must delete, replace or waive the
     mechanism. It may never recommend a patch, because the resumed run refuses one (obs #71).
-  - **A convergence stall gets a flat-count reading.** The reading is `stall` when cycle N's HIGH
-    finding is in the same file, with the same mechanism, as cycle N-1's. It is `discovery` when
+  - **A convergence stall gets a flat-count reading.** The reading is `stall` when any of cycle N's
+    HIGH findings is in the same file, with the same mechanism, as one of cycle N-1's; each such
+    finding is named. It is `discovery` when
     the earlier fixes held and the re-probe found something new. A discovery says that a grant
     pays for new work, not another attempt at the same defect.
 
