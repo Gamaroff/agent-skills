@@ -85,7 +85,7 @@ bash .agents/skills/{develop-story|develop-task}/references/set-qa-phase.sh 5a  
 The Stop hook (`develop-pipeline-on-stop.sh`) reads `qa_phase` on a step-5 lock to name `/qa-task`
 (or `/qa-story`), `/qa-fix` or `/review-pr`; an **absent** `qa_phase` names 5a, the loud re-entrant
 default. The halt snapshot is a superset of the lock, so `qa_phase` — and `extra_cycles_granted` /
-`qa_max_cycles` above — travel into `develop-pipeline.last-halt.json` without a second writer.
+`qa_max_cycles` / `convergence_from_cycle` above — travel into `develop-pipeline.last-halt.json` without a second writer.
 
 Separately, several **HALT** paths end the run without reaching escalation: the no-code-change HALT
 and the mid-loop PR MERGED/CLOSED HALT (both in 5b), the twice-red fast-gate bail-out (5b step 0a),
@@ -621,10 +621,15 @@ the pipeline noticed.
 3. **Take readings only from cycles `>= convergence_from_cycle`** — the lock field
    (`jq -r '.convergence_from_cycle // 1' .claude/state/develop-pipeline.lock`; absent → `1`, every
    reading counts). The `1` is for a lock **without the field**, never for a missing or unreadable
-   lock. A lock the jq cannot read is restored first, with
-   `advance-pipeline-lock.sh --restore {work-item-dir}`, and the field is read again. Defaulting it to `1` would reopen the window over the pre-grant
-   readings and trip on the first post-grant gate. A grant restarts the three-reading rule, so "k more cycles" delivers k cycles,
-   and the guard re-arms once three post-grant readings exist (task.239, obs #72).
+   lock. When the jq fails, **HALT** with its stderr and do not run the trip. A missing lock is put
+   back by the resume contract's **Restore the lock (both resume paths)**, which says who restores
+   it; that step does not repair a lock that is present but does not parse. Defaulting to `1` would
+   reopen the window over the pre-grant readings and trip on the first post-grant gate.
+
+   A grant restarts the three-reading rule, so "k more cycles" delivers k cycles unless the guard
+   re-arms first. It re-arms once three post-grant readings exist. A grant of 3 or more whose first
+   three readings are flat escalates again at the 5a of the third granted cycle, and the cycles
+   after it do not run (task.239, obs #72).
    **Within that window, from its third reading onward, if `HIGH_N > 0` AND `HIGH_{N-2} > 0` AND `HIGH_N >= HIGH_{N-1}` AND
    `HIGH_{N-1} >= HIGH_{N-2}` — i.e. HIGH findings were present at all three readings and the
    count has failed to strictly decrease across two consecutive cycles — the loop is not
@@ -670,8 +675,12 @@ the pipeline noticed.
    | `7, 7, 7` (cycles 1–3) | absent | yes, at cycle 3 | a lock written before task.239 reads `1`: unchanged |
 
    The window governs this trip only. The route classifier below (`classifyLoopRoute`) still reads
-   the whole sequence: its exits end a loop that has finished, so a pre-grant reading can only let a
-   granted run exit sooner, never spend its budget.
+   the whole sequence, pre-grant readings included. Routes 2 and 2b end a loop that has finished, so
+   there a pre-grant reading can only let a granted run exit sooner. Route 2c can go the other way.
+   When the budget is spent, it compares MEDIUM over cycles N-2..N, and after a grant of 1 or 2 that
+   window holds a pre-grant gate. A pre-grant MEDIUM no higher than the next reading makes route 2c
+   decline, unless the last gate reads MEDIUM 0. The run then escalates instead of gating its last
+   fix.
 
 **Escalate; do not silently accept.** The remaining HIGH findings are not noise to be dropped
 because the loop got tired of them. On the observed task a genuine defect in the *shipped* artifact
@@ -2019,7 +2028,7 @@ convergence stall, say which file the fixes kept circling and why patching it st
 working}
 
 **Third-strike files**: {the files the comparison the resumed 5b will run prints (filling rule 1)
-— struck on a stall, one strike from the third-strike rule on a loop limit — each with its
+— struck, or one strike from the third-strike rule, as filling rule 1's table says — each with its
 mechanism read from its `finding:` texts — or "none"}
 
 **Recommended next steps**:
@@ -2065,7 +2074,7 @@ convergence stall, say which file the fixes kept circling and why patching it st
 working}
 
 **Third-strike files**: {the files the comparison the resumed 5b will run prints (filling rule 1)
-— struck on a stall, one strike from the third-strike rule on a loop limit — each with its
+— struck, or one strike from the third-strike rule, as filling rule 1's table says — each with its
 mechanism read from its `finding:` texts — or "none"}
 
 **Recommended next steps**:
@@ -2089,11 +2098,12 @@ Three lines of the entry carry that, and each is filled from evidence on disk, n
    | Halt | Re-enters at | The resumed 5b compares | Run now | List each file printed as |
    | --- | --- | --- | --- | --- |
    | Convergence stall | 5b | gates N-2, N-1, N | that rule's three-gate `comm -12` block | struck |
-   | Loop limit (either form) | 5a | gates N-1, N and the gate the resumed 5a writes | `comm -12 <(high_files "$GATE_N1") <(high_files "$GATE_N")` | one strike from the third-strike rule |
+   | Loop limit (either form) | 5a | gates N-1, N and the gate the resumed 5a writes | `comm -12 <(high_files "$GATE_N1") <(high_files "$GATE_N")` | one strike from the third-strike rule, or struck when the three-gate block also prints it |
 
    A loop-limit grant reviews before it fixes, so the three-gate comparison over gates N-2..N is
    not the one the run applies. A file that is HIGH in gates N-1 and N is struck the moment the
-   resumed review finds it again, and a file struck over N-2..N is in that set too.
+   resumed review finds it again. A file HIGH in all three of N-2..N is in that set too, and it is
+   already struck. On a loop limit, run the three-gate block as well and list its files as struck.
 
    For each file listed, name the mechanism from its `finding:` texts, as that rule already
    requires, and make item 1 of *Recommended next steps* one of the rule's three permitted moves —
@@ -2102,10 +2112,11 @@ Three lines of the entry carry that, and each is filled from evidence on disk, n
    not accept puts the file on its third strike, and 5b then refuses the next patch. Either way the
    escalation would be recommending a step the run will refuse (task.215, obs #71; task.239 bug.1).
    Too few gates for the comparison, or no file printed: write "none".
-2. **Flat-count reading — Convergence stall only.** Compare cycle N's HIGH finding with cycle
-   N-1's. **Stall**: its `file:` is in the previous gate's `high_files` output **and** its
-   `finding:` names the same function or mechanism, or cites the previous fix. **Discovery**:
-   otherwise — the earlier fixes held and the re-probe found something new (task.180, obs #19). The
+2. **Flat-count reading — Convergence stall only.** Compare each of cycle N's HIGH findings with
+   cycle N-1's gate. **Stall**: at least one of them repeats. Its `file:` is in the previous gate's
+   `high_files` output **and** its `finding:` names the same function or mechanism, or cites the
+   previous fix. Name that one in the entry; if several repeat, name each. **Discovery**: none
+   repeats. The earlier fixes held and the re-probe found something new (task.180, obs #19). The
    `file:` overlap is the checkable half; the mechanism is the author's reading, recorded beside it.
    Neither changes the trip: a person still decides. On a discovery reading, item 1 says the earlier
    fixes held and that a grant buys new ground, not another try at the same defect.

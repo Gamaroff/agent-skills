@@ -294,21 +294,21 @@ None.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-28
-**Quality Score**: 90/100
+**Quality Score**: 80/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.239.qa.1.qa-escalation-and-grant-say-what-runs.md](./task.239.qa.1.qa-escalation-and-grant-say-what-runs.md)
-- **Gate File**: [task.239.gate.1.qa-escalation-and-grant-say-what-runs.yml](./task.239.gate.1.qa-escalation-and-grant-say-what-runs.yml)
+- **Full Report**: [task.239.qa.2.qa-escalation-and-grant-say-what-runs.md](./task.239.qa.2.qa-escalation-and-grant-say-what-runs.md)
+- **Gate File**: [task.239.gate.2.qa-escalation-and-grant-say-what-runs.yml](./task.239.gate.2.qa-escalation-and-grant-say-what-runs.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 70
+- **Tests Executed**: 74
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Key Findings
-One medium: the escalation's third-strike constraint misses a loop-limit grant's two-strike files (TASK-239-BUG-1). Four lows: the hooks doc and detector prompt lack the new field, the scenario-12 replay locks lack it, the lock-missing case is unstated, and the window table is not tested against the rule.
+Cycle 1's five fixes hold, each guarded by a mutation-proved test, and TASK-239-BUG-1 is closed. One medium: the new lock-restore sentence promises a repair that `--restore` does not make on a present lock (TASK-239-BUG-2). Six lows: route 2c still reads pre-grant MEDIUM; a three-strike file is labelled "one strike from" on a loop limit; the flat-count reading with several HIGH findings is undefined; "k cycles" ignores the re-armed trip; four sites that list the grant write set omit the field; and the parity guard is vacuous.
 
 ## Change Log
 
@@ -322,6 +322,8 @@ One medium: the escalation's third-strike constraint misses a loop-limit grant's
 | 2026-10-28 |  | Implemented — 17 files, 11 tests | develop |
 | 2026-10-28 |  | QA gate CONCERNS (90/100) — 5 findings (1 medium, 4 low) | qa-task |
 | 2026-10-28 |  | QA findings fixed — CR-1 to CR-5 (bug.1 ready for QA), 1 iteration | qa-fix |
+| 2026-10-28 |  | QA gate CONCERNS (80/100) — 7 findings (1 medium, 6 low); bug.1 closed | qa-task |
+| 2026-10-28 |  | QA findings fixed — QA2-CR-1 to CR-7 (bug.2 ready for QA), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

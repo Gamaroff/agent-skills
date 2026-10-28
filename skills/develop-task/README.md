@@ -358,7 +358,7 @@ sequenceDiagram
         CC-->>-H: hash
         H->>GH: git push origin HEAD
         H->>H: HALT — QA loop limit reached
-        note right of H: resume offers "Resume the QA loop with {k} more cycles"<br/>(grant-qa-cycles.sh writes extra_cycles_granted, qa_max_cycles)
+        note right of H: resume offers "Resume the QA loop with {k} more cycles"<br/>(grant-qa-cycles.sh writes extra_cycles_granted, qa_max_cycles, convergence_from_cycle)
     end
 ```
 
@@ -412,7 +412,7 @@ sequenceDiagram
     else
         alt halt snapshot: loop-limit / not-converging
             H->>U: offer "Resume the QA loop with {k} more cycles"
-            H->>Lock: grant-qa-cycles.sh — extra_cycles_granted, qa_max_cycles, qa_phase<br/>(qa_phase 5a, or 5b after not-converging)
+            H->>Lock: grant-qa-cycles.sh — extra_cycles_granted, qa_max_cycles, convergence_from_cycle, qa_phase<br/>(qa_phase 5a, or 5b after not-converging)
         else halt_step 7, DoD ❌ GAPS (the script refuses a document-only or uncommitted fix)
             H->>U: offer "Re-enter QA at 5a" (Recommended)
             H->>Lock: reenter-qa-after-finalise.sh — current_step 5, qa_phase 5a

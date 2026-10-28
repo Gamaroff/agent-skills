@@ -98,6 +98,8 @@ const FILES = {
   changelog: "CHANGELOG.md",
   setWaitingOn: "shared/resources/set-waiting-on.sh",
   pauseDoc: "shared/resources/develop-pipeline-pause.md",
+  taskReadme: "skills/develop-task/README.md",
+  storyReadme: "skills/develop-story/README.md",
   reenterScript: "shared/resources/reenter-qa-after-finalise.sh",
 };
 const text = Object.fromEntries(
@@ -149,17 +151,39 @@ test("convergence_from_cycle: the writer, the reader and every describer name it
     "storySkill",
     "hooksDoc",
     "detectorPrompt",
+    "taskReadme",
+    "storyReadme",
   ];
-  assert.ok(
-    participants.length > 0,
-    "non-vacuity: the convergence_from_cycle participant list is empty",
-  );
   for (const name of participants) {
+    assert.ok(
+      text[name] && text[name].length > 0,
+      `non-vacuity: ${name} (${FILES[name]}) was not read`,
+    );
     assert.match(
       text[name],
       /\bconvergence_from_cycle\b/,
       `${name} (${FILES[name]}) must name convergence_from_cycle`,
     );
+  }
+  // A README that lists the grant's write set lists all of it: a file-level match is satisfied by
+  // one line while another still names only the old fields (QA2-CR-6).
+  for (const name of ["taskReadme", "storyReadme"]) {
+    const writeSet = text[name]
+      .split("\n")
+      .filter(
+        (l) => /grant-qa-cycles\.sh/.test(l) && /extra_cycles_granted/.test(l),
+      );
+    assert.ok(
+      writeSet.length >= 2,
+      `non-vacuity: ${name} lists the grant write set ${writeSet.length} time(s)`,
+    );
+    for (const line of writeSet) {
+      assert.match(
+        line,
+        /\bconvergence_from_cycle\b/,
+        `${name}: write-set line omits the field: ${line.trim()}`,
+      );
+    }
   }
   // The writer sets it in the SAME jq write as the budget, never in a second call.
   assert.match(

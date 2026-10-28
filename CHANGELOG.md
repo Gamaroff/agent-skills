@@ -18,9 +18,11 @@ All notable changes to this project will be documented in this file. Format foll
   - **A grant opens a fresh Convergence window.** `grant-qa-cycles.sh` now writes
     `convergence_from_cycle = base + 1` in the same atomic write as `qa_max_cycles` and `qa_phase`,
     and prints it after `reenter_at=`. The Convergence check counts readings only from that cycle,
-    so a grant of k runs k cycles. On task 215, a grant of 2 escalated after one cycle because the
+    so a grant of k runs k cycles, unless three post-grant readings are flat, in which case it
+    escalates again at the third. On task 215, a grant of 2 escalated after one cycle because the
     check counted three pre-grant readings (obs #72). A lock without the field reads `1`, which is
-    the old behaviour. The route classifier still reads the whole sequence.
+    the old behaviour. The route classifier still reads the whole sequence, so route 2c's MEDIUM
+    window can still hold a pre-grant gate.
   - **The recommendation obeys the third-strike rule.** Before writing "Recommended next steps",
     the escalation runs the third-strike comparison the resumed 5b will run. After a convergence
     stall that covers the last three gates. After a loop limit it covers the last two, because the

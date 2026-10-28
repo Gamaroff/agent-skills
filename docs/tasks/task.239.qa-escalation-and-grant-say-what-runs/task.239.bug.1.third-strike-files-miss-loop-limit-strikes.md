@@ -4,7 +4,7 @@
 **Bug ID**: TASK-239-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-10-28
 
@@ -103,3 +103,4 @@ it red; reverted green.
 | 2026-10-28 | New | QA Engineer | QA cycle 1 — code-review finding CR-1, confirmed by reading the 5a/5b re-entry order in the resume contract step 4 |
 | 2026-10-28 | In Progress | qa-fix | Investigation, QA cycle 1 |
 | 2026-10-28 | Ready for QA | qa-fix | Per-halt comparison table in filling rule 1; behavioural test added |
+| 2026-10-28 | Closed | qa-task | Verified by task.239.qa.2.qa-escalation-and-grant-say-what-runs.md |

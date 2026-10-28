@@ -154,14 +154,21 @@ test("loop-limit escalation lists a file struck at the last two gates; the three
     /^comm -12 <\(high_files "\$GATE_N1"\) <\(high_files "\$GATE_N"\)$/,
   );
   assert.match(cells[5], /one strike from the third-strike rule/);
+  assert.match(cells[5], /struck when the three-gate block also prints it/);
 
   const dir = mkdtempSync(join(tmpdir(), "t239-strike-"));
   try {
-    const gate = (file) =>
-      `gate: CONCERNS\ntop_issues:\n  - id: X-1\n    severity: high\n    file: ${file}\n    finding: >-\n      - a wrapped dash\n`;
-    writeFileSync(join(dir, "g2.yml"), gate("other.sh"));
-    writeFileSync(join(dir, "g1.yml"), gate("struck.sh"));
-    writeFileSync(join(dir, "g0.yml"), gate("struck.sh"));
+    // two.sh is HIGH at N-1 and N only; three.sh at N-2, N-1 and N (already struck, QA2-CR-3).
+    const gate = (...files) =>
+      `gate: CONCERNS\ntop_issues:\n${files
+        .map(
+          (f, i) =>
+            `  - id: X-${i}\n    severity: high\n    file: ${f}\n    finding: >-\n      - a wrapped dash\n`,
+        )
+        .join("")}`;
+    writeFileSync(join(dir, "g2.yml"), gate("other.sh", "three.sh"));
+    writeFileSync(join(dir, "g1.yml"), gate("two.sh", "three.sh"));
+    writeFileSync(join(dir, "g0.yml"), gate("two.sh", "three.sh"));
     const run = (cmd) =>
       execFileSync("bash", ["-c", `${highFiles}\n${cmd}`], {
         encoding: "utf8",
@@ -175,18 +182,26 @@ test("loop-limit escalation lists a file struck at the last two gates; the three
     // Control: the function reads a gate at all.
     assert.equal(
       run('high_files "$GATE_N"'),
-      "struck.sh",
+      "three.sh\ntwo.sh",
       "control: high_files reads the fixture",
     );
-    assert.equal(
-      run(threeGate),
-      "",
-      "the three-gate block must not list a two-strike file",
+    const struck = run(threeGate).split("\n").filter(Boolean);
+    const listed = run(loopLimitCmd).split("\n").filter(Boolean);
+    assert.deepEqual(
+      struck,
+      ["three.sh"],
+      "the three-gate block lists only the file HIGH at all three gates",
     );
-    assert.equal(
-      run(loopLimitCmd),
-      "struck.sh",
-      "the loop-limit command must list it",
+    assert.deepEqual(
+      listed,
+      ["three.sh", "two.sh"],
+      "the loop-limit command lists both the two-strike and the three-strike file",
+    );
+    // The row's labels: struck when the three-gate block also prints it, else one strike from.
+    assert.deepEqual(
+      listed.filter((f) => !struck.includes(f)),
+      ["two.sh"],
+      "only two.sh is one strike from the rule",
     );
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -195,7 +210,7 @@ test("loop-limit escalation lists a file struck at the last two gates; the three
   for (const [name, t] of Object.entries(TEMPLATES)) {
     assert.match(
       t,
-      /one strike from the third-strike rule on a loop limit/,
+      /struck, or one strike from the third-strike rule, as filling rule 1's table says/,
       `${name} template`,
     );
   }
@@ -302,7 +317,7 @@ test("the step-5-6 Convergence check carries the window clause the function mirr
   assert.match(loopDoc, /jq -r '\.convergence_from_cycle \/\/ 1'/);
   assert.match(
     loopDoc,
-    /A grant restarts the three-reading rule, so "k more cycles" delivers k cycles/,
+    /A grant restarts the three-reading rule, so "k more cycles" delivers k cycles unless the guard\s+re-arms first/,
   );
   assert.match(
     loopDoc,
