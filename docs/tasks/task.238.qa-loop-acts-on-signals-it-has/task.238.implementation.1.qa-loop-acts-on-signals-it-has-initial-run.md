@@ -36,7 +36,7 @@ Make the QA loop act on four signals it already holds (red CI on the PR, a pre-e
 | 2. review-task             | ✅ Done    | `task.238.review.{N}.{name}.md` exists (or skip logged)                | Skipped: Ready for Development + `task.238.review.1.…md` exists | —                    | 2026-10-28T03:25Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline; 4/4 phases; ci:fast 6491/0 | —                    | 2026-10-28T03:50Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #770: https://github.com/Gamaroff/agent-skills/pull/770 | —                    | 2026-10-28T03:58Z |
-| 5–6. qa-task / qa-fix loop | ❌ Halted | `task.238.qa.{N}.*.md`; `task.238.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 3 cycles: FAIL 70 → CONCERNS 80 → PASS 90, 5c APPROVE; re-entered after DoD gaps: FAIL 20 → FAIL 50; loop limit (5 of 5); +2 granted: FAIL 60 → CONCERNS 80; loop limit (7 of 7), cycle 7 fix `d51a9dca` ungated | —                    | 2026-10-28T04:42Z |
+| 5–6. qa-task / qa-fix loop | ❌ Halted | `task.238.qa.{N}.*.md`; `task.238.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 3 cycles: FAIL 70 → CONCERNS 80 → PASS 90, 5c APPROVE; re-entered after DoD gaps: FAIL 20 → FAIL 50; loop limit (5 of 5); +2 granted: FAIL 60 → CONCERNS 80; loop limit (7 of 7); +1 granted: CONCERNS 80; loop limit (8 of 8), cycle 8 fix `92e33b0f` ungated | —                    | 2026-10-28T04:42Z |
 | 7. finalise                | ❌ Halted  | `task.238.dod.{N}.*.md`; task `status: accepted`                       | DoD gaps (5): security probe 2 medium + 1 low; SC-10 2 unheld guards — `task.238.dod.1` | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
@@ -170,6 +170,22 @@ Make the QA loop act on four signals it already holds (red CI on the PR, a pre-e
 - Cycle 7 is `QA_MAX_CYCLES`. After this 5b, the Loop limit trigger asks the engine for route 2c
   (gate-the-last-fix).
 
+### QA loop re-entry (second grant) — 2026-10-28
+
+- QA loop re-entry: 1 extra cycle granted; 0 cycle(s) run outside the loop back-filled from disk. The user chose "Resume at 5a with 1 more cycle" at invocation. `grant-qa-cycles.sh` restored the lock from the halt snapshot: `QA_CYCLE=7`, `qa_max_cycles=8`, `reenter_at=5a`. Cycle 8 gates the cycle 7 fix `d51a9dca`.
+
+### QA cycle 8 routing — 2026-10-28
+
+- Traceability mapper skipped, for the same reason as cycles 1–7. `SAFETY_REPROBE=false`: gate 7's security is CONCERNS/measured, with no HIGH and no FAIL. The scope is the files changed since gate 7's head (27 files).
+- CR-1 kept at the reviewer's `medium`. The measured plausibility is low: 0 of 183 tracked review reports use such a value, and review-pr emits plain scalars. Severity was not lowered, for consistency with bug.16 (the same class, rated medium at gate 7), and because the check's documented guarantee is false either way. With `medium`, the gate reads CONCERNS and the loop continues.
+- Gate 8 CONCERNS. The HIGH sequence is `1, 0, 0, 3, 2, 2, 0, 0`. The Convergence check does not trip (`HIGH_N` is 0). Route classifier: `continue` (`not-a-pass-gate`; route 2 declined: `product-defect-signal`).
+- Third strike: none, since gates 7 and 8 raised no HIGH.
+- Narrowing offer: signalled. "Narrowing residue — every MEDIUM on gates 7 and 8 names shared/resources/develop-pipeline-step-5-6-qa-loop.md (TASK-238-CR7-1, TASK-238-CR7-2, TASK-238-CR8-1); HIGH 0 on both. This is an OFFER to qa-fix Step 2.6, not a route and not an escalation."
+- QA Cycle 8 — changes-requested: stage-disabled.
+- Cycle 8 is `QA_MAX_CYCLES`. After this 5b, the Loop limit trigger asks the engine for route 2c.
+- qa-fix cycle 8: Step 2.6 narrowing offer taken, move **consolidate** (value allow-list), `92e33b0f`. fix_cycle not supplied; derived from the gate (8).
+- Loop limit (8 of 8): route 2c declined. `Loop route: continue (medium-not-falling) — MEDIUM reads 0, 2, 1 over cycles 6–8 — route 2c needs it strictly falling, or 0 on the last gate, which is the evidence that one more gate would clear.` Escalating.
+
 ---
 
 ## Issues Log
@@ -284,6 +300,51 @@ because gate 6 raised no MEDIUM (it was all HIGH), which breaks the falling sequ
 2. Or accept with a waiver: take option 2 of the HALT message (5c `/review-pr`, then `/finalise`).
    This is reasonable here because gate 7 had no HIGH, but its MEDIUM fixes are ungated.
 3. File CR7-3, CR7-4 and the deferred structured fast-gate comparison as a follow-up task.
+
+### QA Loop Limit Reached — 2026-10-28 (after 3 granted cycles)
+
+The pipeline completed 8 qa-task/qa-fix cycles without a clean PASS. The owner granted a third
+cycle (`qa_max_cycles` 7 → 8), and it is spent.
+
+**Final gate status**: CONCERNS (gate 8, 80/100, head `a2a41ca1`). Cycle 8's fix (`92e33b0f`) has
+**not been gated**.
+**HIGH findings per cycle**: 1, 0, 0, 3, 2, 2, 0, 0. Gates 7 and 8 raised no HIGH. The Convergence
+check did not trip.
+**MEDIUM findings per cycle**: 2, 1, 0, 2, 1, 0, 2, 1.
+**Remaining issues** (from gate 8; fixed in `92e33b0f` and Ready for QA, ungated):
+- TASK-238-CR8-1 (medium), `shared/resources/develop-pipeline-step-5-6-qa-loop.md`: the
+  open-coverage check read `0` for value shapes it did not read (bug.17).
+- Carried advisory, not gated: CR7-3, CR7-4 and CR7-6 (as above).
+
+**What was attempted per cycle**:
+- Cycles 1–7: see the two escalations above.
+- Cycle 8: gate 8 verified cycle 7's fixes (bug.15 and bug.16 closed; PRB7-1 held). It found one
+  MEDIUM in the same awk: values, not lines, were unchecked. The pipeline sent the narrowing offer
+  (every MEDIUM on gates 7 and 8 names one file). qa-fix took **consolidate**: a value allow-list
+  that completes the line allow-list (`92e33b0f`).
+- Route 2c was evaluated and declined: `medium-not-falling` (MEDIUM reads 0, 2, 1 over cycles 6–8).
+
+**Likely root cause**: no blocker remains, and gates 7 and 8 raised no HIGH. The last three MEDIUMs
+were all in one hand-rolled reader, the §5c open-coverage awk. Each cycle found the next shape it
+did not refuse:
+- cycle 7: free text, then two list shapes;
+- cycle 8: values.
+
+The check now accepts only review-pr's emitted shape. That closes the class by construction, rather
+than by another enumerated shape. Measured exposure is zero: none of the 183 tracked reports uses
+any refused shape. Route 2c declined because gate 6 raised no MEDIUM (it was all HIGH), not because
+the loop stopped improving.
+
+**Recommended next steps**:
+1. Accept with a waiver: take option 2 of the HALT message (5c `/review-pr`, then `/finalise`).
+   This is reasonable here. There is no HIGH on the last two gates. The ungated fix narrows a
+   reader to an allow-list, mutation-proven against all 183 reports with no change. 5c re-reads the
+   head, so the fix is not shipped unread.
+2. Or grant 1 more cycle to gate `92e33b0f`: choose "Resume at 5a with 1 more cycle".
+3. Either way, file a follow-up task to:
+   - replace the awk with a bundled script that holds the shape table and its tests (gate 8's
+     `recommendations.future`);
+   - cover CR7-3, CR7-4 and the deferred structured fast-gate comparison.
 
 ---
 
@@ -404,14 +465,47 @@ Evidence:
 **Commit**: `d51a9dca`, pushed with gate 7, QA report 7 and the cycle 7 probe record. PR comment
 issuecomment-6462812768; tracker comment `qa-fix-7` posted on #768.
 
+### QA Cycle 8 — 2026-10-28
+**Gate Result**: CONCERNS (80/100)
+**Issues Found**: 1. One MEDIUM: bug.17 (CR8-1). The §5c open-coverage allow-list checks line shapes, not value shapes. A block-scalar, tagged or anchored `category: coverage`, a continued `provenance:` value and a flow value carrying ` #` each read `0`. The reviewer (CR-1) and the probe engine (5 cases) found it independently. bug.15, bug.16 and PRB7-1 were verified, and both guards were mutation-proved. Probes: 81 executed, 7 scored reproduced, 0 escaped. Two of the 7 are bug.16's cases, which now read `unreadable`, the accepted outcome. Fast gate green (6521/0). PR CI green on `a2a41ca1`.
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop limit reached
+
+**Fixes Applied**:
+- bug.17 (Step 2.6, pipeline narrowing offer; move: **consolidate**). The line allow-list is now
+  completed with a value allow-list. Each of these reads `unreadable`:
+  - a `category:` value outside review-pr's six tokens;
+  - a deeper line that continues a `category:` or `provenance:` value;
+  - either key given twice in one entry;
+  - a ` #` inside a plain flow value.
+- `CHANGELOG.md` no longer claims "every YAML spelling".
+- Deliberate change: `category: coverage-gap` now reads `unreadable` (it read `0`).
+
+**Evidence**:
+- 8 new open-coverage cases, plus 1 updated. Each of the four guards was mutation-proven: removing
+  it turned its case red, and restoring it brought 76/76 back.
+- All 183 tracked PR review reports read the same `OPEN_COVERAGE` before and after: 125 × `0`,
+  35 × `1`, 4 × `2`, 19 × `unreadable`.
+- Probe cases from cycles 5, 7 and 8: none reads `0` for a coverage entry.
+- Probe (Step 3.5), phrases `open-coverage`, `open coverage finding` and `every YAML spelling`:
+  population 5, plus the CHANGELOG. The QA loop doc and the CHANGELOG were updated. The others
+  route on the printed value and are unaffected.
+- Fast gate: 6529 tests, 0 fail. `bundle:check` reports 0 problems.
+
+**Commit**: `92e33b0f`, pushed with gate 8, QA report 8 and the cycle 8 probe record. PR comment
+issuecomment-6463432344; tracker comment `qa-fix-8` posted on #768.
+
 ---
 
 ## Completion
 
-**Finished**: 2026-10-28T07:00Z (halted)
-**Final Status**: Escalated — QA loop limit reached (7 of 7, after 2 granted cycles)
+**Finished**: 2026-10-28T07:38Z (halted)
+**Final Status**: Escalated — QA loop limit reached (8 of 8, after 3 granted cycles)
 **Branch**: feature/task.238.qa-loop-acts-on-signals-it-has
 **PR**: https://github.com/Gamaroff/agent-skills/pull/770
-**QA Iterations**: 7 (FAIL 70 → CONCERNS 80 → PASS 90, 5c APPROVE; DoD gaps; re-entry → FAIL 20 → FAIL 50; +2 granted → FAIL 60 → CONCERNS 80); cycle 7's fix `d51a9dca` ungated
+**QA Iterations**: 7 (FAIL 70 → CONCERNS 80 → PASS 90, 5c APPROVE; DoD gaps; re-entry → FAIL 20 → FAIL 50; +2 granted → FAIL 60 → CONCERNS 80; +1 granted → CONCERNS 80); cycle 8's fix `92e33b0f` ungated
 **DoD Summary**: `task.238.dod.1.qa-loop-acts-on-signals-it-has.md` — ❌ GAPS IDENTIFIED (all 5 fixed in `adff39e2`)
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
