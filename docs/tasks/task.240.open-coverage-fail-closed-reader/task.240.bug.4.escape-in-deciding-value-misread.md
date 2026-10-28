@@ -4,7 +4,7 @@
 **Bug ID**: TASK-240-BUG-4
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 4 scoped review, CR-1; reproduced by QA)
 **Date Found**: 2026-10-28
 
@@ -116,3 +116,4 @@ print `OPEN_COVERAGE=unreadable`.
 | 2026-10-28 | New | qa-task | Found in QA cycle 4 (task.240.qa.4.open-coverage-fail-closed-reader.md) |
 | 2026-10-28 | In Progress | qa-fix | Investigation started |
 | 2026-10-28 | Ready for QA | qa-fix | Escape refused in deciding values (consolidate: one strict rule); M16–M17 mutation-proven |
+| 2026-10-28 | Closed | develop-task | Verified by task.240.qa.5.open-coverage-fail-closed-reader.md; the escape rows still refuse under the version 1.2 reader (gate 9). Closed at 5c (PR review PC-3) |

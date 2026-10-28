@@ -5,10 +5,12 @@ type: task
 description: "Replace the §5c open-coverage awk with a bundled Node reader that parses the PR review's machine-readable findings block and prints unreadable for any shape it cannot read, so the QA loop stops finding one more shape gap per cycle."
 tags: [develop-task, develop-story, qa-loop, review-pr, open-coverage, task.238-follow-up]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: High
 created: 2026-10-28
 updated: 2026-10-28
+completed_date: 2026-10-28
+pr_number: 776
 assignee:
 estimated_effort_hours: 8
 github_issue: 771
@@ -16,7 +18,7 @@ github_issue: 771
 
 # Technical Task: Fail-closed reader for the 5c open-coverage check
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.240.review.1.open-coverage-fail-closed-reader.md` implemented 2026-10-28
 **GitHub Issue**: [#771](https://github.com/Gamaroff/agent-skills/issues/771)
 
@@ -198,8 +200,10 @@ one count to another. A consumer now needs Node at §5c, which every pipeline st
 **Amended 2026-10-28 (author-approved, after the QA loop escalation).** The reader accepts one line
 per key, so shapes the awk counted now read `unreadable`: a flow entry, a nested list, a block
 scalar, a value wrapped onto a deeper line, and plain free text holding `: ` (which YAML rejects).
-review-pr's template emits none of them and no tracked report uses one (SC-4). A review that does
-use one halts 5c at the **Review failed** arm; it is never counted wrong.
+No tracked report uses one (SC-4). review-pr's template writes `finding:` and `suggested_action:`
+unquoted, though, so a review whose sentence holds `: ` reads `unreadable`. A review that uses any
+of these shapes halts 5c at the **Review failed** arm; it is never counted wrong. Quoting those two
+fields in the template is a follow-up, outside this task (PR review PC-5).
 
 ---
 
@@ -468,6 +472,10 @@ prose), `develop-pipeline-on-stop.sh:195,205` and its test `:349,353,354`,
 **Deferred work**: none from this task. CR7-3, CR7-4, CR9-5 and the structured pre-existing
 comparison stay out of scope as § 4 states.
 
+> **Superseded by version 1.2.** The notes for QA fix cycles 1–5 below describe a reader that
+> accepted wrapped and nested values. The one-line-per-key reader (see below) refuses those shapes,
+> so the cycle 1–3 acceptance rules no longer ship. The notes are kept as history.
+
 **QA fix cycle 1 (TASK-240-QA-1, bug.1).** The reader now accepts a value that wraps onto deeper
 lines under any key except `category` and `provenance`. A plain value may wrap unless a wrapped line
 reads as `key: `. A quoted value may wrap until its closing quote, which must be on a deeper line.
@@ -519,6 +527,21 @@ reader's header, which had drifted from the code. Results:
 - Corpus: 0 changes.
 - `ci:fast`: green, 6,644 pass and 0 fail.
 
+**QA fix cycle 6 (bug.6, bug.7, bug.8; `5f69c201`).** The PyYAML differential generator was widened
+first (bug.8). Then a comment ends a wrap (bug.6), and indicator-led values and tabs are refused
+(bug.7).
+
+**QA fix cycle 7 (bug.9, bug.10; `443e4f6d`).** A blank line holding a tab and a bracket in a plain
+flow value are refused.
+
+**Version 1.2: one line per key (`149f9235`, after the second loop escalation).** The reader
+accepts one line per key over an allow-listed character set, and refuses everything else. This ends
+the shape-by-shape fixes of cycles 1–7. The amendment is in § 5.
+
+**QA fix cycle 8 (bug.11; `a3b9c0d0`).** `countOpenCoverage` takes the report's bytes and decodes
+them strictly. An invalid UTF-8 sequence reads `unreadable` (`bad-encoding`). Mutation proofs M36
+and M37 each turned tests red, and the corpus shows 0 changes. Gate 9 passed with no open finding.
+
 ---
 
 <!--
@@ -550,12 +573,35 @@ reader's header, which had drifted from the code. Results:
 ### Key Findings
 
 [bug.11](./task.240.bug.11.invalid-utf8-decoded-leniently.md) is fixed and closed: an invalid UTF-8 byte now reads `unreadable` (`bad-encoding`). No open finding. Two low cleanups are recorded for later: a non-view byte container reads `no-section`, and no test pins `ignoreBOM` on the bytes path.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.240.qa.9.open-coverage-fail-closed-reader.md`
+**Gate File**: `task.240.gate.9.open-coverage-fail-closed-reader.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Review (Step 5c)**: `task.240.pr-review.1.open-coverage-fail-closed-reader.md`, ⚠️ CONCERNS with no coverage finding
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 11/11 met (SC-1 to SC-11), each with code and per-PR test evidence
+✅ **PR & CI:** PR #776; the host requires no reviews; all 6 checks green on `966aba75`
+✅ **Documentation:** § 5c and its bundled copies updated; CHANGELOG cites task 240
+✅ **Security Review:** ✅ PASS. No secrets and no eval or shell in shipped code. `boundary: internal` (the pipeline's own review report)
+⚠️ **Compliance Review:** not applicable (internal developer tooling)
+
+**Task marked as ACCEPTED on:** 2026-10-28
+
+**Detailed Verification Log:** See `task.240.dod.1.open-coverage-fail-closed-reader.md` for the full verification evidence and timestamps.
 
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-28 | 1.0     | Initial draft | create-task |
 | 2026-10-28 | 1.1     | Review passed (8/10) — parser rules aligned with six pinned parity expectations (case-blind values, column-0 entries, nested values and comments, `no-category`, escapes); SC-5 given a test; "184" count dropped | review-task |
 | 2026-10-28 |         | Status → ready-for-development | review-task |
@@ -578,6 +624,8 @@ reader's header, which had drifted from the code. Results:
 | 2026-10-28 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-10-28 |         | QA findings fixed — the report's bytes decoded strictly inside the reader, an invalid sequence refused as `bad-encoding` (bug.11), 1 iteration | qa-fix |
 | 2026-10-28 |         | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-10-28 |         | PR review CONCERNS: § 5 claim about the review-pr template corrected; Implementation Notes for cycles 6–8 and version 1.2 added | develop-task |
+| 2026-10-28 | 1.3 | DoD verified — accepted (PR #776) | finalise |
 <!-- change-log-end -->
 
 ---

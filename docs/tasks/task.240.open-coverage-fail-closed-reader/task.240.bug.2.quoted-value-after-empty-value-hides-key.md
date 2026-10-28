@@ -4,7 +4,7 @@
 **Bug ID**: TASK-240-BUG-2
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 2 refute pass, CR-1; reproduced by QA)
 **Date Found**: 2026-10-28
 
@@ -129,3 +129,4 @@ copies.
 | 2026-10-28 | New | qa-task | Found in QA cycle 2 (task.240.qa.2.open-coverage-fail-closed-reader.md) |
 | 2026-10-28 | In Progress | qa-fix | Investigation started |
 | 2026-10-28 | Ready for QA | qa-fix | Fix implemented (consolidate: allow-list for nested openers); M9–M11 mutation-proven |
+| 2026-10-28 | Closed | develop-task | Verified by task.240.qa.3.open-coverage-fail-closed-reader.md; the shape still reads unreadable under the version 1.2 reader (gate 9). Closed at 5c (PR review PC-1) |
