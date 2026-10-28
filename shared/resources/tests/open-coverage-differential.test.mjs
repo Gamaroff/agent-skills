@@ -15,11 +15,10 @@
  *
  * The reference count mirrors the reader's documented value semantics: the category and the
  * provenance are compared case-blind (`category: Coverage` counts — the parity suite pins it), and
- * a missing or null provenance is not `pre-existing`. One documented leniency is modelled too: a
- * block-style free-text value (any key but `category`/`provenance`) written plain with a `: ` in it
- * is read to the end of its line, as task.238 bug.15 pins, because review-pr writes plain
- * sentences. YAML rejects that line; the reference quotes it first (`lenientFreeText`) so PyYAML
- * reads what the reader is documented to read.
+ * a missing or null provenance is not `pre-existing`. The reference models no leniency: plain free
+ * text holding `: ` is refused, as YAML rejects it (task.238 bug.15's leniency went with the
+ * one-line grammar). The suite compares strings, so it does not reach the CLI's UTF-8 decode;
+ * tests/open-coverage.test.mjs holds that with byte-level rows (task.240 bug.11).
  *
  * PyYAML is a hard requirement, as it is for tests/skill-frontmatter.test.js; CI installs it. A
  * missing parser fails this suite rather than skipping it, because a skipped differential test

@@ -32,7 +32,9 @@
  * Anything else is a refusal, including a line deeper than its entry's keys, a flow entry, a block
  * scalar, an anchor and a tag. The block may hold only printable ASCII, newlines and, beyond ASCII,
  * letters, marks, numbers, punctuation and symbols: no tab, carriage return, control or format
- * character, and no space but U+0020. Each rule is one YAML states for a one-line value, so a block
+ * character, and no space but U+0020. The report must also be valid UTF-8: the CLI hands the reader
+ * the file's bytes, and an invalid sequence is a refusal, never the U+FFFD a lenient decode would
+ * put in its place (task.240 bug.11). Each rule is one YAML states for a one-line value, so a block
  * the reader counts is one YAML reads the same way; the differential suite
  * (tests/open-coverage-differential.test.mjs) compares the two with PyYAML.
  * `category` and `provenance` values compare case-blind. `category` must be one of review-pr's six
@@ -62,6 +64,7 @@ const REASONS = Object.freeze([
   "no-category",
   "unterminated",
   "not-a-map",
+  "bad-encoding",
 ]);
 
 /** The category tokens review-pr writes: coverage|scope|trail|consistency for PC-*, bug|cleanup for CR-*. */
@@ -80,6 +83,9 @@ const KEY_LINE = /^([A-Za-z_][A-Za-z0-9_-]{0,63}):(?: +(.*)| *)$/;
 // Every character the block may hold. A tab, a carriage return, a control or format character and
 // a space other than U+0020 are each something YAML rejects or reads as a break (task.240 bug.9).
 const BLOCK_CHARS = /^[\n\x20-\x7e\p{L}\p{M}\p{N}\p{P}\p{S}]*$/u;
+// Fatal, so an invalid byte throws instead of becoming U+FFFD, which BLOCK_CHARS admits as a symbol.
+// ignoreBOM keeps a leading BOM in the text, as the `utf8` read this replaced did.
+const UTF8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 
 class Refusal extends Error {
   constructor(reason, detail) {
@@ -258,12 +264,22 @@ function setKey(cur, k, at) {
   cur.keys.set(k[1], value(k[2] ?? ""));
 }
 
-/**
- * The open coverage findings in a review report's text: { count } or { unreadable: reason, detail }.
- * Never throws on input.
- */
-function countOpenCoverage(text) {
+/** A report's bytes as text, or a refusal when they are not valid UTF-8. */
+function decode(bytes) {
   try {
+    return UTF8.decode(bytes);
+  } catch {
+    return refuse("bad-encoding", "the report is not valid UTF-8");
+  }
+}
+
+/**
+ * The open coverage findings in a review report — its text, or its bytes, which must be valid
+ * UTF-8: { count } or { unreadable: reason, detail }. Never throws on input.
+ */
+function countOpenCoverage(input) {
+  try {
+    const text = input instanceof Uint8Array ? decode(input) : input;
     if (
       typeof text !== "string" ||
       !/^## Machine-Readable Findings[ \t]*$/m.test(text)
@@ -305,9 +321,10 @@ function main(argv) {
     );
     return 2;
   }
-  let text;
+  let bytes;
   try {
-    text = fs.readFileSync(file, "utf8");
+    // Bytes, not a `utf8` read: countOpenCoverage decodes them strictly (task.240 bug.11).
+    bytes = fs.readFileSync(file);
   } catch (e) {
     process.stderr.write(
       `open-coverage: unreadable — no-section: cannot read ${file} (${e.code || e.message})\n`,
@@ -315,7 +332,7 @@ function main(argv) {
     process.stdout.write("OPEN_COVERAGE=unreadable\n");
     return 0;
   }
-  const r = countOpenCoverage(text);
+  const r = countOpenCoverage(bytes);
   if ("count" in r) {
     process.stdout.write(`OPEN_COVERAGE=${r.count}\n`);
   } else {

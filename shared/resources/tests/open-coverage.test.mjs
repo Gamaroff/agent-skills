@@ -332,7 +332,35 @@ const REFUSED = [
     "    category: coverage\n    finding: a\u0000b\n",
     "    category: coverage\n    finding: a\u001bb\n",
   ].map((lines) => ["bad-line", findings(`  - id: PC-1\n${lines}`)]),
+  // Bytes that are not UTF-8 (task.240 bug.11). A lenient decode turns each into U+FFFD, a symbol
+  // BLOCK_CHARS admits, and the block counts 1 where PyYAML raises ReaderError. A stray
+  // continuation byte, a truncated sequence, an overlong encoding and a UTF-16 surrogate.
+  ...[[0xff], [0xc3], [0xc0, 0xaf], [0xed, 0xa0, 0x80]].map((bad) => [
+    "bad-encoding",
+    Buffer.concat([
+      Buffer.from(
+        findings("  - id: PC-1\n    category: coverage\n    finding: a"),
+      ),
+      Buffer.from(bad),
+      Buffer.from("b\n"),
+    ]),
+  ]),
 ];
+
+test("valid UTF-8 bytes read as their text does", () => {
+  for (const text of [
+    findings(
+      "  - id: PC-1\n    category: coverage\n    finding: café \u{1F600}\n",
+    ),
+    findings(
+      "  - id: PC-1\n    category: coverage\n    provenance: pre-existing\n",
+    ),
+  ])
+    assert.deepEqual(
+      countOpenCoverage(Buffer.from(text)),
+      countOpenCoverage(text),
+    );
+});
 
 // The title names the row by index: a fence string inside a template-literal expression blinds the
 // relationship-assertion scanner to the rest of the file.
@@ -402,6 +430,22 @@ test("CLI: a count, a refusal and a missing file each print one line and exit 0"
       assert.match(r.stdout, /^OPEN_COVERAGE=(\d+|unreadable)\n$/);
     }
     assert.match(cli(["--file", bad]).stderr, /bad-value/);
+    // The CLI reads bytes: an invalid one inside the block is a refusal, not U+FFFD (bug.11).
+    const latin = path.join(dir, "latin.md");
+    writeFileSync(
+      latin,
+      Buffer.concat([
+        Buffer.from(
+          findings("  - id: PC-1\n    category: coverage\n    note: a"),
+        ),
+        Buffer.from([0xff]),
+        Buffer.from("b\n"),
+      ]),
+    );
+    const r = cli(["--file", latin]);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.stdout, "OPEN_COVERAGE=unreadable\n");
+    assert.match(r.stderr, /bad-encoding/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-240-BUG-9
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 7 hand probe; reproduced against PyYAML 6.0.3)
 **Date Found**: 2026-10-28
 
@@ -102,3 +102,4 @@ should print `OPEN_COVERAGE=unreadable`.
 | 2026-10-28 | New | qa-task | Found in QA cycle 7 (task.240.qa.7.open-coverage-fail-closed-reader.md) |
 | 2026-10-28 | In Progress | qa-fix | Investigation started |
 | 2026-10-28 | Ready for QA | qa-fix | Fix implemented; mutation-proven |
+| 2026-10-28 | Closed | qa-task | Verified by task.240.qa.8.open-coverage-fail-closed-reader.md |

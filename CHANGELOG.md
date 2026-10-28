@@ -19,7 +19,9 @@ All notable changes to this project will be documented in this file. Format foll
   with an optional trailing ` # comment`. A plain value starts with a letter, a digit or a
   non-ASCII character and holds no `: `. A double-quoted value may escape only `\\` and `\"`. The
   block may hold printable ASCII and, beyond ASCII, letters, marks, numbers, punctuation and
-  symbols, so a tab, a carriage return, a control character or a no-break space is refused.
+  symbols, so a tab, a carriage return, a control character or a no-break space is refused. The
+  report must be valid UTF-8: the CLI reads its bytes and refuses an invalid sequence as
+  `bad-encoding`, where a lenient decode had turned it into U+FFFD and counted the block.
   Everything else reads `unreadable`: a value wrapped onto a deeper line, a nested list, a block
   scalar, a flow entry `- {…}`, an anchor or a tag. Keys are case-sensitive, as in YAML.
 

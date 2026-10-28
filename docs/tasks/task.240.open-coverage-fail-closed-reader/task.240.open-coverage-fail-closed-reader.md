@@ -537,25 +537,23 @@ reader's header, which had drifted from the code. Results:
 
 ### QA Report
 
-- **Full Report**: [task.240.qa.7.open-coverage-fail-closed-reader.md](./task.240.qa.7.open-coverage-fail-closed-reader.md)
-- **Gate File**: [task.240.gate.7.open-coverage-fail-closed-reader.yml](./task.240.gate.7.open-coverage-fail-closed-reader.yml)
+- **Full Report**: [task.240.qa.8.open-coverage-fail-closed-reader.md](./task.240.qa.8.open-coverage-fail-closed-reader.md)
+- **Gate File**: [task.240.gate.8.open-coverage-fail-closed-reader.yml](./task.240.gate.8.open-coverage-fail-closed-reader.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 6680 (full `ci:fast`), plus the differential suite at 5 fresh seeds × 25,000 and a 34-shape PyYAML hand probe
+- **Tests Executed**: 6705 (full `ci:fast`), plus the differential suite at 5 fresh seeds × 25,000 and a 54-shape PyYAML hand probe
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
 
-BUG-6, BUG-7 and BUG-8 are fixed and closed. Two medium findings remain, and one low:
+BUG-9 and BUG-10 are fixed and closed. The allow-list parser gave no wrong count under any probe this cycle. One medium finding remains, in the CLI:
 
-- TASK-240-QA-11 ([bug.9](./task.240.bug.9.tab-in-blank-line-accepted.md)): a whitespace-only line holding a tab is skipped as blank.
-- TASK-240-QA-12 ([bug.10](./task.240.bug.10.flow-value-bracket-accepted.md)): a plain flow value holding a bracket is accepted.
-- TASK-240-QA-13 (bug.10, low): the flow generator never emits a bracket mid-value.
+- TASK-240-QA-14 ([bug.11](./task.240.bug.11.invalid-utf8-decoded-leniently.md)): an invalid UTF-8 byte is decoded to U+FFFD, and the block still counts where PyYAML refuses to read it.
 
-In each case the count is the one the writer meant. YAML gives the block no count. The tracked corpus holds neither shape.
+The count is the one the writer meant. 0 of 187 tracked reports hold invalid UTF-8.
 
 <!-- change-log-start -->
 ## Change Log
@@ -581,6 +579,8 @@ In each case the count is the one the writer meant. YAML gives the block no coun
 | 2026-10-28 |         | QA gate CONCERNS (90/100) — 3 findings | qa-task |
 | 2026-10-28 |         | QA findings fixed — generator widened first, then a tab-holding blank line (bug.9) and a bracket in a plain flow value (bug.10) refused, 1 iteration | qa-fix |
 | 2026-10-28 | 1.2     | Reader narrowed to one line per key after the QA loop escalation (author-approved): Overview, In Scope, Target Architecture, Breaking Changes and SC-2 amended; flow, nested, block-scalar, wrapped and plain `: ` shapes now read `unreadable` | Lorien Gamaroff |
+| 2026-10-28 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-10-28 |         | QA findings fixed — the report's bytes decoded strictly inside the reader, an invalid sequence refused as `bad-encoding` (bug.11), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---
