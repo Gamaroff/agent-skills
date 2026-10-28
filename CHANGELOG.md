@@ -27,7 +27,8 @@ All notable changes to this project will be documented in this file. Format foll
   wrap. A nested value must be one flat list, map or scalar at one indent. In a block scalar, `#`
   is content. A comment ends a wrapped plain value, so no deeper line may follow it. A plain value
   may not start with a YAML indicator (a backtick, `@`, `%`, `|`, `- `, `? `, `: `, or a `,`):
-  reviews quote their free text. A tab is refused anywhere outside a block scalar's content. No
+  reviews quote their free text. A tab is refused anywhere outside a block scalar's content, and so
+  is a whitespace-only line holding one. A plain flow value may not hold `[` or `]`. No
   tracked report holds any of these shapes. The shell
   `case` guard stays as the backstop for a reader that does not run. `pr-review-current.js` now
   exports its block extractor, so the two readers share one regex.

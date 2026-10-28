@@ -207,6 +207,11 @@ function generator(r) {
 
   // The space after a key's colon — or, rarely, a tab, which YAML rejects there.
   const separator = () => (chance(0.03) ? pick(["\t", " \t"]) : " ");
+  // A whitespace-only line — or, rarely, one holding a tab, which YAML rejects anywhere.
+  const blank = (ind) =>
+    chance(0.1)
+      ? pick(["\t\n", `${sp(ind)}\t\n`])
+      : pick(["\n", `${sp(ind)}\n`]);
 
   function flowEntry(listIndent) {
     const keys = ["id", "category", ...(chance(0.6) ? ["provenance"] : [])];
@@ -215,7 +220,7 @@ function generator(r) {
       const w = pick(words).replace(/[,{}#]/g, "");
       risky = chance(RISK);
       const v = risky
-        ? pick([`"${w}\\t"`, "x: y", `${w} # c`, `'${w}`])
+        ? pick([`"${w}\\t"`, "x: y", `${w} # c`, `'${w}`, `${w}]`, `a[${w}`])
         : pick([w, w, `"${w}"`, `'${w.replace(/'/g, "''")}'`]);
       return `${keyName(k)}:${risky && chance(0.5) ? "" : separator()}${v}`;
     });
@@ -243,11 +248,14 @@ function generator(r) {
           ? `${sp(listIndent)}-${sp(dash)}`
           : sp(chance(0.03) ? pick([col - 1, col + 1, listIndent + 2]) : col);
       out += `${head}${keyName(k)}:${v.inline === "" ? "" : separator() + v.inline}\n`;
-      for (const [ind, text] of v.lines) out += `${sp(ind)}${text}\n`;
+      for (const [ind, text] of v.lines) {
+        out += `${sp(ind)}${text}\n`;
+        if (chance(0.03)) out += blank(ind);
+      }
       if (chance(0.05))
         out += pick([
           `${sp(col)}# a comment\n`,
-          "\n",
+          blank(col),
           `${sp(listIndent)}# c\n`,
         ]);
     });

@@ -33,8 +33,9 @@
  *     bug.1). A quote still open at the entry's key indent is refused, and so is a deeper line
  *     after a comment that ends a plain value (bug.6).
  * Refused besides: a plain value that starts with a YAML indicator (`` ` ``, `@`, `%`, `|`, `- `,
- * `? `, `: `, an anchor, alias or tag; in block style a `,`) (bug.7), and a tab anywhere outside a
- * block scalar's content. Each is a line YAML rejects. The differential suite
+ * `? `, `: `, an anchor, alias or tag; in block style a `,`) (bug.7), a plain flow value holding
+ * `[` or `]` (bug.10), a tab anywhere outside a block scalar's content, and a whitespace-only line
+ * holding a tab, which YAML rejects even there (bug.9). Each is a line YAML rejects. The differential suite
  * (tests/open-coverage-differential.test.mjs) compares the reader with PyYAML.
  * `category` and `provenance` values compare case-blind. `category` must be one of review-pr's six
  * tokens (review-pr SKILL.md Step 7).
@@ -126,6 +127,10 @@ function scalar(s, flow, strict = flow) {
     const value = m[0].replace(/[ \t]+$/, "");
     if (/[ \t]#/.test(value) || value.startsWith("#"))
       refuse("bad-value", "a comment inside a flow entry");
+    // Inside a flow collection `[` and `]` are indicators wherever they sit: YAML rejects a plain
+    // value holding one (task.240 bug.10).
+    if (/[[\]]/.test(value))
+      refuse("bad-value", `a bracket inside a plain flow value: ${value}`);
     return { value: plain(value), rest: s.slice(m[0].length) };
   }
   return {
@@ -289,7 +294,15 @@ function parseBlock(block) {
   const lines = block.split("\n");
   for (let n = 0; n < lines.length; n++) {
     const line = lines[n];
-    if (/^[ \t]*$/.test(line)) continue;
+    if (/^[ \t]*$/.test(line)) {
+      // A whitespace-only line holding a tab is one YAML rejects wherever it sits (task.240 bug.9).
+      if (line.includes("\t"))
+        refuse(
+          "bad-line",
+          `a whitespace-only line holding a tab (line ${n + 1})`,
+        );
+      continue;
+    }
     const lead = line.match(/^[ \t]*/)[0];
     if (lead.includes("\t"))
       refuse("bad-line", `a tab in the indentation (line ${n + 1})`);

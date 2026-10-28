@@ -143,6 +143,22 @@ const ACCEPTED = [
     ),
     1,
   ],
+  // What bug.9 and bug.10's refusals must leave alone: a spaces-only blank line, and a bracket in a
+  // quoted flow value or a block plain value.
+  [
+    "a spaces-only blank line between entries is blank",
+    findings(
+      "  - id: PC-1\n    category: coverage\n   \n  - id: PC-2\n    category: coverage\n",
+    ),
+    2,
+  ],
+  [
+    "a bracket in a quoted flow value or a block plain value is text",
+    findings(
+      '  - {category: coverage, ref: "CHANGELOG.md [Unreleased]"}\n  - id: PC-2\n    category: coverage\n    finding: see [x] here\n',
+    ),
+    2,
+  ],
   // What bug.6, bug.7 and CR-4's refusals must leave alone: YAML reads each of these.
   [
     "a comment between nested list items ends nothing",
@@ -376,6 +392,19 @@ const REFUSED = [
     "    category: coverage\t# c\n",
     "    category: coverage\t\n",
   ].map((lines) => ["bad-line", findings(`  - id: PC-1\n${lines}`)]),
+  // A whitespace-only line holding a tab, wherever it sits — between entries, at the end, inside a
+  // block scalar (task.240 bug.9).
+  ...[
+    "    category: coverage\n  \t\n  - id: PC-2\n    category: coverage\n",
+    "    category: coverage\n\t\n",
+    "    category: coverage\n    finding: |\n      x\n\t\n      y\n",
+  ].map((lines) => ["bad-line", findings(`  - id: PC-1\n${lines}`)]),
+  // A bracket inside a plain flow value (task.240 bug.10).
+  ...[
+    "{category: coverage, provenance: pre-existing]}",
+    "{category: coverage, id: a]b}",
+    "{category: coverage, id: a[b}",
+  ].map((entry) => ["bad-value", findings(`  - ${entry}\n`)]),
 ];
 
 // The title names the row by index: a fence string inside a template-literal expression blinds the

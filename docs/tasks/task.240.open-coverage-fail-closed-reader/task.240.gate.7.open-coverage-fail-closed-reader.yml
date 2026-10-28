@@ -1,0 +1,91 @@
+schema: 2
+task: 'task.240.open-coverage-fail-closed-reader'
+task_title: 'Fail-closed reader for the 5c open-coverage check'
+gate: CONCERNS
+status_reason: 'Cycle 7, the last granted cycle. BUG-6, BUG-7 and BUG-8 are verified fixed and closed. Two more shapes that YAML rejects still get a count: a whitespace-only line holding a tab (BUG-9, found by the QA hand probe) and a plain flow value holding a bracket (BUG-10, from code review CR-1). The generator reaches neither. In both, the count matches what the writer meant, and the tracked corpus holds 0 of either shape.'
+reviewer: 'QA Engineer'
+head: '5f69c201f78fa093e05ef024300267ae88f27e95'
+updated: '2026-10-28T16:49:29Z'
+
+top_issues:
+  - id: 'TASK-240-QA-11'
+    severity: medium
+    file: 'shared/resources/open-coverage.js'
+    finding: 'A whitespace-only line holding a tab is skipped as blank (line 291) before the tab rule sees it, so a block PyYAML rejects (ScannerError) gets a count; between entries it prints 2. Cycle 6 states that a tab is refused anywhere outside a block scalar.'
+    suggested_action: 'Refuse a whitespace-only line that holds a tab before the blank skip; let the generator emit whitespace-only lines; mutation-prove both (BUG-9).'
+    suggested_owner: dev
+    bug_ref: 'task.240.bug.9.tab-in-blank-line-accepted.md'
+    status: open
+  - id: 'TASK-240-QA-12'
+    severity: medium
+    file: 'shared/resources/open-coverage.js'
+    finding: 'CR-1: a plain flow value holding `[` or `]` mid-value is accepted (line 124), so `- {category: coverage, provenance: pre-existing]}` prints 1 where PyYAML raises ParserError.'
+    suggested_action: 'Refuse a plain flow value that contains a bracket anywhere; pin the three shapes; keep a quoted bracket counting (BUG-10).'
+    suggested_owner: dev
+    bug_ref: 'task.240.bug.10.flow-value-bracket-accepted.md'
+    status: open
+  - id: 'TASK-240-QA-13'
+    severity: low
+    file: 'shared/resources/tests/open-coverage-differential.test.mjs'
+    finding: 'CR-2: the flow-entry generator never puts a bracket inside a flow value (line 215), so the suite is green on CR-1.'
+    suggested_action: 'Add risky flow values with a bracket mid-value (BUG-10).'
+    suggested_owner: dev
+    bug_ref: 'task.240.bug.10.flow-value-bracket-accepted.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 6680
+  phases_verified: 4/4
+  trace:
+    phases_covered: [0, 1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: internal, as on gates 1-6. countOpenCoverage reads a pipeline-written review report that no corpus sink models; its fail-closed property is exercised by the PyYAML differential suite. Text parsing only: no eval, no shell, no file write.'
+  performance:
+    status: PASS
+    notes: 'One linear pass and one command node call at 5c (SC-5). Differential suite at N=25000 runs in seconds.'
+  reliability:
+    status: CONCERNS
+    notes: 'BUG-6/7/8 fixed. BUG-9 and BUG-10: two shapes YAML rejects still get a count.'
+  maintainability:
+    status: PASS
+    notes: 'Header and CHANGELOG match the code except the tab claim BUG-9 falsifies. CR-3 and CR-4 (advisory): an internal error and an unreadable file share a reason with malformed input.'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-240-QA-11, QA-12 and QA-13. Widen the generator first, so it can emit a whitespace-only line holding a tab and a flow value holding a bracket, and confirm red before the reader fix.'
+      refs: ['shared/resources/open-coverage.js', 'shared/resources/tests/open-coverage-differential.test.mjs']
+  future:
+    - action: 'CR-3 (cleanup): give a thrown reader defect its own reason instead of bad-line, so 5c can tell a broken reader from a bad review.'
+      refs: ['shared/resources/open-coverage.js']
+    - action: 'CR-4 (cleanup): report an unreadable report file as its own reason, not no-section.'
+      refs: ['shared/resources/open-coverage.js']
+    - action: 'CR-6 (carried, low): python3 -I ignores user site-packages; a host with PyYAML only in the user site fails the suite as if PyYAML were missing.'
+      refs: ['shared/resources/tests/open-coverage-differential.test.mjs']
+    - action: 'Carried: echo the reader stderr at 5c; pin per-file corpus results.'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'shared/resources/tests/open-coverage.test.mjs']
+    - action: 'Over-refusals recorded, all fail-closed and allowed: a tab in a comment line or inside a quoted value; a column-0 comment after a wrap; an empty flow value before a comma.'
+      refs: ['shared/resources/open-coverage.js']
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 2
+  fix_date: '2026-10-28'
+  total_iterations: 6
+  verification_method: 'bug.6 and bug.7 shapes re-run against PyYAML (all unreadable); 34-shape hand probe: 1 wrong (BUG-9), 4 over-refusals; differential suite at seeds 11, 42, 99, 1234, 2026 × 25000 green; N=999 refused; worktree mutations (endsAtComment plain, INDICATOR backtick, tab rule) each red; ci:fast 6680 pass / 0 fail.'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-240-QA-11 and QA-12 fixed']

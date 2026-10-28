@@ -521,25 +521,25 @@ reader's header, which had drifted from the code. Results:
 
 ### QA Report
 
-- **Full Report**: [task.240.qa.6.open-coverage-fail-closed-reader.md](./task.240.qa.6.open-coverage-fail-closed-reader.md)
-- **Gate File**: [task.240.gate.6.open-coverage-fail-closed-reader.yml](./task.240.gate.6.open-coverage-fail-closed-reader.yml)
+- **Full Report**: [task.240.qa.7.open-coverage-fail-closed-reader.md](./task.240.qa.7.open-coverage-fail-closed-reader.md)
+- **Gate File**: [task.240.gate.7.open-coverage-fail-closed-reader.yml](./task.240.gate.7.open-coverage-fail-closed-reader.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 6660 (full `ci:fast`), plus the targeted suites under 2 mutations
+- **Tests Executed**: 6680 (full `ci:fast`), plus the differential suite at 5 fresh seeds × 25,000 and a 34-shape PyYAML hand probe
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
 
-BUG-5 is fixed and the PyYAML differential test has landed. Three medium findings remain:
+BUG-6, BUG-7 and BUG-8 are fixed and closed. Two medium findings remain, and one low:
 
-- TASK-240-QA-8 ([bug.6](./task.240.bug.6.comment-inside-wrapped-value-accepted.md)): a comment inside a wrapped plain value is accepted.
-- TASK-240-QA-9 ([bug.7](./task.240.bug.7.indicator-leading-value-accepted.md)): a value that starts with a YAML indicator is read as plain text.
-- TASK-240-QA-10 ([bug.8](./task.240.bug.8.differential-generator-misses-shapes.md)): the differential generator cannot produce either shape.
+- TASK-240-QA-11 ([bug.9](./task.240.bug.9.tab-in-blank-line-accepted.md)): a whitespace-only line holding a tab is skipped as blank.
+- TASK-240-QA-12 ([bug.10](./task.240.bug.10.flow-value-bracket-accepted.md)): a plain flow value holding a bracket is accepted.
+- TASK-240-QA-13 (bug.10, low): the flow generator never emits a bracket mid-value.
 
-In each case the count is the one the writer meant. YAML gives the block no count.
+In each case the count is the one the writer meant. YAML gives the block no count. The tracked corpus holds neither shape.
 
 <!-- change-log-start -->
 ## Change Log
@@ -562,6 +562,8 @@ In each case the count is the one the writer meant. YAML gives the block no coun
 | 2026-10-28 |         | QA findings fixed — entry key column measured (bug.5), header drift (QA-7), 1 iteration | qa-fix |
 | 2026-10-28 |         | QA gate CONCERNS (90/100) — 3 findings | qa-task |
 | 2026-10-28 |         | QA findings fixed — differential generator widened first (bug.8), comment ends a wrap (bug.6), indicator-led values and tabs refused (bug.7, CR-4), 1 iteration | qa-fix |
+| 2026-10-28 |         | QA gate CONCERNS (90/100) — 3 findings | qa-task |
+| 2026-10-28 |         | QA findings fixed — generator widened first, then a tab-holding blank line (bug.9) and a bracket in a plain flow value (bug.10) refused, 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---
