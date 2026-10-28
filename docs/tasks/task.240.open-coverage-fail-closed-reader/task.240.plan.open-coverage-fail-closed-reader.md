@@ -43,22 +43,40 @@ function countOpenCoverage(text) { /* extract → parse → count */ }
 **Parser rules** (the accepted set; everything else is a refusal):
 
 - Top-level keys: `reviewed_gate`, `findings`, `truncated_count`, each once. An unknown top-level
-  key is a refusal, and so is a missing `findings`.
-- `findings: []` reads as an empty list (count 0, which task.238 tests already pin).
+  key is a refusal, and so is a missing `findings`. This is deliberately stricter than the awk,
+  which ignored keys before `findings:` and took a later one as the list's terminator; no tracked
+  report carries another top-level key (review.1 O-2).
+- `findings: []` reads as an empty list (count 0, which task.238 tests already pin). Any other
+  inline value of `findings:` is a refusal.
 - A list entry is either `- key: value` followed by keys at the entry's indent + 2, or
-  `- {k: v, k: v}` complete on one line.
+  `- {k: v, k: v}` complete on one line. The list may sit indented or at column 0.
+- Blank lines and indented full-line comments (`    # …`) are skipped. A column-0 `#` line is a
+  refusal: the old `sed` range stopped at a column-0 `## ` line, and "a findings list cut short by a
+  column-0 heading line" pins `unreadable`.
 - Values:
-  - Plain, `'single'` or `"double"` quoted. In plain values, a ` #` starts a comment.
+  - Plain, `'single'` or `"double"` quoted. In plain values, a ` #` starts a comment. A
+    block-style double-quoted value accepts the `\"` and `\\` escapes (four tracked reports use
+    them); inside a flow entry an escaped quote is a refusal (`bad-value`), which keeps "a flow
+    entry the reader cannot tokenise" at `unreadable`.
   - `>-`, `>`, `|-` or `|`, followed by strictly deeper lines.
+  - An empty value followed by strictly deeper lines (a nested list or map): text, never read for a
+    key — except under `category:` or `provenance:`, where any deeper line is a refusal.
   - Tags (`!`), anchors (`&`) and aliases (`*`) are refusals.
-- A duplicate key in one entry is a refusal.
+- `category` and `provenance` values compare case-blind (`category: Coverage` pins `1`).
+- A duplicate key in one entry is a refusal. An entry with no `category` key is a refusal
+  (`no-category`, task.238 bug.8).
 - `category` must be one of review-pr's six tokens: `coverage`, `scope`, `trail`, `consistency`,
   `bug`, `cleanup`. Anything else is a refusal, matching task.238 bug.17.
-- The block must end at the closing fence. A column-0 line that is not a top-level key is a
-  refusal (CR9-3).
+- The block must end at the closing fence. A column-0 line that is not a top-level key, a `- `
+  entry of a column-0 list, or the closing fence is a refusal (CR9-3).
 
 **Reason list** (fixed, and exported for the tests): `no-section`, `no-fence`, `no-findings-key`,
-`bad-line`, `bad-value`, `duplicate-key`, `bad-category`, `unterminated`, `not-a-map`.
+`bad-line`, `bad-value`, `duplicate-key`, `bad-category`, `no-category`, `unterminated`,
+`not-a-map`.
+
+Every rule above is pinned by a `RAW_CASES` or `UNREADABLE_CASES` row in
+`pr-review-loop-parity.test.mjs`; reuse that table as the unit test's input so the two cannot
+disagree.
 
 ### Phase 2: The call site
 
@@ -84,6 +102,7 @@ function countOpenCoverage(text) { /* extract → parse → count */ }
     `.agents/skills/develop-task/references/open-coverage.js` exists. Memory note: a gitignored
     `.agents/skills` symlink can mask this locally, so check the CI shape.
   - The failing-awk test becomes a failing-node test: a `node` stub on `PATH` that exits 2.
+  - A new assertion: the §5c block holds exactly one `command node` call and no `awk` (SC-5).
 
 ### Phase 3: Corpus, probe and docs
 
