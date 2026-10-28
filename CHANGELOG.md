@@ -22,9 +22,10 @@ All notable changes to this project will be documented in this file. Format foll
     check counted three pre-grant readings (obs #72). A lock without the field reads `1`, which is
     the old behaviour. The route classifier still reads the whole sequence.
   - **The recommendation obeys the third-strike rule.** Before writing "Recommended next steps",
-    the escalation runs the third-strike comparison over the last three gates. For each file it
-    prints, step 1 must delete, replace or waive the struck mechanism. It may never recommend a
-    patch, because the resumed 5b refuses one (obs #71).
+    the escalation runs the third-strike comparison the resumed 5b will run. After a convergence
+    stall that covers the last three gates. After a loop limit it covers the last two, because the
+    grant reviews before it fixes. For each file it prints, step 1 must delete, replace or waive the
+    mechanism. It may never recommend a patch, because the resumed run refuses one (obs #71).
   - **A convergence stall gets a flat-count reading.** The reading is `stall` when cycle N's HIGH
     finding is in the same file, with the same mechanism, as cycle N-1's. It is `discovery` when
     the earlier fixes held and the re-probe found something new. A discovery says that a grant

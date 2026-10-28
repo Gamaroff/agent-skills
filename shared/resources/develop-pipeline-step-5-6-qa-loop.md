@@ -620,7 +620,10 @@ the pipeline noticed.
 
 3. **Take readings only from cycles `>= convergence_from_cycle`** — the lock field
    (`jq -r '.convergence_from_cycle // 1' .claude/state/develop-pipeline.lock`; absent → `1`, every
-   reading counts). A grant restarts the three-reading rule, so "k more cycles" delivers k cycles,
+   reading counts). The `1` is for a lock **without the field**, never for a missing or unreadable
+   lock. A lock the jq cannot read is restored first, with
+   `advance-pipeline-lock.sh --restore {work-item-dir}`, and the field is read again. Defaulting it to `1` would reopen the window over the pre-grant
+   readings and trip on the first post-grant gate. A grant restarts the three-reading rule, so "k more cycles" delivers k cycles,
    and the guard re-arms once three post-grant readings exist (task.239, obs #72).
    **Within that window, from its third reading onward, if `HIGH_N > 0` AND `HIGH_{N-2} > 0` AND `HIGH_N >= HIGH_{N-1}` AND
    `HIGH_{N-1} >= HIGH_{N-2}` — i.e. HIGH findings were present at all three readings and the
@@ -2015,14 +2018,15 @@ infrastructure, acceptance criteria that cannot be met with current approach; on
 convergence stall, say which file the fixes kept circling and why patching it stopped
 working}
 
-**Third-strike files**: {the files the Third-strike rule's comparison prints for the last three
-gates, each with its mechanism read from the three `finding:` texts — or "none"}
+**Third-strike files**: {the files the comparison the resumed 5b will run prints (filling rule 1)
+— struck on a stall, one strike from the third-strike rule on a loop limit — each with its
+mechanism read from its `finding:` texts — or "none"}
 
 **Recommended next steps**:
 1. {Specific action. For each third-strike file: delete, replace or waive the struck mechanism,
-   naming it — never a patch to it, which the resumed 5b forbids. On a discovery reading: say the
-   earlier fixes held and this HIGH is new ground, so a grant buys new ground, not another try at
-   the same defect}
+   naming it — never a patch to it, which the resumed run refuses (filling rule 1). On a discovery
+   reading: say the earlier fixes held and this HIGH is new ground, so a grant buys new ground, not
+   another try at the same defect}
 2. {Specific action}
 3. {Specific action — e.g., update story if issues reflect out-of-scope requirements}
 ```
@@ -2060,14 +2064,15 @@ infrastructure, success criteria that cannot be met with current approach; on a
 convergence stall, say which file the fixes kept circling and why patching it stopped
 working}
 
-**Third-strike files**: {the files the Third-strike rule's comparison prints for the last three
-gates, each with its mechanism read from the three `finding:` texts — or "none"}
+**Third-strike files**: {the files the comparison the resumed 5b will run prints (filling rule 1)
+— struck on a stall, one strike from the third-strike rule on a loop limit — each with its
+mechanism read from its `finding:` texts — or "none"}
 
 **Recommended next steps**:
 1. {Specific action. For each third-strike file: delete, replace or waive the struck mechanism,
-   naming it — never a patch to it, which the resumed 5b forbids. On a discovery reading: say the
-   earlier fixes held and this HIGH is new ground, so a grant buys new ground, not another try at
-   the same defect}
+   naming it — never a patch to it, which the resumed run refuses (filling rule 1). On a discovery
+   reading: say the earlier fixes held and this HIGH is new ground, so a grant buys new ground, not
+   another try at the same defect}
 2. {Specific action}
 3. {Specific action — e.g., update task if issues reflect out-of-scope requirements}
 ```
@@ -2077,14 +2082,26 @@ gates, each with its mechanism read from the three `finding:` texts — or "none
 A recommendation written at a halt must already obey the rules the resumed run will apply (obs #71).
 Three lines of the entry carry that, and each is filled from evidence on disk, not from memory:
 
-1. **Third-strike files — run the comparison when the entry is written.** Run the
-   `high_files()` / `comm -12` block under **Third-strike rule — replace, do not patch again**
-   (above; do not copy it) over the last three gates, exactly as 5b would on re-entry. For each file
-   it prints, name the mechanism from the three `finding:` texts, as that rule already requires, and
-   make item 1 of *Recommended next steps* one of the rule's three permitted moves — **delete**,
-   **replace** or **waive** — for that mechanism. A struck mechanism may not be recommended for a
-   patch: the resumed 5b forbids exactly that move, so the escalation would be recommending a step
-   the run will refuse (task.215, obs #71). Fewer than three gates, or no file printed: write "none".
+1. **Third-strike files — run the comparison the resumed 5b will run.** Use the `high_files()`
+   function under **Third-strike rule — replace, do not patch again** (above; do not copy it). Which
+   gates it compares depends on where the grant re-enters (`grant-qa-cycles.sh`'s `reenter_at=`):
+
+   | Halt | Re-enters at | The resumed 5b compares | Run now | List each file printed as |
+   | --- | --- | --- | --- | --- |
+   | Convergence stall | 5b | gates N-2, N-1, N | that rule's three-gate `comm -12` block | struck |
+   | Loop limit (either form) | 5a | gates N-1, N and the gate the resumed 5a writes | `comm -12 <(high_files "$GATE_N1") <(high_files "$GATE_N")` | one strike from the third-strike rule |
+
+   A loop-limit grant reviews before it fixes, so the three-gate comparison over gates N-2..N is
+   not the one the run applies. A file that is HIGH in gates N-1 and N is struck the moment the
+   resumed review finds it again, and a file struck over N-2..N is in that set too.
+
+   For each file listed, name the mechanism from its `finding:` texts, as that rule already
+   requires, and make item 1 of *Recommended next steps* one of the rule's three permitted moves —
+   **delete**, **replace** or **waive** — for that mechanism. Never recommend a patch for it. On a
+   stall the resumed 5b forbids that move outright. On a loop limit, a patch the resumed review does
+   not accept puts the file on its third strike, and 5b then refuses the next patch. Either way the
+   escalation would be recommending a step the run will refuse (task.215, obs #71; task.239 bug.1).
+   Too few gates for the comparison, or no file printed: write "none".
 2. **Flat-count reading — Convergence stall only.** Compare cycle N's HIGH finding with cycle
    N-1's. **Stall**: its `file:` is in the previous gate's `high_files` output **and** its
    `finding:` names the same function or mechanism, or cites the previous fix. **Discovery**:

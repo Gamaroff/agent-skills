@@ -11,5 +11,6 @@
   "qa_phase": "5c",
   "extra_cycles_granted": 2,
   "started_at": "2026-09-18T12:00:00Z",
-  "qa_max_cycles": 8
+  "qa_max_cycles": 8,
+  "convergence_from_cycle": 7
 }

@@ -21,9 +21,10 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
@@ -65,7 +66,7 @@ test("both escalation templates carry the flat-count reading, the third-strike f
     );
     assert.match(
       body,
-      /never a patch to it, which the resumed 5b forbids/,
+      /never a patch to it, which the resumed run refuses \(filling rule 1\)/,
       `${kind} template must forbid recommending a patch to a struck mechanism`,
     );
     assert.match(
@@ -95,7 +96,7 @@ test("the filling rules point at the third-strike comparison, not a copy of it (
   );
   assert.match(
     rules,
-    /`high_files\(\)` \/ `comm -12` block under \*\*Third-strike rule — replace, do not patch again\*\*/,
+    /`high_files\(\)`\s+function under \*\*Third-strike rule — replace, do not patch again\*\*/,
     "the rules must name the comparison block by its heading",
   );
   assert.match(
@@ -111,6 +112,92 @@ test("the filling rules point at the third-strike comparison, not a copy of it (
   );
   for (const word of ["**Stall**", "**Discovery**"]) {
     assert.ok(rules.includes(word), `the rules must define ${word}`);
+  }
+});
+
+// ── Which gates the third-strike comparison reads, per halt (task.239 bug.1) ──
+// A loop-limit grant re-enters at 5a, so the resumed 5b compares gates N-1, N and the gate the
+// resumed review writes, not N-2..N. Run the doc's own high_files() and its two commands on gates
+// where a file is HIGH at N-1 and N only: the three-gate block must miss it and the loop-limit
+// command must list it, or the escalation recommends a patch the resumed run refuses.
+test("loop-limit escalation lists a file struck at the last two gates; the three-gate block does not", () => {
+  const fence = fenceAfter(
+    loopDoc,
+    "#### Third-strike rule — replace, do not patch again",
+  );
+  const body = fence.slice(fence.indexOf("\n") + 1); // drop the ```bash info string
+  const fnEnd = body.indexOf("\n}\n");
+  assert.ok(
+    body.includes("high_files() {") && fnEnd > 0,
+    "high_files() not found in its fence",
+  );
+  const highFiles = body.slice(0, fnEnd + 3);
+  const threeGate = body.slice(fnEnd + 3);
+  assert.match(
+    threeGate,
+    /comm -12 <\(comm -12/,
+    "the three-gate block is not after the function",
+  );
+
+  const rules = loopDoc.slice(
+    loopDoc.indexOf(
+      "#### Filling the escalation entry — rules both templates share",
+    ),
+  );
+  const row = rules.split("\n").find((l) => /^\s*\| Loop limit/.test(l));
+  assert.ok(row, "the filling rules have no Loop limit row");
+  const cells = row.split(" | ").map((c) => c.trim());
+  // cells[0] is the text before the row's first pipe; cells[4] is "Run now", cells[5] "List as".
+  const loopLimitCmd = cells[4].replace(/^`|`$/g, "");
+  assert.match(
+    loopLimitCmd,
+    /^comm -12 <\(high_files "\$GATE_N1"\) <\(high_files "\$GATE_N"\)$/,
+  );
+  assert.match(cells[5], /one strike from the third-strike rule/);
+
+  const dir = mkdtempSync(join(tmpdir(), "t239-strike-"));
+  try {
+    const gate = (file) =>
+      `gate: CONCERNS\ntop_issues:\n  - id: X-1\n    severity: high\n    file: ${file}\n    finding: >-\n      - a wrapped dash\n`;
+    writeFileSync(join(dir, "g2.yml"), gate("other.sh"));
+    writeFileSync(join(dir, "g1.yml"), gate("struck.sh"));
+    writeFileSync(join(dir, "g0.yml"), gate("struck.sh"));
+    const run = (cmd) =>
+      execFileSync("bash", ["-c", `${highFiles}\n${cmd}`], {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          GATE_N2: join(dir, "g2.yml"),
+          GATE_N1: join(dir, "g1.yml"),
+          GATE_N: join(dir, "g0.yml"),
+        },
+      }).trim();
+    // Control: the function reads a gate at all.
+    assert.equal(
+      run('high_files "$GATE_N"'),
+      "struck.sh",
+      "control: high_files reads the fixture",
+    );
+    assert.equal(
+      run(threeGate),
+      "",
+      "the three-gate block must not list a two-strike file",
+    );
+    assert.equal(
+      run(loopLimitCmd),
+      "struck.sh",
+      "the loop-limit command must list it",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+
+  for (const [name, t] of Object.entries(TEMPLATES)) {
+    assert.match(
+      t,
+      /one strike from the third-strike rule on a loop limit/,
+      `${name} template`,
+    );
   }
 });
 
@@ -164,6 +251,47 @@ test("window rule: a grant restarts the three-reading rule (task.215 / obs #72)"
     null,
     "a post-grant run that strictly decreases never trips",
   );
+});
+
+test("every row of the doc's worked-example table agrees with the rule", () => {
+  const head = loopDoc.indexOf(
+    "| Sequence (cycles, oldest → newest) | `convergence_from_cycle` |",
+  );
+  assert.ok(head >= 0, "the worked-example table is missing");
+  const rows = loopDoc
+    .slice(head)
+    .split("\n")
+    .slice(2)
+    .filter((_, i, all) => all.slice(0, i + 1).every((l) => /^\s*\|/.test(l)));
+  assert.ok(
+    rows.length >= 3,
+    `non-vacuity: expected at least 3 rows, parsed ${rows.length}`,
+  );
+  for (const row of rows) {
+    const cells = row
+      .replace(/\\\|/g, ",")
+      .split("|")
+      .slice(1, -1)
+      .map((c) => c.trim());
+    const highs = cells[0]
+      .replace(/\(.*\)/, "")
+      .replace(/`/g, "")
+      .split(",")
+      .map(Number);
+    assert.ok(
+      highs.length >= 3 && highs.every(Number.isInteger),
+      `unparsed sequence: ${row}`,
+    );
+    const cfc = cells[1] === "absent" ? undefined : Number(cells[1]);
+    const said = cells[2].match(/at cycle (\d+)/);
+    assert.ok(said, `no "at cycle N" in: ${row}`);
+    const want = /^\*\*no\*\*|^no\b/.test(cells[2]) ? null : Number(said[1]);
+    assert.equal(
+      convergenceTrip(highs, cfc),
+      want,
+      `the table row disagrees with the rule: ${row}`,
+    );
+  }
 });
 
 test("the step-5-6 Convergence check carries the window clause the function mirrors", () => {

@@ -147,6 +147,8 @@ test("convergence_from_cycle: the writer, the reader and every describer name it
     "resumeContract",
     "taskSkill",
     "storySkill",
+    "hooksDoc",
+    "detectorPrompt",
   ];
   assert.ok(
     participants.length > 0,

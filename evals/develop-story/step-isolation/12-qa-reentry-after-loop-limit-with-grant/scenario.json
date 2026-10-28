@@ -31,6 +31,13 @@
       ]
     },
     {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/.claude/state/develop-pipeline.lock",
+        "\"convergence_from_cycle\": 7"
+      ]
+    },
+    {
       "fn": "fileDoesNotMatch",
       "args": [
         "$SANDBOX/.claude/state/develop-pipeline.lock",
