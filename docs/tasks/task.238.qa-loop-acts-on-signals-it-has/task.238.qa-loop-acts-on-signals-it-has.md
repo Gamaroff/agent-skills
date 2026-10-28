@@ -5,10 +5,11 @@ type: task
 description: "Make the QA loop act on four signals it already holds and today ignores or destroys: a red CI result on the PR, a fast-gate red that is pre-existing or produced no result, a red gate log, and a 5c coverage finding that /finalise is certain to fail."
 tags: [develop-task, develop-story, develop-bug, qa-task, qa-story, qa-fix, qa-loop, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-27
 updated: 2026-10-28
+completed_date: 2026-10-28
 assignee:
 estimated_effort_hours: 13
 github_issue: 768
@@ -17,7 +18,7 @@ pr_number: 770
 
 # Technical Task: QA loop acts on the signals it already has
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.238.review.1.qa-loop-acts-on-signals-it-has.md` implemented 2026-10-28
 **GitHub Issue**: [#768](https://github.com/Gamaroff/agent-skills/issues/768)
 
@@ -131,7 +132,7 @@ The QA loop (Steps 5–6) holds four signals that it ignores or destroys, and ea
 
 ## 5. Breaking Changes
 
-None to an API. Two behaviours change for a pipeline run:
+None to an API. Three behaviours change for a pipeline run:
 
 1. **A 5c `CONCERNS` with an open coverage finding now uses one more QA cycle**, where today it proceeds to Step 7. Migration: none. The cycle is bounded by the same 5-cycle budget as `REQUEST CHANGES`.
 2. **A QA gate can now be `CONCERNS` because a CI lane is red** on the judged head and not on the base. Migration: none. That red used to surface at `/finalise` as a HALT.
@@ -320,6 +321,7 @@ None.
    - Probability: Medium without the oracle: a fresh worktree has no `node_modules` or `.agents/skills`, so a base run fails for environmental reasons.
    - Mitigation: pre-existing requires the same failing tests on both sides. An environmental base failure is `BASE_CHECK=unavailable` → attributable. The differential oracle in Phase 1 is tested shape by shape.
    - Rollback: revert Phase 1 alone.
+   - *(Moot since 2026-10-28, QA cycle 6: the pre-existing branch was deleted; see SC-2 and Deferred Work.)*
 5. **A resume after a coverage `CONCERNS` skips the fix.**
    - Mitigation: the resume row split (SC-4b), tested in the resume-table guard.
 
@@ -327,6 +329,7 @@ None.
 
 1. **A base worktree for the pre-existing check collides with the checkout's** `.agents/skills` move-aside.
    - Mitigation: create the worktree under `.worktrees/` and remove it in the same block. The plan names the command.
+   - *(Moot since 2026-10-28, QA cycle 6: no base worktree is created any more; see SC-6.)*
 
 ---
 
@@ -375,12 +378,12 @@ None.
 - The cycle 9 fix holds: bug.18 and bug.19 are closed, and each of its three guards is mutation-proved. No top issue is open
 - One low gap remains in the §5c open-coverage check and is reproduced: a repeated `findings:` key with a cut-short second list reads `0` (CR10-1). By owner decision it is deferred to task.240, which replaces the awk
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded)
 
-**Status:** IN PROGRESS
+**Status:** IN PROGRESS (run 1 only; superseded by DoD run 2, below)
 
 > **Superseded (2026-10-28).** These are DoD run 1's gaps, against gate 3. All five were fixed in
-> `adff39e2`, and QA cycles 4–9 have run since. `/finalise` rewrites this section on its next run.
+> `adff39e2`, and QA cycles 4–10 have run since. DoD run 2 verified every criterion again and accepted.
 
 ### QA Gate Status
 
@@ -421,6 +424,30 @@ The QA gate passed. The gaps below come from `/finalise`'s own checks: the secur
 - **Structured pre-existing comparison** (QA cycle 6, third strike on `fast-gate-outcome.sh`): the `pre-existing red` outcome was deleted rather than patched a fourth time. Gates 4, 5 and 6 each found another `node --test` log shape the comparison misread (bug.5–bug.14). A replacement must compare structured results from runs it controls (for example `--test-reporter=tap` written to a file on both sides, keyed on node's own test identity), not parse a gate log. Needs its own task document.
 - **Gate 6 advisory items** carried to `recommendations.future`: CR6-2 (output before node's results), CR6-3 (`gh run list --event push`), CR6-4 (pre-existing decided per CI lane), CR6-5 (open-coverage awk on a truncated block), CR6-7 (Bitbucket PR lookup HTTP status). CR6-6 is moot: the code it named was deleted.
 - **CR10-1, deferred to task.240** (QA cycle 10, owner decision 2026-10-28): the §5c open-coverage awk never clears `term`, so a block with a second `findings:` list cut short reads `0` where `unreadable` is correct. It is reproduced by `oc10-second-findings-cut-short`, and 0 of 185 tracked reports have the shape. task.240 (issue #771) replaces the awk with a parser that refuses a duplicate key. No success criterion states the reader's fail-closed property, so none is amended.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.238.qa.10.qa-loop-acts-on-signals-it-has.md`
+**Gate File**: `task.238.gate.10.qa-loop-acts-on-signals-it-has.yml`
+**Gate Status**: ⚠️ CONCERNS (no open entry; residue CR10-1 deferred to task.240)
+**Quality Score**: 90/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 15/15 met (SC-1 to SC-12, SC-3a, SC-4a, SC-4b), each with code and per-PR test evidence
+✅ **PR Review:** PR #770; 5c `/review-pr` APPROVE (`task.238.pr-review.4`); the host requires no review
+✅ **CI:** SUCCESS on all 6 checks at `934ce5db` (reading 1)
+✅ **Documentation:** CHANGELOG `[Unreleased]` cites task 238 with all four behaviours; SC-12 sweep clean
+✅ **Security Review:** checklist PASS; probe 119 executed, 0 escaped, 1 reproduced, which is the owner-deferred CR10-1 (low, task.240)
+✅ **Compliance Review:** not applicable (internal tooling)
+
+**Task marked as ACCEPTED on:** 2026-10-28
+
+**Detailed Verification Log:** See `task.238.dod.2.qa-loop-acts-on-signals-it-has.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
@@ -450,6 +477,7 @@ The QA gate passed. The gaps below come from `/finalise`'s own checks: the secur
 | 2026-10-28 |  | QA findings fixed — gate 9 CONCERNS, 2 entries (bug.18, bug.19) plus low CR9-3, 1 iteration; the §5c open-coverage check maps a non-count value to `unreadable`, refuses any line after a one-line flow entry, and requires a terminator after `findings:` | qa-fix |
 | 2026-10-28 |  | PR review 3 doc-only findings fixed: `pr_number: 770` added; the Overview and Phase 1 checkbox reworded to the amended SC-2; the DoD run 1 gaps section marked superseded | develop-task |
 | 2026-10-28 |  | QA gate CONCERNS (90/100) — 0 open entries; bug.18 and bug.19 closed; CR10-1 (low) deferred to task.240 | qa-task |
+| 2026-10-28 | 1.3 | DoD passed — accepted (PR #770); CR10-1 deferred to task.240 | finalise |
 <!-- change-log-end -->
 
 ---
