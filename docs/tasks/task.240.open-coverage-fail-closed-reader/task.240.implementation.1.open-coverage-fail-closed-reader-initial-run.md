@@ -3,7 +3,7 @@
 **Task**: `task.240.open-coverage-fail-closed-reader.md`
 **Run Number**: 1
 **Started**: 2026-10-28 16:05
-**Status**: Escalated
+**Status**: Completed
 
 ---
 
@@ -36,9 +36,9 @@ Replace the §5c open-coverage awk with a bundled Node reader (`open-coverage.js
 | 2. review-task             | ✅ Done    | `task.240.review.{N}.{name}.md` exists (or skip logged)                | `task.240.review.1.open-coverage-fail-closed-reader.md` — READY 8/10; Planned → Ready for Development | —                    | 2026-10-28T14:07Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (iter 1); 15/15 phases; ci:fast green on iter 2 | `.summaries/step-3-iteration-audit-1.json` | 2026-10-28T14:34Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #776: https://github.com/Gamaroff/agent-skills/pull/776 | —                    | 2026-10-28T14:36Z |
-| 5–6. qa-task / qa-fix loop | ⚠️ Escalated | `task.240.qa.{N}.*.md`; `task.240.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | Escalated at loop limit (5 cycles, all CONCERNS, HIGH 0, MEDIUM 1); re-entered at 5a with 2 extra cycles (budget 7); escalated again at 7 cycles (MEDIUM 3, 2; route 2c declined) | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.240.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.240.qa.{N}.*.md`; `task.240.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 9 cycles. Escalated at 5 and at 7, re-entered each time (budget 9). Gate 9 PASS (100); 5c CONCERNS, `OPEN_COVERAGE=0` (`task.240.pr-review.1`) | —                    | 2026-10-28T18:08Z |
+| 7. finalise                | ✅ Done    | `task.240.dod.{N}.*.md`; task `status: accepted`                       | `task.240.dod.1` ACCEPTED; `4d61b657`; CI reading 2 SUCCESS (tree-equivalent); #771 closed | —                    | 2026-10-28T18:16Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Implementation report only (`docs(task.240)` commit) | —                    | 2026-10-28T18:17Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -130,6 +130,20 @@ Replace the §5c open-coverage awk with a bundled Node reader (`open-coverage.js
 - qa-fix cycle 7: the generator was widened first, red on 92 of 25,000. The fast gate was green on attempt 1 (6,688 pass, 0 fail). Commit `443e4f6d` carries the fix, gate.7, qa.7 and bugs 6–10. Pushed once; the PR is OPEN.
 - Loop limit at cycle 7: route 2c declined (`medium-not-falling`, 1, 3, 2), so the loop escalated (Issues Log, second entry).
 - After the second halt (2026-10-28, user-approved), the operator applied the escalation's recommended step 1 in session: the reader now reads one line per key over an allow-listed character set, instead of refusing named shapes. It wrote no gate, so it is not a cycle; a re-entry at 5a gates it with `443e4f6d`. Measured first: the 168 readable tracked blocks use only one-line keys, and their unquoted values hold `§`, `—`, backticks, `|`, `"`, `bundle:check` and `PR #657` (a comment in YAML), so the plain-value rule follows YAML's one-line rules (letter, digit or non-ASCII first; no `: `; ` #` starts a comment) rather than a narrow ASCII set. SC-4: 187 of 187 reports read the same. The author approved amending the Target Architecture and SC-2: 10 parity fixtures in flow, nested, block-scalar or wrapped shapes now expect `unreadable`; 3 whose point is "keys count only in key position" keep their count with the free text quoted, and a new case pins the plain form as `unreadable`. None changes from one count to another. The differential generator was re-aimed at characters and one-line value forms. On the old reader it found 194 wrong counts in 25,000 blocks, including three new classes: `reviewed_gate: a: b`, control characters, and a no-break space after `pre-existing` read as pre-existing (a false 0). New reader: 7 seeds × 25,000, 0 disagreements; the gate-7 hand probe, 0 wrong (22 of 34 over-refused). Mutations M28–M35 are each red. M35 (flow guard off) is caught by the unit reasons only, since a flow entry is still refused as not-a-map.
+- QA loop re-entry (2026-10-28, user-approved via `/develop-task … resume at 5a with 2 more cycles`): 2 extra cycles granted; 0 cycle(s) run outside the loop back-filled from disk (7 gates, 7 `### QA Cycle` entries). `grant-qa-cycles.sh` → `QA_CYCLE=7 extra_cycles_granted=2 qa_max_cycles=9 reenter_at=5a`; lock restored from the halt snapshot. Gate 8 reads `443e4f6d` + `149f9235` (the allow-list reader).
+- Gate 8 (scoped: 16 files since `5f69c201`; reviewer 17:41:46Z–17:48:31Z, `duration_ms` 376,663): CONCERNS, HIGH 0, MEDIUM 1 (TASK-240-QA-14, BUG-11: lenient UTF-8 decode in the CLI). Reproduced against PyYAML 6.0.3; 0 of 187 corpus reports hold invalid UTF-8; severity kept. The parser held: 54-shape hand probe 0 wrong, differential seeds 3/17/777/8080/31337 × 25,000 green, 4 worktree mutations each red. BUG-9 and BUG-10 closed. CI green on `afccc788`. Convergence: HIGH all zeros, not tripped. Route: `continue` (`not-a-pass-gate`; route 2 declined `product-defect-signal`) → 5b. `boundary: internal` kept: a filename-sink probe of the CLI scored that sink's own contract, so its record was discarded.
+- QA Cycle 8 — changes-requested: `stage-disabled`.
+- Third-strike rule: not applicable (HIGH 0).
+- Narrowing residue — every MEDIUM on gates 7 and 8 names shared/resources/open-coverage.js (TASK-240-QA-11, TASK-240-QA-12, TASK-240-QA-14); HIGH 0 on both. This is an OFFER to qa-fix Step 2.6, not a route and not an escalation. The mechanism differs from gates 1–7: the CLI's file decode, not the parser.
+- qa-fix cycle 8: the findings ingester was not dispatched. The gate's one finding was written by this session minutes earlier, so it was read inline. **No independent ingest ran.** `pr_review`: none (selector `none`). `fix_cycle` was derived from the gate (8). Step 2.6 move: consolidate. Step 3.5 probe (phrases `readFileSync(file, "utf8")`, `bad-encoding`, `lenientFreeText`): 4 hits, all unrelated `node -e` readers, unaffected. The fast gate was red on attempt 1 (`format:check`, the new test rows) and green on attempt 2 after Prettier (6,710 pass, 0 fail). Commit `a3b9c0d0` carries the fix, gate.8, qa.8, bug.11, and bugs 9–10 closed. Pushed once; the PR is OPEN at `a3b9c0d0` (read with `gh pr view` directly, not the poller agent).
+- QA cycle 9 ran from the qa-task instructions already loaded, without re-invoking the skill. Gate 9 PASS (100), with no open entry. bug.11 closed. Committed `966aba75` (gate 9, qa.9) and pushed; the trail assertion passed. 5c: `/review-pr --effort medium --comment --no-code` gave CONCERNS, `OPEN_COVERAGE=0`, review comment https://github.com/Gamaroff/agent-skills/pull/776#issuecomment-6476805470. Carry: bugs 2–4 closed, and the task document's § 5 and Implementation Notes fixed. The loop exited through route 1.
+- DoD summary: `task.240.dod.1.open-coverage-fail-closed-reader.md`. ACCEPTED: AC PASS (11/11), security PASS (`boundary: internal`), compliance N/A, docs PASS. The host requires no review, so that column is met by `task.240.pr-review.1`.
+- CI reading 1: SUCCESS @ `966aba7584de` (6 checks); CI reading 2: SUCCESS (tree-equivalent to `a3b9c0d051cc`) @ `4d61b65760e7` (the acceptance commit; everything after `a3b9c0d0` is docs-only).
+- Acceptance commit `4d61b657` (`docs(task.240): accept — DoD, sprint review; registry ticked; 5c review carried`), pushed; 6b assertions passed; 6d: CHANGELOG cites task 240.
+- DoD body posted to PR: https://github.com/Gamaroff/agent-skills/pull/776#issuecomment-6476993564 (the canonical summary).
+- Issue close: #771 `done` comment `posted`, closed, state confirmed CLOSED. The Document link was unchanged (it already points at a durable target).
+- Board transition: `gh-stage.js --stage done` gave `already` (the card was already at Done).
+- Task completed: `status: accepted`, Change Log 1.3, registry row `ticked`.
 - Not done, out of this task's scope: review-pr's template writes `finding:` and `suggested_action:` unquoted, and a sentence holding `: ` written there now halts 5c as `unreadable`. None of the 30 unquoted ones in the corpus does. Quoting both in the template is a follow-up.
 
 ---
@@ -288,14 +302,46 @@ _Track each QA review/fix cycle._
 **Fixes Applied**: The generator was widened first: whitespace-only lines, 10% of them holding a tab, and flow values with a bracket. On the unchanged reader it was red on 92 of 25,000 blocks. Then the reader refuses a tab-holding blank line (BUG-9) and a bracket in a plain flow value (BUG-10). Added 6 refused and 2 accepted unit rows. M26 and M27 each red. Differential: 7 seeds × 25,000, 0 disagreements. `ci:fast`: 6,688 pass. Route 2c declined (`medium-not-falling`). No gate reads this fix.
 **Commit**: `443e4f6d`
 
+### QA Cycle 8 — 2026-10-28
+**Gate Result**: CONCERNS
+**Issues Found**: 1 medium. TASK-240-QA-14: the CLI decodes the report leniently, so an invalid UTF-8 byte becomes U+FFFD and the block still counts where PyYAML raises ReaderError (BUG-11, code review CR-1). 2 low cleanups in `future` (CR-2, CR-3). BUG-9 and BUG-10 verified fixed and closed. The allow-list parser: 54-shape hand probe 0 wrong, 5 new differential seeds × 25,000 green, corpus distribution unchanged.
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 8 of 9)
+**Fixes Applied**: Step 2.6 consolidate move. The UTF-8 decode moved inside `countOpenCoverage`, which now takes the report's bytes and decodes them with a fatal `TextDecoder` (`ignoreBOM` keeps valid input byte-identical); an invalid sequence is the new reason `bad-encoding`, and the CLI reads bytes (BUG-11). Gate 8 CR-2 (differential test header) fixed too. Added 4 byte-level refusal rows, a bytes-equal-text row and a CLI case. M36 (lenient decode in the reader) 5 red; M37 (`utf8` read in the CLI) 1 red. Corpus: 187 reports, distribution unchanged. `ci:fast`: attempt 1 red on `format:check` for the test file, attempt 2 green after Prettier (6,710 pass, 0 fail).
+**Commit**: `a3b9c0d0`
+
+### QA Cycle 9 — 2026-10-28
+**Gate Result**: PASS
+**Issues Found**: none open. BUG-11 verified fixed and closed. 2 low cleanups in `future` (CR-1: a non-view byte container reads `no-section`; CR-2: `ignoreBOM` not pinned on the bytes path). Reviewer: fatal decoder vs Python strict UTF-8 over 862,998 sequences identical; 15 byte injections and 18 input types, no false count.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: ⚠️ CONCERNS — `task.240.pr-review.1.open-coverage-fail-closed-reader.md` (conformance lens only, `--no-code`; `OPEN_COVERAGE=0`). 4 medium (PC-1–PC-3: bugs 2–4 never closed; PC-5: § 5 claimed the review-pr template emits no `: ` free text), 3 low (PC-4, PC-6, PC-7). Summary comment posted to PR #776.
+**Loop exit**: 5c route 1 (gate 9 PASS, no open entry). CONCERNS with no open coverage finding, so the loop exits to Step 7
+**Action**: Proceeding to 5c (PR conformance review)
+**Carried to 6a**: task.240.pr-review.1 report; bug.2, bug.3 and bug.4 closed (they cite qa.3, qa.4 and qa.5); task document § 5 corrected (PC-5), and Implementation Notes for cycles 6–8 and version 1.2 added, with cycles 1–5 marked superseded (PC-6)
+**Recorded, not fixed at 5c**: PC-4 (this report's header, Steps 5–6 row and Completion; Step 8 owns them); PC-7 (the differential test is not in Files Summary; its `ref` is a test path, outside the doc-only patterns). Follow-up: quote `finding:` and `suggested_action:` in the review-pr template (PC-5)
+
 ---
 
 ## Completion
 
-**Finished**: 2026-10-28 (halted at the QA loop limit)
-**Final Status**: Escalated
+**Finished**: 2026-10-28T18:17Z
+**Final Status**: Completed
 **Branch**: feature/task.240.open-coverage-fail-closed-reader
 **PR**: #776 — https://github.com/Gamaroff/agent-skills/pull/776
-**QA Iterations**: 7 (loop limit, after 2 granted cycles)
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 9 (base budget 5, plus 2 cycles granted after each of the two escalations)
+**DoD Summary**: `task.240.dod.1.open-coverage-fail-closed-reader.md` — ACCEPTED
+**Tracker debt**: none
+
+**Completion Summary**: Implemented `shared/resources/open-coverage.js`, a fail-closed reader that
+replaces the §5c open-coverage awk with one `command node` call. It took 9 QA cycles. Cycles 1–7
+fixed shape after shape in a lenient parser, and the loop escalated twice. After the second
+escalation, the author approved narrowing the reader to one line per key over an allow-listed
+character set (version 1.2). Cycle 8 then closed the last gap, a lenient UTF-8 decode, by decoding
+the report's bytes strictly. Gate 9 passed at 100 with no open entry. The 5c review was CONCERNS
+with no coverage finding, and its doc-only findings rode the acceptance commit. 11 bugs were filed
+and closed. One follow-up is recorded: quote `finding:` and `suggested_action:` in the review-pr
+template (PC-5).
