@@ -19,7 +19,13 @@ All notable changes to this project will be documented in this file. Format foll
   that holds a quote or a flow collection, open or closed. An open one would make YAML read the
   key-indent lines after it as text. The third is a backslash escape in a quoted `category:` or
   `provenance:` value. The reader does not decode escapes, so it refuses one rather than compare a
-  value YAML would read differently. No tracked report holds any of these shapes. The shell
+  value YAML would read differently. A differential test now generates small blocks and checks
+  that the reader prints `unreadable` or exactly PyYAML's count, never another count. It found
+  more shapes the reader must refuse. Keys are case-sensitive, as in YAML: `Category:` is not
+  `category:`. A flow key needs a space after its colon. A plain `category:` or `provenance:`
+  value may not hold `: `. Free text that does is still read to the end of its line, but may not
+  wrap. A nested value must be one flat list, map or scalar at one indent. In a block scalar, `#`
+  is content. No tracked report holds any of these shapes. The shell
   `case` guard stays as the backstop for a reader that does not run. `pr-review-current.js` now
   exports its block extractor, so the two readers share one regex.
 

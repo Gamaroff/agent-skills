@@ -46,6 +46,22 @@ const ACCEPTED = [
     report("findings:\ntruncated_count: 0\n"),
     0,
   ],
+  // Shapes the differential suite found (open-coverage-differential.test.mjs), each pinned here
+  // so a regression names its rule rather than a seed.
+  [
+    "a capitalised Provenance: is not provenance: keys are case-sensitive, as in YAML",
+    findings(
+      "  - id: PC-1\n    category: coverage\n    Provenance: pre-existing\n",
+    ),
+    1,
+  ],
+  [
+    "free text holding `: ` is read to the end of its line (task.238 bug.15)",
+    findings(
+      "  - id: PC-1\n    category: coverage\n    finding: it reads: 0\n",
+    ),
+    1,
+  ],
   // A dash with wider spacing: the entry's keys sit at its first key's column (task.240 bug.5).
   [
     "an entry whose keys line up after a two-space dash",
@@ -219,6 +235,48 @@ const REFUSED = [
     "bad-value",
     findings(
       "  - id: PC-1\n    category: coverage\n    evidence:\n      [a,\n    provenance: pre-existing]\n",
+    ),
+  ],
+  // Shapes the differential suite found, each a block YAML rejects or reads differently.
+  // A capitalised key is not the key: the entry has no category.
+  ["no-category", findings("  - id: PC-1\n    Category: coverage\n")],
+  // A flow key with no space after its colon is one plain scalar in YAML.
+  ["bad-line", findings("  - {id: PC-1, category:coverage}\n")],
+  // A plain value holding `: ` where the count reads it, or inside a flow entry.
+  ["bad-value", findings("  - id: PC-1\n    category: cover: age\n")],
+  ["bad-value", findings("  - {id: x: y, category: coverage}\n")],
+  // Free text read leniently past its `: ` may not wrap.
+  [
+    "bad-value",
+    findings(
+      "  - id: PC-1\n    category: coverage\n    finding: it reads: 0\n      more\n",
+    ),
+  ],
+  // A nested value is flat: one kind, one indent, one plain item per line.
+  ...[
+    "        - a.md\n      - b.md\n",
+    "      - a.md\n        - b.md\n",
+    "      - a.md\n      plain\n",
+  ].map((lines) => [
+    "bad-line",
+    findings(`  - id: PC-1\n    category: coverage\n    evidence:\n${lines}`),
+  ]),
+  ...["      - &a x\n", "      - k: x: y\n", "      - *a\n"].map((lines) => [
+    "bad-value",
+    findings(`  - id: PC-1\n    category: coverage\n    evidence:\n${lines}`),
+  ]),
+  // In a block scalar `#` is content and sets the indent; a comment shallower than the content
+  // ends the scalar, so nothing deeper may follow it.
+  [
+    "bad-line",
+    findings(
+      "  - id: PC-1\n    category: coverage\n    finding: |\n        # content\n      shallower\n",
+    ),
+  ],
+  [
+    "bad-value",
+    findings(
+      "  - id: PC-1\n    category: coverage\n    finding: |\n  # c\n      more\n",
     ),
   ],
   // A key at `dash + 2` after a dash with wider spacing (task.240 bug.5): YAML rejects the block.

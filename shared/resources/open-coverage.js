@@ -102,15 +102,24 @@ function scalar(s, flow, strict = flow) {
   }
   if (/^[!&*]/.test(s)) refuse("bad-value", `a tag, anchor or alias: ${s}`);
   if (/^[[{]/.test(s)) refuse("bad-value", `a nested flow collection: ${s}`);
+  // A plain scalar holding `: `, or ending in `:`, is one YAML rejects. A flow value or a value the
+  // count compares (`strict`) is refused. Block free text keeps the old leniency — read to the end
+  // of the line, colons included (task.238 bug.15 pins it: review-pr writes plain sentences) — and
+  // blockValue lets it no deeper line.
+  const plain = (value) => {
+    if (strict && /:(?:[ \t]|$)/.test(value))
+      refuse("bad-value", `a plain value that reads as a key: ${value}`);
+    return value;
+  };
   if (flow) {
     const m = s.match(/^[^,}]*/);
     const value = m[0].replace(/[ \t]+$/, "");
     if (/[ \t]#/.test(value) || value.startsWith("#"))
       refuse("bad-value", "a comment inside a flow entry");
-    return { value, rest: s.slice(m[0].length) };
+    return { value: plain(value), rest: s.slice(m[0].length) };
   }
   return {
-    value: s.replace(/[ \t]+#.*$/, "").replace(/[ \t]+$/, ""),
+    value: plain(s.replace(/[ \t]+#.*$/, "").replace(/[ \t]+$/, "")),
     rest: "",
   };
 }
@@ -185,8 +194,15 @@ function blockValue(key, raw) {
     mustEnd(rest, "a quoted value");
     return { value, deeper: "refuse" };
   }
-  // A comment ends a plain value: YAML has nothing a deeper line could continue.
-  return { value, deeper: deciding || /[ \t]#/.test(s) ? "refuse" : "plain" };
+  // A comment ends a plain value: YAML has nothing a deeper line could continue. Nor may free text
+  // read leniently past a `: ` wrap — it is one line or nothing.
+  return {
+    value,
+    deeper:
+      deciding || /[ \t]#/.test(s) || /:(?:[ \t]|$)/.test(value)
+        ? "refuse"
+        : "plain",
+  };
 }
 
 /**
@@ -200,11 +216,24 @@ function blockValue(key, raw) {
  * where a misread costs a false 0.
  */
 const NESTED_OPENER = /["[{]|(?<![\p{L}\p{N}])'|'(?![\p{L}\p{N}])/u;
+// A YAML indicator at the start of a scalar: an anchor, alias, tag, block scalar, reserved
+// character, or a dash, `?` or `:` that opens a structure.
+const NESTED_INDICATOR = /^(?:[&*!|>%@`]|[-?:](?:[ \t]|$))/;
 function nestedLine(text, key, n) {
   if (NESTED_OPENER.test(text))
     refuse(
       "bad-value",
       `a quote or flow collection in a value nested under ${key}: (line ${n + 1})`,
+    );
+  // One optional item dash, then a plain scalar or one `key: plain` pair — nothing else.
+  const parts = text
+    .replace(/^-(?:[ \t]+|$)/, "")
+    .split(/:(?:[ \t]+|$)/)
+    .map((p) => p.trim());
+  if (parts.length > 2 || parts.some((p) => NESTED_INDICATOR.test(p)))
+    refuse(
+      "bad-value",
+      `a nested line under ${key}: that is not one plain item (line ${n + 1})`,
     );
 }
 
@@ -214,9 +243,11 @@ function flowEntry(s) {
   let rest = s.slice(1);
   for (;;) {
     rest = rest.replace(/^[ \t]+/, "");
-    const k = rest.match(/^([A-Za-z0-9_-]+):[ \t]*/);
+    // A flow key's colon is followed by a space, `,` or `}`: `{category:coverage}` is one plain
+    // scalar in YAML, not a category (task.240 CR-2).
+    const k = rest.match(/^([A-Za-z0-9_-]+):(?:[ \t]+|(?=[,}]))/);
     if (!k) refuse("bad-line", `a flow entry the reader cannot tokenise: ${s}`);
-    const key = k[1].toLowerCase();
+    const key = k[1];
     if (keys.has(key))
       refuse("duplicate-key", `${key} given twice in one entry`);
     const { value, rest: after } = scalar(rest.slice(k[0].length), true);
@@ -232,7 +263,7 @@ function flowEntry(s) {
   }
 }
 
-/** Parse the block's lines into its findings entries (Maps of lower-cased key → value). */
+/** Parse the block's lines into its findings entries (Maps of key → value; keys case-sensitive). */
 function parseBlock(block) {
   const top = new Set();
   const entries = [];
@@ -310,7 +341,16 @@ function parseBlock(block) {
 
     if (!inFindings)
       refuse("bad-line", `an indented line outside findings: (line ${n + 1})`);
-    if (text.startsWith("#")) continue; // an indented comment line
+    // An indented comment line — except inside a block scalar, where `#` is content and the line
+    // sets the scalar's indent like any other.
+    const inScalar =
+      cur && !cur.flow && cur.deeper === "text" && indent > cur.keyIndent;
+    if (text.startsWith("#") && !inScalar) {
+      // A comment shallower than a block scalar's content ends it: YAML has no scalar for a
+      // deeper line after it to belong to.
+      if (cur && !cur.flow && cur.deeper === "text") cur.deeper = "refuse";
+      continue;
+    }
 
     // A line deeper than the open entry's keys belongs to the last key's value.
     if (cur && !cur.flow && indent > cur.keyIndent) {
@@ -327,6 +367,39 @@ function parseBlock(block) {
           "bad-value",
           `a deeper line under ${cur.lastKey}: (line ${n + 1})`,
         );
+      // A nested value or a block scalar takes its indent from its first line; a later line
+      // shallower than that but deeper than the keys belongs to nothing, and YAML rejects it.
+      if (cur.deeper === "nested" || cur.deeper === "text") {
+        if (cur.deeperIndent === null) cur.deeperIndent = indent;
+        else if (indent < cur.deeperIndent)
+          refuse(
+            "bad-line",
+            `a line under ${cur.lastKey}: shallower than the value's first line (line ${n + 1})`,
+          );
+        // A nested value is flat: one list, map or plain scalar at one indent. Anything deeper —
+        // an item's child, a continuation — is a structure the reader does not model, and no
+        // writer emits it.
+        else if (cur.deeper === "nested" && indent > cur.deeperIndent)
+          refuse(
+            "bad-line",
+            `a line under ${cur.lastKey}: deeper than the nested value's first line (line ${n + 1})`,
+          );
+      }
+      // A nested value is one node: a list, a map or a plain scalar. Lines at its own indent that
+      // switch kind (`- a` then `plain`) are a block YAML rejects.
+      if (cur.deeper === "nested" && indent === cur.deeperIndent) {
+        const kind = /^-(?:[ \t]|$)/.test(text)
+          ? "list"
+          : /:(?:[ \t]|$)/.test(text)
+            ? "map"
+            : "plain";
+        if (cur.deeperKind == null) cur.deeperKind = kind;
+        else if (kind !== cur.deeperKind)
+          refuse(
+            "bad-line",
+            `a ${kind} line in a nested ${cur.deeperKind} under ${cur.lastKey}: (line ${n + 1})`,
+          );
+      }
       continue;
     }
     if (cur && cur.flow && indent > cur.indent)
@@ -378,13 +451,16 @@ function parseBlock(block) {
 }
 
 function setKey(cur, rawKey, raw, n) {
-  const key = rawKey.toLowerCase();
+  // Keys are case-sensitive, as in YAML: `Category:` is not `category:` (task.240 CR-3).
+  const key = rawKey;
   if (cur.keys.has(key))
     refuse("duplicate-key", `${key} given twice in one entry (line ${n + 1})`);
   const { value, deeper } = blockValue(key, raw);
   cur.keys.set(key, value);
   cur.lastKey = key;
   cur.deeper = deeper;
+  cur.deeperIndent = null;
+  cur.deeperKind = null;
 }
 
 /**
