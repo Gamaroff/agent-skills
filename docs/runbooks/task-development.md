@@ -271,6 +271,20 @@ remove the key and 6d prints `6d: changelog checks not enabled` instead.
 2. Re-invoke `/finalise`. 6a skips the acceptance commit it already made, 6c re-reads CI on the new
    head, and the PR comment and tracker close follow.
 
+### `/finalise` halts with `changelog-unknown`
+
+**You see:** `HALT: changelog-unknown — changelog-enforce.sh answered '…', not on or off`, either
+at Step 3b before the DoD agents are dispatched, or at Step 7 action 6d.
+**Cause:** the changelog opt-in resolver could not run, so `/finalise` cannot tell whether
+`changelog.enforce` is set. Usually `changelog-enforce.sh` or the `read-config.sh` beside it is
+missing from `.agents/skills/finalise/references/` (a partial or stale install). `/finalise` stops
+rather than reading a broken install as "not enabled", which would silently drop an opted-in
+project's check.
+**Fix:**
+1. Reinstall or re-bundle the `finalise` skill so both files are present.
+2. Check it: `bash .agents/skills/finalise/references/changelog-enforce.sh` prints `on` or `off`.
+3. Re-invoke `/finalise`.
+
 ### Task registry shows a duplicate "Next Available" number
 
 **You see:** Two tasks share the same number; `/create-task` used the same counter value twice.

@@ -1817,7 +1817,7 @@ POLLEOF
    recorded in the implementation report's Decisions Log (`CI reading 1: … @ …; CI reading 2: … @
    …`) and in the PR comment body below — both outside the verified commit.
 
-6d. **CHANGELOG citation check (blocking — HALT `no-changelog-entry`).** Every accepted work item
+6d. **CHANGELOG citation check (blocking — HALT `no-changelog-entry`; HALT `changelog-unknown` when the opt-in cannot be read).** Every accepted work item
    must be cited in `CHANGELOG.md` under `## [Unreleased]` as `(task N)` / `(bug N)` — the
    convention in `docs/contributing/releases.md`. **It runs only when the project opts in** with
    `changelog.enforce: true` in `skills-config.yaml`; otherwise the block prints
@@ -2479,7 +2479,7 @@ EOF
 - [ ] Sprint Review summary file created at `{story-directory}/sprint-review-summary.md`
 - [ ] **Publish boundary (6a–6c) crossed before any side-effect**: acceptance commit made with output and exit status read (never suppressed), pushed; document, DoD summary and sprint review asserted **tracked and on `origin/<branch>`** (`git ls-files --error-unmatch` + `git show origin/<branch>:<path>`), not merely present; PR head equals the pushed head; **CI reading 2 read `SUCCESS` on that head** — anything else is HALT `ci-not-green-on-acceptance-head`, with no comment, close or board move issued
 - [ ] Both CI readings recorded with their heads — reading 1 in the running summary (Step 6), reading 2 on the PR canonical comment and in the implementation report
-- [ ] CHANGELOG citation checked (6d) — `6d: changelog checks not enabled` when `changelog.enforce` is not `true`; otherwise `(task N)` present under `[Unreleased]`, or `6d: no CHANGELOG.md — not applicable` when the repository has no `CHANGELOG.md`; otherwise HALT `no-changelog-entry` before the PR comment
+- [ ] CHANGELOG citation checked (6d) — `6d: changelog checks not enabled` when `changelog.enforce` is not `true`; otherwise `(task N)` present under `[Unreleased]`, or `6d: no CHANGELOG.md — not applicable` when the repository has no `CHANGELOG.md`; otherwise HALT `no-changelog-entry` before the PR comment; HALT `changelog-unknown` when `changelog-enforce.sh` answers neither `on` nor `off`
 - [ ] PR comment posted (GitHub: `gh pr comment`, Bitbucket: REST API) — **after** 6a–6c
 - [ ] Tracker issue closed: Jira issue transitioned via MCP (`transitionJiraIssue`) **OR** GitHub issue closed via `gh issue close` + closure confirmed with `gh issue view --json state` **OR** warning comment posted (if close failed after retry)
 - [ ] **Jira only — terminal status RE-READ after the Document-link re-point**, and re-asserted if the

@@ -54,6 +54,7 @@ const STEP8 = "shared/resources/develop-pipeline-step-8-commit.md";
 const QA_LOOP = "shared/resources/develop-pipeline-step-5-6-qa-loop.md";
 const RELEASES = "docs/contributing/releases.md";
 const DRIFT_TEST = "evals/shared/tests/changelog-entry-drift.test.mjs";
+const RUNBOOK = "docs/runbooks/task-development.md";
 
 const finalise = read(FINALISE);
 
@@ -836,7 +837,9 @@ test("no dispatched DoD prompt but the gated docs prompt checks CHANGELOG.md", (
     ],
     // The bug DoD template copies agent 4's gated item; it reads nothing itself.
     [
-      /Agent 4's changelog item, copied: .*?`⚠️ NOT_APPLICABLE — changelog checks not enabled`/,
+      // The template's own words, literally: a `.*?` here would cut a real read inserted
+      // between the anchors along with the span (task.241 CR3-1).
+      /Agent 4's changelog item, copied: the `\(bug N\)` entry it found under `## \[Unreleased\]`, or `⚠️ NOT_APPLICABLE — changelog checks not enabled`/,
       "bug DoD template copies the gated docs result",
     ],
     [/^## Step 4b: Docs & Changelog$/, "bug DoD template section heading"],
@@ -903,6 +906,42 @@ test("/finalise 6d names `no-changelog-entry` as a HALT, and the release docs na
     "6d's heading names it blocking",
   );
   assert.match(sixD, /\[Unreleased\]/, "6d reads the [Unreleased] section");
+
+  // Every HALT token 6d's block can emit is named where a reader looks for 6d's outcomes: the
+  // heading, the completion checklist and the runbook. Derived from the block, so a new HALT
+  // that is not named turns this red (task.241 CR3-2).
+  const tokens = [
+    ...new Set(
+      [...sixDBlock().matchAll(/HALT: ([a-z][a-z0-9-]+)/g)].map((m) => m[1]),
+    ),
+  ];
+  assert.ok(
+    tokens.length >= 2,
+    `6d block: expected at least 2 HALT tokens, found ${tokens.join(", ")}`,
+  );
+  const heading = sixD.split("\n")[0];
+  const checklist = finalise
+    .split("\n")
+    .find((l) => l.startsWith("- [ ] CHANGELOG citation checked (6d)"));
+  assert.ok(checklist, `${FINALISE}: no 6d completion-checklist line`);
+  const runbook = read(RUNBOOK);
+  for (const t of tokens) {
+    assert.match(
+      heading,
+      new RegExp(`HALT \`${t}\``),
+      `6d heading must name ${t}`,
+    );
+    assert.match(
+      checklist,
+      new RegExp(`HALT \`${t}\``),
+      `6d checklist must name ${t}`,
+    );
+    assert.match(
+      runbook,
+      new RegExp(`^### \`/finalise\` halts with \`${t}\`$`, "m"),
+      `${RUNBOOK} must carry an entry for ${t}`,
+    );
+  }
 
   const releases = read(RELEASES);
   assert.ok(
