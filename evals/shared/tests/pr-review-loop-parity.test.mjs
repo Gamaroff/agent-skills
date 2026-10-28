@@ -1143,6 +1143,13 @@ const RAW_CASES = [
     '  - id: PC-1\n    finding: "text\n    category: coverage"\n    category: trail\n',
     "unreadable",
   ],
+  // The same trap one line lower (task.240 bug.2): a quote opened under an empty key runs, in
+  // YAML, over the key-indent lines below it. Read as keys, they printed a false 0.
+  [
+    "a quoted value opened on the line after an empty key",
+    '  - id: PC-1\n    category: coverage\n    finding:\n      "open\n    provenance: pre-existing\n    note: end"\n',
+    "unreadable",
+  ],
   // A list cut short reads unreadable, not the count of what survived (task.238 CR9-3): a column-0
   // `## ` line inside the fence ends the section the check reads.
   [

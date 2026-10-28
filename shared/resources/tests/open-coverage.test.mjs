@@ -94,6 +94,14 @@ const ACCEPTED = [
     ),
     1,
   ],
+  // A nested value under an empty key whose quotes and flow collections close on their own line.
+  [
+    "a nested list of closed quoted, keyed and flow values",
+    findings(
+      '  - id: PC-1\n    category: coverage\n    evidence:\n      - "a, b"\n      - c: "d"\n      - [x, y]\n      - {k: v}\n      - it\'s plain\n',
+    ),
+    1,
+  ],
   [
     "a flow entry with a quoted comma",
     findings('  - {id: PC-1, category: coverage, ref: "a, b"}\n'),
@@ -191,6 +199,20 @@ const REFUSED = [
     "bad-value",
     report(
       'findings:\n  - id: PC-1\n    category: coverage\n    finding: "opened\n      never closed\n',
+    ),
+  ],
+  // A nested value that opens a quote or a flow collection and does not close it on that line
+  // (task.240 bug.2): YAML runs it over the key-indent lines below.
+  [
+    "bad-value",
+    findings(
+      "  - id: PC-1\n    category: coverage\n    evidence:\n      - sub: 'open\n    provenance: pre-existing'\n",
+    ),
+  ],
+  [
+    "bad-value",
+    findings(
+      "  - id: PC-1\n    category: coverage\n    evidence:\n      [a,\n    provenance: pre-existing]\n",
     ),
   ],
   [

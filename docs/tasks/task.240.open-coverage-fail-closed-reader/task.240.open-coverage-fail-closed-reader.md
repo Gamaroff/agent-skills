@@ -464,6 +464,15 @@ this fix and is narrower than what ships; the reader's header is now the list. R
 
 Details are in the bug report.
 
+**QA fix cycle 2 (TASK-240-QA-2, bug.2).** In a nested value under an empty key, any quoted scalar
+or flow collection that opens on a line must now close on that line, or the reader refuses the
+report. The pipeline offered the narrowing-residue move, and the change was taken as a consolidate
+move (an allow-list), not as a second round of quote tracking. Results:
+
+- Mutation proofs M9–M11 each turned at least one test red.
+- The corpus diff shows 0 changes over 187 reports.
+- `ci:fast` is green: 6,622 pass, 0 fail.
+
 ---
 
 <!--
@@ -482,22 +491,22 @@ Details are in the bug report.
 
 ### QA Report
 
-- **Full Report**: [task.240.qa.1.open-coverage-fail-closed-reader.md](./task.240.qa.1.open-coverage-fail-closed-reader.md)
-- **Gate File**: [task.240.gate.1.open-coverage-fail-closed-reader.yml](./task.240.gate.1.open-coverage-fail-closed-reader.yml)
+- **Full Report**: [task.240.qa.2.open-coverage-fail-closed-reader.md](./task.240.qa.2.open-coverage-fail-closed-reader.md)
+- **Gate File**: [task.240.gate.2.open-coverage-fail-closed-reader.yml](./task.240.gate.2.open-coverage-fail-closed-reader.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 155 (unit, parity, extractor, relationship lint) plus a 187-report corpus diff
+- **Tests Executed**: 168 (unit, parity, extractor and relationship lint), plus a 187-report corpus diff and CI (green on `a98f5470`)
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
 
-One medium regression (TASK-240-QA-1,
-[task.240.bug.1.wrapped-value-reads-unreadable.md](./task.240.bug.1.wrapped-value-reads-unreadable.md)):
-a value under `finding:` that wraps onto a deeper line, valid YAML that the awk read correctly, now
-reads `unreadable`.
+BUG-1 is fixed and verified. One medium false 0 remains (TASK-240-QA-2,
+[task.240.bug.2.quoted-value-after-empty-value-hides-key.md](./task.240.bug.2.quoted-value-after-empty-value-hides-key.md)).
+When an empty `finding:` value is followed by a quoted value on the next line, a key line inside
+the quoted value is read as a key.
 
 <!-- change-log-start -->
 ## Change Log
@@ -510,6 +519,8 @@ reads `unreadable`.
 | 2026-10-28 |         | Implemented — 5 source files (1 new reader, 1 new unit suite), 32 unit tests + 1 new parity test; status → ready-for-review | develop |
 | 2026-10-28 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-10-28 |         | QA findings fixed — wrapped values under non-deciding keys accepted (bug.1), 1 iteration | qa-fix |
+| 2026-10-28 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-10-28 |         | QA findings fixed — nested openers must close on their line (bug.2), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

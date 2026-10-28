@@ -13,8 +13,11 @@ All notable changes to this project will be documented in this file. Format foll
   shapes it refused, so each shape it did not list was skipped and read as "no coverage", and
   task 238's QA loop found one more per cycle. The printed contract, the routing and every existing
   fixture are unchanged, and every tracked review report reads the same as before. A long value
-  may wrap onto deeper lines, as YAML allows; a block YAML itself rejects (a wrapped line that
-  reads as `key: `, a quote never closed) now reads `unreadable` where the awk read a count. The shell
+  may wrap onto deeper lines, as YAML allows. Where the awk read a count, the reader now prints
+  `unreadable` for two kinds of block. One is a block YAML itself rejects: a wrapped line that
+  reads as `key: `, or a quote that is never closed. The other is a nested value under an empty key
+  whose quote or flow collection stays open past its line. YAML would read the key-indent lines
+  after it as text. No tracked report holds either shape. The shell
   `case` guard stays as the backstop for a reader that does not run. `pr-review-current.js` now
   exports its block extractor, so the two readers share one regex.
 
