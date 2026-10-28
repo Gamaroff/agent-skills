@@ -3,7 +3,7 @@
 **Task**: `task.238.qa-loop-acts-on-signals-it-has.md`
 **Run Number**: 1
 **Started**: 2026-10-28 (UTC)
-**Status**: In Progress
+**Status**: Escalated
 
 ---
 
@@ -36,7 +36,7 @@ Make the QA loop act on four signals it already holds (red CI on the PR, a pre-e
 | 2. review-task             | ✅ Done    | `task.238.review.{N}.{name}.md` exists (or skip logged)                | Skipped: Ready for Development + `task.238.review.1.…md` exists | —                    | 2026-10-28T03:25Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline; 4/4 phases; ci:fast 6491/0 | —                    | 2026-10-28T03:50Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #770: https://github.com/Gamaroff/agent-skills/pull/770 | —                    | 2026-10-28T03:58Z |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.238.qa.{N}.*.md`; `task.238.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 3 cycles: FAIL 70 → CONCERNS 80 → PASS 90; 5c APPROVE (`pr-review.1`, PC-1 doc-only fixed and staged) | —                    | 2026-10-28T04:42Z |
+| 5–6. qa-task / qa-fix loop | ❌ Halted | `task.238.qa.{N}.*.md`; `task.238.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 3 cycles: FAIL 70 → CONCERNS 80 → PASS 90, 5c APPROVE; re-entered after DoD gaps: FAIL 20 → FAIL 50; loop limit (5 of 5), cycle 5 fix `8345b798` ungated | —                    | 2026-10-28T04:42Z |
 | 7. finalise                | ❌ Halted  | `task.238.dod.{N}.*.md`; task `status: accepted`                       | DoD gaps (5): security probe 2 medium + 1 low; SC-10 2 unheld guards — `task.238.dod.1` | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
@@ -121,6 +121,29 @@ Make the QA loop act on four signals it already holds (red CI on the PR, a pre-e
 - Step 6 decision: **NOT ACCEPTED, 5 gaps**. Step 8a does not apply: two sections FAIL and two findings are medium. Gap report written to the task body; Change Log row added; gaps PR comment posted (issuecomment-6460939215). Lock held at 7 by `advance-pipeline-lock.sh --skill finalise`.
 - HALT per Step 7 "If DoD Gaps Are Found". The gaps change code, so the resume should take **Re-enter QA at 5a** (`reenter-qa-after-finalise.sh`).
 
+### Resume — QA re-entry after finalise DoD gaps — 2026-10-28
+
+- The HALT left the lock at 7 with no halt snapshot. Snapshot written and lock removed on resume (`halt_step` 7), so the re-entry script could restore from it.
+- Gaps fixed in `adff39e2`, test-first: the 2 `..` tests and 2 quoted-coverage tests were red on `3080a556` (the `..` case classed `pre-existing`, as the DoD probe did). Fix: `..`-segment guard in `fast-gate-outcome.sh`; the §5c awk accepts a quoted `category:` / `provenance:`; both usage tests assert each case's own stderr.
+- Mutation proofs recorded in the `adff39e2` message: `--vcs`, `--pr`, `--exit` checks, the `..` guard, both quote allowances, each red on revert. The 9 guards `/finalise` proved at `8ac7ffef` are listed there too.
+- QA re-entry after finalise DoD gaps: reenter-qa: re-entered QA at step 5 / qa_phase 5a — qa_max_cycles=5 (base 3), gate_head=8b7e8d1cb9d2779d36a00731d3f1c13eebc8135a.
+
+### QA fix cycle 4 — bug.6 rule — 2026-10-28
+
+- The user chose to **fail closed with a clean-ratchet allowance**. `pre-existing` needs node's results to end the log; only npm's failure report and a clean `tmp-leak` report may follow them. Rejected alternatives:
+  - Fully generic fail-closed: `pre-existing` would never fire in this repository, since every red ends with `tmp-leak` lines.
+  - Running the whole fast gate at the base: minutes long, and it breaks the 90 s bound.
+- CR4-9 does not use `ℹ cancelled N`. Measured on node 26.8.2, a SIGTERM/SIGINT interrupt and a test timeout both print `fail 0` / `cancelled 1`. Only the `test-tmpdir` wrapper's own signal line separates them, so only that line makes a run not measured. A plain `node --test` interrupt stays attributable and spends a retry: the safe direction.
+
+### QA cycle 5 routing — 2026-10-28
+
+- Gate 5 FAIL, HIGH sequence `1, 0, 0, 3, 2`. Convergence check: no trip (`HIGH_{N-2}` = 0). Third strike: no (`fast-gate-outcome.sh` has HIGH in gates 4 and 5 only). Route: `continue`. Narrowing offer: not signalled (`high-findings-remain`).
+- QA Cycle 5 — changes-requested: stage-disabled.
+- qa-fix cycle 5 — fix_cycle: not supplied, so it is derived from the gate (5). The findings ingester was not dispatched: this session authored gate 5 and bug.10–bug.12 minutes earlier, so the findings were read inline (Step 1b). That loses ingester independence; the findings themselves are QA's, unchanged.
+- bug.10 design: key on `line:column` rather than on the suite path. Node's spec summary omits the suite, while both reporters print the position. A test whose line moved reads attributable: the safe direction, at the cost of a triage on a PR that edits the failing test's file.
+- bug.11 design: the TAP check starts at the final top-level plan. Node 26.8.2 prints a test's own stdout and stderr as `#` lines before it, so checking every `#` line would refuse any chatty suite. That variant was mutation-tested and turned the control red.
+- Cycle 5 is the last of `qa_max_cycles` 5: after 5b commits, Loop Escalation's loop-limit trigger runs (route 2c is evaluated first; it requires HIGH 0 on the last gate, so it declines).
+
 ---
 
 ## Issues Log
@@ -134,6 +157,59 @@ _Problems encountered and how they were resolved or escalated._
   4. SC-10: `shared/resources/tests/qa-ci-read.test.mjs:397` usage test is unheld (it does not go red with the `--vcs` validation removed).
   5. SC-10: `evals/shared/tests/qa-loop-fast-gate-outcomes.test.mjs:632` `--exit abc` case is unheld (it does not go red with the `--exit` number check removed).
   - Escalated: pipeline HALTed at Step 7. Resume with "Re-enter QA at 5a".
+  - Resolved: all 5 fixed in `adff39e2`; QA re-entered at 5a to gate the fix before `/finalise` re-runs.
+
+### QA Loop Limit Reached — 2026-10-28
+
+The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS. The 5-cycle budget counts the
+three cycles before the finalise re-entry: `qa_max_cycles` was 5, from `reenter-qa-after-finalise.sh`.
+
+**Final gate status**: FAIL (gate 5, 50/100, head `4ef29ed1`). Cycle 5's fix (`8345b798`) has **not
+been gated**.
+**HIGH findings per cycle**: 1, 0, 0, 3, 2. Not a stall: the Convergence check did not trip
+(`HIGH_{N-2}` = 0). The cycle 4 and cycle 5 HIGHs are new findings each time, not repeats.
+**Remaining issues** (from gate 5; all three fixed in `8345b798` and Ready for QA, ungated):
+- TASK-238-CR5-1 (high), `shared/resources/fast-gate-outcome.sh`: failures were keyed by leaf name,
+  which spec shares across describes (bug.10).
+- TASK-238-CR5-2 (high), `shared/resources/fast-gate-outcome.sh`: node's own diagnostic errors
+  were never looked for (bug.11).
+- TASK-238-PRB5-1 (medium), `shared/resources/fast-gate-outcome.sh`: a second node summary reset
+  the trailer check (bug.12).
+- Advisory, not gated: `qa-ci-read.sh` `--event push` for the GitHub base reading (CR-5 / CR-3);
+  a non-node red printed *before* node's results is never examined.
+
+**What was attempted per cycle**:
+- Cycle 1: open-coverage unreadable fails closed; Stop-hook 5c re-prompt; `--base` option guard
+  (bug.1-bug.3).
+- Cycle 2: bounded base run with cleanup on every exit (bug.4). Gate 3 PASS; 5c APPROVE;
+  `/finalise` then found 5 DoD gaps, fixed in `adff39e2`, and QA was re-entered at 5a.
+- Cycle 4: per-test base comparison; fail closed on non-node output; Bitbucket same-pipeline base;
+  every YAML coverage shape; option-shaped path guard (bug.5-bug.9).
+- Cycle 5: position key; node diagnostic refusal; trailer kept across runs (bug.10-bug.12).
+- Route 2c (gate-the-last-fix half-cycle) was evaluated and declined: `high-on-last-gate`, since
+  gate 5 raised 2 HIGH.
+
+**Likely root cause**: every HIGH since cycle 4 is in one file, `fast-gate-outcome.sh`, and in one
+claim: that a head red is *pre-existing*. The classifier infers that from a free-text log. Each
+safety re-probe finds another log shape the inference had not considered:
+- bare names
+- non-node steps
+- describes that share a leaf name
+- node's own diagnostics
+- multiple runs
+
+The fixes have each narrowed `pre-existing`, which is the safe direction. But the claim is a deny-list
+over an open input, the shape Step 2.6 calls a narrowing residue: copying more of node's output
+format is still a patch.
+
+**Recommended next steps**:
+1. Grant 1-2 more cycles to gate `8345b798`: on resume, choose "Resume at 5a with {k} more cycles".
+   The fix answers every gate 5 finding, with red-before tests and 6 mutations.
+2. Or change the claim's shape: `pre-existing` only when the head log is a node --test run
+   **alone** (the gate is exactly `node --test …`), and attributable otherwise. That is an
+   allow-list of the accepted shape, not more deny rules.
+3. Or accept gate 5's residue with a waiver and take option 2 of the HALT message (5c, then
+   `/finalise`). Not recommended: gate 5's HIGHs are fixed but ungated.
 
 ---
 
@@ -174,14 +250,47 @@ _Track each QA review/fix cycle._
 **Fixes Applied**: none — gate passed
 **Commit**: `8ac7ffef` (gate 3 and QA report, path 1)
 
+### QA Cycle 4 — 2026-10-28
+**Gate Result**: FAIL (20/100)
+**Issues Found**: 7: bug.5 (bare-name base comparison), bug.6 (pre-existing ignores non-node red), bug.7 (Bitbucket base reading uses any pipeline), all HIGH; bug.8 (open-coverage awk shapes) and bug.9 (option-shaped test path, probe-measured), both MEDIUM; CR4-8 and CR4-9 LOW. All 5 DoD 1 gaps are verified fixed. PR CI pending on `adff39e2` (recorded, not waited on).
+**HIGH findings**: 3
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 4 of 5)
+**Fixes Applied**: bug.5: the fast gate compares failing tests as file + name pairs; a failing file absent at the base, or a test with no file, is attributable; the base uses the head log's reporter. bug.6: `pre-existing` needs node's results to end the log, except npm's report and a clean `tmp-leak` report. bug.7: the Bitbucket base reading uses the same pipeline (selector type + pattern). bug.8: the §5c awk reads comments, list-first keys, the flow form and any letter case, and prints `unreadable` on an entry it cannot read. bug.9: a `-`-leading path is refused. Also CR4-8 (a rerun supersedes), CR4-9 (wrapper signal line → not measured) and advisory CR-6 (a base containing `HEAD` is refused). Every new test was red on `adff39e2`; 13 mutations were each red; awk results agree across gawk ×3 and mawk. Fast gate attempt 1 green, 6519/0.
+**Commit**: `4ef29ed1`
+
+### QA Cycle 5 — 2026-10-28
+**Gate Result**: FAIL (50/100)
+**Issues Found**: 3: bug.10 (a leaf test name shared across describes reads pre-existing) and bug.11 (node's own diagnostic errors are never looked for), both HIGH, both reproduced by QA on node 26.8.2; bug.12 (a second node summary resets the trailer check), MEDIUM, probe-measured. bug.5 to bug.9 verified and closed. Advisory: `--event push` for the GitHub base reading (cycle 4 CR-5, again). Probes 57 executed, 0 escaped. PR CI pending on `4ef29ed1` (recorded, not waited on).
+**HIGH findings**: 2
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop limit reached
+**Fixes Applied**:
+- **bug.10:** failures are keyed on file, line and column, which node prints in both reporters.
+- **bug.11:** any node diagnostic other than the run summary or the coverage report is attributable. In spec every `ℹ` line is checked; in TAP, `#` lines are checked after the final plan.
+- **bug.12:** the trailer check no longer resets at a later node summary.
+
+Evidence:
+- Every new test was red on `4ef29ed1`, and both should-merge controls pass on real node 26.8.2 logs.
+- 6 mutations were each red.
+- The awk output is identical under gawk ×3 and mawk 1.3.4.
+- A TAP-subtest fixture's typed column (`3:54`) was corrected to node's `3:34`.
+- Fast gate: attempt 1 was red on prettier (the new test file); attempt 2 was green, 6538 tests, 0 fail.
+
+**Commit**: `8345b798`
+
 ---
 
 ## Completion
 
-**Finished**: 2026-10-28T05:15Z (halted)
-**Final Status**: Escalated — HALT at Step 7, finalise DoD gaps (5)
+**Finished**: 2026-10-28T05:57Z (halted)
+**Final Status**: Escalated — QA loop limit reached (5 of 5), after re-entry from the Step 7 DoD gaps
 **Branch**: feature/task.238.qa-loop-acts-on-signals-it-has
 **PR**: https://github.com/Gamaroff/agent-skills/pull/770
-**QA Iterations**: 3 (FAIL 70 → CONCERNS 80 → PASS 90) + 5c APPROVE
-**DoD Summary**: `task.238.dod.1.qa-loop-acts-on-signals-it-has.md` — ❌ GAPS IDENTIFIED
+**QA Iterations**: 5 (FAIL 70 → CONCERNS 80 → PASS 90, 5c APPROVE; DoD gaps; re-entry → FAIL 20 → FAIL 50); cycle 5's fix `8345b798` ungated
+**DoD Summary**: `task.238.dod.1.qa-loop-acts-on-signals-it-has.md` — ❌ GAPS IDENTIFIED (all 5 fixed in `adff39e2`)
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
