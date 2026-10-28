@@ -310,9 +310,36 @@ None.
 ### Key Findings
 No critical issues identified. Cycle 4's fixes hold: every describer of the grant write set lists the four fields, and the window qualifier and its worked-example rows are bound to the rule by tests. Both bugs are closed. The last cycle's review asked for high-confidence, line-anchored defects only.
 
-## Change Log
+## Definition of Done - Gaps Identified
 
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.239.qa.5.qa-escalation-and-grant-say-what-runs.md`
+**Gate File**: `task.239.gate.5.qa-escalation-and-grant-say-what-runs.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+### Missing Criteria:
+
+1. **Acceptance Criteria:**
+   - [ ] SC-7: a loop-limit escalation runs two `high_files` comparisons (the two-gate command and the three-gate block, since `274ebe31`), against "at most one per entry"
+   - [ ] SC-11: five new guards have no recorded mutation proof — the struck-file constraint assertions (`qa-escalation-template.test.mjs:62-71`, the mutation § 8 names), the grant-boundary marker (`:72-76`), the filling-rules pointer test (`:86-116`), the `convergenceTrip` window-rule test (`:234-286`) and the refused-grant case (`grant-qa-cycles.test.sh:140-144`)
+
+### Next Steps:
+
+- [ ] Decide SC-7: reword it to what shipped (one comparison on a stall, two on a loop limit, as bug.1 requires) with a Change Log row, or reduce the loop-limit rule to one comparison
+- [ ] Mutation-prove the five guards and record each mutation in a commit message
+- [ ] Re-run `/finalise`
+
+**Estimated Effort:** Small (under 1 hour)
+
+**Gap Report Generated:** 2026-10-28
+
+**Detailed Verification Log:** See `task.239.dod.1.qa-escalation-and-grant-say-what-runs.md` for the full evidence. Security probes: 30 executed, 0 reproduced.
 <!-- change-log-start -->
+## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
@@ -329,6 +356,7 @@ No critical issues identified. Cycle 4's fixes hold: every describer of the gran
 | 2026-10-28 |  | QA gate CONCERNS (90/100) — 4 findings (all low) | qa-task |
 | 2026-10-28 |  | QA findings fixed — QA4-CR-1 to CR-4, 1 iteration | qa-fix |
 | 2026-10-28 |  | QA gate PASS (100/100) — no findings; both bugs closed | qa-task |
+| 2026-10-28 |  | DoD incomplete — 2 gaps identified (SC-7, SC-11) | finalise |
 <!-- change-log-end -->
 
 ---
