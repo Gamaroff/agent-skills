@@ -1023,6 +1023,16 @@ because no test carries them (obs #210). A behaviour criterion whose only eviden
 with no committed per-PR test, is a **MEDIUM** finding in `top_issues[]`, so it enters the fix loop
 rather than halting at finalise (obs #224).
 
+**A residual that says a check cannot run is a claim. Re-test its premise before you restate it.**
+When the work item, the implementation report or a previous QA report says a criterion is unverified
+because the environment lacks something ("CI has no zsh lane", "no Bitbucket credential", "this host
+cannot run X"), check that premise against its source of truth on this cycle. For CI, that is the
+workflow files and this head's CI log. For a credential or a tool, it is the environment itself.
+Record the residual with the instrument you checked it with, for example `test.yml:37 installs zsh;
+CI log shows the [zsh] cases passing`. A residual carried forward from the document without a
+re-check is not evidence. On task.241 one was restated through two QA cycles, while the CI log those
+cycles had read showed the check passing (obs #119).
+
 **Functional Criteria:**
 
 | Criterion                   | Target | Actual | Status   | Notes |

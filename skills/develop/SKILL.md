@@ -921,6 +921,11 @@ docs/tasks/
 - Update Implementation Plan checkboxes as phases complete
 - Update Files Summary section with all new/modified/deleted files
 - Update Success Criteria checkboxes when criteria are met
+- A criterion you cannot verify on this host (a missing shell, tool or service) is **unverified
+  locally**, never plain "unverified". Before writing it down, read the CI workflow files and say
+  whether CI runs the check, citing the file and line. "CI has no X" is a claim about the workflow,
+  so check it there and not on your machine. task.241 recorded "CI has no zsh lane" while
+  `test.yml` had installed zsh for three weeks, and two QA cycles repeated it (obs #119)
 - Never modify QA-created files (QA reports)
 - Update bug report files when fixing bugs (Investigation, Fix Implementation sections)
 
