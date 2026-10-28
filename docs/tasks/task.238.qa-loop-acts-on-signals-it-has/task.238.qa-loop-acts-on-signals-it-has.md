@@ -192,6 +192,12 @@ The pre-existing branch lets a red gate commit and push, so it widens what the g
 
 ## 7. Files Summary
 
+### Files to Create
+
+- ✅ `shared/resources/fast-gate-outcome.sh`: the three-outcome classifier that 5b step 0a and develop-bug's step 3a call
+- ✅ `shared/resources/qa-ci-read.sh`: the one-time CI read at the qa-task and qa-story gate step
+- ✅ `shared/resources/tests/qa-ci-read.test.mjs`: its tests
+
 ### Files to Modify (Core Implementation)
 
 1. ✅ `shared/resources/develop-pipeline-step-5-6-qa-loop.md`: 5b step 0a, the CI paragraph, Verdict branching, and the REQUEST CHANGES invocation
@@ -369,9 +375,45 @@ None.
 - All four QA findings across cycles 1–2 are verified fixed (bug.1–bug.4 closed)
 - No open finding; advisory items are recorded in the gate's `recommendations.future`
 
-## Change Log
+## Definition of Done - Gaps Identified
 
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.238.qa.3.qa-loop-acts-on-signals-it-has.md`
+**Gate File**: `task.238.gate.3.qa-loop-acts-on-signals-it-has.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 90/100
+
+The QA gate passed. The gaps below come from `/finalise`'s own checks: the security probe plan (28 cases executed) and a mutation run of the SC-10 guards.
+
+### Missing Criteria:
+
+1. **Security Review:**
+   - ⚠️ (medium) `shared/resources/fast-gate-outcome.sh:99` refuses only an absolute failing-test path. A `test at ../../x.test.mjs` line in the gate log makes the base run execute the head checkout's copy, so a head-only red can be classed `pre-existing` and pushed
+   - ⚠️ (medium) The same `../` escape through the reporter's `location: '…'` form (`fast-gate-outcome.sh:96`)
+   - ⚠️ (low) The 5c open-coverage awk (`develop-pipeline-step-5-6-qa-loop.md:1547`) does not count a quoted `category: "coverage"`
+
+2. **Acceptance Criteria:**
+   - [ ] SC-10: `shared/resources/tests/qa-ci-read.test.mjs:397` "usage errors exit 2" stays green with the `--vcs` validation removed. It runs outside a git checkout, so every case also exits 2 at `git rev-parse`
+   - [ ] SC-10: `evals/shared/tests/qa-loop-fast-gate-outcomes.test.mjs:632`'s `--exit abc` case stays green with the `--exit` number check removed, because it also exits 2 at the missing-log check
+
+### Next Steps:
+
+- [ ] Refuse any failing-test path with a `..` segment in `fast-gate-outcome.sh`; test both log forms (the DoD probe's `log-path-dotdot-*` fixtures), red on `8ac7ffef`
+- [ ] Let the open-coverage awk accept an optionally quoted value; add the quoted case to the block test
+- [ ] Assert each usage case's own stderr message in both tests, and mutation-prove them
+- [ ] Record all SC-10 mutation proofs in the fix commit's message (nine are held already, listed in the DoD)
+- [ ] Re-gate through QA, then re-run `/finalise`
+
+**Estimated Effort:** Small (1–2 hours)
+
+**Gap Report Generated:** 2026-10-28
+
+**Detailed Verification Log:** See `task.238.dod.1.qa-loop-acts-on-signals-it-has.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
+## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
@@ -384,6 +426,7 @@ None.
 | 2026-10-28 |  | QA gate CONCERNS (80/100) — 1 finding (1 medium); bug.1–bug.3 closed | qa-task |
 | 2026-10-28 |  | QA findings fixed — gate 2 CONCERNS, 1 entry (bug.4), 1 iteration; status stays ready-for-review | qa-fix |
 | 2026-10-28 |  | QA gate PASS (90/100) — 0 findings; bug.4 closed | qa-task |
+| 2026-10-28 |  | DoD incomplete — 5 gaps identified (security probe 2 medium + 1 low; SC-10 two unheld guards) | finalise |
 <!-- change-log-end -->
 
 ---
