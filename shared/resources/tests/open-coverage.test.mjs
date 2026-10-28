@@ -46,6 +46,12 @@ const ACCEPTED = [
     report("findings:\ntruncated_count: 0\n"),
     0,
   ],
+  // A dash with wider spacing: the entry's keys sit at its first key's column (task.240 bug.5).
+  [
+    "an entry whose keys line up after a two-space dash",
+    findings("  -  category: coverage\n     provenance: pre-existing\n"),
+    0,
+  ],
   [
     "one open coverage finding",
     findings("  - id: PC-1\n    category: coverage\n"),
@@ -215,6 +221,11 @@ const REFUSED = [
       "  - id: PC-1\n    category: coverage\n    evidence:\n      [a,\n    provenance: pre-existing]\n",
     ),
   ],
+  // A key at `dash + 2` after a dash with wider spacing (task.240 bug.5): YAML rejects the block.
+  ...["  -  ", "  -   "].map((dash) => [
+    "bad-line",
+    findings(`${dash}category: coverage\n    provenance: pre-existing\n`),
+  ]),
   // An escape in a value the count compares (task.240 bug.4): the reader does not decode escapes,
   // so it refuses one rather than compare a value YAML would read differently.
   ...[

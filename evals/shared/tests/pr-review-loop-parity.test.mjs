@@ -995,6 +995,18 @@ const RAW_CASES = [
     "- id: PC-1\n  category: coverage\n- id: PC-2\n  category: coverage\n  provenance: pre-existing\n",
     1,
   ],
+  // The entry's keys sit at its first key's column (task.240 bug.5): a key at `dash + 2` after a
+  // wider dash is a block YAML rejects, and it printed 0.
+  [
+    "a key at dash + 2 after a two-space dash",
+    "  -  category: coverage\n    provenance: pre-existing\n",
+    "unreadable",
+  ],
+  [
+    "keys lined up after a two-space dash",
+    "  -  category: coverage\n     provenance: pre-existing\n",
+    0,
+  ],
   [
     "a nested list inside an entry does not split it",
     "  - id: PC-1\n    category: coverage\n    evidence:\n      - a.md\n      - b.md\n",

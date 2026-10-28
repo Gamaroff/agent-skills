@@ -494,6 +494,15 @@ used. Results:
 - Corpus: 0 changes.
 - `ci:fast`: green, 6,639 pass and 0 fail.
 
+**QA fix cycle 5 (TASK-240-QA-6, bug.5; QA-7).** An entry's key column is now measured from where
+its first key sits (`keyIndent`), instead of being assumed to be the dash plus two. Before this,
+wide spacing after a dash let a block that YAML rejects read 0. This fix also corrects the
+reader's header, which had drifted from the code. Results:
+
+- Mutation proof: M18 turned 5 tests red.
+- Corpus: 0 changes.
+- `ci:fast`: green, 6,644 pass and 0 fail.
+
 ---
 
 <!--
@@ -512,22 +521,22 @@ used. Results:
 
 ### QA Report
 
-- **Full Report**: [task.240.qa.4.open-coverage-fail-closed-reader.md](./task.240.qa.4.open-coverage-fail-closed-reader.md)
-- **Gate File**: [task.240.gate.4.open-coverage-fail-closed-reader.yml](./task.240.gate.4.open-coverage-fail-closed-reader.yml)
+- **Full Report**: [task.240.qa.5.open-coverage-fail-closed-reader.md](./task.240.qa.5.open-coverage-fail-closed-reader.md)
+- **Gate File**: [task.240.gate.5.open-coverage-fail-closed-reader.yml](./task.240.gate.5.open-coverage-fail-closed-reader.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 184 (unit, parity, extractor and relationship lint)
+- **Tests Executed**: 189 (unit, parity, extractor and relationship lint)
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
 
-BUG-3 is fixed. One medium finding remains: TASK-240-QA-5, described in
-[task.240.bug.4.escape-in-deciding-value-misread.md](./task.240.bug.4.escape-in-deciding-value-misread.md).
-The reader takes a backslash escape in a `category:` or `provenance:` value literally, but YAML
-decodes it. The two can therefore disagree on whether a finding is open.
+BUG-4 is fixed. One medium finding remains, TASK-240-QA-6 (bug report:
+[task.240.bug.5.wide-dash-spacing-misplaces-keys.md](./task.240.bug.5.wide-dash-spacing-misplaces-keys.md)).
+The reader assumes an entry's keys sit two columns after the dash, even when more than one space
+follows it. As a result, a block that YAML rejects reads as 0.
 
 <!-- change-log-start -->
 ## Change Log
@@ -546,6 +555,8 @@ decodes it. The two can therefore disagree on whether a finding is open.
 | 2026-10-28 |         | QA findings fixed — nested opener scan replaced by a character rule (bug.3), 1 iteration | qa-fix |
 | 2026-10-28 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-10-28 |         | QA findings fixed — escape refused in a deciding value (bug.4), 1 iteration | qa-fix |
+| 2026-10-28 |         | QA gate CONCERNS (90/100) — 2 findings | qa-task |
+| 2026-10-28 |         | QA findings fixed — entry key column measured (bug.5), header drift (QA-7), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

@@ -19,10 +19,11 @@
  * Accepted (each pinned by a case in evals/shared/tests/pr-review-loop-parity.test.mjs):
  *   - top-level keys `reviewed_gate`, `findings`, `truncated_count`, each at most once;
  *   - `findings:` followed by a block list (indented, or at column 0), or `findings: []`;
- *   - an entry `- key: value` with its other keys two columns deeper than its dash, or a one-line
- *     flow entry `- {k: v, k: v}`;
+ *   - an entry `- key: value` with its other keys at its first key's column, or a one-line flow
+ *     entry `- {k: v, k: v}`;
  *   - plain, 'single'- or "double"-quoted values (a block-style double-quoted value may carry
- *     escapes; a flow one may not), a trailing ` # comment`, and `>`/`|` block scalars;
+ *     escapes, except under `category` or `provenance`; a flow one may not), a trailing
+ *     ` # comment`, and `>`/`|` block scalars;
  *   - under any key but `category` and `provenance`, deeper lines after a block scalar indicator,
  *     read as text, and after an empty value, read as a nested value of plain text: a line that
  *     holds a quote or a flow collection is refused (task.240 bug.2, bug.3) — never for a key;
@@ -258,7 +259,7 @@ function parseBlock(block) {
     // indent ends the entry's keys, so a quote still open by then is never closed (task.240 bug.1).
     // Checked before the comment skip: a `#` inside quotes is text.
     if (cur && (cur.deeper === '"' || cur.deeper === "'")) {
-      if (indent <= cur.indent + 2)
+      if (indent <= cur.keyIndent)
         refuse(
           "bad-value",
           `an unterminated quoted value under ${cur.lastKey}: (line ${n + 1})`,
@@ -312,7 +313,7 @@ function parseBlock(block) {
     if (text.startsWith("#")) continue; // an indented comment line
 
     // A line deeper than the open entry's keys belongs to the last key's value.
-    if (cur && !cur.flow && indent > cur.indent + 2) {
+    if (cur && !cur.flow && indent > cur.keyIndent) {
       // A wrapped plain value may not hold `key: ` — YAML refuses that, and reading it as text
       // would hide a key the author meant.
       if (cur.deeper === "plain" && /:(?:[ \t]|$)/.test(text))
@@ -351,13 +352,17 @@ function parseBlock(block) {
           "not-a-map",
           `an entry that is not a map (line ${n + 1}): ${rest}`,
         );
-      cur = { keys: new Map(), indent, flow: false };
+      // The entry's keys sit at its first key's column, wherever the dash's spacing puts it:
+      // assuming `dash + 2` read `-  category: x` / `    provenance: y` — which YAML rejects —
+      // as one entry and printed 0 (task.240 bug.5).
+      const keyIndent = indent + text.length - rest.length;
+      cur = { keys: new Map(), indent, keyIndent, flow: false };
       setKey(cur, k[1], k[2], n);
       continue;
     }
 
     const k = text.match(KEY_LINE);
-    if (!cur || cur.flow || indent !== cur.indent + 2 || !k)
+    if (!cur || cur.flow || indent !== cur.keyIndent || !k)
       refuse(
         "bad-line",
         `a line the reader cannot place (line ${n + 1}): ${text}`,
