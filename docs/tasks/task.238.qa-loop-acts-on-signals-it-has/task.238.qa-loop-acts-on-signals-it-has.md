@@ -12,6 +12,7 @@ updated: 2026-10-28
 assignee:
 estimated_effort_hours: 13
 github_issue: 768
+pr_number: 770
 ---
 
 # Technical Task: QA loop acts on the signals it already has
@@ -31,7 +32,7 @@ The QA loop (Steps 5–6) holds four signals that it ignores or destroys, and ea
 **Key deliverables:**
 
 - **CI read at gate writing (obs #45).** `/qa-task` and `/qa-story` read the PR's CI result once, at Step 10, without waiting, on GitHub and Bitbucket. A completed failure on the head they judge becomes a gate finding, unless the same check is also red on the PR base. Then it is recorded as pre-existing.
-- **Three fast-gate outcomes (obs #14).** 5b step 0a names *attributable red*, *pre-existing red* (the same failing tests fail on the PR base) and *not measured* (no exit code, or a killed or timed-out run). Each one has its own action.
+- **Two outcomes for a red fast gate (obs #14).** 5b step 0a names *attributable red* and *not measured* (no exit code, or a killed or timed-out run). Each one has its own action. A red is never compared with the PR base: the *pre-existing red* outcome was deleted in QA cycle 6 (SC-2, amended; see Deferred Work).
 - **Gated log cleanup (obs #41).** Every fast-gate block deletes its log only in a statement keyed on a zero exit, so the command that reads a red result cannot delete its log.
 - **Coverage findings go back to 5b (obs #8).** On a 5c `CONCERNS` verdict, an open `category: coverage` finding sends the run back to 5b, like `REQUEST CHANGES`. `/qa-fix` has a priority row for it, and a resume re-enters 5b. Trail, consistency and scope findings stay non-blocking.
 
@@ -153,7 +154,7 @@ The pre-existing branch lets a red gate commit and push, so it widens what the g
 **Files:** `develop-pipeline-step-5-6-qa-loop.md` (5b step 0a), `develop-pipeline-step-3-develop-loop.md` (Output Capture Pattern), `skills/develop/SKILL.md` (its `TEST_LOG` block), `test-failure-triage-prompt.md` (Log Cleanup Rule), `develop-bug-step-5-6-verify-loop.md` (its 0a)
 
 - [x] Replace each "cleanup mirrors" prose line with a one-statement gated cleanup inside the block, for the foreground and background forms, at every site in § 3's site list
-- [x] Add the three-outcome classification to 5b step 0a: not measured (no `GATE_EXIT=` line, or exit 124/137/143), pre-existing red (the same tests fail in a base worktree), attributable red (including `BASE_CHECK=unavailable`)
+- [x] Add the red-gate classification to 5b step 0a: not measured (no `GATE_EXIT=` line, or exit 124/137/143) and attributable red. *(Amended 2026-10-28: the pre-existing red outcome and its `BASE_CHECK=unavailable` handling were deleted in QA cycle 6, per SC-2.)*
 - [x] Apply the same to develop-bug's verify-loop 0a
 - [x] Record each outcome's QA Iteration History wording
 
@@ -378,6 +379,9 @@ None.
 
 **Status:** IN PROGRESS
 
+> **Superseded (2026-10-28).** These are DoD run 1's gaps, against gate 3. All five were fixed in
+> `adff39e2`, and QA cycles 4–9 have run since. `/finalise` rewrites this section on its next run.
+
 ### QA Gate Status
 
 **QA Report**: `task.238.qa.3.qa-loop-acts-on-signals-it-has.md`
@@ -443,6 +447,7 @@ The QA gate passed. The gaps below come from `/finalise`'s own checks: the secur
 | 2026-10-28 |  | QA findings fixed — gate 8 CONCERNS, 1 entry (bug.17), 1 iteration; the §5c open-coverage check now allow-lists values as well as lines (review-pr's six category tokens; a continued, repeated or commented value reads `unreadable`) | qa-fix |
 | 2026-10-28 |  | QA gate CONCERNS (80/100) — 2 findings (2 medium); bug.17 verified and closed; bug.18, bug.19 opened | qa-task |
 | 2026-10-28 |  | QA findings fixed — gate 9 CONCERNS, 2 entries (bug.18, bug.19) plus low CR9-3, 1 iteration; the §5c open-coverage check maps a non-count value to `unreadable`, refuses any line after a one-line flow entry, and requires a terminator after `findings:` | qa-fix |
+| 2026-10-28 |  | PR review 3 doc-only findings fixed: `pr_number: 770` added; the Overview and Phase 1 checkbox reworded to the amended SC-2; the DoD run 1 gaps section marked superseded | develop-task |
 <!-- change-log-end -->
 
 ---
