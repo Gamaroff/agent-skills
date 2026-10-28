@@ -310,6 +310,26 @@ None.
 ### Key Findings
 No critical issues identified. Cycle 4's fixes hold: every describer of the grant write set lists the four fields, and the window qualifier and its worked-example rows are bound to the rule by tests. Both bugs are closed. The last cycle's review asked for high-confidence, line-anchored defects only.
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS (DoD run 3)
+
+### Missing Criteria:
+
+1. **Acceptance Criteria:**
+   - [ ] SC-7 (stall member): no per-PR test reads filling rule 1's Convergence stall row (`shared/resources/develop-pipeline-step-5-6-qa-loop.md:2103`), so "at most one `high_files` comparison on a stall" is unguarded. The loop-limit member is pinned at `qa-escalation-template.test.mjs:147-157`.
+
+### Next Steps:
+
+- [ ] Add one assertion that the stall row's "Run now" cell is the three-gate block alone, and mutation-prove it
+- [ ] Re-enter QA (the test change is code), then re-run `/finalise`
+
+**Estimated Effort:** Small
+
+**Gap Report Generated:** 2026-10-28
+
+**Detailed Verification Log:** See `task.239.dod.3.qa-escalation-and-grant-say-what-runs.md`.
+
 ## Definition of Done - Gaps Identified — run 2 (historical, superseded)
 
 **Status:** SUPERSEDED. The gap was closed on 2026-10-28: mutations M10–M16 were run (each red, then restored green) and are recorded in the commit that adds this note. Kept as history; the current verdict is the newest `task.239.dod.{N}` file.
@@ -379,6 +399,7 @@ No critical issues identified. Cycle 4's fixes hold: every describer of the gran
 | 2026-10-28 |  | DoD incomplete — 2 gaps identified (SC-7, SC-11) | finalise |
 | 2026-10-28 | 1.2 | SC-7 reworded to what shipped (one comparison on a stall, two on a loop limit, per bug.1); SC-11 closed by mutation-proving five guards (M5–M9) | orchestrator |
 | 2026-10-28 |  | DoD incomplete — 1 gap identified (SC-11, run 2) | finalise |
+| 2026-10-28 |  | DoD incomplete — 1 gap identified (SC-7 stall member, run 3) | finalise |
 <!-- change-log-end -->
 
 ---
