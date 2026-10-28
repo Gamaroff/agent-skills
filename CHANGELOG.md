@@ -42,7 +42,12 @@ All notable changes to this project will be documented in this file. Format foll
   it could have routed. A test fills the template with such a sentence and checks that it counts.
   `open-coverage.js` now decodes any byte container (a typed array, a DataView or an ArrayBuffer,
   from any realm), and refuses an input that is neither text nor bytes as `not-text`, so
-  `no-section` only ever means a report with no heading. A test now pins `ignoreBOM`.
+  `no-section` only ever means a report with no heading. A test now pins `ignoreBOM`. Two more
+  reasons separate failures that say nothing about the report: `read-error`, for a file the CLI
+  cannot read (it was `no-section`), and `internal-error`, for a defect in the reader (it was
+  `bad-line`). The PyYAML differential suite runs `python3 -E` from an empty working directory
+  instead of `python3 -I`, which also disabled the user site, so a host with PyYAML installed only
+  there failed the suite as if PyYAML were missing.
 
 - **`/finalise`'s changelog checks are opt-in (task 241).** Both checks — the docs subagent's
   "CHANGELOG.md updated" judgement and Step 7 action 6d's `no-changelog-entry` HALT — now run only

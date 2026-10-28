@@ -394,8 +394,58 @@ for (const [i, [reason, text]] of REFUSED.entries()) {
   });
 }
 
+// The reason the CLI names on stderr for `args`, or null when it names none.
+function cliReason(args) {
+  return /unreadable — ([a-z-]+):/.exec(cli(args).stderr)?.[1] ?? null;
+}
+
+// Runs `fn` while String.prototype.toLowerCase throws: the one way to force a defect inside the
+// reader, so the internal-error arm is exercised rather than assumed.
+function withBrokenLowerCase(fn) {
+  const original = String.prototype.toLowerCase;
+  String.prototype.toLowerCase = () => {
+    throw new Error("forced");
+  };
+  try {
+    return fn();
+  } finally {
+    String.prototype.toLowerCase = original;
+  }
+}
+
+test("a file the CLI cannot read is read-error, never no-section", () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "open-coverage-read-"));
+  try {
+    for (const file of [path.join(dir, "absent.md"), dir])
+      assert.equal(cliReason(["--file", file]), "read-error", file);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a throw inside the reader is internal-error, never bad-line", () => {
+  const r = withBrokenLowerCase(() =>
+    countOpenCoverage(findings("  - id: PC-1\n    category: coverage\n")),
+  );
+  assert.deepEqual(r, { unreadable: "internal-error", detail: "forced" });
+});
+
 test("every reason in REASONS is reachable by some input", () => {
   const reached = new Set(REFUSED.map(([reason]) => reason));
+  // Two reasons no report text reaches: the CLI's for a missing file, and a defect in the reader.
+  const dir = mkdtempSync(path.join(os.tmpdir(), "open-coverage-reach-"));
+  try {
+    reached.add(cliReason(["--file", path.join(dir, "absent.md")]));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+  reached.add(
+    withBrokenLowerCase(
+      () =>
+        countOpenCoverage(findings("  - id: PC-1\n    category: coverage\n"))
+          .unreadable,
+    ),
+  );
   for (const reason of REASONS)
     assert.ok(reached.has(reason), `no test reaches ${reason}`);
 });

@@ -46,7 +46,9 @@
  *   node open-coverage.js --file <pr-review-report>
  *
  * Prints exactly one line, `OPEN_COVERAGE=<n>` or `OPEN_COVERAGE=unreadable`, and exits 0 — a
- * refusal included. The reason for a refusal goes to stderr only. Exit 2: usage.
+ * refusal included. The reason for a refusal goes to stderr only. Exit 2: usage. Two reasons say
+ * nothing about the report's shape: `read-error`, a file the CLI cannot read, and `internal-error`,
+ * a defect in this reader.
  */
 
 "use strict";
@@ -69,6 +71,8 @@ const REASONS = Object.freeze([
   "not-a-map",
   "bad-encoding",
   "not-text",
+  "read-error",
+  "internal-error",
 ]);
 
 /** The category tokens review-pr writes: coverage|scope|trail|consistency for PC-*, bug|cleanup for CR-*. */
@@ -321,7 +325,8 @@ function countOpenCoverage(input) {
   } catch (e) {
     if (e instanceof Refusal)
       return { unreadable: e.reason, detail: e.message };
-    return { unreadable: "bad-line", detail: `internal error: ${e.message}` };
+    // A defect in this reader, not a shape in the report: named apart from bad-line (task.240 CR-3).
+    return { unreadable: "internal-error", detail: e.message };
   }
 }
 
@@ -340,7 +345,7 @@ function main(argv) {
     bytes = fs.readFileSync(file);
   } catch (e) {
     process.stderr.write(
-      `open-coverage: unreadable — no-section: cannot read ${file} (${e.code || e.message})\n`,
+      `open-coverage: unreadable — read-error: cannot read ${file} (${e.code || e.message})\n`,
     );
     process.stdout.write("OPEN_COVERAGE=unreadable\n");
     return 0;
