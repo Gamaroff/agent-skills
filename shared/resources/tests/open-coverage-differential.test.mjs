@@ -30,8 +30,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -248,6 +249,34 @@ function generator(r) {
   };
 }
 
+// `-E` ignores PYTHON* variables, and the empty working directory keeps a stray `yaml.py` off the
+// front of sys.path. Not `-I`: it also disables the user site, so a host with PyYAML installed
+// only there failed this suite as if PyYAML were missing (task.240 gate 9 CR-6).
+const PY_ARGS = ["-E"];
+
+/** Runs a python3 script with PY_ARGS, in a fresh empty working directory. */
+function python(script, input) {
+  const cwd = mkdtempSync(path.join(os.tmpdir(), "open-coverage-py-"));
+  try {
+    return spawnSync("python3", [...PY_ARGS, "-c", script], {
+      cwd,
+      input,
+      encoding: "utf8",
+      maxBuffer: 64 * 1024 * 1024,
+    });
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+}
+
+test("python3 runs with the user site enabled, from an empty working directory", () => {
+  const res = python(
+    "import json, os, site; print(json.dumps([site.ENABLE_USER_SITE, os.listdir('.')]))",
+  );
+  assert.equal(res.status, 0, res.error?.message || res.stderr);
+  assert.deepEqual(JSON.parse(res.stdout), [true, []]);
+});
+
 /** PyYAML's reading of every block, in one process: a count, or null when it has none. */
 function yamlCounts(blocks) {
   const script = `
@@ -274,11 +303,7 @@ for b in json.load(sys.stdin):
     out.append(n)
 json.dump(out, sys.stdout)
 `;
-  const res = spawnSync("python3", ["-I", "-c", script], {
-    input: JSON.stringify(blocks),
-    encoding: "utf8",
-    maxBuffer: 64 * 1024 * 1024,
-  });
+  const res = python(script, JSON.stringify(blocks));
   assert.equal(
     res.status,
     0,
