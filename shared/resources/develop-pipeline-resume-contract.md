@@ -631,8 +631,10 @@ This convention ensures the cycle budget is respected across resumes.
    pipeline ran it.
 3. **Offer the grant.** When the halt snapshot's `halt_reason` matches `loop-limit|not-converging`,
    Phase 0b's prompt — which lives in `skills/develop-task/SKILL.md` and `skills/develop-story/SKILL.md`,
-   not here — is the halt message's own three options plus **"Resume at 5a with {k} more cycles"**.
-   On accept, record the grant with **one call** to the bundled writer:
+   not here — is the halt message's own three options plus **"Resume the QA loop with {k} more cycles"**.
+   The label names the action, not a phase: which phase the run re-enters is the script's decision
+   (below), and a label that hard-coded `5a` was wrong for every not-converging grant (task.239,
+   obs #70). On accept, record the grant with **one call** to the bundled writer:
 
    ```bash
    bash .agents/skills/{develop-story|develop-task}/references/grant-qa-cycles.sh {doc-directory} {k} {implementation-report-path}
@@ -654,10 +656,11 @@ This convention ensures the cycle budget is respected across resumes.
      **refuses a snapshot for another document** — one whose `task_or_story_directory` is not
      `{doc-directory}` — because a stale snapshot persists by design.
    - It **never lowers** a `qa_max_cycles` the lock already carries.
-   - It **writes three fields atomically** — `extra_cycles_granted = k` (the record),
-     `qa_max_cycles = base + k` (the budget) and `qa_phase`, the re-entry point — via `mktemp` +
-     `mv`, removing its temp file on every failure, and prints the budget and `reenter_at` back from
-     the written lock. **The re-entry point depends on where the halt stopped** (obs #228) — which
+   - It **writes four fields atomically** — `extra_cycles_granted = k` (the record),
+     `qa_max_cycles = base + k` (the budget), `qa_phase`, the re-entry point, and
+     `convergence_from_cycle = base + 1`, where the Convergence check starts counting readings again
+     (task.239, obs #72) — via `mktemp` + `mv`, removing its temp file on every failure, and prints
+     the budget, `reenter_at` and `convergence_from_cycle` back from the written lock. **The re-entry point depends on where the halt stopped** (obs #228) — which
      value for which halt is the `qa_phase` row of the lock schema in `develop-pipeline-pause.md`.
      The reason: a `loop-limit` halt ran its last 5b, so the next gate must read that fix, and a
      `not-converging` halt fired at 5a *before* 5b, so the latest gate's queue must go to `/qa-fix`
@@ -681,7 +684,10 @@ This convention ensures the cycle budget is respected across resumes.
    `evals/shared/tests/qa-loop-lock-fields-parity.test.mjs` fails when any file disagrees. **Do not
    reuse `MAX_ITER`**: that is the Step 3 develop-loop bound (below), a different budget over a
    different loop.
-4. **Re-enter at the phase the grant printed (`reenter_at`).** `5a` → as cycle `NEXT_CYCLE`; 5a's
+4. **Re-enter at the phase the grant printed (`reenter_at`), and report it from that line.**
+   `reenter_at=5b` → tell the operator "re-entering at 5b: fix first"; `reenter_at=5a` → "re-entering
+   at 5a: review first". Report what the script printed; do not restate the rule that picks it.
+   `5a` → as cycle `NEXT_CYCLE`; 5a's
    own first action (`set-qa-phase.sh 5a`) then runs as on any cycle and is a noop here. `5b` → run
    5b on the latest gate as cycle `QA_CYCLE` (the cycle the halt interrupted), then 5a as
    `NEXT_CYCLE`. **A declined grant, or a grant the script refused (exit 1 — surface its stderr line to the

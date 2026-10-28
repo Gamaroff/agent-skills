@@ -3,8 +3,8 @@
 # grant-qa-cycles.sh — record a re-entry grant of k extra QA cycles on the pipeline lock.
 #
 # Sibling of set-qa-phase.sh and advance-pipeline-lock.sh (task.123, QA cycle 2 CR-1/CR-2).
-# Phase 0b of a develop-{story,task} resume after a loop-limit halt offers
-# "Resume at 5a with {k} more cycles"; on accept this script is the ONE writer of
+# Phase 0b of a develop-{story,task} resume after a loop-limit or not-converging halt offers
+# "Resume the QA loop with {k} more cycles"; on accept this script is the ONE writer of
 # the grant. It does three things the prose used to leave to the caller, and each
 # was a defect when left there:
 #
@@ -66,7 +66,9 @@
 #     so a refusal never leaves state behind (task.123 QA cycle 4, CR-1); the message names the
 #     smallest k that would be accepted
 #   • qa_max_cycles on the lock is not an integer               → warning on stderr, treated as 0
-#   • otherwise → writes extra_cycles_granted, qa_max_cycles AND qa_phase in one write. qa_phase is the
+#   • otherwise → writes extra_cycles_granted, qa_max_cycles, qa_phase AND convergence_from_cycle
+#     (= base + 1, the first cycle the Convergence check reads after the grant — task.239) in one
+#     write. qa_phase is the
 #     RE-ENTRY POINT, and it depends on where the halt stopped (obs #228):
 #       - the restored candidate's halt_reason is `not-converging`, alone or followed by `:` or a space
 #         and detail (the HALT's own spelling, obs #17) → 5b. The Convergence check fires
@@ -77,8 +79,9 @@
 #         restore dropped) → 5a: the last cycle ran its 5b, so its fix is what the next gate reads.
 #     Either way a Stop between this write and a separate set-qa-phase call would otherwise name the
 #     wrong phase (task.123 QA cycle 3, CR-3). Then prints
-#     `grant-qa-cycles: QA_CYCLE=<base> extra_cycles_granted=<k> qa_max_cycles=<n> reenter_at=<5a|5b>` with <n> read
-#     BACK from the written lock, and, when the lock was restored,
+#     `grant-qa-cycles: QA_CYCLE=<base> extra_cycles_granted=<k> qa_max_cycles=<n> reenter_at=<5a|5b> convergence_from_cycle=<base+1>`
+#     with <n>, the phase and the window start read BACK from the written lock (the tokens before
+#     convergence_from_cycle keep their order: callers read reenter_at=), and, when the lock was restored,
 #     `grant-qa-cycles: lock restored from <snapshot>` on stderr (relaying --restore's line)
 #
 # Paths honour PIPELINE_LOCK and PIPELINE_HALT_SNAPSHOT for tests; defaults are the pipeline's.
@@ -227,6 +230,9 @@ fi
 # qa_phase in the SAME write — 5b after a not-converging halt (the last gate's fix never ran),
 # else 5a — so a Stop hook firing between this write and a separate set-qa-phase call never
 # reads the snapshot's phase and names the wrong step (obs #228).
+# convergence_from_cycle in the SAME write — base + 1, the first cycle whose reading the grant
+# pays for. The Convergence check counts readings only from it, so "k more cycles" runs k cycles
+# instead of tripping on the pre-grant readings it was granted past (task.239, obs #72).
 undo_restore() { [ -n "$RESTORED" ] && echo "grant-qa-cycles: lock restored from $RESTORED is kept (its snapshot was consumed); the grant was not written" >&2; return 0; }
 TMP=$(mktemp "$(dirname "$LOCK")/.grant-qa-cycles.XXXXXX") || { undo_restore; exit 1; }
 REENTER=5a
@@ -239,7 +245,8 @@ case "$HALT_REASON" in
   not-converging | not-converging:* | "not-converging "*) REENTER=5b ;;
 esac
 if ! jq --argjson k "$K" --argjson c "$QA_CYCLE" --arg p "$REENTER" \
-     '.extra_cycles_granted = $k | .qa_max_cycles = ($c + $k) | .qa_phase = $p' "$LOCK" > "$TMP"; then
+     '.extra_cycles_granted = $k | .qa_max_cycles = ($c + $k) | .qa_phase = $p
+      | .convergence_from_cycle = ($c + 1)' "$LOCK" > "$TMP"; then
   rm -f "$TMP"
   undo_restore
   echo "grant-qa-cycles: jq write failed" >&2
@@ -250,5 +257,5 @@ mv "$TMP" "$LOCK"
 # Read the budget BACK from the lock — one source, not a shell recomputation that can
 # disagree with what jq wrote (task.123 QA cycle 3, CR-4).
 WRITTEN=$(jq -r '.qa_max_cycles' "$LOCK")
-echo "grant-qa-cycles: QA_CYCLE=$QA_CYCLE extra_cycles_granted=$K qa_max_cycles=$WRITTEN reenter_at=$(jq -r '.qa_phase' "$LOCK")"
+echo "grant-qa-cycles: QA_CYCLE=$QA_CYCLE extra_cycles_granted=$K qa_max_cycles=$WRITTEN reenter_at=$(jq -r '.qa_phase' "$LOCK") convergence_from_cycle=$(jq -r '.convergence_from_cycle' "$LOCK")"
 exit 0

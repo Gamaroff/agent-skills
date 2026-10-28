@@ -140,8 +140,8 @@ flowchart TD
     S5half -- no open entry --> S5c
     S5half -- open entry --> HALTQA
     S6half -- no --> HALTQA[HALT: QA loop limit reached]
-    HALTQA -.->|"resume: Resume at 5a with k more cycles<br/>grant-qa-cycles.sh"| S5pre
-    HALTCONV -.->|"resume: Resume at 5a with k more cycles<br/>grant-qa-cycles.sh re-enters at 5b"| S6
+    HALTQA -.->|"resume: Resume the QA loop with k more cycles<br/>grant-qa-cycles.sh"| S5pre
+    HALTCONV -.->|"resume: Resume the QA loop with k more cycles<br/>grant-qa-cycles.sh re-enters at 5b"| S6
 
     S7[Step 7: finalise<br/>DoD + 6a acceptance commit + push<br/>CI readings 1 and 2 + tracker close + board Done] --> S7chk{All 3 artifacts?<br/>dod.N.md + status:accepted + PR comment}
     S7chk -- no --> HALT7[HALT: DoD gaps]
@@ -373,7 +373,7 @@ sequenceDiagram
         CC-->>-H: hash
         H->>GH: git push origin HEAD
         H->>H: HALT — QA loop limit reached
-        note right of H: resume offers "Resume at 5a with {k} more cycles"<br/>(grant-qa-cycles.sh writes extra_cycles_granted, qa_max_cycles)
+        note right of H: resume offers "Resume the QA loop with {k} more cycles"<br/>(grant-qa-cycles.sh writes extra_cycles_granted, qa_max_cycles)
     end
 ```
 
@@ -426,7 +426,7 @@ sequenceDiagram
         H->>U: HALT — manual resolution required
     else
         alt halt snapshot: loop-limit / not-converging
-            H->>U: offer "Resume at 5a with {k} more cycles"
+            H->>U: offer "Resume the QA loop with {k} more cycles"
             H->>Lock: grant-qa-cycles.sh — extra_cycles_granted, qa_max_cycles, qa_phase<br/>(qa_phase 5a, or 5b after not-converging)
         else halt_step 7, DoD ❌ GAPS (the script refuses a document-only or uncommitted fix)
             H->>U: offer "Re-enter QA at 5a" (Recommended)

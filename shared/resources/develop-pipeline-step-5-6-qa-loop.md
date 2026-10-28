@@ -618,7 +618,11 @@ the pipeline noticed.
    and deliberately does not count HIGH: the HIGH count stays the awk's (engine property 2), so the
    two guards can never disagree about it.
 
-3. **From cycle 3 onward, if `HIGH_N > 0` AND `HIGH_{N-2} > 0` AND `HIGH_N >= HIGH_{N-1}` AND
+3. **Take readings only from cycles `>= convergence_from_cycle`** — the lock field
+   (`jq -r '.convergence_from_cycle // 1' .claude/state/develop-pipeline.lock`; absent → `1`, every
+   reading counts). A grant restarts the three-reading rule, so "k more cycles" delivers k cycles,
+   and the guard re-arms once three post-grant readings exist (task.239, obs #72).
+   **Within that window, from its third reading onward, if `HIGH_N > 0` AND `HIGH_{N-2} > 0` AND `HIGH_N >= HIGH_{N-1}` AND
    `HIGH_{N-1} >= HIGH_{N-2}` — i.e. HIGH findings were present at all three readings and the
    count has failed to strictly decrease across two consecutive cycles — the loop is not
    converging. Stop and escalate.** Do not run 5b. Go to **Loop Escalation** below and use the
@@ -637,8 +641,8 @@ the pipeline noticed.
    be reduced: it is a defect in the last fix, not a loop that stopped working, and it routes to 5b
    like any open queue (obs #227; task.140 escalated on exactly this sequence).
 
-   Cycles 1 and 2 never trip it: the rule needs three readings to see a flat line, and a single
-   flat cycle is normal.
+   Cycles 1 and 2 never trip it (nor the first two cycles after a grant): the rule needs three
+   readings to see a flat line, and a single flat cycle is normal.
 
    Worked examples — the second is the one the rule must **not** match:
 
@@ -653,6 +657,18 @@ the pipeline noticed.
 
    On the observed `7, 7, 7, 7, 4` sequence this trips at the end of cycle 3 — `7 >= 7` and
    `7 >= 7` — cutting three futile cycles.
+
+   With a grant, the window decides which readings are the three. `|` marks the grant boundary:
+
+   | Sequence (cycles, oldest → newest) | `convergence_from_cycle` | Trips? | Why |
+   |---|---|---|---|
+   | `1, 1, 1 \| 1` (cycles 1–4) | 4 | **no**, at cycle 4 | one post-grant reading; the task.215 case, where a grant of 2 escalated after one fix (obs #72) |
+   | `1, 1, 1 \| 1, 1, 1` (cycles 1–6) | 4 | yes, at cycle 6 | three post-grant readings, flat: a person decides again |
+   | `7, 7, 7` (cycles 1–3) | absent | yes, at cycle 3 | a lock written before task.239 reads `1`: unchanged |
+
+   The window governs this trip only. The route classifier below (`classifyLoopRoute`) still reads
+   the whole sequence: its exits end a loop that has finished, so a pre-grant reading can only let a
+   granted run exit sooner, never spend its budget.
 
 **Escalate; do not silently accept.** The remaining HIGH findings are not noise to be dropped
 because the loop got tired of them. On the observed task a genuine defect in the *shipped* artifact
@@ -1982,6 +1998,9 @@ a contradiction to whoever picks it up.
 
 **Final gate status**: {status}
 **HIGH findings per cycle**: {HIGH_1}, {HIGH_2}, … {HIGH_N} — {flat from cycle {i} onward / still rising}
+                    {when the lock has convergence_from_cycle: {HIGH_1}, … {HIGH_b} | {HIGH_b+1}, … {HIGH_N} — grant at cycle {b}}
+{Convergence stall only:
+**Flat-count reading**: {stall | discovery} — {file}: {mechanism}, cycle {N-1} vs cycle {N}}
 **Remaining issues** (from final gate file):
 {List each top_issue: description, severity, file (from the entry's `file:` key)}
 
@@ -1996,8 +2015,14 @@ infrastructure, acceptance criteria that cannot be met with current approach; on
 convergence stall, say which file the fixes kept circling and why patching it stopped
 working}
 
+**Third-strike files**: {the files the Third-strike rule's comparison prints for the last three
+gates, each with its mechanism read from the three `finding:` texts — or "none"}
+
 **Recommended next steps**:
-1. {Specific action}
+1. {Specific action. For each third-strike file: delete, replace or waive the struck mechanism,
+   naming it — never a patch to it, which the resumed 5b forbids. On a discovery reading: say the
+   earlier fixes held and this HIGH is new ground, so a grant buys new ground, not another try at
+   the same defect}
 2. {Specific action}
 3. {Specific action — e.g., update story if issues reflect out-of-scope requirements}
 ```
@@ -2018,6 +2043,9 @@ working}
 
 **Final gate status**: {status}
 **HIGH findings per cycle**: {HIGH_1}, {HIGH_2}, … {HIGH_N} — {flat from cycle {i} onward / still rising}
+                    {when the lock has convergence_from_cycle: {HIGH_1}, … {HIGH_b} | {HIGH_b+1}, … {HIGH_N} — grant at cycle {b}}
+{Convergence stall only:
+**Flat-count reading**: {stall | discovery} — {file}: {mechanism}, cycle {N-1} vs cycle {N}}
 **Remaining issues** (from final gate file):
 {List each top_issue: description, severity, file (from the entry's `file:` key)}
 
@@ -2032,11 +2060,41 @@ infrastructure, success criteria that cannot be met with current approach; on a
 convergence stall, say which file the fixes kept circling and why patching it stopped
 working}
 
+**Third-strike files**: {the files the Third-strike rule's comparison prints for the last three
+gates, each with its mechanism read from the three `finding:` texts — or "none"}
+
 **Recommended next steps**:
-1. {Specific action}
+1. {Specific action. For each third-strike file: delete, replace or waive the struck mechanism,
+   naming it — never a patch to it, which the resumed 5b forbids. On a discovery reading: say the
+   earlier fixes held and this HIGH is new ground, so a grant buys new ground, not another try at
+   the same defect}
 2. {Specific action}
 3. {Specific action — e.g., update task if issues reflect out-of-scope requirements}
 ```
+
+#### Filling the escalation entry — rules both templates share
+
+A recommendation written at a halt must already obey the rules the resumed run will apply (obs #71).
+Three lines of the entry carry that, and each is filled from evidence on disk, not from memory:
+
+1. **Third-strike files — run the comparison when the entry is written.** Run the
+   `high_files()` / `comm -12` block under **Third-strike rule — replace, do not patch again**
+   (above; do not copy it) over the last three gates, exactly as 5b would on re-entry. For each file
+   it prints, name the mechanism from the three `finding:` texts, as that rule already requires, and
+   make item 1 of *Recommended next steps* one of the rule's three permitted moves — **delete**,
+   **replace** or **waive** — for that mechanism. A struck mechanism may not be recommended for a
+   patch: the resumed 5b forbids exactly that move, so the escalation would be recommending a step
+   the run will refuse (task.215, obs #71). Fewer than three gates, or no file printed: write "none".
+2. **Flat-count reading — Convergence stall only.** Compare cycle N's HIGH finding with cycle
+   N-1's. **Stall**: its `file:` is in the previous gate's `high_files` output **and** its
+   `finding:` names the same function or mechanism, or cites the previous fix. **Discovery**:
+   otherwise — the earlier fixes held and the re-probe found something new (task.180, obs #19). The
+   `file:` overlap is the checkable half; the mechanism is the author's reading, recorded beside it.
+   Neither changes the trip: a person still decides. On a discovery reading, item 1 says the earlier
+   fixes held and that a grant buys new ground, not another try at the same defect.
+3. **HIGH findings per cycle — mark the grant boundary.** When the lock carries
+   `convergence_from_cycle`, list every cycle and put `|` after cycle `convergence_from_cycle - 1`,
+   so the reader sees which readings the trip counted.
 
 Set report status to `Escalated`. Invoke the `/commit-changes` skill to commit the implementation
 report — **and, on a convergence stall, this cycle's gate `.yml` and QA report `.md` alongside it**,
@@ -2076,8 +2134,9 @@ Options:
 2. Accept the current gate status: run Step 5c first (/review-pr --effort medium --comment
    --no-code), then /finalise — on a host with no review decision, finalise needs that report
 3. Update the story requirements if issues reflect unintended scope
-4. Re-run /develop-story to resume with more cycles — Phase 0b offers "Resume at 5a with {k}
-   more cycles"; any /qa-story you run by hand in between is counted from its gate on disk
+4. Re-run /develop-story to resume with more cycles — Phase 0b offers
+   "Resume the QA loop with {k} more cycles"; any /qa-story you run by hand in between is counted
+   from its gate on disk
 ```
 
 #### develop-task HALT message
@@ -2099,8 +2158,9 @@ Options:
 2. Accept the current gate status: run Step 5c first (/review-pr --effort medium --comment
    --no-code), then /finalise — on a host with no review decision, finalise needs that report
 3. Update the task requirements if issues reflect unintended scope
-4. Re-run /develop-task to resume with more cycles — Phase 0b offers "Resume at 5a with {k}
-   more cycles"; any /qa-task you run by hand in between is counted from its gate on disk
+4. Re-run /develop-task to resume with more cycles — Phase 0b offers
+   "Resume the QA loop with {k} more cycles"; any /qa-task you run by hand in between is counted
+   from its gate on disk
 ```
 
 > **Option 2 goes through 5c, not around it.** A loop that escalates never reaches Step 5c, so no
