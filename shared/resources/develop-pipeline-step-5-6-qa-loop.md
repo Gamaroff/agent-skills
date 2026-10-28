@@ -1527,69 +1527,14 @@ for a gap the loop had already named. Decide it mechanically, from the review re
 
 ```bash
 REVIEW="{the PR review report this cycle's 5c wrote}"
-# The Machine-Readable Findings block. The check reads an ALLOW-LIST of line shapes under
-# `findings:` and prints `unreadable` on any other line, so a shape it does not know is never read as
-# "no coverage" (task.238 bug.16):
-#   `- key: value`  opens an entry, at the first item's indent
-#   `- {k: v, …}`   opens a one-line flow entry; quoted values are read whole, so a comma or a
-#                   `provenance:` inside one is text, not a key. The entry is complete on its line:
-#                   any line after it but the next entry is refused (task.238 bug.19)
-#   `key: value`    a key of the open entry, two columns deeper than its dash
-#   deeper lines    a block scalar or nested value: text, never read for a key — but a deeper line
-#                   right after `category:` or `provenance:` continues THAT value, and is refused
-# Values are allow-listed too (task.238 bug.17): `category:` must be one of the six tokens review-pr
-# writes (coverage, scope, trail, consistency, bug, cleanup), so a tag, an anchor or a block-scalar
-# indicator is refused rather than read as a non-coverage category; a key given twice in one entry,
-# or a ` #` inside a flow value, is refused too. Keys are read only in key position, so
-# `provenance: pre-existing` quoted in a `finding:` does not exempt it (task.238 bug.15). An entry is
-# open coverage when its `category:` is `coverage` and its `provenance:` is not `pre-existing`
-# (review-pr emits no status field), read case-blind, bare or YAML-quoted, with a trailing
-# `# comment` stripped (`\047` is a single quote inside this single-quoted awk program). A report
-# that cannot be read, whose block has no `findings:` key, holds an inline list, or holds an entry
-# with no category prints `unreadable`, never 0: "found none" and "could not look" must not print the
-# same value (task.238 bug.1, bug.8). So does a list with no terminator — the closing fence or a
-# top-level key — after it, which is a block cut short (task.238 CR9-3), and so does any value
-# that is not a count, the empty one an awk that did not run leaves (task.238 bug.18).
-BLOCK=""
-[ -f "$REVIEW" ] && [ -r "$REVIEW" ] && BLOCK=$(sed -n '/^## Machine-Readable Findings/,/^## /p' "$REVIEW")
-if printf '%s\n' "$BLOCK" | grep -qE '^findings:'; then
-  OPEN_COVERAGE=$(printf '%s\n' "$BLOCK" \
-    | awk 'function done() { if (open) { e++; if (cat) c++; if (cov && !pre) n++ }; open = cat = cov = pre = fl = 0; lk = ""; split("", seen) }
-           function unq(v) { if (v ~ /^".*"$/ || v ~ /^\047.*\047$/) v = substr(v, 2, length(v) - 2); return v }
-           function key(k, v) { if (k == "category" || k == "provenance") { if (k in seen) bad = 1; seen[k] = 1 }
-                                if (k == "category") { cat = 1; if (v == "coverage") cov = 1
-                                                       if (v !~ /^(coverage|scope|trail|consistency|bug|cleanup)$/) bad = 1 }
-                                if (k == "provenance" && v == "pre-existing") pre = 1
-                                lk = k }
-           function pair(s,   k) { k = s; sub(/:.*$/, "", k); sub(/^[^:]*:[[:space:]]*/, "", s)
-                                    sub(/[[:space:]]+#.*$/, "", s); sub(/[[:space:]]+$/, "", s); key(k, unq(s)) }
-           function flow(s,   k, v) {
-             while (match(s, /^[[:space:]]*[a-z0-9_-]+:[[:space:]]*/)) {
-               k = substr(s, 1, RLENGTH); s = substr(s, RLENGTH + 1); sub(/^[[:space:]]*/, "", k); sub(/:.*$/, "", k)
-               if (match(s, /^"[^"]*"/) || match(s, /^\047[^\047]*\047/)) v = substr(s, 2, RLENGTH - 2)
-               else { match(s, /^[^,}"\047]*/); v = substr(s, 1, RLENGTH); sub(/[[:space:]]+$/, "", v)
-                      if (v ~ /[[:space:]]#/) return 0 }
-               s = substr(s, RLENGTH + 1); key(k, v)
-               if (match(s, /^[[:space:]]*}[[:space:]]*(#.*)?$/)) return 1
-               if (!match(s, /^[[:space:]]*,/)) return 0
-               s = substr(s, RLENGTH + 1)
-             }
-             return 0 }
-           /^findings:/ { inf = 1; r = $0; sub(/^findings:[[:space:]]*/, "", r); sub(/[[:space:]]*#.*$/, "", r)
-                          if (r != "" && r != "[]") bad = 1; next }
-           !inf || /^[[:space:]]*(#.*)?$/ { next }
-           /^[^[:space:]-]/ { if (inf && ($0 ~ /^\140\140\140/ || $0 ~ /^[a-z0-9_-]+:/)) term = 1; done(); inf = 0; next }
-           { l = tolower($0); match(l, /^ */); d = RLENGTH }
-           (ind == "" || d == ind) && match(l, /^ *- \{/) { ind = d; done(); open = fl = 1; if (!flow(substr(l, RLENGTH + 1))) bad = 1; next }
-           (ind == "" || d == ind) && l ~ /^ *- [a-z0-9_-]+:/ { ind = d; done(); open = 1; pair(substr(l, d + 3)); next }
-           fl { bad = 1; next }
-           open && d == ind + 2 && l ~ /^ *[a-z0-9_-]+:/ { pair(substr(l, d + 1)); next }
-           open && d > ind + 2 { if (lk == "category" || lk == "provenance") bad = 1; next }
-           { bad = 1 }
-           END { done(); if (bad || e != c || !term) print "unreadable"; else print n + 0 }')
-else
-  OPEN_COVERAGE=unreadable
-fi
+# open-coverage.js parses the report's Machine-Readable Findings block against the shape review-pr
+# emits and prints `unreadable` for anything it cannot place, so a shape it does not know is never
+# read as "no coverage" (task.240; the accepted shapes are listed in its header). An entry is open
+# coverage when its `category:` is `coverage` and its `provenance:` is not `pre-existing`.
+# The `case` below is the backstop: a reader that did not run leaves an empty value, and any value
+# that is not a count reads `unreadable` (task.238 bug.18).
+OPEN_COVERAGE=$(command node .agents/skills/{develop-story|develop-task}/references/open-coverage.js \
+  --file "$REVIEW" 2>/dev/null | sed -n 's/^OPEN_COVERAGE=//p')
 case "$OPEN_COVERAGE" in ''|*[!0-9]*) OPEN_COVERAGE=unreadable ;; esac
 echo "OPEN_COVERAGE=$OPEN_COVERAGE"
 ```

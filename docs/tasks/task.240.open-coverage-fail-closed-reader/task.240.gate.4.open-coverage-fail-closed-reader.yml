@@ -1,0 +1,71 @@
+schema: 2
+task: 'task.240.open-coverage-fail-closed-reader'
+task_title: 'Fail-closed reader for the 5c open-coverage check'
+gate: CONCERNS
+status_reason: 'Cycle 3 fix verified: the four bug.3 shapes and the cycle 1-2 fixtures read as designed; corpus 0 changes; ci:fast green. The scoped review found that quoted() keeps an escaped character literally, so a deciding value with a backslash escape reads differently from YAML — a false 0 the base awk did not have (BUG-4).'
+reviewer: 'QA Engineer'
+head: '32065fbfda2b9b8fe3a43b6446608709e8ac76b6'
+updated: '2026-10-28T15:18:09Z'
+
+top_issues:
+  - id: 'TASK-240-QA-5'
+    severity: medium
+    file: 'shared/resources/open-coverage.js'
+    finding: 'quoted() reads a double-quoted escape as the escaped character, so `provenance: "pr\e-existing"` and `provenance: "pre-exis\ting"` under `category: coverage` print 0 where PyYAML and the base awk read 1, and `category: "cover\age"` prints 1 where PyYAML reads 0 (reproduced; CR-1; present since c054f8f4, new on this branch; re-rated high -> medium: 0 of 187 tracked reports quote a deciding value with a backslash and review-pr writes both values bare; confidence high unchanged; bug report task.240.bug.4.escape-in-deciding-value-misread.md).'
+    suggested_action: 'Refuse a backslash escape in a quoted category or provenance value, as a flow entry already refuses one; add parity rows.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 184
+  phases_verified: 4/4
+  trace:
+    phases_covered: [0, 1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: internal — shared/resources/open-coverage.js#countOpenCoverage reads the review-pr report (a pipeline-written artefact); no corpus sink models it. The reader parses text only: no eval, no shell, no file write.'
+  performance:
+    status: PASS
+    notes: 'One linear pass; one command node call at 5c (SC-5).'
+  reliability:
+    status: CONCERNS
+    notes: 'BUG-4: a deciding value with a backslash escape is misread. BUG-3 fixed and verified.'
+  maintainability:
+    status: PASS
+    notes: 'The nested rule is now one character test; the remaining finding is in escape decoding, a separate mechanism from nested quote closure.'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-240-QA-5 (BUG-4): refuse an escape in a deciding value; add parity rows.'
+      refs: ['shared/resources/open-coverage.js', 'evals/shared/tests/pr-review-loop-parity.test.mjs']
+  future:
+    - action: 'Carried from gates 2-3 (pre-existing on the base awk, 0 corpus hits): CR-2 flow key with no space after the colon; CR-3 case-blind keys; CR-4 comment inside a wrapped plain value.'
+      refs: ['shared/resources/open-coverage.js']
+      provenance: pre-existing
+    - action: 'Carried from gates 2-3: CR-5 echo the reader stderr at 5c; CR-6 a differential test against a YAML parser — four cycles of hand-picked rows have each found the next shape a parser would have caught; cycle 1 CR-2 pin per-file corpus results; cycle 1 CR-3 an internal-error reason.'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'shared/resources/tests/open-coverage.test.mjs']
+    - action: 'Step 4b could not execute the changed 5c block (command node not on the executor allow-list); the parity suite runs it under bash and zsh in CI.'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 1
+  fix_date: '2026-10-28'
+  total_iterations: 3
+  verification_method: 'bug.3 shapes re-run (unreadable x4); cycle 1-2 fixtures re-run as designed; targeted suites 184/184; M9 and M12-M15 proven by qa-fix.'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-240-QA-5 fixed']

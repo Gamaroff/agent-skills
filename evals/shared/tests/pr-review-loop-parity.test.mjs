@@ -27,16 +27,23 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { extractBlocks } from "../../../shared/resources/qa-execute-snippets.mjs";
+
+const { countOpenCoverage } = createRequire(import.meta.url)(
+  "../../../shared/resources/open-coverage.js",
+);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..", "..", "..");
@@ -847,11 +854,25 @@ function openCoverageOf(body, env = process.env) {
   try {
     const report = join(dir, "task.1.pr-review.1.x.md");
     if (body !== null) writeFileSync(report, body);
+    // The block calls the reader at its consumer path. Run it from a consumer-shaped cwd whose
+    // `.agents/skills/develop-task` is the tracked skill, so the test reads the bundled copy and
+    // never leans on a local, gitignored `.agents/skills` symlink (task.240).
+    mkdirSync(join(dir, ".agents", "skills"), { recursive: true });
+    symlinkSync(
+      join(repoRoot, "skills", "develop-task"),
+      join(dir, ".agents", "skills", "develop-task"),
+    );
     const code = blocks[0].code
       .split("{the PR review report this cycle's 5c wrote}")
-      .join(report);
+      .join(report)
+      .split("{develop-story|develop-task}")
+      .join("develop-task");
     const runIn = (sh) => {
-      const r = spawnSync(sh, ["-c", code], { encoding: "utf8", env });
+      const r = spawnSync(sh, ["-c", code], {
+        encoding: "utf8",
+        env,
+        cwd: dir,
+      });
       if (r.error?.code === "ENOENT") return undefined; // zsh absent on this runner
       assert.equal(r.status, 0, `${sh}: ${r.stderr}`);
       const m = r.stdout.match(/^OPEN_COVERAGE=(\d+|unreadable)$/m);
@@ -928,9 +949,18 @@ const COVERAGE_CASES = [
   ],
 ];
 
+// The same tables, two harnesses (task.240 SC-1): every case also runs straight through the reader
+// the §5c block calls, so a shape the pure function gets wrong is named here, not only as a shell
+// value.
+const readerSays = (text) => {
+  const r = countOpenCoverage(text);
+  return "count" in r ? r.count : "unreadable";
+};
+
 for (const [label, findings, want] of COVERAGE_CASES) {
   test(`open-coverage check: ${label}`, () => {
     assert.equal(openCoverage(findings), want);
+    assert.equal(readerSays(reviewReport(findings)), want, "countOpenCoverage");
   });
 }
 
@@ -949,15 +979,17 @@ const RAW_CASES = [
     "  - category: coverage\n    id: PC-1\n  - category: trail\n    id: PC-2\n",
     1,
   ],
+  // The reader reads one key per line (task.240): the flow form, which no review-pr template or
+  // tracked report uses, is refused rather than parsed.
   [
     "the flow form",
     "  - {id: PC-1, category: coverage, severity: medium}\n",
-    1,
+    "unreadable",
   ],
   [
     "the flow form with provenance: pre-existing",
     "  - {id: PC-1, category: coverage, provenance: pre-existing}\n",
-    0,
+    "unreadable",
   ],
   ["a capitalised value", "  - id: PC-1\n    category: Coverage\n", 1],
   [
@@ -965,10 +997,22 @@ const RAW_CASES = [
     "- id: PC-1\n  category: coverage\n- id: PC-2\n  category: coverage\n  provenance: pre-existing\n",
     1,
   ],
+  // The entry's keys sit at its first key's column (task.240 bug.5): a key at `dash + 2` after a
+  // wider dash is a block YAML rejects, and it printed 0.
   [
-    "a nested list inside an entry does not split it",
+    "a key at dash + 2 after a two-space dash",
+    "  -  category: coverage\n    provenance: pre-existing\n",
+    "unreadable",
+  ],
+  [
+    "keys lined up after a two-space dash",
+    "  -  category: coverage\n     provenance: pre-existing\n",
+    0,
+  ],
+  [
+    "a nested list inside an entry is a deeper line",
     "  - id: PC-1\n    category: coverage\n    evidence:\n      - a.md\n      - b.md\n",
-    1,
+    "unreadable",
   ],
   [
     "a commented-out category is not one",
@@ -987,25 +1031,31 @@ const RAW_CASES = [
     (b) =>
       b.replace("findings:\n", "findings: [{id: PC-1, category: coverage}]\n"),
   ],
-  // Keys are read only in key position (task.238 bug.15): each of these printed 0.
+  // Keys are read only in key position (task.238 bug.15): each of these printed 0. Free text that
+  // holds `: ` is quoted; written plain it is a line YAML rejects, refused since task.240.
   [
     "provenance: pre-existing quoted in a finding's free text does not exempt it",
+    '  - id: PC-1\n    category: coverage\n    finding: "QA filed its CI red with provenance: pre-existing, which hid it"\n',
+    1,
+  ],
+  [
+    "the same free text written plain is refused",
     "  - id: PC-1\n    category: coverage\n    finding: QA filed its CI red with provenance: pre-existing, which hid it\n",
-    1,
+    "unreadable",
   ],
   [
-    "provenance: pre-existing inside a quoted flow value does not exempt it",
+    "provenance: pre-existing inside a quoted flow value is refused with the flow entry",
     '  - {id: PC-1, finding: "a, provenance: pre-existing", category: coverage}\n',
-    1,
+    "unreadable",
   ],
   [
-    "provenance: pre-existing in a block scalar does not exempt it",
+    "provenance: pre-existing in a block scalar is refused with the block scalar",
     "  - id: PC-1\n    category: coverage\n    finding: >-\n      the base read it as\n      provenance: pre-existing\n",
-    1,
+    "unreadable",
   ],
   [
     "category: coverage in another entry's free text is not a coverage finding",
-    "  - id: PC-1\n    category: trail\n    finding: unlike category: coverage, this one\n",
+    "  - id: PC-1\n    category: trail\n    finding: 'unlike category: coverage, this one'\n",
     0,
   ],
   // A shape outside the allow-list reads unreadable, never 0 (task.238 bug.16).
@@ -1066,10 +1116,10 @@ const RAW_CASES = [
     "unreadable",
   ],
   // review-pr's documented shape still reads: one exempted coverage entry, a trail entry and a
-  // block-scalar finding whose text names both keys.
+  // quoted finding whose text names both keys.
   [
     "review-pr's documented block, coverage exempted",
-    '  - id: PC-1\n    category: coverage\n    severity: medium\n    confidence: high\n    ref: "SC-3"\n    provenance: pre-existing\n    anchor_check: no-line\n    finding: >-\n      category: coverage, provenance: new\n    suggested_action: file a follow-up\n  - id: CR-1\n    category: bug\n    severity: low\n    ref: "x.js:3"\n    finding: a typo\n',
+    '  - id: PC-1\n    category: coverage\n    severity: medium\n    confidence: high\n    ref: "SC-3"\n    provenance: pre-existing\n    anchor_check: no-line\n    finding: "category: coverage, provenance: new"\n    suggested_action: file a follow-up\n  - id: CR-1\n    category: bug\n    severity: low\n    ref: "x.js:3"\n    finding: a typo\n',
     0,
   ],
   // A flow entry is complete on its line (task.238 bug.19): a key after it is invalid YAML, and it
@@ -1085,10 +1135,65 @@ const RAW_CASES = [
     "unreadable",
   ],
   [
-    "a flow entry followed by a block entry still reads",
+    "a flow entry before a block entry is refused with it",
     "  - {id: PC-1, category: trail}\n  - id: PC-2\n    category: coverage\n",
-    1,
+    "unreadable",
   ],
+  // A long value wrapped onto deeper lines is valid YAML, and task.240 bug.1 made the first reader
+  // accept it. Every later wrap shape YAML rejects was one more bug (bugs 2, 3, 6), so the reader
+  // now reads one line per key and refuses a wrap whatever it holds.
+  [
+    "a plain finding: value wrapped onto a deeper line",
+    "  - id: PC-1\n    category: trail\n    finding: a long plain value that\n      wraps onto a deeper line\n",
+    "unreadable",
+  ],
+  [
+    "a double-quoted finding: value wrapped onto a deeper line",
+    '  - id: PC-1\n    category: coverage\n    finding: "a long quoted value that\n      wraps onto a deeper line"\n',
+    "unreadable",
+  ],
+  [
+    "a single-quoted finding: value wrapped onto a deeper line",
+    "  - id: PC-1\n    finding: 'it''s long\n      and wraps'\n    category: coverage\n",
+    "unreadable",
+  ],
+  // The trap: a quote still open at the key indent. YAML reads `category: coverage` here as quoted
+  // text; reading it as a key would count it, so the reader refuses rather than guess.
+  [
+    "a quoted value still open at the entry's key indent",
+    '  - id: PC-1\n    finding: "text\n    category: coverage"\n    category: trail\n',
+    "unreadable",
+  ],
+  // The same trap one line lower (task.240 bug.2): a quote opened under an empty key runs, in
+  // YAML, over the key-indent lines below it. Read as keys, they printed a false 0.
+  [
+    "a quoted value opened on the line after an empty key",
+    '  - id: PC-1\n    category: coverage\n    finding:\n      "open\n    provenance: pre-existing\n    note: end"\n',
+    "unreadable",
+  ],
+  // An escape in a deciding value (task.240 bug.4): kept literally, `pr\e-existing` read as
+  // pre-existing and printed 0; YAML decodes it and reads the entry open.
+  [
+    "an escape in a quoted provenance value",
+    '  - id: PC-1\n    category: coverage\n    provenance: "pr\\e-existing"\n',
+    "unreadable",
+  ],
+  [
+    "an escape in a quoted category value",
+    '  - id: PC-1\n    category: "cover\\age"\n',
+    "unreadable",
+  ],
+  // The same trap behind a prefix the opener scan did not strip (task.240 bug.3): each printed 0.
+  ...[
+    ["inside a flow collection", '[a, "b]'],
+    ["behind a nested dash", '- - "open'],
+    ["behind an anchor", '- &a "open'],
+    ["behind a key with a space", '- sub key: "open'],
+  ].map(([where, line]) => [
+    `a nested quote opened ${where}`,
+    `  - id: PC-1\n    category: coverage\n    evidence:\n      ${line}\n    provenance: pre-existing\n    note: x"]\n`,
+    "unreadable",
+  ]),
   // A list cut short reads unreadable, not the count of what survived (task.238 CR9-3): a column-0
   // `## ` line inside the fence ends the section the check reads.
   [
@@ -1101,6 +1206,7 @@ const RAW_CASES = [
 for (const [label, yaml, want, edit = (b) => b] of RAW_CASES) {
   test(`open-coverage check: ${label} → ${want}`, () => {
     assert.equal(openCoverageOf(edit(rawReport(yaml))), want);
+    assert.equal(readerSays(edit(rawReport(yaml))), want, "countOpenCoverage");
   });
 }
 
@@ -1125,15 +1231,18 @@ const UNREADABLE_CASES = [
 for (const [label, body] of UNREADABLE_CASES) {
   test(`open-coverage check: ${label} → unreadable, never 0`, () => {
     assert.equal(openCoverageOf(body), "unreadable");
+    if (body !== null)
+      assert.equal(readerSays(body), "unreadable", "countOpenCoverage");
   });
 }
 
-// An awk that does not run prints nothing, and an empty value took the Otherwise exit to Step 7
-// (task.238 bug.18). A stub awk that exits 2 stands in for a missing binary or a rejected program.
-test("open-coverage check: an awk that fails → unreadable, never an empty value", () => {
-  const bin = mkdtempSync(join(tmpdir(), "failing-awk-"));
+// A reader that does not run prints nothing, and an empty value took the Otherwise exit to Step 7
+// (task.238 bug.18). A stub `node` that exits 2 stands in for a missing binary or a crashed reader
+// (task.240: the reader is open-coverage.js, so the stub moved from awk to node).
+test("open-coverage check: a reader that fails → unreadable, never an empty value", () => {
+  const bin = mkdtempSync(join(tmpdir(), "failing-node-"));
   try {
-    writeFileSync(join(bin, "awk"), "#!/bin/sh\nexit 2\n", { mode: 0o755 });
+    writeFileSync(join(bin, "node"), "#!/bin/sh\nexit 2\n", { mode: 0o755 });
     const env = { ...process.env, PATH: `${bin}:${process.env.PATH}` };
     assert.equal(
       openCoverageOf(rawReport("  - id: PC-1\n    category: coverage\n"), env),
@@ -1142,6 +1251,16 @@ test("open-coverage check: an awk that fails → unreadable, never an empty valu
   } finally {
     rmSync(bin, { recursive: true, force: true });
   }
+});
+
+// SC-5 (task.240): the check costs one `node` call and nothing else — no awk program comes back.
+test("open-coverage check: the §5c block runs exactly one `command node` call and no awk", () => {
+  const [block] = extractBlocks(loopDoc).filter((b) =>
+    b.code.includes("OPEN_COVERAGE=$("),
+  );
+  assert.ok(block, "the open-coverage block moved");
+  assert.equal(block.code.match(/\bcommand node\b/g)?.length ?? 0, 1);
+  assert.doesNotMatch(block.code, /\bawk\b/);
 });
 
 test("open-coverage check: an empty findings list (`findings: []`) reads 0, not unreadable", () => {

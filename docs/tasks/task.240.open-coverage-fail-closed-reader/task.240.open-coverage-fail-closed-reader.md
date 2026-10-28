@@ -5,10 +5,12 @@ type: task
 description: "Replace the §5c open-coverage awk with a bundled Node reader that parses the PR review's machine-readable findings block and prints unreadable for any shape it cannot read, so the QA loop stops finding one more shape gap per cycle."
 tags: [develop-task, develop-story, qa-loop, review-pr, open-coverage, task.238-follow-up]
 category: refactoring
-status: planned
+status: accepted
 priority: High
 created: 2026-10-28
 updated: 2026-10-28
+completed_date: 2026-10-28
+pr_number: 776
 assignee:
 estimated_effort_hours: 8
 github_issue: 771
@@ -16,7 +18,8 @@ github_issue: 771
 
 # Technical Task: Fail-closed reader for the 5c open-coverage check
 
-**Status:** Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.240.review.1.open-coverage-fail-closed-reader.md` implemented 2026-10-28
 **GitHub Issue**: [#771](https://github.com/Gamaroff/agent-skills/issues/771)
 
 ---
@@ -38,8 +41,9 @@ does not change.
 - `shared/resources/open-coverage.js`: a pure reader plus CLI, bundled into `develop-task` and
   `develop-story`.
 - The §5c block calls it and keeps its shell-level non-count guard.
-- `pr-review-loop-parity.test.mjs` passes unchanged in its expectations: 82 cases.
-- All 184 tracked reports read the same before and after.
+- `pr-review-loop-parity.test.mjs` passes. No case changes from one count to another; cases in
+  shapes outside the one-line grammar now read `unreadable` (amended 2026-10-28, see SC-2).
+- Every tracked `*.pr-review.*.md` reads the same before and after (SC-4).
 
 **Expected outcome**: a review shape the reader does not know reads `unreadable` by construction,
 not by an enumerated refusal. The QA loop stops spending its cycles on reader gaps.
@@ -121,12 +125,24 @@ merges (Phase 0).
   (`command node open-coverage.js --file <report>`) that prints `OPEN_COVERAGE=<n|unreadable>` and
   exits 0. The `reason` goes to stderr only, so the printed contract is unchanged.
 - **A strict reader of review-pr's emitted shape, not a general YAML parser.**
-  - It accepts: a block list of maps; plain, single- or double-quoted scalars; one-line flow maps
-    (`- {id: PC-1, category: coverage}`); and folded or literal block scalars (`>-`, `|`) for
-    long values.
-  - Anything else is `unreadable`: anchors, tags, aliases, a duplicate key, a line it cannot place,
-    a block with no terminator, a missing or untagged fence, an absent `findings:` key, or a
-    non-map entry.
+  - It accepts: a block list of maps, indented or at column 0, one key per line; a value on its
+    key's line, empty, plain, or single- or double-quoted (a double-quoted value may carry `\"`
+    and `\\` escapes, as four tracked reports do, and no other), with an optional trailing
+    ` # comment`; blank lines and indented full-line comments, skipped. A plain value starts with
+    a letter, a digit or a non-ASCII character and holds no `: `. The block holds only printable
+    ASCII and non-ASCII letters, marks, numbers, punctuation and symbols. `category` and
+    `provenance` values compare case-blind (`category: Coverage` is coverage).
+  - **Amended 2026-10-28 (author-approved, after the QA loop escalation).** As first written the
+    reader also accepted one-line flow maps, block scalars, and deeper lines under a key. Each of
+    seven QA cycles found one more shape among them that the reader counted and YAML rejected
+    (bugs 1–10), so the grammar was narrowed to the one line per key that review-pr's template
+    emits and every tracked report uses. Those shapes now read `unreadable`.
+  - Anything else is `unreadable`: anchors, tags, aliases, a duplicate key, an entry with no
+    `category`, a line it cannot place, a column-0 `#` line, a deeper line under `category:` or
+    `provenance:`, an escaped quote inside a flow entry, a block with no terminator, a missing or
+    untagged fence, an absent `findings:` key, or a non-map entry.
+  - Each of these is pinned by an existing `RAW_CASES` / `UNREADABLE_CASES` expectation; the rule
+    list follows the suite, not the other way round (review.1 I-1 to I-5).
   - **Decision (author confirm):** a dedicated reader, not a `strict` mode in `yaml-subset.js`.
     Strictness there changes a parser with 9 fail-open consumers, and it needs flow maps and block
     scalars that none of them use. That is a separate decision with its own blast radius.
@@ -154,8 +170,8 @@ merges (Phase 0).
 
 ✅ `shared/resources/open-coverage.js` and its unit tests
 ✅ The §5c call site and its comments in `develop-pipeline-step-5-6-qa-loop.md`
-✅ `pr-review-loop-parity.test.mjs`: the harness keeps locating and running the block; every
-existing fixture keeps its expected value
+✅ `pr-review-loop-parity.test.mjs`: the harness keeps locating and running the block; no
+fixture changes from one count to another (amended 2026-10-28, see SC-2)
 ✅ Exporting the block extractor from `pr-review-current.js`
 ✅ Bundled copies (`npm run bundle`)
 ✅ The CHANGELOG entry
@@ -177,9 +193,17 @@ not the reader.
 
 ## 5. Breaking Changes
 
-None. The API is stable: the block still prints exactly one `OPEN_COVERAGE=<n|unreadable>` line,
-and every fixture keeps its expected value. A consumer now needs Node at §5c, which every pipeline
-step already requires (`command node` throughout `develop-pipeline-step-5-6-qa-loop.md`).
+The block still prints exactly one `OPEN_COVERAGE=<n|unreadable>` line, and no input changes from
+one count to another. A consumer now needs Node at §5c, which every pipeline step already requires
+(`command node` throughout `develop-pipeline-step-5-6-qa-loop.md`).
+
+**Amended 2026-10-28 (author-approved, after the QA loop escalation).** The reader accepts one line
+per key, so shapes the awk counted now read `unreadable`: a flow entry, a nested list, a block
+scalar, a value wrapped onto a deeper line, and plain free text holding `: ` (which YAML rejects).
+No tracked report uses one (SC-4). review-pr's template writes `finding:` and `suggested_action:`
+unquoted, though, so a review whose sentence holds `: ` reads `unreadable`. A review that uses any
+of these shapes halts 5c at the **Review failed** arm; it is never counted wrong. Quoting those two
+fields in the template is a follow-up, outside this task (PR review PC-5).
 
 ---
 
@@ -189,7 +213,7 @@ step already requires (`command node` throughout `develop-pipeline-step-5-6-qa-l
 
 ### Phase 0: Precondition (Risk: Low)
 
-- [ ] HALT unless task.238 (PR #770) has merged to `develop`: the §5c block this task replaces
+- [x] HALT unless task.238 (PR #770) has merged to `develop`: the §5c block this task replaces
       exists only on that branch until then. Check with
       `git grep -n 'OPEN_COVERAGE=\$(' origin/develop -- shared/resources/develop-pipeline-step-5-6-qa-loop.md`.
       A hit means merged.
@@ -199,14 +223,15 @@ step already requires (`command node` throughout `develop-pipeline-step-5-6-qa-l
 **Files**: `shared/resources/open-coverage.js` (new),
 `shared/resources/tests/open-coverage.test.mjs` (new), `shared/resources/pr-review-current.js`
 
-- [ ] Export the block extractor from `pr-review-current.js`, with no behaviour change. Its own
+- [x] Export the block extractor from `pr-review-current.js`, with no behaviour change. Its own
       tests stay green.
-- [ ] `countOpenCoverage(text)`: extract, parse strictly, then count entries with
+- [x] `countOpenCoverage(text)`: extract, parse strictly, then count entries with
       `category === "coverage"` and `provenance !== "pre-existing"`.
-- [ ] Every refusal returns `{ unreadable: <reason> }` from a fixed reason list. There is no
-      skip branch anywhere.
-- [ ] The CLI prints `OPEN_COVERAGE=` plus the value, and exits 0. A usage error exits 2.
-- [ ] Unit tests: each accepted shape, each refusal reason, and a non-vacuity check (a corpus test
+- [x] Every refusal returns `{ unreadable: <reason> }` from a fixed reason list, which includes
+      `no-category` for an entry with no `category` key (task.238 bug.8). There is no skip branch
+      for an unparsed line; only blank lines and indented comments are skipped.
+- [x] The CLI prints `OPEN_COVERAGE=` plus the value, and exits 0. A usage error exits 2.
+- [x] Unit tests: each accepted shape, each refusal reason, and a non-vacuity check (a corpus test
       that reads at least one report with `1` and one with `unreadable`).
 
 ### Phase 2: The call site (Risk: Medium)
@@ -214,26 +239,31 @@ step already requires (`command node` throughout `develop-pipeline-step-5-6-qa-l
 **Files**: `shared/resources/develop-pipeline-step-5-6-qa-loop.md`,
 `evals/shared/tests/pr-review-loop-parity.test.mjs`
 
-- [ ] Replace the awk program with the one `command node` call. Keep `REVIEW=`, the no-file and
+- [x] Replace the awk program with the one `command node` call. Keep `REVIEW=`, the no-file and
       no-section branches if the reader does not cover them, and the `case` guard.
-- [ ] Replace the shape-table comments with one pointer to `open-coverage.js`.
-- [ ] Update `openCoverageOf` so it still finds and runs the block, under bash and zsh.
-- [ ] Every existing case keeps its expected value. The failing-awk case becomes a failing-node
+- [x] Replace the shape-table comments with one pointer to `open-coverage.js`.
+- [x] Update `openCoverageOf` so it still finds and runs the block, under bash and zsh. It
+      substitutes `{develop-story|develop-task}` and runs from a temp cwd whose
+      `.agents/skills/develop-task` links to the tracked `skills/develop-task`, so it does not
+      depend on the gitignored local symlink. Run it once with that symlink moved aside.
+- [x] Add a parity assertion that the §5c block holds exactly one `command node` call and no
+      `awk` (SC-5).
+- [x] Every existing case keeps its expected value. The failing-awk case becomes a failing-node
       case (a `node` stub that exits 2 on `PATH`) and still expects `unreadable`.
-- [ ] Mutation-prove: make the reader return `{ count: 0 }` for any refused shape. The refusal
+- [x] Mutation-prove: make the reader return `{ count: 0 }` for any refused shape. The refusal
       fixtures must go red.
 
 ### Phase 3: Corpus, probe and docs (Risk: Low)
 
 **Files**: `CHANGELOG.md`, bundled copies
 
-- [ ] Corpus diff: run the old block (from `ded46852`) and the new one over every tracked
+- [x] Corpus diff: run the old block (from `ded46852`) and the new one over every tracked
       `*.pr-review.*.md`. Expect 0 changes. Record the distribution and the command; do not
       restate the number in prose (obs #117).
-- [ ] Probe the phrases `OPEN_COVERAGE`, `open-coverage` and `open coverage finding` over
+- [x] Probe the phrases `OPEN_COVERAGE`, `open-coverage` and `open coverage finding` over
       `SKILL.md`, `references/*.md` and `shared/resources/*.md`, generated copies removed. List
       every site as updated or unaffected.
-- [ ] `npm run bundle`. CHANGELOG `[Unreleased]` names the reader and cites task.240.
+- [x] `npm run bundle`. CHANGELOG `[Unreleased]` names the reader and cites task.240.
 
 ---
 
@@ -259,7 +289,10 @@ only bundled files.
 
 6. ✅ `CHANGELOG.md`
 7. ✅ `skills/develop-task/references/*` and `skills/develop-story/references/*`: regenerated by
-   `npm run bundle`, never hand-edited
+   `npm run bundle`, never hand-edited. New copies: `open-coverage.js` and `pr-review-current.js`
+   (required by the reader) in both; `develop-pipeline-step-5-6-qa-loop.md` refreshed in both.
+8. ✅ `skills/qa-fix/references/pr-review-current.js`: regenerated by `npm run bundle` (the
+   extractor export)
 
 ### Files to Delete
 
@@ -303,31 +336,35 @@ Not applicable. The check runs once per 5c on one file.
 
 ### Functional
 
-- [ ] SC-1: `countOpenCoverage` returns `unreadable` for every refusal shape in
+- [x] SC-1: `countOpenCoverage` returns `unreadable` for every refusal shape in
       `RAW_CASES`/`UNREADABLE_CASES`, and the count for every `COVERAGE_CASES` shape. It has no
       skip branch: a mutation that skips an unparsed line turns a test red.
-- [ ] SC-2: `pr-review-loop-parity.test.mjs` passes, with every pre-existing case keeping its
-      expected value, under bash and zsh.
-- [ ] SC-3: a failing reader (a `node` stub that exits 2 on `PATH`) reads `unreadable`.
-- [ ] SC-4: every tracked `*.pr-review.*.md` reads the same `OPEN_COVERAGE` before and after. The
+- [x] SC-2: `pr-review-loop-parity.test.mjs` passes under bash and zsh, and no pre-existing case
+      changes from one count to another. Amended 2026-10-28 (author-approved): cases outside the
+      one-line grammar — the flow form, a nested list, a block scalar, a wrapped value, plain free
+      text holding `: ` — now expect `unreadable`; it was "every pre-existing case keeping its
+      expected value".
+- [x] SC-3: a failing reader (a `node` stub that exits 2 on `PATH`) reads `unreadable`.
+- [x] SC-4: every tracked `*.pr-review.*.md` reads the same `OPEN_COVERAGE` before and after. The
       command and its distribution are in the implementation report.
 
 ### Performance
 
-- [ ] SC-5: no new CI wait, and no new process beyond one `node` call at 5c.
+- [x] SC-5: no new CI wait, and no new process beyond one `node` call at 5c. Held by the parity
+      assertion that the §5c block holds exactly one `command node` call and no `awk`.
 
 ### Code Quality
 
-- [ ] SC-6: `npm run ci:fast` passes.
-- [ ] SC-7: `npm run bundle:check` passes, and nothing under `skills/*/references/` is
+- [x] SC-6: `npm run ci:fast` passes.
+- [x] SC-7: `npm run bundle:check` passes, and nothing under `skills/*/references/` is
       hand-edited.
-- [ ] SC-8: `npm run validate -- skills/develop-task/` and `skills/develop-story/` pass.
-- [ ] SC-9: every new guard is mutation-proven, and the commit message records it.
+- [x] SC-8: `npm run validate -- skills/develop-task/` and `skills/develop-story/` pass.
+- [x] SC-9: every new guard is mutation-proven, and the commit message records it.
 
 ### Migration
 
-- [ ] SC-10: the CHANGELOG `[Unreleased]` entry cites task.240 and names the reader.
-- [ ] SC-11: the probe over `OPEN_COVERAGE` / `open-coverage` / `open coverage finding` lists
+- [x] SC-10: the CHANGELOG `[Unreleased]` entry cites task.240 and names the reader.
+- [x] SC-11: the probe over `OPEN_COVERAGE` / `open-coverage` / `open coverage finding` lists
       every site, and none describes the awk.
 
 ---
@@ -383,18 +420,212 @@ Not applicable. The check runs once per 5c on one file.
 
 ---
 
+## Implementation Notes
+
+**Completion date**: 2026-10-28 (develop-task Step 3, inline — plan file and surface map present).
+
+**Implementation summary**: `shared/resources/open-coverage.js` parses the findings block with a
+line-based strict reader that refuses through one `Refusal` path; it requires
+`extractFindingsBlock` from `pr-review-current.js`. §5c now holds one `command node` call, the
+`case` guard and a six-line pointer comment in place of the 35-line awk program and its 23-line
+shape table.
+
+**Approach**: the accepted shapes were taken from the parity suite's pinned expectations, not from
+the awk's code: every `RAW_CASES` / `UNREADABLE_CASES` / `COVERAGE_CASES` row now also runs straight
+through `countOpenCoverage` in the same test (SC-1), as well as through the doc's block under bash
+(and zsh where installed).
+
+**Testing results**:
+
+- Unit: `command node --test shared/resources/tests/open-coverage.test.mjs` — 32 pass (accepted
+  shapes, one or more cases per reason in `REASONS` with a reachability assertion, the control case,
+  CLI contract, corpus non-vacuity).
+- Parity: `command node --test evals/shared/tests/pr-review-loop-parity.test.mjs` — 83 pass (82
+  pre-existing with unchanged expectations, plus the SC-5 assertion). zsh is not installed on the
+  development machine, so the zsh arm runs in CI only (`.github/workflows/test.yml` installs it).
+  Also run once with the local `.agents/skills` symlink moved aside: 83 pass.
+- Corpus (SC-4): the old block extracted from `develop` at `83aacf7b` and the new CLI over
+  `git ls-files '*pr-review.*.md'` — 0 changes. Distribution: `0` ×128, `1` ×35, `2` ×5,
+  `unreadable` ×19 (the 19 have no findings heading).
+- `npm run ci:fast`: green on the second run. The first run failed one test,
+  `tests/relationship-assertion-lint.test.js` "no file in the live corpus is invisible to the
+  scanner": a fence string nested in a template-literal test title blinded the scanner to the rest
+  of `open-coverage.test.mjs`. The title now names the row by index.
+- `npm run bundle:check`: 0 problems. `npm run validate -- skills/develop-task/` and
+  `skills/develop-story/`: pass.
+- Mutation proofs (each reverted; the reader restored byte-identical, checked with `cmp`):
+  M1 an unplaceable line skipped instead of refused → 2 red; M2 the `pre-existing` filter dropped →
+  7 red; M3 every refusal returned as `{ count: 0 }` → 40 red; M4 the §5c `case` guard removed → 1
+  red (the failing-node case).
+
+**Phase 3 probe** (`git grep -n -i -E 'OPEN_COVERAGE|open-coverage|open coverage finding' --
+'shared/resources/*.md' 'skills/*/SKILL.md' 'shared/resources/*.sh'`, generated copies excluded): 25
+sites. Updated: the §5c block and its pointer comment (`develop-pipeline-step-5-6-qa-loop.md`
+§5c). Unaffected — each routes on the printed value and none describes the awk: the rest of
+`develop-pipeline-step-5-6-qa-loop.md` (the verdict table, the 5b invocation heading, the exit
+prose), `develop-pipeline-on-stop.sh:195,205` and its test `:349,353,354`,
+`develop-pipeline-resume-contract.md:464,474,555–557`, `implementation-report-template.md:73,171`,
+`develop-task/SKILL.md:203`, `develop-story/SKILL.md:214`.
+
+**CR9-4** (no test ran the reader under mawk or BWK awk) is moot: no awk remains in the check.
+
+**Deferred work**: none from this task. CR7-3, CR7-4, CR9-5 and the structured pre-existing
+comparison stay out of scope as § 4 states.
+
+> **Superseded by version 1.2.** The notes for QA fix cycles 1–5 below describe a reader that
+> accepted wrapped and nested values. The one-line-per-key reader (see below) refuses those shapes,
+> so the cycle 1–3 acceptance rules no longer ship. The notes are kept as history.
+
+**QA fix cycle 1 (TASK-240-QA-1, bug.1).** The reader now accepts a value that wraps onto deeper
+lines under any key except `category` and `provenance`. A plain value may wrap unless a wrapped line
+reads as `key: `. A quoted value may wrap until its closing quote, which must be on a deeper line.
+Each shape was checked against PyYAML 6.0.3. The accepted list in § 3 Target Architecture predates
+this fix and is narrower than what ships; the reader's header is now the list. Results:
+
+- Mutation proofs M5–M8 each turned at least one test red.
+- The corpus diff shows 0 changes over 187 reports.
+- `ci:fast` is green: 6,618 pass, 0 fail.
+
+Details are in the bug report.
+
+**QA fix cycle 2 (TASK-240-QA-2, bug.2).** In a nested value under an empty key, any quoted scalar
+or flow collection that opens on a line must now close on that line, or the reader refuses the
+report. The pipeline offered the narrowing-residue move, and the change was taken as a consolidate
+move (an allow-list), not as a second round of quote tracking. Results:
+
+- Mutation proofs M9–M11 each turned at least one test red.
+- The corpus diff shows 0 changes over 187 reports.
+- `ci:fast` is green: 6,622 pass, 0 fail.
+
+**QA fix cycle 3 (TASK-240-QA-3, bug.3).** Cycle 2's opener scan looked at one position on the
+line, so an opener behind a prefix got past it. Cycle 3 replaced the scan with a rule over
+characters: a line nested under an empty key may not contain a double quote, a `[` or `{`, or a
+single quote other than an apostrophe. Closed quotes and flow collections are refused as well,
+which fails closed. No tracked report has a nested value of this kind.
+
+| Check | Result |
+| --- | --- |
+| Mutation proofs | M9 and M12–M15 each turned at least one test red |
+| Corpus diff | 0 changes |
+| `ci:fast` | green: 6,634 pass, 0 fail |
+
+**QA fix cycle 4 (TASK-240-QA-5, bug.4).** `quoted()` skipped over an escape without decoding it.
+A `category:` or `provenance:` value with an escape could therefore read differently from YAML.
+Those two values now refuse an escape, using the same `strict` rule that flow entries already
+used. Results:
+
+- Mutation proofs: M16 and M17 each turned tests red.
+- Corpus: 0 changes.
+- `ci:fast`: green, 6,639 pass and 0 fail.
+
+**QA fix cycle 5 (TASK-240-QA-6, bug.5; QA-7).** An entry's key column is now measured from where
+its first key sits (`keyIndent`), instead of being assumed to be the dash plus two. Before this,
+wide spacing after a dash let a block that YAML rejects read 0. This fix also corrects the
+reader's header, which had drifted from the code. Results:
+
+- Mutation proof: M18 turned 5 tests red.
+- Corpus: 0 changes.
+- `ci:fast`: green, 6,644 pass and 0 fail.
+
+**QA fix cycle 6 (bug.6, bug.7, bug.8; `5f69c201`).** The PyYAML differential generator was widened
+first (bug.8). Then a comment ends a wrap (bug.6), and indicator-led values and tabs are refused
+(bug.7).
+
+**QA fix cycle 7 (bug.9, bug.10; `443e4f6d`).** A blank line holding a tab and a bracket in a plain
+flow value are refused.
+
+**Version 1.2: one line per key (`149f9235`, after the second loop escalation).** The reader
+accepts one line per key over an allow-listed character set, and refuses everything else. This ends
+the shape-by-shape fixes of cycles 1–7. The amendment is in § 5.
+
+**QA fix cycle 8 (bug.11; `a3b9c0d0`).** `countOpenCoverage` takes the report's bytes and decodes
+them strictly. An invalid UTF-8 sequence reads `unreadable` (`bad-encoding`). Mutation proofs M36
+and M37 each turned tests red, and the corpus shows 0 changes. Gate 9 passed with no open finding.
+
+---
+
 <!--
   Change Log — append-only, newest at the bottom. Canonical format:
   references/document-change-log.md.
   EVERY new row bumps frontmatter `updated:` in the same edit.
 -->
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-28
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [task.240.qa.9.open-coverage-fail-closed-reader.md](./task.240.qa.9.open-coverage-fail-closed-reader.md)
+- **Gate File**: [task.240.gate.9.open-coverage-fail-closed-reader.yml](./task.240.gate.9.open-coverage-fail-closed-reader.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 6710 (full `ci:fast`), plus 3 differential seeds × 25,000 and the 54-shape PyYAML hand probe
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+[bug.11](./task.240.bug.11.invalid-utf8-decoded-leniently.md) is fixed and closed: an invalid UTF-8 byte now reads `unreadable` (`bad-encoding`). No open finding. Two low cleanups are recorded for later: a non-view byte container reads `no-section`, and no test pins `ignoreBOM` on the bytes path.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.240.qa.9.open-coverage-fail-closed-reader.md`
+**Gate File**: `task.240.gate.9.open-coverage-fail-closed-reader.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Review (Step 5c)**: `task.240.pr-review.1.open-coverage-fail-closed-reader.md`, ⚠️ CONCERNS with no coverage finding
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 11/11 met (SC-1 to SC-11), each with code and per-PR test evidence
+✅ **PR & CI:** PR #776; the host requires no reviews; all 6 checks green on `966aba75`
+✅ **Documentation:** § 5c and its bundled copies updated; CHANGELOG cites task 240
+✅ **Security Review:** ✅ PASS. No secrets and no eval or shell in shipped code. `boundary: internal` (the pipeline's own review report)
+⚠️ **Compliance Review:** not applicable (internal developer tooling)
+
+**Task marked as ACCEPTED on:** 2026-10-28
+
+**Detailed Verification Log:** See `task.240.dod.1.open-coverage-fail-closed-reader.md` for the full verification evidence and timestamps.
+
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-28 | 1.0     | Initial draft | create-task |
+| 2026-10-28 | 1.1     | Review passed (8/10) — parser rules aligned with six pinned parity expectations (case-blind values, column-0 entries, nested values and comments, `no-category`, escapes); SC-5 given a test; "184" count dropped | review-task |
+| 2026-10-28 |         | Status → ready-for-development | review-task |
+| 2026-10-28 |         | Implemented — 5 source files (1 new reader, 1 new unit suite), 32 unit tests + 1 new parity test; status → ready-for-review | develop |
+| 2026-10-28 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-10-28 |         | QA findings fixed — wrapped values under non-deciding keys accepted (bug.1), 1 iteration | qa-fix |
+| 2026-10-28 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-10-28 |         | QA findings fixed — nested openers must close on their line (bug.2), 1 iteration | qa-fix |
+| 2026-10-28 |         | QA gate CONCERNS (90/100) — 2 findings | qa-task |
+| 2026-10-28 |         | QA findings fixed — nested opener scan replaced by a character rule (bug.3), 1 iteration | qa-fix |
+| 2026-10-28 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-10-28 |         | QA findings fixed — escape refused in a deciding value (bug.4), 1 iteration | qa-fix |
+| 2026-10-28 |         | QA gate CONCERNS (90/100) — 2 findings | qa-task |
+| 2026-10-28 |         | QA findings fixed — entry key column measured (bug.5), header drift (QA-7), 1 iteration | qa-fix |
+| 2026-10-28 |         | QA gate CONCERNS (90/100) — 3 findings | qa-task |
+| 2026-10-28 |         | QA findings fixed — differential generator widened first (bug.8), comment ends a wrap (bug.6), indicator-led values and tabs refused (bug.7, CR-4), 1 iteration | qa-fix |
+| 2026-10-28 |         | QA gate CONCERNS (90/100) — 3 findings | qa-task |
+| 2026-10-28 |         | QA findings fixed — generator widened first, then a tab-holding blank line (bug.9) and a bracket in a plain flow value (bug.10) refused, 1 iteration | qa-fix |
+| 2026-10-28 | 1.2     | Reader narrowed to one line per key after the QA loop escalation (author-approved): Overview, In Scope, Target Architecture, Breaking Changes and SC-2 amended; flow, nested, block-scalar, wrapped and plain `: ` shapes now read `unreadable` | Lorien Gamaroff |
+| 2026-10-28 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-10-28 |         | QA findings fixed — the report's bytes decoded strictly inside the reader, an invalid sequence refused as `bad-encoding` (bug.11), 1 iteration | qa-fix |
+| 2026-10-28 |         | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-10-28 |         | PR review CONCERNS: § 5 claim about the review-pr template corrected; Implementation Notes for cycles 6–8 and version 1.2 added | develop-task |
+| 2026-10-28 | 1.3 | DoD verified — accepted (PR #776) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -402,22 +633,22 @@ Not applicable. The check runs once per 5c on one file.
 ## Progress Tracking
 
 ### Phase 0: Precondition
-- [ ] task.238 merged to `develop`
+- [x] task.238 merged to `develop`
 
 ### Phase 1: The reader
-- [ ] Extractor exported
-- [ ] `countOpenCoverage` and CLI
-- [ ] Unit tests and control case
+- [x] Extractor exported
+- [x] `countOpenCoverage` and CLI
+- [x] Unit tests and control case
 
 ### Phase 2: The call site
-- [ ] §5c block replaced
-- [ ] Parity harness updated
-- [ ] Mutation proof
+- [x] §5c block replaced
+- [x] Parity harness updated
+- [x] Mutation proof
 
 ### Phase 3: Corpus, probe and docs
-- [ ] Corpus diff
-- [ ] Probe
-- [ ] Bundle and CHANGELOG
+- [x] Corpus diff
+- [x] Probe
+- [x] Bundle and CHANGELOG
 
 ---
 

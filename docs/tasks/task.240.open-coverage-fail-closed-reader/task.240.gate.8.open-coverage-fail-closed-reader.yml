@@ -1,0 +1,75 @@
+schema: 2
+task: 'task.240.open-coverage-fail-closed-reader'
+task_title: 'Fail-closed reader for the 5c open-coverage check'
+gate: CONCERNS
+status_reason: 'Cycle 8, the first gate on the allow-list reader (149f9235) and cycle 7''s fix (443e4f6d). BUG-9 and BUG-10 are verified fixed and closed. The reader itself held: a 54-shape hand probe and 5 new differential seeds at 25,000 blocks found 0 wrong counts. One medium remains, in the CLI and not the parser: an invalid UTF-8 byte is decoded to U+FFFD and the block still counts, where PyYAML refuses to read it (BUG-11). 0 of 187 tracked reports hold invalid UTF-8.'
+reviewer: 'QA Engineer'
+head: 'afccc7883d3e13e91b89b6e3362559fdc297e01e'
+updated: '2026-10-28T17:49:57Z'
+
+top_issues:
+  - id: 'TASK-240-QA-14'
+    severity: medium
+    file: 'shared/resources/open-coverage.js'
+    finding: 'CR-1: the CLI reads the report with fs.readFileSync(file, "utf8") (line 310), which turns an invalid byte into U+FFFD; U+FFFD passes BLOCK_CHARS, so `note: a\xffb` inside an entry prints OPEN_COVERAGE=1 where PyYAML raises ReaderError. The differential suite calls countOpenCoverage on strings and never runs the decode.'
+    suggested_action: 'Decode with TextDecoder("utf-8", { fatal: true }) and read a decode failure as unreadable; add a CLI test with an invalid byte inside the block; mutation-prove it (BUG-11).'
+    suggested_owner: dev
+    bug_ref: 'task.240.bug.11.invalid-utf8-decoded-leniently.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 6705
+  phases_verified: 4/4
+  trace:
+    phases_covered: [0, 1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: internal, as on gates 1-7. shared/resources/open-coverage.js#countOpenCoverage reads a /review-pr report this pipeline writes; markdown-structure models the implementation report only, and a filename-sink run against the CLI scored the sink''s own contract (cycle-number parsing), not this one, so its record was discarded. Fail-closed property exercised by the PyYAML differential suite and a 54-shape hand probe. Text parsing only: no eval, no shell, no write.'
+  performance:
+    status: PASS
+    notes: 'One linear pass and one command node call at 5c (SC-5). Differential suite at N=25000 runs in about 15 s per seed.'
+  reliability:
+    status: CONCERNS
+    notes: 'BUG-9 and BUG-10 fixed. BUG-11: an invalid UTF-8 byte still gets a count at the CLI.'
+  maintainability:
+    status: PASS
+    notes: 'Header, CHANGELOG and task Target Architecture match the one-line grammar. CR-2 (advisory): the differential test header still describes a lenientFreeText reference that no longer exists.'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-240-QA-14: fatal UTF-8 decode in the CLI, with a CLI test and a mutation proof.'
+      refs: ['shared/resources/open-coverage.js', 'shared/resources/tests/open-coverage.test.mjs']
+  future:
+    - action: 'CR-2 (cleanup, low): reword the differential test header (lines 18-22), which still describes the removed lenientFreeText leniency.'
+      refs: ['shared/resources/tests/open-coverage-differential.test.mjs']
+    - action: 'CR-3 (cleanup, carried from gate 7 CR-3/CR-4): give an unreadable file and an internal error their own reasons instead of no-section and bad-line.'
+      refs: ['shared/resources/open-coverage.js']
+    - action: 'CR-6 (carried, low): python3 -I ignores user site-packages; a host with PyYAML only in the user site fails the suite as if PyYAML were missing.'
+      refs: ['shared/resources/tests/open-coverage-differential.test.mjs']
+    - action: 'Carried from the implementation report: quote finding: and suggested_action: in the review-pr template, so free text holding `: ` does not halt 5c as unreadable.'
+      refs: ['skills/review-pr/SKILL.md']
+    - action: 'Over-refusals recorded, all fail-closed and allowed (hand probe, 8 of 54): `~` as a value, a `...` document end, a value continued on a deeper line, a multi-line quoted value, a zero-width or no-break space, a private-use character, a %YAML directive.'
+      refs: ['shared/resources/open-coverage.js']
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 1
+  fix_date: '2026-10-28'
+  total_iterations: 7
+  verification_method: 'bug.9 and bug.10 shapes re-run (all unreadable; a quoted bracket still counts); 54-shape hand probe against PyYAML 6.0.3: 0 wrong, 8 over-refusals; differential suite at seeds 3, 17, 777, 8080, 31337 x 25000 green; corpus 187 reports, distribution 0x128, 1x35, 2x5, unreadable x19, as recorded; worktree mutations (charset widened, keyIndent check dropped, `: ` check dropped, first-char check dropped) each red; ci:fast 6705 pass / 0 fail; CI green on afccc788.'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-240-QA-14 fixed']

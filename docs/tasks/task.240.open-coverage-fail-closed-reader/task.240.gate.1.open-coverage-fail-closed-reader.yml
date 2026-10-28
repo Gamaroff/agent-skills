@@ -1,0 +1,63 @@
+schema: 2
+task: 'task.240.open-coverage-fail-closed-reader'
+task_title: 'Fail-closed reader for the 5c open-coverage check'
+gate: CONCERNS
+status_reason: 'The reader, call site, harness and corpus parity all hold, and the corpus reads the same before and after. One reproduced regression: a wrapped value under a non-deciding key, valid YAML the awk read correctly, now reads unreadable (BUG-1).'
+reviewer: 'QA Engineer'
+head: 'c054f8f4473ef3a634bf6cb73121c0daafdd1fb7'
+updated: '2026-10-28T14:40:00Z'
+
+top_issues:
+  - id: 'TASK-240-QA-1'
+    severity: medium
+    file: 'shared/resources/open-coverage.js'
+    finding: 'A plain or double-quoted value under a non-deciding key (e.g. finding:) that wraps onto a deeper line reads unreadable; the replaced awk read the plain shape as 0 and the quoted shape as 1 (reproduced; CR-1; bug report task.240.bug.1.wrapped-value-reads-unreadable.md).'
+    suggested_action: 'Accept deeper lines after a plain or quoted value as text for keys outside DECIDING, let a double-quoted value under such a key continue to its closing quote, keep the refusal for category/provenance, and add parity rows for both shapes plus the quoted-key trap.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 116
+  phases_verified: 4/4
+  trace:
+    phases_covered: [0, 1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: internal — shared/resources/open-coverage.js#countOpenCoverage reads the review-pr report (a pipeline-written artefact); no corpus sink models it (markdown-structure models the implementation report). The reader parses text only: no eval, no shell, no file write; values are compared, never executed.'
+  performance:
+    status: PASS
+    notes: 'SC-5: one command node call at 5c, held by the parity assertion; no new CI wait.'
+  reliability:
+    status: CONCERNS
+    notes: 'BUG-1: a valid wrapped value reads unreadable, which halts a clean run after a 5c re-run.'
+  maintainability:
+    status: PASS
+    notes: 'A 35-line awk program and its 23-line shape table replaced by a documented parser with ten named refusal reasons and a reachability test.'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-240-QA-1 (BUG-1) and add parity rows for the wrapped shapes.'
+      refs: ['shared/resources/open-coverage.js', 'evals/shared/tests/pr-review-loop-parity.test.mjs']
+  future:
+    - action: 'CR-2: pin the per-file corpus results (a file -> value snapshot) so a regression on any one tracked report fails the corpus test; today it checks only that one 1 and one unreadable exist.'
+      refs: ['shared/resources/tests/open-coverage.test.mjs']
+    - action: 'CR-3: give a non-Refusal exception its own reason (internal-error) so a reader defect is not reported as bad-line.'
+      refs: ['shared/resources/open-coverage.js']
+    - action: 'Step 4b could not execute the changed 5c block: qa-execute-snippets refuses `command node` (unrecognised-command, fail-closed). The parity suite runs that block under bash and zsh instead.'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-240-QA-1 fixed']

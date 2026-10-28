@@ -1,0 +1,65 @@
+schema: 2
+task: 'task.240.open-coverage-fail-closed-reader'
+task_title: 'Fail-closed reader for the 5c open-coverage check'
+gate: PASS
+status_reason: 'Cycle 9, the last granted cycle. BUG-11 is verified fixed and closed: an invalid UTF-8 byte now reads unreadable (bad-encoding). The reviewer compared the fatal decoder with Python''s strict codec over 862,998 byte sequences, with identical results, and found no byte input that reaches a count PyYAML rejects. Two low cleanups are advisory and routed to future.'
+reviewer: 'QA Engineer'
+head: 'a3b9c0d051cc33e244161f3757bd7ddbb4ad907c'
+updated: '2026-10-28T18:02:21Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 6710
+  phases_verified: 4/4
+  trace:
+    phases_covered: [0, 1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: internal, as on gates 1-8. shared/resources/open-coverage.js#countOpenCoverage reads a /review-pr report, an artefact this pipeline writes; no corpus sink models that document (markdown-structure models the implementation report). The fail-closed property is exercised by the PyYAML differential suite, a 54-shape hand probe, byte-level refusal rows and the reviewer''s 862,998-sequence decoder comparison. Text parsing only: no eval, no shell, no write.'
+  performance:
+    status: PASS
+    notes: 'One linear pass and one command node call at 5c (SC-5). The strict decode adds no pass the utf8 read did not make.'
+  reliability:
+    status: PASS
+    notes: 'BUG-9, BUG-10 and BUG-11 are fixed. No probe this cycle found a count PyYAML disagrees with: 54 hand shapes, seeds 5, 99 and 4242 at 25,000 blocks, 15 byte injections and 18 input types.'
+  maintainability:
+    status: PASS
+    notes: 'Header, CHANGELOG and tests match the code. CR-1 and CR-2 (advisory): a non-view byte container reads no-section, and no test pins ignoreBOM on the bytes path.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (cleanup, low): route a non-string, non-Uint8Array input (ArrayBuffer, DataView, a cross-realm view) to its own refusal or through the decoder, so no-section only ever means a missing heading.'
+      refs: ['shared/resources/open-coverage.js']
+    - action: 'CR-2 (cleanup, low): add a BOM-prefixed byte row to the bytes-equal-text test, so ignoreBOM is pinned.'
+      refs: ['shared/resources/tests/open-coverage.test.mjs']
+    - action: 'Carried (gate 7/8 CR-3): give an unreadable file and an internal error their own reasons instead of no-section and bad-line.'
+      refs: ['shared/resources/open-coverage.js']
+    - action: 'Carried (CR-6, low): python3 -I ignores user site-packages; a host with PyYAML only in the user site fails the differential suite as if PyYAML were missing.'
+      refs: ['shared/resources/tests/open-coverage-differential.test.mjs']
+    - action: 'Carried: quote finding: and suggested_action: in the review-pr template, so free text holding `: ` does not halt 5c as unreadable.'
+      refs: ['skills/review-pr/SKILL.md']
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-10-28'
+  total_iterations: 8
+  verification_method: 'bug.11 reproduction re-run (unreadable, bad-encoding); 54-shape hand probe: 0 wrong; differential seeds 5, 99, 4242 x 25000 green; corpus 187 reports, distribution unchanged; reviewer: decoder vs Python strict utf-8 over 862,998 sequences identical, 15 byte injections and 18 input types, no false count; fix mutation-proven at cycle 8 (M36 5 red, M37 1 red); ci:fast 6710 pass / 0 fail.'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

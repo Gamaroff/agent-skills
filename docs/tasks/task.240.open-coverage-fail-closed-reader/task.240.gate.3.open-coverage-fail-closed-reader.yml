@@ -1,0 +1,78 @@
+schema: 2
+task: 'task.240.open-coverage-fail-closed-reader'
+task_title: 'Fail-closed reader for the 5c open-coverage check'
+gate: CONCERNS
+status_reason: 'Cycle 2 fix verified for its own shape (BUG-2 reads unreadable; corpus 0 changes; ci:fast green). The scoped review found that nestedLine() checks only the first character after one dash and one simple key, so an opener behind a prefix or inside a flow collection still hides a key-indent line (BUG-3); and its comment strip refuses a closed flow line with a quoted #.'
+reviewer: 'QA Engineer'
+head: '46146a35c93cdd4154fda83d5f37da816c454703'
+updated: '2026-10-28T15:06:51Z'
+
+top_issues:
+  - id: 'TASK-240-QA-3'
+    severity: medium
+    file: 'shared/resources/open-coverage.js'
+    finding: 'nestedLine() sees only an opener at the first character after one `- ` and one simple key, so `[a, "b]`, `- - "open`, `- &a "open` and `- sub key: "open` under an empty key each run, in YAML, over the key-indent `provenance: pre-existing`; the reader prints 0, PyYAML reads 1 (reproduced; CR-1 and CR-2; re-rated high -> medium: 0 of 187 tracked reports carry any nested value under an empty key and no writer emits one; confidence high unchanged; bug report task.240.bug.3.nested-opener-check-bypassed.md).'
+    suggested_action: 'Replace the opener scan with a character rule: a nested line under an empty key may hold no double quote, no [ or {, and no single quote other than an apostrophe between word characters; refuse otherwise.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-240-QA-4'
+    severity: low
+    file: 'shared/resources/open-coverage.js'
+    finding: 'The flow-line comment strip in nestedLine() is quote-blind, so `- [a, "see #12"]` reads unreadable where the old awk and PyYAML read 1 (CR-3; a false unreadable introduced in cycle 2 — the fail-closed direction).'
+    suggested_action: 'Resolved by the TASK-240-QA-3 replacement, which refuses every nested quote by design; record it as such.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 172
+  phases_verified: 4/4
+  trace:
+    phases_covered: [0, 1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: internal — shared/resources/open-coverage.js#countOpenCoverage reads the review-pr report (a pipeline-written artefact); no corpus sink models it. The reader parses text only: no eval, no shell, no file write.'
+  performance:
+    status: PASS
+    notes: 'One linear pass; one command node call at 5c (SC-5).'
+  reliability:
+    status: CONCERNS
+    notes: 'BUG-3: four contrived but valid nested shapes read a false 0. BUG-2 fixed for its own shape.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Third MEDIUM on the same mechanism (quote handling); narrowing residue — a further patch to the scan would repeat the pattern.'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-240-QA-3 (BUG-3) by replacing the nested opener scan, not patching it; add parity rows for the four shapes.'
+      refs: ['shared/resources/open-coverage.js', 'evals/shared/tests/pr-review-loop-parity.test.mjs']
+  future:
+    - action: 'Carried from gate 2 (pre-existing on the base awk, 0 corpus hits): CR-2 flow key with no space after the colon; CR-3 case-blind keys; CR-4 comment inside a wrapped plain value.'
+      refs: ['shared/resources/open-coverage.js']
+      provenance: pre-existing
+    - action: 'Carried from gate 2: CR-5 echo the reader stderr at 5c; CR-6 a differential test against a YAML parser (it would have found BUG-2 and BUG-3 without a hand-picked row); cycle 1 CR-2 pin per-file corpus results; cycle 1 CR-3 an internal-error reason.'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'shared/resources/tests/open-coverage.test.mjs']
+    - action: 'Step 4b could not execute the changed 5c block (command node not on the executor allow-list); the parity suite runs it under bash and zsh in CI.'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 1
+  fix_date: '2026-10-28'
+  total_iterations: 2
+  verification_method: 'bug.2 reproduction re-run (unreadable); cycle 1 fixtures re-run (0 / 1 / unreadable); targeted suites 172/172; validate x3 green.'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-240-QA-3 fixed']

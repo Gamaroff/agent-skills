@@ -1,0 +1,86 @@
+schema: 2
+task: 'task.240.open-coverage-fail-closed-reader'
+task_title: 'Fail-closed reader for the 5c open-coverage check'
+gate: CONCERNS
+status_reason: 'Cycle 6 (granted re-entry). BUG-5 is fixed and the PyYAML differential test (CR-6) has landed, but the scoped review found two more shape classes YAML rejects that the reader counts: a comment inside a wrapped plain value (BUG-6) and an indicator-leading value (BUG-7). The generator cannot produce either (BUG-8). The counts match what the writer meant; no deciding key is misplaced.'
+reviewer: 'QA Engineer'
+head: '22bdc3e9d7f4b675860974478943012f195b26c0'
+updated: '2026-10-28T16:27:53Z'
+
+top_issues:
+  - id: 'TASK-240-QA-8'
+    severity: medium
+    file: 'shared/resources/open-coverage.js'
+    finding: 'The comment-ends-the-value rule (line 351) covers block scalars only, so a wrapped plain value cut by a comment line, or by a ` #` on a wrapped line, keeps reading and prints 1 where PyYAML raises ParserError (reproduced; CR-1; 0 of 168 corpus blocks; severity kept, since review-pr is a model writer; bug report task.240.bug.6.comment-inside-wrapped-value-accepted.md).'
+    suggested_action: 'Refuse deeper plain lines after a comment, or after a wrapped line holding ` #`; pin both shapes.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-240-QA-9'
+    severity: medium
+    file: 'shared/resources/open-coverage.js'
+    finding: 'scalar() (line 103) refuses only `!`, `&` and `*` at the start of a key-level value. A value starting with a backtick, `@`, `%`, `, ` or `- ` is read as plain and counted (each prints 1), while PyYAML rejects each block (reproduced; CR-2; 0 of 168 corpus blocks; a backtick-led finding sentence is a likely review-pr output; bug report task.240.bug.7.indicator-leading-value-accepted.md).'
+    suggested_action: 'Refuse them under category/provenance; under free text either refuse, or document a leniency and model it in lenientFreeText. A blanket refusal would halt real reviews.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-240-QA-10'
+    severity: medium
+    file: 'shared/resources/tests/open-coverage-differential.test.mjs'
+    finding: 'The generator emits exactly one wrapped line (line 163), no indicator-leading value and no tab separator, so the suite is green while QA-8 and QA-9 reproduce by hand (CR-3; bug report task.240.bug.8.differential-generator-misses-shapes.md).'
+    suggested_action: 'Widen the grammar to 1-3 wrapped lines with interleaved comments, indicator-leading values and a tab separator; mutation-prove the suite red on QA-8 and QA-9.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 6660
+  phases_verified: 4/4
+  trace:
+    phases_covered: [0, 1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: internal, as on gates 1-5. countOpenCoverage reads a pipeline-written review report that no corpus sink models; its fail-closed property is exercised by the PyYAML differential suite. Text parsing only: no eval, no shell, no file write.'
+  performance:
+    status: PASS
+    notes: 'One linear pass and one command node call at 5c (SC-5). The differential suite runs one python3 process per run.'
+  reliability:
+    status: CONCERNS
+    notes: 'BUG-5 is fixed. BUG-6 and BUG-7: shapes YAML rejects get a count.'
+  maintainability:
+    status: PASS
+    notes: 'Header matches the code (QA-7 closed). The differential suite has a generator gap (QA-10).'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-240-QA-8, QA-9 and QA-10 together: each reader fix must turn the widened differential suite red when reverted.'
+      refs: ['shared/resources/open-coverage.js', 'shared/resources/tests/open-coverage-differential.test.mjs']
+  future:
+    - action: 'CR-4 (low, confidence medium): a tab after a key colon is accepted and counted; PyYAML rejects it.'
+      refs: ['shared/resources/open-coverage.js']
+    - action: 'CR-5 (low): the non-vacuity floors scale with N, so OPEN_COVERAGE_DIFF_N=0 passes vacuously; add a minimum N.'
+      refs: ['shared/resources/tests/open-coverage-differential.test.mjs']
+    - action: 'CR-6 (low, confidence low): python3 -I ignores user site-packages; a host with PyYAML only in the user site fails the suite as if PyYAML were missing.'
+      refs: ['shared/resources/tests/open-coverage-differential.test.mjs']
+    - action: 'Carried: CR-5 echo the reader stderr at 5c; pin per-file corpus results; an internal-error reason.'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'shared/resources/tests/open-coverage.test.mjs']
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 3
+  fix_date: '2026-10-28'
+  total_iterations: 5
+  verification_method: 'bug.5 shapes re-run (unreadable; the aligned block reads 0); mutation keyIndent -> dash+2 turned 5 tests red; the 22bdc3e9 comment-ends-scalar rule reverted turned 1 test red; ci:fast 6660 pass / 0 fail.'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-240-QA-8, QA-9 and QA-10 fixed']
