@@ -361,18 +361,18 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.238.qa.8.qa-loop-acts-on-signals-it-has.md](./task.238.qa.8.qa-loop-acts-on-signals-it-has.md)
-- **Gate File**: [task.238.gate.8.qa-loop-acts-on-signals-it-has.yml](./task.238.gate.8.qa-loop-acts-on-signals-it-has.yml)
+- **Full Report**: [task.238.qa.9.qa-loop-acts-on-signals-it-has.md](./task.238.qa.9.qa-loop-acts-on-signals-it-has.md)
+- **Gate File**: [task.238.gate.9.qa-loop-acts-on-signals-it-has.yml](./task.238.gate.9.qa-loop-acts-on-signals-it-has.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 6521
+- **Tests Executed**: 6529
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- The cycle 7 fixes hold: bug.15, bug.16 and PRB7-1 are closed, and both guards are mutation-proved. Fast gate and PR CI are green
-- One MEDIUM in the §5c open-coverage check (bug.17): its allow-list checks line shapes but not values, so a tagged, anchored or block-scalar category, a continued provenance value and a malformed flow entry read `0`
+- The cycle 8 fix holds: bug.17 is closed, and all four of its guards are mutation-proved. The suite, bundle check, validate and PR CI are green
+- Two MEDIUMs remain in the §5c open-coverage check. A failing `awk` prints an empty `OPEN_COVERAGE` that takes the Otherwise exit (bug.18). A block key after a flow entry is read as that entry's, so an invalid-YAML exemption reads `0` (bug.19)
 
 ## Definition of Done - Gaps Identified
 
@@ -441,6 +441,8 @@ The QA gate passed. The gaps below come from `/finalise`'s own checks: the secur
 | 2026-10-28 |  | QA findings fixed — gate 7 CONCERNS, 3 entries (bug.15, bug.16, PRB7-1) plus cleanup CR7-5, 1 iteration; the §5c open-coverage check now reads an allow-list of line shapes; the wrapper's signal sentence counts only after node's summary | qa-fix |
 | 2026-10-28 |  | QA gate CONCERNS (80/100) — 1 finding (1 medium); bug.15–bug.16 verified and closed | qa-task |
 | 2026-10-28 |  | QA findings fixed — gate 8 CONCERNS, 1 entry (bug.17), 1 iteration; the §5c open-coverage check now allow-lists values as well as lines (review-pr's six category tokens; a continued, repeated or commented value reads `unreadable`) | qa-fix |
+| 2026-10-28 |  | QA gate CONCERNS (80/100) — 2 findings (2 medium); bug.17 verified and closed; bug.18, bug.19 opened | qa-task |
+| 2026-10-28 |  | QA findings fixed — gate 9 CONCERNS, 2 entries (bug.18, bug.19) plus low CR9-3, 1 iteration; the §5c open-coverage check maps a non-count value to `unreadable`, refuses any line after a one-line flow entry, and requires a terminator after `findings:` | qa-fix |
 <!-- change-log-end -->
 
 ---

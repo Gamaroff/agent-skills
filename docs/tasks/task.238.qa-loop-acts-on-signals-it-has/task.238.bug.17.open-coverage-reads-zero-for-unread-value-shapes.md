@@ -4,7 +4,7 @@
 **Bug ID**: TASK-238-BUG-17
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 8 diff review, CR8-1; reproduced by the probe engine)
 **Date Found**: 2026-10-28
 
@@ -119,3 +119,4 @@ case.
 | 2026-10-28 | New | qa-task | Found by QA cycle 8 (`task.238.qa.8.qa-loop-acts-on-signals-it-has.md`) |
 | 2026-10-28 | In Progress | qa-fix | Investigation started (QA cycle 8 fix) |
 | 2026-10-28 | Ready for QA | qa-fix | Value allow-list: unknown category token, continued value, duplicate key, flow comment read unreadable |
+| 2026-10-28 | Closed | qa-task | Verified by task.238.qa.9.qa-loop-acts-on-signals-it-has.md |

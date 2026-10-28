@@ -833,8 +833,8 @@ function reviewReport(findings) {
 }
 
 // `body` is the report's text, or null for a path that does not exist. Returns the count, or the
-// literal `unreadable`.
-function openCoverageOf(body) {
+// literal `unreadable`. `env` replaces the block's environment (the failing-awk case).
+function openCoverageOf(body, env = process.env) {
   const blocks = extractBlocks(loopDoc).filter((b) =>
     b.code.includes("OPEN_COVERAGE=$("),
   );
@@ -851,7 +851,7 @@ function openCoverageOf(body) {
       .split("{the PR review report this cycle's 5c wrote}")
       .join(report);
     const runIn = (sh) => {
-      const r = spawnSync(sh, ["-c", code], { encoding: "utf8" });
+      const r = spawnSync(sh, ["-c", code], { encoding: "utf8", env });
       if (r.error?.code === "ENOENT") return undefined; // zsh absent on this runner
       assert.equal(r.status, 0, `${sh}: ${r.stderr}`);
       const m = r.stdout.match(/^OPEN_COVERAGE=(\d+|unreadable)$/m);
@@ -1072,6 +1072,30 @@ const RAW_CASES = [
     '  - id: PC-1\n    category: coverage\n    severity: medium\n    confidence: high\n    ref: "SC-3"\n    provenance: pre-existing\n    anchor_check: no-line\n    finding: >-\n      category: coverage, provenance: new\n    suggested_action: file a follow-up\n  - id: CR-1\n    category: bug\n    severity: low\n    ref: "x.js:3"\n    finding: a typo\n',
     0,
   ],
+  // A flow entry is complete on its line (task.238 bug.19): a key after it is invalid YAML, and it
+  // printed 0 by exempting the flow entry's coverage finding.
+  [
+    "a key line after a one-line flow entry",
+    "  - {id: PC-1, category: coverage}\n    provenance: pre-existing\n",
+    "unreadable",
+  ],
+  [
+    "a deeper text line after a one-line flow entry",
+    "  - {id: PC-1, category: coverage}\n      more text\n",
+    "unreadable",
+  ],
+  [
+    "a flow entry followed by a block entry still reads",
+    "  - {id: PC-1, category: trail}\n  - id: PC-2\n    category: coverage\n",
+    1,
+  ],
+  // A list cut short reads unreadable, not the count of what survived (task.238 CR9-3): a column-0
+  // `## ` line inside the fence ends the section the check reads.
+  [
+    "a findings list cut short by a column-0 heading line",
+    "  - id: CR-1\n    category: bug\n## a comment\n  - id: PC-1\n    category: coverage\n",
+    "unreadable",
+  ],
 ];
 
 for (const [label, yaml, want, edit = (b) => b] of RAW_CASES) {
@@ -1092,6 +1116,10 @@ const UNREADABLE_CASES = [
     "a findings heading with no findings: key",
     "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: none\n```\n\n## Recommended Actions\n",
   ],
+  [
+    "a findings list with no terminator after it (a report cut off mid-block)",
+    "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nfindings:\n  - id: PC-1\n    category: trail\n",
+  ],
 ];
 
 for (const [label, body] of UNREADABLE_CASES) {
@@ -1099,6 +1127,22 @@ for (const [label, body] of UNREADABLE_CASES) {
     assert.equal(openCoverageOf(body), "unreadable");
   });
 }
+
+// An awk that does not run prints nothing, and an empty value took the Otherwise exit to Step 7
+// (task.238 bug.18). A stub awk that exits 2 stands in for a missing binary or a rejected program.
+test("open-coverage check: an awk that fails → unreadable, never an empty value", () => {
+  const bin = mkdtempSync(join(tmpdir(), "failing-awk-"));
+  try {
+    writeFileSync(join(bin, "awk"), "#!/bin/sh\nexit 2\n", { mode: 0o755 });
+    const env = { ...process.env, PATH: `${bin}:${process.env.PATH}` };
+    assert.equal(
+      openCoverageOf(rawReport("  - id: PC-1\n    category: coverage\n"), env),
+      "unreadable",
+    );
+  } finally {
+    rmSync(bin, { recursive: true, force: true });
+  }
+});
 
 test("open-coverage check: an empty findings list (`findings: []`) reads 0, not unreadable", () => {
   assert.equal(
