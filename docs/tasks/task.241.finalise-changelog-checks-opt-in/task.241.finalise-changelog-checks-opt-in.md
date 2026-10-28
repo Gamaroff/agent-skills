@@ -5,10 +5,12 @@ type: task
 description: "Gate both /finalise changelog checks behind skills-config.yaml changelog.enforce, off by default, so /finalise never reads a consumer's CHANGELOG.md unless the project opts in."
 tags: [finalise, changelog, skills-config, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-28
 updated: 2026-10-28
+completed_date: 2026-10-28
+pr_number: 773
 assignee:
 estimated_effort_hours: 16
 github_issue: 772
@@ -16,7 +18,7 @@ github_issue: 772
 
 # Technical Task: Make /finalise changelog checks opt-in
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.241.review.1.finalise-changelog-checks-opt-in.md` implemented 2026-10-28
 **GitHub Issue**: [#772](https://github.com/Gamaroff/agent-skills/issues/772)
 
@@ -160,10 +162,10 @@ flowchart TD
 
   The `CHANGELOG.md` entry for this task states this, and so does the configuration reference.
 
-### A non-boolean value no longer reads as on
+### Only a YAML true turns the checks on
 
 - **Before**: no key existed.
-- **After**: `enforce: yes` reads as off with a warning, because the two reader tiers disagree on it (see § 3). Write `true`.
+- **After**: any YAML true spelling (`true`, `yes`, `on`, in any case) reads as on, under either reader tier (see § 3). Any other value that is not a false spelling, such as `enabled` or `1`, reads as off with a warning naming it. Write `true`.
 
 ---
 
@@ -216,7 +218,7 @@ flowchart TD
 - [x] Wiring test: the dispatch table row 4 and the prompt both name `<CHANGELOG_ENFORCE>`, and the prompt's Step 2 opens with the gate.
 - [x] Mutation-prove 6d: delete the gate line; the unset-key case goes red with `HALT: no-changelog-entry` (5 red). Dropping `<CHANGELOG_ENFORCE>` from row 4 turns the wiring test red (1 red).
 - [x] Keep `6d: no CHANGELOG.md — not applicable` byte-identical: `finalise-publish-boundary.test.mjs` asserts it (the only test literal the change touches; `git grep -n -E "CHANGELOG citation checked|4\. Docs & changelog|Check CHANGELOG\.md|6d: no CHANGELOG|CHANGELOG\.md updated" -- '*.test.*' 'evals/**' 'tests/**'`).
-- [x] Run the zsh arm locally and record the result in the implementation report — CI has no zsh lane. **Attempted, not runnable:** zsh is installed neither on this laptop nor on the `.249` server (checked 2026-10-28). The draft's "zsh is installed here" was wrong. The zsh arm is **unverified** for this change, which is a recorded residual. The new gate line uses only `[ "$CL" != on ]` and `echo`, constructs that behave the same in both shells.
+- [x] Run the zsh arm and record the result in the implementation report. **Not runnable locally:** zsh is installed neither on this laptop nor on the `.249` server (checked 2026-10-28). **Verified on CI:** `.github/workflows/test.yml` installs zsh, and the zsh arm ran green on `93fb2108` (run 40675928437). The draft's "CI has no zsh lane" was wrong; the cycle-2 CI log shows the zsh variants running.
 - [x] `npm run bundle`, `npm run bundle:check`, `npm run generate-catalog`, `npm test`.
 
 **Dependencies**: Phases 1–3.
@@ -289,7 +291,7 @@ Not applicable. One extra config read per `/finalise` run.
 
 ### Functional
 
-- [x] With `changelog.enforce` unset, the shipped 6d block in a repo holding an uncited `CHANGELOG.md` exits 0 and prints `6d: changelog checks not enabled` — held per PR under bash by `finalise-publish-boundary.test.mjs`; the zsh arm runs where zsh is installed (CI's `ubuntu-latest` has none, so `SHELLS` drops it). **zsh arm unverified:** no host available to this run has zsh (Phase 4).
+- [x] With `changelog.enforce` unset, the shipped 6d block in a repo holding an uncited `CHANGELOG.md` exits 0 and prints `6d: changelog checks not enabled` — held per PR by `finalise-publish-boundary.test.mjs` under bash, and under zsh on CI, whose `test.yml` installs it (green on `93fb2108`). A host without zsh drops that arm from `SHELLS`.
 - [x] With `changelog.enforce: true`, every existing 6d case passes unchanged — the same file's existing cases, run with an `enforce: true` config fixture.
 - [x] `changelog-enforce.sh` prints the same answer under both reader tiers: `on` for any YAML true spelling, `off` for unset or any false spelling, and `off` plus a stderr warning for any other non-empty value — held by `shared/resources/tests/changelog-enforce.test.mjs` (§ 3 correction).
 - [x] The docs prompt's Step 2 instructs `NOT_APPLICABLE` ("changelog checks not enabled") when `<CHANGELOG_ENFORCE>` is `off`, and `NOT_APPLICABLE` ("repository keeps no CHANGELOG.md") when on and the file is absent; `/finalise` row 4 substitutes `<CHANGELOG_ENFORCE>` — a documentation criterion, held by the wiring test (the subagent itself cannot run offline).
@@ -399,12 +401,35 @@ None.
 - **TASK-241-CR3-1** (LOW) — carried to gate 3 `recommendations.future` (route 2b, cycle 3): the bug-template allow-list span in `finalise-publish-boundary.test.mjs` uses `.*?` between its anchors; replace it with the literal middle text.
 - **TASK-241-CR3-2** (LOW) — carried to gate 3 `recommendations.future` (route 2b, cycle 3): name the `changelog-unknown` HALT in the 6d heading, the completion checklist and the runbook, and test that every 6d `HALT:` token is listed.
 
-## Change Log
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.241.qa.3.finalise-changelog-checks-opt-in.md`
+**Gate File**: `task.241.gate.3.finalise-changelog-checks-opt-in.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 96/100, after 3 QA cycles
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 12/12 met. 9 are held by tests that run on every PR, and 3 are documentation criteria whose text was read.
+✅ **PR Review:** PR #773. The host requires no review, so the Step 5c report `task.241.pr-review.1.finalise-changelog-checks-opt-in.md` (CONCERNS, no coverage finding) stands in. Its three doc findings are fixed.
+✅ **CI:** green over 6 checks on `8754c848`.
+✅ **Documentation:** CHANGELOG `(task 241)`, `configuration.md`, `releases.md`, the runbook and the finalise skill are updated.
+✅ **Security Review:** ✅ PASS. 31 probes over the resolver and the Step 3b guard, 0 reproduced, 0 escapes.
+⚠️ **Compliance Review:** not applicable (internal tooling).
+
+**Task marked as ACCEPTED on:** 2026-10-28
+
+**Detailed Verification Log:** see `task.241.dod.1.finalise-changelog-checks-opt-in.md` for the full verification evidence.
 
 <!-- change-log-start -->
+## Change Log
 
 | Date | Version | Description | Author |
-| ---- | ------- | ----------- | ------ |
+|------|---------|-------------|--------|
 | 2026-10-28 | 1.0 | Initial draft — cut from observation #118 | create-task |
 | 2026-10-28 | 1.1 | Review passed (8/10) — criteria re-scoped to what a per-PR test can hold (zsh arm local-only, docs prompt as a documentation criterion, performance bound marked not applicable), sweep search recorded, differential oracle named | review-task |
 | 2026-10-28 |  | Status → ready-for-development | review-task |
@@ -414,7 +439,8 @@ None.
 | 2026-10-28 |  | QA gate CONCERNS (90/100) — 1 medium (CI tmp-leak ratchet), 4 low findings | qa-task |
 | 2026-10-28 |  | QA findings fixed — BUG-4 6d temp dirs removed + ratchet entry deleted; CR2-1 3b/6d HALT `changelog-unknown` on a resolver that could not run; CR2-2/CR2-4 enumeration covers assets/ and any case; CR2-3 deeper nesting documented and pinned; 1 iteration | qa-fix |
 | 2026-10-28 |  | QA gate PASS (96/100) — 0 high, 0 medium, 2 low carried to Deferred Work (route 2b) | qa-task |
-
+| 2026-10-28 |  | PR review CONCERNS — PC-3 Breaking Changes `enforce: yes` entry corrected to match the resolver; PC-1/PC-2 zsh arm recorded as verified on CI | review-pr |
+| 2026-10-28 | 1.2 | DoD verified — accepted (PR #773) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
@@ -435,7 +461,7 @@ None.
   - `npm run ci:fast`: 6,567 tests, 0 failures, 14 skipped.
   - `eval:all`, `bundle:check`, `check:generated` and `validate` all green.
   - 3 mutation proofs, each red, then green once restored.
-- **Deferred / residual:** the zsh arm of the 6d tests is unverified, because neither the laptop nor `.249` has zsh.
+- **Deferred / residual:** none for zsh. The zsh arm of the 6d tests cannot run on the laptop or `.249`, but CI's `test.yml` installs zsh and ran it green on `93fb2108`. Carried LOWs CR3-1 and CR3-2: see Deferred Work.
 
 QA artifacts will land beside this file: `task.241.qa.{N}.finalise-changelog-checks-opt-in.md`, bug reports as `task.241.bug.{N}.{name}.md`, gates as `task.241.gate.{N}.finalise-changelog-checks-opt-in.yml`.
 
