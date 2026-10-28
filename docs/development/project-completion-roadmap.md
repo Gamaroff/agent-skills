@@ -20,7 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. No phase is open (Phase 17 closed 2026-10-27); selection falls through to the registries.
+chain, a human gate. Phase 18 is open (opened 2026-10-28); once it closes, selection falls through to the registries.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -66,6 +66,17 @@ Read only by `--batch`. Two rows conflict when they share a tag that **either** 
 | `mutation-proving` | `shared/resources/mutation-proving.md`                                  |
 | `docs-pipeline`    | `docs/runbooks/*`, `docs/concepts/*`, `docs/reference/pipeline-artifacts.md`, `docs/operations/workflows.md`, `skills/develop-*/README.md` |
 | `pipeline-lock`    | `shared/resources/advance-pipeline-lock.sh`, `advance-pipeline-lock.test.sh`  |
+
+## PHASE 18 — fail-closed open-coverage reader (opened 2026-10-28)
+
+An **override**: the owner asked for T240 ahead of every other story and task. T240 replaces the
+§5c open-coverage awk that task.238's QA loop escalated on after 9 cycles. It edits that block, so
+it cannot start until T238 has merged. T238 sits here as a `manual` row: it is waiting on the
+owner's acceptance decision (PR #770), and the loop stops at it rather than resuming that run.
+Tick T238 when PR #770 merges; T240 is selected next.
+
+- [ ] **T238** QA loop acts on the signals it already has · manual — PR #770 escalated at the QA loop limit; awaiting the owner's acceptance decision · touches: pipeline-steps!, qa-skills~, bundles~ · /develop-task docs/tasks/task.238.qa-loop-acts-on-signals-it-has/task.238.qa-loop-acts-on-signals-it-has.md
+- [ ] **T240** Fail-closed reader for the 5c open-coverage check · deps: T238 · touches: pipeline-steps!, bundles~ · /develop-task docs/tasks/task.240.open-coverage-fail-closed-reader/task.240.open-coverage-fail-closed-reader.md
 
 ## Deferred / human-gated
 
@@ -211,3 +222,4 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-10-27 | **T235 accepted + merged — PR #761 merged** (`d8e1b270`). `select-next.mjs` reads a new `blocked_on_external:` frontmatter field: the registry fallback checks it after the eligibility floor and before dependencies, passes the row over with `externalBlock` and a reason naming the condition, counts rejections by cause in the selected rationale and names each held row in the `roadmap-complete` detail. Placeholders and the YAML nulls do not hold a row; the loader became the exported, read-once `makeRegistryLoader`; task.174 carries the field. Two QA cycles (PASS 100 → PASS 100): cycle 1 made the shared `frontmatterScalar` quote-aware (a quoted ` #` stays in the value); cycle 2's one low (TASK-235-CR2-1, an escaped or doubled quote ends a value early, 0 of 522 tracked values) carried to Deferred Work (route 2b). 5c APPROVE, its two lows closed at finalise; DoD 16/16 with the wall time re-measured on the PR head (104.5% of develop); security probe 29 executed, 0 reproduced; merge gate `npm run ci` green (6416 tests, 0 fail). Issue #759 closed. **Next: T236.** |
 | 2026-10-27 | **T236 accepted + merged — PR #763 merged** (`86de1a42`). `create-task` § 1.1 step 3 is now one runnable block. It reads the task id from the registry, single-quotes the task number and ids and checks both against their digit rules, and calls `seedFromObservations(entries, { taskId })` once. `seed-step-block.test.js` executes that block from `SKILL.md`; `seed-block-probe.js` builds the fence probe QA and finalise both run. Four QA cycles (CONCERNS 70 → CONCERNS 90 → PASS 100 → PASS 100): cycles 1–2 fixed a worktree-unsafe test, an unvalidated task number, a block the probe could not reach and double-quoted substitutions. DoD run 1 stopped on a red CI `test` QA had not read: CI has zsh, so the probe ran 36 times, not 18. `1689d7cb` asserts the count per shell (mutation-proven with a stand-in zsh), re-entered QA as cycle 4, and DoD run 2 accepted 11/11. Security probe 18 executed, 0 reproduced; 5c APPROVE twice; merge gate `npm run ci` green (6422 tests, 0 fail); CI 6/6. Issue #760 closed. Observation #107 records the CI-read gap in qa-task. |
 | 2026-10-27 | **Phase 17 closed and archived** to `roadmap-history.md` (T235 and T236). No phase is open; selection falls through to the registries (next: T179; T174 is held on its external precondition). |
+| 2026-10-28 | **Phase 18 opened** with T238 (`manual`: PR #770 escalated at the QA loop limit and awaits the owner's acceptance decision) then T240 (fail-closed open-coverage reader, `deps: T238`), ordered ahead of the registry fallback at the owner's request. |
