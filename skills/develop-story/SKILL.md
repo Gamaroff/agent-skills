@@ -211,7 +211,8 @@ bash .agents/skills/develop-story/references/advance-pipeline-lock.sh {N+1}
 For Step 8 → completion: `... advance-pipeline-lock.sh --complete` — a no-op by then, because Step 8 already ran it as its Completion Checklist's last action, after checks 2–5 passed (task 161).
 
 **Steps 5–6 are one step to the lock.** `current_step` goes `4 → 5` when the QA loop is entered and
-`5 → 7` when 5c returns APPROVE or CONCERNS; `advance-pipeline-lock.sh 6` is **never** issued. Inside
+`5 → 7` when 5c returns APPROVE or CONCERNS (a CONCERNS without an open coverage finding);
+`advance-pipeline-lock.sh 6` is **never** issued. Inside
 the loop the sub-position is the lock's `qa_phase` field (`5a|5b|5c`), which
 `references/set-qa-phase.sh` writes as each sub-step's first action and the `Stop` hook reads to name `/qa-story`,
 `/qa-fix` or `/review-pr`. The helper is monotonic and must stay so; `qa_phase` is how the loop's
@@ -249,8 +250,9 @@ See `references/develop-pipeline-step-5-6-qa-loop.md` for the full Steps 5–6 p
 `WAIVED` hands to 5c, which runs `/review-pr --effort {medium|low} --comment --no-code` over the open PR —
 the conformance lens only, since the QA step already ran the code reviewer.
 `REQUEST CHANGES` routes back to 5b `/qa-fix` and consumes a cycle from the **shared** 5-cycle
-budget; `APPROVE` and `CONCERNS` exit to Step 7, with `CONCERNS` findings recorded rather than
-blocking; on either, doc-only findings are fixed when the carry clears them, and ride the
+budget, and so does a `CONCERNS` whose review holds an open `category: coverage` finding — a gap
+`/finalise` is certain to fail (task.238); `APPROVE` and any other `CONCERNS` exit to Step 7, with
+`CONCERNS` findings recorded rather than blocking; on either, doc-only findings are fixed when the carry clears them, and ride the
 acceptance commit. The
 `ready-for-merge` stage fires there, after the review clears — not on the QA gate. `/review-pr`
 stays advisory throughout: it writes no gate file and never edits code, and this orchestrator is

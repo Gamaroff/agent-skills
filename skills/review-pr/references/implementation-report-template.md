@@ -71,7 +71,7 @@ Created as `story.{P}.{E}.{S}.implementation.{N}.{descriptive-name}.md` in the s
 | 2. review-story             | ⏳ Pending | `story.{P}.{E}.{S}.review.{N}.{name}.md` exists (or skip logged)                          |       | —                    |                 |
 | 3. develop                  | ⏳ Pending | Story status == `Ready for Review`                                                           |       | —                    |                 |
 | 4. create-pr                | ⏳ Pending | PR URL targets `develop` (or chosen base); issue/tracker comment posted                      |       | —                    |                 |
-| 5–6. qa-story / qa-fix loop | ⏳ Pending | `story.{P}.{E}.{S}.qa.{N}.*.md`; `story.{P}.{E}.{S}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
+| 5–6. qa-story / qa-fix loop | ⏳ Pending | `story.{P}.{E}.{S}.qa.{N}.*.md`; `story.{P}.{E}.{S}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                 | ⏳ Pending | `story.{P}.{E}.{S}.dod.{N}.*.md`; story `status: accepted`                                |       | —                    |                 |
 | 8. commit-changes           | ⏳ Pending | All artifacts committed and pushed                                                           |       | —                    |                 |
 
@@ -169,7 +169,7 @@ Created as `task.{id}.implementation.{N}.{descriptive-name}.md` in the task dire
 | 2. review-task             | ⏳ Pending | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               |       | —                    |                 |
 | 3. develop                 | ⏳ Pending | Task status == `Ready for Review`                                      |       | —                    |                 |
 | 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 

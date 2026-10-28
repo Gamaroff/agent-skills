@@ -403,9 +403,12 @@ Parse latest gate YAML for:
 - `risk_summary.recommendations.must_fix[]`
 
 When `PR_REVIEW` (selected in Step 1a) is a path, read that report's `## Machine-Readable Findings`
-block — `id`, `severity`, `ref`, `finding`, `suggested_action` — and treat a `high` finding as a
-HIGH gate `top_issue`. On the `REQUEST CHANGES` path it is the only carrier of the work; the gate is
-clean. Read no other PR review report. **Skip an entry marked `provenance: pre-existing`.** `/review-pr`
+block — `id`, `category`, `severity`, `ref`, `finding`, `suggested_action` — and treat a `high` finding as a
+HIGH gate `top_issue`. **Treat a `category: coverage` finding as work at any severity** — Step 2's
+row 4: the orchestrator also returns a 5c `CONCERNS` to this skill when the review holds an open
+coverage finding, and such a finding is often `medium` or `low`, which no other row would pick up
+(task.238). On the `REQUEST CHANGES` path, and on that `CONCERNS` path, the review is the only
+carrier of the work; the gate is clean. Read no other PR review report. **Skip an entry marked `provenance: pre-existing`.** `/review-pr`
 found it identical on the PR base and left it out of its verdict, so it is a follow-up for the base,
 not work for this branch, exactly as `/qa-task` routes the same finding to `recommendations.future`
 (obs #271).
@@ -469,13 +472,16 @@ This prevents the large QA artifact content from polluting the fix implementatio
 1. **Blocker/Critical severity bug reports** → Fix immediately, blocks deployment
 2. **High severity** bug reports → Fix in current cycle
 3. **High severity** items in `top_issues` (security/performance/reliability/maintainability)
-4. **NFR FAIL statuses** → must fix all FAIL items
-5. **Medium severity** bug reports → Address after critical items
-6. **NFR CONCERNS** → minimize or document
-7. **Test Design coverage_gaps** → prioritize P0 scenarios
-8. **Trace uncovered requirements** → AC-level gaps
-9. **Risk must_fix recommendations**
-10. **Low severity** bug reports and issues → Fix when time permits
+4. **pr-review `coverage` findings, at any severity** → each is a criterion the work item promised,
+   and `/finalise`'s acceptance-criteria check fails it (task.238). Close the gap the finding
+   names — the code, test or artifact the criterion asks for — never by editing the criterion
+5. **NFR FAIL statuses** → must fix all FAIL items
+6. **Medium severity** bug reports → Address after critical items
+7. **NFR CONCERNS** → minimize or document
+8. **Test Design coverage_gaps** → prioritize P0 scenarios
+9. **Trace uncovered requirements** → AC-level gaps
+10. **Risk must_fix recommendations**
+11. **Low severity** bug reports and issues → Fix when time permits
 
 **Step 2a: Identify Ambiguities and Multiple Options**
 

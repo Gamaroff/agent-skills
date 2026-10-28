@@ -25,9 +25,18 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
+import { extractBlocks } from "../../../shared/resources/qa-execute-snippets.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..", "..", "..");
@@ -678,16 +687,41 @@ test("each 5c verdict maps to ONE destination, read off its own row", () => {
     "REQUEST CHANGES is still inside the loop — it must not exit, and must not re-enter at 5a",
   );
 
-  for (const v of ["APPROVE", "CONCERNS"]) {
-    const a = verdictRow(v);
-    assert.match(a, /exit the loop/, `${v} must exit the loop`);
-    assert.match(a, /Step 7/, `${v} must proceed to Step 7`);
-    assert.doesNotMatch(
-      a,
-      /Return to \*\*5[ab]\*\*/,
-      `${v} is terminal for the loop — it must not route back into 5a or 5b`,
-    );
-  }
+  const approve = verdictRow("APPROVE");
+  assert.match(approve, /exit the loop/, "APPROVE must exit the loop");
+  assert.match(approve, /Step 7/, "APPROVE must proceed to Step 7");
+  assert.doesNotMatch(
+    approve,
+    /[Rr]eturn to \*\*5[ab]\*\*/,
+    "APPROVE is terminal for the loop — it must not route back into 5a or 5b",
+  );
+
+  // CONCERNS is conditional since task.238: an open coverage finding takes the REQUEST CHANGES arm
+  // (back to 5b, never 5a); otherwise it exits. Both halves are read off the one row, in order — the
+  // condition first, then the exit it overrides.
+  const concerns = verdictRow("CONCERNS");
+  const cond = concerns.search(/open `category: coverage` entry/);
+  const back = concerns.search(/return to \*\*5b\*\*/);
+  const otherwise = concerns.search(/\*\*Otherwise\*\*/);
+  const exits = concerns.search(/exit the loop, proceed to Step 7/);
+  assert.ok(
+    cond > -1,
+    "the CONCERNS row must name the open-coverage condition",
+  );
+  assert.ok(back > cond, "an open coverage finding must return the run to 5b");
+  assert.ok(
+    otherwise > back,
+    "the exit must be the condition's OTHERWISE branch",
+  );
+  assert.ok(
+    exits > otherwise,
+    "a CONCERNS without an open coverage finding must still exit to Step 7",
+  );
+  assert.doesNotMatch(
+    concerns,
+    /[Rr]eturn to \*\*5a\*\*/,
+    "the coverage route re-enters 5b, never 5a",
+  );
 
   const failed = verdictRow("Review failed");
   assert.match(failed, /\bHALT\b/, "the failure arm must HALT");
@@ -741,33 +775,159 @@ test("REQUEST CHANGES returns to 5b and consumes a shared cycle", () => {
   );
   assert.match(
     s5c,
+    /#### Invoking `\/qa-fix` on a REQUEST CHANGES verdict, or a CONCERNS with an open coverage finding\n/,
+    "the invocation block serves the coverage route too (task.238) — its heading says so",
+  );
+  assert.match(
+    s5c,
     /re-enters 5b, not 5a/i,
     "entering at 5a would re-run QA against an unchanged tree",
   );
 });
 
-test("APPROVE and CONCERNS exit the loop, and CONCERNS does not block", () => {
-  const s5c = section5c();
+test("APPROVE exits; CONCERNS exits unless an open coverage finding sends it to 5b (task.238)", () => {
   // The APPROVE row's wording is unchanged from the original 5c section, so asserting it alone
-  // pins nothing this cycle fixed. Assert the CONCERNS semantics instead, which is the one of the
-  // three verdicts whose behaviour is easy to get wrong (it exits WITHOUT blocking).
-  // Task 89: read off the APPROVE row's own action cell, not "APPROVE somewhere, then an exit
-  // phrase somewhere later in the row" — same class as the two above.
+  // pins nothing. CONCERNS is the verdict whose behaviour is easy to get wrong: since task.238 it
+  // blocks on exactly one thing — an open coverage finding — and on nothing else.
+  // Task 89: read off each row's own action cell, not "CONCERNS somewhere, then an exit phrase
+  // somewhere later" — same class as the two above.
   assert.match(
     verdictRow("APPROVE"),
     /exit the loop|Step 7/,
     "the APPROVE table ROW must exit the loop",
   );
+  const concerns = verdictRow("CONCERNS");
   assert.match(
-    s5c,
-    /\|[^|\n]*CONCERNS[^|\n]*\|[^|\n]*Do not block[^|\n]*Step 7[^|\n]*\|/,
-    "the CONCERNS row must record findings, not block, AND still exit to Step 7",
+    concerns,
+    /open `category: coverage` entry\*\* \(one without `provenance: pre-existing`/,
+    "the condition is an OPEN coverage entry — one review-pr marked pre-existing is not open",
   );
   assert.match(
-    s5c,
-    /CONCERNS.*\*\*Do not block\.\*\*/s,
-    "CONCERNS records findings without blocking",
+    concerns,
+    /take the \*\*REQUEST CHANGES\*\* arm/,
+    "an open coverage finding takes the REQUEST CHANGES arm, so it inherits its invocation and cycle accounting",
   );
+  assert.match(
+    concerns,
+    /\*\*Otherwise\*\* record the findings[^|]*\*\*Do not block\.\*\*[^|]*Step 7/,
+    "every other CONCERNS records findings, does not block, and still exits to Step 7",
+  );
+});
+
+// ── task.238: the open-coverage check, executed ─────────────────────────────────────────────────
+// The rule a CONCERNS routes on is a block in §5c, not a judgement. Run it against review reports
+// shaped like review-pr's Machine-Readable Findings and read the count it prints.
+
+function reviewReport(findings) {
+  const entries = findings
+    .map(
+      (f, i) =>
+        `  - id: PC-${i + 1}\n    category: ${f.category}\n    severity: ${f.severity ?? "medium"}\n    confidence: high\n    ref: "Success Criteria ${i + 1}"\n` +
+        (f.pre ? "    provenance: pre-existing\n" : "") +
+        `    finding: x\n    suggested_action: y\n`,
+    )
+    .join("");
+  return `# PR Review\n\n**Verdict:** CONCERNS\n\n## Machine-Readable Findings\n\n\`\`\`yaml\nreviewed_gate: task.1.gate.1.x.yml\nfindings:\n${entries}truncated_count: 0\n\`\`\`\n\n## Recommended Actions\n\n1. category: coverage (prose after the block must not count)\n`;
+}
+
+function openCoverage(findings) {
+  const blocks = extractBlocks(loopDoc).filter((b) =>
+    b.code.includes("OPEN_COVERAGE=$("),
+  );
+  assert.equal(
+    blocks.length,
+    1,
+    "expected exactly one open-coverage block in the QA loop doc",
+  );
+  const dir = mkdtempSync(join(tmpdir(), "open-coverage-"));
+  try {
+    const report = join(dir, "task.1.pr-review.1.x.md");
+    writeFileSync(report, reviewReport(findings));
+    const code = blocks[0].code
+      .split("{the PR review report this cycle's 5c wrote}")
+      .join(report);
+    const r = spawnSync("bash", ["-c", code], { encoding: "utf8" });
+    assert.equal(r.status, 0, r.stderr);
+    const m = r.stdout.match(/^OPEN_COVERAGE=(\d+)$/m);
+    assert.ok(m, `no OPEN_COVERAGE line:\n${r.stdout}`);
+    return Number(m[1]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+const COVERAGE_CASES = [
+  ["an open coverage finding (medium) → 5b", [{ category: "coverage" }], 1],
+  [
+    "an open coverage finding at low severity still routes",
+    [{ category: "coverage", severity: "low" }],
+    1,
+  ],
+  [
+    "a coverage finding marked provenance: pre-existing → Step 7",
+    [{ category: "coverage", pre: true }],
+    0,
+  ],
+  [
+    "control (obs #176): a medium consistency finding only → Step 7",
+    [{ category: "consistency" }],
+    0,
+  ],
+  [
+    "trail and scope only → Step 7",
+    [{ category: "trail" }, { category: "scope" }],
+    0,
+  ],
+  ["no findings → Step 7", [], 0],
+  [
+    "the last entry is read too (no trailing `- id:` closes it)",
+    [
+      { category: "consistency" },
+      { category: "coverage", pre: true },
+      { category: "coverage" },
+    ],
+    1,
+  ],
+];
+
+for (const [label, findings, want] of COVERAGE_CASES) {
+  test(`open-coverage check: ${label}`, () => {
+    assert.equal(openCoverage(findings), want);
+  });
+}
+
+test("SC-4a: /qa-fix's ladder works a pr-review coverage finding at any severity, and the ingester keeps its category", () => {
+  // Routing a CONCERNS to 5b is only half the fix: a `medium` coverage finding had no row in qa-fix's
+  // priority order, so qa-fix changed nothing and 5b step 0's no-change HALT fired on a real gap.
+  const qaFix = read("skills/qa-fix/SKILL.md");
+  const start = qaFix.indexOf("**Priority Order** (highest first):");
+  assert.ok(start > -1, "qa-fix Step 2's priority order moved");
+  const ladder = qaFix
+    .slice(start, qaFix.indexOf("\n\n", qaFix.indexOf("\n1. ", start)))
+    .split("\n")
+    .filter((l) => /^\d+\. /.test(l));
+  const row = ladder.findIndex((l) =>
+    /pr-review `coverage` findings, at any severity/.test(l),
+  );
+  assert.ok(
+    row > -1,
+    `no ladder row for pr-review coverage findings:\n${ladder.join("\n")}`,
+  );
+  const medium = ladder.findIndex((l) =>
+    /\*\*Medium severity\*\* bug reports/.test(l),
+  );
+  assert.ok(
+    row < medium,
+    "the coverage row must outrank medium bug reports — /finalise fails the criterion",
+  );
+  assert.match(
+    qaFix,
+    /Treat a `category: coverage` finding as work at any severity/,
+    "Step 1b must say the same",
+  );
+  // The ingester feeds qa-fix its findings: a dropped category makes the row unreachable.
+  assert.match(ingester, /\| `category` \| `category` \| \*\*Carried\*\*/);
+  assert.doesNotMatch(ingester, /\| `category` \| — \| \*\*Dropped/);
 });
 
 // Task 237: the doc-only carry is invoked by BOTH exiting verdicts. The rule lives in three places —
@@ -1582,27 +1742,66 @@ test("the 5c resume check reads the report, not the filesystem", () => {
   // repointed it at 5a; both stayed 20/0 green, while this block's own comment claimed "each is
   // asserted specifically". A guard that covers four of five values, omitting the terminal one, is
   // the sixth instance of mention-standing-in-for-mapping in this task.
-  const exit = subStateRows.find(
-    (r) => r.key.includes("`APPROVE`") && r.key.includes("`CONCERNS`"),
+  //
+  // task.238 split the arm in three: one row keyed on `APPROVE`, and two on `CONCERNS` — one whose
+  // review holds an open coverage finding (5c routed back, like REQUEST CHANGES: re-enter at 5b) and
+  // one whose review holds none (cleared: Step 7). Each is asserted by its own destination.
+  const approveRows = subStateRows.filter((r) => r.key.includes("`APPROVE`"));
+  assert.equal(
+    approveRows.length,
+    1,
+    `expected exactly ONE sub-state row keyed on APPROVE. Rows present: ${subStateRows.map((r) => r.key).join(" / ")}`,
+  );
+  const concernsRows = subStateRows.filter((r) => r.key.includes("`CONCERNS`"));
+  assert.equal(
+    concernsRows.length,
+    2,
+    `expected exactly TWO sub-state rows keyed on CONCERNS (with and without an open coverage finding). Rows present: ${subStateRows.map((r) => r.key).join(" / ")}`,
+  );
+  const concernsOpen = concernsRows.find((r) =>
+    /holds an open coverage finding/.test(r.key),
+  );
+  const concernsNone = concernsRows.find((r) =>
+    /holds no open coverage finding/.test(r.key),
   );
   assert.ok(
-    exit,
-    `the sub-state table must carry the terminal APPROVE/CONCERNS row. Rows present: ${subStateRows.map((r) => r.key).join(" / ")}`,
+    concernsOpen && concernsNone,
+    "the two CONCERNS rows must be split on an open coverage finding",
   );
+  for (const exit of [approveRows[0], concernsNone]) {
+    assert.match(
+      exit.action,
+      /Step 5–6 is complete/,
+      "the exit arm must state that Step 5-6 is COMPLETE — that is the whole content of the verdict",
+    );
+    assert.match(
+      exit.action,
+      /go to Step 7/,
+      "the exit arm must route to Step 7",
+    );
+    assert.doesNotMatch(
+      exit.action,
+      /re-enter at \*\*5[abc]\*\*/,
+      "a cleared 5c does not re-enter the loop — re-entering would re-run QA against a tree that already passed",
+    );
+  }
   assert.match(
-    exit.action,
-    /Step 5–6 is complete/,
-    "the exit arm must state that Step 5-6 is COMPLETE — that is the whole content of the verdict",
-  );
-  assert.match(
-    exit.action,
-    /go to Step 7/,
-    "the exit arm must route to Step 7",
+    concernsOpen.action,
+    /set the counter to `N`, re-enter at \*\*5b\*\*/,
+    "a run killed after a CONCERNS with an open coverage finding resumes at 5b, as REQUEST CHANGES does — Step 7 would hand /finalise the gap it is certain to fail",
   );
   assert.doesNotMatch(
-    exit.action,
-    /re-enter at \*\*5[abc]\*\*/,
-    "a cleared 5c does not re-enter the loop — re-entering would re-run QA against a tree that already passed",
+    concernsOpen.action,
+    /go to Step 7/,
+    "the coverage arm is not an exit",
+  );
+  // The three states the row must hold in (task.238 § 3): before 5b starts, inside 5b, and after 5b
+  // exits — when the next 5a's entry is the highest and this row stops selecting.
+  assert.match(concernsOpen.action, /dies before 5b starts/);
+  assert.match(concernsOpen.action, /dies inside 5b/);
+  assert.match(
+    concernsOpen.action,
+    /once 5b exits and increments the counter[^|]*no longer selects/,
   );
 
   for (const v of ["pending — 5c not yet run", "not reached"]) {

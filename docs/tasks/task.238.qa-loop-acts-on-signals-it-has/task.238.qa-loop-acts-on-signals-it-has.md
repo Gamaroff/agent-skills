@@ -5,7 +5,7 @@ type: task
 description: "Make the QA loop act on four signals it already holds and today ignores or destroys: a red CI result on the PR, a fast-gate red that is pre-existing or produced no result, a red gate log, and a 5c coverage finding that /finalise is certain to fail."
 tags: [develop-task, develop-story, develop-bug, qa-task, qa-story, qa-fix, qa-loop, observation]
 category: refactoring
-status: ready-for-development
+status: ready-for-review
 priority: Medium
 created: 2026-10-27
 updated: 2026-10-28
@@ -16,7 +16,7 @@ github_issue: 768
 
 # Technical Task: QA loop acts on the signals it already has
 
-**Status:** Ready for Development
+**Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.238.review.1.qa-loop-acts-on-signals-it-has.md` implemented 2026-10-28
 **GitHub Issue**: [#768](https://github.com/Gamaroff/agent-skills/issues/768)
 
@@ -152,10 +152,10 @@ The pre-existing branch lets a red gate commit and push, so it widens what the g
 
 **Files:** `develop-pipeline-step-5-6-qa-loop.md` (5b step 0a), `develop-pipeline-step-3-develop-loop.md` (Output Capture Pattern), `skills/develop/SKILL.md` (its `TEST_LOG` block), `test-failure-triage-prompt.md` (Log Cleanup Rule), `develop-bug-step-5-6-verify-loop.md` (its 0a)
 
-- [ ] Replace each "cleanup mirrors" prose line with a one-statement gated cleanup inside the block, for the foreground and background forms, at every site in § 3's site list
-- [ ] Add the three-outcome classification to 5b step 0a: not measured (no `GATE_EXIT=` line, or exit 124/137/143), pre-existing red (the same tests fail in a base worktree), attributable red (including `BASE_CHECK=unavailable`)
-- [ ] Apply the same to develop-bug's verify-loop 0a
-- [ ] Record each outcome's QA Iteration History wording
+- [x] Replace each "cleanup mirrors" prose line with a one-statement gated cleanup inside the block, for the foreground and background forms, at every site in § 3's site list
+- [x] Add the three-outcome classification to 5b step 0a: not measured (no `GATE_EXIT=` line, or exit 124/137/143), pre-existing red (the same tests fail in a base worktree), attributable red (including `BASE_CHECK=unavailable`)
+- [x] Apply the same to develop-bug's verify-loop 0a
+- [x] Record each outcome's QA Iteration History wording
 
 **Dependencies:** none
 
@@ -163,10 +163,10 @@ The pre-existing branch lets a red gate commit and push, so it widens what the g
 
 **Files:** `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md`, `develop-pipeline-step-5-6-qa-loop.md` (the CI paragraph)
 
-- [ ] Branch each PR Existence Check on `VCS` (guarded `resolve-platform.sh`). Add the Bitbucket open-PR lookup with `bitbucket-auth.sh`, and have Step 14 reuse the values
-- [ ] Add a one-time CI read at Step 10 for GitHub and Bitbucket, using `/finalise`'s bucketing rules exactly (including `ACTION_REQUIRED`), and map only when the PR head equals `git rev-parse HEAD`
-- [ ] For each completed failing check, read the same check's latest completed run on the PR base. Red there → `recommendations.future` with `provenance: pre-existing`; otherwise → a `top_issues[]` entry (`severity: medium`). Record undecided states in Review Methodology
-- [ ] Reword the loop's "CI and the QA loop" paragraph to name the Step 10 read, and keep "no cycle waits"
+- [x] Branch each PR Existence Check on `VCS` (guarded `resolve-platform.sh`). Add the Bitbucket open-PR lookup with `bitbucket-auth.sh`, and have Step 14 reuse the values (implemented as a re-derivation: each fenced block runs in its own shell, so a variable cannot carry from the check to Step 13 — see the implementation report's Step 3 decisions)
+- [x] Add a one-time CI read at Step 10 for GitHub and Bitbucket, using `/finalise`'s bucketing rules exactly (including `ACTION_REQUIRED`), and map only when the PR head equals `git rev-parse HEAD`
+- [x] For each completed failing check, read the same check's latest completed run on the PR base. Red there → `recommendations.future` with `provenance: pre-existing`; otherwise → a `top_issues[]` entry (`severity: medium`). Record undecided states in Review Methodology
+- [x] Reword the loop's "CI and the QA loop" paragraph to name the Step 10 read, and keep "no cycle waits"
 
 **Dependencies:** none
 
@@ -174,17 +174,17 @@ The pre-existing branch lets a red gate commit and push, so it widens what the g
 
 **Files:** `develop-pipeline-step-5-6-qa-loop.md` (Verdict branching, carry prose, the REQUEST CHANGES invocation heading), `skills/qa-fix/SKILL.md` (Step 1b, Step 2), `develop-pipeline-resume-contract.md` (the 5c resume table), and the restatements the plan's sweep finds
 
-- [ ] Add the open-coverage condition to the `CONCERNS` row, and route it through the `REQUEST CHANGES` arm
-- [ ] Add `/qa-fix`'s Step 2 row for pr-review coverage findings at any severity, and the matching Step 1b sentence. State in the invocation section that the ingester already carries `severity` as-is (`qa-findings-ingester-prompt.md:72`)
-- [ ] Split the resume contract's `APPROVE` or `CONCERNS` row, covering the three states named in § 3
-- [ ] Update the restatements that say `CONCERNS` always proceeds (see the plan's grep)
+- [x] Add the open-coverage condition to the `CONCERNS` row, and route it through the `REQUEST CHANGES` arm
+- [x] Add `/qa-fix`'s Step 2 row for pr-review coverage findings at any severity, and the matching Step 1b sentence. State in the invocation section that the ingester already carries `severity` as-is (`qa-findings-ingester-prompt.md:72`) — and the ingester now carries `category` too, which it used to drop (without it the new row was unreachable)
+- [x] Split the resume contract's `APPROVE` or `CONCERNS` row, covering the three states named in § 3
+- [x] Update the restatements that say `CONCERNS` always proceeds (see the plan's grep)
 
 **Dependencies:** none
 
 ### Phase 4: Guards, bundle and record (Risk: Low)
 
-- [ ] Tests in § 8, each one mutation-proved
-- [ ] `npm run bundle`; CHANGELOG `[Unreleased]`
+- [x] Tests in § 8, each one mutation-proved
+- [x] `npm run bundle`; CHANGELOG `[Unreleased]`
 
 **Dependencies:** Phases 1–3
 
@@ -356,6 +356,7 @@ None.
 | 2026-10-27 | 1.0 | Initial draft — cut from observations #8, #14, #41, #45 | create-task |
 | 2026-10-28 | 1.1 | Review 1 (7/10, 14 Important, 0 Critical) — CI read moved to Step 10 with a base check; Bitbucket PR Existence Check added; qa-fix ladder row and resume-row split added; "open" coverage finding defined; pre-existing red requires the same failing tests, with a differential oracle (Phase 1 → Medium); jq gains ACTION_REQUIRED and a head-equality rule; test sites, cleanup sites and the SC-12 sweep refreshed; effort 8h → 13h | review-task |
 | 2026-10-28 |  | Status → ready-for-development | review-task |
+| 2026-10-28 |  | Implemented — 20 files (2 new scripts, 2 new test files), 77 new tests; status → ready-for-review | develop |
 <!-- change-log-end -->
 
 ---
@@ -364,21 +365,21 @@ None.
 
 ### Phase 1: Fast-gate outcomes and gated cleanup
 
-- [ ] Gated cleanup at every site in § 3's site list
-- [ ] Three outcomes in 5b step 0a and develop-bug, with the differential oracle
+- [x] Gated cleanup at every site in § 3's site list
+- [x] Three outcomes in 5b step 0a and develop-bug, with the differential oracle
 
 ### Phase 2: PR Existence Check and CI read at Step 10
 
-- [ ] VCS-branched PR Existence Check in qa-task and qa-story
-- [ ] Step 10 read, base check, map and record (GitHub and Bitbucket)
+- [x] VCS-branched PR Existence Check in qa-task and qa-story
+- [x] Step 10 read, base check, map and record (GitHub and Bitbucket)
 
 ### Phase 3: Coverage findings to 5b
 
-- [ ] Verdict table, qa-fix ladder row, resume-row split, restatements
+- [x] Verdict table, qa-fix ladder row, resume-row split, restatements
 
 ### Phase 4: Guards, bundle and record
 
-- [ ] Tests, bundle, CHANGELOG
+- [x] Tests, bundle, CHANGELOG
 
 ---
 

@@ -246,6 +246,8 @@ ITER=<current develop loop iteration>
 TEST_LOG=".claude/state/test-output-${ITER}-$(date +%s).log"
 <fastGateCommand> > "$TEST_LOG" 2>&1
 TEST_EXIT=$?
+echo "TEST_EXIT=$TEST_EXIT TEST_LOG=$TEST_LOG"
+[ "$TEST_EXIT" -eq 0 ] && rm -f "$TEST_LOG"   # a red log is never removed here
 ```
 
 **When the gate can outlive the tool timeout, start it with `run_in_background`** and let the log
@@ -253,8 +255,18 @@ carry the exit code: `<fastGateCommand> > "$TEST_LOG" 2>&1; echo "TEST_EXIT=$?" 
 Mark the wait before yielding —
 `bash .agents/skills/{develop-story|develop-task}/references/set-waiting-on.sh "step-3 fast gate iter $ITER" --kind task --budget-minutes {M}`
 (`develop-pipeline-hooks.md` §"waiting_on") — and on the notification `--clear` it and read the
-`TEST_EXIT=` line (`grep '^TEST_EXIT=' "$TEST_LOG"`). A foreground call killed at the timeout loses
-its exit code, and can leave a moved `.agents/skills` unrestored.
+result with this block, which is the background form's cleanup too:
+
+```bash
+TEST_LOG="{the log the background gate wrote}"
+TEST_EXIT=$(sed -n 's/^TEST_EXIT=//p' "$TEST_LOG" | tail -1)
+echo "TEST_EXIT=${TEST_EXIT:-none} TEST_LOG=$TEST_LOG"
+grep -q '^TEST_EXIT=0$' "$TEST_LOG" && rm -f "$TEST_LOG"   # a red or unfinished log is never removed here
+```
+
+A foreground call killed at the timeout loses its exit code, and can leave a moved `.agents/skills`
+unrestored. A log with no `TEST_EXIT=` line is a run that never finished: it is not a pass, and it
+is not a failure to triage — re-run it.
 
 ### On Test Failure (TEST_EXIT != 0)
 
@@ -264,8 +276,12 @@ Main reads only the triage summary (counts + ≤10 failure bullets + `next_file`
 
 ### Log Cleanup
 
-- `TEST_EXIT == 0` → `rm -f "$TEST_LOG"` — log no longer needed
-- `TEST_EXIT != 0` → retain for post-mortem; do not delete on failure
+The cleanup is the last statement of each block above — `[ "$TEST_EXIT" -eq 0 ] && rm -f "$TEST_LOG"`
+in the foreground form, `grep -q '^TEST_EXIT=0$' "$TEST_LOG" && rm -f "$TEST_LOG"` in the background
+form — and never a statement of its own. **Reading the result and removing the log are separate
+decisions**, and keying the removal on the result in the same statement is what stops a command that
+batches a read with cleanup from removing a red log (task.238, obs #41). A red log is retained for
+post-mortem; the triage subagent reads it.
 
 ---
 

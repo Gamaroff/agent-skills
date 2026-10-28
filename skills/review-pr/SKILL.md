@@ -1069,8 +1069,9 @@ The distinction is the whole reason the wiring is legitimate:
 - `/review-pr` **reports** a verdict. It writes no gate `.yml`, never submits a formal GitHub
   review, and never edits code — exactly as before.
 - The **orchestrator** acts on that verdict: `REQUEST CHANGES` sends the run back to `/qa-fix` on
-  the shared 5-cycle budget; `APPROVE` and `CONCERNS` exit to Step 7, with `CONCERNS` findings
-  recorded rather than blocking; on either, doc-only findings are fixed when the carry clears
+  the shared 5-cycle budget, and so does a `CONCERNS` holding an open `category: coverage` finding
+  (one without `provenance: pre-existing`; task.238); `APPROVE` and any other `CONCERNS` exit to
+  Step 7, with `CONCERNS` findings recorded rather than blocking; on either, doc-only findings are fixed when the carry clears
   them, and ride the acceptance commit.
 
 Gate files remain the exclusive output of `/qa-story` and `/qa-task`.

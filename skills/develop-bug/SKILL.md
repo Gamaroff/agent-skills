@@ -263,7 +263,9 @@ Follow the generic mechanics in [`references/develop-pipeline-step-4-create-pr.m
 
 ### Step 5–6: Verify & Fix Loop
 
-See [`references/develop-bug-step-5-6-verify-loop.md`](references/develop-bug-step-5-6-verify-loop.md): QA verifies the **bug scenario is gone** and no regressions were introduced. On PASS → write the **QA Verification (✅ Fixed)** subsection into the current iteration and mark the bug for close. On FAIL → **reopen**: append `### Iteration N+1`, set status `reopened`, invoke `/qa-fix` (a PR now exists, so qa-fix's bug-update machinery applies cleanly), commit/push per cycle. Bounded `MAX_ITER=5`.
+See [`references/develop-bug-step-5-6-verify-loop.md`](references/develop-bug-step-5-6-verify-loop.md): QA verifies the **bug scenario is gone** and no regressions were introduced. On PASS → write the **QA Verification (✅ Fixed)** subsection into the current iteration and mark the bug for close. On FAIL → **reopen**: append `### Iteration N+1`, set status `reopened`, invoke `/qa-fix` (a PR now exists, so qa-fix's bug-update machinery applies cleanly), commit/push per cycle. Bounded `MAX_ITER=5`. Step 3a's fast gate is classified by
+`references/fast-gate-outcome.sh` — not measured, pre-existing on the base, or attributable — and
+only an attributable red re-enters the fix loop (task.238).
 
 ### Step 7: Finalise & Close Bug
 
