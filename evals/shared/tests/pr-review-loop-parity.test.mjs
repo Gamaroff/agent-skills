@@ -932,6 +932,67 @@ for (const [label, findings, want] of COVERAGE_CASES) {
   });
 }
 
+// Every valid YAML spelling of a finding is read, and a block the check cannot account for reads
+// `unreadable` (task.238 bug.8): each of the first four printed OPEN_COVERAGE=0.
+const rawReport = (yaml) =>
+  `# PR Review\n\n**Verdict:** CONCERNS\n\n## Machine-Readable Findings\n\n\`\`\`yaml\nreviewed_gate: task.1.gate.1.x.yml\nfindings:\n${yaml}truncated_count: 0\n\`\`\`\n\n## Recommended Actions\n\n1. x\n`;
+const RAW_CASES = [
+  [
+    "a trailing comment after the category",
+    "  - id: PC-1\n    category: coverage       # coverage | scope | trail | consistency\n    severity: medium\n",
+    1,
+  ],
+  [
+    "category as the list item's first key",
+    "  - category: coverage\n    id: PC-1\n  - category: trail\n    id: PC-2\n",
+    1,
+  ],
+  [
+    "the flow form",
+    "  - {id: PC-1, category: coverage, severity: medium}\n",
+    1,
+  ],
+  [
+    "the flow form with provenance: pre-existing",
+    "  - {id: PC-1, category: coverage, provenance: pre-existing}\n",
+    0,
+  ],
+  ["a capitalised value", "  - id: PC-1\n    category: Coverage\n", 1],
+  [
+    "list items at column 0",
+    "- id: PC-1\n  category: coverage\n- id: PC-2\n  category: coverage\n  provenance: pre-existing\n",
+    1,
+  ],
+  [
+    "a nested list inside an entry does not split it",
+    "  - id: PC-1\n    category: coverage\n    evidence:\n      - a.md\n      - b.md\n",
+    1,
+  ],
+  [
+    "a commented-out category is not one",
+    "  - id: PC-1\n    category: trail\n    # category: coverage\n",
+    0,
+  ],
+  [
+    "an entry with no recognised category",
+    "  - id: PC-1\n    category: coverage\n  - id: PC-2\n    categry: coverage\n",
+    "unreadable",
+  ],
+  [
+    "a findings list written inline",
+    "",
+    "unreadable",
+    (b) =>
+      b.replace("findings:\n", "findings: [{id: PC-1, category: coverage}]\n"),
+  ],
+];
+
+for (const [label, yaml, want, edit = (b) => b] of RAW_CASES) {
+  test(`open-coverage check: ${label} → ${want}`, () => {
+    assert.equal(openCoverageOf(edit(rawReport(yaml))), want);
+  });
+}
+
 // "Found none" and "could not look" must not print the same value (task.238 bug.1): each of these
 // printed OPEN_COVERAGE=0 and exited the loop to Step 7.
 const UNREADABLE_CASES = [

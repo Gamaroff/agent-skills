@@ -156,17 +156,28 @@ def name(p):
     sel = (p.get("target") or {}).get("selector") or {}
     return "pipeline #%s%s" % (p.get("build_number", "?"), (" (%s)" % sel["pattern"]) if sel.get("pattern") else "")
 def url(p): return "https://bitbucket.org/%s/%s/pipelines/results/%s" % (ws, repo, p.get("build_number", ""))
-runs = [p for p in values if commit(p) and commit(p)[:12] == sha[:12]]
+# A pipeline is its selector: the same type and pattern is the same check (task.238 bug.7).
+def key(p):
+    sel = (p.get("target") or {}).get("selector") or {}
+    return (sel.get("type") or "", sel.get("pattern") or "")
+def newest_per_key(ps):  # values are sorted newest first; a rerun supersedes the earlier run (CR4-8)
+    seen, out = set(), []
+    for p in ps:
+        if key(p) not in seen:
+            seen.add(key(p)); out.append(p)
+    return out
+runs = newest_per_key([p for p in values if commit(p) and commit(p)[:12] == sha[:12]])
 if not runs:
     print("NONE"); raise SystemExit
 bad = [p for p in runs if status(p) == "COMPLETED" and result(p) in ("FAILED", "ERROR")]
 if bad:
-    base_runs = [p for p in values if (p.get("target") or {}).get("ref_name") == base and status(p) == "COMPLETED"]
-    latest = base_runs[0] if base_runs else None  # values are sorted newest first
     with open(failed, "w") as out:
         for p in bad:
+            base_runs = [b for b in values if (b.get("target") or {}).get("ref_name") == base
+                         and status(b) == "COMPLETED" and key(b) == key(p)]
+            latest = base_runs[0] if base_runs else None
             if latest is None:
-                st, ev = "none", "no completed pipeline on %s" % base
+                st, ev = "none", "no completed run of the same pipeline on %s" % base
             elif result(latest) in ("FAILED", "ERROR"):
                 st, ev = "red", "red on %s too (pipeline #%s)" % (base, latest.get("build_number", "?"))
             else:

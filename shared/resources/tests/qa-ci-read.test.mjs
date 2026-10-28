@@ -267,11 +267,19 @@ test("github: a gh read failure is UNKNOWN, never a finding and never green", ()
 
 // ── Bitbucket ───────────────────────────────────────────────────────────────────────────────────
 
-const pipeline = (n, commit, state, result, ref = "feature/x") => ({
+const pipeline = (
+  n,
+  commit,
+  state,
+  result,
+  ref = "feature/x",
+  selector = { type: "branches", pattern: "**" },
+) => ({
   build_number: n,
-  target: { ref_name: ref, commit: { hash: commit } },
+  target: { ref_name: ref, commit: { hash: commit }, selector },
   state: { name: state, ...(result ? { result: { name: result } } : {}) },
 });
+const custom = { type: "custom", pattern: "nightly" };
 
 function bbSetup() {
   const s = setup();
@@ -307,6 +315,37 @@ const BB_CASES = [
     ],
     "FAILURE",
     ["pre-existing"],
+  ],
+  [
+    // task.238 bug.7: the base reading is the same pipeline (selector type and pattern), never
+    // whichever pipeline ran last on the base.
+    "a red base pipeline of another selector is not the same check → a top_issue",
+    (h) => [
+      pipeline(42, "d".repeat(40), "COMPLETED", "FAILED", "develop", custom),
+      pipeline(41, h, "COMPLETED", "FAILED"),
+      pipeline(40, "b".repeat(40), "COMPLETED", "SUCCESSFUL", "develop"),
+    ],
+    "FAILURE",
+    ["top_issue"],
+  ],
+  [
+    "no base pipeline of the same selector → a top_issue (no base evidence)",
+    (h) => [
+      pipeline(12, h, "COMPLETED", "FAILED"),
+      pipeline(11, "b".repeat(40), "COMPLETED", "FAILED", "develop", custom),
+    ],
+    "FAILURE",
+    ["top_issue"],
+  ],
+  [
+    // CR4-8: a rerun of the same pipeline supersedes the earlier one.
+    "a FAILED head pipeline superseded by a green rerun of the same selector → green",
+    (h) => [
+      pipeline(13, h, "COMPLETED", "SUCCESSFUL"),
+      pipeline(12, h, "COMPLETED", "FAILED"),
+    ],
+    "SUCCESS",
+    [],
   ],
   [
     "IN_PROGRESS → nothing",

@@ -213,6 +213,11 @@ function repoWithBase(baseTest, extra = {}) {
   git(fx.work, "commit", "-q", "-m", "base test");
   git(fx.work, "push", "-q", "origin", "develop");
   git(fx.work, "checkout", "-q", "feature/x");
+  // A PR head has commits of its own; without one, origin/develop would contain HEAD and the
+  // classifier rightly refuses the comparison (CR4-6).
+  write(fx.work, "head.txt", "the change\n");
+  git(fx.work, "add", "head.txt");
+  git(fx.work, "commit", "-q", "-m", "the change");
   return fx;
 }
 
@@ -536,6 +541,228 @@ test("a file name that merely contains `..` is not refused", () => {
       "--base",
       "develop",
     ]);
+    assert.equal(outcome, "pre-existing", out);
+  } finally {
+    cleanup(fx.dir);
+  }
+});
+
+// The comparison is per test, not per name: a head-only failure that shares a name with a test
+// already red at the base is not pre-existing (task.238 bug.5).
+function classifyLog(work, body, base = "develop") {
+  return classify(work, [
+    "--log",
+    headLog(work, body),
+    "--exit",
+    "1",
+    "--base",
+    base,
+  ]);
+}
+
+const specLog = (...pairs) =>
+  [
+    "✖ failing tests:",
+    "",
+    ...pairs.flatMap(([file, name]) => [
+      `test at ${file}:3:1`,
+      `✖ ${name} (1.2ms)`,
+      "  AssertionError [ERR_ASSERTION]: x",
+      "",
+    ]),
+    "GATE_EXIT=1",
+    "",
+  ].join("\n");
+
+test("attributable: a head-only failure that shares its name with a base failure in another file (bug.5)", () => {
+  const fx = repoWithBase(A_FAILS, { "o.test.mjs": A_PASSES });
+  try {
+    const { outcome, out } = classifyLog(
+      fx.work,
+      specLog(["t.test.mjs", "a"], ["o.test.mjs", "a"]),
+    );
+    assert.equal(outcome, "attributable", out);
+    assert.match(out, /fails only on the head: o\.test\.mjs/);
+  } finally {
+    cleanup(fx.dir);
+  }
+});
+
+test("attributable: a failing head file that does not exist at the base (bug.5)", () => {
+  const fx = repoWithBase(A_FAILS);
+  try {
+    write(fx.work, "n.test.mjs", A_FAILS);
+    const { outcome, out } = classifyLog(
+      fx.work,
+      specLog(["t.test.mjs", "a"], ["n.test.mjs", "a"]),
+    );
+    assert.equal(outcome, "attributable", out);
+    assert.match(out, /does not exist at the base: n\.test\.mjs/);
+  } finally {
+    cleanup(fx.dir);
+  }
+});
+
+test("attributable: a failing test the log names with no file (bug.5)", () => {
+  const fx = repoWithBase(A_FAILS);
+  try {
+    const { outcome, out } = classifyLog(
+      fx.work,
+      "✖ failing tests:\n\ntest at t.test.mjs:3:1\n✖ a (1.2ms)\n✖ b (1.0ms)\nGATE_EXIT=1\n",
+    );
+    assert.equal(outcome, "attributable", out);
+    assert.match(out, /names no file/);
+  } finally {
+    cleanup(fx.dir);
+  }
+});
+
+// A red is pre-existing only when node --test's results end the log: output after them may be
+// another step's red, which the base comparison cannot see (task.238 bug.6).
+const CLEAN_RATCHET = [
+  "tmp-leak: 3 top-level entries under 1 prefixes left by the suite (directory removed)",
+  "tmp-leak: ratchet ok",
+];
+for (const [label, trailer] of [
+  ["another step's output after node's results", ["lint: 3 errors"]],
+  [
+    "a tripped tmp-leak ratchet",
+    [
+      "tmp-leak: 9 top-level entries under 2 prefixes left by the suite (directory removed)",
+      'tmp-leak: new prefix "x-" (4 entries) — git grep -n \'"x-\'',
+    ],
+  ],
+  [
+    "a wrapper's own failure report",
+    ["test-tmpdir: could not remove /tmp/test-tmpdir-x"],
+  ],
+]) {
+  test(`attributable: ${label} (bug.6)`, () => {
+    const fx = repoWithBase(A_FAILS);
+    try {
+      const body = specLog(["t.test.mjs", "a"]).replace(
+        "GATE_EXIT=1",
+        [...trailer, "GATE_EXIT=1"].join("\n"),
+      );
+      const { outcome, out } = classifyLog(fx.work, body);
+      assert.equal(outcome, "attributable", out);
+      assert.match(out, /after the node --test results/);
+    } finally {
+      cleanup(fx.dir);
+    }
+  });
+}
+
+test("pre-existing: npm's failure report and a clean tmp-leak report after node's results (bug.6 control)", () => {
+  const fx = repoWithBase(A_FAILS);
+  try {
+    const body = specLog(["t.test.mjs", "a"]).replace(
+      "GATE_EXIT=1",
+      [
+        ...CLEAN_RATCHET,
+        "npm error Lifecycle script `test:suite` failed with error:",
+        "npm error code 1",
+        "GATE_EXIT=1",
+      ].join("\n"),
+    );
+    const { outcome, out } = classifyLog(fx.work, body);
+    assert.equal(outcome, "pre-existing", out);
+  } finally {
+    cleanup(fx.dir);
+  }
+});
+
+test("attributable: a failing-test path that starts with - never reaches node as an option (bug.9)", () => {
+  const fx = repoWithBase(A_FAILS);
+  try {
+    const { outcome, out } = classifyLog(
+      fx.work,
+      specLog(["--test-reporter=tap", "a"], ["t.test.mjs", "a"]),
+    );
+    assert.equal(outcome, "attributable", out);
+    assert.match(out, /outside the checkout/);
+    assert.doesNotMatch(out, /^BASE_EXIT=/m, "the base ran");
+  } finally {
+    cleanup(fx.dir);
+  }
+});
+
+test("attributable: a base that already contains HEAD proves nothing (CR4-6)", () => {
+  const fx = repoWithBase(A_PASSES);
+  try {
+    write(fx.work, "t.test.mjs", A_FAILS);
+    git(fx.work, "add", "-A");
+    git(fx.work, "commit", "-q", "-m", "head breaks a");
+    git(fx.work, "push", "-q", "origin", "feature/x");
+    const { outcome, out } = classifyLog(
+      fx.work,
+      specLog(["t.test.mjs", "a"]),
+      "feature/x",
+    );
+    assert.equal(outcome, "attributable", out);
+    assert.match(out, /already contains HEAD/);
+  } finally {
+    cleanup(fx.dir);
+  }
+});
+
+for (const line of [
+  "test-tmpdir: interrupted by SIGINT — per-run directory removed",
+  "test-tmpdir: the suite was killed by SIGTERM",
+]) {
+  test(`not measured: a run the wrapper reports as signalled (${line.slice(12, 30)}…) (CR4-9)`, () => {
+    const fx = repoWithBase(A_FAILS);
+    try {
+      const body = specLog(["t.test.mjs", "a"]).replace(
+        "GATE_EXIT=1",
+        `${line}\nGATE_EXIT=1`,
+      );
+      const { outcome, out } = classifyLog(fx.work, body);
+      assert.equal(outcome, "not-measured", out);
+    } finally {
+      cleanup(fx.dir);
+    }
+  });
+}
+
+test("a timed-out test (cancelled, fail 0) with no signal report stays measured (CR4-9 control)", () => {
+  const fx = repoWithBase(A_FAILS);
+  try {
+    const body = [
+      "ℹ fail 0",
+      "ℹ cancelled 1",
+      "",
+      specLog(["t.test.mjs", "a"]),
+    ].join("\n");
+    const { outcome, out } = classifyLog(fx.work, body);
+    assert.notEqual(outcome, "not-measured", out);
+  } finally {
+    cleanup(fx.dir);
+  }
+});
+
+test("pre-existing from a TAP log with a failing subtest: the base runs the head log's reporter", () => {
+  const nested = `${HEADER}test("s", async (t) => { await t.test("inner", () => assert.equal(1, 2)); });\n`;
+  const fx = repoWithBase(nested);
+  try {
+    const real = fs.realpathSync(fx.work);
+    const tap = [
+      "TAP version 13",
+      "# Subtest: s",
+      "    not ok 1 - inner",
+      "      ---",
+      `      location: '${real}/t.test.mjs:3:54'`,
+      "      ...",
+      "not ok 1 - s",
+      "  ---",
+      `  location: '${real}/t.test.mjs:3:1'`,
+      "  ...",
+      "1..1",
+      "# fail 2",
+      "GATE_EXIT=1",
+      "",
+    ].join("\n");
+    const { outcome, out } = classifyLog(fx.work, tap);
     assert.equal(outcome, "pre-existing", out);
   } finally {
     cleanup(fx.dir);

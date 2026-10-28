@@ -355,25 +355,25 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: PASS
+**QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-28
-**Quality Score**: 90/100
-**Gate Decision**: PASS
+**Quality Score**: 20/100
+**Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.238.qa.3.qa-loop-acts-on-signals-it-has.md](./task.238.qa.3.qa-loop-acts-on-signals-it-has.md)
-- **Gate File**: [task.238.gate.3.qa-loop-acts-on-signals-it-has.yml](./task.238.gate.3.qa-loop-acts-on-signals-it-has.yml)
+- **Full Report**: [task.238.qa.4.qa-loop-acts-on-signals-it-has.md](./task.238.qa.4.qa-loop-acts-on-signals-it-has.md)
+- **Gate File**: [task.238.gate.4.qa-loop-acts-on-signals-it-has.yml](./task.238.gate.4.qa-loop-acts-on-signals-it-has.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 6500
+- **Tests Executed**: 6507
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **Critical Issues**: 3
+- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- All four QA findings across cycles 1–2 are verified fixed (bug.1–bug.4 closed)
-- No open finding; advisory items are recorded in the gate's `recommendations.future`
+- All 5 DoD 1 gaps are verified fixed in `adff39e2`, with their probes engaging
+- The safety re-probe found 3 HIGH defects that widen `pre-existing` (bug.5, bug.6, bug.7) and 2 MEDIUM (bug.8, bug.9)
 
 ## Definition of Done - Gaps Identified
 
@@ -427,6 +427,8 @@ The QA gate passed. The gaps below come from `/finalise`'s own checks: the secur
 | 2026-10-28 |  | QA findings fixed — gate 2 CONCERNS, 1 entry (bug.4), 1 iteration; status stays ready-for-review | qa-fix |
 | 2026-10-28 |  | QA gate PASS (90/100) — 0 findings; bug.4 closed | qa-task |
 | 2026-10-28 |  | DoD incomplete — 5 gaps identified (security probe 2 medium + 1 low; SC-10 two unheld guards) | finalise |
+| 2026-10-28 |  | QA gate FAIL (20/100) — 7 findings (3 high, 2 medium, 2 low); DoD 1 gaps verified fixed; status → in-progress | qa-task |
+| 2026-10-28 |  | QA findings fixed — gate 4 FAIL, 7 entries (bug.5–bug.9, CR4-8, CR4-9; advisory CR-6 too), 1 iteration; status → ready-for-review | qa-fix |
 <!-- change-log-end -->
 
 ---

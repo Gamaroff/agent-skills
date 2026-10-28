@@ -1,0 +1,130 @@
+[
+  {
+    "id": "log-path-dotdot-test-at",
+    "sink": "shell-exec",
+    "input": "escape.log",
+    "direction": "hostile",
+    "why": "a failing-test path climbing out of the base worktree makes the base run execute the head checkout's copy; a head-only failure then reads as pre-existing and is committed and pushed red",
+    "correct": "refused before the base run (attributable); the head-copy file never executes",
+    "fixture": {
+      "files": {
+        "h.test.mjs": "import test from \"node:test\";\nimport assert from \"node:assert/strict\";\nimport { writeFileSync } from \"node:fs\";\ntest(\"a\", () => { writeFileSync(new URL(\"./RAN-OUTSIDE-BASE\", import.meta.url), \"\"); assert.fail(\"a\"); });\n",
+        "escape.log": "✖ failing tests:\n\ntest at ../../h.test.mjs:4:1\n✖ a (1.2ms)\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "absent": [
+        "RAN-OUTSIDE-BASE"
+      ]
+    }
+  },
+  {
+    "id": "log-path-dotdot-location",
+    "sink": "shell-exec",
+    "input": "escape-loc.log",
+    "direction": "hostile",
+    "why": "the same escape through the reporter's location: form",
+    "correct": "refused before the base run (attributable); the head-copy file never executes",
+    "fixture": {
+      "files": {
+        "h.test.mjs": "import test from \"node:test\";\nimport assert from \"node:assert/strict\";\nimport { writeFileSync } from \"node:fs\";\ntest(\"a\", () => { writeFileSync(new URL(\"./RAN-OUTSIDE-BASE\", import.meta.url), \"\"); assert.fail(\"a\"); });\n",
+        "escape-loc.log": "✖ failing tests:\n\n✖ a (1.2ms)\n  location: '../../h.test.mjs:4:1'\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "absent": [
+        "RAN-OUTSIDE-BASE"
+      ]
+    }
+  },
+  {
+    "id": "log-path-absolute",
+    "sink": "shell-exec",
+    "input": "abs.log",
+    "direction": "hostile",
+    "why": "an absolute failing-test path lies outside the checkout",
+    "correct": "refused by the existing guard: attributable",
+    "fixture": {
+      "files": {
+        "abs.log": "✖ failing tests:\n\ntest at /nonexistent/x.test.mjs:1:1\n✖ a (1.2ms)\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "BASE_CHECK=unavailable (a failing test file lies outside the checkout)\nGATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-path-repo-relative",
+    "sink": "shell-exec",
+    "input": ".claude/state/gate.log",
+    "direction": "legitimate",
+    "why": "the ordinary log shape: a repo-relative test that fails the same way at the base must still classify pre-existing",
+    "correct": "pre-existing",
+    "expected": {
+      "exit": 0,
+      "stdout": "BASE_EXIT=1 (node --test t.test.mjs at origin/develop; log .claude/state/gate.log.base)\nGATE_OUTCOME=pre-existing (a;)\n"
+    }
+  },
+  {
+    "id": "log-path-dotdot-midpath",
+    "sink": "shell-exec",
+    "input": "mid.log",
+    "direction": "hostile",
+    "why": "a .. segment after a real directory still climbs out of the base worktree",
+    "correct": "refused before the base run (attributable)",
+    "fixture": {
+      "files": {
+        "h.test.mjs": "import test from \"node:test\";\nimport assert from \"node:assert/strict\";\nimport { writeFileSync } from \"node:fs\";\ntest(\"a\", () => { writeFileSync(new URL(\"./RAN-OUTSIDE-BASE\", import.meta.url), \"\"); assert.fail(\"a\"); });",
+        "mid.log": "✖ failing tests:\n\ntest at sub/../../../h.test.mjs:4:1\n✖ a (1.2ms)\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "absent": [
+        "RAN-OUTSIDE-BASE"
+      ],
+      "stdout": "BASE_CHECK=unavailable (a failing test file lies outside the checkout)\nGATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-path-dot-dotdot",
+    "sink": "shell-exec",
+    "input": "dot.log",
+    "direction": "hostile",
+    "why": "a leading ./ before .. is the same escape",
+    "correct": "refused before the base run (attributable)",
+    "fixture": {
+      "files": {
+        "h.test.mjs": "import test from \"node:test\";\nimport assert from \"node:assert/strict\";\nimport { writeFileSync } from \"node:fs\";\ntest(\"a\", () => { writeFileSync(new URL(\"./RAN-OUTSIDE-BASE\", import.meta.url), \"\"); assert.fail(\"a\"); });",
+        "dot.log": "✖ failing tests:\n\n✖ a (1.2ms)\n  location: './../../h.test.mjs:4:1'\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "absent": [
+        "RAN-OUTSIDE-BASE"
+      ],
+      "stdout": "BASE_CHECK=unavailable (a failing test file lies outside the checkout)\nGATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "log-path-option-shaped",
+    "sink": "shell-exec",
+    "input": "opt.log",
+    "direction": "hostile",
+    "why": "a failing-test path starting with - reaches node --test at the base as an option (CR-7)",
+    "correct": "refused before the base run (attributable)",
+    "fixture": {
+      "files": {
+        "opt.log": "✖ failing tests:\n\ntest at --test-reporter=tap:1:1\ntest at t.test.mjs:3:1\n✖ a (1.2ms)\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "BASE_CHECK=unavailable (a failing test file lies outside the checkout)\nGATE_OUTCOME=attributable\n"
+    }
+  }
+]

@@ -15,15 +15,22 @@ All notable changes to this project will be documented in this file. Format foll
   worktree — recorded, not fixed), or *attributable red* (everything else — the fix loop, as
   before); every check it cannot complete falls back to attributable, including a base run that
   outlasts its 90 s bound, and the base worktree and test processes are removed on every exit path
-  (obs #14). (3) **PR existence
+  (obs #14). A test is its file and its name, so a head-only red that shares a name with a base
+  red stays attributable. So does any output after node's results other than npm's failure report
+  and a clean `tmp-leak` report, a failing file that is new on the head, a base that already
+  contains `HEAD`, and a failing path that is absolute, climbs out with `..` or starts with `-`. (3) **PR existence
   and CI**: `/qa-task` and `/qa-story` find the PR on Bitbucket as well as GitHub, and read the PR's
   CI once at the gate step through `qa-ci-read.sh` — a failure on the head becomes a `medium`
   `top_issue`, a failure also red on the base goes to `recommendations.future` as pre-existing, and
-  a pending, cancelled or unreadable run adds nothing; it never polls (obs #45). (4) **Coverage
+  a pending, cancelled or unreadable run adds nothing; it never polls (obs #45). On Bitbucket the
+  base reading is the same pipeline (selector type and pattern), and a rerun supersedes the run
+  before it. (4) **Coverage
   findings route**: a 5c `CONCERNS` whose review holds an open `category: coverage` finding returns
   to 5b like `REQUEST CHANGES`, `/qa-fix` gains a priority row for coverage findings at any severity,
   the findings ingester now carries `category`, and the resume contract splits its exit row in three
-  (obs #8). `pr-review-loop-parity.test.mjs` runs the open-coverage block against fixtures;
+  (obs #8). The open-coverage check reads every YAML spelling of a finding and prints
+  `unreadable` for a block it cannot account for. `pr-review-loop-parity.test.mjs` runs the
+  open-coverage block against fixtures;
   `qa-loop-fast-gate-outcomes.test.mjs` and `qa-ci-read.test.mjs` are new.
 
 - **Step 5c applies doc-only findings on `APPROVE`, not only on `CONCERNS` (task 237).** An `APPROVE`

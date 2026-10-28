@@ -1244,8 +1244,8 @@ After fixes are applied:
 
    | Outcome | How to tell | Action | QA Iteration History line |
    |---|---|---|---|
-   | **not measured** | no `GATE_EXIT=` line in the log (background form: the run never finished), or an exit of 124 (timeout), 137 (SIGKILL) or 143 (SIGTERM) | re-run the gate once. It is never green and never red, and it consumes no retry attempt | `Fast gate: not measured ({reason})` |
-   | **pre-existing red** | the **same tests fail** in a worktree at the PR base: every failing test the head log names fails there too | record both runs, then commit and push as on green | `Fast gate: red, pre-existing on {base} ({tests}; head: {fastGateCommand}, base: node --test {files})` |
+   | **not measured** | no `GATE_EXIT=` line in the log (background form: the run never finished), an exit of 124 (timeout), 137 (SIGKILL) or 143 (SIGTERM), or the `test-tmpdir` wrapper's own report that a signal interrupted or killed the suite | re-run the gate once. It is never green and never red, and it consumes no retry attempt | `Fast gate: not measured ({reason})` |
+   | **pre-existing red** | the **same tests fail** in a worktree at the PR base: every failing test the head log names — its file and its name — fails there too | record both runs, then commit and push as on green | `Fast gate: red, pre-existing on {base} ({tests}; head: {fastGateCommand}, base: node --test {files})` |
    | **attributable red** | any other red, including `BASE_CHECK=unavailable` | the triage-and-retry path below, unchanged | unchanged — the failing output |
 
    One script decides it. Run it from the repository root, only on a non-green result:
@@ -1264,8 +1264,14 @@ After fixes are applied:
    rule has one definition.
 
    **Pre-existing is the one outcome that widens what the gate lets through, so it is narrow by
-   construction.** It needs a red base run in which every failing test the head names also fails, and
-   anything less falls to *attributable*: a base run where a different test fails, one that fails on
+   construction.** It needs a red base run in which every failing test the head names also fails — a
+   test is its file and its name, so a head-only red that shares a name with a base red in another
+   file does not match (task.238 bug.5) — and anything less falls to *attributable*: a failing test
+   the log names with no file, a failing file that does not exist at the base, a failing path that is
+   absolute, climbs out with `..` or starts with `-` (node would read it as an option), a base that
+   already contains `HEAD`, a log with any output after node's results other than npm's failure
+   report and a clean `tmp-leak` report (another step's red the base run cannot see — bug.6), a
+   base run where a different test fails, one that fails on
    `Cannot find module` or `command not found` (a fresh worktree has no `node_modules` of its own),
    one that fails for want of `.agents/skills` (gitignored, so never in a worktree), a base worktree
    that cannot be created, a base run that does not finish within its bound (90 s by default, so a
@@ -1536,19 +1542,29 @@ for a gap the loop had already named. Decide it mechanically, from the review re
 
 ```bash
 REVIEW="{the PR review report this cycle's 5c wrote}"
-# The Machine-Readable Findings block: entries split on `- id:`; an entry is open coverage when it
-# carries `category: coverage` and no `provenance: pre-existing` (review-pr emits no status field),
-# either value bare or YAML-quoted (`\047` is a single quote inside this single-quoted awk program).
-# A report that cannot be read, or whose block has no `findings:` key, prints `unreadable`, never 0:
-# "found none" and "could not look" must not print the same value (task.238 bug.1).
+# The Machine-Readable Findings block: an entry is each list item under `findings:` at the first
+# item's indent, whatever key comes first, block or flow form (`- {id: …, category: …}`). It is open
+# coverage when it carries `category: coverage` and no `provenance: pre-existing` (review-pr emits no
+# status field), read case-blind, bare or YAML-quoted, with any `# comment` stripped (`\047` is a
+# single quote inside this single-quoted awk program). A report that cannot be read, whose block has
+# no `findings:` key, holds an inline list, or holds an entry with no readable category prints
+# `unreadable`, never 0: "found none" and "could not look" must not print the same value (task.238
+# bug.1, bug.8).
 BLOCK=""
 [ -f "$REVIEW" ] && [ -r "$REVIEW" ] && BLOCK=$(sed -n '/^## Machine-Readable Findings/,/^## /p' "$REVIEW")
 if printf '%s\n' "$BLOCK" | grep -qE '^findings:'; then
   OPEN_COVERAGE=$(printf '%s\n' "$BLOCK" \
-    | awk '/^[[:space:]]*- id:/ { if (cov && !pre) n++; cov = 0; pre = 0 }
-           /^[[:space:]]*category:[[:space:]]*["\047]?coverage["\047]?[[:space:]]*$/ { cov = 1 }
-           /^[[:space:]]*provenance:[[:space:]]*["\047]?pre-existing["\047]?[[:space:]]*$/ { pre = 1 }
-           END { if (cov && !pre) n++; print n + 0 }')
+    | awk 'function done() { if (open) { e++; if (cat) c++; if (cov && !pre) n++ }; open = cat = cov = pre = 0 }
+           /^findings:/ { inf = 1; r = $0; sub(/^findings:[[:space:]]*/, "", r); sub(/[[:space:]]*#.*$/, "", r)
+                          if (r != "" && r != "[]") bad = 1; next }
+           !inf || /^[[:space:]]*(#.*)?$/ { next }
+           /^[^[:space:]-]/ { done(); inf = 0; next }
+           { l = tolower($0); sub(/[[:space:]]#.*$/, "", l) }
+           match(l, /^[[:space:]]*- /) { d = RLENGTH; if (ind == "") ind = d; if (d == ind) { done(); open = 1 } }
+           l ~ /(^|[{,[:space:]])category:[[:space:]]*[^[:space:],}]/ { cat = 1 }
+           l ~ /(^|[{,[:space:]])category:[[:space:]]*["\047]?coverage["\047]?[[:space:]]*([,}]|$)/ { cov = 1 }
+           l ~ /(^|[{,[:space:]])provenance:[[:space:]]*["\047]?pre-existing["\047]?[[:space:]]*([,}]|$)/ { pre = 1 }
+           END { done(); if (bad || e != c) print "unreadable"; else print n + 0 }')
 else
   OPEN_COVERAGE=unreadable
 fi

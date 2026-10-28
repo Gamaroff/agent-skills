@@ -1,0 +1,107 @@
+schema: 2
+task: 'task.238.qa-loop-acts-on-signals-it-has'
+task_title: 'QA loop acts on the signals it already has'
+gate: FAIL
+status_reason: 'The five DoD 1 gaps are fixed in adff39e2 and their probes now engage (6/6 log paths, 8/8 --base, 8/8 --pr). The unscoped safety re-probe found 3 high-confidence HIGH defects in the same boundaries: fast-gate-outcome.sh compares failures by bare test name (CR-1) and never checks that node tests explain the whole red (CR-2), and qa-ci-read.sh reads any base pipeline as the base reading on Bitbucket (CR-3). Each one lets a head-only red be classed pre-existing.'
+reviewer: 'QA Engineer'
+head: 'adff39e2efdaace3da490278437994aea2443c7e'
+updated: '2026-10-28T05:17:36Z'
+
+top_issues:
+  - id: 'TASK-238-CR4-1'
+    severity: high
+    file: 'shared/resources/fast-gate-outcome.sh'
+    finding: 'Head and base failures are compared by bare test name (comm -23 on head-fails/base-fails, :151), so a head-only red whose name matches a test already failing at the base is classed pre-existing. A new head file missing at the base is skipped by node and does not count against it. Reviewer reproduced with spec and TAP logs. bug.5'
+    suggested_action: 'Compare (file, test) pairs, keeping each test at/location line with its failure line; treat a head failing file absent at the base as unavailable.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-238-CR4-2'
+    severity: high
+    file: 'shared/resources/fast-gate-outcome.sh'
+    finding: 'pre-existing (:153) is returned once the named node tests fail at the base, without checking that they account for the red exit. A gate whose red also comes from a non-node step is classed pre-existing and pushed, contrary to the step 5-6 doc. Reviewer reproduced it with a node test plus a lint error and exit 1. bug.6'
+    suggested_action: 'Return pre-existing only when the log shows node --test is the whole gate (or compare the full fastGateCommand at the base); otherwise unavailable.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-238-CR4-3'
+    severity: high
+    file: 'shared/resources/qa-ci-read.sh'
+    finding: 'On Bitbucket the base reading (:164) is the newest completed pipeline of any selector on the base, so an unrelated failed custom/deploy pipeline makes a real head failure pre-existing and keeps it out of /qa-fix. Reviewer reproduced it with the embedded python. bug.7'
+    suggested_action: 'Pick the base pipeline with the same selector type and pattern as the failed head pipeline; none when there is no such pipeline.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-238-CR4-4'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'The 5c OPEN_COVERAGE awk (:1548) counts 0 for category: coverage with a trailing comment (probe oc-coverage-trailing-comment reproduced; pr-conformance-prompt.md:137, the writer template, shows that exact shape), for a list item that opens with category: rather than id:, for the flow form, and for Coverage. bug.8'
+    suggested_action: 'Strip trailing comments, match case-insensitively, split entries on any list item, and print unreadable when entries and recognised categories disagree in number.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-238-PRB4-1'
+    severity: medium
+    file: 'shared/resources/fast-gate-outcome.sh'
+    finding: 'A failing-test path that starts with - reaches node --test at the base as an option (:122): probe log-path-option-shaped (test at --test-reporter=tap:1:1) reproduced, classed pre-existing. --import=<abs head path> would run head code at the base, the DoD 1 class. Reviewer CR-7, measured here. bug.9'
+    suggested_action: 'Return unavailable for any files entry that starts with -, or pass each entry as ./<path>.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-238-CR4-8'
+    severity: low
+    file: 'shared/resources/qa-ci-read.sh'
+    finding: 'On Bitbucket a failed pipeline for the head sha counts as a failure even when a later re-run of the same selector on that sha passed (:162).'
+    suggested_action: 'Keep only the newest pipeline per selector for the head commit before bucketing.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-238-CR4-9'
+    severity: low
+    file: 'shared/resources/fast-gate-outcome.sh'
+    finding: 'A signal-interrupted node --test (and the test-tmpdir wrapper) exits 1, not 143/130, so an interrupted run is classed attributable and spends a retry (:36).'
+    suggested_action: 'Treat a summary with cancelled N > 0, or a wrapper killed-by-signal line, as not-measured.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 20
+
+evidence:
+  tests_reviewed: 6507
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 35
+    escaped: 0
+    notes: 'task.238.qa.4.security.run.json: base-argument 8/8 and pr-argument 8/8 engage; log-test-paths 6/7 (the 4 DoD cases and 2 new .. shapes held; log-path-option-shaped reproduced); open-coverage-check 11/12 (both quoted forms held; oc-coverage-trailing-comment reproduced). Three HIGH boundary defects (CR4-1..3) let a head-only red be classed pre-existing.'
+  performance:
+    status: PASS
+    notes: 'No change to the bounded base run.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR4-9: an interrupted run spends a retry. Advisory CR-6: a base that already contains HEAD makes every red pre-existing.'
+  maintainability:
+    status: PASS
+    notes: 'The DoD 1 fixes are small and each is held by a committed, mutation-proved test.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR4-1, CR4-2, CR4-3 (HIGH), CR4-4 and PRB4-1 (MEDIUM): bug.5 to bug.9'
+      refs: ['shared/resources/fast-gate-outcome.sh', 'shared/resources/qa-ci-read.sh', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+  future:
+    - action: 'CR-5 (cycle 4, medium confidence, not run): gh run list --branch includes pull_request runs from a branch named like the base; add --event push'
+      refs: ['shared/resources/qa-ci-read.sh']
+    - action: 'CR-6 (cycle 4, medium confidence): unavailable when origin/$BASE already contains HEAD'
+      refs: ['shared/resources/fast-gate-outcome.sh']
+    - action: 'Step 4b: 4 changed blocks in develop-pipeline-step-5-6-qa-loop.md not executed by the snippet engine (2 rm -rf, 1 templated helper path, 1 awk fail-closed); the awk block is executed under bash and zsh by pr-review-loop-parity.test.mjs and by the fence probe'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'Cycle 3 advisory, still open: CR-1 (bound covers the test run only), CR-3 (orphan can share $LOG.base), CR-4 (assertGone), CR-2 pre-existing'
+      refs: ['shared/resources/fast-gate-outcome.sh', 'evals/shared/tests/qa-loop-fast-gate-outcomes.test.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []
