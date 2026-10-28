@@ -4,7 +4,7 @@
 **Bug ID**: TASK-238-BUG-4
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 2 refute pass, CR-1)
 **Date Found**: 2026-10-28
 
@@ -125,3 +125,4 @@ answers that question by test rather than by assumption.
 | 2026-10-28 | New | qa-task | Found in QA cycle 2 |
 | 2026-10-28 | In Progress | qa-fix | Investigation started |
 | 2026-10-28 | Ready for QA | qa-fix | Fix implemented (QA cycle 2 fix) |
+| 2026-10-28 | Closed | qa-task | Verified by task.238.qa.3.qa-loop-acts-on-signals-it-has.md |

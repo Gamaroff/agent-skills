@@ -1,0 +1,64 @@
+schema: 2
+task: 'task.238.qa-loop-acts-on-signals-it-has'
+task_title: 'QA loop acts on the signals it already has'
+gate: PASS
+status_reason: 'Cycle 2''s one finding is verified fixed (bug.4 closed: the base run is bounded and every exit path cleans up, with 4 tests red on the prior script and 4 mutations covered). The scoped cycle-3 review found 4 low items, none promoted: CR-2 is pre-existing on develop, and the rest are low-confidence or cleanup. The --base probe re-ran on the changed script: 8 executed, 0 escaped.'
+reviewer: 'QA Engineer'
+head: '8b7e8d1cb9d2779d36a00731d3f1c13eebc8135a'
+updated: '2026-10-28T04:34:34Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 6500
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 8
+    escaped: 0
+    notes: 'fast-gate-outcome.sh --base re-probed on the bug.4 script (task.238.qa.3.security.run.json, same cases and setup as qa.2): engages, 6 hostile rejected, 2 legitimate accepted. FAST_GATE_BASE_TIMEOUT is validated (a non-positive-integer value exits 2, tested).'
+  performance:
+    status: PASS
+    notes: 'The base run is now bounded (90 s by default); a green gate still creates no worktree.'
+  reliability:
+    status: PASS
+    notes: 'bug.4 fixed: process-group watchdog, EXIT/TERM/INT/HUP cleanup, sweep of SIGKILLed predecessors. Advisory: CR-1 (the bound covers the test run, not fetch/checkout), CR-3 (an orphan of a group-SIGKILLed run can share $LOG.base); cycle-2 CR-2/CR-5 still open.'
+  maintainability:
+    status: PASS
+    notes: 'Advisory CR-4: assertGone force-kills before it asserts.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (cycle 3): the 90 s bound covers only the base node --test run; bound fetch and checkout too, or state the bound covers the test run only'
+      refs: ['shared/resources/fast-gate-outcome.sh', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'CR-3 (cycle 3): record the base and watchdog group ids so the sweep can kill an orphan, or write the base log to a run-unique path before copying it to $LOG.base'
+      refs: ['shared/resources/fast-gate-outcome.sh']
+    - action: 'CR-4 (cycle 3): assertGone should record survival after the poll and assert on that, killing only in cleanup'
+      refs: ['evals/shared/tests/qa-loop-fast-gate-outcomes.test.mjs']
+    - action: 'CR-2 (cycle 3): the 5b fast-gate run block reads ${QA_CYCLE} with no writer in the block (the test injects it through env)'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+      provenance: pre-existing
+    - action: 'Cycle 2 advisory, still open: CR-2 (pre-existing deny-list), CR-3 (PR Review row names no report), CR-4 (low coverage under APPROVE — needs a decision), CR-5 (leaf-name comparison), CR-6 (GATE_EXIT=0 removal predicate), CR-7 (unreachable provenance qualifier)'
+      refs: ['shared/resources/fast-gate-outcome.sh', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'shared/resources/develop-pipeline-resume-contract.md']
+    - action: 'Cycle 1 advisory, still open: CR-3 (non-node failures), CR-4 (Bitbucket superseded runs), CR-5 (PR check read failure), CR-6 (symlinked checkout)'
+      refs: ['shared/resources/fast-gate-outcome.sh', 'shared/resources/qa-ci-read.sh', 'skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+    - action: 'Pre-existing (Step 4b): develop-pipeline-resume-contract.md:492 block reads a lock a temp copy lacks'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+      provenance: pre-existing
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []

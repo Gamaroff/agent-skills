@@ -349,26 +349,25 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-28
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 90/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.238.qa.2.qa-loop-acts-on-signals-it-has.md](./task.238.qa.2.qa-loop-acts-on-signals-it-has.md)
-- **Gate File**: [task.238.gate.2.qa-loop-acts-on-signals-it-has.yml](./task.238.gate.2.qa-loop-acts-on-signals-it-has.yml)
+- **Full Report**: [task.238.qa.3.qa-loop-acts-on-signals-it-has.md](./task.238.qa.3.qa-loop-acts-on-signals-it-has.md)
+- **Gate File**: [task.238.gate.3.qa-loop-acts-on-signals-it-has.yml](./task.238.gate.3.qa-loop-acts-on-signals-it-has.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 6497
+- **Tests Executed**: 6500
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- Cycle 1's three findings are verified fixed (bug.1–bug.3 closed); the `--base` refusal is measured by the probe engine (8 cases, calibrated red on the pre-fix script)
-- MEDIUM: the base run in `fast-gate-outcome.sh` has no timeout, and a kill strands its worktree (bug.4)
-- Six advisory code-review findings recorded in the gate's `recommendations.future`
+- All four QA findings across cycles 1–2 are verified fixed (bug.1–bug.4 closed)
+- No open finding; advisory items are recorded in the gate's `recommendations.future`
 
 ## Change Log
 
@@ -384,6 +383,7 @@ None.
 | 2026-10-28 |  | QA findings fixed — gate 1 FAIL, 3 entries (bug.1–bug.3), 1 iteration; status → ready-for-review | qa-fix |
 | 2026-10-28 |  | QA gate CONCERNS (80/100) — 1 finding (1 medium); bug.1–bug.3 closed | qa-task |
 | 2026-10-28 |  | QA findings fixed — gate 2 CONCERNS, 1 entry (bug.4), 1 iteration; status stays ready-for-review | qa-fix |
+| 2026-10-28 |  | QA gate PASS (90/100) — 0 findings; bug.4 closed | qa-task |
 <!-- change-log-end -->
 
 ---
