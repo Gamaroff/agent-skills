@@ -4,7 +4,7 @@
 **Bug ID**: TASK-238-BUG-18
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 9 diff review, CR9-1; reproduced by QA)
 **Date Found**: 2026-10-28
 
@@ -90,3 +90,4 @@ failure, whatever the cause, so it does not depend on the awk program.
 | 2026-10-28 | New | qa-task | Found by QA cycle 9 (`task.238.qa.9.qa-loop-acts-on-signals-it-has.md`) |
 | 2026-10-28 | In Progress | qa-fix | Investigation started (QA cycle 9 fix) |
 | 2026-10-28 | Ready for QA | qa-fix | Fixed in QA cycle 9 (see Developer Fix Cycle) |
+| 2026-10-28 | Closed | qa-task | Verified by task.238.qa.10.qa-loop-acts-on-signals-it-has.md |

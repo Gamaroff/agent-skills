@@ -206,6 +206,20 @@ Make the QA loop act on four signals it already holds (red CI on the PR, a pre-e
   read `superseded`, so PR review 2 was not ingested.
 - Route 2c: `Loop route: continue (medium-not-falling) — MEDIUM reads 2, 1, 2 over cycles 7–9 — route 2c needs it strictly falling, or 0 on the last gate, which is the evidence that one more gate would clear.` Escalated.
 
+### HALT option 2, then QA loop re-entry (fourth grant) — 2026-10-28
+
+- The owner first took HALT option 2. The hand-run 5c (`task.238.pr-review.3`, conformance lens
+  only) read **REQUEST CHANGES**. PC-1 (trail, high/high): gate 9 never reached 5c. PC-2 to PC-4:
+  the cycle 9 fix is ungated, and bug.18 and bug.19 are still Ready for QA. `/finalise` was not
+  run, because it refuses a REQUEST CHANGES review. This is a recurrence of observation #115:
+  option 2 cannot pass its own 5c on an escalated run.
+- The doc-only findings PC-5 to PC-8 were fixed by hand in `885debef`: `pr_number: 770`, the
+  Overview and Phase 1 checkbox, and the DoD run 1 section marked superseded.
+- QA loop re-entry: 1 extra cycle granted (`qa_max_cycles` 9 → 10). No cycle was run outside the
+  loop, so nothing was back-filled.
+- Owner decision: any new §5c open-coverage awk shape gap that gate 10 raises is recorded as
+  deferred to task.240 (issue #771, which replaces the awk), not fixed again in this run.
+
 ---
 
 ## Issues Log
@@ -604,6 +618,15 @@ issuecomment-6463432344; tracker comment `qa-fix-8` posted on #768.
 
 **Commit**: `0df2880e`, pushed with gate 9, QA report 9, the cycle 9 probe record and PR review 2.
 PR comment issuecomment-6464285328 and the #768 comment were posted.
+
+### QA Cycle 10 — 2026-10-28
+**Gate Result**: CONCERNS (90/100)
+**Issues Found**: 0 open entries. bug.18 and bug.19 are verified and closed. Each of the three cycle 9 guards turns a committed fixture red under QA mutation (3 of 3). Security reads CONCERNS for one low gap in the same check, CR10-1 (reviewer CR-1, low/low). `term` is never cleared, so a second `findings:` list cut short reads `0`. QA reproduced it with the probe engine (`oc10-second-findings-cut-short`). By owner decision it is deferred to task.240 (task Deferred Work). Probes: 29 executed, 0 escaped. Parity 82/82. The hosted Test lane passed on identical code (`ded46852`). PR CI on `885debef` was pending at gate writing.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: pending — 5c not yet run
+**Loop exit**: route 3 — `CONCERNS` with no open entry in `top_issues[]`
+**Action**: Proceeding to 5c (PR conformance review)
 
 ---
 

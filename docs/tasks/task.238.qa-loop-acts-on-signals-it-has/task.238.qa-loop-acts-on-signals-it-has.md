@@ -358,22 +358,22 @@ None.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-28
-**Quality Score**: 80/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.238.qa.9.qa-loop-acts-on-signals-it-has.md](./task.238.qa.9.qa-loop-acts-on-signals-it-has.md)
-- **Gate File**: [task.238.gate.9.qa-loop-acts-on-signals-it-has.yml](./task.238.gate.9.qa-loop-acts-on-signals-it-has.yml)
+- **Full Report**: [task.238.qa.10.qa-loop-acts-on-signals-it-has.md](./task.238.qa.10.qa-loop-acts-on-signals-it-has.md)
+- **Gate File**: [task.238.gate.10.qa-loop-acts-on-signals-it-has.yml](./task.238.gate.10.qa-loop-acts-on-signals-it-has.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 6529
+- **Tests Executed**: 6535
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- The cycle 8 fix holds: bug.17 is closed, and all four of its guards are mutation-proved. The suite, bundle check, validate and PR CI are green
-- Two MEDIUMs remain in the §5c open-coverage check. A failing `awk` prints an empty `OPEN_COVERAGE` that takes the Otherwise exit (bug.18). A block key after a flow entry is read as that entry's, so an invalid-YAML exemption reads `0` (bug.19)
+- The cycle 9 fix holds: bug.18 and bug.19 are closed, and each of its three guards is mutation-proved. No top issue is open
+- One low gap remains in the §5c open-coverage check and is reproduced: a repeated `findings:` key with a cut-short second list reads `0` (CR10-1). By owner decision it is deferred to task.240, which replaces the awk
 
 ## Definition of Done - Gaps Identified
 
@@ -420,6 +420,7 @@ The QA gate passed. The gaps below come from `/finalise`'s own checks: the secur
 
 - **Structured pre-existing comparison** (QA cycle 6, third strike on `fast-gate-outcome.sh`): the `pre-existing red` outcome was deleted rather than patched a fourth time. Gates 4, 5 and 6 each found another `node --test` log shape the comparison misread (bug.5–bug.14). A replacement must compare structured results from runs it controls (for example `--test-reporter=tap` written to a file on both sides, keyed on node's own test identity), not parse a gate log. Needs its own task document.
 - **Gate 6 advisory items** carried to `recommendations.future`: CR6-2 (output before node's results), CR6-3 (`gh run list --event push`), CR6-4 (pre-existing decided per CI lane), CR6-5 (open-coverage awk on a truncated block), CR6-7 (Bitbucket PR lookup HTTP status). CR6-6 is moot: the code it named was deleted.
+- **CR10-1, deferred to task.240** (QA cycle 10, owner decision 2026-10-28): the §5c open-coverage awk never clears `term`, so a block with a second `findings:` list cut short reads `0` where `unreadable` is correct. It is reproduced by `oc10-second-findings-cut-short`, and 0 of 185 tracked reports have the shape. task.240 (issue #771) replaces the awk with a parser that refuses a duplicate key. No success criterion states the reader's fail-closed property, so none is amended.
 <!-- change-log-start -->
 ## Change Log
 
@@ -448,6 +449,7 @@ The QA gate passed. The gaps below come from `/finalise`'s own checks: the secur
 | 2026-10-28 |  | QA gate CONCERNS (80/100) — 2 findings (2 medium); bug.17 verified and closed; bug.18, bug.19 opened | qa-task |
 | 2026-10-28 |  | QA findings fixed — gate 9 CONCERNS, 2 entries (bug.18, bug.19) plus low CR9-3, 1 iteration; the §5c open-coverage check maps a non-count value to `unreadable`, refuses any line after a one-line flow entry, and requires a terminator after `findings:` | qa-fix |
 | 2026-10-28 |  | PR review 3 doc-only findings fixed: `pr_number: 770` added; the Overview and Phase 1 checkbox reworded to the amended SC-2; the DoD run 1 gaps section marked superseded | develop-task |
+| 2026-10-28 |  | QA gate CONCERNS (90/100) — 0 open entries; bug.18 and bug.19 closed; CR10-1 (low) deferred to task.240 | qa-task |
 <!-- change-log-end -->
 
 ---
