@@ -1,0 +1,65 @@
+schema: 2
+task: 'task.242.scope-finalise-re-runs'
+task_title: 'Scope finalise re-runs to the gaps and the changed evidence'
+gate: CONCERNS
+status_reason: 'The cycle-7 fix (QA7-1) is verified: restoring changed: null in merge turns its test red, and ignoring goneCandidates turns two other tests red. No high finding. The independent reviewer found one medium bug at high confidence, promoted under code_review_blocking and reproduced by execution: in merge, a new member citing only a bare basename that several HEAD files carry, none of them changed, reads unresolved and is counted, so its FAIL stands, while the same token beside an unchanged full path reads unchanged and the FAIL is overturned.'
+reviewer: 'QA Engineer'
+head: 'e3a2ac0dbe89ee6e6dac630337eb7af054421d65'
+updated: '2026-10-29T10:14:52Z'
+
+top_issues:
+  - id: 'TASK-242-QA8-1'
+    severity: medium
+    file: 'shared/resources/finalise-rerun-scope.js'
+    finding: 'memberEvidence (finalise-rerun-scope.js:218) returns "unresolved" for two different states: a citation that names nothing tracked, and a bare basename several HEAD files carry with no candidate changed, where the evidence is known to be unchanged. merge counts "unresolved", so a new member G9 citing "a.test.mjs:3" alone (tests/a.test.mjs and lib/z/a.test.mjs both tracked, neither changed) is counted and its FAIL stands (SC-3=FAIL), while "tests/b.test.mjs:1, a.test.mjs:3" in the same fixture reads unchanged, goes to advisories, and the FAIL is overturned (SC-3=PASS). Reproduced by execution in a scratch worktree with a temporary copy of the QA7-1 test. This repository tracks 335 basenames more than once (git ls-files), mostly bundled copies such as finalise-rerun-scope.js, so the task.239 shape (a finer member on unchanged evidence) is overturned only when the cited basename happens to be unique. Source: code-review CR-1 (bug, medium, confidence high), promoted under code_review_blocking.'
+    suggested_action: 'Make an ambiguous bare basename with no changed candidate read as unchanged evidence, not unresolved: in merge, and on the scope side too if the same rule is wanted there (code-review CR-2, low). The reviewer suggests resolving an ambiguous basename to every candidate always. Note that the existing scope test "citations that resolve to no tracked path → evidence-unresolved; a unique basename resolves" pins today''s scope-side behaviour (cycle-7 mutation 2), so that test changes with it. Add the lone-token twin of the QA7-1 merge test (no candidate changed: expect PASS plus the advisory). Or take the structural option in recommendations.future.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 48
+  phases_verified: 18/18
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false, as in cycles 1-7. A carry or count classifier over git state; it writes no disk path.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'QA8-1: in merge, a lone ambiguous bare citation with no changed candidate keeps a FAIL that the same citation beside an unchanged path overturns.'
+  maintainability:
+    status: PASS
+    notes: 'QA7-1 is covered by committed tests (two mutations covered). merge and scope now share one index constructor.'
+
+recommendations:
+  immediate:
+    - action: 'Make an ambiguous bare basename with no changed candidate read as unchanged in merge, and add the lone-token merge test (QA8-1)'
+      refs: ['shared/resources/finalise-rerun-scope.js']
+  future:
+    - action: 'Bare-basename resolution has had a new edge case in every cycle since cycle 3 (CR3-1, CR4-1, CR5-1, CR6-1, QA7-1, QA8-1). The structural option is still open: a bare basename never resolves, so the criterion or member is always re-judged.'
+      refs: ['shared/resources/finalise-rerun-scope.js']
+    - action: 'Code-review CR-2 (low): on the scope side a lone ambiguous bare citation with no changed candidate is evidence-unresolved and re-judged on every re-run, while the same token beside an unchanged path carries.'
+      refs: ['shared/resources/finalise-rerun-scope.js']
+    - action: 'Code-review CR-3 (cleanup): goneCandidates: false drops only the gone basename map; a full-path citation of a deleted file still resolves in merge, which the comments at lines 179-182 and 651-656 do not say.'
+      refs: ['shared/resources/finalise-rerun-scope.js']
+    - action: 'Step 4b: no runnable prose changed this cycle.'
+      refs: ['skills/finalise/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: BLOCKED
+  conditions: ['QA8-1 fixed and re-reviewed']

@@ -142,6 +142,10 @@ Each mutation was applied with the Edit tool to the file named, the named test f
 - QA Cycle 7: the traceability mapper ran (13 criteria; SC-11 partial; SC-12 and SC-13 have no test). Gate 7 CONCERNS, HIGH 0. Convergence: window starts at cycle 7, one reading, no trip. Route: `continue (not-a-pass-gate)`; route 2 declined: `product-defect-signal`. changes-requested → `stage-disabled`.
 - QA Cycle 7 — QA7-1 enters `top_issues[]` though the reviewer rated it confidence medium. `code_review_blocking` promotes only high confidence, and the confidence was not changed. QA raised the finding from its own execution reproduction (a FAIL on changed evidence is overturned; the control keeps it), because it breaks SC-4's merge rule. This is a judgement call made on the operator's behalf.
 - QA Cycle 7 — narrowing offer: Narrowing residue — every MEDIUM on gates 6 and 7 names shared/resources/finalise-rerun-scope.js (TASK-242-CR6-1, TASK-242-QA7-1); HIGH 0 on both. Passed to qa-fix Step 2.6.
+- QA loop re-entry: 1 extra cycle granted (operator request, third grant); 0 cycle(s) run outside the loop back-filled from disk. `grant-qa-cycles.sh`: `QA_CYCLE=7 extra_cycles_granted=1 qa_max_cycles=8 reenter_at=5a convergence_from_cycle=8` — re-entering at 5a (review first), so gate 8 reads the QA7-1 fix at `cc0da45e`. The lock was restored from the halt snapshot. The Phase 0a detector subagent was not dispatched: the operator named the resume option, and the state was read inline (PR #781 open at `e3a2ac0d`, branch level with origin, no stale snapshot).
+- QA Cycle 8: the traceability mapper ran (13 criteria; SC-11 and SC-13 partial, SC-12 integration). Gate 8 CONCERNS, HIGH 0. Convergence: window starts at cycle 8, one reading, no trip. Route: `continue (not-a-pass-gate)`; route 2 declined: `product-defect-signal`.
+- QA Cycle 8 — the step-3b uncommitted-change guard saw `docs/tasks/task-registry.md` modified. That is task 243's registry row from another session, not a fix to this change set. The review went ahead (the scope reads committed history), and the file was left out of every commit in this run.
+- QA Cycle 8 — no qa-fix after gate 8: the budget (8) is spent at this gate, so a fix would have no gate to read it. This applies the operator's standing rule (2026-10-29): the budget counts gates, and the loop never hands over a fix no gate has read. Until task.243 lands, the step doc still describes a fix after the last gate. Escalated at the gate instead; the head handed over (`e3a2ac0d`) is the one gate 8 read.
 
 ---
 
@@ -220,6 +224,29 @@ The pipeline completed 7 qa-task/qa-fix cycles (5 plus 2 granted, one at a time)
 1. Accept the current state: run `/review-pr --effort medium --comment --no-code` on `cc0da45e`, then `/finalise`. The fix is small, consolidating and mutation-proven, and the review reads it.
 2. Or re-run `/develop-task` and take "Resume the QA loop with 1 more cycle" to gate `cc0da45e` first.
 3. Or drop bare-basename resolution entirely (a bare basename never resolves, so the criterion is always re-judged), if one more edge appears.
+
+### QA Loop Limit Reached — 2026-10-29
+
+The pipeline completed 8 qa-task cycles (5 plus 3 granted, one at a time) without a clean PASS. Cycle 8 ran its gate and no fix: the budget was spent at the gate, so the head handed over is the one gate 8 read.
+
+**Final gate status**: CONCERNS (90/100, gate 8 at `e3a2ac0d`; no ungated fix)
+**HIGH findings per cycle**: 2, 3, 1, 0, 0, 0, 0 | 0 — third grant at cycle 8; 0 since cycle 4
+**Remaining issues** (from final gate file):
+- TASK-242-QA8-1 (medium, `shared/resources/finalise-rerun-scope.js`): `memberEvidence` returns `unresolved` both for a citation that names nothing tracked and for an ambiguous bare basename with every candidate unchanged. merge counts `unresolved`, so a new member citing only such a basename keeps its FAIL, while the same token beside an unchanged path overturns it. Reproduced by execution. 335 basenames are tracked more than once in this repository (mostly bundled copies), so the task.239 shape is at risk whenever a member cites a bundled script by basename. **Not fixed.**
+
+**What was attempted per cycle**:
+- Cycles 1–7: see the three escalation entries above.
+- Cycle 8 (granted): gate 8 verified QA7-1 (2 of 2 mutations covered) and found QA8-1: merge with no changed candidate, the mirror of QA7-1 (merge with a changed candidate). No qa-fix ran.
+- Route 2c (gate the last fix) does not apply: there is no ungated fix.
+
+**Likely root cause**: the same mechanism, now from the other side. Cycle 7 made merge and scope share one ambiguity rule: an ambiguous basename resolves to every candidate when one changed, else to nothing. "Nothing" means `unresolved`, and merge and scope both treat `unresolved` as "cannot vouch", which is right for a citation of nothing and wrong for one whose candidates are all known to be unchanged. Six cycles in a row (CR3-1, CR4-1, CR5-1, CR6-1, QA7-1, QA8-1) found an edge in how a bare basename resolves. Each fix was correct for its case. The rule keeps a hidden third state ("ambiguous but all unchanged") that the two-valued `paths` result cannot express.
+
+**Third-strike files**: none. Gates 7 and 8 raised no HIGH, so the two-gate comparison prints nothing.
+
+**Recommended next steps**:
+1. Replace the mechanism instead of patching it again. Either (a) an ambiguous basename resolves to every candidate always, so "unchanged" means all candidates unchanged and "changed" means any changed. This is the reviewer's suggestion; the scope test "citations that resolve to no tracked path → evidence-unresolved; a unique basename resolves" changes with it. Or (b) a bare basename never resolves, so it is always re-judged on the scope side and always counted on the merge side. (a) keeps carry; (b) is simplest. Do it as a qa-fix under a 2-cycle grant, so a gate reads the fix and one more cycle is left if that gate finds something.
+2. Or accept the current state with QA8-1 recorded as a known limit: run `/review-pr --effort medium --comment --no-code` on `e3a2ac0d`, then `/finalise`. The defect's direction is conservative (a FAIL is kept, never dropped), so it can stall a re-run but never accept a gap.
+3. Or move QA8-1 to a follow-up task and amend SC-3/SC-4 to name the limit, then take option 2.
 
 ---
 
@@ -313,6 +340,18 @@ _Track each QA review/fix cycle._
 **Fixes Applied**: QA7-1 (narrowing offer taken: **consolidate the contract**). The scope-side rule is sound: when no candidate changed, nothing the citation could mean changed. The defect was that merge switched it off with a hand-built `changed: null` override. `evidenceIndex(…, { goneCandidates: false })` is now merge's index. It differs from scope's only in its candidate set (no gone paths, CR5-1), and `changed` is kept. 1 merge test added (both identity directions), 1 extended; both failed first. Mutations: `changed: null` restored → covered; `goneCandidates` ignored → covered. `ci:fast` 6798 tests, 6784 pass, 0 fail; `bundle:check` clean. The first `ci:fast` run was red on prettier formatting of the two edited files; after formatting it was green. The ingester and pre-fix mapping ran inline: the orchestrator wrote gate 7 in this session, so this pass is not independent of the review.
 **Commit**: `cc0da45e`
 **Post-fix PR state**: OPEN (pushed `9d690e98..cc0da45e`). Read inline with `gh pr view`; the tracker poller subagent was not dispatched.
+
+### QA Cycle 8 — 2026-10-29
+**Gate Result**: CONCERNS (90/100)
+**Issues Found**: 1. QA8-1 (medium, confidence high, promoted): in merge, a new member citing only an ambiguous bare basename with no changed candidate reads `unresolved` and is counted, so its FAIL stands, while the same token beside an unchanged path reads `unchanged` and the FAIL is overturned. Reproduced by execution in a scratch worktree. Advisory: CR-2 (low, the scope-side twin) and CR-3 (cleanup, comments). QA7-1 verified: 2 of 2 mutations covered. Reviewer: dispatched 10:11:35Z, returned in 117.1 s.
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop limit reached
+**Fixes Applied**: none. The budget was spent at this gate, and a fix with no gate to read it is not run (operator rule, 2026-10-29).
+**Commit**: the gate and QA report ride the escalation commit.
+**Post-fix PR state**: OPEN at `e3a2ac0d`.
 
 ---
 

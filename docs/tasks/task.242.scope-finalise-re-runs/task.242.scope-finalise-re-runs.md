@@ -373,18 +373,18 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.242.qa.7.scope-finalise-re-runs.md](./task.242.qa.7.scope-finalise-re-runs.md)
-- **Gate File**: [task.242.gate.7.scope-finalise-re-runs.yml](./task.242.gate.7.scope-finalise-re-runs.yml)
+- **Full Report**: [task.242.qa.8.scope-finalise-re-runs.md](./task.242.qa.8.scope-finalise-re-runs.md)
+- **Gate File**: [task.242.gate.8.scope-finalise-re-runs.yml](./task.242.gate.8.scope-finalise-re-runs.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 47
+- **Tests Executed**: 48
 - **Phases Verified**: 18/18
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-The cycle-6 fix is verified (2 of 2 mutations covered) and there is no high finding. One medium remains:
-- QA7-1: on the merge side, a new member whose citation has several tokens, one an ambiguous bare basename with a changed candidate, reads as unchanged, so the agent's FAIL is overturned. Reproduced by execution.
+The cycle-7 fix is verified (2 of 2 mutations covered) and there is no high finding. One medium remains:
+- QA8-1: in merge, a new member citing only an ambiguous bare basename with no changed candidate reads `unresolved` and is counted, so its FAIL stands, while the same token beside an unchanged path overturns it. Promoted at high confidence; reproduced by execution.
 
 ## Change Log
 
@@ -408,6 +408,7 @@ The cycle-6 fix is verified (2 of 2 mutations covered) and there is no high find
 | 2026-10-29 |  | QA fix cycle 6. CR6-1 (scope the claim): a bare basename several files carry no longer names one. It resolves to every candidate when any of them changed since the prior head (added, modified or gone), else to nothing. This subsumes the CR4-1 gone-only rule. `merge` keeps the HEAD-alone rule (CR5-1). § 3 *Citation paths* restated. 1 test added, 1 extended, both seen failing first; 2 of 3 mutations covered, 1 absorbed. Status → ready-for-review | qa-fix |
 | 2026-10-29 |  | QA gate CONCERNS (90/100). 1 finding: QA7-1 (medium). On the merge side, a multi-token new-member citation with an ambiguous changed basename reads as unchanged, so the agent's FAIL is overturned. Reproduced by execution. CR6-1 verified (2 of 2 covered) | qa-task |
 | 2026-10-29 |  | QA fix cycle 7. QA7-1 (consolidate the contract): `merge` builds its index with `evidenceIndex(…, { goneCandidates: false })`. That keeps `changed`, so one ambiguity rule runs over HEAD's candidates, and the hand-built `changed: null` override is gone. § 3 *Citation paths* restated. 1 merge test added (candidate changed → FAIL stands; none changed → overturned), 1 extended, both seen failing first; 2 of 2 mutations covered. Status → ready-for-review | qa-fix |
+| 2026-10-29 |  | QA gate CONCERNS (90/100). 1 finding: QA8-1 (medium, promoted). In merge, a new member citing only an ambiguous bare basename with no changed candidate reads unresolved and keeps its FAIL, while the same token beside an unchanged path overturns it. Reproduced by execution. QA7-1 verified (2 of 2 covered) | qa-task |
 
 ---
 
