@@ -4,6 +4,34 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **`create-story` and `create-task` offer to set wireframe mapping up (task 246).** When a
+  wireframe is added and `skills-config.yaml` has no `ui:` block, or one without a map path, the
+  skill detects the project's component barrel, import module and any existing catalogue table, and
+  asks once: set up with those values, adjust them, not now, or never for this repo. Two new engine
+  commands do the work: `wireframe-map.js detect` (read-only; reports `configured`, `declined`,
+  `partial` or `unset` with a proposal and its evidence) and `configure` (the only writer of
+  `skills-config.yaml`: it appends the block or inserts the keys a partial one lacks, keeps every
+  other byte and the file's line endings, and restores the file if it does not read back). The
+  develop pipelines never offer setup.
+- **A first run gets candidates from the catalogue (task 246).** On an empty map, `resolve` offered
+  nothing for every open node. It now adds up to five catalogue entries per node, after any near-miss
+  map rows: those with a PascalCase name segment equal to the primitive (`basis: name`), then those
+  whose description names it (`basis: purpose`). Every candidate now carries `source` (`map` or
+  `catalogue`).
+- **A guide to writing map rows by hand**, in `wireframe-component-mapping.md`, with worked example
+  rows and the two things a signature cannot say: a sibling's context (use a label pattern) and
+  which icon a generic glyph stands for (record the component; read the icon from the design
+  source). Newly created maps link to it from their header.
+
+### Changed
+
+- **`ui.wireframeMap: false` or `off` now declines wireframe mapping (task 246).** Every engine
+  command answers `reason: declined`, exit 0, and writes nothing, and no skill offers setup again.
+  Before, `false` read as unset and `off` as a map file named `off`; a project whose map file is
+  literally named `off` must rename it.
+
 ## [v0.62.0] - 2026-10-29
 
 ### Added

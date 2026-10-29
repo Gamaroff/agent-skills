@@ -231,8 +231,9 @@ observations:
   # observations belong in one place across every project.
   workspace: ~/.agents/skill-observations
 
-# Link Wireloom wireframe nodes to your own UI components. Optional; omit the block
-# and no skill reads a wireframe for components. See "UI — wireframes and components".
+# Link Wireloom wireframe nodes to your own UI components. Optional: create-story and
+# create-task offer to write this block the first time they add a wireframe, and
+# `wireframeMap: false` declines it for good. See "UI — wireframes and components".
 ui:
   componentCatalogue: docs/architecture/components.md # markdown list of the components
   componentImport: "@your-org/ui" # the module code must import them from
@@ -332,7 +333,7 @@ gate, and strategy — single-item and batch runs never diverge) and adds
 | `ui.componentBarrel`                             | path                            | unset                                            | Entry file whose value exports are the components: `export { … } from` and `export * from` are followed, and only PascalCase names are kept. |
 | `ui.catalogueSection`                            | heading line                    | `## Components`                                  | The catalogue heading whose tables hold one row per component, named in the first cell as `` `Name` ``. |
 | `ui.componentExclude`                            | list[name]                      | `[]`                                             | Exports that are not drawn components (a theme provider, for example). A block list, a one-line `[A, B]` or a single name. |
-| `ui.wireframeMap`                                | path                            | unset                                            | The project's map of wireframe-node-to-component links, each confirmed by a person. **Setting it turns the feature on.** Created by the skills when missing. |
+| `ui.wireframeMap`                                | path, or `false` / `off`        | unset                                            | The project's map of wireframe-node-to-component links, each confirmed by a person. **A path turns the feature on; `false` or `off` (any case) declines it, and no skill offers setup again.** The map is created by the skills when missing. |
 
 ## UI — wireframes and components
 
@@ -342,6 +343,15 @@ wireframe node to one of your components: they apply links people have already c
 the rest (or, unattended, assume the best match and flag it for QA), and add each answer to
 `ui.wireframeMap`. Review, QA and `review-pr` check the result. Procedure:
 [`wireframe-component-mapping.md`](../../shared/resources/wireframe-component-mapping.md).
+
+**You do not need to write the `ui:` block either.** The first time `create-story` or `create-task`
+adds a wireframe to a project without one, it detects your component barrel, the module to import
+from and any existing catalogue table, and asks once: set up with those values, adjust them, not
+now, or never for this repo. Accepting writes the block (or the keys a partial block lacks) through
+the engine, which reads the file back and restores it if it does not read as written. "Never" writes
+`wireframeMap: false`, and from then on every skill skips the mapping silently; "Not now" writes
+nothing, so the next wireframe asks again. The develop pipelines never offer setup. Writing
+`ui.wireframeMap: false` (or `off`) by hand declines the same way.
 
 **You do not need to write either file.** The first skill that needs them creates them: the
 catalogue with one row per component `ui.componentBarrel` exports (purpose taken from each
@@ -357,7 +367,15 @@ attribute value is percent-encoded except for letters, digits, `- _ . ! ~ * ' ( 
 `/ : # @ + =` (`value=1%2C500`). A value written by hand needs encoding only for `,`, `}`, a `%`
 followed by two hex digits, or whitespace at its end. The Label column, when set, must match the
 node's quoted label (`/regex/` for a pattern). The row with the most constraints wins. A Component of
-`(layout)` marks a node that draws nothing of its own. Edit the rows freely.
+`(layout)` marks a node that draws nothing of its own. Edit the rows freely: the procedure's
+[Writing map rows by hand](../../shared/resources/wireframe-component-mapping.md#writing-map-rows-by-hand)
+has worked examples, and covers the two things a signature cannot say (a sibling's context, and
+which icon a generic glyph stands for).
+
+When the map has no row for a node, `resolve` also proposes components from the catalogue: those
+with a name segment equal to the primitive (`button` → `Button`, `IconButton`), then those whose
+description names it. They are proposals only, marked `source: catalogue`; nothing is recorded until
+a person confirms one.
 
 ## QA artifacts are co-located
 

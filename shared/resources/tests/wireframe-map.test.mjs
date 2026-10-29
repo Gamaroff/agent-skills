@@ -9,6 +9,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -29,6 +30,10 @@ const {
   readMap,
   parsePattern,
   match,
+  detect,
+  configure,
+  readUiConfig,
+  runCli,
 } = require(SCRIPT);
 
 // U+2028 LINE SEPARATOR and U+2029 PARAGRAPH SEPARATOR, built rather than written: a literal
@@ -1037,4 +1042,679 @@ test("CLI: an unreadable skills-config.yaml exits 1 as config-unreadable, a miss
     cleanup(unreadable);
     cleanup(missing);
   }
+});
+
+// ---------------------------------------------------------------------------
+// task.246: the decline state, detect, configure and catalogue candidates
+// ---------------------------------------------------------------------------
+
+// A bare project: only the files given, no config unless one is passed.
+function project(files = {}) {
+  const root = mkdtempSync(join(tmpdir(), "wfsetup-"));
+  for (const [rel, text] of Object.entries(files)) {
+    mkdirSync(dirname(join(root, rel)), { recursive: true });
+    writeFileSync(join(root, rel), text);
+  }
+  return root;
+}
+
+// Every file under root and its bytes: equal snapshots mean nothing was written.
+function snapshot(root) {
+  const out = {};
+  const walk = (dir) => {
+    for (const e of readdirSync(join(root, dir), { withFileTypes: true })) {
+      const rel = dir ? `${dir}/${e.name}` : e.name;
+      if (e.isDirectory()) walk(rel);
+      else out[rel] = readFileSync(join(root, rel), "utf8");
+    }
+  };
+  walk("");
+  return out;
+}
+
+const config = (root) => readFileSync(join(root, "skills-config.yaml"), "utf8");
+const { parseYamlSubset: parseConfig } = require(
+  join(HERE, "..", "yaml-subset.js"),
+);
+const readUiConfigRaw = (text) => parseConfig(text).ui || {};
+const flagsOf = (opts) =>
+  Object.entries(opts).flatMap(([k, v]) => [`--${k}`, v]);
+
+// The text `after` adds to `before` at one place, or null when it is not one insertion.
+function inserted(before, after) {
+  let i = 0;
+  while (i < before.length && before[i] === after[i]) i++;
+  const len = after.length - before.length;
+  return len > 0 && after.slice(0, i) + after.slice(i + len) === before
+    ? after.slice(i, i + len)
+    : null;
+}
+
+const BARREL = [
+  "export { Pill } from './pill';",
+  "export { PillGroup, type PillProps } from './pill-group';",
+  "export { Card } from './card';",
+  "export const ICON_NAMES = [];",
+  "",
+].join("\n");
+
+const CONFIGURED_FILES = {
+  "src/components/index.ts": BARREL,
+  "src/components/pill.tsx": "export function Pill() {}\n",
+};
+
+test("a decline (false, off, OFF) makes ensure, resolve and record answer declined and write nothing", () => {
+  for (const value of ["false", "off", "OFF", "'Off'"]) {
+    const root = consumer({
+      config: CONFIG.replace(/wireframeMap: .*$/m, `wireframeMap: ${value}`),
+    });
+    try {
+      const before = snapshot(root);
+      assert.deepEqual(readUiConfig(root), { declined: true }, value);
+      assert.equal(ensure(root).reason, "declined", value);
+      assert.equal(resolve(root, "docs/story.md").reason, "declined", value);
+      assert.equal(
+        record(root, { signature: "*>chip", component: "Pill", by: "t" })
+          .reason,
+        "declined",
+        value,
+      );
+      const cli = runCli([
+        "resolve",
+        "docs/story.md",
+        "--root",
+        root,
+        "--json",
+      ]);
+      assert.equal(cli.exitCode, 0, value);
+      assert.deepEqual(snapshot(root), before, `${value}: nothing written`);
+    } finally {
+      cleanup(root);
+    }
+  }
+  // Control: a map path that merely starts with "off" is a path, not a decline.
+  const path = consumer({
+    config: CONFIG.replace(/wireframeMap: .*$/m, "wireframeMap: offline.md"),
+  });
+  try {
+    assert.equal(readUiConfig(path).wireframeMap, "offline.md");
+    assert.equal(resolve(path, "docs/story.md").reason, "ok");
+  } finally {
+    cleanup(path);
+  }
+});
+
+test("detect proposes a src/components barrel, and reports configured and declined", () => {
+  const root = project(CONFIGURED_FILES);
+  try {
+    const r = detect(root);
+    assert.equal(r.reason, "ok");
+    assert.equal(r.state, "unset");
+    assert.equal(r.present, undefined);
+    assert.equal(r.proposal.componentBarrel.value, "src/components/index.ts");
+    assert.match(r.proposal.componentBarrel.evidence, /exports 3 components/);
+    assert.equal(r.proposal.componentImport.value, null);
+    assert.equal(
+      r.proposal.componentCatalogue.value,
+      "docs/architecture/components.md",
+    );
+    assert.equal(r.proposal.catalogueSection.value, "## Components");
+    assert.deepEqual(r.proposal.componentExclude.value, []);
+    assert.equal(
+      r.proposal.wireframeMap.value,
+      "docs/architecture/wireframe-component-map.md",
+    );
+    writeFileSync(
+      join(root, "skills-config.yaml"),
+      "ui:\n  wireframeMap: docs/map.md\n",
+    );
+    assert.deepEqual(detect(root), { reason: "ok", state: "configured" });
+    writeFileSync(
+      join(root, "skills-config.yaml"),
+      "ui:\n  wireframeMap: off\n",
+    );
+    assert.deepEqual(detect(root), { reason: "ok", state: "declined" });
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("detect prefers the workspace package with most components and takes its package name", () => {
+  const root = project({
+    ...CONFIGURED_FILES,
+    "package.json": JSON.stringify({ name: "the-repo" }),
+    "packages/ui/package.json": JSON.stringify({ name: "@acme/pills" }),
+    "packages/ui/src/index.ts": BARREL + "export { Tag } from './tag';\n",
+    "packages/empty/src/index.ts": "export const x = 1;\n",
+  });
+  try {
+    const r = detect(root);
+    assert.equal(r.proposal.componentBarrel.value, "packages/ui/src/index.ts");
+    assert.deepEqual(r.proposal.componentImport, {
+      value: "@acme/pills",
+      evidence: "name in packages/ui/package.json",
+    });
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("detect reads a tsconfig path alias that lands on the barrel", () => {
+  const root = project({
+    ...CONFIGURED_FILES,
+    "package.json": JSON.stringify({ name: "the-repo" }),
+    "tsconfig.json": [
+      "{",
+      "  // comments are allowed here",
+      '  "compilerOptions": {',
+      '    "baseUrl": ".",',
+      '    "paths": { "@app/components": ["src/components/index.ts"] }',
+      "  }",
+      "}",
+    ].join("\n"),
+  });
+  try {
+    assert.equal(
+      detect(root).proposal.componentImport.value,
+      "@app/components",
+    );
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("detect proposes an existing catalogue table that lists three or more exports, with its heading", () => {
+  const table = (names) =>
+    [
+      "| Name | Purpose |",
+      "| --- | --- |",
+      ...names.map((n) => `| \`${n}\` | something |`),
+      "",
+    ].join("\n");
+  const root = project({
+    ...CONFIGURED_FILES,
+    "docs/architecture/ui.md": [
+      "# UI",
+      "",
+      "## Two only",
+      "",
+      table(["Pill", "Card"]),
+      "## Our components",
+      "",
+      table(["Pill", "PillGroup", "Card", "NotExported"]),
+    ].join("\n"),
+  });
+  try {
+    const p = detect(root).proposal;
+    assert.equal(p.componentCatalogue.value, "docs/architecture/ui.md");
+    assert.equal(p.catalogueSection.value, "## Our components");
+    assert.match(p.componentCatalogue.evidence, /lists 3 of 3 exports/);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("detect on a project with no component barrel answers nothing-found and proposes nothing", () => {
+  const root = project({ "src/index.ts": BARREL, "README.md": "# x\n" });
+  try {
+    assert.deepEqual(detect(root), {
+      reason: "nothing-found",
+      state: "unset",
+      proposal: null,
+    });
+    const cli = runCli(["detect", "--root", root, "--json"]);
+    assert.equal(cli.exitCode, 0);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("detect reads a ui: block without wireframeMap as partial, and proposes only the missing keys", () => {
+  const cases = [
+    ["ui:\n  componentCatalogue: docs/c.md\n", ["componentCatalogue"]],
+    ["ui:\n", []],
+    ["ui:\nother: 1\n", []],
+  ];
+  for (const [text, present] of cases) {
+    const root = project({ ...CONFIGURED_FILES, "skills-config.yaml": text });
+    try {
+      const r = detect(root);
+      assert.equal(r.state, "partial", text);
+      assert.deepEqual(r.present, present, text);
+      for (const k of present)
+        assert.equal(r.proposal[k], undefined, `${text}: ${k} is not proposed`);
+      assert.equal(r.proposal.componentBarrel.value, "src/components/index.ts");
+      assert.ok(r.proposal.wireframeMap, text);
+    } finally {
+      cleanup(root);
+    }
+  }
+});
+
+test("detect writes nothing, in any state", () => {
+  const configs = [
+    null,
+    "ui:\n",
+    "ui:\n  componentCatalogue: docs/c.md\n",
+    "ui:\n  wireframeMap: false\n",
+    "ui:\n  wireframeMap: docs/map.md\n",
+  ];
+  for (const text of configs) {
+    const files = { ...CONFIGURED_FILES };
+    if (text !== null) files["skills-config.yaml"] = text;
+    const root = project(files);
+    try {
+      const before = snapshot(root);
+      detect(root);
+      runCli(["detect", "--root", root, "--json"]);
+      assert.deepEqual(snapshot(root), before, String(text));
+    } finally {
+      cleanup(root);
+    }
+  }
+});
+
+test("detect reads only its bounded set: one level of packages/, docs/ to depth 4", () => {
+  const deep = project({ "packages/a/b/src/index.ts": BARREL });
+  const shallow = project({ "packages/a/src/index.ts": BARREL });
+  const catalogue = (rel) =>
+    project({
+      ...CONFIGURED_FILES,
+      [rel]: [
+        "## Components",
+        "",
+        "| Name | Purpose |",
+        "| --- | --- |",
+        "| `Pill` | x |",
+        "| `PillGroup` | x |",
+        "| `Card` | x |",
+        "",
+      ].join("\n"),
+    });
+  const deepDocs = catalogue("docs/a/b/c/d/e/x.md");
+  const depth4 = catalogue("docs/a/b/c/d/x.md");
+  const tasks = catalogue("docs/tasks/x.md");
+  try {
+    assert.equal(detect(deep).reason, "nothing-found", "two levels down");
+    // Control: one level down is found, so the miss above is the bound and not a broken scan.
+    assert.equal(
+      detect(shallow).proposal.componentBarrel.value,
+      "packages/a/src/index.ts",
+    );
+    assert.equal(
+      detect(deepDocs).proposal.componentCatalogue.value,
+      "docs/architecture/components.md",
+      "depth 5 is not read",
+    );
+    assert.equal(
+      detect(depth4).proposal.componentCatalogue.value,
+      "docs/a/b/c/d/x.md",
+      "depth 4 is read",
+    );
+    assert.equal(
+      detect(tasks).proposal.componentCatalogue.value,
+      "docs/architecture/components.md",
+      "docs/tasks is not read",
+    );
+  } finally {
+    for (const r of [deep, shallow, deepDocs, depth4, tasks]) cleanup(r);
+  }
+});
+
+const SETUP = {
+  barrel: "src/components/index.ts",
+  import: "@acme/ui",
+  catalogue: "docs/architecture/components.md",
+  section: "## Components",
+  map: "docs/architecture/wireframe-component-map.md",
+};
+
+test("configure appends a ui: block, keeps every existing byte, and reads back configured", () => {
+  const before = "develop:\n  defaultMode: standard\n# trailing comment";
+  const root = project({ "skills-config.yaml": before });
+  try {
+    const r = configure(root, { ...SETUP, exclude: "Provider, Theme" });
+    assert.equal(r.reason, "ok");
+    assert.equal(r.action, "appended");
+    const after = config(root);
+    assert.ok(after.startsWith(before), "existing bytes kept");
+    const ui = readUiConfig(root);
+    assert.equal(ui.componentBarrel, SETUP.barrel);
+    assert.equal(ui.componentImport, "@acme/ui");
+    assert.equal(ui.catalogueSection, "## Components");
+    assert.deepEqual(ui.componentExclude, ["Provider", "Theme"]);
+    assert.equal(ui.wireframeMap, SETUP.map);
+    assert.equal(detect(root).state, "configured");
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("configure keeps a CRLF file's line endings, and creates a missing file", () => {
+  const crlf = project({ "skills-config.yaml": "develop:\r\n  x: 1\r\n" });
+  const none = project();
+  try {
+    assert.equal(configure(crlf, SETUP).reason, "ok");
+    const text = config(crlf);
+    assert.equal(text.replace(/\r\n/g, "").includes("\n"), false, "no bare LF");
+    assert.equal(readUiConfig(crlf).wireframeMap, SETUP.map);
+    const r = configure(none, SETUP);
+    assert.equal(r.action, "created");
+    assert.equal(readUiConfig(none).componentBarrel, SETUP.barrel);
+  } finally {
+    cleanup(crlf);
+    cleanup(none);
+  }
+});
+
+test("configure refuses exists, writing nothing, when the map is set or declined, a key conflicts, or ui: is one line", () => {
+  const decline = ["--decline"];
+  const cases = [
+    ["ui:\n  wireframeMap: docs/map.md\n", "wireframeMap"],
+    ["ui:\n  wireframeMap: false\n", "wireframeMap"],
+    // The same value again is still a set map: not a key to insert a second time.
+    [`ui:\n  wireframeMap: ${SETUP.map}\n`, "wireframeMap"],
+    ["ui:\n  wireframeMap: off\n", "wireframeMap", decline],
+    ["ui:\n  wireframeMap: docs/map.md\n", "wireframeMap", decline],
+    ["ui:\n  componentImport: '@other/ui'\n", "componentImport"],
+    ["ui: {componentCatalogue: docs/c.md}\n", "ui"],
+  ];
+  for (const [text, key, flags = flagsOf(SETUP)] of cases) {
+    const root = project({ "skills-config.yaml": text });
+    try {
+      const cli = runCli(["configure", ...flags, "--root", root, "--json"]);
+      assert.equal(cli.exitCode, 1, text);
+      assert.deepEqual(
+        cli.payload,
+        { reason: "exists", file: "skills-config.yaml", key },
+        text,
+      );
+      assert.equal(config(root), text, `${text}: unchanged`);
+    } finally {
+      cleanup(root);
+    }
+  }
+});
+
+test("configure inserts only the missing keys inside a partial block, keeping every other byte", () => {
+  const cases = [
+    "develop:\n  x: 1\nui:\n  componentCatalogue: docs/architecture/components.md\n\n# note\nother: 1\n",
+    "ui:\n",
+    "ui:\nother: 1\n",
+    'ui:   # set up later\n    componentImport: "@acme/ui"\nother:\n  - a\n',
+  ];
+  for (const before of cases) {
+    const root = project({ "skills-config.yaml": before });
+    try {
+      const r = configure(root, SETUP);
+      assert.equal(r.reason, "ok", before);
+      assert.equal(r.action, "inserted", before);
+      const after = config(root);
+      const added = inserted(before, after);
+      assert.ok(added, `${before}: one insertion, every other byte kept`);
+      for (const line of added.split("\n").filter(Boolean))
+        assert.match(
+          line,
+          /^\s+\S/,
+          `${before}: inserted line is inside the block`,
+        );
+      for (const k of Object.keys(readUiConfigRaw(before)))
+        assert.ok(!r.written.includes(k), `${before}: ${k} was already there`);
+      assert.equal(detect(root).state, "configured", before);
+      const cfg = parseConfig(after);
+      if ("other" in parseConfig(before))
+        assert.deepEqual(cfg.other, parseConfig(before).other, before);
+      assert.equal(
+        cfg.ui.other,
+        undefined,
+        `${before}: other stays outside ui`,
+      );
+    } finally {
+      cleanup(root);
+    }
+  }
+});
+
+test("configure keeps a present key that matches, and needs a barrel only when the block has none", () => {
+  const root = project({
+    "skills-config.yaml": "ui:\n  componentBarrel: src/components/index.ts\n",
+  });
+  const empty = project();
+  try {
+    const r = configure(root, { map: SETUP.map });
+    assert.equal(r.reason, "ok");
+    assert.deepEqual(r.written, ["wireframeMap"]);
+    const none = runCli(["configure", "--map", SETUP.map, "--root", empty]);
+    assert.equal(none.exitCode, 2);
+    assert.equal(existsSync(join(empty, "skills-config.yaml")), false);
+  } finally {
+    cleanup(root);
+    cleanup(empty);
+  }
+});
+
+test("configure refuses a value holding a line terminator, and writes nothing", () => {
+  for (const bad of ["a\nb", "a\rb", `a${LS}b`]) {
+    const root = project({ "skills-config.yaml": "x: 1\n" });
+    try {
+      const cli = runCli([
+        "configure",
+        ...flagsOf({ ...SETUP, import: bad }),
+        "--root",
+        root,
+      ]);
+      assert.equal(cli.exitCode, 2, JSON.stringify(bad));
+      assert.equal(config(root), "x: 1\n");
+    } finally {
+      cleanup(root);
+    }
+  }
+});
+
+test("configure --decline round-trips to declined, from no block and from a partial one", () => {
+  for (const before of [
+    null,
+    "x: 1\n",
+    "ui:\n  componentCatalogue: docs/c.md\n",
+  ]) {
+    const root = project(
+      before === null ? {} : { "skills-config.yaml": before },
+    );
+    try {
+      const r = configure(root, { decline: true });
+      assert.equal(r.reason, "ok", String(before));
+      assert.equal(r.declined, true);
+      assert.equal(detect(root).state, "declined", String(before));
+      assert.equal(ensure(root).reason, "declined");
+      if (before !== null)
+        assert.ok(inserted(before, config(root)), String(before));
+    } finally {
+      cleanup(root);
+    }
+  }
+});
+
+test("configure restores the original bytes when the file does not read back as written", () => {
+  // yaml-subset does not unescape a double-quoted backslash, so `a\b` reads back as `a\\b`.
+  const before = "develop:\r\n  x: 1\r\n";
+  const appended = project({ "skills-config.yaml": before });
+  const partial = project({
+    "skills-config.yaml": "ui:\n  componentBarrel: b.ts\n",
+  });
+  const created = project();
+  try {
+    const cli = runCli([
+      "configure",
+      ...flagsOf({ ...SETUP, import: "a\\b" }),
+      "--root",
+      appended,
+      "--json",
+    ]);
+    assert.equal(cli.exitCode, 1);
+    assert.equal(cli.payload.reason, "write-failed");
+    assert.equal(config(appended), before);
+    assert.equal(configure(partial, { map: "a\\b" }).reason, "write-failed");
+    assert.equal(config(partial), "ui:\n  componentBarrel: b.ts\n");
+    assert.equal(
+      configure(created, { ...SETUP, map: "a\\b" }).reason,
+      "write-failed",
+    );
+    assert.equal(existsSync(join(created, "skills-config.yaml")), false);
+  } finally {
+    for (const r of [appended, partial, created]) cleanup(r);
+  }
+});
+
+test("CLI: configure usage — --decline takes no value flags, and needs --map otherwise", () => {
+  const root = project();
+  try {
+    assert.equal(runCli(["configure", "--root", root]).exitCode, 2);
+    assert.equal(
+      runCli(["configure", "--decline", "--map", "m.md", "--root", root])
+        .exitCode,
+      2,
+    );
+    assert.equal(runCli(["detect", "--decline", "--root", root]).exitCode, 2);
+    assert.equal(existsSync(join(root, "skills-config.yaml")), false);
+  } finally {
+    cleanup(root);
+  }
+});
+
+const CANDIDATE_STORY = [
+  "# Story",
+  "",
+  "```wireloom",
+  "window:",
+  '  chip "Tag"',
+  '  button "Go"',
+  "```",
+  "",
+].join("\n");
+
+const catalogueOf = (rows, section = "## Components") =>
+  [
+    section,
+    "",
+    "| Component | Tier | Use it for |",
+    "| --- | --- | --- |",
+    ...rows.map(([n, purpose]) => `| \`${n}\` | atoms | ${purpose} |`),
+    "",
+  ].join("\n");
+
+function candidatesFor(rows, { map = null, section } = {}) {
+  const files = {
+    "docs/story.md": CANDIDATE_STORY,
+    "docs/components.md": catalogueOf(rows, section),
+  };
+  if (map) files["docs/wireframe-map.md"] = map;
+  const root = consumer({ files });
+  try {
+    const r = resolve(root, "docs/story.md");
+    const of = (p) => r.unresolved.find((n) => n.signature === `window>${p}`);
+    return { r, chip: of("chip").candidates, button: of("button").candidates };
+  } finally {
+    cleanup(root);
+  }
+}
+
+test("resolve offers catalogue candidates on an empty map: name segments, then purpose words", () => {
+  const { r, chip, button } = candidatesFor([
+    ["Card", "A surface"],
+    ["Pill", "A removable chip"],
+    ["PillGroup", "Groups pills"],
+    ["ChipRow", "Lays chips out"],
+    // Control: the primitive inside a segment, and nowhere in the purpose, is not a match.
+    ["Rechip", "Something else entirely"],
+    ["Button", "A call to action"],
+    ["IconButton", "An icon you press"],
+    ["ButtonGroup", "Buttons side by side"],
+    ["Rebutton", "A call to action, again"],
+  ]);
+  assert.equal(r.mapState, "missing");
+  assert.equal(r.catalogueState, "ok");
+  assert.deepEqual(
+    chip.map((c) => [c.component, c.basis]),
+    [
+      ["ChipRow", "name"],
+      ["Pill", "purpose"],
+    ],
+  );
+  assert.deepEqual(
+    button.map((c) => c.component),
+    ["Button", "IconButton", "ButtonGroup"],
+  );
+  for (const c of [...chip, ...button]) {
+    assert.equal(c.source, "catalogue");
+    assert.equal(c.from, "catalogue");
+    assert.equal(c.variant, "");
+  }
+});
+
+test("resolve offers at most five catalogue candidates", () => {
+  const names = ["A", "B", "C", "D", "E", "F", "G"].map((x) => [
+    `${x}aChip`,
+    "x",
+  ]);
+  const { chip } = candidatesFor(names);
+  assert.equal(chip.length, 5);
+});
+
+test("near-miss candidates come first, keep their old shape, and are not repeated from the catalogue", () => {
+  const map = [
+    "| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
+    "| `chip{kind=x}` |  | ChipRow | dense |  |  | 2026-10-29, a |",
+    "",
+  ].join("\n");
+  const { chip } = candidatesFor(
+    [
+      ["ChipRow", "Lays chips out"],
+      ["Pill", "A removable chip"],
+    ],
+    { map },
+  );
+  assert.deepEqual(chip, [
+    {
+      component: "ChipRow",
+      variant: "dense",
+      from: "chip{kind=x}",
+      source: "map",
+    },
+    {
+      component: "Pill",
+      variant: "",
+      from: "catalogue",
+      source: "catalogue",
+      basis: "purpose",
+    },
+  ]);
+});
+
+test("near-miss output is unchanged apart from source, and a catalogue without its section offers none", () => {
+  const root = consumer({ files: { "docs/wireframe-map.md": MAP } });
+  try {
+    const r = resolve(root, "docs/story.md");
+    const strip = (n) =>
+      n.candidates.map(({ source, ...rest }) => {
+        assert.equal(source, "map");
+        return rest;
+      });
+    const by = (label) => r.unresolved.find((n) => n.label === label);
+    assert.deepEqual(
+      strip(r.unresolved.find((n) => n.signature === "row>icon{name=leader}")),
+      [{ component: "Icon", variant: "lock", from: "icon{name=lock}" }],
+    );
+    assert.deepEqual(strip(by("Family")), [
+      { component: "Carousel", variant: "all slides", from: "text" },
+      { component: "Heading", variant: "", from: "text[bold]" },
+    ]);
+  } finally {
+    cleanup(root);
+  }
+  const { r, chip } = candidatesFor([["ChipRow", "x"]], {
+    section: "## Something else",
+  });
+  assert.equal(r.catalogueState, "no-section");
+  assert.deepEqual(chip, []);
 });
