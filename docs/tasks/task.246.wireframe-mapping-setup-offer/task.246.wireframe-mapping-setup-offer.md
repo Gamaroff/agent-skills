@@ -642,11 +642,40 @@ is dropped. The file still reads back correctly.
   removed list ends the file without a newline and holds a blank line, `configure` deletes the blank
   line and adds a final newline; strip from the last non-blank retained piece.
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.246.qa.4.wireframe-mapping-setup-offer.md`
+**Gate File**: `task.246.gate.4.wireframe-mapping-setup-offer.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+### Missing Criteria:
+
+- [ ] #11: the `wireframe-mapping-hooks.test.mjs` test "no develop pipeline step calls detect or configure" checks develop-story, develop-task and develop-bug only. `skills/develop-next/SKILL.md` and `skills/develop-batch/SKILL.md`, which the criterion's `skills/develop-*/SKILL.md` covers, are unchecked.
+- [ ] #12: no test holds the `libs/*` workspace bound of `detect` (`WORKSPACES`, `wireframe-map.js:1013`). Removing `libs`, or letting it go two levels deep, turns nothing red.
+- [ ] #13: the cycle-3 fill-before-insert order fix has a test but no mutation proof (implementation report, QA Cycle 3).
+
+### Next Steps:
+
+- [ ] Make the hooks test enumerate `skills/develop-*/SKILL.md` instead of a fixed list.
+- [ ] Add a `libs/a/src/index.ts` (found) and `libs/a/b/src/index.ts` (not found) case to the bounded-set test, and mutation-prove it.
+- [ ] Mutation-prove the fill-before-insert order (swap the order, see the last-line test go red), and record it.
+
+**Estimated Effort:** Small (test-only; under an hour)
+
+**Gap Report Generated:** 2026-10-30
+**QA Gate Reference**: See `task.246.gate.4.wireframe-mapping-setup-offer.yml` for full details
+
+**Detailed Verification Log:** See `task.246.dod.1.wireframe-mapping-setup-offer.md` for the complete verification evidence.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-29 | 1.0     | Initial draft, from the rebirth-wallet confirmation of v0.62.0 | create-task |
 | 2026-10-29 | 1.1     | Review 1 (7/10 → 9/10): added the `partial` state (a `ui:` block without `wireframeMap` looped); defined "sets `ui.wireframeMap`" once for its 12 gate sites; listed `wireframe-mapping-hooks.test.mjs`; held the offer, near-miss and bounded-read criteria with tests | review-task |
 | 2026-10-29 |         | Status → ready-for-development | review-task |
@@ -658,6 +687,7 @@ is dropped. The file still reads back correctly.
 | 2026-10-30 |         | QA gate CONCERNS (90/100) — 2 findings | qa-task |
 | 2026-10-30 |         | QA findings fixed — cycle 3: 1 bug and 1 low finding; 1 new test | qa-fix |
 | 2026-10-30 |         | QA gate PASS (100/100) — 1 low finding, carried to future work | qa-task |
+| 2026-10-30 |  | DoD incomplete — 3 gaps identified | finalise |
 <!-- change-log-end -->
 
 ---

@@ -1,0 +1,29 @@
+{
+  "sink": null,
+  "entry": "cli:shared/resources/wireframe-map.js",
+  "name": "ensure writes nothing on a decline",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 9,
+  "passed": 9,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": [
+    "ensure",
+    "{input}",
+    "--root",
+    "{fixture}",
+    "--json"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-29T23:14:39.494Z"
+}
