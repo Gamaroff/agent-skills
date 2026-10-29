@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-10-29
-**Next Available Task Number:** **245**
+**Next Available Task Number:** **246**
 
 ## How to use
 
@@ -285,6 +285,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 241 | [Make /finalise changelog checks opt-in](task.241.finalise-changelog-checks-opt-in/task.241.finalise-changelog-checks-opt-in.md) | accepted | refactoring | Medium | 2026-10-28 | [#772](https://github.com/Gamaroff/agent-skills/issues/772) | — cut from observation #118 (consumer repos warned about a CHANGELOG.md they never adopted) |
 | 242 | [Scope finalise re-runs](task.242.scope-finalise-re-runs/task.242.scope-finalise-re-runs.md) | accepted | refactoring | Medium | 2026-10-29 | [#780](https://github.com/Gamaroff/agent-skills/issues/780) | — cut from observation #121 (task.239 needed five /finalise runs; each re-judged passed criteria more finely) · PR #781 merged |
 | 244 | [The QA loop always ends on a gate](task.244.qa-loop-ends-on-a-gate/task.244.qa-loop-ends-on-a-gate.md) | planned | refactoring | High | 2026-10-29 | [#782](https://github.com/Gamaroff/agent-skills/issues/782) | — prompted by task.242's loop-limit halt, which handed over an ungated fix after route 2c declined |
+| 245 | [Shared-checkout-safe guards and staging](task.245.shared-checkout-safe-guards-and-staging/task.245.shared-checkout-safe-guards-and-staging.md) | planned | refactoring | Medium | 2026-10-29 | [#783](https://github.com/Gamaroff/agent-skills/issues/783) | — cut from observations #126, #127 (a parallel session's edit in the same checkout: swept into finalise 6a's commit; HALTed a QA re-review) |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 

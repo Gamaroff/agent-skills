@@ -20,7 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. No phase is open (Phase 18 closed 2026-10-28); selection falls through to the registries.
+chain, a human gate. Phase 19 is open (opened 2026-10-29): T245, then T244.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -66,6 +66,19 @@ Read only by `--batch`. Two rows conflict when they share a tag that **either** 
 | `mutation-proving` | `shared/resources/mutation-proving.md`                                  |
 | `docs-pipeline`    | `docs/runbooks/*`, `docs/concepts/*`, `docs/reference/pipeline-artifacts.md`, `docs/operations/workflows.md`, `skills/develop-*/README.md` |
 | `pipeline-lock`    | `shared/resources/advance-pipeline-lock.sh`, `advance-pipeline-lock.test.sh`  |
+
+## PHASE 19 — shared-checkout safety before the QA-loop rework (opened 2026-10-29)
+
+An **override**: without it the registry fallback selects T244 first, because it takes the
+lowest-numbered task. T245 goes first because this checkout is shared with a parallel session (the
+T243 wireframe work), and T245 fixes the two places that session's edits break a run: `/finalise` 6a
+sweeping its registry row into an acceptance commit (obs #127), and the QA re-review halting on its
+edit (obs #126). T244's QA loop runs the re-review on every cycle, so it benefits directly. The two
+rows are independent (`deps: none`). They share a soft edit to `qa-task`/`qa-story`, so the second
+to merge rebases.
+
+- [ ] **T245** Shared-checkout-safe guards and staging · deps: none · touches: finalise!, qa-skills~, orchestrators~, bundles~ · /develop-task docs/tasks/task.245.shared-checkout-safe-guards-and-staging/task.245.shared-checkout-safe-guards-and-staging.md
+- [ ] **T244** The QA loop always ends on a gate · deps: none · touches: pipeline-steps!, qa-skills~, bundles~ · /develop-task docs/tasks/task.244.qa-loop-ends-on-a-gate/task.244.qa-loop-ends-on-a-gate.md
 
 ## Deferred / human-gated
 
@@ -215,3 +228,4 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-10-28 | **T238 accepted + merged — PR #770 merged** (`780ac732`). The QA loop acts on four signals it already held. A red gate log is kept, not deleted (obs #41). A red fast gate is classified `not measured` (one re-run) or `attributable` by `fast-gate-outcome.sh` (obs #14). `/qa-task` and `/qa-story` read PR CI once at Step 10 through `qa-ci-read.sh`, on GitHub and Bitbucket (obs #45). A 5c `CONCERNS` with an open `category: coverage` finding returns to 5b, with a qa-fix ladder row and a resume split (obs #8). Ten QA cycles, four of them owner-granted (FAIL 70 → CONCERNS 80 → PASS 90; DoD run 1 gaps; FAIL 20 → FAIL 50 → FAIL 60 → CONCERNS 80 ×3 → CONCERNS 90). Cycle 6 deleted the `pre-existing red` outcome at its third strike, with the structured replacement deferred. Cycles 7–10 hardened the §5c open-coverage reader. 19 bug reports, all closed. 5c APPROVE; DoD run 2 accepted 15/15; security probe 119 executed, 0 escaped, 1 reproduced (CR10-1, owner-deferred to T240); CI 6/6. Issue #768 closed. **Next: T240.** |
 | 2026-10-28 | **T240 accepted + merged — PR #776 merged** (`d820f8f2`). The §5c open-coverage count now comes from `shared/resources/open-coverage.js`, one `command node` call plus a `case` backstop in place of a 35-line awk. The reader reads one line per key over an allow-listed character set, decodes bytes strictly (invalid UTF-8 is `bad-encoding`), and answers `unreadable` on every shape it cannot place, so the loop halts rather than printing a wrong count; a failing `node` reads `unreadable` too. All 187 tracked review reports read as before; a PyYAML differential test compares it with YAML on random blocks. Nine QA cycles (CONCERNS 90 ×8 → PASS 100), 11 bug reports, all closed; every guard mutation-proven (M1–M37). 5c CONCERNS with `OPEN_COVERAGE=0`, PC-4 and PC-7 recorded; DoD accepted 11/11; CI 6/6 on `966aba75`. Follow-ups PR #777 and #778 merged after. Issue #771 closed. **Phase 18 is complete**; selection falls through to the registries. |
 | 2026-10-28 | **Phase 18 closed and archived** to `roadmap-history.md` (T238 and T240). No phase is open; selection falls through to the registries (next: T239). |
+| 2026-10-29 | **Phase 19 opened** with T245 (shared-checkout-safe guards and staging, cut from obs #126 and #127) then T244 (the QA loop always ends on a gate). An override of the registry order: T245 fixes the two ways a parallel session in the same checkout breaks a run, and T244's QA loop hits one of them on every cycle. Both `deps: none`; soft overlap on `qa-skills`. |
