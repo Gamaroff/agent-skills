@@ -634,8 +634,12 @@ function merge(s, agentYaml, opts, io) {
     (a) => a && typeof a === "object",
   );
   const changed = new Set(s.changed || []);
-  const tracked = evidenceIndex(io.tracked(), changed);
-  const mio = { memberEvidence: (m) => memberEvidence(m, tracked, changed) };
+  // A new member's evidence is this run's agent citing HEAD, so a gone path
+  // cannot be what it meant: its bare basename resolves against HEAD alone.
+  // The gone-candidate rule is for the prior record's citations, written
+  // before the deletion (QA cycle 5, CR5-1).
+  const atHead = { ...evidenceIndex(io.tracked(), changed), goneByBase: null };
+  const mio = { memberEvidence: (m) => memberEvidence(m, atHead, changed) };
 
   // Zero criteria: nothing to key on, so the agent's verdicts pass through.
   if (s.criteria.length === 0) {

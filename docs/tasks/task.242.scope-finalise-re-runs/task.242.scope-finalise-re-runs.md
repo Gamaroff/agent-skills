@@ -97,7 +97,7 @@ Step 3c aggregation (existing, extended: after the YAML parse, before Step 3d re
 
 **Citation paths.** A citation contributes a path only when it resolves to a file `git ls-files` tracks:
 - a repo-relative `path:line` resolves to its path, including a path deleted or renamed since the prior head (it counts as changed);
-- a bare basename resolves when exactly one file at HEAD has that basename. When any path deleted or renamed since the prior head also has it, the citation was ambiguous when it was written, so it resolves to every file that has it. The gone path counts as changed, and the criterion is re-judged, not carried on a guess. That covers a file moved under its own name (QA cycles 2–4: CR2-3, CR3-1, CR4-1);
+- a bare basename resolves when exactly one file at HEAD has that basename. When any path deleted or renamed since the prior head also has it, the citation was ambiguous when it was written, so it resolves to every file that has it. The gone path counts as changed, and the criterion is re-judged, not carried on a guess. That covers a file moved under its own name (QA cycles 2–4: CR2-3, CR3-1, CR4-1). This rule is for the prior record's citations only. A new member's evidence is cited by this run's agent against HEAD, so `merge` resolves its bare basename against HEAD alone (QA cycle 5, CR5-1);
 - an abbreviated `:N-M`, a commit SHA, or anything ambiguous does not resolve.
 
 task.239's DoD runs cite all three unresolvable shapes. A PASS with no resolvable code, test or member-evidence path cannot be watched for change, so it is re-judged rather than carried.
@@ -373,18 +373,18 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.242.qa.4.scope-finalise-re-runs.md](./task.242.qa.4.scope-finalise-re-runs.md)
-- **Gate File**: [task.242.gate.4.scope-finalise-re-runs.yml](./task.242.gate.4.scope-finalise-re-runs.yml)
+- **Full Report**: [task.242.qa.5.scope-finalise-re-runs.md](./task.242.qa.5.scope-finalise-re-runs.md)
+- **Gate File**: [task.242.gate.5.scope-finalise-re-runs.yml](./task.242.gate.5.scope-finalise-re-runs.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 141
+- **Tests Executed**: 142
 - **Phases Verified**: 18/18
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-The cycle-3 fixes are verified (6 of 6 mutation proofs covered) and there is no high finding. One medium remains:
-- CR4-1: a bare basename shared by a HEAD file and a path gone since the prior head is resolved as exact, so the criterion is carried rather than re-judged.
+The cycle-4 fix is verified (4 of 4 mutation proofs covered) and there is no high finding. One promoted medium remains:
+- CR5-1: the gone-candidate rule also reaches merge's new-member evidence, so a same-basename deletion counts a new member on unchanged evidence.
 
 ## Change Log
 
@@ -402,6 +402,8 @@ The cycle-3 fixes are verified (6 of 6 mutation proofs covered) and there is no 
 | 2026-10-29 |  | QA fix cycle 3. CR3-1: a bare basename resolves against HEAD first, falling back to a gone path only when HEAD has none, so a file moved under its own name is re-judged. CR3-2: diffs read with `-z`. Two dead-code cleanups. § 3 *Citation paths* restated. 3 new tests; 6 mutations covered. Status → ready-for-review | qa-fix |
 | 2026-10-29 |  | QA gate CONCERNS (90/100). 1 finding: CR4-1 (medium), an ambiguous bare basename across HEAD and a gone path is resolved as exact and carried. The cycle-3 fixes verified (6 of 6 covered) | qa-task |
 | 2026-10-29 |  | QA fix cycle 4. CR4-1: when a gone path also carries a bare basename, the citation resolves to every candidate and the criterion is re-judged, not carried on a guess. § 3 *Citation paths* restated. 1 test rewritten, 1 added; 4 mutations covered. Status → ready-for-review | qa-fix |
+| 2026-10-29 |  | QA gate CONCERNS (90/100). 1 finding: CR5-1 (medium, promoted). The gone-candidate rule also reaches merge's new-member evidence, so a same-basename deletion counts a new member on unchanged evidence. CR4-1 verified (4 of 4 covered) | qa-task |
+| 2026-10-29 |  | QA fix cycle 5. CR5-1: `merge` resolves a new member's evidence against HEAD alone; the gone-candidate rule stays with the prior record's citations. § 3 *Citation paths* restated. 1 test added, seen failing before the fix; mutations covered. Status → ready-for-review | qa-fix |
 
 ---
 

@@ -1,0 +1,59 @@
+schema: 2
+task: 'task.242.scope-finalise-re-runs'
+task_title: 'Scope finalise re-runs to the gaps and the changed evidence'
+gate: CONCERNS
+status_reason: 'The cycle-4 fix (CR4-1) is verified: 4 of 4 mutation proofs covered, no high finding. The independent reviewer found one promoted medium bug, verified by execution: the CR4-1 widening also applies to new-member evidence in merge, which this run''s agent cites against HEAD. A same-basename deletion then counts a new member on unchanged evidence and reopens the task.239 loop.'
+reviewer: 'QA Engineer'
+head: '1146a0e7960f1116f260f557f2afec85cb0fde30'
+updated: '2026-10-29T08:06:02Z'
+
+top_issues:
+  - id: 'TASK-242-CR5-1'
+    severity: medium
+    file: 'shared/resources/finalise-rerun-scope.js'
+    finding: 'merge builds its member-evidence index with evidenceIndex (finalise-rerun-scope.js:637-638), so the cycle-4 gone-candidate widening in resolveCitation (line 159) also reaches the citations this run''s agent wrote against HEAD. Executed: a new member citing "b.js:3", with tracked [src/a.js, src/b.js] and old/b.js gone, resolves to [src/b.js, old/b.js], reads as changed and is counted. With nothing gone it reads as unchanged and becomes an advisory. A deletion elsewhere therefore lets a new member on unchanged evidence keep the criterion failing: the task.239 new-gap-each-run loop, which §3 forbids. Code-review CR-1 (bug, medium, confidence high) was promoted by code_review_blocking.'
+    suggested_action: 'Resolve a citation by its provenance: the prior record''s citations (scope) keep the gone-candidate rule, and a current-run citation (merge''s new-member check) resolves against HEAD alone. Add a merge test with a same-basename deletion beside a new member on unchanged evidence.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 142
+  phases_verified: 18/18
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false, as in cycles 1-4. A carry or count classifier over git state; it writes no disk path.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR5-1: a same-basename deletion counts a new member on unchanged HEAD evidence, so the anti-loop rule does not hold on that path.'
+  maintainability:
+    status: PASS
+    notes: 'The CR4-1 tests cover both identity directions on the scope side; the merge side has no gone-basename case (CR5-1).'
+
+recommendations:
+  immediate:
+    - action: 'Resolve current-run citations against HEAD only (CR5-1)'
+      refs: ['shared/resources/finalise-rerun-scope.js']
+  future:
+    - action: 'Step 4b: no runnable prose changed this cycle.'
+      refs: ['skills/finalise/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: BLOCKED
+  conditions: ['CR5-1 fixed and re-reviewed']

@@ -1085,6 +1085,56 @@ test("reported-gap: non_member_fail keeps an agent FAIL that an invented member 
   }
 });
 
+test("merge: a new member's bare citation resolves at HEAD, whatever shares its basename gone (CR5-1)", () => {
+  // old/a.test.mjs shares the basename G9 cites and is deleted; G9's own
+  // evidence, tests/a.test.mjs, is unchanged.
+  const dir = mkRepo({ "old/a.test.mjs": "x\n" });
+  try {
+    const prior = record(dir, git(dir, "rev-parse", "HEAD"), {
+      "SC-3": {
+        status: "FAIL",
+        members: [
+          { member: "G1", evidence: "tests/a.test.mjs:1", status: "PASS" },
+          { member: "G2", evidence: "tests/b.test.mjs:1", status: "PASS" },
+        ],
+        note: "cited test does not run per PR",
+      },
+    });
+    git(dir, "rm", "-q", "old/a.test.mjs");
+    git(dir, "commit", "-q", "-m", "delete the other a.test.mjs");
+    const s = scopeAt(dir, prior);
+    assert.ok(s.changed.includes("old/a.test.mjs"), "the deletion is seen");
+    const g9 = [
+      '        - member: "G9"',
+      '          evidence: "a.test.mjs:5"',
+      "          status: FAIL",
+    ];
+    const r = eng.merge(
+      s,
+      gapYaml(
+        sc3Entry("FAIL", {
+          extraMembers: g9,
+          fields: ['      note: "G9 unmapped"'],
+        }),
+      ),
+      {},
+      eng.gitIo(dir),
+    );
+    // The task.239 shape holds: G9 is an advisory, and the FAIL resting on it
+    // is overturned.
+    assert.equal(sc3Of(r).status, "PASS");
+    const notes = r.ac_result.ac_traceability.advisories.map((a) => a.note);
+    assert.ok(
+      notes.some((n) =>
+        /new member G9 judged FAIL on unchanged evidence/.test(n),
+      ),
+      notes.join("\n"),
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test("scope: a cited path deleted or renamed since the prior head re-judges; an unrelated rename does not (CR2-3)", () => {
   for (const [label, move, want] of [
     ["deleted", (d) => git(d, "rm", "-q", "src/b.js"), "evidence-changed"],
