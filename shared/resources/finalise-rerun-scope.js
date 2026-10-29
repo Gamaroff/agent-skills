@@ -129,10 +129,10 @@ function isReopened(body) {
 /**
  * Resolve the paths a citation names. A token contributes a path only when it
  * resolves to a tracked file, or to one gone since the prior head: a
- * repo-relative path as written, or a bare basename exactly one file at HEAD
- * carries (or, when HEAD carries none, exactly one gone file). An abbreviated
- * `:N-M`, a commit SHA, an ambiguous basename and `NOT_APPLICABLE: …` resolve
- * to nothing.
+ * repo-relative path as written; a bare basename exactly one file at HEAD
+ * carries; or, when any gone path carries the basename, every file that does.
+ * An abbreviated `:N-M`, a commit SHA, a basename only HEAD carries more than
+ * once and `NOT_APPLICABLE: …` resolve to nothing.
  */
 function resolveCitation(citation, tracked) {
   if (citation === null || citation === undefined) return [];
@@ -149,12 +149,15 @@ function resolveCitation(citation, tracked) {
       continue;
     }
     if (token.includes("/")) continue;
-    // A bare basename resolves against HEAD first; only a basename HEAD no
-    // longer carries falls back to the paths gone since the prior head.
-    const hits = tracked.byBase.get(token);
-    const gone = tracked.goneByBase && tracked.goneByBase.get(token);
-    if (hits && hits.length === 1) out.add(hits[0]);
-    else if (!hits && gone && gone.length === 1) out.add(gone[0]);
+    // A bare basename a path gone since the prior head also carries was
+    // ambiguous when the prior run cited it: it resolves to every candidate,
+    // and the gone one counts as changed, so the criterion is re-judged rather
+    // than carried on a guess (QA cycle 4, CR4-1). Otherwise it resolves only
+    // when exactly one file at HEAD carries it.
+    const hits = tracked.byBase.get(token) || [];
+    const gone = (tracked.goneByBase && tracked.goneByBase.get(token)) || [];
+    if (gone.length > 0) for (const p of [...hits, ...gone]) out.add(p);
+    else if (hits.length === 1) out.add(hits[0]);
   }
   return [...out];
 }
@@ -165,7 +168,8 @@ function resolveCitation(citation, tracked) {
 // nothing and the criterion's other, unchanged paths carried it (task.242 QA
 // cycle 2, CR2-3). The gone paths keep their own basename map: merged into
 // HEAD's, a file moved under the same name (src/b.js → lib/b.js) made its
-// bare basename ambiguous, and the move was carried (QA cycle 3, CR3-1).
+// bare basename ambiguous, and the move was carried (QA cycle 3, CR3-1);
+// kept apart, resolveCitation fails a shared basename toward re-judge (CR4-1).
 function evidenceIndex(trackedPaths, changed) {
   const head = trackedIndex(trackedPaths);
   const gone = [...changed].filter((p) => !head.paths.has(p));

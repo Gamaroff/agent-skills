@@ -1144,22 +1144,63 @@ test("scope: a bare-cited file moved or deleted under its own basename re-judges
   }
 });
 
-test("evidenceIndex: HEAD wins a bare basename; a gone path is used only when HEAD has none (CR3-1)", () => {
+test("evidenceIndex: a bare basename a gone path shares resolves to every candidate (CR3-1, CR4-1)", () => {
   const r = (cite, tracked, changed) =>
-    eng.resolveCitation(cite, eng.evidenceIndex(tracked, new Set(changed)));
-  // Should merge: the moved file resolves to its new path, the deleted to its old.
+    eng
+      .resolveCitation(cite, eng.evidenceIndex(tracked, new Set(changed)))
+      .sort();
+  // Moved under its own name, or deleted: the gone path is among the answers,
+  // and a gone path is always changed.
   assert.deepEqual(r("b.js:1", ["lib/b.js"], ["src/b.js", "lib/b.js"]), [
     "lib/b.js",
+    "src/b.js",
   ]);
   assert.deepEqual(r("b.js:1", ["src/a.js"], ["src/b.js"]), ["src/b.js"]);
-  // Should not merge: an unrelated same-basename deletion leaves HEAD's unique
-  // file the answer, and two gone candidates resolve to nothing, never a guess.
-  assert.deepEqual(r("b.js:1", ["src/b.js"], ["old/b.js"]), ["src/b.js"]);
-  assert.deepEqual(r("b.js:1", ["src/a.js"], ["x/b.js", "y/b.js"]), []);
-  // HEAD's own ambiguity is not broken by a gone path.
-  assert.deepEqual(r("b.js:1", ["x/b.js", "y/b.js"], ["z/b.js"]), []);
+  // Ambiguous at the prior head (CR4-1): HEAD's unchanged file is not picked
+  // as if it were the one meant; the deleted one rides along, so re-judge.
+  assert.deepEqual(r("b.js:1", ["src/b.js"], ["old/b.js"]), [
+    "old/b.js",
+    "src/b.js",
+  ]);
+  assert.deepEqual(r("b.js:1", ["src/a.js"], ["x/b.js", "y/b.js"]), [
+    "x/b.js",
+    "y/b.js",
+  ]);
+  // Control — nothing gone: HEAD's unique file resolves, HEAD's own ambiguity
+  // resolves to nothing, as before this task's cycles.
+  assert.deepEqual(r("b.js:1", ["src/b.js", "src/a.js"], ["src/a.js"]), [
+    "src/b.js",
+  ]);
+  assert.deepEqual(r("b.js:1", ["x/b.js", "y/b.js"], []), []);
   // A full path still resolves whether it is at HEAD or gone.
   assert.deepEqual(r("src/b.js:1", ["src/a.js"], ["src/b.js"]), ["src/b.js"]);
+});
+
+test("scope: a bare citation ambiguous at the prior head re-judges once a candidate is deleted (CR4-1)", () => {
+  // src/b.js stays unchanged; lib/x/b.js, which also carried the basename at
+  // the prior head, is deleted.
+  const dir = mkRepo({ "lib/x/b.js": "x\n" });
+  try {
+    const prior = record(dir, git(dir, "rev-parse", "HEAD"), {
+      "SC-2": { code_citation: "b.js:1" },
+    });
+    git(dir, "rm", "-q", "lib/x/b.js");
+    git(dir, "commit", "-q", "-m", "delete the other b.js");
+    assert.equal(reasonOf(scopeAt(dir, prior), "SC-2"), "evidence-changed");
+    // Control: with nothing deleted the same record carries SC-2.
+    const dir2 = mkRepo();
+    try {
+      const prior2 = record(dir2, git(dir2, "rev-parse", "HEAD"), {
+        "SC-2": { code_citation: "b.js:1" },
+      });
+      commit(dir2, { "CHANGELOG.md": "## [Unreleased]\n- x\n" });
+      assert.equal(reasonOf(scopeAt(dir2, prior2), "SC-2"), "unchanged");
+    } finally {
+      cleanup(dir2);
+    }
+  } finally {
+    cleanup(dir);
+  }
 });
 
 test("gitIo: a non-ASCII path reaches changed and dirty unquoted (CR3-2)", () => {

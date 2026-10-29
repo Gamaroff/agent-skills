@@ -97,7 +97,7 @@ Step 3c aggregation (existing, extended: after the YAML parse, before Step 3d re
 
 **Citation paths.** A citation contributes a path only when it resolves to a file `git ls-files` tracks:
 - a repo-relative `path:line` resolves to its path, including a path deleted or renamed since the prior head (it counts as changed);
-- a bare basename resolves when exactly one file at HEAD has that basename. When HEAD has none, it resolves to the one deleted or renamed path that does. HEAD wins, so a file moved under its own name resolves to its new path (QA cycles 2–3: CR2-3, CR3-1);
+- a bare basename resolves when exactly one file at HEAD has that basename. When any path deleted or renamed since the prior head also has it, the citation was ambiguous when it was written, so it resolves to every file that has it. The gone path counts as changed, and the criterion is re-judged, not carried on a guess. That covers a file moved under its own name (QA cycles 2–4: CR2-3, CR3-1, CR4-1);
 - an abbreviated `:N-M`, a commit SHA, or anything ambiguous does not resolve.
 
 task.239's DoD runs cite all three unresolvable shapes. A PASS with no resolvable code, test or member-evidence path cannot be watched for change, so it is re-judged rather than carried.
@@ -366,25 +366,25 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-29
-**Quality Score**: 80/100
-**Gate Decision**: FAIL
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.242.qa.3.scope-finalise-re-runs.md](./task.242.qa.3.scope-finalise-re-runs.md)
-- **Gate File**: [task.242.gate.3.scope-finalise-re-runs.yml](./task.242.gate.3.scope-finalise-re-runs.yml)
+- **Full Report**: [task.242.qa.4.scope-finalise-re-runs.md](./task.242.qa.4.scope-finalise-re-runs.md)
+- **Gate File**: [task.242.gate.4.scope-finalise-re-runs.yml](./task.242.gate.4.scope-finalise-re-runs.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 138
+- **Tests Executed**: 141
 - **Phases Verified**: 18/18
-- **Critical Issues**: 1
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: PASS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-All four cycle-2 findings are fixed and mutation-proved (10 of 10 covered). The cycle-3 review found one new high defect, introduced by the CR2-3 fix:
-- CR3-1: a cited file moved to another directory under the same basename makes its bare citation ambiguous, so the criterion is carried instead of re-judged.
+The cycle-3 fixes are verified (6 of 6 mutation proofs covered) and there is no high finding. One medium remains:
+- CR4-1: a bare basename shared by a HEAD file and a path gone since the prior head is resolved as exact, so the criterion is carried rather than re-judged.
 
 ## Change Log
 
@@ -400,6 +400,8 @@ All four cycle-2 findings are fixed and mutation-proved (10 of 10 covered). The 
 | 2026-10-29 |  | QA fix cycle 2. The 3 gate findings are fixed, plus advisory CR2-4. CR2-1: an unanswered gap keeps its prior FAIL. CR2-2: a structured `non_member_fail` keeps a non-member agent FAIL, and the overturned note is kept as an advisory. CR2-3: deleted and renamed cited paths now count as changed. CR2-4: the record carries the dirty paths, re-judged next run. § 3 merge rule restated to match. 4 new tests; 10 mutations covered. Status → ready-for-review | qa-fix |
 | 2026-10-29 |  | QA gate FAIL (80/100). 1 finding: CR3-1, a same-basename directory move makes a bare citation ambiguous and the criterion is carried, introduced by the CR2-3 fix. The cycle-2 fixes verified (10 of 10 covered). Status → in-progress | qa-task |
 | 2026-10-29 |  | QA fix cycle 3. CR3-1: a bare basename resolves against HEAD first, falling back to a gone path only when HEAD has none, so a file moved under its own name is re-judged. CR3-2: diffs read with `-z`. Two dead-code cleanups. § 3 *Citation paths* restated. 3 new tests; 6 mutations covered. Status → ready-for-review | qa-fix |
+| 2026-10-29 |  | QA gate CONCERNS (90/100). 1 finding: CR4-1 (medium), an ambiguous bare basename across HEAD and a gone path is resolved as exact and carried. The cycle-3 fixes verified (6 of 6 covered) | qa-task |
+| 2026-10-29 |  | QA fix cycle 4. CR4-1: when a gone path also carries a bare basename, the citation resolves to every candidate and the criterion is re-judged, not carried on a guess. § 3 *Citation paths* restated. 1 test rewritten, 1 added; 4 mutations covered. Status → ready-for-review | qa-fix |
 
 ---
 
