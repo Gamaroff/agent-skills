@@ -1,0 +1,97 @@
+schema: 2
+task: 'task.243.wireframe-component-mapping'
+task_title: "Link Wireloom wireframe nodes to the project's UI components, and ask when unsure"
+gate: CONCERNS
+status_reason: 'The cycle 3 fixes hold (stale-file discard, resume, Step 1 ordering, all mutation-proven), but the Step 1 placement lost the 0c-wire gate on ensure, runs before the lock exists, and its key check deletes the file on any failure.'
+reviewer: 'QA Engineer'
+head: 'a139422b1ef9b0ca4f2cdb409ea649a36e305975'
+updated: '2026-10-29T15:16:57Z'
+
+top_issues:
+  - id: 'TASK-243-CR4-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-1-create-branch.md'
+    finding: 'ensure runs for every work item in an opted-in consumer: ensure() is unset only when both ui keys are absent, and the 0c-wire gate was dropped.'
+    suggested_action: 'Restore the 0c-wire gate on the writes section; correct the sentence.'
+    suggested_owner: dev
+    bug_ref: 'task.243.bug.10.wireframe-ensure-runs-for-every-work-item.md'
+    status: open
+  - id: 'TASK-243-CR4-2'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-1-create-branch.md'
+    finding: 'The writes run before the lock is written; an interruption there leaves a dirty tree and no lock, and the next fresh run halts at /create-branch.'
+    suggested_action: 'Write after the lock exists and before the review reads the document: the start of Step 2.'
+    suggested_owner: dev
+    bug_ref: 'task.243.bug.11.wireframe-writes-run-before-the-lock-exists.md'
+    status: open
+  - id: 'TASK-243-CR4-3'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-1-create-branch.md'
+    finding: 'The key check deletes the held file on any mismatch, including an unreadable file, a missing jq and a ./-prefixed path; the double-quoted document path is expanded by bash.'
+    suggested_action: 'jq -e --arg on normalised paths; exit 1 discards, 2+ keeps the file and halts; single-quote the path.'
+    suggested_owner: dev
+    bug_ref: 'task.243.bug.12.held-answers-key-check-deletes-on-any-failure.md'
+    status: open
+  - id: 'TASK-243-CR4-4'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-3-develop-loop.md'
+    finding: 'The Step 3 backstop has no develop-bug exclusion though develop-bug loads the Step 3 doc.'
+    suggested_action: 'Remove the backstop once the writes sit where every resume re-enters, or exclude develop-bug.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-243-CR4-5'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-0-resolve-and-prepare.md'
+    finding: 'The fresh-run delete of the held file sits inside the 0c-wire gate, so a fresh run that skips 0c-wire keeps an earlier run''s answers for the same document.'
+    suggested_action: 'Delete the held file before the 0c-wire gate.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70 # 100 - 10 x 3 medium findings
+
+evidence:
+  tests_reviewed: 32
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false; the document-key check decides whether held answers are written, but it guards correctness of one run''s own state, not an untrusted input; CR4-3 is a correctness finding.'
+  performance:
+    status: PASS
+    notes: 'No change to the engine.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR4-2 and CR4-3.'
+  maintainability:
+    status: PASS
+    notes: 'Every changed block is executed by a test.'
+
+recommendations:
+  immediate:
+    - action: 'Move the wireframe writes to the start of Step 2 (after the lock, before the gate check), behind the 0c-wire gate, with a jq -e key check that halts on an unreadable file; delete the held file before the 0c-wire gate; drop the Step 3 backstop (bug.10, bug.11, bug.12, CR4-4, CR4-5).'
+      refs: ['shared/resources/develop-pipeline-step-2-review.md', 'shared/resources/develop-pipeline-step-1-create-branch.md', 'shared/resources/develop-pipeline-step-0-resolve-and-prepare.md', 'shared/resources/develop-pipeline-step-3-develop-loop.md']
+  future:
+    - action: 'CR2-2 (gate 2), CR-6, CR-8, CR-9 (gate 1).'
+      refs: ['shared/resources/wireframe-map.js']
+
+bug_resolution:
+  bugs_fixed: 9
+  bugs_remaining: 3
+  fix_date: '2026-10-29'
+  total_iterations: 3
+  verification_method: 'bug.7-9: four tests, five mutation proofs covered; fast gate 6834/0; CI green at a139422b'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['CR4-1, CR4-2, CR4-3 fixed and re-gated']

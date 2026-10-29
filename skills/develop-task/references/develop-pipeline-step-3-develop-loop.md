@@ -12,13 +12,6 @@ Loaded by `/develop-story` and `/develop-task` during Step 3. Story/task variant
 
 ---
 
-**Wireframe writes not yet made.** Step 1 writes 0d's held wireframe answers and consumes
-`.claude/state/wireframe-answers.json`. If that file still exists here, the run entered after Step 1:
-run [Step 1 § Wireframe writes](develop-pipeline-step-1-create-branch.md#wireframe-writes-shared)
-now, before the codebase mapping.
-
----
-
 ## Pre-develop Codebase Mapping (CRITICAL for context efficiency)
 
 > This step invokes `/develop`, but the Explore subagent and plan file discovery below must run first. Do not invoke `/develop` until those are complete.
@@ -47,7 +40,7 @@ Ask it to find: all files likely affected by the success criteria and implementa
   ...
   ```
   If `ALWAYS_LOAD_FILES` is empty (all files were missing), log a warning and proceed without them.
-- **Wireframe component table** (when `ui.wireframeMap` is set and the document holds a ` ```wireloom ` block): pass the document's component table, which Step 1 completed with 0d's answers, labelled `Wireframe nodes → components (build each node from the component named; import from {ui.componentImport})`, followed by every assumption 0d logged, labelled `Assumed, not confirmed — QA checks these`. `/develop` builds from the table, never from the Wireloom primitive alone.
+- **Wireframe component table** (when `ui.wireframeMap` is set and the document holds a ` ```wireloom ` block): pass the document's component table, which Step 2 completed with 0d's answers, labelled `Wireframe nodes → components (build each node from the component named; import from {ui.componentImport})`, followed by every assumption 0d logged, labelled `Assumed, not confirmed — QA checks these`. `/develop` builds from the table, never from the Wireloom primitive alone.
 - See `/develop` SKILL.md **Caller-Supplied Context** section for the full contract on how orchestrators may prepend context (surface map, plan file path, always-load files, iteration hint) and how `/develop` must honour it.
 
 ---

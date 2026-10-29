@@ -623,23 +623,29 @@ Store `ALWAYS_LOAD_FILES` as a pipeline-wide variable — it is consumed in Step
 
 ## 0c-wire. Resolve Wireframe Nodes to Components
 
-Only when `skills-config.yaml` sets `ui.wireframeMap` **and** the document holds a ` ```wireloom ` block; otherwise set `WIREFRAME_OPEN=[]` and skip silently. This section is identical for both orchestrators, and is the develop-time half of [`wireframe-component-mapping.md`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/wireframe-component-mapping.md).
+On every fresh run, before the gate below: a fresh run's wireframe answers start empty. A file left
+by an earlier run that never reached Step 2 would otherwise be written into this document there,
+even when this run skips 0c-wire because the feature is now off or the block was removed. A resume
+skips Phase 0, and keeps its own.
+
+```bash
+rm -f .claude/state/wireframe-answers.json
+```
+
+Then, only when `skills-config.yaml` sets `ui.wireframeMap` **and** the document holds a ` ```wireloom ` block; otherwise set `WIREFRAME_OPEN=[]` and skip silently. This section is identical for both orchestrators, and is the develop-time half of [`wireframe-component-mapping.md`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/wireframe-component-mapping.md).
 
 ```bash
 # The first Phase 0 write under .claude/state: no earlier block has created it.
 mkdir -p .claude/state
-# A fresh run's answers start empty. A file left by a run that never reached Step 1 would
-# otherwise be written into this document there. A resume skips this section, and keeps its own.
-rm -f .claude/state/wireframe-answers.json
 command node .agents/skills/{develop-story|develop-task}/references/wireframe-map.js resolve {document-file} --json \
   > .claude/state/wireframe-map.json
 ```
 
-1. `resolve` only. **Phase 0 writes no tracked file**: Step 1's `/create-branch` refuses a tree with any uncommitted file other than the implementation report, so a catalogue, map or document edit made here would halt the run before its branch exists. `resolve` reads a missing map as no confirmed links (`mapState: missing`, every node open). The mapping procedure's `ensure` and `record` run once the branch exists, before Step 2 reads the document ([Step 1 § Wireframe writes](develop-pipeline-step-1-create-branch.md#wireframe-writes-shared)).
+1. `resolve` only. **Phase 0 writes no tracked file**: Step 1's `/create-branch` refuses a tree with any uncommitted file other than the implementation report, so a catalogue, map or document edit made here would halt the run before its branch exists. `resolve` reads a missing map as no confirmed links (`mapState: missing`, every node open). The mapping procedure's `ensure` and `record` run once the branch and the lock exist, before the review reads the document ([Step 2 § Wireframe writes](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/develop-pipeline-step-2-review.md#wireframe-writes-before-the-gate-check)).
 2. Drop from `unresolved[]` every node the document's own component table already settles: the author answered it at `create-story` / `create-task` time. What remains is `WIREFRAME_OPEN`.
 3. For each node in `WIREFRAME_OPEN`, prepare the proposal the mapping procedure's step 4 describes (design source, catalogue, candidates). Nothing is written to the map or the document yet.
 
-`WIREFRAME_OPEN` feeds 0d. Step 3 builds from the document's component table, which Step 1 completes with 0d's answers.
+`WIREFRAME_OPEN` feeds 0d. Step 3 builds from the document's component table, which Step 2 completes with 0d's answers.
 
 ---
 
@@ -741,7 +747,7 @@ If the user selects "Other" for Q1 or Q2, follow up with a plain text request fo
 
 **No Q3** — qa-planning skip is silent (see paragraph above).
 
-**Wireframe questions** (only when `WIREFRAME_OPEN` from 0c-wire is non-empty). One question per open node, or per group of nodes that share a signature and label pattern, built as the mapping procedure's step 5 sets out, with the proposal as **(Recommended)**. `--defaults` answers them all with their Recommended option and logs each as an assumption — never as a confirmation. `AskUserQuestion` takes at most four questions per call: put as many as fit beside Q1/Q2 in the one call, and the rest in follow-up calls straight after it, still before Step 1. After asking, hold the answers in `.claude/state/wireframe-answers.json` as `{"document": "{document-file}", "answers": [...]}`, one entry per node: its signature, component, variant, label pattern if any, and whether it was confirmed or assumed. Do not write them to the document or the map yet. `.claude/state` is ignored, so the tree stays clean for Step 1, which writes them once the branch exists ([Step 1 § Wireframe writes](develop-pipeline-step-1-create-branch.md#wireframe-writes-shared)).
+**Wireframe questions** (only when `WIREFRAME_OPEN` from 0c-wire is non-empty). One question per open node, or per group of nodes that share a signature and label pattern, built as the mapping procedure's step 5 sets out, with the proposal as **(Recommended)**. `--defaults` answers them all with their Recommended option and logs each as an assumption — never as a confirmation. `AskUserQuestion` takes at most four questions per call: put as many as fit beside Q1/Q2 in the one call, and the rest in follow-up calls straight after it, still before Step 1. After asking, hold the answers in `.claude/state/wireframe-answers.json` as `{"document": "{document-file}", "answers": [...]}`, one entry per node: its signature, component, variant, label pattern if any, and whether it was confirmed or assumed. Do not write them to the document or the map yet. `.claude/state` is ignored, so the tree stays clean for Step 1, and Step 2 writes them once the branch and the lock exist ([Step 2 § Wireframe writes](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/develop-pipeline-step-2-review.md#wireframe-writes-before-the-gate-check)).
 
 ### Answer resolution — ask only what nothing answers
 

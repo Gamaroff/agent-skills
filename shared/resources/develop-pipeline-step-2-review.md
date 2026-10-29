@@ -11,6 +11,54 @@ Loaded by `/develop-story` and `/develop-task` during Step 2. Story/task variant
 
 ---
 
+## Wireframe writes (before the gate check)
+
+Only when `skills-config.yaml` sets `ui.wireframeMap` **and** the document holds a ` ```wireloom `
+block, the same gate as Phase 0c-wire; otherwise skip silently. This runs whether the review below
+runs or is skipped.
+
+Phase 0 resolves the wireframe and asks about its open nodes, but writes nothing tracked: the
+branch did not exist yet. The writes happen here. The branch and the lock both exist now, the review
+has not yet read the document, and a resumed run re-enters this step. Every part below is
+idempotent, so a run interrupted here simply runs it again.
+
+```bash
+command node .agents/skills/{develop-story|develop-task}/references/wireframe-map.js ensure --json
+# 0d's held answers, keyed to the document they answer. Compared inside jq, so the path is never
+# expanded by the shell, and with any leading ./ removed from both sides.
+HELD=.claude/state/wireframe-answers.json
+DOC='{document-file}'
+if [ -f "$HELD" ]; then
+  jq -e --arg d "$DOC" '((.document // "") | ltrimstr("./")) == ($d | ltrimstr("./"))' "$HELD" >/dev/null
+  rc=$?
+  case $rc in
+    0) ;; # this document's answers
+    1) echo "wireframe answers in $HELD belong to another document — discarded"; rm -f "$HELD" ;;
+    *) echo "HALT: $HELD cannot be read (jq exit $rc) — kept; repair or delete it, then re-run Step 2"; exit 1 ;;
+  esac
+fi
+```
+
+A `HALT` line means the file holds this run's answers in a form that cannot be checked, or `jq` is
+missing. Stop and report it. Deleting the file would lose the answers silently, and the review
+would then report those nodes as never answered.
+
+1. Log `ensure`'s report in the Decisions Log. A file it `created` or `updated` is committed with the work.
+2. When `.claude/state/wireframe-answers.json` exists, for each entry in its `answers`: add its row to
+   the document's component table (the mapping procedure's step 6), and for each **confirmed** one
+   run one `wireframe-map.js record` call. An assumed entry gets its table row and no map row: an
+   assumption is not a confirmation. Skip a node whose table row is already there; `record`
+   replaces a row with the same signature and label, so a repeated call adds nothing.
+3. Then consume the file, so no later step or run writes it again:
+
+   ```bash
+   rm -f .claude/state/wireframe-answers.json
+   ```
+
+`develop-bug` has its own Step 2 document and no 0c-wire, so it never reaches this section.
+
+---
+
 ## Gate Check
 
 Re-read the document's `Status:` field (captured in Phase 0). Then check for an existing review report:

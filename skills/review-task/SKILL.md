@@ -1353,7 +1353,7 @@ Run `wireframe-map.js resolve` (`references/wireframe-map.js`) on the task, as `
 - a table row whose component the catalogue (`ui.componentCatalogue`) does not list → **Important**, unless the row says the component is new;
 - a wireframe that differs from the screen's own wireframe document (made from its design source) → **Important**: copy the published blocks.
 
-Interactive mode asks about the open nodes, as the mapping procedure's step 5 sets out, and records each answer in the table and the map. Validate mode records them. Inside `develop-task` the review is Step 2: Phase 0 has already asked about the open nodes, and Step 1 has written the answers into the table, so a node still open here was not answered.
+Interactive mode asks about the open nodes, as the mapping procedure's step 5 sets out, and records each answer in the table and the map. Validate mode records them. Inside `develop-task` the review is Step 2: Phase 0 has already asked about the open nodes, and Step 2 writes the answers into the table before this review runs, so a node still open here was not answered.
 
 **Output**: append to the Important bucket used by Steps 6, 7.
 

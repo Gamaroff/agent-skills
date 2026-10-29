@@ -4,7 +4,7 @@
 **Bug ID**: TASK-243-BUG-7
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-10-29
 
@@ -60,3 +60,4 @@ making the key check reject the document's own answers turns it red.
 | 2026-10-29 | New | QA Engineer | Found in QA cycle 3 (code review CR-1), confirmed against step-0 0b |
 | 2026-10-29 | In Progress | qa-fix | Root cause identified |
 | 2026-10-29 | Ready for QA | qa-fix | Fix implemented with mutation-proven tests (qa-fix cycle 3) |
+| 2026-10-29 | Closed | QA Engineer | Verified in QA cycle 4: mutation-proven test holds at a139422b |

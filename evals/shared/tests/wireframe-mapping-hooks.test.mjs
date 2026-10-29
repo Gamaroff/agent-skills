@@ -73,33 +73,49 @@ test("develop Phase 0 resolves in 0c-wire and asks in 0d", () => {
     read("shared/resources/develop-pipeline-autonomous-defaults.md"),
     /Wireframe node with no confirmed component/,
   );
-  // The answers are written at Step 1, before Step 2's review reads the document (QA cycle 3,
-  // CR3-2); Step 3 builds from the table they completed.
-  const step1 = read(
-    "shared/resources/develop-pipeline-step-1-create-branch.md",
-  );
-  const writes = step1.indexOf("## Wireframe writes");
+  // The answers are written at the start of Step 2: after the lock exists (QA cycle 4, CR4-2),
+  // before the review reads the document (QA cycle 3, CR3-2), behind the 0c-wire gate (CR4-1).
+  // Step 3 builds from the table they completed.
+  const step2 = read("shared/resources/develop-pipeline-step-2-review.md");
+  const writes = step2.indexOf("## Wireframe writes");
   assert.ok(
-    writes > 0 && writes < step1.indexOf("## Post-Branch Steps"),
-    "Step 1 writes the held answers before it is marked done",
+    writes > 0 && writes < step2.indexOf("## Gate Check"),
+    "Step 2 writes the held answers before its gate check",
+  );
+  assert.match(
+    step2.slice(writes),
+    /^Only when `skills-config.yaml` sets `ui.wireframeMap` \*\*and\*\* the document holds/m,
+  );
+  assert.doesNotMatch(
+    read("shared/resources/develop-pipeline-step-1-create-branch.md"),
+    /## Wireframe writes/,
+    "Step 1 writes before the lock exists",
   );
   assert.match(
     read("shared/resources/develop-pipeline-step-3-develop-loop.md"),
-    /document's component table, which Step 1 completed/,
+    /document's component table, which Step 2 completed/,
   );
 });
 
-// The bash block under a step doc's heading, placeholders filled, as a consumer would run it.
-const stepBlock = (rel, from, to) => {
-  const doc = read(rel);
-  const start = doc.indexOf(from);
+// The bash under a step doc's heading, placeholders filled, as a consumer would run it: the first
+// block, or with `all` every block in the range, in order.
+const stepBlock = (
+  rel,
+  from,
+  to,
+  { all = false, doc = "docs/story.md" } = {},
+) => {
+  const text = read(rel);
+  const start = text.indexOf(from);
   assert.ok(start >= 0, `${rel} lost "${from}"`);
-  const end = to ? doc.indexOf(to, start) : doc.length;
-  const fence = /```bash\n([\s\S]*?)\n```/.exec(doc.slice(start, end));
-  assert.ok(fence, `${from} has no bash block`);
-  const block = fence[1]
+  const end = to ? text.indexOf(to, start) : text.length;
+  const fences = [
+    ...text.slice(start, end).matchAll(/```bash\n([\s\S]*?)\n```/g),
+  ].map((m) => m[1]);
+  assert.ok(fences.length, `${from} has no bash block`);
+  const block = (all ? fences.join("\n") : fences[0])
     .replaceAll("{develop-story|develop-task}", "develop-task")
-    .replaceAll("{document-file}", "docs/story.md");
+    .replaceAll("{document-file}", doc);
   assert.ok(!/\{[\w|-]+\}/.test(block), `unfilled placeholder in:\n${block}`);
   return block;
 };
@@ -150,6 +166,7 @@ test("the 0c-wire block runs in a fresh checkout and writes no tracked file", ()
     "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md",
     "## 0c-wire.",
     "## 0d.",
+    { all: true },
   );
   const dir = consumer();
   try {
@@ -182,39 +199,46 @@ const hold = (dir, document) => {
   );
 };
 
-// A fresh run starts with no held answers: a file left by a run that never reached Step 1 would
-// otherwise be written into this run's document (QA cycle 3, CR3-3).
+// A fresh run starts with no held answers: a file left by a run that never reached Step 2 would
+// otherwise be written into this run's document (QA cycle 3, CR3-3). The delete sits before the
+// 0c-wire gate, so a fresh run that skips 0c-wire clears it too (QA cycle 4, CR4-5).
 test("a fresh 0c-wire discards a held answers file left by an earlier run", () => {
-  const block = stepBlock(
-    "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md",
-    "## 0c-wire.",
-    "## 0d.",
+  const S0 = "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md";
+  const section = read(S0).slice(
+    read(S0).indexOf("## 0c-wire."),
+    read(S0).indexOf("## 0d."),
+  );
+  assert.ok(
+    section.indexOf("rm -f .claude/state/wireframe-answers.json") <
+      section.indexOf("only when `skills-config.yaml` sets"),
+    "the fresh-run delete sits inside the 0c-wire gate",
   );
   const dir = consumer();
   try {
     hold(dir, "docs/other.md");
-    run(dir, block);
+    run(dir, stepBlock(S0, "## 0c-wire.", "## 0d.", { all: true }));
     assert.equal(existsSync(join(dir, HELD)), false);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-const step1Block = () =>
+const step2Block = (doc) =>
   stepBlock(
-    "shared/resources/develop-pipeline-step-1-create-branch.md",
+    "shared/resources/develop-pipeline-step-2-review.md",
     "## Wireframe writes",
-    "## Post-Branch Steps",
+    "## Gate Check",
+    { doc },
   );
 
-// The writes Phase 0 defers happen at Step 1, on the branch. They are gated on the held file, not on
-// 0c-wire having run in this session, so a resumed run (which skips Phase 0) still makes them
-// (QA cycle 3, CR3-1): this run has no Phase 0 at all.
-test("Step 1's wireframe writes create the catalogue and map, and keep this document's answers", () => {
+// The writes Phase 0 defers happen at the start of Step 2, on the branch. They are gated on the held
+// file, not on 0c-wire having run in this session, so a resumed run (which skips Phase 0) still makes
+// them (QA cycle 3, CR3-1): this run has no Phase 0 at all.
+test("Step 2's wireframe writes create the catalogue and map, and keep this document's answers", () => {
   const dir = consumer();
   try {
     hold(dir, "docs/story.md");
-    run(dir, step1Block());
+    run(dir, step2Block("docs/story.md"));
     assert.match(
       readFileSync(join(dir, "docs/components.md"), "utf8"),
       /Button/,
@@ -229,14 +253,59 @@ test("Step 1's wireframe writes create the catalogue and map, and keep this docu
   }
 });
 
-test("Step 1's wireframe writes discard another document's held answers", () => {
+test("Step 2's wireframe writes discard another document's held answers", () => {
   const dir = consumer();
   try {
     hold(dir, "docs/other.md");
-    run(dir, step1Block());
+    run(dir, step2Block("docs/story.md"));
     assert.equal(existsSync(join(dir, HELD)), false);
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// Only another document's answers are discarded (QA cycle 4, CR4-3): a ./ prefix is the same
+// document, a path the shell would expand is compared as written, and a file that cannot be read
+// stops the run and is kept.
+test("Step 2's key check keeps this document's answers however the path is spelled", () => {
+  for (const [held, doc] of [
+    ["./docs/story.md", "docs/story.md"],
+    ["docs/story.md", "./docs/story.md"],
+    ["docs/a$HOME`b`.md", "docs/a$HOME`b`.md"],
+  ]) {
+    const dir = consumer();
+    try {
+      hold(dir, held);
+      run(dir, step2Block(doc));
+      assert.ok(
+        existsSync(join(dir, HELD)),
+        `${held} vs ${doc}: answers discarded`,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("Step 2's key check halts on an unreadable answers file and keeps it", () => {
+  for (const content of [
+    "not json",
+    JSON.stringify([{ signature: "*>button" }]),
+  ]) {
+    const dir = consumer();
+    try {
+      mkdirSync(join(dir, ".claude/state"), { recursive: true });
+      writeFileSync(join(dir, HELD), content);
+      const r = spawnSync("bash", ["-c", step2Block("docs/story.md")], {
+        cwd: dir,
+        encoding: "utf8",
+      });
+      assert.notEqual(r.status, 0, `${content}: did not halt`);
+      assert.match(r.stdout, /HALT/);
+      assert.ok(existsSync(join(dir, HELD)), `${content}: file deleted`);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   }
 });
 
