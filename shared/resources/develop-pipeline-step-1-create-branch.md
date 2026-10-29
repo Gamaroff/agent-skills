@@ -109,6 +109,42 @@ If that also fails, run `git stash list` to find the stash index and `git stash 
 
 ---
 
+## Wireframe writes (shared)
+
+Phase 0 resolves the wireframe and asks about its open nodes, but writes nothing tracked (see the
+0c-wire section of the step-0 doc): the branch did not exist yet. The writes happen here, on the
+branch and before Step 2's review reads the document. Run this on every path through Step 1 of
+`develop-story` and `develop-task`; `ensure` answers `unset` and writes nothing when the feature is
+off. `develop-bug` skips this section: it has no 0c-wire and does not bundle the engine.
+
+```bash
+command node .agents/skills/{develop-story|develop-task}/references/wireframe-map.js ensure --json
+# 0d's held answers, keyed to the document they answer. Another document's answers are a run
+# that never reached this step: discard them rather than write them here.
+HELD=.claude/state/wireframe-answers.json
+if [ -f "$HELD" ] && [ "$(jq -r '.document // empty' "$HELD")" != "{document-file}" ]; then
+  echo "wireframe answers in $HELD belong to $(jq -r '.document // "no document"' "$HELD") — discarded"
+  rm -f "$HELD"
+fi
+```
+
+1. Log `ensure`'s report in the Decisions Log. A file it `created` or `updated` is committed with the work.
+2. When `.claude/state/wireframe-answers.json` exists, for each entry in its `answers`: add its row to
+   the document's component table (the mapping procedure's step 6), and for each **confirmed** one
+   run one `wireframe-map.js record` call. An assumed entry gets its table row and no map row: an
+   assumption is not a confirmation. Skip a node whose table row is already there; `record`
+   replaces a row with the same signature and label, so a repeated call adds nothing.
+3. Then consume the file, so no later step or run writes it again:
+
+   ```bash
+   rm -f .claude/state/wireframe-answers.json
+   ```
+
+The gate is the file, not "0c-wire ran in this session": a run resumed from a new session skips
+Phase 0 and still finds the file here.
+
+---
+
 ## Post-Branch Steps (shared)
 
 After the story branch is created:

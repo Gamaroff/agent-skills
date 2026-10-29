@@ -73,9 +73,19 @@ test("develop Phase 0 resolves in 0c-wire and asks in 0d", () => {
     read("shared/resources/develop-pipeline-autonomous-defaults.md"),
     /Wireframe node with no confirmed component/,
   );
+  // The answers are written at Step 1, before Step 2's review reads the document (QA cycle 3,
+  // CR3-2); Step 3 builds from the table they completed.
+  const step1 = read(
+    "shared/resources/develop-pipeline-step-1-create-branch.md",
+  );
+  const writes = step1.indexOf("## Wireframe writes");
+  assert.ok(
+    writes > 0 && writes < step1.indexOf("## Post-Branch Steps"),
+    "Step 1 writes the held answers before it is marked done",
+  );
   assert.match(
     read("shared/resources/develop-pipeline-step-3-develop-loop.md"),
-    /WIREFRAME_TABLE/,
+    /document's component table, which Step 1 completed/,
   );
 });
 
@@ -160,21 +170,71 @@ test("the 0c-wire block runs in a fresh checkout and writes no tracked file", ()
   }
 });
 
-// The writes Phase 0 defers happen at Step 3, on the branch: the catalogue and map appear there.
-test("Step 3's wireframe writes create the catalogue and the map", () => {
+const HELD = ".claude/state/wireframe-answers.json";
+const hold = (dir, document) => {
+  mkdirSync(join(dir, ".claude/state"), { recursive: true });
+  writeFileSync(
+    join(dir, HELD),
+    JSON.stringify({
+      document,
+      answers: [{ signature: "*>button", component: "Button" }],
+    }),
+  );
+};
+
+// A fresh run starts with no held answers: a file left by a run that never reached Step 1 would
+// otherwise be written into this run's document (QA cycle 3, CR3-3).
+test("a fresh 0c-wire discards a held answers file left by an earlier run", () => {
   const block = stepBlock(
-    "shared/resources/develop-pipeline-step-3-develop-loop.md",
-    "## Wireframe writes",
-    "## Pre-develop Codebase Mapping",
+    "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md",
+    "## 0c-wire.",
+    "## 0d.",
   );
   const dir = consumer();
   try {
+    hold(dir, "docs/other.md");
     run(dir, block);
+    assert.equal(existsSync(join(dir, HELD)), false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+const step1Block = () =>
+  stepBlock(
+    "shared/resources/develop-pipeline-step-1-create-branch.md",
+    "## Wireframe writes",
+    "## Post-Branch Steps",
+  );
+
+// The writes Phase 0 defers happen at Step 1, on the branch. They are gated on the held file, not on
+// 0c-wire having run in this session, so a resumed run (which skips Phase 0) still makes them
+// (QA cycle 3, CR3-1): this run has no Phase 0 at all.
+test("Step 1's wireframe writes create the catalogue and map, and keep this document's answers", () => {
+  const dir = consumer();
+  try {
+    hold(dir, "docs/story.md");
+    run(dir, step1Block());
     assert.match(
       readFileSync(join(dir, "docs/components.md"), "utf8"),
       /Button/,
     );
     assert.ok(existsSync(join(dir, "docs/wireframe-map.md")));
+    assert.ok(
+      existsSync(join(dir, HELD)),
+      "this document's answers were discarded",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("Step 1's wireframe writes discard another document's held answers", () => {
+  const dir = consumer();
+  try {
+    hold(dir, "docs/other.md");
+    run(dir, step1Block());
+    assert.equal(existsSync(join(dir, HELD)), false);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

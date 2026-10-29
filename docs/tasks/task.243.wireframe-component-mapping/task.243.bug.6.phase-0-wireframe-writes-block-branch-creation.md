@@ -4,7 +4,7 @@
 **Bug ID**: TASK-243-BUG-6
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-10-29
 
@@ -84,3 +84,4 @@ then `git status`. Expect nothing new outside `.claude/state`.
 | 2026-10-29 | New | QA Engineer | Found in QA cycle 2 (refute pass, CR-1), confirmed against step-1 and create-branch |
 | 2026-10-29 | In Progress | qa-fix | Root cause identified |
 | 2026-10-29 | Ready for QA | qa-fix | Fix implemented with two mutation-proven tests (qa-fix cycle 2) |
+| 2026-10-29 | Closed | QA Engineer | Verified in QA cycle 3: clean-tree test mutation-proven; Phase 0 writes no tracked file at 8ec313f5 |

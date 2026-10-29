@@ -234,27 +234,27 @@ catalogue files stay as they are.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-29
-**Quality Score**: 80/100
-**Gate Decision**: FAIL
+**Quality Score**: 70/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.243.qa.2.wireframe-component-mapping.md](./task.243.qa.2.wireframe-component-mapping.md)
-- **Gate File**: [task.243.gate.2.wireframe-component-mapping.yml](./task.243.gate.2.wireframe-component-mapping.yml)
+- **Full Report**: [task.243.qa.3.wireframe-component-mapping.md](./task.243.qa.3.wireframe-component-mapping.md)
+- **Gate File**: [task.243.gate.3.wireframe-component-mapping.yml](./task.243.gate.3.wireframe-component-mapping.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 29 (wireframe suites); 6831 in the cycle 1 fast gate
+- **Tests Executed**: 30 (wireframe suites); 6832 in the cycle 2 fast gate
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-All six cycle 1 findings are fixed, and each is held by a mutation-proven test. Bug reports
-`task.243.bug.1`–`5` are closed. The cycle 2 refute pass found one HIGH (CR2-1): Phase 0 writes the
-catalogue and map before Step 1, so `/create-branch` halts on the first opted-in develop run. Bug
-report `task.243.bug.6`.
+The cycle 2 fix holds: Phase 0 writes no tracked file, and `task.243.bug.6` is closed. Moving the
+writes to Step 3 opened three medium gaps. A resumed run never writes the held answers (bug.7).
+Step 2 reviews the document before they are written (bug.8). And the answers file is not keyed to
+its document, so a later run can reuse it (bug.9).
 
 ## Change Log
 
@@ -268,4 +268,6 @@ report `task.243.bug.6`.
 | 2026-10-29 |  | QA findings fixed — cycle 1, 6 findings (bug.1–5 Ready for QA, CR-7), each with a mutation-proven test | qa-fix |
 | 2026-10-29 |  | QA gate FAIL (80/100) — cycle 1 fixes verified (bug.1–5 closed); 1 new high finding, Phase 0 writes block Step 1 (bug.6) | qa-task |
 | 2026-10-29 |  | QA findings fixed — cycle 2, 1 finding (bug.6 Ready for QA): Phase 0 read-only, wireframe writes moved to Step 3 | qa-fix |
+| 2026-10-29 |  | QA gate CONCERNS (70/100) — bug.6 verified and closed; 3 new medium findings on when the held answers are written (bug.7–9) | qa-task |
+| 2026-10-29 |  | QA findings fixed — cycle 3, 3 findings (bug.7–9 Ready for QA): wireframe writes at Step 1, gated on a document-keyed answers file | qa-fix |
 <!-- change-log-end -->

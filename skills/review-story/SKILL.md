@@ -1407,7 +1407,7 @@ If a visual diagram is absent but highly recommended (e.g., the story describes 
    - a table row whose component the catalogue (`ui.componentCatalogue`) does not list is an **Important** finding, unless its decision says the component is new;
    - when the screen has a wireframe document made from its design source, a story wireframe that differs from it is an **Important** finding: copy the published blocks.
 
-   In Interactive mode, the open nodes join the Unified Question Point, asked as the mapping procedure's step 5 sets out, and each answer is recorded in the table and the map. In Validate mode (including `develop-story` Step 2), record them; `develop-story` Phase 0 asks about whatever is still open.
+   In Interactive mode, the open nodes join the Unified Question Point, asked as the mapping procedure's step 5 sets out, and each answer is recorded in the table and the map. In Validate mode (including `develop-story` Step 2), record them. Inside `develop-story` the review is Step 2: Phase 0 has already asked about the open nodes, and Step 1 has written the answers into the table, so a node still open here was not answered.
 
 **Output**: Wireframe verification findings added to the review report/validation report.
 
