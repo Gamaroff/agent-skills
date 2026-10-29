@@ -76,8 +76,8 @@ const MAP_HEADER = [
   "the rest; the answers are added here. Edit rows freely: the most specific matching row wins.",
   "",
   "- **Signature** — `parent>primitive[flags]{key=value}`. `*` is any parent; name only the flags",
-  "  and attributes the link depends on. A value holding `,` `}` `%`, whitespace or a table",
-  "  character is percent-encoded: `value=1%2C500`.",
+  "  and attributes the link depends on. Copy it as `resolve` prints it: a value is",
+  "  percent-encoded except for letters, digits, `- _ . ! ~ * ' ( ) / : # @ + =` (`value=1%2C500`).",
   "- **Label** — empty for any label, a plain string to match it exactly, or `/regex/`.",
   "- **Component** — what the node is built from; `(layout)` for a node that draws nothing.",
   "",
@@ -215,7 +215,8 @@ function parseLine(raw) {
 // encodeURIComponent leaves alone, plus `/ : # @ + =` for readability. A value can then never
 // carry the list's own separators (`,` `}`), a table cell's (`|`, a backtick), whitespace the
 // reader trims, or a line terminator, so every node's signature reads back to the node.
-// parsePattern decodes; a hand-written row needs encoding only for a value holding one of those.
+// parsePattern decodes leniently, so a hand-written value needs encoding only for `,`, `}`, a `%`
+// before two hex digits, or whitespace at its end (list items are trimmed).
 const READABLE = /%(?:2F|3A|23|40|2B|3D)/g;
 
 function encodeValue(value) {
