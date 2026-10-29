@@ -228,7 +228,7 @@ None.
 ### Performance
 
 - [x] SC-6: The grant is still one script call. No new call is added to Phase 0b
-- [x] SC-7: The escalation adds at most one `high_files` comparison per entry on a convergence stall, and at most two on a loop limit: the two-gate comparison the resumed 5b reads, and the three-gate one (task.239 bug.1, QA2-CR-3)
+- [x] SC-7: Each escalation entry runs the comparisons its halt calls for. On a convergence stall there are two: the three-gate `comm -12` block, filling rule 1's one third-strike comparison, and filling rule 2's check of each cycle-N HIGH file against gate N-1's `high_files` output (the Flat-count reading of SC-5). On a loop limit there are two third-strike comparisons: the two-gate one the resumed review reads, and the three-gate block (task.239 bug.1, QA2-CR-3)
 
 ### Code Quality
 
@@ -310,9 +310,9 @@ None.
 ### Key Findings
 No critical issues identified. Granted cycle 6 adds a test that pins filling rule 1's Convergence stall row, closing DoD run 3's SC-7 gap. Mutations M17 and M18 turn it red. ci:fast is green. Two reviewer findings are advisory: a medium-confidence reading of rule 2 as a second comparison, and an unbounded slice in the test.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 4 (historical, superseded)
 
-**Status:** IN PROGRESS (DoD run 4)
+**Status:** SUPERSEDED. Both gaps were closed on 2026-10-29 in a document-only commit. SC-7 was reworded to count filling rule 2's previous-gate check. Mutations M19–M33 were each red and then restored green, and they are recorded in the commit message. Kept as history; the current verdict is the newest `task.239.dod.{N}` file.
 
 ### Missing Criteria:
 
@@ -424,6 +424,7 @@ No critical issues identified. Granted cycle 6 adds a test that pins filling rul
 | 2026-10-28 |  | DoD incomplete — 1 gap identified (SC-7 stall member, run 3) | finalise |
 | 2026-10-29 |  | QA gate PASS (100/100) — 0 findings (cycle 6, granted after DoD run 3) | qa-task |
 | 2026-10-29 |  | DoD incomplete — 2 gaps identified (SC-7 stall member, SC-11; run 4) | finalise |
+| 2026-10-29 | 1.3 | SC-7 reworded to count filling rule 2's previous-gate check on a stall; SC-11 closed by mutation-proving the remaining assertion groups (M19–M33) | orchestrator |
 <!-- change-log-end -->
 
 ---

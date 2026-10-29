@@ -137,6 +137,10 @@ _Problems encountered and how they were resolved or escalated._
   - SC-11: four assertion groups have no recorded mutation (`qa-escalation-template.test.mjs:231`, `:93-96`, `:108-112`, `:113-115`), including the new test's "re-enters at 5b" check, and three map only partly.
   - Security passed a fourth time: 30 executed, 0 reproduced.
   - This is the fourth run in a row to find a gap the previous run passed, so the orchestrator stopped for the user's decision. Gaps PR comment: #issuecomment-6487350726.
+- **Resolved 2026-10-29 in a document-only commit (the user approved it, then one more `/finalise` run; if that run finds yet another new gap, the user's standing instruction is to accept with a recorded override rather than loop).**
+  - SC-7 was reworded to what ships: on a stall, filling rule 1's three-gate block plus rule 2's check against gate N-1's `high_files` output; on a loop limit, two third-strike comparisons.
+  - Each mutation went red and was restored green. M19–M30 targeted the step-5-6 doc; M31–M33 targeted the pause doc. No source file changed.
+  - The `listed` and filtered deepEquals in the loop-limit test are reached only through a row command that the `:152` regex already pins, so no doc mutation reaches them on their own. They back the regex up.
 
 ---
 
