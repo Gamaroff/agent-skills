@@ -802,6 +802,130 @@ test("replay control: a prior FAIL member the agent still fails keeps the gap", 
   }
 });
 
+// QA cycle 1, CR-3: the members overturn an agent FAIL only when they explain it.
+const RUN5_NO_FAILING_MEMBER = AGENT_RUN5.replace(
+  /\n {8}- member: "G5"[\s\S]*?a finer group no earlier run named"/,
+  "",
+);
+
+test("reported-gap: an agent FAIL that names no failing member stands (CR-3)", () => {
+  const { dir, prior } = replayRepo();
+  try {
+    assert.notEqual(RUN5_NO_FAILING_MEMBER, AGENT_RUN5);
+    assert.doesNotMatch(RUN5_NO_FAILING_MEMBER, /member: "G[57]"/);
+    const s = scopeAt(dir, prior);
+    const sc11 = eng
+      .merge(s, RUN5_NO_FAILING_MEMBER, {}, eng.gitIo(dir))
+      .ac_result.ac_traceability.acs.find((x) => x.ac_id === "SC-11");
+    assert.equal(sc11.status, "FAIL", "the FAIL rests on something else");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("reported-gap: test_runs_per_pr: false keeps the criterion FAIL whatever the members say (CR-3)", () => {
+  const { dir, prior } = replayRepo();
+  try {
+    const yaml = AGENT_RUN5.replace(
+      /(ac_id: "SC-11"[\s\S]*?test_runs_per_pr:) true/,
+      "$1 false",
+    );
+    assert.notEqual(yaml, AGENT_RUN5);
+    const s = scopeAt(dir, prior);
+    const sc11 = eng
+      .merge(s, yaml, {}, eng.gitIo(dir))
+      .ac_result.ac_traceability.acs.find((x) => x.ac_id === "SC-11");
+    assert.equal(sc11.status, "FAIL");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("reported-gap: a re-check member the agent omits is FAIL, never its prior PASS (CR-4)", () => {
+  const { dir, prior } = replayRepo();
+  try {
+    // G4–G6's evidence moves, so every member is re-checked.
+    commit(dir, {
+      "tests/qa-escalation-template.test.mjs": "groups changed\n",
+    });
+    const s = scopeAt(dir, prior);
+    assert.deepEqual(s.rejudge.find((r) => r.id === "SC-11").rejudge_members, [
+      "G1",
+      "G2",
+      "G3",
+      "G4",
+      "G5",
+      "G6",
+    ]);
+    // The agent passes everything it answers, and does not answer G4 or G6.
+    const yaml = RUN5_NO_FAILING_MEMBER.replace(
+      /(ac_id: "SC-11"\n\s+description: "[^"]*"\n\s+status:) FAIL/,
+      "$1 PASS",
+    ).replace(
+      /(\n {8}- member: "G3"\n {10}evidence: "[^"]+"\n {10}status: PASS)/,
+      '$1\n        - member: "G5"\n          evidence: "tests/qa-escalation-template.test.mjs:93"\n          status: PASS',
+    );
+    const sc11 = eng
+      .merge(s, yaml, {}, eng.gitIo(dir))
+      .ac_result.ac_traceability.acs.find((x) => x.ac_id === "SC-11");
+    assert.equal(sc11.status, "FAIL");
+    const g4 = sc11.members.find((m) => m.member === "G4");
+    assert.equal(g4.status, "FAIL");
+    assert.match(g4.note, /no verdict returned for re-check member G4/);
+    // Control: answer G4 and G6 too and the criterion passes.
+    const full = yaml.replace(
+      /(\n {8}- member: "G5"\n {10}evidence: "[^"]+"\n {10}status: PASS)/,
+      '$1\n        - member: "G4"\n          evidence: "tests/qa-escalation-template.test.mjs:231"\n          status: PASS\n        - member: "G6"\n          evidence: "tests/qa-escalation-template.test.mjs:108"\n          status: PASS',
+    );
+    assert.notEqual(full, yaml);
+    assert.equal(
+      eng
+        .merge(s, full, {}, eng.gitIo(dir))
+        .ac_result.ac_traceability.acs.find((x) => x.ac_id === "SC-11").status,
+      "PASS",
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("merge: an id the engine did not issue is reported with its own status, empty and duplicate ids included (CR-8)", () => {
+  const dir = mkRepo();
+  try {
+    const s = scopeAt(dir, null);
+    const yaml = [
+      "ac_traceability:",
+      "  acs:",
+      '    - ac_id: ""',
+      "      status: FAIL",
+      '      note: "empty id"',
+      '    - ac_id: "AC9"',
+      "      status: PASS",
+      '    - ac_id: "AC9"',
+      "      status: FAIL",
+      "  docs: []",
+      "",
+    ].join("\n");
+    const ac = eng.merge(s, yaml, {}, eng.gitIo(dir)).ac_result.ac_traceability;
+    assert.deepEqual(ac.id_mismatches, ["(none)", "AC9", "AC9"]);
+    const notes = ac.advisories.map((a) => `${a.ac_id} ${a.note}`);
+    assert.ok(
+      notes.some((n) => /^\(none\) .*\(FAIL: empty id\)/.test(n)),
+      notes.join("\n"),
+    );
+    assert.ok(
+      notes.some((n) => /^AC9 .*\(PASS\)/.test(n)),
+      notes.join("\n"),
+    );
+    assert.ok(
+      notes.some((n) => /^AC9 .*\(FAIL\)/.test(n)),
+      notes.join("\n"),
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
 // ── merge ─────────────────────────────────────────────────────────────────
 
 function agentYaml(acs, { docs = "  docs: []", overall = "PASS" } = {}) {
@@ -937,6 +1061,12 @@ test("computeOverall: PASS, PARTIAL and FAIL", () => {
   assert.equal(
     eng.computeOverall([{ status: "PASS" }], [{ status: "FAIL" }]),
     "PARTIAL",
+  );
+  // CR-6: no criterion verdict at all is not "every criterion passed".
+  assert.equal(eng.computeOverall([], []), "NEEDS_MANUAL_REVIEW");
+  assert.equal(
+    eng.computeOverall([], [{ status: "PASS" }]),
+    "NEEDS_MANUAL_REVIEW",
   );
 });
 

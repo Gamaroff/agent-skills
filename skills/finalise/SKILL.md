@@ -489,6 +489,15 @@ takes no PR argument, and inside a pipeline the branch rung answers. Record
 the document (task 242). Engine source: `references/finalise-rerun-scope.js`.
 
 ```bash
+# INPUTS, substituted into THIS block — no block inherits another's variables: STEM and DOD_N
+# exactly as Step 0 bound them. Unbound, the glob below is `.dod.*.ac.json`, no record ever
+# matches, and every re-run reports `no-prior-record` at exit 0 (task.242 QA cycle 1, CR-2).
+STEM="{story.{P}.{E}.{S} | task.{id}}"
+DOD_N="{Step 0's DOD_N}"
+case "$STEM$DOD_N" in *'{'*) echo "HALT: STEM and DOD_N must be substituted into this block (an unsubstituted placeholder found)"; exit 1 ;; esac
+[ -n "$STEM" ] || { echo "HALT: STEM is empty — substitute the work item's filename stem"; exit 1; }
+case "$DOD_N" in ''|*[!0-9]*) echo "HALT: DOD_N ('$DOD_N') is not Step 0's run number"; exit 1 ;; esac
+mkdir -p .claude/state
 # The newest prior run's AC record. Each run writes ${STEM}.dod.{N}.ac.json at Step 3c; the glob
 # never matches a ${STEM}.dod.{N}.security.run.json. Empty on a first run.
 source .agents/skills/finalise/references/newest-numbered.sh || exit 1
@@ -723,6 +732,13 @@ Save agent 1's YAML, verbatim, to `.claude/state/finalise-ac-result-${DOD_N}.yam
 tool, then:
 
 ```bash
+# INPUTS, substituted into THIS block, as in Step 3a: STEM and DOD_N exactly as Step 0 bound them.
+# Unbound, `--dod-n ""` is a usage error and every run HALTs here (task.242 QA cycle 1, CR-1).
+STEM="{story.{P}.{E}.{S} | task.{id}}"
+DOD_N="{Step 0's DOD_N}"
+case "$STEM$DOD_N" in *'{'*) echo "HALT: STEM and DOD_N must be substituted into this block (an unsubstituted placeholder found)"; exit 1 ;; esac
+[ -n "$STEM" ] || { echo "HALT: STEM is empty — substitute the work item's filename stem"; exit 1; }
+case "$DOD_N" in ''|*[!0-9]*) echo "HALT: DOD_N ('$DOD_N') is not Step 0's run number"; exit 1 ;; esac
 AC_RECORD="{document-directory}/${STEM}.dod.${DOD_N}.ac.json"
 AC_MERGED_FILE=".claude/state/finalise-ac-merged-${DOD_N}.json"
 command node .agents/skills/finalise/references/finalise-rerun-scope.js merge \
@@ -742,8 +758,10 @@ echo "AC_OVERALL=$AC_OVERALL"
 On `merged`, `AC_RESULT` **is** `.ac_result.ac_traceability` from `$AC_MERGED_FILE`, not the agent's
 YAML: every carried verdict is restored whatever the agent returned, a carried criterion the agent
 re-judged differently is moved to `advisories`, a `reported-gap` criterion's status is recomputed from
-its merged members, and `overall` is recomputed from the merged `acs` and `docs` — never copied from
-the agent. Steps 3d and 6 read that. `id_mismatches` names any `ac_id` the agent returned that the
+its merged members (a re-check member the agent did not answer counts as `FAIL`, and an agent `FAIL`
+stands when it names no failing member or reports `test_runs_per_pr: false`), and `overall` is
+recomputed from the merged `acs` and `docs` — never copied from the agent, and
+`NEEDS_MANUAL_REVIEW` when no criterion verdict exists at all. Steps 3d and 6 read that. `id_mismatches` names any `ac_id` the agent returned that the
 scope did not issue; such a verdict is not merged, and the criterion it was meant for reads `FAIL`
 with `no verdict returned under id …`.
 
@@ -1613,9 +1631,13 @@ standalone.
    fi
    # This run's AC record (Step 3c, task 242) — stories and tasks only, and absent when agent 1's
    # answer was unparseable, so it is added on its own behind an existence check like the registry.
+   # THIS run's exact path, numbered from the DoD file resolved above — never the newest record in
+   # the series, which on an unparseable run is an earlier run's (task.242 QA cycle 1, CR-7).
    AC_RECORD=""
    if [ "$DOC_KIND" != "bug" ]; then
-     AC_RECORD=$(newest_numbered "{document-directory}" dod -name "${STEM}.dod.*.ac.json")
+     DOD_REST=${DOD_PATH##*/}; DOD_REST=${DOD_REST#"$STEM".dod.}
+     AC_RECORD="{document-directory}/${STEM}.dod.${DOD_REST%%.*}.ac.json"
+     [ -f "$AC_RECORD" ] || AC_RECORD=""
    fi
    if [ -n "$AC_RECORD" ]; then
      git add "$AC_RECORD"
@@ -1694,6 +1716,11 @@ standalone.
      FINAL_ASSERT_DESC="the pushed DoD file does not carry **Final Status:** ✅ ACCEPTED — Step 7.1 did not fill it"
    else
      ARTIFACTS=("{document-path}" "$DOD_PATH" "{document-directory}/sprint-review-summary.md")
+     # This run's AC record (task 242), when Step 3c wrote one — the same path 6a stages. Present on
+     # disk and not pushed is exactly what this check exists to catch (task.242 QA cycle 1, CR-5).
+     DOD_REST=${DOD_PATH##*/}; DOD_REST=${DOD_REST#"$STEM".dod.}
+     AC_RECORD="{document-directory}/${STEM}.dod.${DOD_REST%%.*}.ac.json"
+     if [ -f "$AC_RECORD" ]; then ARTIFACTS+=("$AC_RECORD"); fi
      FINAL_ASSERT_PATH="{document-path}"; FINAL_ASSERT_PATTERN='^status: accepted$'
      FINAL_ASSERT_DESC="the pushed document does not read status: accepted"
    fi

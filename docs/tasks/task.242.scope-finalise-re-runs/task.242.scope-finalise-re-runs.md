@@ -364,6 +364,27 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-29
+**Quality Score**: 30/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.242.qa.1.scope-finalise-re-runs.md](./task.242.qa.1.scope-finalise-re-runs.md)
+- **Gate File**: [task.242.gate.1.scope-finalise-re-runs.yml](./task.242.gate.1.scope-finalise-re-runs.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 126
+- **Phases Verified**: 18/18
+- **Critical Issues**: 2
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
+
+### Key Findings
+The Step 3a and 3c blocks read `$STEM` and `$DOD_N` without binding them, so 3c HALTs on every story or task run and 3a never finds a prior record (CR-1, CR-2). Also open: the reported-gap recompute overturns a non-member FAIL (CR-3), an omitted re-check member is carried as PASS (CR-4), and 7.6b does not assert the AC record (CR-5).
+
 ## Change Log
 
 | Date | Version | Description | Author |
@@ -372,6 +393,8 @@ None.
 | 2026-10-29 | 1.1 | Review 1 (6/10 → 8/10): engine-assigned criterion ids; citation resolution and `evidence-unresolved`; reported-gap member rules and status recompute; `overall` from `acs[]` and `docs[]`; reconstruction states; tests that read the AC prompt; SC-11 closed to a named guard list | review-task |
 | 2026-10-29 |  | Status → ready-for-development | review-task |
 | 2026-10-29 |  | Implemented — 9 authored files (engine, its 33 tests, AC prompt, finalise SKILL.md, 2 pipeline step docs, 2 eval tests, CHANGELOG) plus bundled copies; 4 contract tests added; 28 guards mutation-proved | develop |
+| 2026-10-29 |  | QA gate FAIL (30/100) — 5 findings (2 high: unbound `STEM`/`DOD_N` in Steps 3a and 3c); Status → in-progress | qa-task |
+| 2026-10-29 |  | QA fix cycle 1 — all 8 findings fixed (CR-1–CR-5 from the gate, CR-6–CR-8 advisory): Steps 3a and 3c bind `STEM`/`DOD_N` in-block with a HALT guard; reported-gap merge keeps an unexplained agent FAIL and fails an unanswered re-check member; 7.6a/7.6b use this run's AC record; 8 new tests plus CR-6 assertions in an existing one, 9 mutations covered; Status → ready-for-review | qa-fix |
 
 ---
 

@@ -405,6 +405,8 @@ function renderScopeText(s) {
 // ── merge ───────────────────────────────────────────────────────────────────
 
 function computeOverall(acs, docs) {
+  // No criterion verdict at all is not "every criterion passed".
+  if (acs.length === 0) return "NEEDS_MANUAL_REVIEW";
   const docOk = (d) =>
     d && (d.status === "PASS" || d.status === "NOT_APPLICABLE");
   const allPass = acs.every((a) => a.status === "PASS") && docs.every(docOk);
@@ -428,9 +430,11 @@ function recordEntry(c, ac) {
 
 // Re-judge a `reported-gap` criterion member by member (task § 3, *Members in
 // a reported-gap re-judge*). Carried members keep their prior verdict; prior
-// FAIL members and members whose evidence moved take the agent's; a member the
-// prior record never listed, whose evidence is unchanged, is an advisory. The
-// status is computed from the counted members, never taken from the agent.
+// FAIL members and members whose evidence moved take the agent's (FAIL when it
+// does not answer one); a member the prior record never listed, whose evidence
+// is unchanged, is an advisory. The status is computed from the counted
+// members, except that an agent FAIL stands when the members do not explain it
+// (task.242 QA cycle 1, CR-3, CR-4).
 function mergeReportedGap(r, agentAc, io, advisories) {
   const prior = r.prior;
   if (r.known_members.length === 0) {
@@ -466,7 +470,13 @@ function mergeReportedGap(r, agentAc, io, advisories) {
     } else if (a) {
       counted.push(a);
     } else {
-      counted.push({ ...m, status: m.status === "PASS" ? "PASS" : "FAIL" });
+      // Listed for re-check and not answered: the prior verdict rests on
+      // evidence that moved (or was a FAIL), so it is not carried.
+      counted.push({
+        ...m,
+        status: "FAIL",
+        note: `no verdict returned for re-check member ${m.member}`,
+      });
     }
   }
   for (const [name, a] of agentMembers) {
@@ -485,11 +495,26 @@ function mergeReportedGap(r, agentAc, io, advisories) {
     (agentAc && agentAc.code_citation) ?? prior.code_citation ?? null;
   const test =
     (agentAc && agentAc.test_citation) ?? prior.test_citation ?? null;
+  // The members may overturn an agent FAIL only when the members explain it:
+  // every member the agent failed is carried or was sent to advisories. A FAIL
+  // that names no failing member rests on something else (the execution rule,
+  // a test that does not cover the criterion), and stands.
+  const agentFailed = Boolean(agentAc) && agentAc.status !== "PASS";
+  const agentFailMembers = [...agentMembers.values()].filter(
+    (m) => m.status !== "PASS",
+  );
+  const explainedByMembers =
+    agentFailMembers.length > 0 &&
+    agentFailMembers.every(
+      (m) => carried.has(m.member) || !known.has(m.member),
+    );
   const pass =
     counted.length > 0 &&
     counted.every((m) => m.status === "PASS") &&
     code !== null &&
-    test !== null;
+    test !== null &&
+    !(agentAc && agentAc.test_runs_per_pr === false) &&
+    (!agentFailed || explainedByMembers);
   return {
     ...(agentAc || {}),
     ac_id: r.id,
@@ -553,14 +578,14 @@ function merge(s, agentYaml, opts, io) {
   for (const a of ac.acs) {
     if (!a || typeof a !== "object") continue;
     const id = a.ac_id === undefined || a.ac_id === null ? "" : String(a.ac_id);
-    if (engineIds.has(id)) agentById.set(id, a);
-    else idMismatches.push(id || "(none)");
-  }
-  for (const id of idMismatches) {
-    const a = ac.acs.find((x) => x && String(x.ac_id ?? "(none)") === id);
+    if (engineIds.has(id)) {
+      agentById.set(id, a);
+      continue;
+    }
+    idMismatches.push(id || "(none)");
     advisories.push({
-      ac_id: id,
-      note: `agent returned an id the engine did not issue (${a && a.status ? a.status : "no status"}${a && a.note ? `: ${a.note}` : ""}); not merged`,
+      ac_id: id || "(none)",
+      note: `agent returned an id the engine did not issue (${a.status ? a.status : "no status"}${a.note ? `: ${a.note}` : ""}); not merged`,
     });
   }
 

@@ -872,6 +872,66 @@ for (const shell of SHELLS) {
     }
   });
 
+  // task 242, QA cycle 1 (CR-5, CR-7): 6a stages this run's AC record and 6b
+  // asserts the same one pushed. Both derive it from the run's DoD file, never
+  // the newest record in the series — on an unparseable run that is an earlier
+  // run's.
+  test(`[${shell}] 7.6b asserts THIS run's AC record pushed when Step 3c wrote one, and never an earlier run's (task 242 CR-5, CR-7)`, () => {
+    const dir = sixBFixture();
+    try {
+      writeFileSync(path.join(dir, "task.67.dod.0.ac.json"), "{}");
+      const without = runBlock(sixBAssertBlock(), dir, "task.67", "task");
+      assert.equal(without.status, 0, without.stderr + without.stdout);
+      assert.match(
+        without.stdout,
+        /^N=3$/m,
+        "an earlier run's record is not this run's",
+      );
+      assert.doesNotMatch(without.stdout, /ac\.json/);
+      writeFileSync(path.join(dir, "task.67.dod.1.ac.json"), "{}");
+      const withRec = runBlock(sixBAssertBlock(), dir, "task.67", "task");
+      assert.equal(withRec.status, 0, withRec.stderr + withRec.stdout);
+      assert.match(withRec.stdout, /^N=4$/m, withRec.stdout);
+      assert.match(withRec.stdout, /^A=.*\/task\.67\.dod\.1\.ac\.json$/m);
+      const bug = runBlock(sixBAssertBlock(), dir, "task.67.bug.3", "bug");
+      assert.doesNotMatch(bug.stdout, /ac\.json/, "a bug run has no AC record");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test(`[${shell}] 7.6a and 7.6b derive the same AC record path from the DoD file (task 242 CR-5)`, () => {
+    // The two lines each block uses, lifted out and run with the same inputs.
+    const derive = (start) => {
+      const at = skill.indexOf("DOD_REST=${DOD_PATH##*/}", start);
+      assert.ok(at > -1, "derivation present");
+      const end = skill.indexOf('.ac.json"', at) + '.ac.json"'.length;
+      return skill
+        .slice(at, end)
+        .replace(/^ {3}/gm, "")
+        .replace(/\{document-directory\}/g, "/w");
+    };
+    const sixA = derive(
+      skill.indexOf("This run's AC record (Step 3c, task 242)"),
+    );
+    const sixB = derive(
+      skill.indexOf("This run's AC record (task 242), when Step 3c wrote one"),
+    );
+    for (const [dod, want] of [
+      ["/w/task.67.dod.3.parent.md", "/w/task.67.dod.3.ac.json"],
+      ["/w/task.67.dod.12.x.y.md", "/w/task.67.dod.12.ac.json"],
+    ]) {
+      const out = [sixA, sixB].map(
+        (d) =>
+          spawnSync(shell, ["-c", `${d}\nprintf '%s' "$AC_RECORD"`], {
+            encoding: "utf8",
+            env: { PATH: process.env.PATH, DOD_PATH: dod, STEM: "task.67" },
+          }).stdout,
+      );
+      assert.deepEqual(out, [want, want], `${dod}: ${out.join(" | ")}`);
+    }
+  });
+
   test(`[${shell}] 7.6a / 7.6b with an input unbound HALT rather than run the task branch (TASK-125-BUG-15 class)`, () => {
     const dir = sixBFixture();
     try {
