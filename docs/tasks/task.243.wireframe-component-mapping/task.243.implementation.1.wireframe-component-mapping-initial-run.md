@@ -36,9 +36,9 @@ Take task 243, already implemented and reviewed outside the pipeline, through re
 | 2. review-task             | ✅ Done    | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               | Review 2: READY TO IMPLEMENT, 9/10, 0 Critical / 0 Important; 3 Optional fixes applied | —                    | 2026-10-29T13:37Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Implemented outside the pipeline (`17dd614a`); close-out only: fast gate green (6825 tests, 0 failed), status → Ready for Review | —                    | 2026-10-29T13:47Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #785: https://github.com/Gamaroff/agent-skills/pull/785 | —                    | 2026-10-29T13:52Z |
-| 5–6. qa-task / qa-fix loop | ✅ Done | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 11 cycles of a 12-cycle budget: two user grants (after the cycle 5 loop-limit halt, and at gate 10), plus re-entries after DoD runs 1 and 2; gate 11 PASS 100/100; 5c APPROVE (`task.243.pr-review.3`) | —                    | 2026-10-29T17:13Z |
-| 7. finalise                | ⚠️ Gaps | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      | DoD run 1: 1 gap (SC-1, `resolve` unset path untested), closed by `9e50d3b7`. DoD run 2: 1 gap (security, `parsePattern` accepts a newline; 4 low probes), closed by `c9f77474` and gates 9–11. DoD run 3: 1 gap (security, U+2028/U+2029 accepted in a signature or label; 9 low probes); halted | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 14 cycles of a 15-cycle budget: three user grants (after the cycle 5 loop-limit halt, at gate 10, and at the gate 13 loop limit), plus re-entries after DoD runs 1, 2 and 3; gate 14 PASS 100/100; 5c APPROVE (`task.243.pr-review.4`) | —                    | 2026-10-29T18:29Z |
+| 7. finalise                | ✅ Done | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      | DoD runs 1–3 each found 1 gap, and each was closed by a later QA cycle: SC-1 (`9e50d3b7`), a newline in `parsePattern` (`c9f77474`, gates 9–11), and U+2028/U+2029 (gate 12). DoD run 4 ACCEPTED (`task.243.dod.4`): 7/7, probe 136/0/0, acceptance commit `9f027fe6` | —                    | 2026-10-29T18:47Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Implementation report final commit (PC-1 carry included) | —                    | 2026-10-29T18:50Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -199,6 +199,33 @@ Take task 243, already implemented and reviewed outside the pipeline, through re
   - CR13-2: the round-trip test puts every value under one key and adds `1` and `100%`.
   - Mutation-proven 3 of 3 (raw compare, unsorted flags, prefix-matching `score`).
 - Probe: `record` and replace-rule wording across the executed wireframe documents (`wireframe-component-mapping.md` and its copies, the engine header). None states how `record` picks the row to replace, so none changed. CR13-3 (the incomplete list of encoded characters) stays advisory.
+
+### Step 7 — finalise (run 4, accepted)
+
+- DoD run 4 used scoped re-run mode (prior record `task.243.dod.3.ac.json`): 6 criteria re-judged (all `evidence-changed`), 1 carried (SC-6). AC PASS 7/7, compliance NOT_APPLICABLE, docs PASS (CHANGELOG cites task 243). AC record: `task.243.dod.4.ac.json`.
+- `gh pr diff` refused the PR as too large (over 20,000 lines). The agents read a local `git diff origin/develop...HEAD` instead, excluding the generated `skills/*/references/` copies.
+- Security: `boundary: true`, with 13 controls:
+  - gate 14's 11 controls, reusing its committed cases files through a `cases_from` hand-off that the caller inlined;
+  - two new `cli:` controls for `f715cd44`'s replace-by-`signatureKey` (17 signature cases and 5 label cases, the label set also exercising CR14-2).
+- The plan file was built by `gen-dod4-plan.py` in the scratchpad.
+- **First probe run discarded.** The security agent's reply came back with `>` HTML-escaped as `&gt;`. The plan built from it therefore ran every `record` control with the signature `*&gt;chip`, which `parsePattern` correctly refuses. The result read 49 legitimate cases as over-blocked and 7 controls as `unverifiable`.
+- Cause, verified: the gate-14 record's argv reads `*>chip`, and no committed cases file, test or procedure contains `&gt;`.
+- That run's untracked record and cases files were deleted. The plan was rebuilt with `&gt;` restored to `>` and re-run: 136 executed, 0 reproduced, 0 escaped, all 13 controls `engages`. The DoD file states this.
+- CI reading 1: SUCCESS @ `d24e061b` over 6 checks.
+- CI reading 2: SUCCESS (tree-equivalent to `d24e061bb33f`) @ `9f027fe6` over 6 checks, after 30 s. The acceptance commit is docs-only, so the docs-only rule satisfied the reading before the head's own run finished.
+- Decision: ACCEPTED.
+  - The document changed: `status: accepted`, `completed_date`, the Change Log row 1.3, and a DoD PASSED section replacing run 3's gap report (closes PC-3). Progress Tracking is ticked.
+  - Registry tick: `ticked` (row 287, `in-progress` → `accepted`).
+  - Sprint review summary written.
+- The run 3 gap section held literal U+2028/U+2029 characters, which the Edit tool cannot match. The task document was therefore rewritten whole with the Write tool, and the hunk list was checked afterwards.
+- Acceptance commit `9f027fe6`, pushed. It carried the 5c set: `task.243.pr-review.4`, PC-2 Deferred Work and PC-4 `pr_number` in the task document. The DoD 4 probe record and cases files rode with it.
+- 6d: CHANGELOG `[Unreleased]` cites task 243.
+- Canonical PR comment posted (6505384913).
+- Tracker:
+  - the issue #784 Document link was re-pointed to `develop`;
+  - the `done` comment was posted;
+  - #784 is closed (state verified CLOSED);
+  - `gh-stage.js --stage done` answered `already`.
 
 ---
 
@@ -500,16 +527,18 @@ _Track each QA review/fix cycle._
   CR14-2 (dropping the label term from the replace lookup reds no test; mutation `no-red-untested`).
 **HIGH findings**: 0
 **MEDIUM findings**: 0
-**Loop exit**: PASS with no open entry. Next: Step 5c, then `/finalise` run 4.
+**Loop exit**: route 1 (PASS with no open entry in `top_issues[]`).
+**PR Review**: APPROVE (`task.243.pr-review.4`) — 4 lows: PC-2 and PC-4 fixed in the acceptance commit; PC-1 (this report) in the Step 8 commit; PC-3 closed by `/finalise` run 4, which replaced the DoD section
+**Action**: Proceeding to 5c (PR conformance review)
 
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-10-29T18:50Z
+**Final Status**: Completed
 **Branch**: feature/task.243.wireframe-component-mapping
 **PR**: https://github.com/Gamaroff/agent-skills/pull/785
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 14 (budget 15, after three user grants); final gate 14 PASS 100/100
+**DoD Summary**: `task.243.dod.4.wireframe-component-mapping.md` — ACCEPTED (run 4 of 4); CI reading 1: SUCCESS @ `d24e061b`; CI reading 2: SUCCESS (tree-equivalent to `d24e061bb33f`) @ `9f027fe6`
+**Tracker debt**: none
