@@ -1,0 +1,33 @@
+{
+  "sink": "path",
+  "entry": "cli:shared/resources/finalise-rerun-scope.js",
+  "name": "merge writes no AC record from an unparseable agent answer",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 7,
+  "passed": 7,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": [
+    "merge",
+    "--scope",
+    "scope.json",
+    "--result",
+    "{input}",
+    "--dod-n",
+    "1",
+    "--record-out",
+    "out.ac.json"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-29T11:13:58.859Z"
+}

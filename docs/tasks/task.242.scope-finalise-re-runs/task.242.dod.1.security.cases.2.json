@@ -1,0 +1,181 @@
+[
+  {
+    "id": "garbage-yaml",
+    "sink": "path",
+    "direction": "hostile",
+    "input": "garbage.yaml",
+    "why": "An unparseable agent answer must not produce a record the next run would carry from.",
+    "correct": "prints 'full (result-unparseable)', exits 0, writes no out.ac.json",
+    "expected": {
+      "exit": 0,
+      "stdout": "full (result-unparseable)\n",
+      "absent": [
+        "out.ac.json"
+      ]
+    },
+    "fixture": {
+      "files": {
+        "garbage.yaml": "::: not yaml [\n\t- {\n",
+        "scope.json": "{\"mode\":\"full\",\"reason\":\"no-prior-record\",\"head\":\"0123456789abcdef0123456789abcdef01234567\",\"criteria\":[{\"id\":\"SC-1\",\"text\":\"SC-1: the engine scopes a re-run\",\"text_hash\":\"0000\"}],\"rejudge\":[{\"id\":\"SC-1\",\"reason\":\"full\"}],\"carry\":[],\"dirty\":[],\"document\":\"doc.md\"}",
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        ".git/refs/tags/.keep": ""
+      }
+    }
+  },
+  {
+    "id": "overall-pass-no-acs",
+    "sink": "path",
+    "direction": "hostile",
+    "input": "overall.yaml",
+    "why": "An answer claiming overall PASS with no criteria list must not become a merged result.",
+    "correct": "result-unparseable, exits 0, writes no record",
+    "expected": {
+      "exit": 0,
+      "stdout": "full (result-unparseable)\n",
+      "absent": [
+        "out.ac.json"
+      ]
+    },
+    "fixture": {
+      "files": {
+        "overall.yaml": "ac_traceability:\n  overall: PASS\n  summary: all criteria pass\n",
+        "scope.json": "{\"mode\":\"full\",\"reason\":\"no-prior-record\",\"head\":\"0123456789abcdef0123456789abcdef01234567\",\"criteria\":[{\"id\":\"SC-1\",\"text\":\"SC-1: the engine scopes a re-run\",\"text_hash\":\"0000\"}],\"rejudge\":[{\"id\":\"SC-1\",\"reason\":\"full\"}],\"carry\":[],\"dirty\":[],\"document\":\"doc.md\"}",
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        ".git/refs/tags/.keep": ""
+      }
+    }
+  },
+  {
+    "id": "acs-scalar",
+    "sink": "path",
+    "direction": "hostile",
+    "input": "scalar.yaml",
+    "why": "A scalar acs value is not a criteria list.",
+    "correct": "result-unparseable, exits 0, writes no record",
+    "expected": {
+      "exit": 0,
+      "stdout": "full (result-unparseable)\n",
+      "absent": [
+        "out.ac.json"
+      ]
+    },
+    "fixture": {
+      "files": {
+        "scalar.yaml": "ac_traceability:\n  acs: PASS\n  overall: PASS\n",
+        "scope.json": "{\"mode\":\"full\",\"reason\":\"no-prior-record\",\"head\":\"0123456789abcdef0123456789abcdef01234567\",\"criteria\":[{\"id\":\"SC-1\",\"text\":\"SC-1: the engine scopes a re-run\",\"text_hash\":\"0000\"}],\"rejudge\":[{\"id\":\"SC-1\",\"reason\":\"full\"}],\"carry\":[],\"dirty\":[],\"document\":\"doc.md\"}",
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        ".git/refs/tags/.keep": ""
+      }
+    }
+  },
+  {
+    "id": "acs-mapping",
+    "sink": "path",
+    "direction": "hostile",
+    "input": "mapping.yaml",
+    "why": "A mapping of id to verdict is not the acs list merge joins on.",
+    "correct": "result-unparseable, exits 0, writes no record",
+    "expected": {
+      "exit": 0,
+      "stdout": "full (result-unparseable)\n",
+      "absent": [
+        "out.ac.json"
+      ]
+    },
+    "fixture": {
+      "files": {
+        "mapping.yaml": "ac_traceability:\n  acs:\n    SC-1: PASS\n  overall: PASS\n",
+        "scope.json": "{\"mode\":\"full\",\"reason\":\"no-prior-record\",\"head\":\"0123456789abcdef0123456789abcdef01234567\",\"criteria\":[{\"id\":\"SC-1\",\"text\":\"SC-1: the engine scopes a re-run\",\"text_hash\":\"0000\"}],\"rejudge\":[{\"id\":\"SC-1\",\"reason\":\"full\"}],\"carry\":[],\"dirty\":[],\"document\":\"doc.md\"}",
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        ".git/refs/tags/.keep": ""
+      }
+    }
+  },
+  {
+    "id": "empty-answer",
+    "sink": "path",
+    "direction": "hostile",
+    "input": "empty.yaml",
+    "why": "An empty answer (a crashed agent) must keep NEEDS_MANUAL_REVIEW and write no record.",
+    "correct": "result-unparseable, exits 0, writes no record",
+    "expected": {
+      "exit": 0,
+      "stdout": "full (result-unparseable)\n",
+      "absent": [
+        "out.ac.json"
+      ]
+    },
+    "fixture": {
+      "files": {
+        "empty.yaml": "",
+        "scope.json": "{\"mode\":\"full\",\"reason\":\"no-prior-record\",\"head\":\"0123456789abcdef0123456789abcdef01234567\",\"criteria\":[{\"id\":\"SC-1\",\"text\":\"SC-1: the engine scopes a re-run\",\"text_hash\":\"0000\"}],\"rejudge\":[{\"id\":\"SC-1\",\"reason\":\"full\"}],\"carry\":[],\"dirty\":[],\"document\":\"doc.md\"}",
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        ".git/refs/tags/.keep": ""
+      }
+    }
+  },
+  {
+    "id": "prose-answer",
+    "sink": "path",
+    "direction": "hostile",
+    "input": "prose.yaml",
+    "why": "A prose answer naming a verdict is not structured output.",
+    "correct": "result-unparseable, exits 0, writes no record",
+    "expected": {
+      "exit": 0,
+      "stdout": "full (result-unparseable)\n",
+      "absent": [
+        "out.ac.json"
+      ]
+    },
+    "fixture": {
+      "files": {
+        "prose.yaml": "All criteria pass. overall: PASS\n",
+        "scope.json": "{\"mode\":\"full\",\"reason\":\"no-prior-record\",\"head\":\"0123456789abcdef0123456789abcdef01234567\",\"criteria\":[{\"id\":\"SC-1\",\"text\":\"SC-1: the engine scopes a re-run\",\"text_hash\":\"0000\"}],\"rejudge\":[{\"id\":\"SC-1\",\"reason\":\"full\"}],\"carry\":[],\"dirty\":[],\"document\":\"doc.md\"}",
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        ".git/refs/tags/.keep": ""
+      }
+    }
+  },
+  {
+    "id": "well-formed-answer",
+    "sink": "path",
+    "direction": "legitimate",
+    "input": "ok.yaml",
+    "why": "A well-formed acs list keyed on the engine's id must merge; an over-strict guard sends every run to NEEDS_MANUAL_REVIEW. If git ls-files cannot answer in the case directory this reads as overblocked — the fixture, not the guard.",
+    "correct": "prints 'full (merged)', exits 0",
+    "expected": {
+      "exit": 0,
+      "stdout": "full (merged)\n"
+    },
+    "fixture": {
+      "files": {
+        "ok.yaml": "ac_traceability:\n  acs:\n    - ac_id: \"SC-1\"\n      description: \"the engine scopes a re-run\"\n      status: PASS\n      code_citation: \"doc.md:1\"\n      test_citation: \"doc.md:2\"\n  overall: PASS\n",
+        "scope.json": "{\"mode\":\"full\",\"reason\":\"no-prior-record\",\"head\":\"0123456789abcdef0123456789abcdef01234567\",\"criteria\":[{\"id\":\"SC-1\",\"text\":\"SC-1: the engine scopes a re-run\",\"text_hash\":\"0000\"}],\"rejudge\":[{\"id\":\"SC-1\",\"reason\":\"full\"}],\"carry\":[],\"dirty\":[],\"document\":\"doc.md\"}",
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+        ".git/objects/info/.keep": "",
+        ".git/refs/heads/.keep": "",
+        ".git/refs/tags/.keep": ""
+      }
+    }
+  }
+]

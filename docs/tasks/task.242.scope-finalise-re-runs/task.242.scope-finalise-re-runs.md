@@ -5,10 +5,12 @@ type: task
 description: "Give a /finalise re-run a fixed scope: re-judge only the gaps the previous run reported and the criteria whose evidence changed since its head, carry every other verdict forward, and report anything new on an untouched criterion as advisory."
 tags: [finalise, dod, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-29
 updated: 2026-10-29
+completed_date: 2026-10-29
+pr_number: 781
 assignee:
 estimated_effort_hours: 8
 github_issue: 780
@@ -16,7 +18,7 @@ github_issue: 780
 
 # Technical Task: Scope finalise re-runs
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.242.review.1.scope-finalise-re-runs.md` implemented 2026-10-29
 **GitHub Issue**: [#780](https://github.com/Gamaroff/agent-skills/issues/780)
 
@@ -387,6 +389,31 @@ None.
 The cycle-9 fix is verified (2 of 2 mutations covered) and there is no high finding. One medium remains:
 - QA10-1: a path citation written with `./`, a leading `/`, backslashes or a `#L` anchor is matched exactly and resolves to nothing, while the plain `path:line` form resolves. Promoted at high confidence; reproduced by execution. No committed record here uses these shapes.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.242.qa.10.scope-finalise-re-runs.md`
+**Gate File**: `task.242.gate.10.scope-finalise-re-runs.yml`
+**Gate Status**: ⚠️ CONCERNS. One medium, TASK-242-QA10-1, was accepted by the operator as a known limit (§ 3 *Citation paths*)
+**Quality Score**: 90/100
+**PR Review**: ✅ APPROVE (`task.242.pr-review.1.scope-finalise-re-runs.md`)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 13/13 met (SC-10 not applicable by design). This was a full run (`no-prior-record`), and it wrote this task's first AC record, `task.242.dod.1.ac.json`
+✅ **Tests:** engine suite 52/52 and contract suites green; each § 8 guard mutation-proved (M1–M28 plus per-cycle proofs)
+✅ **PR Review:** PR #781; Step 5c conformance review APPROVE; CI green on `ba663028`
+✅ **Documentation:** CHANGELOG [Unreleased] (task 242); finalise SKILL.md, AC prompt and pipeline step docs, with their bundled copies
+✅ **Security Review:** PASS. Two controls were probed by execution: 17 candidates, 0 reproduced, 0 escapes
+✅ **Compliance Review:** not applicable (internal tooling, no personal data)
+
+**Task marked as ACCEPTED on:** 2026-10-29
+
+**Detailed Verification Log:** See `task.242.dod.1.scope-finalise-re-runs.md` for complete verification evidence and timestamps.
+
 ## Change Log
 
 | Date | Version | Description | Author |
@@ -416,6 +443,7 @@ The cycle-9 fix is verified (2 of 2 mutations covered) and there is no high find
 | 2026-10-29 |  | QA gate CONCERNS (90/100). 1 finding: QA10-1 (medium, promoted). A path citation written with `./`, a leading `/`, backslashes or a `#L` anchor is matched exactly and resolves to nothing, while the plain form resolves. Reproduced by execution. QA9-1 verified (2 of 2 covered). The granted budget (10) is spent at this gate | qa-task |
 | 2026-10-29 |  | Operator accepted gate 10 as it stands: QA10-1 recorded as a known limit in § 3 *Citation paths*, not fixed. The run proceeds to the PR review and `/finalise` | develop-task |
 | 2026-10-29 |  | PR review 1: APPROVE, 2 low conformance findings fixed in place. § 3 and SC-1 now name the fifth `full` reason, `no-criteria` (PC-1); § 7 file 8 says what the PR changed in `finalise-bug-mode.test.mjs` (PC-2) | review-pr |
+| 2026-10-29 | 1.2 | DoD verified — accepted (PR #781). 13/13 criteria on a full first run; boundary probed, 17 executed, 0 reproduced | finalise |
 
 ---
 
