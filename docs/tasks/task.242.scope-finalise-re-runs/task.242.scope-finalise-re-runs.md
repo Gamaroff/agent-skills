@@ -5,7 +5,7 @@ type: task
 description: "Give a /finalise re-run a fixed scope: re-judge only the gaps the previous run reported and the criteria whose evidence changed since its head, carry every other verdict forward, and report anything new on an untouched criterion as advisory."
 tags: [finalise, dod, observation]
 category: refactoring
-status: ready-for-development
+status: ready-for-review
 priority: Medium
 created: 2026-10-29
 updated: 2026-10-29
@@ -16,7 +16,7 @@ github_issue: 780
 
 # Technical Task: Scope finalise re-runs
 
-**Status:** Ready for Development
+**Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.242.review.1.scope-finalise-re-runs.md` implemented 2026-10-29
 **GitHub Issue**: [#780](https://github.com/Gamaroff/agent-skills/issues/780)
 
@@ -175,33 +175,33 @@ The `reported-gap` row is what would have stopped task.239. Run 4 named SC-11's 
 
 ### Phase 1: The engine (Risk: Medium)
 
-- [ ] `scope`: the four `full` reasons and the six per-criterion rows of § 3, with criterion text hashing on a normalised line (checkbox state stripped, whitespace collapsed)
-- [ ] Criterion identity (§ 3): the document id or `#N`, matched by id or by text hash
-- [ ] Citation resolution (§ 3): repo-relative path, or a unique basename through `git ls-files`, else unresolved
-- [ ] `merge`: restore every carried verdict and citation, and move a carried criterion's differing agent verdict into `advisories[]`. Apply the § 3 member rules and recompute a `reported-gap` criterion's status from its merged members. Recompute `overall` from the merged `acs[]` and `docs[]`. Parse the agent's YAML with `yaml-subset.js` (`parseYamlSubset`). Unparseable output leaves Step 3c's existing `NEEDS_MANUAL_REVIEW` rule in force, and no record is written.
-- [ ] Exit codes in the repository's idiom: 0 for any answer (read `mode`/`reason`), 2 for a usage error
-- [ ] Unit tests on a temp git repo, one per reason, plus the task.239 replay and its controls (§ 8)
+- [x] `scope`: the four `full` reasons and the six per-criterion rows of § 3, with criterion text hashing on a normalised line (checkbox state stripped, whitespace collapsed)
+- [x] Criterion identity (§ 3): the document id or `#N`, matched by id or by text hash
+- [x] Citation resolution (§ 3): repo-relative path, or a unique basename through `git ls-files`, else unresolved
+- [x] `merge`: restore every carried verdict and citation, and move a carried criterion's differing agent verdict into `advisories[]`. Apply the § 3 member rules and recompute a `reported-gap` criterion's status from its merged members. Recompute `overall` from the merged `acs[]` and `docs[]`. Parse the agent's YAML with `yaml-subset.js` (`parseYamlSubset`). Unparseable output leaves Step 3c's existing `NEEDS_MANUAL_REVIEW` rule in force, and no record is written.
+- [x] Exit codes in the repository's idiom: 0 for any answer (read `mode`/`reason`), 2 for a usage error
+- [x] Unit tests on a temp git repo, one per reason, plus the task.239 replay and its controls (§ 8)
 
 ### Phase 2: The AC prompt (Risk: Medium)
 
-- [ ] A new section before Step 3 that reads `<RERUN_SCOPE>`. Keep the `### Step 3: Check each acceptance criterion` heading byte-identical, because two skills link to its anchor.
-- [ ] The section tells the agent to use the criterion ids `<RERUN_SCOPE>` lists, in full mode too. It instructs no write (`explore-prompts-no-write.test.js`) and states no count of kinds (`count-of-kinds.js`).
-- [ ] Output gains `members[]` (member, evidence, status) on quantified criteria and a top-level `advisories[]`
-- [ ] `full` scope reads exactly as today's prompt
+- [x] A new section before Step 3 that reads `<RERUN_SCOPE>`. Keep the `### Step 3: Check each acceptance criterion` heading byte-identical, because two skills link to its anchor.
+- [x] The section tells the agent to use the criterion ids `<RERUN_SCOPE>` lists, in full mode too. It instructs no write (`explore-prompts-no-write.test.js`) and states no count of kinds (`count-of-kinds.js`).
+- [x] Output gains `members[]` (member, evidence, status) on quantified criteria and a top-level `advisories[]`
+- [x] `full` scope reads exactly as today's prompt
 
 ### Phase 3: Wire `/finalise` (Risk: Medium)
 
-- [ ] Existing Step 3a (Prepare Shared Context): locate the prior record with `newest_numbered … -name "${STEM}.dod.*.ac.json"` and run `scope`. Add `<RERUN_SCOPE>` to the Step 3b dispatch table. No new step heading.
-- [ ] Existing Step 3c (Aggregate Results): after the YAML parse and before Step 3d renders, run `merge` and write `${STEM}.dod.${DOD_N}.ac.json`
-- [ ] DoD Step 2 block: the line `**Re-run scope:** {mode} ({reason}) — {K} re-judged, {M} carried`, and the advisory list
-- [ ] Bug-mode table row `rerun-scope` (story/task run, bug skip) and its marker
-- [ ] 6a and 8 stage the AC record with the DoD file
+- [x] Existing Step 3a (Prepare Shared Context): locate the prior record with `newest_numbered … -name "${STEM}.dod.*.ac.json"` and run `scope`. Add `<RERUN_SCOPE>` to the Step 3b dispatch table. No new step heading.
+- [x] Existing Step 3c (Aggregate Results): after the YAML parse and before Step 3d renders, run `merge` and write `${STEM}.dod.${DOD_N}.ac.json`
+- [x] DoD Step 2 block: the line `**Re-run scope:** {mode} ({reason}) — {K} re-judged, {M} carried`, and the advisory list
+- [x] Bug-mode table row `rerun-scope` (story/task run, bug skip) and its marker
+- [x] 6a and 8 stage the AC record with the DoD file (6a: an existence-checked add beside the registry add; `/finalise` Step 8 stages nothing, and the orchestrator's Step 8 `/commit-changes --scope` carries the record on a gaps halt)
 
 ### Phase 4: Bundle, docs, record (Risk: Low)
 
-- [ ] `npm run bundle`, then confirm `bundle:check` is clean
-- [ ] CHANGELOG [Unreleased] entry citing task 242
-- [ ] Mutation-prove each new guard and record it in the commit body
+- [x] `npm run bundle`, then confirm `bundle:check` is clean
+- [x] CHANGELOG [Unreleased] entry citing task 242
+- [x] Mutation-prove each new guard and record it in the commit body
 
 ---
 
@@ -371,15 +371,16 @@ None.
 | 2026-10-29 | 1.0 | Initial draft — cut from observation #121 | create-task |
 | 2026-10-29 | 1.1 | Review 1 (6/10 → 8/10): engine-assigned criterion ids; citation resolution and `evidence-unresolved`; reported-gap member rules and status recompute; `overall` from `acs[]` and `docs[]`; reconstruction states; tests that read the AC prompt; SC-11 closed to a named guard list | review-task |
 | 2026-10-29 |  | Status → ready-for-development | review-task |
+| 2026-10-29 |  | Implemented — 9 authored files (engine, its 33 tests, AC prompt, finalise SKILL.md, 2 pipeline step docs, 2 eval tests, CHANGELOG) plus bundled copies; 4 contract tests added; 28 guards mutation-proved | develop |
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1: The engine
-- [ ] Phase 2: The AC prompt
-- [ ] Phase 3: Wire `/finalise`
-- [ ] Phase 4: Bundle, docs, record
+- [x] Phase 1: The engine
+- [x] Phase 2: The AC prompt
+- [x] Phase 3: Wire `/finalise`
+- [x] Phase 4: Bundle, docs, record
 
 ---
 
