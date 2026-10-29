@@ -1,0 +1,61 @@
+schema: 2
+task: 'task.242.scope-finalise-re-runs'
+task_title: 'Scope finalise re-runs to the gaps and the changed evidence'
+gate: CONCERNS
+status_reason: 'The cycle-6 fix (CR6-1) is verified: removing it turns its test red, and over-widening turns two other tests red. No high finding. The independent reviewer found one medium bug on the merge side, which QA reproduced by execution: a new member whose citation has several tokens, one of them a bare basename that is ambiguous at HEAD with a changed candidate, reads as unchanged, so the agent''s FAIL is overturned.'
+reviewer: 'QA Engineer'
+head: '9d690e98415bc3fc639532f6324a220d26594d2b'
+updated: '2026-10-29T09:13:39Z'
+
+top_issues:
+  - id: 'TASK-242-QA7-1'
+    severity: medium
+    file: 'shared/resources/finalise-rerun-scope.js'
+    finding: 'merge builds its index with changed: null (finalise-rerun-scope.js:651), so a bare basename that is ambiguous at HEAD never widens, even when a HEAD candidate changed. A new member with the evidence "tests/b.test.mjs:1, a.test.mjs:3" (tests/a.test.mjs modified, lib/z/a.test.mjs also at HEAD) resolves to [tests/b.test.mjs] alone. memberEvidence returns unchanged, and the agent''s FAIL is overturned. Reproduced by execution: SC-3=PASS, with the note "new member G9 judged FAIL on unchanged evidence". The control, with no same-basename file, gives SC-3=FAIL. The CR6-1 claim that "merge counts changed and unresolved alike" holds only for a one-token citation. Source: code-review CR-1 (bug, medium, confidence medium). It is not promoted under code_review_blocking. QA raises it from its own execution reproduction; the reviewer''s confidence is unchanged.'
+    suggested_action: 'In merge, null only goneByBase (CR5-1: a gone path cannot be what a HEAD citation meant) and keep changed, so a bare basename ambiguous at HEAD with a changed HEAD candidate resolves to every HEAD candidate. Add a merge test with a multi-token new-member citation and its unique-basename control, so the changed: null mutation is no longer absorbed.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 47
+  phases_verified: 18/18
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false, as in cycles 1-6. A carry or count classifier over git state; it writes no disk path.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'QA7-1: on the merge side, an ambiguous bare basename with a changed candidate, in a multi-token citation, overturns a FAIL on changed evidence.'
+  maintainability:
+    status: PASS
+    notes: 'CR6-1 is covered by committed tests (two mutations covered). The merge index changed: null mutation is still absorbed (QA7-1).'
+
+recommendations:
+  immediate:
+    - action: 'Keep changed in the merge index and null only goneByBase; add the multi-token merge test with its control (QA7-1)'
+      refs: ['shared/resources/finalise-rerun-scope.js']
+  future:
+    - action: 'Bare-basename resolution has had a new edge case every cycle since cycle 3 (CR3-1, CR4-1, CR5-1, CR6-1, QA7-1). The structural option is still open: a bare basename never resolves, so the criterion or member is always re-judged.'
+      refs: ['shared/resources/finalise-rerun-scope.js']
+    - action: 'Step 4b: no runnable prose changed this cycle.'
+      refs: ['skills/finalise/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: BLOCKED
+  conditions: ['QA7-1 fixed and re-reviewed']

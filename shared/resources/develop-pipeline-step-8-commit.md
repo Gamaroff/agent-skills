@@ -80,8 +80,8 @@ Then invoke the `/commit-changes` skill with `--scope {work-item-dir}`, plus one
 
 
 > **What this commit carries changed with task.115.** The acceptance artefacts — the document with
-> `status: accepted`, the DoD summary, `sprint-review-summary.md` and (tasks) the ticked registry —
-> are committed and pushed by `/finalise` itself at its Step 7 action 6a, *before* any PR or tracker
+> `status: accepted`, the DoD summary and its `*.dod.{N}.ac.json` AC record, `sprint-review-summary.md`
+> and (tasks) the ticked registry — are committed and pushed by `/finalise` itself at its Step 7 action 6a, *before* any PR or tracker
 > side-effect, so that CI can be read on the head that carries the acceptance. This Step 8 commit is
 > therefore the **implementation report and nothing else new** — with one expected residue: on a Jira
 > project the document carries a frontmatter-only `jira_last_*` rewrite from Step 7 action 8's

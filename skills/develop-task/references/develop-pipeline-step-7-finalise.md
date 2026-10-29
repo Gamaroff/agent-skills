@@ -140,8 +140,8 @@ deliberately unchanged, so **no Version bump**:
 ## The publish boundary — what `/finalise` has already done before it returns
 
 `/finalise` Step 7 actions 6a–6c (task.115) commit the acceptance artefacts — the document with
-`status: accepted`, the `*.dod.{N}.*.md` summary, `sprint-review-summary.md` and (tasks) the ticked
-registry — **push them, assert each is tracked and on `origin/<branch>`, and take a second CI
+`status: accepted`, the `*.dod.{N}.*.md` summary, `sprint-review-summary.md`, (stories and tasks)
+the `*.dod.{N}.ac.json` AC record (task 242) and (tasks) the ticked registry — **push them, assert each is tracked and on `origin/<branch>`, and take a second CI
 reading on that pushed head**, all *before* its own PR comment, tracker comment, issue close and
 board move. Every side-effect in this document therefore runs against a pushed, CI-green acceptance
 commit. 6a commits the whole index, so it also carries what 5c staged — the PR review report and any

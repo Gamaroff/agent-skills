@@ -1,0 +1,97 @@
+schema: 2
+task: 'task.242.scope-finalise-re-runs'
+task_title: 'Scope finalise re-runs to the gaps and the changed evidence'
+gate: FAIL
+status_reason: 'The new Step 3a and Step 3c blocks in finalise SKILL.md read $STEM and $DOD_N without binding them: 3c HALTs on every story/task run (empty --dod-n is a usage error) and 3a can never find a prior record, so the feature is inert. Three medium engine and staging defects are also open.'
+reviewer: 'QA Engineer'
+head: 'd2e9c3eb0c0dce19b0cb79a09623f6f4efb19dd9'
+updated: '2026-10-29T07:14:06Z'
+
+top_issues:
+  - id: 'TASK-242-CR-1'
+    severity: high
+    file: 'skills/finalise/SKILL.md'
+    finding: 'Step 3c merge block (SKILL.md:731) reads ${STEM} and $DOD_N but binds neither; each fenced block is its own shell, so --dod-n "" fails the CLI digit check (exit 2) and every story/task finalise run HALTs at Step 3c. The contract test pins the unbound text, so it cannot see this.'
+    suggested_action: 'Bind STEM="{…}" and DOD_N="{Step 0''s DOD_N}" at the top of the block with the empty/placeholder HALT guard Step 3b.1 and 7.6a use, and add a test that runs the block (fence form) or asserts each block binds what it reads.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-242-CR-2'
+    severity: high
+    file: 'skills/finalise/SKILL.md'
+    finding: 'Step 3a scope block (SKILL.md:495) reads ${STEM} and ${DOD_N} unbound, so the glob is ".dod.*.ac.json", no prior record ever matches, and every re-run reports full (no-prior-record) at exit 0 — the scoping never fires.'
+    suggested_action: 'Bind STEM and DOD_N in the block as substituted inputs and HALT when either is empty or still a {…} placeholder.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-242-CR-3'
+    severity: medium
+    file: 'shared/resources/finalise-rerun-scope.js'
+    finding: 'mergeReportedGap (finalise-rerun-scope.js:487) recomputes a reported-gap criterion to PASS whenever its counted members pass and both citations exist, overturning an agent FAIL that rests on a non-member reason such as test_runs_per_pr: false.'
+    suggested_action: 'Keep the agent FAIL when test_runs_per_pr is false or the FAIL cites a non-member reason; override only when the FAIL is fully explained by carried or advisory members.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-242-CR-4'
+    severity: medium
+    file: 'shared/resources/finalise-rerun-scope.js'
+    finding: 'A prior-PASS member listed for re-check that the agent omits keeps its prior PASS (finalise-rerun-scope.js:468), so a criterion can PASS on stale member evidence; an omitted whole criterion becomes FAIL, an omitted member does not.'
+    suggested_action: 'Count an omitted re-check member as FAIL with a no-verdict-returned note.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-242-CR-5'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The AC record was added to 7.6a staging and to the step-7 doc''s tracked-and-pushed claim, but 7.6b''s ARTIFACTS list (SKILL.md:1696) was not updated, so an unpushed record passes 6b.'
+    suggested_action: 'Add the AC record to 7.6b''s story/task ARTIFACTS when it exists, and pin that 6a and 6b name the same artefacts.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 30
+
+evidence:
+  tests_reviewed: 126
+  phases_verified: 18/18
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6]
+    phases_with_issues: [3, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false. Candidates read: resolveCitation (matches tokens against the git ls-files set only, never touches disk; an unresolved citation fails toward re-judge), isReopened, and the SKILL.md 3a/3c HALT blocks (exit-code checks on the engine, not repo-state classification). No hostile-input sink fits.'
+  performance:
+    status: PASS
+    notes: 'One JSON read and one git diff --name-only per run; no numeric bound claimed (SC-10).'
+  reliability:
+    status: FAIL
+    notes: 'CR-1: every story/task finalise run HALTs at Step 3c. CR-2: the scoped path is unreachable.'
+  maintainability:
+    status: CONCERNS
+    notes: 'CR-5: an artefact-list site (7.6b) not enumerated when the record was added.'
+
+recommendations:
+  immediate:
+    - action: 'Bind STEM and DOD_N in the Step 3a and 3c blocks with a placeholder guard (CR-1, CR-2)'
+      refs: ['skills/finalise/SKILL.md']
+    - action: 'Fix the reported-gap recompute and the omitted re-check member (CR-3, CR-4)'
+      refs: ['shared/resources/finalise-rerun-scope.js']
+    - action: 'Add the AC record to the 7.6b ARTIFACTS assertion (CR-5)'
+      refs: ['skills/finalise/SKILL.md']
+  future:
+    - action: 'CR-6 (medium confidence): an empty merged acs list computes overall PASS; return NEEDS_MANUAL_REVIEW instead'
+      refs: ['shared/resources/finalise-rerun-scope.js']
+    - action: 'CR-7: 6a stages the newest AC record in the series, which on an unparseable run is an earlier run''s; test for this run''s exact path'
+      refs: ['skills/finalise/SKILL.md']
+    - action: 'CR-8 (cleanup): build id-mismatch advisories from the entries collected in the first loop'
+      refs: ['shared/resources/finalise-rerun-scope.js']
+    - action: 'Step 4b: the 3 changed SKILL.md blocks (lines 491, 725, 1565) were all refused as mutating; none executed'
+      refs: ['skills/finalise/SKILL.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

@@ -1,0 +1,61 @@
+schema: 2
+task: 'task.242.scope-finalise-re-runs'
+task_title: 'Scope finalise re-runs to the gaps and the changed evidence'
+gate: CONCERNS
+status_reason: 'The cycle-5 fix (CR5-1) is verified: removing it turns its test red, and no high finding remains. The independent reviewer found one promoted medium bug, reproduced by execution: on the scope side, a file added under a cited basename makes the bare citation ambiguous at HEAD with nothing gone, so it resolves to nothing, and the criterion is carried although its cited file changed.'
+reviewer: 'QA Engineer'
+head: '3717756af85eb306143ba77c6cd7801cf08e64e6'
+updated: '2026-10-29T08:34:19Z'
+
+top_issues:
+  - id: 'TASK-242-CR6-1'
+    severity: medium
+    file: 'shared/resources/finalise-rerun-scope.js'
+    finding: 'resolveCitation (finalise-rerun-scope.js:158-160) widens a bare basename only when a gone path shares it. When a prior PASS cites "b.js:1" (meaning src/b.js), and since the prior head src/b.js was modified and lib/z/b.js was added, HEAD carries the basename twice and nothing is gone, so the token resolves to nothing. The criterion''s other, unchanged path then carries it as unchanged. Reproduced by execution: carry=[SC-2 unchanged] with changed=[lib/z/b.js, src/b.js]; the control without the addition gives evidence-changed. This breaks §3: a carried verdict is re-judged as soon as any cited path changes. Code-review CR6-1 (bug, medium, confidence high), promoted by code_review_blocking.'
+    suggested_action: 'On the scope side only (prior-record citations; merge keeps the HEAD-alone rule from CR5-1), resolve a bare basename to every candidate whenever any changed path carries it (added, modified or gone), so an ambiguity that appears after the prior head fails toward re-judge. Add a scope test for "cited file modified plus a same-basename file added", with the modify-only control.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 46
+  phases_verified: 18/18
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false, as in cycles 1-5. A carry or count classifier over git state; it writes no disk path.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR6-1: a same-basename addition makes a bare prior citation resolve to nothing, so a criterion whose cited file changed is carried.'
+  maintainability:
+    status: PASS
+    notes: 'CR5-1 is covered by a committed test (mutation-proven). The scope side has no same-basename-addition case (CR6-1).'
+
+recommendations:
+  immediate:
+    - action: 'Resolve a bare prior-record citation to every candidate when any changed path carries its basename (CR6-1)'
+      refs: ['shared/resources/finalise-rerun-scope.js']
+  future:
+    - action: 'Bare-basename resolution has had a new edge case each cycle since cycle 3 (CR3-1, CR4-1, CR5-1, CR6-1). Consider the structural option the implementation report names: a bare basename never resolves, so the criterion is always re-judged.'
+      refs: ['shared/resources/finalise-rerun-scope.js']
+    - action: 'Step 4b: no runnable prose changed this cycle.'
+      refs: ['skills/finalise/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: BLOCKED
+  conditions: ['CR6-1 fixed and re-reviewed']

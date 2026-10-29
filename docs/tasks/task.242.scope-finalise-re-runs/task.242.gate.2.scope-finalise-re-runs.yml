@@ -1,0 +1,79 @@
+schema: 2
+task: 'task.242.scope-finalise-re-runs'
+task_title: 'Scope finalise re-runs to the gaps and the changed evidence'
+gate: FAIL
+status_reason: 'All eight cycle-1 findings are fixed and mutation-proved, but the cycle-2 refute pass found three high engine defects that let a re-run carry or restore a PASS it should not. Two come from the reported-gap merge rule: an omitted criterion, and an invented member on unchanged evidence. The third is a cited path that was deleted or renamed since the prior head.'
+reviewer: 'QA Engineer'
+head: '15185f81e9e4b80959b84604c9513defcb28f8b3'
+updated: '2026-10-29T07:30:36Z'
+
+top_issues:
+  - id: 'TASK-242-CR2-1'
+    severity: high
+    file: 'shared/resources/finalise-rerun-scope.js'
+    finding: 'mergeReportedGap (finalise-rerun-scope.js:501): when the agent omits a member-shaped reported-gap criterion, or returns it under an id the engine did not issue, agentFailed is false. If the prior FAIL had no failing member (for example an execution-rule FAIL) every member is carried as PASS, so the prior FAIL becomes PASS. The member-less branch at :439 already keeps it FAIL.'
+    suggested_action: 'When agentAc is absent, keep the prior FAIL with a "no verdict returned" note, as the member-less branch does, and test both the omitted and the mis-identified case.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-242-CR2-2'
+    severity: high
+    file: 'shared/resources/finalise-rerun-scope.js'
+    finding: 'explainedByMembers (finalise-rerun-scope.js:505) counts a new member on unchanged evidence as explaining the FAIL. An agent FAIL for a non-member reason that also lists one invented FAIL member therefore becomes PASS, and the agent''s note is overwritten. This contradicts the AC prompt''s Step 0 ("a FAIL that names no failing member stands"). The cycle-1 CR-3 fix introduced it.'
+    suggested_action: 'Let the agent name a non-member FAIL in a structured field the engine reads (a note cannot be parsed), and keep its FAIL whenever that field is set. When the members do overturn a FAIL, keep the agent''s note as an advisory. The task.239 replay (G5 carried, G7 advisory → PASS) must still pass.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-242-CR2-3'
+    severity: high
+    file: 'shared/resources/finalise-rerun-scope.js'
+    finding: 'resolveCitation (finalise-rerun-scope.js:145) keeps only paths tracked at HEAD, so a path deleted since the prior head drops out of the criterion''s evidence. git diff --name-only also reports a rename under its new name only, so a renamed citation is lost too. If any other cited path is unchanged, scope carries the PASS as "unchanged".'
+    suggested_action: 'Resolve citations against the files tracked at HEAD plus the changed set, and diff with --no-renames so both old and new paths appear. A cited path that changed or vanished then sends the criterion to evidence-changed.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 40
+
+evidence:
+  tests_reviewed: 134
+  phases_verified: 18/18
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false, as in cycle 1. resolveCitation, isReopened and the scope/merge classifiers decide re-judge vs carry over pipeline-written records and git state, and touch no disk path. No security-input-corpus sink models a carry decision. Their correctness defects (CR2-1..3) are reliability findings, not hostile-input escapes.'
+  performance:
+    status: PASS
+    notes: 'Unchanged from cycle 1: one JSON read and two git diff --name-only calls per run.'
+  reliability:
+    status: FAIL
+    notes: 'CR2-1, CR2-2, CR2-3: three paths carry or restore a PASS that the evidence no longer supports. CR2-4 (advisory) is a fourth, on a dirty working tree.'
+  maintainability:
+    status: PASS
+    notes: 'Cycle-1 fixes are commented with their finding ids. The new blocks test executes the real 3a/3c fences rather than pinning their text.'
+
+recommendations:
+  immediate:
+    - action: 'Keep the prior FAIL when a reported-gap criterion gets no agent verdict (CR2-1)'
+      refs: ['shared/resources/finalise-rerun-scope.js']
+    - action: 'Read a non-member FAIL from a structured field, never from invented advisory members (CR2-2)'
+      refs: ['shared/resources/finalise-rerun-scope.js', 'shared/resources/finalise-dod-ac-prompt.md']
+    - action: 'Resolve deleted and renamed cited paths as changed evidence (CR2-3)'
+      refs: ['shared/resources/finalise-rerun-scope.js']
+  future:
+    - action: 'CR2-4 (medium/medium, not promoted): the record keys on HEAD while the agents judged the working tree, so a verdict made on an uncommitted edit that is later discarded is carried. Record the dirty paths at merge and treat them as changed on the next scope.'
+      refs: ['skills/finalise/SKILL.md', 'shared/resources/finalise-rerun-scope.js']
+    - action: 'Step 4b: the 4 changed SKILL.md blocks are still refused as mutating. finalise-rerun-scope-blocks.test.mjs now executes 3a and 3c, which covers the gap Step 4b cannot reach.'
+      refs: ['skills/finalise/SKILL.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

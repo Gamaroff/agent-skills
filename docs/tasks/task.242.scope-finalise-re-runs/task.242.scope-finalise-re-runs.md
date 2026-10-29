@@ -5,10 +5,12 @@ type: task
 description: "Give a /finalise re-run a fixed scope: re-judge only the gaps the previous run reported and the criteria whose evidence changed since its head, carry every other verdict forward, and report anything new on an untouched criterion as advisory."
 tags: [finalise, dod, observation]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 created: 2026-10-29
 updated: 2026-10-29
+completed_date: 2026-10-29
+pr_number: 781
 assignee:
 estimated_effort_hours: 8
 github_issue: 780
@@ -16,7 +18,8 @@ github_issue: 780
 
 # Technical Task: Scope finalise re-runs
 
-**Status:** Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.242.review.1.scope-finalise-re-runs.md` implemented 2026-10-29
 **GitHub Issue**: [#780](https://github.com/Gamaroff/agent-skills/issues/780)
 
 ---
@@ -41,7 +44,7 @@ github_issue: 780
 
 ### Current Problems
 
-- **No fixed point.** task.239 ran `/finalise` five times (observation #121). Each AC run judged the criteria more finely than the one before and found a gap the previous run had passed. Run 5 failed SC-11 on three assertion groups (`qa-escalation-template.test.mjs:102-106`, `:356-360`, `:410-412`). Runs 1–4 had read those groups and passed them. No code changed between runs 4 and 5: `b324b496` touched only the task document.
+- **No fixed point.** task.239 ran `/finalise` five times (observation #121). Each AC run judged the criteria more finely than the one before and found a gap the previous run had passed. Run 5 failed SC-11 on three assertion groups (`qa-escalation-template.test.mjs:102-106`, `:356-360`, `:410-412`). None of runs 1–4 named them; run 4 had listed seven other groups (`:231`, `:93-96`, `:108-112`, `:113-115`, `:352-355`, `:190-205`, `:156`/`:210-216`). No code changed between runs 4 and 5: `b324b496` touched only the task document.
 - **The loop ended by hand.** The pipeline has no rule that stops a run from re-judging what the last run passed. Run 5 was accepted only because the user set one in advance ("if run 5 finds yet another new gap, accept with a recorded override"). See `task.239.dod.5.qa-escalation-and-grant-say-what-runs.md` § Step 5.
 - **Every extra run is expensive.** One DoD run is four agents, a 30-case probe and a CI reading. On task.239 that was four extra runs.
 - **Nothing is kept to compare with.** The AC agent's result is captured as `AC_RESULT` (`skills/finalise/SKILL.md:513`, *`Each agent returns YAML. Capture: \`AC_RESULT\``*). It is rendered into the DoD markdown and then discarded. A re-run has no machine-readable record of what the last run passed, so it cannot carry anything.
@@ -64,29 +67,45 @@ github_issue: 780
 - **Prior runs.** Step 2's rule (`skills/finalise/SKILL.md:283`, *`Treat **every** existing DoD/ACCEPTED block as **superseded**. Verify each criterion afresh`*) applies when a document that was accepted is reopened (`PRIOR_DOD > 0` and status not `accepted`). It stays as it is: a reopened document is new work. Step 3's "Idempotent re-run" (`:859`) is about not duplicating sections in one running summary. It is unrelated to scope.
 - **Heads.** Step 6 records `CI_HEAD_1=$(git rev-parse HEAD)` (`:1139`) for the CI reading. No per-run record of the head the AC agent read exists.
 - **Numbering.** DoD files are numbered by `newest-numbered.sh` (`next_numbered` at `skills/finalise/SKILL.md:171`). The same helper can find the newest prior AC record.
-- **Other readers of the AC prompt.** `qa-task/SKILL.md:1015`, `qa-story/SKILL.md:1538`, `review-task/SKILL.md:1244` and `review-story/SKILL.md:1264` cite it. The last two link to the anchor `#step-3-check-each-acceptance-criterion`. None of them dispatch it. Each has a bundled copy at `skills/{finalise,review-task,review-story}/references/finalise-dod-ac-prompt.md`.
+- **Other readers of the AC prompt.** Search: `git grep -n finalise-dod-ac-prompt -- 'skills/*/SKILL.md' 'shared/resources' evals tests`, bundled `references/` copies excluded.
+  - Skills: `qa-task/SKILL.md:1015`, `qa-story/SKILL.md:1538`, `review-task/SKILL.md:1244` and `review-story/SKILL.md:1264` cite it. The last two link to the anchor `#step-3-check-each-acceptance-criterion`. None of them dispatch it. Each has a bundled copy at `skills/{finalise,review-task,review-story}/references/finalise-dod-ac-prompt.md`.
+  - Tests:
+    - `tests/explore-prompts-no-write.test.js:158` reads the prompt as an Explore prompt, so the new Step 0 must not instruct a write.
+    - `tests/review-task-measured-criterion.test.js:119` uses `tests/lib/count-of-kinds.js` to hold that the prompt states the count of test-free kinds once, in Step 3, so Step 0 must not state a count of kinds.
+    - `tests/review-plan-shape-checks.test.js:225` pins the Step 3 anchor.
 - **Bug mode.** The bug-mode table (`skills/finalise/SKILL.md`, § "What bug mode runs and skips") lists every step key. `evals/shared/tests/finalise-bug-mode.test.mjs` asserts that the table and the `**Bug mode (\`key\`):**` markers agree in both directions.
 
 ### Target Architecture
 
 ```
-Step 3a (new, before dispatch)
+Step 3a (existing "Prepare Shared Context", extended)
   PRIOR = newest ${STEM}.dod.*.ac.json beside the document (none on a first run)
   node finalise-rerun-scope.js scope --prior PRIOR --doc DOC --head HEAD --json
-    → { mode: full | scoped, reason, rejudge[], carry[] }
-  substitute <RERUN_SCOPE> into the AC prompt (full → "judge every criterion")
+    → { mode: full | scoped, reason, criteria[] (id, text_hash), rejudge[], carry[] }
+  substitute <RERUN_SCOPE> into the AC prompt: the criterion ids the agent must echo,
+    plus (scoped only) the rejudge and carry lists. Full → "judge every criterion".
 
 Step 3b dispatch (unchanged shape: four agents, one message)
   AC agent judges rejudge[]; copies carry[] through; anything else it sees → advisories[]
 
-Step 3c aggregation
+Step 3c aggregation (existing, extended: after the YAML parse, before Step 3d renders)
   node finalise-rerun-scope.js merge --scope SCOPE --result AC_YAML --json
     → AC_RESULT with every carried verdict restored; a carried criterion the agent
       re-judged differently is moved to advisories[], never into status
-  write ${STEM}.dod.${DOD_N}.ac.json (head, text hashes, verdicts, citations, members)
+  write ${STEM}.dod.${DOD_N}.ac.json (head, ids, text hashes, verdicts, citations, members)
 ```
 
-**When the scope is `full`** (the engine's reason in brackets): no prior record (`no-prior-record`), a record it cannot read or whose schema it does not know (`prior-unreadable`), a reopened document under the Step 2 rule (`reopened`), or a prior head that is not an ancestor of HEAD (`head-not-ancestor`, a rebase or force-push). Every doubt fails toward a full run, which is today's behaviour.
+**Criterion identity.** The engine assigns every criterion's id, and the agent echoes it. The id is the document's own leading id when the line has one (`SC-7`, `AC3`). Otherwise it is `#N`, the criterion's position in the section. Of the 14 most recent task documents, 10 carry no leading ids. A prior criterion is matched by id when the document has ids, and otherwise by text hash. An id-less criterion whose text changed is therefore `new-criterion`. `<RERUN_SCOPE>` lists the ids in full mode too, so every record is keyed the same way. `merge` joins on these ids and never on an id the agent invented.
+
+**Citation paths.** A citation contributes a path only when it resolves to a file `git ls-files` tracks:
+- a repo-relative `path:line` resolves to its path, including a path deleted or renamed since the prior head (it counts as changed);
+- a bare basename resolves to every file that has it, at HEAD or deleted since the prior head. Any token without a slash is a bare basename, even when a repository-root file has that name: `README.md` resolves to the root file and every nested `README.md` (QA cycle 9, QA9-1). The engine never guesses which one a citation meant: the evidence changed when any of those files changed since the prior head (added, modified, deleted or renamed), and is unchanged when none did. So a file moved under its own name, or a same-basename file added beside the cited one, re-judges the criterion, and a basename several unchanged files share carries it, alone or beside other unchanged paths (QA cycles 2–8: CR2-3, CR3-1, CR4-1, CR6-1, QA8-1). A deleted file is a basename candidate only for the prior record's citations. A new member's evidence is cited by this run's agent against HEAD, so `merge` takes its bare basename's candidates from HEAD alone (QA cycle 5, CR5-1); the rule is otherwise the same one (QA cycles 7–8, QA7-1, QA8-1);
+- an abbreviated `:N-M` or a commit SHA does not resolve.
+- **Known limit (QA10-1, accepted 2026-10-29):** a path is matched as written, with no normalisation, so a path written with `./`, a leading `/`, backslashes or a `#L` anchor does not resolve. Beside an unchanged path, such a citation carries its criterion; as a new member's only evidence, it is counted. The AC prompt asks for repo-relative `path:line`, and no record in this repository uses the other forms.
+
+task.239's DoD runs cite all three unresolvable shapes. A PASS with no resolvable code, test or member-evidence path cannot be watched for change, so it is re-judged rather than carried.
+
+**When the scope is `full`** (the engine's reason in brackets): no prior record (`no-prior-record`), a record it cannot read or whose schema it does not know (`prior-unreadable`), a reopened document under the Step 2 rule (`reopened`), a prior head that is not an ancestor of HEAD (`head-not-ancestor`, a rebase or force-push), or a document with no criterion line the engine can key (`no-criteria`, added during implementation). Every doubt fails toward a full run, which is today's behaviour.
 
 **When the scope is `scoped`,** each criterion gets one of these outcomes:
 
@@ -96,9 +115,12 @@ Step 3c aggregation
 | any | criterion text hash differs | re-judge | `criterion-changed` |
 | `FAIL` | — | re-judge, carrying the members the prior run mapped whose evidence is unchanged | `reported-gap` |
 | `PASS` | a cited path (code, test, or a member's evidence) is in `git diff --name-only PRIOR_HEAD..HEAD` | re-judge | `evidence-changed` |
+| `PASS` | no citation resolves to a tracked path (see *Citation paths*) | re-judge | `evidence-unresolved` |
 | `PASS` | none of the above | carry | `unchanged` |
 
-The `reported-gap` row is what would have stopped task.239. Run 4 named SC-11's unmapped groups, and run 5 should have checked those and the members whose evidence moved. It re-opened members run 4 had already mapped.
+**Members in a `reported-gap` re-judge.** Only two kinds of member are judged: the members the prior run reported as FAIL, and members whose evidence path changed or does not resolve. A carried member keeps its prior verdict. A member the prior record never listed, whose evidence is unchanged, goes to `advisories[]` and does not count toward the verdict. A finer re-split is how the task.239 loop found a new gap each run, and this rule stops it. The criterion's status is then recomputed from its merged members: PASS when every counted member is PASS. An agent FAIL is overturned only when the members explain it, meaning every member it failed is carried or advisory. A FAIL that names no failing member, sets `non_member_fail`, or reports `test_runs_per_pr: false` stands. A gap the agent does not answer keeps its prior FAIL. (QA cycles 1–2: CR-3, CR2-1, CR2-2.)
+
+The `reported-gap` row is what would have stopped task.239. Run 4 named SC-11's unmapped groups, and run 5 should have checked those and the members whose evidence moved. Instead it judged three finer groups that no earlier run had named.
 
 **Existing mechanisms of this kind.** `finalise-fix-and-recheck.mjs` decides whether one finding may be fixed in-run (Step 8a). It does not scope a whole run, and this task does not change it. The Step 2 reopen rule stays in force: the engine reads it as `reopened` → `full`. Neither mechanism is replaced. The engine sits beside both.
 
@@ -106,6 +128,14 @@ The `reported-gap` row is what would have stopped task.239. Run 4 named SC-11's 
 
 - Carrying a verdict is not trusting a checkbox. The carried verdict is the prior run's own evidence, and it is re-judged as soon as any cited path changes.
 - CI and the QA gate still gate acceptance as they do today. A change elsewhere that breaks a carried criterion turns CI red, and Step 6 refuses on CI.
+- `overall` is recomputed from the merged `acs[]` **and** `docs[]`. A failing `docs[]` item keeps `AC_OVERALL` off PASS, as it does today.
+- A reopened document is always `full`. Its `PASSED ✅` heading still matches the Step 2 rule after it is retitled historical, so every re-run after a reopen judges every criterion. This is intended: a reopened document is new work.
+- **Reconstruction states.** The record is the only state `scope` reads, and it must answer correctly in each of these:
+  - the record's run crashed before Step 6 decided: its verdicts are still judgements at its head, so it is used;
+  - prior head equals HEAD: a re-run with no commits, where only the reported gaps are re-judged;
+  - the record exists on disk but was never committed: it is found by the same glob and used;
+  - Step 8a changed the tree after 3c wrote the record: the next run sees the fix commit in `git diff` and re-judges what it touched;
+  - a later DoD run wrote no record (it crashed before 3c): the newest record is the older run's, and its head is diffed against HEAD as usual.
 
 ---
 
@@ -148,30 +178,33 @@ The `reported-gap` row is what would have stopped task.239. Run 4 named SC-11's 
 
 ### Phase 1: The engine (Risk: Medium)
 
-- [ ] `scope`: the four `full` reasons and the five per-criterion rows of § 3, with criterion text hashing on a normalised line (checkbox state stripped, whitespace collapsed)
-- [ ] `merge`: restore every carried verdict and citation, move a carried criterion's differing agent verdict into `advisories[]`, recompute `overall` from the merged list
-- [ ] Exit codes in the repository's idiom: 0 for any answer (read `mode`/`reason`), 2 for a usage error
-- [ ] Unit tests on a temp git repo, one per reason, plus the task.239 replay and its controls (§ 8)
+- [x] `scope`: the four `full` reasons and the six per-criterion rows of § 3, with criterion text hashing on a normalised line (checkbox state stripped, whitespace collapsed)
+- [x] Criterion identity (§ 3): the document id or `#N`, matched by id or by text hash
+- [x] Citation resolution (§ 3): repo-relative path, or a unique basename through `git ls-files`; an ambiguous basename resolves to every candidate (changed when any changed)
+- [x] `merge`: restore every carried verdict and citation, and move a carried criterion's differing agent verdict into `advisories[]`. Apply the § 3 member rules and recompute a `reported-gap` criterion's status from its merged members. Recompute `overall` from the merged `acs[]` and `docs[]`. Parse the agent's YAML with `yaml-subset.js` (`parseYamlSubset`). Unparseable output leaves Step 3c's existing `NEEDS_MANUAL_REVIEW` rule in force, and no record is written.
+- [x] Exit codes in the repository's idiom: 0 for any answer (read `mode`/`reason`), 2 for a usage error
+- [x] Unit tests on a temp git repo, one per reason, plus the task.239 replay and its controls (§ 8)
 
 ### Phase 2: The AC prompt (Risk: Medium)
 
-- [ ] A new section before Step 3 that reads `<RERUN_SCOPE>`. Keep the `### Step 3: Check each acceptance criterion` heading byte-identical, because two skills link to its anchor.
-- [ ] Output gains `members[]` (member, evidence, status) on quantified criteria and a top-level `advisories[]`
-- [ ] `full` scope reads exactly as today's prompt
+- [x] A new section before Step 3 that reads `<RERUN_SCOPE>`. Keep the `### Step 3: Check each acceptance criterion` heading byte-identical, because two skills link to its anchor.
+- [x] The section tells the agent to use the criterion ids `<RERUN_SCOPE>` lists, in full mode too. It instructs no write (`explore-prompts-no-write.test.js`) and states no count of kinds (`count-of-kinds.js`).
+- [x] Output gains `members[]` (member, evidence, status) on quantified criteria and a top-level `advisories[]`
+- [x] `full` scope reads exactly as today's prompt
 
 ### Phase 3: Wire `/finalise` (Risk: Medium)
 
-- [ ] Step 3a: locate the prior record with `newest_numbered … -name "${STEM}.dod.*.ac.json"` and run `scope`. Add `<RERUN_SCOPE>` to the dispatch table.
-- [ ] Step 3c: run `merge` and write `${STEM}.dod.${DOD_N}.ac.json`
-- [ ] DoD Step 2 block: the line `**Re-run scope:** {mode} ({reason}) — {K} re-judged, {M} carried`, and the advisory list
-- [ ] Bug-mode table row `rerun-scope` (story/task run, bug skip) and its marker
-- [ ] 6a and 8 stage the AC record with the DoD file
+- [x] Existing Step 3a (Prepare Shared Context): locate the prior record with `newest_numbered … -name "${STEM}.dod.*.ac.json"` and run `scope`. Add `<RERUN_SCOPE>` to the Step 3b dispatch table. No new step heading.
+- [x] Existing Step 3c (Aggregate Results): after the YAML parse and before Step 3d renders, run `merge` and write `${STEM}.dod.${DOD_N}.ac.json`
+- [x] DoD Step 2 block: the line `**Re-run scope:** {mode} ({reason}) — {K} re-judged, {M} carried`, and the advisory list
+- [x] Bug-mode table row `rerun-scope` (story/task run, bug skip) and its marker
+- [x] 6a and 8 stage the AC record with the DoD file (6a: an existence-checked add beside the registry add; `/finalise` Step 8 stages nothing, and the orchestrator's Step 8 `/commit-changes --scope` carries the record on a gaps halt)
 
 ### Phase 4: Bundle, docs, record (Risk: Low)
 
-- [ ] `npm run bundle`, then confirm `bundle:check` is clean
-- [ ] CHANGELOG [Unreleased] entry citing task 242
-- [ ] Mutation-prove each new guard and record it in the commit body
+- [x] `npm run bundle`, then confirm `bundle:check` is clean
+- [x] CHANGELOG [Unreleased] entry citing task 242
+- [x] Mutation-prove each new guard and record it in the commit body
 
 ---
 
@@ -195,11 +228,12 @@ The `reported-gap` row is what would have stopped task.239. Run 4 named SC-11's 
 ### Files to Modify (Tests)
 
 7. ✅ `evals/shared/tests/finalise-dod-prompt-contract.test.mjs` — the AC prompt carries the scope section, the Step 3 heading is unchanged, and `<RERUN_SCOPE>` is in the dispatch table
-8. ✅ `evals/shared/tests/finalise-bug-mode.test.mjs` — no edit expected. It derives the keys from the table, so the new row is checked automatically (confirm it goes red without the marker).
+8. ✅ `evals/shared/tests/finalise-bug-mode.test.mjs` — the new row's key is derived from the table, but its verb is pinned: an `EXPECTED_VERBS` entry `rerun-scope: skip`, so the test goes red without the marker. QA cycle 1 added two tests for the 7.6a/7.6b AC-record staging (CR-5, CR-7).
+9. ✅ Must stay green, no edit expected: `tests/explore-prompts-no-write.test.js`, `tests/review-task-measured-criterion.test.js` and `tests/review-plan-shape-checks.test.js`. Each reads the AC prompt (§ 3, *Other readers*).
 
 ### Files to Modify (Documentation)
 
-9. ✅ `CHANGELOG.md`
+10. ✅ `CHANGELOG.md`
 
 ### Files to Delete
 
@@ -213,7 +247,7 @@ None.
 
 - **Scope:** `finalise-rerun-scope.js`, both commands, every reason.
 - **Fixture:** a temp git repo with a task document and cited files, and a prior record at commit A. Each case makes one change and commits B.
-- **task.239 replay:** a prior record in which SC-11 is FAIL with groups G1–G3 named unmapped and G4–G6 mapped. HEAD changes only the task document. Expected: SC-11 is `reported-gap`, with G4–G6 carried and G1–G3 re-judged. Every untouched PASS is `unchanged`.
+- **task.239 replay:** a prior record in which SC-11 is FAIL with groups G1–G3 named unmapped and G4–G6 mapped. HEAD changes only the task document. Expected from `scope`: SC-11 is `reported-gap`, with G4–G6 carried and G1–G3 re-judged. Every untouched PASS is `unchanged`. The replay continues through `merge`. The agent returns SC-11 FAIL, with G1–G3 PASS, G5 FAIL, and a new finer group G7 FAIL whose evidence is unchanged. The merged SC-11 is PASS: G5 is restored and G7 goes to `advisories[]`.
 - **Controls** (obs #176 — vary each dimension the rule reads):
   - a cited test file changed → `evidence-changed`
   - a criterion reworded → `criterion-changed`
@@ -221,10 +255,20 @@ None.
   - a rebased prior head → `full`/`head-not-ancestor`
   - a corrupt record → `full`/`prior-unreadable`
   - a reopened document → `full`/`reopened`
+  - a carried PASS whose citations are `:356-360` and a commit SHA → `evidence-unresolved`. Control: a bare basename that matches exactly one tracked file resolves, and the PASS carries as `unchanged`.
+  - an id-less document (a story fixture and a task fixture): criteria get `#N` ids; a reworded id-less criterion → `new-criterion`; an unchanged one matches by text hash
+  - the reconstruction states of § 3: prior head equal to HEAD, and a record that is not committed
 - **merge:**
   - an agent that returns FAIL for a carried criterion: the merged status stays PASS, and the finding appears in `advisories[]`
   - an agent that omits a carried criterion: still restored
-  - `overall` is recomputed, never copied from the agent
+  - an agent that returns its own ids (`AC1`, `AC2`) instead of the engine's: the join uses the engine's ids, and the mismatch is reported, not silently merged
+  - `overall` is recomputed, never copied from the agent. A failing `docs[]` item over all-PASS criteria keeps `overall` off PASS.
+- **Guards to mutation-prove (the closed set SC-11 counts).** Each guard gets one mutation that turns its test red, and is then restored:
+  1. each of the ten scope reasons (four `full`, six per-criterion)
+  2. criterion id assignment and text-hash matching
+  3. citation resolution
+  4. the `merge` rules: carried status restored, differing verdict sent to advisory, reported-gap status recomputed, new unchanged member sent to advisory, and `overall` taken from `acs[]` and `docs[]`
+  5. the contract pins: the Step 0 section, the byte-identical Step 3 heading, `<RERUN_SCOPE>` in the dispatch row, the scope line, the advisory list, and the `rerun-scope` bug-mode marker
 - **Command:** `command node --test shared/resources/tests/finalise-rerun-scope.test.mjs`
 
 ### Integration Tests
@@ -247,11 +291,11 @@ Not applicable. The engine reads one JSON record and runs one `git diff --name-o
 
 ### Functional
 
-- [ ] SC-1: `scope` returns `full` with reasons `no-prior-record`, `prior-unreadable`, `reopened` and `head-not-ancestor`, each pinned by a test on the temp-repo fixture
-- [ ] SC-2: `scope` assigns `new-criterion`, `criterion-changed`, `reported-gap`, `evidence-changed` and `unchanged` per § 3's table, each pinned by a test
-- [ ] SC-3: The task.239 replay fixture scopes SC-11 to `reported-gap`. The members the prior run mapped are carried; the ones it named unmapped are re-judged. Every untouched PASS is `unchanged`.
+- [ ] SC-1: `scope` returns `full` with reasons `no-prior-record`, `prior-unreadable`, `reopened` and `head-not-ancestor`, each pinned by a test on the temp-repo fixture (a fifth, `no-criteria`, was added during implementation and is pinned too)
+- [ ] SC-2: `scope` assigns `new-criterion`, `criterion-changed`, `reported-gap`, `evidence-changed`, `evidence-unresolved` and `unchanged` per § 3's table, each pinned by a test. Criteria in an id-less document get `#N` ids and match by text hash, pinned on a story fixture and a task fixture.
+- [ ] SC-3: The task.239 replay fixture scopes SC-11 to `reported-gap`. The members the prior run mapped are carried; the ones it named unmapped are re-judged. Every untouched PASS is `unchanged`. Through `merge`, an agent FAIL that rests only on a carried member and a new unchanged member yields SC-11 PASS, with the new member in `advisories[]`.
 - [ ] SC-4: `merge` keeps a carried criterion's prior status and citations whatever the agent returned, and moves a differing agent verdict into `advisories[]`. Pinned by tests for "agent returns FAIL" and "agent omits it".
-- [ ] SC-5: `merge` recomputes `overall` from the merged criteria. An agent `overall: FAIL` over all-PASS merged criteria yields PASS.
+- [ ] SC-5: `merge` recomputes `overall` from the merged `acs[]` and `docs[]`. An agent `overall: FAIL` over all-PASS criteria and docs yields PASS. A failing `docs[]` item over all-PASS criteria does not.
 - [ ] SC-6: `/finalise` Step 3a runs `scope` before dispatch, and Step 3c runs `merge` and writes `${STEM}.dod.${DOD_N}.ac.json`. A contract test reads both commands in `skills/finalise/SKILL.md`.
 - [ ] SC-7: The AC prompt reads `<RERUN_SCOPE>` in a section before Step 3. `### Step 3: Check each acceptance criterion` is byte-identical to today's (contract test).
 - [ ] SC-8: The DoD Step 2 block template carries the re-run scope line and the "Advisory (not a gap)" list (contract test).
@@ -263,7 +307,7 @@ Not applicable. The engine reads one JSON record and runs one `git diff --name-o
 
 ### Code Quality
 
-- [ ] SC-11: Each new guard is mutation-proved (red without the behaviour, green with it), and the proofs are recorded in commit bodies
+- [ ] SC-11: Each guard in § 8's *Guards to mutation-prove* list is mutation-proved: red without the behaviour, green with it. The implementation report has one mutation row per listed guard, and the list is closed.
 - [ ] SC-12: `npm run ci:fast` and `npm run bundle:check` pass on the PR head
 
 ### Migration
@@ -286,7 +330,7 @@ None.
    - Rollback: delete the prior `*.ac.json` to force a full run.
 2. **Evidence outside the cited paths.** A criterion can rest on a file its citations do not name.
    - Probability: Medium. Impact: Medium.
-   - Mitigation: `members[]` carries each member's evidence path, and the citation rule already requires a code and a test citation for a PASS. The task.239 replay control varies a cited test file.
+   - Mitigation: `members[]` carries each member's evidence path, and the citation rule already requires a code and a test citation for a PASS. A PASS whose citations resolve to no tracked path is re-judged (`evidence-unresolved`), never carried. The task.239 replay control varies a cited test file.
 3. **The agent ignores the scope.**
    - Probability: Medium. Impact: Low.
    - Mitigation: `merge` enforces the scope mechanically. Whatever the agent returns for a carried criterion becomes an advisory, never a status.
@@ -323,20 +367,92 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-29
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.242.qa.10.scope-finalise-re-runs.md](./task.242.qa.10.scope-finalise-re-runs.md)
+- **Gate File**: [task.242.gate.10.scope-finalise-re-runs.yml](./task.242.gate.10.scope-finalise-re-runs.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 52
+- **Phases Verified**: 18/18
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+The cycle-9 fix is verified (2 of 2 mutations covered) and there is no high finding. One medium remains:
+- QA10-1: a path citation written with `./`, a leading `/`, backslashes or a `#L` anchor is matched exactly and resolves to nothing, while the plain `path:line` form resolves. Promoted at high confidence; reproduced by execution. No committed record here uses these shapes.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.242.qa.10.scope-finalise-re-runs.md`
+**Gate File**: `task.242.gate.10.scope-finalise-re-runs.yml`
+**Gate Status**: ⚠️ CONCERNS. One medium, TASK-242-QA10-1, was accepted by the operator as a known limit (§ 3 *Citation paths*)
+**Quality Score**: 90/100
+**PR Review**: ✅ APPROVE (`task.242.pr-review.1.scope-finalise-re-runs.md`)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 13/13 met (SC-10 not applicable by design). This was a full run (`no-prior-record`), and it wrote this task's first AC record, `task.242.dod.1.ac.json`
+✅ **Tests:** engine suite 52/52 and contract suites green; each § 8 guard mutation-proved (M1–M28 plus per-cycle proofs)
+✅ **PR Review:** PR #781; Step 5c conformance review APPROVE; CI green on `ba663028`
+✅ **Documentation:** CHANGELOG [Unreleased] (task 242); finalise SKILL.md, AC prompt and pipeline step docs, with their bundled copies
+✅ **Security Review:** PASS. Two controls were probed by execution: 17 candidates, 0 reproduced, 0 escapes
+✅ **Compliance Review:** not applicable (internal tooling, no personal data)
+
+**Task marked as ACCEPTED on:** 2026-10-29
+
+**Detailed Verification Log:** See `task.242.dod.1.scope-finalise-re-runs.md` for complete verification evidence and timestamps.
+
 ## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-10-29 | 1.0 | Initial draft — cut from observation #121 | create-task |
+| 2026-10-29 | 1.1 | Review 1 (6/10 → 8/10): engine-assigned criterion ids; citation resolution and `evidence-unresolved`; reported-gap member rules and status recompute; `overall` from `acs[]` and `docs[]`; reconstruction states; tests that read the AC prompt; SC-11 closed to a named guard list | review-task |
+| 2026-10-29 |  | Status → ready-for-development | review-task |
+| 2026-10-29 |  | Implemented — 9 authored files (engine, its 33 tests, AC prompt, finalise SKILL.md, 2 pipeline step docs, 2 eval tests, CHANGELOG) plus bundled copies; 4 contract tests added; 28 guards mutation-proved | develop |
+| 2026-10-29 |  | QA gate FAIL (30/100) — 5 findings (2 high: unbound `STEM`/`DOD_N` in Steps 3a and 3c); Status → in-progress | qa-task |
+| 2026-10-29 |  | QA fix cycle 1 — all 8 findings fixed (CR-1–CR-5 from the gate, CR-6–CR-8 advisory): Steps 3a and 3c bind `STEM`/`DOD_N` in-block with a HALT guard; reported-gap merge keeps an unexplained agent FAIL and fails an unanswered re-check member; 7.6a/7.6b use this run's AC record; 8 new tests plus CR-6 assertions in an existing one, 9 mutations covered; Status → ready-for-review | qa-fix |
+| 2026-10-29 |  | QA gate FAIL (40/100) — 3 findings (all high: reported-gap merge passes an omitted criterion and an invented-member FAIL; a deleted or renamed cited path is dropped); cycle-1 fixes verified; Status → in-progress | qa-task |
+| 2026-10-29 |  | QA fix cycle 2. The 3 gate findings are fixed, plus advisory CR2-4. CR2-1: an unanswered gap keeps its prior FAIL. CR2-2: a structured `non_member_fail` keeps a non-member agent FAIL, and the overturned note is kept as an advisory. CR2-3: deleted and renamed cited paths now count as changed. CR2-4: the record carries the dirty paths, re-judged next run. § 3 merge rule restated to match. 4 new tests; 10 mutations covered. Status → ready-for-review | qa-fix |
+| 2026-10-29 |  | QA gate FAIL (80/100). 1 finding: CR3-1, a same-basename directory move makes a bare citation ambiguous and the criterion is carried, introduced by the CR2-3 fix. The cycle-2 fixes verified (10 of 10 covered). Status → in-progress | qa-task |
+| 2026-10-29 |  | QA fix cycle 3. CR3-1: a bare basename resolves against HEAD first, falling back to a gone path only when HEAD has none, so a file moved under its own name is re-judged. CR3-2: diffs read with `-z`. Two dead-code cleanups. § 3 *Citation paths* restated. 3 new tests; 6 mutations covered. Status → ready-for-review | qa-fix |
+| 2026-10-29 |  | QA gate CONCERNS (90/100). 1 finding: CR4-1 (medium), an ambiguous bare basename across HEAD and a gone path is resolved as exact and carried. The cycle-3 fixes verified (6 of 6 covered) | qa-task |
+| 2026-10-29 |  | QA fix cycle 4. CR4-1: when a gone path also carries a bare basename, the citation resolves to every candidate and the criterion is re-judged, not carried on a guess. § 3 *Citation paths* restated. 1 test rewritten, 1 added; 4 mutations covered. Status → ready-for-review | qa-fix |
+| 2026-10-29 |  | QA gate CONCERNS (90/100). 1 finding: CR5-1 (medium, promoted). The gone-candidate rule also reaches merge's new-member evidence, so a same-basename deletion counts a new member on unchanged evidence. CR4-1 verified (4 of 4 covered) | qa-task |
+| 2026-10-29 |  | QA fix cycle 5. CR5-1: `merge` resolves a new member's evidence against HEAD alone; the gone-candidate rule stays with the prior record's citations. § 3 *Citation paths* restated. 1 test added, seen failing before the fix; mutations covered. Status → ready-for-review | qa-fix |
+| 2026-10-29 |  | QA gate CONCERNS (90/100). 1 finding: CR6-1 (medium, promoted). A file added under a cited basename makes a bare prior-record citation resolve to nothing, so a criterion whose cited file changed is carried. CR5-1 verified (covered) | qa-task |
+| 2026-10-29 |  | QA fix cycle 6. CR6-1 (scope the claim): a bare basename several files carry no longer names one. It resolves to every candidate when any of them changed since the prior head (added, modified or gone), else to nothing. This subsumes the CR4-1 gone-only rule. `merge` keeps the HEAD-alone rule (CR5-1). § 3 *Citation paths* restated. 1 test added, 1 extended, both seen failing first; 2 of 3 mutations covered, 1 absorbed. Status → ready-for-review | qa-fix |
+| 2026-10-29 |  | QA gate CONCERNS (90/100). 1 finding: QA7-1 (medium). On the merge side, a multi-token new-member citation with an ambiguous changed basename reads as unchanged, so the agent's FAIL is overturned. Reproduced by execution. CR6-1 verified (2 of 2 covered) | qa-task |
+| 2026-10-29 |  | QA fix cycle 7. QA7-1 (consolidate the contract): `merge` builds its index with `evidenceIndex(…, { goneCandidates: false })`. That keeps `changed`, so one ambiguity rule runs over HEAD's candidates, and the hand-built `changed: null` override is gone. § 3 *Citation paths* restated. 1 merge test added (candidate changed → FAIL stands; none changed → overturned), 1 extended, both seen failing first; 2 of 2 mutations covered. Status → ready-for-review | qa-fix |
+| 2026-10-29 |  | QA gate CONCERNS (90/100). 1 finding: QA8-1 (medium, promoted). In merge, a new member citing only an ambiguous bare basename with no changed candidate reads unresolved and keeps its FAIL, while the same token beside an unchanged path overturns it. Reproduced by execution. QA7-1 verified (2 of 2 covered) | qa-task |
+| 2026-10-29 |  | QA fix cycle 8. QA8-1 (replace the mechanism, operator's choice): a bare basename resolves to every file that carries it, always, so evidence is changed when any candidate changed and unchanged when none did; an ambiguous basename is never unresolved. The scope side follows the same rule (CR-2), and the goneCandidates comments say what they exclude (CR-3). § 3 *Citation paths* restated. 3 tests updated, 1 extended, 1 added, all seen failing first; 3 of 3 mutations covered. Status → ready-for-review | qa-fix |
+| 2026-10-29 |  | QA gate CONCERNS (90/100). 1 finding: QA9-1 (medium, promoted). A bare citation that also names a repository-root file stops at the exact-path check and resolves to that file alone, so a changed same-basename file elsewhere is missed; in merge a deleted root file still matches. Reproduced by execution. QA8-1 verified (3 of 3 covered) | qa-task |
+| 2026-10-29 |  | QA fix cycle 9. QA9-1 (finishing the cycle-8 replace): a token without a slash always goes through the basename rule, so a name a root file shares resolves to every candidate, and merge's index no longer matches a deleted root file. § 3 *Citation paths* restated. 3 tests added, all seen failing first; 2 of 2 mutations covered. Status → ready-for-review | qa-fix |
+| 2026-10-29 |  | QA gate CONCERNS (90/100). 1 finding: QA10-1 (medium, promoted). A path citation written with `./`, a leading `/`, backslashes or a `#L` anchor is matched exactly and resolves to nothing, while the plain form resolves. Reproduced by execution. QA9-1 verified (2 of 2 covered). The granted budget (10) is spent at this gate | qa-task |
+| 2026-10-29 |  | Operator accepted gate 10 as it stands: QA10-1 recorded as a known limit in § 3 *Citation paths*, not fixed. The run proceeds to the PR review and `/finalise` | develop-task |
+| 2026-10-29 |  | PR review 1: APPROVE, 2 low conformance findings fixed in place. § 3 and SC-1 now name the fifth `full` reason, `no-criteria` (PC-1); § 7 file 8 says what the PR changed in `finalise-bug-mode.test.mjs` (PC-2) | review-pr |
+| 2026-10-29 | 1.2 | DoD verified — accepted (PR #781). 13/13 criteria on a full first run; boundary probed, 17 executed, 0 reproduced | finalise |
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1: The engine
-- [ ] Phase 2: The AC prompt
-- [ ] Phase 3: Wire `/finalise`
-- [ ] Phase 4: Bundle, docs, record
+- [x] Phase 1: The engine
+- [x] Phase 2: The AC prompt
+- [x] Phase 3: Wire `/finalise`
+- [x] Phase 4: Bundle, docs, record
 
 ---
 

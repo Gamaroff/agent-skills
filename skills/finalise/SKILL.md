@@ -99,6 +99,7 @@ apply to a bug?" a lookup instead of a judgement.
 | `verification-complete` | Step 7.1 — the `## Verification Complete` block | run — append | run — **fill** the template's block in place; never append a second heading |
 | `read-document` | Step 1 — read the document | run | run — the bug report, frontmatter or header block (`references/bug-doc.js`) |
 | `qa-reports` | Step 2 — QA reports and gate | run | run — globs scoped to `${STEM}` (a co-located bug must not read its parent's); none expected; the verify loop's `#### QA Verification` and the implementation report are the QA record |
+| `rerun-scope` | Step 3a — re-run scope and Step 3c — AC record | run | **skip** — fix-evidence has no criteria list to scope; no AC record is read or written |
 | `ac-agent` | Step 3b — AC traceability agent | run | **skip** — a bug has no ACs; the `fix-evidence` agent takes its slot |
 | `fix-evidence` | Step 3b — fix-evidence agent | — | run — `references/finalise-dod-fix-evidence-prompt.md` |
 | `frontmatter-accepted` | Step 7.2 — `status: accepted` | run | **skip** — `accepted` is not a bug status; develop-bug Part B writes `closed` |
@@ -484,6 +485,48 @@ takes no PR argument, and inside a pipeline the branch rung answers. Record
 `**PR:** #{PR_NUMBER} (source: {PR_SOURCE})` in the running summary's Step 2 block — or
 `**PR:** unresolved (no branch PR, lock, frontmatter or confirmed citation)` when `PR_NUMBER` is empty.
 
+**Then compute the re-run scope** — what agent 1 re-judges, from the newest prior AC record beside
+the document (task 242). Engine source: `references/finalise-rerun-scope.js`.
+
+```bash
+# INPUTS, substituted into THIS block — no block inherits another's variables: STEM and DOD_N
+# exactly as Step 0 bound them. Unbound, the glob below is `.dod.*.ac.json`, no record ever
+# matches, and every re-run reports `no-prior-record` at exit 0 (task.242 QA cycle 1, CR-2).
+STEM="{story.{P}.{E}.{S} | task.{id}}"
+DOD_N="{Step 0's DOD_N}"
+case "$STEM$DOD_N" in *'{'*) echo "HALT: STEM and DOD_N must be substituted into this block (an unsubstituted placeholder found)"; exit 1 ;; esac
+[ -n "$STEM" ] || { echo "HALT: STEM is empty — substitute the work item's filename stem"; exit 1; }
+case "$DOD_N" in ''|*[!0-9]*) echo "HALT: DOD_N ('$DOD_N') is not Step 0's run number"; exit 1 ;; esac
+mkdir -p .claude/state
+# The newest prior run's AC record. Each run writes ${STEM}.dod.{N}.ac.json at Step 3c; the glob
+# never matches a ${STEM}.dod.{N}.security.run.json. Empty on a first run.
+source .agents/skills/finalise/references/newest-numbered.sh || exit 1
+PRIOR_AC_RECORD=$(newest_numbered "{document-directory}" dod -name "${STEM}.dod.*.ac.json")
+RERUN_HEAD=$(git rev-parse HEAD)   # the head this run's agents read; the record stores it
+RERUN_SCOPE_FILE=".claude/state/finalise-rerun-scope-${DOD_N}.json"
+command node .agents/skills/finalise/references/finalise-rerun-scope.js scope \
+  --doc "{document-path}" --head "$RERUN_HEAD" --prior "$PRIOR_AC_RECORD" --json > "$RERUN_SCOPE_FILE"
+case $? in
+  0) jq -r '"re-run scope: \(.mode) (\(.reason)) — \(.rejudge | length) to re-judge, \(.carry | length) carried"' "$RERUN_SCOPE_FILE" ;;
+  *) echo "HALT: finalise-rerun-scope.js scope failed — see $RERUN_SCOPE_FILE"; exit 1 ;;
+esac
+RERUN_SCOPE=$(jq -r '.scope_text' "$RERUN_SCOPE_FILE")   # substituted for <RERUN_SCOPE> in agent 1's prompt
+```
+
+`full` is today's behaviour — judge every criterion — and the engine answers it whenever it has a
+doubt: no prior record (`no-prior-record`), a record it cannot read (`prior-unreadable`), a document
+reopened under Step 2's rule (`reopened`), a prior head that is not an ancestor of `HEAD`
+(`head-not-ancestor`, a rebase or force-push), or no criterion line it can key (`no-criteria`).
+`scoped` re-judges the criteria the prior run failed (`reported-gap`), the ones whose text changed
+(`new-criterion`, `criterion-changed`), the passes whose cited code, test or member evidence changed
+since the prior head (`evidence-changed`) or resolves to no tracked file (`evidence-unresolved`), and
+carries every other pass (`unchanged`). Without this, each re-run judged every criterion afresh and
+more finely than the last, and found a gap the run before had passed — task.239 needed five runs and a
+hand-set stop rule (obs #121). **To force a full re-judge**, move the newest `${STEM}.dod.*.ac.json`
+aside; the next run reports `no-prior-record`.
+
+**Bug mode (`rerun-scope`):** skip — a bug report has no criteria list to scope; the fix-evidence agent's five checks run in full every time, and no AC record is read or written.
+
 #### Step 3b: Dispatch 4 Explore Subagents in Parallel
 
 **CRITICAL**: Send all 4 Agent tool calls in a **single message**. Do not send them sequentially.
@@ -505,7 +548,7 @@ as off would drop an opted-in repository's changelog check with no line saying w
 
 | Agent                | Prompt file                                    | Key substitutions                                            |
 | -------------------- | ---------------------------------------------- | ------------------------------------------------------------ |
-| 1. AC traceability   | `references/finalise-dod-ac-prompt.md`         | `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`, `<DIFF_FILE>` |
+| 1. AC traceability   | `references/finalise-dod-ac-prompt.md`         | `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`, `<DIFF_FILE>`, `<RERUN_SCOPE>` (Step 3a's `$RERUN_SCOPE`) |
 | 2. Security review   | `references/finalise-dod-security-prompt.md`   | `<STORY_FILE>`, `<STORY_TYPE>`, `<DOD_N>` (Step 0's `$DOD_N`) |
 | 3. Compliance review | `references/finalise-dod-compliance-prompt.md` | `<STORY_FILE>`                                               |
 | 4. Docs & changelog  | `references/finalise-dod-docs-prompt.md`       | `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`, `<DIFF_FILE>`, `<CHANGELOG_ENFORCE>` |
@@ -684,6 +727,48 @@ still matches; an entry a sink models is probed, never skipped. A reason that fa
 
 **Never abort due to a single agent failure.** One failed section = manual review for that section only.
 
+**Then enforce the re-run scope on agent 1's answer, and write this run's AC record** (task 242).
+Save agent 1's YAML, verbatim, to `.claude/state/finalise-ac-result-${DOD_N}.yaml` with the file-write
+tool, then:
+
+```bash
+# INPUTS, substituted into THIS block, as in Step 3a: STEM and DOD_N exactly as Step 0 bound them.
+# Unbound, `--dod-n ""` is a usage error and every run HALTs here (task.242 QA cycle 1, CR-1).
+STEM="{story.{P}.{E}.{S} | task.{id}}"
+DOD_N="{Step 0's DOD_N}"
+case "$STEM$DOD_N" in *'{'*) echo "HALT: STEM and DOD_N must be substituted into this block (an unsubstituted placeholder found)"; exit 1 ;; esac
+[ -n "$STEM" ] || { echo "HALT: STEM is empty — substitute the work item's filename stem"; exit 1; }
+case "$DOD_N" in ''|*[!0-9]*) echo "HALT: DOD_N ('$DOD_N') is not Step 0's run number"; exit 1 ;; esac
+AC_RECORD="{document-directory}/${STEM}.dod.${DOD_N}.ac.json"
+AC_MERGED_FILE=".claude/state/finalise-ac-merged-${DOD_N}.json"
+command node .agents/skills/finalise/references/finalise-rerun-scope.js merge \
+  --scope ".claude/state/finalise-rerun-scope-${DOD_N}.json" \
+  --result ".claude/state/finalise-ac-result-${DOD_N}.yaml" \
+  --dod-n "$DOD_N" --record-out "$AC_RECORD" --json > "$AC_MERGED_FILE"
+[ $? -eq 0 ] || { echo "HALT: finalise-rerun-scope.js merge failed — see $AC_MERGED_FILE"; exit 1; }
+case "$(jq -r '.reason' "$AC_MERGED_FILE")" in
+  merged)             AC_OVERALL=$(jq -r '.ac_result.ac_traceability.overall' "$AC_MERGED_FILE")
+                      RERUN_SCOPE_LINE=$(jq -r '.scope_line' "$AC_MERGED_FILE") ;;
+  result-unparseable) AC_OVERALL=NEEDS_MANUAL_REVIEW; RERUN_SCOPE_LINE="" ;;   # no record is written
+  *)                  echo "HALT: merge answered $(jq -r '.reason' "$AC_MERGED_FILE")"; exit 1 ;;
+esac
+echo "AC_OVERALL=$AC_OVERALL"
+```
+
+On `merged`, `AC_RESULT` **is** `.ac_result.ac_traceability` from `$AC_MERGED_FILE`, not the agent's
+YAML: every carried verdict is restored whatever the agent returned, a carried criterion the agent
+re-judged differently is moved to `advisories`, a `reported-gap` criterion's status is recomputed from
+its merged members (a gap the agent did not answer keeps its prior `FAIL`, a re-check member it did
+not answer counts as `FAIL`, and an agent `FAIL` stands when it names no failing member, sets
+`non_member_fail` or reports `test_runs_per_pr: false`), and `overall` is
+recomputed from the merged `acs` and `docs` — never copied from the agent, and
+`NEEDS_MANUAL_REVIEW` when no criterion verdict exists at all. Steps 3d and 6 read that. `id_mismatches` names any `ac_id` the agent returned that the
+scope did not issue; such a verdict is not merged, and the criterion it was meant for reads `FAIL`
+with `no verdict returned under id …`.
+
+A bug run skips this with the rest of `rerun-scope` (Step 3a's marker): no merge runs and no record
+is written; `AC_RESULT` is the fix-evidence agent's answer, as Step 3b says.
+
 #### Step 3d: Write Consolidated DoD Running Summary Sections
 
 Append sections to the running summary file. **One append per section** — not per individual check. Use the Edit tool four times (one per section).
@@ -696,6 +781,7 @@ Append sections to the running summary file. **One append per section** — not 
 **Overall AC Status:** {AC_OVERALL — ✅ PASS | ❌ FAIL | ⚠️ PARTIAL | 🔍 NEEDS_MANUAL_REVIEW}
 **PR Status:** {ac_result.pr_status} (PR #{PR_NUMBER})
 **PR Review Decision:** {ac_result.pr_review_decision}
+{RERUN_SCOPE_LINE — e.g. **Re-run scope:** scoped (prior-record) — 2 re-judged, 9 carried; omit the line when it is empty}
 
 ### Acceptance Criteria
 
@@ -703,12 +789,22 @@ Append sections to the running summary file. **One append per section** — not 
 
 #### {ac.ac_id}: {ac.description}
 
-**Status:** {✅ PASS | ❌ FAIL}
+**Status:** {✅ PASS | ❌ FAIL}{ac.carried ? " (carried from the prior run)" : ""}
 
 - Code evidence: `{ac.code_citation or "not found — FAIL"}`
 - Test evidence: `{ac.test_citation or "not found — FAIL"}`
   {ac.note ? "- Note: " + ac.note : ""}
   {endfor}
+
+### Advisory (not a gap)
+
+{for each a in ac_result.advisories:}
+
+- **{a.ac_id}**: {a.note}
+  {endfor}
+{no advisories → "None."}
+
+{ac_result.id_mismatches non-empty → "**Ids the agent returned that the scope did not issue (not merged):** " + the list}
 
 ### Documentation
 
@@ -1534,6 +1630,21 @@ standalone.
      ADD_EXIT=$?
      [ "$ADD_EXIT" -eq 0 ] || { echo "HALT: git add of the task registry failed (exit $ADD_EXIT)"; exit 1; }
    fi
+   # This run's AC record (Step 3c, task 242) — stories and tasks only, and absent when agent 1's
+   # answer was unparseable, so it is added on its own behind an existence check like the registry.
+   # THIS run's exact path, numbered from the DoD file resolved above — never the newest record in
+   # the series, which on an unparseable run is an earlier run's (task.242 QA cycle 1, CR-7).
+   AC_RECORD=""
+   if [ "$DOC_KIND" != "bug" ]; then
+     DOD_REST=${DOD_PATH##*/}; DOD_REST=${DOD_REST#"$STEM".dod.}
+     AC_RECORD="{document-directory}/${STEM}.dod.${DOD_REST%%.*}.ac.json"
+     [ -f "$AC_RECORD" ] || AC_RECORD=""
+   fi
+   if [ -n "$AC_RECORD" ]; then
+     git add "$AC_RECORD"
+     ADD_EXIT=$?
+     [ "$ADD_EXIT" -eq 0 ] || { echo "HALT: git add of the AC record $AC_RECORD failed (exit $ADD_EXIT)"; exit 1; }
+   fi
 
    # NEVER suppress a commit's output or exit status in a chain. The rejection this rule exists
    # for (obs #48) was a pre-commit hook refusing the commit — and `>/dev/null 2>&1 || true`
@@ -1546,7 +1657,7 @@ standalone.
    # git spells the artefacts' names on both sides: a pathspec diff over ADD_PATHS normalises an
    # absolute, `./`-prefixed or doubled-slash path to the name the full list prints, where a string
    # comparison read every artefact as carried (task.173 QA-1, CR-4).
-   EXPECTED=$(git -c core.quotePath=false diff --cached --name-only -- "${ADD_PATHS[@]}" docs/tasks/task-registry.md)
+   EXPECTED=$(git -c core.quotePath=false diff --cached --name-only -- "${ADD_PATHS[@]}" docs/tasks/task-registry.md ${AC_RECORD:+"$AC_RECORD"})
    CARRIED=$(git -c core.quotePath=false diff --cached --name-only \
      | grep -vxF -f <(printf '%s\n' "$EXPECTED") || true)
    CARRY_SUFFIX=""
@@ -1606,6 +1717,11 @@ standalone.
      FINAL_ASSERT_DESC="the pushed DoD file does not carry **Final Status:** ✅ ACCEPTED — Step 7.1 did not fill it"
    else
      ARTIFACTS=("{document-path}" "$DOD_PATH" "{document-directory}/sprint-review-summary.md")
+     # This run's AC record (task 242), when Step 3c wrote one — the same path 6a stages. Present on
+     # disk and not pushed is exactly what this check exists to catch (task.242 QA cycle 1, CR-5).
+     DOD_REST=${DOD_PATH##*/}; DOD_REST=${DOD_REST#"$STEM".dod.}
+     AC_RECORD="{document-directory}/${STEM}.dod.${DOD_REST%%.*}.ac.json"
+     if [ -f "$AC_RECORD" ]; then ARTIFACTS+=("$AC_RECORD"); fi
      FINAL_ASSERT_PATH="{document-path}"; FINAL_ASSERT_PATTERN='^status: accepted$'
      FINAL_ASSERT_DESC="the pushed document does not read status: accepted"
    fi
