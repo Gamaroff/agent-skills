@@ -377,7 +377,8 @@ function parsePattern(sig) {
   return {
     parent: m[1] && m[1] !== "*" ? m[1] : null,
     primitive: m[2],
-    flags: list(m[3]),
+    // A repeated flag is one constraint: `score` counts these, and `signatureKey` compares them.
+    flags: [...new Set(list(m[3]))],
     attrs,
   };
 }
@@ -390,7 +391,7 @@ function signatureKey(sig) {
   return JSON.stringify([
     p.parent,
     p.primitive,
-    [...new Set(p.flags)].sort(),
+    [...p.flags].sort(),
     Object.entries(p.attrs).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
   ]);
 }

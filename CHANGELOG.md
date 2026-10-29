@@ -176,6 +176,12 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **A wireframe-map row with a repeated flag no longer outranks a more specific row (task 243,
+  CR14-1).** `input[a,a,a]` means `input[a]`, but `score` counted each repeat as a constraint, so it
+  beat `input[a,b]` for an `input[a,b]` node. `parsePattern` now de-duplicates flags, so ranking and
+  `record`'s replace rule read one definition. A new test also shows that `record` keeps rows with
+  the same signature and different labels apart (CR14-2).
+
 - **`/create-task --from-observation` no longer seeds a fragment as the description (obs #101, #109).**
   The sentence splitter ended on the dot of `e.g.`, `i.e.`, `vs.` and `cf.`, and on a list marker
   partway through the section, so "…acceptance establishes, e.g." and "Choose one, or both: 1." both
