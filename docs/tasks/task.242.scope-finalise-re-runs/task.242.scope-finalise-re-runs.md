@@ -373,18 +373,18 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.242.qa.9.scope-finalise-re-runs.md](./task.242.qa.9.scope-finalise-re-runs.md)
-- **Gate File**: [task.242.gate.9.scope-finalise-re-runs.yml](./task.242.gate.9.scope-finalise-re-runs.yml)
+- **Full Report**: [task.242.qa.10.scope-finalise-re-runs.md](./task.242.qa.10.scope-finalise-re-runs.md)
+- **Gate File**: [task.242.gate.10.scope-finalise-re-runs.yml](./task.242.gate.10.scope-finalise-re-runs.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 49
+- **Tests Executed**: 52
 - **Phases Verified**: 18/18
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-The cycle-8 fix is verified (3 of 3 mutations covered) and there is no high finding. One medium remains:
-- QA9-1: a slash-less citation that also names a repository-root file stops at the exact-path check, so it resolves to the root file alone and misses a changed same-basename file elsewhere; in merge, a deleted root file still matches a bare token. Promoted at high confidence; reproduced by execution.
+The cycle-9 fix is verified (2 of 2 mutations covered) and there is no high finding. One medium remains:
+- QA10-1: a path citation written with `./`, a leading `/`, backslashes or a `#L` anchor is matched exactly and resolves to nothing, while the plain `path:line` form resolves. Promoted at high confidence; reproduced by execution. No committed record here uses these shapes.
 
 ## Change Log
 
@@ -412,6 +412,7 @@ The cycle-8 fix is verified (3 of 3 mutations covered) and there is no high find
 | 2026-10-29 |  | QA fix cycle 8. QA8-1 (replace the mechanism, operator's choice): a bare basename resolves to every file that carries it, always, so evidence is changed when any candidate changed and unchanged when none did; an ambiguous basename is never unresolved. The scope side follows the same rule (CR-2), and the goneCandidates comments say what they exclude (CR-3). § 3 *Citation paths* restated. 3 tests updated, 1 extended, 1 added, all seen failing first; 3 of 3 mutations covered. Status → ready-for-review | qa-fix |
 | 2026-10-29 |  | QA gate CONCERNS (90/100). 1 finding: QA9-1 (medium, promoted). A bare citation that also names a repository-root file stops at the exact-path check and resolves to that file alone, so a changed same-basename file elsewhere is missed; in merge a deleted root file still matches. Reproduced by execution. QA8-1 verified (3 of 3 covered) | qa-task |
 | 2026-10-29 |  | QA fix cycle 9. QA9-1 (finishing the cycle-8 replace): a token without a slash always goes through the basename rule, so a name a root file shares resolves to every candidate, and merge's index no longer matches a deleted root file. § 3 *Citation paths* restated. 3 tests added, all seen failing first; 2 of 2 mutations covered. Status → ready-for-review | qa-fix |
+| 2026-10-29 |  | QA gate CONCERNS (90/100). 1 finding: QA10-1 (medium, promoted). A path citation written with `./`, a leading `/`, backslashes or a `#L` anchor is matched exactly and resolves to nothing, while the plain form resolves. Reproduced by execution. QA9-1 verified (2 of 2 covered). The granted budget (10) is spent at this gate | qa-task |
 
 ---
 

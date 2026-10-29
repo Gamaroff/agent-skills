@@ -150,6 +150,7 @@ Each mutation was applied with the Edit tool to the file named, the named test f
 - QA Cycle 8 (5b, after re-entry): changes-requested → `stage-disabled`. Third strike: none (HIGH 0 on gates 6–8). Narrowing offer: Narrowing residue — every MEDIUM on gates 7 and 8 names shared/resources/finalise-rerun-scope.js (TASK-242-QA7-1, TASK-242-QA8-1); HIGH 0 on both. Passed to qa-fix Step 2.6, with the move the operator chose: **replace** — an ambiguous bare basename resolves to every candidate, always.
 - QA Cycle 9: the traceability mapper ran (13 criteria; SC-11 and SC-13 partial, SC-12 integration). Gate 9 CONCERNS, HIGH 0. Convergence: window starts at cycle 9, one reading, no trip. Route: `continue (not-a-pass-gate)`. Budget: gate 9 of 10, so a cycle-9 fix still has a gate (cycle 10) to read it. The step-3b dirty-tree guard again saw only task 243's `docs/tasks/task-registry.md` (observation #126); review went ahead. `ci:fast` had 1 failure: this cycle's own gate draft, read while its `updated:` held a placeholder; stamped, `gate-head-freshness.test.mjs` passes 10/10.
 - QA Cycle 9 (5b): narrowing residue again — every MEDIUM on gates 7–9 names shared/resources/finalise-rerun-scope.js. Move: **finish the replace** the operator chose at cycle 8, not a new patch. QA9-1 is the one place the cycle-8 rule does not run: the exact-path check answers a slash-less token before the basename maps. The fix sends every slash-less token through the basename maps only. Decided by the orchestrator under the cycle-8 approval; reported to the operator.
+- QA Cycle 10: the traceability mapper ran (13 criteria; SC-11 and SC-13 partial, SC-12 integration). Gate 10 CONCERNS, HIGH 0. Convergence: two readings (0, 0) since the grant, no trip. Route: `continue (not-a-pass-gate)`, but the budget (10) is spent at this gate. No qa-fix after gate 10: a fix would have no gate to read it (operator rule, 2026-10-29). Escalated at the gate.
 
 ---
 
@@ -251,6 +252,30 @@ The pipeline completed 8 qa-task cycles (5 plus 3 granted, one at a time) withou
 1. Replace the mechanism instead of patching it again. Either (a) an ambiguous basename resolves to every candidate always, so "unchanged" means all candidates unchanged and "changed" means any changed. This is the reviewer's suggestion; the scope test "citations that resolve to no tracked path → evidence-unresolved; a unique basename resolves" changes with it. Or (b) a bare basename never resolves, so it is always re-judged on the scope side and always counted on the merge side. (a) keeps carry; (b) is simplest. Do it as a qa-fix under a 2-cycle grant, so a gate reads the fix and one more cycle is left if that gate finds something.
 2. Or accept the current state with QA8-1 recorded as a known limit: run `/review-pr --effort medium --comment --no-code` on `e3a2ac0d`, then `/finalise`. The defect's direction is conservative (a FAIL is kept, never dropped), so it can stall a re-run but never accept a gap.
 3. Or move QA8-1 to a follow-up task and amend SC-3/SC-4 to name the limit, then take option 2.
+
+### QA Loop Limit Reached — 2026-10-29
+
+The pipeline completed 10 qa-task cycles (5 plus 5 granted) without a clean PASS. Cycle 10 ran its gate and no fix: the budget was spent at the gate, so the head handed over (`1ee28b5b`) is the one gate 10 read.
+
+**Final gate status**: CONCERNS (90/100, gate 10 at `1ee28b5b`; no ungated fix)
+**HIGH findings per cycle**: 2, 3, 1, 0, 0, 0, 0, 0 | 0, 0 — grant of 2 at cycle 9; 0 since cycle 4
+**Remaining issues** (from final gate file):
+- TASK-242-QA10-1 (medium, `shared/resources/finalise-rerun-scope.js`): a token with a slash is matched exactly, with no normalisation. `./src/a.js:5`, `/src/a.js:5`, `src\a.js:5`, `src/a.js#L5` and `./README.md` resolve to nothing. On the scope side such a citation beside an unchanged path is carried after its file changes. On the merge side it is counted where the plain form is an advisory. No committed record uses these shapes. **Not fixed.**
+
+**What was attempted per cycle**:
+- Cycles 1–8: see the four escalation entries above.
+- Cycle 8 fix (after the 2-cycle grant): replaced the ambiguity rule. A bare basename resolves to every candidate, always (QA8-1).
+- Cycle 9: gate 9 verified it (3 of 3 mutations covered) and found QA9-1: the exact-path check answered a root file's name before the basename rule. Fix: a token without a slash always goes through the basename rule.
+- Cycle 10: gate 10 verified that (2 of 2 covered) and found QA10-1 on the path side. No qa-fix ran. Route 2c does not apply: there is no ungated fix.
+
+**Likely root cause**: the basename rule is now closed. Cycles 8–9 left one rule with no hidden third state, and gate 10 found nothing more in it. QA10-1 is a different, smaller gap: path tokens are never normalised. It has been there since the first commit, and each review reached it only now, because each cycle's scope pointed the reviewer at the resolver and each fix narrowed what was left to find. The failure modes differ by side: the scope side carries (the risky direction), and the merge side keeps a FAIL (the conservative one).
+
+**Third-strike files**: none. Gates 8–10 raised no HIGH.
+
+**Recommended next steps**:
+1. Fix QA10-1 under a 2-cycle grant. Normalise each token before routing: backslashes to slashes, strip a leading `./` or `/` and a `#L` anchor, skip a token ending in `/`. Pin `./src/a.js:5` and `src/a.js:5` to the same answer on both sides, then gate it. It is mechanical and its scope is clear, and the scope-side carry is the risky direction.
+2. Or accept QA10-1 as a recorded limit. Add one line to § 3 (*Citation paths*: a path is matched as written; `./`, a leading `/`, backslashes and `#L` anchors do not resolve). Then run `/review-pr --effort medium --comment --no-code` on `1ee28b5b` and `/finalise`. The AC prompt asks for repo-relative `path:line`, and no record here uses the other shapes.
+3. Or move QA10-1 to a follow-up task and take option 2.
 
 ---
 
@@ -368,8 +393,22 @@ _Track each QA review/fix cycle._
 **Loop exit**: n/a — this exit not taken
 **Action**: qa-fix (cycle 9 of 10; cycle 10 gates it)
 **Fixes Applied**: QA9-1 (finishing the cycle-8 replace). `resolveCitation` takes a token with a slash as a path, as written, and sends every token without one through the basename maps, a root file's name included. A root `README.md` and a nested one now both resolve (CR-1), and merge's index no longer matches a deleted root file through `paths` (CR-2). Tests: 3 added (a `resolveCitation` unit test with root candidates on both indexes; a scope pair, root candidate vs nested-only shape, carry vs re-judge; a merge pair, deleted root file vs deleted nested file, both advisory). All three were red before the fix. Mutations: the old exact-path-first order restored → 3 tests red → covered; the exact match unioned with the basename rule (fixes CR-1, not CR-2) → 2 red → covered. The findings ingester and pre-fix mapping ran inline (this session wrote gate 9), so this pass is not independent of the review.
-**Commit**: the gate and QA report rode `dffb4a35`; the fix commit is below.
-**Post-fix PR state**: see the fix commit.
+**Commit**: the gate and QA report rode `dffb4a35`; the fix is `1ee28b5b`.
+**Post-fix PR state**: OPEN at `1ee28b5b`.
+
+---
+
+### QA Cycle 10 — 2026-10-29
+**Gate Result**: CONCERNS (90/100)
+**Issues Found**: 1. QA10-1 (medium, confidence high, promoted): a token with a slash is matched exactly, with no normalisation, so `./src/a.js:5`, `/src/a.js:5`, `src\a.js:5`, `src/a.js#L5` and `./README.md` resolve to nothing while `src/a.js:5` resolves. Reproduced with `node -e`. No committed `*.ac.json` record uses these shapes. Advisory: CR-2 (cleanup, a test comment names the wrong fixture file). QA9-1 verified: 2 of 2 mutations covered. Reviewer: dispatched 10:43:07Z, returned in 121.5 s.
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop limit reached
+**Fixes Applied**: none. The budget (10) is spent at this gate, and a fix with no gate to read it is not run (operator rule, 2026-10-29).
+**Commit**: the gate and QA report ride the escalation commit.
+**Post-fix PR state**: OPEN at `1ee28b5b`.
 
 ---
 

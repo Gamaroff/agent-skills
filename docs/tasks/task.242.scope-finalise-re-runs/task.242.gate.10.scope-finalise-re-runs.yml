@@ -1,0 +1,61 @@
+schema: 2
+task: 'task.242.scope-finalise-re-runs'
+task_title: 'Scope finalise re-runs to the gaps and the changed evidence'
+gate: CONCERNS
+status_reason: 'The cycle-9 fix (QA9-1) is verified: restoring the exact-path-first order turns 3 tests red, and unioning the exact match with the basename rule turns 2 red. No high finding. The independent reviewer found one more gap in citation resolution, at high confidence, promoted under code_review_blocking and reproduced by execution: a token with a slash is matched exactly with no normalisation, so ./src/a.js:5, /src/a.js:5, src\a.js:5, src/a.js#L5 and ./README.md resolve to nothing while src/a.js:5 resolves to src/a.js.'
+reviewer: 'QA Engineer'
+head: '1ee28b5b4f3bf40e7832dfa5051773f591c868fd'
+updated: '2026-10-29T10:51:52Z'
+
+top_issues:
+  - id: 'TASK-242-QA10-1'
+    severity: medium
+    file: 'shared/resources/finalise-rerun-scope.js'
+    finding: 'resolveCitation (finalise-rerun-scope.js:153) matches a token containing a slash against tracked.paths exactly, with no normalisation. ./src/a.js:5, /src/a.js:5, src\a.js:5, src/a.js#L5 and ./README.md resolve to [] while src/a.js:5 resolves to [src/a.js] (reproduced with node -e). On the scope side, a PASS entry citing ./src/a.js:5 beside an unchanged test citation carries after src/a.js changes, while the plain form re-judges. On the merge side, a new member citing ./tests/a.test.mjs:5 reads unresolved and is counted, so its FAIL stands, while tests/a.test.mjs:5 reads unchanged and is an advisory. The token routing dates from the engine''s first commit (5bcbc5d9); cycle 9''s comment ("a token with a slash is a path, taken as written") states it as the contract. No committed *.ac.json record in this repository uses these shapes (grep). Source: code-review CR-1 (bug, medium, confidence high), promoted under code_review_blocking.'
+    suggested_action: 'Normalise each token before routing: backslashes to slashes, strip a leading ./ or /, strip a #L anchor, skip a token ending in /. Pin ./src/a.js:5 and src/a.js:5 to the same answer, as a scope carry/re-judge pair and a merge counted/advisory pair. Or record the shapes as unsupported in § 3 and accept the limit.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 52
+  phases_verified: 18/18
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false, as in cycles 1-9. A carry or count classifier over git state; it writes no disk path.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'QA10-1: a path citation written with ./, a leading /, backslashes or a #L anchor resolves to nothing.'
+  maintainability:
+    status: PASS
+    notes: 'QA9-1 is covered by committed tests (two mutations covered). Code-review CR-2 (cleanup): the new merge pair test comment names lib/a.test.mjs where the fixture has tests/a.test.mjs.'
+
+recommendations:
+  immediate:
+    - action: 'Normalise citation tokens before routing, and pin the ./ and plain forms to the same answer on both sides (QA10-1)'
+      refs: ['shared/resources/finalise-rerun-scope.js']
+  future:
+    - action: 'Code-review CR-2 (cleanup): the merge pair test comment says lib/a.test.mjs; the fixture file is tests/a.test.mjs.'
+      refs: ['shared/resources/tests/finalise-rerun-scope.test.mjs']
+    - action: 'Step 4b: no runnable prose changed this cycle.'
+      refs: ['skills/finalise/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: BLOCKED
+  conditions: ['QA10-1 fixed and re-reviewed, or accepted as a recorded limit']
