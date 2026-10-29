@@ -223,6 +223,13 @@ catalogue files stay as they are.
   `existsSync` assertions in the `resolve` unset test cannot fail, because `resolve` has no write
   path. Drop them or mark them documentary. (CR8-2, the "read-only" wording for `0c-wire`, was
   fixed in this document at PR review 2.)
+- **TASK-243-CR11-1** (LOW) — carried to gate 11 `recommendations.future` (cycle 11). `record`
+  refuses an odd backtick in `--by` and `--date`, although `readMap` never reads the Confirmed cell,
+  which is the last column by default. Check the two only when a column follows Confirmed, or keep
+  the refusal as a margin and say so in the code and test comments.
+- **TASK-243-CR11-2** (LOW) — carried to gate 11 `recommendations.future` (cycle 11). The comment
+  at `wireframe-map.js:725` says `--by`/`--date` skip `unquote` because the Confirmed cell starts
+  with the date. The real reason is that `readMap` does not read that cell.
 
 ## Progress Tracking
 
@@ -275,35 +282,43 @@ remain, both advisory (CR11-1, CR11-2).
 
 ### QA Gate Status
 
-**QA Report**: `task.243.qa.8.wireframe-component-mapping.md`
-**Gate File**: `task.243.gate.8.wireframe-component-mapping.yml`
+**QA Report**: `task.243.qa.11.wireframe-component-mapping.md`
+**Gate File**: `task.243.gate.11.wireframe-component-mapping.yml`
 **Gate Status**: ✅ PASS
 **Quality Score**: 100/100
 
-DoD run 2. Run 1's gap (SC-1: `resolve`'s unset path untested) is closed: all seven criteria pass.
-The gap below was found by the security probe run, against a boundary this run added to the plan.
+DoD run 3. Run 2's gap (a newline in a signature) is closed, and so are the related cases gates
+9–11 found. All seven criteria pass, as do docs and CI reading 1. The gap below was found by the
+security probe run, which this time added U+2028/U+2029 cases.
 
 ### Missing Criteria:
 
 1. **Security:**
-   - [ ] `parsePattern` (`shared/resources/wireframe-map.js:324`) accepts a signature containing a
-     newline, and `record` writes it into the map unchanged. The row splits and the table ends
-     early. There are 4 low probes, all fail-closed (`task.243.dod.2.security.run.json`).
+   - [ ] `parsePattern` (`shared/resources/wireframe-map.js:328`) and `record`'s line-break check
+     (`:729`) test `/[\r\n]/`, which misses U+2028 and U+2029. `--signature` and `--label` also skip
+     the read-back check. A value carrying either character is written as one intact row, but it
+     reads back with its backticks. The row then never matches, is never offered as a candidate,
+     and is duplicated on re-record. There are 9 low probes and 0 escapes
+     (`task.243.dod.3.security.run.json`).
 
 ### Next Steps:
 
-- [ ] Make `parsePattern` reject `/[\r\n]/` on the raw signature, so `record` refuses it
-- [ ] Add a test in `shared/resources/tests/wireframe-map.test.mjs` that runs the four probe inputs
-      through `record`: each throws and leaves the map unchanged. Mutation-prove it.
+- [ ] Widen both checks to `/[\r\n  ]/`, so `parsePattern` returns null and `record`
+      refuses every written field that carries one
+- [ ] Add the nine probe inputs to test 18 in `shared/resources/tests/wireframe-map.test.mjs`
+      (each refused, map unchanged); mutation-prove it
 - [ ] Run `npm run bundle` (the eight `skills/*/references/wireframe-map.js` copies)
-- [ ] Re-enter QA at 5a, then re-run `/finalise`
+- [ ] Re-enter QA at 5a (gate 12, the last cycle of the 12-cycle budget), then re-run `/finalise`
 
-**Estimated Effort:** Small (a one-line guard and one test)
+Step 8a fix-and-recheck was refused on `inside-files-summary`. The fix must regenerate the bundled
+copies, and the evaluator matches paths exactly while §7 names those copies as `skills/*/references/`.
 
-**Gap Report Generated:** 2026-10-29 (DoD run 2; supersedes run 1's report)
-**QA Gate Reference**: See `task.243.gate.8.wireframe-component-mapping.yml` for full details
+**Estimated Effort:** Small (one regex in two places, one test, a re-bundle)
 
-**Detailed Verification Log:** See `task.243.dod.2.wireframe-component-mapping.md` for complete verification evidence and timestamps (run 1: `task.243.dod.1.wireframe-component-mapping.md`).
+**Gap Report Generated:** 2026-10-29 (DoD run 3; supersedes run 2's report)
+**QA Gate Reference**: See `task.243.gate.11.wireframe-component-mapping.yml` for full details
+
+**Detailed Verification Log:** See `task.243.dod.3.wireframe-component-mapping.md` for complete verification evidence and timestamps (runs 1–2: `task.243.dod.1.wireframe-component-mapping.md`, `task.243.dod.2.wireframe-component-mapping.md`).
 <!-- change-log-start -->
 ## Change Log
 
@@ -335,5 +350,6 @@ The gap below was found by the security probe run, against a boundary this run a
 | 2026-10-29 |  | QA gate CONCERNS (90/100) — cycle 10 of 10; cycle 9 fix verified and mutation-proven; 1 medium finding (CR10-1: an odd backtick in an unquoted record cell collapses the row), 1 low cleanup; probe 66/5/0 | qa-task |
 | 2026-10-29 |  | QA findings fixed — CR10-1 and CR10-2: record refuses any value that would not read back from its map row (round-trip through the reader); mutation-proven; probe re-run 50/0/0; fix cycle 10 | qa-fix |
 | 2026-10-29 |  | QA gate PASS (100/100) — cycle 11 of 12; cycle 10 fix verified and mutation-proven (CR10-1, CR10-2 fixed); 2 low advisory findings (CR11-1, CR11-2); probe 79/0/0 | qa-task |
+| 2026-10-29 |  | DoD incomplete — 1 gap identified (security: U+2028/U+2029 accepted in a record signature or label; 9 low probes); fix-and-recheck refused (inside-files-summary) | finalise |
 <!-- change-log-end -->
 

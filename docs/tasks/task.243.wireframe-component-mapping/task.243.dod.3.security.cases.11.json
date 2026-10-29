@@ -1,0 +1,100 @@
+[
+  {
+    "id": "rec3.date.iso",
+    "sink": "markdown-structure",
+    "input": "2026-01-01",
+    "why": "A date value a person would confirm.",
+    "correct": "Accept (exit 0, row written).",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "# Wireframe component map\n\nLinks between Wireloom wireframe nodes and this project's UI components, each confirmed by a\nperson. Skills that read a wireframe resolve a node from the first matching row and ask about\nthe rest; the answers are added here. Edit rows freely: the most specific matching row wins.\n\n- **Signature** — `parent>primitive[flags]{key=value}`. `*` is any parent; name only the flags\n  and attributes the link depends on.\n- **Label** — empty for any label, a plain string to match it exactly, or `/regex/`.\n- **Component** — what the node is built from; `(layout)` for a node that draws nothing.\n\n| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n"
+      }
+    }
+  },
+  {
+    "id": "rec3.date.short",
+    "sink": "markdown-structure",
+    "input": "2026-1-1",
+    "why": "--date that would split, corrupt or not read back from the map row.",
+    "correct": "Refuse (exit 2, map unchanged).",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "# Wireframe component map\n\nLinks between Wireloom wireframe nodes and this project's UI components, each confirmed by a\nperson. Skills that read a wireframe resolve a node from the first matching row and ask about\nthe rest; the answers are added here. Edit rows freely: the most specific matching row wins.\n\n- **Signature** — `parent>primitive[flags]{key=value}`. `*` is any parent; name only the flags\n  and attributes the link depends on.\n- **Label** — empty for any label, a plain string to match it exactly, or `/regex/`.\n- **Component** — what the node is built from; `(layout)` for a node that draws nothing.\n\n| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n"
+      }
+    }
+  },
+  {
+    "id": "rec3.date.trailing-newline",
+    "sink": "markdown-structure",
+    "input": "2026-01-01\n",
+    "why": "--date that would split, corrupt or not read back from the map row.",
+    "correct": "Refuse (exit 2, map unchanged).",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "# Wireframe component map\n\nLinks between Wireloom wireframe nodes and this project's UI components, each confirmed by a\nperson. Skills that read a wireframe resolve a node from the first matching row and ask about\nthe rest; the answers are added here. Edit rows freely: the most specific matching row wins.\n\n- **Signature** — `parent>primitive[flags]{key=value}`. `*` is any parent; name only the flags\n  and attributes the link depends on.\n- **Label** — empty for any label, a plain string to match it exactly, or `/regex/`.\n- **Component** — what the node is built from; `(layout)` for a node that draws nothing.\n\n| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n"
+      }
+    }
+  },
+  {
+    "id": "rec3.date.pipe",
+    "sink": "markdown-structure",
+    "input": "2026-01-01 | x",
+    "why": "--date that would split, corrupt or not read back from the map row.",
+    "correct": "Refuse (exit 2, map unchanged).",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "# Wireframe component map\n\nLinks between Wireloom wireframe nodes and this project's UI components, each confirmed by a\nperson. Skills that read a wireframe resolve a node from the first matching row and ask about\nthe rest; the answers are added here. Edit rows freely: the most specific matching row wins.\n\n- **Signature** — `parent>primitive[flags]{key=value}`. `*` is any parent; name only the flags\n  and attributes the link depends on.\n- **Label** — empty for any label, a plain string to match it exactly, or `/regex/`.\n- **Component** — what the node is built from; `(layout)` for a node that draws nothing.\n\n| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n"
+      }
+    }
+  },
+  {
+    "id": "rec3.date.us",
+    "sink": "markdown-structure",
+    "input": "01/01/2026",
+    "why": "--date that would split, corrupt or not read back from the map row.",
+    "correct": "Refuse (exit 2, map unchanged).",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "# Wireframe component map\n\nLinks between Wireloom wireframe nodes and this project's UI components, each confirmed by a\nperson. Skills that read a wireframe resolve a node from the first matching row and ask about\nthe rest; the answers are added here. Edit rows freely: the most specific matching row wins.\n\n- **Signature** — `parent>primitive[flags]{key=value}`. `*` is any parent; name only the flags\n  and attributes the link depends on.\n- **Label** — empty for any label, a plain string to match it exactly, or `/regex/`.\n- **Component** — what the node is built from; `(layout)` for a node that draws nothing.\n\n| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n"
+      }
+    }
+  },
+  {
+    "id": "rec3.date.backtick",
+    "sink": "markdown-structure",
+    "input": "2026-01-01`",
+    "why": "--date that would split, corrupt or not read back from the map row.",
+    "correct": "Refuse (exit 2, map unchanged).",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "# Wireframe component map\n\nLinks between Wireloom wireframe nodes and this project's UI components, each confirmed by a\nperson. Skills that read a wireframe resolve a node from the first matching row and ask about\nthe rest; the answers are added here. Edit rows freely: the most specific matching row wins.\n\n- **Signature** — `parent>primitive[flags]{key=value}`. `*` is any parent; name only the flags\n  and attributes the link depends on.\n- **Label** — empty for any label, a plain string to match it exactly, or `/regex/`.\n- **Component** — what the node is built from; `(layout)` for a node that draws nothing.\n\n| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n"
+      }
+    }
+  },
+  {
+    "id": "rec3.date.newline-row",
+    "sink": "markdown-structure",
+    "input": "2026-01-01\n| `*>input` | | Evil | | | | 2026-01-01, x |",
+    "why": "--date that would split, corrupt or not read back from the map row.",
+    "correct": "Refuse (exit 2, map unchanged).",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "# Wireframe component map\n\nLinks between Wireloom wireframe nodes and this project's UI components, each confirmed by a\nperson. Skills that read a wireframe resolve a node from the first matching row and ask about\nthe rest; the answers are added here. Edit rows freely: the most specific matching row wins.\n\n- **Signature** — `parent>primitive[flags]{key=value}`. `*` is any parent; name only the flags\n  and attributes the link depends on.\n- **Label** — empty for any label, a plain string to match it exactly, or `/regex/`.\n- **Component** — what the node is built from; `(layout)` for a node that draws nothing.\n\n| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n"
+      }
+    }
+  }
+]

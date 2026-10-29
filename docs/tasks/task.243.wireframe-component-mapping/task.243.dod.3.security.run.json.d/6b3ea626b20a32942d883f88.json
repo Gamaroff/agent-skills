@@ -1,0 +1,25 @@
+{
+  "sink": "path",
+  "entry": "fence:shared/resources/develop-pipeline-step-2-review.md#Wireframe writes (before the gate check)",
+  "name": "step-2 wireframe-writes held-answers key check",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 7,
+  "passed": 7,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": [
+    "bash"
+  ],
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": null,
+  "slot": "{document-file}",
+  "fixture_setup": null,
+  "ran_at": "2026-10-29T17:23:01.522Z"
+}

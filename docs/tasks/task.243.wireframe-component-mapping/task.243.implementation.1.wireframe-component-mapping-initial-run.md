@@ -36,8 +36,8 @@ Take task 243, already implemented and reviewed outside the pipeline, through re
 | 2. review-task             | ✅ Done    | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               | Review 2: READY TO IMPLEMENT, 9/10, 0 Critical / 0 Important; 3 Optional fixes applied | —                    | 2026-10-29T13:37Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Implemented outside the pipeline (`17dd614a`); close-out only: fast gate green (6825 tests, 0 failed), status → Ready for Review | —                    | 2026-10-29T13:47Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #785: https://github.com/Gamaroff/agent-skills/pull/785 | —                    | 2026-10-29T13:52Z |
-| 5–6. qa-task / qa-fix loop | ✅ Done | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 8 cycles (5 + 2 granted after a loop-limit halt, + 1 re-entry after DoD run 1); gate 8 PASS 100/100; 5c APPROVE (`task.243.pr-review.2`) | —                    | 2026-10-29T16:40Z |
-| 7. finalise                | ⚠️ Gaps | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      | DoD run 1: 1 gap (SC-1, `resolve` unset path untested), closed by `9e50d3b7`. DoD run 2: 1 gap (security, `parsePattern` accepts a newline; 4 low probes); halted | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 11 cycles of a 12-cycle budget: two user grants (after the cycle 5 loop-limit halt, and at gate 10), plus re-entries after DoD runs 1 and 2; gate 11 PASS 100/100; 5c APPROVE (`task.243.pr-review.3`) | —                    | 2026-10-29T17:13Z |
+| 7. finalise                | ⚠️ Gaps | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      | DoD run 1: 1 gap (SC-1, `resolve` unset path untested), closed by `9e50d3b7`. DoD run 2: 1 gap (security, `parsePattern` accepts a newline; 4 low probes), closed by `c9f77474` and gates 9–11. DoD run 3: 1 gap (security, U+2028/U+2029 accepted in a signature or label; 9 low probes); halted | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -149,6 +149,18 @@ Take task 243, already implemented and reviewed outside the pipeline, through re
   - Commit `c9f77474`, pushed.
 - QA re-entry after finalise DoD gaps (run 2): re-entered QA at step 5 / qa_phase 5a. `qa_max_cycles` is 10 (base 8); `gate_head` is `9e50d3b7`.
 
+### Step 7 — finalise (run 3, gaps)
+
+- DoD run 3 used scoped re-run mode (prior record `task.243.dod.2.ac.json`): 5 criteria re-judged, 2 carried. AC PASS 7/7, compliance NOT_APPLICABLE, docs PASS. AC record: `task.243.dod.3.ac.json`.
+- PR review: the repository requires none (`reviewDecision` null), so the column is satisfied by `task.243.pr-review.3` (APPROVE).
+- Security found `boundary: true`, with 11 controls: run 2's two `fence:` guards and `parsePattern` (now with U+2028/U+2029 cases), plus one `cli:` control per `record` flag (`--signature`, `--label`, `--component`, `--variant`, `--hint`, `--notes`, `--by`, `--date`). The agent's cli cases carried no `why`, `correct` or map fixture, so the plan file was built by `gen-dod3-plan.mjs` in the scratchpad, which fills them in from gate 11's case shape. Inputs and directions are the agent's, unchanged.
+- Result: 114 executed, 9 reproduced, 0 escapes. The two fence guards held (16 of 16), as did `--component`, `--variant`, `--hint`, `--notes`, `--by` and `--date`.
+- The 9 reproductions are all U+2028 or U+2029: 4 on `parsePattern`, 3 on `--signature`, 2 on `--label`. The `/[\r\n]/` checks at `wireframe-map.js:328` and `:729` miss both characters, and `--signature` and `--label` skip the read-back check. Re-dispatching the agent graded all 9 low: the row stays one line, but it reads back with its backticks, never matches, and duplicates on re-record. Nothing splits or mis-resolves.
+- CI reading 1: SUCCESS @ `f08386fc` over 6 checks (`test` was in progress at the first sample).
+- Decision: GAPS (1, security). The fix-and-recheck evaluator returned `halt`, failing `inside-files-summary` (the eight bundled copies, which the Files Summary names by glob) and `mutation-proved` (the expected first-run refusal). This is the same refusal as run 2; the glob was not expanded.
+- Recorded: the gaps Change Log row, the gap report in the task body (it replaces run 2's), and the gaps PR comment.
+- The 5c carry set (`task.243.pr-review.3`, the PC-2 Deferred Work fix, and the PC-1 Pipeline Progress fix in this report) rides this gaps commit, as in runs 1 and 2.
+
 ---
 
 ## Issues Log
@@ -216,6 +228,24 @@ the Files Summary's `skills/*/references/` glob, and every engine fix must updat
 `record` test that runs the four probe inputs, each throwing and leaving the map unchanged. Then run
 `npm run bundle` and mutation-prove the change. This changes code, so the resume re-enters QA at 5a
 (cycle 9 of `qa_max_cycles` 9).
+
+### Finalise DoD Gaps (run 3) — 2026-10-29
+
+`/finalise` (DoD run 3, `task.243.dod.3.wireframe-component-mapping.md`) did not accept. Run 2's gap
+is closed. There is 1 new gap, in the same class:
+
+- **Security:** the line-break checks in `parsePattern` (`shared/resources/wireframe-map.js:328`) and
+  `record` (`:729`) test `/[\r\n]/`, which misses U+2028 and U+2029. `--signature` and `--label` skip
+  the read-back check that catches the other fields. A value carrying either character is written
+  as one intact row. It reads back with its backticks, never matches, and is duplicated on
+  re-record. There are 9 low probes and 0 escapes.
+
+The other sections passed: AC 7/7, docs PASS, compliance N/A. CI reading 1 was SUCCESS @ `f08386fc`.
+Fix-and-recheck (Step 8a) was refused on `inside-files-summary` again.
+
+**Recommended fix:** widen both checks to `/[\r\n  ]/`, and add the nine probe inputs to test
+18 (each refused, map byte-identical). Mutation-prove it, then run `npm run bundle`. This changes
+code, so it re-enters QA at 5a. Gate 12 is the last cycle of the current `qa_max_cycles` 12.
 
 ---
 
@@ -344,6 +374,8 @@ _Track each QA review/fix cycle._
 **HIGH findings**: 0
 **MEDIUM findings**: 0
 **Loop exit**: route 1, a clean gate. The classifier returned `continue (no-open-residue)`: the gate has no open entry, so this is route 1's clean exit, not a residue route.
+**PR Review**: APPROVE — `task.243.pr-review.3.wireframe-component-mapping.md` (conformance lens only, `--no-code`). It raised 2 low trail findings, both doc-only and fixed in the carry. PC-1: the Pipeline Progress steps 5–6 row is updated to gate 11. PC-2: CR11-1 and CR11-2 are listed under Deferred Work. No coverage finding is open.
+**Carried to 6a**: docs/tasks/task.243.wireframe-component-mapping/task.243.pr-review.3.wireframe-component-mapping.md docs/tasks/task.243.wireframe-component-mapping/task.243.wireframe-component-mapping.md docs/tasks/task.243.wireframe-component-mapping/task.243.implementation.1.wireframe-component-mapping-initial-run.md
 **Action**: Proceeding to 5c (PR conformance review)
 
 ---
