@@ -36,9 +36,9 @@ Make the QA loop's escalation and its re-entry grant say what the resumed run wi
 | 2. review-task             | ✅ Done | `task.239.review.{N}.{name}.md` exists (or skip logged)               | `task.239.review.1.qa-escalation-and-grant-say-what-runs.md` — READY TO IMPLEMENT 8/10; Planned → Ready for Development | —                    | 2026-10-28T19:36Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline, 1 iteration; ci:fast green; 4 mutations proved | —                    | 2026-10-28T19:46Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #779; in-review comment posted | —                    | 2026-10-28T19:47Z |
-| 5–6. qa-task / qa-fix loop | ✅ Done | `task.239.qa.{N}.*.md`; `task.239.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 5 cycles; gate 5 PASS 100; 5c APPROVE | —                    | 2026-10-28T20:44Z |
-| 7. finalise                | ❌ Gaps | `task.239.dod.{N}.*.md`; task `status: accepted`                      | `task.239.dod.1.*` — NOT ACCEPTED, 2 gaps (SC-7, SC-11); HALT, lock held at 7 | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.239.qa.{N}.*.md`; `task.239.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 6 cycles (cycle 6 granted); gate 6 PASS 100; 5c APPROVE | —                    | 2026-10-28T20:44Z |
+| 7. finalise                | ✅ Done | `task.239.dod.{N}.*.md`; task `status: accepted`                      | Runs 1–4 gaps; run 5 `task.239.dod.5.*` ACCEPTED by recorded user override on SC-11 (M34–M36 proved); #769 closed | —                    | 2026-10-29T04:03Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Implementation report only | —                    | 2026-10-29T04:03Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -141,6 +141,12 @@ _Problems encountered and how they were resolved or escalated._
   - SC-7 was reworded to what ships: on a stall, filling rule 1's three-gate block plus rule 2's check against gate N-1's `high_files` output; on a loop limit, two third-strike comparisons.
   - Each mutation went red and was restored green. M19–M30 targeted the step-5-6 doc; M31–M33 targeted the pause doc. No source file changed.
   - The `listed` and filtered deepEquals in the loop-limit test are reached only through a row command that the `:152` regex already pins, so no doc mutation reaches them on their own. They back the regex up.
+- **Step 7 — DoD run 5 (2026-10-29): ACCEPTED by recorded user override on SC-11.**
+  - AC PARTIAL, 12/13. SC-7 passed against the reworded criterion; the residual is that rule 2's "previous gate's `high_files` output" wording is not pinned word for word (follow-up). SC-11 failed on three assertion groups with no recorded mutation: `qa-escalation-template.test.mjs:102-106`, `:356-360`, `:410-412`. Security PASS (probe 30 executed, 0 reproduced). Compliance NOT_APPLICABLE. Docs PASS.
+  - This was a fifth consecutive run to find a new gap, so the user's standing instruction applied: accept with a recorded override, do not loop. Before accepting, the orchestrator proved the three groups, with no source change: M34 deleted the task.215 row (1 red), M35 renamed the third-strike heading (2 red), M36 removed the label from `troubleshooting.md` (1 red). Each was restored green. They are recorded in `d232e6d9`. What the override waives is a sixth run re-verifying them.
+  - CI reading 1: SUCCESS @ `b324b496` (6 checks). Acceptance commit `d232e6d9` (task doc, dod.5, sprint review, registry tick) pushed; 6b assertions passed; 6d CHANGELOG cites task 239. CI reading 2: SUCCESS (tree-equivalent to `ec7ea9aa`) @ `d232e6d9`, over 6 checks after 30 s.
+  - Outward: canonical PR comment posted (#issuecomment-6487567633), with the override stated in its body. The `done` lead is a fixed template that reads as an unqualified pass, so the body states the override. Tracker `done` comment: posted. #769: CLOSED. Board `done`: already. Lock advanced 7 → 8.
+  - The implementation report had no `### QA Cycle 6` heading (cycle 6 was logged here only), so the canonical comment's cycle count would have read 5. The heading was added in Step 8.
 
 ---
 
@@ -201,14 +207,25 @@ _Track each QA review/fix cycle._
 **Loop exit**: route 1 — clean gate, 5c APPROVE
 **Action**: Proceeding to 5c → APPROVE → Step 7
 
+### QA Cycle 6 — 2026-10-29
+**Gate Result**: PASS (100) — head `2eaa7268`
+**Issues Found**: 0 blocking. Granted cycle (`grant-qa-cycles.sh … 1`, `convergence_from_cycle 6`) after DoD run 3, to verify the stall-row test.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: unchanged — the 5c APPROVE stands; the cycle-6 diff is one test
+**Loop exit**: route 1 — clean gate
+**Action**: Re-entered Step 7 (DoD runs 4 and 5)
+
 ---
 
 ## Completion
 
-**Finished**: 2026-10-28 (halted at Step 7)
-**Final Status**: Escalated — DoD gaps (SC-7, SC-11); lock held at Step 7
+**Finished**: 2026-10-29T04:03Z
+**Final Status**: Completed
 **Branch**: feature/task.239.qa-escalation-and-grant-say-what-runs
 **PR**: https://github.com/Gamaroff/agent-skills/pull/779
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 6 (cycle 6 granted)
+**DoD Summary**: `task.239.dod.5.qa-escalation-and-grant-say-what-runs.md` — ACCEPTED by recorded user override on SC-11
+**Tracker debt**: none
+
+**Completion Summary**: Implemented an action-named grant label, a post-grant Convergence window (`convergence_from_cycle`, written by `grant-qa-cycles.sh`), and escalation templates that run the third-strike comparison and recommend only the moves it permits. The not-converging variant gains a stall/discovery reading. Six QA cycles: gates 1–4 CONCERNS, 5–6 PASS 100, two task bugs closed. `/finalise` ran five times. Each AC run judged the criteria more finely than the one before. Run 5 was accepted under the user's standing override after M34–M36 were proved. Follow-ups: pin filling rule 2's wording; factor the filling-rules row lookups (QA6-CR-2).
