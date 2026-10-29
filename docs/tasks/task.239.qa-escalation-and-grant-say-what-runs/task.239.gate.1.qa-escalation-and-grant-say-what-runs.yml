@@ -1,0 +1,88 @@
+schema: 2
+task: 'task.239.qa-escalation-and-grant-say-what-runs'
+task_title: 'QA escalation and grant say what will run'
+gate: CONCERNS
+status_reason: 'All four phases delivered and every guard mutation-proved, but the third-strike constraint is wrong for a loop-limit grant (medium), and four low gaps remain: two describers and two eval fixtures lack the new field, the lock-missing case is unstated, and the window table is untested.'
+reviewer: 'QA Engineer'
+head: '32ecb0e7ee08cdf06c6ad40f958010312b8b5c1a'
+updated: '2026-10-28T19:52:28Z'
+
+top_issues:
+  - id: 'TASK-239-QA1-CR-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'Filling rule 1 says the escalation runs the third-strike comparison over the last three gates "exactly as 5b would on re-entry". A loop-limit grant re-enters at 5a, so its first 5b compares gates base-1, base, base+1; a file struck at base-1 and base is not listed, and the escalation may recommend the patch the resumed 5b refuses (obs #71 on the loop-limit path). Bug: task.239.bug.1.third-strike-files-miss-loop-limit-strikes.md'
+    suggested_action: 'On a loop-limit escalation also list files struck in the last two gates as one strike from the rule and forbid a patch recommendation for them; keep the three-gate form for not-converging; make the "exactly as 5b" wording true per halt kind; add a template-test assertion.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-239-QA1-CR-2'
+    severity: low
+    file: 'evals/shared/tests/qa-loop-lock-fields-parity.test.mjs'
+    finding: 'The convergence_from_cycle participant list omits hooksDoc and detectorPrompt. develop-pipeline-hooks.md:86 lists the other loop fields the lock carries and pipeline-resume-detector-prompt.md:117 reports the grant fields; neither names the new field, and nothing fails.'
+    suggested_action: 'Name convergence_from_cycle (one writer: grant-qa-cycles.sh) in the hooks doc loop-field list and the detector prompt grant line; add hooksDoc and detectorPrompt to the participant list.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-239-QA1-CR-3'
+    severity: low
+    file: 'evals/develop-task/step-isolation/12-qa-reentry-after-loop-limit-with-grant/scenario.json'
+    finding: 'Both scenario-12 replay locks (task and story) carry qa_max_cycles 8 and extra_cycles_granted 2 but no convergence_from_cycle, a post-grant state the grant script can no longer produce; the scenarios do not assert the 7 a base-6 grant writes.'
+    suggested_action: 'Add "convergence_from_cycle": 7 to both replay locks and a fileMatches assertion beside the qa_max_cycles 8 assertion in both scenario.json files.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-239-QA1-CR-4'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'Convergence check step 3 defines only the absent-field default (1). A missing or unreadable lock makes the jq print nothing, and an agent defaulting that to 1 counts the pre-grant readings again: the obs #72 defect.'
+    suggested_action: 'State that a missing or unreadable lock is restored with advance-pipeline-lock.sh --restore (which keeps the field) before the check reads it, and never read as 1.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-239-QA1-CR-5'
+    severity: low
+    file: 'evals/shared/tests/qa-escalation-template.test.mjs'
+    finding: 'The window test checks a mirror function against hand-written cases and the doc by phrase only; the worked-example table rows are not checked against the mirror, so the table and the rule can drift.'
+    suggested_action: 'Parse the grant worked-example table (sequence, convergence_from_cycle, trips at) from the doc and assert convergenceTrip against every row.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 70
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false. The diff adds no accept/reject predicate: one field to an existing atomic write, one result-line token, and prose. The grant script refusal paths are unchanged and covered by its suite.'
+  performance:
+    status: PASS
+    notes: 'One extra jq read on the result line; no loops added.'
+  reliability:
+    status: PASS
+    notes: 'Atomic write unchanged in shape; refused grant writes no field (tested); absent field reads 1 (tested by mutation).'
+  maintainability:
+    status: CONCERNS
+    notes: 'Two describers of the lock fields omit the new field and the parity test does not hold them (CR-2).'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-239-QA1-CR-1 (loop-limit third-strike constraint).'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+  future:
+    - action: 'Resume contract fenced block at line 492 fails under qa-execute-snippets for want of a lock fixture; identical on base (pre-existing, harness seeding, not prose).'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+      provenance: pre-existing
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-239-QA1-CR-1 fixed']

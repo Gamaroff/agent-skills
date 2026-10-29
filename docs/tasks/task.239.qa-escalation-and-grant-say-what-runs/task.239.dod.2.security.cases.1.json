@@ -1,0 +1,410 @@
+[
+  {
+    "id": "k.one",
+    "input": "1",
+    "direction": "legitimate",
+    "why": "smallest valid grant",
+    "correct": "accept; writes the four fields",
+    "expected": {
+      "exit": 0,
+      "stdout": "grant-qa-cycles: QA_CYCLE=3 extra_cycles_granted=1 qa_max_cycles=4 reenter_at=5a convergence_from_cycle=4\n"
+    },
+    "fixture": {
+      "files": {
+        "doc/t.gate.3.x.yml": "gate: CONCERNS\n",
+        "state/lock.json": "{\"current_step\":5,\"qa_phase\":\"5a\"}\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  },
+  {
+    "id": "k.two",
+    "input": "2",
+    "direction": "legitimate",
+    "why": "the task.215 grant",
+    "correct": "accept; convergence_from_cycle = base + 1 printed after reenter_at",
+    "expected": {
+      "exit": 0,
+      "stdout": "grant-qa-cycles: QA_CYCLE=3 extra_cycles_granted=2 qa_max_cycles=5 reenter_at=5a convergence_from_cycle=4\n"
+    },
+    "fixture": {
+      "files": {
+        "doc/t.gate.3.x.yml": "gate: CONCERNS\n",
+        "state/lock.json": "{\"current_step\":5,\"qa_phase\":\"5a\"}\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  },
+  {
+    "id": "k.ten",
+    "input": "10",
+    "direction": "legitimate",
+    "why": "multi-digit k with a zero not leading",
+    "correct": "accept",
+    "fixture": {
+      "files": {
+        "doc/t.gate.3.x.yml": "gate: CONCERNS\n",
+        "state/lock.json": "{\"current_step\":5,\"qa_phase\":\"5a\"}\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  },
+  {
+    "id": "k.zero",
+    "input": "0",
+    "direction": "hostile",
+    "why": "a zero grant",
+    "correct": "refuse with usage, nothing written",
+    "expected": {
+      "exit": 1
+    },
+    "fixture": {
+      "files": {
+        "doc/t.gate.3.x.yml": "gate: CONCERNS\n",
+        "state/lock.json": "{\"current_step\":5,\"qa_phase\":\"5a\"}\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  },
+  {
+    "id": "k.leading-zero",
+    "input": "02",
+    "direction": "hostile",
+    "why": "octal to the shell, decimal to jq",
+    "correct": "refuse",
+    "expected": {
+      "exit": 1
+    },
+    "fixture": {
+      "files": {
+        "doc/t.gate.3.x.yml": "gate: CONCERNS\n",
+        "state/lock.json": "{\"current_step\":5,\"qa_phase\":\"5a\"}\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  },
+  {
+    "id": "k.octal-08",
+    "input": "08",
+    "direction": "hostile",
+    "why": "invalid octal digit",
+    "correct": "refuse",
+    "expected": {
+      "exit": 1
+    },
+    "fixture": {
+      "files": {
+        "doc/t.gate.3.x.yml": "gate: CONCERNS\n",
+        "state/lock.json": "{\"current_step\":5,\"qa_phase\":\"5a\"}\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  },
+  {
+    "id": "k.negative",
+    "input": "-1",
+    "direction": "hostile",
+    "why": "negative grant would lower the budget",
+    "correct": "refuse",
+    "expected": {
+      "exit": 1
+    },
+    "fixture": {
+      "files": {
+        "doc/t.gate.3.x.yml": "gate: CONCERNS\n",
+        "state/lock.json": "{\"current_step\":5,\"qa_phase\":\"5a\"}\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  },
+  {
+    "id": "k.plus",
+    "input": "+2",
+    "direction": "hostile",
+    "why": "alternative spelling of a number",
+    "correct": "refuse",
+    "expected": {
+      "exit": 1
+    },
+    "fixture": {
+      "files": {
+        "doc/t.gate.3.x.yml": "gate: CONCERNS\n",
+        "state/lock.json": "{\"current_step\":5,\"qa_phase\":\"5a\"}\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  },
+  {
+    "id": "k.trailing-space",
+    "input": "2 ",
+    "direction": "hostile",
+    "why": "whitespace that test(1) may trim",
+    "correct": "refuse",
+    "expected": {
+      "exit": 1
+    },
+    "fixture": {
+      "files": {
+        "doc/t.gate.3.x.yml": "gate: CONCERNS\n",
+        "state/lock.json": "{\"current_step\":5,\"qa_phase\":\"5a\"}\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  },
+  {
+    "id": "k.newline",
+    "input": "2\n3",
+    "direction": "hostile",
+    "why": "a second line after a valid number",
+    "correct": "refuse",
+    "expected": {
+      "exit": 1
+    },
+    "fixture": {
+      "files": {
+        "doc/t.gate.3.x.yml": "gate: CONCERNS\n",
+        "state/lock.json": "{\"current_step\":5,\"qa_phase\":\"5a\"}\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  },
+  {
+    "id": "k.hex",
+    "input": "0x10",
+    "direction": "hostile",
+    "why": "base prefix",
+    "correct": "refuse",
+    "expected": {
+      "exit": 1
+    },
+    "fixture": {
+      "files": {
+        "doc/t.gate.3.x.yml": "gate: CONCERNS\n",
+        "state/lock.json": "{\"current_step\":5,\"qa_phase\":\"5a\"}\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  },
+  {
+    "id": "k.exponent",
+    "input": "1e3",
+    "direction": "hostile",
+    "why": "valid JSON number for --argjson, not an integer to the shell",
+    "correct": "refuse",
+    "expected": {
+      "exit": 1
+    },
+    "fixture": {
+      "files": {
+        "doc/t.gate.3.x.yml": "gate: CONCERNS\n",
+        "state/lock.json": "{\"current_step\":5,\"qa_phase\":\"5a\"}\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  },
+  {
+    "id": "k.empty",
+    "input": "",
+    "direction": "hostile",
+    "why": "no k",
+    "correct": "refuse with usage",
+    "expected": {
+      "exit": 1
+    },
+    "fixture": {
+      "files": {
+        "doc/t.gate.3.x.yml": "gate: CONCERNS\n",
+        "state/lock.json": "{\"current_step\":5,\"qa_phase\":\"5a\"}\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  },
+  {
+    "id": "k.int64-max",
+    "input": "9223372036854775807",
+    "direction": "hostile",
+    "why": "QA_CYCLE + K wraps negative in $(( ))",
+    "correct": "refuse; never write a wrapped budget",
+    "expected": {
+      "exit": 1
+    },
+    "fixture": {
+      "files": {
+        "doc/t.gate.3.x.yml": "gate: CONCERNS\n",
+        "state/lock.json": "{\"current_step\":5,\"qa_phase\":\"5a\"}\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  },
+  {
+    "id": "k.over-int64",
+    "input": "99999999999999999999",
+    "direction": "hostile",
+    "why": "out of range for test -ge",
+    "correct": "refuse",
+    "expected": {
+      "exit": 1
+    },
+    "fixture": {
+      "files": {
+        "doc/t.gate.3.x.yml": "gate: CONCERNS\n",
+        "state/lock.json": "{\"current_step\":5,\"qa_phase\":\"5a\"}\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  },
+  {
+    "id": "k.subst",
+    "input": "$(touch pwned)",
+    "direction": "hostile",
+    "why": "command substitution in k must never execute",
+    "correct": "refuse; never evaluate",
+    "expected": {
+      "exit": 1,
+      "absent": [
+        "pwned"
+      ]
+    },
+    "fixture": {
+      "files": {
+        "doc/t.gate.3.x.yml": "gate: CONCERNS\n",
+        "state/lock.json": "{\"current_step\":5,\"qa_phase\":\"5a\"}\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  },
+  {
+    "id": "k.semicolon",
+    "input": "2;touch pwned2",
+    "direction": "hostile",
+    "why": "separator after a valid number",
+    "correct": "refuse; never evaluate",
+    "expected": {
+      "exit": 1,
+      "absent": [
+        "pwned2"
+      ]
+    },
+    "fixture": {
+      "files": {
+        "doc/t.gate.3.x.yml": "gate: CONCERNS\n",
+        "state/lock.json": "{\"current_step\":5,\"qa_phase\":\"5a\"}\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  },
+  {
+    "id": "k.backtick",
+    "input": "`touch pwned3`",
+    "direction": "hostile",
+    "why": "backtick substitution",
+    "correct": "refuse; never evaluate",
+    "expected": {
+      "exit": 1,
+      "absent": [
+        "pwned3"
+      ]
+    },
+    "fixture": {
+      "files": {
+        "doc/t.gate.3.x.yml": "gate: CONCERNS\n",
+        "state/lock.json": "{\"current_step\":5,\"qa_phase\":\"5a\"}\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  },
+  {
+    "id": "k.jq-filter",
+    "input": "1 | .qa_max_cycles = 99",
+    "direction": "hostile",
+    "why": "jq filter text where --argjson expects a number",
+    "correct": "refuse",
+    "expected": {
+      "exit": 1
+    },
+    "fixture": {
+      "files": {
+        "doc/t.gate.3.x.yml": "gate: CONCERNS\n",
+        "state/lock.json": "{\"current_step\":5,\"qa_phase\":\"5a\"}\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  },
+  {
+    "id": "k.never-lower",
+    "input": "2",
+    "direction": "hostile",
+    "why": "the lock already carries a higher budget (9 > 3 + 2)",
+    "correct": "refuse; lock untouched, no convergence_from_cycle written",
+    "expected": {
+      "exit": 1
+    },
+    "fixture": {
+      "files": {
+        "doc/t.gate.3.x.yml": "gate: CONCERNS\n",
+        "state/lock.json": "{\"current_step\":5,\"qa_max_cycles\":9}\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  }
+]

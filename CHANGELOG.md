@@ -6,6 +6,40 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **A QA-loop escalation and its re-entry grant now say what the resumed run will do (task 239).**
+  Four changes, each closing a gap where the halt told the operator one thing and the resumed run
+  did another:
+
+  - **The grant option names the action.** Phase 0b now offers "Resume the QA loop with {k} more
+    cycles", not "Resume at 5a with {k} more cycles". A not-converging grant re-enters at 5b, so
+    the old label was wrong for every one of them (obs #70). After the grant, the orchestrator
+    reports the phase from `grant-qa-cycles.sh`'s `reenter_at=` token: 5b is "fix first", 5a is
+    "review first".
+  - **A grant opens a fresh Convergence window.** `grant-qa-cycles.sh` now writes
+    `convergence_from_cycle = base + 1` in the same atomic write as `qa_max_cycles` and `qa_phase`,
+    and prints it after `reenter_at=`. The Convergence check counts readings only from that cycle,
+    so a grant of k runs k cycles, unless HIGH findings stay present and stop falling over three
+    consecutive post-grant readings, in which case it escalates again at the third of them. On task 215, a grant of 2 escalated after one cycle because the
+    check counted three pre-grant readings (obs #72). A lock without the field reads `1`, which is
+    the old behaviour. The route classifier still reads the whole sequence, so route 2c's MEDIUM
+    window can still hold a pre-grant gate.
+  - **The recommendation obeys the third-strike rule.** Before writing "Recommended next steps",
+    the escalation runs the third-strike comparison the resumed 5b will run. After a convergence
+    stall that covers the last three gates. After a loop limit it covers the last two, because the
+    grant reviews before it fixes. For each file it prints, step 1 must delete, replace or waive the
+    mechanism. It may never recommend a patch, because the resumed run refuses one (obs #71).
+  - **A convergence stall gets a flat-count reading.** The reading is `stall` when any of cycle N's
+    HIGH findings is in the same file, with the same mechanism, as one of cycle N-1's; each such
+    finding is named. It is `discovery` when
+    the earlier fixes held and the re-probe found something new. A discovery says that a grant
+    pays for new work, not another attempt at the same defect.
+
+  Guards: `grant-qa-cycles.test.sh` checks the field and the printed token for both halt kinds, on
+  an existing lock, on a second grant, and on a refused grant.
+  `evals/shared/tests/qa-escalation-template.test.mjs` checks both templates, mirrors the window
+  rule with a control case, and sweeps for the old label. `qa-loop-lock-fields-parity.test.mjs`
+  checks the new field's spelling across its writer, its reader and the documents that describe it.
+
 - **The QA loop's open-coverage check reads with a parser, not an awk (task 240).** §5c's
   `OPEN_COVERAGE=` line now comes from `open-coverage.js`, bundled into `develop-task` and
   `develop-story`. It parses the review's `## Machine-Readable Findings` block against the shape

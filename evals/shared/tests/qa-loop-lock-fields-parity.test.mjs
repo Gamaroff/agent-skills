@@ -30,6 +30,15 @@
 //                         DESCRIBED by the pause reference, the hooks doc and
 //                         both develop-* SKILL.md.
 //
+// A fifth joined with task.239:
+//
+//   convergence_from_cycle  integer — the first cycle the Convergence check
+//                         counts. WRITTEN by grant-qa-cycles.sh (the one writer,
+//                         in the same write as qa_max_cycles and qa_phase), READ
+//                         by the step-5-6 doc's Convergence check, DESCRIBED by
+//                         the pause reference, the resume contract and both
+//                         develop-* SKILL.md.
+//
 // A field with two spellings is a field with no reader: the writer writes
 // `qa_phase`, the hook reads `qaPhase`, and the default arm fires on every
 // stop — silently, because an absent field IS a legal state. This test pins
@@ -87,8 +96,11 @@ const FILES = {
   hooksDoc: "shared/resources/develop-pipeline-hooks.md",
   grantScript: "shared/resources/grant-qa-cycles.sh",
   changelog: "CHANGELOG.md",
+  troubleshooting: "docs/reference/troubleshooting.md",
   setWaitingOn: "shared/resources/set-waiting-on.sh",
   pauseDoc: "shared/resources/develop-pipeline-pause.md",
+  taskReadme: "skills/develop-task/README.md",
+  storyReadme: "skills/develop-story/README.md",
   reenterScript: "shared/resources/reenter-qa-after-finalise.sh",
 };
 const text = Object.fromEntries(
@@ -123,7 +135,84 @@ const MISSPELLINGS = [
   // task.182: the qa_reentry field
   /\bqaReentry\b/,
   /\bqa_re_entry\b/,
+  // task.239: the convergence_from_cycle field
+  /\bconvergenceFromCycle\b/,
+  /\bconvergence-from-cycle\b/,
+  /\bconvergence_from\b(?!_cycle)/,
+  /\bconvergence_start(_cycle)?\b/,
 ];
+
+test("convergence_from_cycle: the writer, the reader and every describer name it (task.239)", () => {
+  const participants = [
+    "grantScript",
+    "loopDoc",
+    "pauseDoc",
+    "resumeContract",
+    "taskSkill",
+    "storySkill",
+    "hooksDoc",
+    "detectorPrompt",
+    "taskReadme",
+    "storyReadme",
+  ];
+  for (const name of participants) {
+    assert.ok(
+      text[name] && text[name].length > 0,
+      `non-vacuity: ${name} (${FILES[name]}) was not read`,
+    );
+    assert.match(
+      text[name],
+      /\bconvergence_from_cycle\b/,
+      `${name} (${FILES[name]}) must name convergence_from_cycle`,
+    );
+  }
+  // A README that lists the grant's write set lists all of it: a file-level match is satisfied by
+  // one line while another still names only the old fields (QA2-CR-6).
+  // Every describer that names the script beside its write set, with how many such lines it has
+  // (QA4-CR-1: troubleshooting.md listed three of the four and no check read it).
+  for (const [name, minLines] of [
+    ["taskReadme", 2],
+    ["storyReadme", 2],
+    ["troubleshooting", 1],
+  ]) {
+    const writeSet = text[name]
+      .split("\n")
+      .filter(
+        (l) => /grant-qa-cycles\.sh/.test(l) && /extra_cycles_granted/.test(l),
+      );
+    assert.ok(
+      writeSet.length >= minLines,
+      `non-vacuity: ${name} lists the grant write set ${writeSet.length} time(s)`,
+    );
+    // Every field the grant writes, not only the new one (QA3-CR-3).
+    for (const line of writeSet) {
+      for (const field of [
+        "extra_cycles_granted",
+        "qa_max_cycles",
+        "convergence_from_cycle",
+        "qa_phase",
+      ]) {
+        assert.match(
+          line,
+          new RegExp(`\\b${field}\\b`),
+          `${name}: write-set line omits ${field}: ${line.trim()}`,
+        );
+      }
+    }
+  }
+  // The writer sets it in the SAME jq write as the budget, never in a second call.
+  assert.match(
+    text.grantScript,
+    /\.qa_max_cycles = \(\$c \+ \$k\) \| \.qa_phase = \$p\s*\|\s*\.convergence_from_cycle = \(\$c \+ 1\)/,
+    "grant-qa-cycles.sh must write convergence_from_cycle in the same jq write as qa_max_cycles",
+  );
+  // The reader defaults an absent field to 1, so a lock from before task.239 behaves as before.
+  assert.match(
+    text.loopDoc,
+    /convergence_from_cycle \/\/ 1/,
+    "the Convergence check must read the field with an absent → 1 default",
+  );
+});
 
 test("every participant spells `qa_phase` and `extra_cycles_granted` the same way", () => {
   for (const [name, body] of Object.entries(text)) {
@@ -276,7 +365,7 @@ test("qa_reentry: the writer and every reader and describer name it (task.182)",
   for (const name of ["taskSkill", "storySkill"]) {
     assert.match(
       text[name],
-      /and `qa_phase` \(which value: the `qa_phase` row of the lock schema in `references\/develop-pipeline-pause\.md`\) atomically/,
+      /`qa_phase` \(which value: the `qa_phase` row of the lock schema in `references\/develop-pipeline-pause\.md`\) and `convergence_from_cycle` atomically/,
       `${name} must cite the lock schema for the qa_phase the grant writes`,
     );
   }
@@ -629,7 +718,7 @@ test("QA_MAX_CYCLES is the lock's qa_max_cycles — reconstructed count plus the
   // restoring the lock from the halt snapshot when the HALT removed it (C2-CR-1).
   assert.match(
     text.grantScript,
-    /'\.extra_cycles_granted = \$k \| \.qa_max_cycles = \(\$c \+ \$k\) \| \.qa_phase = \$p'/,
+    /'\.extra_cycles_granted = \$k \| \.qa_max_cycles = \(\$c \+ \$k\) \| \.qa_phase = \$p\s*\|\s*\.convergence_from_cycle = \(\$c \+ 1\)'/,
     "grant-qa-cycles.sh must write qa_max_cycles as the reconstructed count plus the grant, and the re-entry qa_phase, in one write (C3-CR-3, obs #228)",
   );
   // task.124: the restore moved into advance-pipeline-lock.sh --restore, the ONE restore path.
@@ -718,11 +807,24 @@ test("the re-entry rule derives cycles-outside-the-loop from disk and never stor
     "a back-filled entry must be marked as run outside the loop",
   );
   // The Phase 0b prompt lives in the SKILL.md files, not the step doc.
+  // task.239 (obs #70): the label names the action. The phase is grant-qa-cycles.sh's decision,
+  // and the old phase-named label was wrong for every not-converging grant, which re-enters at 5b.
+  // (Spelled `5[a]` below so the label sweep in qa-escalation-template.test.mjs never finds it here.)
   for (const name of ["taskSkill", "storySkill"]) {
     assert.match(
       text[name],
-      /Resume at 5a with \{k\} more cycles/,
+      /Resume the QA loop with \{k\} more cycles/,
       `${name} must offer the grant in Phase 0b`,
+    );
+    assert.doesNotMatch(
+      text[name],
+      /Resume at 5[a] with/,
+      `${name} must not name a phase in the grant option (task.239)`,
+    );
+    assert.match(
+      text[name],
+      /reenter_at=5b` → "re-entering at 5b: fix first"/,
+      `${name} must report the phase from the script's result line (task.239)`,
     );
   }
   assert.doesNotMatch(

@@ -49,7 +49,7 @@ Update the header comment's output-line description (`:79`) and the label (`:6`)
 
 Run the site command from the task's § 3 and replace `Resume at 5a with {k} more cycles` with `Resume the QA loop with {k} more cycles` at each site. In the README mermaid edges the plain form is `Resume the QA loop with k more cycles`. In the two step-isolation evals, update the expected answer text only, never the scenario's facts.
 
-**Phase 0b** (`skills/develop-task/SKILL.md:332`, `skills/develop-story/SKILL.md:345`, resume contract step 3). After the grant call, add: *"Report the phase from the script's result line: `reenter_at=5b` → 're-entering at 5b: fix first', `reenter_at=5a` → 're-entering at 5a: review first'. Do not restate the rule that picks it."*
+**Phase 0b** (`skills/develop-task/SKILL.md:334`, `skills/develop-story/SKILL.md:347`, resume contract step 3). After the grant call, add: *"Report the phase from the script's result line: `reenter_at=5b` → 're-entering at 5b: fix first', `reenter_at=5a` → 're-entering at 5a: review first'. Do not restate the rule that picks it."*
 
 `qa-loop-lock-fields-parity.test.mjs:724` asserts the old label. Change it to the new one and add a negative assertion for the old one.
 

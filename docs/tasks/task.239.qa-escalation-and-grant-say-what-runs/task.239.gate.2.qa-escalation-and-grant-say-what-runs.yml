@@ -1,0 +1,109 @@
+schema: 2
+task: 'task.239.qa-escalation-and-grant-say-what-runs'
+task_title: 'QA escalation and grant say what will run'
+gate: CONCERNS
+status_reason: 'Cycle 1 fixed all five gate-1 findings, and each fix is held by a test that a mutation turns red. The refute pass found that the new lock-restore sentence promises a repair --restore does not make (medium), plus five low prose claims that are false at an edge: route 2c, a three-strike file on a loop limit, the plural flat-count reading, "k cycles", and four describers of the grant write set.'
+reviewer: 'QA Engineer'
+head: '31f6b48bab94218db3cb9ceaf7d051f1272d88ac'
+updated: '2026-10-28T20:07:33Z'
+
+top_issues:
+  - id: 'TASK-239-QA2-CR-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'Convergence check step 3 says a lock the jq cannot read is restored with advance-pipeline-lock.sh --restore and then read again. restore_lock exits 0 ("lock present, nothing to restore") whenever the lock file exists, so a present but corrupt lock is never repaired. A missing lock with no snapshot makes --restore exit 1. The sentence has already forbidden the default of 1 and gives no next step. The citation is also a bare script name with a new {work-item-dir} placeholder. Bug: task.239.bug.2.lock-restore-sentence-misstates-restore.md'
+    suggested_action: 'Split the cases. A missing lock: cite the resume contract''s "Restore the lock (both resume paths)". A present but unparseable lock, or a non-zero --restore: HALT with the stderr. Keep "never default to 1". If a command is shown, use the bundled path with {doc-directory}.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-239-QA2-CR-2'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'The window note says a pre-grant reading "can only let a granted run exit sooner, never spend its budget". With budgetSpent, classifyLoopRoute route 2c compares MEDIUM over cycles N-2..N (qa-diminishing-returns.js). After a grant of 2, cycle N-2 is the pre-grant base, and a low pre-grant MEDIUM gives medium-not-falling, so the run escalates instead of taking the half-cycle.'
+    suggested_action: 'Say that pre-grant readings still decide route 2c''s MEDIUM window, or apply convergence_from_cycle there too. Prefer the sentence: changing the classifier is outside this task.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-239-QA2-CR-3'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'On a loop limit, filling rule 1 lists every file the two-gate command prints as "one strike from the third-strike rule". A file HIGH in gates N-2, N-1 and N is already struck, and the label understates it.'
+    suggested_action: 'On a loop limit, also run the three-gate block, list its files as struck, and keep "one strike from" for files printed only by the two-gate command. Extend the behavioural test with a three-gate file.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-239-QA2-CR-4'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'Filling rule 2 compares "cycle N''s HIGH finding" in the singular. A stall usually has several HIGH findings, so the single stall-or-discovery reading is undefined when one repeats and another is new.'
+    suggested_action: 'Define it for several findings: a stall when any HIGH repeats its file and mechanism, naming that one, otherwise discovery.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-239-QA2-CR-5'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: '"k more cycles delivers k cycles" is stated without qualification (step-5-6 step 3, docs/reference/troubleshooting.md:192, CHANGELOG). The window re-arms at the third post-grant reading, so with k >= 3 and flat readings the check trips at the 5a of cycle base+3, and that cycle''s 5b and any later granted cycles do not run. The doc''s own "1,1,1 | 1,1,1 trips at 6" row shows it.'
+    suggested_action: 'Qualify it at all three sites: a grant delivers k cycles unless three post-grant readings are flat, in which case the check escalates again at the third.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-239-QA2-CR-6'
+    severity: low
+    file: 'skills/develop-task/README.md'
+    finding: 'Sites that list the grant''s write set still omit convergence_from_cycle: develop-task README.md:361 and :415, develop-story README.md:376 and :430, and step-5-6:87''s superset note. The diff edited both READMEs (the label), and the parity participants do not include them.'
+    suggested_action: 'Name the field at every site that lists the write set, and add both READMEs to the parity test''s convergence_from_cycle participants.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-239-QA2-CR-7'
+    severity: low
+    file: 'evals/shared/tests/qa-loop-lock-fields-parity.test.mjs'
+    finding: 'The non-vacuity guard asserts participants.length > 0 on an array literal declared two lines above. It can never fail.'
+    suggested_action: 'Replace it with a check that each participant''s text was read and is non-empty, or delete it.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 74
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false. The cycle-1 fix adds no accept/reject predicate: prose, two eval fixtures, and test code (convergenceTrip and the high_files fixture run are test-only). The grant script is unchanged since gate 1.'
+  performance:
+    status: PASS
+    notes: 'No runtime change since gate 1.'
+  reliability:
+    status: CONCERNS
+    notes: 'The lock-restore sentence leaves a damaged lock with no legal next step (CR-1).'
+  maintainability:
+    status: CONCERNS
+    notes: 'Four prose claims are false at an edge (CR-2 to CR-5), and four sites that list the grant write set omit the new field (CR-6).'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-239-QA2-CR-1 (the lock-restore sentence).'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+  future:
+    - action: 'Resume contract fenced block at line 492, and the detector prompt fenced block at line 69, fail under qa-execute-snippets for want of a lock fixture. Both fail identically on the merge base (pre-existing, harness seeding, not prose).'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/pipeline-resume-detector-prompt.md']
+      provenance: pre-existing
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 1
+  fix_date: '2026-10-28'
+  total_iterations: 1
+  verification_method: 'Behavioural test on the doc''s own high_files() with fixture gates; QA re-read of the per-halt table'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-239-QA2-CR-1 fixed']
