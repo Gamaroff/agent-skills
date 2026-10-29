@@ -138,6 +138,16 @@ Take task 243, already implemented and reviewed outside the pipeline, through re
   - The glob was not expanded to get past the evaluator.
 - Recorded: the gaps Change Log row, the gap report in the task body (it replaces run 1's), and the gaps PR comment https://github.com/Gamaroff/agent-skills/pull/785#issuecomment-6502540619.
 - The 5c carry set (`task.243.pr-review.2` and the PC-1 task-doc fix) rides this gaps commit, as it did in run 1.
+- Gaps commit `88c5c3d5`, pushed. HALT snapshot `develop-pipeline.last-halt.json` (`halt_step` 7, `halt_reason` dod-gaps) written and the lock removed.
+- Security fix (user: "Go ahead"):
+  - `parsePattern` now returns null for any `\r` or `\n`, so `record` throws a UsageError and does not write a split row.
+  - New test: `record` refuses the four probe inputs and a CRLF, and leaves the map byte-identical.
+  - Mutation proof: the test is red with the guard removed (`not ok 17`, 17/18) and green again with it restored (18/18).
+  - `npm run bundle` updated the eight copies.
+  - The first fast gate failed `format:check`: my edit had dropped a space after `const m =`. Prettier fixed it (whitespace only).
+  - Re-run fast gate: 6841 tests, 0 failed.
+  - Commit `c9f77474`, pushed.
+- QA re-entry after finalise DoD gaps (run 2): re-entered QA at step 5 / qa_phase 5a. `qa_max_cycles` is 10 (base 8); `gate_head` is `9e50d3b7`.
 
 ---
 
@@ -298,6 +308,17 @@ _Track each QA review/fix cycle._
 **PR Review**: APPROVE — `task.243.pr-review.2.wireframe-component-mapping.md` (conformance lens only, `--no-code`). It raised 2 low findings, both fixed. PC-1: CR8-2's wording was fixed in the task document, and CR8-1 is listed under Deferred Work. PC-2: the Pipeline Progress row is updated. No coverage finding is open.
 **Carried to 6a**: docs/tasks/task.243.wireframe-component-mapping/task.243.pr-review.2.wireframe-component-mapping.md docs/tasks/task.243.wireframe-component-mapping/task.243.wireframe-component-mapping.md
 **Action**: Proceeding to 5c (PR conformance review)
+
+### QA Cycle 9 — 2026-10-29
+**Gate Result**: PASS (100/100). This is the re-entry after finalise DoD run 2 (security gap: a newline in a signature).
+**Issues Found**:
+- The fix `c9f77474` is verified: mutation-proven (outcome: covered), and the `parsePattern` probe re-ran at 11 executed, 0 reproduced, 0 escaped.
+- 2 low findings. CR9-1 (promoted, high confidence): `record` writes six other fields through `cell()`, which escapes only `|`, so a newline in any of them still splits the row. Reproduced. CR9-2 (advisory, medium confidence): a backtick in a signature breaks the cell.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**Loop exit**: The route classifier returned the Cosmetic-residue exit (2b) for TASK-243-CR9-1. The user chose to fix it instead ("Fix now, cycle 10"): CR9-1 is the same class as the DoD run 2 gap, and 2b would have deferred the rest of that class to `/finalise`. CR9-2 rides the same fix.
+**PR Review**: not reached — gate did not exit the loop
+**Action**: Running qa-fix (cycle 9 of 10)
 
 ---
 

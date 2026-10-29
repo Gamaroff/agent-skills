@@ -713,6 +713,24 @@ function record(root, opts) {
   if (!ui || !ui.wireframeMap) return { reason: "unset" };
   if (!parsePattern(opts.signature))
     throw new UsageError(`--signature is not a signature: ${opts.signature}`);
+  // Every value lands in one cell of one table line, and `cell` escapes only `|`. A line break
+  // in any of them splits the row (parsePattern has already refused one in the signature), and
+  // a backtick in a cell written inside backticks leaves an odd count, so splitRow reads the
+  // rest of the row as code and the row comes back as one cell.
+  for (const flag of [
+    "label",
+    "component",
+    "variant",
+    "hint",
+    "notes",
+    "by",
+    "date",
+  ])
+    if (opts[flag] != null && /[\r\n]/.test(String(opts[flag])))
+      throw new UsageError(`--${flag} must be one line`);
+  for (const flag of ["signature", "label"])
+    if (opts[flag] && String(opts[flag]).includes("`"))
+      throw new UsageError(`--${flag} may not contain a backtick`);
   const file = path.resolve(root, ui.wireframeMap);
   if (!fs.existsSync(file)) ensure(root);
   const text = fs.readFileSync(file, "utf8");

@@ -331,5 +331,6 @@ The gap below was found by the security probe run, against a boundary this run a
 | 2026-10-29 |  | QA gate PASS (100/100) — re-entry after finalise DoD run 1; SC-1 test verified and mutation-proven; 0 bugs, 2 low cleanups (CR8-1, CR8-2) | qa-task |
 | 2026-10-29 |  | DoD incomplete — 1 gap identified (security: parsePattern accepts a newline in a signature; 4 low probes) | finalise |
 | 2026-10-29 |  | QA gate PASS (100/100) — re-entry after finalise DoD run 2; parsePattern newline fix verified, mutation-proven, probe 11/0/0; 2 low findings (CR9-1 promoted, CR9-2 advisory) | qa-task |
+| 2026-10-29 |  | QA findings fixed — CR9-1 (a line break in any written record field) and CR9-2 (a backtick in the signature or label) are refused with a UsageError; mutation-proven; fix cycle 9 | qa-fix |
 <!-- change-log-end -->
 

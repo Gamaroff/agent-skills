@@ -26,6 +26,7 @@ const {
   ensure,
   resolve,
   record,
+  readMap,
 } = require(SCRIPT);
 
 const CONFIG = [
@@ -491,6 +492,69 @@ test("record refuses a signature with a line break and leaves the map unchanged"
       );
     }
     assert.equal(readFileSync(map, "utf8"), before);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("record refuses a line break in any written field, and a backtick in a code cell", () => {
+  const root = consumer();
+  try {
+    ensure(root);
+    const base = {
+      signature: "*>chip",
+      component: "Chip",
+      by: "a developer",
+      date: "2026-10-29",
+    };
+    record(root, base);
+    const map = join(root, "docs/wireframe-map.md");
+    const before = readFileSync(map, "utf8");
+    for (const flag of [
+      "label",
+      "component",
+      "variant",
+      "hint",
+      "notes",
+      "by",
+      "date",
+    ]) {
+      for (const v of ["a\nb", "\nab", "ab\n", "a\r\nb", "a\rb"]) {
+        assert.throws(
+          () => record(root, { ...base, [flag]: v }),
+          new RegExp(`--${flag} must be one line`),
+          `${flag} ${JSON.stringify(v)}`,
+        );
+      }
+    }
+    for (const [flag, v] of [
+      ["signature", "button[a`b]"],
+      ["signature", "*>icon{name=`x}"],
+      ["label", "*>tab`"],
+      ["label", "`*>tab`"],
+    ]) {
+      assert.throws(
+        () => record(root, { ...base, [flag]: v }),
+        new RegExp(`--${flag} may not contain a backtick`),
+        `${flag} ${JSON.stringify(v)}`,
+      );
+    }
+    assert.equal(readFileSync(map, "utf8"), before);
+
+    // Not refused: a backtick in a cell that is not written inside backticks, and a pipe anywhere.
+    record(root, {
+      ...base,
+      signature: "*>tab",
+      label: "*>tab[active]",
+      component: "Tab",
+      notes: "wraps `Tabs` | one per row",
+    });
+    const row = readMap(readFileSync(map, "utf8")).rows.find(
+      (r) => r.signature === "*>tab",
+    );
+    assert.equal(row.label, "*>tab[active]");
+    assert.equal(row.component, "Tab");
+    assert.equal(row.notes, "wraps `Tabs` | one per row");
   } finally {
     cleanup(root);
   }
