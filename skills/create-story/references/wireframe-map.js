@@ -714,24 +714,37 @@ function record(root, opts) {
   if (!ui || !ui.wireframeMap) return { reason: "unset" };
   if (!parsePattern(opts.signature))
     throw new UsageError(`--signature is not a signature: ${opts.signature}`);
-  // Every value lands in one cell of one table line, and `cell` escapes only `|`. A line break
-  // in any of them splits the row (parsePattern has already refused one in the signature), and
-  // a backtick in a cell written inside backticks leaves an odd count, so splitRow reads the
-  // rest of the row as code and the row comes back as one cell.
-  for (const flag of [
-    "label",
-    "component",
-    "variant",
-    "hint",
-    "notes",
-    "by",
-    "date",
-  ])
+  // Every value lands in one cell of one table line, and the row must read back as written.
+  // Three rules, all checked before anything is read or written:
+  //   - no line break in any value: it splits the row (parsePattern has refused one in the
+  //     signature already);
+  //   - no backtick in the signature or label, the two cells written inside backticks;
+  //   - every other value must survive the reader itself: written as a cell with a cell after
+  //     it, splitRow gives it back unchanged and the next cell is still there. An odd backtick
+  //     count fails this, since splitRow stays in code mode and merges what follows. A cell of
+  //     its own also goes through readMap's unquote, which strips a whole-cell backtick pair;
+  //     --by and --date share the Confirmed cell, which starts with the date, so they do not.
+  const ownCell = ["component", "variant", "hint", "notes"];
+  const unquoted = [...ownCell, "by", "date"];
+  for (const flag of ["label", ...unquoted])
     if (opts[flag] != null && /[\r\n]/.test(String(opts[flag])))
       throw new UsageError(`--${flag} must be one line`);
   for (const flag of ["signature", "label"])
     if (opts[flag] && String(opts[flag]).includes("`"))
       throw new UsageError(`--${flag} may not contain a backtick`);
+  for (const flag of unquoted) {
+    if (opts[flag] == null) continue;
+    const back = splitRow(`| ${cell(opts[flag])} | next |`);
+    const read = ownCell.includes(flag) ? unquote(back[0]) : back[0];
+    if (
+      back.length !== 2 ||
+      read !== String(opts[flag]).trim() ||
+      back[1] !== "next"
+    )
+      throw new UsageError(
+        `--${flag} would not read back from the map row: ${opts[flag]}`,
+      );
+  }
   const file = path.resolve(root, ui.wireframeMap);
   if (!fs.existsSync(file)) ensure(root);
   const text = fs.readFileSync(file, "utf8");

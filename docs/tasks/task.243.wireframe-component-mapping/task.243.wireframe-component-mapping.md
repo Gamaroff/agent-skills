@@ -333,5 +333,6 @@ The gap below was found by the security probe run, against a boundary this run a
 | 2026-10-29 |  | QA gate PASS (100/100) — re-entry after finalise DoD run 2; parsePattern newline fix verified, mutation-proven, probe 11/0/0; 2 low findings (CR9-1 promoted, CR9-2 advisory) | qa-task |
 | 2026-10-29 |  | QA findings fixed — CR9-1 (a line break in any written record field) and CR9-2 (a backtick in the signature or label) are refused with a UsageError; mutation-proven; fix cycle 9 | qa-fix |
 | 2026-10-29 |  | QA gate CONCERNS (90/100) — cycle 10 of 10; cycle 9 fix verified and mutation-proven; 1 medium finding (CR10-1: an odd backtick in an unquoted record cell collapses the row), 1 low cleanup; probe 66/5/0 | qa-task |
+| 2026-10-29 |  | QA findings fixed — CR10-1 and CR10-2: record refuses any value that would not read back from its map row (round-trip through the reader); mutation-proven; probe re-run 50/0/0; fix cycle 10 | qa-fix |
 <!-- change-log-end -->
 

@@ -539,22 +539,57 @@ test("record refuses a line break in any written field, and a backtick in a code
         `${flag} ${JSON.stringify(v)}`,
       );
     }
+    // An odd backtick count in a cell not written inside backticks leaves splitRow in code mode,
+    // so the cells after it merge into it. Each position: trailing, leading, middle, three.
+    for (const flag of [
+      "component",
+      "variant",
+      "hint",
+      "notes",
+      "by",
+      "date",
+    ]) {
+      for (const v of ["Chip`", "`Chip", "see `Tabs", "a ` b ` c `"]) {
+        assert.throws(
+          () => record(root, { ...base, [flag]: v }),
+          new RegExp(`--${flag} would not read back from the map row`),
+          `${flag} ${JSON.stringify(v)}`,
+        );
+      }
+    }
+    // A cell of its own that is wholly one code span loses that pair to readMap's unquote.
+    for (const flag of ["component", "variant", "hint", "notes"]) {
+      for (const v of ["`Tabs`", "``.btn``"]) {
+        assert.throws(
+          () => record(root, { ...base, [flag]: v }),
+          new RegExp(`--${flag} would not read back from the map row`),
+          `${flag} ${JSON.stringify(v)}`,
+        );
+      }
+    }
     assert.equal(readFileSync(map, "utf8"), before);
 
-    // Not refused: a backtick in a cell that is not written inside backticks, and a pipe anywhere.
+    // Not refused, and read back intact: a balanced backtick pair inside a cell, a pipe
+    // anywhere, an escaped pipe the writer must not double-unescape, and a code span that
+    // closes the Confirmed cell (which starts with the date, so unquote leaves it alone).
     record(root, {
       ...base,
       signature: "*>tab",
       label: "*>tab[active]",
-      component: "Tab",
+      component: "Tab `x` | y",
+      variant: "a\\|b",
+      hint: ".btn `x`",
       notes: "wraps `Tabs` | one per row",
+      by: "`dev`",
     });
-    const row = readMap(readFileSync(map, "utf8")).rows.find(
-      (r) => r.signature === "*>tab",
-    );
+    const text = readFileSync(map, "utf8");
+    const row = readMap(text).rows.find((r) => r.signature === "*>tab");
     assert.equal(row.label, "*>tab[active]");
-    assert.equal(row.component, "Tab");
+    assert.equal(row.component, "Tab `x` | y");
+    assert.equal(row.variant, "a\\|b");
+    assert.equal(row.hint, ".btn `x`");
     assert.equal(row.notes, "wraps `Tabs` | one per row");
+    assert.match(text.split("\n")[row.line - 1], /\| 2026-10-29, `dev` \|$/);
   } finally {
     cleanup(root);
   }
