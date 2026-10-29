@@ -36,7 +36,7 @@ First pipeline run for task.242: give a `/finalise` re-run a fixed scope (persis
 | 2. review-task             | ✅ Done    | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               | Skipped — already reviewed (`task.242.review.1.scope-finalise-re-runs.md`) | —                    | 2026-10-29T06:46Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; audit 18/18, `ready-for-review`; `ci:fast` 6765 pass / 0 fail (after a prettier fix) | `.summaries/step-3-loop-audit-1.json` | 2026-10-29T07:06Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #781: https://github.com/Gamaroff/agent-skills/pull/781 | —                    | 2026-10-29T07:08Z |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | `.summaries/step-5-traceability-mapper.json` |                 |
 | 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
@@ -135,6 +135,9 @@ Each mutation was applied with the Edit tool to the file named, the named test f
 - QA Cycle 1: changes-requested → `stage-disabled`. The 5b ingester and pre-fix mapping ran inline, because the orchestrator wrote gate 1 (an independence loss).
 - QA Cycle 2: the refute pass ran in an independent Explore reviewer: dispatched 07:26:33Z, returned in 162.7 s (from `duration_ms`). Narrowing residue: not signalled (high-findings-remain). changes-requested → `stage-disabled`.
 - QA Cycle 2 — CR2-2 design choice: a structured `non_member_fail` field. A note cannot be parsed, and the task.239 replay (G7 on unchanged evidence goes to advisories and does not fail SC-11) has to keep passing. An agent that ignores the field can still flip a FAIL. The engine cannot tell that apart from task.239's finer re-split. This is recorded as the remaining limit.
+- QA loop re-entry: 1 extra cycle granted (operator request); 0 cycle(s) run outside the loop back-filled from disk. `grant-qa-cycles.sh`: `QA_CYCLE=5 extra_cycles_granted=1 qa_max_cycles=6 reenter_at=5a convergence_from_cycle=6` — re-entering at 5a (review first), so gate 6 reads the CR5-1 fix at `4c6474ad`. The escalation HALT had left the lock in place with no halt snapshot, so the script found a surviving lock and restored nothing.
+- QA Cycle 6: the traceability mapper ran (13 criteria; SC-11 and SC-13 partial, SC-12 integration). Cycles 1–5 did not run it and logged no skip reason. Gate 6 CONCERNS, HIGH 0. Convergence: one post-grant reading, no trip. Route: `continue (not-a-pass-gate)`; route 2 declined: `product-defect-signal`.
+- QA Cycle 6 — narrowing offer: Narrowing residue — every MEDIUM on gates 5 and 6 names shared/resources/finalise-rerun-scope.js (TASK-242-CR5-1, TASK-242-CR6-1); HIGH 0 on both. Passed to qa-fix Step 2.6.
 
 ---
 
@@ -167,6 +170,29 @@ The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS.
 1. Re-run `/develop-task` and take Phase 0b's "Resume the QA loop with 1 more cycle". One gate on `4c6474ad` reads the CR5-1 fix, and if it is clean the run goes to 5c and finalise. This is the cheapest path. Each of the last three fixes was verified, and the HIGHs have been 0 for two gates.
 2. Or, to stop the basename edge cases altogether: replace bare-basename resolution with "a bare basename never resolves, so the criterion is re-judged". This trades a re-judge on every bare citation for no identity rule at all. Do it as a qa-fix under a granted cycle, then gate it.
 3. Or accept the current state: run `/review-pr --effort medium --comment --no-code`, then `/finalise`. The remaining finding is fixed but ungated, so the review must read `4c6474ad`.
+
+### QA Loop Limit Reached — 2026-10-29
+
+The pipeline completed 6 qa-task/qa-fix cycles (5 plus 1 granted) without a clean PASS.
+
+**Final gate status**: CONCERNS (90/100, gate 6 at `3717756a`; cycle 6's fix `4c501df4` is ungated)
+**HIGH findings per cycle**: 2, 3, 1, 0, 0 | 0 — grant at cycle 6; 0 since cycle 4
+**Remaining issues** (from final gate file):
+- TASK-242-CR6-1 (medium, `shared/resources/finalise-rerun-scope.js`): a file added under a cited basename made a bare prior-record citation resolve to nothing, so a criterion whose cited file changed was carried. **Fixed in `4c501df4`**: the fix failed first in the new tests, the fix-removed and over-widening mutations are covered, and `ci:fast` is green. No gate has read it yet.
+
+**What was attempted per cycle**:
+- Cycles 1–5: see the escalation entry above.
+- Cycle 6 (granted): gate 6 verified CR5-1 (covered) and found CR6-1. The narrowing offer fired (every MEDIUM on gates 5 and 6 is in `finalise-rerun-scope.js`), and qa-fix took **scope the claim**. The engine no longer guesses which file an ambiguous bare basename meant. It asks only whether any candidate changed, which subsumes the CR4-1 rule rather than adding a fifth.
+- Route 2c (gate the last fix) was considered and declined: `medium-not-falling`. MEDIUM read 1, 1, 1 over cycles 4–6.
+
+**Likely root cause**: the same mechanism as before: bare-basename citation resolution when files move, appear or disappear between runs. Cycles 3–6 each found the next case: move (CR3-1), deletion (CR4-1), provenance (CR5-1) and addition (CR6-1). Cycle 6 changed the rule's shape instead of adding a case. There is now one rule for every ambiguity: re-judge when any candidate changed, else do not resolve. That leaves no add/move/delete sub-case to fall through. It is the strongest reason so far to expect the next gate to come back clean, but no gate has confirmed it.
+
+**Third-strike files**: none. Gates 5 and 6 raised no HIGH, so the two-gate comparison prints nothing.
+
+**Recommended next steps**:
+1. Re-run `/develop-task` and take Phase 0b's "Resume the QA loop with 1 more cycle". One gate on `4c501df4` reads the restructured rule, and if it is clean the run goes to 5c and finalise.
+2. Or accept the current state: run `/review-pr --effort medium --comment --no-code`, then `/finalise`. The fix is green and mutation-proven but ungated, so the review must read `4c501df4`.
+3. Or, if another basename edge is found, drop bare-basename resolution entirely (a bare basename never resolves, so the criterion is always re-judged). This costs carry on every bare citation.
 
 ---
 
@@ -234,6 +260,20 @@ _Track each QA review/fix cycle._
 **Commit**: `4c6474ad`
 **Post-fix PR state**: OPEN at `4c6474ad` (pushed)
 **Incident**: the qa-fix-5 PR and tracker comments were first posted with the previous step's body, because a Write to `comment-body.md` was refused (file changed on disk) and the post ran in the same turn. Both were corrected in place (PATCH; the issue comment keeps its `qa-fix-5` marker).
+
+---
+
+### QA Cycle 6 — 2026-10-29
+**Gate Result**: CONCERNS (90/100)
+**Issues Found**: 1. CR6-1 (medium, confidence high, promoted): a file added under a cited basename makes a bare prior-record citation ambiguous at HEAD with nothing gone. It resolves to nothing, so a criterion whose cited file changed is carried. Reproduced by execution. CR5-1 verified: fix removed → its test red (covered). Reviewer: dispatched 08:30:41Z, returned in 108.8 s.
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop limit reached
+**Fixes Applied**: CR6-1 (narrowing offer taken: **scope the claim**). A bare basename that several files carry no longer names one: it resolves to every candidate when any of them changed since the prior head (added, modified or gone), else to nothing. This subsumes the CR4-1 gone-only rule. `merge` keeps the HEAD-alone rule (CR5-1) through an index with no `changed` set. 1 scope test added, 1 extended; both failed first. Mutations: fix removed → covered, over-widening → covered, merge's `changed: null` → absorbed (merge counts `changed` and `unresolved` alike). `ci:fast` 6783 pass, 0 fail.
+**Commit**: `4c501df4`
+**Post-fix PR state**: OPEN at `4c501df4` (pushed). Read inline with `gh pr view`; the tracker poller subagent was not dispatched.
 
 ---
 
