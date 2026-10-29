@@ -618,24 +618,23 @@ the primitive in the middle of a segment (`Rebutton`), which must not match `but
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-30
-**Quality Score**: 70/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.246.qa.2.wireframe-mapping-setup-offer.md](./task.246.qa.2.wireframe-mapping-setup-offer.md)
-- **Gate File**: [task.246.gate.2.wireframe-mapping-setup-offer.yml](./task.246.gate.2.wireframe-mapping-setup-offer.yml)
+- **Full Report**: [task.246.qa.3.wireframe-mapping-setup-offer.md](./task.246.qa.3.wireframe-mapping-setup-offer.md)
+- **Gate File**: [task.246.gate.3.wireframe-mapping-setup-offer.yml](./task.246.gate.3.wireframe-mapping-setup-offer.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 132 (changed suites); `ci:fast` 6883, 0 failed
+- **Tests Executed**: 138 (changed suites); `ci:fast` 6889, 0 failed
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Cycle 1's findings are fixed (BUG-1 closed). The cycle 2 refute pass found three medium bugs: a
-wildcard alias proposed as a bare prefix (BUG-3), `False` not declining (BUG-4), and a block-list
-path key crashing `detect` (BUG-5). It also found three low ones: a BOM hiding `ui:`, the indent
-taken from a comment (BUG-2 reopened), and NEL refused by `record`.
+The cycle 2 findings are fixed; BUG-2, BUG-3 and BUG-4 are closed. Filling a blank path key removes
+the list under it but stops at a blank line or comment, so `configure` answers `write-failed` on a
+valid layout (BUG-5 reopened). The same code deletes a comment indented under the key (low).
 
 <!-- change-log-start -->
 ## Change Log
@@ -650,6 +649,8 @@ taken from a comment (BUG-2 reopened), and NEL refused by `record`.
 | 2026-10-30 |         | QA findings fixed — cycle 1: 2 bugs and 3 low findings, plus advisory CR-3 and CR-4; 4 new tests | qa-fix |
 | 2026-10-30 |         | QA gate CONCERNS (70/100) — 6 findings | qa-task |
 | 2026-10-30 |         | QA findings fixed — cycle 2: 3 bugs and 3 low findings, plus a quoted `ui:` key; 6 new tests | qa-fix |
+| 2026-10-30 |         | QA gate CONCERNS (90/100) — 2 findings | qa-task |
+| 2026-10-30 |         | QA findings fixed — cycle 3: 1 bug and 1 low finding; 1 new test | qa-fix |
 <!-- change-log-end -->
 
 ---

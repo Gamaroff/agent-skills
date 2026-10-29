@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'Medium'
 created: '2026-10-30'
@@ -12,7 +12,7 @@ description: 'detect proposes the bare prefix of a wildcard tsconfig alias, whic
 
 **Bug ID**: TASK-246-BUG-3
 **Related**: [task.246](./task.246.wireframe-mapping-setup-offer.md)
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Priority**: Medium
 **Severity**: Major
 **Created**: 2026-10-30
@@ -112,6 +112,7 @@ evidence `tsconfig.json paths alias @ui/* is a wildcard…`.
 | 2026-10-30 | New    | QA Engineer | Bug created |
 | 2026-10-30 | In Progress | qa-fix | Investigation started (cycle 2) |
 | 2026-10-30 | Ready for QA | qa-fix | Fixed in QA cycle 2; see Developer Fix Cycle |
+| 2026-10-30 | Closed | qa-task | Verified in QA cycle 3 (task.246.qa.3.wireframe-mapping-setup-offer.md) |
 
 ---
 

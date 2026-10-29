@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'Medium'
 created: '2026-10-30'
@@ -12,7 +12,7 @@ description: 'a ui: key written with no value is missing to detect and present t
 
 **Bug ID**: TASK-246-BUG-2
 **Related**: [task.246](./task.246.wireframe-mapping-setup-offer.md)
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Priority**: Medium
 **Severity**: Major
 **Created**: 2026-10-30
@@ -160,6 +160,7 @@ BOM and no quotes each turn a test red.
 | 2026-10-30 | Reopened | qa-task | Partial (CR2-5): a blank key under a deeper first comment is not found; see task.246.qa.2.wireframe-mapping-setup-offer.md |
 | 2026-10-30 | In Progress | qa-fix | Investigation started (cycle 2) |
 | 2026-10-30 | Ready for QA | qa-fix | Fixed in QA cycle 2; see Developer Fix Cycle |
+| 2026-10-30 | Closed | qa-task | Verified in QA cycle 3 (task.246.qa.3.wireframe-mapping-setup-offer.md) |
 
 ---
 

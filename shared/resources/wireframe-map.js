@@ -1430,31 +1430,43 @@ function configure(root, opts) {
       return { last, indent: indent || "  " };
     };
     const eol = eolOf(before);
-    const { last, indent } = scan();
-    const lines = Object.entries(written)
-      .filter(([k]) => !(k in blank))
-      .flatMap(([k, v]) => yamlLines(k, v, indent));
-    if (lines.length) {
-      const lead = pieces[last].endsWith("\n") ? "" : eol;
-      pieces.splice(last + 1, 0, lead + lines.join(eol) + eol);
-    }
+    const { indent } = scan();
     // A blank key is rewritten where it stands, with any list under it: a list under a path key
-    // is no value there, and left in place it would hang off the new one.
+    // is no value there, and left in place it would hang off the new one. Blank lines and
+    // comments among the value lines stay where they are, as yaml-subset reads past both.
     const under = new RegExp(`^${indent}(\\s|-(\\s|$))`);
     for (const [k, v] of Object.entries(blank)) {
       const end = scan().last;
       const key = new RegExp(`^${indent}["']?${k}["']?\\s*:`);
       const j = pieces.findIndex((p, n) => n > at && n <= end && key.test(p));
       if (j < 0) return out("exists", { key: k });
-      let n = j + 1;
-      while (n < pieces.length && pieces[n].trim() && under.test(pieces[n]))
-        n++;
-      const tail = /\r?\n$/.exec(pieces[n - 1]);
-      pieces.splice(
-        j,
-        n - j,
-        yamlLines(k, v, indent).join(eol) + (tail ? tail[0] : ""),
-      );
+      const drop = [];
+      for (let n = j + 1; n < pieces.length; n++) {
+        if (!pieces[n].trim() || /^\s*#/.test(pieces[n])) continue;
+        if (!under.test(pieces[n])) break;
+        drop.push(n);
+      }
+      // A file that ended without a newline still does when its last line goes.
+      const unterminated =
+        drop.includes(pieces.length - 1) &&
+        !pieces[pieces.length - 1].endsWith("\n");
+      const tail = /\r?\n$/.exec(pieces[j]);
+      pieces[j] = yamlLines(k, v, indent).join(eol) + (tail ? tail[0] : "");
+      for (const n of drop.reverse()) pieces.splice(n, 1);
+      if (unterminated)
+        pieces[pieces.length - 1] = pieces[pieces.length - 1].replace(
+          /\r?\n$/,
+          "",
+        );
+    }
+    // The other missing keys go after the block's last key line, as it stands after the fills.
+    const { last } = scan();
+    const lines = Object.entries(written)
+      .filter(([k]) => !(k in blank))
+      .flatMap(([k, v]) => yamlLines(k, v, indent));
+    if (lines.length) {
+      const lead = pieces[last].endsWith("\n") ? "" : eol;
+      pieces.splice(last + 1, 0, lead + lines.join(eol) + eol);
     }
     text = pieces.join("");
     action = "inserted";

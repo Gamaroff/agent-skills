@@ -1378,6 +1378,63 @@ test("a list under a path key is no value: detect reads partial, configure needs
   }
 });
 
+test("configure removes the list under a blank key past blank lines and comments, and keeps them", () => {
+  const cases = [
+    // [before, after]: the barrel is filled, the map inserted after the block's last key line.
+    [
+      "ui:\n  componentBarrel:\n\n    - src/x.ts\n  componentCatalogue: c.md\nother: 1\n",
+      'ui:\n  componentBarrel: "b.ts"\n\n  componentCatalogue: c.md\n  wireframeMap: "m.md"\nother: 1\n',
+    ],
+    [
+      "ui:\n  componentBarrel:\n  # note\n    - src/x.ts\n  componentCatalogue: c.md\n",
+      'ui:\n  componentBarrel: "b.ts"\n  # note\n  componentCatalogue: c.md\n  wireframeMap: "m.md"\n',
+    ],
+    [
+      "ui:\n  componentBarrel:\n    # set me later\n  componentCatalogue: c.md\n",
+      'ui:\n  componentBarrel: "b.ts"\n    # set me later\n  componentCatalogue: c.md\n  wireframeMap: "m.md"\n',
+    ],
+    [
+      "ui:\r\n  componentBarrel:\r\n    - a.ts\r\n    # mid\r\n    - b.ts\r\n  componentCatalogue: c.md\r\n",
+      'ui:\r\n  componentBarrel: "b.ts"\r\n    # mid\r\n  componentCatalogue: c.md\r\n  wireframeMap: "m.md"\r\n',
+    ],
+  ];
+  for (const [before, after] of cases) {
+    const root = project({ "skills-config.yaml": before });
+    try {
+      assert.equal(detect(root).state, "partial", JSON.stringify(before));
+      const r = configure(root, { barrel: "b.ts", map: "m.md" });
+      assert.equal(r.reason, "ok", JSON.stringify(before));
+      assert.equal(config(root), after);
+      assert.equal(detect(root).state, "configured");
+    } finally {
+      cleanup(root);
+    }
+  }
+  // A list on the file's last line, with no newline: the file still ends without one, and a key
+  // inserted after a filled one follows it directly.
+  const lastLines = [
+    [
+      { map: "m.md" },
+      "ui:\n  componentBarrel: b.ts\n  wireframeMap:\n    - m.md",
+      'ui:\n  componentBarrel: b.ts\n  wireframeMap: "m.md"',
+    ],
+    [
+      { barrel: "b.ts", map: "m.md" },
+      "ui:\n  componentCatalogue: c.md\n  componentBarrel:\n    - src/x.ts",
+      'ui:\n  componentCatalogue: c.md\n  componentBarrel: "b.ts"\n  wireframeMap: "m.md"\n',
+    ],
+  ];
+  for (const [opts, before, after] of lastLines) {
+    const root = project({ "skills-config.yaml": before });
+    try {
+      assert.equal(configure(root, opts).reason, "ok", JSON.stringify(before));
+      assert.equal(config(root), after);
+    } finally {
+      cleanup(root);
+    }
+  }
+});
+
 test("detect and configure find a ui: key quoted or after a byte-order mark, as yaml-subset does", () => {
   for (const before of [
     `${String.fromCharCode(0xfeff)}ui:\n  componentBarrel: b.ts\n`,

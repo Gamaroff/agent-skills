@@ -1,0 +1,65 @@
+schema: 2
+task: 'task.246.wireframe-mapping-setup-offer'
+task_title: 'Wireframe mapping setup offer and first-run candidates'
+gate: CONCERNS
+status_reason: 'All six cycle 2 findings are fixed and verified, and the configure value guard still engages on all 17 probe cases, but the scoped review of the cycle 2 fix found that removing a list under a blank path key stops at a blank line or comment (setup fails with write-failed on a valid file) and deletes a comment under the key.'
+reviewer: 'QA Engineer'
+head: '1f6477a9b51fe4706695dd7c9ef527c0cdb697ad'
+updated: '2026-10-29T22:52:38Z'
+
+top_issues:
+  - id: 'TASK-246-CR3-1'
+    severity: medium
+    file: 'shared/resources/wireframe-map.js'
+    finding: 'When configure rewrites a blank path key, the loop removing the list under it stops at a blank line or a same-indent comment, which yaml-subset skips: "componentBarrel:" then a blank line then "- src/x.ts" leaves the list hanging off the new scalar, so configure answers write-failed on a valid file and setup cannot complete (BUG-5 reopened).'
+    suggested_action: 'Skip blank and comment lines while removing the list, stopping only at the next line that is neither indented further nor a same-indent list item; test a blank line and a comment between the key and its list.'
+    suggested_owner: dev
+    bug_ref: 'task.246.bug.5.block-list-path-key-crashes-detect.md'
+    status: open
+  - id: 'TASK-246-CR3-2'
+    severity: low
+    file: 'shared/resources/wireframe-map.js'
+    finding: 'The `under` pattern matches comment lines indented below a blank key, so filling "componentBarrel:" deletes "    # set me later" beneath it, against the promise that configure keeps every other byte (reviewer confidence medium; QA reproduced).'
+    suggested_action: 'Remove only list-item and nested-value lines under a blank key and keep comment lines; test that a comment under a filled key survives.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 138
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 17
+    escaped: 0
+    notes: 'boundary: true — the configure --map value guard changed this cycle (decline refusal, YAML_LINE_BREAK), so the cycle 2 cases were re-run with the cli: form (task.246.qa.2.configure-value-cases.json, record task.246.qa.3.security.run.json): 10 hostile refused, 7 legitimate accepted, verdict engages. Map paths are still not containment-checked (pre-existing).'
+  performance:
+    status: PASS
+    notes: 'The blank-key loop rescans the block once per blank key (at most six keys); negligible.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR3-1 leaves setup unable to complete on a valid layout; configure restores the file, so nothing is corrupted.'
+  maintainability:
+    status: PASS
+    notes: 'Prettier clean; detect, configure and readUiConfig now share one presence rule, one decline rule and one ui: line pattern.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Map and catalogue paths are not checked for containment in the repository (ensure/record write where the config points); pre-existing, now also reachable through configure.'
+      refs: ['shared/resources/wireframe-map.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-246-CR3-1 fixed and re-reviewed']

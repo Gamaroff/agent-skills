@@ -101,6 +101,41 @@ red.
 **Verification Steps for QA**: rerun the cycle 2 reproduction; `detect` answers `partial` instead of
 throwing.
 
+### Iteration 2
+
+#### Investigation (Reopened → In Progress)
+
+**Date**: 2026-10-30
+**Developer**: qa-fix (develop-task, QA cycle 3)
+
+**Root Cause Analysis** (CR3-1, CR3-2): the loop that removed the list under a filled key stopped
+at the first blank line, and it treated a comment as part of the list. yaml-subset reads past both,
+so a list after a blank line or a same-indent comment was left under the new scalar
+(`write-failed`), and a comment indented under the key was deleted.
+
+#### Fix Implementation (In Progress → Ready for QA)
+
+**Date**: 2026-10-30
+
+**Fix Description**: the removal skips blank and comment lines, keeping them in place, and removes
+only list items and deeper value lines. It stops at the first line that is neither. A file that
+ended without a newline still does. Blank keys are now filled before the missing keys are
+inserted, so an insert follows the filled key directly.
+
+**Files Modified**:
+
+- `shared/resources/wireframe-map.js` — `configure` (blank-key fill, insert order)
+- `shared/resources/tests/wireframe-map.test.mjs` — "configure removes the list under a blank key
+  past blank lines and comments, and keeps them"
+
+**Testing**: four layouts (a blank line before the list, a same-indent comment, a comment under the
+key, a comment between list items with CRLF) and two last-line cases without a newline. Each
+asserts the exact bytes, then `detect` → `configured`. Mutation-proven: stopping at a blank line or
+comment, removing comments with the list, and adding a final newline each turn the test red.
+
+**Verification Steps for QA**: rerun the cycle 3 reproductions; both answer `ok` and keep every
+comment.
+
 ---
 
 ## Status History
@@ -110,6 +145,9 @@ throwing.
 | 2026-10-30 | New    | QA Engineer | Bug created |
 | 2026-10-30 | In Progress | qa-fix | Investigation started (cycle 2) |
 | 2026-10-30 | Ready for QA | qa-fix | Fixed in QA cycle 2; see Developer Fix Cycle |
+| 2026-10-30 | Reopened | qa-task | Partial (CR3-1): the list under a blank key is not removed past a blank line or comment; see task.246.qa.3.wireframe-mapping-setup-offer.md |
+| 2026-10-30 | In Progress | qa-fix | Investigation started (cycle 3) |
+| 2026-10-30 | Ready for QA | qa-fix | Fixed in QA cycle 3; see Iteration 2 |
 
 ---
 
