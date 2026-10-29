@@ -273,4 +273,5 @@ loop budget is spent.
 | 2026-10-29 |  | QA gate CONCERNS (70/100) — bug.7–9 verified and closed; 3 new medium findings in the Step 1 placement (bug.10–12), 2 low | qa-task |
 | 2026-10-29 |  | QA findings fixed — cycle 4, 5 findings (bug.10–12 Ready for QA, CR4-4, CR4-5): wireframe writes at the start of Step 2, behind the 0c-wire gate, with a jq key check that halts on an unreadable file | qa-fix |
 | 2026-10-29 |  | QA gate CONCERNS (90/100) — bug.10–12 verified and closed; 1 new medium finding (bug.13: a resume past Step 2 skips the wireframe writes), 1 low | qa-task |
+| 2026-10-29 |  | QA findings fixed — cycle 5 (granted), 2 findings (bug.13 Ready for QA, CR5-2): Step 3 stops on this document's held answers; a missing document key halts | qa-fix |
 <!-- change-log-end -->

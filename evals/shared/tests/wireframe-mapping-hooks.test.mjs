@@ -291,6 +291,9 @@ test("Step 2's key check halts on an unreadable answers file and keeps it", () =
   for (const content of [
     "not json",
     JSON.stringify([{ signature: "*>button" }]),
+    // No document key to check is not "another document" (QA cycle 5, CR5-2).
+    JSON.stringify({ answers: [] }),
+    JSON.stringify({ document: null, answers: [] }),
   ]) {
     const dir = consumer();
     try {
@@ -303,6 +306,49 @@ test("Step 2's key check halts on an unreadable answers file and keeps it", () =
       assert.notEqual(r.status, 0, `${content}: did not halt`);
       assert.match(r.stdout, /HALT/);
       assert.ok(existsSync(join(dir, HELD)), `${content}: file deleted`);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+// A resume the detector sends to Step 3 skips Step 2, so Step 3 stops on this document's held answers
+// (QA cycle 5, CR5-1, bug.13). Another run's file, an unreadable one, or none at all passes.
+test("Step 3 stops on this document's held answers and passes otherwise", () => {
+  const step3 = read(
+    "shared/resources/develop-pipeline-step-3-develop-loop.md",
+  );
+  const guard = step3.indexOf("## Held wireframe answers");
+  assert.ok(
+    guard > 0 && guard < step3.indexOf("## Pre-develop Codebase Mapping"),
+    "the guard runs before Step 3's codebase mapping",
+  );
+  const block = stepBlock(
+    "shared/resources/develop-pipeline-step-3-develop-loop.md",
+    "## Held wireframe answers",
+    "## Pre-develop Codebase Mapping",
+    { doc: "./docs/story.md" },
+  );
+  for (const [content, halts] of [
+    [null, false],
+    [JSON.stringify({ document: "docs/story.md", answers: [] }), true],
+    [JSON.stringify({ document: "docs/other.md", answers: [] }), false],
+    ["not json", false],
+  ]) {
+    const dir = consumer();
+    try {
+      if (content !== null) {
+        mkdirSync(join(dir, ".claude/state"), { recursive: true });
+        writeFileSync(join(dir, HELD), content);
+      }
+      const r = spawnSync("bash", ["-c", block], {
+        cwd: dir,
+        encoding: "utf8",
+      });
+      assert.equal(r.status !== 0, halts, `${content}: ${r.stdout}${r.stderr}`);
+      if (halts) assert.match(r.stdout, /HALT/);
+      if (content !== null)
+        assert.ok(existsSync(join(dir, HELD)), `${content}: file deleted`);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

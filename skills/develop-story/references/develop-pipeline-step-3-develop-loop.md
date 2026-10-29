@@ -12,6 +12,30 @@ Loaded by `/develop-story` and `/develop-task` during Step 3. Story/task variant
 
 ---
 
+## Held wireframe answers (develop-story, develop-task)
+
+Step 2 writes Phase 0's wireframe answers into the document and then deletes the file that held
+them. A resume can land here without Step 2 having run: the detector can recommend Step 3 for a
+run that stopped inside Step 2. So, first:
+
+```bash
+HELD=.claude/state/wireframe-answers.json
+DOC='{document-file}'
+if [ -f "$HELD" ] && jq -e --arg d "$DOC" \
+     '(.document | type) == "string" and (.document | ltrimstr("./")) == ($d | ltrimstr("./"))' \
+     "$HELD" >/dev/null 2>&1; then
+  echo "HALT: $HELD still holds this document's wireframe answers — run Step 2 § Wireframe writes, then return to Step 3"
+  exit 1
+fi
+```
+
+On that `HALT`, run [Step 2 § Wireframe writes](develop-pipeline-step-2-review.md#wireframe-writes-before-the-gate-check)
+now, then start Step 3 again. Do not delete the file to get past the check: it holds the user's
+answers. The check fires only on this document's answers. Another run's file, or one that cannot be
+read, is Step 2's to judge, so `develop-bug` (no wireframe questions) is never stopped by it.
+
+---
+
 ## Pre-develop Codebase Mapping (CRITICAL for context efficiency)
 
 > This step invokes `/develop`, but the Explore subagent and plan file discovery below must run first. Do not invoke `/develop` until those are complete.

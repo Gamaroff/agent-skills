@@ -25,11 +25,13 @@ idempotent, so a run interrupted here simply runs it again.
 ```bash
 command node .agents/skills/{develop-story|develop-task}/references/wireframe-map.js ensure --json
 # 0d's held answers, keyed to the document they answer. Compared inside jq, so the path is never
-# expanded by the shell, and with any leading ./ removed from both sides.
+# expanded by the shell, and with any leading ./ removed from both sides. A file whose document key
+# is missing or not a string cannot be checked, so it is an error (exit 5), not another document.
 HELD=.claude/state/wireframe-answers.json
 DOC='{document-file}'
 if [ -f "$HELD" ]; then
-  jq -e --arg d "$DOC" '((.document // "") | ltrimstr("./")) == ($d | ltrimstr("./"))' "$HELD" >/dev/null
+  jq -e --arg d "$DOC" 'if (.document | type) != "string" then error("no document key")
+    else (.document | ltrimstr("./")) == ($d | ltrimstr("./")) end' "$HELD" >/dev/null
   rc=$?
   case $rc in
     0) ;; # this document's answers
@@ -39,8 +41,8 @@ if [ -f "$HELD" ]; then
 fi
 ```
 
-A `HALT` line means the file holds this run's answers in a form that cannot be checked, or `jq` is
-missing. Stop and report it. Deleting the file would lose the answers silently, and the review
+A `HALT` line means the file holds answers in a form that cannot be checked (not JSON, not an
+object, or no `document` key), or `jq` is missing. Stop and report it. Deleting the file would lose the answers silently, and the review
 would then report those nodes as never answered.
 
 1. Log `ensure`'s report in the Decisions Log. A file it `created` or `updated` is committed with the work.
