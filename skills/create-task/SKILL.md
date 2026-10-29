@@ -1,7 +1,7 @@
 ---
 name: create-task
 description: Create comprehensive technical task documentation for refactoring, infrastructure changes, and technical improvements. Interactive workflow with decision guidance for non-user-facing work. `--from-observation` with a list of observation ids seeds the task from observation-log entries, asks only what they leave open, and parks the entries on the new task.
-invokes: [ensure-task-github-issue, ensure-task-jira-issue, mermaid-architect]
+invokes: [ensure-task-github-issue, ensure-task-jira-issue, mermaid-architect, wireframe]
 ---
 
 > **Status lifecycle**: see [`references/document-status-lifecycle.md`](references/document-status-lifecycle.md)
@@ -491,6 +491,24 @@ After the Implementation Plan and Technical Background are populated, decide whe
 2. The skill returns a Mermaid block (with YAML metadata header) and a 2-sentence "Architectural assumptions" summary.
 3. Paste the block into Section 3 (Technical Background) under a "Current vs Target Architecture" subheading, OR into Section 6 (Implementation Plan) under a "Decision Flow" subheading — whichever is more relevant.
 4. Accept `no diagram justified — {reason}` without pushing back.
+
+### 2.6 Check for UI/Wireframe Opportunity (conditional, via `wireframe`)
+
+Most tasks draw nothing. A task that does — it migrates a screen onto shared components, rebuilds a layout, or changes what a user sees — gets the same wireframe treatment as a story (`create-story` 5.4.6), so both kinds of work item reach the develop pipelines in the same shape.
+
+**Detection rule**: the task touches frontend screens, components, layout, navigation or styles, or its Success Criteria name something a user sees.
+
+**Process**:
+
+1. **If the rule matches**, ask with `AskUserQuestion`:
+   - **Header**: `Wireframe`
+   - **Question**: "This task changes a user interface (UI) that can be visualized as a wireframe. Would you like to add a wireframe for this task using the `wireframe` skill?"
+   - **Options**: `Yes — Add wireframe (Recommended)` / `No — Skip wireframe`
+2. **If Yes**:
+   - **If the screen already has a wireframe document** made from its design source (`<stem>.wireframe.md` beside it), copy its blocks verbatim and link the file. Otherwise invoke `wireframe` and follow its **Working from a brief** section, with the task's Scope and Success Criteria as the brief.
+   - Embed it in Section 3 (Technical Background) under a `### Visual Layout / Wireframe` subheading: the rendered SVG beside the task file, then its ` ```wireloom ` source. Run `wireframe`'s `check` until it reports `ok`.
+   - Add an Implementation Plan step: `Implement the UI to match the wireframe (see Technical Background › Visual Layout / Wireframe)`.
+3. **Link the wireframe's nodes to components** (only when `skills-config.yaml` sets `ui.wireframeMap`; otherwise skip silently). Follow `references/wireframe-component-mapping.md` (engine: `references/wireframe-map.js`) with the author present, exactly as `create-story` does: `ensure`, `resolve`, propose, ask about every open node, then write the component table under the wireframe and each confirmed answer into the map.
 
 ### 3. Validation Before File Creation
 

@@ -621,6 +621,24 @@ Store `ALWAYS_LOAD_FILES` as a pipeline-wide variable — it is consumed in Step
 
 ---
 
+## 0c-wire. Resolve Wireframe Nodes to Components
+
+Only when `skills-config.yaml` sets `ui.wireframeMap` **and** the document holds a ` ```wireloom ` block; otherwise set `WIREFRAME_OPEN=[]` and skip silently. This section is identical for both orchestrators, and is the develop-time half of [`wireframe-component-mapping.md`](wireframe-component-mapping.md).
+
+```bash
+command node .agents/skills/{develop-story|develop-task}/references/wireframe-map.js ensure --json
+command node .agents/skills/{develop-story|develop-task}/references/wireframe-map.js resolve {document-file} --json \
+  > .claude/state/wireframe-map.json
+```
+
+1. Log `ensure`'s report in the Decisions Log. A file it `created` or `updated` is committed with the work.
+2. Drop from `unresolved[]` every node the document's own component table already settles: the author answered it at `create-story` / `create-task` time. What remains is `WIREFRAME_OPEN`.
+3. For each node in `WIREFRAME_OPEN`, prepare the proposal the mapping procedure's step 4 describes (design source, catalogue, candidates). Phase 0 stays side-effect free: nothing is written to the map or the document yet.
+
+`WIREFRAME_OPEN` feeds 0d. Store the resolved table (`resolved[]` plus the document's own table) as `WIREFRAME_TABLE` for Step 3.
+
+---
+
 ## 0d. Upfront Setup — Gather All Decisions Before Execution
 
 Check the current branch:
@@ -719,6 +737,8 @@ If the user selects "Other" for Q1 or Q2, follow up with a plain text request fo
 
 **No Q3** — qa-planning skip is silent (see paragraph above).
 
+**Wireframe questions** (only when `WIREFRAME_OPEN` from 0c-wire is non-empty). One question per open node, or per group of nodes that share a signature and label pattern, built as the mapping procedure's step 5 sets out, with the proposal as **(Recommended)**. `--defaults` answers them all with their Recommended option and logs each as an assumption — never as a confirmation. `AskUserQuestion` takes at most four questions per call: put as many as fit beside Q1/Q2 in the one call, and the rest in follow-up calls straight after it, still before Step 1. After asking, record each answer into the document's component table and each confirmed one into the map with `wireframe-map.js record`; this is the one write Phase 0 makes, and it happens only after the person has answered.
+
 ### Answer resolution — ask only what nothing answers
 
 Every answer resolves in one order: **flag → consumer policy → derived recommendation → ask**
@@ -792,7 +812,7 @@ Log one Decisions Log line per answer: `{question}: {value} — source: {flag|po
 | `develop-story` | Q1 (branch base) + Q2 (PR target), minus every one the resolver answered | **`questions[]`** |
 | `develop-task`  | Q1 (branch base) + Q2 (PR target), minus every one the resolver answered | **`questions[]`** |
 
-With no flags and no policy that is **2**, exactly as before. `--defaults` with nothing in conflict is **0** — skip the `AskUserQuestion` call entirely. Resume cases skip any question the lock's `answers` settles (a legacy lock: any already recorded in the Decisions Log) — typical resume: 0 questions.
+Plus one wireframe question per open node group from 0c-wire — **0** when `ui.wireframeMap` is unset, the document has no wireframe, or every node is settled; those go in the same call while it has room, then in follow-up calls. With no flags, no policy and no open wireframe node that is **2**, exactly as before. `--defaults` with nothing in conflict is **0** — skip the `AskUserQuestion` call entirely. Resume cases skip any question the lock's `answers` settles (a legacy lock: any already recorded in the Decisions Log) — typical resume: 0 questions.
 
 If your count does not match the required count for the detected scenario, fix the call before invoking the tool. Do NOT invent additional questions ("Run mode?", "Auto-continue?", etc.) — pipeline mode is autonomous (lite-mode detection runs in 0a-parallel Agent 3) and any other policy comes from `references/develop-pipeline-autonomous-defaults.md`. Adding undocumented questions causes UX drift and may suppress the documented ones (observed regression in live-github-test).
 

@@ -230,6 +230,16 @@ observations:
   # when the skills being observed are installed at user scope and their
   # observations belong in one place across every project.
   workspace: ~/.agents/skill-observations
+
+# Link Wireloom wireframe nodes to your own UI components. Optional; omit the block
+# and no skill reads a wireframe for components. See "UI — wireframes and components".
+ui:
+  componentCatalogue: docs/architecture/components.md # markdown list of the components
+  componentImport: "@your-org/ui" # the module code must import them from
+  componentBarrel: src/components/index.ts # entry file whose exports are the components
+  catalogueSection: "## Components" # heading the catalogue rows sit under
+  componentExclude: [] # exports that draw nothing (providers and the like)
+  wireframeMap: docs/architecture/wireframe-component-map.md # confirmed links
 ```
 
 `develop-batch` reuses the `developNext:` keys above (same roadmap, base branch, merge
@@ -317,6 +327,33 @@ gate, and strategy — single-item and batch runs never diverge) and adds
 | `loopSupervisor.dashboardUrl`                    | URL                             | unset                                            | Where `loop-supervisor` POSTs a status frame on each iteration boundary. Inert when unset. `--dashboard` overrides. The payload contract is in [`skills/loop-supervisor/README.md`](../../skills/loop-supervisor/README.md#publishing-the-run-to-a-dashboard); a failed push warns once and never affects the run. **The token is deliberately not a config key** — this file is committed, so it comes from `--dashboard-token` or `$LOOP_SUPERVISOR_DASHBOARD_TOKEN` instead. |
 | `loopSupervisor.adapters.<name>`                 | map of paths                    | (adapter defaults)                               | Per-adapter overrides for `stateFile`, `lockFile`, `haltFile`, `probeScript` and `command`. **Declarative only** — a config key that could name a module to `require()` would be a code-execution surface, so JavaScript adapters are deliberately not supported. Without an override, the `develop-next` and `develop-batch` `probeScript` is the first of `.agents/skills/`, `.claude/skills/` and `skills/` (each followed by `develop-next/scripts/select-next.mjs`) that exists under the project root. When none exists, the probe stops with `probe script not found`, listing the paths searched. A configured `probeScript` wins and is never searched; one Node cannot resolve as a script to run is reported by its configured path. |
 | `observations.workspace`                         | path (absolute or `~`-relative) | `~/.claude/projects/<project-path with / → ->`   | Root of the `observe-work` observation workspace — the anchor holding `skill-observations/` (the log, the families registry, the review date) and `skill-updates/` (staged skill updates). **Highest-precedence source**; `$OBS_WORKSPACE` is second and the project-identity path is the default, so an absent key is a working default rather than a disabled feature. That default is the project's absolute path with every `/` replaced by `-`, under `~/.claude/projects/` — so `/Users/ada/Projects/app` resolves to `~/.claude/projects/-Users-ada-Projects-app`. Note it is `.claude/`, not `.agents/`: this one path is fixed by the agent home, not by this repository's agent-agnostic-path convention. Must be one stable path that outlives a session: a resolved value inside `/tmp`, `.claude/worktrees/`, or a linked git worktree is **refused outright**, not warned about and not silently defaulted. Set it to a shared user-scope path when the skills being observed are installed at user scope — see [Observation workspace](#observation-workspace). There is deliberately **no `observations.enabled` and no `observations.review_interval_days`**: nothing reads either, and the review-staleness threshold is the `OBS_STALE_DAYS` environment variable instead. |
+| `ui.componentCatalogue`                          | path                            | unset                                            | Markdown file listing the project's UI components. Skills that read a wireframe propose components from it. Seeded from `ui.componentBarrel` when missing; an existing file only gains rows for exports it lacks. See [UI — wireframes and components](#ui--wireframes-and-components). |
+| `ui.componentImport`                             | module specifier                | unset                                            | The module code must import the components from. QA and `review-pr` check each mapped component is imported from it. |
+| `ui.componentBarrel`                             | path                            | unset                                            | Entry file whose value exports are the components: `export { … } from` and `export * from` are followed, and only PascalCase names are kept. |
+| `ui.catalogueSection`                            | heading line                    | `## Components`                                  | The catalogue heading whose tables hold one row per component, named in the first cell as `` `Name` ``. |
+| `ui.componentExclude`                            | list[name]                      | `[]`                                             | Exports that are not drawn components (a theme provider, for example). |
+| `ui.wireframeMap`                                | path                            | unset                                            | The project's map of wireframe-node-to-component links, each confirmed by a person. **Setting it turns the feature on.** Created by the skills when missing. |
+
+## UI — wireframes and components
+
+A Wireloom wireframe records a screen's parts and their order, not which component draws each part.
+With a `ui:` block, `create-story`, `create-task`, `develop-story` and `develop-task` resolve every
+wireframe node to one of your components: they apply links people have already confirmed, ask about
+the rest (or, unattended, assume the best match and flag it for QA), and add each answer to
+`ui.wireframeMap`. Review, QA and `review-pr` check the result. Procedure:
+[`wireframe-component-mapping.md`](../../shared/resources/wireframe-component-mapping.md).
+
+**You do not need to write either file.** The first skill that needs them creates them: the
+catalogue with one row per component `ui.componentBarrel` exports (purpose taken from each
+component's doc comment, or `_describe me_`), and the map with its header and an empty table. Later
+runs add a catalogue row for each new export, under `### Added by wireframe-map`, and never change a
+row you wrote. A file that exists but cannot be read is left alone and reported.
+
+**The map's rows** are `Signature | Label | Component | Variant / props | Source hint | Notes |
+Confirmed`. A signature is `parent>primitive[flag]{key=value}`: `*>button[primary]`,
+`footer>button[primary]`, `row>icon{name=leader}`. The Label column, when set, must match the
+node's quoted label (`/regex/` for a pattern). The row with the most constraints wins. A Component of
+`(layout)` marks a node that draws nothing of its own. Edit the rows freely.
 
 ## QA artifacts are co-located
 

@@ -39,6 +39,7 @@ Ask it to find: all files likely affected by the success criteria and implementa
   ...
   ```
   If `ALWAYS_LOAD_FILES` is empty (all files were missing), log a warning and proceed without them.
+- **Wireframe component table** (only when Phase 0c-wire ran): pass `WIREFRAME_TABLE` labelled `Wireframe nodes → components (build each node from the component named; import from {ui.componentImport})`, followed by every assumption 0d logged, labelled `Assumed, not confirmed — QA checks these`. `/develop` builds from the table, never from the Wireloom primitive alone.
 - See `/develop` SKILL.md **Caller-Supplied Context** section for the full contract on how orchestrators may prepend context (surface map, plan file path, always-load files, iteration hint) and how `/develop` must honour it.
 
 ---

@@ -1057,6 +1057,8 @@ cycles had read showed the check passing (obs #119).
 | TypeScript compilation | 0 errors | 0 errors | PASS   |       |
 | Documentation          | Updated  | Complete | PASS   |       |
 
+**Wireframe conformance** (only when the task has a wireframe component table and `skills-config.yaml` sets `ui.wireframeMap`; procedure: `references/wireframe-component-mapping.md`). For each row, the changed UI builds that node from the component named, imported from `ui.componentImport`, with the variant the row gives; a node rebuilt by hand or from another component is a `category: coverage` finding. For each entry under `### Wireframe mapping assumptions` in the implementation report's Decisions Log, check the assumed component against the design source the wireframe came from, and record the verdict in the QA report; a wrong assumption is a `high` finding, and a right one may then be recorded in the map with `wireframe-map.js record` (`references/wireframe-map.js`).
+
 ### Step 6: Validate Breaking Changes
 
 For each breaking change documented in the task:
