@@ -241,20 +241,19 @@ catalogue files stay as they are.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.243.qa.5.wireframe-component-mapping.md](./task.243.qa.5.wireframe-component-mapping.md)
-- **Gate File**: [task.243.gate.5.wireframe-component-mapping.yml](./task.243.gate.5.wireframe-component-mapping.yml)
+- **Full Report**: [task.243.qa.6.wireframe-component-mapping.md](./task.243.qa.6.wireframe-component-mapping.md)
+- **Gate File**: [task.243.gate.6.wireframe-component-mapping.yml](./task.243.gate.6.wireframe-component-mapping.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 34 (wireframe suites); 6836 in the cycle 4 fast gate
+- **Tests Executed**: 35 (wireframe suites); 6837 in the cycle 5 fast gate
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Key Findings
-The cycle 4 fixes hold, and `task.243.bug.10`–`12` are closed. One medium gap remains: a resume
-that the detector sends past Step 2 skips the wireframe writes (bug.13). One low finding remains: a
-held file with no document key is deleted rather than halted on. This is the fifth gate, so the QA
-loop budget is spent.
+The cycle 5 fixes hold, and `task.243.bug.13` is closed. One medium gap remains: the new Step 3
+guard has no gate, while the Step 2 writes it sends the run to do (bug.14). There are also two low
+findings on the guard's checks and tests.
 
 ## Change Log
 
@@ -274,4 +273,6 @@ loop budget is spent.
 | 2026-10-29 |  | QA findings fixed — cycle 4, 5 findings (bug.10–12 Ready for QA, CR4-4, CR4-5): wireframe writes at the start of Step 2, behind the 0c-wire gate, with a jq key check that halts on an unreadable file | qa-fix |
 | 2026-10-29 |  | QA gate CONCERNS (90/100) — bug.10–12 verified and closed; 1 new medium finding (bug.13: a resume past Step 2 skips the wireframe writes), 1 low | qa-task |
 | 2026-10-29 |  | QA findings fixed — cycle 5 (granted), 2 findings (bug.13 Ready for QA, CR5-2): Step 3 stops on this document's held answers; a missing document key halts | qa-fix |
+| 2026-10-29 |  | QA gate CONCERNS (90/100) — bug.13 verified and closed; 1 new medium finding (bug.14: the Step 3 guard is ungated while the Step 2 writes are gated), 2 low | qa-task |
+| 2026-10-29 |  | QA findings fixed — cycle 6, 3 findings (bug.14 Ready for QA, CR6-2, CR6-3): the Step 3 guard shares Step 2's gate and key check | qa-fix |
 <!-- change-log-end -->

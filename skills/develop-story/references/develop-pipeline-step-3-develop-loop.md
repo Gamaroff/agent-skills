@@ -14,25 +14,35 @@ Loaded by `/develop-story` and `/develop-task` during Step 3. Story/task variant
 
 ## Held wireframe answers (develop-story, develop-task)
 
+Only when `skills-config.yaml` sets `ui.wireframeMap` **and** the document holds a ` ```wireloom `
+block, the gate of [Step 2 § Wireframe writes](develop-pipeline-step-2-review.md#wireframe-writes-before-the-gate-check);
+otherwise skip. The two must share one gate: this check sends the run to that section, and a
+section that skips would send it straight back here. `develop-bug` asks no wireframe questions and
+skips this section. With the gate false, held answers are not written, because the feature is off
+for this document. The next fresh run's 0c-wire deletes the file.
+
 Step 2 writes Phase 0's wireframe answers into the document and then deletes the file that held
 them. A resume can land here without Step 2 having run: the detector can recommend Step 3 for a
-run that stopped inside Step 2. So, first:
+run that stopped inside Step 2. So, first, with Step 2's own key check:
 
 ```bash
 HELD=.claude/state/wireframe-answers.json
 DOC='{document-file}'
-if [ -f "$HELD" ] && jq -e --arg d "$DOC" \
-     '(.document | type) == "string" and (.document | ltrimstr("./")) == ($d | ltrimstr("./"))' \
-     "$HELD" >/dev/null 2>&1; then
-  echo "HALT: $HELD still holds this document's wireframe answers — run Step 2 § Wireframe writes, then return to Step 3"
-  exit 1
+if [ -f "$HELD" ]; then
+  jq -e --arg d "$DOC" 'if (.document | type) != "string" then error("no document key")
+    else (.document | ltrimstr("./")) == ($d | ltrimstr("./")) end' "$HELD" >/dev/null
+  rc=$?
+  case $rc in
+    0) echo "HALT: $HELD still holds this document's wireframe answers — run Step 2 § Wireframe writes, then return to Step 3"; exit 1 ;;
+    1) ;; # another document's answers: not this run's to write
+    *) echo "HALT: $HELD cannot be read (jq exit $rc) — kept; repair or delete it, then re-run Step 3"; exit 1 ;;
+  esac
 fi
 ```
 
-On that `HALT`, run [Step 2 § Wireframe writes](develop-pipeline-step-2-review.md#wireframe-writes-before-the-gate-check)
-now, then start Step 3 again. Do not delete the file to get past the check: it holds the user's
-answers. The check fires only on this document's answers. Another run's file, or one that cannot be
-read, is Step 2's to judge, so `develop-bug` (no wireframe questions) is never stopped by it.
+On the first `HALT`, run Step 2 § Wireframe writes now, then start Step 3 again. Do not delete the
+file to get past the check: it holds the user's answers. The second `HALT` is the one Step 2 raises
+on the same file, for the same reason.
 
 ---
 

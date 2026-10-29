@@ -312,28 +312,33 @@ test("Step 2's key check halts on an unreadable answers file and keeps it", () =
   }
 });
 
-// A resume the detector sends to Step 3 skips Step 2, so Step 3 stops on this document's held answers
-// (QA cycle 5, CR5-1, bug.13). Another run's file, an unreadable one, or none at all passes.
-test("Step 3 stops on this document's held answers and passes otherwise", () => {
-  const step3 = read(
-    "shared/resources/develop-pipeline-step-3-develop-loop.md",
+const S3 = "shared/resources/develop-pipeline-step-3-develop-loop.md";
+const step3Block = () =>
+  stepBlock(
+    S3,
+    "## Held wireframe answers",
+    "## Pre-develop Codebase Mapping",
+    {
+      doc: "./docs/story.md",
+    },
   );
+
+// A resume the detector sends to Step 3 skips Step 2, so Step 3 stops on this document's held answers
+// (QA cycle 5, CR5-1, bug.13). Another document's file, or none, passes; a file Step 2 would halt on
+// halts here too (QA cycle 6, CR6-2).
+test("Step 3 stops on this document's held answers and passes otherwise", () => {
+  const step3 = read(S3);
   const guard = step3.indexOf("## Held wireframe answers");
   assert.ok(
     guard > 0 && guard < step3.indexOf("## Pre-develop Codebase Mapping"),
     "the guard runs before Step 3's codebase mapping",
   );
-  const block = stepBlock(
-    "shared/resources/develop-pipeline-step-3-develop-loop.md",
-    "## Held wireframe answers",
-    "## Pre-develop Codebase Mapping",
-    { doc: "./docs/story.md" },
-  );
   for (const [content, halts] of [
     [null, false],
     [JSON.stringify({ document: "docs/story.md", answers: [] }), true],
     [JSON.stringify({ document: "docs/other.md", answers: [] }), false],
-    ["not json", false],
+    ["not json", true],
+    [JSON.stringify({ answers: [] }), true],
   ]) {
     const dir = consumer();
     try {
@@ -341,7 +346,7 @@ test("Step 3 stops on this document's held answers and passes otherwise", () => 
         mkdirSync(join(dir, ".claude/state"), { recursive: true });
         writeFileSync(join(dir, HELD), content);
       }
-      const r = spawnSync("bash", ["-c", block], {
+      const r = spawnSync("bash", ["-c", step3Block()], {
         cwd: dir,
         encoding: "utf8",
       });
@@ -353,6 +358,52 @@ test("Step 3 stops on this document's held answers and passes otherwise", () => 
       rmSync(dir, { recursive: true, force: true });
     }
   }
+});
+
+test("Step 3 halts, and keeps the file, when jq is missing", () => {
+  const bash = spawnSync("bash", ["-c", "command -v bash"], {
+    encoding: "utf8",
+  }).stdout.trim();
+  const dir = consumer();
+  try {
+    hold(dir, "docs/story.md");
+    const empty = join(dir, "no-tools");
+    mkdirSync(empty);
+    const r = spawnSync(bash, ["-c", step3Block()], {
+      cwd: dir,
+      encoding: "utf8",
+      env: { PATH: empty },
+    });
+    assert.notEqual(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /HALT/);
+    assert.ok(existsSync(join(dir, HELD)), "file deleted");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// The guard sends the run to Step 2 § Wireframe writes, so the two must share one gate and one key
+// check: a gate only one of them states loops the run (QA cycle 6, CR6-1, bug.14), and two filters
+// drift (CR6-2).
+test("Step 3's guard and Step 2's writes share one gate and one key check", () => {
+  const S2 = "shared/resources/develop-pipeline-step-2-review.md";
+  const section = (rel, from, to) => {
+    const t = read(rel);
+    return t.slice(t.indexOf(from), t.indexOf(to));
+  };
+  const two = section(S2, "## Wireframe writes", "## Gate Check");
+  const three = section(
+    S3,
+    "## Held wireframe answers",
+    "## Pre-develop Codebase Mapping",
+  );
+  const gate =
+    /^Only when `skills-config.yaml` sets `ui.wireframeMap` \*\*and\*\* the document holds a ` ```wireloom `\nblock\b/m;
+  assert.match(two, gate);
+  assert.match(three, gate);
+  const filter = (text) => /jq -e --arg d "\$DOC" '([^']+)'/.exec(text)?.[1];
+  assert.ok(filter(two), "Step 2 lost its key check");
+  assert.equal(filter(three), filter(two));
 });
 
 test("an unattended assumption is flagged, never recorded as confirmed", () => {

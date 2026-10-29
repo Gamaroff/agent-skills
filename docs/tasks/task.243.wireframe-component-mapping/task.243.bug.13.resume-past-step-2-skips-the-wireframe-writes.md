@@ -4,7 +4,7 @@
 **Bug ID**: TASK-243-BUG-13
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-10-29
 
@@ -68,3 +68,4 @@ test for Step 2 gains `{"answers":[]}` and `{"document":null}`. Mutation-proven:
 | 2026-10-29 | New | QA Engineer | Found in QA cycle 5 (code review CR-1), confirmed against the lock contract and the resume detector |
 | 2026-10-29 | In Progress | qa-fix | Root cause identified |
 | 2026-10-29 | Ready for QA | qa-fix | Fix implemented with mutation-proven tests (qa-fix cycle 5) |
+| 2026-10-29 | Closed | QA Engineer | Verified in QA cycle 6: mutation-proven tests hold at 264a8f82 |
