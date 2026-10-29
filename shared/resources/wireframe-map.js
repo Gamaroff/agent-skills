@@ -321,11 +321,17 @@ function readMap(text) {
   return { rows, tableEnd: end, columns: head.length };
 }
 
+// ECMAScript's whole LineTerminator set. A value is one cell on one line: \r and \n split the
+// row, and U+2028/U+2029 — which neither readMap nor Markdown ends a line at — stop unquote's
+// `.` from crossing, so the cell reads back with its backticks and the row never matches.
+const LINE_TERMINATOR = new RegExp(
+  `[\\r\\n${String.fromCharCode(0x2028, 0x2029)}]`,
+);
+
 function parsePattern(sig) {
   // A signature is one table cell on one line. `record` writes it untrimmed, and the
-  // flag and attribute lists below would match across a line break, so a newline
-  // anywhere would split the map row and end the table early.
-  if (/[\r\n]/.test(sig)) return null;
+  // flag and attribute lists below would match across a line terminator.
+  if (LINE_TERMINATOR.test(sig)) return null;
   const m = /^(?:([\w*-]+)>)?([\w-]+)(?:\[([^\]]*)\])?(?:\{([^}]*)\})?$/.exec(
     sig.trim(),
   );
@@ -715,7 +721,7 @@ function record(root, opts) {
     throw new UsageError(`--signature is not a signature: ${opts.signature}`);
   // Every value lands in one cell of one table line, and the row must read back as written.
   // Three rules, all checked before anything is read or written:
-  //   - no line break in any value: it splits the row (parsePattern has refused one in the
+  //   - no line terminator in any value (LINE_TERMINATOR; parsePattern has refused one in the
   //     signature already);
   //   - no backtick in the signature or label, the two cells written inside backticks;
   //   - every other value must survive the reader itself: written as a cell with a cell after
@@ -726,7 +732,7 @@ function record(root, opts) {
   const ownCell = ["component", "variant", "hint", "notes"];
   const unquoted = [...ownCell, "by", "date"];
   for (const flag of ["label", ...unquoted])
-    if (opts[flag] != null && /[\r\n]/.test(String(opts[flag])))
+    if (opts[flag] != null && LINE_TERMINATOR.test(String(opts[flag])))
       throw new UsageError(`--${flag} must be one line`);
   for (const flag of ["signature", "label"])
     if (opts[flag] && String(opts[flag]).includes("`"))

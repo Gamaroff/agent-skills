@@ -29,6 +29,11 @@ const {
   readMap,
 } = require(SCRIPT);
 
+// U+2028 LINE SEPARATOR and U+2029 PARAGRAPH SEPARATOR, built rather than written: a literal
+// one is invisible in an editor.
+const LS = String.fromCharCode(0x2028);
+const PS = String.fromCharCode(0x2029);
+
 const CONFIG = [
   "ui:",
   "  componentCatalogue: docs/components.md",
@@ -478,6 +483,11 @@ test("record refuses a signature with a line break and leaves the map unchanged"
       "button\n",
       "\nbutton",
       "button\r\n",
+      // U+2028/U+2029 keep the row on one line but stop the cell reading back (DoD run 3).
+      `*>chip${LS}`,
+      `${LS}*>chip`,
+      `*>chip[a${PS}b]`,
+      `*>icon{name=a${LS}b}`,
     ]) {
       assert.throws(
         () =>
@@ -519,7 +529,16 @@ test("record refuses a line break in any written field, and a backtick in a code
       "by",
       "date",
     ]) {
-      for (const v of ["a\nb", "\nab", "ab\n", "a\r\nb", "a\rb"]) {
+      for (const v of [
+        "a\nb",
+        "\nab",
+        "ab\n",
+        "a\r\nb",
+        "a\rb",
+        `a${LS}b`,
+        `ab${PS}`,
+        `${LS}ab`,
+      ]) {
         assert.throws(
           () => record(root, { ...base, [flag]: v }),
           new RegExp(`--${flag} must be one line`),

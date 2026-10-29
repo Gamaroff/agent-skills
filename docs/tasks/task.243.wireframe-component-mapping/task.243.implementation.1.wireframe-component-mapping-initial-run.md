@@ -160,6 +160,17 @@ Take task 243, already implemented and reviewed outside the pipeline, through re
 - Decision: GAPS (1, security). The fix-and-recheck evaluator returned `halt`, failing `inside-files-summary` (the eight bundled copies, which the Files Summary names by glob) and `mutation-proved` (the expected first-run refusal). This is the same refusal as run 2; the glob was not expanded.
 - Recorded: the gaps Change Log row, the gap report in the task body (it replaces run 2's), and the gaps PR comment.
 - The 5c carry set (`task.243.pr-review.3`, the PC-2 Deferred Work fix, and the PC-1 Pipeline Progress fix in this report) rides this gaps commit, as in runs 1 and 2.
+- Gaps commit `ee59caa0`, pushed; `b8f2c1f5` corrected the DoD file's completion time (written as 17:41Z, actually 17:25Z). HALT snapshot `develop-pipeline.last-halt.json` (`halt_step` 7, `halt_reason` dod-gaps) written and the lock removed.
+- Security fix (user: "go ahead"):
+  - One constant, `LINE_TERMINATOR`, holds ECMAScript's whole LineTerminator set (`\r`, `\n`, U+2028, U+2029). These are the characters `unquote`'s `.` cannot cross. `parsePattern` and `record`'s per-field check both use it, so the class is closed rather than extended by two characters.
+  - The read-back check was not extended to `--signature` and `--label`. Every value traced through it already round-trips once the terminators are refused, so it would have caught nothing and no test could prove it.
+  - The regex is built with `String.fromCharCode`. A first edit wrote the escapes as literal U+2028/U+2029, which ended the regex literal mid-line (a SyntaxError, caught by prettier before any commit). The tests build `LS`/`PS` the same way.
+  - Tests: the signature test gains the four U+2028/U+2029 probe inputs, and test 18 gains three per written field.
+  - Mutation proofs, each restored from a `cp` snapshot:
+    - Reverting `parsePattern`'s check turns the signature test red (18/19).
+    - Reverting `record`'s field check turns test 18 red (18/19).
+    - Restored: 19/19.
+  - `npm run bundle` updated the eight copies, and `bundle:check` is clean.
 
 ---
 
