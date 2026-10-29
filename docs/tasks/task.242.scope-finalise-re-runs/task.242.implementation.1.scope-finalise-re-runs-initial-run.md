@@ -3,7 +3,7 @@
 **Task**: `task.242.scope-finalise-re-runs.md`
 **Run Number**: 1
 **Started**: 2026-10-29 06:45 UTC
-**Status**: In Progress
+**Status**: Escalated
 
 ---
 
@@ -35,7 +35,7 @@ First pipeline run for task.242: give a `/finalise` re-run a fixed scope (persis
 | 1. create-branch           | ✅ Done    | Branch `feature/task.{id}.*` exists in git                             | Existing branch reused, at `09dfe989`; pushed with tracking | —                    | 2026-10-29T06:46Z |
 | 2. review-task             | ✅ Done    | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               | Skipped — already reviewed (`task.242.review.1.scope-finalise-re-runs.md`) | —                    | 2026-10-29T06:46Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; audit 18/18, `ready-for-review`; `ci:fast` 6765 pass / 0 fail (after a prettier fix) | `.summaries/step-3-loop-audit-1.json` | 2026-10-29T07:06Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #781: https://github.com/Gamaroff/agent-skills/pull/781 | —                    | 2026-10-29T07:08Z |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
@@ -87,6 +87,14 @@ First pipeline run for task.242: give a `/finalise` re-run a fixed scope (persis
 - Fast gate iter 1: `format:check` failed on 3 new files (prettier); fixed with `prettier --write`, re-bundled; iter 1b `npm run ci:fast` green — 6779 tests, 6765 pass, 0 fail, 14 skipped.
 - Loop audit iter 1: `ready-for-review`, 18/18 → loop exit. Development completion comment `posted` to github issue 780.
 
+### Step 4 — create-pr
+
+- Staging scope: the work-item dir, CHANGELOG.md, evals/shared/tests, shared/resources, skills/finalise, and the `references/` dirs of develop-bug, develop-story, develop-task, finalise, qa-story, qa-task, review-pr, review-story and review-task. No out-of-scope untracked files, so nothing was held. The report's links checked clean (0 relative links).
+- Commits `5bcbc5d9` (feat, the code) and `d2e9c3eb` (docs, the task files); leak check OK.
+- PR created: https://github.com/Gamaroff/agent-skills/pull/781 (base `develop`, `Closes #780`). The PR body was written by the orchestrator from its own record of the change, not by the summariser subagent.
+- in-review comment `posted` on #780. GitHub board: in-review → `stage-disabled` (this repo's workflow does not opt the moment in).
+- Post-PR state check: PR #781 is OPEN (checked inline with `gh pr view`, not through the poller subagent); 0 errors.
+
 #### Mutation proofs (SC-11 — one row per guard in task § 8's closed list)
 
 Each mutation was applied with the Edit tool to the file named, the named test file run, and the file restored from a `cp` snapshot (restore verified with `cmp`). Every row went red.
@@ -122,17 +130,110 @@ Each mutation was applied with the Edit tool to the file named, the named test f
 | M27 | 5 — advisory list | `### Advisory (not a gap)` removed | `/finalise: the DoD Step 2 block carries … the advisory list` |
 | M28 | 5 — `rerun-scope` bug-mode marker | marker removed | `finalise-bug-mode.test.mjs`: every table row has exactly one prose marker … |
 
+### Step 5 — QA loop
+
+- QA Cycle 1: changes-requested → `stage-disabled`. The 5b ingester and pre-fix mapping ran inline, because the orchestrator wrote gate 1 (an independence loss).
+- QA Cycle 2: the refute pass ran in an independent Explore reviewer: dispatched 07:26:33Z, returned in 162.7 s (from `duration_ms`). Narrowing residue: not signalled (high-findings-remain). changes-requested → `stage-disabled`.
+- QA Cycle 2 — CR2-2 design choice: a structured `non_member_fail` field. A note cannot be parsed, and the task.239 replay (G7 on unchanged evidence goes to advisories and does not fail SC-11) has to keep passing. An agent that ignores the field can still flip a FAIL. The engine cannot tell that apart from task.239's finer re-split. This is recorded as the remaining limit.
+
 ---
 
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
 
+### QA Loop Limit Reached — 2026-10-29
+
+The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS.
+
+**Final gate status**: CONCERNS (90/100, gate 5 at `1146a0e7`; cycle 5's fix `4c6474ad` is ungated)
+**HIGH findings per cycle**: 2, 3, 1, 0, 0 — at 0 since cycle 4
+**Remaining issues** (from final gate file):
+- TASK-242-CR5-1 (medium, `shared/resources/finalise-rerun-scope.js`): the gone-candidate rule reached merge's new-member evidence, so a same-basename deletion counted a new member on unchanged evidence. **Fixed in `4c6474ad`**: the fix failed first in a new test, and both mutation directions are covered. No gate has read it yet.
+
+**What was attempted per cycle**:
+- Cycle 1: `STEM`/`DOD_N` bound in Steps 3a/3c; the reported-gap merge tightened; 7.6a/7.6b use this run's AC record (8 findings).
+- Cycle 2: an unanswered gap keeps its prior FAIL; a structured `non_member_fail`; `evidenceIndex` plus `--no-renames`; dirty paths recorded (4 findings).
+- Cycle 3: bare basenames resolved against HEAD first, with a gone-path fallback; `-z` diffs (CR3-1, CR3-2 and 2 cleanups).
+- Cycle 4: a bare basename that a gone path shares resolves to every candidate (CR4-1).
+- Cycle 5: that rule bound to prior-record citations; `merge` resolves new members at HEAD (CR5-1).
+- Route 2c (gate the last fix) was considered and declined: `medium-not-falling`. MEDIUM read 0, 1, 1 over cycles 3–5.
+
+**Likely root cause**: the HIGHs converged (2, 3, 1, 0, 0). Cycles 3–5 each found a new edge in one mechanism: how a bare-basename citation resolves when files move or are deleted between the prior run and this one. Each fix was correct for the case it named, and the next review found a neighbouring case. That is narrowing on one rule, not a regression. The rule now has an explicit provenance split. A prior-record citation was written before the move, so it may mean a gone file. A current-run citation cannot. Every cycle's fix is mutation-proven. The open question is whether the resolver needs a different shape (for example, exact paths only, with bare basenames always re-judged), not another patch.
+
+**Third-strike files**: none. Gates 4 and 5 raised no HIGH, so the two-gate comparison prints nothing (`shared/resources/finalise-rerun-scope.js` carried HIGHs at gates 2 and 3 only).
+
+**Recommended next steps**:
+1. Re-run `/develop-task` and take Phase 0b's "Resume the QA loop with 1 more cycle". One gate on `4c6474ad` reads the CR5-1 fix, and if it is clean the run goes to 5c and finalise. This is the cheapest path. Each of the last three fixes was verified, and the HIGHs have been 0 for two gates.
+2. Or, to stop the basename edge cases altogether: replace bare-basename resolution with "a bare basename never resolves, so the criterion is re-judged". This trades a re-judge on every bare citation for no identity rule at all. Do it as a qa-fix under a granted cycle, then gate it.
+3. Or accept the current state: run `/review-pr --effort medium --comment --no-code`, then `/finalise`. The remaining finding is fixed but ungated, so the review must read `4c6474ad`.
+
 ---
 
 ## QA Iteration History
 
 _Track each QA review/fix cycle._
+
+### QA Cycle 1 — 2026-10-29
+**Gate Result**: FAIL (30/100)
+**Issues Found**: 5. CR-1: Step 3c reads `STEM`/`DOD_N` unbound and HALTs. CR-2: Step 3a reads them unbound and never finds a prior record. CR-3: the reported-gap recompute overturns a non-member FAIL. CR-4: an omitted re-check member is carried as PASS. CR-5: 7.6b `ARTIFACTS` lacks the AC record.
+**HIGH findings**: 2
+**MEDIUM findings**: 3
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+**Fixes Applied**: All 8 findings fixed. CR-1/CR-2: the 3a and 3c blocks bind `STEM`/`DOD_N` with a HALT guard. CR-3/CR-4: the reported-gap merge keeps an unexplained agent FAIL and fails an unanswered re-check member. CR-5/CR-7: 7.6a and 7.6b use this run's AC record. CR-6/CR-8: also fixed. 8 new tests were added, including `finalise-rerun-scope-blocks.test.mjs`, which executes the real 3a/3c blocks. 9 mutations were run; all were covered. `ci:fast` green: 6773 pass, 0 fail. Probe: every merge-rule statement site was swept. The ingester and pre-fix mapping ran inline: the orchestrator wrote gate 1, so this pass is not independent of the review.
+**Commit**: `15185f81`
+**Post-fix PR state**: OPEN at `15185f81` (checked inline with `gh pr view`, not by a poller subagent)
+
+### QA Cycle 2 — 2026-10-29
+**Gate Result**: FAIL (40/100)
+**Issues Found**: 3, all from the cycle-2 refute pass over the whole diff. CR2-1: an omitted member-shaped reported gap flips to PASS. CR2-2: an invented advisory member overturns a non-member FAIL (introduced by the cycle-1 CR-3 fix). CR2-3: a deleted or renamed cited path is dropped from the evidence. Also advisory: CR2-4, the record keys on HEAD, not on the tree that was judged. All 8 cycle-1 findings were verified fixed: 9 of 9 mutation proofs covered, run in a scratch worktree.
+**HIGH findings**: 3
+**MEDIUM findings**: 0
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+**Fixes Applied**: All 4 fixed (3 high plus advisory CR2-4). CR2-1: an unanswered gap keeps its prior FAIL. CR2-2: a structured `non_member_fail` keeps a non-member agent FAIL; the record carries it, the scope text names it, and an overturned note becomes an advisory. CR2-3: `evidenceIndex` (tracked plus changed) and `--no-renames`. CR2-4: `dirty` at scope time becomes `dirty_paths` in the record, which the next scope counts as changed. 4 new tests; 10 of 10 mutations covered. `ci:fast` 6777 pass, 0 fail. Probe: 6 observables, 3 sites updated, 2 unaffected. The ingester and fix mapping ran inline (the orchestrator wrote gate 2), so this pass is not independent of the review.
+**Commit**: `a43bee98`
+**Post-fix PR state**: OPEN at `a43bee98` (pushed; checked inline)
+
+### QA Cycle 3 — 2026-10-29
+**Gate Result**: FAIL (80/100)
+**Issues Found**: 1. CR3-1: a same-basename directory move makes a bare citation ambiguous, so the criterion is carried instead of re-judged. The CR2-3 fix introduced it: reproduced as `evidence-changed` at 15185f81 and `unchanged` at a43bee98. Advisory: CR3-2 (low; `git diff` without `-z` C-quotes non-ASCII paths) and 2 cleanups. All 4 cycle-2 findings were verified fixed: 10 of 10 mutation proofs covered, in a scratch worktree. Reviewer: an independent Explore subagent, dispatched 07:41:46Z, returned in 149.2 s.
+**HIGH findings**: 1
+**MEDIUM findings**: 0
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 3 of 5). Convergence: 2, 3, 1 falls, not tripped. Third strike: none (the engine file has HIGHs at gates 2 and 3 only).
+**Fixes Applied**: CR3-1: `evidenceIndex` keeps gone paths in a separate `goneByBase`; a bare basename resolves HEAD first and falls back to a gone path only when HEAD carries none. CR3-2: diffs read with `-z`. CR3-3/CR3-4 cleanups. 3 new tests, covering both identity directions; 6 of 6 mutations covered. `ci:fast` 6780 pass, 0 fail. Narrowing residue (repeat subject: citation identity): patch, because one function owns the rule and both directions now carry a test pair. The fix mapping ran inline, since the orchestrator wrote gate 3.
+**Commit**: `8419df32`
+**Post-fix PR state**: OPEN at `8419df32` (pushed)
+
+### QA Cycle 4 — 2026-10-29
+**Gate Result**: CONCERNS (90/100)
+**Issues Found**: 1. CR4-1 (medium): a bare basename shared by a HEAD file and a path gone since the prior head is resolved as exact, so the criterion is carried. The reviewer rated it medium/medium (not promoted); QA reproduced it by execution and entered it in `top_issues[]`. It predates cycle 3 (the HEAD-only resolution at 15185f81 behaves the same). The cycle-3 fixes are verified: 6 of 6 mutation proofs covered, in a scratch worktree. Reviewer: dispatched 07:55:01Z, returned in 73.0 s.
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 4 of 5). Convergence: 2, 3, 1, 0, HIGH_N 0, not tripped. Diminishing-returns: one HIGH-0 gate, not two.
+**Fixes Applied**: CR4-1. When a gone path carries a bare basename, the citation resolves to every candidate, so the criterion is re-judged. 1 test was rewritten and 1 added; 4 of 4 mutations covered, including the control direction. `ci:fast` 6781 pass, 0 fail. Narrowing residue (repeat subject, the third cycle on basename resolution): **scope the claim**. An ambiguous basename no longer resolves to a guessed file; when a gone path shares it, the engine fails toward re-judge.
+**Commit**: `1146a0e7`
+**Post-fix PR state**: OPEN at `1146a0e7` (pushed)
+
+### QA Cycle 5 — 2026-10-29
+**Gate Result**: CONCERNS (90/100)
+**Issues Found**: 1. CR5-1 (medium, confidence high, promoted): the CR4-1 gone-candidate rule also reached merge's new-member evidence, so a same-basename deletion counted a new member on unchanged evidence. Reproduced by execution. CR4-1 verified: 4 of 4 mutation proofs covered, in a scratch worktree. Reviewer: dispatched 08:03:26Z, returned in 75.3 s.
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop limit reached
+**Fixes Applied**: CR5-1. `merge` resolves a new member's evidence against a HEAD-only index; the gone-candidate rule stays with the prior record's citations. 1 test added, seen failing before the fix. 2 of 2 mutations covered (fix removed; over-reach into scope). `ci:fast` 6782 pass, 0 fail. Narrowing residue (the fourth cycle on bare-basename resolution): **scope the claim** to the citations it is true for.
+**Commit**: `4c6474ad`
+**Post-fix PR state**: OPEN at `4c6474ad` (pushed)
+**Incident**: the qa-fix-5 PR and tracker comments were first posted with the previous step's body, because a Write to `comment-body.md` was refused (file changed on disk) and the post ran in the same turn. Both were corrected in place (PATCH; the issue comment keeps its `qa-fix-5` marker).
 
 ---
 
@@ -141,7 +242,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: feature/task.242.scope-finalise-re-runs
-**PR**: {populated after Step 4}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/781
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
