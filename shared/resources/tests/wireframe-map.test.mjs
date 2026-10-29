@@ -172,6 +172,22 @@ test("ensure is a no-op without a ui: block", () => {
   }
 });
 
+test("resolve is a no-op without a ui: block or a wireframeMap", () => {
+  // The story holds a wireloom block, so only the unset gate stops resolve here.
+  const noMapKey = CONFIG.replace(/^ {2}wireframeMap: .*\n/m, "");
+  assert.ok(!noMapKey.includes("wireframeMap"), "fixture still names a map");
+  for (const config of ["tracker: jira\n", noMapKey]) {
+    const root = consumer({ config });
+    try {
+      assert.deepEqual(resolve(root, "docs/story.md"), { reason: "unset" });
+      assert.equal(existsSync(join(root, "docs/components.md")), false);
+      assert.equal(existsSync(join(root, "docs/wireframe-map.md")), false);
+    } finally {
+      cleanup(root);
+    }
+  }
+});
+
 test("ensure seeds the catalogue from the barrel and an empty map", () => {
   const root = consumer();
   try {
