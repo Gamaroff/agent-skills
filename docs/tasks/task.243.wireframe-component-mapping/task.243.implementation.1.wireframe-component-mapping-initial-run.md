@@ -275,6 +275,48 @@ Fix-and-recheck (Step 8a) was refused on `inside-files-summary` again.
 18 (each refused, map byte-identical). Mutation-prove it, then run `npm run bundle`. This changes
 code, so it re-enters QA at 5a. Gate 12 is the last cycle of the current `qa_max_cycles` 12.
 
+### QA Loop Limit Reached (after DoD run 3) — 2026-10-29
+
+The pipeline completed 13 qa-task gates (`qa_max_cycles` 13 after the DoD run 3 re-entry) without a
+clean PASS. The budget counts gates, so the loop stops at gate 13 and runs no fix that no gate would
+read. The head handed over, `5fb5865a`, is gated.
+
+**Final gate status**: CONCERNS (90/100)
+**HIGH findings per cycle**: 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 — 0 from cycle 3 on
+(`convergence_from_cycle` 11: 0, 1, 0, 0, 0, 0, 0, 0, 0, 0 | 0, 0, 0)
+**Remaining issues** (from gate 13):
+- TASK-243-CR13-1 (medium, `shared/resources/wireframe-map.js`, bug.16). Since cycle 12's
+  `decodeValue`, two signature texts can mean one value (`v=é` / `v=%C3%A9`, `v=72%` / `v=72%25`).
+  `record` finds the row to replace by raw text, so re-recording a node in the other spelling adds a
+  second row, and `match` keeps returning the older answer.
+- TASK-243-CR13-2 (low, `shared/resources/tests/wireframe-map.test.mjs`). The round-trip test's
+  no-merge check cannot fail, because each value sits under its own key.
+
+**What was attempted per cycle**:
+- Cycles 1–5: as in the first QA Loop Limit Reached entry above.
+- Cycles 6–11: granted cycles and the DoD run 1 and 2 re-entries (QA Iteration History).
+- Cycle 12: the DoD run 3 fix verified (`LINE_TERMINATOR`). Fix cycle 12 gave attribute values one
+  percent-encoding shared by `signatureOf` and `parsePattern` (bug.15).
+- Cycle 13: gate only. bug.15 verified and closed; CR13-1 found. Route 2c was not evaluated: the
+  budget counts gates, so cycle 13 has no fix for it to gate (classifier with `budgetSpent: true`:
+  `continue (last-cycle-not-a-fix)`).
+
+**Likely root cause**: the cycle 12 fix was right in kind. Writer and reader now share one encoding.
+But decoding made the signature text non-canonical, and `record` still treats the text as the
+row's identity. Each of the last three gates found one identity defect in the map grammar
+(U+2028, the attribute encoding, now row identity). The engine's other behaviour and SC-1 – SC-7
+have held.
+
+**Third-strike files**: none (no HIGH in gate 12 or gate 13).
+
+**Recommended next steps**:
+1. Grant 2 cycles: one fix and one gate. The fix finds the row to replace by parsed signature (the
+   output of `parsePattern`, attributes decoded and sorted) plus the label. Add a test that records
+   over a hand-written row in the other spelling and expects `replaced`. Give the round-trip test's
+   no-merge check one shared key (CR13-2). Then 5c and `/finalise` run 4.
+2. Alternatively, accept CONCERNS through 5c and finalise, with bug.16 open. This is not recommended:
+   a corrected answer would be silently ignored.
+
 ---
 
 ## QA Iteration History
@@ -417,6 +459,23 @@ _Track each QA review/fix cycle._
 **Loop exit**: none. The classifier returned `continue (not-a-pass-gate)`, and with no HIGH finding the Convergence check cannot trip.
 **PR Review**: not reached — gate did not exit the loop
 **Action**: Running qa-fix (cycle 12 of 13)
+
+### QA Cycle 13 — 2026-10-29
+**Gate Result**: CONCERNS (90/100). Cycle 13 of 13, the last. The gate reads fix cycle 12, `5fb5865a`.
+**Issues Found**:
+- bug.15 is verified and closed. Its reproduction reads `1,500` and `a}b` back unchanged. Three
+  mutations (encode off, decode off, strict decode) each turn the round-trip test red, in a scratch
+  worktree (outcome: covered). The probe re-run gives 114 executed, 0 reproduced, 0 escaped.
+- 1 medium, promoted as TASK-243-CR13-1 ([bug.16](./task.243.bug.16.record-adds-a-second-row-for-an-equivalent-signature.md)).
+  `record` matches rows by raw signature text, so an equivalent spelling adds a second row that
+  loses the tie. Reproduced by QA. At the gate 12 head the two spellings name different values, so
+  the defect comes from the cycle 12 decoding.
+- 1 low promoted (CR13-2: the no-merge check cannot fail); 1 cleanup advisory (CR13-3).
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**Loop exit**: none. The budget is spent at this gate. The classifier with `budgetSpent: true` returned `continue (last-cycle-not-a-fix)`.
+**PR Review**: not reached — gate did not exit the loop
+**Action**: Escalating — loop limit reached
 
 ---
 
