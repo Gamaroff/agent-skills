@@ -250,19 +250,18 @@ catalogue files stay as they are.
 **Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.243.qa.7.wireframe-component-mapping.md](./task.243.qa.7.wireframe-component-mapping.md)
-- **Gate File**: [task.243.gate.7.wireframe-component-mapping.yml](./task.243.gate.7.wireframe-component-mapping.yml)
+- **Full Report**: [task.243.qa.8.wireframe-component-mapping.md](./task.243.qa.8.wireframe-component-mapping.md)
+- **Gate File**: [task.243.gate.8.wireframe-component-mapping.yml](./task.243.gate.8.wireframe-component-mapping.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 37 (wireframe suites); 6839 in the cycle 6 fast gate
+- **Tests Executed**: 38 (wireframe suites); 6840 in the SC-1 fast gate
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-All 14 bug reports are closed. The Step 3 guard and the Step 2 writes share one gate and one key
-check. One low finding remains: a test does not assert its own premise. There are also three low
-advisories on HALT wording.
+Re-entry after finalise DoD run 1. The SC-1 gap is closed: a test now holds `resolve`'s unset path,
+and removing that gate turns it red. There are no bugs, only two low cleanups (CR8-1, CR8-2).
 
 ## Definition of Done - Gaps Identified
 
@@ -298,7 +297,6 @@ criterion member to a test.
 **QA Gate Reference**: See `task.243.gate.7.wireframe-component-mapping.yml` for full details
 
 **Detailed Verification Log:** See `task.243.dod.1.wireframe-component-mapping.md` for complete verification evidence and timestamps.
-
 <!-- change-log-start -->
 ## Change Log
 
@@ -323,4 +321,6 @@ criterion member to a test.
 | 2026-10-29 |  | QA gate PASS (100/100) — bug.14 verified and closed; all 14 bug reports closed; 1 low test-premise finding open (CR7-1) | qa-task |
 | 2026-10-29 |  | PR review APPROVE (PR #785); PC-1 fixed: Scope and Files Summary name the Step 2 wireframe writes and the Step 3 guard | develop-task |
 | 2026-10-29 |  | DoD incomplete — 1 gap identified (SC-1: resolve unset path untested) | finalise |
+| 2026-10-29 |  | QA gate PASS (100/100) — re-entry after finalise DoD run 1; SC-1 test verified and mutation-proven; 0 bugs, 2 low cleanups (CR8-1, CR8-2) | qa-task |
 <!-- change-log-end -->
+
