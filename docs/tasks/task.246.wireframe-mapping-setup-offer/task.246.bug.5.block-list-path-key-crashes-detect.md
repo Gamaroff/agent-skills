@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'Medium'
 created: '2026-10-30'
@@ -12,7 +12,7 @@ description: 'presentKeys counts a block list as present for a path key that rea
 
 **Bug ID**: TASK-246-BUG-5
 **Related**: [task.246](./task.246.wireframe-mapping-setup-offer.md)
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Priority**: Medium
 **Severity**: Major
 **Created**: 2026-10-30
@@ -148,6 +148,7 @@ comment.
 | 2026-10-30 | Reopened | qa-task | Partial (CR3-1): the list under a blank key is not removed past a blank line or comment; see task.246.qa.3.wireframe-mapping-setup-offer.md |
 | 2026-10-30 | In Progress | qa-fix | Investigation started (cycle 3) |
 | 2026-10-30 | Ready for QA | qa-fix | Fixed in QA cycle 3; see Iteration 2 |
+| 2026-10-30 | Closed | qa-task | Verified in QA cycle 4 (task.246.qa.4.wireframe-mapping-setup-offer.md) |
 
 ---
 

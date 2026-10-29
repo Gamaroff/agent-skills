@@ -615,26 +615,32 @@ the primitive in the middle of a segment (`Rebutton`), which must not match `but
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-30
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.246.qa.3.wireframe-mapping-setup-offer.md](./task.246.qa.3.wireframe-mapping-setup-offer.md)
-- **Gate File**: [task.246.gate.3.wireframe-mapping-setup-offer.yml](./task.246.gate.3.wireframe-mapping-setup-offer.yml)
+- **Full Report**: [task.246.qa.4.wireframe-mapping-setup-offer.md](./task.246.qa.4.wireframe-mapping-setup-offer.md)
+- **Gate File**: [task.246.gate.4.wireframe-mapping-setup-offer.yml](./task.246.gate.4.wireframe-mapping-setup-offer.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 138 (changed suites); `ci:fast` 6889, 0 failed
+- **Tests Executed**: 139 (changed suites); `ci:fast` 6890, 0 failed
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-The cycle 2 findings are fixed; BUG-2, BUG-3 and BUG-4 are closed. Filling a blank path key removes
-the list under it but stops at a blank line or comment, so `configure` answers `write-failed` on a
-valid layout (BUG-5 reopened). The same code deletes a comment indented under the key (low).
+All findings from four QA cycles are fixed, and all five bug reports are closed. One low
+byte-preservation defect (CR4-1) is carried to future work: a blank line inside a removed final list
+is dropped. The file still reads back correctly.
+
+## Deferred Work
+
+- **TASK-246-CR4-1** (LOW) — carried to gate 4 `recommendations.future` (route 2b, cycle 4): when a
+  removed list ends the file without a newline and holds a blank line, `configure` deletes the blank
+  line and adds a final newline; strip from the last non-blank retained piece.
 
 <!-- change-log-start -->
 ## Change Log
@@ -651,6 +657,7 @@ valid layout (BUG-5 reopened). The same code deletes a comment indented under th
 | 2026-10-30 |         | QA findings fixed — cycle 2: 3 bugs and 3 low findings, plus a quoted `ui:` key; 6 new tests | qa-fix |
 | 2026-10-30 |         | QA gate CONCERNS (90/100) — 2 findings | qa-task |
 | 2026-10-30 |         | QA findings fixed — cycle 3: 1 bug and 1 low finding; 1 new test | qa-fix |
+| 2026-10-30 |         | QA gate PASS (100/100) — 1 low finding, carried to future work | qa-task |
 <!-- change-log-end -->
 
 ---

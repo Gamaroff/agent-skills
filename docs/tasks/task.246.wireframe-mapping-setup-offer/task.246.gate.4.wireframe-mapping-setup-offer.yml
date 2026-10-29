@@ -1,0 +1,63 @@
+schema: 2
+task: 'task.246.wireframe-mapping-setup-offer'
+task_title: 'Wireframe mapping setup offer and first-run candidates'
+gate: PASS
+status_reason: 'Both cycle 3 findings are fixed and verified (BUG-5 ready to close); the scoped review of the cycle 3 fix found one low byte-preservation defect: a blank line inside a removed final list is dropped and a final newline is added. The file still reads back as configured.'
+reviewer: 'QA Engineer'
+head: 'a0073d014200132eba8479e4290fefb64bc7326d'
+updated: '2026-10-29T23:01:17Z'
+
+top_issues:
+  - id: 'TASK-246-CR4-1'
+    severity: low
+    file: 'shared/resources/wireframe-map.js'
+    finding: 'When the removed list ends the file without a newline and a blank line sits inside it, the newline is stripped from the kept blank line rather than from the last content line, so the blank line is deleted and the file gains a final newline (reviewer confidence medium; QA reproduced; configure still answers ok and detect configured).'
+    suggested_action: 'Strip the trailing newline from the last non-blank retained piece, and add this case to the last-line test table.'
+    suggested_owner: dev
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 139
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 17
+    escaped: 0
+    notes: 'boundary: true — the configure value guard is unchanged since cycle 3, whose re-run (task.246.qa.3.security.run.json) refused all 10 hostile cases and accepted all 7 legitimate ones; verdict engages. Map paths are still not containment-checked (pre-existing).'
+  performance:
+    status: PASS
+    notes: 'The blank-key fill is one pass per blank key over the block.'
+  reliability:
+    status: PASS
+    notes: 'Every layout reproduced in cycles 2-3 now configures; CR4-1 changes bytes, not meaning.'
+  maintainability:
+    status: PASS
+    notes: 'Prettier clean; blank keys are filled before inserts, so each step works on the file as it stands.'
+
+recommendations:
+  immediate: []
+  future:
+    - id: 'TASK-246-CR4-1'
+      action: 'Strip the trailing newline from the last non-blank retained piece, and add this case to the last-line test table.'
+      finding: 'When the removed list ends the file without a newline and a blank line sits inside it, the newline is stripped from the kept blank line rather than from the last content line, so the blank line is deleted and the file gains a final newline (configure still answers ok and detect configured).'
+      refs: ['shared/resources/wireframe-map.js']
+      carried_from: 'top_issues (route 2b, cycle 4)'
+    - action: 'Map and catalogue paths are not checked for containment in the repository (ensure/record write where the config points); pre-existing, now also reachable through configure.'
+      refs: ['shared/resources/wireframe-map.js']
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []
