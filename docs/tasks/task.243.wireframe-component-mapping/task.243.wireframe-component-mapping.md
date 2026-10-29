@@ -210,6 +210,9 @@ catalogue files stay as they are.
   the answers in the story and the map. It needs a release that exists only after merge, and
   finalise runs before merge, so it is not a success criterion here. It is checked by hand after
   the next release.
+- **TASK-243-CR7-1** (LOW) — carried to gate 7 `recommendations.future` (route 2b, cycle 7). The
+  no-jq test in `wireframe-mapping-hooks.test.mjs` should assert the jq-missing arm's own message,
+  so that it proves the PATH stripping reached that branch.
 
 ## Progress Tracking
 
@@ -234,26 +237,26 @@ catalogue files stay as they are.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-29
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.243.qa.6.wireframe-component-mapping.md](./task.243.qa.6.wireframe-component-mapping.md)
-- **Gate File**: [task.243.gate.6.wireframe-component-mapping.yml](./task.243.gate.6.wireframe-component-mapping.yml)
+- **Full Report**: [task.243.qa.7.wireframe-component-mapping.md](./task.243.qa.7.wireframe-component-mapping.md)
+- **Gate File**: [task.243.gate.7.wireframe-component-mapping.yml](./task.243.gate.7.wireframe-component-mapping.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 35 (wireframe suites); 6837 in the cycle 5 fast gate
+- **Tests Executed**: 37 (wireframe suites); 6839 in the cycle 6 fast gate
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-The cycle 5 fixes hold, and `task.243.bug.13` is closed. One medium gap remains: the new Step 3
-guard has no gate, while the Step 2 writes it sends the run to do (bug.14). There are also two low
-findings on the guard's checks and tests.
+All 14 bug reports are closed. The Step 3 guard and the Step 2 writes share one gate and one key
+check. One low finding remains: a test does not assert its own premise. There are also three low
+advisories on HALT wording.
 
 ## Change Log
 
@@ -275,4 +278,5 @@ findings on the guard's checks and tests.
 | 2026-10-29 |  | QA findings fixed — cycle 5 (granted), 2 findings (bug.13 Ready for QA, CR5-2): Step 3 stops on this document's held answers; a missing document key halts | qa-fix |
 | 2026-10-29 |  | QA gate CONCERNS (90/100) — bug.13 verified and closed; 1 new medium finding (bug.14: the Step 3 guard is ungated while the Step 2 writes are gated), 2 low | qa-task |
 | 2026-10-29 |  | QA findings fixed — cycle 6, 3 findings (bug.14 Ready for QA, CR6-2, CR6-3): the Step 3 guard shares Step 2's gate and key check | qa-fix |
+| 2026-10-29 |  | QA gate PASS (100/100) — bug.14 verified and closed; all 14 bug reports closed; 1 low test-premise finding open (CR7-1) | qa-task |
 <!-- change-log-end -->

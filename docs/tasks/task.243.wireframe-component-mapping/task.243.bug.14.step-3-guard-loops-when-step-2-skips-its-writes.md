@@ -4,7 +4,7 @@
 **Bug ID**: TASK-243-BUG-14
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-10-29
 
@@ -64,3 +64,4 @@ Mutation-proven: 6 of 6 `covered`.
 | 2026-10-29 | New | QA Engineer | Found in QA cycle 6 (code review CR-1), confirmed against both documents' gates |
 | 2026-10-29 | In Progress | qa-fix | Root cause identified |
 | 2026-10-29 | Ready for QA | qa-fix | Fix implemented with mutation-proven tests (qa-fix cycle 6) |
+| 2026-10-29 | Closed | QA Engineer | Verified in QA cycle 7: mutation-proven tests hold at 82e7f84f |
