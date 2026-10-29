@@ -627,14 +627,13 @@ Only when `skills-config.yaml` sets `ui.wireframeMap` **and** the document holds
 ```bash
 # The first Phase 0 write under .claude/state: no earlier block has created it.
 mkdir -p .claude/state
-command node .agents/skills/{develop-story|develop-task}/references/wireframe-map.js ensure --json
 command node .agents/skills/{develop-story|develop-task}/references/wireframe-map.js resolve {document-file} --json \
   > .claude/state/wireframe-map.json
 ```
 
-1. Log `ensure`'s report in the Decisions Log. A file it `created` or `updated` is committed with the work.
+1. `resolve` only. **Phase 0 writes no tracked file**: Step 1's `/create-branch` refuses a tree with any uncommitted file other than the implementation report, so a catalogue, map or document edit made here would halt the run before its branch exists. `resolve` reads a missing map as no confirmed links (`mapState: missing`, every node open). The mapping procedure's `ensure` and `record` run at Step 3 instead ([§ Wireframe writes](develop-pipeline-step-3-develop-loop.md#wireframe-writes-only-when-phase-0c-wire-ran)).
 2. Drop from `unresolved[]` every node the document's own component table already settles: the author answered it at `create-story` / `create-task` time. What remains is `WIREFRAME_OPEN`.
-3. For each node in `WIREFRAME_OPEN`, prepare the proposal the mapping procedure's step 4 describes (design source, catalogue, candidates). Phase 0 stays side-effect free: nothing is written to the map or the document yet.
+3. For each node in `WIREFRAME_OPEN`, prepare the proposal the mapping procedure's step 4 describes (design source, catalogue, candidates). Nothing is written to the map or the document yet.
 
 `WIREFRAME_OPEN` feeds 0d. Store the resolved table (`resolved[]` plus the document's own table) as `WIREFRAME_TABLE` for Step 3.
 
@@ -738,7 +737,7 @@ If the user selects "Other" for Q1 or Q2, follow up with a plain text request fo
 
 **No Q3** — qa-planning skip is silent (see paragraph above).
 
-**Wireframe questions** (only when `WIREFRAME_OPEN` from 0c-wire is non-empty). One question per open node, or per group of nodes that share a signature and label pattern, built as the mapping procedure's step 5 sets out, with the proposal as **(Recommended)**. `--defaults` answers them all with their Recommended option and logs each as an assumption — never as a confirmation. `AskUserQuestion` takes at most four questions per call: put as many as fit beside Q1/Q2 in the one call, and the rest in follow-up calls straight after it, still before Step 1. After asking, record each answer into the document's component table and each confirmed one into the map with `wireframe-map.js record`; this is the one write Phase 0 makes, and it happens only after the person has answered.
+**Wireframe questions** (only when `WIREFRAME_OPEN` from 0c-wire is non-empty). One question per open node, or per group of nodes that share a signature and label pattern, built as the mapping procedure's step 5 sets out, with the proposal as **(Recommended)**. `--defaults` answers them all with their Recommended option and logs each as an assumption — never as a confirmation. `AskUserQuestion` takes at most four questions per call: put as many as fit beside Q1/Q2 in the one call, and the rest in follow-up calls straight after it, still before Step 1. After asking, hold the answers in `.claude/state/wireframe-answers.json`, one entry per node: its signature, component, variant, label pattern if any, and whether it was confirmed or assumed. Do not write them to the document or the map yet. `.claude/state` is ignored, so the tree stays clean for Step 1, and Step 3 writes them once the branch exists ([§ Wireframe writes](develop-pipeline-step-3-develop-loop.md#wireframe-writes-only-when-phase-0c-wire-ran)).
 
 ### Answer resolution — ask only what nothing answers
 

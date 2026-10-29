@@ -50,7 +50,10 @@ left alone that a person should look at: log both, and never halt on them.
 ### 1. Ensure
 
 Run `ensure` first, every time. A consumer that has never run this gets its catalogue (one row per
-component its barrel exports) and an empty map without anyone writing them. Log what it reports in
+component its barrel exports) and an empty map without anyone writing them. The develop pipelines
+are the one exception to "first": their Phase 0 runs before the branch exists and must leave the
+tree clean, so they `resolve` there (a missing map reads as no confirmed links) and run `ensure` at
+Step 3. Log what it reports in
 the work item's Decisions Log, or in the authoring skill's summary.
 
 ### 2. Use the source's own wireframe
@@ -113,6 +116,6 @@ Decision | Why`). Every node and every part the _Conversion notes_ list as dropp
 | Skill                              | When                                 | People present                                                                                                            |
 | ---------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
 | `create-story`, `create-task`      | after the wireframe is embedded      | yes — the author answers                                                                                                  |
-| `develop-story`, `develop-task`    | Phase 0 (`0c-wire`), questions in 0d | unless `--defaults`                                                                                                       |
+| `develop-story`, `develop-task`    | Phase 0 (`0c-wire` resolves, 0d asks); `ensure` and the writes at Step 3, once the branch exists | unless `--defaults`                                                                                                       |
 | `review-story`, `review-task`      | as a review axis                     | a node with no table row is an **Important** finding                                                                      |
 | `qa-story`, `qa-task`, `review-pr` | conformance                          | each mapped component is imported from `ui.componentImport`; each flagged assumption is checked against the design source |

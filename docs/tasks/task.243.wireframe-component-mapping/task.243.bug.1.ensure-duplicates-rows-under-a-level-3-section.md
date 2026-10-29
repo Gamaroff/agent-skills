@@ -4,7 +4,7 @@
 **Bug ID**: TASK-243-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-10-29
 
@@ -66,3 +66,4 @@ Mutation-proven: restoring the fixed `###` turns that test red.
 | 2026-10-29 | New | QA Engineer | Found in QA cycle 1 (code review CR-1), reproduced with three `ensure` runs |
 | 2026-10-29 | In Progress | qa-fix | Root cause identified |
 | 2026-10-29 | Ready for QA | qa-fix | Fix implemented with a mutation-proven regression test (qa-fix cycle 1) |
+| 2026-10-29 | Closed | QA Engineer | Verified in QA cycle 2: regression test is mutation-proven, repro no longer fires at 8b431651 |

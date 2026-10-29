@@ -8,6 +8,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -78,44 +79,73 @@ test("develop Phase 0 resolves in 0c-wire and asks in 0d", () => {
   );
 });
 
-// The 0c-wire block runs as delivered (placeholders filled) in a consumer checkout with no
-// .claude/state directory: the first develop run in a project must not lose resolve's output.
-test("the 0c-wire block runs in a fresh checkout and writes the resolve output", () => {
-  const step0 = read(
-    "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md",
-  );
-  const section = step0.slice(
-    step0.indexOf("## 0c-wire."),
-    step0.indexOf("## 0d."),
-  );
-  const fence = /```bash\n([\s\S]*?)\n```/.exec(section);
-  assert.ok(fence, "0c-wire has no bash block");
+// The bash block under a step doc's heading, placeholders filled, as a consumer would run it.
+const stepBlock = (rel, from, to) => {
+  const doc = read(rel);
+  const start = doc.indexOf(from);
+  assert.ok(start >= 0, `${rel} lost "${from}"`);
+  const end = to ? doc.indexOf(to, start) : doc.length;
+  const fence = /```bash\n([\s\S]*?)\n```/.exec(doc.slice(start, end));
+  assert.ok(fence, `${from} has no bash block`);
   const block = fence[1]
     .replaceAll("{develop-story|develop-task}", "develop-task")
     .replaceAll("{document-file}", "docs/story.md");
   assert.ok(!/\{[\w|-]+\}/.test(block), `unfilled placeholder in:\n${block}`);
+  return block;
+};
 
-  const dir = mkdtempSync(join(tmpdir(), "wf-0c-wire-"));
+// A consumer that has turned the feature on and has no catalogue or map yet: the case where
+// `ensure` would create both.
+const consumer = () => {
+  const dir = mkdtempSync(join(tmpdir(), "wf-develop-"));
+  const refs = join(dir, ".agents/skills/develop-task/references");
+  mkdirSync(refs, { recursive: true });
+  for (const f of ["wireframe-map.js", "yaml-subset.js"])
+    copyFileSync(join(ROOT, "shared/resources", f), join(refs, f));
+  mkdirSync(join(dir, "docs"));
+  mkdirSync(join(dir, "src"));
+  writeFileSync(
+    join(dir, "skills-config.yaml"),
+    "ui:\n  componentCatalogue: docs/components.md\n  componentBarrel: src/index.ts\n" +
+      "  wireframeMap: docs/wireframe-map.md\n",
+  );
+  writeFileSync(
+    join(dir, "src/index.ts"),
+    "export const Button = () => null;\n",
+  );
+  writeFileSync(
+    join(dir, "docs/story.md"),
+    '# Story\n\n```wireloom\nwindow:\n  button "Done" primary\n```\n',
+  );
+  return dir;
+};
+
+// Every file a commit could pick up: all of the checkout except the ignored pipeline state.
+const trackable = (dir) =>
+  readdirSync(dir, { recursive: true })
+    .map(String)
+    .filter((p) => !p.startsWith(".claude") && !p.startsWith(".agents"))
+    .sort();
+
+const run = (dir, block) => {
+  const r = spawnSync("bash", ["-c", block], { cwd: dir, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+};
+
+// The 0c-wire block runs as delivered in a consumer checkout with no .claude/state directory, and
+// writes nothing a commit could pick up: Step 1's /create-branch halts on any such file, and the
+// branch does not exist yet (QA cycle 2, CR2-1).
+test("the 0c-wire block runs in a fresh checkout and writes no tracked file", () => {
+  const block = stepBlock(
+    "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md",
+    "## 0c-wire.",
+    "## 0d.",
+  );
+  const dir = consumer();
   try {
-    const refs = join(dir, ".agents/skills/develop-task/references");
-    mkdirSync(refs, { recursive: true });
-    for (const f of ["wireframe-map.js", "yaml-subset.js"])
-      copyFileSync(join(ROOT, "shared/resources", f), join(refs, f));
-    mkdirSync(join(dir, "docs"));
-    writeFileSync(
-      join(dir, "skills-config.yaml"),
-      "ui:\n  wireframeMap: docs/wireframe-map.md\n",
-    );
-    writeFileSync(
-      join(dir, "docs/story.md"),
-      '# Story\n\n```wireloom\nwindow:\n  button "Done" primary\n```\n',
-    );
+    const before = trackable(dir);
     assert.equal(existsSync(join(dir, ".claude/state")), false);
-    const run = spawnSync("bash", ["-c", block], {
-      cwd: dir,
-      encoding: "utf8",
-    });
-    assert.equal(run.status, 0, run.stderr);
+    run(dir, block);
     const out = JSON.parse(
       readFileSync(join(dir, ".claude/state/wireframe-map.json"), "utf8"),
     );
@@ -124,6 +154,27 @@ test("the 0c-wire block runs in a fresh checkout and writes the resolve output",
       out.unresolved.some((n) => n.signature === "window>button[primary]"),
       JSON.stringify(out.unresolved),
     );
+    assert.deepEqual(trackable(dir), before, "Phase 0 wrote a tracked file");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// The writes Phase 0 defers happen at Step 3, on the branch: the catalogue and map appear there.
+test("Step 3's wireframe writes create the catalogue and the map", () => {
+  const block = stepBlock(
+    "shared/resources/develop-pipeline-step-3-develop-loop.md",
+    "## Wireframe writes",
+    "## Pre-develop Codebase Mapping",
+  );
+  const dir = consumer();
+  try {
+    run(dir, block);
+    assert.match(
+      readFileSync(join(dir, "docs/components.md"), "utf8"),
+      /Button/,
+    );
+    assert.ok(existsSync(join(dir, "docs/wireframe-map.md")));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

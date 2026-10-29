@@ -11,6 +11,26 @@ Loaded by `/develop-story` and `/develop-task` during Step 3. Story/task variant
 
 ---
 
+## Wireframe writes (only when Phase 0c-wire ran)
+
+Phase 0 resolves the wireframe and asks about its open nodes, but writes nothing tracked: Step 1's
+`/create-branch` refuses a dirty tree. The writes happen here, first, on the branch, whether Step 1
+created it or found it already there.
+
+```bash
+command node .agents/skills/{develop-story|develop-task}/references/wireframe-map.js ensure --json
+```
+
+1. Log `ensure`'s report in the Decisions Log. A file it `created` or `updated` is committed with the work.
+2. For each entry in `.claude/state/wireframe-answers.json` (0d): add its row to the document's
+   component table (the mapping procedure's step 6), and for each **confirmed** one run one
+   `wireframe-map.js record` call. An assumed entry gets its table row and no map row: an assumption
+   is not a confirmation.
+3. On resume, skip a node whose table row is already written. `record` replaces a row with the same
+   signature and label, so a repeated call adds nothing.
+
+---
+
 ## Pre-develop Codebase Mapping (CRITICAL for context efficiency)
 
 > This step invokes `/develop`, but the Explore subagent and plan file discovery below must run first. Do not invoke `/develop` until those are complete.
