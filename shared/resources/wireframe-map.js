@@ -401,11 +401,13 @@ function readMap(text) {
   return { rows, headerLine: start, tableEnd: end, columns: head.length };
 }
 
-// ECMAScript's whole LineTerminator set. A value is one cell on one line: \r and \n split the
-// row, and U+2028/U+2029 — which neither readMap nor Markdown ends a line at — stop unquote's
-// `.` from crossing, so the cell reads back with its backticks and the row never matches.
+// ECMAScript's whole LineTerminator set, plus NEL. A value is one cell on one line: \r and \n
+// split the row, and U+2028/U+2029 — which neither readMap nor Markdown ends a line at — stop
+// unquote's `.` from crossing, so the cell reads back with its backticks and the row never
+// matches. NEL (U+0085) is a YAML 1.1 line break, so a config value holding one is two lines to
+// any reader but yaml-subset.
 const LINE_TERMINATOR = new RegExp(
-  `[\\r\\n${String.fromCharCode(0x2028, 0x2029)}]`,
+  `[\\r\\n${String.fromCharCode(0x85, 0x2028, 0x2029)}]`,
 );
 
 function parsePattern(sig) {
@@ -1060,13 +1062,41 @@ function findBarrel(root) {
   );
 }
 
-// A JSON file, or null. tsconfig.json allows comments, so those are stripped first.
-function jsonFile(file, comments) {
+// tsconfig.json is JSONC: comments and trailing commas. One scan drops both and copies each string
+// literal whole, so a "@x/*" alias or a "src/**/*.ts" glob is not read as the start of a comment.
+function stripJsonc(text) {
+  let out = "";
+  let comma = -1; // where in `out` a comma waits to be seen as trailing
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '"') {
+      let j = i + 1;
+      while (j < text.length && text[j] !== '"') j += text[j] === "\\" ? 2 : 1;
+      out += text.slice(i, j + 1);
+      comma = -1;
+      i = j;
+    } else if (c === "/" && text[i + 1] === "/") {
+      const end = text.indexOf("\n", i);
+      i = (end < 0 ? text.length : end) - 1;
+    } else if (c === "/" && text[i + 1] === "*") {
+      const end = text.indexOf("*/", i + 2);
+      i = end < 0 ? text.length : end + 1;
+    } else {
+      if ((c === "}" || c === "]") && comma >= 0)
+        out = out.slice(0, comma) + out.slice(comma + 1);
+      if (c === ",") comma = out.length;
+      else if (!/\s/.test(c)) comma = -1;
+      out += c;
+    }
+  }
+  return out;
+}
+
+// A JSON file, or null; `jsonc` reads it as tsconfig.json is written.
+function jsonFile(file, jsonc) {
   try {
-    let text = fs.readFileSync(file, "utf8");
-    if (comments)
-      text = text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
-    return JSON.parse(text);
+    const text = fs.readFileSync(file, "utf8");
+    return JSON.parse(jsonc ? stripJsonc(text) : text);
   } catch (_) {
     return null;
   }
@@ -1267,7 +1297,7 @@ function readsBack(root, before, written) {
   const prevUi = prev.ui && typeof prev.ui === "object" ? prev.ui : {};
   const nowUi = cfg.ui && typeof cfg.ui === "object" ? cfg.ui : {};
   for (const k of Object.keys(prevUi))
-    if (!same(prevUi[k], nowUi[k])) return false;
+    if (!(k in written) && !same(prevUi[k], nowUi[k])) return false;
   for (const [k, v] of Object.entries(written))
     if (!sameValue(k, nowUi[k], v)) return false;
   return written.wireframeMap === false
@@ -1284,9 +1314,19 @@ function configure(root, opts) {
     section: "catalogueSection",
     map: "wireframeMap",
   };
-  for (const flag of [...Object.keys(flags), "exclude"])
-    if (opts[flag] != null && LINE_TERMINATOR.test(String(opts[flag])))
+  for (const flag of [...Object.keys(flags), "exclude"]) {
+    if (opts[flag] == null) continue;
+    const v = String(opts[flag]);
+    if (LINE_TERMINATOR.test(v))
       throw new UsageError(`--${flag} must be one line`);
+    // A value is written double-quoted, and yaml-subset reads a quoted value verbatim: any
+    // character JSON.stringify escapes would read back as its escape, not as given.
+    const ch = [...v].find((c) => JSON.stringify(c) !== `"${c}"`);
+    if (ch !== undefined)
+      throw new UsageError(
+        `--${flag} cannot hold U+${ch.codePointAt(0).toString(16).toUpperCase().padStart(4, "0")}: skills-config.yaml would not read it back`,
+      );
+  }
   const given = {};
   if (opts.decline) given.wireframeMap = false;
   else
@@ -1343,10 +1383,16 @@ function configure(root, opts) {
       .replace(/(^|\s)#.*$/, "")
       .trim();
     if (inline) return out("exists", { key: "ui" });
+    // Present means what `detect` means by it: a key with no value is missing, and its line is
+    // replaced where it stands rather than shadowed by a second one.
+    const present = presentKeys(raw);
     written = {};
+    const blank = {};
     for (const [k, v] of Object.entries(given)) {
-      if (!Object.prototype.hasOwnProperty.call(raw, k)) written[k] = v;
+      if (!present.includes(k)) written[k] = v;
       else if (!sameValue(k, raw[k], v)) return out("exists", { key: k });
+      if (!present.includes(k) && Object.prototype.hasOwnProperty.call(raw, k))
+        blank[k] = v;
     }
     // The block ends at its last indented line before the next column-0 key. Blank lines and
     // column-0 comments inside it do not end it, and are not where it ends.
@@ -1360,11 +1406,20 @@ function configure(root, opts) {
       if (indent === null) indent = /^\s*/.exec(line)[0];
     }
     const eol = eolOf(before);
-    const lines = Object.entries(written).flatMap(([k, v]) =>
-      yamlLines(k, v, indent || "  "),
-    );
-    const lead = pieces[last].endsWith("\n") ? "" : eol;
-    pieces.splice(last + 1, 0, lead + lines.join(eol) + eol);
+    for (const [k, v] of Object.entries(blank)) {
+      const key = new RegExp(`^${indent}["']?${k}["']?\\s*:`);
+      const j = pieces.findIndex((p, n) => n > at && n <= last && key.test(p));
+      if (j < 0) return out("exists", { key: k });
+      const end = /\r?\n$/.exec(pieces[j]);
+      pieces[j] = yamlLines(k, v, indent).join(eol) + (end ? end[0] : "");
+    }
+    const lines = Object.entries(written)
+      .filter(([k]) => !(k in blank))
+      .flatMap(([k, v]) => yamlLines(k, v, indent || "  "));
+    if (lines.length) {
+      const lead = pieces[last].endsWith("\n") ? "" : eol;
+      pieces.splice(last + 1, 0, lead + lines.join(eol) + eol);
+    }
     text = pieces.join("");
     action = "inserted";
   }
@@ -1432,8 +1487,11 @@ function parseArgs(argv) {
     const values = CONFIGURE_VALUES.filter((k) => opts[k] != null);
     if (opts.decline && values.length)
       throw new UsageError(`configure --decline takes no --${values[0]}`);
-    if (!opts.decline && !opts.map)
+    if (!opts.decline && !String(opts.map || "").trim())
       throw new UsageError("configure needs --map, or --decline");
+  } else {
+    const stray = CONFIGURE_VALUES.find((k) => opts[k] != null);
+    if (stray) throw new UsageError(`--${stray} is a configure flag`);
   }
   if (command === "resolve" && opts.positional.length !== 1)
     throw new UsageError("resolve takes one work-item path");

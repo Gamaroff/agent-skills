@@ -1,0 +1,91 @@
+schema: 2
+task: 'task.246.wireframe-mapping-setup-offer'
+task_title: 'Wireframe mapping setup offer and first-run candidates'
+gate: CONCERNS
+status_reason: 'All five phases verified and 128 tests green, but two medium correctness bugs in detect/configure (tsconfig parsing; an empty ui: key that detect and configure read differently) break success criteria a test did not reach.'
+reviewer: 'QA Engineer'
+head: '91b0c468ca7d17aac4cd7ab081b9f84b34570d0a'
+updated: '2026-10-29T22:15:37Z'
+
+top_issues:
+  - id: 'TASK-246-CR-1'
+    severity: medium
+    file: 'shared/resources/wireframe-map.js'
+    finding: 'jsonFile strips /* */ comments inside JSON strings, so a tsconfig with a "@x/*" alias and a "src/**/*.ts" include glob (or trailing commas) fails to parse and detect proposes no componentImport (BUG-1).'
+    suggested_action: 'Strip comments with a string-aware scanner and drop trailing commas before JSON.parse; add tests for the /* alias, the ** glob and trailing commas, with the plain-alias control.'
+    suggested_owner: dev
+    bug_ref: 'task.246.bug.1.tsconfig-comment-strip-eats-path-globs.md'
+    status: open
+  - id: 'TASK-246-CR-2'
+    severity: medium
+    file: 'shared/resources/wireframe-map.js'
+    finding: 'A ui: key written with no value is missing to detect (partial, offer setup) but present to configure (exists), so setup is offered on every wireframe and can never complete (BUG-2).'
+    suggested_action: 'Have configure decide presence with presentKeys, replace an empty key line in place instead of inserting a second one, and test an empty wireframeMap: and an empty componentImport:.'
+    suggested_owner: dev
+    bug_ref: 'task.246.bug.2.empty-ui-key-detect-configure-disagree.md'
+    status: open
+  - id: 'TASK-246-PROBE-1'
+    severity: low
+    file: 'shared/resources/wireframe-map.js'
+    finding: 'configure accepts a value holding NEL (U+0085) while refusing U+2028 and U+2029; yaml-subset reads it back verbatim, so it is inert in this repository, but it is a YAML 1.1 line break (probe case configure.nel).'
+    suggested_action: 'Add U+0085 to LINE_TERMINATOR (it then also guards signatures and record fields) and a configure.nel test.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-246-PROBE-2'
+    severity: low
+    file: 'shared/resources/wireframe-map.js'
+    finding: 'A value holding a double quote (or a backslash) is written escaped, which yaml-subset does not unescape, so configure restores the file and answers write-failed instead of a usage error naming the character (probe case configure.double-quote).'
+    suggested_action: 'Refuse " and \ in configure values up front as a UsageError naming the flag and the character, and test it; keep write-failed for genuine read-back mismatches.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-246-QA-1'
+    severity: low
+    file: 'docs/tasks/task.246.wireframe-mapping-setup-offer/task.246.wireframe-mapping-setup-offer.md'
+    finding: 'PR #793 body says "Breaking Changes: None", but the task § 5 lists two (false/off now decline; candidates carry source).'
+    suggested_action: 'Edit the PR body Breaking Changes section to name both, with their migrations from § 5.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 128
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 12
+    escaped: 0
+    notes: 'boundary: true — configure value guard probed with cli: form, 12 cases (task.246.qa.1.configure-value-cases.json, record task.246.qa.1.security.run.json): LF, CR, CRLF, U+2028, U+2029 refused; NEL accepted but inert in yaml-subset (PROBE-1, low); a double quote overblocked as write-failed (PROBE-2, low). No write outside the fixture. Map paths are not containment-checked, as before this change.'
+  performance:
+    status: PASS
+    notes: 'detect reads a bounded set, held by "detect reads only its bounded set".'
+  reliability:
+    status: CONCERNS
+    notes: 'configure restores bytes on a failed read-back (tested, mutation-proven). CR-2 leaves a hand-blanked key in a loop: offered, then refused, on every wireframe.'
+  maintainability:
+    status: PASS
+    notes: 'Prettier clean, tests named for behaviour, procedure and configuration docs updated; CR-4 (configure-only flags accepted by other commands) is an advisory cleanup.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-3 (advisory, medium confidence): trim --map before the CLI presence check so a whitespace-only value is a usage error (exit 2), not write-failed.'
+      refs: ['shared/resources/wireframe-map.js']
+    - action: 'CR-4 (advisory cleanup): accept CONFIGURE_VALUES only for the configure command, so ensure/resolve/record keep refusing --map, --barrel and the rest as unknown flags.'
+      refs: ['shared/resources/wireframe-map.js']
+    - action: 'Map and catalogue paths are not checked for containment in the repository (ensure/record write where the config points); pre-existing, now also reachable through configure.'
+      refs: ['shared/resources/wireframe-map.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-246-CR-1 and TASK-246-CR-2 fixed and re-reviewed']

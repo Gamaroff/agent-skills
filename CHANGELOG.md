@@ -12,9 +12,12 @@ All notable changes to this project will be documented in this file. Format foll
   asks once: set up with those values, adjust them, not now, or never for this repo. Two new engine
   commands do the work: `wireframe-map.js detect` (read-only; reports `configured`, `declined`,
   `partial` or `unset` with a proposal and its evidence) and `configure` (the only writer of
-  `skills-config.yaml`: it appends the block or inserts the keys a partial one lacks, keeps every
-  other byte and the file's line endings, and restores the file if it does not read back). The
-  develop pipelines never offer setup.
+  `skills-config.yaml`: it appends the block or inserts the keys a partial one lacks, fills a key
+  written with no value where it stands, keeps every other byte and the file's line endings, and
+  restores the file if it does not read back). A value the file cannot hold — a line break, a `"`,
+  a `\` or another control character — is a usage error naming the flag. `detect` reads
+  `tsconfig.json` as JSONC, so a `/*` path alias, a `**` include glob and trailing commas no longer
+  hide the import alias. The develop pipelines never offer setup.
 - **A first run gets candidates from the catalogue (task 246).** On an empty map, `resolve` offered
   nothing for every open node. It now adds up to five catalogue entries per node, after any near-miss
   map rows: those with a PascalCase name segment equal to the primitive (`basis: name`), then those

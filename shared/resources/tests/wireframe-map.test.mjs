@@ -1223,6 +1223,47 @@ test("detect reads a tsconfig path alias that lands on the barrel", () => {
   }
 });
 
+test("detect reads tsconfig.json as JSONC: a /* alias, a ** glob, comments and trailing commas", () => {
+  const tsconfig = (alias, extra = "") =>
+    [
+      "{",
+      "  /* block comment */",
+      '  "compilerOptions": {',
+      '    "baseUrl": ".", // line comment',
+      `    "paths": { "${alias}": ["src/components/index.ts"], "@x/*": ["lib/*"], },`,
+      "  },",
+      `  "include": ["src/**/*.ts", "a // not a comment", "b, }"]${extra}`,
+      "}",
+    ].join("\n");
+  const cases = [
+    // [tsconfig text, the import detect must propose]
+    [tsconfig("@app/components"), "@app/components"],
+    [tsconfig("@app/components/*"), "@app/components"],
+    [tsconfig("@app/components", ","), "@app/components"],
+    // The control: plain JSON, no comment and no trailing comma.
+    [
+      JSON.stringify({
+        compilerOptions: {
+          paths: { "@app/components": ["src/components/index.ts"] },
+        },
+      }),
+      "@app/components",
+    ],
+  ];
+  for (const [text, want] of cases) {
+    const root = project({
+      ...CONFIGURED_FILES,
+      "package.json": JSON.stringify({ name: "the-repo" }),
+      "tsconfig.json": text,
+    });
+    try {
+      assert.equal(detect(root).proposal.componentImport.value, want, text);
+    } finally {
+      cleanup(root);
+    }
+  }
+});
+
 test("detect proposes an existing catalogue table that lists three or more exports, with its heading", () => {
   const table = (names) =>
     [
@@ -1493,8 +1534,156 @@ test("configure keeps a present key that matches, and needs a barrel only when t
   }
 });
 
+test("configure fills a key written with no value where it stands, so detect then reads configured", () => {
+  const cases = [
+    // [before, the flags configure is given]
+    ["ui:\n  componentBarrel: b.ts\n  wireframeMap:\n", { map: "m.md" }],
+    [
+      'ui:\n  componentBarrel: b.ts\n  wireframeMap: ""\nother: 1\n',
+      { map: "m.md" },
+    ],
+    [
+      "ui:\n  componentImport:\n  componentBarrel: b.ts\n",
+      { map: "m.md", import: "@x/ui" },
+    ],
+    [
+      "ui:\r\n  componentBarrel: b.ts\r\n  wireframeMap:   # todo\r\n",
+      { map: "m.md" },
+    ],
+    ["ui:\n  componentBarrel: b.ts\n  wireframeMap:", { map: "m.md" }],
+  ];
+  for (const [before, opts] of cases) {
+    const root = project({ "skills-config.yaml": before });
+    try {
+      const d = detect(root);
+      assert.equal(d.state, "partial", before);
+      const r = configure(root, opts);
+      assert.equal(r.reason, "ok", before);
+      assert.equal(detect(root).state, "configured", before);
+      const after = config(root);
+      // One line per key: the blank line was replaced, not shadowed by a second one.
+      for (const k of r.written)
+        assert.equal(
+          after
+            .split(/\r?\n/)
+            .filter((l) => new RegExp(`^\\s*${k}\\s*:`).test(l)).length,
+          1,
+          `${before}: ${k} appears once`,
+        );
+      const cfg = parseConfig(after);
+      assert.equal(cfg.ui.wireframeMap, "m.md", before);
+      if (opts.import) assert.equal(cfg.ui.componentImport, "@x/ui", before);
+      if ("other" in parseConfig(before)) assert.equal(cfg.other, 1, before);
+      // Every line that was not a blank key is kept, in order.
+      const kept = (t) =>
+        t
+          .split(/\r?\n/)
+          .filter((l) => !/^\s*(wireframeMap|componentImport)\s*:/.test(l));
+      assert.deepEqual(kept(after), kept(before), before);
+      if (before.includes("\r\n"))
+        assert.ok(!/[^\r]\n/.test(after), "CRLF kept");
+    } finally {
+      cleanup(root);
+    }
+  }
+  const declined = project({
+    "skills-config.yaml": "ui:\n  componentBarrel: b.ts\n  wireframeMap:\n",
+  });
+  try {
+    assert.equal(configure(declined, { decline: true }).reason, "ok");
+    assert.equal(detect(declined).state, "declined");
+    assert.equal(
+      config(declined),
+      "ui:\n  componentBarrel: b.ts\n  wireframeMap: false\n",
+    );
+  } finally {
+    cleanup(declined);
+  }
+});
+
+test("configure refuses a character skills-config.yaml cannot read back, naming it, and writes nothing", () => {
+  const bad = [
+    ["import", '@acme/"ui"', "U+0022"],
+    ["barrel", "src\\components\\index.ts", "U+005C"],
+    ["section", "## A\tB", "U+0009"],
+    ["exclude", "A,B\u0000", "U+0000"],
+    ["catalogue", "docs/c\ud800.md", "U+D800"],
+  ];
+  for (const [flag, value, code] of bad) {
+    const root = project({ "skills-config.yaml": "x: 1\n" });
+    try {
+      const cli = runCli([
+        "configure",
+        ...flagsOf({ ...SETUP, [flag]: value }),
+        "--root",
+        root,
+        "--json",
+      ]);
+      assert.equal(cli.exitCode, 2, `${flag}=${JSON.stringify(value)}`);
+      assert.equal(cli.payload.reason, "usage");
+      assert.ok(
+        cli.error.includes(`--${flag} cannot hold ${code}:`),
+        cli.error,
+      );
+      assert.equal(config(root), "x: 1\n");
+    } finally {
+      cleanup(root);
+    }
+  }
+  // A non-ASCII character JSON.stringify keeps as itself is stored and read back.
+  const root = project();
+  try {
+    assert.equal(
+      configure(root, { ...SETUP, section: "## Composants — UI 😀" }).reason,
+      "ok",
+    );
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("CLI: configure needs a non-blank --map, and its flags belong to configure alone", () => {
+  const root = project({ "skills-config.yaml": "x: 1\n" });
+  try {
+    for (const map of ["", "   "]) {
+      const cli = runCli([
+        "configure",
+        "--barrel",
+        "b.ts",
+        "--map",
+        map,
+        "--root",
+        root,
+      ]);
+      assert.equal(cli.exitCode, 2, JSON.stringify(map));
+    }
+    for (const argv of [
+      ["ensure", "--map", "m.md"],
+      ["detect", "--barrel", "b.ts"],
+      [
+        "record",
+        "--signature",
+        "button",
+        "--component",
+        "B",
+        "--by",
+        "me",
+        "--exclude",
+        "A",
+      ],
+    ]) {
+      const cli = runCli([...argv, "--root", root]);
+      assert.equal(cli.exitCode, 2, argv.join(" "));
+      assert.match(cli.error, /is a configure flag/);
+    }
+    assert.equal(config(root), "x: 1\n");
+  } finally {
+    cleanup(root);
+  }
+});
+
 test("configure refuses a value holding a line terminator, and writes nothing", () => {
-  for (const bad of ["a\nb", "a\rb", `a${LS}b`]) {
+  for (const bad of ["a\nb", "a\rb", `a${LS}b`, "a\u0085b"]) {
     const root = project({ "skills-config.yaml": "x: 1\n" });
     try {
       const cli = runCli([
@@ -1535,7 +1724,7 @@ test("configure --decline round-trips to declined, from no block and from a part
 });
 
 test("configure restores the original bytes when the file does not read back as written", () => {
-  // yaml-subset does not unescape a double-quoted backslash, so `a\b` reads back as `a\\b`.
+  // A map of `off` is written as given but reads back as a decline, so the feature is not on.
   const before = "develop:\r\n  x: 1\r\n";
   const appended = project({ "skills-config.yaml": before });
   const partial = project({
@@ -1545,7 +1734,7 @@ test("configure restores the original bytes when the file does not read back as 
   try {
     const cli = runCli([
       "configure",
-      ...flagsOf({ ...SETUP, import: "a\\b" }),
+      ...flagsOf({ ...SETUP, map: "off" }),
       "--root",
       appended,
       "--json",
@@ -1553,10 +1742,10 @@ test("configure restores the original bytes when the file does not read back as 
     assert.equal(cli.exitCode, 1);
     assert.equal(cli.payload.reason, "write-failed");
     assert.equal(config(appended), before);
-    assert.equal(configure(partial, { map: "a\\b" }).reason, "write-failed");
+    assert.equal(configure(partial, { map: "Off" }).reason, "write-failed");
     assert.equal(config(partial), "ui:\n  componentBarrel: b.ts\n");
     assert.equal(
-      configure(created, { ...SETUP, map: "a\\b" }).reason,
+      configure(created, { ...SETUP, map: "OFF" }).reason,
       "write-failed",
     );
     assert.equal(existsSync(join(created, "skills-config.yaml")), false);

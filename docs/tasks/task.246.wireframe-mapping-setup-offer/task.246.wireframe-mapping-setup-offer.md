@@ -613,6 +613,31 @@ the primitive in the middle of a segment (`Rebutton`), which must not match `but
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-30
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.246.qa.1.wireframe-mapping-setup-offer.md](./task.246.qa.1.wireframe-mapping-setup-offer.md)
+- **Gate File**: [task.246.gate.1.wireframe-mapping-setup-offer.yml](./task.246.gate.1.wireframe-mapping-setup-offer.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 128
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+Two medium bugs in new engine code: `detect` cannot parse a tsconfig with a `/*` alias and a `**`
+glob, or trailing commas (BUG-1); an empty `ui:` key is missing to `detect` and present to
+`configure`, so setup is offered and always refused (BUG-2). Three low items: NEL accepted in a
+`configure` value, a double quote refused as `write-failed`, and the PR body omits the breaking
+changes.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -622,6 +647,8 @@ the primitive in the middle of a segment (`Rebutton`), which must not match `but
 | 2026-10-29 | 1.1     | Review 1 (7/10 → 9/10): added the `partial` state (a `ui:` block without `wireframeMap` looped); defined "sets `ui.wireframeMap`" once for its 12 gate sites; listed `wireframe-mapping-hooks.test.mjs`; held the offer, near-miss and bounded-read criteria with tests | review-task |
 | 2026-10-29 |         | Status → ready-for-development | review-task |
 | 2026-10-30 |         | Implemented — 9 source files (+16 bundled copies), 25 new tests; status → ready-for-review | develop |
+| 2026-10-30 |         | QA gate CONCERNS (80/100) — 5 findings | qa-task |
+| 2026-10-30 |         | QA findings fixed — cycle 1: 2 bugs and 3 low findings, plus advisory CR-3 and CR-4; 4 new tests | qa-fix |
 <!-- change-log-end -->
 
 ---
