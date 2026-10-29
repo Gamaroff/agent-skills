@@ -422,6 +422,24 @@ test("resolve picks the most specific matching row and lists the open nodes", ()
   }
 });
 
+// A repeated flag is one constraint, so it must not make a row look more specific than it is
+// (gate 14, CR14-1): `input[a,a,a]` means `input[a]` and loses to `input[a,b]`.
+test("match counts a repeated flag once when ranking rows", () => {
+  const node = {
+    parent: null,
+    primitive: "input",
+    label: null,
+    flags: ["a", "b"],
+    attrs: {},
+  };
+  const rows = [
+    { signature: "input[a,a,a]", label: "", component: "Repeated" },
+    { signature: "input[a,b]", label: "", component: "Specific" },
+  ];
+  assert.equal(match(rows, node).component, "Specific");
+  assert.equal(match([...rows].reverse(), node).component, "Specific");
+});
+
 test("resolve without a map file treats every node as open", () => {
   const root = consumer();
   try {
@@ -582,6 +600,61 @@ test("record replaces a row spelled differently that means the same, and only th
         assert.ok(after.includes(`\`${first}\``), `${first} then ${second}`);
         assert.ok(after.includes("| Old |"), `${first} then ${second}`);
       }
+    } finally {
+      cleanup(root);
+    }
+  }
+});
+
+// The row to replace is found by meaning AND label: the same signature under another label is
+// another row (gate 14, CR14-2). Each case records three rows, then re-records one of them.
+test("record keeps rows with the same signature and different labels apart", () => {
+  const cases = [
+    // [the re-recorded label, the action, the component left on each original row]
+    ["Save", "replaced", { "": "Plain", Save: "New" }],
+    ["", "replaced", { "": "New", Save: "Saver" }],
+    ["Cancel", "added", { "": "Plain", Save: "Saver" }],
+    ["save", "added", { "": "Plain", Save: "Saver" }],
+    ["/Save/", "added", { "": "Plain", Save: "Saver" }],
+  ];
+  for (const [label, action, left] of cases) {
+    const root = consumer();
+    try {
+      ensure(root);
+      const opts = { by: "a developer", date: "2026-10-29" };
+      record(root, {
+        ...opts,
+        signature: "button[primary]",
+        component: "Plain",
+      });
+      record(root, {
+        ...opts,
+        signature: "button[primary]",
+        label: "Save",
+        component: "Saver",
+      });
+      const r = record(root, {
+        ...opts,
+        // An equivalent spelling, so the label is the only term that can tell the rows apart.
+        signature: "*>button[primary,primary]",
+        label,
+        component: "New",
+      });
+      assert.equal(r.action, action, `label ${JSON.stringify(label)}`);
+      const rows = readMap(
+        readFileSync(join(root, "docs/wireframe-map.md"), "utf8"),
+      ).rows;
+      assert.equal(
+        rows.length,
+        action === "added" ? 3 : 2,
+        `label ${JSON.stringify(label)}: row count`,
+      );
+      for (const [l, component] of Object.entries(left))
+        assert.equal(
+          rows.find((x) => (x.label || "") === l).component,
+          component,
+          `label ${JSON.stringify(label)}: the ${JSON.stringify(l)} row`,
+        );
     } finally {
       cleanup(root);
     }

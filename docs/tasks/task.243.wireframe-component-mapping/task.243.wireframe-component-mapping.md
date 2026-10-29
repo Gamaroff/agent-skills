@@ -245,11 +245,14 @@ catalogue files stay as they are.
   `resolve` prints it.
 - **TASK-243-CR14-1** (LOW) — carried to gate 14. `signatureKey` de-duplicates flags but `score`
   counts them with duplicates, so `input[a,a]` and `input[a]` share a key but not a score.
-  De-duplicate once in `parsePattern`.
+  De-duplicate once in `parsePattern`. **Fixed after acceptance (2026-10-29):** `parsePattern`
+  de-duplicates flags. The test "match counts a repeated flag once when ranking rows" turns red when
+  the fix is reverted.
 - **TASK-243-CR14-2** (LOW) — carried to gate 14. No test shows that `record` keeps rows with the
   same signature and different labels apart (the mutation reds nothing). Add a must-differ label
   case to the record test. (DoD run 4's probe exercised the behaviour, 5 cases, all held: the gap is
-  a per-PR test, not the code.)
+  a per-PR test, not the code.) **Fixed after acceptance (2026-10-29):** the test "record keeps rows
+  with the same signature and different labels apart" turns red when the label term is dropped.
 
 ## Progress Tracking
 
@@ -364,5 +367,6 @@ The gate-14 low findings stay in Deferred Work above.
 | 2026-10-29 |  | QA findings fixed — cycle 13, 2 findings (bug.16 Ready for QA, CR13-1; CR13-2), after a 2-cycle grant | qa-fix |
 | 2026-10-29 |  | QA gate PASS (100/100) — 0 blocking, 2 advisory lows (TASK-243-CR14-1, CR14-2); bug.16 closed | qa-task |
 | 2026-10-29 | 1.3 | DoD passed — accepted (PR #785); DoD run 4, 7/7 criteria, probe 136/0/0 | finalise |
+| 2026-10-29 |  | Deferred Work: CR14-1 and CR14-2 fixed after acceptance (flags de-duplicated in parsePattern; label must-differ test) | Lorien Gamaroff |
 <!-- change-log-end -->
 
