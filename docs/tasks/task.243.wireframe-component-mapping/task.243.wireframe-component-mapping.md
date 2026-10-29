@@ -247,27 +247,27 @@ catalogue files stay as they are.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-29
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.243.qa.10.wireframe-component-mapping.md](./task.243.qa.10.wireframe-component-mapping.md)
-- **Gate File**: [task.243.gate.10.wireframe-component-mapping.yml](./task.243.gate.10.wireframe-component-mapping.yml)
+- **Full Report**: [task.243.qa.11.wireframe-component-mapping.md](./task.243.qa.11.wireframe-component-mapping.md)
+- **Gate File**: [task.243.gate.11.wireframe-component-mapping.yml](./task.243.gate.11.wireframe-component-mapping.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 40 (wireframe suites); 6842 in the fix's fast gate
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-The cycle 9 fix holds. `record` refuses a line break in every written field and a backtick in
-`--signature` and `--label`, and both guards are mutation-proven. One medium finding remains
-(CR10-1): an odd backtick in an unquoted cell (`--component`, `--variant`, `--hint`, `--notes`,
-`--by`) still collapses the row. The probe measured it: 66 executed, 5 reproduced, 0 escaped.
+The cycle 10 fix closes the odd-backtick class (CR10-1, CR10-2). `record` round-trips every unquoted
+value through the reader before any read or write, and refuses one that would not come back intact.
+Both arms are mutation-proven. The probe measured 79 executed, 0 reproduced, 0 escaped. Two lows
+remain, both advisory (CR11-1, CR11-2).
 
 ## Definition of Done - Gaps Identified
 
@@ -334,5 +334,6 @@ The gap below was found by the security probe run, against a boundary this run a
 | 2026-10-29 |  | QA findings fixed — CR9-1 (a line break in any written record field) and CR9-2 (a backtick in the signature or label) are refused with a UsageError; mutation-proven; fix cycle 9 | qa-fix |
 | 2026-10-29 |  | QA gate CONCERNS (90/100) — cycle 10 of 10; cycle 9 fix verified and mutation-proven; 1 medium finding (CR10-1: an odd backtick in an unquoted record cell collapses the row), 1 low cleanup; probe 66/5/0 | qa-task |
 | 2026-10-29 |  | QA findings fixed — CR10-1 and CR10-2: record refuses any value that would not read back from its map row (round-trip through the reader); mutation-proven; probe re-run 50/0/0; fix cycle 10 | qa-fix |
+| 2026-10-29 |  | QA gate PASS (100/100) — cycle 11 of 12; cycle 10 fix verified and mutation-proven (CR10-1, CR10-2 fixed); 2 low advisory findings (CR11-1, CR11-2); probe 79/0/0 | qa-task |
 <!-- change-log-end -->
 
