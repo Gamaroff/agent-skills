@@ -6,6 +6,24 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **A `/finalise` re-run now judges a fixed scope, so a DoD loop has a fixed point (task 242).**
+  Each run used to judge every criterion afresh, and more finely than the last: task.239 ran
+  `/finalise` five times, each finding a gap the run before had passed on an unchanged tree, and
+  stopped only on a stop rule set by hand (obs #121). Each story/task run now writes an AC record,
+  `{STEM}.dod.{N}.ac.json`, beside its DoD file: the head the agents read, and each criterion's id,
+  text hash, verdict, citations and — for a quantified criterion — members. The next run's Step 3a
+  reads the newest record with the new `finalise-rerun-scope.js scope` and re-judges only the
+  reported gaps, the criteria whose text changed, and the passes whose cited code, test or member
+  evidence changed (or resolves to no tracked file); every other pass is carried. Step 3c's
+  `finalise-rerun-scope.js merge` enforces that on the agent's answer: a carried verdict is restored
+  whatever the agent returned, a finer finding on it is listed under **Advisory (not a gap)** rather
+  than failing the run, and `overall` is recomputed from the merged criteria and docs. The DoD's
+  Step 2 block names the scope on every run (`**Re-run scope:** {mode} ({reason}) — K re-judged, M
+  carried`). Any doubt — no record, an unreadable one, a reopened document, a rebased head — runs
+  `full`, which is the old behaviour. **The first run after upgrading is `full`
+  (`no-prior-record`)**, since no record exists yet. **To force a full re-judge**, move the newest
+  `*.ac.json` beside the document aside. Bug mode is unchanged (`rerun-scope` is a bug-mode skip).
+
 - **A QA-loop escalation and its re-entry grant now say what the resumed run will do (task 239).**
   Four changes, each closing a gap where the halt told the operator one thing and the resumed run
   did another:

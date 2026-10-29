@@ -19,6 +19,7 @@ import assert from "node:assert/strict";
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 
 import { allCases } from "../../../shared/resources/security-input-corpus.mjs";
 import { bundleCheck } from "../lib/bundled-parity.mjs";
@@ -1112,5 +1113,161 @@ test("every transitively-bundled reference is in sync with its source", () => {
     ok,
     `bundle_skill.py --check skills/finalise reported problems outside the ` +
       `prompt's own references:\n${stdout}`,
+  );
+});
+
+// ── the AC prompt's re-run scope (task 242) ─────────────────────────────────
+//
+// A re-run judges a fixed scope: /finalise computes it at Step 3a, hands it to
+// agent 1 as <RERUN_SCOPE>, and enforces it on the answer at Step 3c. These
+// pins hold the four places that wiring lives, and the Step 3 heading two
+// other skills link to by anchor.
+
+const AC_PROMPT = "finalise-dod-ac-prompt.md";
+const acSource = () =>
+  readFileSync(join(repoRoot, "shared", "resources", AC_PROMPT), "utf-8");
+const STEP3_HEADING = "### Step 3: Check each acceptance criterion";
+
+test("AC prompt: a Step 0 before Step 3 reads <RERUN_SCOPE>", () => {
+  const text = acSource();
+  const step0 = text.indexOf("### Step 0: Read the re-run scope");
+  const step3 = text.indexOf(`\n${STEP3_HEADING}\n`);
+  assert.ok(
+    step0 !== -1,
+    "the AC prompt has no `### Step 0: Read the re-run scope` section",
+  );
+  assert.ok(step3 !== -1, "the AC prompt's Step 3 heading is gone or changed");
+  assert.ok(step0 < step3, "Step 0 must come before Step 3");
+  const section = text.slice(step0, text.indexOf("\n### Step 1:", step0));
+  assert.ok(
+    section.includes("<RERUN_SCOPE>"),
+    "Step 0 does not carry the <RERUN_SCOPE> placeholder",
+  );
+  assert.ok(
+    has(section, "mode: full"),
+    "Step 0 does not say what a full scope means",
+  );
+  assert.ok(
+    has(section, "advisories"),
+    "Step 0 does not route out-of-scope findings to advisories",
+  );
+  assert.ok(
+    has(text, "advisories:"),
+    "the output schema has no advisories list",
+  );
+  assert.ok(
+    /^\s+members:/m.test(text),
+    "the output schema has no members list",
+  );
+});
+
+test("AC prompt: the Step 3 heading is byte-identical in the source and every bundled copy", () => {
+  // review-task and review-story link to #step-3-check-each-acceptance-criterion.
+  for (const rel of [
+    ["shared", "resources", AC_PROMPT],
+    ["skills", "finalise", "references", AC_PROMPT],
+    ["skills", "review-task", "references", AC_PROMPT],
+    ["skills", "review-story", "references", AC_PROMPT],
+  ]) {
+    const text = readFileSync(join(repoRoot, ...rel), "utf-8");
+    assert.ok(
+      text.split("\n").includes(STEP3_HEADING),
+      `${rel.join("/")} does not carry \`${STEP3_HEADING}\` as a line`,
+    );
+    assert.ok(
+      text.includes("### Step 0: Read the re-run scope"),
+      `${rel.join("/")} is stale — run \`npm run bundle\``,
+    );
+  }
+});
+
+test("/finalise: Step 3a runs scope, the dispatch row passes <RERUN_SCOPE>, Step 3c runs merge and writes the record", () => {
+  const text = skill();
+  const row = text
+    .split("\n")
+    .find((l) => l.startsWith("| 1. AC traceability"));
+  assert.ok(
+    row && row.includes("<RERUN_SCOPE>"),
+    "dispatch table row 1 does not substitute <RERUN_SCOPE>",
+  );
+  const s3a = text.slice(
+    text.indexOf("#### Step 3a:"),
+    text.indexOf("#### Step 3b:"),
+  );
+  assert.match(
+    s3a,
+    /finalise-rerun-scope\.js scope\b/,
+    "Step 3a does not run the scope command",
+  );
+  assert.match(
+    s3a,
+    /newest_numbered "\{document-directory\}" dod -name "\$\{STEM\}\.dod\.\*\.ac\.json"/,
+    "Step 3a does not resolve the newest prior AC record",
+  );
+  const s3c = text.slice(
+    text.indexOf("#### Step 3c:"),
+    text.indexOf("#### Step 3d:"),
+  );
+  assert.match(
+    s3c,
+    /finalise-rerun-scope\.js merge\b/,
+    "Step 3c does not run the merge command",
+  );
+  assert.match(
+    s3c,
+    /--record-out "\$AC_RECORD"/,
+    "Step 3c does not write the AC record",
+  );
+  assert.ok(
+    s3c.includes(
+      'AC_RECORD="{document-directory}/${STEM}.dod.${DOD_N}.ac.json"',
+    ),
+    "Step 3c's record path is not ${STEM}.dod.${DOD_N}.ac.json",
+  );
+});
+
+test("/finalise: the DoD Step 2 block carries the re-run scope line and the advisory list", () => {
+  const text = skill();
+  const s3d = text.slice(
+    text.indexOf("#### Step 3d:"),
+    text.indexOf("**Append 2"),
+  );
+  assert.ok(
+    s3d.includes("{RERUN_SCOPE_LINE"),
+    "the Step 2 block does not render the re-run scope line",
+  );
+  assert.ok(
+    s3d.includes("**Re-run scope:**"),
+    "the Step 2 block does not show the scope line's shape",
+  );
+  assert.ok(
+    s3d.includes("### Advisory (not a gap)"),
+    "the Step 2 block has no `### Advisory (not a gap)` list",
+  );
+  assert.ok(
+    s3d.includes("ac_result.advisories"),
+    "the advisory list does not read ac_result.advisories",
+  );
+  // The line the template shows is the line the engine prints.
+  const require = createRequire(import.meta.url);
+  const eng = require(
+    join(repoRoot, "shared", "resources", "finalise-rerun-scope.js"),
+  );
+  const line = eng.merge(
+    {
+      mode: "full",
+      reason: "no-prior-record",
+      head: "h",
+      criteria: [],
+      rejudge: [],
+      carry: [],
+    },
+    "ac_traceability:\n  acs: []\n",
+    {},
+    { tracked: () => [] },
+  ).scope_line;
+  assert.ok(
+    line.startsWith("**Re-run scope:** full (no-prior-record) — "),
+    `the engine's scope line changed shape: ${line}`,
   );
 });

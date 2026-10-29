@@ -136,6 +136,7 @@ const EXPECTED_VERBS = {
   "verification-complete": "run",
   "read-document": "run",
   "qa-reports": "run",
+  "rerun-scope": "skip", // task 242 — a bug has no criteria list to scope
   "ac-agent": "skip",
   "fix-evidence": "run",
   "frontmatter-accepted": "skip",
