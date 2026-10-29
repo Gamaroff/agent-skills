@@ -57,8 +57,13 @@ function detect(root) {
 }
 ```
 
-`ui` holding only other keys (no `wireframeMap`) is `unset`. That is the case of a project that
-wrote a catalogue but never turned mapping on.
+**`partial` (review 1, I1).** A file with a top-level `ui:` key (`/^ui\s*:/m` on the raw text,
+because an empty `ui:` reads as `null`) whose `wireframeMap` is neither a path nor a decline is
+`partial`, not `unset`: a project that wrote a catalogue but never turned mapping on. Read as
+`unset`, the offer fired, `configure` refused `exists`, and re-running `detect` looped. Return
+`{ reason: "ok", state: "partial", present: [keys set], proposal }`, with the proposal holding only
+the missing keys (`proposal: null` and `reason: nothing-found` when the barrel is missing and not
+already configured). Order the checks: `declined`, then `configured`, then `partial`, then `unset`.
 
 **`findBarrel(root)`** collects candidates in this order, keeping the ones whose
 `barrelExports(root, rel, []).size >= 1`:
@@ -112,6 +117,16 @@ function configure(root, opts) {
 ```
 
 - `/^ui\s*:/m` matches a top-level key only, because an indented `ui:` does not start at column 0.
+- **The `partial` path replaces the early `exists` return** when `ui.wireframeMap` is unset:
+  - refuse `exists` when `wireframeMap` is already a path or a decline, when `ui:` carries a value
+    on its own line (`ui: {…}`), or when a given key is present with a different value (name it);
+  - find the block's end: the last line after `ui:` that is indented or blank-then-indented, before
+    the next column-0 line;
+  - insert only the missing keys after that line, at the indent of the block's first child (two
+    spaces when it has none), joined with `eol`;
+  - `roundTrips` checks every key that was present reads back unchanged, as well as the new ones.
+  A one-line splice keeps every other byte, which the tests assert by comparing the text with the
+  inserted lines removed.
 - Quote values with `JSON.stringify`. Check first that `yaml-subset` reads double-quoted strings
   back verbatim (`command node -e` on a value holding `#`, `: ` and `@`); if it does not, that is
   exactly the case the read-back exists for, so add a test for it.
@@ -165,8 +180,8 @@ it before comparing, and escape it for the `RegExp`: primitives may hold `-`.
 > `state`:
 > - `configured`: follow the procedure, as before;
 > - `declined`: skip silently;
-> - `unset`: ask one `AskUserQuestion` (header `Components`). The question shows each proposed
->   value and its evidence. The options are:
+> - `unset` or `partial`: ask one `AskUserQuestion` (header `Components`). The question shows each
+>   proposed value and its evidence, and on `partial` the keys already present. The options are:
 >   - Set up with these values (Recommended);
 >   - Adjust (the author gives values in "Other");
 >   - Not now;
@@ -186,10 +201,21 @@ Name the procedure section for the details rather than restating them in both sk
 > `configure`, and the catalogue and map files `ensure` and `record` write
 
 **Procedure.** Rewrite `wireframe-component-mapping.md` *Off unless configured* (`:7`) as a
-three-state rule:
-- `unset`: only the authoring skills offer setup; every other skill skips;
+four-state rule, opening with what "sets `ui.wireframeMap`" means: it names a map path; `false` or
+`off` is a decline. Twelve sites gate on that phrase (review 1, I2; the grep is in the task's § 3)
+and stay as written, so this definition is the one place their meaning changes.
+- `unset` or `partial`: only the authoring skills offer setup; every other skill skips;
 - `declined`: everything skips silently;
 - `configured`: run the procedure.
+
+Change the reason line (`:43`) to "`unset` and `declined` mean the feature is off: stop here."
+
+**Hooks test (`evals/shared/tests/wireframe-mapping-hooks.test.mjs`).** Its "the hooks are off
+unless ui.wireframeMap is set" test asserts each hooked `SKILL.md` mentions `ui.wireframeMap`.
+Split it: the six other skills keep that assertion; create-story and create-task assert their step
+3 runs `detect --json` and names `configured`, `declined`, `partial` and `unset`. Add a test that
+the procedure's reason line names `declined`, and one that no `skills/develop-*/SKILL.md` or
+`shared/resources/develop-pipeline-*.md` calls `wireframe-map.js detect` or `configure`.
 
 Add a short "### 0. Set up (authoring skills only)" step describing the offer once. Both skills
 then cite it.
@@ -222,12 +248,18 @@ Rules, one short paragraph each:
 - `wireframeMap: false` (or `off`) declines;
 - a link to the guide.
 
-Also add `false` to the key table's `ui.wireframeMap` row if the table has one; check with
-`grep -n 'ui.wireframeMap' docs/reference/configuration.md`.
+The key table's `ui.wireframeMap` row is at `:335` and says "**Setting it turns the feature on.**"
+Change it to "A path turns the feature on; `false` or `off` declines it, and no skill offers setup
+again."
+
+The guide also says a `basis: name` candidate is a hint, not a role: `text` matches `TextField` by
+segment.
 
 **`MAP_HEADER` (`:70`).** After the Component bullet, add:
-- one bullet: "**Writing rows by hand** — see the guide in the project's
-  `wireframe-component-mapping.md` (examples, sibling context, icons)";
+- one bullet: "**Writing rows by hand** — see the guide in
+  `.agents/skills/create-story/references/wireframe-component-mapping.md` (examples, sibling
+  context, icons)". Never a `shared/resources/` literal: the bundler rewrites it inside `.js`
+  files;
 - two example lines in a fenced block or as bullets: the `footer>button[primary]` row and the
   `*>row` `(layout)` row.
 
@@ -265,6 +297,13 @@ Mutation proofs:
 1. **Decline guard:** remove it from `resolve`, and the decline test goes red.
 2. **`detect` is read-only:** add a `createMap` call to it, and the snapshot test goes red.
 3. **`configure` refuses an existing block:** drop the `exists` check, and the test goes red.
-4. **`configure` restores on a failed read-back:** skip the restore, and the test goes red.
+4. **`configure` restores on a failed read-back:** skip the restore, and the test goes red. The
+   mismatch input is a value holding a backslash, which yaml-subset does not unescape.
+4a. **`partial` inserts inside the block:** insert at end of file instead, and the test with a
+   top-level key after `ui:` goes red.
+4b. **`detect` reads only its bounded set:** recurse one level deeper under `packages/`, and the
+   two-level barrel test goes red.
+4c. **Develop pipelines never offer setup:** add a `wireframe-map.js detect` line to
+   `develop-pipeline-step-0-resolve-and-prepare.md`, and the hooks test goes red.
 5. **Segment match:** switch it to a substring match, and the `Rebutton` control goes red.
 6. **Candidate cap:** remove it, and the cap test goes red.
