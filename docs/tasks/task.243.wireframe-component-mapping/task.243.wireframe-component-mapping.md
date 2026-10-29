@@ -80,7 +80,7 @@ The consumer also asked for two properties:
 - Hooks in these skills:
   - `create-story` 5.4.6, plus a new `create-task` 2.6 that mirrors it: embed the source's own
     wireframe when one exists, then resolve and ask;
-  - develop Phase 0 `0c-wire` and the 0d wireframe questions, read-only: 0d holds the answers in
+  - develop Phase 0 `0c-wire` and the 0d wireframe questions, with no tracked writes: 0d holds the answers in
     `.claude/state/wireframe-answers.json`, because the branch does not exist yet (bug.6);
   - Step 2 § Wireframe writes, the first point where the branch and the lock both exist: `ensure`,
     the table rows, and a `record` per confirmed answer, then the held file is deleted
@@ -149,7 +149,7 @@ what each one touched.
 | `shared/resources/tests/wireframe-map.test.mjs` | new |
 | `evals/shared/tests/wireframe-mapping-hooks.test.mjs` | new |
 | `docs/reference/configuration.md` | `ui:` schema, keys, section |
-| `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` | `0c-wire` (read-only), 0d questions held for Step 2, count |
+| `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` | `0c-wire` (no tracked writes), 0d questions held for Step 2, count |
 | `shared/resources/develop-pipeline-step-2-review.md` | Wireframe writes (before the gate check) |
 | `shared/resources/develop-pipeline-step-3-develop-loop.md` | held-answers guard, table hand-off |
 | `shared/resources/develop-pipeline-autonomous-defaults.md` | unattended row |
@@ -219,6 +219,10 @@ catalogue files stay as they are.
 - **TASK-243-CR7-1** (LOW) — carried to gate 7 `recommendations.future` (route 2b, cycle 7). The
   no-jq test in `wireframe-mapping-hooks.test.mjs` should assert the jq-missing arm's own message,
   so that it proves the PATH stripping reached that branch.
+- **TASK-243-CR8-1** (LOW) — carried to gate 8 `recommendations.future` (cycle 8). The two
+  `existsSync` assertions in the `resolve` unset test cannot fail, because `resolve` has no write
+  path. Drop them or mark them documentary. (CR8-2, the "read-only" wording for `0c-wire`, was
+  fixed in this document at PR review 2.)
 
 ## Progress Tracking
 
@@ -269,34 +273,35 @@ and removing that gate turns it red. There are no bugs, only two low cleanups (C
 
 ### QA Gate Status
 
-**QA Report**: `task.243.qa.7.wireframe-component-mapping.md`
-**Gate File**: `task.243.gate.7.wireframe-component-mapping.yml`
+**QA Report**: `task.243.qa.8.wireframe-component-mapping.md`
+**Gate File**: `task.243.gate.8.wireframe-component-mapping.yml`
 **Gate Status**: ✅ PASS
 **Quality Score**: 100/100
 
-The gate passed. The gap below was found by the DoD acceptance-criteria check, which traces each
-criterion member to a test.
+DoD run 2. Run 1's gap (SC-1: `resolve`'s unset path untested) is closed: all seven criteria pass.
+The gap below was found by the security probe run, against a boundary this run added to the plan.
 
 ### Missing Criteria:
 
-1. **Acceptance Criteria:**
-   - [ ] SC-1: no test asserts that `resolve` answers `unset` and writes nothing without a `ui:`
-     block. The code is correct (`shared/resources/wireframe-map.js:645`); only `ensure`'s unset
-     path is tested (`shared/resources/tests/wireframe-map.test.mjs:164`).
+1. **Security:**
+   - [ ] `parsePattern` (`shared/resources/wireframe-map.js:324`) accepts a signature containing a
+     newline, and `record` writes it into the map unchanged. The row splits and the table ends
+     early. There are 4 low probes, all fail-closed (`task.243.dod.2.security.run.json`).
 
 ### Next Steps:
 
-- [ ] Add a test in `shared/resources/tests/wireframe-map.test.mjs`: `resolve` with no `ui:` block,
-      and with `ui:` but no `wireframeMap`, answers `reason: unset` and writes no map
-- [ ] Mutation-prove it (remove the unset return in `resolve`; the test goes red)
+- [ ] Make `parsePattern` reject `/[\r\n]/` on the raw signature, so `record` refuses it
+- [ ] Add a test in `shared/resources/tests/wireframe-map.test.mjs` that runs the four probe inputs
+      through `record`: each throws and leaves the map unchanged. Mutation-prove it.
+- [ ] Run `npm run bundle` (the eight `skills/*/references/wireframe-map.js` copies)
 - [ ] Re-enter QA at 5a, then re-run `/finalise`
 
-**Estimated Effort:** Small (one test case)
+**Estimated Effort:** Small (a one-line guard and one test)
 
-**Gap Report Generated:** 2026-10-29
-**QA Gate Reference**: See `task.243.gate.7.wireframe-component-mapping.yml` for full details
+**Gap Report Generated:** 2026-10-29 (DoD run 2; supersedes run 1's report)
+**QA Gate Reference**: See `task.243.gate.8.wireframe-component-mapping.yml` for full details
 
-**Detailed Verification Log:** See `task.243.dod.1.wireframe-component-mapping.md` for complete verification evidence and timestamps.
+**Detailed Verification Log:** See `task.243.dod.2.wireframe-component-mapping.md` for complete verification evidence and timestamps (run 1: `task.243.dod.1.wireframe-component-mapping.md`).
 <!-- change-log-start -->
 ## Change Log
 
@@ -322,5 +327,6 @@ criterion member to a test.
 | 2026-10-29 |  | PR review APPROVE (PR #785); PC-1 fixed: Scope and Files Summary name the Step 2 wireframe writes and the Step 3 guard | develop-task |
 | 2026-10-29 |  | DoD incomplete — 1 gap identified (SC-1: resolve unset path untested) | finalise |
 | 2026-10-29 |  | QA gate PASS (100/100) — re-entry after finalise DoD run 1; SC-1 test verified and mutation-proven; 0 bugs, 2 low cleanups (CR8-1, CR8-2) | qa-task |
+| 2026-10-29 |  | DoD incomplete — 1 gap identified (security: parsePattern accepts a newline in a signature; 4 low probes) | finalise |
 <!-- change-log-end -->
 

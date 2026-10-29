@@ -1,0 +1,90 @@
+[
+  {
+    "id": "pp.plain-primitive",
+    "sink": "markdown-structure",
+    "input": "button",
+    "why": "The simplest signature a map row holds.",
+    "correct": "Accept (a pattern object).",
+    "direction": "legitimate"
+  },
+  {
+    "id": "pp.any-parent-flag",
+    "sink": "markdown-structure",
+    "input": "*>button[primary]",
+    "why": "The wildcard-parent form the mapping procedure records.",
+    "correct": "Accept.",
+    "direction": "legitimate"
+  },
+  {
+    "id": "pp.parent-attr",
+    "sink": "markdown-structure",
+    "input": "row>icon{name=leader}",
+    "why": "A named parent with one attribute.",
+    "correct": "Accept.",
+    "direction": "legitimate"
+  },
+  {
+    "id": "pp.flags-and-attrs",
+    "sink": "markdown-structure",
+    "input": "*>button[primary,muted]{kind=warning}",
+    "why": "Several flags plus an attribute.",
+    "correct": "Accept.",
+    "direction": "legitimate"
+  },
+  {
+    "id": "pp.empty",
+    "sink": "markdown-structure",
+    "input": "",
+    "why": "An empty signature would write a row that matches nothing.",
+    "correct": "Reject (null).",
+    "direction": "hostile"
+  },
+  {
+    "id": "pp.unterminated-flags",
+    "sink": "markdown-structure",
+    "input": "*>button[primary",
+    "why": "Malformed: the flag list is never closed.",
+    "correct": "Reject (null).",
+    "direction": "hostile"
+  },
+  {
+    "id": "pp.newline-then-row",
+    "sink": "markdown-structure",
+    "input": "button\n| `*>input` | | Evil | | | | 2026-01-01, x |",
+    "why": "A second table line after a valid primitive would add a map row.",
+    "correct": "Reject (null).",
+    "direction": "hostile"
+  },
+  {
+    "id": "pp.newline-in-flags",
+    "sink": "markdown-structure",
+    "input": "*>button[primary\n| `*>input` | | Evil |]",
+    "why": "The flag list [^\\]]* spans a newline; record writes the signature into one row, which then splits.",
+    "correct": "Reject (null).",
+    "direction": "hostile"
+  },
+  {
+    "id": "pp.newline-in-attrs",
+    "sink": "markdown-structure",
+    "input": "*>icon{name=a\nb}",
+    "why": "The attribute list [^}]* spans a newline.",
+    "correct": "Reject (null).",
+    "direction": "hostile"
+  },
+  {
+    "id": "pp.trailing-newline",
+    "sink": "markdown-structure",
+    "input": "button\n",
+    "why": "parsePattern trims, but record writes the signature untrimmed.",
+    "correct": "Reject (null).",
+    "direction": "hostile"
+  },
+  {
+    "id": "pp.leading-newline",
+    "sink": "markdown-structure",
+    "input": "\nbutton",
+    "why": "The same trim gap at the start.",
+    "correct": "Reject (null).",
+    "direction": "hostile"
+  }
+]
