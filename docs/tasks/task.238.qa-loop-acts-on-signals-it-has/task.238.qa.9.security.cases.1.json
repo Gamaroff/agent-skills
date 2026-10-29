@@ -1,0 +1,194 @@
+[
+  {
+    "id": "oc9-flow-then-key-exempt",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "cycle 9 CR-2: a flow entry followed by an indented key is invalid YAML (PyYAML: expected <block end>); reading the key as the flow entry's own exempts a coverage finding and prints 0",
+    "correct": "unreadable, never 0",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  - {id: PC-1, category: coverage}\n    provenance: pre-existing\n```\n\n## Next\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=unreadable\n"
+    }
+  },
+  {
+    "id": "oc9-truncated-by-hash-heading",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "cycle 9 CR-3: a column-0 `## ` comment inside the fence ends the sed range, so the coverage entry after it is never read",
+    "correct": "unreadable, never 0",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  - id: CR-1\n    category: bug\n## a comment\n  - id: PC-1\n    category: coverage\n```\n\n## Next\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=unreadable\n"
+    }
+  },
+  {
+    "id": "oc9-key-deeper-than-entry",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "a key two columns deeper than its entry's keys is a plain-scalar continuation, not a key; the entry then has no category",
+    "correct": "unreadable, never 0",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  - id: PC-1\n      category: coverage\n```\n\n## Next\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=unreadable\n"
+    }
+  },
+  {
+    "id": "oc9-dash-line-block-scalar",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "a block-scalar category on the dash line itself",
+    "correct": "unreadable, never 0",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  - category: |\n      coverage\n```\n\n## Next\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=unreadable\n"
+    }
+  },
+  {
+    "id": "oc9-provenance-block-sequence",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "a provenance given as a block sequence: a deeper line after provenance:",
+    "correct": "unreadable, never 0",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  - id: PC-1\n    category: coverage\n    provenance:\n      - pre-existing\n```\n\n## Next\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=unreadable\n"
+    }
+  },
+  {
+    "id": "oc9-flow-duplicate-category",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "a category given twice in one flow entry",
+    "correct": "unreadable, never 0",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  - {id: PC-1, category: trail, category: coverage}\n```\n\n## Next\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=unreadable\n"
+    }
+  },
+  {
+    "id": "oc9-indent-change",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "a second entry at a deeper indent than the first",
+    "correct": "unreadable, never 0",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  - id: PC-1\n    category: trail\n    - id: PC-2\n      category: coverage\n```\n\n## Next\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=unreadable\n"
+    }
+  },
+  {
+    "id": "oc9-uppercase-coverage",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "legitimate",
+    "why": "the check is case-blind",
+    "correct": "1",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  - id: PC-1\n    category: COVERAGE\n```\n\n## Next\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=1\n"
+    }
+  },
+  {
+    "id": "oc9-provenance-quoted",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "legitimate",
+    "why": "a YAML-quoted provenance exempts",
+    "correct": "0",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  - id: PC-1\n    category: coverage\n    provenance: \"pre-existing\"\n```\n\n## Next\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=0\n"
+    }
+  },
+  {
+    "id": "oc9-flow-exempt",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "legitimate",
+    "why": "a one-line flow entry carrying its own provenance",
+    "correct": "0",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  - {id: PC-1, category: coverage, provenance: pre-existing}\n```\n\n## Next\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=0\n"
+    }
+  },
+  {
+    "id": "oc9-nested-category-is-not-the-finding",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "legitimate",
+    "why": "valid YAML: the coverage category belongs to a nested mapping, the finding's own is trail",
+    "correct": "0",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  - id: PC-1\n    category: trail\n    sub:\n      category: coverage\n```\n\n## Next\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=0\n"
+    }
+  },
+  {
+    "id": "oc9-quoted-hash-in-flow",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "legitimate",
+    "why": "a quoted ` #` inside a flow value is text",
+    "correct": "1",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  - {id: PC-1, category: coverage, finding: \"a # b\"}\n```\n\n## Next\n"
+      }
+    },
+    "expected": {
+      "stdout": "OPEN_COVERAGE=1\n"
+    }
+  }
+]

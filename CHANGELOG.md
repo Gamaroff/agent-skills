@@ -4,6 +4,287 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.62.0] - 2026-10-29
+
+### Added
+
+- **Wireframe nodes are linked to the project's own UI components, and the skills ask when unsure
+  (task 243).** A Wireloom wireframe keeps a screen's parts and their order, not which component
+  draws each part, so agents built from the primitive and got components, variants and icons wrong.
+  Opt in with a `ui:` block in `skills-config.yaml` (`wireframeMap` turns it on):
+  - **`create-story` and `create-task`** embed the screen's own wireframe document when one exists,
+    rather than drawing from the brief, and resolve each node while the author is present.
+    `create-task` gains the wireframe step it lacked (2.6).
+  - **`develop-story` and `develop-task`** resolve the nodes in Phase 0 (`0c-wire`) and ask about
+    the open ones in 0d. Under `--defaults` they take the best proposal, and log it under
+    `### Wireframe mapping assumptions` in the report's Decisions Log. It is never written to the map
+    as a confirmation. Step 3 passes the table to `/develop`.
+  - **`review-story`, `review-task`, QA and `review-pr`** flag an unmapped node, a component
+    missing from the catalogue, a node rebuilt by hand, and an assumption QA never checked.
+  - **The engine** `shared/resources/wireframe-map.js` has three commands:
+    - `ensure` creates a missing catalogue (one row per component the barrel exports) and a missing
+      map, adds rows for new exports, and never overwrites;
+    - `resolve` matches nodes against the map's confirmed links, where the most specific row wins;
+    - `record` remembers an answer.
+
+  Without a `ui:` block nothing changes. Procedure:
+  [`wireframe-component-mapping.md`](shared/resources/wireframe-component-mapping.md).
+
+### Changed
+
+- **A `/finalise` re-run now judges a fixed scope, so a DoD loop has a fixed point (task 242).**
+  Each run used to judge every criterion afresh, and more finely than the last: task.239 ran
+  `/finalise` five times, each finding a gap the run before had passed on an unchanged tree, and
+  stopped only on a stop rule set by hand (obs #121). Each story/task run now writes an AC record,
+  `{STEM}.dod.{N}.ac.json`, beside its DoD file: the head the agents read, and each criterion's id,
+  text hash, verdict, citations and — for a quantified criterion — members. The next run's Step 3a
+  reads the newest record with the new `finalise-rerun-scope.js scope` and re-judges only the
+  reported gaps, the criteria whose text changed, and the passes whose cited code, test or member
+  evidence changed (or resolves to no tracked file); every other pass is carried. Step 3c's
+  `finalise-rerun-scope.js merge` enforces that on the agent's answer: a carried verdict is restored
+  whatever the agent returned, a finer finding on it is listed under **Advisory (not a gap)** rather
+  than failing the run, and `overall` is recomputed from the merged criteria and docs. The DoD's
+  Step 2 block names the scope on every run (`**Re-run scope:** {mode} ({reason}) — K re-judged, M
+  carried`). Any doubt — no record, an unreadable one, a reopened document, a rebased head — runs
+  `full`, which is the old behaviour. **The first run after upgrading is `full`
+  (`no-prior-record`)**, since no record exists yet. **To force a full re-judge**, move the newest
+  `*.ac.json` beside the document aside. Bug mode is unchanged (`rerun-scope` is a bug-mode skip).
+
+- **A QA-loop escalation and its re-entry grant now say what the resumed run will do (task 239).**
+  Four changes, each closing a gap where the halt told the operator one thing and the resumed run
+  did another:
+
+  - **The grant option names the action.** Phase 0b now offers "Resume the QA loop with {k} more
+    cycles", not "Resume at 5a with {k} more cycles". A not-converging grant re-enters at 5b, so
+    the old label was wrong for every one of them (obs #70). After the grant, the orchestrator
+    reports the phase from `grant-qa-cycles.sh`'s `reenter_at=` token: 5b is "fix first", 5a is
+    "review first".
+  - **A grant opens a fresh Convergence window.** `grant-qa-cycles.sh` now writes
+    `convergence_from_cycle = base + 1` in the same atomic write as `qa_max_cycles` and `qa_phase`,
+    and prints it after `reenter_at=`. The Convergence check counts readings only from that cycle,
+    so a grant of k runs k cycles, unless HIGH findings stay present and stop falling over three
+    consecutive post-grant readings, in which case it escalates again at the third of them. On task 215, a grant of 2 escalated after one cycle because the
+    check counted three pre-grant readings (obs #72). A lock without the field reads `1`, which is
+    the old behaviour. The route classifier still reads the whole sequence, so route 2c's MEDIUM
+    window can still hold a pre-grant gate.
+  - **The recommendation obeys the third-strike rule.** Before writing "Recommended next steps",
+    the escalation runs the third-strike comparison the resumed 5b will run. After a convergence
+    stall that covers the last three gates. After a loop limit it covers the last two, because the
+    grant reviews before it fixes. For each file it prints, step 1 must delete, replace or waive the
+    mechanism. It may never recommend a patch, because the resumed run refuses one (obs #71).
+  - **A convergence stall gets a flat-count reading.** The reading is `stall` when any of cycle N's
+    HIGH findings is in the same file, with the same mechanism, as one of cycle N-1's; each such
+    finding is named. It is `discovery` when
+    the earlier fixes held and the re-probe found something new. A discovery says that a grant
+    pays for new work, not another attempt at the same defect.
+
+  Guards: `grant-qa-cycles.test.sh` checks the field and the printed token for both halt kinds, on
+  an existing lock, on a second grant, and on a refused grant.
+  `evals/shared/tests/qa-escalation-template.test.mjs` checks both templates, mirrors the window
+  rule with a control case, and sweeps for the old label. `qa-loop-lock-fields-parity.test.mjs`
+  checks the new field's spelling across its writer, its reader and the documents that describe it.
+
+- **The QA loop's open-coverage check reads with a parser, not an awk (task 240).** §5c's
+  `OPEN_COVERAGE=` line now comes from `open-coverage.js`, bundled into `develop-task` and
+  `develop-story`. It parses the review's `## Machine-Readable Findings` block against the shape
+  `/review-pr` emits and prints `unreadable` for anything it cannot place: the old awk listed the
+  shapes it refused, so each shape it did not list was skipped and read as "no coverage", and
+  task 238's QA loop found one more per cycle. The printed contract and the routing are unchanged,
+  and every tracked review report reads the same as before.
+
+  The reader accepts one line per key, the shape review-pr's template emits and the only one the
+  tracked reports use. A value sits on its key's line: empty, plain, or single- or double-quoted,
+  with an optional trailing ` # comment`. A plain value starts with a letter, a digit or a
+  non-ASCII character and holds no `: `. A double-quoted value may escape only `\\` and `\"`. The
+  block may hold printable ASCII and, beyond ASCII, letters, marks, numbers, punctuation and
+  symbols, so a tab, a carriage return, a control character or a no-break space is refused. The
+  report must be valid UTF-8: the CLI reads its bytes and refuses an invalid sequence as
+  `bad-encoding`, where a lenient decode had turned it into U+FFFD and counted the block.
+  Everything else reads `unreadable`: a value wrapped onto a deeper line, a nested list, a block
+  scalar, a flow entry `- {…}`, an anchor or a tag. Keys are case-sensitive, as in YAML.
+
+  An earlier version accepted most of YAML's block shapes and refused the ones known to break, and
+  each of seven QA cycles found one more shape it counted and YAML rejected. One read a no-break
+  space after `pre-existing` as `pre-existing` and printed a false 0. A differential test now
+  generates blocks and checks that the reader prints `unreadable` or exactly PyYAML's count, never
+  another count. Some fixtures from task 238 now read `unreadable` where they read a count: the flow
+  form, a nested list, a block scalar, a wrapped value, and plain free text holding `: `, which YAML
+  rejects. No fixture changed from one count to another. The shell `case` guard stays as the
+  backstop for a reader that does not run. `pr-review-current.js` now exports its block extractor,
+  so the two readers share one regex.
+
+- **`/review-pr` quotes the free text in its machine-readable block (task 240 follow-up).** The
+  report template now writes `finding:` and `suggested_action:` double-quoted, escaping only `\"`
+  and `\\`, and a new rule beside it says why: a bare sentence holding `: ` reads as a key, so §5c's
+  reader refused the whole block and the develop pipeline halted at **Review failed** on a review
+  it could have routed. A test fills the template with such a sentence and checks that it counts.
+  `open-coverage.js` now decodes any byte container (a typed array, a DataView or an ArrayBuffer,
+  from any realm), and refuses an input that is neither text nor bytes as `not-text`, so
+  `no-section` only ever means a report with no heading. A test now pins `ignoreBOM`. Two more
+  reasons separate failures that say nothing about the report: `read-error`, for a file the CLI
+  cannot read (it was `no-section`), and `internal-error`, for a defect in the reader (it was
+  `bad-line`). The PyYAML differential suite runs `python3 -E` from an empty working directory
+  instead of `python3 -I`, which also disabled the user site, so a host with PyYAML installed only
+  there failed the suite as if PyYAML were missing.
+
+- **`/finalise`'s changelog checks are opt-in (task 241).** Both checks — the docs subagent's
+  "CHANGELOG.md updated" judgement and Step 7 action 6d's `no-changelog-entry` HALT — now run only
+  when `skills-config.yaml` sets `changelog.enforce: true`. Unset, `/finalise` never reads
+  `CHANGELOG.md` on its own account: the subagent reports `NOT_APPLICABLE`, 6d prints
+  `6d: changelog checks not enabled`, and the AC and bug-mode fix-evidence agents leave the
+  changelog to the docs subagent. It is read only when the work item's own acceptance criteria name
+  it. A config the reader cannot follow, or a block-scalar value, reads as off with one warning line
+  rather than silently, and the new key's spelling guard applies only under `changelog:`. A
+  resolver that is missing or cannot load its reader is a broken install, not an unset key: both
+  checks HALT `changelog-unknown`. Consumer repositories were being warned about, or halted on, a
+  `(task N)` citation convention that is this repository's own; one resolver,
+  `changelog-enforce.sh`, now answers for both checks so they cannot disagree again (obs #118). With
+  the key on, a missing `CHANGELOG.md` is now `NOT_APPLICABLE` in the docs check too, matching 6d.
+  **Breaking for consumers that relied on the 6d HALT**: add `changelog:` / `enforce: true` to keep
+  it. This repository sets it.
+- **The QA loop acts on four signals it already had (task 238).** (1) **Gated log cleanup**: every
+  fast-gate site (5b step 0a, Step 3, `/develop`, the triage prompt, develop-bug 3a) now prints its
+  exit code and removes the log only when that exit is 0, foreground or background, so a red log is
+  never deleted before it is read (obs #41). (2) **A red fast gate is classified first**:
+  `fast-gate-outcome.sh` reads a non-green run as *not measured* (no exit, a timeout signal, or the
+  test wrapper's own signal report — re-run once, no retry spent) or *attributable red* (everything
+  else — the fix loop, as before) (obs #14). A third outcome, *pre-existing red*, compared failing
+  tests with a run at the PR base. It was deleted after QA cycles 4–6 each found another
+  `node --test` log shape it misread as pre-existing. A structured comparison is deferred work on
+  task 238. (3) **PR existence
+  and CI**: `/qa-task` and `/qa-story` find the PR on Bitbucket as well as GitHub, and read the PR's
+  CI once at the gate step through `qa-ci-read.sh` — a failure on the head becomes a `medium`
+  `top_issue`, a failure also red on the base goes to `recommendations.future` as pre-existing, and
+  a pending, cancelled or unreadable run adds nothing; it never polls (obs #45). On Bitbucket the
+  base reading is the same pipeline (selector type and pattern), and a rerun supersedes the run
+  before it. (4) **Coverage
+  findings route**: a 5c `CONCERNS` whose review holds an open `category: coverage` finding returns
+  to 5b like `REQUEST CHANGES`, `/qa-fix` gains a priority row for coverage findings at any severity,
+  the findings ingester now carries `category`, and the resume contract splits its exit row in three
+  (obs #8). The open-coverage check reads an allow-list of the line and value shapes review-pr
+  writes and prints `unreadable` for anything else, never `0` — a block cut short and an awk that
+  did not run included. `pr-review-loop-parity.test.mjs` runs the
+  open-coverage block against fixtures;
+  `qa-loop-fast-gate-outcomes.test.mjs` and `qa-ci-read.test.mjs` are new.
+
+- **Step 5c applies doc-only findings on `APPROVE`, not only on `CONCERNS` (task 237).** An `APPROVE`
+  carries only low findings, and a low finding is most often a one-word documentation fix — yet the
+  carry fixed doc-only findings on `CONCERNS` alone, so an `APPROVE`'s went unfixed to `/finalise`,
+  whose docs agent can only halt on it (task.179 halted at Step 7 this way; observation #109). Both
+  verdicts now run the same classify and stage blocks, which are unchanged: code and path-less
+  findings are still recorded and not fixed. The restatements in the finalise step doc, `/finalise`,
+  `/develop-task`, `/develop-story` and `/review-pr` now say "doc-only fixes" with no verdict, and
+  `pr-review-loop-parity.test.mjs` pins both verdict rows and both carry-prose sentences.
+
+### Fixed
+
+- **The wireframe map engine's last task-243 lows are closed (CR12-2 to CR12-5, PARSELINE-1).**
+  - A `skills-config.yaml` that exists but cannot be read no longer reads as "feature off". Every
+    command exits 1 with `reason: config-unreadable`.
+  - Adding a row to a CRLF map or catalogue keeps CRLF, instead of rewriting every line as LF.
+  - A Wireloom line whose label or attribute holds U+2028 or U+2029 is now listed as a node, not
+    dropped.
+  - Candidates are filtered by whole catalogue names (`ButtonGroup` no longer passes on `Button`).
+    `resolve` reports `catalogueState`, so a catalogue without its section is visible rather than
+    silently unfiltered.
+  - `record` creates only a missing map. It no longer runs all of `ensure`, which also wrote the
+    catalogue.
+
+- **`/finalise` no longer runs a security probe plan whose arguments were HTML-escaped in transport
+  (obs #133).** On task.243 the security agent's reply turned every `>` into `&gt;`, so each control
+  ran against an argument the code never holds. The run reported 49 legitimate cases as
+  over-blocked: a false security FAIL. `security-probe-plan.mjs` now refuses such an entry as
+  `plan-entry-html-entity` and runs the rest, and Step 3b.1 says how to restore the plan and re-run.
+  Only the arguments are checked, because a case's input may hold an entity on purpose.
+
+- **A wireframe-map row with a repeated flag no longer outranks a more specific row (task 243,
+  CR14-1).** `input[a,a,a]` means `input[a]`, but `score` counted each repeat as a constraint, so it
+  beat `input[a,b]` for an `input[a,b]` node. `parsePattern` now de-duplicates flags, so ranking and
+  `record`'s replace rule read one definition. A new test also shows that `record` keeps rows with
+  the same signature and different labels apart (CR14-2).
+
+- **`/create-task --from-observation` no longer seeds a fragment as the description (obs #101, #109).**
+  The sentence splitter ended on the dot of `e.g.`, `i.e.`, `vs.` and `cf.`, and on a list marker
+  partway through the section, so "…acceptance establishes, e.g." and "Choose one, or both: 1." both
+  cleared the 20-character floor and were seeded as complete descriptions. Those dots no longer end a
+  sentence, and `etc.` ends one only when a capital follows. An Improvement that opens with a lead-in
+  ending in `:` and then lists options now seeds `description: null` with
+  `descriptionReason: list-lead-in`. Step 4 then asks the author which option the task takes.
+- **`/review-pr` reads a target's host once, for both parser arms (task 179).** The scheme-less arm
+  matched the known-host list against the raw first segment while the URL arm stripped `?…`, `#…`,
+  `user@` and `:port` first, so `ghe.corp#.atlassian.net/o/r/pull/7` passed the check and parsed as
+  PR 7 on host `ghe.corp`. Both arms now call one `host_of`: that target and
+  `github.com:1@evil.com/…` stay branches, and `x@github.com/o/r/pull/1` parses as PR 1, as its
+  `https://` form does. A `.env` line whose `JIRA_URL` is only a comment (`JIRA_URL= # prod`) now
+  reads as unset rather than warning "differs from JIRA_URL # prod". The parser header, Step 0b, the
+  KIND table and the `target` row say which URLs may omit `https://`; §0a's lookup contract names
+  `pr_number` and all five callers; three stale test comments and a test title were corrected.
+
+- **`create-task --from-observation` seeds on the first attempt (task 236, obs #104).** § 1.1 step 3
+  described the `seedFromObservations` call in prose and left out the required `taskId`, so
+  following it exactly threw `taskId is required`; it also said "for each entry", where the
+  function takes every entry in one call. The step is now one runnable block that reads the task
+  id first and makes the single call. A new test, `skills/create-task/tests/seed-step-block.test.js`,
+  extracts that block from `SKILL.md` and runs it against a scratch log, so the step and the
+  function can no longer disagree with the suite green. The block refuses a task number that is not
+  digits (`task.236` had seeded `task.task.236 merged to develop`). It single-quotes the two values,
+  so shell syntax in them (`$(…)`, a backtick, `"`) reaches that check as typed instead of being
+  expanded first; the step says to substitute only digits, commas and spaces. It has its own
+  heading, so the `fence:` probe reaches it; `seed-block-probe.js` builds that probe, and the test
+  runs its 18 cases on every PR. The test's scratch log lives under the main checkout, so it also passes from a linked
+  worktree.
+
+- **`develop-next` reads an escaped quote and `false` / `no` correctly in frontmatter (task 235
+  follow-up).** The shared frontmatter reader ended a quoted value at the first matching quote, so
+  `"billing \"v2\" live"` read as `billing \` and `'billing-service''s PR merged'` as
+  `billing-service`; it now skips `\"` and `\\` inside double quotes and `''` inside single quotes,
+  and reads each back as the one character YAML means (TASK-235-CR2-1). `blocked_on_external:
+  false` or `no` now means not blocked, as `none` and `null` already did, instead of holding the
+  row on a condition named "false". Old and new readings agree on all 522 tracked values.
+
+- **`develop-next`'s registry fallback passes over a task blocked on another repository
+  (task 235).** A cross-repository blocker could only be written as free text, which the selector
+  never reads, so it selected T174 while T174 waited on tinker-city task.127 — and each run then
+  paid a full pipeline setup to reach the task's own Phase 0 HALT. A document may now carry
+  `blocked_on_external: "<condition>"`. The fallback checks it after the eligibility floor and
+  before dependencies, passes the row over with `externalBlock` and a reason naming the condition
+  and the document, and never selects it. A held row is never silent: the selected rationale now
+  counts rejections by cause (document status, dependencies, external precondition) and names
+  each held row, and the `roadmap-complete` detail names each held path. Placeholders (`none`,
+  `n/a`, `tbd`, `—`) and the YAML nulls `null` / `~` do not hold a row. The registry loader is now
+  the exported `makeRegistryLoader`, which reads each document once. The authoring rule in
+  `create-task` § 1.2 and the task registry say to set the field; task.174 carries it.
+  `--batch` and the roadmap path are unchanged. The shared frontmatter reader now keeps a ` #`
+  inside a quoted value, which reaches all five fields it reads (`status`, `epic`, `epic_source`,
+  `branch_model` and the new field); old and new readings agree on all 522 tracked values.
+
+- **The review skills advance the pipeline lock only on a passing review, and task.164's
+  follow-ups are closed (task 165).** `review-story`'s cooperation block advanced the lock to 3
+  even on a NO-GO, after which `/develop-story` Step 2 HALTed with the lock already pointing at
+  develop. `review-task` had no block, so the `review-story|review-task → 3` arm of the `--skill`
+  mapping was half true. Both now advance only when the review passed and promoted the document to
+  `ready-for-development`, and print one line when they hold the lock. The new
+  `review-lock-cooperation.test.mjs` runs both blocks as written, the `fence:` probe scores them
+  (fixtures `t165-review-{task,story}-cases.json`),
+  and `pipeline-lock-cooperation.md` names them as gated. Exception 2 of the remaining-work banner
+  now says what is true: "not `current_step`", a QA-loop HALT lists `- Steps 5–6:` first, its
+  contrast is limited to blocks derived from `current_step`, and the mapping states *where* a
+  sub-skill moves the lock. The HALT pin refuses a mapped name in plain prose too, with a boundary
+  so `develop` does not match `develop-task`. It reads the mapping from its own
+  `case "$SKILL_NAME" in` block rather than spanning ~280 lines from the first `--skill)` arm. The
+  hook floor checks the `COMPLETION_LINE=` and `ALREADY_DONE=` bindings by name. A test-only
+  `ADVANCE_LOCK_TEST_4B_ONLY` seam stops the lock test file after scenario 4b. The 4b meta-test
+  sets it and requires its NOTE, which takes the meta-test from 17.9s to 1.2s.
+- **The reference-doc pinning test closes task.142's four advisory findings (task 169).** A flag
+  now counts as documented only as a whole token, so a row advertising `--read` no longer passes
+  on a `SKILL.md` that documents only `--read-only`. `activation-phrases.md` flags are checked
+  against their skill — including a flag written as its own span after the skill, which used to be
+  dropped (3 checked, floor 2). An empty `SKILL.md` reports "is empty" instead of "does not
+  exist", on both pages. The two live groups share one memoised `getCorpus()`, so the pages are
+  read once per run. A call-site fixture lengthens every flag in every `SKILL.md` and requires
+  every check to fail, which holds `resolveCorpus` and not only the helper. Each fix was
+  mutation-proven: reverting it turns a named test red.
+
 ## [v0.61.1] - 2026-10-26
 
 ### Fixed

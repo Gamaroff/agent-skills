@@ -1,0 +1,74 @@
+schema: 2
+task: 'task.237.carry-doc-only-findings-on-approve'
+task_title: 'Apply 5c doc-only findings on APPROVE'
+gate: CONCERNS
+status_reason: 'Cycle 1 fix verified: M4 and M5 are red, so TASK-237-BUG-1 is closed. The cycle-2 refute pass found that the negative guard is not scoped to the sentence it judges. M7 (a CONCERNS-keyed sentence) and M8 (an APPROVE key after "e.g.") stay green, and M9 (a correct sentence after an APPROVE clause) goes red (QA-2, MEDIUM). Also open is QA-3 (LOW): the empty-CARRY_FIXED sentence keys on the classify input, not on the edit set.'
+reviewer: 'QA Engineer'
+head: '0b32332776aa88e8acf9a01fe7a0f475c4028494'
+updated: '2026-10-27T16:20:05Z'
+
+top_issues:
+  - id: 'QA-2'
+    severity: medium
+    file: 'evals/shared/tests/pr-review-loop-parity.test.mjs'
+    finding: 'The CARRY_FIXED negative assertion scans forward from each APPROVE to a period plus whitespace, instead of judging the sentence that holds "leave CARRY_FIXED empty". So a CONCERNS-keyed sentence (M7), an APPROVE key after "e.g." (M8) and a reversed word order are all missed. A correct sentence after an APPROVE clause (M9) is falsely flagged. The Carry section is also sliced by hand rather than through sectionBetween (code review CR-1, CR-4; TASK-237-BUG-2).'
+    suggested_action: 'Read the Carry section via sectionBetween, then split it into sentences. A sentence ends at a period followed by whitespace and a capital letter or backtick. Assert that no sentence holding "leave CARRY_FIXED empty" names APPROVE or CONCERNS. Mutation-prove M4, M5, M7, M8 and M9, plus the reversed word order.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-3'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'The new sentence "When the classify block cleared no path, leave CARRY_FIXED empty" keys emptiness on the classify input. The block defines CARRY_FIXED as the paths the doc-only fixes changed ("write CARRY_FIXED=() when none"). On APPROVE, where a doc-only finding "may be fixed", a path can be cleared and still left unedited, and the prose does not cover that case (code review CR-2).'
+    suggested_action: 'Key the sentence on the edit set. For example: "When no doc-only fix changed a path, because the classify block cleared none or none was fixed, leave CARRY_FIXED empty". Update the positive pin to match, then re-bundle.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 57
+  phases_verified: 3/3
+  ci: 'not read this cycle (cycle-1 fix commit 0b323327 pushed)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false, the same reading as cycle 1. The cycle-1 fix touches only a test, and the regex is linear (400k chars in 16 ms).'
+  performance:
+    status: PASS
+    notes: 'Prose and test change; negative regex timed linear.'
+  reliability:
+    status: PASS
+    notes: 'Classify and stage blocks unchanged; acceptance-commit-carries-5c 24/24.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The guard for "names no verdict" holds for one verdict in one word order (QA-2).'
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 1
+  fix_date: '2026-10-27'
+  total_iterations: 1
+  verification_method: 'Mutations M4 and M5 re-run against 0b323327; both red'
+
+recommendations:
+  immediate:
+    - action: 'Scope the negative guard to the sentence (QA-2); key the empty-CARRY_FIXED sentence on the edit set (QA-3).'
+      refs: ['evals/shared/tests/pr-review-loop-parity.test.mjs', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+  future:
+    - action: 'develop-pipeline-autonomous-defaults.md:34 still reads "APPROVE → exit to Step 7". It states no fix rule, so it is outside SC3, but it is the same terse shape the diff rewrote in three SKILL.md files. The population grep did not search the arrow form (code review CR-3, LOW).'
+      refs: ['shared/resources/develop-pipeline-autonomous-defaults.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['QA-2 fixed']

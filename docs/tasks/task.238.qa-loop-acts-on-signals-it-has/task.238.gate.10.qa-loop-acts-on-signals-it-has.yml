@@ -1,0 +1,65 @@
+schema: 2
+task: 'task.238.qa-loop-acts-on-signals-it-has'
+task_title: 'QA loop acts on the signals it already has'
+gate: CONCERNS
+status_reason: 'The cycle 9 fix is verified at 885debef: bug.18 and bug.19 are closed, and each of its three guards turns a committed fixture red under QA mutation. Parity 82/82, bundle check, validate and the hosted Test lane on the same code are green. No top issue is open. Security reads CONCERNS for one reproduced low gap in the same check (CR10-1: a repeated findings: key with a cut-short second list reads 0), deferred to task.240 by owner decision.'
+reviewer: 'QA Engineer'
+head: '885debefe59aa8989ef8ee5374219c727f3cec31'
+updated: '2026-10-28T08:49:26Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 6535
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 29
+    escaped: 0
+    notes: 'task.238.qa.10.security.run.json, fence form on the §5c block. The gate 9 cases (12) and gate 8 cases (8) re-run: every bug.18 and bug.19 shape is refused, and all legitimate controls pass. oc8-provenance-continued prints unreadable, which its correct field accepts. 8 new cycle 10 cases: 6 match, and oc10-crlf-category and oc10-two-findings-blocks print 1, which their correct fields accept (QA set expected too narrowly). One reproduction, oc10-second-findings-cut-short (CR10-1, reviewer CR-1): it prints 0 where unreadable is correct. Measured plausibility: 0 of 185 tracked PR review reports repeat the findings: key, and review-pr''s template writes it once. Deferred to task.240 (issue #771), whose parser refuses a duplicate key.'
+  performance:
+    status: PASS
+    notes: 'Unchanged in kind. The cycle 9 fix adds one flag and one terminator test per line.'
+  reliability:
+    status: PASS
+    notes: 'CR9-1 is fixed: a failed awk now prints unreadable (committed failing-awk fixture). CR7-4 is still carried (advisory).'
+  maintainability:
+    status: PASS
+    notes: 'QA mutated each of the three cycle 9 guards in a scratch worktree: the non-count shell guard, the flow-line refusal and the terminator requirement. Each turned a committed fixture red, 3 of 3 covered. The reviewer CR-2 cleanup (a redundant inf test) is advisory.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR10-1 (low, reviewer confidence low, reproduced by oc10-second-findings-cut-short): term is never cleared, so a second findings: list cut short reads a count. Deferred to task.240 by owner decision (2026-10-28), which replaces the awk with a parser that refuses a duplicate key'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'docs/tasks/task.240.open-coverage-fail-closed-reader/task.240.open-coverage-fail-closed-reader.md']
+    - action: 'CR10-2 (cleanup, reviewer CR-2): drop the redundant inf test in the column-0 rule; moot once task.240 replaces the awk'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'CR9-4 (low, low confidence): run the open-coverage fixtures under each installed awk variant; task.240 removes the awk dependency'
+      refs: ['evals/shared/tests/pr-review-loop-parity.test.mjs']
+    - action: 'CR9-5 (low, low confidence): enumerate every consumer of a 5c CONCERNS verdict and qualify each for open coverage (out of scope in task.240)'
+      refs: ['skills/finalise/SKILL.md', 'shared/resources/develop-pipeline-step-7-finalise.md']
+    - action: 'Carried from gates 6–8: CR7-3, CR7-4, CR7-6, CR6-3, CR6-5, CR6-7, and the structured pre-existing comparison for the fast gate (task Deferred Work)'
+      refs: ['shared/resources/qa-ci-read.sh', 'shared/resources/fast-gate-outcome.sh', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_verified: ['task.238.bug.18', 'task.238.bug.19']
+  bugs_opened: []
+  fix_date: '2026-10-28'
+  verification_method: 'Committed regression fixtures (4 RAW_CASES, 1 UNREADABLE_CASE, a failing-awk stub test), 3 QA mutations each red, probe engine re-run of the gate 8 and 9 cases (20) plus 9 new cases'
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions: ['task.240 replaces the open-coverage awk (CR10-1 deferred there)']

@@ -5,7 +5,7 @@ How to use this document: work top to bottom. Only `[ ]` rows are candidates; `[
 [`roadmap-history.md`](./roadmap-history.md), so a `deps:` entry naming no current row means
 _already shipped_, not an error. Resolve any such reference there.
 
-**Phases 1 through 16 are complete and archived** to
+**Phases 1 through 18 are complete and archived** to
 [`roadmap-history.md`](./roadmap-history.md) — resolve any `deps:` naming a row you cannot find here
 against that file. The rows under "Deferred / human-gated" remain invisible to selection.
 
@@ -20,7 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. No phase is open (Phase 16 closed 2026-10-23); selection falls through to the registries.
+chain, a human gate. Phase 19 is open (opened 2026-10-29): T245, then T244.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -67,6 +67,19 @@ Read only by `--batch`. Two rows conflict when they share a tag that **either** 
 | `docs-pipeline`    | `docs/runbooks/*`, `docs/concepts/*`, `docs/reference/pipeline-artifacts.md`, `docs/operations/workflows.md`, `skills/develop-*/README.md` |
 | `pipeline-lock`    | `shared/resources/advance-pipeline-lock.sh`, `advance-pipeline-lock.test.sh`  |
 
+## PHASE 19 — shared-checkout safety before the QA-loop rework (opened 2026-10-29)
+
+An **override**: without it the registry fallback selects T244 first, because it takes the
+lowest-numbered task. T245 goes first because this checkout is shared with a parallel session (the
+T243 wireframe work), and T245 fixes the two places that session's edits break a run: `/finalise` 6a
+sweeping its registry row into an acceptance commit (obs #127), and the QA re-review halting on its
+edit (obs #126). T244's QA loop runs the re-review on every cycle, so it benefits directly. The two
+rows are independent (`deps: none`). They share a soft edit to `qa-task`/`qa-story`, so the second
+to merge rebases.
+
+- [ ] **T245** Shared-checkout-safe guards and staging · deps: none · touches: finalise!, qa-skills~, orchestrators~, bundles~ · /develop-task docs/tasks/task.245.shared-checkout-safe-guards-and-staging/task.245.shared-checkout-safe-guards-and-staging.md
+- [ ] **T244** The QA loop always ends on a gate · deps: none · touches: pipeline-steps!, qa-skills~, bundles~ · /develop-task docs/tasks/task.244.qa-loop-ends-on-a-gate/task.244.qa-loop-ends-on-a-gate.md
+
 ## Deferred / human-gated
 
 Rows here are invisible to selection. Move a row up into a phase when it becomes actionable.
@@ -78,7 +91,7 @@ Rows here are invisible to selection. Move a row up into a phase when it becomes
 
 ## Housekeeping
 
-- [x] Archive accepted rows to `roadmap-history.md` at each phase close — Phase 5 archived 2026-09-12; Phases 6, 7 and 8 archived 2026-10-06; Phases 9 and 10 archived 2026-10-11; Phase 11 archived 2026-10-16; Phase 12 archived 2026-10-20; Phase 13 archived 2026-10-21; Phases 14 and 15 archived 2026-10-22; Phase 16 archived 2026-10-23
+- [x] Archive accepted rows to `roadmap-history.md` at each phase close — Phase 5 archived 2026-09-12; Phases 6, 7 and 8 archived 2026-10-06; Phases 9 and 10 archived 2026-10-11; Phase 11 archived 2026-10-16; Phase 12 archived 2026-10-20; Phase 13 archived 2026-10-21; Phases 14 and 15 archived 2026-10-22; Phase 16 archived 2026-10-23; Phase 17 archived 2026-10-27; Phase 18 archived 2026-10-28
 - [ ] If a phase is ever re-opened: tick its rows `[x]` as each item is accepted — an unticked row for an accepted item is still selected and stalls the loop
 
 **Registry-selected items need no row here.** When selection falls through to the registries (the
@@ -207,3 +220,12 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-10-22 | **Phase 16 opened** with T230 (keep foreign sections out of the change-log block, cut from observation #91), ordered ahead of the registry fallback at the owner's request; without it T217 is selected first. |
 | 2026-10-23 | **T230 accepted + merged — PR #735 merged** (`31643ca4`). `change-log.js` no longer absorbs a section written inside the change-log markers: `partitionForeign` lifts it above the start marker (if it sat before the log) or below the end marker (if after), and `upsertChangeLog`, the new `foreignSections`/`liftForeignSections` exports and a new corpus guard (`change-log-foreign-section-corpus.test.mjs`, floor 100 blocks, 120 today) all read that one partition. The Deferred Work placement rule now anchors on the marker in finalise 7.4's words, and task.166, 170, 175 and 203 had their DoD sections moved out. Four QA cycles (FAIL 60 → CONCERNS 70 → CONCERNS 70 → PASS 95); cycles 1–3 each hardened how the log's own table is chosen (heading-anchored, own section first, a sign-off table is not a log), with 16 engine mutations proven. Two lows carried to Deferred Work (route 2b); 5c APPROVE; DoD 15/15, with AC8 re-measured on the PR head (0.941 s at load 2.35); merge gate `npm run ci` green (6237 pass, 0 fail). Issue #734 closed. |
 | 2026-10-23 | **Phase 16 closed and archived** to `roadmap-history.md` (T230). No phase is open; selection falls through to the registries (next: T217). |
+| 2026-10-27 | **Phase 17 opened** with T235 (select-next external precondition, cut from observation #103), then T236 (create-task seed step, cut from observation #104), ordered ahead of the registry fallback at the owner's request; without it T174 is selected first and halts on its tinker-city blocker. |
+| 2026-10-27 | **T235 accepted + merged — PR #761 merged** (`d8e1b270`). `select-next.mjs` reads a new `blocked_on_external:` frontmatter field: the registry fallback checks it after the eligibility floor and before dependencies, passes the row over with `externalBlock` and a reason naming the condition, counts rejections by cause in the selected rationale and names each held row in the `roadmap-complete` detail. Placeholders and the YAML nulls do not hold a row; the loader became the exported, read-once `makeRegistryLoader`; task.174 carries the field. Two QA cycles (PASS 100 → PASS 100): cycle 1 made the shared `frontmatterScalar` quote-aware (a quoted ` #` stays in the value); cycle 2's one low (TASK-235-CR2-1, an escaped or doubled quote ends a value early, 0 of 522 tracked values) carried to Deferred Work (route 2b). 5c APPROVE, its two lows closed at finalise; DoD 16/16 with the wall time re-measured on the PR head (104.5% of develop); security probe 29 executed, 0 reproduced; merge gate `npm run ci` green (6416 tests, 0 fail). Issue #759 closed. **Next: T236.** |
+| 2026-10-27 | **T236 accepted + merged — PR #763 merged** (`86de1a42`). `create-task` § 1.1 step 3 is now one runnable block. It reads the task id from the registry, single-quotes the task number and ids and checks both against their digit rules, and calls `seedFromObservations(entries, { taskId })` once. `seed-step-block.test.js` executes that block from `SKILL.md`; `seed-block-probe.js` builds the fence probe QA and finalise both run. Four QA cycles (CONCERNS 70 → CONCERNS 90 → PASS 100 → PASS 100): cycles 1–2 fixed a worktree-unsafe test, an unvalidated task number, a block the probe could not reach and double-quoted substitutions. DoD run 1 stopped on a red CI `test` QA had not read: CI has zsh, so the probe ran 36 times, not 18. `1689d7cb` asserts the count per shell (mutation-proven with a stand-in zsh), re-entered QA as cycle 4, and DoD run 2 accepted 11/11. Security probe 18 executed, 0 reproduced; 5c APPROVE twice; merge gate `npm run ci` green (6422 tests, 0 fail); CI 6/6. Issue #760 closed. Observation #107 records the CI-read gap in qa-task. |
+| 2026-10-27 | **Phase 17 closed and archived** to `roadmap-history.md` (T235 and T236). No phase is open; selection falls through to the registries (next: T179; T174 is held on its external precondition). |
+| 2026-10-28 | **Phase 18 opened** with T238 (`manual`: PR #770 escalated at the QA loop limit and awaits the owner's acceptance decision) then T240 (fail-closed open-coverage reader, `deps: T238`), ordered ahead of the registry fallback at the owner's request. |
+| 2026-10-28 | **T238 accepted + merged — PR #770 merged** (`780ac732`). The QA loop acts on four signals it already held. A red gate log is kept, not deleted (obs #41). A red fast gate is classified `not measured` (one re-run) or `attributable` by `fast-gate-outcome.sh` (obs #14). `/qa-task` and `/qa-story` read PR CI once at Step 10 through `qa-ci-read.sh`, on GitHub and Bitbucket (obs #45). A 5c `CONCERNS` with an open `category: coverage` finding returns to 5b, with a qa-fix ladder row and a resume split (obs #8). Ten QA cycles, four of them owner-granted (FAIL 70 → CONCERNS 80 → PASS 90; DoD run 1 gaps; FAIL 20 → FAIL 50 → FAIL 60 → CONCERNS 80 ×3 → CONCERNS 90). Cycle 6 deleted the `pre-existing red` outcome at its third strike, with the structured replacement deferred. Cycles 7–10 hardened the §5c open-coverage reader. 19 bug reports, all closed. 5c APPROVE; DoD run 2 accepted 15/15; security probe 119 executed, 0 escaped, 1 reproduced (CR10-1, owner-deferred to T240); CI 6/6. Issue #768 closed. **Next: T240.** |
+| 2026-10-28 | **T240 accepted + merged — PR #776 merged** (`d820f8f2`). The §5c open-coverage count now comes from `shared/resources/open-coverage.js`, one `command node` call plus a `case` backstop in place of a 35-line awk. The reader reads one line per key over an allow-listed character set, decodes bytes strictly (invalid UTF-8 is `bad-encoding`), and answers `unreadable` on every shape it cannot place, so the loop halts rather than printing a wrong count; a failing `node` reads `unreadable` too. All 187 tracked review reports read as before; a PyYAML differential test compares it with YAML on random blocks. Nine QA cycles (CONCERNS 90 ×8 → PASS 100), 11 bug reports, all closed; every guard mutation-proven (M1–M37). 5c CONCERNS with `OPEN_COVERAGE=0`, PC-4 and PC-7 recorded; DoD accepted 11/11; CI 6/6 on `966aba75`. Follow-ups PR #777 and #778 merged after. Issue #771 closed. **Phase 18 is complete**; selection falls through to the registries. |
+| 2026-10-28 | **Phase 18 closed and archived** to `roadmap-history.md` (T238 and T240). No phase is open; selection falls through to the registries (next: T239). |
+| 2026-10-29 | **Phase 19 opened** with T245 (shared-checkout-safe guards and staging, cut from obs #126 and #127) then T244 (the QA loop always ends on a gate). An override of the registry order: T245 fixes the two ways a parallel session in the same checkout breaks a run, and T244's QA loop hits one of them on every cycle. Both `deps: none`; soft overlap on `qa-skills`. |

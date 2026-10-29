@@ -1,0 +1,164 @@
+[
+  {
+    "id": "exit-not-a-number",
+    "sink": "shell-exec",
+    "input": "abc",
+    "direction": "hostile",
+    "why": "an --exit value that is not a plain exit code must be refused, never classified",
+    "correct": "usage error (exit 2), no outcome",
+    "expected": {
+      "exit": 2,
+      "stdout": ""
+    }
+  },
+  {
+    "id": "exit-negative",
+    "sink": "shell-exec",
+    "input": "-1",
+    "direction": "hostile",
+    "why": "an --exit value that is not a plain exit code must be refused, never classified",
+    "correct": "usage error (exit 2), no outcome",
+    "expected": {
+      "exit": 2,
+      "stdout": ""
+    }
+  },
+  {
+    "id": "exit-leading-space",
+    "sink": "shell-exec",
+    "input": " 1",
+    "direction": "hostile",
+    "why": "an --exit value that is not a plain exit code must be refused, never classified",
+    "correct": "usage error (exit 2), no outcome",
+    "expected": {
+      "exit": 2,
+      "stdout": ""
+    }
+  },
+  {
+    "id": "exit-plus-sign",
+    "sink": "shell-exec",
+    "input": "+1",
+    "direction": "hostile",
+    "why": "an --exit value that is not a plain exit code must be refused, never classified",
+    "correct": "usage error (exit 2), no outcome",
+    "expected": {
+      "exit": 2,
+      "stdout": ""
+    }
+  },
+  {
+    "id": "exit-hex",
+    "sink": "shell-exec",
+    "input": "0x1",
+    "direction": "hostile",
+    "why": "an --exit value that is not a plain exit code must be refused, never classified",
+    "correct": "usage error (exit 2), no outcome",
+    "expected": {
+      "exit": 2,
+      "stdout": ""
+    }
+  },
+  {
+    "id": "exit-command-substitution",
+    "sink": "shell-exec",
+    "input": "$(touch PWNED)",
+    "direction": "hostile",
+    "why": "an --exit value that is not a plain exit code must be refused, never classified",
+    "correct": "usage error (exit 2), no outcome",
+    "expected": {
+      "exit": 2,
+      "stdout": "",
+      "absent": [
+        "PWNED"
+      ]
+    }
+  },
+  {
+    "id": "exit-semicolon",
+    "sink": "shell-exec",
+    "input": "1; touch PWNED",
+    "direction": "hostile",
+    "why": "an --exit value that is not a plain exit code must be refused, never classified",
+    "correct": "usage error (exit 2), no outcome",
+    "expected": {
+      "exit": 2,
+      "stdout": "",
+      "absent": [
+        "PWNED"
+      ]
+    }
+  },
+  {
+    "id": "exit-newline-zero",
+    "sink": "shell-exec",
+    "input": "1\n0",
+    "direction": "hostile",
+    "why": "an --exit value that is not a plain exit code must be refused, never classified",
+    "correct": "usage error (exit 2), no outcome",
+    "expected": {
+      "exit": 2,
+      "stdout": ""
+    }
+  },
+  {
+    "id": "exit-one",
+    "sink": "shell-exec",
+    "input": "1",
+    "direction": "legitimate",
+    "why": "a real exit code classifies by its value",
+    "correct": "GATE_OUTCOME=attributable",
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "exit-zero",
+    "sink": "shell-exec",
+    "input": "0",
+    "direction": "legitimate",
+    "why": "a real exit code classifies by its value",
+    "correct": "GATE_OUTCOME=green",
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=green\n"
+    }
+  },
+  {
+    "id": "exit-timeout",
+    "sink": "shell-exec",
+    "input": "124",
+    "direction": "legitimate",
+    "why": "a real exit code classifies by its value",
+    "correct": "GATE_OUTCOME=not-measured (exit 124)",
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=not-measured (exit 124)\n"
+    }
+  },
+  {
+    "id": "exit-sigkill",
+    "sink": "shell-exec",
+    "input": "137",
+    "direction": "legitimate",
+    "why": "a real exit code classifies by its value",
+    "correct": "GATE_OUTCOME=not-measured (exit 137)",
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=not-measured (exit 137)\n"
+    }
+  },
+  {
+    "id": "exit-empty",
+    "sink": "shell-exec",
+    "input": "",
+    "direction": "legitimate",
+    "why": "a real exit code classifies by its value",
+    "correct": "GATE_OUTCOME=not-measured (no GATE_EXIT recorded)",
+    "expected": {
+      "exit": 0,
+      "stdout": "GATE_OUTCOME=not-measured (no GATE_EXIT recorded)\n"
+    }
+  }
+]

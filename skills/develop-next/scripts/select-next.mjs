@@ -881,6 +881,9 @@ export function selectNext(model, opts = {}) {
     // row that can never be selected because its status is misspelled must say
     // so in the one line a human or a loop log actually reads.
     const offLifecycle = frontier.passedOver.filter((p) => p.offLifecycle);
+    // A held row is never silent (task.235): a field nobody clears is named on
+    // every run that stops here.
+    const held = frontier.passedOver.filter((p) => p.externalBlock);
     return {
       status: "stop",
       stopReason: "roadmap-complete",
@@ -891,6 +894,10 @@ export function selectNext(model, opts = {}) {
         (offLifecycle.length
           ? ` — WARNING: ${offLifecycle.length} row(s) carry a status outside their lifecycle and can never be selected: ` +
             `${offLifecycle.map((p) => `${p.path} (${p.documentStatus})`).join(", ")}`
+          : "") +
+        (held.length
+          ? ` — ${held.length} row(s) held on an external precondition: ` +
+            `${held.map((p) => `${p.path} (${p.externalBlock})`).join(", ")}`
           : ""),
       skipped,
       registryFrontier: registryFrontierOut,
@@ -922,15 +929,26 @@ function buildRegistryRationale(frontier, skipped) {
   // Distinguish the two kinds of pass-over. Reporting them as one number reads
   // as "32 rows were rejected" when 34 of them were never looked at, which is
   // the kind of quietly-wrong count this feature exists to stop producing.
-  const rejected = frontier.passedOver.filter(
-    (r) => r.eligible === false,
+  // Rejections are counted by cause: a dependency-blocked or externally held
+  // row was not "rejected on document status", and saying so sends the reader
+  // to the wrong fix (task.235).
+  const refused = frontier.passedOver.filter((r) => r.eligible === false);
+  const held = refused.filter((r) => r.externalBlock);
+  const depBlocked = refused.filter(
+    (r) => !r.externalBlock && /^blocked on unaccepted/.test(r.reason || ""),
   ).length;
+  const rejected = refused.length - held.length - depBlocked;
   const unevaluated = frontier.passedOver.filter(
     (r) => r.eligible === null,
   ).length;
-  if (rejected || unevaluated)
+  if (refused.length || unevaluated)
     parts.push(
-      `${rejected} registry row(s) rejected on document status, ${unevaluated} not evaluated (see registryFrontier.passedOver; --lint evaluates all)`,
+      `${rejected} registry row(s) rejected on document status, ${depBlocked} blocked on dependencies, ` +
+        `${held.length} held on an external precondition` +
+        (held.length
+          ? `: ${held.map((r) => `${r.kind === "bug" ? "B" : "T"}${r.n} (${r.externalBlock})`).join(", ")}`
+          : "") +
+        `, ${unevaluated} not evaluated (see registryFrontier.passedOver; --lint evaluates all)`,
     );
   if (skipped.length)
     parts.push(`${skipped.length} roadmap row(s) skipped (see skipped[])`);
@@ -987,9 +1005,69 @@ export function parseFrontmatterStatus(text) {
 }
 
 /**
+ * Read a document's `blocked_on_external:` condition — a precondition outside
+ * this repository that no in-repo action can clear (task.235). Null when the
+ * field is absent or holds a placeholder.
+ *
+ * The YAML nulls and `false` / `no` are checked separately from `DEP_EMPTY_RE`.
+ * This repository writes an unset key as `null`, and `frontmatterScalar`
+ * returns the string "null" for it; a writer who means "not blocked" may write
+ * `false` or `no`. Without the check each would hold the row on a condition
+ * literally named "null" or "false". `DEP_EMPTY_RE` itself is not widened — it
+ * also reads the `Depends on` cell.
+ *
+ * @param {string} text
+ * @returns {string|null}
+ */
+export function externalBlockOf(text) {
+  const v = frontmatterScalar(text, "blocked_on_external");
+  return v && !DEP_EMPTY_RE.test(v) && !YAML_UNSET_RE.test(v) ? v : null;
+}
+
+const YAML_UNSET_RE = /^(?:null|~|false|no)$/i;
+
+/**
+ * The registry loader `main` hands to `registryFrontier`. Each document's text
+ * is read once and shared by `readStatus`, `readExternalBlock` and the
+ * dependency lookups, which all go through `readStatus` again. Exported so the
+ * read count is testable; `readFile` returns "" for an absent file.
+ *
+ * @param {{bugRegistry: string, taskRegistry: string}} paths
+ * @param {(path: string) => string} readFile
+ */
+export function makeRegistryLoader(paths, readFile) {
+  const docCache = new Map();
+  const docText = (p) => {
+    if (!docCache.has(p)) docCache.set(p, readFile(p));
+    return docCache.get(p);
+  };
+  return {
+    bugRegistry: { path: paths.bugRegistry, text: readFile(paths.bugRegistry) },
+    taskRegistry: {
+      path: paths.taskRegistry,
+      text: readFile(paths.taskRegistry),
+    },
+    readStatus: (docPath) => {
+      const text = docText(docPath);
+      return text ? parseFrontmatterStatus(text) : null;
+    },
+    readExternalBlock: (docPath) => externalBlockOf(docText(docPath)),
+  };
+}
+
+/**
  * Read one top-level scalar out of a document's YAML frontmatter — same
  * deliberately minimal reading as `parseFrontmatterStatus`: trailing comment
  * and surrounding quotes stripped, case preserved. Null when absent.
+ *
+ * A quoted value ends at its closing quote, so a ` #` inside it is text, not a
+ * comment — `blocked_on_external: "billing-service PR #982 merged"` is one
+ * condition, not `billing-service PR` (task.235 CR-1). Outside quotes ` #` starts a
+ * comment, as YAML has it. An unbalanced quote falls through to the plain rule.
+ *
+ * An escaped quote does not close the value: `\"` and `\\` inside double quotes,
+ * `''` inside single quotes, each read back as the one character YAML means
+ * (task.235 CR2-1). Other backslash sequences are kept as written.
  *
  * @param {string} text
  * @param {string} key
@@ -1003,9 +1081,40 @@ function frontmatterScalar(text, key) {
   const line = m[1].split(/\r?\n/).find((l) => keyRe.test(l));
   if (!line) return null;
   let v = line.replace(keyRe, "").trim();
+  const quote = v[0];
+  if (quote === '"' || quote === "'") {
+    const end = closingQuote(v, quote);
+    if (end > 0) {
+      const inner = v.slice(1, end);
+      const unescaped =
+        quote === '"'
+          ? inner.replace(/\\(["\\])/g, "$1")
+          : inner.replace(/''/g, "'");
+      return unescaped.trim() || null;
+    }
+  }
   v = v.replace(/\s+#.*$/, "").trim(); // strip a trailing comment
   v = v.replace(/^['"]|['"]$/g, "").trim();
   return v || null;
+}
+
+/**
+ * Index of the quote that closes the quoted scalar opening at `v[0]`, or -1.
+ * Skips `\x` inside double quotes and a doubled `''` inside single quotes.
+ *
+ * @param {string} v
+ * @param {'"' | "'"} quote
+ * @returns {number}
+ */
+function closingQuote(v, quote) {
+  for (let i = 1; i < v.length; i++) {
+    if (quote === '"' && v[i] === "\\") i++;
+    else if (v[i] === quote) {
+      if (quote === "'" && v[i + 1] === "'") i++;
+      else return i;
+    }
+  }
+  return -1;
 }
 
 /** A markdown table separator row (`| --- | :--: |`). */
@@ -1520,6 +1629,10 @@ export function registryFrontier(registries, opts = {}) {
   const reg = registries || {};
   const readStatus =
     typeof reg.readStatus === "function" ? reg.readStatus : () => null;
+  const readExternalBlock =
+    typeof reg.readExternalBlock === "function"
+      ? reg.readExternalBlock
+      : () => null;
 
   const bugSrc = reg.bugRegistry || {};
   const taskSrc = reg.taskRegistry || {};
@@ -1603,6 +1716,21 @@ export function registryFrontier(registries, opts = {}) {
         ...entry,
         eligible: false,
         reason: `document status ${docStatus} — outside the ${row.kind} eligibility floor (${[...ELIGIBLE_FOR[row.kind]].join(", ")})`,
+      });
+      continue;
+    }
+    // A precondition outside this repository (task.235). Checked AFTER the floor,
+    // so a cancelled or accepted document still reports its nearer cause, and
+    // BEFORE the dependencies, because it is the one condition no in-repo action
+    // can clear. Never silent: the rationale and the roadmap-complete detail
+    // name every held row the frontier evaluated.
+    const externalBlock = readExternalBlock(row.path);
+    if (externalBlock) {
+      passedOver.push({
+        ...entry,
+        eligible: false,
+        externalBlock,
+        reason: `blocked on an external precondition: ${externalBlock} — clear blocked_on_external in ${row.path} when it is met`,
       });
       continue;
     }
@@ -2068,20 +2196,11 @@ function main() {
       return "";
     }
   };
-  const loadRegistries = () => ({
-    bugRegistry: {
-      path: args.bugRegistry,
-      text: readOrEmpty(args.bugRegistry),
-    },
-    taskRegistry: {
-      path: args.taskRegistry,
-      text: readOrEmpty(args.taskRegistry),
-    },
-    readStatus: (docPath) => {
-      const text = readOrEmpty(docPath);
-      return text ? parseFrontmatterStatus(text) : null;
-    },
-  });
+  const loadRegistries = () =>
+    makeRegistryLoader(
+      { bugRegistry: args.bugRegistry, taskRegistry: args.taskRegistry },
+      readOrEmpty,
+    );
 
   if (args.lint) {
     // Lint evaluates EVERY registry row, not just up to the first eligible one:

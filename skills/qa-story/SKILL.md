@@ -151,46 +151,61 @@ Creates: story.1.178.8.gate.1.initial-review.yml
 
 **How PR Selection Works:**
 
-- The skill uses `gh pr view` to find the PR associated with your **current Git branch**
-- GitHub CLI matches the PR where `headRefName` equals your current branch name
-- If multiple PRs exist from the same branch, the most recent one is selected
+- The skill finds the PR associated with your **current Git branch**, branching on `VCS`
+- GitHub: `gh pr view` matches the PR whose `headRefName` equals your current branch; if several
+  exist from the same branch, the most recent one is selected
+- Bitbucket: the REST API's open pull request whose `source.branch.name` is your current branch —
+  `gh pr view` cannot address a Bitbucket PR, so an unconditional call HALTed every Bitbucket run
+  here (task.238)
 - This ensures you're reviewing the PR for the branch you're currently working on
 
 Before starting the review:
 
-1. **Check for PR existence:**
+1. **Check for PR existence, and parse it** — one block, because each fenced block runs as its own
+   shell and a `PR_JSON` set in one is empty in the next:
 
    ```bash
-   # Get current branch
+   source references/resolve-platform.sh || exit 1
    CURRENT_BRANCH=$(git branch --show-current)
 
-   # Find PR for current branch
-   PR_JSON=$(gh pr view --json url,state,title,number 2>&1)
-   EXIT_CODE=$?
+   if [ "$VCS" = "bitbucket" ]; then
+     # The same coordinates and credential Review Completion item 6 derives.
+     BB_PATH=$(git remote get-url origin | sed -E 's|.*bitbucket\.org[:/]||; s|\.git$||')
+     BB_WORKSPACE=$(echo "$BB_PATH" | cut -d'/' -f1)
+     BB_REPO=$(echo "$BB_PATH" | cut -d'/' -f2)
+     BB_API="https://api.bitbucket.org/2.0"
+     source references/bitbucket-auth.sh || exit 1
+     PR_JSON=$(curl -s -G "${BB_CURL_AUTH[@]}" \
+       "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests" \
+       --data-urlencode "q=source.branch.name=\"${CURRENT_BRANCH}\" AND state=\"OPEN\"" \
+       | jq -c '.values[0] // empty | {url: .links.html.href, state: .state, title: .title, number: .id}')
+   else
+     PR_JSON=$(gh pr view --json url,state,title,number 2>/dev/null)
+   fi
 
-   if [ $EXIT_CODE -ne 0 ]; then
+   if [ -z "$PR_JSON" ]; then
      echo "⚠️ No pull request found for branch: $CURRENT_BRANCH"
      echo ""
      echo "QA Review requires a pull request to post results."
      echo ""
      echo "Options:"
-     echo "1. Create a PR: gh pr create"
-     echo "2. Use /create-pr skill"
-     echo "3. Push changes: git push -u origin $CURRENT_BRANCH"
+     echo "1. Use /create-pr skill"
+     echo "2. Push changes: git push -u origin $CURRENT_BRANCH"
      echo ""
      echo "Once PR is created, re-run /qa-story"
      exit 1
    fi
-   ```
 
-2. **Parse and validate PR information:**
-
-   ```bash
    PR_URL=$(printf '%s' "$PR_JSON" | jq -r '.url')
    PR_STATE=$(printf '%s' "$PR_JSON" | jq -r '.state')
    PR_NUMBER=$(printf '%s' "$PR_JSON" | jq -r '.number')
    PR_TITLE=$(printf '%s' "$PR_JSON" | jq -r '.title')
+   echo "VCS=$VCS PR_NUMBER=$PR_NUMBER PR_STATE=$PR_STATE PR_URL=$PR_URL"
    ```
+
+2. **Bitbucket finds only an open PR**, so `PR_STATE` there is `OPEN`. Review Completion item 6
+   derives the Bitbucket coordinates again with the same commands rather than reading these
+   variables from another shell.
 
 3. **Handle PR state:**
    - **OPEN**: ✅ Proceed with review
@@ -1499,6 +1514,7 @@ See NFR Assessment section below for detailed process.
 - **Review TypeScript Compliance Agent findings (Phase 1.5)** against project TypeScript standards
 - **Review Accessibility Agent findings (Phase 1.5)** against project accessibility standards
 - **Cross-check Definition of Done Agent (Phase 1.5)** for standards compliance
+- **Wireframe conformance** (only when the story has a wireframe component table and `skills-config.yaml` sets `ui.wireframeMap`; procedure: `references/wireframe-component-mapping.md`). For each row, the changed UI builds that node from the component named, imported from `ui.componentImport`, with the variant the row gives; a node rebuilt by hand or from another component is a `category: coverage` finding. For each entry under `### Wireframe mapping assumptions` in the implementation report's Decisions Log, check the assumed component against the design source the wireframe came from, and record the verdict in the QA report; a wrong assumption is a `high` finding, and a right one may then be recorded in the map with `wireframe-map.js record` (`references/wireframe-map.js`).
 
 **Run the validation commands your coding standards name, not only the test runner.** The coding
 standards file is loaded on every pipeline run (`devLoadAlwaysFiles`). For each command it lists
@@ -1530,6 +1546,16 @@ Performance and structural criteria ("defined once", "one pass", "offline") are 
 because no test carries them (obs #210). A behaviour criterion whose only evidence is a hand run,
 with no committed per-PR test, is a **MEDIUM** finding in `top_issues[]`, so it enters the fix loop
 rather than halting at finalise (obs #224).
+
+**A residual that says a check cannot run is a claim. Re-test its premise before you restate it.**
+When the work item, the implementation report or a previous QA report says a criterion is unverified
+because the environment lacks something ("CI has no zsh lane", "no Bitbucket credential", "this host
+cannot run X"), check that premise against its source of truth on this cycle. For CI, that is the
+workflow files and this head's CI log. For a credential or a tool, it is the environment itself.
+Record the residual with the instrument you checked it with, for example `test.yml:37 installs zsh;
+CI log shows the [zsh] cases passing`. A residual carried forward from the document without a
+re-check is not evidence. On task.241 one was restated through two QA cycles, while the CI log those
+cycles had read showed the check passing (obs #119).
 
 #### Phase 6: Documentation and Comments
 
@@ -1641,6 +1667,10 @@ stories/
 - [ ] Automated Testing
 - [ ] Performance Testing
 - [ ] Security Review
+
+[The CI_SUMMARY line from the gate step's CI read — e.g. `CI on {sha}: 1 failed (0 pre-existing)`,
+or `CI on {sha}: pending` — always present, since an undecided reading is recorded here and nowhere
+else]
 
 ## Test Results Summary
 
@@ -1833,7 +1863,7 @@ gate once it is written.
 
 #### Output 2: Quality Gate File
 
-> **Precondition — no dispatched review is outstanding.** Do not write a gate while a code review dispatched in this cycle has not returned its `code_review:` block. The gate is a verdict on all the evidence, and a review still running is evidence not yet in hand — a `PASS` written now can be contradicted minutes later by the reviewer it did not wait for (task.106, obs #56). If the diff-review step reports the review as outstanding, wait against its wall-clock budget or resolve it per `references/develop-pipeline-autonomous-defaults.md` §Subagents **before** this step; never write around it. **That is the only wait.** A pending, cancelled or unavailable CI run on the PR is **not** a precondition of this step: CI is gated once, on the final commit, at `/finalise`, and no QA cycle waits on CI before then. If the latest CI state is to hand, record it as `evidence.ci` (informational — for example `pending @ {sha}`); never hold the gate for it.
+> **Precondition — no dispatched review is outstanding.** Do not write a gate while a code review dispatched in this cycle has not returned its `code_review:` block. The gate is a verdict on all the evidence, and a review still running is evidence not yet in hand — a `PASS` written now can be contradicted minutes later by the reviewer it did not wait for (task.106, obs #56). If the diff-review step reports the review as outstanding, wait against its wall-clock budget or resolve it per `references/develop-pipeline-autonomous-defaults.md` §Subagents **before** this step; never write around it. **That is the only wait.** A pending, cancelled or unavailable CI run on the PR is **not** a precondition of this step: CI is gated once, on the final commit, at `/finalise`, and no QA cycle waits on CI before then. The CI read below runs **once**, never polls, and never holds the gate: a completed failure becomes a finding, and every undecided state is recorded and changes nothing.
 
 > **`top_issues[]` holds THIS cycle's findings only.** Do not copy a previous cycle's entries
 > forward, even annotated `status: closed`, and even though carrying the history reads as helpful.
@@ -1871,6 +1901,32 @@ later commit. The repository's gate-head freshness test fails a `schema: 2` gate
 `head:` is not a full SHA, whose `updated:` is not a `date -u` timestamp, or whose `updated:`
 precedes the head's author time when the head resolves. Existence and ancestry are checked by the
 Step 3b scope block at the next cycle and by the 5c conformance lens, while the branch is intact.
+
+**Read the PR's CI once, then compose the gate** (task.238, obs #45). A red CI lane on the PR used
+to go unread until `/finalise`, which found it after a PASS gate and a 5c APPROVE (task.203,
+task.236). This is the latest point a read can still change the gate, and it is a read, not a wait:
+
+```bash
+source references/resolve-platform.sh || exit 1
+bash .agents/skills/qa-story/references/qa-ci-read.sh --vcs "$VCS" --pr "{PR_NUMBER from the PR Existence Check}"
+```
+
+Engine source: `qa-ci-read.sh` (bundled into each skill that runs it as `references/qa-ci-read.sh`). It
+buckets checks exactly as `/finalise` does (`ACTION_REQUIRED` is a failure, `CANCELLED` and a running
+CheckRun's `conclusion: ""` are undecided, a Bitbucket 403 is a failed read and never "no CI"), and
+it maps a result only when the PR's head equals `git rev-parse HEAD`. For each completed failure it
+reads the same check's latest completed run on the PR base. Map its output:
+
+| Output | Gate entry |
+|---|---|
+| `CI_FINDING` `top_issue` — red on the head, green or absent on the base | a `top_issues[]` entry: `id: '{PREFIX}-CI-{n}'`, `severity: medium`, `file:` the path the failing job's log names (else the workflow file, e.g. `.github/workflows/{name}.yml`), `finding: 'CI check {check} failed on {sha} ({url}); {base evidence}'`, `suggested_action: 'reproduce locally and fix'`, `suggested_owner: dev`, `status: open` |
+| `CI_FINDING` `pre-existing` — red on the base too | a `recommendations.future` entry: `action: 'CI check {check} red on {sha} and on the base ({url}; {base evidence})'`, `refs: ['{workflow file}']`, `provenance: pre-existing` — never a `top_issue`, so it never reaches `/qa-fix` with nothing to fix |
+| `CI_STATE` `PENDING`, `CANCELLED`, `NONE`, `SUCCESS`, `HEAD_MISMATCH` or `UNKNOWN` | nothing in the gate |
+
+Copy the `CI_SUMMARY=` line into the QA report's **Testing Approach** section in every case.
+`severity: medium`, not `high`: a `high` would trip the third-strike rule and the convergence check
+on a lane the fixer may not own, such as a flaky one, while `medium` already makes the gate
+`CONCERNS` and puts the red into `/qa-fix`'s queue.
 
 **Gate File Structure:**
 

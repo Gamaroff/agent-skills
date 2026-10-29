@@ -1,0 +1,197 @@
+[
+  {
+    "id": "d.plain",
+    "input": "doc",
+    "direction": "legitimate",
+    "why": "the document directory holding gate.3",
+    "correct": "accept",
+    "fixture": {
+      "files": {
+        "doc/t.gate.3.x.yml": "gate: CONCERNS\n",
+        "state/lock.json": "{\"current_step\":5,\"qa_phase\":\"5a\"}\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  },
+  {
+    "id": "d.dot-slash",
+    "input": "./doc",
+    "direction": "legitimate",
+    "why": "alternative spelling of the same directory",
+    "correct": "accept",
+    "fixture": {
+      "files": {
+        "doc/t.gate.3.x.yml": "gate: CONCERNS\n",
+        "state/lock.json": "{\"current_step\":5,\"qa_phase\":\"5a\"}\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  },
+  {
+    "id": "d.trailing-slash",
+    "input": "doc/",
+    "direction": "legitimate",
+    "why": "trailing slash",
+    "correct": "accept",
+    "fixture": {
+      "files": {
+        "doc/t.gate.3.x.yml": "gate: CONCERNS\n",
+        "state/lock.json": "{\"current_step\":5,\"qa_phase\":\"5a\"}\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  },
+  {
+    "id": "d.zero-padded-gate",
+    "input": "doc",
+    "direction": "legitimate",
+    "why": "gate.08 is cycle 8, not octal",
+    "correct": "accept; base 8, window 9",
+    "expected": {
+      "exit": 0,
+      "stdout": "grant-qa-cycles: QA_CYCLE=8 extra_cycles_granted=2 qa_max_cycles=10 reenter_at=5a convergence_from_cycle=9\n"
+    },
+    "fixture": {
+      "files": {
+        "doc/t.gate.08.x.yml": "gate: CONCERNS\n",
+        "state/lock.json": "{\"current_step\":5,\"qa_phase\":\"5a\"}\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  },
+  {
+    "id": "d.missing",
+    "input": "nope",
+    "direction": "hostile",
+    "why": "not a directory",
+    "correct": "refuse with usage",
+    "expected": {
+      "exit": 1
+    },
+    "fixture": {
+      "files": {
+        "doc/t.gate.3.x.yml": "gate: CONCERNS\n",
+        "state/lock.json": "{\"current_step\":5,\"qa_phase\":\"5a\"}\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  },
+  {
+    "id": "d.file",
+    "input": "doc/t.gate.3.x.yml",
+    "direction": "hostile",
+    "why": "a file, not a directory",
+    "correct": "refuse",
+    "expected": {
+      "exit": 1
+    },
+    "fixture": {
+      "files": {
+        "doc/t.gate.3.x.yml": "gate: CONCERNS\n",
+        "state/lock.json": "{\"current_step\":5,\"qa_phase\":\"5a\"}\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  },
+  {
+    "id": "d.empty",
+    "input": "",
+    "direction": "hostile",
+    "why": "no doc-dir",
+    "correct": "refuse with usage",
+    "expected": {
+      "exit": 1
+    },
+    "fixture": {
+      "files": {
+        "doc/t.gate.3.x.yml": "gate: CONCERNS\n",
+        "state/lock.json": "{\"current_step\":5,\"qa_phase\":\"5a\"}\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  },
+  {
+    "id": "d.no-gate",
+    "input": "empty",
+    "direction": "hostile",
+    "why": "a directory with no gate: nothing to grant against",
+    "correct": "refuse; no window written",
+    "expected": {
+      "exit": 1
+    },
+    "fixture": {
+      "files": {
+        "empty/notes.md": "x\n",
+        "state/lock.json": "{\"current_step\":5,\"qa_phase\":\"5a\"}\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  },
+  {
+    "id": "d.subst",
+    "input": "$(touch pwned)",
+    "direction": "hostile",
+    "why": "command substitution in the path must never execute",
+    "correct": "refuse; never evaluate",
+    "expected": {
+      "exit": 1,
+      "absent": [
+        "pwned"
+      ]
+    },
+    "fixture": {
+      "files": {
+        "doc/t.gate.3.x.yml": "gate: CONCERNS\n",
+        "state/lock.json": "{\"current_step\":5,\"qa_phase\":\"5a\"}\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  },
+  {
+    "id": "d.lock-not-object",
+    "input": "doc",
+    "direction": "hostile",
+    "why": "lock present but a JSON array",
+    "correct": "refuse; lock untouched",
+    "expected": {
+      "exit": 1
+    },
+    "fixture": {
+      "files": {
+        "doc/t.gate.3.x.yml": "gate: CONCERNS\n",
+        "state/lock.json": "[1,2]\n"
+      },
+      "env": {
+        "PIPELINE_LOCK": "state/lock.json",
+        "PIPELINE_HALT_SNAPSHOT": "state/last-halt.json"
+      }
+    }
+  }
+]

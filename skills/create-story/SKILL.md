@@ -753,10 +753,13 @@ After Dev Notes, plan, and diagrams are considered, check to see if the story do
      - `No — Skip wireframe`: Do not add wireframes.
 
 2. **If the user chooses Yes**:
-   - Invoke the `wireframe` skill (read its instructions if you haven't already) and follow its **Working from a brief** section, with the story's acceptance criteria as the brief.
+   - **If the screen already has a wireframe document** — the `wireframe` skill made one from the screen's design source (`<stem>.wireframe.md` beside it) — copy its blocks verbatim and link the file, rather than drawing a new one. Its _Conversion notes_ record what the drawing leaves out, and a fresh drawing loses them.
+   - Otherwise invoke the `wireframe` skill (read its instructions if you haven't already) and follow its **Working from a brief** section, with the story's acceptance criteria as the brief.
    - Embed the wireframe in the story document under the **Dev Notes** section, under a `## Visual Layout / Wireframe` subheading: the rendered SVG (written next to the story file) followed by its ```` ```wireloom ```` source, exactly as `wireframe`'s Process step 5 lays out. Run its `check` until it reports `ok` before saving.
    - Add a task/subtask to the story's **Tasks / Subtasks** section to implement the UI it shows:
      - `- [ ] Implement the UI to match the wireframe (see Dev Notes › Visual Layout / Wireframe)`
+
+3. **Link the wireframe's nodes to components** (only when `skills-config.yaml` sets `ui.wireframeMap`; otherwise skip silently). Follow `references/wireframe-component-mapping.md` (engine: `references/wireframe-map.js`) with the author present: `ensure`, `resolve`, propose, ask about every open node, then write the component table into Dev Notes and each confirmed answer into the map. A story whose wireframe nodes are all in that table is one `develop-story` can build without asking.
 
 ### 5.5 Add Testing Guidance
 

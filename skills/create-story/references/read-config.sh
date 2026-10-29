@@ -462,11 +462,20 @@ _CONFIG_SUBSET_VERDICT=""
 #   read_nested_config_key          prd.prdShardedLocation | architecture.architectureShardedLocation
 #                                   observations.workspace | subagents.wallClockMinutes (set-waiting-on.sh)
 #   read_nested_config_key_strict   access.tracker | access.vcs
+#                                   changelog.enforce (changelog-enforce.sh)
 #   config_child_shape              access
 #
 # Widening the surface without widening this list would re-open the hole for the new key, quietly.
 # tracker-access.test.sh pins the list against the live call sites so that cannot pass unnoticed.
-_CONFIG_GUARDED_KEYS='access|tracker|vcs|prd|architecture|prdShardedLocation|architectureShardedLocation|observations|workspace|subagents|wallClockMinutes'
+_CONFIG_GUARDED_KEYS='access|tracker|vcs|prd|architecture|prdShardedLocation|architectureShardedLocation|observations|workspace|subagents|wallClockMinutes|changelog|enforce'
+
+# Where a guarded key COUNTS as consumed, for a key whose bare name is too generic to guard at any
+# depth. `name:-` = only as a top-level key; `name:parent` = only as a child of that top-level
+# parent. A key not listed here is guarded wherever it appears, as before. Without this, guarding
+# `enforce` refused a consumer config holding a quoted `"enforce":` under some unrelated block, and
+# every reader — `tracker` included — answered __UNSUPPORTED__ (task.241, BUG-3). Every name here
+# must also be in _CONFIG_GUARDED_KEYS: this narrows the guard, it never adds one.
+_CONFIG_GUARDED_SCOPES='changelog:-,enforce:changelog'
 
 # _config_subset_scan — populate $_CONFIG_SUBSET_VERDICT. Echoes nothing.
 #
@@ -491,15 +500,24 @@ _config_subset_scan() {
   [ -f "$SKILLS_CONFIG_FILE" ] || return 0
   [ -r "$SKILLS_CONFIG_FILE" ] || return 0
 
-  _CONFIG_SUBSET_VERDICT=$(LC_ALL=C awk -v guarded="$_CONFIG_GUARDED_KEYS" '
+  _CONFIG_SUBSET_VERDICT=$(LC_ALL=C awk -v guarded="$_CONFIG_GUARDED_KEYS" -v scopes="$_CONFIG_GUARDED_SCOPES" '
     function refuse(what) { printf "%d:%s", NR, what; found = 1; exit }
-    # True when a key name is one this reader consumes — the LOCAL rules refuse only those.
-    function consumed(name) { return (name ~ ("^(" guarded ")$")) }
+    # True when a key name is one this reader consumes AT THIS POSITION — the LOCAL rules refuse
+    # only those. A scoped name (see _CONFIG_GUARDED_SCOPES) counts only at its own position, read
+    # from the current line indent and the top-level key the line sits under.
+    function consumed(name) {
+      if (name !~ ("^(" guarded ")$")) return 0
+      if (!(name in scope)) return 1
+      if (scope[name] == "-") return (indent == 0)
+      return (indent > 0 && top == scope[name])
+    }
 
     BEGIN {
       # Built here rather than written inline because the program is inside shell single quotes,
       # so a literal apostrophe cannot appear in it. \047 is the POSIX octal escape for one.
       QKEY = "^[[:space:]]*[\"\047][^\"\047]*[\"\047][[:space:]]*:"
+      ns = split(scopes, sc, ",")
+      for (i = 1; i <= ns; i++) { split(sc[i], kv, ":"); scope[kv[1]] = kv[2] }
     }
 
     # A BOM sits before the first key and hides it from every anchored regex below.
@@ -520,6 +538,9 @@ _config_subset_scan() {
     # A trailing comment cannot alias anything, and scanning it would refuse a config that merely
     # DESCRIBES an anchor. Stripping can only remove text, so it can never invent a refusal.
     { s = $0; sub(/[[:space:]]#.*$/, "", s); sub(/[[:space:]]+$/, "", s) }
+
+    # The top-level key every following indented line sits under — what a scoped key is judged by.
+    indent == 0 { top = s; sub(/^["\047]/, "", top); sub(/["\047]?[[:space:]]*:.*$/, "", top) }
 
     s ~ /^[[:space:]]*<<[[:space:]]*:/            { refuse("a merge key (`<<`)") }
     s ~ /^[[:space:]]*\?([[:space:]]|$)/          { refuse("an explicit key (`? key`)") }

@@ -34,8 +34,8 @@ which ends a loop whose HIGH findings are gone and whose `PASS` gate carries not
 entries; and, at the budget, the **Gate-the-last-fix half-cycle** (route 2c), which grants one
 review + gate to a fix the last budgeted cycle landed and no gate has read — its gate reaches 5c
 by the shape of route 1 or 3, and is named as its own route because of the moment it fires. None
-of these is an exit *around* 5c: `APPROVE` or `CONCERNS` from 5c remains the only thing that opens
-Step 7.
+of these is an exit *around* 5c: `APPROVE` or `CONCERNS` from 5c (a `CONCERNS` without an open
+coverage finding) remains the only thing that opens Step 7.
 
 There are **two ways it escalates** instead: the 5-cycle limit, and — from cycle 3 onward — the
 **Convergence check**, which halts the moment the loop stops reducing HIGH findings. The convergence
@@ -85,7 +85,7 @@ bash .agents/skills/{develop-story|develop-task}/references/set-qa-phase.sh 5a  
 The Stop hook (`develop-pipeline-on-stop.sh`) reads `qa_phase` on a step-5 lock to name `/qa-task`
 (or `/qa-story`), `/qa-fix` or `/review-pr`; an **absent** `qa_phase` names 5a, the loud re-entrant
 default. The halt snapshot is a superset of the lock, so `qa_phase` — and `extra_cycles_granted` /
-`qa_max_cycles` above — travel into `develop-pipeline.last-halt.json` without a second writer.
+`qa_max_cycles` / `convergence_from_cycle` above — travel into `develop-pipeline.last-halt.json` without a second writer.
 
 Separately, several **HALT** paths end the run without reaching escalation: the no-code-change HALT
 and the mid-loop PR MERGED/CLOSED HALT (both in 5b), the twice-red fast-gate bail-out (5b step 0a),
@@ -618,7 +618,20 @@ the pipeline noticed.
    and deliberately does not count HIGH: the HIGH count stays the awk's (engine property 2), so the
    two guards can never disagree about it.
 
-3. **From cycle 3 onward, if `HIGH_N > 0` AND `HIGH_{N-2} > 0` AND `HIGH_N >= HIGH_{N-1}` AND
+3. **Take readings only from cycles `>= convergence_from_cycle`** — the lock field
+   (`jq -r '.convergence_from_cycle // 1' .claude/state/develop-pipeline.lock`; absent → `1`, every
+   reading counts). The `1` is for a lock **without the field**, never for a missing or unreadable
+   lock. When the jq fails, **HALT** with its stderr and do not run the trip. A missing lock is put
+   back by the resume contract's **Restore the lock (both resume paths)**, which says who restores
+   it; that step does not repair a lock that is present but does not parse. Defaulting to `1` would
+   reopen the window over the pre-grant readings and trip on the first post-grant gate.
+
+   A grant restarts the three-reading rule, so "k more cycles" delivers k cycles unless the guard
+   re-arms first. It re-arms once three post-grant readings exist. From the third granted cycle on,
+   any three consecutive post-grant readings that meet the condition below (HIGH present and not
+   falling) escalate again at the 5a of the cycle that gives the third of those readings, and the
+   granted cycles after it do not run (task.239, obs #72; the table below has both shapes).
+   **Within that window, from its third reading onward, if `HIGH_N > 0` AND `HIGH_{N-2} > 0` AND `HIGH_N >= HIGH_{N-1}` AND
    `HIGH_{N-1} >= HIGH_{N-2}` — i.e. HIGH findings were present at all three readings and the
    count has failed to strictly decrease across two consecutive cycles — the loop is not
    converging. Stop and escalate.** Do not run 5b. Go to **Loop Escalation** below and use the
@@ -637,8 +650,8 @@ the pipeline noticed.
    be reduced: it is a defect in the last fix, not a loop that stopped working, and it routes to 5b
    like any open queue (obs #227; task.140 escalated on exactly this sequence).
 
-   Cycles 1 and 2 never trip it: the rule needs three readings to see a flat line, and a single
-   flat cycle is normal.
+   Cycles 1 and 2 never trip it (nor the first two cycles after a grant): the rule needs three
+   readings to see a flat line, and a single flat cycle is normal.
 
    Worked examples — the second is the one the rule must **not** match:
 
@@ -653,6 +666,24 @@ the pipeline noticed.
 
    On the observed `7, 7, 7, 7, 4` sequence this trips at the end of cycle 3 — `7 >= 7` and
    `7 >= 7` — cutting three futile cycles.
+
+   With a grant, the window decides which readings are the three. `|` marks the grant boundary:
+
+   | Sequence (cycles, oldest → newest) | `convergence_from_cycle` | Trips? | Why |
+   |---|---|---|---|
+   | `1, 1, 1 \| 1` (cycles 1–4) | 4 | **no**, at cycle 4 | one post-grant reading; the task.215 case, where a grant of 2 escalated after one fix (obs #72) |
+   | `1, 1, 1 \| 1, 1, 1` (cycles 1–6) | 4 | yes, at cycle 6 | three post-grant readings, flat: a person decides again |
+   | `1, 1, 1 \| 1, 2, 3` (cycles 1–6) | 4 | yes, at cycle 6 | rising is not falling: HIGH present and not falling trips, not only a flat count |
+   | `1, 1, 1 \| 3, 2, 2, 2` (cycles 1–7) | 4 | yes, at cycle 7 | the first post-grant trio falls; the trio ending at cycle 7 does not, so the trip comes at the fourth granted cycle |
+   | `7, 7, 7` (cycles 1–3) | absent | yes, at cycle 3 | a lock written before task.239 reads `1`: unchanged |
+
+   The window governs this trip only. The route classifier below (`classifyLoopRoute`) still reads
+   the whole sequence, pre-grant readings included. Routes 2 and 2b end a loop that has finished, so
+   there a pre-grant reading can only let a granted run exit sooner. Route 2c can go the other way.
+   When the budget is spent, it compares MEDIUM over cycles N-2..N, and after a grant of 1 or 2 that
+   window holds a pre-grant gate. A pre-grant MEDIUM no higher than the next reading makes route 2c
+   decline, unless the last gate reads MEDIUM 0. The run then escalates instead of gating its last
+   fix.
 
 **Escalate; do not silently accept.** The remaining HIGH findings are not noise to be dropped
 because the loop got tired of them. On the observed task a genuine defect in the *shipped* artifact
@@ -794,7 +825,8 @@ The record, as the first exit writes it:
    resume and files a trail defect at 5c.
 2. **Do not run 5b.**
 3. **Hand to 5c**, exactly as a `PASS` gate does. Since 5c became the loop's exit gate the only route
-   to Step 7 is 5c returning `APPROVE` or `CONCERNS`, and this must not become the one path that
+   to Step 7 is 5c returning `APPROVE` or `CONCERNS` (a `CONCERNS` without an open coverage
+   finding), and this must not become the one path that
    reaches Step 7 without a PR conformance review — that would make it a *weaker* exit than a clean
    gate takes, on a run that by construction has stopped finding blockers.
 4. **Carry the residue, by id, and close it in `top_issues[]`** — `ROUTE_JSON`'s `residueIds` names
@@ -1105,9 +1137,13 @@ ten minutes of runner time). It is that **every fix commit reached merge without
 of its own**, because a cycle's second push kept cancelling its own in-flight run.
 
 **CI and the QA loop — no cycle waits on CI.** QA cycles (5a/5b) and the 5c review do **not** wait
-for the PR's CI run. Each cycle pushes as above, and CI runs in the background as free information:
-read its latest state if it is to hand, never block on it. A cycle's suite evidence is the local fast
-gate (`develop.fastGateCommand`, step 0a) plus the diff review. **CI green is required exactly once,
+for the PR's CI run. Each cycle pushes as above, and CI runs in the background as free information.
+**5a reads it once per cycle**: `/qa-task` and `/qa-story` read the PR's CI state at their gate step
+(qa-task Step 10), just before composing the gate, without polling (task.238, obs #45). A completed
+failure on the judged head that is not also red on the PR base becomes a `severity: medium` gate
+finding, so it enters 5b's queue; a lane red on the base too is recorded as pre-existing and kept
+out of it; anything undecided changes nothing. Nothing ever blocks on CI.
+A cycle's suite evidence is the local fast gate (`develop.fastGateCommand`, step 0a) plus the diff review. **CI green is required exactly once,
 on the final commit, at `/finalise`** — its CI reading 1 (the acceptance decision) and CI reading 2
 (on the acceptance commit) are this pipeline's only CI gate.
 (`/develop-next`'s and `/develop-batch`'s merge step waits on CI again, on that same final head —
@@ -1197,6 +1233,8 @@ After fixes are applied:
    FIX_LOG=".claude/state/qa-fix-gate-${QA_CYCLE}-$(date +%s).log"
    <fastGateCommand> > "$FIX_LOG" 2>&1
    GATE_EXIT=$?
+   echo "GATE_EXIT=$GATE_EXIT FIX_LOG=$FIX_LOG"
+   [ "$GATE_EXIT" -eq 0 ] && rm -f "$FIX_LOG"   # a red log is never removed here
    ```
 
    **When the gate can outlive the tool timeout, start it with `run_in_background`** and let the log
@@ -1204,8 +1242,23 @@ After fixes are applied:
    Mark the wait before yielding —
    `bash .agents/skills/{develop-story|develop-task}/references/set-waiting-on.sh "5b fast gate cycle {N}" --kind task --budget-minutes {M}`
    (`develop-pipeline-hooks.md` §"waiting_on") — and on the notification `--clear` it and read the
-   `GATE_EXIT=` line (`grep '^GATE_EXIT=' "$FIX_LOG"`). A foreground
-   call killed at the timeout loses its exit code, and can leave a moved `.agents/skills` unrestored.
+   result with this block, which is the background form's cleanup too:
+
+   ```bash
+   FIX_LOG="{the log the background gate wrote}"
+   GATE_EXIT=$(sed -n 's/^GATE_EXIT=//p' "$FIX_LOG" | tail -1)
+   echo "GATE_EXIT=${GATE_EXIT:-none} FIX_LOG=$FIX_LOG"
+   grep -q '^GATE_EXIT=0$' "$FIX_LOG" && rm -f "$FIX_LOG"   # a red or unfinished log is never removed here
+   ```
+
+   A foreground call killed at the timeout loses its exit code, and can leave a moved
+   `.agents/skills` unrestored.
+
+   **Reading the result and removing the log are separate decisions.** The removal is keyed on the
+   result in the same statement, so a command that batches a read with cleanup cannot remove a red
+   log. Never write a bare `rm -f "$FIX_LOG"`: task.202 batched `grep … "$FIX_LOG"; …; rm -f "$FIX_LOG"`,
+   the red log was gone, and a second ~4-minute gate run spent the 2-attempt bound just to name the
+   failure (obs #41).
 
    `<fastGateCommand>` is `develop.fastGateCommand` from `skills-config.yaml` — the same fast tier
    the develop loop runs (see
@@ -1215,7 +1268,40 @@ After fixes are applied:
    cycle runs the key has already been proven to name a real script. The slow tier stays out of this
    cycle by design; it runs once at `develop-next`'s merge gate.
 
-   **This is a gate on the commit, not a new halt.** On `GATE_EXIT != 0`, do **not** commit yet — a
+   **Classify a non-green result before triaging it — a red gate has two outcomes, not one**
+   (task.238, obs #14). A green gate (`GATE_EXIT=0`) skips this entirely and goes straight to step 1.
+
+   | Outcome | How to tell | Action | QA Iteration History line |
+   |---|---|---|---|
+   | **not measured** | no `GATE_EXIT=` line in the log (background form: the run never finished), an exit of 124 (timeout), 137 (SIGKILL) or 143 (SIGTERM), or the `test-tmpdir` wrapper's own report that a signal interrupted or killed the suite | re-run the gate once. It is never green and never red, and it consumes no retry attempt | `Fast gate: not measured ({reason})` |
+   | **attributable red** | any other red | the triage-and-retry path below, unchanged | unchanged — the failing output |
+
+   One script decides it. Run it from the repository root, only on a non-green result:
+
+   ```bash
+   bash .agents/skills/{develop-story|develop-task}/references/fast-gate-outcome.sh \
+     --log "{the gate log}" \
+     --exit "{the GATE_EXIT the run printed — empty when it printed none}"
+   ```
+
+   It prints exactly one `GATE_OUTCOME=not-measured|attributable` line and exits 0 for every
+   outcome — act on the line, not the exit code. Engine source: `fast-gate-outcome.sh` (bundled
+   into each skill that runs it as `references/fast-gate-outcome.sh`); develop-bug's step 3a calls the
+   same script, so the rule has one definition.
+
+   **There is no pre-existing red.** A red is never compared with a run at the PR base, so a red that
+   is also red on the base spends a retry like any other. A third outcome once let such a red through
+   after comparing failing tests with a base run. QA cycles 4, 5 and 6 of task.238 each found another
+   `node --test` log shape the comparison misread, so that a head-only failure went through as
+   pre-existing (bug.5 to bug.14). At the third strike the comparison was deleted, not patched again.
+   A structured comparison, from runs the script controls rather than a parsed log, is deferred work
+   on task.238.
+
+   **A not-measured gate is re-run once, and the re-run is classified again.** Its result is what
+   counts. A second not-measured result is an attributable red attempt that counts against the
+   2-attempt bound below — two runs that never finished are not a reading, and they are not a pass.
+
+   **This is a gate on the commit, not a new halt.** On an **attributable** red, do **not** commit yet — a
    red tree is exactly what the cycle machinery is for. Triage per the step-3 pattern, feed the
    finding back into this cycle's fixes, and re-run the gate.
 
@@ -1232,8 +1318,6 @@ After fixes are applied:
    MAX_ITER — both of which count *cycles*, so an unbounded inner re-run would never reach either.
    An earlier revision of this block claimed "the MAX_ITER cap still bounds the loop"; it does not
    bound this retry, and a stated guarantee that is not real is worse than an unstated one.
-
-   Cleanup mirrors step 3: `GATE_EXIT == 0` → `rm -f "$FIX_LOG"`; non-zero → retain for post-mortem.
 
    > **Why the gate sits between 0 and 1, and not after the commit.** A qa-fix cycle pushes to the PR
    > branch, so a red commit is a red PR the reviewer sees before the next cycle repairs it — and on
@@ -1328,7 +1412,8 @@ After fixes are applied:
 ### 5c. PR Conformance Review (shared)
 
 **Lock**: `bash .agents/skills/{develop-story|develop-task}/references/set-qa-phase.sh 5c` before anything else in this sub-step. `current_step` stays `5`;
-it advances to `7` only at the Step 7 transition, on `APPROVE` or `CONCERNS`.
+it advances to `7` only at the Step 7 transition, on `APPROVE` or `CONCERNS` (a `CONCERNS` without
+an open coverage finding — one with returns to 5b, and the lock stays at `5`).
 
 Perform this step **before Step 7**, on any of the **five routes out of 5a**:
 
@@ -1460,9 +1545,38 @@ gate.
 | Verdict | Action |
 | --- | --- |
 | 🚨 **REQUEST CHANGES** | Return to **5b** and run `/qa-fix` with the review's findings (see the invocation below). **Do not increment the counter here** — 5b's step 7 increments it on exit, exactly as on any other cycle. A review-driven fix is a cycle like any other, and it is counted in the same one place. |
-| ⚠️ **CONCERNS** | Record the findings in the QA Cycle entry and the implementation report. **Do not block.** Signal `ready-for-merge`, carry the review into the acceptance commit (below; doc-only findings may be fixed there), exit the loop, proceed to Step 7. |
-| ✅ **APPROVE** | Signal `ready-for-merge`, carry the review into the acceptance commit (below), exit the loop, proceed to Step 7. |
-| ❌ **Review failed** — `/review-pr` HALTed, could not resolve a PR, or errored | **Not a verdict, and not an exit.** Log it in the Issues Log, record `review failed` on the cycle's `**PR Review**` row, the gate and QA report are already committed by path 1 — do not commit again — and **HALT** naming the PR and the failure. Do **not** fall through to Step 7: 5c is the only exit, so a run that skips it silently finalises without the check this step exists to add. |
+| ⚠️ **CONCERNS** | **If the review's Machine-Readable Findings hold an open `category: coverage` entry** (one without `provenance: pre-existing` — the check below decides it, and an `unreadable` result is the **Review failed** arm, never an exit), take the **REQUEST CHANGES** arm: return to **5b** with the same invocation, the same Remaining Work Status block and the same cycle accounting. **Otherwise** record the findings in the QA Cycle entry and the implementation report. **Do not block.** Signal `ready-for-merge`, carry the review into the acceptance commit (below; doc-only findings may be fixed there), exit the loop, proceed to Step 7. |
+| ✅ **APPROVE** | Signal `ready-for-merge`, carry the review into the acceptance commit (below; doc-only findings may be fixed there), exit the loop, proceed to Step 7. |
+| ❌ **Review failed** — `/review-pr` HALTed, could not resolve a PR, or errored; or the open-coverage check below printed `unreadable` | **Not a verdict, and not an exit.** Log it in the Issues Log, record `review failed` on the cycle's `**PR Review**` row, the gate and QA report are already committed by path 1 — do not commit again — and **HALT** naming the PR and the failure. Do **not** fall through to Step 7: 5c is the only exit, so a run that skips it silently finalises without the check this step exists to add. |
+
+**An open coverage finding sends a `CONCERNS` back to 5b** (task.238, obs #8). A coverage finding
+is, by `/review-pr`'s definition, a gap between the PR and what its work item promised — exactly
+what `/finalise`'s acceptance-criteria agent checks. Passed forward as non-blocking, it failed that
+check after a full four-agent DoD pass (task.201, task.184), and the run paid a HALT and a re-entry
+for a gap the loop had already named. Decide it mechanically, from the review report the cycle's
+`**PR Review**` row names:
+
+```bash
+REVIEW="{the PR review report this cycle's 5c wrote}"
+# open-coverage.js parses the report's Machine-Readable Findings block against the shape review-pr
+# emits and prints `unreadable` for anything it cannot place, so a shape it does not know is never
+# read as "no coverage" (task.240; the accepted shapes are listed in its header). An entry is open
+# coverage when its `category:` is `coverage` and its `provenance:` is not `pre-existing`.
+# The `case` below is the backstop: a reader that did not run leaves an empty value, and any value
+# that is not a count reads `unreadable` (task.238 bug.18).
+OPEN_COVERAGE=$(command node .agents/skills/{develop-story|develop-task}/references/open-coverage.js \
+  --file "$REVIEW" 2>/dev/null | sed -n 's/^OPEN_COVERAGE=//p')
+case "$OPEN_COVERAGE" in ''|*[!0-9]*) OPEN_COVERAGE=unreadable ;; esac
+echo "OPEN_COVERAGE=$OPEN_COVERAGE"
+```
+
+`OPEN_COVERAGE` above zero on a `CONCERNS` verdict → the REQUEST CHANGES arm. `unreadable` → the
+**Review failed** arm: the check could not look, so neither exit is decided, and HALT is the only
+arm that does not guess. Every coverage finding
+counts, whatever its severity and whatever its `ref` says: the `ref` is free-form, and no reliable
+reading of it says which ones name a criterion (task.238 § 3). `trail`, `scope` and `consistency`
+findings never route — they stay non-blocking, as before. `APPROVE` is unchanged: it carries only
+`severity: low` findings.
 
 > **Why the failure arm is spelled out.** A gate that reaches 5c from 5a (§5c routes 1, 2, 2b and 3) does so without entering 5b, so
 > it skips 5b step 5's mid-loop PR-state poll — which means a PR closed or merged underneath the run
@@ -1493,7 +1607,11 @@ by design at 5c (Step 8 owns it), and a fix that later fails a check is undone w
 `git checkout HEAD`. That command is safe only on a file that held no other work. A `ref` with no
 path (an `AC-n` id), a path outside the patterns, and a path that fails the second test are
 **recorded and not fixed**, exactly as before. A code change after the last QA cycle is what the loop
-exists to prevent. Classify on `CONCERNS` before touching anything.
+exists to prevent. Classify on `APPROVE` or `CONCERNS` before touching anything. The two verdicts
+differ in what is recorded, not in what may be fixed: an `APPROVE` carries only `severity: low`
+findings or none (`/review-pr`'s verdict table), a doc-only low finding is the cheapest fix the loop
+can make, and one left unfixed reaches `/finalise`, whose docs agent can only halt on it (task.237,
+observation #109 — task.179 halted at Step 7 on a one-word CHANGELOG fix its 5c `APPROVE` had found).
 
 **The eligible list is one record with one writer** (task.173 QA-3, consolidated):
 
@@ -1599,8 +1717,9 @@ report (`/review-pr` already staged it; staging again is a no-op) and each chang
 cleared, once it passes `doc-links.js`. A cleared path that fails the link check is restored to
 `HEAD`, which undoes only the 5c edit because the path was clean when cleared; its finding is
 recorded, not fixed. A path the classifier did **not** clear is a HALT and is left untouched: this
-block never discards work it cannot prove is its own. On `APPROVE`, or a `CONCERNS` with nothing
-doc-only, leave `CARRY_FIXED` empty: the block then only asserts the report is staged.
+block never discards work it cannot prove is its own. When the classify block cleared no path, or no
+fix changed a cleared path, leave `CARRY_FIXED` empty: the block then only asserts the report is
+staged.
 
 ```bash
 # INPUTS, bound in THIS block: the report, and every path the doc-only fixes changed (repo-relative).
@@ -1664,7 +1783,16 @@ therefore consumes a cycle it would not have consumed before, and can reach Loop
 run that previously exited clean. That is the gate working, not a regression — and the escalation
 path already exists.
 
-#### Invoking `/qa-fix` on a REQUEST CHANGES verdict
+#### Invoking `/qa-fix` on a REQUEST CHANGES verdict, or a CONCERNS with an open coverage finding
+
+Both arrive here and are handled identically: the same Remaining Work Status block, the same
+invocation with `pr_review=`, the same cycle accounting (5b's step 7 increments the counter). A
+coverage finding is often `medium` or `low`, and two things make sure it is worked rather than
+dropped: the findings ingester carries `severity` as-is (`qa-findings-ingester-prompt.md`), so it
+enters `/qa-fix`'s Findings Summary at its own severity, and `/qa-fix` Step 2 has a priority row for
+pr-review `coverage` findings **at any severity** (with the matching Step 1b sentence). Without that
+row a `medium` coverage finding had no place in the ladder, `/qa-fix` changed nothing, and 5b step
+0's no-change HALT fired on a gap that was real.
 
 **Remaining Work Status block (required, before re-entering 5b).** Emit the block with the
 position line `Steps 5–6/8 — QA LOOP ⏳ review requested changes, cycle {CYCLE}/5` before the
@@ -1710,7 +1838,8 @@ when in fact they were never delivered.
 
 #### Signal the `ready-for-merge` stage
 
-Only on **APPROVE** or **CONCERNS** — never on REQUEST CHANGES, which is still inside the loop.
+Only on **APPROVE** or a **CONCERNS** that exits — never on REQUEST CHANGES, or on a CONCERNS with
+an open coverage finding, both of which are still inside the loop.
 When `TRACKER_ISSUE` is set, branch on `TRACKER` — the same shape as the `changes-requested` signal
 in 5b, which has always covered both:
 
@@ -1884,6 +2013,9 @@ a contradiction to whoever picks it up.
 
 **Final gate status**: {status}
 **HIGH findings per cycle**: {HIGH_1}, {HIGH_2}, … {HIGH_N} — {flat from cycle {i} onward / still rising}
+                    {when the lock has convergence_from_cycle: {HIGH_1}, … {HIGH_b} | {HIGH_b+1}, … {HIGH_N} — grant at cycle {b}}
+{Convergence stall only:
+**Flat-count reading**: {stall | discovery} — {file}: {mechanism}[; {file}: {mechanism} …], cycle {N-1} vs cycle {N}}
 **Remaining issues** (from final gate file):
 {List each top_issue: description, severity, file (from the entry's `file:` key)}
 
@@ -1898,8 +2030,15 @@ infrastructure, acceptance criteria that cannot be met with current approach; on
 convergence stall, say which file the fixes kept circling and why patching it stopped
 working}
 
+**Third-strike files**: {the files the comparison the resumed 5b will run prints (filling rule 1)
+— struck, or one strike from the third-strike rule, as filling rule 1's table says — each with its
+mechanism read from its `finding:` texts — or "none"}
+
 **Recommended next steps**:
-1. {Specific action}
+1. {Specific action. For each third-strike file: delete, replace or waive the struck mechanism,
+   naming it — never a patch to it, which the resumed run refuses (filling rule 1). On a discovery
+   reading: say the earlier fixes held and this HIGH is new ground, so a grant buys new ground, not
+   another try at the same defect}
 2. {Specific action}
 3. {Specific action — e.g., update story if issues reflect out-of-scope requirements}
 ```
@@ -1920,6 +2059,9 @@ working}
 
 **Final gate status**: {status}
 **HIGH findings per cycle**: {HIGH_1}, {HIGH_2}, … {HIGH_N} — {flat from cycle {i} onward / still rising}
+                    {when the lock has convergence_from_cycle: {HIGH_1}, … {HIGH_b} | {HIGH_b+1}, … {HIGH_N} — grant at cycle {b}}
+{Convergence stall only:
+**Flat-count reading**: {stall | discovery} — {file}: {mechanism}[; {file}: {mechanism} …], cycle {N-1} vs cycle {N}}
 **Remaining issues** (from final gate file):
 {List each top_issue: description, severity, file (from the entry's `file:` key)}
 
@@ -1934,11 +2076,56 @@ infrastructure, success criteria that cannot be met with current approach; on a
 convergence stall, say which file the fixes kept circling and why patching it stopped
 working}
 
+**Third-strike files**: {the files the comparison the resumed 5b will run prints (filling rule 1)
+— struck, or one strike from the third-strike rule, as filling rule 1's table says — each with its
+mechanism read from its `finding:` texts — or "none"}
+
 **Recommended next steps**:
-1. {Specific action}
+1. {Specific action. For each third-strike file: delete, replace or waive the struck mechanism,
+   naming it — never a patch to it, which the resumed run refuses (filling rule 1). On a discovery
+   reading: say the earlier fixes held and this HIGH is new ground, so a grant buys new ground, not
+   another try at the same defect}
 2. {Specific action}
 3. {Specific action — e.g., update task if issues reflect out-of-scope requirements}
 ```
+
+#### Filling the escalation entry — rules both templates share
+
+A recommendation written at a halt must already obey the rules the resumed run will apply (obs #71).
+Three lines of the entry carry that, and each is filled from evidence on disk, not from memory:
+
+1. **Third-strike files — run the comparison the resumed 5b will run.** Use the `high_files()`
+   function under **Third-strike rule — replace, do not patch again** (above; do not copy it). Which
+   gates it compares depends on where the grant re-enters (`grant-qa-cycles.sh`'s `reenter_at=`):
+
+   | Halt | Re-enters at | The resumed 5b compares | Run now | List each file printed as |
+   | --- | --- | --- | --- | --- |
+   | Convergence stall | 5b | gates N-2, N-1, N | that rule's three-gate `comm -12` block | struck |
+   | Loop limit (either form) | 5a | gates N-1, N and the gate the resumed 5a writes | `comm -12 <(high_files "$GATE_N1") <(high_files "$GATE_N")` | one strike from the third-strike rule, or struck when the three-gate block also prints it |
+
+   A loop-limit grant reviews before it fixes, so the three-gate comparison over gates N-2..N is
+   not the one the run applies. A file that is HIGH in gates N-1 and N is struck the moment the
+   resumed review finds it again. A file HIGH in all three of N-2..N is in that set too, and it is
+   already struck. On a loop limit, run the three-gate block as well and list its files as struck.
+
+   For each file listed, name the mechanism from its `finding:` texts, as that rule already
+   requires, and make item 1 of *Recommended next steps* one of the rule's three permitted moves —
+   **delete**, **replace** or **waive** — for that mechanism. Never recommend a patch for it. On a
+   stall the resumed 5b forbids that move outright. On a loop limit, a patch the resumed review does
+   not accept puts the file on its third strike, and 5b then refuses the next patch. Either way the
+   escalation would be recommending a step the run will refuse (task.215, obs #71; task.239 bug.1).
+   Too few gates for the comparison, or no file printed: write "none".
+2. **Flat-count reading — Convergence stall only.** Compare each of cycle N's HIGH findings with
+   cycle N-1's gate. **Stall**: at least one of them repeats. Its `file:` is in the previous gate's
+   `high_files` output **and** its `finding:` names the same function or mechanism, or cites the
+   previous fix. Name that one in the entry; if several repeat, name each. **Discovery**: none
+   repeats. The earlier fixes held and the re-probe found something new (task.180, obs #19). The
+   `file:` overlap is the checkable half; the mechanism is the author's reading, recorded beside it.
+   Neither changes the trip: a person still decides. On a discovery reading, item 1 says the earlier
+   fixes held and that a grant buys new ground, not another try at the same defect.
+3. **HIGH findings per cycle — mark the grant boundary.** When the lock carries
+   `convergence_from_cycle`, list every cycle and put `|` after cycle `convergence_from_cycle - 1`,
+   so the reader sees which readings the trip counted.
 
 Set report status to `Escalated`. Invoke the `/commit-changes` skill to commit the implementation
 report — **and, on a convergence stall, this cycle's gate `.yml` and QA report `.md` alongside it**,
@@ -1978,8 +2165,9 @@ Options:
 2. Accept the current gate status: run Step 5c first (/review-pr --effort medium --comment
    --no-code), then /finalise — on a host with no review decision, finalise needs that report
 3. Update the story requirements if issues reflect unintended scope
-4. Re-run /develop-story to resume with more cycles — Phase 0b offers "Resume at 5a with {k}
-   more cycles"; any /qa-story you run by hand in between is counted from its gate on disk
+4. Re-run /develop-story to resume with more cycles — Phase 0b offers
+   "Resume the QA loop with {k} more cycles"; any /qa-story you run by hand in between is counted
+   from its gate on disk
 ```
 
 #### develop-task HALT message
@@ -2001,8 +2189,9 @@ Options:
 2. Accept the current gate status: run Step 5c first (/review-pr --effort medium --comment
    --no-code), then /finalise — on a host with no review decision, finalise needs that report
 3. Update the task requirements if issues reflect unintended scope
-4. Re-run /develop-task to resume with more cycles — Phase 0b offers "Resume at 5a with {k}
-   more cycles"; any /qa-task you run by hand in between is counted from its gate on disk
+4. Re-run /develop-task to resume with more cycles — Phase 0b offers
+   "Resume the QA loop with {k} more cycles"; any /qa-task you run by hand in between is counted
+   from its gate on disk
 ```
 
 > **Option 2 goes through 5c, not around it.** A loop that escalates never reaches Step 5c, so no

@@ -624,6 +624,8 @@ ITER=<current develop loop iteration, or 1 if not in an orchestrated loop>
 TEST_LOG=".claude/state/test-output-${ITER}-$(date +%s).log"
 <fastGateCommand> > "$TEST_LOG" 2>&1
 TEST_EXIT=$?
+echo "TEST_EXIT=$TEST_EXIT TEST_LOG=$TEST_LOG"
+[ "$TEST_EXIT" -eq 0 ] && rm -f "$TEST_LOG"   # a red log is never removed here
 ```
 
 `<fastGateCommand>` is `develop.fastGateCommand` from `skills-config.yaml` — the project's cheap
@@ -638,7 +640,9 @@ expensive enough to be reverted. The slow tier runs once, at `develop-next`'s me
 
 On non-zero exit, dispatch the Agent tool with `subagent_type="Explore"` using the prompt from `references/test-failure-triage-prompt.md` (substitute `<log_path>` with `$TEST_LOG`). Persist the triage result per the output contract in that file. Main reads only the returned triage summary (counts + ≤10 failure bullets + `next_file` hint).
 
-Log cleanup: `TEST_EXIT == 0` → `rm -f "$TEST_LOG"`; `TEST_EXIT != 0` → retain for post-mortem.
+Log cleanup is the block's last statement, keyed on the result: a red log is retained for
+post-mortem. Reading the result and removing the log are separate decisions — never batch a read
+of `$TEST_LOG` with a bare `rm -f "$TEST_LOG"` (task.238, obs #41).
 
 Three-strikes escalation (applied to the triage summary, not the raw log):
 
@@ -917,6 +921,11 @@ docs/tasks/
 - Update Implementation Plan checkboxes as phases complete
 - Update Files Summary section with all new/modified/deleted files
 - Update Success Criteria checkboxes when criteria are met
+- A criterion you cannot verify on this host (a missing shell, tool or service) is **unverified
+  locally**, never plain "unverified". Before writing it down, read the CI workflow files and say
+  whether CI runs the check, citing the file and line. "CI has no X" is a claim about the workflow,
+  so check it there and not on your machine. task.241 recorded "CI has no zsh lane" while
+  `test.yml` had installed zsh for three weeks, and two QA cycles repeated it (obs #119)
 - Never modify QA-created files (QA reports)
 - Update bug report files when fixing bugs (Investigation, Fix Implementation sections)
 

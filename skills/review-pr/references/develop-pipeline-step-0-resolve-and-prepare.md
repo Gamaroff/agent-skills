@@ -131,11 +131,12 @@ LOCAL_PATH=$(echo "$DOC_URL" | sed 's|https://github\.com/[^/]*/[^/]*/blob/[^/]*
 
 ### Key → document lookup
 
-The one lookup from a tracker key to its work-item document. `develop-story`, `develop-task` and
-`/review-pr` all run it from here; do not restate the grep at a call site.
+The one lookup from a key — a tracker key, an issue number or a PR number — to its work-item
+document. `develop-story`, `develop-task`, `/review-pr`, `review-task` and `review-story` all run it
+from here; do not restate the grep at a call site.
 
 ```bash
-# KEY_FIELD: jira_key | github_issue.  KEY_VALUE: the Jira key or the issue number.
+# KEY_FIELD: jira_key | github_issue | pr_number.  KEY_VALUE: the Jira key, the issue number or the PR number.
 # Anchored at both ends, so PROJ-70 does not match PROJ-702 and issue 5 does not match 55.
 # Quote-tolerant: jira_key is written quoted ('PROJ-702' or "PROJ-702") in most consumer docs.
 # Recursive grep, not a docs/**/ glob — ** needs globstar in bash and matches one level without it.
@@ -145,7 +146,7 @@ The one lookup from a tracker key to its work-item document. `develop-story`, `d
 # finalise's sprint-review summary is dropped, because artifacts copy the item's key. Only the
 # basename is read, so a directory such as epic.1.4.qa.tools/ excludes nothing.
 # An empty KEY_VALUE would match every blank key field, so both inputs must be bound.
-: "${KEY_FIELD:?bind KEY_FIELD (jira_key or github_issue)}" "${KEY_VALUE:?bind KEY_VALUE (the key or issue number)}"
+: "${KEY_FIELD:?bind KEY_FIELD (jira_key, github_issue or pr_number)}" "${KEY_VALUE:?bind KEY_VALUE (the key, issue number or PR number)}"
 # A missing or unreadable docs/ (the wrong cwd) is its own HALT, never "no document has this key".
 [ -d docs ] && [ -r docs ] || { DOC_STATUS=unreadable; echo "HALT: docs/ not found or unreadable in $(pwd) — run from the repository root"; exit 1; }
 DOC_MATCHES=$(grep -rlE "^${KEY_FIELD}:[[:space:]]*['\"]?${KEY_VALUE}['\"]?[[:space:]]*$" docs/ 2>/dev/null \
@@ -620,6 +621,34 @@ Store `ALWAYS_LOAD_FILES` as a pipeline-wide variable — it is consumed in Step
 
 ---
 
+## 0c-wire. Resolve Wireframe Nodes to Components
+
+On every fresh run, before the gate below: a fresh run's wireframe answers start empty. A file left
+by an earlier run that never reached Step 2 would otherwise be written into this document there,
+even when this run skips 0c-wire because the feature is now off or the block was removed. A resume
+skips Phase 0, and keeps its own.
+
+```bash
+rm -f .claude/state/wireframe-answers.json
+```
+
+Then, only when `skills-config.yaml` sets `ui.wireframeMap` **and** the document holds a ` ```wireloom ` block; otherwise set `WIREFRAME_OPEN=[]` and skip silently. This section is identical for both orchestrators, and is the develop-time half of [`wireframe-component-mapping.md`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/wireframe-component-mapping.md).
+
+```bash
+# The first Phase 0 write under .claude/state: no earlier block has created it.
+mkdir -p .claude/state
+command node .agents/skills/{develop-story|develop-task}/references/wireframe-map.js resolve {document-file} --json \
+  > .claude/state/wireframe-map.json
+```
+
+1. `resolve` only. **Phase 0 writes no tracked file**: Step 1's `/create-branch` refuses a tree with any uncommitted file other than the implementation report, so a catalogue, map or document edit made here would halt the run before its branch exists. `resolve` reads a missing map as no confirmed links (`mapState: missing`, every node open). The mapping procedure's `ensure` and `record` run once the branch and the lock exist, before the review reads the document ([Step 2 § Wireframe writes](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/develop-pipeline-step-2-review.md#wireframe-writes-before-the-gate-check)).
+2. Drop from `unresolved[]` every node the document's own component table already settles: the author answered it at `create-story` / `create-task` time. What remains is `WIREFRAME_OPEN`.
+3. For each node in `WIREFRAME_OPEN`, prepare the proposal the mapping procedure's step 4 describes (design source, catalogue, candidates). Nothing is written to the map or the document yet.
+
+`WIREFRAME_OPEN` feeds 0d. Step 3 builds from the document's component table, which Step 2 completes with 0d's answers.
+
+---
+
 ## 0d. Upfront Setup — Gather All Decisions Before Execution
 
 Check the current branch:
@@ -718,6 +747,8 @@ If the user selects "Other" for Q1 or Q2, follow up with a plain text request fo
 
 **No Q3** — qa-planning skip is silent (see paragraph above).
 
+**Wireframe questions** (only when `WIREFRAME_OPEN` from 0c-wire is non-empty). One question per open node, or per group of nodes that share a signature and label pattern, built as the mapping procedure's step 5 sets out, with the proposal as **(Recommended)**. `--defaults` answers them all with their Recommended option and logs each as an assumption — never as a confirmation. `AskUserQuestion` takes at most four questions per call: put as many as fit beside Q1/Q2 in the one call, and the rest in follow-up calls straight after it, still before Step 1. After asking, hold the answers in `.claude/state/wireframe-answers.json` as `{"document": "{document-file}", "answers": [...]}`, one entry per node: its signature, component, variant, label pattern if any, and whether it was confirmed or assumed. Do not write them to the document or the map yet. `.claude/state` is ignored, so the tree stays clean for Step 1, and Step 2 writes them once the branch and the lock exist ([Step 2 § Wireframe writes](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/develop-pipeline-step-2-review.md#wireframe-writes-before-the-gate-check)).
+
 ### Answer resolution — ask only what nothing answers
 
 Every answer resolves in one order: **flag → consumer policy → derived recommendation → ask**
@@ -791,7 +822,7 @@ Log one Decisions Log line per answer: `{question}: {value} — source: {flag|po
 | `develop-story` | Q1 (branch base) + Q2 (PR target), minus every one the resolver answered | **`questions[]`** |
 | `develop-task`  | Q1 (branch base) + Q2 (PR target), minus every one the resolver answered | **`questions[]`** |
 
-With no flags and no policy that is **2**, exactly as before. `--defaults` with nothing in conflict is **0** — skip the `AskUserQuestion` call entirely. Resume cases skip any question the lock's `answers` settles (a legacy lock: any already recorded in the Decisions Log) — typical resume: 0 questions.
+Plus one wireframe question per open node group from 0c-wire — **0** when `ui.wireframeMap` is unset, the document has no wireframe, or every node is settled; those go in the same call while it has room, then in follow-up calls. With no flags, no policy and no open wireframe node that is **2**, exactly as before. `--defaults` with nothing in conflict is **0** — skip the `AskUserQuestion` call entirely. Resume cases skip any question the lock's `answers` settles (a legacy lock: any already recorded in the Decisions Log) — typical resume: 0 questions.
 
 If your count does not match the required count for the detected scenario, fix the call before invoking the tool. Do NOT invent additional questions ("Run mode?", "Auto-continue?", etc.) — pipeline mode is autonomous (lite-mode detection runs in 0a-parallel Agent 3) and any other policy comes from `references/develop-pipeline-autonomous-defaults.md`. Adding undocumented questions causes UX drift and may suppress the documented ones (observed regression in live-github-test).
 

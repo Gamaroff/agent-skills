@@ -1,0 +1,114 @@
+[
+  {
+    "id": "oc8-category-block-scalar",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "cycle 8, the allow-list's key line: `category: >-` with `coverage` on the next line is valid YAML whose category is coverage; reading the indicator as the value counts a categorised non-coverage entry and prints 0",
+    "correct": "unreadable (or 1), never 0",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  - id: PC-1\n    category: >-\n      coverage\n    severity: medium\n    finding: criterion 3 is not met\n```\n\n## Next\n"
+      }
+    },
+    "expected": { "stdout": "OPEN_COVERAGE=unreadable\n" }
+  },
+  {
+    "id": "oc8-category-tagged",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "cycle 8: `category: !!str coverage` is valid YAML whose value is coverage",
+    "correct": "unreadable (or 1), never 0",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  - id: PC-1\n    category: !!str coverage\n    severity: medium\n    finding: criterion 3 is not met\n```\n\n## Next\n"
+      }
+    },
+    "expected": { "stdout": "OPEN_COVERAGE=unreadable\n" }
+  },
+  {
+    "id": "oc8-category-anchor",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "cycle 8: `category: &c coverage` is valid YAML whose value is coverage",
+    "correct": "unreadable (or 1), never 0",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  - id: PC-1\n    category: &c coverage\n    severity: medium\n    finding: criterion 3 is not met\n```\n\n## Next\n"
+      }
+    },
+    "expected": { "stdout": "OPEN_COVERAGE=unreadable\n" }
+  },
+  {
+    "id": "oc8-provenance-continued",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "cycle 8: a plain scalar continued on a deeper line makes provenance `pre-existing on the base only`, not `pre-existing`; the deeper line is skipped as text, so the entry is exempted",
+    "correct": "1 (or unreadable)",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  - id: PC-1\n    category: coverage\n    provenance: pre-existing\n      on the base only\n    severity: medium\n    finding: criterion 3 is not met\n```\n\n## Next\n"
+      }
+    },
+    "expected": { "stdout": "OPEN_COVERAGE=1\n" }
+  },
+  {
+    "id": "oc8-flow-unclosed-comment",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "cycle 8: `#` after a space inside a flow mapping starts a comment that swallows the closing brace, so the entry is malformed; the flow tokeniser reads `coverage #x` as the category value and prints 0",
+    "correct": "unreadable",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: g.yml\nfindings:\n  - {id: PC-1, category: coverage #x}\n```\n\n## Next\n"
+      }
+    },
+    "expected": { "stdout": "OPEN_COVERAGE=unreadable\n" }
+  },
+  {
+    "id": "oc8-crlf",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "cycle 8: a report written with CRLF line endings must still count its coverage entry",
+    "correct": "1",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\r\n\r\n## Machine-Readable Findings\r\n\r\n```yaml\r\nreviewed_gate: g.yml\r\nfindings:\r\n  - id: PC-1\r\n    category: coverage\r\n    severity: medium\r\n    finding: criterion 3 is not met\r\n```\r\n\r\n## Next\r\n"
+      }
+    },
+    "expected": { "stdout": "OPEN_COVERAGE=1\n" }
+  },
+  {
+    "id": "oc8-review-pr-template",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "legitimate",
+    "why": "control: review-pr's documented block shape, one coverage entry exempted as pre-existing and one trail entry",
+    "correct": "0",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: task.1.gate.3.x.yml\nfindings:\n  # one entry per rendered finding, conformance first then code\n  - id: PC-1\n    category: coverage\n    severity: medium\n    confidence: high\n    ref: \"SC-3\"\n    provenance: pre-existing\n    anchor_check: no-line\n    finding: criterion 3 was already unmet on the base\n    suggested_action: file a follow-up\n  - id: PC-2\n    category: trail\n    severity: low\n    confidence: high\n    ref: \"report\"\n    anchor_check: no-line\n    finding: a row is missing\n    suggested_action: add it\ntruncated_count: 2\n```\n\n## Recommended Actions\n"
+      }
+    },
+    "expected": { "stdout": "OPEN_COVERAGE=0\n" }
+  },
+  {
+    "id": "oc8-review-pr-template-open",
+    "sink": "filename",
+    "input": "r.md",
+    "direction": "hostile",
+    "why": "control: review-pr's documented block shape with one open coverage entry and a quoted ref that names provenance",
+    "correct": "1",
+    "fixture": {
+      "files": {
+        "r.md": "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: task.1.gate.3.x.yml\nfindings:\n  - id: PC-1\n    category: coverage\n    severity: medium\n    confidence: high\n    ref: \"provenance: pre-existing\"\n    anchor_check: no-line\n    finding: criterion 3 is not met\n    suggested_action: meet it\ntruncated_count: 1\n```\n\n## Recommended Actions\n"
+      }
+    },
+    "expected": { "stdout": "OPEN_COVERAGE=1\n" }
+  }
+]

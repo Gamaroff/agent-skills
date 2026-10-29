@@ -1,0 +1,83 @@
+schema: 2
+task: 'task.240.open-coverage-fail-closed-reader'
+task_title: 'Fail-closed reader for the 5c open-coverage check'
+gate: CONCERNS
+status_reason: 'Cycle 1 fix verified (BUG-1 closed; M5 and M6 re-proven covered; corpus 0 changes; CI green). The refute pass found one in-scope false 0: a quoted value opened on the line after an empty value hides a key-indent line, the bug.1 trap one line lower (BUG-2).'
+reviewer: 'QA Engineer'
+head: 'a98f54701983d9c1c64db2b80497d0b5f6bd0415'
+updated: '2026-10-28T14:56:14Z'
+
+top_issues:
+  - id: 'TASK-240-QA-2'
+    severity: medium
+    file: 'shared/resources/open-coverage.js'
+    finding: 'After an empty non-deciding value (finding:), deeper lines are text with no quote tracking, so a quoted scalar opened on the next line hides a key-indent `provenance: pre-existing` that YAML reads as quoted text; the reader prints 0, PyYAML reads 1 (reproduced; CR-1; re-rated high -> medium: shape in 0/187 tracked reports and no writer or template emits it; confidence high unchanged; bug report task.240.bug.2.quoted-value-after-empty-value-hides-key.md).'
+    suggested_action: 'After an empty value, track a deeper line that opens with a quote by the cycle-1 rule (runs to its closing quote; refused if still open at the key indent or at end of block), refuse a deeper flow-collection opener, and add a parity row for the shape.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 168
+  phases_verified: 4/4
+  trace:
+    phases_covered: [0, 1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: internal — shared/resources/open-coverage.js#countOpenCoverage reads the review-pr report (a pipeline-written artefact); no corpus sink models it (markdown-structure models the implementation report). The reader parses text only: no eval, no shell, no file write; values are compared, never executed.'
+  performance:
+    status: PASS
+    notes: 'SC-5: one command node call at 5c, held by the parity assertion; the reader is a single linear pass over the block.'
+  reliability:
+    status: CONCERNS
+    notes: 'BUG-2: a contrived but valid YAML shape reads a false 0. BUG-1 fixed and verified.'
+  maintainability:
+    status: PASS
+    notes: 'One quoted-text scanner (quoted()) now serves the one-line and wrapped paths; every refusal reason is reachable and tested.'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-240-QA-2 (BUG-2) and add a parity row for a quoted value opened after an empty value.'
+      refs: ['shared/resources/open-coverage.js', 'evals/shared/tests/pr-review-loop-parity.test.mjs']
+  future:
+    - action: 'CR-2 (cycle 2): a flow key with no space after the colon (`{category:coverage}`) reads 1 where YAML reads no category; identical on the base awk, 0 corpus hits.'
+      refs: ['shared/resources/open-coverage.js']
+      provenance: pre-existing
+    - action: 'CR-3 (cycle 2): entry keys compare case-blind (`Provenance: pre-existing` exempts, `Category: coverage` counts) where YAML keys are case-sensitive; identical on the base awk, 0 corpus hits. Decide: refuse a case-variant deciding key, or document case-blind keys.'
+      refs: ['shared/resources/open-coverage.js']
+      provenance: pre-existing
+    - action: 'CR-4 (cycle 2): a comment line inside a wrapped plain value, followed by more wrapped text, reads a count where YAML raises a parse error; identical on the base awk.'
+      refs: ['shared/resources/open-coverage.js']
+      provenance: pre-existing
+    - action: 'CR-5 (cycle 2): the 5c block discards the reader stderr, so a broken reader and a refused report both halt as unreadable with no reason; echo the reason beside the value.'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'CR-6 (cycle 2): a differential test against a real YAML parser would let the suite contradict the reader on shapes nobody listed.'
+      refs: ['shared/resources/tests/open-coverage.test.mjs']
+    - action: 'Cycle 1 CR-2: pin the per-file corpus results (a file -> value snapshot).'
+      refs: ['shared/resources/tests/open-coverage.test.mjs']
+    - action: 'Cycle 1 CR-3: give a non-Refusal exception its own reason (internal-error).'
+      refs: ['shared/resources/open-coverage.js']
+    - action: 'Step 4b could not execute the changed 5c block: qa-execute-snippets refuses `command node` (unrecognised-command, fail-closed). The parity suite runs that block under bash and zsh (CI green on a98f5470).'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 1
+  fix_date: '2026-10-28'
+  total_iterations: 1
+  verification_method: 'Reproduction fixtures re-run (0 / 1 / unreadable as expected); M5 and M6 re-proven covered in a scratch worktree; corpus diff 0 changes.'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-240-QA-2 fixed']

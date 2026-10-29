@@ -1,0 +1,96 @@
+[
+  {
+    "id": "pr-repo-option",
+    "sink": "shell-exec",
+    "input": "--repo=evil/other",
+    "direction": "hostile",
+    "why": "an option-shaped PR value redirects gh pr view to another repository",
+    "correct": "usage error before any gh call",
+    "expected": {
+      "exit": 2,
+      "stdout": "",
+      "stderr": "qa-ci-read: --pr must be a PR number\n"
+    }
+  },
+  {
+    "id": "pr-leading-dash",
+    "sink": "shell-exec",
+    "input": "-1",
+    "direction": "hostile",
+    "why": "option-shaped",
+    "correct": "usage error",
+    "expected": {
+      "exit": 2,
+      "stdout": "",
+      "stderr": "qa-ci-read: --pr must be a PR number\n"
+    }
+  },
+  {
+    "id": "pr-number-then-option",
+    "sink": "shell-exec",
+    "input": "768 --repo=evil/other",
+    "direction": "hostile",
+    "why": "composition: a valid number followed by an option in one argument",
+    "correct": "usage error",
+    "expected": {
+      "exit": 2,
+      "stdout": "",
+      "stderr": "qa-ci-read: --pr must be a PR number\n"
+    }
+  },
+  {
+    "id": "pr-path-traversal",
+    "sink": "shell-exec",
+    "input": "768/../../pipelines",
+    "direction": "hostile",
+    "why": "on Bitbucket the value is a URL path segment (pullrequests/$PR)",
+    "correct": "usage error",
+    "expected": {
+      "exit": 2,
+      "stdout": "",
+      "stderr": "qa-ci-read: --pr must be a PR number\n"
+    }
+  },
+  {
+    "id": "pr-fullwidth-digits",
+    "sink": "shell-exec",
+    "input": "７６８",
+    "direction": "hostile",
+    "why": "alternative spelling: non-ASCII digits against a [0-9] glob",
+    "correct": "usage error",
+    "expected": {
+      "exit": 2,
+      "stdout": "",
+      "stderr": "qa-ci-read: --pr must be a PR number\n"
+    }
+  },
+  {
+    "id": "pr-empty",
+    "sink": "shell-exec",
+    "input": "",
+    "direction": "hostile",
+    "why": "the unparseable case: an unsubstituted or empty PR number",
+    "correct": "usage error",
+    "expected": {
+      "exit": 2,
+      "stdout": "",
+      "stderr": "qa-ci-read: --pr must be a PR number\n"
+    }
+  },
+  {
+    "id": "pr-number",
+    "sink": "shell-exec",
+    "input": "768",
+    "direction": "legitimate",
+    "why": "an ordinary PR number",
+    "correct": "a reading (exit 0; UNKNOWN under the fake gh)"
+  },
+  {
+    "id": "pr-one",
+    "sink": "shell-exec",
+    "input": "1",
+    "direction": "legitimate",
+    "why": "a single-digit PR number",
+    "correct": "a reading (exit 0)"
+  }
+]

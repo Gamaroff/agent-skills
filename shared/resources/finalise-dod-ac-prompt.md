@@ -1,17 +1,30 @@
 ---
 name: finalise-dod-ac-prompt
-description: Explore subagent prompt for AC traceability, PR status, and documentation check in /finalise DoD parallel dispatch. Substitute <STORY_FILE>, <PR_NUMBER>, <STORY_TYPE>, and <DIFF_FILE> before dispatching.
+description: Explore subagent prompt for AC traceability, PR status, and documentation check in /finalise DoD parallel dispatch. Substitute <STORY_FILE>, <PR_NUMBER>, <STORY_TYPE>, <DIFF_FILE>, and <RERUN_SCOPE> before dispatching.
 ---
 
 # AC Traceability Check — Explore Subagent Prompt
 
-**Usage**: Dispatch as an Explore subagent from `/finalise` Steps 3–5 parallel dispatch. Substitute `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`, and `<DIFF_FILE>` before sending.
+**Usage**: Dispatch as an Explore subagent from `/finalise` Steps 3–5 parallel dispatch. Substitute `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`, `<DIFF_FILE>`, and `<RERUN_SCOPE>` before sending.
 
 ---
 
 ## Instructions
 
 You are a read-only verification agent. Check AC traceability, PR review status, and documentation updates for the story/task being finalised.
+
+### Step 0: Read the re-run scope
+
+The caller computed this run's scope from the previous run's record (`finalise-rerun-scope.js scope`):
+
+```
+<RERUN_SCOPE>
+```
+
+- **Use the ids it lists as `ac_id`, quoted exactly** (`ac_id: "#2"` — unquoted, a `#` starts a YAML comment). It lists them in every mode. A verdict under any other id is not merged.
+- **`mode: full`**: judge every criterion, exactly as Step 3 says.
+- **`mode: scoped`**: judge only the criteria under **Re-judge**, by Step 3's rules. For a `reported-gap` entry that lists members, re-check the members it names under `re-check members` and any member whose evidence moved since the prior head; return every member you judged in `members`. A `re-check members` entry you do not return counts as `FAIL`, and so does a re-judged criterion you do not return. When the criterion fails for a reason that is not a member (the execution rule, a test that does not cover it), state that reason in `non_member_fail`: the caller reads that field, never your `note`. A `FAIL` that sets it, or that names no failing member, stands whatever the members say; without it, a `FAIL` whose failing members are all carried or new on unchanged evidence is overturned. An entry that shows `prior non-member FAIL` names the reason the previous run gave: check whether it still holds. Copy each **Carry** criterion through unchanged.
+- **A problem you notice outside your scope** — in a carried criterion, a carried member, or a member no earlier run named whose evidence has not changed — goes in `advisories` with its evidence. It is reported to the reader and does not fail the run. The caller restores every carried verdict whatever you return, so an advisory is the only place such a finding is kept.
 
 ### Step 1: Read the story/task file
 
@@ -35,7 +48,7 @@ For each AC item extracted in Step 1:
 3. Also search for a test file (`.spec.ts`, `.test.ts`, `.spec.js`) that covers the AC — grep for the same key terms.
 4. **Citation rule**: A `PASS` requires BOTH a non-null `code_citation` AND a non-null `test_citation`. Missing either → `FAIL`. No exceptions.
 5. **Execution rule**: the cited test must actually run in a lane that gates this change. A test that exists but never executes on the PR is not evidence — it is a citation. Determine the lane from the test's path and the project's CI config (e.g. a `paths-ignore`d job, a suite excluded by the runner's default scope, a directory the per-PR job does not select). If the cited test does not run per-PR, set `status: FAIL` and name the lane in `note`, even though the file exists.
-6. **Quantifier rule**: a criterion over a set ("each test", "every file", "all call sites") is checked member by member. List the members from `<DIFF_FILE>`, map each one to its evidence, and put every unmapped member in `note`. `PASS` only when that list is empty. Evidence that some members are covered proves "at least one", not "each".
+6. **Quantifier rule**: a criterion over a set ("each test", "every file", "all call sites") is checked member by member. List the members from `<DIFF_FILE>`, map each one to its evidence, and put every unmapped member in `note`. `PASS` only when that list is empty. Return the list as `members` (each `member`, `evidence`, `status`), so a re-run can carry the mapped ones. Evidence that some members are covered proves "at least one", not "each".
 
 ⚠️ **A ticked AC checkbox is a claim, not evidence.** Verify against the diff and the test lane; never treat the story's own checkbox as satisfying either rule. Both failure modes below have occurred and neither was caught by the checkbox:
 
@@ -63,7 +76,7 @@ Based on `<STORY_TYPE>`:
 - **api / backend**: Is there an updated OpenAPI/Swagger spec, or API docs file? Search for `.yaml`/`.json` files with `paths:` or `swagger:` content, or `docs/api/`.
 - **ui / frontend**: Are there updated screenshots or user guide markdown files in `docs/`?
 - **data**: Is schema documentation updated? Search `docs/` for ERD or schema doc mentions.
-- **refactoring / task**: Are any README or skill files updated where behaviour changed? Check `CHANGELOG.md` for an entry matching this story/task.
+- **refactoring / task**: Are any README or skill files updated where behaviour changed? Do not read `CHANGELOG.md` for this: the changelog entry is agent 4's check (`finalise-dod-docs-prompt.md`), which runs only when the project opts in (`changelog.enforce`, task.241). A criterion of the work item's own that names the changelog is still checked above, as a documentation criterion.
 
 If no documentation update is required for the story type (e.g. pure internal refactor): mark `NOT_APPLICABLE` with a note citing the reason from the story file.
 
@@ -86,12 +99,20 @@ ac_traceability:
       code_citation: "path/to/file.ts:NN"   # null if not found
       test_citation: "path/to/file.spec.ts:NN"  # null if not found, or "NOT_APPLICABLE: reason"
       test_runs_per_pr: true | false | null     # false → status must be FAIL; name the lane in note. null only when test_citation is NOT_APPLICABLE
+      members:                                  # required when the quantifier rule applies; omit otherwise
+        - member: "the member's name, as you listed it"
+          evidence: "path/to/file.spec.ts:NN"   # null if unmapped
+          status: PASS | FAIL
+      non_member_fail: "reason"                 # only on a FAIL whose reason is not a member; omit otherwise
       note: "optional explanation"
   docs:
     - item: "description of doc item"
       status: PASS | FAIL | NOT_APPLICABLE
       citation: "path/to/file.md:NN"   # null if not found
       note: "optional, required if NOT_APPLICABLE"
+  advisories:                                   # findings outside the Step 0 scope; [] when none
+    - ac_id: "SC-1"
+      note: "what you saw, with its evidence"
   overall: PASS | FAIL | PARTIAL
   summary: "one-line summary of AC traceability results"
 ```

@@ -1,0 +1,76 @@
+schema: 2
+task: 'task.238.qa-loop-acts-on-signals-it-has'
+task_title: 'QA loop acts on the signals it already has'
+gate: CONCERNS
+status_reason: 'The cycle 7 fixes are verified at a2a41ca1: bug.15, bug.16 and PRB7-1 are closed, each held by a committed test that QA mutation-proved, and the fast gate and PR CI are green. One MEDIUM remains in the same 5c open-coverage check: its new allow-list checks line shapes but not value shapes, so a tagged, anchored or block-scalar category, a continued provenance value and a malformed flow entry read 0. The reviewer and the probe engine (5 cases) found it independently (CR8-1, bug.17).'
+reviewer: 'QA Engineer'
+head: 'a2a41ca15e691b8993023e85227bb694ea7b7e87'
+updated: '2026-10-28T07:28:27Z'
+
+top_issues:
+  - id: 'TASK-238-CR8-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'The 5c open-coverage check (:1551) allow-lists line shapes but not values: key() reads any non-empty category value as a readable category and any provenance: pre-existing as an exemption. A block-scalar, tagged or anchored category: coverage, a provenance value continued on a deeper line, and a flow value carrying " #" each print OPEN_COVERAGE=0 instead of unreadable, which falsifies the check''s own "never read as no coverage" claim and the CHANGELOG entry. Reviewer CR-1 (medium, medium confidence, reproduced by running the awk); probe cases oc8-category-block-scalar, oc8-category-tagged, oc8-category-anchor, oc8-provenance-continued and oc8-flow-unclosed-comment reproduced. Measured plausibility: 0 of 183 tracked PR review reports use such a value; review-pr emits plain scalars. bug.17'
+    suggested_action: 'Allow-list values too: a category outside review-pr''s emitted tokens prints unreadable, a deeper line directly after a category: or provenance: key prints unreadable, and a flow plain value containing " #" prints unreadable; add the five probe cases to the open-coverage fixtures and correct the CHANGELOG claim if any shape stays unread.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 6521
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 81
+    escaped: 0
+    notes: 'task.238.qa.8.security.run.json: open-coverage-check 24/24, log-test-paths 25/25 (PRB7-1 case now attributable), log-signal-8 7/7 and exit-argument 13/13 engage. open-coverage-shapes-7: oc-provenance-in-free-text and the control pass; oc-bare-dash-item and oc-flow-sequence-next-line now print unreadable, the outcome bug.16 accepts (their cases expect 1). open-coverage-shapes-8: 5 of 7 hostile cases reproduced (CR8-1); the review-pr-template control and its open variant pass.'
+  performance:
+    status: PASS
+    notes: 'Unchanged since gate 7: the fast-gate classifier reads one log with one awk and runs nothing a second time.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR7-4 is carried, not fixed: the background read keys on the last GATE_EXIT line but the removal on any GATE_EXIT=0 line (advisory, recommendations.future).'
+  maintainability:
+    status: PASS
+    notes: 'QA mutated both cycle 7 guards in a scratch worktree (key reading on deeper lines; the signal sentence counted anywhere); each turned its predicted committed test red.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR8-1 (MEDIUM, bug.17): allow-list the open-coverage check''s values, not only its lines'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+  future:
+    - action: 'The open-coverage awk has drawn findings in gates 1, 4, 7 and 8 and in DoD 1 (bug.1, bug.8, the quoted-category gap, bug.15, bug.16, bug.17), each a further YAML shape. A structural alternative to another patch: parse the Machine-Readable Findings block with a real YAML parser in a bundled script, or narrow the check to review-pr''s emitted shape and print unreadable for everything else'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'CR7-3 (medium confidence): the CI read marks a head failure pre-existing whenever the same-named base job is red for any reason'
+      refs: ['shared/resources/qa-ci-read.sh']
+    - action: 'CR7-4 (low, medium confidence, reproduced at gate 7): key the background-read log removal on the GATE_EXIT value read, not on any GATE_EXIT=0 line'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md', 'shared/resources/develop-pipeline-step-3-develop-loop.md']
+    - action: 'CR7-6 (cleanup): Bitbucket head pipeline beyond the 50 newest reads CI_STATE=NONE'
+      refs: ['shared/resources/qa-ci-read.sh']
+    - action: 'Carried from gate 6: CR6-3 (gh run list --event push), CR6-5 (open-coverage awk on a truncated block), CR6-7 (Bitbucket PR lookup HTTP status)'
+      refs: ['shared/resources/qa-ci-read.sh', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'skills/qa-task/SKILL.md']
+    - action: 'Structured pre-existing comparison for the fast gate (task Deferred Work)'
+      refs: ['shared/resources/fast-gate-outcome.sh']
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_verified: ['task.238.bug.15', 'task.238.bug.16']
+  bugs_opened: ['task.238.bug.17']
+  fix_date: '2026-10-28'
+  verification_method: 'Committed regression tests (each red against ad6fef33 per qa-fix 7), 2 QA mutations each red, probe engine re-run (81 cases)'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['bug.17 fixed, or accepted as deferred work']

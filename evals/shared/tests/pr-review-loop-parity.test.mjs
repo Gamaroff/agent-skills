@@ -25,9 +25,25 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
+import { extractBlocks } from "../../../shared/resources/qa-execute-snippets.mjs";
+
+const { countOpenCoverage } = createRequire(import.meta.url)(
+  "../../../shared/resources/open-coverage.js",
+);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..", "..", "..");
@@ -678,16 +694,41 @@ test("each 5c verdict maps to ONE destination, read off its own row", () => {
     "REQUEST CHANGES is still inside the loop — it must not exit, and must not re-enter at 5a",
   );
 
-  for (const v of ["APPROVE", "CONCERNS"]) {
-    const a = verdictRow(v);
-    assert.match(a, /exit the loop/, `${v} must exit the loop`);
-    assert.match(a, /Step 7/, `${v} must proceed to Step 7`);
-    assert.doesNotMatch(
-      a,
-      /Return to \*\*5[ab]\*\*/,
-      `${v} is terminal for the loop — it must not route back into 5a or 5b`,
-    );
-  }
+  const approve = verdictRow("APPROVE");
+  assert.match(approve, /exit the loop/, "APPROVE must exit the loop");
+  assert.match(approve, /Step 7/, "APPROVE must proceed to Step 7");
+  assert.doesNotMatch(
+    approve,
+    /[Rr]eturn to \*\*5[ab]\*\*/,
+    "APPROVE is terminal for the loop — it must not route back into 5a or 5b",
+  );
+
+  // CONCERNS is conditional since task.238: an open coverage finding takes the REQUEST CHANGES arm
+  // (back to 5b, never 5a); otherwise it exits. Both halves are read off the one row, in order — the
+  // condition first, then the exit it overrides.
+  const concerns = verdictRow("CONCERNS");
+  const cond = concerns.search(/open `category: coverage` entry/);
+  const back = concerns.search(/return to \*\*5b\*\*/);
+  const otherwise = concerns.search(/\*\*Otherwise\*\*/);
+  const exits = concerns.search(/exit the loop, proceed to Step 7/);
+  assert.ok(
+    cond > -1,
+    "the CONCERNS row must name the open-coverage condition",
+  );
+  assert.ok(back > cond, "an open coverage finding must return the run to 5b");
+  assert.ok(
+    otherwise > back,
+    "the exit must be the condition's OTHERWISE branch",
+  );
+  assert.ok(
+    exits > otherwise,
+    "a CONCERNS without an open coverage finding must still exit to Step 7",
+  );
+  assert.doesNotMatch(
+    concerns,
+    /[Rr]eturn to \*\*5a\*\*/,
+    "the coverage route re-enters 5b, never 5a",
+  );
 
   const failed = verdictRow("Review failed");
   assert.match(failed, /\bHALT\b/, "the failure arm must HALT");
@@ -741,33 +782,596 @@ test("REQUEST CHANGES returns to 5b and consumes a shared cycle", () => {
   );
   assert.match(
     s5c,
+    /#### Invoking `\/qa-fix` on a REQUEST CHANGES verdict, or a CONCERNS with an open coverage finding\n/,
+    "the invocation block serves the coverage route too (task.238) — its heading says so",
+  );
+  assert.match(
+    s5c,
     /re-enters 5b, not 5a/i,
     "entering at 5a would re-run QA against an unchanged tree",
   );
 });
 
-test("APPROVE and CONCERNS exit the loop, and CONCERNS does not block", () => {
-  const s5c = section5c();
+test("APPROVE exits; CONCERNS exits unless an open coverage finding sends it to 5b (task.238)", () => {
   // The APPROVE row's wording is unchanged from the original 5c section, so asserting it alone
-  // pins nothing this cycle fixed. Assert the CONCERNS semantics instead, which is the one of the
-  // three verdicts whose behaviour is easy to get wrong (it exits WITHOUT blocking).
-  // Task 89: read off the APPROVE row's own action cell, not "APPROVE somewhere, then an exit
-  // phrase somewhere later in the row" — same class as the two above.
+  // pins nothing. CONCERNS is the verdict whose behaviour is easy to get wrong: since task.238 it
+  // blocks on exactly one thing — an open coverage finding — and on nothing else.
+  // Task 89: read off each row's own action cell, not "CONCERNS somewhere, then an exit phrase
+  // somewhere later" — same class as the two above.
   assert.match(
     verdictRow("APPROVE"),
     /exit the loop|Step 7/,
     "the APPROVE table ROW must exit the loop",
   );
+  const concerns = verdictRow("CONCERNS");
   assert.match(
-    s5c,
-    /\|[^|\n]*CONCERNS[^|\n]*\|[^|\n]*Do not block[^|\n]*Step 7[^|\n]*\|/,
-    "the CONCERNS row must record findings, not block, AND still exit to Step 7",
+    concerns,
+    /open `category: coverage` entry\*\* \(one without `provenance: pre-existing`/,
+    "the condition is an OPEN coverage entry — one review-pr marked pre-existing is not open",
   );
   assert.match(
-    s5c,
-    /CONCERNS.*\*\*Do not block\.\*\*/s,
-    "CONCERNS records findings without blocking",
+    concerns,
+    /take the \*\*REQUEST CHANGES\*\* arm/,
+    "an open coverage finding takes the REQUEST CHANGES arm, so it inherits its invocation and cycle accounting",
   );
+  assert.match(
+    concerns,
+    /\*\*Otherwise\*\* record the findings[^|]*\*\*Do not block\.\*\*[^|]*Step 7/,
+    "every other CONCERNS records findings, does not block, and still exits to Step 7",
+  );
+});
+
+// ── task.238: the open-coverage check, executed ─────────────────────────────────────────────────
+// The rule a CONCERNS routes on is a block in §5c, not a judgement. Run it against review reports
+// shaped like review-pr's Machine-Readable Findings and read the count it prints.
+
+function reviewReport(findings) {
+  const entries = findings
+    .map(
+      (f, i) =>
+        `  - id: PC-${i + 1}\n    category: ${f.category}\n    severity: ${f.severity ?? "medium"}\n    confidence: high\n    ref: "Success Criteria ${i + 1}"\n` +
+        (f.pre
+          ? `    provenance: ${f.pre === true ? "pre-existing" : f.pre}\n`
+          : "") +
+        `    finding: x\n    suggested_action: y\n`,
+    )
+    .join("");
+  return `# PR Review\n\n**Verdict:** CONCERNS\n\n## Machine-Readable Findings\n\n\`\`\`yaml\nreviewed_gate: task.1.gate.1.x.yml\nfindings:\n${entries}truncated_count: 0\n\`\`\`\n\n## Recommended Actions\n\n1. category: coverage (prose after the block must not count)\n`;
+}
+
+// `body` is the report's text, or null for a path that does not exist. Returns the count, or the
+// literal `unreadable`. `env` replaces the block's environment (the failing-awk case).
+function openCoverageOf(body, env = process.env) {
+  const blocks = extractBlocks(loopDoc).filter((b) =>
+    b.code.includes("OPEN_COVERAGE=$("),
+  );
+  assert.equal(
+    blocks.length,
+    1,
+    "expected exactly one open-coverage block in the QA loop doc",
+  );
+  const dir = mkdtempSync(join(tmpdir(), "open-coverage-"));
+  try {
+    const report = join(dir, "task.1.pr-review.1.x.md");
+    if (body !== null) writeFileSync(report, body);
+    // The block calls the reader at its consumer path. Run it from a consumer-shaped cwd whose
+    // `.agents/skills/develop-task` is the tracked skill, so the test reads the bundled copy and
+    // never leans on a local, gitignored `.agents/skills` symlink (task.240).
+    mkdirSync(join(dir, ".agents", "skills"), { recursive: true });
+    symlinkSync(
+      join(repoRoot, "skills", "develop-task"),
+      join(dir, ".agents", "skills", "develop-task"),
+    );
+    const code = blocks[0].code
+      .split("{the PR review report this cycle's 5c wrote}")
+      .join(report)
+      .split("{develop-story|develop-task}")
+      .join("develop-task");
+    const runIn = (sh) => {
+      const r = spawnSync(sh, ["-c", code], {
+        encoding: "utf8",
+        env,
+        cwd: dir,
+      });
+      if (r.error?.code === "ENOENT") return undefined; // zsh absent on this runner
+      assert.equal(r.status, 0, `${sh}: ${r.stderr}`);
+      const m = r.stdout.match(/^OPEN_COVERAGE=(\d+|unreadable)$/m);
+      assert.ok(m, `${sh}: no OPEN_COVERAGE line:\n${r.stdout}`);
+      return m[1] === "unreadable" ? m[1] : Number(m[1]);
+    };
+    const got = runIn("bash");
+    const zsh = runIn("zsh");
+    if (zsh !== undefined) assert.equal(zsh, got, "bash and zsh disagree");
+    return got;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function openCoverage(findings) {
+  return openCoverageOf(reviewReport(findings));
+}
+
+const COVERAGE_CASES = [
+  ["an open coverage finding (medium) → 5b", [{ category: "coverage" }], 1],
+  [
+    "an open coverage finding at low severity still routes",
+    [{ category: "coverage", severity: "low" }],
+    1,
+  ],
+  [
+    "a coverage finding marked provenance: pre-existing → Step 7",
+    [{ category: "coverage", pre: true }],
+    0,
+  ],
+  [
+    "control (obs #176): a medium consistency finding only → Step 7",
+    [{ category: "consistency" }],
+    0,
+  ],
+  [
+    "trail and scope only → Step 7",
+    [{ category: "trail" }, { category: "scope" }],
+    0,
+  ],
+  ["no findings → Step 7", [], 0],
+  // YAML allows a quoted scalar; a bare-only match read it as no coverage (task.238 DoD 1).
+  [
+    'a double-quoted category: "coverage" still routes',
+    [{ category: '"coverage"' }],
+    1,
+  ],
+  [
+    "a single-quoted category: 'coverage' still routes",
+    [{ category: "'coverage'" }],
+    1,
+  ],
+  [
+    'a quoted provenance: "pre-existing" still exempts',
+    [{ category: '"coverage"', pre: '"pre-existing"' }],
+    0,
+  ],
+  [
+    // Was 0 until bug.17: review-pr writes six category tokens, and any other is refused rather
+    // than read as "a category, not coverage".
+    "a category that only contains the word is a token review-pr does not write",
+    [{ category: "coverage-gap" }],
+    "unreadable",
+  ],
+  [
+    "the last entry is read too (no trailing `- id:` closes it)",
+    [
+      { category: "consistency" },
+      { category: "coverage", pre: true },
+      { category: "coverage" },
+    ],
+    1,
+  ],
+];
+
+// The same tables, two harnesses (task.240 SC-1): every case also runs straight through the reader
+// the §5c block calls, so a shape the pure function gets wrong is named here, not only as a shell
+// value.
+const readerSays = (text) => {
+  const r = countOpenCoverage(text);
+  return "count" in r ? r.count : "unreadable";
+};
+
+for (const [label, findings, want] of COVERAGE_CASES) {
+  test(`open-coverage check: ${label}`, () => {
+    assert.equal(openCoverage(findings), want);
+    assert.equal(readerSays(reviewReport(findings)), want, "countOpenCoverage");
+  });
+}
+
+// Every valid YAML spelling of a finding is read, and a block the check cannot account for reads
+// `unreadable` (task.238 bug.8): each of the first four printed OPEN_COVERAGE=0.
+const rawReport = (yaml) =>
+  `# PR Review\n\n**Verdict:** CONCERNS\n\n## Machine-Readable Findings\n\n\`\`\`yaml\nreviewed_gate: task.1.gate.1.x.yml\nfindings:\n${yaml}truncated_count: 0\n\`\`\`\n\n## Recommended Actions\n\n1. x\n`;
+const RAW_CASES = [
+  [
+    "a trailing comment after the category",
+    "  - id: PC-1\n    category: coverage       # coverage | scope | trail | consistency\n    severity: medium\n",
+    1,
+  ],
+  [
+    "category as the list item's first key",
+    "  - category: coverage\n    id: PC-1\n  - category: trail\n    id: PC-2\n",
+    1,
+  ],
+  // The reader reads one key per line (task.240): the flow form, which no review-pr template or
+  // tracked report uses, is refused rather than parsed.
+  [
+    "the flow form",
+    "  - {id: PC-1, category: coverage, severity: medium}\n",
+    "unreadable",
+  ],
+  [
+    "the flow form with provenance: pre-existing",
+    "  - {id: PC-1, category: coverage, provenance: pre-existing}\n",
+    "unreadable",
+  ],
+  ["a capitalised value", "  - id: PC-1\n    category: Coverage\n", 1],
+  [
+    "list items at column 0",
+    "- id: PC-1\n  category: coverage\n- id: PC-2\n  category: coverage\n  provenance: pre-existing\n",
+    1,
+  ],
+  // The entry's keys sit at its first key's column (task.240 bug.5): a key at `dash + 2` after a
+  // wider dash is a block YAML rejects, and it printed 0.
+  [
+    "a key at dash + 2 after a two-space dash",
+    "  -  category: coverage\n    provenance: pre-existing\n",
+    "unreadable",
+  ],
+  [
+    "keys lined up after a two-space dash",
+    "  -  category: coverage\n     provenance: pre-existing\n",
+    0,
+  ],
+  [
+    "a nested list inside an entry is a deeper line",
+    "  - id: PC-1\n    category: coverage\n    evidence:\n      - a.md\n      - b.md\n",
+    "unreadable",
+  ],
+  [
+    "a commented-out category is not one",
+    "  - id: PC-1\n    category: trail\n    # category: coverage\n",
+    0,
+  ],
+  [
+    "an entry with no recognised category",
+    "  - id: PC-1\n    category: coverage\n  - id: PC-2\n    categry: coverage\n",
+    "unreadable",
+  ],
+  [
+    "a findings list written inline",
+    "",
+    "unreadable",
+    (b) =>
+      b.replace("findings:\n", "findings: [{id: PC-1, category: coverage}]\n"),
+  ],
+  // Keys are read only in key position (task.238 bug.15): each of these printed 0. Free text that
+  // holds `: ` is quoted; written plain it is a line YAML rejects, refused since task.240.
+  [
+    "provenance: pre-existing quoted in a finding's free text does not exempt it",
+    '  - id: PC-1\n    category: coverage\n    finding: "QA filed its CI red with provenance: pre-existing, which hid it"\n',
+    1,
+  ],
+  [
+    "the same free text written plain is refused",
+    "  - id: PC-1\n    category: coverage\n    finding: QA filed its CI red with provenance: pre-existing, which hid it\n",
+    "unreadable",
+  ],
+  [
+    "provenance: pre-existing inside a quoted flow value is refused with the flow entry",
+    '  - {id: PC-1, finding: "a, provenance: pre-existing", category: coverage}\n',
+    "unreadable",
+  ],
+  [
+    "provenance: pre-existing in a block scalar is refused with the block scalar",
+    "  - id: PC-1\n    category: coverage\n    finding: >-\n      the base read it as\n      provenance: pre-existing\n",
+    "unreadable",
+  ],
+  [
+    "category: coverage in another entry's free text is not a coverage finding",
+    "  - id: PC-1\n    category: trail\n    finding: 'unlike category: coverage, this one'\n",
+    0,
+  ],
+  // A shape outside the allow-list reads unreadable, never 0 (task.238 bug.16).
+  [
+    "a bare dash with the entry's keys on the following lines",
+    "  -\n    id: PC-1\n    category: coverage\n",
+    "unreadable",
+  ],
+  [
+    "a flow sequence on the line after findings:",
+    "  [{id: PC-1, category: coverage}]\n",
+    "unreadable",
+  ],
+  [
+    "a key at an indent no entry owns",
+    "  - id: PC-1\n   category: coverage\n",
+    "unreadable",
+  ],
+  [
+    "a flow entry the reader cannot tokenise",
+    '  - {id: PC-1, category: coverage, finding: "an \\"escaped\\" quote"}\n',
+    "unreadable",
+  ],
+  // Values are allow-listed as well as lines (task.238 bug.17): each of these printed 0.
+  [
+    "a block-scalar category",
+    "  - id: PC-1\n    category: >-\n      coverage\n",
+    "unreadable",
+  ],
+  [
+    "a tagged category",
+    "  - id: PC-1\n    category: !!str coverage\n",
+    "unreadable",
+  ],
+  [
+    "an anchored category",
+    "  - id: PC-1\n    category: &c coverage\n",
+    "unreadable",
+  ],
+  [
+    "a provenance value continued on a deeper line",
+    "  - id: PC-1\n    category: coverage\n    provenance: pre-existing\n      on the base only\n",
+    "unreadable",
+  ],
+  [
+    "provenance given twice in one entry",
+    "  - id: PC-1\n    category: coverage\n    provenance: pre-existing\n    provenance: new\n",
+    "unreadable",
+  ],
+  [
+    "a comment inside a flow entry, which swallows its closing brace",
+    "  - {id: PC-1, category: coverage #x}\n",
+    "unreadable",
+  ],
+  [
+    "a comment inside a flow entry before a readable category",
+    "  - {id: PC-1 #x, category: trail}\n",
+    "unreadable",
+  ],
+  // review-pr's documented shape still reads: one exempted coverage entry, a trail entry and a
+  // quoted finding whose text names both keys.
+  [
+    "review-pr's documented block, coverage exempted",
+    '  - id: PC-1\n    category: coverage\n    severity: medium\n    confidence: high\n    ref: "SC-3"\n    provenance: pre-existing\n    anchor_check: no-line\n    finding: "category: coverage, provenance: new"\n    suggested_action: file a follow-up\n  - id: CR-1\n    category: bug\n    severity: low\n    ref: "x.js:3"\n    finding: a typo\n',
+    0,
+  ],
+  // A flow entry is complete on its line (task.238 bug.19): a key after it is invalid YAML, and it
+  // printed 0 by exempting the flow entry's coverage finding.
+  [
+    "a key line after a one-line flow entry",
+    "  - {id: PC-1, category: coverage}\n    provenance: pre-existing\n",
+    "unreadable",
+  ],
+  [
+    "a deeper text line after a one-line flow entry",
+    "  - {id: PC-1, category: coverage}\n      more text\n",
+    "unreadable",
+  ],
+  [
+    "a flow entry before a block entry is refused with it",
+    "  - {id: PC-1, category: trail}\n  - id: PC-2\n    category: coverage\n",
+    "unreadable",
+  ],
+  // A long value wrapped onto deeper lines is valid YAML, and task.240 bug.1 made the first reader
+  // accept it. Every later wrap shape YAML rejects was one more bug (bugs 2, 3, 6), so the reader
+  // now reads one line per key and refuses a wrap whatever it holds.
+  [
+    "a plain finding: value wrapped onto a deeper line",
+    "  - id: PC-1\n    category: trail\n    finding: a long plain value that\n      wraps onto a deeper line\n",
+    "unreadable",
+  ],
+  [
+    "a double-quoted finding: value wrapped onto a deeper line",
+    '  - id: PC-1\n    category: coverage\n    finding: "a long quoted value that\n      wraps onto a deeper line"\n',
+    "unreadable",
+  ],
+  [
+    "a single-quoted finding: value wrapped onto a deeper line",
+    "  - id: PC-1\n    finding: 'it''s long\n      and wraps'\n    category: coverage\n",
+    "unreadable",
+  ],
+  // The trap: a quote still open at the key indent. YAML reads `category: coverage` here as quoted
+  // text; reading it as a key would count it, so the reader refuses rather than guess.
+  [
+    "a quoted value still open at the entry's key indent",
+    '  - id: PC-1\n    finding: "text\n    category: coverage"\n    category: trail\n',
+    "unreadable",
+  ],
+  // The same trap one line lower (task.240 bug.2): a quote opened under an empty key runs, in
+  // YAML, over the key-indent lines below it. Read as keys, they printed a false 0.
+  [
+    "a quoted value opened on the line after an empty key",
+    '  - id: PC-1\n    category: coverage\n    finding:\n      "open\n    provenance: pre-existing\n    note: end"\n',
+    "unreadable",
+  ],
+  // An escape in a deciding value (task.240 bug.4): kept literally, `pr\e-existing` read as
+  // pre-existing and printed 0; YAML decodes it and reads the entry open.
+  [
+    "an escape in a quoted provenance value",
+    '  - id: PC-1\n    category: coverage\n    provenance: "pr\\e-existing"\n',
+    "unreadable",
+  ],
+  [
+    "an escape in a quoted category value",
+    '  - id: PC-1\n    category: "cover\\age"\n',
+    "unreadable",
+  ],
+  // The same trap behind a prefix the opener scan did not strip (task.240 bug.3): each printed 0.
+  ...[
+    ["inside a flow collection", '[a, "b]'],
+    ["behind a nested dash", '- - "open'],
+    ["behind an anchor", '- &a "open'],
+    ["behind a key with a space", '- sub key: "open'],
+  ].map(([where, line]) => [
+    `a nested quote opened ${where}`,
+    `  - id: PC-1\n    category: coverage\n    evidence:\n      ${line}\n    provenance: pre-existing\n    note: x"]\n`,
+    "unreadable",
+  ]),
+  // A list cut short reads unreadable, not the count of what survived (task.238 CR9-3): a column-0
+  // `## ` line inside the fence ends the section the check reads.
+  [
+    "a findings list cut short by a column-0 heading line",
+    "  - id: CR-1\n    category: bug\n## a comment\n  - id: PC-1\n    category: coverage\n",
+    "unreadable",
+  ],
+];
+
+for (const [label, yaml, want, edit = (b) => b] of RAW_CASES) {
+  test(`open-coverage check: ${label} → ${want}`, () => {
+    assert.equal(openCoverageOf(edit(rawReport(yaml))), want);
+    assert.equal(readerSays(edit(rawReport(yaml))), want, "countOpenCoverage");
+  });
+}
+
+// "Found none" and "could not look" must not print the same value (task.238 bug.1): each of these
+// printed OPEN_COVERAGE=0 and exited the loop to Step 7.
+const UNREADABLE_CASES = [
+  ["a report path that does not exist", null],
+  [
+    "a report with no Machine-Readable Findings block",
+    "# PR Review\n\n**Verdict:** CONCERNS\n\n## Recommended Actions\n\n1. x\n",
+  ],
+  [
+    "a findings heading with no findings: key",
+    "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: none\n```\n\n## Recommended Actions\n",
+  ],
+  [
+    "a findings list with no terminator after it (a report cut off mid-block)",
+    "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nfindings:\n  - id: PC-1\n    category: trail\n",
+  ],
+];
+
+for (const [label, body] of UNREADABLE_CASES) {
+  test(`open-coverage check: ${label} → unreadable, never 0`, () => {
+    assert.equal(openCoverageOf(body), "unreadable");
+    if (body !== null)
+      assert.equal(readerSays(body), "unreadable", "countOpenCoverage");
+  });
+}
+
+// A reader that does not run prints nothing, and an empty value took the Otherwise exit to Step 7
+// (task.238 bug.18). A stub `node` that exits 2 stands in for a missing binary or a crashed reader
+// (task.240: the reader is open-coverage.js, so the stub moved from awk to node).
+test("open-coverage check: a reader that fails → unreadable, never an empty value", () => {
+  const bin = mkdtempSync(join(tmpdir(), "failing-node-"));
+  try {
+    writeFileSync(join(bin, "node"), "#!/bin/sh\nexit 2\n", { mode: 0o755 });
+    const env = { ...process.env, PATH: `${bin}:${process.env.PATH}` };
+    assert.equal(
+      openCoverageOf(rawReport("  - id: PC-1\n    category: coverage\n"), env),
+      "unreadable",
+    );
+  } finally {
+    rmSync(bin, { recursive: true, force: true });
+  }
+});
+
+// SC-5 (task.240): the check costs one `node` call and nothing else — no awk program comes back.
+test("open-coverage check: the §5c block runs exactly one `command node` call and no awk", () => {
+  const [block] = extractBlocks(loopDoc).filter((b) =>
+    b.code.includes("OPEN_COVERAGE=$("),
+  );
+  assert.ok(block, "the open-coverage block moved");
+  assert.equal(block.code.match(/\bcommand node\b/g)?.length ?? 0, 1);
+  assert.doesNotMatch(block.code, /\bawk\b/);
+});
+
+test("open-coverage check: an empty findings list (`findings: []`) reads 0, not unreadable", () => {
+  assert.equal(
+    openCoverageOf(
+      "# PR Review\n\n## Machine-Readable Findings\n\n```yaml\nreviewed_gate: none\nfindings: []\ntruncated_count: 0\n```\n",
+    ),
+    0,
+  );
+});
+
+test("§5c routes an unreadable open-coverage check to the Review failed arm, never to Step 7", () => {
+  const sec = loopDoc.slice(loopDoc.indexOf("OPEN_COVERAGE=$("));
+  const prose = sec.slice(
+    sec.indexOf("```", 10),
+    sec.indexOf("> **Why the failure arm"),
+  );
+  assert.match(prose, /`unreadable`[^.]*\*\*Review failed\*\*/);
+  const row = loopDoc
+    .split("\n")
+    .find((l) => l.startsWith("| ❌ **Review failed**"));
+  assert.ok(row, "the Review failed row moved");
+  assert.match(row, /unreadable/);
+});
+
+test("SC-4a: /qa-fix's ladder works a pr-review coverage finding at any severity, and the ingester keeps its category", () => {
+  // Routing a CONCERNS to 5b is only half the fix: a `medium` coverage finding had no row in qa-fix's
+  // priority order, so qa-fix changed nothing and 5b step 0's no-change HALT fired on a real gap.
+  const qaFix = read("skills/qa-fix/SKILL.md");
+  const start = qaFix.indexOf("**Priority Order** (highest first):");
+  assert.ok(start > -1, "qa-fix Step 2's priority order moved");
+  const ladder = qaFix
+    .slice(start, qaFix.indexOf("\n\n", qaFix.indexOf("\n1. ", start)))
+    .split("\n")
+    .filter((l) => /^\d+\. /.test(l));
+  const row = ladder.findIndex((l) =>
+    /pr-review `coverage` findings, at any severity/.test(l),
+  );
+  assert.ok(
+    row > -1,
+    `no ladder row for pr-review coverage findings:\n${ladder.join("\n")}`,
+  );
+  const medium = ladder.findIndex((l) =>
+    /\*\*Medium severity\*\* bug reports/.test(l),
+  );
+  assert.ok(
+    row < medium,
+    "the coverage row must outrank medium bug reports — /finalise fails the criterion",
+  );
+  assert.match(
+    qaFix,
+    /Treat a `category: coverage` finding as work at any severity/,
+    "Step 1b must say the same",
+  );
+  // The ingester feeds qa-fix its findings: a dropped category makes the row unreachable.
+  assert.match(ingester, /\| `category` \| `category` \| \*\*Carried\*\*/);
+  assert.doesNotMatch(ingester, /\| `category` \| — \| \*\*Dropped/);
+});
+
+// Task 237: the doc-only carry is invoked by BOTH exiting verdicts. The rule lives in three places —
+// the two rows, the "Classify on …" sentence and the CARRY_FIXED sentence — and the last is the one
+// task.179's run obeyed when it left an APPROVE's doc-only finding for /finalise to halt on. Pinning
+// the rows alone would leave that sentence free to revert.
+test("APPROVE and CONCERNS both carry doc-only findings into the acceptance commit (task.237)", () => {
+  for (const v of ["APPROVE", "CONCERNS"]) {
+    assert.match(
+      verdictRow(v),
+      /doc-only findings may be fixed there/,
+      `the ${v} row must carry the doc-only clause — an APPROVE carries low findings, and a doc-only one left unfixed halts /finalise (observation #109)`,
+    );
+  }
+});
+
+test("the carry prose names no verdict where it decides whether to fix (task.237)", () => {
+  const s5c = section5c();
+  const start = s5c.indexOf("#### Carry the review into the acceptance commit");
+  assert.ok(
+    start > -1,
+    "the Carry section heading moved — acceptance-commit-carries-5c.test.mjs locates its blocks by it",
+  );
+  const carry = sectionBetween(
+    "#### Carry the review into the acceptance commit",
+    "\n#### ",
+  );
+  assert.match(
+    carry,
+    /Classify on `APPROVE` or `CONCERNS`/,
+    "the Carry section must classify on APPROVE as well as CONCERNS",
+  );
+  assert.match(
+    carry,
+    /[Ww]hen the classify block cleared no path, or no\s+fix changed a cleared path, leave\s+`CARRY_FIXED`\s+empty/,
+    "the Carry section must key an empty CARRY_FIXED on what was cleared and changed, not on a verdict",
+  );
+  // Judge the clause that decides, not a span scanned from a verdict (TASK-237-BUG-2). A clause
+  // ends at a semicolon, or at a period followed by a capital, backtick, `*` or `(` — so "task.179"
+  // and "e.g. a" do not end one, and a verdict in a neighbouring clause is not read as this one's.
+  const deciding = carry
+    .split(/;\s+|\.\s+(?=[A-Z`*(])/)
+    .filter((clause) => /leave\s+`CARRY_FIXED`\s+empty/i.test(clause));
+  assert.ok(
+    deciding.length > 0,
+    "no clause says when to leave CARRY_FIXED empty, so the verdict check below reads nothing",
+  );
+  for (const clause of deciding) {
+    assert.doesNotMatch(
+      clause,
+      /APPROVE|CONCERNS/,
+      `a clause that decides an empty CARRY_FIXED names a verdict — that is what left task.179's doc-only finding unfixed: ${clause.replace(/\s+/g, " ")}`,
+    );
+  }
 });
 
 test("the 5-cycle bound covers 5c rather than being extended by it", () => {
@@ -1528,27 +2132,81 @@ test("the 5c resume check reads the report, not the filesystem", () => {
   // repointed it at 5a; both stayed 20/0 green, while this block's own comment claimed "each is
   // asserted specifically". A guard that covers four of five values, omitting the terminal one, is
   // the sixth instance of mention-standing-in-for-mapping in this task.
-  const exit = subStateRows.find(
-    (r) => r.key.includes("`APPROVE`") && r.key.includes("`CONCERNS`"),
+  //
+  // task.238 split the arm in three: one row keyed on `APPROVE`, and two on `CONCERNS` — one whose
+  // review holds an open coverage finding (5c routed back, like REQUEST CHANGES: re-enter at 5b) and
+  // one whose review holds none (cleared: Step 7). QA cycle 1 (bug.1) added a third: a check that
+  // printed `unreadable` could not look, so it re-runs 5c like `review failed` and never exits.
+  // Each is asserted by its own destination.
+  const approveRows = subStateRows.filter((r) => r.key.includes("`APPROVE`"));
+  assert.equal(
+    approveRows.length,
+    1,
+    `expected exactly ONE sub-state row keyed on APPROVE. Rows present: ${subStateRows.map((r) => r.key).join(" / ")}`,
+  );
+  const concernsRows = subStateRows.filter((r) => r.key.includes("`CONCERNS`"));
+  assert.equal(
+    concernsRows.length,
+    3,
+    `expected exactly THREE sub-state rows keyed on CONCERNS (open coverage, none, unreadable). Rows present: ${subStateRows.map((r) => r.key).join(" / ")}`,
+  );
+  const concernsUnreadable = concernsRows.find((r) =>
+    /prints `unreadable`/.test(r.key),
   );
   assert.ok(
-    exit,
-    `the sub-state table must carry the terminal APPROVE/CONCERNS row. Rows present: ${subStateRows.map((r) => r.key).join(" / ")}`,
+    concernsUnreadable,
+    "a CONCERNS row must key on an `unreadable` check",
   );
-  assert.match(
-    exit.action,
-    /Step 5–6 is complete/,
-    "the exit arm must state that Step 5-6 is COMPLETE — that is the whole content of the verdict",
-  );
-  assert.match(
-    exit.action,
+  assert.match(concernsUnreadable.action, /re-enter at \*\*5c\*\* once/);
+  assert.doesNotMatch(
+    concernsUnreadable.action,
     /go to Step 7/,
-    "the exit arm must route to Step 7",
+    "an unreadable review is not an exit — it could not look",
+  );
+  const concernsOpen = concernsRows.find((r) =>
+    /holds an open coverage finding/.test(r.key),
+  );
+  const concernsNone = concernsRows.find((r) =>
+    /holds no open coverage finding/.test(r.key),
+  );
+  assert.ok(
+    concernsOpen && concernsNone,
+    "the two CONCERNS rows must be split on an open coverage finding",
+  );
+  for (const exit of [approveRows[0], concernsNone]) {
+    assert.match(
+      exit.action,
+      /Step 5–6 is complete/,
+      "the exit arm must state that Step 5-6 is COMPLETE — that is the whole content of the verdict",
+    );
+    assert.match(
+      exit.action,
+      /go to Step 7/,
+      "the exit arm must route to Step 7",
+    );
+    assert.doesNotMatch(
+      exit.action,
+      /re-enter at \*\*5[abc]\*\*/,
+      "a cleared 5c does not re-enter the loop — re-entering would re-run QA against a tree that already passed",
+    );
+  }
+  assert.match(
+    concernsOpen.action,
+    /set the counter to `N`, re-enter at \*\*5b\*\*/,
+    "a run killed after a CONCERNS with an open coverage finding resumes at 5b, as REQUEST CHANGES does — Step 7 would hand /finalise the gap it is certain to fail",
   );
   assert.doesNotMatch(
-    exit.action,
-    /re-enter at \*\*5[abc]\*\*/,
-    "a cleared 5c does not re-enter the loop — re-entering would re-run QA against a tree that already passed",
+    concernsOpen.action,
+    /go to Step 7/,
+    "the coverage arm is not an exit",
+  );
+  // The three states the row must hold in (task.238 § 3): before 5b starts, inside 5b, and after 5b
+  // exits — when the next 5a's entry is the highest and this row stops selecting.
+  assert.match(concernsOpen.action, /dies before 5b starts/);
+  assert.match(concernsOpen.action, /dies inside 5b/);
+  assert.match(
+    concernsOpen.action,
+    /once 5b exits and increments the counter[^|]*no longer selects/,
   );
 
   for (const v of ["pending — 5c not yet run", "not reached"]) {

@@ -1,0 +1,78 @@
+schema: 2
+task: 'task.240.open-coverage-fail-closed-reader'
+task_title: 'Fail-closed reader for the 5c open-coverage check'
+gate: CONCERNS
+status_reason: 'Cycle 4 fix verified: the four bug.4 shapes read unreadable; earlier fixtures as designed; corpus 0 changes. The scoped review found the entry parser assumes keys at dash + 2 whatever the spacing after the dash, so a block YAML rejects reads a confident 0 where the base awk refused (BUG-5).'
+reviewer: 'QA Engineer'
+head: '0c11216fa157d00d1e219732d88d05ebac5e71bb'
+updated: '2026-10-28T15:29:28Z'
+
+top_issues:
+  - id: 'TASK-240-QA-6'
+    severity: medium
+    file: 'shared/resources/open-coverage.js'
+    finding: 'The entry parser strips every space after the dash but places later keys at dash + 2, so `  -  category: coverage` then `    provenance: pre-existing` — a block PyYAML rejects and the base awk refused — prints 0 (reproduced; CR-1; present since c054f8f4, new on this branch; medium on a measurement: 0 of 187 tracked reports have 2+ spaces after a list dash and review-pr writes one; confidence high; bug report task.240.bug.5.wide-dash-spacing-misplaces-keys.md).'
+    suggested_action: 'Record the first key column when an entry opens and place every later line against it.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-240-QA-7'
+    severity: low
+    file: 'shared/resources/open-coverage.js'
+    finding: 'The header still says a block-style double-quoted value may carry escapes; since 0c11216f a category or provenance value refuses one (CR-2).'
+    suggested_action: 'Reword the accepted-values line.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 189
+  phases_verified: 4/4
+  trace:
+    phases_covered: [0, 1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: internal — shared/resources/open-coverage.js#countOpenCoverage reads the review-pr report (a pipeline-written artefact); no corpus sink models it. The reader parses text only: no eval, no shell, no file write.'
+  performance:
+    status: PASS
+    notes: 'One linear pass; one command node call at 5c (SC-5).'
+  reliability:
+    status: CONCERNS
+    notes: 'BUG-5: a block YAML rejects reads a false 0. BUG-4 fixed and verified.'
+  maintainability:
+    status: PASS
+    notes: 'Header drift (QA-7) only.'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-240-QA-6 (BUG-5) and QA-7; add parity rows for a wide dash.'
+      refs: ['shared/resources/open-coverage.js', 'evals/shared/tests/pr-review-loop-parity.test.mjs']
+  future:
+    - action: 'CR-6 (carried): a differential test against a YAML parser. Five cycles have each found one more hand-picked shape where the reader and YAML disagree; a generated corpus compared with PyYAML is the mechanism that would end that.'
+      refs: ['shared/resources/tests/open-coverage.test.mjs']
+    - action: 'Carried from gates 2-4 (pre-existing on the base awk, 0 corpus hits): CR-2 flow key with no space after the colon; CR-3 case-blind keys; CR-4 comment inside a wrapped plain value.'
+      refs: ['shared/resources/open-coverage.js']
+      provenance: pre-existing
+    - action: 'Carried: CR-5 echo the reader stderr at 5c; cycle 1 CR-2 pin per-file corpus results; cycle 1 CR-3 an internal-error reason; Step 4b could not execute the changed 5c block (command node not allow-listed; CI runs it under bash and zsh).'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'shared/resources/tests/open-coverage.test.mjs']
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 1
+  fix_date: '2026-10-28'
+  total_iterations: 4
+  verification_method: 'bug.4 shapes re-run (unreadable x4); earlier fixtures as designed; targeted suites 189/189; M16-M17 proven by qa-fix.'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-240-QA-6 fixed']

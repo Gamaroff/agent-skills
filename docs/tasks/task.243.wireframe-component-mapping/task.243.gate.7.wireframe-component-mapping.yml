@@ -1,0 +1,75 @@
+schema: 2
+task: 'task.243.wireframe-component-mapping'
+task_title: "Link Wireloom wireframe nodes to the project's UI components, and ask when unsure"
+gate: PASS
+status_reason: 'All three gate 6 findings are fixed and mutation-proven, and the reviewer found no path where the gated guard and the gated writes disagree; one low test-premise finding remains, with three low advisories.'
+reviewer: 'QA Engineer'
+head: '82e7f84fe8688e3eeb5ad989e4630cf0dfe83cf2'
+updated: '2026-10-29T16:05:17Z'
+
+top_issues:
+  - id: 'TASK-243-CR7-1'
+    severity: low
+    file: 'evals/shared/tests/wireframe-mapping-hooks.test.mjs'
+    finding: 'The no-jq test holds this document''s answers, so a run that found jq would also HALT (the rc=0 arm) and the test would stay green: it does not assert that the PATH stripping reached the jq-missing branch. Reported medium; graded low because cycle 6''s mutation proof (the 127 arm made to pass) turned this test red, so the branch is reached today.'
+    suggested_action: 'Assert the unreadable-arm text (cannot be read (jq exit 127)) instead of /HALT/.'
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+
+waiver:
+  active: false
+
+quality_score: 100 # no medium or high findings
+
+evidence:
+  tests_reviewed: 37
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false; unchanged.'
+  performance:
+    status: PASS
+    notes: 'No change to the engine.'
+  reliability:
+    status: PASS
+    notes: 'The guard and the writes share one gate and one key check; no disagreeing path found on fresh, resumed, review-skipped or develop-bug runs.'
+  maintainability:
+    status: PASS
+    notes: 'One test-premise finding (CR7-1) and three advisory wording/test-precision lows; a test holds the shared gate and filter.'
+
+recommendations:
+  immediate: []
+  future:
+    - id: 'TASK-243-CR7-1'
+      action: 'Assert the unreadable-arm text (cannot be read (jq exit 127)) instead of /HALT/ in the no-jq test, so it proves the PATH stripping reached the jq-missing branch.'
+      refs: ['evals/shared/tests/wireframe-mapping-hooks.test.mjs']
+      carried_from: top_issues (route 2b, cycle 7)
+    - action: 'CR7-2 to CR7-4 (advisory): assert each HALT arm by its own message, give jq-missing (exit 127) its own install-jq message in Step 2 and Step 3, and name each HALT by its text rather than first/second.'
+      refs: ['evals/shared/tests/wireframe-mapping-hooks.test.mjs', 'shared/resources/develop-pipeline-step-3-develop-loop.md', 'shared/resources/develop-pipeline-step-2-review.md']
+    - action: 'The resume detector reads the lock''s current_step as finished while Step 1 writes it as pending; worth its own task.'
+      refs: ['shared/resources/pipeline-resume-detector-prompt.md']
+    - action: 'grant-qa-cycles.sh re-enters at 5a after a loop-limit halt that ended on a gate (obs #130).'
+      refs: ['shared/resources/grant-qa-cycles.sh']
+    - action: 'CR2-2 (gate 2), CR-6, CR-8, CR-9 (gate 1).'
+      refs: ['shared/resources/wireframe-map.js']
+
+bug_resolution:
+  bugs_fixed: 14
+  bugs_remaining: 0
+  fix_date: '2026-10-29'
+  total_iterations: 6
+  verification_method: 'bug.14: six mutation proofs covered; fast gate 6839/0'
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []

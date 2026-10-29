@@ -1402,6 +1402,13 @@ If a visual diagram is absent but highly recommended (e.g., the story describes 
    - In Interactive mode: collect this finding for the **Unified Question Point** to ask the user if they want to embed a wireframe.
    - In Validate mode: record the absence of an embedded wireframe in the validation report (non-blocking).
 
+4. **Check the wireframe's nodes are linked to components** (only when `skills-config.yaml` sets `ui.wireframeMap` and a wireframe is embedded). Run `wireframe-map.js resolve` (`references/wireframe-map.js`) on the story, as `references/wireframe-component-mapping.md` describes, and compare its `unresolved[]` with the story's component table in Dev Notes:
+   - a node that neither the map nor the table settles is an **Important** finding: `develop-story` would have to ask about it, or assume;
+   - a table row whose component the catalogue (`ui.componentCatalogue`) does not list is an **Important** finding, unless its decision says the component is new;
+   - when the screen has a wireframe document made from its design source, a story wireframe that differs from it is an **Important** finding: copy the published blocks.
+
+   In Interactive mode, the open nodes join the Unified Question Point, asked as the mapping procedure's step 5 sets out, and each answer is recorded in the table and the map. In Validate mode (including `develop-story` Step 2), record them. Inside `develop-story` the review is Step 2: Phase 0 has already asked about the open nodes, and Step 2 writes the answers into the table before this review runs, so a node still open here was not answered.
+
 **Output**: Wireframe verification findings added to the review report/validation report.
 
 ---
@@ -2877,11 +2884,29 @@ This skill uses:
 
 ## Pipeline Lock Cooperation (when invoked by `/develop-story` or `/develop-task`)
 
-When this skill is invoked as a step in a develop pipeline, advance the pipeline lock as the **last action** before returning, so the orchestrator's next turn does not depend on model discipline:
+When this skill is invoked as a step in a develop pipeline, advance the pipeline lock as the **last
+action** before returning, so the orchestrator's next turn does not depend on model discipline —
+**only on a GO whose story now reads `ready-for-development`**. That is the one case this block
+can tell will proceed. `/develop-story` Step 2 decides on the post-review status, not the verdict: a
+story left at Draft HALTs, and one already `in-progress` proceeds. A lock already at 3 on a HALT
+would let the Stop hook or a resume send the run to Step 3 (develop). So every other case, a NO-GO
+or a GO a blocking sign-off kept at Draft, leaves the lock where it is, and the orchestrator's own
+Step 2 → 3 advance moves it on the runs that proceed (task 165). Whenever a lock exists and is still
+below 3 after the block, the block says so in one line, whatever the reason. The refusal is visible
+in the transcript, and a probe can tell it from a block that never ran.
 
 ```bash
+# {outcome}: this review's verdict (GO / NO-GO (Revision) / NO-GO (Rework)).
+# {story-file}: the story document this review just updated.
 if [ -f .claude/state/develop-pipeline.lock ]; then
-  bash .agents/skills/review-story/references/advance-pipeline-lock.sh --skill review-story 2>/dev/null || true
+  if [ "{outcome}" = "GO" ] \
+    && grep -qE '^status:[[:space:]]*ready-for-development[[:space:]]*$' "{story-file}"; then
+    bash .agents/skills/review-story/references/advance-pipeline-lock.sh --skill review-story || true
+  fi
+  # Held is read off the lock itself, after the call, not off the branch taken: a helper that is
+  # missing, finds no jq, or meets a corrupt lock holds it too, and says why on stderr.
+  grep -qE '"current_step"[[:space:]]*:[[:space:]]*([3-9]|[1-9][0-9]+)' .claude/state/develop-pipeline.lock \
+    || echo "review-story: pipeline lock not advanced — the verdict is not a pass, the story is not ready-for-development, or the helper could not advance it; the orchestrator's Step 2 decides whether the run proceeds"
 fi
 ```
 

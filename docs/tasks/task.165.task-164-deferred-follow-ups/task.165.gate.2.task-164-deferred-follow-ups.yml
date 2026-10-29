@@ -1,0 +1,72 @@
+schema: 2
+task: 'task.165.task-164-deferred-follow-ups'
+task_title: "Close task.164's deferred follow-ups"
+gate: CONCERNS
+status_reason: 'Cycle 1 closed QA-1 to QA-3, and the fence: probe now executes 20 cases with 0 escapes. The refute pass found two medium, high-confidence defects in the review-task gate: its prose says Step 2 HALTs on a failed verdict when the orchestrator decides on status, and a helper failure on the pass branch is silent, which contradicts the new one-line contract.'
+reviewer: 'QA Engineer'
+head: 'accaa2959db6daa335ff7b5aba9ca0d72fe2f68d'
+updated: '2026-10-26T15:53:02Z'
+
+top_issues:
+  - id: 'QA2-1'
+    severity: medium
+    file: 'skills/review-task/SKILL.md'
+    finding: 'CR-1: the prose says develop-task Step 2 HALTs on NEEDS REVISION or REQUIRES REWORK, but Step 2 decides on status alone, and review-task Step 9 promotes a NEEDS REVISION task to ready-for-development once the Step 8.5 fixes are enough. That pair proceeds in the orchestrator, while the gate holds the lock and prints "the review did not pass".'
+    suggested_action: 'Make the gate and its prose match the orchestrator Step 2 decision (the promoted status, given review-task did not HALT). Correct the HALT claim here and in pipeline-lock-cooperation.md, and add a (NEEDS REVISION, ready-for-development) row to review-lock-cooperation.test.mjs.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA2-2'
+    severity: medium
+    file: 'skills/review-task/SKILL.md'
+    finding: 'CR-2: the new contract says a block that holds the lock prints one line, but the pass branch can hold it silently. With jq missing the helper exits 0 and writes only to the discarded stderr. A corrupt lock exits 1 under `|| true`, and a missing helper fails silently. The same applies to review-story/SKILL.md.'
+    suggested_action: 'In both blocks, keep the helper stderr or re-read current_step after the call, and print the one-line refusal whenever the lock still exists below 3. Add a test case with the helper absent.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 6392
+  phases_verified: 5/5
+  ci: 'not read this cycle'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 20
+    escaped: 0
+    notes: 'boundary: true. fence: probe on both review-skill gates, recorded in task.165.qa.2.security.run.json: 10 cases each, hostile-rejected-legitimate-accepted.'
+  performance:
+    status: PASS
+    notes: 'Unchanged since gate 1: the 4b meta-test runs in about 1s.'
+  reliability:
+    status: CONCERNS
+    notes: 'QA2-2: a helper failure on the pass branch holds the lock without the promised refusal line.'
+  maintainability:
+    status: PASS
+    notes: 'QA2-1 is a prose accuracy defect, tracked as a top issue.'
+
+recommendations:
+  immediate:
+    - action: 'QA2-1 and QA2-2: align the review-task gate with the orchestrator, and make every held-lock path print the refusal line.'
+      refs: ['skills/review-task/SKILL.md', 'skills/review-story/SKILL.md']
+  future:
+    - action: 'CR-3 (low): unset ADVANCE_LOCK_TEST_4B_ONLY for the direct test:suite run, so a stray export cannot shorten it.'
+      refs: ['package.json', 'shared/resources/advance-pipeline-lock.test.sh']
+    - action: 'CR-4 and CR-5 (low/low): limit the status match to the frontmatter and accept a quoted value. Make review-story Step 10 name the frontmatter status.'
+      refs: ['skills/review-task/SKILL.md', 'skills/review-story/SKILL.md']
+    - action: 'CR-6 (low): add positive controls for namesSkill.'
+      refs: ['shared/resources/tests/step-8-completion-checklist.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'QA2-1 and QA2-2 fixed and re-reviewed'

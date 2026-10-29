@@ -108,6 +108,41 @@ for case_ in "5b|not-converging: QA loop HIGH 1,1,1,1 at cycle 4 (gate 4 FAIL; T
   fi
 done
 
+# ── task.239: the grant opens a fresh Convergence window (obs #72) ───────────
+# convergence_from_cycle = base + 1, in the same write as the budget and the phase, read back
+# from the lock and printed after reenter_at=. Both halt kinds write it: a not-converging grant
+# re-enters at 5b and a loop-limit grant at 5a, but each one's first new reading is cycle base + 1.
+for case_ in "not-converging: QA loop HIGH 1,1,1 at cycle 3|3|5b" "loop-limit: QA cycle 6 of 6|6|5a"; do
+  REASON=${case_%%|*}; rest=${case_#*|}; BASE=${rest%%|*}; PHASE=${rest#*|}
+  D=$(mktemp -d "$T/window.XXXXXX"); L="$D/state/lock.json"; S="$D/state/last-halt.json"; mkdir -p "$D/state"
+  # shellcheck disable=SC2046 # word-split the gate numbers on purpose
+  mkdoc "$D/doc" $(seq 1 "$BASE")
+  jq -n --arg dir "$D/doc" --arg r "$REASON" '{skill:"develop-task",current_step:5,qa_phase:"5a",task_or_story_directory:$dir,branch:"feature/x",halted_at:"2026-10-28T00:00:00Z",halt_reason:$r,halt_step:"5"}' > "$S"
+  OUT=$(run "$L" "$S" "$D/doc" 2 2>/dev/null); RC=$?
+  WANT=$((BASE + 1))
+  if [ "$RC" -eq 0 ] && [ "$(jq -r '.convergence_from_cycle' "$L")" = "$WANT" ] \
+     && [ "$(jq -r '.qa_phase' "$L")" = "$PHASE" ] && [ "$(jq -r '.qa_max_cycles' "$L")" = "$((BASE + 2))" ] \
+     && echo "$OUT" | grep -qE "reenter_at=$PHASE convergence_from_cycle=$WANT\$"; then
+    pass "${REASON%%:*} grant at base $BASE → convergence_from_cycle $WANT, printed after reenter_at=$PHASE (task.239)"
+  else
+    fail "${REASON%%:*} grant writes convergence_from_cycle" "rc=$RC out=$OUT lock=$(cat "$L" 2>/dev/null)"
+  fi
+done
+# A grant on a lock that already exists (no restore) writes it too.
+D="$T/window-existing"; L="$D/lock.json"; mkdir -p "$D"; mkdoc "$D/doc" 1 2 3 4 5
+printf '{"current_step":5,"qa_phase":"5a"}\n' > "$L"
+run "$L" "$D/none.json" "$D/doc" 2 >/dev/null 2>&1
+[ "$(jq -r '.convergence_from_cycle' "$L")" = "6" ] && pass "grant on an existing lock (gate.5) → convergence_from_cycle 6" || fail "existing lock window" "$(cat "$L")"
+# A second grant moves the window forward to its own base + 1, never back.
+mkdoc "$D/doc" 6 7
+run "$L" "$D/none.json" "$D/doc" 2 >/dev/null 2>&1
+[ "$(jq -r '.convergence_from_cycle' "$L")" = "8" ] && pass "second grant (gate.7) → window moves 6 → 8" || fail "second grant window" "$(cat "$L")"
+# A refused grant writes no window.
+D="$T/window-refused"; L="$D/lock.json"; mkdir -p "$D"; mkdoc "$D/doc" 3
+printf '{"current_step":5,"qa_max_cycles":9}\n' > "$L"
+run "$L" "$D/none.json" "$D/doc" 2 >/dev/null 2>&1; RC=$?
+[ "$RC" -ne 0 ] && [ "$(jq -r '.convergence_from_cycle // "absent"' "$L")" = "absent" ] && pass "refused grant (never-lower) writes no convergence_from_cycle" || fail "refused grant window" "rc=$RC lock=$(cat "$L")"
+
 # A PreCompact snapshot's pause fields are dropped too.
 D="$T/restore-pause"; L="$D/lock.json"; S="$D/snap.json"; mkdir -p "$D"; mkdoc "$D/doc" 5
 printf '{"current_step":5,"task_or_story_directory":"%s","paused_at":"x","pause_reason":"precompact","halt_step":"5"}\n' "$D/doc" > "$S"

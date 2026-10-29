@@ -12,6 +12,40 @@ Loaded by `/develop-story` and `/develop-task` during Step 3. Story/task variant
 
 ---
 
+## Held wireframe answers (develop-story, develop-task)
+
+Only when `skills-config.yaml` sets `ui.wireframeMap` **and** the document holds a ` ```wireloom `
+block, the gate of [Step 2 § Wireframe writes](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/develop-pipeline-step-2-review.md#wireframe-writes-before-the-gate-check);
+otherwise skip. The two must share one gate: this check sends the run to that section, and a
+section that skips would send it straight back here. `develop-bug` asks no wireframe questions and
+skips this section. With the gate false, held answers are not written, because the feature is off
+for this document. The next fresh run's 0c-wire deletes the file.
+
+Step 2 writes Phase 0's wireframe answers into the document and then deletes the file that held
+them. A resume can land here without Step 2 having run: the detector can recommend Step 3 for a
+run that stopped inside Step 2. So, first, with Step 2's own key check:
+
+```bash
+HELD=.claude/state/wireframe-answers.json
+DOC='{document-file}'
+if [ -f "$HELD" ]; then
+  jq -e --arg d "$DOC" 'if (.document | type) != "string" then error("no document key")
+    else (.document | ltrimstr("./")) == ($d | ltrimstr("./")) end' "$HELD" >/dev/null
+  rc=$?
+  case $rc in
+    0) echo "HALT: $HELD still holds this document's wireframe answers — run Step 2 § Wireframe writes, then return to Step 3"; exit 1 ;;
+    1) ;; # another document's answers: not this run's to write
+    *) echo "HALT: $HELD cannot be read (jq exit $rc) — kept; repair or delete it, then re-run Step 3"; exit 1 ;;
+  esac
+fi
+```
+
+On the first `HALT`, run Step 2 § Wireframe writes now, then start Step 3 again. Do not delete the
+file to get past the check: it holds the user's answers. The second `HALT` is the one Step 2 raises
+on the same file, for the same reason.
+
+---
+
 ## Pre-develop Codebase Mapping (CRITICAL for context efficiency)
 
 > This step invokes `/develop`, but the Explore subagent and plan file discovery below must run first. Do not invoke `/develop` until those are complete.
@@ -40,6 +74,7 @@ Ask it to find: all files likely affected by the success criteria and implementa
   ...
   ```
   If `ALWAYS_LOAD_FILES` is empty (all files were missing), log a warning and proceed without them.
+- **Wireframe component table** (when `ui.wireframeMap` is set and the document holds a ` ```wireloom ` block): pass the document's component table, which Step 2 completed with 0d's answers, labelled `Wireframe nodes → components (build each node from the component named; import from {ui.componentImport})`, followed by every assumption 0d logged, labelled `Assumed, not confirmed — QA checks these`. `/develop` builds from the table, never from the Wireloom primitive alone.
 - See `/develop` SKILL.md **Caller-Supplied Context** section for the full contract on how orchestrators may prepend context (surface map, plan file path, always-load files, iteration hint) and how `/develop` must honour it.
 
 ---
@@ -247,6 +282,8 @@ ITER=<current develop loop iteration>
 TEST_LOG=".claude/state/test-output-${ITER}-$(date +%s).log"
 <fastGateCommand> > "$TEST_LOG" 2>&1
 TEST_EXIT=$?
+echo "TEST_EXIT=$TEST_EXIT TEST_LOG=$TEST_LOG"
+[ "$TEST_EXIT" -eq 0 ] && rm -f "$TEST_LOG"   # a red log is never removed here
 ```
 
 **When the gate can outlive the tool timeout, start it with `run_in_background`** and let the log
@@ -254,8 +291,18 @@ carry the exit code: `<fastGateCommand> > "$TEST_LOG" 2>&1; echo "TEST_EXIT=$?" 
 Mark the wait before yielding —
 `bash .agents/skills/{develop-story|develop-task}/references/set-waiting-on.sh "step-3 fast gate iter $ITER" --kind task --budget-minutes {M}`
 (`develop-pipeline-hooks.md` §"waiting_on") — and on the notification `--clear` it and read the
-`TEST_EXIT=` line (`grep '^TEST_EXIT=' "$TEST_LOG"`). A foreground call killed at the timeout loses
-its exit code, and can leave a moved `.agents/skills` unrestored.
+result with this block, which is the background form's cleanup too:
+
+```bash
+TEST_LOG="{the log the background gate wrote}"
+TEST_EXIT=$(sed -n 's/^TEST_EXIT=//p' "$TEST_LOG" | tail -1)
+echo "TEST_EXIT=${TEST_EXIT:-none} TEST_LOG=$TEST_LOG"
+grep -q '^TEST_EXIT=0$' "$TEST_LOG" && rm -f "$TEST_LOG"   # a red or unfinished log is never removed here
+```
+
+A foreground call killed at the timeout loses its exit code, and can leave a moved `.agents/skills`
+unrestored. A log with no `TEST_EXIT=` line is a run that never finished: it is not a pass, and it
+is not a failure to triage — re-run it.
 
 ### On Test Failure (TEST_EXIT != 0)
 
@@ -265,8 +312,12 @@ Main reads only the triage summary (counts + ≤10 failure bullets + `next_file`
 
 ### Log Cleanup
 
-- `TEST_EXIT == 0` → `rm -f "$TEST_LOG"` — log no longer needed
-- `TEST_EXIT != 0` → retain for post-mortem; do not delete on failure
+The cleanup is the last statement of each block above — `[ "$TEST_EXIT" -eq 0 ] && rm -f "$TEST_LOG"`
+in the foreground form, `grep -q '^TEST_EXIT=0$' "$TEST_LOG" && rm -f "$TEST_LOG"` in the background
+form — and never a statement of its own. **Reading the result and removing the log are separate
+decisions**, and keying the removal on the result in the same statement is what stops a command that
+batches a read with cleanup from removing a red log (task.238, obs #41). A red log is retained for
+post-mortem; the triage subagent reads it.
 
 ---
 

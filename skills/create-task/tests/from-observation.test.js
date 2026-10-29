@@ -203,6 +203,92 @@ test("seed: an Improvement that opens with a numbered list seeds its first sente
   );
 });
 
+test("seed: an abbreviation's dot does not end the sentence (obs #101)", () => {
+  // The task.233 Improvement, verbatim: "e.g." cut it to a 66-char fragment
+  // that cleared the length floor.
+  const seed = lib.seedFromObservations(
+    [
+      entry(101, {
+        improvement:
+          'Make the `done` template say only what acceptance establishes, e.g. "checked and\nconfirmed working", and nothing more. A second sentence.',
+      }),
+    ],
+    { taskId: 233 },
+  );
+  assert.equal(
+    seed.description,
+    'Make the `done` template say only what acceptance establishes, e.g. "checked and confirmed working", and nothing more.',
+  );
+  assert.equal(seed.descriptionReason, null);
+  for (const abbr of ["i.e.", "vs.", "cf."]) {
+    const s = lib.seedFromObservations(
+      [
+        entry(1, {
+          improvement: `Read the host once, ${abbr} through host_of. More.`,
+        }),
+      ],
+      { taskId: 1 },
+    );
+    assert.equal(
+      s.description,
+      `Read the host once, ${abbr} through host_of.`,
+      abbr,
+    );
+  }
+  // "etc." can end a sentence: it does when a capital follows, not otherwise.
+  const etc = lib.seedFromObservations(
+    [
+      entry(1, {
+        improvement: "Cover the logs, traces, etc. Then add a test.",
+      }),
+    ],
+    { taskId: 1 },
+  );
+  assert.equal(etc.description, "Cover the logs, traces, etc.");
+  const etcMid = lib.seedFromObservations(
+    [
+      entry(1, {
+        improvement: "Cover the logs, traces, etc. as one record. More.",
+      }),
+    ],
+    { taskId: 1 },
+  );
+  assert.equal(
+    etcMid.description,
+    "Cover the logs, traces, etc. as one record.",
+  );
+});
+
+test("seed: a lead-in to a list is refused, not written as the description (obs #101, #109)", () => {
+  // The obs #109 Improvement shape: the first sentence is "Choose one, or
+  // both:" and the list marker "1." closed it — 23 chars, past the floor.
+  const improvement =
+    "Choose one, or both:\n\n1. The QA loop applies doc-only findings on APPROVE.\n2. finalise gives the docs prompt a severity.";
+  const seed = lib.seedFromObservations([entry(109, { improvement })], {
+    taskId: 237,
+  });
+  assert.equal(seed.description, null);
+  assert.equal(seed.descriptionReason, "list-lead-in");
+  // One lead-in among several entries still refuses: a description built
+  // from the others would describe only part of the task.
+  const two = lib.seedFromObservations(
+    [entry(109, { improvement }), entry(2)],
+    { taskId: 237 },
+  );
+  assert.equal(two.description, null);
+  assert.equal(two.descriptionReason, "list-lead-in");
+  // A colon inside a sentence is not a lead-in.
+  const colon = lib.seedFromObservations(
+    [
+      entry(1, {
+        improvement: "Two fixes: refuse the fragment and ask. Then test.",
+      }),
+    ],
+    { taskId: 1 },
+  );
+  assert.equal(colon.description, "Two fixes: refuse the fragment and ask.");
+});
+
 test("seed: a description under the minimum is refused, not written (obs #291)", () => {
   const seed = lib.seedFromObservations(
     [entry(5, { improvement: "Fix it." })],

@@ -1,0 +1,162 @@
+{
+  "schema": 1,
+  "dod_n": 4,
+  "head": "d24e061bb33fd34c6b36e28e65e59d5d4802dd36",
+  "dirty_paths": [
+    "docs/tasks/task.243.wireframe-component-mapping/task.243.implementation.1.wireframe-component-mapping-initial-run.md",
+    "docs/tasks/task.243.wireframe-component-mapping/task.243.pr-review.4.wireframe-component-mapping.md",
+    "docs/tasks/task.243.wireframe-component-mapping/task.243.wireframe-component-mapping.md"
+  ],
+  "document": "docs/tasks/task.243.wireframe-component-mapping/task.243.wireframe-component-mapping.md",
+  "scope": {
+    "mode": "scoped",
+    "reason": "prior-record",
+    "rejudged": 6,
+    "carried": 1
+  },
+  "criteria": [
+    {
+      "id": "SC-1",
+      "text_hash": "9a8c028edaafdc15d0441a879bfc3fc4fa2c9b2c2bb250aac52062b027e72a80",
+      "status": "PASS",
+      "description": "No ui: block: ensure and resolve answer unset, write nothing",
+      "code_citation": "shared/resources/wireframe-map.js:595",
+      "test_citation": "shared/resources/tests/wireframe-map.test.mjs:183",
+      "members": [
+        {
+          "member": "ensure answers unset and writes nothing",
+          "evidence": "shared/resources/tests/wireframe-map.test.mjs:172",
+          "status": "PASS"
+        },
+        {
+          "member": "resolve answers unset and writes nothing",
+          "evidence": "shared/resources/tests/wireframe-map.test.mjs:183",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Evidence moved because f715cd44 and 5fb5865a added encodeValue/decodeValue, LINE_TERMINATOR and signatureKey above these lines. The gates did not change: ensure returns reason unset at :595 and resolve at :695. The tests at :172 and :183 assert unset and that neither file exists. Lane: shared/resources/tests/*.test.mjs is in package.json test:suite, which `npm test` runs in .github/workflows/test.yml on every pull_request with no path filter. The PR #785 'test' check is SUCCESS at head d24e061b."
+    },
+    {
+      "id": "SC-2",
+      "text_hash": "dc1edbae019181d1a45e5c6c16fed1340224a8c631f3411ac3874d1f80b21a69",
+      "status": "PASS",
+      "description": "ensure seeds missing catalogue and map; second run reports unchanged",
+      "code_citation": "shared/resources/wireframe-map.js:621",
+      "test_citation": "shared/resources/tests/wireframe-map.test.mjs:199",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The logic is unchanged and has moved down. The catalogue is created at :621 and the map at :682. The unchanged branches are at :631 and :687. The test at :199 asserts created/created, then unchanged/unchanged on a second ensure. It runs per PR through npm test in test.yml."
+    },
+    {
+      "id": "SC-3",
+      "text_hash": "2066bded855f890d24dacd5da0661e814217712fb5dc8a1dcea58561887dd3cd",
+      "status": "PASS",
+      "description": "Existing catalogue gains rows only for missing exports, never loses one",
+      "code_citation": "shared/resources/wireframe-map.js:628",
+      "test_citation": "shared/resources/tests/wireframe-map.test.mjs:222",
+      "members": [],
+      "non_member_fail": null,
+      "note": "At :628-663, missing filters out names already catalogued. The new rows are spliced in under the 'Added by wireframe-map' heading with lines.splice(insert.at, 0, ...), so no line is removed. The test at :222 asserts updated, added == ['Row'], the existing Button row kept, and a later unchanged run. The test at :254 covers a level-3 section and a second run. Both run per PR through npm test."
+    },
+    {
+      "id": "SC-4",
+      "text_hash": "ed1af183207c76a8dbab08037fe1056016a7b67fd712801b90b34367b1c56b13",
+      "status": "PASS",
+      "description": "resolve applies most specific matching row, lists other nodes open",
+      "code_citation": "shared/resources/wireframe-map.js:412",
+      "test_citation": "shared/resources/tests/wireframe-map.test.mjs:389",
+      "members": [],
+      "non_member_fail": null,
+      "note": "score() at :412 ranks rows by parent, flags, attributes and label. match() at :429 keeps the highest score, and an earlier row wins a tie. resolve then puts each node in resolved or unresolved (about :715-735). The only change since the last record is that attribute values are decoded in parsePattern, which the round-trip test at :490 covers. The test at :389 asserts that the narrower row wins, that flag, label and attribute mismatches stay open, and that candidates are offered. It runs per PR."
+    },
+    {
+      "id": "SC-5",
+      "text_hash": "52a02403d643067419251ad738f20e16f859d909cba5a689865550cadd618e68",
+      "status": "PASS",
+      "description": "record adds a link; replaces one with same signature and label",
+      "code_citation": "shared/resources/wireframe-map.js:827",
+      "test_citation": "shared/resources/tests/wireframe-map.test.mjs:549",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Since f715cd44, record matches an existing row by signatureKey (defined at about :384: parent, primitive, deduplicated sorted flags, sorted decoded attributes) plus an equal label. It replaces that row at :834; otherwise it adds a row at :843. The test at :437 asserts added, then replaced, leaving one name=leader row. The test at :549 runs 9 cases. These spellings count as the same signature and are replaced: é vs %C3%A9, 72% vs 72%25, *&gt;input vs input, reordered flags, reordered attributes. These count as different and are added: 1 vs 1%2C500, 100% vs 100%2525, a window parent vs any parent, a flag subset. Each case also checks the row count. The test at :490 round-trips 13 awkward values through record and resolve. All run per PR through npm test, and the 'test' check is SUCCESS at head d24e061b. The 8 bundled skills/*/references/wireframe-map.js copies are identical to the source apart from the AUTO-GENERATED header."
+    },
+    {
+      "id": "SC-6",
+      "text_hash": "bed489373b3d13516f7949e669baba261a9e92068db30f5e57241d9d1604e09b",
+      "status": "PASS",
+      "description": "All eight skills carry their hook and bundled engine, procedure, parser",
+      "code_citation": "skills/create-story/SKILL.md:762",
+      "test_citation": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:38",
+      "members": [
+        {
+          "member": "create-story",
+          "evidence": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:27",
+          "status": "PASS"
+        },
+        {
+          "member": "create-task",
+          "evidence": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:28",
+          "status": "PASS"
+        },
+        {
+          "member": "review-story",
+          "evidence": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:29",
+          "status": "PASS"
+        },
+        {
+          "member": "review-task",
+          "evidence": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:30",
+          "status": "PASS"
+        },
+        {
+          "member": "qa-story",
+          "evidence": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:31",
+          "status": "PASS"
+        },
+        {
+          "member": "qa-task",
+          "evidence": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:32",
+          "status": "PASS"
+        },
+        {
+          "member": "develop-story",
+          "evidence": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:33",
+          "status": "PASS"
+        },
+        {
+          "member": "develop-task",
+          "evidence": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:34",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Parameterised test per skill (hooks.test.mjs:37-51) asserts the hook phrase and references/{wireframe-map.js, wireframe-component-mapping.md, yaml-subset.js}; test.mjs:53 asserts each gates on ui.wireframeMap. Verified on disk."
+    },
+    {
+      "id": "#7",
+      "text_hash": "9e9c0b9741af5934aac9b697686feee12b04aed161f3f1e0e267d8486526c3f4",
+      "status": "PASS",
+      "description": "Docs: assumption not recorded; subsection named in four places; not in template",
+      "code_citation": "shared/resources/wireframe-component-mapping.md:98",
+      "test_citation": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:409",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Documentation criterion with a pinning test. Procedure :98 says 'Do not record it in the map: an assumption is not a confirmation', and :100 names the `### Wireframe mapping assumptions` Decisions Log subsection. The heading in backticks also appears at develop-pipeline-autonomous-defaults.md:20, pr-conformance-prompt.md:90, qa-story/SKILL.md:1517 and qa-task/SKILL.md:1060. implementation-report-template.md has 0 matches. The 4-line addition to the procedure since the last record (around :111) does not touch these lines. Pinned per PR by hooks.test.mjs:409-427 (evals/shared/tests/*.test.mjs is in test:suite)."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "SC-1",
+      "note": "Not a failure, carried from earlier runs. resolve has no write path, so the two existsSync assertions at wireframe-map.test.mjs:191-192 cannot fail; the deepEqual {reason:'unset'} does the real work."
+    },
+    {
+      "ac_id": "SC-4",
+      "note": "Carried from earlier runs. No test asserts that resolved plus unresolved covers every node; the partition loop in resolve (wireframe-map.js about :715-735) is what guarantees it."
+    },
+    {
+      "ac_id": "SC-5",
+      "note": "Not a failure. signatureKey deduplicates flags (new Set at wireframe-map.js about :391), but score() at :421 counts p.flags.length with duplicates. So `input[a,a]` and `input[a]` share a key, and record would replace one with the other, yet they score differently in match. This is an edge case only a hand-written duplicate flag can reach. No test covers it."
+    }
+  ]
+}

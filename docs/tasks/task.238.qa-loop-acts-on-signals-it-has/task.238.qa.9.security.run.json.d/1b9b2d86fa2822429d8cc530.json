@@ -1,0 +1,25 @@
+{
+  "sink": "filename",
+  "entry": "fence:shared/resources/develop-pipeline-step-5-6-qa-loop.md#Verdict branching",
+  "name": "open-coverage-shapes-9",
+  "call_site": null,
+  "verdict": "present-but-inert",
+  "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+  "executed": 12,
+  "passed": 10,
+  "reproduced": 2,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": [
+    "bash"
+  ],
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": null,
+  "slot": "{the PR review report this cycle's 5c wrote}",
+  "fixture_setup": null,
+  "ran_at": "2026-10-28T08:17:01.003Z"
+}

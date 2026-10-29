@@ -5,7 +5,7 @@ type: plan
 description: "Code-level guide for task 169: boundary flag matching, activation-flag checks, empty-vs-missing SKILL.md messages and a memoised corpus, each with the test and mutation that holds it."
 task-ref: task.169.pinning-test-advisory-fixes.md
 created: 2026-09-30
-updated: 2026-09-30
+updated: 2026-10-26
 ---
 
 # Implementation Plan: Close the four advisory findings on the reference-doc pinning test
@@ -43,15 +43,21 @@ if (body === null) { missingCommands.push(`… does not exist`); continue; }
 if (!body.trim()) { emptySkills.push(`commands.md:${r.line}: ${r.cell} names /${r.skill}, but skills/${r.skill}/SKILL.md is empty`); continue; }
 ```
 
-`makeSkillMd()` already stores `null` for a missing file; keep it. Return `emptySkills` and assert
-it empty in the commands group (and the same for activation mentions).
+`makeSkillMd()` already stores `null` for a missing file; keep it. Apply the same split to the
+activation side — `missingNamed` takes `body === null` only, a blank body goes to `emptySkills` (today's
+`!lookup(n.skill)` would report an empty file as missing). Return `emptySkills` and assert it empty in
+both live groups.
 
 Fixtures (under `describe("extractors …")` or a new `describe("resolution rules")`):
 
 - `documentsFlag("use --read-only here", "--read") === false`;
   `documentsFlag("pass --read.", "--read") === true`; `documentsFlag("--apply=x", "--apply") === true`.
 - `resolveCorpus` with a fake lookup — `(name) => name === "develop-next" ? "" : skillMd(name)` —
-  returns an `emptySkills` entry naming `develop-next` and no `missingCommands` entry for it.
+  returns an `emptySkills` entry naming `develop-next`, and names it in neither `missingCommands` nor
+  `missingNamed` (`develop-next` is on both pages: `activation-phrases.md:43`).
+- Call-site prefix fixture — `resolveCorpus((n) => { const b = skillMd(n); return b && b.replace(/(--[a-z][a-z0-9-]*)/g, "$1-z"); })`
+  makes every documented flag a longer one: `undocumentedFlags.length === flagChecks` (and `> 0`).
+  Under `includes` it would be 0. After Phase 2, also `undocumentedActivationFlags.length === activationFlagChecks`.
 
 ### Phase 2: Activation flags checked
 
@@ -70,7 +76,8 @@ for (const span of spans) {
 ```
 
 Note the `new Set(spans)` dedupe in today's loop: keep order-preserving dedupe of *skill* spans, but a
-flag span must still attach.
+flag span must still attach. The snippet above does not dedupe — add a per-row `seen` set of skill
+heads (skip a repeated head, but keep `last` pointing at its first mention).
 
 In `resolveCorpus`, for each `named` entry with a non-null, non-empty body, check each flag with
 `documentsFlag`; collect `undocumentedActivationFlags` and count `activationFlagChecks`. Live test:
@@ -104,9 +111,10 @@ test("the corpus is resolved once per run", () => {
 
 | Mutation | Expected red |
 | :--- | :--- |
-| `documentsFlag` → `body.includes(flag)` | the prefix fixture |
+| `documentsFlag` → `body.includes(flag)` | the prefix fixture; the call-site prefix fixture |
+| `resolveCorpus` → `body.includes(flag)` (helper kept) | the call-site prefix fixture |
 | Drop the standalone-flag attachment | activation-flag fixture; live floor (1 < 2) |
-| `body === null` → `!body` | the empty-vs-missing fixture |
+| `body === null` → `!body` (either side) | the empty-vs-missing fixture |
 | `getCorpus` → `resolveCorpus(skillMd)` (no memo) | the resolved-once test |
 
 ## Measurement commands (re-run before setting floors)

@@ -1,0 +1,82 @@
+[
+  {
+    "id": "reopened-plain",
+    "sink": "markdown-structure",
+    "direction": "legitimate",
+    "input": "---\nid: task.1\nstatus: in-progress\n---\n\n# Task\n\n## Definition of Done ✅ PASSED\n\nprior block\n",
+    "why": "A reopened document — status not accepted, an acceptance block present (finalise Step 2). A false answer lets scope carry verdicts the reopen rule says must be re-judged.",
+    "correct": "returns true (reopened → full)"
+  },
+  {
+    "id": "reopened-crlf",
+    "sink": "markdown-structure",
+    "direction": "legitimate",
+    "input": "---\r\nid: task.1\r\nstatus: in-progress\r\n---\r\n\r\n# Task\r\n\r\n## Definition of Done ✅ PASSED\r\n",
+    "why": "A CRLF document is the same reopened document; a frontmatter or heading match that fails on \\r skips the reopen rule silently.",
+    "correct": "returns true"
+  },
+  {
+    "id": "reopened-status-comment",
+    "sink": "markdown-structure",
+    "direction": "legitimate",
+    "input": "---\nid: task.1\nstatus: in-progress # reopened after acceptance\n---\n\n## Definition of Done — PASSED\n",
+    "why": "A trailing YAML comment on status must not make the status read as accepted or hide the reopen.",
+    "correct": "returns true"
+  },
+  {
+    "id": "reopened-status-quoted",
+    "sink": "markdown-structure",
+    "direction": "legitimate",
+    "input": "---\nid: task.1\nstatus: \"ready-for-review\"\n---\n\n## Definition of Done ✅\n",
+    "why": "A quoted non-accepted status beside a ✅ DoD heading is a reopen; Step 2's grep matches on ✅ alone.",
+    "correct": "returns true"
+  },
+  {
+    "id": "reopened-no-frontmatter",
+    "sink": "markdown-structure",
+    "direction": "legitimate",
+    "input": "# Task\n\n## Definition of Done PASSED\n",
+    "why": "No frontmatter means no accepted status, so a PASSED block means a reopen.",
+    "correct": "returns true"
+  },
+  {
+    "id": "first-run",
+    "sink": "markdown-structure",
+    "direction": "hostile",
+    "input": "---\nid: task.1\nstatus: ready-for-review\n---\n\n# Task\n\n## 9. Success Criteria\n\n- [ ] SC-1: thing\n",
+    "why": "A never-accepted document is not reopened; true would force every re-run full.",
+    "correct": "returns false"
+  },
+  {
+    "id": "accepted-doc",
+    "sink": "markdown-structure",
+    "direction": "hostile",
+    "input": "---\nid: task.1\nstatus: accepted\n---\n\n## Definition of Done ✅ PASSED\n",
+    "why": "An accepted document with its own acceptance block is not reopened.",
+    "correct": "returns false"
+  },
+  {
+    "id": "accepted-single-quoted",
+    "sink": "markdown-structure",
+    "direction": "hostile",
+    "input": "---\nid: task.1\nstatus: 'accepted'\n---\n\n## Definition of Done ✅ PASSED\n",
+    "why": "A quoted accepted status is still accepted.",
+    "correct": "returns false"
+  },
+  {
+    "id": "h3-heading-not-a-block",
+    "sink": "markdown-structure",
+    "direction": "hostile",
+    "input": "---\nid: task.1\nstatus: in-progress\n---\n\n### Definition of Done ✅\n",
+    "why": "Step 2's grep counts only level-2 headings; the engine must agree.",
+    "correct": "returns false, matching grep -cE '^## Definition of Done.*(PASSED|✅)'"
+  },
+  {
+    "id": "gaps-heading",
+    "sink": "markdown-structure",
+    "direction": "hostile",
+    "input": "---\nid: task.1\nstatus: in-progress\n---\n\n## Definition of Done — GAPS FOUND ❌\n",
+    "why": "A gaps block is not an acceptance block; true would make every run after a gaps run full.",
+    "correct": "returns false"
+  }
+]

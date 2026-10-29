@@ -1,0 +1,55 @@
+schema: 2
+task: 'task.236.create-task-seed-step-call'
+task_title: 'create-task 1.1 omits the required taskId argument to seedFromObservations'
+gate: PASS
+status_reason: 'The finalise DoD gap is closed. The probe test now asserts executed === caseCount × shells.length and that shells includes bash. With a stand-in zsh the reverted assertion fails 36 !== 18 (the CI failure) and the fix passes under one shell and two. The scoped review found no defect; ci:fast 6422/0 fail.'
+reviewer: 'QA Engineer'
+head: '1689d7cb331704d9029af9e6d723a3d2386c90d6'
+updated: '2026-10-27T07:28:10Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 50
+  phases_verified: 3/3
+  ci: 'pending @ 1689d7cb (test running; link-check, validate, shellcheck, secret-scan pass). Informational; CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 18
+    escaped: 0
+    notes: 'Shipped-file fence probe, record task.236.qa.4.security.run.json: totals.executed 18, reproduced 0, escaped 0 (bash; this host has no zsh). The same cases with a stand-in zsh on PATH ran 36, all scored as their direction requires. The seed block is unchanged since gate 3. Residual CR-2 (low) carried.'
+  performance:
+    status: PASS
+    notes: 'seed-step-block.test.js real 4.504s on 1689d7cb at load 5.15 (bound < 5s); 4.80s earlier at lower load. Margin is thin; in CI the probe test alone took 12s under two shells.'
+  reliability:
+    status: PASS
+    notes: 'The count assertion no longer depends on which shells the host has; the reviewer confirmed probeShells always starts with bash and every (case, shell) pair is counted or declined.'
+  maintainability:
+    status: PASS
+    notes: 'validate rc 0 for create-task; Prettier clean.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Performance margin: seed-step-block.test.js runs at 4.3-4.8s against a 5s bound, and at ~12s for the probe test in CI under two shells; move the probe test to its own file or trim the closure each case embeds.'
+      refs: ['skills/create-task/tests/seed-step-block.test.js', 'skills/create-task/tests/seed-block-probe.js']
+    - action: 'Carried from gate 3: CR-1 (pre-existing double-quoted placeholder sites), CR-2 (single quote left to the prose rule), CR-3 (prune comment), cycle 2 CR-3 and CR-5.'
+      refs: ['skills/create-task/SKILL.md', 'skills/create-task/tests/seed-step-block.test.js']
+    - action: 'Observation #107: qa-task could read the PR''s latest finished CI result for the head it judges; this red lane went unread through cycle 3.'
+      refs: ['skills/qa-task/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

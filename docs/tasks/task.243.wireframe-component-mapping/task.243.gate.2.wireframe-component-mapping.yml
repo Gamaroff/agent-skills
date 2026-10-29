@@ -1,0 +1,71 @@
+schema: 2
+task: 'task.243.wireframe-component-mapping'
+task_title: "Link Wireloom wireframe nodes to the project's UI components, and ask when unsure"
+gate: FAIL
+status_reason: 'All six cycle 1 findings are fixed and held by mutation-proven tests, but the refute pass found that Phase 0 writes the catalogue and map before Step 1, so /create-branch halts on the first develop run in a consumer that turns the feature on.'
+reviewer: 'QA Engineer'
+head: '8b431651494ca8586f55952d1946ea67f35f3180'
+updated: '2026-10-29T14:23:38Z'
+
+top_issues:
+  - id: 'TASK-243-CR2-1'
+    severity: high
+    file: 'shared/resources/develop-pipeline-step-0-resolve-and-prepare.md'
+    finding: '0c-wire ensure and 0d record write consumer files before the branch exists; Step 1 stashes only the implementation report and /create-branch halts on any other uncommitted file. The step-0 text also claims Phase 0 is side-effect free.'
+    suggested_action: 'Keep Phase 0 read-only (resolve only); run ensure and the record calls after branch creation; test that Phase 0 leaves git status clean.'
+    suggested_owner: dev
+    bug_ref: 'task.243.bug.6.phase-0-wireframe-writes-block-branch-creation.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80 # 100 - 20 x 1 high finding
+
+evidence:
+  tests_reviewed: 29
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false, unchanged from gate 1; the cycle 1 fixes add no accept/reject predicate (nameList and isComponentName classify config and export names for a catalogue, and refuse nothing).'
+  performance:
+    status: PASS
+    notes: 'purposeOf now retries from each /** start; linear in practice for component files.'
+  reliability:
+    status: FAIL
+    notes: 'CR2-1 halts the develop pipeline at Step 1 on the first opted-in run.'
+  maintainability:
+    status: PASS
+    notes: 'Each fix has a named regression test.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR2-1 (bug.6) with a test that runs the Phase 0 wireframe blocks and asserts a clean tree.'
+      refs: ['shared/resources/develop-pipeline-step-0-resolve-and-prepare.md', 'shared/resources/develop-pipeline-step-1-create-branch.md']
+  future:
+    - action: 'CR2-2: the Added-heading lookup searches from line 0, so an identical heading above the section defeats the in-section check (advisory, low, medium confidence).'
+      refs: ['shared/resources/wireframe-map.js']
+    - action: 'CR-6 (gate 1): an unreadable map answers ok with every node open; no caller reads mapState.'
+      refs: ['shared/resources/wireframe-map.js']
+    - action: 'CR-8, CR-9 (gate 1): exact-string row replacement; substring candidate filter.'
+      refs: ['shared/resources/wireframe-map.js']
+
+bug_resolution:
+  bugs_fixed: 5
+  bugs_remaining: 1
+  fix_date: '2026-10-29'
+  total_iterations: 1
+  verification_method: 'Committed tests (29/29), mutation proofs 6/6 covered, cycle 1 reproductions re-run at 8b431651'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['CR2-1 fixed and re-gated']

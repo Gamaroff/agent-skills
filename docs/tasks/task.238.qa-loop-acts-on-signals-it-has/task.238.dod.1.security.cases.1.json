@@ -1,0 +1,95 @@
+[
+  {
+    "id": "base-upload-pack-injection",
+    "sink": "shell-exec",
+    "input": "--upload-pack=touch PWNED; git-upload-pack",
+    "direction": "hostile",
+    "why": "git reads an argument after the remote name that starts with - as an option; --upload-pack runs a command over a local transport (bug.3)",
+    "correct": "refused before any git call: attributable, no marker",
+    "expected": {
+      "exit": 0,
+      "stdout": "BASE_CHECK=unavailable (--base is not a branch name: --upload-pack=touch PWNED; git-upload-pack)\nGATE_OUTCOME=attributable\n",
+      "absent": [
+        "PWNED",
+        ".origin.git/PWNED"
+      ]
+    }
+  },
+  {
+    "id": "base-leading-dash",
+    "sink": "shell-exec",
+    "input": "-develop",
+    "direction": "hostile",
+    "why": "any leading dash is option-shaped",
+    "correct": "refused: attributable",
+    "expected": {
+      "exit": 0,
+      "stdout": "BASE_CHECK=unavailable (--base is not a branch name: -develop)\nGATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "base-range",
+    "sink": "shell-exec",
+    "input": "develop..x",
+    "direction": "hostile",
+    "why": "a revision range is not a branch name",
+    "correct": "refused by check-ref-format --branch",
+    "expected": {
+      "exit": 0,
+      "stdout": "BASE_CHECK=unavailable (--base is not a branch name: develop..x)\nGATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "base-dotdot-segment",
+    "sink": "shell-exec",
+    "input": "develop/../x",
+    "direction": "hostile",
+    "why": "a .. path component is not a valid ref",
+    "correct": "refused by check-ref-format --branch",
+    "expected": {
+      "exit": 0,
+      "stdout": "BASE_CHECK=unavailable (--base is not a branch name: develop/../x)\nGATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "base-space",
+    "sink": "shell-exec",
+    "input": "develop x",
+    "direction": "hostile",
+    "why": "a space is not allowed in a ref",
+    "correct": "refused by check-ref-format --branch",
+    "expected": {
+      "exit": 0,
+      "stdout": "BASE_CHECK=unavailable (--base is not a branch name: develop x)\nGATE_OUTCOME=attributable\n"
+    }
+  },
+  {
+    "id": "base-empty",
+    "sink": "shell-exec",
+    "input": "",
+    "direction": "hostile",
+    "why": "an empty base on a red gate is a usage error",
+    "correct": "exit 2, no outcome line",
+    "expected": {
+      "exit": 2,
+      "stdout": "",
+      "stderr": "fast-gate-outcome: --base is required for a red gate\n"
+    }
+  },
+  {
+    "id": "base-develop",
+    "sink": "shell-exec",
+    "input": "develop",
+    "direction": "legitimate",
+    "why": "the ordinary PR target",
+    "correct": "classified (exit 0)"
+  },
+  {
+    "id": "base-nested",
+    "sink": "shell-exec",
+    "input": "release/2.0",
+    "direction": "legitimate",
+    "why": "a nested branch name is valid",
+    "correct": "classified (exit 0)"
+  }
+]

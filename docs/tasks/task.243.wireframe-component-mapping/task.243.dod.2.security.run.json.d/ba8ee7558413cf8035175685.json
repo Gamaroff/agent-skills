@@ -1,0 +1,23 @@
+{
+  "sink": "markdown-structure",
+  "entry": "shared/resources/wireframe-map.js#parsePattern",
+  "name": "parsePattern signature gate",
+  "call_site": null,
+  "verdict": "present-but-inert",
+  "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+  "executed": 11,
+  "passed": 7,
+  "reproduced": 4,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-29T16:32:06.062Z"
+}

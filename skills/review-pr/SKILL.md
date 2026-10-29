@@ -37,7 +37,7 @@ Invoke as `/review-pr [target] [--effort LEVEL] [--comment] [--inline] [--no-cod
 
 | Arg | Values | Default | Meaning |
 | --- | --- | --- | --- |
-| `target` | _(none)_ \| `<PR-number>` \| `<PR-URL>` \| `<branch>` \| `<JIRA-KEY>` \| `<Jira-URL>` \| `#<issue>` \| `<GitHub-issue-URL>` | open PR for the current branch | Which PR to review. A Jira key (`PROJ-702`), a Jira `/browse/` URL, a Jira board URL carrying `?selectedIssue=`, a Jira Cloud `…/issues/KEY` URL, a GitHub issue URL or `#N` names the **work item**; Step 1a resolves it to its PR |
+| `target` | _(none)_ \| `<PR-number>` \| `<PR-URL>` \| `<branch>` \| `<JIRA-KEY>` \| `<Jira-URL>` \| `#<issue>` \| `<GitHub-issue-URL>` | open PR for the current branch | Which PR to review. A Jira key (`PROJ-702`), a Jira `/browse/` URL, a Jira board URL carrying `?selectedIssue=`, a Jira Cloud `…/issues/KEY` URL, a GitHub issue URL or `#N` names the **work item**; Step 1a resolves it to its PR. A GitHub, Bitbucket or `*.atlassian.net` URL may omit `https://`; a self-hosted one may not |
 | `--effort` | `low` \| `medium` \| `high` \| `max` | `medium` | Breadth vs. precision, for **both** lenses |
 | `--comment` | flag | off | Post one summary comment to the PR |
 | `--inline` | flag | off | Additionally post each finding as an inline comment on its own line. Implies `--comment` |
@@ -102,8 +102,9 @@ REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
 BRANCH=$(git branch --show-current)
 PR="" KIND="" JIRA_KEY="" ISSUE_NUM="" TARGET_HOST="" TARGET_REPO=""
 # A refusal (malformed URL, `#abc`, a control character) exits 2 with its reason on
-# stderr — HALT and show it. A URL never falls through to the branch arm: that is how
-# a pasted Jira link used to become "no pull request found for https://…".
+# stderr — HALT and show it. A URL with a scheme, or a scheme-less URL on a known platform
+# host, never falls through to the branch arm: that is how a pasted Jira link used to become
+# "no pull request found for https://…". A scheme-less self-hosted URL is a branch.
 PARSED=$(bash .agents/skills/review-pr/scripts/parse-target.sh "${TARGET:-}") || exit 1
 while IFS='=' read -r k v; do
   case "$k" in
@@ -133,7 +134,7 @@ REMOTE_REPO=$(repo_of "$REMOTE_URL")
 JIRA_URL_SEEN="$JIRA_URL"
 # .env by the resolver's rules: optional `export`, CR stripped, last wins. Then the value: a quoted
 # one is the inside of its first quote pair, verbatim; an unquoted one loses a ` #…` comment tail and
-# trailing space.
+# trailing space, and a value that is only a comment (`JIRA_URL= # prod`) reads as unset.
 # Without that, `JIRA_URL="https://acme.atlassian.net" # prod` kept its comment and warned falsely.
 # Each `t` is its own -e: BSD sed reads `…; t; …` as a label named by the rest of the script.
 # The space after `=` is stripped by the FIRST sed, never the second: any earlier `s` that matches
@@ -141,7 +142,7 @@ JIRA_URL_SEEN="$JIRA_URL"
 [ -n "$JIRA_URL_SEEN" ] || JIRA_URL_SEEN=$(sed -nE 's/^[[:space:]]*(export[[:space:]]+)?JIRA_URL=[[:space:]]*//p' "$(git rev-parse --show-toplevel 2>/dev/null)/.env" 2>/dev/null \
   | tr -d '\r' | tail -1 \
   | sed -E -e "s/^\"([^\"]*)\".*\$/\1/" -e t -e "s/^'([^']*)'.*\$/\1/" -e t \
-        -e 's/[[:space:]]+#.*$//' -e 's/[[:space:]]+$//')
+        -e 's/(^|[[:space:]]+)#.*$//' -e 's/[[:space:]]+$//')
 case "$KIND" in
   pr)
     if [ -n "$TARGET_HOST" ]; then                     # a bare number has no host to check
@@ -201,7 +202,7 @@ printf 'KIND=%s PR=%s BRANCH=%s JIRA_KEY=%s ISSUE_NUM=%s TARGET_HOST=%s TARGET_R
 | --- | --- | --- |
 | `pr-for-current-branch` | no argument | Step 1b, PR for `$BRANCH` |
 | `pr` | a bare number; a GitHub `/pull/N`, Bitbucket web `/pull-requests/N` or API `/pullrequests/N` URL (`…/pull/12/files` is PR 12) | Step 1b |
-| `branch` | anything else that is not a URL | Step 1b |
+| `branch` | anything else — including a scheme-less URL whose host is not a known platform host | Step 1b |
 | `jira` | a bare key (`PROJ-702`), `/browse/KEY`, a board URL's `selectedIssue=KEY`, Jira Cloud `…/issues/KEY` | Step 1a |
 | `github-issue` | `#N`, a GitHub `/issues/N` URL | Step 1a |
 
@@ -788,8 +789,8 @@ findings:
     confidence: {low|medium|high}
     ref: {the same ref rendered after the em-dash, quoted}
     anchor_check: {ok|unchecked-text|no-line|no-such-file|out-of-range|text-mismatch|unparseable}
-    finding: {one sentence: what is wrong}
-    suggested_action: {one sentence: the fix approach}
+    finding: "{one sentence: what is wrong}"
+    suggested_action: "{one sentence: the fix approach}"
 truncated_count: {integer — the two lenses' counts summed}
 ```
 
@@ -799,7 +800,7 @@ truncated_count: {integer — the two lenses' counts summed}
 ````
 
 **About the machine-readable block.** It is what `/qa-fix`'s findings ingester reads; the rendered
-sections above it are for humans. Six rules, each of which has a way of going wrong:
+sections above it are for humans. Seven rules, each of which has a way of going wrong:
 
 - **`reviewed_gate` names the gate Step 3 read**, never a guess. `/qa-fix` ingests this report only
   while no higher-numbered gate exists (`pr-review-current.js`, bundled with `/qa-fix`, decides).
@@ -816,6 +817,11 @@ sections above it are for humans. Six rules, each of which has a way of going wr
 - **`anchor_check` beside every `ref`**, the checker's verdict from Step 6. The `ref` keeps the
   reviewer's value even when it is wrong, so `anchor_check` is what tells `/qa-fix` a verified
   location from an unverified one.
+- **Double-quote `finding` and `suggested_action`**, each on its key's line, escaping only `\"` and
+  `\\`. They are free text, and a bare sentence holding `: ` reads as a key: Step 5c's reader
+  (`open-coverage.js`) refuses the whole block, and the develop pipeline halts at **Review failed**
+  on a review it could have routed. Write every other character as itself; `\n`, `\t` and any
+  other escape are refused, not decoded (task.240 PR review PC-5).
 - **Always emit the section, even with nothing to report** — as `findings: []` with
   `truncated_count: 0`. If a findings-free report omitted it, an absent section would mean both
   "report written before this existed" and "no findings", and the ingester's legacy fallback would
@@ -1068,8 +1074,10 @@ The distinction is the whole reason the wiring is legitimate:
 - `/review-pr` **reports** a verdict. It writes no gate `.yml`, never submits a formal GitHub
   review, and never edits code — exactly as before.
 - The **orchestrator** acts on that verdict: `REQUEST CHANGES` sends the run back to `/qa-fix` on
-  the shared 5-cycle budget; `CONCERNS` records findings without blocking; `APPROVE` exits to
-  Step 7.
+  the shared 5-cycle budget, and so does a `CONCERNS` holding an open `category: coverage` finding
+  (one without `provenance: pre-existing`; task.238); `APPROVE` and any other `CONCERNS` exit to
+  Step 7, with `CONCERNS` findings recorded rather than blocking; on either, doc-only findings are fixed when the carry clears
+  them, and ride the acceptance commit.
 
 Gate files remain the exclusive output of `/qa-story` and `/qa-task`.
 

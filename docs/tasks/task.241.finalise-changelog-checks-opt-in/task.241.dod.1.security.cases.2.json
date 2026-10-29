@@ -1,0 +1,153 @@
+[
+  {
+    "id": "guard.on",
+    "sink": "path",
+    "input": "stub.sh",
+    "why": "The resolver's on answer must pass the guard.",
+    "correct": "Continue (exit 0, no output).",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        "stub.sh": "echo on\n"
+      }
+    },
+    "expected": {
+      "stdout": "",
+      "exit": 0
+    }
+  },
+  {
+    "id": "guard.off",
+    "sink": "path",
+    "input": "stub.sh",
+    "why": "The resolver's off answer must pass the guard.",
+    "correct": "Continue (exit 0, no output).",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        "stub.sh": "echo off\n"
+      }
+    },
+    "expected": {
+      "stdout": "",
+      "exit": 0
+    }
+  },
+  {
+    "id": "guard.unknown",
+    "sink": "path",
+    "input": "stub.sh",
+    "why": "The resolver's own broken-install answer.",
+    "correct": "HALT changelog-unknown.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "stub.sh": "echo unknown\n"
+      }
+    },
+    "expected": {
+      "stdout": "HALT: changelog-unknown — changelog-enforce.sh answered 'unknown', not on or off; check .agents/skills/finalise/references/ holds changelog-enforce.sh and read-config.sh, then re-run /finalise\n",
+      "exit": 1
+    }
+  },
+  {
+    "id": "guard.empty",
+    "sink": "path",
+    "input": "stub.sh",
+    "why": "Empty output means the resolver did not run. It must not read as off.",
+    "correct": "HALT changelog-unknown.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "stub.sh": "exit 0\n"
+      }
+    },
+    "expected": {
+      "stdout": "HALT: changelog-unknown — changelog-enforce.sh answered '', not on or off; check .agents/skills/finalise/references/ holds changelog-enforce.sh and read-config.sh, then re-run /finalise\n",
+      "exit": 1
+    }
+  },
+  {
+    "id": "guard.missing",
+    "sink": "path",
+    "input": "missing-resolver.sh",
+    "why": "A resolver file that is absent from the install.",
+    "correct": "HALT changelog-unknown.",
+    "direction": "hostile",
+    "expected": {
+      "stdout": "HALT: changelog-unknown — changelog-enforce.sh answered '', not on or off; check .agents/skills/finalise/references/ holds changelog-enforce.sh and read-config.sh, then re-run /finalise\n",
+      "exit": 1
+    }
+  },
+  {
+    "id": "guard.uppercase",
+    "sink": "path",
+    "input": "stub.sh",
+    "why": "The guard accepts the normalised answer only, so ON is not on.",
+    "correct": "HALT changelog-unknown.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "stub.sh": "echo ON\n"
+      }
+    },
+    "expected": {
+      "stdout": "HALT: changelog-unknown — changelog-enforce.sh answered 'ON', not on or off; check .agents/skills/finalise/references/ holds changelog-enforce.sh and read-config.sh, then re-run /finalise\n",
+      "exit": 1
+    }
+  },
+  {
+    "id": "guard.trailing-space",
+    "sink": "path",
+    "input": "stub.sh",
+    "why": "on with a trailing space is not on.",
+    "correct": "HALT changelog-unknown.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "stub.sh": "echo 'on '\n"
+      }
+    },
+    "expected": {
+      "stdout": "HALT: changelog-unknown — changelog-enforce.sh answered 'on ', not on or off; check .agents/skills/finalise/references/ holds changelog-enforce.sh and read-config.sh, then re-run /finalise\n",
+      "exit": 1
+    }
+  },
+  {
+    "id": "guard.two-lines",
+    "sink": "path",
+    "input": "stub.sh",
+    "why": "Two answers are neither on nor off.",
+    "correct": "HALT changelog-unknown.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "stub.sh": "printf 'on\\noff\\n'\n"
+      }
+    },
+    "expected": {
+      "stdout": "HALT: changelog-unknown — changelog-enforce.sh answered 'on\noff', not on or off; check .agents/skills/finalise/references/ holds changelog-enforce.sh and read-config.sh, then re-run /finalise\n",
+      "exit": 1
+    }
+  },
+  {
+    "id": "guard.answer-is-data",
+    "sink": "path",
+    "input": "stub.sh",
+    "why": "A command substitution inside the answer must be echoed literally, never run.",
+    "correct": "HALT changelog-unknown, and create no file.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "stub.sh": "echo '$(touch pwned)'\n"
+      }
+    },
+    "expected": {
+      "stdout": "HALT: changelog-unknown — changelog-enforce.sh answered '$(touch pwned)', not on or off; check .agents/skills/finalise/references/ holds changelog-enforce.sh and read-config.sh, then re-run /finalise\n",
+      "exit": 1,
+      "absent": [
+        "pwned"
+      ]
+    }
+  }
+]

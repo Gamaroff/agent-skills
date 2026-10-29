@@ -1,0 +1,28 @@
+{
+  "sink": null,
+  "entry": "shell-argv:shared/resources/grant-qa-cycles.sh",
+  "name": "grant-qa-cycles k argument",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 20,
+  "passed": 20,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": [
+    "bash"
+  ],
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": [
+    "doc",
+    "{input}"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-29T03:43:26.297Z"
+}

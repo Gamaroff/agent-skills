@@ -1,0 +1,75 @@
+schema: 2
+task: 'task.165.task-164-deferred-follow-ups'
+task_title: "Close task.164's deferred follow-ups"
+gate: CONCERNS
+status_reason: 'All phases delivered and every functional criterion is held by a committed, mutation-proven test. The two new review-skill gates are boundaries that refuse silently, so the fence: probe declined every hostile case and probes_executed is 0.'
+reviewer: 'QA Engineer'
+head: '863f625d528b5301a8af8add5d0e6d5f87387ade'
+updated: '2026-10-26T15:37:21Z'
+
+top_issues:
+  - id: 'QA-1'
+    severity: medium
+    file: 'skills/review-task/SKILL.md'
+    finding: 'The review-task and review-story lock-cooperation gates refuse on repository state (document status) but print nothing when they refuse, so the fence: probe declines all 7 hostile cases (no-hostile-evidence) and the boundary has probes_executed 0.'
+    suggested_action: 'In both blocks add an elif branch that, when the lock exists and the review did not pass, prints one refusal line; then re-run the fence: probe with each hostile case expecting that line and record the run.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-2'
+    severity: low
+    file: 'skills/review-story/SKILL.md'
+    finding: 'CR-1: the prose says every GO that did not promote HALTs, but a GO on an in-progress story proceeds and is advanced by the orchestrator, not the block.'
+    suggested_action: 'Reword to name the orchestrator Step 2 → 3 advance for the in-progress case, and add an in-progress row to review-lock-cooperation.test.mjs.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-3'
+    severity: low
+    file: 'skills/review-task/SKILL.md'
+    finding: 'CR-2: the new cooperation heading names /develop-story, which never invokes review-task.'
+    suggested_action: 'Narrow the heading to /develop-task.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 6392
+  phases_verified: 5/5
+  ci: 'not read this cycle'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [4]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: true (review-skill gates, repo-state refusal). fence: probe ran 1 legitimate case (accepted); 7 hostile cases declined, no-hostile-evidence — the gate refuses silently. QA-1.'
+  performance:
+    status: PASS
+    notes: '4b meta-test 17.9s (base 54636ed0) → 1.0s (head 863f625d); full lock test still 102/0.'
+  reliability:
+    status: PASS
+    notes: 'Both gates fail safe; no-lock path is a no-op (tested).'
+  maintainability:
+    status: PASS
+    notes: 'The --skill mapping is stated once; the banner cites it and the test reads it from its own case block.'
+
+recommendations:
+  immediate:
+    - action: 'QA-1: give both review-skill gates a refusal line and record a fence: probe run with executed > 0.'
+      refs: ['skills/review-task/SKILL.md', 'skills/review-story/SKILL.md']
+  future:
+    - action: 'QA-2 and QA-3 (low): prose accuracy in the two cooperation sections.'
+      refs: ['skills/review-story/SKILL.md', 'skills/review-task/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'QA-1 closed by a recorded fence: probe run with executed > 0'

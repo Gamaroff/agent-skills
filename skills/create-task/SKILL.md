@@ -1,7 +1,7 @@
 ---
 name: create-task
 description: Create comprehensive technical task documentation for refactoring, infrastructure changes, and technical improvements. Interactive workflow with decision guidance for non-user-facing work. `--from-observation` with a list of observation ids seeds the task from observation-log entries, asks only what they leave open, and parks the entries on the new task.
-invokes: [ensure-task-github-issue, ensure-task-jira-issue, mermaid-architect]
+invokes: [ensure-task-github-issue, ensure-task-jira-issue, mermaid-architect, wireframe]
 ---
 
 > **Status lifecycle**: see [`references/document-status-lifecycle.md`](references/document-status-lifecycle.md)
@@ -202,14 +202,50 @@ could forget: 9 entries had been parked by hand, each by whichever session remem
    the entry's `status` is not `open`, and name the id, the files and the status. A parked or
    actioned entry already has a home, and a second task cut from it is the duplicate this entry
    prevents.
-3. **Seed.** For each entry, read `${OBS_LOG_DIR}/<file>` (the `file` the scan returned; `OBS_LOG_DIR`
-   is set by the resolver, so source it again in the same shell as this read, or every path loses its
-   directory) and pass
-   `{ frontmatter: <the scan entry>, body: <the file's text> }` to `seedFromObservations` in
-   `scripts/lib.js`. It returns `ids`, `title` (the bare name, or `null` with `titleReason`),
-   `description` (or `null` with `descriptionReason: too-short`), `tags`,
-   `references`, `changeLogDescription` and the `park` vectors. It throws on a non-`open` entry, and on
-   an entry whose identity is uncertain. Identity is the scan entry's `file` prefix, which is what
+
+#### Steps 3 to 6: seed, ask, cite and park
+
+3. **Seed.** The seed needs the task id, because each park condition names it: read the registry's
+   **Next Available Task Number** (§ 1) **before** this step, and put it in `{next-task-number}`.
+   Put the selected ids in `{observation-ids}`. **Substitute only digits, commas and spaces**, and
+   refuse the run on anything else before substituting: the two values sit in single quotes, which
+   stop the shell expanding `$`, backticks and `"`, and only a `'` can end them. Run the block as it
+   stands, from the repository root, in one shell. It re-sources the resolver, because `OBS_LOG_DIR`
+   is what locates each entry's file, and it calls `seedFromObservations` **once**, with every
+   selected entry:
+
+   ```bash
+   source .agents/skills/create-task/references/resolve-observation-workspace.sh || exit 1
+   TASK_ID='{next-task-number}'
+   OBS_IDS='{observation-ids}'
+   command node .agents/skills/create-task/references/observation-log.js scan --json \
+     | command node -e '
+   const fs = require("fs"), path = require("path");
+   const lib = require(path.resolve(".agents/skills/create-task/scripts/lib.js"));
+   const scan = JSON.parse(fs.readFileSync(0, "utf8"));
+   if (!/^[0-9]+$/.test(process.argv[1])) { console.error("not a task number: " + process.argv[1]); process.exit(1); }
+   if (scan.reason !== "ok") { console.error("scan: " + scan.reason); process.exit(1); }
+   const entries = process.argv[2].split(",").map((s) => s.trim()).map((id) => {
+     if (!/^[0-9]+$/.test(id)) { console.error("not an observation id: " + id); process.exit(1); }
+     const hit = scan.entries.filter((e) => new RegExp("^0*" + Number(id) + "-").test(e.file));
+     if (hit.length !== 1) { console.error("id " + id + " matches " + hit.length + " files"); process.exit(1); }
+     const body = fs.readFileSync(path.join(process.env.OBS_LOG_DIR, hit[0].file), "utf8");
+     return { frontmatter: hit[0], body };
+   });
+   console.log(JSON.stringify(lib.seedFromObservations(entries, { taskId: process.argv[1] }), null, 2));
+   ' -- "$TASK_ID" "$OBS_IDS"
+   ```
+
+   Under `node -e`, `process.argv[1]` is the first argument after the `--`, and the `--` keeps a
+   value that starts with `-` from being read as a node option. One call is the
+   point: a run with several entries returns `title: null` with `titleReason: multiple-entries`,
+   one References list and one Change Log description, and a per-entry loop returns none of those.
+   The seed is printed as JSON. It holds `ids`, `title` (the bare name, or `null` with `titleReason`),
+   `description` (or `null` with `descriptionReason`: `too-short` or `list-lead-in`), `tags`,
+   `references`, `changeLogDescription` and the `park` vectors. The block exits non-zero, naming the
+   input, on a task number or an observation id that is not digits, on a non-`open` entry and on
+   an entry whose identity is uncertain: stop and report it.
+   Identity is the scan entry's `file` prefix, which is what
    `set-status --id` resolves, and the frontmatter id must agree with it.
    The Improvement sections seed Target Architecture and the Implementation Plan. The Issue sections
    seed Motivation, **and every current-state name they carry is grepped before it is written**
@@ -217,7 +253,8 @@ could forget: 9 entries had been parked by hand, each by whichever session remem
 4. **Ask only what is still open.** Ask for the title only when `title` is `null`: `over-bound`
    (observation titles run long, and a title is a name, obs #128) or `multiple-entries`. Ask for
    the description only when `description` is `null` (`too-short`: an Improvement whose first
-   sentence is a fragment, obs #291). Also ask the
+   sentence is a fragment, obs #291; `list-lead-in`: an Improvement that opens "Choose one:" and
+   lists options, so which one the task takes is the author's call, obs #109). Also ask the
    tracker-sync question at 4.5, which stays opt-in. Take the rest as defaults and **report** each one
    in the completion message: priority `Medium`, the template's category, and effort from the rubric
    (§ 4.4). § 3.5 still runs in full. Its Critical items are about the document, not the author, and a
@@ -265,9 +302,12 @@ are one task.
 **A blocker in another repository is never written `task.N`.** The registry reads `task.N` in the
 `Depends on` cell as a task in *this* registry, so another repository's task.127 binds to this
 repository's unrelated task.127. Write it as free text after ` — `, naming the repository
-(`— blocked on <other-repo> task.127`), and give the task a Phase 0 that HALTs until the blocker is
-met. The selector does not parse free text and may pick the task, so the Phase 0 HALT is what stops
-it (obs #243).
+(`— blocked on <other-repo> task.127`), **and** set `blocked_on_external:` in the task's frontmatter
+to the same condition (`blocked_on_external: "<other-repo> task.127 merged"`). While the field is set,
+`develop-next`'s registry fallback passes the task over and names the condition on every run that
+evaluates it; a human deletes the field when the condition is met. Still give the task a Phase 0 that
+HALTs until the blocker is met — that is the backstop for a direct `/develop-task` run, which never
+goes through the selector (obs #243, task.235).
 
 ### 1.5 Analyse Git History for Technical Context
 
@@ -451,6 +491,24 @@ After the Implementation Plan and Technical Background are populated, decide whe
 2. The skill returns a Mermaid block (with YAML metadata header) and a 2-sentence "Architectural assumptions" summary.
 3. Paste the block into Section 3 (Technical Background) under a "Current vs Target Architecture" subheading, OR into Section 6 (Implementation Plan) under a "Decision Flow" subheading — whichever is more relevant.
 4. Accept `no diagram justified — {reason}` without pushing back.
+
+### 2.6 Check for UI/Wireframe Opportunity (conditional, via `wireframe`)
+
+Most tasks draw nothing. A task that does — it migrates a screen onto shared components, rebuilds a layout, or changes what a user sees — gets the same wireframe treatment as a story (`create-story` 5.4.6), so both kinds of work item reach the develop pipelines in the same shape.
+
+**Detection rule**: the task touches frontend screens, components, layout, navigation or styles, or its Success Criteria name something a user sees.
+
+**Process**:
+
+1. **If the rule matches**, ask with `AskUserQuestion`:
+   - **Header**: `Wireframe`
+   - **Question**: "This task changes a user interface (UI) that can be visualized as a wireframe. Would you like to add a wireframe for this task using the `wireframe` skill?"
+   - **Options**: `Yes — Add wireframe (Recommended)` / `No — Skip wireframe`
+2. **If Yes**:
+   - **If the screen already has a wireframe document** made from its design source (`<stem>.wireframe.md` beside it), copy its blocks verbatim and link the file. Otherwise invoke `wireframe` and follow its **Working from a brief** section, with the task's Scope and Success Criteria as the brief.
+   - Embed it in Section 3 (Technical Background) under a `### Visual Layout / Wireframe` subheading: the rendered SVG beside the task file, then its ` ```wireloom ` source. Run `wireframe`'s `check` until it reports `ok`.
+   - Add an Implementation Plan step: `Implement the UI to match the wireframe (see Technical Background › Visual Layout / Wireframe)`.
+3. **Link the wireframe's nodes to components** (only when `skills-config.yaml` sets `ui.wireframeMap`; otherwise skip silently). Follow `references/wireframe-component-mapping.md` (engine: `references/wireframe-map.js`) with the author present, exactly as `create-story` does: `ensure`, `resolve`, propose, ask about every open node, then write the component table under the wireframe and each confirmed answer into the map.
 
 ### 3. Validation Before File Creation
 

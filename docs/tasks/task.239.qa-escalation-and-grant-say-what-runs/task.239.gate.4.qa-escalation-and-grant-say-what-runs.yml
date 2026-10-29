@@ -1,0 +1,88 @@
+schema: 2
+task: 'task.239.qa-escalation-and-grant-say-what-runs'
+task_title: 'QA escalation and grant say what will run'
+gate: CONCERNS
+status_reason: 'Cycle 3 fixed all four gate-3 lows, and the reviewer confirmed the new qualifier against the trip rule ("present at all three" follows from the conditions). A scoped review found four more lows: troubleshooting.md lists three of the four write-set fields, two grant-script comments still count the fields wrong, one sentence''s "that cycle" is ambiguous, and the new window assertions test only the in-test copy of the rule. No HIGH or MEDIUM.'
+reviewer: 'QA Engineer'
+head: '978fa17d29be5fce8887f2e293352cfb6219e1ac'
+updated: '2026-10-28T20:33:00Z'
+
+top_issues:
+  - id: 'TASK-239-QA4-CR-1'
+    severity: low
+    file: 'docs/reference/troubleshooting.md'
+    finding: 'Line 192 lists the grant write set as extra_cycles_granted, qa_max_cycles and convergence_from_cycle, and leaves out qa_phase. The parity test''s four-field loop reads only the two READMEs.'
+    suggested_action: 'Add qa_phase, and widen the write-set loop to every describer that names the script beside its fields.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-239-QA4-CR-2'
+    severity: low
+    file: 'shared/resources/grant-qa-cycles.sh'
+    finding: 'The step-4 comment (line 224) says "Write the three fields atomically", and the header (line 28) says "WRITES both fields". The jq write sets four.'
+    suggested_action: 'Say four at both sites, and name them in the header.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-239-QA4-CR-3'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: '"escalate again at that cycle''s 5a" reads back to "the third granted cycle", the only cycle the sentence names. The escalation comes at the cycle of the trio''s third reading, which can be later (3,2,2,2 trips at the fourth granted cycle).'
+    suggested_action: 'Say "the 5a of the cycle that gives the third of those readings".'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-239-QA4-CR-4'
+    severity: low
+    file: 'evals/shared/tests/qa-escalation-template.test.mjs'
+    finding: 'The three new window assertions exercise only convergenceTrip, the in-test copy of the rule. Neither the rising nor the late-trio case is a row of the doc''s worked-example table, and no assertion pins the qualifier sentence, so the prose could slide back to "flat" with every test green.'
+    suggested_action: 'Add both cases as rows of the worked-example table, which the table-row test ties to the rule, and match the qualifier in the loop doc.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 16
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false. Cycle 3 changed prose, comments, two READMEs and test code.'
+  performance:
+    status: PASS
+    notes: 'No runtime change.'
+  reliability:
+    status: PASS
+    notes: 'No behaviour change; the grant script change is comments only.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Four low residues (CR-1 to CR-4).'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-239-QA4-CR-1 to CR-4 (all low), sweeping every write-set describer rather than the named lines.'
+      refs: ['docs/reference/troubleshooting.md', 'shared/resources/grant-qa-cycles.sh', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'evals/shared/tests/qa-escalation-template.test.mjs']
+  future:
+    - action: 'Resume contract fenced block at line 492, and the detector prompt fenced block at line 69, fail under qa-execute-snippets for want of a lock fixture. Both fail identically on the merge base (pre-existing, harness seeding, not prose).'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/pipeline-resume-detector-prompt.md']
+      provenance: pre-existing
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-10-28'
+  total_iterations: 3
+  verification_method: 'Scoped reviewer re-derived the trip rule and the jq write set'
+
+deployment_readiness:
+  staging: READY
+  production: CONDITIONAL
+  conditions: ['QA4 lows fixed or accepted']

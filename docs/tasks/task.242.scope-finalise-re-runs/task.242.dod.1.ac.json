@@ -1,0 +1,304 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "ba663028b02002dc84d7b7a0e9e23f59321b5174",
+  "dirty_paths": [
+    "docs/tasks/task-registry.md"
+  ],
+  "document": "docs/tasks/task.242.scope-finalise-re-runs/task.242.scope-finalise-re-runs.md",
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 13,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "SC-1",
+      "text_hash": "e38f5e4c8dfc329ec4d3ad235c4354a0f9a34f0bc7a72f0f5ab706376f5b3079",
+      "status": "PASS",
+      "description": "scope returns full for each full reason, each pinned by a test",
+      "code_citation": "shared/resources/finalise-rerun-scope.js:297",
+      "test_citation": "shared/resources/tests/finalise-rerun-scope.test.mjs:223",
+      "members": [
+        {
+          "member": "no-prior-record",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:223",
+          "status": "PASS"
+        },
+        {
+          "member": "prior-unreadable",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:239",
+          "status": "PASS"
+        },
+        {
+          "member": "reopened",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:260",
+          "status": "PASS"
+        },
+        {
+          "member": "head-not-ancestor",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:287",
+          "status": "PASS"
+        },
+        {
+          "member": "no-criteria (added during implementation)",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:301",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "scopeOf returns fullScope for each reason at :301/:307/:318/:323/:328/:334. Each reason has its own temp-repo test. The suite runs in npm test via the 'shared/resources/tests/*.test.mjs' glob, which the test.yml job runs on every pull_request. Run locally: 52/52 pass."
+    },
+    {
+      "id": "SC-2",
+      "text_hash": "5f34451cb8cabebc134d4d2a886652111fcf48087efb9856038b871661736daf",
+      "status": "PASS",
+      "description": "Six per-criterion scope reasons pinned; id-less #N ids match by hash",
+      "code_citation": "shared/resources/finalise-rerun-scope.js:357",
+      "test_citation": "shared/resources/tests/finalise-rerun-scope.test.mjs:321",
+      "members": [
+        {
+          "member": "new-criterion",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:341",
+          "status": "PASS"
+        },
+        {
+          "member": "criterion-changed",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:341",
+          "status": "PASS"
+        },
+        {
+          "member": "reported-gap",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:359",
+          "status": "PASS"
+        },
+        {
+          "member": "evidence-changed",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:373",
+          "status": "PASS"
+        },
+        {
+          "member": "evidence-unresolved",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:419",
+          "status": "PASS"
+        },
+        {
+          "member": "unchanged",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:321",
+          "status": "PASS"
+        },
+        {
+          "member": "id-less task fixture (#N ids, text-hash match)",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:482",
+          "status": "PASS"
+        },
+        {
+          "member": "id-less story fixture (#N ids, text-hash match)",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:521",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "The reasons are assigned at finalise-rerun-scope.js:357/361/375/389/393/395. #N id assignment is in readCriteria (:92), with readCriteria tests at :196 and :208. The test runs per PR via npm test in test.yml."
+    },
+    {
+      "id": "SC-3",
+      "text_hash": "ccfe1985c6c4a205eb9c75c92f85b6b53cde5dc61828a06124d26eb12a2631a3",
+      "status": "PASS",
+      "description": "task.239 replay: SC-11 reported-gap; merge yields PASS, G7 advisory",
+      "code_citation": "shared/resources/finalise-rerun-scope.js:507",
+      "test_citation": "shared/resources/tests/finalise-rerun-scope.test.mjs:681",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The replay at :681 asserts that SC-11 is reported-gap, G4-G6 are carried, G1-G3 are re-judged, and SC-1/SC-2 are unchanged. The replay at :708 asserts that merge gives SC-11 PASS, restores G5 to PASS, sends G7 to advisories and leaves G7 uncounted. Both run per PR via npm test."
+    },
+    {
+      "id": "SC-4",
+      "text_hash": "f3da3c5dc9f174b535d8ee4c75f6e7c53442144683f9328826a626b3898d87d3",
+      "status": "PASS",
+      "description": "merge restores carried status/citations; differing verdict goes to advisories",
+      "code_citation": "shared/resources/finalise-rerun-scope.js:689",
+      "test_citation": "shared/resources/tests/finalise-rerun-scope.test.mjs:1609",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The carry branch at :689-706 restores the prior status and citations, and pushes an advisory when the agent's status differs (:704). The 'agent returns FAIL' case is the test at :1609, which checks status PASS, code_citation restored and the advisory. The 'agent omits it' case is the test at :1633. Both run per PR."
+    },
+    {
+      "id": "SC-5",
+      "text_hash": "a8e187bd09007048585117b387ac97543b48d2276890375ceaa6f22c3b66092c",
+      "status": "PASS",
+      "description": "merge recomputes overall from merged acs and docs",
+      "code_citation": "shared/resources/finalise-rerun-scope.js:466",
+      "test_citation": "shared/resources/tests/finalise-rerun-scope.test.mjs:1682",
+      "members": [],
+      "non_member_fail": null,
+      "note": "computeOverall reads both acs and docs, and finish() at :737 uses it, keeping the agent's value only as agent_overall. In the test at :1682, an agent overall FAIL over all-PASS gives PASS, and a failing docs item gives PARTIAL, not PASS. computeOverall also has its own test at :1711. All run per PR."
+    },
+    {
+      "id": "SC-6",
+      "text_hash": "db19264ab7d3ea448ee5ecc18f320cf6b797e9afbfbf360c3f1471ed326c877a",
+      "status": "PASS",
+      "description": "Step 3a runs scope; Step 3c runs merge and writes ac.json",
+      "code_citation": "skills/finalise/SKILL.md:507",
+      "test_citation": "evals/shared/tests/finalise-dod-prompt-contract.test.mjs:1184",
+      "members": [],
+      "non_member_fail": null,
+      "note": "SKILL.md:507 runs `finalise-rerun-scope.js scope` in Step 3a. :742-744 runs `merge` and sets AC_RECORD=${STEM}.dod.${DOD_N}.ac.json in Step 3c. The contract test at :1184 regex-matches both commands. finalise-rerun-scope-blocks.test.mjs:161 also executes the real blocks. The evals/shared/tests glob is in npm test. Run locally: 97/97 pass."
+    },
+    {
+      "id": "SC-7",
+      "text_hash": "33d43b25041bebcca7e71d2158b22ae8fc1d3426326f6509b44324441df9245c",
+      "status": "PASS",
+      "description": "AC prompt Step 0 reads <RERUN_SCOPE>; Step 3 heading byte-identical",
+      "code_citation": "shared/resources/finalise-dod-ac-prompt.md:16",
+      "test_citation": "evals/shared/tests/finalise-dod-prompt-contract.test.mjs:1131",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Step 0 (:16) carries <RERUN_SCOPE> at :21 and sits before Step 3 (:43). The Step 3 heading is identical to develop's, checked with `git show develop:...`. The test at :1131 pins Step 0. The test at :1164 pins the byte-identical heading across the source and the bundled copies. Both run per PR."
+    },
+    {
+      "id": "SC-8",
+      "text_hash": "6f9571f6c55697493eacb6e0808979a1cd950de10bf70458451443899c350214",
+      "status": "PASS",
+      "description": "DoD Step 2 block has re-run scope line and advisory list",
+      "code_citation": "skills/finalise/SKILL.md:784",
+      "test_citation": "evals/shared/tests/finalise-dod-prompt-contract.test.mjs:1229",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The template carries {RERUN_SCOPE_LINE ... **Re-run scope:** ...} at :784 and '### Advisory (not a gap)' at :799. The contract test at :1229 asserts both. It runs per PR."
+    },
+    {
+      "id": "SC-9",
+      "text_hash": "599d5fa83d4e459a843186e190441f6bbafc04cd259b38ec5c72de9afafc4a79",
+      "status": "PASS",
+      "description": "Bug-mode table has rerun-scope skip marker; test red without it",
+      "code_citation": "skills/finalise/SKILL.md:102",
+      "test_citation": "evals/shared/tests/finalise-bug-mode.test.mjs:139",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The table row is at :102 and the prose marker '**Bug mode (`rerun-scope`):** skip' is at :528. EXPECTED_VERBS pins 'rerun-scope: skip' (:139), which the tests at :162 and :178 read. The red-without-marker proof is M28 in the implementation report (:131). Green locally; runs per PR."
+    },
+    {
+      "id": "SC-10",
+      "text_hash": "be48f2d092d29385ef51e09e59fbe8f2242e8af87cf2c451e314787204d929e9",
+      "status": "PASS",
+      "description": "Performance: not applicable, no numeric bound claimed",
+      "code_citation": "docs/tasks/task.242.scope-finalise-re-runs/task.242.scope-finalise-re-runs.md:279",
+      "test_citation": "NOT_APPLICABLE: the task explicitly states no performance test applies (§ 8 Performance Tests: 'Not applicable.')",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The task document says at :279 and :304 that there is no performance bound. The engine reads one JSON record and runs one git diff, and no numeric bound is claimed. The 'no tests applicable' path fits because the task states it explicitly."
+    },
+    {
+      "id": "SC-11",
+      "text_hash": "ce8d71953bad3c3a39f8c6b728de135476af8812ff3d50753c9315de5beb93e9",
+      "status": "PASS",
+      "description": "Each § 8 guard mutation-proved; one report row per guard",
+      "code_citation": "docs/tasks/task.242.scope-finalise-re-runs/task.242.implementation.1.scope-finalise-re-runs-initial-run.md:98",
+      "test_citation": "shared/resources/tests/finalise-rerun-scope.test.mjs:1862",
+      "members": [
+        {
+          "member": "1 - ten scope reasons (4 full + 6 per-criterion)",
+          "evidence": "implementation report :104-107, :109-114 (M1-M4, M6-M11; M5 covers the added no-criteria)",
+          "status": "PASS"
+        },
+        {
+          "member": "2 - criterion id assignment and text-hash matching",
+          "evidence": "implementation report :115-116 (M12, M13)",
+          "status": "PASS"
+        },
+        {
+          "member": "3 - citation resolution",
+          "evidence": "implementation report :117-118 (M14, M15)",
+          "status": "PASS"
+        },
+        {
+          "member": "4a - merge: carried status restored",
+          "evidence": "implementation report :119 (M16)",
+          "status": "PASS"
+        },
+        {
+          "member": "4b - merge: differing verdict to advisory",
+          "evidence": "implementation report :120 (M17)",
+          "status": "PASS"
+        },
+        {
+          "member": "4c - merge: reported-gap status recomputed",
+          "evidence": "implementation report :121 (M18)",
+          "status": "PASS"
+        },
+        {
+          "member": "4d - merge: new unchanged member to advisory",
+          "evidence": "implementation report :122 (M19)",
+          "status": "PASS"
+        },
+        {
+          "member": "4e - merge: overall from acs and docs",
+          "evidence": "implementation report :123-124 (M20, M21)",
+          "status": "PASS"
+        },
+        {
+          "member": "5a - contract pin: Step 0 section",
+          "evidence": "implementation report :126 (M23)",
+          "status": "PASS"
+        },
+        {
+          "member": "5b - contract pin: byte-identical Step 3 heading",
+          "evidence": "implementation report :127 (M24)",
+          "status": "PASS"
+        },
+        {
+          "member": "5c - contract pin: <RERUN_SCOPE> in dispatch row",
+          "evidence": "implementation report :128 (M25)",
+          "status": "PASS"
+        },
+        {
+          "member": "5d - contract pin: scope line",
+          "evidence": "implementation report :129 (M26)",
+          "status": "PASS"
+        },
+        {
+          "member": "5e - contract pin: advisory list",
+          "evidence": "implementation report :130 (M27)",
+          "status": "PASS"
+        },
+        {
+          "member": "5f - contract pin: rerun-scope bug-mode marker",
+          "evidence": "implementation report :131 (M28)",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Each guard in § 8's closed list maps to at least one M-row that names the test that went red. :100 says every row went red and the file was restored and checked with cmp. The cited tests (engine suite plus the evals/shared/tests contract files) all run per PR in npm test. The test at :1862 also asserts that every documented reason is reached."
+    },
+    {
+      "id": "SC-12",
+      "text_hash": "d36fc32817ec99a1d295d9c50bf180b287f365389e461afb484b8450720c5653",
+      "status": "PASS",
+      "description": "ci:fast and bundle:check pass on the PR head",
+      "code_citation": "package.json:25",
+      "test_citation": ".github/workflows/test.yml:55",
+      "members": [],
+      "non_member_fail": null,
+      "note": "PR head is ba663028. On that head, `gh pr checks 781` shows test pass (4m23s) and validate pass. The test job runs format:check + npm test, the two parts of ci:fast. The validate job runs bundle_skill.py --check (validate.yml:128). The last local run, on 1ee28b5b, had one doc-links failure. Since then there are only doc commits. On the current head, doc-links.test.mjs passes 31/31 and format:check is clean."
+    },
+    {
+      "id": "SC-13",
+      "text_hash": "48b4ad45cfcb419f614efcd6c09c2cf18ceb1fb66331180538422bd27a88628e",
+      "status": "PASS",
+      "description": "CHANGELOG [Unreleased] cites task 242, forced-full escape, first-run full",
+      "code_citation": "CHANGELOG.md:9",
+      "test_citation": "evals/shared/tests/changelog-entry-drift.test.mjs:1",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Documentation criterion; I read the text. Under [Unreleased] (:5), :9 cites '(task 242)'. :23-24 says 'The first run after upgrading is `full` (`no-prior-record`)'. :24-25 says 'To force a full re-judge, move the newest `*.ac.json` beside the document aside'. The changelog corpus guard runs in npm test but only checks accepted tasks merged since the last tag, so it guards this entry after merge."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "SC-1",
+      "note": "Known limit QA10-1, accepted by the operator and recorded in task § 3 :102. A citation written with './', a leading '/', backslashes or a '#L' anchor is matched as written and does not resolve. This is outside every SC's stated scope and does not affect any criterion verdict."
+    }
+  ]
+}

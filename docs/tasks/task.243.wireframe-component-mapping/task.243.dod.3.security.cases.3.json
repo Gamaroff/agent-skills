@@ -1,0 +1,138 @@
+[
+  {
+    "id": "pp.plain-primitive",
+    "sink": "markdown-structure",
+    "input": "button",
+    "why": "The simplest signature a map row holds.",
+    "correct": "Accept (a parsed signature).",
+    "direction": "legitimate"
+  },
+  {
+    "id": "pp.any-parent-flag",
+    "sink": "markdown-structure",
+    "input": "*>button[primary]",
+    "why": "The wildcard-parent form the procedure records.",
+    "correct": "Accept (a parsed signature).",
+    "direction": "legitimate"
+  },
+  {
+    "id": "pp.parent-attr",
+    "sink": "markdown-structure",
+    "input": "row>icon{name=leader}",
+    "why": "A named parent with one attribute.",
+    "correct": "Accept (a parsed signature).",
+    "direction": "legitimate"
+  },
+  {
+    "id": "pp.flags-and-attrs",
+    "sink": "markdown-structure",
+    "input": "*>button[primary,muted]{kind=warning}",
+    "why": "Several flags plus an attribute.",
+    "correct": "Accept (a parsed signature).",
+    "direction": "legitimate"
+  },
+  {
+    "id": "pp.pipe-in-flags",
+    "sink": "markdown-structure",
+    "input": "*>button[a|b]",
+    "why": "A pipe in a flag list.",
+    "correct": "Accept (a parsed signature).",
+    "direction": "legitimate"
+  },
+  {
+    "id": "pp.empty",
+    "sink": "markdown-structure",
+    "input": "",
+    "why": "An empty signature would write a row that matches nothing.",
+    "correct": "Refuse (null).",
+    "direction": "hostile"
+  },
+  {
+    "id": "pp.unterminated-flags",
+    "sink": "markdown-structure",
+    "input": "*>button[primary",
+    "why": "Malformed: the flag list is never closed.",
+    "correct": "Refuse (null).",
+    "direction": "hostile"
+  },
+  {
+    "id": "pp.newline-then-row",
+    "sink": "markdown-structure",
+    "input": "button\n| `*>input` | | Evil | | | | 2026-01-01, x |",
+    "why": "A second table line would add a map row.",
+    "correct": "Refuse (null).",
+    "direction": "hostile"
+  },
+  {
+    "id": "pp.newline-in-flags",
+    "sink": "markdown-structure",
+    "input": "*>button[primary\n| `*>input` | | Evil |]",
+    "why": "The flag list spans a newline.",
+    "correct": "Refuse (null).",
+    "direction": "hostile"
+  },
+  {
+    "id": "pp.newline-in-attrs",
+    "sink": "markdown-structure",
+    "input": "*>icon{name=a\nb}",
+    "why": "The attribute list spans a newline.",
+    "correct": "Refuse (null).",
+    "direction": "hostile"
+  },
+  {
+    "id": "pp.trailing-newline",
+    "sink": "markdown-structure",
+    "input": "button\n",
+    "why": "parsePattern trims, record writes untrimmed.",
+    "correct": "Refuse (null).",
+    "direction": "hostile"
+  },
+  {
+    "id": "pp.leading-newline",
+    "sink": "markdown-structure",
+    "input": "\nbutton",
+    "why": "The same trim gap at the start.",
+    "correct": "Refuse (null).",
+    "direction": "hostile"
+  },
+  {
+    "id": "pp.cr-only",
+    "sink": "markdown-structure",
+    "input": "button\r",
+    "why": "A lone carriage return.",
+    "correct": "Refuse (null).",
+    "direction": "hostile"
+  },
+  {
+    "id": "pp.u2028-trailing",
+    "sink": "markdown-structure",
+    "input": "*>chip ",
+    "why": "trim() strips U+2028, the [\\r\\n] check misses it.",
+    "correct": "Refuse (null).",
+    "direction": "hostile"
+  },
+  {
+    "id": "pp.u2028-leading",
+    "sink": "markdown-structure",
+    "input": " *>chip",
+    "why": "The same at the start.",
+    "correct": "Refuse (null).",
+    "direction": "hostile"
+  },
+  {
+    "id": "pp.u2029-in-flags",
+    "sink": "markdown-structure",
+    "input": "*>button[a b]",
+    "why": "The flag list spans U+2029.",
+    "correct": "Refuse (null).",
+    "direction": "hostile"
+  },
+  {
+    "id": "pp.u2028-in-attrs",
+    "sink": "markdown-structure",
+    "input": "*>icon{name=a b}",
+    "why": "The attribute list spans U+2028.",
+    "correct": "Refuse (null).",
+    "direction": "hostile"
+  }
+]

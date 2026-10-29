@@ -1,0 +1,60 @@
+schema: 2
+task: 'task.237.carry-doc-only-findings-on-approve'
+task_title: 'Apply 5c doc-only findings on APPROVE'
+gate: CONCERNS
+status_reason: 'The rule change and its row and Classify-on guards are correct and mutation-proved. The new CARRY_FIXED sentence, half of success criterion 2, is held by no committed test: deleting it, or reverting it with a period before "leave", leaves the suite green (QA-1, MEDIUM).'
+reviewer: 'QA Engineer'
+head: '928fc7899b7db854cc0022a7dc497abdd7be1da5'
+updated: '2026-10-27T15:56:54Z'
+
+top_issues:
+  - id: 'QA-1'
+    severity: medium
+    file: 'evals/shared/tests/pr-review-loop-parity.test.mjs'
+    finding: 'The carry-prose test pins only the absence of one old CARRY_FIXED wording. Nothing asserts the new classify-keyed sentence exists, so deleting it (mutation M4) or reverting it with a period between APPROVE and "leave" (M5) stays green. The CHANGELOG says the test pins both carry-prose sentences (code review CR-1, CR-2; TASK-237-BUG-1).'
+    suggested_action: 'Add a positive assertion for the classify-keyed CARRY_FIXED sentence and widen the negative pattern so a period inside the sentence cannot hide an APPROVE key; mutation-prove M4 and M5 red.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 57
+  phases_verified: 3/3
+  ci: 'pending @ 928fc789 (test job running; link-check, secret-scan, shellcheck, validate pass)'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false. The diff adds no predicate and changes no line inside a fenced block that refuses or HALTs: the three QA-loop hunks are prose outside the classify and stage fences, and the one changed fenced line (finalise 6a) is a comment.'
+  performance:
+    status: PASS
+    notes: 'Prose and test change; no runtime path. No new pipeline step or commit.'
+  reliability:
+    status: PASS
+    notes: 'Classify and stage blocks byte-identical; acceptance-commit-carries-5c.test.mjs 24/24 unchanged. A bad 5c doc fix is restored by the existing link-check path.'
+  maintainability:
+    status: CONCERNS
+    notes: 'One of the two carry-prose sentences the task names as guarded is not pinned (QA-1).'
+
+recommendations:
+  immediate:
+    - action: 'Pin the classify-keyed CARRY_FIXED sentence positively and harden the negative pattern (QA-1).'
+      refs: ['evals/shared/tests/pr-review-loop-parity.test.mjs']
+  future:
+    - action: 'qa-execute-snippets reports zero-blocks-executed on develop-pipeline-step-7-finalise.md, finalise/SKILL.md and review-pr/SKILL.md. These are file-level and every block is placeholder or mutating; the one changed block (finalise 6a) is a git-commit block whose only changed line is a comment.'
+      refs: ['skills/finalise/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['QA-1 fixed']

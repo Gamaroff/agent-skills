@@ -1,0 +1,83 @@
+schema: 2
+task: 'task.243.wireframe-component-mapping'
+task_title: "Link Wireloom wireframe nodes to the project's UI components, and ask when unsure"
+gate: CONCERNS
+status_reason: 'Both gate 5 findings are fixed and mutation-proven, but the new Step 3 guard is ungated while the Step 2 writes it sends the run to are gated, so a paused run whose gate changed loops; the guard also passes states Step 2 halts on.'
+reviewer: 'QA Engineer'
+head: '264a8f82497e4333ad854c29aca63b70b957d2cc'
+updated: '2026-10-29T15:56:03Z'
+
+top_issues:
+  - id: 'TASK-243-CR6-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-3-develop-loop.md'
+    finding: 'The guard has no gate, but Step 2 § Wireframe writes skips silently when ui.wireframeMap is unset or the wireloom block is gone, and the guard forbids deleting the file: a resume after the gate changed cycles Step 3 HALT, Step 2 skip, Step 3 HALT.'
+    suggested_action: 'Put the guard behind the same gate as Step 2 § Wireframe writes, stated in the same words, and say what happens to held answers when the gate is false.'
+    suggested_owner: dev
+    bug_ref: 'task.243.bug.14.step-3-guard-loops-when-step-2-skips-its-writes.md'
+    status: open
+  - id: 'TASK-243-CR6-2'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-3-develop-loop.md'
+    finding: 'The guard folds jq missing, an unparseable file and a missing document key into its pass branch, where Step 2 HALTs on all three; the two filters disagree.'
+    suggested_action: 'Use Step 2''s filter and three-way case in the guard, and assert in a test that the two filters are identical.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-243-CR6-3'
+    severity: low
+    file: 'evals/shared/tests/wireframe-mapping-hooks.test.mjs'
+    finding: 'The Step 3 test covers no missing-key file and no missing jq, and nothing ties the guard''s gate to Step 2''s.'
+    suggested_action: 'Add those cases, and assert both sections state the same gate.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90 # 100 - 10 x 1 medium finding
+
+evidence:
+  tests_reviewed: 35
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false; unchanged.'
+  performance:
+    status: PASS
+    notes: 'No change to the engine.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR6-1: a guard that can loop on resume.'
+  maintainability:
+    status: CONCERNS
+    notes: 'CR6-2: two key-check filters that disagree.'
+
+recommendations:
+  immediate:
+    - action: 'Gate the Step 3 guard like Step 2 § Wireframe writes, and give it Step 2''s filter and three-way case (bug.14, CR6-2, CR6-3).'
+      refs: ['shared/resources/develop-pipeline-step-3-develop-loop.md']
+  future:
+    - action: 'The resume detector reads the lock''s current_step as finished while Step 1 writes it as pending; worth its own task.'
+      refs: ['shared/resources/pipeline-resume-detector-prompt.md']
+    - action: 'grant-qa-cycles.sh re-enters at 5a after a loop-limit halt that ended on a gate (obs #130).'
+      refs: ['shared/resources/grant-qa-cycles.sh']
+
+bug_resolution:
+  bugs_fixed: 13
+  bugs_remaining: 1
+  fix_date: '2026-10-29'
+  total_iterations: 5
+  verification_method: 'bug.13: five mutation proofs covered; fast gate 6837/0'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['CR6-1 fixed and re-gated']

@@ -1,0 +1,75 @@
+schema: 2
+task: 'task.243.wireframe-component-mapping'
+task_title: "Link Wireloom wireframe nodes to the project's UI components, and ask when unsure"
+gate: PASS
+status_reason: 'The cycle 13 fix holds: record now replaces the row whose signature means the same thing (bug.16 reproduction reads replaced, one row, newer answer resolves; bug.16 closed), and the round-trip no-merge check can now fail. All three fix arms are mutation-proven at QA, the probe re-run measures 114 executed, 0 reproduced, 0 escaped, and the reviewer found one low cleanup only.'
+reviewer: 'QA Engineer'
+head: 'f715cd441389ea35c53125253e61273f0b96fd5a'
+updated: '2026-10-29T18:24:16Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 21
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 114
+    escaped: 0
+    notes: 'boundary: true. The DoD run 3 plan (11 controls: two fence guards, parsePattern, eight record flags) re-run against f715cd44: 114 executed, 0 reproduced, 0 escaped, every control executed (task.243.qa.14.security.run.json).'
+  performance:
+    status: PASS
+    notes: 'signatureKey parses each existing row once per record call; maps are small, so this is negligible.'
+  reliability:
+    status: PASS
+    notes: 'A corrected answer now replaces the old row in either spelling (CR13-1 fixed).'
+  maintainability:
+    status: PASS
+    notes: 'One definition of what a signature means, used by record; bundled copies match their sources; bundle:check clean. One low cleanup (CR14-1).'
+
+recommendations:
+  immediate: []
+  future:
+    - id: 'TASK-243-CR14-1'
+      action: 'signatureKey de-duplicates flags but score counts p.flags.length with duplicates, so input[a,a] and input[a] share a key but not a score; de-duplicate flags once in parsePattern and add that pair to the replace cases.'
+      refs: ['shared/resources/wireframe-map.js']
+    - id: 'TASK-243-CR14-2'
+      action: 'No test shows that record keeps rows with the same signature and different labels apart: dropping the label term from the replace lookup leaves all 21 tests green (mutation no-red-untested). Add a must-differ label case to the record test.'
+      refs: ['shared/resources/tests/wireframe-map.test.mjs']
+    - id: 'TASK-243-CR13-3'
+      action: 'The procedure and configuration.md list only some of the characters encodeValue encodes; say every character outside the unreserved set plus / : # @ + = is encoded, or say to copy the signature exactly as resolve prints it.'
+      refs: ['shared/resources/wireframe-component-mapping.md', 'docs/reference/configuration.md']
+      carried_from: gate 13
+    - id: 'TASK-243-CR12-2-5'
+      action: 'CR12-2 (unreadable config read as missing), CR12-3 (substring candidate filter), CR12-4 (CRLF rewritten as LF), CR12-5 (cleanups): unchanged from gate 13.'
+      refs: ['shared/resources/wireframe-map.js']
+      carried_from: gate 12
+    - id: 'TASK-243-PARSELINE-1'
+      action: 'A Wireloom line holding U+2028 yields no node, because parseLine''s .*$ cannot cross it.'
+      refs: ['shared/resources/wireframe-map.js']
+      carried_from: gate 13
+    - action: 'CR11-1, CR11-2, CR8-1, CR7-1 to CR7-4 and the gate 1-2 lows: unchanged from gate 12.'
+      refs: ['shared/resources/wireframe-map.js', 'shared/resources/tests/wireframe-map.test.mjs', 'evals/shared/tests/wireframe-mapping-hooks.test.mjs']
+
+bug_resolution:
+  bugs_fixed: 19
+  bugs_remaining: 0
+  fix_date: '2026-10-29'
+  total_iterations: 11
+  verification_method: 'Cycle 13 fix f715cd44: bug.16 reproduction reads replaced, one row, and the newer answer resolves; mutations (raw-text compare, unsorted flags, prefix score) each turn a committed test red (20/21), restored 21/21, in a scratch worktree; probe 114 executed, 0 reproduced, 0 escaped'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

@@ -1,0 +1,51 @@
+schema: 2
+task: 'task.179.review-pr-resolution-follow-ups'
+task_title: '/review-pr resolution follow-ups'
+gate: PASS
+status_reason: 'All three phases deliver their criteria, each backed by a committed test that a mutation turns red; the parser probe engages with 0 reproduced. The one code-review finding is a low-severity, medium-confidence edge case (JIRA_URL=#bare) and stays advisory.'
+reviewer: 'QA Engineer'
+head: 'ce069bb6dc368f66fa417741a2a448bc6c57ed35'
+updated: '2026-10-27T08:41:11Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 172
+  phases_verified: 3/3
+  ci: 'pending @ ce069bb6 (link-check, secret-scan, shellcheck, validate pass; test pending) — CI is gated at /finalise'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 21
+    escaped: 0
+    notes: 'shell-fn probe of parse_target (filename sink, the 21 committed PARSER_PROBE_CASES incl. the two new CR-1 bypass shapes), bash only (zsh absent on this host; CI runs zsh): engages, 0 reproduced, 0 overblocked, 0 escaped.'
+  performance:
+    status: PASS
+    notes: 'The offline-parser test stubs gh, curl, wget and git and runs every parser case; none is called. Calibrated by an injected curl.'
+  reliability:
+    status: PASS
+    notes: 'One host reading for both parser arms; the scheme-less arm can no longer accept a host the URL arm reads differently.'
+  maintainability:
+    status: PASS
+    notes: '172/172 review-pr tests; stale comments and the docs-guard title corrected; §0a contract names pr_number.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (low/medium): `JIRA_URL=#bare` reads as unset, but a sourcing shell reads it as `#bare`. The test comment says "as a shell reads it". Either treat `#` as a comment only after whitespace in the raw value, or drop `#bare` from the test and reword the comment.'
+      refs: ['skills/review-pr/SKILL.md', 'skills/review-pr/tests/review-pr.test.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

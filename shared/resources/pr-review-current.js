@@ -50,16 +50,26 @@ function newestNumbered(dir, kind, ext) {
 }
 
 /**
+ * The text of a report's `## Machine-Readable Findings` block: the lines between its ```yaml fence
+ * and the closing fence. Returns null when there is no such heading, no `yaml` fence after it, or no
+ * closing fence. The one extractor for this block; open-coverage.js requires it (task.240).
+ */
+function extractFindingsBlock(text) {
+  const block = text.match(
+    /^## Machine-Readable Findings\s*\n+```yaml\n([\s\S]*?)^```/m,
+  );
+  return block ? block[1] : null;
+}
+
+/**
  * The `reviewed_gate:` value from a report's machine-readable block.
  * Returns undefined when the block or the key is absent (a legacy report); otherwise the gate's
  * number, with 0 for `none` — the report was written when no gate existed.
  */
 function reviewedGateNumber(text) {
-  const block = text.match(
-    /^## Machine-Readable Findings\s*\n+```yaml\n([\s\S]*?)^```/m,
-  );
-  if (!block) return undefined;
-  const line = block[1].match(/^reviewed_gate:[ \t]*(.*?)[ \t]*$/m);
+  const block = extractFindingsBlock(text);
+  if (block === null) return undefined;
+  const line = block.match(/^reviewed_gate:[ \t]*(.*?)[ \t]*$/m);
   if (!line) return undefined;
   const value = line[1].replace(/^["']|["']$/g, "");
   if (value === "" || value === "none" || value === "null" || value === "~")
@@ -115,6 +125,6 @@ function main(argv) {
   return 0;
 }
 
-module.exports = { select, reviewedGateNumber };
+module.exports = { select, reviewedGateNumber, extractFindingsBlock };
 
 if (require.main === module) process.exitCode = main(process.argv.slice(2));

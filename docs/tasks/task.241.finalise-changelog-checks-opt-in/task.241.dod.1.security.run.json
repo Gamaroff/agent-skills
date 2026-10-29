@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "path",
+      "entry": "fence:skills/finalise/SKILL.md#Step 3b: Dispatch 4 Explore Subagents in Parallel",
+      "name": "changelog opt-in guard (Step 3b)",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 9,
+      "passed": 9,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": [
+        "bash"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": ".agents/skills/finalise/references/changelog-enforce.sh",
+      "fixture_setup": null,
+      "ran_at": "2026-10-28T11:11:27.611Z"
+    },
+    {
+      "sink": "path",
+      "entry": "shell-argv:shared/resources/changelog-enforce.sh",
+      "name": "changelog.enforce resolver",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 22,
+      "passed": 22,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": [
+        "bash"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "{input}"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-10-28T11:11:27.500Z"
+    }
+  ],
+  "totals": {
+    "executed": 31,
+    "reproduced": 0,
+    "escaped": 0
+  },
+  "updated_at": "2026-10-28T11:11:27.611Z"
+}

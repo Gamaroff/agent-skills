@@ -254,3 +254,123 @@ test("in this repo the sibling is present, so the drift guard actually ran", () 
     "qa-story must exist in this repo",
   );
 });
+
+// ── task.238: the PR Existence Check branches on VCS, and Step 10 reads CI once ──────────────────
+
+const { spawnSync } = require("child_process");
+const os = require("os");
+
+/** The first fenced bash block after `heading`, de-indented. */
+function blockAfter(md, heading) {
+  const at = md.indexOf(heading);
+  assert.ok(at >= 0, `heading not found: ${heading}`);
+  const open = md.indexOf("```bash", at);
+  const close = md.indexOf("```", open + 7);
+  const raw = md.slice(md.indexOf("\n", open) + 1, close);
+  const indent = raw.match(/^ */)[0].length;
+  return raw
+    .split("\n")
+    .map((l) => l.slice(Math.min(indent, l.match(/^ */)[0].length)))
+    .join("\n");
+}
+
+/**
+ * Run the PR Existence Check with `gh` and `curl` stubbed, the resolver replaced by a fixed VCS and
+ * the credential helper by an empty auth array. Returns the stdout and which stubs were called.
+ */
+function runPrCheck(md, vcs) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "qa-pr-check-"));
+  try {
+    const bin = path.join(dir, "bin");
+    fs.mkdirSync(bin);
+    const log = path.join(dir, "calls");
+    fs.writeFileSync(
+      path.join(bin, "gh"),
+      `#!/bin/sh\necho "gh $*" >> "${log}"\necho '{"url":"https://github.com/o/r/pull/5","state":"OPEN","title":"T","number":5}'\n`,
+      { mode: 0o755 },
+    );
+    fs.writeFileSync(
+      path.join(bin, "curl"),
+      `#!/bin/sh\necho "curl $*" >> "${log}"\necho '{"values":[{"id":12,"state":"OPEN","title":"T","links":{"html":{"href":"https://bitbucket.org/ws/r/pull-requests/12"}}}]}'\n`,
+      { mode: 0o755 },
+    );
+    const work = path.join(dir, "work");
+    fs.mkdirSync(work);
+    const git = (...a) => spawnSync("git", a, { cwd: work, encoding: "utf8" });
+    git("init", "-q", "-b", "feature/x");
+    git("remote", "add", "origin", "git@bitbucket.org:ws/repo.git");
+    const code = blockAfter(md, "### PR Existence Check")
+      .replace("source references/resolve-platform.sh || exit 1", `VCS=${vcs}`)
+      .replace(
+        "source references/bitbucket-auth.sh || exit 1",
+        "BB_CURL_AUTH=()",
+      );
+    assert.ok(
+      code.includes(`VCS=${vcs}`),
+      "the check no longer sources the platform resolver",
+    );
+    const r = spawnSync("bash", ["-c", code], {
+      cwd: work,
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+    });
+    const calls = fs.existsSync(log) ? fs.readFileSync(log, "utf8") : "";
+    return { status: r.status, out: r.stdout + r.stderr, calls };
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+// qa-story's own suite runs the same three cases against qa-story's SKILL.md: the suites ship with
+// their own skill, so neither can lean on the other's copy.
+for (const [name, md] of [["qa-task", SKILL]]) {
+  test(`${name}: on VCS=bitbucket the PR Existence Check finds the open PR over REST and never calls gh`, () => {
+    const r = runPrCheck(md, "bitbucket");
+    assert.equal(r.status, 0, r.out);
+    assert.match(r.out, /PR_NUMBER=12 PR_STATE=OPEN/);
+    assert.match(r.calls, /^curl .*pullrequests/m);
+    assert.match(r.calls, /source\.branch\.name="feature\/x" AND state="OPEN"/);
+    assert.doesNotMatch(
+      r.calls,
+      /^gh /m,
+      "the Bitbucket arm called gh pr view",
+    );
+  });
+
+  test(`${name}: on VCS=github the PR Existence Check is gh pr view, and never curl`, () => {
+    const r = runPrCheck(md, "github");
+    assert.equal(r.status, 0, r.out);
+    assert.match(r.out, /PR_NUMBER=5 PR_STATE=OPEN/);
+    assert.match(r.calls, /^gh pr view --json url,state,title,number/m);
+    assert.doesNotMatch(r.calls, /^curl /m);
+  });
+
+  test(`${name}: the gate step reads CI once through qa-ci-read.sh, and maps a pre-existing red away from top_issues`, () => {
+    const at = md.indexOf("**Read the PR's CI once, then compose the gate**");
+    assert.ok(at >= 0, "the CI read is gone from the gate step");
+    const section = md.slice(
+      at,
+      md.indexOf("severity: medium`, not `high`", at),
+    );
+    assert.match(
+      section,
+      new RegExp(
+        `bash \\.agents/skills/${name}/references/qa-ci-read\\.sh --vcs "\\$VCS" --pr`,
+      ),
+    );
+    assert.match(
+      section,
+      /`pre-existing`[^|]*\|[^|]*recommendations\.future[^|]*provenance: pre-existing/,
+    );
+    assert.match(
+      section,
+      /`top_issue`[^|]*\|[^|]*top_issues\[\][^|]*severity: medium/,
+    );
+    // SC-5: a read, never a wait.
+    const code = blockAfter(
+      md,
+      "**Read the PR's CI once, then compose the gate**",
+    );
+    assert.doesNotMatch(code, /\bsleep\b|--watch|\buntil\b/);
+  });
+}

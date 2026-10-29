@@ -1,0 +1,156 @@
+[
+  {
+    "id": "rec3.component.plain",
+    "sink": "markdown-structure",
+    "input": "Chip",
+    "why": "A component value a person would confirm.",
+    "correct": "Accept (exit 0, row written).",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "# Wireframe component map\n\nLinks between Wireloom wireframe nodes and this project's UI components, each confirmed by a\nperson. Skills that read a wireframe resolve a node from the first matching row and ask about\nthe rest; the answers are added here. Edit rows freely: the most specific matching row wins.\n\n- **Signature** — `parent>primitive[flags]{key=value}`. `*` is any parent; name only the flags\n  and attributes the link depends on.\n- **Label** — empty for any label, a plain string to match it exactly, or `/regex/`.\n- **Component** — what the node is built from; `(layout)` for a node that draws nothing.\n\n| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n"
+      }
+    }
+  },
+  {
+    "id": "rec3.component.dotted",
+    "sink": "markdown-structure",
+    "input": "Button.Accent",
+    "why": "A component value a person would confirm.",
+    "correct": "Accept (exit 0, row written).",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "# Wireframe component map\n\nLinks between Wireloom wireframe nodes and this project's UI components, each confirmed by a\nperson. Skills that read a wireframe resolve a node from the first matching row and ask about\nthe rest; the answers are added here. Edit rows freely: the most specific matching row wins.\n\n- **Signature** — `parent>primitive[flags]{key=value}`. `*` is any parent; name only the flags\n  and attributes the link depends on.\n- **Label** — empty for any label, a plain string to match it exactly, or `/regex/`.\n- **Component** — what the node is built from; `(layout)` for a node that draws nothing.\n\n| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n"
+      }
+    }
+  },
+  {
+    "id": "rec3.component.layout",
+    "sink": "markdown-structure",
+    "input": "(layout)",
+    "why": "A component value a person would confirm.",
+    "correct": "Accept (exit 0, row written).",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "# Wireframe component map\n\nLinks between Wireloom wireframe nodes and this project's UI components, each confirmed by a\nperson. Skills that read a wireframe resolve a node from the first matching row and ask about\nthe rest; the answers are added here. Edit rows freely: the most specific matching row wins.\n\n- **Signature** — `parent>primitive[flags]{key=value}`. `*` is any parent; name only the flags\n  and attributes the link depends on.\n- **Label** — empty for any label, a plain string to match it exactly, or `/regex/`.\n- **Component** — what the node is built from; `(layout)` for a node that draws nothing.\n\n| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n"
+      }
+    }
+  },
+  {
+    "id": "rec3.component.pipe",
+    "sink": "markdown-structure",
+    "input": "A | B",
+    "why": "A component value a person would confirm.",
+    "correct": "Accept (exit 0, row written).",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "# Wireframe component map\n\nLinks between Wireloom wireframe nodes and this project's UI components, each confirmed by a\nperson. Skills that read a wireframe resolve a node from the first matching row and ask about\nthe rest; the answers are added here. Edit rows freely: the most specific matching row wins.\n\n- **Signature** — `parent>primitive[flags]{key=value}`. `*` is any parent; name only the flags\n  and attributes the link depends on.\n- **Label** — empty for any label, a plain string to match it exactly, or `/regex/`.\n- **Component** — what the node is built from; `(layout)` for a node that draws nothing.\n\n| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n"
+      }
+    }
+  },
+  {
+    "id": "rec3.component.code-span",
+    "sink": "markdown-structure",
+    "input": "Icon `bell`",
+    "why": "A component value a person would confirm.",
+    "correct": "Accept (exit 0, row written).",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "# Wireframe component map\n\nLinks between Wireloom wireframe nodes and this project's UI components, each confirmed by a\nperson. Skills that read a wireframe resolve a node from the first matching row and ask about\nthe rest; the answers are added here. Edit rows freely: the most specific matching row wins.\n\n- **Signature** — `parent>primitive[flags]{key=value}`. `*` is any parent; name only the flags\n  and attributes the link depends on.\n- **Label** — empty for any label, a plain string to match it exactly, or `/regex/`.\n- **Component** — what the node is built from; `(layout)` for a node that draws nothing.\n\n| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n"
+      }
+    }
+  },
+  {
+    "id": "rec3.component.empty",
+    "sink": "markdown-structure",
+    "input": "",
+    "why": "--component that would split, corrupt or not read back from the map row.",
+    "correct": "Refuse (exit 2, map unchanged).",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "# Wireframe component map\n\nLinks between Wireloom wireframe nodes and this project's UI components, each confirmed by a\nperson. Skills that read a wireframe resolve a node from the first matching row and ask about\nthe rest; the answers are added here. Edit rows freely: the most specific matching row wins.\n\n- **Signature** — `parent>primitive[flags]{key=value}`. `*` is any parent; name only the flags\n  and attributes the link depends on.\n- **Label** — empty for any label, a plain string to match it exactly, or `/regex/`.\n- **Component** — what the node is built from; `(layout)` for a node that draws nothing.\n\n| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n"
+      }
+    }
+  },
+  {
+    "id": "rec3.component.newline",
+    "sink": "markdown-structure",
+    "input": "Chip\n| `*>input` | | Evil | | | | 2026-01-01, x |",
+    "why": "--component that would split, corrupt or not read back from the map row.",
+    "correct": "Refuse (exit 2, map unchanged).",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "# Wireframe component map\n\nLinks between Wireloom wireframe nodes and this project's UI components, each confirmed by a\nperson. Skills that read a wireframe resolve a node from the first matching row and ask about\nthe rest; the answers are added here. Edit rows freely: the most specific matching row wins.\n\n- **Signature** — `parent>primitive[flags]{key=value}`. `*` is any parent; name only the flags\n  and attributes the link depends on.\n- **Label** — empty for any label, a plain string to match it exactly, or `/regex/`.\n- **Component** — what the node is built from; `(layout)` for a node that draws nothing.\n\n| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n"
+      }
+    }
+  },
+  {
+    "id": "rec3.component.cr",
+    "sink": "markdown-structure",
+    "input": "Chip\r",
+    "why": "--component that would split, corrupt or not read back from the map row.",
+    "correct": "Refuse (exit 2, map unchanged).",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "# Wireframe component map\n\nLinks between Wireloom wireframe nodes and this project's UI components, each confirmed by a\nperson. Skills that read a wireframe resolve a node from the first matching row and ask about\nthe rest; the answers are added here. Edit rows freely: the most specific matching row wins.\n\n- **Signature** — `parent>primitive[flags]{key=value}`. `*` is any parent; name only the flags\n  and attributes the link depends on.\n- **Label** — empty for any label, a plain string to match it exactly, or `/regex/`.\n- **Component** — what the node is built from; `(layout)` for a node that draws nothing.\n\n| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n"
+      }
+    }
+  },
+  {
+    "id": "rec3.component.odd-backtick",
+    "sink": "markdown-structure",
+    "input": "Ch`ip",
+    "why": "--component that would split, corrupt or not read back from the map row.",
+    "correct": "Refuse (exit 2, map unchanged).",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "# Wireframe component map\n\nLinks between Wireloom wireframe nodes and this project's UI components, each confirmed by a\nperson. Skills that read a wireframe resolve a node from the first matching row and ask about\nthe rest; the answers are added here. Edit rows freely: the most specific matching row wins.\n\n- **Signature** — `parent>primitive[flags]{key=value}`. `*` is any parent; name only the flags\n  and attributes the link depends on.\n- **Label** — empty for any label, a plain string to match it exactly, or `/regex/`.\n- **Component** — what the node is built from; `(layout)` for a node that draws nothing.\n\n| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n"
+      }
+    }
+  },
+  {
+    "id": "rec3.component.whole-backticks",
+    "sink": "markdown-structure",
+    "input": "`Chip`",
+    "why": "--component that would split, corrupt or not read back from the map row.",
+    "correct": "Refuse (exit 2, map unchanged).",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "# Wireframe component map\n\nLinks between Wireloom wireframe nodes and this project's UI components, each confirmed by a\nperson. Skills that read a wireframe resolve a node from the first matching row and ask about\nthe rest; the answers are added here. Edit rows freely: the most specific matching row wins.\n\n- **Signature** — `parent>primitive[flags]{key=value}`. `*` is any parent; name only the flags\n  and attributes the link depends on.\n- **Label** — empty for any label, a plain string to match it exactly, or `/regex/`.\n- **Component** — what the node is built from; `(layout)` for a node that draws nothing.\n\n| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n"
+      }
+    }
+  },
+  {
+    "id": "rec3.component.code-span-pipe",
+    "sink": "markdown-structure",
+    "input": "`a|b`",
+    "why": "--component that would split, corrupt or not read back from the map row.",
+    "correct": "Refuse (exit 2, map unchanged).",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "# Wireframe component map\n\nLinks between Wireloom wireframe nodes and this project's UI components, each confirmed by a\nperson. Skills that read a wireframe resolve a node from the first matching row and ask about\nthe rest; the answers are added here. Edit rows freely: the most specific matching row wins.\n\n- **Signature** — `parent>primitive[flags]{key=value}`. `*` is any parent; name only the flags\n  and attributes the link depends on.\n- **Label** — empty for any label, a plain string to match it exactly, or `/regex/`.\n- **Component** — what the node is built from; `(layout)` for a node that draws nothing.\n\n| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n"
+      }
+    }
+  }
+]

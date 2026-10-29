@@ -303,3 +303,25 @@ lowest-numbered task. T230 fixes observation #91 while the T229 run that found i
 task.166, 170, 175 and 203 already carry a DoD section there.
 
 - [x] **T230** Keep foreign sections out of the change-log block · deps: none · touches: change-log!, pipeline-steps~, bundles~ · /develop-task docs/tasks/task.230.change-log-block-foreign-sections/task.230.change-log-block-foreign-sections.md — ✅ **accepted + merged** ([PR #735](https://github.com/Gamaroff/agent-skills/pull/735), `31643ca4`; QA PASS 95/100 after 4 cycles, DoD accepted on run 1, CI 6/6). `change-log.js` lifts a sibling section written inside the change-log markers back out — above them if it sat before the log, below them if after — through one partition the writer and a new corpus guard share; task.166, 170, 175 and 203 repaired
+
+## PHASE 17 — observation fixes from the T169 run (opened 2026-10-27, closed 2026-10-27)
+
+An **override**: without it the registry fallback selects T174, which is blocked on tinker-city
+task.127 and halts at its own Phase 0. The owner asked for these two ahead of every other story and
+task. T235 goes first: it teaches the fallback to pass over a task like T174, so the loop stops
+halting on it. T236 then fixes the `create-task` seed step. The two are independent and share only
+a soft edit to `create-task/SKILL.md` (§ 1.2 and § 1.1).
+
+- [x] **T235** select-next registry fallback passes over an external precondition · deps: none · touches: selection!, templates~ · /develop-task docs/tasks/task.235.select-next-external-precondition/task.235.select-next-external-precondition.md — ✅ **accepted + merged** ([PR #761](https://github.com/Gamaroff/agent-skills/pull/761), `d8e1b270`; QA PASS 100/100 after 2 cycles, DoD accepted on run 1, CI 6/6). A task may carry `blocked_on_external: "<condition>"`; the registry fallback passes it over with the condition named, and T174 now reads as held instead of being selected
+- [x] **T236** create-task 1.1 seed step makes a runnable call · deps: none · touches: templates~ · /develop-task docs/tasks/task.236.create-task-seed-step-call/task.236.create-task-seed-step-call.md — ✅ **accepted + merged** ([PR #763](https://github.com/Gamaroff/agent-skills/pull/763), `86de1a42`; QA PASS 100/100 after 4 cycles, DoD accepted on run 2, CI 6/6). § 1.1 step 3 is one runnable block that passes `{ taskId }` to `seedFromObservations`, and a test executes that block from `SKILL.md`
+
+## PHASE 18 — fail-closed open-coverage reader (opened 2026-10-28, closed 2026-10-28)
+
+An **override**: the owner asked for T240 ahead of every other story and task. T240 replaces the
+§5c open-coverage awk that task.238's QA loop escalated on after 9 cycles. It edits that block, so
+it cannot start until T238 has merged. T238 sits here as a `manual` row: it is waiting on the
+owner's acceptance decision (PR #770), and the loop stops at it rather than resuming that run.
+Tick T238 when PR #770 merges; T240 is selected next.
+
+- [x] **T238** QA loop acts on the signals it already has · deps: none · touches: pipeline-steps!, qa-skills~, bundles~ · /develop-task docs/tasks/task.238.qa-loop-acts-on-signals-it-has/task.238.qa-loop-acts-on-signals-it-has.md — ✅ **accepted + merged** ([PR #770](https://github.com/Gamaroff/agent-skills/pull/770), `780ac732`; QA CONCERNS 90/100 after 10 cycles with 4 owner-granted, DoD accepted on run 2, CI 6/6). The QA loop keeps a red gate log, classifies a red fast gate, reads PR CI once at Step 10 on GitHub and Bitbucket, and sends a 5c `CONCERNS` with an open coverage finding back to 5b. CR10-1 deferred to T240
+- [x] **T240** Fail-closed reader for the 5c open-coverage check · deps: T238 · touches: pipeline-steps!, bundles~ · /develop-task docs/tasks/task.240.open-coverage-fail-closed-reader/task.240.open-coverage-fail-closed-reader.md — ✅ **accepted + merged** ([PR #776](https://github.com/Gamaroff/agent-skills/pull/776), `d820f8f2`; QA PASS 100/100 after 9 cycles, DoD accepted, CI 6/6). §5c's open-coverage count comes from `open-coverage.js`, a strict Node reader that answers `unreadable` (and halts) on anything it cannot place, in place of a 35-line awk

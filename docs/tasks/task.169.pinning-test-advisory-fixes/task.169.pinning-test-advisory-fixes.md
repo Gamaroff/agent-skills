@@ -5,10 +5,12 @@ type: task
 description: "Follow-up to task.142: tests/reference-doc-skill-pinning.test.js matches flags by substring, never checks activation-table flags, reports an empty SKILL.md as missing, and resolves the corpus twice — fix all four, each pinned by a test."
 tags: [testing, guard, reference-docs, follow-up, task-142]
 category: testing
-status: planned
+status: accepted
 priority: Low
 created: 2026-09-30
-updated: 2026-09-30
+updated: 2026-10-26
+completed_date: 2026-10-26
+pr_number: 758
 assignee:
 estimated_effort_hours: 2
 risk_level: low
@@ -17,7 +19,9 @@ github_issue: 535
 
 # Technical Task: Close the four advisory findings on the reference-doc pinning test
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.169.review.1.pinning-test-advisory-fixes.md` implemented 2026-10-26
 
 **GitHub Issue**: [#535](https://github.com/Gamaroff/agent-skills/issues/535)
 
@@ -86,7 +90,10 @@ All four sites are in `tests/reference-doc-skill-pinning.test.js` (grep anchors,
 
 Measured on `develop` at `bcd37b71` (2026-09-30), by the commands in the plan:
 
-- Command-row flag checks: **19**; with a trailing-boundary match (`(?![a-z0-9-])`), **0** fail.
+- Command-row flag checks — every `--flag` in a `commands.md` row's first cell, deduped per row,
+  whose skill resolves: **19** at `bcd37b71`, **24** at `81ea2550` (2026-10-26, review re-measure). With
+  a trailing-boundary match (`(?![a-z0-9-])`), **0** fail at both. The count drifts; the test's floor
+  (`>= 16`) is what holds it, not this figure.
 - Activation-table flags: **3** — `review-story --validate` (in-span, line 29), `review-bug`
   `--validate` (separate span, line 30), `observe-work` `--review` (separate span, line 105). All
   three are documented by their skill under the boundary match.
@@ -147,11 +154,17 @@ is already wrong.
 
 **Changes**:
 
-- [ ] Add `escapeRegExp` and `documentsFlag(body, flag)` using `(?![a-z0-9-])`; use it in `resolveCorpus`.
-- [ ] Fixture: a `SKILL.md` body holding only `--read-only` does not document `--read`.
-- [ ] `resolveCorpus` distinguishes `null` (missing) from blank text (empty), with two messages.
-- [ ] Fixture: `resolveCorpus` with a fake lookup returning `""` for one skill reports "is empty",
-      not "does not exist".
+- [x] Add `escapeRegExp` and `documentsFlag(body, flag)` using `(?![a-z0-9-])`; use it in `resolveCorpus`.
+- [x] Fixture: a `SKILL.md` body holding only `--read-only` does not document `--read`.
+- [x] `resolveCorpus` distinguishes `null` (missing) from blank text (empty), with two messages — on
+      **both** sides: command rows (`missingCommands` / `emptySkills`) and activation mentions
+      (`missingNamed` / `emptySkills`, replacing today's `!lookup(n.skill)`).
+- [x] Fixture: `resolveCorpus` with a fake lookup returning `""` for `develop-next` (named on both
+      pages — `commands.md` and `activation-phrases.md:43`) reports "is empty" in `emptySkills` and
+      names `develop-next` in neither `missingCommands` nor `missingNamed`.
+- [x] Call-site prefix fixture: `resolveCorpus` with a lookup that lengthens every `--flag` in each
+      `SKILL.md` (`--x` → `--x-z`) reports every flag check as undocumented
+      (`undocumentedFlags.length === flagChecks > 0`). Holds the call site, not only `documentsFlag`.
 
 **Dependencies**: none.
 
@@ -163,11 +176,15 @@ is already wrong.
 
 **Changes**:
 
-- [ ] `extractActivationSkills` attaches a standalone `--flag` span to the preceding skill span.
-- [ ] `resolveCorpus` checks each activation flag with `documentsFlag`, returning
+- [x] `extractActivationSkills` attaches a standalone `--flag` span to the preceding skill span.
+- [x] Keep today's per-row dedupe of skill spans (order-preserving): a skill named twice in one cell
+      yields one mention; a flag span still attaches.
+- [x] `resolveCorpus` checks each activation flag with `documentsFlag`, returning
       `undocumentedActivationFlags` and `activationFlagChecks`.
-- [ ] Live test: `undocumentedActivationFlags` is empty and `activationFlagChecks >= 2` (3 measured).
-- [ ] Fixture: `` `review-bug` (picks `--validate`) `` yields skill `review-bug` with flag `--validate`.
+- [x] Live test: `undocumentedActivationFlags` is empty and `activationFlagChecks >= 2` (3 measured).
+- [x] Fixture: `` `review-bug` (picks `--validate`) `` yields skill `review-bug` with flag `--validate`.
+- [x] The call-site prefix fixture also asserts
+      `undocumentedActivationFlags.length === activationFlagChecks > 0`.
 
 **Dependencies**: Phase 1 (`documentsFlag`).
 
@@ -179,11 +196,11 @@ is already wrong.
 
 **Changes**:
 
-- [ ] Memoised `getCorpus()`; both live `describe` blocks read it.
-- [ ] Test: `getCorpus()` returns the same object on every call, and a second call reads neither
+- [x] Memoised `getCorpus()`; both live `describe` blocks read it.
+- [x] Test: `getCorpus()` returns the same object on every call, and a second call reads neither
       reference page (spy on `fs.readFileSync`).
-- [ ] CHANGELOG `[Unreleased]` line.
-- [ ] Mutation-prove each of the four fixes.
+- [x] CHANGELOG `[Unreleased]` line.
+- [x] Mutation-prove each of the four fixes (six mutations, both reverts of the flag fix and both sides of empty-vs-missing).
 
 **Dependencies**: Phases 1–2.
 
@@ -221,9 +238,9 @@ None.
 
 **Actions**:
 
-- [ ] Prefix flag not documented by a longer flag.
-- [ ] Standalone activation flag span attaches to its skill.
-- [ ] Empty vs missing `SKILL.md` produce distinct messages.
+- [x] Prefix flag not documented by a longer flag — at `documentsFlag` and at `resolveCorpus`.
+- [x] Standalone activation flag span attaches to its skill.
+- [x] Empty vs missing `SKILL.md` produce distinct messages, on both pages.
 
 **Command**: `command node --test tests/reference-doc-skill-pinning.test.js`
 
@@ -233,8 +250,8 @@ None.
 
 **Actions**:
 
-- [ ] Command-row and activation flags all documented; activation floor holds.
-- [ ] `getCorpus()` identity and single-read assertion.
+- [x] Command-row and activation flags all documented; activation floor holds.
+- [x] `getCorpus()` identity and single-read assertion.
 
 **Command**: `npm test`
 
@@ -252,29 +269,30 @@ None.
 
 ### Functional
 
-- [ ] A row flag that a skill documents only as a longer flag fails the flag test — held by the
-      prefix fixture and a mutation reverting to `includes`.
-- [ ] Every activation-table flag is checked against its skill — held by the live activation-flag
+- [x] A row flag that a skill documents only as a longer flag fails the flag test — held by the
+      prefix fixture and the call-site prefix fixture, and by two mutations: `documentsFlag` reverted
+      to `includes`, and `resolveCorpus` reverted to `body.includes(flag)` with the helper kept.
+- [x] Every activation-table flag is checked against its skill — held by the live activation-flag
       test (floor ≥ 2) and a mutation removing a documented flag's check.
-- [ ] An empty `SKILL.md` reports "is empty", a missing one "does not exist" — held by the fake-lookup
-      fixture.
-- [ ] The corpus is resolved once per run — held by the `getCorpus()` identity and single-read test.
+- [x] An empty `SKILL.md` reports "is empty", a missing one "does not exist", on both pages — held by
+      the fake-lookup fixture, which asserts the command and the activation side.
+- [x] The corpus is resolved once per run — held by the `getCorpus()` identity and single-read test.
 
 ### Performance
 
-- [ ] The existing cost tests (no spawn/network; one `SKILL.md` read per skill) stay green — held by
+- [x] The existing cost tests (no spawn/network; one `SKILL.md` read per skill) stay green — held by
       those two tests.
 
 ### Code Quality
 
-- [ ] `node:test` + `node:assert` only; Prettier clean; `npm test` green with `.claude/skills` and
+- [x] `node:test` + `node:assert` only; Prettier clean; `npm test` green with `.claude/skills` and
       `.agents/skills` moved aside.
-- [ ] Each of the four fixes mutation-proven: reverting it turns a named test red.
+- [x] Each of the four fixes mutation-proven: reverting it turns a named test red.
 
 ### Migration
 
-- [ ] `CHANGELOG.md` `[Unreleased]` records the change.
-- [ ] No consumer-facing change.
+- [x] `CHANGELOG.md` `[Unreleased]` records the change.
+- [x] No consumer-facing change.
 
 ---
 
@@ -327,16 +345,100 @@ None.
 
 **Critical**: flaky or unlocalisable red. **Non-critical**: edge cases, wording.
 
+## Implementation Summary
+
+**Completion Date**: 2026-10-26
+
+**Approach**: Inline from the co-located plan (develop-task Step 3), one file. `documentsFlag(body, flag)`
+matches `escapeRegExp(flag) + "(?![a-z0-9-])"` and replaces both `body.includes(flag)` call sites in
+`resolveCorpus`. `extractActivationSkills` walks the cell's spans in order: a skill span becomes a
+mention (one per skill per row — a repeated skill re-points to its first mention), a `--flag` span
+attaches to the last skill seen, and one with no skill before it is dropped. `resolveCorpus` now treats
+`lookup() === null` as missing and a blank body as empty on both pages, returns `emptySkills`,
+`undocumentedActivationFlags` and `activationFlagChecks`, and both live groups read a memoised
+`getCorpus()`. `withSpies` moved to module scope so the resolved-once test can use it. No reference
+page changed: the live corpus passes the stricter checks as measured.
+
+**Testing Results**:
+
+- `command node --test tests/reference-doc-skill-pinning.test.js`: 29 tests, 0 failures (was 18).
+  New: four extractor fixtures (standalone flag, two skills + trailing flag, repeated skill, orphan
+  flag), `resolution rules` (whole-token match; call-site prefix fixture; empty vs missing on both
+  pages; missing vs empty), three live tests (empty on each page, activation flags with floor 2 —
+  3 checked), and `the corpus is resolved once per run`.
+- Mutation proofs (each reverted one fix; the named tests went red, then the file was restored):
+  M1 `documentsFlag` → `body.includes(flag)` → whole-token fixture + call-site prefix fixture red;
+  M2 both `resolveCorpus` call sites → `body.includes(flag)` with the helper kept → call-site prefix
+  fixture red; M3 standalone-flag attachment removed → three extractor fixtures + live activation-flag
+  test red (1 check < floor 2); M4 `body === null` → `!body` on the command side → empty-vs-missing
+  fixture red; M4b the same on the activation side → empty-vs-missing fixture red; M5 `getCorpus`
+  without the memo → resolved-once test red.
+- `npm run ci:fast` (format check + full hermetic suite) with `.agents/skills` and `.claude/skills`
+  moved aside: 6,406 tests, 6,392 pass, 0 fail.
+
+**Deferred Work**: none.
+
 ---
 
-<!-- change-log-start -->
+## QA Testing Results
 
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-26
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [task.169.qa.1.pinning-test-advisory-fixes.md](./task.169.qa.1.pinning-test-advisory-fixes.md)
+- **Gate File**: [task.169.gate.1.pinning-test-advisory-fixes.yml](./task.169.gate.1.pinning-test-advisory-fixes.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 29 in the target file; 6,406 in `npm run ci:fast` (6,392 pass, 0 fail)
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+No critical issues identified. 8/8 QA mutation proofs are covered by committed tests. Two low
+diff-review points (CR-1, CR-2) are advisory follow-ups in the gate's `recommendations.future`.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.169.qa.1.pinning-test-advisory-fixes.md`
+**Gate File**: `task.169.gate.1.pinning-test-advisory-fixes.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 9/9 met, each with a committed per-PR test or a cited document line
+✅ **Unit Tests:** 29 tests in `tests/reference-doc-skill-pinning.test.js` (was 18); 8/8 QA mutation proofs covered
+✅ **PR Review:** PR #758; Step 5c review APPROVE (`task.169.pr-review.1.pinning-test-advisory-fixes.md`); CI SUCCESS on `9ac0f7a0`
+✅ **Documentation:** `CHANGELOG.md` `[Unreleased]` entry (task 169)
+✅ **Security Review:** PASS — test-only change, no secrets or unsafe patterns, `boundary: false`
+— **Compliance Review:** NOT_APPLICABLE — no data, payment, UI or health scope
+
+**Task marked as ACCEPTED on:** 2026-10-26
+
+**Detailed Verification Log:** See `task.169.dod.1.pinning-test-advisory-fixes.md` for complete verification evidence and timestamps.
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-30 | 1.0     | Initial draft | create-task |
-
+| 2026-10-26 | 1.1     | Review passed (9/10) — empty-vs-missing split on both pages; call-site prefix fixture added; flag figure re-measured (24); skill-span dedupe made explicit | review-task |
+| 2026-10-26 |         | Status → ready-for-development | review-task |
+| 2026-10-26 |         | Implemented — 2 files (test + CHANGELOG), 11 tests added, 6 mutation proofs | develop |
+| 2026-10-26 |         | QA gate PASS (100/100) — 0 findings in queue, 2 advisory | qa-task |
+| 2026-10-26 | 1.2 | DoD passed — accepted (PR #758) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -345,19 +447,19 @@ None.
 
 ### Phase 1: Boundary flag match and empty-vs-missing
 
-- [ ] `documentsFlag` + prefix fixture
-- [ ] Empty vs missing messages + fixture
+- [x] `documentsFlag` + prefix fixture
+- [x] Empty vs missing messages + fixture
 
 ### Phase 2: Activation flags checked
 
-- [ ] Standalone flag attachment + fixture
-- [ ] Live activation-flag assertion with floor
+- [x] Standalone flag attachment + fixture
+- [x] Live activation-flag assertion with floor
 
 ### Phase 3: One corpus resolution per run
 
-- [ ] `getCorpus()` + identity/single-read test
-- [ ] CHANGELOG
-- [ ] Four mutation proofs
+- [x] `getCorpus()` + identity/single-read test
+- [x] CHANGELOG
+- [x] Mutation proofs (six — see Implementation Summary)
 
 ---
 

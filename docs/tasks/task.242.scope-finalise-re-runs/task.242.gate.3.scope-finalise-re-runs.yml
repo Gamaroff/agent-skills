@@ -1,0 +1,63 @@
+schema: 2
+task: 'task.242.scope-finalise-re-runs'
+task_title: 'Scope finalise re-runs to the gaps and the changed evidence'
+gate: FAIL
+status_reason: 'All four cycle-2 findings (CR2-1..4) are fixed and mutation-proved (10 of 10 covered). The cycle-3 review found one new high defect, introduced by the CR2-3 fix: a cited file moved to another directory under the same basename now makes its bare citation ambiguous, so the criterion is carried instead of re-judged.'
+reviewer: 'QA Engineer'
+head: 'a43bee983bd757c51e6f172624bc67bd9f03b24b'
+updated: '2026-10-29T07:46:15Z'
+
+top_issues:
+  - id: 'TASK-242-CR3-1'
+    severity: high
+    file: 'shared/resources/finalise-rerun-scope.js'
+    finding: 'evidenceIndex (finalise-rerun-scope.js:161) adds every changed path to the citation index, and the diff now runs with --no-renames. A same-basename directory move (git mv src/b.js lib/b.js) therefore puts two b.js paths in the index. The unique-basename rule then fails, so a bare "b.js:1" citation resolves to nothing, and a PASS criterion whose other citation is unchanged is carried as "unchanged". Reproduced in a real git repo: the cycle-2 head 15185f81 gives SC-2 evidence-changed; a43bee98 gives SC-2 unchanged. The CR2-3 fix introduced this regression, the identity-rule merge direction its test did not carry (its rename also changed the basename, and it cited a full path).'
+    suggested_action: 'Resolve a bare basename against the HEAD-tracked paths first, falling back to the changed-only paths when HEAD has no match, or treat an ambiguous basename as changed when any of its candidates is in changed. Test a same-basename directory move cited bare, with an unchanged co-citation.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 138
+  phases_verified: 18/18
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false, as in cycles 1-2. resolveCitation, evidenceIndex and the scope/merge classifiers decide re-judge vs carry over pipeline-written records and git state, and write no disk path. No security-input-corpus sink models a carry decision. CR3-1 is a reliability defect, not a hostile-input escape.'
+  performance:
+    status: PASS
+    notes: 'One more git diff --name-only call per scope (dirty). No other change.'
+  reliability:
+    status: FAIL
+    notes: 'CR3-1: a same-basename directory move carries a PASS that the evidence no longer supports. CR3-2 (advisory, low/medium): C-quoted non-ASCII paths from git diff never match a citation.'
+  maintainability:
+    status: PASS
+    notes: 'Fixes are commented with their finding ids. Two dead guards (CR3-3, CR3-4) are advisory cleanups.'
+
+recommendations:
+  immediate:
+    - action: 'Keep a bare-basename citation resolvable, or treat it as changed, across a same-basename directory move (CR3-1)'
+      refs: ['shared/resources/finalise-rerun-scope.js']
+  future:
+    - action: 'CR3-2 (low/medium, not promoted): gitIo.changed and gitIo.dirty read git diff --name-only without -z, so a path with non-ASCII or special characters comes back C-quoted and never matches the raw ls-files -z index. The changed half dates from the branch''s first commit; dirty is new this cycle. A one-line fix (-z split on NUL) is worth taking in the CR3-1 cycle.'
+      refs: ['shared/resources/finalise-rerun-scope.js']
+    - action: 'CR3-3, CR3-4 (cleanups): drop the dead agentAc && guard in mergeReportedGap and the no-op || null after nonMemberFail.'
+      refs: ['shared/resources/finalise-rerun-scope.js']
+    - action: 'Step 4b: the 4 changed SKILL.md blocks are still refused as mutating. finalise-rerun-scope-blocks.test.mjs executes 3a and 3c.'
+      refs: ['skills/finalise/SKILL.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

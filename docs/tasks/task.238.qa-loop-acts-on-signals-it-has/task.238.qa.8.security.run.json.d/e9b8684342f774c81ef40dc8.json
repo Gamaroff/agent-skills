@@ -1,0 +1,30 @@
+{
+  "sink": "shell-exec",
+  "entry": "shell-argv:shared/resources/fast-gate-outcome.sh",
+  "name": "log-test-paths",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 25,
+  "passed": 25,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": [
+    "bash"
+  ],
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": [
+    "--log",
+    "{input}",
+    "--exit",
+    "1"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": "/home/gamaroff/Development/agent-skills/docs/tasks/task.238.qa-loop-acts-on-signals-it-has/task.238.qa.5.security.setup.sh",
+  "ran_at": "2026-10-28T07:26:01.651Z"
+}

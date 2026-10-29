@@ -1,0 +1,64 @@
+schema: 2
+task: 'task.165.task-164-deferred-follow-ups'
+task_title: "Close task.164's deferred follow-ups"
+gate: PASS
+status_reason: 'QA2-1 and QA2-2 are fixed and mutation-proven (M13 to M16 red). The fence: probe executes 22 cases with 0 escapes. The scoped diff review returned three findings, none high-confidence: the whole-file status match (0 of 632 work-item documents carry a body status line) and a body/frontmatter field question. All three are recorded as future work.'
+reviewer: 'QA Engineer'
+head: '239b2eb4aa644db5072c8688672320a6f40ab0bf'
+updated: '2026-10-26T16:06:57Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 6393
+  phases_verified: 5/5
+  ci: 'not read this cycle'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 22
+    escaped: 0
+    notes: 'boundary: true. fence: probe on both review-skill gates, recorded in task.165.qa.3.security.run.json: 11 cases each, hostile-rejected-legitimate-accepted, including helper-cannot-advance.'
+  performance:
+    status: PASS
+    notes: 'Unchanged: the 4b meta-test runs in about 1s.'
+  reliability:
+    status: PASS
+    notes: 'QA2-2 fixed. A held lock is read off the lock after the call, and the helper-missing and corrupt-lock tests are committed (M13, M14 red).'
+  maintainability:
+    status: PASS
+    notes: 'QA2-1 fixed. The prose in both skills and in pipeline-lock-cooperation.md claims only what the verdict can tell (M15 red).'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1/CR-2 (cycle 3, medium/medium; was cycle-2 CR-5): limit the review gates'' status match to the frontmatter and accept a quoted value, ideally with one shared helper. Plausibility measured: 0 of 632 tracked task/story documents carry a body status line (reader calibrated on a constructed body line).'
+      refs: ['skills/review-task/SKILL.md', 'skills/review-story/SKILL.md']
+    - action: 'CR-3 (cycle 3, low/low; was cycle-2 CR-4): make review-story Step 10 name the frontmatter status in its edit, or state which field the gate and develop-story Step 2 both read.'
+      refs: ['skills/review-story/SKILL.md']
+    - action: 'Cycle-2 CR-3 (low): unset ADVANCE_LOCK_TEST_4B_ONLY for the direct test:suite run.'
+      refs: ['package.json', 'shared/resources/advance-pipeline-lock.test.sh']
+    - action: 'Cycle-2 CR-6 (low): add positive controls for namesSkill.'
+      refs: ['shared/resources/tests/step-8-completion-checklist.test.mjs']
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-10-26'
+  total_iterations: 2
+  verification_method: 'Committed executed-prose tests, fence: probe run record, mutation proofs M11 and M13–M16'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

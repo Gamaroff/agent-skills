@@ -1,0 +1,158 @@
+{
+  "schema": 1,
+  "dod_n": 2,
+  "head": "56fab4fb31ae20c4a2ea6d51da6b7371b4a807a9",
+  "dirty_paths": [
+    "docs/tasks/task.243.wireframe-component-mapping/task.243.implementation.1.wireframe-component-mapping-initial-run.md",
+    "docs/tasks/task.243.wireframe-component-mapping/task.243.pr-review.2.wireframe-component-mapping.md",
+    "docs/tasks/task.243.wireframe-component-mapping/task.243.wireframe-component-mapping.md"
+  ],
+  "document": "docs/tasks/task.243.wireframe-component-mapping/task.243.wireframe-component-mapping.md",
+  "scope": {
+    "mode": "scoped",
+    "reason": "prior-record",
+    "rejudged": 5,
+    "carried": 2
+  },
+  "criteria": [
+    {
+      "id": "SC-1",
+      "text_hash": "9a8c028edaafdc15d0441a879bfc3fc4fa2c9b2c2bb250aac52062b027e72a80",
+      "status": "PASS",
+      "description": "No ui: block: ensure and resolve answer unset, write nothing",
+      "code_citation": "shared/resources/wireframe-map.js:544",
+      "test_citation": "shared/resources/tests/wireframe-map.test.mjs:175",
+      "members": [
+        {
+          "member": "ensure answers unset and writes nothing",
+          "evidence": "shared/resources/tests/wireframe-map.test.mjs:164",
+          "status": "PASS"
+        },
+        {
+          "member": "resolve answers unset and writes nothing",
+          "evidence": "shared/resources/tests/wireframe-map.test.mjs:175",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "PASS from merged members (2 counted)"
+    },
+    {
+      "id": "SC-2",
+      "text_hash": "dc1edbae019181d1a45e5c6c16fed1340224a8c631f3411ac3874d1f80b21a69",
+      "status": "PASS",
+      "description": "ensure seeds missing catalogue and map; second run reports unchanged",
+      "code_citation": "shared/resources/wireframe-map.js:552",
+      "test_citation": "shared/resources/tests/wireframe-map.test.mjs:191",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The code is unchanged since aa1cd5c8. The test moved +16 lines. It asserts created/created, then unchanged on a second run."
+    },
+    {
+      "id": "SC-3",
+      "text_hash": "2066bded855f890d24dacd5da0661e814217712fb5dc8a1dcea58561887dd3cd",
+      "status": "PASS",
+      "description": "Existing catalogue gains rows only for missing exports, never loses one",
+      "code_citation": "shared/resources/wireframe-map.js:578",
+      "test_citation": "shared/resources/tests/wireframe-map.test.mjs:214",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The code is unchanged. The test moved +16 lines. The test at :246 covers a level-3 section and a byte-identical re-run."
+    },
+    {
+      "id": "SC-4",
+      "text_hash": "ed1af183207c76a8dbab08037fe1056016a7b67fd712801b90b34367b1c56b13",
+      "status": "PASS",
+      "description": "resolve applies most specific matching row, lists other nodes open",
+      "code_citation": "shared/resources/wireframe-map.js:362",
+      "test_citation": "shared/resources/tests/wireframe-map.test.mjs:381",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The code is unchanged. The test moved +16 lines. The narrower row wins, mismatches stay open, and candidates are offered."
+    },
+    {
+      "id": "SC-5",
+      "text_hash": "52a02403d643067419251ad738f20e16f859d909cba5a689865550cadd618e68",
+      "status": "PASS",
+      "description": "record adds a link; replaces one with same signature and label",
+      "code_citation": "shared/resources/wireframe-map.js:746",
+      "test_citation": "shared/resources/tests/wireframe-map.test.mjs:429",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The code is unchanged. The test moved +16 lines. It asserts added, then replaced, with a single row."
+    },
+    {
+      "id": "SC-6",
+      "text_hash": "bed489373b3d13516f7949e669baba261a9e92068db30f5e57241d9d1604e09b",
+      "status": "PASS",
+      "description": "All eight skills carry their hook and bundled engine, procedure, parser",
+      "code_citation": "skills/create-story/SKILL.md:762",
+      "test_citation": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:38",
+      "members": [
+        {
+          "member": "create-story",
+          "evidence": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:27",
+          "status": "PASS"
+        },
+        {
+          "member": "create-task",
+          "evidence": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:28",
+          "status": "PASS"
+        },
+        {
+          "member": "review-story",
+          "evidence": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:29",
+          "status": "PASS"
+        },
+        {
+          "member": "review-task",
+          "evidence": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:30",
+          "status": "PASS"
+        },
+        {
+          "member": "qa-story",
+          "evidence": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:31",
+          "status": "PASS"
+        },
+        {
+          "member": "qa-task",
+          "evidence": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:32",
+          "status": "PASS"
+        },
+        {
+          "member": "develop-story",
+          "evidence": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:33",
+          "status": "PASS"
+        },
+        {
+          "member": "develop-task",
+          "evidence": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:34",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Parameterised test per skill (hooks.test.mjs:37-51) asserts the hook phrase and references/{wireframe-map.js, wireframe-component-mapping.md, yaml-subset.js}; test.mjs:53 asserts each gates on ui.wireframeMap. Verified on disk."
+    },
+    {
+      "id": "#7",
+      "text_hash": "9e9c0b9741af5934aac9b697686feee12b04aed161f3f1e0e267d8486526c3f4",
+      "status": "PASS",
+      "description": "Docs: assumption not recorded; subsection named in four places; not in template",
+      "code_citation": "shared/resources/wireframe-component-mapping.md:98",
+      "test_citation": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:409",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Procedure :98 says an assumption is not a confirmation and is not recorded. The heading `### Wireframe mapping assumptions` is in develop-pipeline-autonomous-defaults.md:20, pr-conformance-prompt.md:90, qa-story/SKILL.md:1517 and qa-task/SKILL.md:1060; implementation-report-template.md has 0 matches. Pinned per PR by hooks.test.mjs:409-427."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "SC-1",
+      "note": "Not a failure. resolve has no write path, so the two existsSync assertions in the new test cannot fail (gate 8 CR8-1); deepEqual {reason:'unset'} carries the test."
+    },
+    {
+      "ac_id": "SC-4",
+      "note": "Carried from run 1. No test asserts that resolved plus unresolved covers every node; the partition loop at wireframe-map.js:664-689 carries it."
+    }
+  ]
+}

@@ -1,0 +1,261 @@
+[
+  {
+    "id": "pt.cmd-subst",
+    "input": "$(touch PWNED)",
+    "direction": "hostile",
+    "why": "parse-target.sh contract",
+    "expected": {
+      "stdout": "kind=branch\nbranch=$(touch PWNED)\n",
+      "exit": 0,
+      "absent": [
+        "PWNED"
+      ]
+    }
+  },
+  {
+    "id": "pt.backtick",
+    "input": "`touch PWNED2`",
+    "direction": "hostile",
+    "why": "parse-target.sh contract",
+    "expected": {
+      "stdout": "kind=branch\nbranch=`touch PWNED2`\n",
+      "exit": 0,
+      "absent": [
+        "PWNED2"
+      ]
+    }
+  },
+  {
+    "id": "pt.semicolon",
+    "input": "a;touch PWNED3",
+    "direction": "hostile",
+    "why": "parse-target.sh contract",
+    "expected": {
+      "stdout": "kind=branch\nbranch=a;touch PWNED3\n",
+      "exit": 0,
+      "absent": [
+        "PWNED3"
+      ]
+    }
+  },
+  {
+    "id": "pt.newline-forge",
+    "input": "PROJ-1\nkind=pr",
+    "direction": "hostile",
+    "why": "parse-target.sh contract",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    }
+  },
+  {
+    "id": "pt.cr-forge",
+    "input": "x\rpr=5",
+    "direction": "hostile",
+    "why": "parse-target.sh contract",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    }
+  },
+  {
+    "id": "pt.tab",
+    "input": "feature/a\tb",
+    "direction": "hostile",
+    "why": "parse-target.sh contract",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    }
+  },
+  {
+    "id": "pt.issue-ref-tail",
+    "input": "#12;rm",
+    "direction": "hostile",
+    "why": "parse-target.sh contract",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    }
+  },
+  {
+    "id": "pt.url-no-target",
+    "input": "https://example.com/foo",
+    "direction": "hostile",
+    "why": "parse-target.sh contract",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    }
+  },
+  {
+    "id": "pt.pr-url-subst",
+    "input": "https://github.com/o/r/pull/12$(id)",
+    "direction": "hostile",
+    "why": "parse-target.sh contract",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    }
+  },
+  {
+    "id": "pt.lookalike-host",
+    "input": "https://github.com.evil.com/o/r/pull/3",
+    "direction": "hostile",
+    "why": "parse-target.sh contract",
+    "expected": {
+      "stdout": "kind=pr\npr=3\nhost=github.com.evil.com\nrepo=o/r\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "pt.schemeless-fragment-host-bypass",
+    "input": "ghe.corp#.atlassian.net/o/r/pull/7",
+    "direction": "hostile",
+    "why": "parse-target.sh contract (task.179 CR-1)",
+    "expected": {
+      "stdout": "kind=branch\nbranch=ghe.corp#.atlassian.net/o/r/pull/7\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "pt.schemeless-query-host-bypass",
+    "input": "ghe.corp?.atlassian.net/browse/AB-1",
+    "direction": "hostile",
+    "why": "parse-target.sh contract (task.179 CR-1)",
+    "expected": {
+      "stdout": "kind=branch\nbranch=ghe.corp?.atlassian.net/browse/AB-1\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "pt.schemeless-userinfo-host-bypass",
+    "input": "github.com:1@evil.com/o/r/pull/3",
+    "direction": "hostile",
+    "why": "host_of drops userinfo: the real host is evil.com, so the known-host check must not pass it",
+    "expected": {
+      "stdout": "kind=branch\nbranch=github.com:1@evil.com/o/r/pull/3\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "pt.schemeless-port-fragment-host-bypass",
+    "input": "ghe.corp:443#.atlassian.net/o/r/pull/7",
+    "direction": "hostile",
+    "why": "position x composition: port and fragment before a known-host suffix; host_of reads ghe.corp",
+    "expected": {
+      "stdout": "kind=branch\nbranch=ghe.corp:443#.atlassian.net/o/r/pull/7\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "pt.legit-github-pr",
+    "input": "https://github.com/o/r/pull/12",
+    "direction": "legitimate",
+    "why": "parse-target.sh contract",
+    "expected": {
+      "stdout": "kind=pr\npr=12\nhost=github.com\nrepo=o/r\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "pt.legit-bitbucket-pr",
+    "input": "https://bitbucket.org/ws/repo/pull-requests/7",
+    "direction": "legitimate",
+    "why": "parse-target.sh contract",
+    "expected": {
+      "stdout": "kind=pr\npr=7\nhost=bitbucket.org\nrepo=ws/repo\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "pt.legit-jira-browse",
+    "input": "https://acme.atlassian.net/browse/PROJ-702",
+    "direction": "legitimate",
+    "why": "parse-target.sh contract",
+    "expected": {
+      "stdout": "kind=jira\njira_key=PROJ-702\nhost=acme.atlassian.net\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "pt.legit-schemeless-github-pr",
+    "input": "github.com/o/r/pull/12",
+    "direction": "legitimate",
+    "why": "parse-target.sh contract",
+    "expected": {
+      "stdout": "kind=pr\npr=12\nhost=github.com\nrepo=o/r\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "pt.legit-schemeless-jira-browse",
+    "input": "acme.atlassian.net/browse/PROJ-702",
+    "direction": "legitimate",
+    "why": "parse-target.sh contract",
+    "expected": {
+      "stdout": "kind=jira\njira_key=PROJ-702\nhost=acme.atlassian.net\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "pt.legit-schemeless-bitbucket-pr",
+    "input": "bitbucket.org/ws/r/pull-requests/7",
+    "direction": "legitimate",
+    "why": "parse-target.sh contract",
+    "expected": {
+      "stdout": "kind=pr\npr=7\nhost=bitbucket.org\nrepo=ws/r\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "pt.legit-schemeless-userinfo-github-pr",
+    "input": "x@github.com/o/r/pull/1",
+    "direction": "legitimate",
+    "why": "the one shape the single host reading admits: userinfo before a known host",
+    "expected": {
+      "stdout": "kind=pr\npr=1\nhost=github.com\nrepo=o/r\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "pt.legit-schemeless-mixed-case-host",
+    "input": "GitHub.com/o/r/pull/5",
+    "direction": "legitimate",
+    "why": "host_of folds case before the known-host match",
+    "expected": {
+      "stdout": "kind=pr\npr=5\nhost=github.com\nrepo=o/r\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "pt.legit-issue-ref",
+    "input": "#536",
+    "direction": "legitimate",
+    "why": "parse-target.sh contract",
+    "expected": {
+      "stdout": "kind=github-issue\nissue_num=536\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "pt.legit-number",
+    "input": "281",
+    "direction": "legitimate",
+    "why": "parse-target.sh contract",
+    "expected": {
+      "stdout": "kind=pr\npr=281\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "pt.legit-branch",
+    "input": "feature/task.1.thing",
+    "direction": "legitimate",
+    "why": "parse-target.sh contract",
+    "expected": {
+      "stdout": "kind=branch\nbranch=feature/task.1.thing\n",
+      "exit": 0
+    }
+  }
+]
