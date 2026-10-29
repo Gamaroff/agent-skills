@@ -3,7 +3,17 @@
 // without the engine it runs, fails here rather than in a consumer's pipeline.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -66,6 +76,57 @@ test("develop Phase 0 resolves in 0c-wire and asks in 0d", () => {
     read("shared/resources/develop-pipeline-step-3-develop-loop.md"),
     /WIREFRAME_TABLE/,
   );
+});
+
+// The 0c-wire block runs as delivered (placeholders filled) in a consumer checkout with no
+// .claude/state directory: the first develop run in a project must not lose resolve's output.
+test("the 0c-wire block runs in a fresh checkout and writes the resolve output", () => {
+  const step0 = read(
+    "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md",
+  );
+  const section = step0.slice(
+    step0.indexOf("## 0c-wire."),
+    step0.indexOf("## 0d."),
+  );
+  const fence = /```bash\n([\s\S]*?)\n```/.exec(section);
+  assert.ok(fence, "0c-wire has no bash block");
+  const block = fence[1]
+    .replaceAll("{develop-story|develop-task}", "develop-task")
+    .replaceAll("{document-file}", "docs/story.md");
+  assert.ok(!/\{[\w|-]+\}/.test(block), `unfilled placeholder in:\n${block}`);
+
+  const dir = mkdtempSync(join(tmpdir(), "wf-0c-wire-"));
+  try {
+    const refs = join(dir, ".agents/skills/develop-task/references");
+    mkdirSync(refs, { recursive: true });
+    for (const f of ["wireframe-map.js", "yaml-subset.js"])
+      copyFileSync(join(ROOT, "shared/resources", f), join(refs, f));
+    mkdirSync(join(dir, "docs"));
+    writeFileSync(
+      join(dir, "skills-config.yaml"),
+      "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+    );
+    writeFileSync(
+      join(dir, "docs/story.md"),
+      '# Story\n\n```wireloom\nwindow:\n  button "Done" primary\n```\n',
+    );
+    assert.equal(existsSync(join(dir, ".claude/state")), false);
+    const run = spawnSync("bash", ["-c", block], {
+      cwd: dir,
+      encoding: "utf8",
+    });
+    assert.equal(run.status, 0, run.stderr);
+    const out = JSON.parse(
+      readFileSync(join(dir, ".claude/state/wireframe-map.json"), "utf8"),
+    );
+    assert.equal(out.reason, "ok");
+    assert.ok(
+      out.unresolved.some((n) => n.signature === "window>button[primary]"),
+      JSON.stringify(out.unresolved),
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("an unattended assumption is flagged, never recorded as confirmed", () => {

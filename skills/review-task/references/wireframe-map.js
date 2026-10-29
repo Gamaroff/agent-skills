@@ -32,7 +32,8 @@
  *
  * `ensure` creates what is missing and never overwrites. A missing catalogue is seeded with one row
  * per component the barrel exports; an existing one gains a row only for an export it lacks, under
- * `### Added by wireframe-map` at the end of `catalogueSection`. A missing map is created with its
+ * an `Added by wireframe-map` heading one level below `catalogueSection` (`###` under the default
+ * `## Components`), at the end of that section. A missing map is created with its
  * header and an empty table. A file that exists but cannot be read as expected is left alone.
  *
  * Signatures. A node's signature is `parent>primitive[flag,flag]{key=value,…}`: its parent's
@@ -88,7 +89,10 @@ const MAP_COLUMNS = [
   "Notes",
   "Confirmed",
 ];
-const ADDED_HEADING = "### Added by wireframe-map";
+// One level below the configured section, so the added rows stay inside it: a heading at the
+// section's own level would end the section, and the next run would not see the rows it added.
+const addedHeading = (section) =>
+  `${"#".repeat(headingLevel(section) + 1)} Added by wireframe-map`;
 const LAYOUT = "(layout)";
 
 class UsageError extends Error {}
@@ -114,11 +118,20 @@ function readUiConfig(root) {
     componentImport: str(ui.componentImport),
     componentBarrel: str(ui.componentBarrel),
     catalogueSection: str(ui.catalogueSection) || "## Components",
-    componentExclude: Array.isArray(ui.componentExclude)
-      ? ui.componentExclude.map(String)
-      : [],
+    componentExclude: nameList(ui.componentExclude),
     wireframeMap: str(ui.wireframeMap),
   };
+}
+
+// A list of names, in any of the forms a config author writes: a block list, a one-line
+// `[A, B]` (which yaml-subset reads as a string) or a single name.
+function nameList(v) {
+  if (Array.isArray(v)) return v.map(String);
+  if (typeof v !== "string" || !v.trim()) return [];
+  const flow = /^\[(.*)\]$/.exec(v.trim());
+  return (flow ? flow[1].split(",") : [v])
+    .map((s) => s.trim().replace(/^(["'])(.*)\1$/, "$2"))
+    .filter(Boolean);
 }
 
 // ---------------------------------------------------------------------------
@@ -171,8 +184,9 @@ function extractBlocks(text) {
 }
 
 // One Wireloom line: `primitive "label" flag key=value key="v w" …` with an optional trailing `:`.
+// Wireloom comments are whole lines (`listNodes` skips them), so a `#` here is content.
 function parseLine(raw) {
-  const text = raw.replace(/\s+#.*$/, "").replace(/:\s*$/, "");
+  const text = raw.replace(/:\s*$/, "");
   const m = /^(\s*)([A-Za-z][\w-]*)(.*)$/.exec(text);
   if (!m) return null;
   const node = {
@@ -395,10 +409,13 @@ function nearMisses(rows, node) {
 // The catalogue
 // ---------------------------------------------------------------------------
 
+const headingLevel = (heading) =>
+  (/^(#+)\s/.exec(heading.trim()) || [, "##"])[1].length;
+
 function sectionBounds(lines, heading) {
   const start = lines.findIndex((l) => l.trim() === heading.trim());
   if (start === -1) return null;
-  const level = (/^(#+)\s/.exec(heading.trim()) || [, "##"])[1].length;
+  const level = headingLevel(heading);
   let end = lines.length;
   for (let i = start + 1; i < lines.length; i++) {
     const h = /^(#+)\s/.exec(lines[i]);
@@ -445,8 +462,9 @@ function purposeOf(file, name) {
   } catch (_) {
     return null;
   }
+  // The body may not cross `*/`: otherwise a file's header comment is read as the component's.
   const re = new RegExp(
-    `/\\*\\*([\\s\\S]*?)\\*/\\s*export\\s+(?:default\\s+)?(?:function|const|class)\\s+${name}\\b`,
+    `/\\*\\*((?:(?!\\*/)[\\s\\S])*?)\\*/\\s*export\\s+(?:default\\s+)?(?:function|const|class)\\s+${name}\\b`,
   );
   const m = re.exec(text);
   if (!m) return null;
@@ -465,6 +483,11 @@ function tierOf(root, file) {
   if (i >= 0 && parts[i + 1]) return parts[i + 1];
   return parts.length > 1 ? parts[parts.length - 2] : "";
 }
+
+// PascalCase with at least one lowercase letter: `HStack` and `QRCode` are components, while
+// `ICON_NAMES` and `URL` are constants.
+const isComponentName = (name) =>
+  /^[A-Z][A-Za-z0-9]*$/.test(name) && /[a-z]/.test(name);
 
 // Value exports of the barrel, followed through `export … from` and `export * from`, keeping
 // PascalCase names only: types, hooks and constants are not drawn components.
@@ -492,15 +515,15 @@ function barrelExports(root, barrel, exclude) {
           .split(/\s+as\s+/)
           .pop()
           .trim();
-        if (/^[A-Z][a-z][A-Za-z0-9]*$/.test(name) && !out.has(name))
-          out.set(name, target);
+        if (isComponentName(name) && !out.has(name)) out.set(name, target);
       }
     }
     const star = /export\s*\*\s*from\s*['"]([^'"]+)['"]/g;
     while ((m = star.exec(text))) walk(resolveModule(file, m[1]));
     const local =
-      /export\s+(?:default\s+)?(?:function|const|class)\s+([A-Z][a-z][A-Za-z0-9]*)/g;
-    while ((m = local.exec(text))) if (!out.has(m[1])) out.set(m[1], file);
+      /export\s+(?:default\s+)?(?:function|const|class)\s+([A-Z][A-Za-z0-9]*)\b/g;
+    while ((m = local.exec(text)))
+      if (isComponentName(m[1]) && !out.has(m[1])) out.set(m[1], file);
   };
   walk(path.resolve(root, barrel));
   for (const name of exclude) out.delete(name);
@@ -563,7 +586,8 @@ function ensure(root) {
           const rows = missing.map((n) =>
             catalogueRow(root, n, exports.get(n)),
           );
-          const sub = sectionBounds(lines.slice(0, b.end), ADDED_HEADING);
+          const added = addedHeading(ui.catalogueSection);
+          const sub = sectionBounds(lines.slice(0, b.end), added);
           let insert;
           if (sub && sub.start > b.start) {
             let at = sub.end;
@@ -576,7 +600,7 @@ function ensure(root) {
               at,
               lines: [
                 "",
-                ADDED_HEADING,
+                added,
                 "",
                 "| Component | Tier | Use it for |",
                 "| --- | --- | --- |",

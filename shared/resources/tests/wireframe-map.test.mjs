@@ -125,6 +125,30 @@ test("parseLine reads the primitive, label, flags and attributes", () => {
   );
 });
 
+test("parseLine keeps a # inside a quoted label: Wireloom comments are whole lines", () => {
+  assert.equal(parseLine('  text "Order #1234" muted').label, "Order #1234");
+  assert.deepEqual(parseLine('  text "Order #1234" muted').flags, ["muted"]);
+  const nodes = listNodes(
+    extractBlocks(
+      [
+        "```wireloom",
+        "window:",
+        "  # a comment line",
+        '  text "Issue #7"',
+        "```",
+        "",
+      ].join("\n"),
+    ),
+  );
+  assert.deepEqual(
+    nodes.map((n) => [n.primitive, n.label]),
+    [
+      ["window", null],
+      ["text", "Issue #7"],
+    ],
+  );
+});
+
 test("listNodes gives each node a path id, its file line and a signature", () => {
   const nodes = listNodes(extractBlocks(STORY));
   const button = nodes.find((n) => n.primitive === "button");
@@ -198,6 +222,114 @@ test("ensure adds only a new export to an existing catalogue, under its own head
     const added = text.indexOf("### Added by wireframe-map");
     assert.ok(added > 0 && added < text.indexOf("## Something else"));
     assert.equal(ensure(root).catalogue, "unchanged");
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("ensure under a level-3 section nests its heading below it, and a second run writes nothing", () => {
+  const config = CONFIG.replace("'## Components'", "'### Components'");
+  const existing = [
+    "# Ours",
+    "",
+    "### Components",
+    "",
+    "| Component | Tier | Use it for |",
+    "| --- | --- | --- |",
+    "| `Other` | atoms | Ours |",
+    "",
+    "### Something else",
+    "",
+  ].join("\n");
+  const root = consumer({ config, files: { "docs/components.md": existing } });
+  try {
+    const file = join(root, "docs/components.md");
+    assert.equal(ensure(root).catalogue, "updated");
+    const once = readFileSync(file, "utf8");
+    assert.equal(
+      (once.match(/^#### Added by wireframe-map$/gm) || []).length,
+      1,
+    );
+    assert.ok(once.indexOf("#### Added") < once.indexOf("### Something else"));
+    // Write N and write N+1 are byte-identical: the rows added are seen as catalogued.
+    for (let run = 2; run <= 3; run++) {
+      assert.equal(ensure(root).catalogue, "unchanged", `run ${run}`);
+      assert.equal(
+        readFileSync(file, "utf8"),
+        once,
+        `run ${run} changed the file`,
+      );
+    }
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("componentExclude accepts a one-line [A, B] list and a single name", () => {
+  for (const form of ["[Provider]", "['Provider', Row]", "Provider"]) {
+    const config = CONFIG.replace(
+      "  componentExclude:\n    - Provider\n",
+      `  componentExclude: ${form}\n`,
+    );
+    assert.notEqual(
+      config,
+      CONFIG,
+      "the fixture's exclude block was not replaced",
+    );
+    const root = consumer({ config });
+    try {
+      const added = ensure(root).added;
+      assert.ok(
+        !added.includes("Provider"),
+        `${form}: Provider was catalogued`,
+      );
+      assert.ok(added.includes("Button"), `${form}: Button was dropped`);
+    } finally {
+      cleanup(root);
+    }
+  }
+});
+
+test("barrel names with two leading capitals are components; all-caps constants are not", () => {
+  const root = consumer({
+    files: {
+      "src/index.ts": [
+        "export { Button } from './components/atoms/button/button';",
+        "export { QRCode } from './components/atoms/qr/qr';",
+        "export * from './layout';",
+        "",
+      ].join("\n"),
+      "src/components/atoms/qr/qr.tsx": "export function QRCode() {}\n",
+      "src/layout.ts":
+        "export function HStack() {}\nexport const URL = 'x';\nexport const ICON_NAMES = [];\n",
+    },
+  });
+  try {
+    assert.deepEqual(ensure(root).added, ["Button", "HStack", "QRCode"]);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("a component's purpose is its own doc comment, not the file's header comment", () => {
+  const root = consumer({
+    files: {
+      "src/components/atoms/button/button.tsx": [
+        "/** Module header: everything about buttons. */",
+        "import x from 'x';",
+        "/** A call to action. */",
+        "export function Button() {}",
+        "",
+      ].join("\n"),
+      "src/components/molecules/row/row.tsx":
+        "/** Module header for rows. */\nimport y from 'y';\nexport function Row() {}\n",
+    },
+  });
+  try {
+    ensure(root);
+    const cat = readFileSync(join(root, "docs/components.md"), "utf8");
+    assert.match(cat, /^\| `Button` \| atoms \| A call to action\. \|$/m);
+    assert.match(cat, /^\| `Row` \| molecules \| _describe me_ \|$/m);
   } finally {
     cleanup(root);
   }

@@ -625,6 +625,8 @@ Store `ALWAYS_LOAD_FILES` as a pipeline-wide variable — it is consumed in Step
 Only when `skills-config.yaml` sets `ui.wireframeMap` **and** the document holds a ` ```wireloom ` block; otherwise set `WIREFRAME_OPEN=[]` and skip silently. This section is identical for both orchestrators, and is the develop-time half of [`wireframe-component-mapping.md`](wireframe-component-mapping.md).
 
 ```bash
+# The first Phase 0 write under .claude/state: no earlier block has created it.
+mkdir -p .claude/state
 command node .agents/skills/{develop-story|develop-task}/references/wireframe-map.js ensure --json
 command node .agents/skills/{develop-story|develop-task}/references/wireframe-map.js resolve {document-file} --json \
   > .claude/state/wireframe-map.json

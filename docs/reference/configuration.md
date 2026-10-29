@@ -331,7 +331,7 @@ gate, and strategy — single-item and batch runs never diverge) and adds
 | `ui.componentImport`                             | module specifier                | unset                                            | The module code must import the components from. QA and `review-pr` check each mapped component is imported from it. |
 | `ui.componentBarrel`                             | path                            | unset                                            | Entry file whose value exports are the components: `export { … } from` and `export * from` are followed, and only PascalCase names are kept. |
 | `ui.catalogueSection`                            | heading line                    | `## Components`                                  | The catalogue heading whose tables hold one row per component, named in the first cell as `` `Name` ``. |
-| `ui.componentExclude`                            | list[name]                      | `[]`                                             | Exports that are not drawn components (a theme provider, for example). |
+| `ui.componentExclude`                            | list[name]                      | `[]`                                             | Exports that are not drawn components (a theme provider, for example). A block list, a one-line `[A, B]` or a single name. |
 | `ui.wireframeMap`                                | path                            | unset                                            | The project's map of wireframe-node-to-component links, each confirmed by a person. **Setting it turns the feature on.** Created by the skills when missing. |
 
 ## UI — wireframes and components
@@ -346,8 +346,9 @@ the rest (or, unattended, assume the best match and flag it for QA), and add eac
 **You do not need to write either file.** The first skill that needs them creates them: the
 catalogue with one row per component `ui.componentBarrel` exports (purpose taken from each
 component's doc comment, or `_describe me_`), and the map with its header and an empty table. Later
-runs add a catalogue row for each new export, under `### Added by wireframe-map`, and never change a
-row you wrote. A file that exists but cannot be read is left alone and reported.
+runs add a catalogue row for each new export, under an `Added by wireframe-map` heading one level
+below `ui.catalogueSection` (`###` under the default `## Components`), and never change a row you
+wrote. A file that exists but cannot be read is left alone and reported.
 
 **The map's rows** are `Signature | Label | Component | Variant / props | Source hint | Notes |
 Confirmed`. A signature is `parent>primitive[flag]{key=value}`: `*>button[primary]`,

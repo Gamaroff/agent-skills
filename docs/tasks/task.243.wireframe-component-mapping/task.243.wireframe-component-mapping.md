@@ -232,6 +232,30 @@ catalogue files stay as they are.
 - Review: [`task.243.review.1.wireframe-component-mapping.md`](task.243.review.1.wireframe-component-mapping.md)
 - Tracker: [#784](https://github.com/Gamaroff/agent-skills/issues/784)
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-29
+**Quality Score**: 50/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.243.qa.1.wireframe-component-mapping.md](./task.243.qa.1.wireframe-component-mapping.md)
+- **Gate File**: [task.243.gate.1.wireframe-component-mapping.yml](./task.243.gate.1.wireframe-component-mapping.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 23 (new suites); 6825 in the Step 3 fast gate
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+Five medium findings, each reproduced or verified, and one low. In the engine: duplicated rows
+under a `###` catalogue section (CR-1), a `#` inside a quoted label (CR-2), the flow-list
+`componentExclude` (CR-3), and names like `HStack` dropped from the catalogue (CR-4). In Phase 0:
+`0c-wire` fails on a fresh checkout (4B-1). Bug reports `task.243.bug.1`–`5`.
+
 ## Change Log
 
 | Date | Version | Description | Author |
@@ -240,4 +264,6 @@ catalogue files stay as they are.
 | 2026-10-29 | 1.1 | Review (7/10, needs revision → fixed): linked #784; rebased on develop; SC-8 moved to Deferred Work; Files Summary corrected; plan restated as completed phases; Progress Tracking and References added | review-task |
 | 2026-10-29 | 1.2 | Review 2 passed (9/10) — review 1's fixes verified; SC-1–SC-7 name their test files; SC-7 stated as a documentation criterion; registry row added to Files Summary | review-task |
 | 2026-10-29 |  | Status → ready-for-review — implemented outside the pipeline (`17dd614a`, 22 source files, 2 new suites); fast gate re-run by `/develop-task` Step 3 | develop-task |
+| 2026-10-29 |  | QA gate CONCERNS (50/100) — 6 findings (5 medium, 1 low) | qa-task |
+| 2026-10-29 |  | QA findings fixed — cycle 1, 6 findings (bug.1–5 Ready for QA, CR-7), each with a mutation-proven test | qa-fix |
 <!-- change-log-end -->
