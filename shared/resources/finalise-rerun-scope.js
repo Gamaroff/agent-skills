@@ -152,6 +152,15 @@ function resolveCitation(citation, tracked) {
   return [...out];
 }
 
+// The paths a citation may resolve to: the files tracked at HEAD, plus every
+// path that changed since the prior head. A cited file deleted or renamed
+// since then is in the second set only; without it the citation resolved to
+// nothing and the criterion's other, unchanged paths carried it (task.242 QA
+// cycle 2, CR2-3).
+function evidenceIndex(trackedPaths, changed) {
+  return trackedIndex([...new Set([...trackedPaths, ...changed])]);
+}
+
 function trackedIndex(paths) {
   const byBase = new Map();
   for (const p of paths) {
@@ -205,13 +214,21 @@ function gitIo(cwd) {
     // Committed changes since the prior head, plus the tracked files the
     // working tree has changed since HEAD. A superset of the committed diff,
     // so an uncommitted edit to a cited file re-judges rather than carries.
+    // --no-renames: a rename is listed under both names, so a citation of the
+    // old name is seen as changed (CR2-3).
     changed: (from, to) => {
       const lines = (s) => s.split("\n").filter(Boolean);
       return new Set([
-        ...lines(git(cwd, ["diff", "--name-only", from, to])),
-        ...lines(git(cwd, ["diff", "--name-only", "HEAD"])),
+        ...lines(git(cwd, ["diff", "--name-only", "--no-renames", from, to])),
+        ...lines(git(cwd, ["diff", "--name-only", "--no-renames", "HEAD"])),
       ]);
     },
+    // The tracked files the working tree has changed since HEAD: what this
+    // run's agents read and the head does not hold (CR2-4).
+    dirty: () =>
+      git(cwd, ["diff", "--name-only", "--no-renames", "HEAD"])
+        .split("\n")
+        .filter(Boolean),
     tracked: () => git(cwd, ["ls-files", "-z"]).split("\0").filter(Boolean),
   };
 }
@@ -242,6 +259,14 @@ function fullScope(reason, criteria, head, extra = {}) {
  * @param {object}      io               { isAncestor, changed, tracked } — gitIo(cwd) in the CLI
  */
 function scope(input, io) {
+  const s = scopeOf(input, io);
+  // What the agents of THIS run will read beyond the head. merge copies it into
+  // the record, and the next scope treats it as changed: a verdict made on an
+  // uncommitted edit that is later discarded is not carried (CR2-4).
+  return { ...s, dirty: io.dirty ? io.dirty() : [] };
+}
+
+function scopeOf(input, io) {
   const criteria = readCriteria(input.docBody);
   const head = input.head;
   if (input.priorText === null || input.priorText === undefined) {
@@ -284,7 +309,11 @@ function scope(input, io) {
   }
 
   const changed = io.changed(prior.head, head);
-  const tracked = trackedIndex(io.tracked());
+  // The prior run's agents also read these, uncommitted; HEAD may no longer
+  // hold what they read, so they count as changed (CR2-4).
+  for (const p of Array.isArray(prior.dirty_paths) ? prior.dirty_paths : [])
+    if (typeof p === "string" && p) changed.add(p);
+  const tracked = evidenceIndex(io.tracked(), changed);
   // Match by id when the document wrote ids, else by text hash: an id-less
   // criterion's `#N` moves when a sibling is inserted, its text does not.
   const hasIds = criteria.some((c) => !c.id.startsWith("#"));
@@ -384,6 +413,9 @@ function renderScopeText(s) {
   lines.push("Use these ids as `ac_id`, quoted exactly. Re-judge:");
   for (const r of s.rejudge) {
     let line = `- ${quoteId(r.id)} (${r.reason}): ${short(r.id)}`;
+    if (r.reason === "reported-gap" && r.prior && r.prior.non_member_fail) {
+      line += `\n  prior non-member FAIL (re-check it): ${r.prior.non_member_fail}`;
+    }
     if (r.reason === "reported-gap" && r.known_members.length > 0) {
       const carried = r.carried_members.map((m) => m.member);
       line += `\n  re-check members: ${r.rejudge_members.join("; ") || "(none)"}`;
@@ -423,8 +455,18 @@ function recordEntry(c, ac) {
     code_citation: ac.code_citation ?? null,
     test_citation: ac.test_citation ?? null,
     members: Array.isArray(ac.members) ? ac.members : [],
+    // Why a FAIL rested on something other than a member (CR2-2). Kept so the
+    // next run's scope can name it, and is only meaningful beside a FAIL.
+    non_member_fail: ac.status === "PASS" ? null : nonMemberFail(ac) || null,
     note: ac.note ?? null,
   };
+}
+
+// The agent's structured reason for a FAIL that is not a member: a non-empty
+// string, or null. A note cannot be parsed; this field is what the merge reads.
+function nonMemberFail(ac) {
+  const v = ac && ac.non_member_fail;
+  return typeof v === "string" && v.trim() ? v.trim() : null;
 }
 
 // Re-judge a `reported-gap` criterion member by member (task § 3, *Members in
@@ -436,16 +478,20 @@ function recordEntry(c, ac) {
 // (task.242 QA cycle 1, CR-3, CR-4).
 function mergeReportedGap(r, agentAc, io, advisories) {
   const prior = r.prior;
+  // No verdict for a gap: the prior FAIL stands, member-shaped or not. Carried
+  // members alone cannot clear it — the prior FAIL may rest on no member at all
+  // (task.242 QA cycle 2, CR2-1).
+  if (!agentAc) {
+    return {
+      ...prior,
+      ac_id: r.id,
+      status: "FAIL",
+      note: `no verdict returned for ${r.id}; prior FAIL stands`,
+    };
+  }
   if (r.known_members.length === 0) {
     // The prior gap was not member-shaped: an ordinary re-judge.
-    return agentAc
-      ? { ...agentAc, ac_id: r.id }
-      : {
-          ...prior,
-          ac_id: r.id,
-          status: "FAIL",
-          note: `no verdict returned for ${r.id}; prior FAIL stands`,
-        };
+    return { ...agentAc, ac_id: r.id };
   }
   const agentMembers = new Map(
     (agentAc && Array.isArray(agentAc.members) ? agentAc.members : [])
@@ -490,19 +536,22 @@ function mergeReportedGap(r, agentAc, io, advisories) {
       counted.push(a);
     }
   }
-  const code =
-    (agentAc && agentAc.code_citation) ?? prior.code_citation ?? null;
-  const test =
-    (agentAc && agentAc.test_citation) ?? prior.test_citation ?? null;
+  const code = agentAc.code_citation ?? prior.code_citation ?? null;
+  const test = agentAc.test_citation ?? prior.test_citation ?? null;
   // The members may overturn an agent FAIL only when the members explain it:
-  // every member the agent failed is carried or was sent to advisories. A FAIL
-  // that names no failing member rests on something else (the execution rule,
-  // a test that does not cover the criterion), and stands.
-  const agentFailed = Boolean(agentAc) && agentAc.status !== "PASS";
+  // every member the agent failed is carried or was sent to advisories, AND
+  // the agent named no non-member reason. A FAIL that names no failing member,
+  // or that carries `non_member_fail`, rests on something else (the execution
+  // rule, a test that does not cover the criterion), and stands. The field is
+  // what tells "failed because of finer member G7" (task.239: overturned) from
+  // "failed for X, and also listed G7" (stands) — a note cannot be parsed
+  // (task.242 QA cycle 2, CR2-2).
+  const agentFailed = agentAc.status !== "PASS";
   const agentFailMembers = [...agentMembers.values()].filter(
     (m) => m.status !== "PASS",
   );
   const explainedByMembers =
+    !nonMemberFail(agentAc) &&
     agentFailMembers.length > 0 &&
     agentFailMembers.every(
       (m) => carried.has(m.member) || !known.has(m.member),
@@ -512,19 +561,26 @@ function mergeReportedGap(r, agentAc, io, advisories) {
     counted.every((m) => m.status === "PASS") &&
     code !== null &&
     test !== null &&
-    !(agentAc && agentAc.test_runs_per_pr === false) &&
+    agentAc.test_runs_per_pr !== false &&
     (!agentFailed || explainedByMembers);
+  // An overturned FAIL keeps the agent's own words, as an advisory.
+  if (pass && agentFailed && agentAc.note) {
+    advisories.push({
+      ac_id: r.id,
+      note: `agent's FAIL overturned by the merged members: ${agentAc.note}`,
+    });
+  }
   return {
-    ...(agentAc || {}),
+    ...agentAc,
     ac_id: r.id,
-    description: (agentAc && agentAc.description) ?? prior.description ?? null,
+    description: agentAc.description ?? prior.description ?? null,
     status: pass ? "PASS" : "FAIL",
     code_citation: code,
     test_citation: test,
     members: counted,
     note: pass
-      ? `PASS from merged members (${counted.length} counted)${agentAc && agentAc.status !== "PASS" ? `; agent's FAIL rested on carried or advisory members` : ""}`
-      : ((agentAc && agentAc.note) ?? prior.note ?? null),
+      ? `PASS from merged members (${counted.length} counted)${agentFailed ? `; agent's FAIL rested on carried or advisory members` : ""}`
+      : (agentAc.note ?? prior.note ?? null),
   };
 }
 
@@ -561,8 +617,8 @@ function merge(s, agentYaml, opts, io) {
   const advisories = (Array.isArray(ac.advisories) ? ac.advisories : []).filter(
     (a) => a && typeof a === "object",
   );
-  const tracked = trackedIndex(io.tracked());
   const changed = new Set(s.changed || []);
+  const tracked = evidenceIndex(io.tracked(), changed);
   const mio = { memberEvidence: (m) => memberEvidence(m, tracked, changed) };
 
   // Zero criteria: nothing to key on, so the agent's verdicts pass through.
@@ -665,6 +721,10 @@ function finish(s, ac, acs, docs, advisories, idMismatches, entries, opts) {
     schema: SCHEMA,
     dod_n: opts.dodN ?? null,
     head: s.head,
+    // Tracked files the agents read uncommitted at this run (scope time). The
+    // next scope counts them as changed, so a verdict resting on an edit that
+    // never reached a commit is re-judged rather than carried (CR2-4).
+    dirty_paths: Array.isArray(s.dirty) ? s.dirty : [],
     document: opts.document ?? null,
     scope: rerunScope,
     criteria: entries.length

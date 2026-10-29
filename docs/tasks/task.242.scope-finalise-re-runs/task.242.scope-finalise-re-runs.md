@@ -115,7 +115,7 @@ task.239's DoD runs cite all three unresolvable shapes. A PASS with no resolvabl
 | `PASS` | no citation resolves to a tracked path (see *Citation paths*) | re-judge | `evidence-unresolved` |
 | `PASS` | none of the above | carry | `unchanged` |
 
-**Members in a `reported-gap` re-judge.** Only two kinds of member are judged: the members the prior run reported as FAIL, and members whose evidence path changed or does not resolve. A carried member keeps its prior verdict. A member the prior record never listed, whose evidence is unchanged, goes to `advisories[]` and does not count toward the verdict. A finer re-split is how the task.239 loop found a new gap each run, and this rule stops it. The criterion's status is then recomputed from its merged members: PASS when every counted member is PASS. The agent's own status for the criterion is not used.
+**Members in a `reported-gap` re-judge.** Only two kinds of member are judged: the members the prior run reported as FAIL, and members whose evidence path changed or does not resolve. A carried member keeps its prior verdict. A member the prior record never listed, whose evidence is unchanged, goes to `advisories[]` and does not count toward the verdict. A finer re-split is how the task.239 loop found a new gap each run, and this rule stops it. The criterion's status is then recomputed from its merged members: PASS when every counted member is PASS. An agent FAIL is overturned only when the members explain it, meaning every member it failed is carried or advisory. A FAIL that names no failing member, sets `non_member_fail`, or reports `test_runs_per_pr: false` stands. A gap the agent does not answer keeps its prior FAIL. (QA cycles 1–2: CR-3, CR2-1, CR2-2.)
 
 The `reported-gap` row is what would have stopped task.239. Run 4 named SC-11's unmapped groups, and run 5 should have checked those and the members whose evidence moved. Instead it judged three finer groups that no earlier run had named.
 
@@ -369,21 +369,26 @@ None.
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-29
-**Quality Score**: 30/100
+**Quality Score**: 40/100
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.242.qa.1.scope-finalise-re-runs.md](./task.242.qa.1.scope-finalise-re-runs.md)
-- **Gate File**: [task.242.gate.1.scope-finalise-re-runs.yml](./task.242.gate.1.scope-finalise-re-runs.yml)
+- **Full Report**: [task.242.qa.2.scope-finalise-re-runs.md](./task.242.qa.2.scope-finalise-re-runs.md)
+- **Gate File**: [task.242.gate.2.scope-finalise-re-runs.yml](./task.242.gate.2.scope-finalise-re-runs.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 126
+- **Tests Executed**: 134
 - **Phases Verified**: 18/18
-- **Critical Issues**: 2
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
+- **Critical Issues**: 3
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: PASS
 
 ### Key Findings
-The Step 3a and 3c blocks read `$STEM` and `$DOD_N` without binding them, so 3c HALTs on every story or task run and 3a never finds a prior record (CR-1, CR-2). Also open: the reported-gap recompute overturns a non-member FAIL (CR-3), an omitted re-check member is carried as PASS (CR-4), and 7.6b does not assert the AC record (CR-5).
+All eight cycle-1 findings are fixed and mutation-proved. The cycle-2 refute pass found three engine paths that carry or restore a PASS the evidence no longer supports:
+- CR2-1: an omitted member-shaped reported gap passes.
+- CR2-2: an invented advisory member overturns a non-member FAIL.
+- CR2-3: a deleted or renamed cited path is dropped from the evidence.
+
+Also open, as advisory: CR2-4, the record keys on HEAD, not on the tree that was judged.
 
 ## Change Log
 
@@ -395,6 +400,8 @@ The Step 3a and 3c blocks read `$STEM` and `$DOD_N` without binding them, so 3c 
 | 2026-10-29 |  | Implemented — 9 authored files (engine, its 33 tests, AC prompt, finalise SKILL.md, 2 pipeline step docs, 2 eval tests, CHANGELOG) plus bundled copies; 4 contract tests added; 28 guards mutation-proved | develop |
 | 2026-10-29 |  | QA gate FAIL (30/100) — 5 findings (2 high: unbound `STEM`/`DOD_N` in Steps 3a and 3c); Status → in-progress | qa-task |
 | 2026-10-29 |  | QA fix cycle 1 — all 8 findings fixed (CR-1–CR-5 from the gate, CR-6–CR-8 advisory): Steps 3a and 3c bind `STEM`/`DOD_N` in-block with a HALT guard; reported-gap merge keeps an unexplained agent FAIL and fails an unanswered re-check member; 7.6a/7.6b use this run's AC record; 8 new tests plus CR-6 assertions in an existing one, 9 mutations covered; Status → ready-for-review | qa-fix |
+| 2026-10-29 |  | QA gate FAIL (40/100) — 3 findings (all high: reported-gap merge passes an omitted criterion and an invented-member FAIL; a deleted or renamed cited path is dropped); cycle-1 fixes verified; Status → in-progress | qa-task |
+| 2026-10-29 |  | QA fix cycle 2. The 3 gate findings are fixed, plus advisory CR2-4. CR2-1: an unanswered gap keeps its prior FAIL. CR2-2: a structured `non_member_fail` keeps a non-member agent FAIL, and the overturned note is kept as an advisory. CR2-3: deleted and renamed cited paths now count as changed. CR2-4: the record carries the dirty paths, re-judged next run. § 3 merge rule restated to match. 4 new tests; 10 mutations covered. Status → ready-for-review | qa-fix |
 
 ---
 

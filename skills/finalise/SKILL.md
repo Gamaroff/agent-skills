@@ -758,8 +758,9 @@ echo "AC_OVERALL=$AC_OVERALL"
 On `merged`, `AC_RESULT` **is** `.ac_result.ac_traceability` from `$AC_MERGED_FILE`, not the agent's
 YAML: every carried verdict is restored whatever the agent returned, a carried criterion the agent
 re-judged differently is moved to `advisories`, a `reported-gap` criterion's status is recomputed from
-its merged members (a re-check member the agent did not answer counts as `FAIL`, and an agent `FAIL`
-stands when it names no failing member or reports `test_runs_per_pr: false`), and `overall` is
+its merged members (a gap the agent did not answer keeps its prior `FAIL`, a re-check member it did
+not answer counts as `FAIL`, and an agent `FAIL` stands when it names no failing member, sets
+`non_member_fail` or reports `test_runs_per_pr: false`), and `overall` is
 recomputed from the merged `acs` and `docs` — never copied from the agent, and
 `NEEDS_MANUAL_REVIEW` when no criterion verdict exists at all. Steps 3d and 6 read that. `id_mismatches` names any `ac_id` the agent returned that the
 scope did not issue; such a verdict is not merged, and the criterion it was meant for reads `FAIL`

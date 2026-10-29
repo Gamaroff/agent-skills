@@ -24,7 +24,7 @@ The caller computed this run's scope from the previous run's record (`finalise-r
 
 - **Use the ids it lists as `ac_id`, quoted exactly** (`ac_id: "#2"` — unquoted, a `#` starts a YAML comment). It lists them in every mode. A verdict under any other id is not merged.
 - **`mode: full`**: judge every criterion, exactly as Step 3 says.
-- **`mode: scoped`**: judge only the criteria under **Re-judge**, by Step 3's rules. For a `reported-gap` entry that lists members, re-check the members it names under `re-check members` and any member whose evidence moved since the prior head; return every member you judged in `members`. A `re-check members` entry you do not return counts as `FAIL`. When the criterion fails for a reason that is not a member (the execution rule, a test that does not cover it), say so in `note`: a `FAIL` that names no failing member stands whatever the members say. Copy each **Carry** criterion through unchanged.
+- **`mode: scoped`**: judge only the criteria under **Re-judge**, by Step 3's rules. For a `reported-gap` entry that lists members, re-check the members it names under `re-check members` and any member whose evidence moved since the prior head; return every member you judged in `members`. A `re-check members` entry you do not return counts as `FAIL`, and so does a re-judged criterion you do not return. When the criterion fails for a reason that is not a member (the execution rule, a test that does not cover it), state that reason in `non_member_fail`: the caller reads that field, never your `note`. A `FAIL` that sets it, or that names no failing member, stands whatever the members say; without it, a `FAIL` whose failing members are all carried or new on unchanged evidence is overturned. An entry that shows `prior non-member FAIL` names the reason the previous run gave: check whether it still holds. Copy each **Carry** criterion through unchanged.
 - **A problem you notice outside your scope** — in a carried criterion, a carried member, or a member no earlier run named whose evidence has not changed — goes in `advisories` with its evidence. It is reported to the reader and does not fail the run. The caller restores every carried verdict whatever you return, so an advisory is the only place such a finding is kept.
 
 ### Step 1: Read the story/task file
@@ -104,6 +104,7 @@ ac_traceability:
         - member: "the member's name, as you listed it"
           evidence: "path/to/file.spec.ts:NN"   # null if unmapped
           status: PASS | FAIL
+      non_member_fail: "reason"                 # only on a FAIL whose reason is not a member; omit otherwise
       note: "optional explanation"
   docs:
     - item: "description of doc item"

@@ -926,6 +926,217 @@ test("merge: an id the engine did not issue is reported with its own status, emp
   }
 });
 
+// QA cycle 2. A reported gap whose prior FAIL rested on no member: SC-3 failed
+// with both its members mapped and passing (an execution-rule FAIL, say).
+function nonMemberGap(extraPrior = {}) {
+  const dir = mkRepo();
+  const prior = record(dir, git(dir, "rev-parse", "HEAD"), {
+    "SC-3": {
+      status: "FAIL",
+      members: [
+        { member: "G1", evidence: "tests/a.test.mjs:1", status: "PASS" },
+        { member: "G2", evidence: "tests/b.test.mjs:1", status: "PASS" },
+      ],
+      note: "cited test does not run per PR",
+      ...extraPrior,
+    },
+  });
+  return { dir, s: scopeAt(dir, prior) };
+}
+
+// SC-1, SC-2 and SC-4 are carried; `sc3` is the agent's SC-3 entry, or "".
+function gapYaml(sc3) {
+  const pass = (id) =>
+    `    - ac_id: "${id}"\n      status: PASS\n      code_citation: "src/a.js:1"\n      test_citation: "tests/a.test.mjs:1"\n      test_runs_per_pr: true`;
+  return [
+    "ac_traceability:",
+    "  acs:",
+    pass("SC-1"),
+    pass("SC-2"),
+    ...(sc3 ? [sc3] : []),
+    pass("SC-4"),
+    "  docs: []",
+    "",
+  ].join("\n");
+}
+
+const SC3_MEMBERS = [
+  "      members:",
+  '        - member: "G1"',
+  '          evidence: "tests/a.test.mjs:1"',
+  "          status: PASS",
+  '        - member: "G2"',
+  '          evidence: "tests/b.test.mjs:1"',
+  "          status: PASS",
+];
+
+function sc3Entry(status, { extraMembers = [], fields = [] } = {}) {
+  return [
+    `    - ac_id: "SC-3"`,
+    `      status: ${status}`,
+    '      code_citation: "src/a.js:1"',
+    '      test_citation: "tests/a.test.mjs:1"',
+    "      test_runs_per_pr: true",
+    ...SC3_MEMBERS,
+    ...extraMembers,
+    ...fields,
+  ].join("\n");
+}
+
+const sc3Of = (r) =>
+  r.ac_result.ac_traceability.acs.find((x) => x.ac_id === "SC-3");
+
+test("reported-gap: no agent verdict keeps the prior FAIL, even when every member is carried (CR2-1)", () => {
+  const { dir, s } = nonMemberGap();
+  try {
+    const gap = s.rejudge.find((r) => r.id === "SC-3");
+    assert.equal(gap.reason, "reported-gap");
+    assert.deepEqual(gap.rejudge_members, [], "every member is carried");
+    // Omitted, and returned under an id the engine did not issue.
+    for (const yaml of [
+      gapYaml(""),
+      gapYaml(sc3Entry("PASS").replace('"SC-3"', '"SC-3x"')),
+    ]) {
+      const r = eng.merge(s, yaml, {}, eng.gitIo(dir));
+      assert.equal(sc3Of(r).status, "FAIL");
+      assert.match(
+        sc3Of(r).note,
+        /no verdict returned for SC-3; prior FAIL stands/,
+      );
+      assert.equal(r.ac_result.ac_traceability.overall, "PARTIAL");
+    }
+    // Control: an agent that re-judges SC-3 PASS is merged as PASS.
+    const ok = eng.merge(s, gapYaml(sc3Entry("PASS")), {}, eng.gitIo(dir));
+    assert.equal(sc3Of(ok).status, "PASS");
+    assert.equal(ok.ac_result.ac_traceability.overall, "PASS");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+const INVENTED_G9 = [
+  '        - member: "G9"',
+  '          evidence: "tests/a.test.mjs:5"',
+  "          status: FAIL",
+];
+
+test("reported-gap: non_member_fail keeps an agent FAIL that an invented member would otherwise overturn (CR2-2)", () => {
+  const { dir, s } = nonMemberGap();
+  try {
+    const stands = eng.merge(
+      s,
+      gapYaml(
+        sc3Entry("FAIL", {
+          extraMembers: INVENTED_G9,
+          fields: [
+            '      non_member_fail: "cited test does not exercise the criterion"',
+            '      note: "test misses the branch"',
+          ],
+        }),
+      ),
+      {},
+      eng.gitIo(dir),
+    );
+    assert.equal(sc3Of(stands).status, "FAIL");
+    assert.equal(sc3Of(stands).note, "test misses the branch");
+    // The reason is kept in the record, and the next run's scope names it.
+    const entry = stands.record.criteria.find((c) => c.id === "SC-3");
+    assert.equal(
+      entry.non_member_fail,
+      "cited test does not exercise the criterion",
+    );
+    const next = scopeAt(dir, JSON.stringify(stands.record));
+    assert.match(
+      eng.renderScopeText(next),
+      /prior non-member FAIL \(re-check it\): cited test does not exercise the criterion/,
+    );
+    // Control — the task.239 shape: without the field, a FAIL resting only on a
+    // new member on unchanged evidence is overturned, and the agent's note is
+    // kept as an advisory.
+    const overturned = eng.merge(
+      s,
+      gapYaml(
+        sc3Entry("FAIL", {
+          extraMembers: INVENTED_G9,
+          fields: ['      note: "G9 unmapped"'],
+        }),
+      ),
+      {},
+      eng.gitIo(dir),
+    );
+    assert.equal(sc3Of(overturned).status, "PASS");
+    const notes = overturned.ac_result.ac_traceability.advisories.map(
+      (a) => a.note,
+    );
+    assert.ok(
+      notes.some((n) => /new member G9/.test(n)),
+      notes.join("\n"),
+    );
+    assert.ok(
+      notes.some((n) => /agent's FAIL overturned .*: G9 unmapped/.test(n)),
+      notes.join("\n"),
+    );
+    assert.equal(
+      overturned.record.criteria.find((c) => c.id === "SC-3").non_member_fail,
+      null,
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("scope: a cited path deleted or renamed since the prior head re-judges; an unrelated rename does not (CR2-3)", () => {
+  for (const [label, move, want] of [
+    ["deleted", (d) => git(d, "rm", "-q", "src/b.js"), "evidence-changed"],
+    [
+      "renamed",
+      (d) => git(d, "mv", "src/b.js", "src/c.js"),
+      "evidence-changed",
+    ],
+    [
+      "unrelated rename",
+      (d) => git(d, "mv", "lib/x/dup.js", "lib/x/dup2.js"),
+      "unchanged",
+    ],
+  ]) {
+    const dir = mkRepo();
+    try {
+      const prior = record(dir, git(dir, "rev-parse", "HEAD"), {
+        // src/a.js and tests/a.test.mjs stay unchanged throughout.
+        "SC-2": { code_citation: "src/a.js:1 src/b.js:1" },
+      });
+      move(dir);
+      git(dir, "commit", "-q", "-m", label);
+      assert.equal(reasonOf(scopeAt(dir, prior), "SC-2"), want, label);
+    } finally {
+      cleanup(dir);
+    }
+  }
+});
+
+test("scope → merge → scope: a cited file the agents read uncommitted, then discarded, is re-judged (CR2-4)", () => {
+  const dir = mkRepo();
+  try {
+    writeFileSync(join(dir, "src/b.js"), "uncommitted\n");
+    const s1 = scopeAt(dir, null);
+    assert.deepEqual(s1.dirty, ["src/b.js"]);
+    const yaml = gapYaml(sc3Entry("PASS")).replace(
+      /(ac_id: "SC-2"\n\s+status: PASS\n\s+code_citation:) "src\/a.js:1"/,
+      '$1 "src/b.js:1"',
+    );
+    const r = eng.merge(s1, yaml, {}, eng.gitIo(dir));
+    assert.deepEqual(r.record.dirty_paths, ["src/b.js"]);
+    git(dir, "checkout", "-q", "--", "src/b.js");
+    const text = JSON.stringify(r.record);
+    assert.equal(reasonOf(scopeAt(dir, text), "SC-2"), "evidence-changed");
+    // Control: the same record written from a clean tree carries SC-2.
+    const clean = JSON.stringify({ ...r.record, dirty_paths: [] });
+    assert.equal(reasonOf(scopeAt(dir, clean), "SC-2"), "unchanged");
+  } finally {
+    cleanup(dir);
+  }
+});
+
 // ── merge ─────────────────────────────────────────────────────────────────
 
 function agentYaml(acs, { docs = "  docs: []", overall = "PASS" } = {}) {
