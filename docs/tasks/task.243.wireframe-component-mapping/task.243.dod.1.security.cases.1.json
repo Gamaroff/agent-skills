@@ -1,0 +1,150 @@
+[
+  {
+    "id": "s3.no-held-file",
+    "sink": "path",
+    "input": "docs/tasks/task.9.x/task.9.x.md",
+    "why": "No answers are held, which is the common case.",
+    "correct": "Pass silently (exit 0, no output).",
+    "direction": "legitimate",
+    "expected": {
+      "stdout": "",
+      "exit": 0
+    }
+  },
+  {
+    "id": "s3.other-document",
+    "sink": "path",
+    "input": "docs/tasks/task.9.x/task.9.x.md",
+    "why": "Answers held for another document are not this run's to write.",
+    "correct": "Pass silently (exit 0) and leave the file in place.",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        ".claude/state/wireframe-answers.json": "{\"document\":\"docs/tasks/task.8.y/task.8.y.md\",\"answers\":[]}"
+      }
+    },
+    "expected": {
+      "stdout": "",
+      "exit": 0
+    }
+  },
+  {
+    "id": "s3.this-document",
+    "sink": "path",
+    "input": "docs/tasks/task.9.x/task.9.x.md",
+    "why": "A resume that landed past Step 2 with this document's answers still held would build without them (bug.13).",
+    "correct": "HALT and send the run back to Step 2's wireframe writes.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        ".claude/state/wireframe-answers.json": "{\"document\":\"docs/tasks/task.9.x/task.9.x.md\",\"answers\":[{\"signature\":\"*>button[primary]\",\"component\":\"Button\",\"confirmed\":true}]}"
+      }
+    },
+    "expected": {
+      "stdout": "HALT: .claude/state/wireframe-answers.json still holds this document's wireframe answers — run Step 2 § Wireframe writes, then return to Step 3\n",
+      "exit": 1
+    }
+  },
+  {
+    "id": "s3.this-document-dot-slash",
+    "sink": "path",
+    "input": "docs/tasks/task.9.x/task.9.x.md",
+    "why": "A leading ./ on the held key must not let this document's answers pass as another's.",
+    "correct": "HALT the same as an exact match.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        ".claude/state/wireframe-answers.json": "{\"document\":\"./docs/tasks/task.9.x/task.9.x.md\",\"answers\":[]}"
+      }
+    },
+    "expected": {
+      "stdout": "HALT: .claude/state/wireframe-answers.json still holds this document's wireframe answers — run Step 2 § Wireframe writes, then return to Step 3\n",
+      "exit": 1
+    }
+  },
+  {
+    "id": "s3.dot-slash-input",
+    "sink": "path",
+    "input": "./docs/tasks/task.9.x/task.9.x.md",
+    "why": "The same ./ spelling on the slot side.",
+    "correct": "HALT the same as an exact match.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        ".claude/state/wireframe-answers.json": "{\"document\":\"docs/tasks/task.9.x/task.9.x.md\",\"answers\":[]}"
+      }
+    },
+    "expected": {
+      "stdout": "HALT: .claude/state/wireframe-answers.json still holds this document's wireframe answers — run Step 2 § Wireframe writes, then return to Step 3\n",
+      "exit": 1
+    }
+  },
+  {
+    "id": "s3.missing-document-key",
+    "sink": "path",
+    "input": "docs/tasks/task.9.x/task.9.x.md",
+    "why": "Without a document key the file cannot be checked, and must not be read as another document's (CR5-2).",
+    "correct": "HALT with the cannot-be-read message (jq exit 5).",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        ".claude/state/wireframe-answers.json": "{\"answers\":[]}"
+      }
+    },
+    "expected": {
+      "stdout": "HALT: .claude/state/wireframe-answers.json cannot be read (jq exit 5) — kept; repair or delete it, then re-run Step 3\n",
+      "exit": 1
+    }
+  },
+  {
+    "id": "s3.non-string-document-key",
+    "sink": "path",
+    "input": "docs/tasks/task.9.x/task.9.x.md",
+    "why": "A document key that is an array holding the right path is still not a string.",
+    "correct": "HALT with the cannot-be-read message (jq exit 5).",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        ".claude/state/wireframe-answers.json": "{\"document\":[\"docs/tasks/task.9.x/task.9.x.md\"],\"answers\":[]}"
+      }
+    },
+    "expected": {
+      "stdout": "HALT: .claude/state/wireframe-answers.json cannot be read (jq exit 5) — kept; repair or delete it, then re-run Step 3\n",
+      "exit": 1
+    }
+  },
+  {
+    "id": "s3.top-level-array",
+    "sink": "path",
+    "input": "docs/tasks/task.9.x/task.9.x.md",
+    "why": "JSON that is not an object.",
+    "correct": "HALT with the cannot-be-read message (jq exit 5).",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        ".claude/state/wireframe-answers.json": "[]"
+      }
+    },
+    "expected": {
+      "stdout": "HALT: .claude/state/wireframe-answers.json cannot be read (jq exit 5) — kept; repair or delete it, then re-run Step 3\n",
+      "exit": 1
+    }
+  },
+  {
+    "id": "s3.not-json",
+    "sink": "path",
+    "input": "docs/tasks/task.9.x/task.9.x.md",
+    "why": "A truncated file.",
+    "correct": "HALT with the cannot-be-read message (jq 1.8 exits 5 on an input parse error).",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        ".claude/state/wireframe-answers.json": "{\"document\": \"docs/tasks/task.9.x/task.9.x.md\""
+      }
+    },
+    "expected": {
+      "stdout": "HALT: .claude/state/wireframe-answers.json cannot be read (jq exit 5) — kept; repair or delete it, then re-run Step 3\n",
+      "exit": 1
+    }
+  }
+]

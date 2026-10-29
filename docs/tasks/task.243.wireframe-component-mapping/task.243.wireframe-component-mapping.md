@@ -80,8 +80,13 @@ The consumer also asked for two properties:
 - Hooks in these skills:
   - `create-story` 5.4.6, plus a new `create-task` 2.6 that mirrors it: embed the source's own
     wireframe when one exists, then resolve and ask;
-  - develop Phase 0 `0c-wire` and the 0d wireframe questions;
-  - the Step 3 hand-off of the table;
+  - develop Phase 0 `0c-wire` and the 0d wireframe questions, read-only: 0d holds the answers in
+    `.claude/state/wireframe-answers.json`, because the branch does not exist yet (bug.6);
+  - Step 2 § Wireframe writes, the first point where the branch and the lock both exist: `ensure`,
+    the table rows, and a `record` per confirmed answer, then the held file is deleted
+    (bug.7–bug.12);
+  - the Step 3 guard that sends a resume landing past Step 2 back to those writes, and the table
+    hand-off (bug.13, bug.14);
   - an autonomous-defaults row;
   - a `### Wireframe mapping assumptions` subsection of the report's Decisions Log;
   - `review-story` 6.6 and `review-task` 6.6;
@@ -144,8 +149,9 @@ what each one touched.
 | `shared/resources/tests/wireframe-map.test.mjs` | new |
 | `evals/shared/tests/wireframe-mapping-hooks.test.mjs` | new |
 | `docs/reference/configuration.md` | `ui:` schema, keys, section |
-| `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` | `0c-wire`, 0d questions, count |
-| `shared/resources/develop-pipeline-step-3-develop-loop.md` | table hand-off |
+| `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` | `0c-wire` (read-only), 0d questions held for Step 2, count |
+| `shared/resources/develop-pipeline-step-2-review.md` | Wireframe writes (before the gate check) |
+| `shared/resources/develop-pipeline-step-3-develop-loop.md` | held-answers guard, table hand-off |
 | `shared/resources/develop-pipeline-autonomous-defaults.md` | unattended row |
 | `shared/resources/pr-conformance-prompt.md` | coverage and trail checks |
 | `skills/{create-story,create-task,develop-story,develop-task,review-story,review-task,qa-story,qa-task}/SKILL.md` | hooks |
@@ -258,6 +264,42 @@ All 14 bug reports are closed. The Step 3 guard and the Step 2 writes share one 
 check. One low finding remains: a test does not assert its own premise. There are also three low
 advisories on HALT wording.
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.243.qa.7.wireframe-component-mapping.md`
+**Gate File**: `task.243.gate.7.wireframe-component-mapping.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+The gate passed. The gap below was found by the DoD acceptance-criteria check, which traces each
+criterion member to a test.
+
+### Missing Criteria:
+
+1. **Acceptance Criteria:**
+   - [ ] SC-1: no test asserts that `resolve` answers `unset` and writes nothing without a `ui:`
+     block. The code is correct (`shared/resources/wireframe-map.js:645`); only `ensure`'s unset
+     path is tested (`shared/resources/tests/wireframe-map.test.mjs:164`).
+
+### Next Steps:
+
+- [ ] Add a test in `shared/resources/tests/wireframe-map.test.mjs`: `resolve` with no `ui:` block,
+      and with `ui:` but no `wireframeMap`, answers `reason: unset` and writes no map
+- [ ] Mutation-prove it (remove the unset return in `resolve`; the test goes red)
+- [ ] Re-enter QA at 5a, then re-run `/finalise`
+
+**Estimated Effort:** Small (one test case)
+
+**Gap Report Generated:** 2026-10-29
+**QA Gate Reference**: See `task.243.gate.7.wireframe-component-mapping.yml` for full details
+
+**Detailed Verification Log:** See `task.243.dod.1.wireframe-component-mapping.md` for complete verification evidence and timestamps.
+
+<!-- change-log-start -->
 ## Change Log
 
 | Date | Version | Description | Author |
@@ -279,4 +321,6 @@ advisories on HALT wording.
 | 2026-10-29 |  | QA gate CONCERNS (90/100) — bug.13 verified and closed; 1 new medium finding (bug.14: the Step 3 guard is ungated while the Step 2 writes are gated), 2 low | qa-task |
 | 2026-10-29 |  | QA findings fixed — cycle 6, 3 findings (bug.14 Ready for QA, CR6-2, CR6-3): the Step 3 guard shares Step 2's gate and key check | qa-fix |
 | 2026-10-29 |  | QA gate PASS (100/100) — bug.14 verified and closed; all 14 bug reports closed; 1 low test-premise finding open (CR7-1) | qa-task |
+| 2026-10-29 |  | PR review APPROVE (PR #785); PC-1 fixed: Scope and Files Summary name the Step 2 wireframe writes and the Step 3 guard | develop-task |
+| 2026-10-29 |  | DoD incomplete — 1 gap identified (SC-1: resolve unset path untested) | finalise |
 <!-- change-log-end -->
