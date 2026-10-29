@@ -176,6 +176,13 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`/finalise` no longer runs a security probe plan whose arguments were HTML-escaped in transport
+  (obs #133).** On task.243 the security agent's reply turned every `>` into `&gt;`, so each control
+  ran against an argument the code never holds. The run reported 49 legitimate cases as
+  over-blocked: a false security FAIL. `security-probe-plan.mjs` now refuses such an entry as
+  `plan-entry-html-entity` and runs the rest, and Step 3b.1 says how to restore the plan and re-run.
+  Only the arguments are checked, because a case's input may hold an entity on purpose.
+
 - **A wireframe-map row with a repeated flag no longer outranks a more specific row (task 243,
   CR14-1).** `input[a,a,a]` means `input[a]`, but `score` counted each repeat as a constraint, so it
   beat `input[a,b]` for an `input[a,b]` node. `parsePattern` now de-duplicates flags, so ranking and

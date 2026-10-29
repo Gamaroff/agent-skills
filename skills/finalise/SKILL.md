@@ -645,7 +645,12 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
    whose arguments carry `--record`, `--repo-root`, `--cases-file`, `--json`, `--emit-block` or
    `--timeout`, which it owns, refuses an entry whose inline `cases` repeat an id (each probe's `key`
    must be unique), and kills an engine run that outlives its overall bound (a refusal, never an
-   execution). Exit 1 (`bad-plan`) means the JSON you wrote is not an array: fix the file, re-run.
+   execution). It also refuses an entry whose arguments hold an HTML entity (`&gt;`, `&lt;`,
+   `&amp;`, `&quot;`, `&apos;`, `&#…;`) as `plan-entry-html-entity`. That is the agent's reply escaped
+   in transport, not the code's own text. On task.243 every `>` arrived as `&gt;`, and the run read
+   49 legitimate cases as over-blocked (obs #133). On that refusal, restore the characters in
+   `.claude/state/probe-plan.json`, check them against the code or a committed cases file, and re-run.
+   Exit 1 (`bad-plan`) means the JSON you wrote is not an array: fix the file, re-run.
    **`probe-plan: no result` is not an empty plan** — the run did not complete (killed, or its output
    did not parse): re-run the step; never fill `SECURITY_RESULT` from an absent result.
    `reason: record-unreadable` means entries ran but their record cannot be folded (`error` says
