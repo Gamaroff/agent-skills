@@ -254,28 +254,28 @@ catalogue files stay as they are.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-29
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.243.qa.13.wireframe-component-mapping.md](./task.243.qa.13.wireframe-component-mapping.md)
-- **Gate File**: [task.243.gate.13.wireframe-component-mapping.yml](./task.243.gate.13.wireframe-component-mapping.yml)
+- **Full Report**: [task.243.qa.14.wireframe-component-mapping.md](./task.243.qa.14.wireframe-component-mapping.md)
+- **Gate File**: [task.243.gate.14.wireframe-component-mapping.yml](./task.243.gate.14.wireframe-component-mapping.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 20 (wireframe-map suite); 6843 in the fix's fast gate
+- **Tests Executed**: 21 (wireframe-map suite); 6844 in the fix's fast gate
 - **Phases Verified**: 5/5
-- **Critical Issues**: 0 (1 medium)
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-The cycle 12 fix holds: every node's signature reads back to the node, bug.15 is closed, and the probe
-reproduces nothing. The decoding it added lets two spellings name one value, and `record` still compares
-raw text, so a re-recorded answer can be added beside the old one and lose to it (TASK-243-CR13-1,
-[bug.16](./task.243.bug.16.record-adds-a-second-row-for-an-equivalent-signature.md)). One low and one
-cleanup are advisory.
+The cycle 13 fix holds: `record` replaces the row whose signature means the same thing, so a
+re-recorded answer takes effect in either spelling, and
+[bug.16](./task.243.bug.16.record-adds-a-second-row-for-an-equivalent-signature.md) is closed. All
+three fix arms are mutation-proven and the probe reproduces nothing. Two lows are advisory
+(TASK-243-CR14-1, CR14-2).
 
 ## Definition of Done - Gaps Identified
 
@@ -356,5 +356,6 @@ copies, and the evaluator matches paths exactly while §7 names those copies as 
 | 2026-10-29 |  | QA findings fixed — cycle 12, 1 finding (bug.15 Ready for QA, CR12-1): attribute values are percent-encoded in a signature and decoded by parsePattern, so every node reads back to itself | qa-fix |
 | 2026-10-29 |  | QA gate CONCERNS (90/100) — 1 medium (TASK-243-CR13-1, bug.16), 1 low; bug.15 closed | qa-task |
 | 2026-10-29 |  | QA findings fixed — cycle 13, 2 findings (bug.16 Ready for QA, CR13-1; CR13-2), after a 2-cycle grant | qa-fix |
+| 2026-10-29 |  | QA gate PASS (100/100) — 0 blocking, 2 advisory lows (TASK-243-CR14-1, CR14-2); bug.16 closed | qa-task |
 <!-- change-log-end -->
 

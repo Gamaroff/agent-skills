@@ -4,7 +4,7 @@
 **Bug ID**: TASK-243-BUG-16
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-10-29
 
@@ -105,3 +105,4 @@ another order. Spellings it still keeps apart: `v=1` and `v=1%2C500`, `v=100%` a
 | 2026-10-29 | New | qa-task | Found by task.243.qa.13.wireframe-component-mapping.md (CR-1) |
 | 2026-10-29 | In Progress | qa-fix | Investigation started (fix cycle 13) |
 | 2026-10-29 | Ready for QA | qa-fix | record matches rows by signatureKey plus label; mutation-proven 3 of 3 |
+| 2026-10-29 | Closed | qa-task | Verified by task.243.qa.14.wireframe-component-mapping.md |

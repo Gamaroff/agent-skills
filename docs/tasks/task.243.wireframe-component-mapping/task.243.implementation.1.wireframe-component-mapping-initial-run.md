@@ -488,6 +488,20 @@ _Track each QA review/fix cycle._
 **PR Review**: not reached — gate did not exit the loop
 **Action**: Running qa-fix (cycle 13 of 15). The run escalated here (loop limit), then the user granted 2 cycles.
 
+### QA Cycle 14 — 2026-10-29
+**Gate Result**: PASS (100/100). Cycle 14 of 15. The gate reads fix cycle 13, `f715cd44`.
+**Issues Found**:
+- bug.16 is verified and closed. Its reproduction reads `replaced`, one row, and the newer answer
+  resolves. Three mutations (raw-text compare, unsorted flags, prefix `score`) each turn a committed
+  test red, in a scratch worktree (outcome: covered). The probe re-run gives 114 executed,
+  0 reproduced, 0 escaped.
+- CR13-2 verified: the prefix mutation now reds the round-trip test.
+- 2 advisory lows: CR14-1 (flags de-duplicated in the key but not in `score`, reviewer cleanup) and
+  CR14-2 (dropping the label term from the replace lookup reds no test; mutation `no-red-untested`).
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**Loop exit**: PASS with no open entry. Next: Step 5c, then `/finalise` run 4.
+
 ---
 
 ## Completion
