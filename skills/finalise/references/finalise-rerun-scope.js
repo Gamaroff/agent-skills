@@ -130,8 +130,9 @@ function isReopened(body) {
 /**
  * Resolve the paths a citation names. A token contributes a path only when it
  * resolves to a tracked file, or to one gone since the prior head: a
- * repo-relative path as written, or a bare basename, which resolves to every
- * file that carries it (at HEAD or gone). An abbreviated `:N-M`, a commit SHA
+ * repo-relative path as written, or a bare basename (any token without a
+ * slash, a root file's name included), which resolves to every file that
+ * carries it (at HEAD or gone). An abbreviated `:N-M`, a commit SHA
  * and `NOT_APPLICABLE: …` resolve to nothing.
  */
 function resolveCitation(citation, tracked) {
@@ -144,11 +145,15 @@ function resolveCitation(citation, tracked) {
       .replace(/^[`'"(\[]+|[`'")\],.]+$/g, "")
       .replace(/:.*$/, "");
     if (!token) continue;
-    if (tracked.paths.has(token)) {
-      out.add(token);
+    // A token with a slash is a path, taken as written. A token without one is
+    // a bare basename even when a repository-root file has that name: the
+    // exact-path test would answer it with the root file alone and miss a
+    // changed same-basename file elsewhere, and in merge's index it would
+    // match a gone root file the basename rule excludes (QA cycle 9, QA9-1).
+    if (token.includes("/")) {
+      if (tracked.paths.has(token)) out.add(token);
       continue;
     }
-    if (token.includes("/")) continue;
     // A bare basename resolves to every file that carries it. The engine never
     // guesses which one a citation meant: the evidence changed when any
     // candidate changed (added, modified or gone — a gone path is always

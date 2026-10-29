@@ -1424,6 +1424,129 @@ test("scope: a lone ambiguous bare citation and the same token beside an unchang
   }
 });
 
+test("resolveCitation: a bare basename a repository-root file carries resolves through the basename rule like any other (QA9-1)", () => {
+  const r = (cite, tracked, changed, opts) =>
+    eng
+      .resolveCitation(cite, eng.evidenceIndex(tracked, new Set(changed), opts))
+      .sort();
+  // A root file and a nested one share the basename: both, as for two nested
+  // files, so the nested one changing is seen (CR-1).
+  assert.deepEqual(
+    r("README.md:12", ["README.md", "docs/README.md"], ["docs/README.md"]),
+    ["README.md", "docs/README.md"],
+  );
+  assert.deepEqual(r("README.md:12", ["README.md", "docs/README.md"], []), [
+    "README.md",
+    "docs/README.md",
+  ]);
+  // A root file alone still resolves.
+  assert.deepEqual(r("README.md", ["README.md", "src/a.js"], []), [
+    "README.md",
+  ]);
+  // A gone root file is a basename candidate for the prior record's citation…
+  assert.deepEqual(r("b.js:3", ["lib/b.js"], ["b.js"]), ["b.js", "lib/b.js"]);
+  // …and, in merge's index, no candidate at all, wherever the deleted file sat
+  // (CR-2): the root case answers as the nested case does.
+  const merge = { goneCandidates: false };
+  assert.deepEqual(r("b.js:3", ["lib/b.js"], ["b.js"], merge), ["lib/b.js"]);
+  assert.deepEqual(r("b.js:3", ["lib/b.js"], ["old/b.js"], merge), [
+    "lib/b.js",
+  ]);
+  // A gone path cited in full still resolves in merge, and reads as changed.
+  assert.deepEqual(r("old/b.js:3", ["lib/b.js"], ["old/b.js"], merge), [
+    "old/b.js",
+  ]);
+});
+
+test("scope: a bare citation a root file shares re-judges when the nested candidate changed, and carries when none did (QA9-1)", () => {
+  const na = "NOT_APPLICABLE: documentation criterion";
+  for (const [label, edit, want] of [
+    [
+      "no candidate changed",
+      { "CHANGELOG.md": "## [Unreleased]\n- x\n" },
+      "unchanged",
+    ],
+    [
+      "the nested candidate changed",
+      { "docs/README.md": "changed\n" },
+      "evidence-changed",
+    ],
+  ]) {
+    const dir = mkRepo({ "README.md": "root\n", "docs/README.md": "docs\n" });
+    try {
+      const prior = record(dir, git(dir, "rev-parse", "HEAD"), {
+        // A root candidate, and the nested-only shape it must answer like.
+        "SC-2": { code_citation: "README.md:1", test_citation: na },
+        "SC-3": { code_citation: "dup.js:1", test_citation: na },
+      });
+      commit(
+        dir,
+        label === "no candidate changed"
+          ? edit
+          : { ...edit, "lib/y/dup.js": "changed\n" },
+        label,
+      );
+      const s = scopeAt(dir, prior);
+      assert.equal(reasonOf(s, "SC-2"), want, `${label}: root candidate`);
+      assert.equal(reasonOf(s, "SC-3"), want, `${label}: nested only`);
+    } finally {
+      cleanup(dir);
+    }
+  }
+});
+
+test("merge: a new member's bare citation reads the same whether the deleted same-basename file sat at the root or nested (QA9-1)", () => {
+  // lib/a.test.mjs is G9's file at HEAD, unchanged. Another a.test.mjs is
+  // deleted: at the root in one run, nested in the other. Neither is a
+  // candidate for this run's citation, so G9 rests on unchanged evidence and
+  // the FAIL on it is overturned both times.
+  for (const gone of ["a.test.mjs", "old/a.test.mjs"]) {
+    const dir = mkRepo({ [gone]: "x\n" });
+    try {
+      const prior = record(dir, git(dir, "rev-parse", "HEAD"), {
+        "SC-3": {
+          status: "FAIL",
+          members: [
+            { member: "G1", evidence: "tests/a.test.mjs:1", status: "PASS" },
+            { member: "G2", evidence: "tests/b.test.mjs:1", status: "PASS" },
+          ],
+          note: "cited test does not run per PR",
+        },
+      });
+      git(dir, "rm", "-q", gone);
+      git(dir, "commit", "-q", "-m", `delete ${gone}`);
+      const s = scopeAt(dir, prior);
+      assert.ok(s.changed.includes(gone), `${gone}: the deletion is seen`);
+      const g9 = [
+        '        - member: "G9"',
+        '          evidence: "a.test.mjs:5"',
+        "          status: FAIL",
+      ];
+      const r = eng.merge(
+        s,
+        gapYaml(
+          sc3Entry("FAIL", {
+            extraMembers: g9,
+            fields: ['      note: "G9 unmapped"'],
+          }),
+        ),
+        {},
+        eng.gitIo(dir),
+      );
+      assert.equal(sc3Of(r).status, "PASS", `${gone}: FAIL overturned`);
+      const notes = r.ac_result.ac_traceability.advisories.map((a) => a.note);
+      assert.ok(
+        notes.some((n) =>
+          /new member G9 judged FAIL on unchanged evidence/.test(n),
+        ),
+        `${gone}: ${notes.join("\n")}`,
+      );
+    } finally {
+      cleanup(dir);
+    }
+  }
+});
+
 test("gitIo: a non-ASCII path reaches changed and dirty unquoted (CR3-2)", () => {
   const dir = mkRepo({ "src/skë.js": "1\n" });
   try {

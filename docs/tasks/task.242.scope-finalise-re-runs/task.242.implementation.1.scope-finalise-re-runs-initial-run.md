@@ -367,9 +367,9 @@ _Track each QA review/fix cycle._
 **PR Review**: not reached — gate did not exit the loop
 **Loop exit**: n/a — this exit not taken
 **Action**: qa-fix (cycle 9 of 10; cycle 10 gates it)
-**Fixes Applied**: pending.
-**Commit**: pending.
-**Post-fix PR state**: pending.
+**Fixes Applied**: QA9-1 (finishing the cycle-8 replace). `resolveCitation` takes a token with a slash as a path, as written, and sends every token without one through the basename maps, a root file's name included. A root `README.md` and a nested one now both resolve (CR-1), and merge's index no longer matches a deleted root file through `paths` (CR-2). Tests: 3 added (a `resolveCitation` unit test with root candidates on both indexes; a scope pair, root candidate vs nested-only shape, carry vs re-judge; a merge pair, deleted root file vs deleted nested file, both advisory). All three were red before the fix. Mutations: the old exact-path-first order restored → 3 tests red → covered; the exact match unioned with the basename rule (fixes CR-1, not CR-2) → 2 red → covered. The findings ingester and pre-fix mapping ran inline (this session wrote gate 9), so this pass is not independent of the review.
+**Commit**: the gate and QA report rode `dffb4a35`; the fix commit is below.
+**Post-fix PR state**: see the fix commit.
 
 ---
 
