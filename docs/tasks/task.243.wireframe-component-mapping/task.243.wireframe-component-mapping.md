@@ -5,18 +5,20 @@ type: task
 description: "An opt-in ui: config block, an engine that resolves wireframe nodes against a project map of confirmed links and seeds the catalogue and map, and hooks in create-story, create-task, the develop pipelines, review, QA and review-pr that ask about open nodes and remember the answers."
 tags: [wireframe, components, skills-config, create-story, create-task, develop-pipeline]
 category: feature
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-29
 updated: 2026-10-29
+completed_date: 2026-10-29
 assignee:
 estimated_effort_hours: 16
 github_issue: 784
+pr_number: 785
 ---
 
 # Technical Task: Link Wireloom wireframe nodes to the project's UI components, and ask when unsure
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.243.review.2.wireframe-component-mapping.md` implemented 2026-10-29
 **GitHub Issue**: [#784](https://github.com/Gamaroff/agent-skills/issues/784)
 
@@ -230,6 +232,24 @@ catalogue files stay as they are.
 - **TASK-243-CR11-2** (LOW) — carried to gate 11 `recommendations.future` (cycle 11). The comment
   at `wireframe-map.js:725` says `--by`/`--date` skip `unquote` because the Confirmed cell starts
   with the date. The real reason is that `readMap` does not read that cell.
+- **TASK-243-CR12-2 to CR12-5** (LOW) — carried to gate 12 `recommendations.future`, still carried
+  by gate 14. `readUiConfig` reads an unreadable config as a missing one (CR12-2); the candidate
+  filter matches a component by substring, and a missing catalogue section disables it (CR12-3);
+  `ensure` and `record` rewrite a CRLF map as LF (CR12-4); `record` re-finds the header `readMap`
+  already found and calls all of `ensure` to create a missing map (CR12-5).
+- **TASK-243-PARSELINE-1** (LOW) — carried to gate 13, still carried by gate 14. A Wireloom line
+  holding U+2028 yields no node, because `parseLine`'s `.*$` cannot cross it.
+- **TASK-243-CR13-3** (LOW) — carried to gate 13, still carried by gate 14. The procedure and
+  `configuration.md` list only some of the characters `encodeValue` encodes; say every character
+  outside the unreserved set plus `/ : # @ + =` is encoded, or say to copy the signature as
+  `resolve` prints it.
+- **TASK-243-CR14-1** (LOW) — carried to gate 14. `signatureKey` de-duplicates flags but `score`
+  counts them with duplicates, so `input[a,a]` and `input[a]` share a key but not a score.
+  De-duplicate once in `parsePattern`.
+- **TASK-243-CR14-2** (LOW) — carried to gate 14. No test shows that `record` keeps rows with the
+  same signature and different labels apart (the mutation reds nothing). Add a must-differ label
+  case to the record test. (DoD run 4's probe exercised the behaviour, 5 cases, all held: the gap is
+  a per-PR test, not the code.)
 
 ## Progress Tracking
 
@@ -240,7 +260,7 @@ catalogue files stay as they are.
 - [x] Phase 5: Verification
 - [x] Review: `task.243.review.1.wireframe-component-mapping.md`
 - [x] Review: `task.243.review.2.wireframe-component-mapping.md`
-- [ ] PR, QA loop, `review-pr` and finalise via `/develop-task`
+- [x] PR, QA loop, `review-pr` and finalise via `/develop-task`
 
 ## References
 
@@ -277,49 +297,35 @@ re-recorded answer takes effect in either spelling, and
 three fix arms are mutation-proven and the probe reproduces nothing. Two lows are advisory
 (TASK-243-CR14-1, CR14-2).
 
-## Definition of Done - Gaps Identified
+## Definition of Done - PASSED ✅
 
-**Status:** IN PROGRESS
+**Status:** ACCEPTED
 
-### QA Gate Status
+### QA Report Summary
 
-**QA Report**: `task.243.qa.11.wireframe-component-mapping.md`
-**Gate File**: `task.243.gate.11.wireframe-component-mapping.yml`
+**QA Report**: `task.243.qa.14.wireframe-component-mapping.md`
+**Gate File**: `task.243.gate.14.wireframe-component-mapping.yml`
 **Gate Status**: ✅ PASS
 **Quality Score**: 100/100
 
-DoD run 3. Run 2's gap (a newline in a signature) is closed, and so are the related cases gates
-9–11 found. All seven criteria pass, as do docs and CI reading 1. The gap below was found by the
-security probe run, which this time added U+2028/U+2029 cases.
+DoD run 4. Run 3's gap was U+2028/U+2029 in a signature or label. QA cycle 12 closed it and gate 12
+verified the fix. Gates 13 and 14 closed the attribute-encoding and equivalent-signature defects
+found after it.
 
-### Missing Criteria:
+All Definition of Done criteria have been verified:
 
-1. **Security:**
-   - [ ] `parsePattern` (`shared/resources/wireframe-map.js:328`) and `record`'s line-break check
-     (`:729`) test `/[\r\n]/`, which misses U+2028 and U+2029. `--signature` and `--label` also skip
-     the read-back check. A value carrying either character is written as one intact row, but it
-     reads back with its backticks. The row then never matches, is never offered as a candidate,
-     and is duplicated on re-record. There are 9 low probes and 0 escapes
-     (`task.243.dod.3.security.run.json`).
+✅ **Acceptance Criteria:** 7/7 (SC-1 to SC-7). Each behaviour criterion cites code and a test that runs on every PR.
+✅ **PR Review:** PR #785. The 5c conformance review is APPROVE (`task.243.pr-review.4.wireframe-component-mapping.md`), and the repository requires no formal review.
+✅ **CI:** reading 1 SUCCESS @ `d24e061b` over 6 checks; reading 2 is taken on the acceptance commit.
+✅ **Documentation:** a CHANGELOG `(task 243)` entry, the `ui:` keys in `docs/reference/configuration.md`, and the procedure bundled into all eight skills.
+✅ **Security Review:** ✅ PASS. 13 controls and 136 probes executed, 0 reproduced, 0 escaped (`task.243.dod.4.security.run.json`).
+✅ **Compliance Review:** NOT_APPLICABLE (internal skill tooling, no personal data, payments or UI).
 
-### Next Steps:
+The gate-14 low findings stay in Deferred Work above.
 
-- [ ] Widen both checks to `/[\r\n  ]/`, so `parsePattern` returns null and `record`
-      refuses every written field that carries one
-- [ ] Add the nine probe inputs to test 18 in `shared/resources/tests/wireframe-map.test.mjs`
-      (each refused, map unchanged); mutation-prove it
-- [ ] Run `npm run bundle` (the eight `skills/*/references/wireframe-map.js` copies)
-- [ ] Re-enter QA at 5a (gate 12, the last cycle of the 12-cycle budget), then re-run `/finalise`
+**Task marked as ACCEPTED on:** 2026-10-29
 
-Step 8a fix-and-recheck was refused on `inside-files-summary`. The fix must regenerate the bundled
-copies, and the evaluator matches paths exactly while §7 names those copies as `skills/*/references/`.
-
-**Estimated Effort:** Small (one regex in two places, one test, a re-bundle)
-
-**Gap Report Generated:** 2026-10-29 (DoD run 3; supersedes run 2's report)
-**QA Gate Reference**: See `task.243.gate.11.wireframe-component-mapping.yml` for full details
-
-**Detailed Verification Log:** See `task.243.dod.3.wireframe-component-mapping.md` for complete verification evidence and timestamps (runs 1–2: `task.243.dod.1.wireframe-component-mapping.md`, `task.243.dod.2.wireframe-component-mapping.md`).
+**Detailed Verification Log:** See `task.243.dod.4.wireframe-component-mapping.md` for complete verification evidence and timestamps (runs 1–3, each closed by a later QA cycle: `task.243.dod.1.wireframe-component-mapping.md`, `task.243.dod.2.wireframe-component-mapping.md`, `task.243.dod.3.wireframe-component-mapping.md`).
 <!-- change-log-start -->
 ## Change Log
 
@@ -357,5 +363,6 @@ copies, and the evaluator matches paths exactly while §7 names those copies as 
 | 2026-10-29 |  | QA gate CONCERNS (90/100) — 1 medium (TASK-243-CR13-1, bug.16), 1 low; bug.15 closed | qa-task |
 | 2026-10-29 |  | QA findings fixed — cycle 13, 2 findings (bug.16 Ready for QA, CR13-1; CR13-2), after a 2-cycle grant | qa-fix |
 | 2026-10-29 |  | QA gate PASS (100/100) — 0 blocking, 2 advisory lows (TASK-243-CR14-1, CR14-2); bug.16 closed | qa-task |
+| 2026-10-29 | 1.3 | DoD passed — accepted (PR #785); DoD run 4, 7/7 criteria, probe 136/0/0 | finalise |
 <!-- change-log-end -->
 

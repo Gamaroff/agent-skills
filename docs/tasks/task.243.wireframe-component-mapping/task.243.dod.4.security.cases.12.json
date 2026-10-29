@@ -1,0 +1,308 @@
+[
+  {
+    "id": "dod4.key.same-spelling",
+    "sink": "markdown-structure",
+    "input": "*>button[primary,muted]{kind=warning,size=lg}",
+    "why": "Identical re-record: the baseline replace.",
+    "correct": "Replace the existing row (replaced, line 3); never add a second row for the same meaning.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n| `*>button[primary,muted]{kind=warning,size=lg}` |  | Button | primary |  |  | 2026-10-01, t |\n"
+      }
+    },
+    "expected": {
+      "stdout": "{\"reason\":\"ok\",\"action\":\"replaced\",\"line\":3,\"map\":\"docs/wireframe-map.md\"}\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "dod4.key.no-parent",
+    "sink": "markdown-structure",
+    "input": "button[primary,muted]{kind=warning,size=lg}",
+    "why": "Omitted parent means * — same key.",
+    "correct": "Replace the existing row (replaced, line 3); never add a second row for the same meaning.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n| `*>button[primary,muted]{kind=warning,size=lg}` |  | Button | primary |  |  | 2026-10-01, t |\n"
+      }
+    },
+    "expected": {
+      "stdout": "{\"reason\":\"ok\",\"action\":\"replaced\",\"line\":3,\"map\":\"docs/wireframe-map.md\"}\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "dod4.key.flag-order",
+    "sink": "markdown-structure",
+    "input": "*>button[muted,primary]{kind=warning,size=lg}",
+    "why": "Flags in the other order — same key.",
+    "correct": "Replace the existing row (replaced, line 3); never add a second row for the same meaning.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n| `*>button[primary,muted]{kind=warning,size=lg}` |  | Button | primary |  |  | 2026-10-01, t |\n"
+      }
+    },
+    "expected": {
+      "stdout": "{\"reason\":\"ok\",\"action\":\"replaced\",\"line\":3,\"map\":\"docs/wireframe-map.md\"}\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "dod4.key.dup-flag",
+    "sink": "markdown-structure",
+    "input": "*>button[primary,muted,primary]{kind=warning,size=lg}",
+    "why": "Duplicate flag — signatureKey dedupes; a second row would lose the match() tie.",
+    "correct": "Replace the existing row (replaced, line 3); never add a second row for the same meaning.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n| `*>button[primary,muted]{kind=warning,size=lg}` |  | Button | primary |  |  | 2026-10-01, t |\n"
+      }
+    },
+    "expected": {
+      "stdout": "{\"reason\":\"ok\",\"action\":\"replaced\",\"line\":3,\"map\":\"docs/wireframe-map.md\"}\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "dod4.key.attr-order",
+    "sink": "markdown-structure",
+    "input": "*>button[primary,muted]{size=lg,kind=warning}",
+    "why": "Attributes in the other order — same key.",
+    "correct": "Replace the existing row (replaced, line 3); never add a second row for the same meaning.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n| `*>button[primary,muted]{kind=warning,size=lg}` |  | Button | primary |  |  | 2026-10-01, t |\n"
+      }
+    },
+    "expected": {
+      "stdout": "{\"reason\":\"ok\",\"action\":\"replaced\",\"line\":3,\"map\":\"docs/wireframe-map.md\"}\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "dod4.key.pct-encoded-attr",
+    "sink": "markdown-structure",
+    "input": "*>button[primary,muted]{kind=%77arning,size=lg}",
+    "why": "Percent-encoded attribute value decoding to the same value.",
+    "correct": "Replace the existing row (replaced, line 3); never add a second row for the same meaning.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n| `*>button[primary,muted]{kind=warning,size=lg}` |  | Button | primary |  |  | 2026-10-01, t |\n"
+      }
+    },
+    "expected": {
+      "stdout": "{\"reason\":\"ok\",\"action\":\"replaced\",\"line\":3,\"map\":\"docs/wireframe-map.md\"}\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "dod4.key.spaced-lists",
+    "sink": "markdown-structure",
+    "input": "*>button[ primary , muted ]{ kind=warning , size=lg }",
+    "why": "Whitespace inside the lists, trimmed by parsePattern.",
+    "correct": "Replace the existing row (replaced, line 3); never add a second row for the same meaning.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n| `*>button[primary,muted]{kind=warning,size=lg}` |  | Button | primary |  |  | 2026-10-01, t |\n"
+      }
+    },
+    "expected": {
+      "stdout": "{\"reason\":\"ok\",\"action\":\"replaced\",\"line\":3,\"map\":\"docs/wireframe-map.md\"}\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "dod4.key.empty-list-items",
+    "sink": "markdown-structure",
+    "input": "*>button[primary,,muted,]{kind=warning,,size=lg,}",
+    "why": "Empty list items, filtered by parsePattern.",
+    "correct": "Replace the existing row (replaced, line 3); never add a second row for the same meaning.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n| `*>button[primary,muted]{kind=warning,size=lg}` |  | Button | primary |  |  | 2026-10-01, t |\n"
+      }
+    },
+    "expected": {
+      "stdout": "{\"reason\":\"ok\",\"action\":\"replaced\",\"line\":3,\"map\":\"docs/wireframe-map.md\"}\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "dod4.key.all-at-once",
+    "sink": "markdown-structure",
+    "input": "button[muted,primary,muted]{size=lg,kind=%77arning}",
+    "why": "Parent, flag order, duplicate flag, attr order and encoding combined.",
+    "correct": "Replace the existing row (replaced, line 3); never add a second row for the same meaning.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n| `*>button[primary,muted]{kind=warning,size=lg}` |  | Button | primary |  |  | 2026-10-01, t |\n"
+      }
+    },
+    "expected": {
+      "stdout": "{\"reason\":\"ok\",\"action\":\"replaced\",\"line\":3,\"map\":\"docs/wireframe-map.md\"}\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "dod4.key.hand-pct-row",
+    "sink": "markdown-structure",
+    "input": "*>meter{v=72%25}",
+    "why": "Node-written v=72%25 against a hand-written v=72% row: one value (the f715cd44 case).",
+    "correct": "Replace the existing row (replaced, line 3); never add a second row for the same meaning.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n| `*>meter{v=72%}` |  | Button | primary |  |  | 2026-10-01, t |\n"
+      }
+    },
+    "expected": {
+      "stdout": "{\"reason\":\"ok\",\"action\":\"replaced\",\"line\":3,\"map\":\"docs/wireframe-map.md\"}\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "dod4.key.hand-pct-input",
+    "sink": "markdown-structure",
+    "input": "*>meter{v=72%}",
+    "why": "Hand-written v=72% against a node-written v=72%25 row: the reverse spelling.",
+    "correct": "Replace the existing row (replaced, line 3); never add a second row for the same meaning.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n| `*>meter{v=72%25}` |  | Button | primary |  |  | 2026-10-01, t |\n"
+      }
+    },
+    "expected": {
+      "stdout": "{\"reason\":\"ok\",\"action\":\"replaced\",\"line\":3,\"map\":\"docs/wireframe-map.md\"}\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "dod4.key.fewer-flags",
+    "sink": "markdown-structure",
+    "input": "*>button[primary]{kind=warning,size=lg}",
+    "why": "A less specific signature is a different row.",
+    "correct": "Add a new row (added, line 4); a different meaning must not overwrite the existing row.",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n| `*>button[primary,muted]{kind=warning,size=lg}` |  | Button | primary |  |  | 2026-10-01, t |\n"
+      }
+    },
+    "expected": {
+      "stdout": "{\"reason\":\"ok\",\"action\":\"added\",\"line\":4,\"map\":\"docs/wireframe-map.md\"}\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "dod4.key.other-parent",
+    "sink": "markdown-structure",
+    "input": "card>button[primary,muted]{kind=warning,size=lg}",
+    "why": "A named parent is narrower than * — a different row.",
+    "correct": "Add a new row (added, line 4); a different meaning must not overwrite the existing row.",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n| `*>button[primary,muted]{kind=warning,size=lg}` |  | Button | primary |  |  | 2026-10-01, t |\n"
+      }
+    },
+    "expected": {
+      "stdout": "{\"reason\":\"ok\",\"action\":\"added\",\"line\":4,\"map\":\"docs/wireframe-map.md\"}\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "dod4.key.fewer-attrs",
+    "sink": "markdown-structure",
+    "input": "*>button[primary,muted]{kind=warning}",
+    "why": "Fewer attributes — a different row.",
+    "correct": "Add a new row (added, line 4); a different meaning must not overwrite the existing row.",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n| `*>button[primary,muted]{kind=warning,size=lg}` |  | Button | primary |  |  | 2026-10-01, t |\n"
+      }
+    },
+    "expected": {
+      "stdout": "{\"reason\":\"ok\",\"action\":\"added\",\"line\":4,\"map\":\"docs/wireframe-map.md\"}\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "dod4.key.attr-case",
+    "sink": "markdown-structure",
+    "input": "*>button[primary,muted]{kind=Warning,size=lg}",
+    "why": "Attribute values are case-sensitive.",
+    "correct": "Add a new row (added, line 4); a different meaning must not overwrite the existing row.",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n| `*>button[primary,muted]{kind=warning,size=lg}` |  | Button | primary |  |  | 2026-10-01, t |\n"
+      }
+    },
+    "expected": {
+      "stdout": "{\"reason\":\"ok\",\"action\":\"added\",\"line\":4,\"map\":\"docs/wireframe-map.md\"}\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "dod4.key.encoded-space",
+    "sink": "markdown-structure",
+    "input": "*>button[primary,muted]{kind=warning%20,size=lg}",
+    "why": "An encoded trailing space decodes to a different value.",
+    "correct": "Add a new row (added, line 4); a different meaning must not overwrite the existing row.",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n| `*>button[primary,muted]{kind=warning,size=lg}` |  | Button | primary |  |  | 2026-10-01, t |\n"
+      }
+    },
+    "expected": {
+      "stdout": "{\"reason\":\"ok\",\"action\":\"added\",\"line\":4,\"map\":\"docs/wireframe-map.md\"}\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "dod4.key.other-primitive",
+    "sink": "markdown-structure",
+    "input": "*>link[primary,muted]{kind=warning,size=lg}",
+    "why": "A different primitive.",
+    "correct": "Add a new row (added, line 4); a different meaning must not overwrite the existing row.",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n| `*>button[primary,muted]{kind=warning,size=lg}` |  | Button | primary |  |  | 2026-10-01, t |\n"
+      }
+    },
+    "expected": {
+      "stdout": "{\"reason\":\"ok\",\"action\":\"added\",\"line\":4,\"map\":\"docs/wireframe-map.md\"}\n",
+      "exit": 0
+    }
+  }
+]
