@@ -97,20 +97,26 @@ const addedHeading = (section) =>
 const LAYOUT = "(layout)";
 
 class UsageError extends Error {}
+// skills-config.yaml exists but cannot be read. Not `unset`: the feature may be on (CR12-2).
+class ConfigError extends Error {}
 
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
 
 function readUiConfig(root) {
-  let cfg;
+  let text;
   try {
-    cfg = parseYamlSubset(
-      fs.readFileSync(path.join(root, "skills-config.yaml"), "utf8"),
+    text = fs.readFileSync(path.join(root, "skills-config.yaml"), "utf8");
+  } catch (e) {
+    // Only a missing file means "no config". An unreadable one read as "feature off", and every
+    // command answered `unset` for a project that had turned it on.
+    if (e && e.code === "ENOENT") return null;
+    throw new ConfigError(
+      `skills-config.yaml cannot be read: ${(e && e.message) || e}`,
     );
-  } catch (_) {
-    return null;
   }
+  const cfg = parseYamlSubset(text);
   const ui = cfg && typeof cfg.ui === "object" && cfg.ui ? cfg.ui : null;
   if (!ui) return null;
   const str = (v) => (typeof v === "string" && v.trim() ? v.trim() : null);
@@ -186,9 +192,11 @@ function extractBlocks(text) {
 
 // One Wireloom line: `primitive "label" flag key=value key="v w" …` with an optional trailing `:`.
 // Wireloom comments are whole lines (`listNodes` skips them), so a `#` here is content.
+// The `s` flags let `.` cross U+2028/U+2029, which split no line here: without them a line holding
+// one yielded no node, and a quoted attribute holding one was dropped (PARSELINE-1).
 function parseLine(raw) {
   const text = raw.replace(/:\s*$/, "");
-  const m = /^(\s*)([A-Za-z][\w-]*)(.*)$/.exec(text);
+  const m = /^(\s*)([A-Za-z][\w-]*)(.*)$/s.exec(text);
   if (!m) return null;
   const node = {
     indent: m[1].length,
@@ -203,8 +211,8 @@ function parseLine(raw) {
       if (node.label === null) node.label = t.slice(1, -1);
       continue;
     }
-    const kv = /^([\w-]+)=(.*)$/.exec(t);
-    if (kv) node.attrs[kv[1]] = kv[2].replace(/^"(.*)"$/, "$1");
+    const kv = /^([\w-]+)=(.*)$/s.exec(t);
+    if (kv) node.attrs[kv[1]] = kv[2].replace(/^"(.*)"$/s, "$1");
     else if (/^[A-Za-z][\w-]*$/.test(t)) node.flags.push(t);
   }
   return node;
@@ -280,6 +288,10 @@ function listNodes(blocks) {
 // Markdown tables
 // ---------------------------------------------------------------------------
 
+// The line ending a file already uses. Lines are split on CRLF or LF, so a write that joined with
+// LF rewrote every line of a CRLF file to add one row (CR12-4). New files are LF.
+const eolOf = (text) => (text.includes("\r\n") ? "\r\n" : "\n");
+
 function splitRow(line) {
   const body = line.trim().replace(/^\|/, "").replace(/\|$/, "");
   const cells = [];
@@ -346,7 +358,7 @@ function readMap(text) {
       line: end + 1,
     });
   }
-  return { rows, tableEnd: end, columns: head.length };
+  return { rows, headerLine: start, tableEnd: end, columns: head.length };
 }
 
 // ECMAScript's whole LineTerminator set. A value is one cell on one line: \r and \n split the
@@ -590,6 +602,20 @@ function catalogueRow(root, name, file) {
 // Commands
 // ---------------------------------------------------------------------------
 
+// An empty map: its guidance and the table header. Callers check that the file is missing.
+function createMap(file) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(
+    file,
+    [
+      ...MAP_HEADER,
+      `| ${MAP_COLUMNS.join(" | ")} |`,
+      `| ${MAP_COLUMNS.map(() => "---").join(" | ")} |`,
+      "",
+    ].join("\n"),
+  );
+}
+
 function ensure(root) {
   const ui = readUiConfig(root);
   const result = { reason: "ok", catalogue: "unset", map: "unset", added: [] };
@@ -660,7 +686,7 @@ function ensure(root) {
             };
           }
           lines.splice(insert.at, 0, ...insert.lines);
-          fs.writeFileSync(file, lines.join("\n"));
+          fs.writeFileSync(file, lines.join(eolOf(text)));
           result.catalogue = "updated";
           result.added = missing;
         }
@@ -671,16 +697,7 @@ function ensure(root) {
   if (ui.wireframeMap) {
     const file = path.resolve(root, ui.wireframeMap);
     if (!fs.existsSync(file)) {
-      fs.mkdirSync(path.dirname(file), { recursive: true });
-      fs.writeFileSync(
-        file,
-        [
-          ...MAP_HEADER,
-          `| ${MAP_COLUMNS.join(" | ")} |`,
-          `| ${MAP_COLUMNS.map(() => "---").join(" | ")} |`,
-          "",
-        ].join("\n"),
-      );
+      createMap(file);
       result.map = "created";
     } else {
       result.map =
@@ -705,14 +722,27 @@ function resolve(root, workItem) {
     ? readMap(fs.readFileSync(mapFile, "utf8"))
     : null;
   const rows = map ? map.rows : [];
-  const catalogue =
-    ui.componentCatalogue &&
-    fs.existsSync(path.resolve(root, ui.componentCatalogue))
-      ? catalogued(
-          fs.readFileSync(path.resolve(root, ui.componentCatalogue), "utf8"),
-          ui.catalogueSection,
-        ) || []
-      : [];
+  // The catalogue's names filter the candidates. A catalogue without its section is reported, not
+  // read as an empty catalogue: both left the filter off, and the caller could not tell (CR12-3).
+  let catalogue = null;
+  let catalogueState = "unset";
+  if (ui.componentCatalogue) {
+    const catFile = path.resolve(root, ui.componentCatalogue);
+    if (!fs.existsSync(catFile)) catalogueState = "missing";
+    else {
+      catalogue = catalogued(
+        fs.readFileSync(catFile, "utf8"),
+        ui.catalogueSection,
+      );
+      catalogueState = catalogue === null ? "no-section" : "ok";
+    }
+  }
+  // The component names a Component cell mentions, whole: `Button in ActionRow` names both, and
+  // `ButtonGroup` names neither `Button` nor `Group` (a substring test passed it on `Button`).
+  const namesIn = (component) =>
+    (component.match(/[A-Za-z][\w.]*/g) || []).map((n) =>
+      n.replace(/\.+$/, ""),
+    );
 
   const resolved = [];
   const unresolved = [];
@@ -738,8 +768,9 @@ function resolve(root, workItem) {
         candidates: nearMisses(rows, node).filter(
           (c) =>
             c.component === LAYOUT ||
+            !catalogue ||
             !catalogue.length ||
-            catalogue.some((n) => c.component.includes(n)),
+            namesIn(c.component).some((n) => catalogue.includes(n)),
         ),
       });
   }
@@ -751,6 +782,7 @@ function resolve(root, workItem) {
     catalogue: ui.componentCatalogue,
     map: ui.wireframeMap,
     mapState: map ? "ok" : fs.existsSync(mapFile) ? "unreadable" : "missing",
+    catalogueState,
     resolved,
     unresolved,
   };
@@ -795,7 +827,8 @@ function record(root, opts) {
       );
   }
   const file = path.resolve(root, ui.wireframeMap);
-  if (!fs.existsSync(file)) ensure(root);
+  // Only the map: the catalogue is ensure's, which the procedure runs first (CR12-5).
+  if (!fs.existsSync(file)) createMap(file);
   const text = fs.readFileSync(file, "utf8");
   const map = readMap(text);
   if (!map) return { reason: "unparseable", map: ui.wireframeMap };
@@ -811,13 +844,7 @@ function record(root, opts) {
     notes: opts.notes || "",
     confirmed,
   };
-  const headerLine = lines.findIndex(
-    (l, i) =>
-      isTableLine(l) &&
-      /signature/i.test(splitRow(l)[0] || "") &&
-      isDivider(lines[i + 1] || ""),
-  );
-  const columns = splitRow(lines[headerLine]).map((h) => h.toLowerCase());
+  const columns = splitRow(lines[map.headerLine]).map((h) => h.toLowerCase());
   const row = `| ${columns
     .map((h) => {
       const key = Object.keys(values).find((k) => h.startsWith(k));
@@ -834,7 +861,7 @@ function record(root, opts) {
   );
   if (same) {
     lines[same.line - 1] = row;
-    fs.writeFileSync(file, lines.join("\n"));
+    fs.writeFileSync(file, lines.join(eolOf(text)));
     return {
       reason: "ok",
       action: "replaced",
@@ -843,7 +870,7 @@ function record(root, opts) {
     };
   }
   lines.splice(map.tableEnd, 0, row);
-  fs.writeFileSync(file, lines.join("\n"));
+  fs.writeFileSync(file, lines.join(eolOf(text)));
   return {
     reason: "ok",
     action: "added",
@@ -914,6 +941,12 @@ function runCli(argv) {
   } catch (err) {
     if (err instanceof UsageError)
       return { exitCode: 2, payload: { reason: "usage" }, error: err.message };
+    if (err instanceof ConfigError)
+      return {
+        exitCode: 1,
+        payload: { reason: "config-unreadable", error: err.message },
+        json: opts.json,
+      };
     throw err;
   }
   const ok = payload.reason === "ok" || payload.reason === "unset";
@@ -923,6 +956,7 @@ function runCli(argv) {
 function human(p) {
   if (p.reason === "unset")
     return "wireframe-map: no ui: block configured — nothing to do";
+  if (p.reason === "config-unreadable") return `wireframe-map: ${p.error}`;
   if (p.resolved)
     return [
       `${p.resolved.length} node(s) resolved, ${p.unresolved.length} open (map: ${p.map})`,

@@ -40,7 +40,9 @@ command node .agents/skills/{skill}/references/wireframe-map.js record \
 
 > Engine source: `wireframe-map.js` (bundled into each skill that runs it as `references/wireframe-map.js`).
 
-Read `reason` from every call. `unset` means the feature is off: stop here. From `ensure`, a file
+Read `reason` from every call. `unset` means the feature is off: stop here. `config-unreadable`
+(exit 1) means `skills-config.yaml` exists but cannot be read: report its `error`, and never treat
+the feature as off. From `ensure`, a file
 reported `created` or `updated` is a change to commit with the work item, and `unreadable` is a file
 left alone that a person should look at: log both, and never halt on them.
 
@@ -67,7 +69,10 @@ only when no such document exists.
 
 Run `resolve` on the work item. It returns `resolved[]` (each with its `component` and `variant`,
 or `layout: true` for a node that draws nothing) and `unresolved[]` (each with `candidates[]` from
-map rows that nearly matched).
+map rows that nearly matched). Candidates are kept only when their Component names a catalogued
+component exactly. `catalogueState` says whether that filter ran: `ok` means it did. `no-section`
+means the catalogue has no `ui.catalogueSection` heading, so nothing was filtered: say so when you
+offer the candidates. `missing` and `unset` mean there is no catalogue to filter by.
 
 ### 4. Propose an answer for each open node
 
