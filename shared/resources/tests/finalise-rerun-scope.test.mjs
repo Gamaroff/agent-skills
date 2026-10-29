@@ -1222,6 +1222,26 @@ test("evidenceIndex: a bare basename a gone path shares resolves to every candid
     "src/b.js",
   ]);
   assert.deepEqual(r("b.js:1", ["x/b.js", "y/b.js"], []), []);
+  // Ambiguous at HEAD with a candidate changed — added or modified since the
+  // prior head (CR6-1): every candidate, so the change is seen.
+  assert.deepEqual(r("b.js:1", ["src/b.js", "lib/z/b.js"], ["lib/z/b.js"]), [
+    "lib/z/b.js",
+    "src/b.js",
+  ]);
+  assert.deepEqual(
+    r("b.js:1", ["src/b.js", "lib/z/b.js"], ["src/b.js", "lib/z/b.js"]),
+    ["lib/z/b.js", "src/b.js"],
+  );
+  // merge's index (CR5-1): a current-run citation resolves at HEAD alone, so
+  // the same ambiguity resolves to nothing there.
+  assert.deepEqual(
+    eng.resolveCitation("b.js:1", {
+      ...eng.evidenceIndex(["src/b.js", "lib/z/b.js"], new Set(["lib/z/b.js"])),
+      goneByBase: null,
+      changed: null,
+    }),
+    [],
+  );
   // A full path still resolves whether it is at HEAD or gone.
   assert.deepEqual(r("src/b.js:1", ["src/a.js"], ["src/b.js"]), ["src/b.js"]);
 });
@@ -1248,6 +1268,44 @@ test("scope: a bare citation ambiguous at the prior head re-judges once a candid
     } finally {
       cleanup(dir2);
     }
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("scope: a bare citation made ambiguous by an added same-basename file re-judges when a candidate changed (CR6-1)", () => {
+  for (const [label, files] of [
+    // The cited file modified and another b.js added: the reviewer's repro.
+    ["modified + added", { "src/b.js": "changed\n", "lib/z/b.js": "z\n" }],
+    // Only the other b.js added: which file the prior run meant is unknown,
+    // and one candidate changed, so re-judge rather than guess.
+    ["added only", { "lib/z/b.js": "z\n" }],
+  ]) {
+    const dir = mkRepo();
+    try {
+      const prior = record(dir, git(dir, "rev-parse", "HEAD"), {
+        // Bare basename beside an unchanged full-path co-citation.
+        "SC-2": { code_citation: "b.js:1" },
+      });
+      commit(dir, files, label);
+      assert.equal(
+        reasonOf(scopeAt(dir, prior), "SC-2"),
+        "evidence-changed",
+        label,
+      );
+    } finally {
+      cleanup(dir);
+    }
+  }
+  // Control: ambiguous at both heads and no candidate changed — nothing the
+  // prior run could have meant moved, so SC-2 carries.
+  const dir = mkRepo({ "lib/z/b.js": "z\n" });
+  try {
+    const prior = record(dir, git(dir, "rev-parse", "HEAD"), {
+      "SC-2": { code_citation: "b.js:1" },
+    });
+    commit(dir, { "CHANGELOG.md": "## [Unreleased]\n- x\n" });
+    assert.equal(reasonOf(scopeAt(dir, prior), "SC-2"), "unchanged");
   } finally {
     cleanup(dir);
   }

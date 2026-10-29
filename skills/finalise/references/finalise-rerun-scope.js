@@ -130,10 +130,10 @@ function isReopened(body) {
 /**
  * Resolve the paths a citation names. A token contributes a path only when it
  * resolves to a tracked file, or to one gone since the prior head: a
- * repo-relative path as written; a bare basename exactly one file at HEAD
- * carries; or, when any gone path carries the basename, every file that does.
- * An abbreviated `:N-M`, a commit SHA, a basename only HEAD carries more than
- * once and `NOT_APPLICABLE: …` resolve to nothing.
+ * repo-relative path as written; a bare basename exactly one file carries (at
+ * HEAD or gone); or, when several carry it and any of them changed, every file
+ * that does. An abbreviated `:N-M`, a commit SHA, an ambiguous basename none
+ * of whose candidates changed and `NOT_APPLICABLE: …` resolve to nothing.
  */
 function resolveCitation(citation, tracked) {
   if (citation === null || citation === undefined) return [];
@@ -150,15 +150,19 @@ function resolveCitation(citation, tracked) {
       continue;
     }
     if (token.includes("/")) continue;
-    // A bare basename a path gone since the prior head also carries was
-    // ambiguous when the prior run cited it: it resolves to every candidate,
-    // and the gone one counts as changed, so the criterion is re-judged rather
-    // than carried on a guess (QA cycle 4, CR4-1). Otherwise it resolves only
-    // when exactly one file at HEAD carries it.
+    // A bare basename one file carries resolves to it. One that several carry
+    // is ambiguous, and the engine does not guess which the prior run meant:
+    // it asks only whether any of them changed. If one did (added, modified or
+    // gone — a gone path is always changed), it resolves to every candidate and
+    // the criterion is re-judged; if none did, it resolves to nothing (QA
+    // cycles 4 and 6, CR4-1, CR6-1). An index with no `changed` set — merge's,
+    // for a current-run citation — never widens (CR5-1).
     const hits = tracked.byBase.get(token) || [];
     const gone = (tracked.goneByBase && tracked.goneByBase.get(token)) || [];
-    if (gone.length > 0) for (const p of [...hits, ...gone]) out.add(p);
-    else if (hits.length === 1) out.add(hits[0]);
+    const candidates = [...hits, ...gone];
+    if (candidates.length === 1) out.add(candidates[0]);
+    else if (tracked.changed && candidates.some((p) => tracked.changed.has(p)))
+      for (const p of candidates) out.add(p);
   }
   return [...out];
 }
@@ -171,11 +175,13 @@ function resolveCitation(citation, tracked) {
 // HEAD's, a file moved under the same name (src/b.js → lib/b.js) made its
 // bare basename ambiguous, and the move was carried (QA cycle 3, CR3-1);
 // kept apart, resolveCitation fails a shared basename toward re-judge (CR4-1).
+// `changed` rides along so an ambiguity a file added or modified since the
+// prior head introduced is seen too (CR6-1).
 function evidenceIndex(trackedPaths, changed) {
   const head = trackedIndex(trackedPaths);
   const gone = [...changed].filter((p) => !head.paths.has(p));
   for (const p of gone) head.paths.add(p);
-  return { ...head, goneByBase: trackedIndex(gone).byBase };
+  return { ...head, goneByBase: trackedIndex(gone).byBase, changed };
 }
 
 function trackedIndex(paths) {
@@ -638,8 +644,13 @@ function merge(s, agentYaml, opts, io) {
   // A new member's evidence is this run's agent citing HEAD, so a gone path
   // cannot be what it meant: its bare basename resolves against HEAD alone.
   // The gone-candidate rule is for the prior record's citations, written
-  // before the deletion (QA cycle 5, CR5-1).
-  const atHead = { ...evidenceIndex(io.tracked(), changed), goneByBase: null };
+  // before the deletion (QA cycle 5, CR5-1). The ambiguity rule is theirs too
+  // (CR6-1): with no `changed` set, an ambiguous basename stays unresolved.
+  const atHead = {
+    ...evidenceIndex(io.tracked(), changed),
+    goneByBase: null,
+    changed: null,
+  };
   const mio = { memberEvidence: (m) => memberEvidence(m, atHead, changed) };
 
   // Zero criteria: nothing to key on, so the agent's verdicts pass through.

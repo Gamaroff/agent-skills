@@ -97,8 +97,8 @@ Step 3c aggregation (existing, extended: after the YAML parse, before Step 3d re
 
 **Citation paths.** A citation contributes a path only when it resolves to a file `git ls-files` tracks:
 - a repo-relative `path:line` resolves to its path, including a path deleted or renamed since the prior head (it counts as changed);
-- a bare basename resolves when exactly one file at HEAD has that basename. When any path deleted or renamed since the prior head also has it, the citation was ambiguous when it was written, so it resolves to every file that has it. The gone path counts as changed, and the criterion is re-judged, not carried on a guess. That covers a file moved under its own name (QA cycles 2–4: CR2-3, CR3-1, CR4-1). This rule is for the prior record's citations only. A new member's evidence is cited by this run's agent against HEAD, so `merge` resolves its bare basename against HEAD alone (QA cycle 5, CR5-1);
-- an abbreviated `:N-M`, a commit SHA, or anything ambiguous does not resolve.
+- a bare basename resolves when exactly one file has it, at HEAD or deleted since the prior head. When several files have it, the engine does not guess which one the prior run meant. It asks only whether any of them changed since the prior head (added, modified, deleted or renamed). If one did, the citation resolves to every file that has the basename, and the criterion is re-judged, not carried on a guess. If none did, the citation does not resolve. That covers a file moved under its own name and a same-basename file added beside the cited one (QA cycles 2–6: CR2-3, CR3-1, CR4-1, CR6-1). This rule is for the prior record's citations only. A new member's evidence is cited by this run's agent against HEAD, so `merge` resolves its bare basename against HEAD alone, and an ambiguous one does not resolve (QA cycle 5, CR5-1);
+- an abbreviated `:N-M`, a commit SHA, or an ambiguous basename none of whose files changed does not resolve.
 
 task.239's DoD runs cite all three unresolvable shapes. A PASS with no resolvable code, test or member-evidence path cannot be watched for change, so it is re-judged rather than carried.
 
@@ -177,7 +177,7 @@ The `reported-gap` row is what would have stopped task.239. Run 4 named SC-11's 
 
 - [x] `scope`: the four `full` reasons and the six per-criterion rows of § 3, with criterion text hashing on a normalised line (checkbox state stripped, whitespace collapsed)
 - [x] Criterion identity (§ 3): the document id or `#N`, matched by id or by text hash
-- [x] Citation resolution (§ 3): repo-relative path, or a unique basename through `git ls-files`, else unresolved
+- [x] Citation resolution (§ 3): repo-relative path, or a unique basename through `git ls-files`; an ambiguous basename resolves to every candidate when one changed, else unresolved
 - [x] `merge`: restore every carried verdict and citation, and move a carried criterion's differing agent verdict into `advisories[]`. Apply the § 3 member rules and recompute a `reported-gap` criterion's status from its merged members. Recompute `overall` from the merged `acs[]` and `docs[]`. Parse the agent's YAML with `yaml-subset.js` (`parseYamlSubset`). Unparseable output leaves Step 3c's existing `NEEDS_MANUAL_REVIEW` rule in force, and no record is written.
 - [x] Exit codes in the repository's idiom: 0 for any answer (read `mode`/`reason`), 2 for a usage error
 - [x] Unit tests on a temp git repo, one per reason, plus the task.239 replay and its controls (§ 8)
@@ -373,18 +373,18 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.242.qa.5.scope-finalise-re-runs.md](./task.242.qa.5.scope-finalise-re-runs.md)
-- **Gate File**: [task.242.gate.5.scope-finalise-re-runs.yml](./task.242.gate.5.scope-finalise-re-runs.yml)
+- **Full Report**: [task.242.qa.6.scope-finalise-re-runs.md](./task.242.qa.6.scope-finalise-re-runs.md)
+- **Gate File**: [task.242.gate.6.scope-finalise-re-runs.yml](./task.242.gate.6.scope-finalise-re-runs.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 142
+- **Tests Executed**: 46
 - **Phases Verified**: 18/18
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-The cycle-4 fix is verified (4 of 4 mutation proofs covered) and there is no high finding. One promoted medium remains:
-- CR5-1: the gone-candidate rule also reaches merge's new-member evidence, so a same-basename deletion counts a new member on unchanged evidence.
+The cycle-5 fix is verified (its test goes red without it) and there is no high finding. One promoted medium remains:
+- CR6-1: a file added under a cited basename makes a bare prior-record citation resolve to nothing, so a criterion whose cited file changed is carried.
 
 ## Change Log
 
@@ -404,6 +404,8 @@ The cycle-4 fix is verified (4 of 4 mutation proofs covered) and there is no hig
 | 2026-10-29 |  | QA fix cycle 4. CR4-1: when a gone path also carries a bare basename, the citation resolves to every candidate and the criterion is re-judged, not carried on a guess. § 3 *Citation paths* restated. 1 test rewritten, 1 added; 4 mutations covered. Status → ready-for-review | qa-fix |
 | 2026-10-29 |  | QA gate CONCERNS (90/100). 1 finding: CR5-1 (medium, promoted). The gone-candidate rule also reaches merge's new-member evidence, so a same-basename deletion counts a new member on unchanged evidence. CR4-1 verified (4 of 4 covered) | qa-task |
 | 2026-10-29 |  | QA fix cycle 5. CR5-1: `merge` resolves a new member's evidence against HEAD alone; the gone-candidate rule stays with the prior record's citations. § 3 *Citation paths* restated. 1 test added, seen failing before the fix; mutations covered. Status → ready-for-review | qa-fix |
+| 2026-10-29 |  | QA gate CONCERNS (90/100). 1 finding: CR6-1 (medium, promoted). A file added under a cited basename makes a bare prior-record citation resolve to nothing, so a criterion whose cited file changed is carried. CR5-1 verified (covered) | qa-task |
+| 2026-10-29 |  | QA fix cycle 6. CR6-1 (scope the claim): a bare basename several files carry no longer names one. It resolves to every candidate when any of them changed since the prior head (added, modified or gone), else to nothing. This subsumes the CR4-1 gone-only rule. `merge` keeps the HEAD-alone rule (CR5-1). § 3 *Citation paths* restated. 1 test added, 1 extended, both seen failing first; 2 of 3 mutations covered, 1 absorbed. Status → ready-for-review | qa-fix |
 
 ---
 
