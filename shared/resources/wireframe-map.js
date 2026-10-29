@@ -37,7 +37,8 @@
  *
  * Signatures. A node's signature is `parent>primitive[flag,flag]{key=value,…}`: its parent's
  * primitive, its own, its bare flags (`primary`, `muted`, `chevron`…) and its attributes
- * (`name=leader`, `kind=warning`…). A map row's signature is a pattern over that: `*` matches any
+ * (`name=leader`, `kind=warning`…), each value percent-encoded outside an allow-list (`encodeValue`
+ * below), so `value="1,500"` is `value=1%2C500`. A map row's signature is a pattern over that: `*` matches any
  * parent, and a row names only the flags and attributes it requires. The row's Label column, when
  * set, must match the node's quoted label: a plain string matches exactly, `/re/` is a regular
  * expression. The row with the most constraints wins; a tie goes to the earlier row.
@@ -74,7 +75,8 @@ const MAP_HEADER = [
   "the rest; the answers are added here. Edit rows freely: the most specific matching row wins.",
   "",
   "- **Signature** — `parent>primitive[flags]{key=value}`. `*` is any parent; name only the flags",
-  "  and attributes the link depends on.",
+  "  and attributes the link depends on. A value holding `,` `}` `%`, whitespace or a table",
+  "  character is percent-encoded: `value=1%2C500`.",
   "- **Label** — empty for any label, a plain string to match it exactly, or `/regex/`.",
   "- **Component** — what the node is built from; `(layout)` for a node that draws nothing.",
   "",
@@ -208,11 +210,36 @@ function parseLine(raw) {
   return node;
 }
 
+// An attribute value in a signature is percent-encoded outside an allow-list: what
+// encodeURIComponent leaves alone, plus `/ : # @ + =` for readability. A value can then never
+// carry the list's own separators (`,` `}`), a table cell's (`|`, a backtick), whitespace the
+// reader trims, or a line terminator, so every node's signature reads back to the node.
+// parsePattern decodes; a hand-written row needs encoding only for a value holding one of those.
+const READABLE = /%(?:2F|3A|23|40|2B|3D)/g;
+
+function encodeValue(value) {
+  return encodeURIComponent(value.toWellFormed()).replace(
+    READABLE,
+    decodeURIComponent,
+  );
+}
+
+// Lenient: a `%` that does not start a valid escape run (`72%`, written by hand) stays as it is.
+function decodeValue(value) {
+  return value.replace(/(?:%[0-9A-Fa-f]{2})+/g, (run) => {
+    try {
+      return decodeURIComponent(run);
+    } catch (_) {
+      return run;
+    }
+  });
+}
+
 function signatureOf(node, parent) {
   const flags = [...node.flags].sort();
   const attrs = Object.keys(node.attrs)
     .sort()
-    .map((k) => `${k}=${node.attrs[k]}`);
+    .map((k) => `${k}=${encodeValue(node.attrs[k])}`);
   return (
     `${parent || "*"}>${node.primitive}` +
     (flags.length ? `[${flags.join(",")}]` : "") +
@@ -344,7 +371,7 @@ function parsePattern(sig) {
   const attrs = {};
   for (const pair of list(m[4])) {
     const kv = /^([\w-]+)=(.*)$/.exec(pair);
-    if (kv) attrs[kv[1]] = kv[2];
+    if (kv) attrs[kv[1]] = decodeValue(kv[2]);
   }
   return {
     parent: m[1] && m[1] !== "*" ? m[1] : null,

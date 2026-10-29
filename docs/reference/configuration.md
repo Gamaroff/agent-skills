@@ -352,7 +352,9 @@ wrote. A file that exists but cannot be read is left alone and reported.
 
 **The map's rows** are `Signature | Label | Component | Variant / props | Source hint | Notes |
 Confirmed`. A signature is `parent>primitive[flag]{key=value}`: `*>button[primary]`,
-`footer>button[primary]`, `row>icon{name=leader}`. The Label column, when set, must match the
+`footer>button[primary]`, `row>icon{name=leader}`. An attribute value holding `,` `}` `%`,
+whitespace or a table character is percent-encoded (`value=1%2C500`); a hand-written value needs
+no other escaping. The Label column, when set, must match the
 node's quoted label (`/regex/` for a pattern). The row with the most constraints wins. A Component of
 `(layout)` marks a node that draws nothing of its own. Edit the rows freely.
 

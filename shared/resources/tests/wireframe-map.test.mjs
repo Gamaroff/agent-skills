@@ -27,6 +27,8 @@ const {
   resolve,
   record,
   readMap,
+  parsePattern,
+  match,
 } = require(SCRIPT);
 
 // U+2028 LINE SEPARATOR and U+2029 PARAGRAPH SEPARATOR, built rather than written: a literal
@@ -463,6 +465,71 @@ test("record adds a row, then replaces it for the same signature and label", () 
   } finally {
     cleanup(root);
   }
+});
+
+// Attribute values holding the signature's own separators, a table cell's, whitespace the reader
+// trims, or a non-ASCII character (gate 12, CR12-1: `value="1,500"` read back as `value: "1"`).
+const AWKWARD = [
+  "1,500",
+  "a}b",
+  "72%",
+  "100%25",
+  "a|b",
+  "x`y",
+  " pad ",
+  "t\tb",
+  "/home",
+  "a=b",
+  "é",
+];
+
+test("every node's signature reads back to the node, and record then resolve settles it", () => {
+  const story = [
+    "```wireloom",
+    "window:",
+    ...AWKWARD.map((v, i) => `  input k${i}="${v}"`),
+    "```",
+    "",
+  ].join("\n");
+  const nodes = listNodes(extractBlocks(story)).filter(
+    (n) => n.primitive === "input",
+  );
+  assert.equal(nodes.length, AWKWARD.length);
+  for (const node of nodes) {
+    const row = { signature: node.signature, label: "" };
+    assert.equal(match([row], node), row, `self-match: ${node.signature}`);
+    // and no other awkward value's node matches it: the encoding does not merge values
+    for (const other of nodes)
+      if (other !== node) assert.equal(match([row], other), null);
+  }
+  const root = consumer({ files: { "docs/story.md": story } });
+  try {
+    ensure(root);
+    for (const node of nodes)
+      record(root, {
+        signature: node.signature,
+        component: "Field",
+        by: "a developer",
+        date: "2026-10-29",
+      });
+    const r = resolve(root, "docs/story.md");
+    for (const node of nodes)
+      assert.equal(
+        r.resolved.find((n) => n.signature === node.signature)?.component,
+        "Field",
+        `resolved: ${node.signature}`,
+      );
+  } finally {
+    cleanup(root);
+  }
+  // A hand-written row needs no encoding, and a `%` that starts no escape stays literal.
+  assert.deepEqual(parsePattern("*>input{v=72%,w=/home}").attrs, {
+    v: "72%",
+    w: "/home",
+  });
+  assert.deepEqual(parsePattern("*>input{v=1%2C500}").attrs, { v: "1,500" });
+  // An escape run that is not UTF-8 is kept as written rather than thrown on.
+  assert.deepEqual(parsePattern("*>input{v=%E2%80}").attrs, { v: "%E2%80" });
 });
 
 test("record refuses a signature with a line break and leaves the map unchanged", () => {

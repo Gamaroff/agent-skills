@@ -109,7 +109,9 @@ sections are fixed by `implementation-report-template.md`.
 Decision | Why`). Every node and every part the _Conversion notes_ list as dropped gets a row.
 - **In the map:** one `record` call per confirmed answer, with the narrowest signature that is
   still true of the other nodes it should cover. Prefer `parent>primitive[flag]` over a bare
-  primitive, and add a label pattern only when the label is what decides it.
+  primitive, and add a label pattern only when the label is what decides it. Copy an attribute
+  value as the node's signature writes it: a value holding `,` `}` `%`, whitespace or a table
+  character is percent-encoded there (`value=1%2C500`), and the map reads it back decoded.
 
 ## Where each skill runs it
 

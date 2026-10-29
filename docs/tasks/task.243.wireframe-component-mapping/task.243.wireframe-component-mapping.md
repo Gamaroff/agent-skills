@@ -353,5 +353,6 @@ copies, and the evaluator matches paths exactly while §7 names those copies as 
 | 2026-10-29 |  | QA gate PASS (100/100) — cycle 11 of 12; cycle 10 fix verified and mutation-proven (CR10-1, CR10-2 fixed); 2 low advisory findings (CR11-1, CR11-2); probe 79/0/0 | qa-task |
 | 2026-10-29 |  | DoD incomplete — 1 gap identified (security: U+2028/U+2029 accepted in a record signature or label; 9 low probes); fix-and-recheck refused (inside-files-summary) | finalise |
 | 2026-10-29 |  | QA gate CONCERNS (90/100) — cycle 12 of 13; DoD run 3 fix verified and mutation-proven (U+2028/U+2029 closed); 1 medium finding (CR12-1: an attribute value with a comma or brace does not round-trip through its own signature, bug.15), 3 low advisory; probe 114/0/0 | qa-task |
+| 2026-10-29 |  | QA findings fixed — cycle 12, 1 finding (bug.15 Ready for QA, CR12-1): attribute values are percent-encoded in a signature and decoded by parsePattern, so every node reads back to itself | qa-fix |
 <!-- change-log-end -->
 

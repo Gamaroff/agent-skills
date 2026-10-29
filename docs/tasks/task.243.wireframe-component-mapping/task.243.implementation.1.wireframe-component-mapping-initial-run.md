@@ -171,6 +171,23 @@ Take task 243, already implemented and reviewed outside the pipeline, through re
     - Reverting `record`'s field check turns test 18 red (18/19).
     - Restored: 19/19.
   - `npm run bundle` updated the eight copies, and `bundle:check` is clean.
+- Fix commit `295974a5` pushed. `reenter-qa-after-finalise.sh` restored the lock at step 5 / 5a with `qa_max_cycles` 13 (base 11 + 2), so gate 12 was cycle 12 of 13, not the last cycle as the DoD file's Next Steps line says.
+
+### Step 5 — QA cycle 12 (re-entry after DoD run 3)
+
+- Gate 12 CONCERNS (90/100). The DoD fix is verified, and the reviewer found CR12-1 (medium/high, promoted): attribute values do not round-trip through their own signature (bug.15). The route classifier returned `continue (not-a-pass-gate)`, so the loop goes to 5b, fix cycle 12 of 13.
+- Step 1a ingester not dispatched: the gate has one open entry and no PR review is current, so the findings were read inline (independence loss: none of note; the gate was written this session).
+- Fix (`/qa-fix` cycle 12): one percent-encoding shared by `signatureOf` (`encodeValue`) and `parsePattern` (`decodeValue`), over an allow-list (`encodeURIComponent`'s set plus `/ : # @ + =`).
+  - Step 2.6 move: consolidate. The two functions had no shared rule for a value.
+  - Patching the reader to accept commas would only have moved the next collision to `}`, `|` or a backtick.
+  - Decoding is lenient, so hand-written rows keep working.
+  - Mutation-proven 3 of 3 (encode off, decode off, strict decode; each 19/20, restored 20/20).
+- Probe (doc fix), phrase `key=value`, population 4:
+  - `shared/resources/develop-pipeline-step-5-6-qa-loop.md`, `skills/qa-task/SKILL.md`: unaffected (Skill-args tokens).
+  - `skills/use-railway/SKILL.md`, `skills/use-railway/references/configure.md`: unaffected (unrelated).
+  - Outside the executed set, three grammar statements were updated: `wireframe-map.js` header and seeded-map guidance, `docs/reference/configuration.md:354`.
+  - The procedure's "In the map" rule (`wireframe-component-mapping.md`) also gained the copy-as-written sentence.
+- New low, not fixed this cycle: a Wireloom line holding U+2028 yields no node at all, because `parseLine`'s `.*$` cannot cross it. It is older than this fix and is not a round-trip failure. Recorded for gate 13.
 
 ---
 
@@ -388,6 +405,18 @@ _Track each QA review/fix cycle._
 **PR Review**: APPROVE — `task.243.pr-review.3.wireframe-component-mapping.md` (conformance lens only, `--no-code`). It raised 2 low trail findings, both doc-only and fixed in the carry. PC-1: the Pipeline Progress steps 5–6 row is updated to gate 11. PC-2: CR11-1 and CR11-2 are listed under Deferred Work. No coverage finding is open.
 **Carried to 6a**: docs/tasks/task.243.wireframe-component-mapping/task.243.pr-review.3.wireframe-component-mapping.md docs/tasks/task.243.wireframe-component-mapping/task.243.wireframe-component-mapping.md docs/tasks/task.243.wireframe-component-mapping/task.243.implementation.1.wireframe-component-mapping-initial-run.md
 **Action**: Proceeding to 5c (PR conformance review)
+
+### QA Cycle 12 — 2026-10-29
+**Gate Result**: CONCERNS (90/100). Cycle 12 of 13. This is a re-entry after `/finalise` DoD run 3 (`reenter-qa-after-finalise.sh`: qa_max_cycles 13, base 11), and the gate reads the fix `295974a5`.
+**Issues Found**:
+- The DoD run 3 fix is verified. The DoD 3 probe plan, re-run as `task.243.qa.12.security.run.json`, gives 114 executed, 0 reproduced, 0 escaped, and all 11 controls engage. Both `LINE_TERMINATOR` arms are mutation-proven at QA in a scratch worktree (outcome: covered).
+- 1 medium, promoted as TASK-243-CR12-1 ([bug.15](./task.243.bug.15.attribute-value-signatures-do-not-round-trip.md)). `signatureOf` writes attribute values unescaped, so a `,` or `}` in a value breaks the node's own signature. `value="1,500"` reads back as `value: "1"` (reproduced by QA). The file is new on the branch, so the defect is not pre-existing.
+- 3 low bugs and 2 cleanups are advisory: CR12-2 to CR12-5.
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**Loop exit**: none. The classifier returned `continue (not-a-pass-gate)`, and with no HIGH finding the Convergence check cannot trip.
+**PR Review**: not reached — gate did not exit the loop
+**Action**: Running qa-fix (cycle 12 of 13)
 
 ---
 

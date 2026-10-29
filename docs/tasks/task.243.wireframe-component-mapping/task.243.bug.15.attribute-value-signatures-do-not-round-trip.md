@@ -4,7 +4,7 @@
 **Bug ID**: TASK-243-BUG-15
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: New
+**Status**: Ready for QA
 **Found By**: QA Engineer
 **Date Found**: 2026-10-29
 
@@ -53,8 +53,47 @@ Give attribute values one encoding that `signatureOf` and `parsePattern` both us
 or escaping `,`, `}` and `]`. Add a test that every `listNodes` signature matches its own node through
 `parsePattern` and `match`. Found by the gate 12 code review (CR-1).
 
+## Developer Fix Cycle
+
+### Iteration 1
+
+**Root Cause**: `signatureOf` and `parsePattern` had no shared rule for a value. The writer put the
+raw value in the signature, and the reader ended and split the list on characters the value was free
+to hold.
+
+**Fix**: one encoding, defined once. `encodeValue` percent-encodes each attribute value outside an
+allow-list: what `encodeURIComponent` leaves alone, plus `/ : # @ + =` for readability. `decodeValue`
+in `parsePattern` reverses it. Decoding is lenient: a `%` that starts no valid escape run (`72%`,
+written by hand) stays literal, so a hand-written row needs no encoding unless its value holds `,`,
+`}`, `%`, whitespace or a table character. The allow-list also keeps `|`, backticks, padding and
+line terminators out of every signature, so `record` accepts every signature `listNodes` produces.
+The grammar statement now says so in the engine header, the seeded map's guidance, the procedure's
+"In the map" rule and `docs/reference/configuration.md`.
+
+**Files Modified**:
+
+- `shared/resources/wireframe-map.js`: `encodeValue`, `decodeValue`, and the header and seeded-map guidance
+- `shared/resources/tests/wireframe-map.test.mjs`: new test, "every node's signature reads back to the node, and record then resolve settles it"
+- `shared/resources/wireframe-component-mapping.md`, `docs/reference/configuration.md`: the encoding rule
+- the eight `skills/*/references/` copies of both shared files (re-bundled)
+
+**Testing**: the new test covers 11 awkward values (`1,500`, `a}b`, `72%`, `100%25`, `a|b`, a
+backtick, padding, a tab, `/home`, `a=b`, `é`). For each one it checks:
+
+- the node matches its own signature;
+- no other value's signature matches it, so nothing is merged;
+- `record` then `resolve` settles it.
+
+Hand-written `72%`, `/home`, `1%2C500` and a non-UTF-8 run `%E2%80` are read as intended.
+
+Mutation-proven, 3 of 3 `covered`: encoding off, decoding off, and a strict decode each turn the new test red (19/20); restored 20/20.
+
+**Verification Steps for QA**: run the reproduction above; every node's attrs read back unchanged.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
 | ---- | ------ | ---------- | ----- |
 | 2026-10-29 | New | qa-task | Found by task.243.qa.12.wireframe-component-mapping.md (CR-1) |
+| 2026-10-29 | In Progress | qa-fix | Investigation started (fix cycle 12) |
+| 2026-10-29 | Ready for QA | qa-fix | One percent-encoding shared by signatureOf and parsePattern; mutation-proven 3 of 3 |
