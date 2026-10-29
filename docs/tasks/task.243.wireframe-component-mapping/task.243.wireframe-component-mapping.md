@@ -247,27 +247,27 @@ catalogue files stay as they are.
 
 ## QA Testing Results
 
-**QA Status**: PASS
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-29
-**Quality Score**: 100/100
-**Gate Decision**: PASS
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.243.qa.9.wireframe-component-mapping.md](./task.243.qa.9.wireframe-component-mapping.md)
-- **Gate File**: [task.243.gate.9.wireframe-component-mapping.yml](./task.243.gate.9.wireframe-component-mapping.yml)
+- **Full Report**: [task.243.qa.10.wireframe-component-mapping.md](./task.243.qa.10.wireframe-component-mapping.md)
+- **Gate File**: [task.243.gate.10.wireframe-component-mapping.yml](./task.243.gate.10.wireframe-component-mapping.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 39 (wireframe suites); 6841 in the fix's fast gate
+- **Tests Executed**: 40 (wireframe suites); 6842 in the fix's fast gate
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Re-entry after finalise DoD run 2. The security gap is closed: `parsePattern` refuses a newline,
-the test holding it is mutation-proven, and the DoD probe plan re-runs clean (11 executed, 0
-reproduced). One low finding is the same class in the other `record` fields (CR9-1), and one low
-backtick case is advisory (CR9-2).
+The cycle 9 fix holds. `record` refuses a line break in every written field and a backtick in
+`--signature` and `--label`, and both guards are mutation-proven. One medium finding remains
+(CR10-1): an odd backtick in an unquoted cell (`--component`, `--variant`, `--hint`, `--notes`,
+`--by`) still collapses the row. The probe measured it: 66 executed, 5 reproduced, 0 escaped.
 
 ## Definition of Done - Gaps Identified
 
@@ -332,5 +332,6 @@ The gap below was found by the security probe run, against a boundary this run a
 | 2026-10-29 |  | DoD incomplete — 1 gap identified (security: parsePattern accepts a newline in a signature; 4 low probes) | finalise |
 | 2026-10-29 |  | QA gate PASS (100/100) — re-entry after finalise DoD run 2; parsePattern newline fix verified, mutation-proven, probe 11/0/0; 2 low findings (CR9-1 promoted, CR9-2 advisory) | qa-task |
 | 2026-10-29 |  | QA findings fixed — CR9-1 (a line break in any written record field) and CR9-2 (a backtick in the signature or label) are refused with a UsageError; mutation-proven; fix cycle 9 | qa-fix |
+| 2026-10-29 |  | QA gate CONCERNS (90/100) — cycle 10 of 10; cycle 9 fix verified and mutation-proven; 1 medium finding (CR10-1: an odd backtick in an unquoted record cell collapses the row), 1 low cleanup; probe 66/5/0 | qa-task |
 <!-- change-log-end -->
 
