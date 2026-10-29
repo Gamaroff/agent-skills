@@ -1,0 +1,75 @@
+schema: 2
+task: 'task.243.wireframe-component-mapping'
+task_title: "Link Wireloom wireframe nodes to the project's UI components, and ask when unsure"
+gate: PASS
+status_reason: 'Re-entry after finalise DoD run 2 (security gap: a newline in a signature). The parsePattern guard holds: it is mutation-proven and the DoD probe plan re-runs clean (11 executed, 0 reproduced). The reviewer found one low, high-confidence bug of the same class in the other record fields (CR9-1), and one low medium-confidence backtick case (CR9-2).'
+reviewer: 'QA Engineer'
+head: 'c9f77474b2c32b84a881e71555960231e2f3779f'
+updated: '2026-10-29T16:46:21Z'
+
+top_issues:
+  - id: 'TASK-243-CR9-1'
+    severity: low
+    file: 'shared/resources/wireframe-map.js'
+    finding: 'record writes --label, --component, --variant, --hint, --notes and --by through cell() (wireframe-map.js:280), which escapes only "|". A newline in any of them still splits the map row and ends the table. Reproduced: a --notes of "a\nb" left a "b | ..." line after the row and dropped its Confirmed cell. This is the class the DoD run 2 gap named, and it is closed for --signature only.'
+    suggested_action: 'Refuse \r and \n in every value record writes (one check at the top of record that throws a UsageError naming the flag), and extend the line-break test to each field.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 100 # no medium or high findings
+
+evidence:
+  tests_reviewed: 39
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 11
+    escaped: 0
+    notes: 'boundary: true (parsePattern). The DoD run 2 plan for parsePattern re-ran against c9f77474: 11 executed, 0 reproduced, 0 escaped (task.243.qa.9.security.run.json). The same cases reproduced 4 before the fix, so the probe is calibrated. CR9-1 is the same class in fields no probe form reaches.'
+  performance:
+    status: PASS
+    notes: 'One regex test per signature.'
+  reliability:
+    status: PASS
+    notes: 'record refuses a line-broken signature and leaves the map byte-identical; a test holds it.'
+  maintainability:
+    status: PASS
+    notes: 'Eight bundled copies match the source apart from the generated header; bundle:check clean.'
+
+recommendations:
+  immediate: []
+  future:
+    - id: 'TASK-243-CR9-2'
+      action: 'Reject backticks in the signature and the label, or escape them when record writes the cell: button[a`b] reads back as one signature cell with an empty component.'
+      refs: ['shared/resources/wireframe-map.js']
+    - id: 'TASK-243-CR8-1'
+      action: 'Drop the two existsSync assertions in the resolve unset test, or mark them documentary: resolve has no write path, so they cannot fail.'
+      refs: ['shared/resources/tests/wireframe-map.test.mjs']
+      carried_from: gate 8
+    - id: 'TASK-243-CR7-1'
+      action: 'Assert the unreadable-arm text (cannot be read (jq exit 127)) instead of /HALT/ in the no-jq test.'
+      refs: ['evals/shared/tests/wireframe-mapping-hooks.test.mjs']
+      carried_from: gate 7
+    - action: 'CR7-2 to CR7-4, the resume-detector current_step reading, grant-qa-cycles.sh re-entry (obs #130), and gate 1-2 lows: unchanged from gate 7.'
+      refs: ['shared/resources/develop-pipeline-step-2-review.md', 'shared/resources/pipeline-resume-detector-prompt.md', 'shared/resources/grant-qa-cycles.sh', 'shared/resources/wireframe-map.js']
+
+bug_resolution:
+  bugs_fixed: 14
+  bugs_remaining: 0
+  fix_date: '2026-10-29'
+  total_iterations: 6
+  verification_method: 'DoD run 2 gap fix c9f77474: mutation-proven at QA (parsePattern guard removed -> record line-break test red, 17/18); parsePattern probe 11/0/0'
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []
