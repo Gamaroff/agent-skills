@@ -5,10 +5,12 @@ type: task
 description: "Make the QA loop's escalation and its re-entry grant describe what the resumed run will actually do: label the option by its action, recommend only moves the third-strike rule permits, tell a stalled mechanism from a newly found one, and deliver the k cycles a grant promises."
 tags: [develop-task, develop-story, qa-loop, escalation, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-27
 updated: 2026-10-29
+completed_date: 2026-10-29
+pr_number: 779
 assignee:
 estimated_effort_hours: 8
 github_issue: 769
@@ -16,7 +18,7 @@ github_issue: 769
 
 # Technical Task: QA escalation and grant say what will run
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.239.review.1.qa-escalation-and-grant-say-what-runs.md` implemented 2026-10-28
 **GitHub Issue**: [#769](https://github.com/Gamaroff/agent-skills/issues/769)
 
@@ -400,6 +402,30 @@ No critical issues identified. Granted cycle 6 adds a test that pins filling rul
 **Gap Report Generated:** 2026-10-28
 
 **Detailed Verification Log:** See `task.239.dod.1.qa-escalation-and-grant-say-what-runs.md` for the full evidence. Security probes: 30 executed, 0 reproduced.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED (DoD run 5, by recorded user override on SC-11)
+
+### QA Report Summary
+
+**QA Report**: `task.239.qa.6.qa-escalation-and-grant-say-what-runs.md`
+**Gate File**: `task.239.gate.6.qa-escalation-and-grant-say-what-runs.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+✅ **Acceptance Criteria:** 12 of 13 passed as judged.
+⚠️ **SC-11:** accepted by override. Run 5 found three assertion groups with no recorded mutation. They were then proved (M34–M36), and the acceptance commit records them, but no sixth run verified them. The user's standing instruction was to accept rather than loop once a fifth consecutive run found a new gap.
+✅ **PR Review & Tests:** Step 5c `/review-pr` APPROVE. CI green on `b324b496` (6 checks). `ci:fast` ran 6742 tests with 0 failed.
+✅ **Documentation:** CHANGELOG [Unreleased], `docs/reference/troubleshooting.md`, both develop READMEs, and 23 bundled copies in sync.
+✅ **Security Review:** PASS. `grant-qa-cycles.sh` was probed: 30 executed, 0 reproduced.
+⚠️ **Compliance Review:** NOT_APPLICABLE (internal tooling).
+
+**Follow-ups:** pin filling rule 2's "previous gate's `high_files` output" wording in a test (SC-7 residual); factor the filling-rules row lookups into one bounded helper (QA6-CR-2).
+
+**Detailed Verification Log:** See `task.239.dod.5.qa-escalation-and-grant-say-what-runs.md` for complete verification evidence and the override record.
+
+**Task marked as ACCEPTED on:** 2026-10-29
 <!-- change-log-start -->
 ## Change Log
 
@@ -425,6 +451,7 @@ No critical issues identified. Granted cycle 6 adds a test that pins filling rul
 | 2026-10-29 |  | QA gate PASS (100/100) — 0 findings (cycle 6, granted after DoD run 3) | qa-task |
 | 2026-10-29 |  | DoD incomplete — 2 gaps identified (SC-7 stall member, SC-11; run 4) | finalise |
 | 2026-10-29 | 1.3 | SC-7 reworded to count filling rule 2's previous-gate check on a stall; SC-11 closed by mutation-proving the remaining assertion groups (M19–M33) | orchestrator |
+| 2026-10-29 | 1.4 | DoD passed — accepted (PR #779), by recorded user override on SC-11 (M34–M36 proved, no sixth run) | finalise |
 <!-- change-log-end -->
 
 ---
