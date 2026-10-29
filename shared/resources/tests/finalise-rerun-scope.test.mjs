@@ -1135,6 +1135,67 @@ test("merge: a new member's bare citation resolves at HEAD, whatever shares its 
   }
 });
 
+test("merge: a new member's bare citation ambiguous at HEAD counts when a candidate changed, beside an unchanged co-citation (QA7-1)", () => {
+  // lib/z/a.test.mjs shares the basename G9 cites and is tracked at both
+  // heads. G9 also cites tests/b.test.mjs, which is unchanged, so the
+  // ambiguous token alone decides whether G9's evidence changed.
+  for (const [label, edit, want] of [
+    // tests/a.test.mjs modified: one candidate changed, so G9 is counted and
+    // the agent's FAIL stands.
+    ["candidate changed", { "tests/a.test.mjs": "modified\n" }, "FAIL"],
+    // Nothing either candidate names changed: G9 rests on unchanged evidence,
+    // goes to advisories, and the FAIL resting on it is overturned.
+    [
+      "no candidate changed",
+      { "CHANGELOG.md": "## [Unreleased]\n- x\n" },
+      "PASS",
+    ],
+  ]) {
+    const dir = mkRepo({ "lib/z/a.test.mjs": "z\n" });
+    try {
+      const prior = record(dir, git(dir, "rev-parse", "HEAD"), {
+        "SC-3": {
+          status: "FAIL",
+          members: [
+            { member: "G1", evidence: "tests/a.test.mjs:1", status: "PASS" },
+            { member: "G2", evidence: "tests/b.test.mjs:1", status: "PASS" },
+          ],
+          note: "cited test does not run per PR",
+        },
+      });
+      commit(dir, edit, label);
+      const s = scopeAt(dir, prior);
+      const g9 = [
+        '        - member: "G9"',
+        '          evidence: "tests/b.test.mjs:1, a.test.mjs:3"',
+        "          status: FAIL",
+      ];
+      const r = eng.merge(
+        s,
+        gapYaml(
+          sc3Entry("FAIL", {
+            extraMembers: g9,
+            fields: ['      note: "G9 unmapped"'],
+          }),
+        ),
+        {},
+        eng.gitIo(dir),
+      );
+      assert.equal(sc3Of(r).status, want, label);
+      const notes = r.ac_result.ac_traceability.advisories.map((a) => a.note);
+      assert.equal(
+        notes.some((n) =>
+          /new member G9 judged FAIL on unchanged evidence/.test(n),
+        ),
+        want === "PASS",
+        `${label}: ${notes.join("\n")}`,
+      );
+    } finally {
+      cleanup(dir);
+    }
+  }
+});
+
 test("scope: a cited path deleted or renamed since the prior head re-judges; an unrelated rename does not (CR2-3)", () => {
   for (const [label, move, want] of [
     ["deleted", (d) => git(d, "rm", "-q", "src/b.js"), "evidence-changed"],
@@ -1232,16 +1293,22 @@ test("evidenceIndex: a bare basename a gone path shares resolves to every candid
     r("b.js:1", ["src/b.js", "lib/z/b.js"], ["src/b.js", "lib/z/b.js"]),
     ["lib/z/b.js", "src/b.js"],
   );
-  // merge's index (CR5-1): a current-run citation resolves at HEAD alone, so
-  // the same ambiguity resolves to nothing there.
-  assert.deepEqual(
-    eng.resolveCitation("b.js:1", {
-      ...eng.evidenceIndex(["src/b.js", "lib/z/b.js"], new Set(["lib/z/b.js"])),
-      goneByBase: null,
-      changed: null,
-    }),
-    [],
-  );
+  // merge's index (CR5-1, QA7-1): a current-run citation resolves at HEAD
+  // alone, so a gone path is not a candidate; the ambiguity rule is the same
+  // one, over HEAD's candidates.
+  const m = (cite, tracked, changed) =>
+    eng
+      .resolveCitation(
+        cite,
+        eng.evidenceIndex(tracked, new Set(changed), { goneCandidates: false }),
+      )
+      .sort();
+  assert.deepEqual(m("b.js:1", ["src/b.js"], ["old/b.js"]), ["src/b.js"]);
+  assert.deepEqual(m("b.js:1", ["src/b.js", "lib/z/b.js"], ["lib/z/b.js"]), [
+    "lib/z/b.js",
+    "src/b.js",
+  ]);
+  assert.deepEqual(m("b.js:1", ["src/b.js", "lib/z/b.js"], ["src/a.js"]), []);
   // A full path still resolves whether it is at HEAD or gone.
   assert.deepEqual(r("src/b.js:1", ["src/a.js"], ["src/b.js"]), ["src/b.js"]);
 });

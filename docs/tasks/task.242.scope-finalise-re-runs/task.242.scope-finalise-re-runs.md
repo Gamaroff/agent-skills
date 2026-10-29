@@ -97,7 +97,7 @@ Step 3c aggregation (existing, extended: after the YAML parse, before Step 3d re
 
 **Citation paths.** A citation contributes a path only when it resolves to a file `git ls-files` tracks:
 - a repo-relative `path:line` resolves to its path, including a path deleted or renamed since the prior head (it counts as changed);
-- a bare basename resolves when exactly one file has it, at HEAD or deleted since the prior head. When several files have it, the engine does not guess which one the prior run meant. It asks only whether any of them changed since the prior head (added, modified, deleted or renamed). If one did, the citation resolves to every file that has the basename, and the criterion is re-judged, not carried on a guess. If none did, the citation does not resolve. That covers a file moved under its own name and a same-basename file added beside the cited one (QA cycles 2–6: CR2-3, CR3-1, CR4-1, CR6-1). This rule is for the prior record's citations only. A new member's evidence is cited by this run's agent against HEAD, so `merge` resolves its bare basename against HEAD alone, and an ambiguous one does not resolve (QA cycle 5, CR5-1);
+- a bare basename resolves when exactly one file has it, at HEAD or deleted since the prior head. When several files have it, the engine does not guess which one the prior run meant. It asks only whether any of them changed since the prior head (added, modified, deleted or renamed). If one did, the citation resolves to every file that has the basename, and the criterion is re-judged, not carried on a guess. If none did, the citation does not resolve. That covers a file moved under its own name and a same-basename file added beside the cited one (QA cycles 2–6: CR2-3, CR3-1, CR4-1, CR6-1). A deleted file is a candidate only for the prior record's citations. A new member's evidence is cited by this run's agent against HEAD, so `merge` takes its bare basename's candidates from HEAD alone (QA cycle 5, CR5-1). The ambiguity rule is the same one: if one of those candidates changed, the evidence counts as changed (QA cycle 7, QA7-1);
 - an abbreviated `:N-M`, a commit SHA, or an ambiguous basename none of whose files changed does not resolve.
 
 task.239's DoD runs cite all three unresolvable shapes. A PASS with no resolvable code, test or member-evidence path cannot be watched for change, so it is re-judged rather than carried.
@@ -373,18 +373,18 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.242.qa.6.scope-finalise-re-runs.md](./task.242.qa.6.scope-finalise-re-runs.md)
-- **Gate File**: [task.242.gate.6.scope-finalise-re-runs.yml](./task.242.gate.6.scope-finalise-re-runs.yml)
+- **Full Report**: [task.242.qa.7.scope-finalise-re-runs.md](./task.242.qa.7.scope-finalise-re-runs.md)
+- **Gate File**: [task.242.gate.7.scope-finalise-re-runs.yml](./task.242.gate.7.scope-finalise-re-runs.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 46
+- **Tests Executed**: 47
 - **Phases Verified**: 18/18
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-The cycle-5 fix is verified (its test goes red without it) and there is no high finding. One promoted medium remains:
-- CR6-1: a file added under a cited basename makes a bare prior-record citation resolve to nothing, so a criterion whose cited file changed is carried.
+The cycle-6 fix is verified (2 of 2 mutations covered) and there is no high finding. One medium remains:
+- QA7-1: on the merge side, a new member whose citation has several tokens, one an ambiguous bare basename with a changed candidate, reads as unchanged, so the agent's FAIL is overturned. Reproduced by execution.
 
 ## Change Log
 
@@ -406,6 +406,8 @@ The cycle-5 fix is verified (its test goes red without it) and there is no high 
 | 2026-10-29 |  | QA fix cycle 5. CR5-1: `merge` resolves a new member's evidence against HEAD alone; the gone-candidate rule stays with the prior record's citations. § 3 *Citation paths* restated. 1 test added, seen failing before the fix; mutations covered. Status → ready-for-review | qa-fix |
 | 2026-10-29 |  | QA gate CONCERNS (90/100). 1 finding: CR6-1 (medium, promoted). A file added under a cited basename makes a bare prior-record citation resolve to nothing, so a criterion whose cited file changed is carried. CR5-1 verified (covered) | qa-task |
 | 2026-10-29 |  | QA fix cycle 6. CR6-1 (scope the claim): a bare basename several files carry no longer names one. It resolves to every candidate when any of them changed since the prior head (added, modified or gone), else to nothing. This subsumes the CR4-1 gone-only rule. `merge` keeps the HEAD-alone rule (CR5-1). § 3 *Citation paths* restated. 1 test added, 1 extended, both seen failing first; 2 of 3 mutations covered, 1 absorbed. Status → ready-for-review | qa-fix |
+| 2026-10-29 |  | QA gate CONCERNS (90/100). 1 finding: QA7-1 (medium). On the merge side, a multi-token new-member citation with an ambiguous changed basename reads as unchanged, so the agent's FAIL is overturned. Reproduced by execution. CR6-1 verified (2 of 2 covered) | qa-task |
+| 2026-10-29 |  | QA fix cycle 7. QA7-1 (consolidate the contract): `merge` builds its index with `evidenceIndex(…, { goneCandidates: false })`. That keeps `changed`, so one ambiguity rule runs over HEAD's candidates, and the hand-built `changed: null` override is gone. § 3 *Citation paths* restated. 1 merge test added (candidate changed → FAIL stands; none changed → overturned), 1 extended, both seen failing first; 2 of 2 mutations covered. Status → ready-for-review | qa-fix |
 
 ---
 

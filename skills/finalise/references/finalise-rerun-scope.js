@@ -155,8 +155,9 @@ function resolveCitation(citation, tracked) {
     // it asks only whether any of them changed. If one did (added, modified or
     // gone — a gone path is always changed), it resolves to every candidate and
     // the criterion is re-judged; if none did, it resolves to nothing (QA
-    // cycles 4 and 6, CR4-1, CR6-1). An index with no `changed` set — merge's,
-    // for a current-run citation — never widens (CR5-1).
+    // cycles 4 and 6, CR4-1, CR6-1). merge's index applies the same rule over
+    // HEAD's candidates alone (CR5-1, QA7-1); an index with no `changed` set
+    // never widens.
     const hits = tracked.byBase.get(token) || [];
     const gone = (tracked.goneByBase && tracked.goneByBase.get(token)) || [];
     const candidates = [...hits, ...gone];
@@ -176,12 +177,19 @@ function resolveCitation(citation, tracked) {
 // bare basename ambiguous, and the move was carried (QA cycle 3, CR3-1);
 // kept apart, resolveCitation fails a shared basename toward re-judge (CR4-1).
 // `changed` rides along so an ambiguity a file added or modified since the
-// prior head introduced is seen too (CR6-1).
-function evidenceIndex(trackedPaths, changed) {
+// prior head introduced is seen too (CR6-1). `goneCandidates: false` is
+// merge's index for a current-run citation: a gone path cannot be what this
+// run's agent meant, so it is no basename candidate (CR5-1), and the
+// ambiguity rule runs over HEAD's candidates with `changed` kept (QA7-1).
+function evidenceIndex(trackedPaths, changed, { goneCandidates = true } = {}) {
   const head = trackedIndex(trackedPaths);
   const gone = [...changed].filter((p) => !head.paths.has(p));
   for (const p of gone) head.paths.add(p);
-  return { ...head, goneByBase: trackedIndex(gone).byBase, changed };
+  return {
+    ...head,
+    goneByBase: goneCandidates ? trackedIndex(gone).byBase : null,
+    changed,
+  };
 }
 
 function trackedIndex(paths) {
@@ -644,13 +652,12 @@ function merge(s, agentYaml, opts, io) {
   // A new member's evidence is this run's agent citing HEAD, so a gone path
   // cannot be what it meant: its bare basename resolves against HEAD alone.
   // The gone-candidate rule is for the prior record's citations, written
-  // before the deletion (QA cycle 5, CR5-1). The ambiguity rule is theirs too
-  // (CR6-1): with no `changed` set, an ambiguous basename stays unresolved.
-  const atHead = {
-    ...evidenceIndex(io.tracked(), changed),
-    goneByBase: null,
-    changed: null,
-  };
+  // before the deletion (QA cycle 5, CR5-1). The ambiguity rule is shared: a
+  // basename several HEAD files carry resolves to all of them when one
+  // changed, else to nothing (CR6-1, QA7-1).
+  const atHead = evidenceIndex(io.tracked(), changed, {
+    goneCandidates: false,
+  });
   const mio = { memberEvidence: (m) => memberEvidence(m, atHead, changed) };
 
   // Zero criteria: nothing to key on, so the agent's verdicts pass through.
