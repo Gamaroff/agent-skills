@@ -189,6 +189,17 @@ Take task 243, already implemented and reviewed outside the pipeline, through re
   - The procedure's "In the map" rule (`wireframe-component-mapping.md`) also gained the copy-as-written sentence.
 - New low, not fixed this cycle: a Wireloom line holding U+2028 yields no node at all, because `parseLine`'s `.*$` cannot cross it. It is older than this fix and is not a round-trip failure. Recorded for gate 13.
 
+### Step 5 — QA cycle 13 and the second grant
+
+- Gate 13 CONCERNS (90/100): bug.15 verified and closed; new medium CR13-1 (bug.16) and low CR13-2. The budget was spent at this gate, so the run escalated without running a fix no gate would read (Issues Log).
+- The user granted 2 cycles. `grant-qa-cycles.sh` gave `qa_max_cycles` 15, `convergence_from_cycle` 14 and `reenter_at=5a`. The lock was then set to 5b by hand: gate 13's queue had not been handed to `/qa-fix`, and re-entering at 5a would have re-reviewed unchanged code.
+- Step 1a ingester not dispatched: the gate was written this session and has two open entries (independence loss: none of note).
+- Fix (`/qa-fix` cycle 13), with the Step 2.6 move "consolidate": a signature now has one definition of what it means. `signatureKey` is the `parsePattern` result with flags de-duplicated and sorted and attributes sorted, and `record` finds the row to replace by it plus the label.
+  - The identity rule is probed in both directions: 5 must-merge and 4 must-differ pairs, drawn from the spellings the procedure allows.
+  - CR13-2: the round-trip test puts every value under one key and adds `1` and `100%`.
+  - Mutation-proven 3 of 3 (raw compare, unsorted flags, prefix-matching `score`).
+- Probe: `record` and replace-rule wording across the executed wireframe documents (`wireframe-component-mapping.md` and its copies, the engine header). None states how `record` picks the row to replace, so none changed. CR13-3 (the incomplete list of encoded characters) stays advisory.
+
 ---
 
 ## Issues Log
@@ -475,7 +486,7 @@ _Track each QA review/fix cycle._
 **MEDIUM findings**: 1
 **Loop exit**: none. The budget is spent at this gate. The classifier with `budgetSpent: true` returned `continue (last-cycle-not-a-fix)`.
 **PR Review**: not reached — gate did not exit the loop
-**Action**: Escalating — loop limit reached
+**Action**: Running qa-fix (cycle 13 of 15). The run escalated here (loop limit), then the user granted 2 cycles.
 
 ---
 

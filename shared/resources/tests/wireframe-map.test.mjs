@@ -469,11 +469,15 @@ test("record adds a row, then replaces it for the same signature and label", () 
 
 // Attribute values holding the signature's own separators, a table cell's, whitespace the reader
 // trims, or a non-ASCII character (gate 12, CR12-1: `value="1,500"` read back as `value: "1"`).
+// `1` and `100%` sit beside `1,500` and `100%25`: a reader that split on the comma, or a writer that
+// left `%` unencoded, would merge each pair (gate 13, CR13-2).
 const AWKWARD = [
   "1,500",
+  "1",
   "a}b",
   "72%",
   "100%25",
+  "100%",
   "a|b",
   "x`y",
   " pad ",
@@ -487,7 +491,8 @@ test("every node's signature reads back to the node, and record then resolve set
   const story = [
     "```wireloom",
     "window:",
-    ...AWKWARD.map((v, i) => `  input k${i}="${v}"`),
+    // One key for every value, so a row can only tell two nodes apart by the value itself.
+    ...AWKWARD.map((v) => `  input k="${v}"`),
     "```",
     "",
   ].join("\n");
@@ -500,25 +505,32 @@ test("every node's signature reads back to the node, and record then resolve set
     assert.equal(match([row], node), row, `self-match: ${node.signature}`);
     // and no other awkward value's node matches it: the encoding does not merge values
     for (const other of nodes)
-      if (other !== node) assert.equal(match([row], other), null);
+      if (other !== node)
+        assert.equal(
+          match([row], other),
+          null,
+          `${node.signature} matched ${other.signature}`,
+        );
   }
   const root = consumer({ files: { "docs/story.md": story } });
   try {
     ensure(root);
-    for (const node of nodes)
+    nodes.forEach((node, i) =>
       record(root, {
         signature: node.signature,
-        component: "Field",
+        component: `Field${i}`,
         by: "a developer",
         date: "2026-10-29",
-      });
+      }),
+    );
     const r = resolve(root, "docs/story.md");
-    for (const node of nodes)
+    nodes.forEach((node, i) =>
       assert.equal(
         r.resolved.find((n) => n.signature === node.signature)?.component,
-        "Field",
+        `Field${i}`,
         `resolved: ${node.signature}`,
-      );
+      ),
+    );
   } finally {
     cleanup(root);
   }
@@ -530,6 +542,50 @@ test("every node's signature reads back to the node, and record then resolve set
   assert.deepEqual(parsePattern("*>input{v=1%2C500}").attrs, { v: "1,500" });
   // An escape run that is not UTF-8 is kept as written rather than thrown on.
   assert.deepEqual(parsePattern("*>input{v=%E2%80}").attrs, { v: "%E2%80" });
+});
+
+// Gate 13, CR13-1: record replaces the row that means the same thing, however it is spelled, and
+// still adds a row for one that means something else.
+test("record replaces a row spelled differently that means the same, and only that", () => {
+  const cases = [
+    // [first, second, the second record's action]
+    ["window>input{v=é}", "window>input{v=%C3%A9}", "replaced"],
+    ["window>input{v=72%}", "window>input{v=72%25}", "replaced"],
+    ["*>input{v=x}", "input{v=x}", "replaced"],
+    ["input[a,b]", "input[b,a]", "replaced"],
+    ["input{a=1,b=2}", "input{b=2,a=1}", "replaced"],
+    ["window>input{v=1}", "window>input{v=1%2C500}", "added"],
+    ["window>input{v=100%}", "window>input{v=100%2525}", "added"],
+    ["window>input{v=x}", "input{v=x}", "added"],
+    ["input[a]", "input[a,b]", "added"],
+  ];
+  for (const [first, second, action] of cases) {
+    const root = consumer();
+    try {
+      ensure(root);
+      const opts = { by: "a developer", date: "2026-10-29" };
+      record(root, { ...opts, signature: first, component: "Old" });
+      const map = join(root, "docs/wireframe-map.md");
+      const before = readFileSync(map, "utf8");
+      const r = record(root, { ...opts, signature: second, component: "New" });
+      assert.equal(r.action, action, `${first} then ${second}`);
+      const after = readFileSync(map, "utf8");
+      assert.equal(
+        after.split("\n").length,
+        before.split("\n").length + (action === "added" ? 1 : 0),
+        `${first} then ${second}: row count`,
+      );
+      if (action === "replaced") {
+        assert.ok(!after.includes("| Old |"), `${first} then ${second}`);
+        assert.ok(after.includes(`\`${second}\``), `${first} then ${second}`);
+      } else {
+        assert.ok(after.includes(`\`${first}\``), `${first} then ${second}`);
+        assert.ok(after.includes("| Old |"), `${first} then ${second}`);
+      }
+    } finally {
+      cleanup(root);
+    }
+  }
 });
 
 test("record refuses a signature with a line break and leaves the map unchanged", () => {

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-243-BUG-16
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: New
+**Status**: Ready for QA
 **Found By**: QA Engineer
 **Date Found**: 2026-10-29
 
@@ -64,8 +64,44 @@ attributes), or by rewriting both sides to one canonical encoded form, plus the 
 that records over a hand-written row in the other encoding and expects `replaced`. Found by the
 gate 13 code review (CR-1).
 
+## Developer Fix Cycle
+
+### Iteration 1
+
+**Root Cause**: `record` used the signature text as the row's identity. That was right while the
+text was canonical. Cycle 12's lenient `decodeValue` made several spellings read as one value, and
+`record` was not told.
+
+**Fix**: `signatureKey(sig)` turns a signature into what it means: the `parsePattern` result, with
+flags de-duplicated and sorted and attributes sorted by key. `record` replaces the row whose key and
+label equal the new one's, and writes the new spelling in its place. Equivalent spellings it now
+merges: `v=é` and `v=%C3%A9`, `v=72%` and `v=72%25`, `*>input` and `input`, flags or attributes in
+another order. Spellings it still keeps apart: `v=1` and `v=1%2C500`, `v=100%` and `v=100%2525`,
+`window>input` and `input`, `[a]` and `[a,b]`.
+
+**Files Modified**:
+
+- `shared/resources/wireframe-map.js`: `signatureKey`; `record` finds the row to replace by it
+- `shared/resources/tests/wireframe-map.test.mjs`: new test "record replaces a row spelled
+  differently that means the same, and only that" (5 must-merge and 4 must-differ pairs, each
+  checking the action, the row count and which answer remains); the round-trip test now puts every
+  value under one key and adds `1` and `100%` beside `1,500` and `100%25` (CR13-2)
+- the eight `skills/*/references/wireframe-map.js` copies (re-bundled)
+
+**Testing**: suite 21/21. Mutation-proven 3 of 3, outcome `covered`:
+
+- raw-text compare restored → the new record test red;
+- flags left unsorted in the key → the new record test red;
+- `score` comparing attribute values by prefix → the round-trip test red. It does not red under the
+  old per-value keys, so this shows CR13-2's check can now fail.
+
+**Verification Steps for QA**: run the reproduction above with `record`. The second call reports
+`replaced`, the map holds one row, and it carries the newer answer.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
 | ---- | ------ | ---------- | ----- |
 | 2026-10-29 | New | qa-task | Found by task.243.qa.13.wireframe-component-mapping.md (CR-1) |
+| 2026-10-29 | In Progress | qa-fix | Investigation started (fix cycle 13) |
+| 2026-10-29 | Ready for QA | qa-fix | record matches rows by signatureKey plus label; mutation-proven 3 of 3 |

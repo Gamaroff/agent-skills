@@ -381,6 +381,19 @@ function parsePattern(sig) {
   };
 }
 
+// What a signature means, as one string: two signatures with the same key match the same nodes
+// (`v=é` and `v=%C3%A9`, `*>input` and `input`, flags in either order). null when it does not parse.
+function signatureKey(sig) {
+  const p = parsePattern(sig);
+  if (!p) return null;
+  return JSON.stringify([
+    p.parent,
+    p.primitive,
+    [...new Set(p.flags)].sort(),
+    Object.entries(p.attrs).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+  ]);
+}
+
 function labelMatches(pattern, label) {
   if (!pattern) return true;
   if (label === null) return false;
@@ -808,8 +821,12 @@ function record(root, opts) {
     })
     .join(" | ")} |`;
 
+  // The row to replace is the one that means the same thing, not the one spelled the same: a
+  // hand-written `v=72%` and the node's own `v=72%25` are one value, and a second row would lose
+  // the tie in match to the first.
+  const key = signatureKey(opts.signature);
   const same = map.rows.find(
-    (r) => r.signature === opts.signature && r.label === (opts.label || ""),
+    (r) => signatureKey(r.signature) === key && r.label === (opts.label || ""),
   );
   if (same) {
     lines[same.line - 1] = row;
