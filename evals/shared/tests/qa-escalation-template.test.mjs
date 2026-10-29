@@ -216,6 +216,23 @@ test("loop-limit escalation lists a file struck at the last two gates; the three
   }
 });
 
+// A stall grant re-enters at 5b, which compares N-2..N and nothing else: the row runs that one
+// block, so an escalation entry carries one comparison, not two (task.239 SC-7).
+test("stall escalation runs the three-gate block alone and lists its files as struck", () => {
+  const rules = loopDoc.slice(
+    loopDoc.indexOf(
+      "#### Filling the escalation entry — rules both templates share",
+    ),
+  );
+  const row = rules.split("\n").find((l) => /^\s*\| Convergence stall/.test(l));
+  assert.ok(row, "the filling rules have no Convergence stall row");
+  const cells = row.split(" | ").map((c) => c.trim());
+  // cells[0] is the text before the row's first pipe; cells[2] is "Re-enters at".
+  assert.equal(cells[2], "5b", "a stall grant re-enters at 5b");
+  assert.equal(cells[4], "that rule's three-gate `comm -12` block");
+  assert.equal(cells[5].replace(/\s*\|$/, ""), "struck");
+});
+
 // ── The window rule (obs #72) ───────────────────────────────────────────────
 /**
  * The Convergence check, as step 3 of the step-5-6 doc states it: count only readings from
