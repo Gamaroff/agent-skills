@@ -237,24 +237,24 @@ catalogue files stay as they are.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-29
-**Quality Score**: 70/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.243.qa.4.wireframe-component-mapping.md](./task.243.qa.4.wireframe-component-mapping.md)
-- **Gate File**: [task.243.gate.4.wireframe-component-mapping.yml](./task.243.gate.4.wireframe-component-mapping.yml)
+- **Full Report**: [task.243.qa.5.wireframe-component-mapping.md](./task.243.qa.5.wireframe-component-mapping.md)
+- **Gate File**: [task.243.gate.5.wireframe-component-mapping.yml](./task.243.gate.5.wireframe-component-mapping.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 32 (wireframe suites); 6834 in the cycle 3 fast gate
+- **Tests Executed**: 34 (wireframe suites); 6836 in the cycle 4 fast gate
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-The cycle 3 fixes hold, and `task.243.bug.7`–`9` are closed. Placing the writes in Step 1 opened
-three medium gaps. `ensure` lost the 0c-wire gate (bug.10). The writes run before the lock exists
-(bug.11). The key check deletes the held file on any failure (bug.12). There are also two low
-findings.
+The cycle 4 fixes hold, and `task.243.bug.10`–`12` are closed. One medium gap remains: a resume
+that the detector sends past Step 2 skips the wireframe writes (bug.13). One low finding remains: a
+held file with no document key is deleted rather than halted on. This is the fifth gate, so the QA
+loop budget is spent.
 
 ## Change Log
 
@@ -272,4 +272,5 @@ findings.
 | 2026-10-29 |  | QA findings fixed — cycle 3, 3 findings (bug.7–9 Ready for QA): wireframe writes at Step 1, gated on a document-keyed answers file | qa-fix |
 | 2026-10-29 |  | QA gate CONCERNS (70/100) — bug.7–9 verified and closed; 3 new medium findings in the Step 1 placement (bug.10–12), 2 low | qa-task |
 | 2026-10-29 |  | QA findings fixed — cycle 4, 5 findings (bug.10–12 Ready for QA, CR4-4, CR4-5): wireframe writes at the start of Step 2, behind the 0c-wire gate, with a jq key check that halts on an unreadable file | qa-fix |
+| 2026-10-29 |  | QA gate CONCERNS (90/100) — bug.10–12 verified and closed; 1 new medium finding (bug.13: a resume past Step 2 skips the wireframe writes), 1 low | qa-task |
 <!-- change-log-end -->

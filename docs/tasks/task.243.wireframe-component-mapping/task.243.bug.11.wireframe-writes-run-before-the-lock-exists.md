@@ -4,7 +4,7 @@
 **Bug ID**: TASK-243-BUG-11
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-10-29
 
@@ -51,3 +51,4 @@ absent from Step 1. Mutation-proven: putting the section back in Step 1 turns it
 | 2026-10-29 | New | QA Engineer | Found in QA cycle 4 (code review CR-2), confirmed against Step 1's section order |
 | 2026-10-29 | In Progress | qa-fix | Root cause identified |
 | 2026-10-29 | Ready for QA | qa-fix | Fix implemented with mutation-proven tests (qa-fix cycle 4) |
+| 2026-10-29 | Closed | QA Engineer | Verified in QA cycle 5: mutation-proven tests hold at 95e5168d |
