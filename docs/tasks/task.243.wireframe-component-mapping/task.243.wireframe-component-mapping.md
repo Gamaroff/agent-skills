@@ -220,18 +220,24 @@ catalogue files stay as they are.
   the next release.
 - **TASK-243-CR7-1** (LOW) — carried to gate 7 `recommendations.future` (route 2b, cycle 7). The
   no-jq test in `wireframe-mapping-hooks.test.mjs` should assert the jq-missing arm's own message,
-  so that it proves the PATH stripping reached that branch.
+  so that it proves the PATH stripping reached that branch. **Fixed after acceptance (2026-10-29):**
+  the test asserts `cannot be read (jq exit 127)`, which goes red with jq left on PATH.
 - **TASK-243-CR8-1** (LOW) — carried to gate 8 `recommendations.future` (cycle 8). The two
   `existsSync` assertions in the `resolve` unset test cannot fail, because `resolve` has no write
   path. Drop them or mark them documentary. (CR8-2, the "read-only" wording for `0c-wire`, was
-  fixed in this document at PR review 2.)
+  fixed in this document at PR review 2.) **Fixed after acceptance (2026-10-29):** dropped, with a
+  comment that SC-1's "writes nothing" is held by the `ensure` test.
 - **TASK-243-CR11-1** (LOW) — carried to gate 11 `recommendations.future` (cycle 11). `record`
   refuses an odd backtick in `--by` and `--date`, although `readMap` never reads the Confirmed cell,
   which is the last column by default. Check the two only when a column follows Confirmed, or keep
-  the refusal as a margin and say so in the code and test comments.
+  the refusal as a margin and say so in the code and test comments. **Fixed after acceptance
+  (2026-10-29):** the refusal is kept, because it is needed. `record` writes cells in the map's own
+  header order, so a hand-edited map can put Notes after Confirmed, and an odd backtick would swallow
+  it. The code comment says so, and a new test shows the hazard.
 - **TASK-243-CR11-2** (LOW) — carried to gate 11 `recommendations.future` (cycle 11). The comment
   at `wireframe-map.js:725` says `--by`/`--date` skip `unquote` because the Confirmed cell starts
-  with the date. The real reason is that `readMap` does not read that cell.
+  with the date. The real reason is that `readMap` does not read that cell. **Fixed after acceptance
+  (2026-10-29):** the code comment and the matching test comment now give that reason.
 - **TASK-243-CR12-2 to CR12-5** (LOW) — carried to gate 12 `recommendations.future`, still carried
   by gate 14. `readUiConfig` reads an unreadable config as a missing one (CR12-2); the candidate
   filter matches a component by substring, and a missing catalogue section disables it (CR12-3);
@@ -368,5 +374,6 @@ The gate-14 low findings stay in Deferred Work above.
 | 2026-10-29 |  | QA gate PASS (100/100) — 0 blocking, 2 advisory lows (TASK-243-CR14-1, CR14-2); bug.16 closed | qa-task |
 | 2026-10-29 | 1.3 | DoD passed — accepted (PR #785); DoD run 4, 7/7 criteria, probe 136/0/0 | finalise |
 | 2026-10-29 |  | Deferred Work: CR14-1 and CR14-2 fixed after acceptance (flags de-duplicated in parsePattern; label must-differ test) | Lorien Gamaroff |
+| 2026-10-29 |  | Deferred Work: CR7-1, CR8-1, CR11-1 and CR11-2 fixed after acceptance (test and comment cleanups) | Lorien Gamaroff |
 <!-- change-log-end -->
 

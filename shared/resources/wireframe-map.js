@@ -768,8 +768,10 @@ function record(root, opts) {
   //   - every other value must survive the reader itself: written as a cell with a cell after
   //     it, splitRow gives it back unchanged and the next cell is still there. An odd backtick
   //     count fails this, since splitRow stays in code mode and merges what follows. A cell of
-  //     its own also goes through readMap's unquote, which strips a whole-cell backtick pair;
-  //     --by and --date share the Confirmed cell, which starts with the date, so they do not.
+  //     its own also goes through readMap's unquote, which strips a whole-cell backtick pair.
+  //     --by and --date share the Confirmed cell, which readMap never reads, so it is not unquoted.
+  //     The two are still checked for a cell after them: the row follows the map's own header
+  //     order, so a hand-edited map can put a column after Confirmed.
   const ownCell = ["component", "variant", "hint", "notes"];
   const unquoted = [...ownCell, "by", "date"];
   for (const flag of ["label", ...unquoted])

@@ -187,9 +187,9 @@ test("resolve is a no-op without a ui: block or a wireframeMap", () => {
   for (const config of ["tracker: jira\n", noMapKey]) {
     const root = consumer({ config });
     try {
+      // No file assertions: resolve has no write path, so they could not fail (CR8-1). The
+      // "writes nothing" half of SC-1 is ensure's, held by the test above.
       assert.deepEqual(resolve(root, "docs/story.md"), { reason: "unset" });
-      assert.equal(existsSync(join(root, "docs/components.md")), false);
-      assert.equal(existsSync(join(root, "docs/wireframe-map.md")), false);
     } finally {
       cleanup(root);
     }
@@ -703,6 +703,31 @@ test("record refuses a signature with a line break and leaves the map unchanged"
   }
 });
 
+// Why --by and --date are checked although readMap never reads Confirmed (CR11-1): the row follows
+// the map's own header order, so a hand-edited map can put Notes after Confirmed, and an odd backtick
+// in Confirmed would swallow it.
+test("a column after Confirmed reads back, and an odd backtick in Confirmed would swallow it", () => {
+  const head =
+    "| Signature | Label | Component | Variant | Source hint | Confirmed | Notes |\n" +
+    "| --- | --- | --- | --- | --- | --- | --- |\n";
+  const root = consumer({ files: { "docs/wireframe-map.md": head } });
+  try {
+    record(root, {
+      signature: "*>chip",
+      component: "Chip",
+      notes: "keep",
+      by: "a developer",
+      date: "2026-10-29",
+    });
+    const text = readFileSync(join(root, "docs/wireframe-map.md"), "utf8");
+    assert.equal(readMap(text).rows[0].notes, "keep");
+    const odd = text.replace("a developer", "a `developer");
+    assert.notEqual(readMap(odd).rows[0].notes, "keep");
+  } finally {
+    cleanup(root);
+  }
+});
+
 test("record refuses a line break in any written field, and a backtick in a code cell", () => {
   const root = consumer();
   try {
@@ -786,7 +811,7 @@ test("record refuses a line break in any written field, and a backtick in a code
 
     // Not refused, and read back intact: a balanced backtick pair inside a cell, a pipe
     // anywhere, an escaped pipe the writer must not double-unescape, and a code span that
-    // closes the Confirmed cell (which starts with the date, so unquote leaves it alone).
+    // closes the Confirmed cell (which readMap never reads, so it is never unquoted).
     record(root, {
       ...base,
       signature: "*>tab",

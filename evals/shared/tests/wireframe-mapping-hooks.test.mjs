@@ -375,7 +375,9 @@ test("Step 3 halts, and keeps the file, when jq is missing", () => {
       env: { PATH: empty },
     });
     assert.notEqual(r.status, 0, r.stdout + r.stderr);
-    assert.match(r.stdout, /HALT/);
+    // The unreadable-file arm, reached because jq was not found (127). A bare /HALT/ also matches
+    // the "still holds this document's answers" arm, which a jq still on PATH would take (CR7-1).
+    assert.match(r.stdout, /HALT: .* cannot be read \(jq exit 127\)/);
     assert.ok(existsSync(join(dir, HELD)), "file deleted");
   } finally {
     rmSync(dir, { recursive: true, force: true });
