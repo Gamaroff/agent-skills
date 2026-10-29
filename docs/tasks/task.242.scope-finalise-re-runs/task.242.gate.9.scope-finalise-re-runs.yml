@@ -1,0 +1,59 @@
+schema: 2
+task: 'task.242.scope-finalise-re-runs'
+task_title: 'Scope finalise re-runs to the gaps and the changed evidence'
+gate: CONCERNS
+status_reason: 'The cycle-8 fix (QA8-1, replace the ambiguity rule) is verified: restoring the old rule turns 6 tests red, dropping gone candidates turns 3 red and ignoring goneCandidates turns 2 red. No high finding. The independent reviewer found one more gap in the same rule, at high confidence, promoted under code_review_blocking and reproduced by execution: a slash-less token that also names a file at the repository root returns at the exact-path check before the basename rule runs, so it resolves to the root file alone. This is true for a HEAD file (CR-1) and, in merge, for a gone file (CR-2).'
+reviewer: 'QA Engineer'
+head: '76e1a94c47bbd8bea61599d6a3c7dd5682d17a71'
+updated: '2026-10-29T10:32:22Z'
+
+top_issues:
+  - id: 'TASK-242-QA9-1'
+    severity: medium
+    file: 'shared/resources/finalise-rerun-scope.js'
+    finding: 'resolveCitation (finalise-rerun-scope.js:146) checks tracked.paths before the bare-basename rule, and a slash-less token equal to a repository-root path stops there. CR-1: with README.md and skills/f/README.md tracked and only the nested one changed, resolveCitation("README.md:12") returns ["README.md"], so the scope side carries a criterion whose cited file changed, and merge sends a new member to advisories instead of counting it. The same shape with no root file ("dup.js" over a/dup.js and b/dup.js, b changed) resolves to both. CR-2: evidenceIndex adds gone paths to paths even under goneCandidates: false, so in merge a bare "b.js:3" resolves to a deleted root b.js (changed, counted), while the same citation with old/b.js deleted resolves to lib/b.js (unchanged, advisory). Reproduced by execution with node -e against the engine. This repository tracks 40 README.md files including one at the root, plus package.json twice and skills-config.yaml three times. Source: code-review CR-1 and CR-2 (bug, medium, confidence high), promoted under code_review_blocking. They share one root cause.'
+    suggested_action: 'A slash-less token resolves through the basename maps only: byBase (which already holds root files) plus goneByBase when present, never through the exact-path check. Add identity-pair tests with a candidate at the repository root, on the scope side (carry vs re-judge) and the merge side (counted vs advisory), and the root-level gone case in the merge index assertions.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 49
+  phases_verified: 18/18
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false, as in cycles 1-8. A carry or count classifier over git state; it writes no disk path.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'QA9-1: a bare citation that also names a repository-root file resolves to that file alone, so a changed same-basename candidate elsewhere is not seen.'
+  maintainability:
+    status: PASS
+    notes: 'QA8-1 is covered by committed tests (three mutations covered). One rule now resolves every ambiguous basename; resolveCitation no longer reads changed.'
+
+recommendations:
+  immediate:
+    - action: 'Resolve a slash-less token through the basename maps only, and add root-candidate identity pairs on both sides (QA9-1)'
+      refs: ['shared/resources/finalise-rerun-scope.js']
+  future:
+    - action: 'Step 4b: no runnable prose changed this cycle.'
+      refs: ['skills/finalise/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: BLOCKED
+  conditions: ['QA9-1 fixed and re-reviewed']
