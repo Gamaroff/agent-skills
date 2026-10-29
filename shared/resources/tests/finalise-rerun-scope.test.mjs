@@ -443,8 +443,8 @@ test("scope: citations that resolve to no tracked path → evidence-unresolved; 
     );
     assert.equal(
       reasonOf(s, "SC-3"),
-      "evidence-unresolved",
-      "an ambiguous basename does not resolve",
+      "unchanged",
+      "an ambiguous basename resolves to every candidate, and none changed",
     );
   } finally {
     cleanup(dir);
@@ -467,7 +467,10 @@ test("resolveCitation: the shapes task.239's runs cited", () => {
   ]);
   assert.deepEqual(eng.resolveCitation(":410-412", t), []);
   assert.deepEqual(eng.resolveCitation("b324b496", t), []);
-  assert.deepEqual(eng.resolveCitation("dup.js:3", t), []);
+  assert.deepEqual(eng.resolveCitation("dup.js:3", t), [
+    "lib/x/dup.js",
+    "lib/y/dup.js",
+  ]);
   assert.deepEqual(eng.resolveCitation("lib/x/dup.js:3", t), ["lib/x/dup.js"]);
   assert.deepEqual(
     eng.resolveCitation("NOT_APPLICABLE: measured criterion", t),
@@ -1135,22 +1138,30 @@ test("merge: a new member's bare citation resolves at HEAD, whatever shares its 
   }
 });
 
-test("merge: a new member's bare citation ambiguous at HEAD counts when a candidate changed, beside an unchanged co-citation (QA7-1)", () => {
+test("merge: a new member's bare citation ambiguous at HEAD counts when a candidate changed, alone or beside an unchanged co-citation (QA7-1, QA8-1)", () => {
   // lib/z/a.test.mjs shares the basename G9 cites and is tracked at both
-  // heads. G9 also cites tests/b.test.mjs, which is unchanged, so the
-  // ambiguous token alone decides whether G9's evidence changed.
-  for (const [label, edit, want] of [
-    // tests/a.test.mjs modified: one candidate changed, so G9 is counted and
-    // the agent's FAIL stands.
-    ["candidate changed", { "tests/a.test.mjs": "modified\n" }, "FAIL"],
-    // Nothing either candidate names changed: G9 rests on unchanged evidence,
-    // goes to advisories, and the FAIL resting on it is overturned.
+  // heads. The ambiguous token alone decides whether G9's evidence changed,
+  // and the lone citation and the one beside unchanged tests/b.test.mjs must
+  // come out the same: an ambiguous basename with no changed candidate is
+  // unchanged evidence, not unresolved (QA8-1).
+  for (const [cite, edit, want, label] of [
+    "a.test.mjs:3",
+    "tests/b.test.mjs:1, a.test.mjs:3",
+  ].flatMap((c) =>
     [
-      "no candidate changed",
-      { "CHANGELOG.md": "## [Unreleased]\n- x\n" },
-      "PASS",
-    ],
-  ]) {
+      // tests/a.test.mjs modified: one candidate changed, so G9 is counted
+      // and the agent's FAIL stands.
+      ["candidate changed", { "tests/a.test.mjs": "modified\n" }, "FAIL"],
+      // Nothing either candidate names changed: G9 rests on unchanged
+      // evidence, goes to advisories, and the FAIL resting on it is
+      // overturned.
+      [
+        "no candidate changed",
+        { "CHANGELOG.md": "## [Unreleased]\n- x\n" },
+        "PASS",
+      ],
+    ].map(([l, e, w]) => [c, e, w, `${c} — ${l}`]),
+  )) {
     const dir = mkRepo({ "lib/z/a.test.mjs": "z\n" });
     try {
       const prior = record(dir, git(dir, "rev-parse", "HEAD"), {
@@ -1167,7 +1178,7 @@ test("merge: a new member's bare citation ambiguous at HEAD counts when a candid
       const s = scopeAt(dir, prior);
       const g9 = [
         '        - member: "G9"',
-        '          evidence: "tests/b.test.mjs:1, a.test.mjs:3"',
+        `          evidence: "${cite}"`,
         "          status: FAIL",
       ];
       const r = eng.merge(
@@ -1277,12 +1288,13 @@ test("evidenceIndex: a bare basename a gone path shares resolves to every candid
     "x/b.js",
     "y/b.js",
   ]);
-  // Control — nothing gone: HEAD's unique file resolves, HEAD's own ambiguity
-  // resolves to nothing, as before this task's cycles.
+  // Control — nothing gone: HEAD's unique file resolves, and HEAD's own
+  // ambiguity resolves to every candidate even when none changed (QA8-1), so
+  // the evidence reads unchanged rather than unresolved.
   assert.deepEqual(r("b.js:1", ["src/b.js", "src/a.js"], ["src/a.js"]), [
     "src/b.js",
   ]);
-  assert.deepEqual(r("b.js:1", ["x/b.js", "y/b.js"], []), []);
+  assert.deepEqual(r("b.js:1", ["x/b.js", "y/b.js"], []), ["x/b.js", "y/b.js"]);
   // Ambiguous at HEAD with a candidate changed — added or modified since the
   // prior head (CR6-1): every candidate, so the change is seen.
   assert.deepEqual(r("b.js:1", ["src/b.js", "lib/z/b.js"], ["lib/z/b.js"]), [
@@ -1293,9 +1305,9 @@ test("evidenceIndex: a bare basename a gone path shares resolves to every candid
     r("b.js:1", ["src/b.js", "lib/z/b.js"], ["src/b.js", "lib/z/b.js"]),
     ["lib/z/b.js", "src/b.js"],
   );
-  // merge's index (CR5-1, QA7-1): a current-run citation resolves at HEAD
-  // alone, so a gone path is not a candidate; the ambiguity rule is the same
-  // one, over HEAD's candidates.
+  // merge's index (CR5-1, QA7-1, QA8-1): a gone path is no basename candidate
+  // for a current-run citation; the ambiguity rule is the same one, over
+  // HEAD's candidates.
   const m = (cite, tracked, changed) =>
     eng
       .resolveCitation(
@@ -1308,7 +1320,10 @@ test("evidenceIndex: a bare basename a gone path shares resolves to every candid
     "lib/z/b.js",
     "src/b.js",
   ]);
-  assert.deepEqual(m("b.js:1", ["src/b.js", "lib/z/b.js"], ["src/a.js"]), []);
+  assert.deepEqual(m("b.js:1", ["src/b.js", "lib/z/b.js"], ["src/a.js"]), [
+    "lib/z/b.js",
+    "src/b.js",
+  ]);
   // A full path still resolves whether it is at HEAD or gone.
   assert.deepEqual(r("src/b.js:1", ["src/a.js"], ["src/b.js"]), ["src/b.js"]);
 });
@@ -1375,6 +1390,37 @@ test("scope: a bare citation made ambiguous by an added same-basename file re-ju
     assert.equal(reasonOf(scopeAt(dir, prior), "SC-2"), "unchanged");
   } finally {
     cleanup(dir);
+  }
+});
+
+test("scope: a lone ambiguous bare citation and the same token beside an unchanged path come out the same (QA8-1, CR-2)", () => {
+  // lib/x/dup.js and lib/y/dup.js both carry the cited basename at both heads.
+  const na = "NOT_APPLICABLE: documentation criterion";
+  for (const [label, edit, want] of [
+    [
+      "no candidate changed",
+      { "CHANGELOG.md": "## [Unreleased]\n- x\n" },
+      "unchanged",
+    ],
+    [
+      "a candidate changed",
+      { "lib/x/dup.js": "changed\n" },
+      "evidence-changed",
+    ],
+  ]) {
+    const dir = mkRepo();
+    try {
+      const prior = record(dir, git(dir, "rev-parse", "HEAD"), {
+        "SC-2": { code_citation: "dup.js:1", test_citation: na },
+        "SC-3": { code_citation: "dup.js:1 src/a.js:1", test_citation: na },
+      });
+      commit(dir, edit, label);
+      const s = scopeAt(dir, prior);
+      assert.equal(reasonOf(s, "SC-2"), want, `${label}: lone`);
+      assert.equal(reasonOf(s, "SC-3"), want, `${label}: beside src/a.js`);
+    } finally {
+      cleanup(dir);
+    }
   }
 });
 

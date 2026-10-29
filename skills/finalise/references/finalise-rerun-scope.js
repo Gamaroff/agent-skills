@@ -130,10 +130,9 @@ function isReopened(body) {
 /**
  * Resolve the paths a citation names. A token contributes a path only when it
  * resolves to a tracked file, or to one gone since the prior head: a
- * repo-relative path as written; a bare basename exactly one file carries (at
- * HEAD or gone); or, when several carry it and any of them changed, every file
- * that does. An abbreviated `:N-M`, a commit SHA, an ambiguous basename none
- * of whose candidates changed and `NOT_APPLICABLE: …` resolve to nothing.
+ * repo-relative path as written, or a bare basename, which resolves to every
+ * file that carries it (at HEAD or gone). An abbreviated `:N-M`, a commit SHA
+ * and `NOT_APPLICABLE: …` resolve to nothing.
  */
 function resolveCitation(citation, tracked) {
   if (citation === null || citation === undefined) return [];
@@ -150,20 +149,16 @@ function resolveCitation(citation, tracked) {
       continue;
     }
     if (token.includes("/")) continue;
-    // A bare basename one file carries resolves to it. One that several carry
-    // is ambiguous, and the engine does not guess which the prior run meant:
-    // it asks only whether any of them changed. If one did (added, modified or
-    // gone — a gone path is always changed), it resolves to every candidate and
-    // the criterion is re-judged; if none did, it resolves to nothing (QA
-    // cycles 4 and 6, CR4-1, CR6-1). merge's index applies the same rule over
-    // HEAD's candidates alone (CR5-1, QA7-1); an index with no `changed` set
-    // never widens.
-    const hits = tracked.byBase.get(token) || [];
-    const gone = (tracked.goneByBase && tracked.goneByBase.get(token)) || [];
-    const candidates = [...hits, ...gone];
-    if (candidates.length === 1) out.add(candidates[0]);
-    else if (tracked.changed && candidates.some((p) => tracked.changed.has(p)))
-      for (const p of candidates) out.add(p);
+    // A bare basename resolves to every file that carries it. The engine never
+    // guesses which one a citation meant: the evidence changed when any
+    // candidate changed (added, modified or gone — a gone path is always
+    // changed), and is unchanged when none did. An ambiguous basename is
+    // therefore never "unresolved", which a lone citation and the same token
+    // beside an unchanged path would read differently (QA cycles 4–8, CR4-1,
+    // CR6-1, QA7-1, QA8-1).
+    for (const p of tracked.byBase.get(token) || []) out.add(p);
+    for (const p of (tracked.goneByBase && tracked.goneByBase.get(token)) || [])
+      out.add(p);
   }
   return [...out];
 }
@@ -175,12 +170,11 @@ function resolveCitation(citation, tracked) {
 // cycle 2, CR2-3). The gone paths keep their own basename map: merged into
 // HEAD's, a file moved under the same name (src/b.js → lib/b.js) made its
 // bare basename ambiguous, and the move was carried (QA cycle 3, CR3-1);
-// kept apart, resolveCitation fails a shared basename toward re-judge (CR4-1).
-// `changed` rides along so an ambiguity a file added or modified since the
-// prior head introduced is seen too (CR6-1). `goneCandidates: false` is
-// merge's index for a current-run citation: a gone path cannot be what this
-// run's agent meant, so it is no basename candidate (CR5-1), and the
-// ambiguity rule runs over HEAD's candidates with `changed` kept (QA7-1).
+// kept apart, a shared basename resolves to both and fails toward re-judge
+// (CR4-1). `goneCandidates: false` is merge's index for a current-run
+// citation: a bare basename this run's agent wrote meant a file at HEAD, so a
+// gone path is no basename candidate (CR5-1). A gone path cited in full still
+// resolves, and reads as changed.
 function evidenceIndex(trackedPaths, changed, { goneCandidates = true } = {}) {
   const head = trackedIndex(trackedPaths);
   const gone = [...changed].filter((p) => !head.paths.has(p));
@@ -188,7 +182,6 @@ function evidenceIndex(trackedPaths, changed, { goneCandidates = true } = {}) {
   return {
     ...head,
     goneByBase: goneCandidates ? trackedIndex(gone).byBase : null,
-    changed,
   };
 }
 
@@ -649,12 +642,12 @@ function merge(s, agentYaml, opts, io) {
     (a) => a && typeof a === "object",
   );
   const changed = new Set(s.changed || []);
-  // A new member's evidence is this run's agent citing HEAD, so a gone path
-  // cannot be what it meant: its bare basename resolves against HEAD alone.
-  // The gone-candidate rule is for the prior record's citations, written
-  // before the deletion (QA cycle 5, CR5-1). The ambiguity rule is shared: a
-  // basename several HEAD files carry resolves to all of them when one
-  // changed, else to nothing (CR6-1, QA7-1).
+  // A new member's evidence is this run's agent citing HEAD, so its bare
+  // basename resolves against HEAD's files alone; the gone-candidate rule is
+  // for the prior record's citations, written before the deletion (QA cycle 5,
+  // CR5-1). A gone path cited in full still resolves, as changed. The
+  // ambiguity rule is shared: a basename several HEAD files carry resolves to
+  // all of them (QA7-1, QA8-1).
   const atHead = evidenceIndex(io.tracked(), changed, {
     goneCandidates: false,
   });
