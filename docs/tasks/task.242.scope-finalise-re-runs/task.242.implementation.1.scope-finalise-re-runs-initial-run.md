@@ -3,7 +3,7 @@
 **Task**: `task.242.scope-finalise-re-runs.md`
 **Run Number**: 1
 **Started**: 2026-10-29 06:45 UTC
-**Status**: Escalated
+**Status**: Completed
 
 ---
 
@@ -37,8 +37,8 @@ First pipeline run for task.242: give a `/finalise` re-run a fixed scope (persis
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; audit 18/18, `ready-for-review`; `ci:fast` 6765 pass / 0 fail (after a prettier fix) | `.summaries/step-3-loop-audit-1.json` | 2026-10-29T07:06Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #781: https://github.com/Gamaroff/agent-skills/pull/781 | —                    | 2026-10-29T07:08Z |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 10 gates (5 + 5 granted); gate 10 CONCERNS, QA10-1 accepted by the operator as a known limit; 5c APPROVE (`task.242.pr-review.1.scope-finalise-re-runs.md`) | `.summaries/step-5-traceability-mapper.json` | 2026-10-29T11:06Z |
-| 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 7. finalise                | ✅ Done    | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      | ACCEPTED — `task.242.dod.1.scope-finalise-re-runs.md`; 13/13, re-run scope full (no-prior-record); probe 17 executed, 0 reproduced | —                    | 2026-10-29T11:30Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Implementation report committed and pushed | —                    | 2026-10-29T11:31Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -152,6 +152,11 @@ Each mutation was applied with the Edit tool to the file named, the named test f
 - QA Cycle 9 (5b): narrowing residue again — every MEDIUM on gates 7–9 names shared/resources/finalise-rerun-scope.js. Move: **finish the replace** the operator chose at cycle 8, not a new patch. QA9-1 is the one place the cycle-8 rule does not run: the exact-path check answers a slash-less token before the basename maps. The fix sends every slash-less token through the basename maps only. Decided by the orchestrator under the cycle-8 approval; reported to the operator.
 - QA Cycle 10: the traceability mapper ran (13 criteria; SC-11 and SC-13 partial, SC-12 integration). Gate 10 CONCERNS, HIGH 0. Convergence: two readings (0, 0) since the grant, no trip. Route: `continue (not-a-pass-gate)`, but the budget (10) is spent at this gate. No qa-fix after gate 10: a fix would have no gate to read it (operator rule, 2026-10-29). Escalated at the gate.
 - Re-entry after the cycle-10 escalation: the operator chose option 2 ("go ahead" on the recommendation to accept QA10-1 as a known limit). Lock restored with `advance-pipeline-lock.sh --restore` (step 5). § 3 *Citation paths* now records the limit; gate 10 is left as QA wrote it (CONCERNS, QA10-1 open), and `/finalise` judges a CONCERNS gate on its evidence. Next: 5c `/review-pr --effort medium --comment --no-code`, then Step 7.
+- 5c: `/review-pr` APPROVE (2 low conformance findings, both doc-only, fixed in the task document and committed at `ba663028`). Lock advanced to 7.
+- Step 7 `/finalise`: ACCEPTED. Re-run scope `full (no-prior-record)`: 13 re-judged, 0 carried. This run wrote the task's first AC record, `task.242.dod.1.ac.json`. Gate 10 CONCERNS judged non-blocking: QA10-1 was accepted as a recorded limit, which is the gate's own stated condition. The security agent set `boundary: true` (QA gates said `false`). Its 2-entry plan ran from /finalise: 17 executed, 0 reproduced, 0 escapes, 0 refusals. Compliance not applicable; docs PASS.
+- CI reading 1: SUCCESS @ `ba663028b020` (6 checks); CI reading 2: SUCCESS @ `ad2652599463` (6 checks, after 60s). The acceptance commit is `ad265259`.
+- Registry: `registry-tick.js` → `ticked` (planned → accepted). The registry file also held task 243's uncommitted row and counter (another session). Only the task-242 tick was staged, through the index; task 243's edits are left in the working tree, untouched.
+- Outward side-effects (after the publish boundary): canonical PR comment posted; issue #780 comment `posted`, issue closed (state CLOSED); board `done` → `already`; Document link already pointed at a durable branch (no edit).
 
 ---
 
@@ -415,10 +420,12 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-10-29 11:31 UTC
+**Final Status**: Completed
 **Branch**: feature/task.242.scope-finalise-re-runs
 **PR**: https://github.com/Gamaroff/agent-skills/pull/781
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 10 (5 + 5 granted)
+**DoD Summary**: task.242.dod.1.scope-finalise-re-runs.md — ACCEPTED
+**Tracker debt**: none
+
+**Completion Summary**: Implemented `finalise-rerun-scope.js` (`scope` before the AC agent, `merge` after it), the per-run AC record, the AC prompt's Step 0, and the `/finalise` Step 3a/3c wiring with its DoD block lines and bug-mode skip. The QA loop took 10 gates. From cycle 3 on, every gate found a new edge in how a citation token resolves. Cycle 8 replaced the basename rule on the operator's choice (a bare basename resolves to every candidate, always). Gate 10's last finding, unnormalised path tokens (QA10-1), was accepted as a known limit rather than fixed. The PR review approved, and `/finalise` accepted on a full first run: 13/13 criteria, boundary probed, CI green on both readings.
