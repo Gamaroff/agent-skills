@@ -151,6 +151,7 @@ Each mutation was applied with the Edit tool to the file named, the named test f
 - QA Cycle 9: the traceability mapper ran (13 criteria; SC-11 and SC-13 partial, SC-12 integration). Gate 9 CONCERNS, HIGH 0. Convergence: window starts at cycle 9, one reading, no trip. Route: `continue (not-a-pass-gate)`. Budget: gate 9 of 10, so a cycle-9 fix still has a gate (cycle 10) to read it. The step-3b dirty-tree guard again saw only task 243's `docs/tasks/task-registry.md` (observation #126); review went ahead. `ci:fast` had 1 failure: this cycle's own gate draft, read while its `updated:` held a placeholder; stamped, `gate-head-freshness.test.mjs` passes 10/10.
 - QA Cycle 9 (5b): narrowing residue again — every MEDIUM on gates 7–9 names shared/resources/finalise-rerun-scope.js. Move: **finish the replace** the operator chose at cycle 8, not a new patch. QA9-1 is the one place the cycle-8 rule does not run: the exact-path check answers a slash-less token before the basename maps. The fix sends every slash-less token through the basename maps only. Decided by the orchestrator under the cycle-8 approval; reported to the operator.
 - QA Cycle 10: the traceability mapper ran (13 criteria; SC-11 and SC-13 partial, SC-12 integration). Gate 10 CONCERNS, HIGH 0. Convergence: two readings (0, 0) since the grant, no trip. Route: `continue (not-a-pass-gate)`, but the budget (10) is spent at this gate. No qa-fix after gate 10: a fix would have no gate to read it (operator rule, 2026-10-29). Escalated at the gate.
+- Re-entry after the cycle-10 escalation: the operator chose option 2 ("go ahead" on the recommendation to accept QA10-1 as a known limit). Lock restored with `advance-pipeline-lock.sh --restore` (step 5). § 3 *Citation paths* now records the limit; gate 10 is left as QA wrote it (CONCERNS, QA10-1 open), and `/finalise` judges a CONCERNS gate on its evidence. Next: 5c `/review-pr --effort medium --comment --no-code`, then Step 7.
 
 ---
 
@@ -403,9 +404,9 @@ _Track each QA review/fix cycle._
 **Issues Found**: 1. QA10-1 (medium, confidence high, promoted): a token with a slash is matched exactly, with no normalisation, so `./src/a.js:5`, `/src/a.js:5`, `src\a.js:5`, `src/a.js#L5` and `./README.md` resolve to nothing while `src/a.js:5` resolves. Reproduced with `node -e`. No committed `*.ac.json` record uses these shapes. Advisory: CR-2 (cleanup, a test comment names the wrong fixture file). QA9-1 verified: 2 of 2 mutations covered. Reviewer: dispatched 10:43:07Z, returned in 121.5 s.
 **HIGH findings**: 0
 **MEDIUM findings**: 1
-**PR Review**: not reached — gate did not exit the loop
-**Loop exit**: n/a — this exit not taken
-**Action**: Escalating — loop limit reached
+**PR Review**: pending — 5c not yet run
+**Loop exit**: operator acceptance (halt option 2) — QA10-1 recorded as a known limit in task § 3
+**Action**: Escalating — loop limit reached. Then, on the operator's decision (halt option 2, accept the current gate status): Proceeding to 5c (PR review)
 **Fixes Applied**: none. The budget (10) is spent at this gate, and a fix with no gate to read it is not run (operator rule, 2026-10-29).
 **Commit**: the gate and QA report ride the escalation commit.
 **Post-fix PR state**: OPEN at `1ee28b5b`.
