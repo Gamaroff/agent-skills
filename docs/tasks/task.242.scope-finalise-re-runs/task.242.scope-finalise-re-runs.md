@@ -103,7 +103,7 @@ Step 3c aggregation (existing, extended: after the YAML parse, before Step 3d re
 
 task.239's DoD runs cite all three unresolvable shapes. A PASS with no resolvable code, test or member-evidence path cannot be watched for change, so it is re-judged rather than carried.
 
-**When the scope is `full`** (the engine's reason in brackets): no prior record (`no-prior-record`), a record it cannot read or whose schema it does not know (`prior-unreadable`), a reopened document under the Step 2 rule (`reopened`), or a prior head that is not an ancestor of HEAD (`head-not-ancestor`, a rebase or force-push). Every doubt fails toward a full run, which is today's behaviour.
+**When the scope is `full`** (the engine's reason in brackets): no prior record (`no-prior-record`), a record it cannot read or whose schema it does not know (`prior-unreadable`), a reopened document under the Step 2 rule (`reopened`), a prior head that is not an ancestor of HEAD (`head-not-ancestor`, a rebase or force-push), or a document with no criterion line the engine can key (`no-criteria`, added during implementation). Every doubt fails toward a full run, which is today's behaviour.
 
 **When the scope is `scoped`,** each criterion gets one of these outcomes:
 
@@ -226,7 +226,7 @@ The `reported-gap` row is what would have stopped task.239. Run 4 named SC-11's 
 ### Files to Modify (Tests)
 
 7. ✅ `evals/shared/tests/finalise-dod-prompt-contract.test.mjs` — the AC prompt carries the scope section, the Step 3 heading is unchanged, and `<RERUN_SCOPE>` is in the dispatch table
-8. ✅ `evals/shared/tests/finalise-bug-mode.test.mjs` — no edit expected. It derives the keys from the table, so the new row is checked automatically (confirm it goes red without the marker).
+8. ✅ `evals/shared/tests/finalise-bug-mode.test.mjs` — the new row's key is derived from the table, but its verb is pinned: an `EXPECTED_VERBS` entry `rerun-scope: skip`, so the test goes red without the marker. QA cycle 1 added two tests for the 7.6a/7.6b AC-record staging (CR-5, CR-7).
 9. ✅ Must stay green, no edit expected: `tests/explore-prompts-no-write.test.js`, `tests/review-task-measured-criterion.test.js` and `tests/review-plan-shape-checks.test.js`. Each reads the AC prompt (§ 3, *Other readers*).
 
 ### Files to Modify (Documentation)
@@ -289,7 +289,7 @@ Not applicable. The engine reads one JSON record and runs one `git diff --name-o
 
 ### Functional
 
-- [ ] SC-1: `scope` returns `full` with reasons `no-prior-record`, `prior-unreadable`, `reopened` and `head-not-ancestor`, each pinned by a test on the temp-repo fixture
+- [ ] SC-1: `scope` returns `full` with reasons `no-prior-record`, `prior-unreadable`, `reopened` and `head-not-ancestor`, each pinned by a test on the temp-repo fixture (a fifth, `no-criteria`, was added during implementation and is pinned too)
 - [ ] SC-2: `scope` assigns `new-criterion`, `criterion-changed`, `reported-gap`, `evidence-changed`, `evidence-unresolved` and `unchanged` per § 3's table, each pinned by a test. Criteria in an id-less document get `#N` ids and match by text hash, pinned on a story fixture and a task fixture.
 - [ ] SC-3: The task.239 replay fixture scopes SC-11 to `reported-gap`. The members the prior run mapped are carried; the ones it named unmapped are re-judged. Every untouched PASS is `unchanged`. Through `merge`, an agent FAIL that rests only on a carried member and a new unchanged member yields SC-11 PASS, with the new member in `advisories[]`.
 - [ ] SC-4: `merge` keeps a carried criterion's prior status and citations whatever the agent returned, and moves a differing agent verdict into `advisories[]`. Pinned by tests for "agent returns FAIL" and "agent omits it".
@@ -415,6 +415,7 @@ The cycle-9 fix is verified (2 of 2 mutations covered) and there is no high find
 | 2026-10-29 |  | QA fix cycle 9. QA9-1 (finishing the cycle-8 replace): a token without a slash always goes through the basename rule, so a name a root file shares resolves to every candidate, and merge's index no longer matches a deleted root file. § 3 *Citation paths* restated. 3 tests added, all seen failing first; 2 of 2 mutations covered. Status → ready-for-review | qa-fix |
 | 2026-10-29 |  | QA gate CONCERNS (90/100). 1 finding: QA10-1 (medium, promoted). A path citation written with `./`, a leading `/`, backslashes or a `#L` anchor is matched exactly and resolves to nothing, while the plain form resolves. Reproduced by execution. QA9-1 verified (2 of 2 covered). The granted budget (10) is spent at this gate | qa-task |
 | 2026-10-29 |  | Operator accepted gate 10 as it stands: QA10-1 recorded as a known limit in § 3 *Citation paths*, not fixed. The run proceeds to the PR review and `/finalise` | develop-task |
+| 2026-10-29 |  | PR review 1: APPROVE, 2 low conformance findings fixed in place. § 3 and SC-1 now name the fifth `full` reason, `no-criteria` (PC-1); § 7 file 8 says what the PR changed in `finalise-bug-mode.test.mjs` (PC-2) | review-pr |
 
 ---
 

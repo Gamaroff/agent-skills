@@ -36,7 +36,7 @@ First pipeline run for task.242: give a `/finalise` re-run a fixed scope (persis
 | 2. review-task             | ✅ Done    | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               | Skipped — already reviewed (`task.242.review.1.scope-finalise-re-runs.md`) | —                    | 2026-10-29T06:46Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; audit 18/18, `ready-for-review`; `ci:fast` 6765 pass / 0 fail (after a prettier fix) | `.summaries/step-3-loop-audit-1.json` | 2026-10-29T07:06Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #781: https://github.com/Gamaroff/agent-skills/pull/781 | —                    | 2026-10-29T07:08Z |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | `.summaries/step-5-traceability-mapper.json` |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 10 gates (5 + 5 granted); gate 10 CONCERNS, QA10-1 accepted by the operator as a known limit; 5c APPROVE (`task.242.pr-review.1.scope-finalise-re-runs.md`) | `.summaries/step-5-traceability-mapper.json` | 2026-10-29T11:06Z |
 | 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
@@ -404,7 +404,7 @@ _Track each QA review/fix cycle._
 **Issues Found**: 1. QA10-1 (medium, confidence high, promoted): a token with a slash is matched exactly, with no normalisation, so `./src/a.js:5`, `/src/a.js:5`, `src\a.js:5`, `src/a.js#L5` and `./README.md` resolve to nothing while `src/a.js:5` resolves. Reproduced with `node -e`. No committed `*.ac.json` record uses these shapes. Advisory: CR-2 (cleanup, a test comment names the wrong fixture file). QA9-1 verified: 2 of 2 mutations covered. Reviewer: dispatched 10:43:07Z, returned in 121.5 s.
 **HIGH findings**: 0
 **MEDIUM findings**: 1
-**PR Review**: pending — 5c not yet run
+**PR Review**: APPROVE — task.242.pr-review.1.scope-finalise-re-runs.md (conformance lens only, `--no-code`; 2 low findings, PC-1 and PC-2, doc-only, fixed in the task document)
 **Loop exit**: operator acceptance (halt option 2) — QA10-1 recorded as a known limit in task § 3
 **Action**: Escalating — loop limit reached. Then, on the operator's decision (halt option 2, accept the current gate status): Proceeding to 5c (PR review)
 **Fixes Applied**: none. The budget (10) is spent at this gate, and a fix with no gate to read it is not run (operator rule, 2026-10-29).
