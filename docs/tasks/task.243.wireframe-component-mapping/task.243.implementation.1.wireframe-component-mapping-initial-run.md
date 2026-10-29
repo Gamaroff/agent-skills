@@ -319,6 +319,32 @@ _Track each QA review/fix cycle._
 **Loop exit**: The route classifier returned the Cosmetic-residue exit (2b) for TASK-243-CR9-1. The user chose to fix it instead ("Fix now, cycle 10"): CR9-1 is the same class as the DoD run 2 gap, and 2b would have deferred the rest of that class to `/finalise`. CR9-2 rides the same fix.
 **PR Review**: not reached — gate did not exit the loop
 **Action**: Running qa-fix (cycle 9 of 10)
+**Fix**: `b1464d42`. `record` refuses `\r`/`\n` in every written field and a backtick in `--signature`/`--label`. Both guards are mutation-proven, the fast gate passes (6842 tests, 0 failed), and `bundle:check` is clean. Deviation: the fix commit also carried this report's cycle 9 entry, which 5b step 1 keeps out of a `fix(...)` commit.
+
+### QA Cycle 10 — 2026-10-29
+**Gate Result**: CONCERNS (90/100). This is the last cycle in the budget (`qa_max_cycles` 10).
+**Issues Found**:
+- The cycle 9 fix is verified: both guards are mutation-proven (outcome: covered).
+- The `record` cli probe ran 66 cases: 5 reproduced, 0 escaped.
+- 1 medium finding, CR10-1 (promoted, high confidence, reproduced): an odd backtick in an unquoted cell (`--component`, `--variant`, `--hint`, `--notes`, `--by`) still collapses the row. All 5 reproduced probe cases are this finding.
+- 1 low cleanup, CR10-2: the "not refused" test case covers a balanced backtick pair only.
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: none. With the budget spent, the route classifier said route 2c would decline after this fix (`medium-not-falling`), which would hand over a fix no gate had read. The user granted 2 cycles ("Grant 2 cycles, fix"). `grant-qa-cycles.sh` set `qa_max_cycles` to 12 and `convergence_from_cycle` to 11. Its re-entry point was 5a, so `set-qa-phase.sh 5b` followed: this gate's queue goes to `/qa-fix` first.
+**Action**: Running qa-fix (cycle 10 of 12)
+**Fix**: `97035bae`. Step 2.6 consolidate move: `record` round-trips each unquoted value through `splitRow` (plus `unquote` for a cell of its own) before any read or write, and refuses the value, naming the flag, when it does not come back intact. It closes CR10-1 and CR10-2. The read-back test also found that a whole-cell code span lost its backticks to `unquote`, and that is now refused. Both arms are mutation-proven. The gate 10 probe cases re-ran 50/0/0, the fast gate passes (6842 tests, 0 failed) and `bundle:check` is clean.
+
+### QA Cycle 11 — 2026-10-29
+**Gate Result**: PASS (100/100). Cycle 11 of 12; this gate reads the cycle 10 fix.
+**Issues Found**:
+- The cycle 10 fix is verified: both arms of the round-trip check are mutation-proven at QA (outcome: covered). CR10-1 and CR10-2 are fixed.
+- The `record` cli probe ran 79 cases: 0 reproduced, 0 escaped. The same odd-backtick cases reproduced 5 times at gate 10.
+- 2 low findings, neither promoted. CR11-1 (bug, medium confidence): the `--by`/`--date` refusal is stricter than the default column order needs. CR11-2 (cleanup): the comment at `wireframe-map.js:725` gives the wrong reason. Both are routed to `recommendations.future`.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**Loop exit**: route 1, a clean gate. The classifier returned `continue (no-open-residue)`: the gate has no open entry, so this is route 1's clean exit, not a residue route.
+**Action**: Proceeding to 5c (PR conformance review)
 
 ---
 
