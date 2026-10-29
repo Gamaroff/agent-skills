@@ -323,6 +323,10 @@ function readMap(text) {
 }
 
 function parsePattern(sig) {
+  // A signature is one table cell on one line. `record` writes it untrimmed, and the
+  // flag and attribute lists below would match across a line break, so a newline
+  // anywhere would split the map row and end the table early.
+  if (/[\r\n]/.test(sig)) return null;
   const m = /^(?:([\w*-]+)>)?([\w-]+)(?:\[([^\]]*)\])?(?:\{([^}]*)\})?$/.exec(
     sig.trim(),
   );

@@ -459,6 +459,43 @@ test("record adds a row, then replaces it for the same signature and label", () 
   }
 });
 
+test("record refuses a signature with a line break and leaves the map unchanged", () => {
+  const root = consumer();
+  try {
+    ensure(root);
+    record(root, {
+      signature: "*>chip",
+      component: "Chip",
+      by: "a developer",
+      date: "2026-10-29",
+    });
+    const map = join(root, "docs/wireframe-map.md");
+    const before = readFileSync(map, "utf8");
+    for (const signature of [
+      "*>button[primary\n| `*>input` | | Evil |]",
+      "*>icon{name=a\nb}",
+      "button\n",
+      "\nbutton",
+      "button\r\n",
+    ]) {
+      assert.throws(
+        () =>
+          record(root, {
+            signature,
+            component: "X",
+            by: "a developer",
+            date: "2026-10-29",
+          }),
+        /--signature is not a signature/,
+        JSON.stringify(signature),
+      );
+    }
+    assert.equal(readFileSync(map, "utf8"), before);
+  } finally {
+    cleanup(root);
+  }
+});
+
 test("CLI: usage errors exit 2, an unknown flag is refused, a missing work item exits 1", () => {
   const root = consumer();
   try {
