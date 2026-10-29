@@ -17,6 +17,7 @@ The rows below apply to both `develop-story` and `develop-task`. Where the two s
 |-----------|---------|
 | Feature branch base | Resolved in Upfront Setup (Q1): `--base`, else the persisted answer, else the Recommended option under `--defaults`, else asked |
 | PR target branch | Resolved in Upfront Setup (Q2), the same way with `--target` |
+| Wireframe node with no confirmed component (Phase 0c-wire) | Asked in Upfront Setup. Under `--defaults`: take the Recommended proposal, log `Wireframe mapping assumed: …` in the Decisions Log under a `### Wireframe mapping assumptions` heading, and do **not** write it to `ui.wireframeMap` — an assumption is not a confirmation. QA checks each one |
 | Speed mode and skips | Resolved in Upfront Setup from `--mode` / `--skip` within `develop.defaultMode` / `develop.skippable` — never asked; a refused flag is logged with its reason and the run continues without it |
 | High-risk gate (story / task) | User-selected in Upfront Setup (Q3) |
 | Story status is `Draft` / Task status is `Planned` | Step 2 runs the review skill (`/review-story` or `/review-task`) to validate and promote autonomously. Do NOT ask the user. |

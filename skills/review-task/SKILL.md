@@ -1343,6 +1343,22 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 
 ---
 
+### Step 6.6: Wireframe Component Links (conditional)
+
+**When**: the task embeds a ` ```wireloom ` block **and** `skills-config.yaml` sets `ui.wireframeMap`. Otherwise skip silently.
+
+Run `wireframe-map.js resolve` (`references/wireframe-map.js`) on the task, as `references/wireframe-component-mapping.md` describes, and compare its `unresolved[]` with the component table under the task's wireframe:
+
+- a node that neither the map nor the table settles → **Important**: `develop-task` would have to ask about it, or assume;
+- a table row whose component the catalogue (`ui.componentCatalogue`) does not list → **Important**, unless the row says the component is new;
+- a wireframe that differs from the screen's own wireframe document (made from its design source) → **Important**: copy the published blocks.
+
+Interactive mode asks about the open nodes, as the mapping procedure's step 5 sets out, and records each answer in the table and the map. Validate mode records them. Inside `develop-task` the review is Step 2: Phase 0 has already asked about the open nodes, and Step 2 writes the answers into the table before this review runs, so a node still open here was not answered.
+
+**Output**: append to the Important bucket used by Steps 6, 7.
+
+---
+
 ### Step 7: Risk Assessment and Rollback Review
 
 **Purpose**: Evaluate risk identification and mitigation planning

@@ -1,0 +1,76 @@
+schema: 2
+task: 'task.243.wireframe-component-mapping'
+task_title: "Link Wireloom wireframe nodes to the project's UI components, and ask when unsure"
+gate: CONCERNS
+status_reason: 'All five cycle 4 findings are fixed and mutation-proven, but removing the Step 3 backstop leaves a resume that the detector sends past Step 2 without the wireframe writes; one low finding on a held file with no document key.'
+reviewer: 'QA Engineer'
+head: '95e5168d3afb4857cf0b481571185536355f2d6d'
+updated: '2026-10-29T15:29:18Z'
+
+top_issues:
+  - id: 'TASK-243-CR5-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-3-develop-loop.md'
+    finding: 'With the Step 3 backstop removed, a resume the detector recommends at Step 3 (it reads the lock''s current_step 2 as finished) skips Step 2 § Wireframe writes, and Step 3 builds from a table the held answers never reached.'
+    suggested_action: 'Restore a one-line Step 3 guard: if the held file exists, run Step 2 § Wireframe writes first.'
+    suggested_owner: dev
+    bug_ref: 'task.243.bug.13.resume-past-step-2-skips-the-wireframe-writes.md'
+    status: open
+  - id: 'TASK-243-CR5-2'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-2-review.md'
+    finding: 'A held file with a missing or null document key exits 1 (reproduced: {"answers":[1]} -> 1), the same as another document, so it is deleted rather than HALTed on.'
+    suggested_action: 'Make a non-string .document an error inside the jq filter, so it HALTs.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90 # 100 - 10 x 1 medium finding
+
+evidence:
+  tests_reviewed: 34
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false; unchanged from gate 4.'
+  performance:
+    status: PASS
+    notes: 'No change to the engine.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR5-1: a resume past Step 2 drops the held answers.'
+  maintainability:
+    status: PASS
+    notes: 'Every changed block is executed by a test.'
+
+recommendations:
+  immediate:
+    - action: 'Restore the one-line Step 3 guard (bug.13) and make a non-string document key HALT (CR5-2).'
+      refs: ['shared/resources/develop-pipeline-step-3-develop-loop.md', 'shared/resources/develop-pipeline-step-2-review.md']
+  future:
+    - action: 'The resume detector reads the lock''s current_step as the finished step (min(LOCK_STEP + 1, 8)) while Step 1 writes it as the pending one; worth its own task.'
+      refs: ['shared/resources/pipeline-resume-detector-prompt.md', 'shared/resources/develop-pipeline-step-1-create-branch.md']
+    - action: 'CR2-2 (gate 2), CR-6, CR-8, CR-9 (gate 1).'
+      refs: ['shared/resources/wireframe-map.js']
+
+bug_resolution:
+  bugs_fixed: 12
+  bugs_remaining: 1
+  fix_date: '2026-10-29'
+  total_iterations: 4
+  verification_method: 'bug.10-12: seven mutation proofs covered; fast gate 6836/0'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['CR5-1 fixed and re-gated']

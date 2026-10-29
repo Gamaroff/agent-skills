@@ -1,0 +1,77 @@
+schema: 2
+task: 'task.243.wireframe-component-mapping'
+task_title: "Link Wireloom wireframe nodes to the project's UI components, and ask when unsure"
+gate: CONCERNS
+status_reason: 'The cycle 9 fix holds: record refuses a line break in every written field and a backtick in the two backtick-wrapped cells; both guards are mutation-proven. The reviewer found the same class one step over (CR10-1, medium, high confidence, reproduced): an odd backtick in an unquoted cell (--component, --variant, --hint, --notes, --by) still collapses the row. The probe measured it: 66 executed, 5 reproduced, all CR10-1, 0 escaped.'
+reviewer: 'QA Engineer'
+head: 'b1464d42c3a2c447cf7dc26bab7102722c948311'
+updated: '2026-10-29T16:56:46Z'
+
+top_issues:
+  - id: 'TASK-243-CR10-1'
+    severity: medium
+    file: 'shared/resources/wireframe-map.js'
+    finding: 'The backtick guard in record (wireframe-map.js:731) covers only --signature and --label, but an odd backtick count in any unquoted cell (--component, --variant, --hint, --notes, --by) also leaves splitRow in code mode, so readMap merges the rest of the row into that cell. Reproduced: --notes "see `Tabs" reads back as notes "see `Tabs | 2026-10-29, t" with the Confirmed cell lost; the qa.10 probe reproduced it for all five unquoted flags.'
+    suggested_action: 'Refuse an odd backtick count in every written cell (or escape backticks in cell() and teach splitRow the escape), correct the comment above the guard, and extend the refusal test to each unquoted flag.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90 # one medium finding
+
+evidence:
+  tests_reviewed: 40
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 66
+    escaped: 0
+    notes: 'boundary: true (record, cli: form, one control per flag). 66 executed, 5 reproduced, 0 escaped (task.243.qa.10.security.run.json). Every line-break case is refused and every legitimate value accepted; the 5 reproduced cases are the odd-backtick inputs for the five unquoted flags, which is TASK-243-CR10-1. They also calibrate the probe: it reports an accepted hostile input when there is one.'
+  performance:
+    status: PASS
+    notes: 'Two short loops over at most seven flags before any read or write.'
+  reliability:
+    status: PASS
+    notes: 'A refused record leaves the map byte-identical; a test holds it.'
+  maintainability:
+    status: PASS
+    notes: 'Eight bundled copies match the source apart from the generated header; bundle:check clean.'
+
+recommendations:
+  immediate:
+    - action: 'TASK-243-CR10-1: refuse an odd backtick count in every cell record writes.'
+      refs: ['shared/resources/wireframe-map.js']
+  future:
+    - id: 'TASK-243-CR10-2'
+      action: 'The "not refused" case in the record refusal test uses a balanced backtick pair only; add an unbalanced case for an unquoted cell with the CR10-1 fix.'
+      refs: ['shared/resources/tests/wireframe-map.test.mjs']
+    - id: 'TASK-243-CR8-1'
+      action: 'Drop the two existsSync assertions in the resolve unset test, or mark them documentary: resolve has no write path, so they cannot fail.'
+      refs: ['shared/resources/tests/wireframe-map.test.mjs']
+      carried_from: gate 8
+    - id: 'TASK-243-CR7-1'
+      action: 'Assert the unreadable-arm text (cannot be read (jq exit 127)) instead of /HALT/ in the no-jq test.'
+      refs: ['evals/shared/tests/wireframe-mapping-hooks.test.mjs']
+      carried_from: gate 7
+    - action: 'CR7-2 to CR7-4, the resume-detector current_step reading, grant-qa-cycles.sh re-entry (obs #130), and gate 1-2 lows: unchanged from gate 7.'
+      refs: ['shared/resources/develop-pipeline-step-2-review.md', 'shared/resources/pipeline-resume-detector-prompt.md', 'shared/resources/grant-qa-cycles.sh', 'shared/resources/wireframe-map.js']
+
+bug_resolution:
+  bugs_fixed: 16
+  bugs_remaining: 1
+  fix_date: '2026-10-29'
+  total_iterations: 7
+  verification_method: 'Cycle 9 fix b1464d42: both record guards mutation-proven at QA (each off -> the refusal test red, 18/19; restored 19/19); cli: probe 66 executed, 5 reproduced (CR10-1), 0 escaped'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-243-CR10-1 fixed or waived']

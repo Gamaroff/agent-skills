@@ -1,0 +1,67 @@
+schema: 2
+task: 'task.243.wireframe-component-mapping'
+task_title: "Link Wireloom wireframe nodes to the project's UI components, and ask when unsure"
+gate: PASS
+status_reason: 'Re-entry after finalise DoD run 1 (gap SC-1). The new resolve unset-path test is not vacuous: it was mutation-proven again at QA, and it closes SC-1. The reviewer found no bugs, only two low cleanups.'
+reviewer: 'QA Engineer'
+head: '9e50d3b7901f21058761909cf5134d0ad9c02505'
+updated: '2026-10-29T16:23:50Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100 # no medium or high findings
+
+evidence:
+  tests_reviewed: 38
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false for this cycle; the change adds one test and no predicate. The DoD run 1 probe record (16 executed, 0 reproduced, 0 escaped) still stands for the shipped guards.'
+  performance:
+    status: PASS
+    notes: 'No change to the engine.'
+  reliability:
+    status: PASS
+    notes: 'resolve returns unset with no ui: block and with ui: but no wireframeMap; a test holds both.'
+  maintainability:
+    status: PASS
+    notes: 'Two low cleanups (CR8-1 test assertions true by construction; CR8-2 "read-only" wording for 0c-wire).'
+
+recommendations:
+  immediate: []
+  future:
+    - id: 'TASK-243-CR8-1'
+      action: 'Drop the two existsSync assertions in the resolve unset test, or mark them documentary: resolve has no write path, so they cannot fail.'
+      refs: ['shared/resources/tests/wireframe-map.test.mjs']
+    - id: 'TASK-243-CR8-2'
+      action: 'Reword "read-only" for 0c-wire in the task §4 Scope and §7 Files Summary to "no tracked writes": it writes .claude/state/wireframe-map.json.'
+      refs: ['docs/tasks/task.243.wireframe-component-mapping/task.243.wireframe-component-mapping.md']
+    - id: 'TASK-243-CR7-1'
+      action: 'Assert the unreadable-arm text (cannot be read (jq exit 127)) instead of /HALT/ in the no-jq test.'
+      refs: ['evals/shared/tests/wireframe-mapping-hooks.test.mjs']
+      carried_from: gate 7
+    - action: 'CR7-2 to CR7-4, the resume-detector current_step reading, grant-qa-cycles.sh re-entry (obs #130), and gate 1-2 lows: unchanged from gate 7.'
+      refs: ['shared/resources/develop-pipeline-step-2-review.md', 'shared/resources/pipeline-resume-detector-prompt.md', 'shared/resources/grant-qa-cycles.sh', 'shared/resources/wireframe-map.js']
+
+bug_resolution:
+  bugs_fixed: 14
+  bugs_remaining: 0
+  fix_date: '2026-10-29'
+  total_iterations: 6
+  verification_method: 'SC-1 fix 9e50d3b7: mutation-proven at QA (resolve unset gate removed -> test red); wireframe suites 38/0'
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []

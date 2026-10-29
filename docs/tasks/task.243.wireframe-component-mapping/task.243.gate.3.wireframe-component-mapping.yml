@@ -1,0 +1,85 @@
+schema: 2
+task: 'task.243.wireframe-component-mapping'
+task_title: "Link Wireloom wireframe nodes to the project's UI components, and ask when unsure"
+gate: CONCERNS
+status_reason: 'The cycle 2 fix holds (Phase 0 writes no tracked file, mutation-proven), but moving the writes to Step 3 opened three medium gaps: a resume never writes the held answers, Step 2 reviews the document before they are written, and a stale answers file is reused by a later run.'
+reviewer: 'QA Engineer'
+head: '8ec313f54ac6da39c95d7f17a042549195650927'
+updated: '2026-10-29T14:58:30Z'
+
+top_issues:
+  - id: 'TASK-243-CR3-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-3-develop-loop.md'
+    finding: 'The writes are gated on "Phase 0c-wire ran", which a resume (it skips 0c) never satisfies, so held answers are never written and Step 3 has no WIREFRAME_TABLE.'
+    suggested_action: 'Gate on the held answers file; read the table from the document at Step 3.'
+    suggested_owner: dev
+    bug_ref: 'task.243.bug.7.held-wireframe-answers-lost-on-resume.md'
+    status: open
+  - id: 'TASK-243-CR3-2'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-3-develop-loop.md'
+    finding: 'Step 2 review runs between 0d and the Step 3 writes, so nodes answered in 0d are reported as Important open nodes; the review skills say Phase 0 runs after the review.'
+    suggested_action: 'Write the held answers after the branch exists and before Step 2 (Step 1 post-branch); correct review-task/review-story wording.'
+    suggested_owner: dev
+    bug_ref: 'task.243.bug.8.step-2-review-runs-before-the-held-answers-are-written.md'
+    status: open
+  - id: 'TASK-243-CR3-3'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-3-develop-loop.md'
+    finding: 'wireframe-answers.json names no document and is never deleted, so a later run writes the previous run''s answers.'
+    suggested_action: 'Key the file to the document; delete it at a fresh 0c-wire and once written.'
+    suggested_owner: dev
+    bug_ref: 'task.243.bug.9.stale-wireframe-answers-file-reused-by-a-later-run.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70 # 100 - 10 x 3 medium findings
+
+evidence:
+  tests_reviewed: 30
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false; the cycle 2 fix moves writes between pipeline steps and adds no accept/reject predicate.'
+  performance:
+    status: PASS
+    notes: 'No change to the engine.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR3-1 and CR3-3: held answers lost on resume, or reused by a later run.'
+  maintainability:
+    status: PASS
+    notes: 'Each step-doc block is executed by a test.'
+
+recommendations:
+  immediate:
+    - action: 'Move the wireframe writes to Step 1 post-branch, gated on a document-keyed answers file that is consumed when written; Step 3 reads the table from the document (bug.7, bug.8, bug.9).'
+      refs: ['shared/resources/develop-pipeline-step-1-create-branch.md', 'shared/resources/develop-pipeline-step-3-develop-loop.md', 'shared/resources/develop-pipeline-step-0-resolve-and-prepare.md']
+  future:
+    - action: 'CR2-2 (gate 2): the Added-heading lookup is not confined to the section.'
+      refs: ['shared/resources/wireframe-map.js']
+    - action: 'CR-6, CR-8, CR-9 (gate 1).'
+      refs: ['shared/resources/wireframe-map.js']
+
+bug_resolution:
+  bugs_fixed: 6
+  bugs_remaining: 3
+  fix_date: '2026-10-29'
+  total_iterations: 2
+  verification_method: 'bug.6: clean-tree test and Step 3 test, both mutation-proven (2/2 covered); fast gate 6832/0'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['CR3-1, CR3-2, CR3-3 fixed and re-gated']

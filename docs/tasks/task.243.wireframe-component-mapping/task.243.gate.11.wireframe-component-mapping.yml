@@ -1,0 +1,71 @@
+schema: 2
+task: 'task.243.wireframe-component-mapping'
+task_title: "Link Wireloom wireframe nodes to the project's UI components, and ask when unsure"
+gate: PASS
+status_reason: 'The cycle 10 fix holds: record round-trips every unquoted value through the reader before any read or write, which closes CR10-1 (odd backtick) and CR10-2 (test gap) and also refuses a whole-cell code span that unquote would strip. Both arms are mutation-proven at QA. The probe measured 79 executed, 0 reproduced, 0 escaped. The reviewer found two lows and no promotable bug.'
+reviewer: 'QA Engineer'
+head: '97035bae0cfe0d5dede6665fc7f8a9f41b7b0346'
+updated: '2026-10-29T17:08:18Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100 # no medium or high finding
+
+evidence:
+  tests_reviewed: 40
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 79
+    escaped: 0
+    notes: 'boundary: true (record, cli: form, one control per flag). 79 executed, 0 reproduced, 0 escaped (task.243.qa.11.security.run.json). Every line-break, odd-backtick and whole-cell code-span case is refused, and every legitimate value is accepted, including a balanced inner span, an escaped pipe and a code span in --by. The same odd-backtick cases reproduced 5 times at gate 10, so the probe is calibrated on this defect.'
+  performance:
+    status: PASS
+    notes: 'At most six splitRow calls on one short line each, before any read or write.'
+  reliability:
+    status: PASS
+    notes: 'A refused record leaves the map byte-identical; the refusal test asserts it after every case.'
+  maintainability:
+    status: PASS
+    notes: 'One rule (the reader is the allow-list) replaces a growing deny-list; eight bundled copies match the source apart from the generated header; bundle:check clean.'
+
+recommendations:
+  immediate: []
+  future:
+    - id: 'TASK-243-CR11-1'
+      action: 'The round-trip check refuses an odd backtick in --by/--date although readMap never reads the Confirmed cell; either check them only when a column follows Confirmed, or keep the refusal as a margin and say so in the code and test comments.'
+      refs: ['shared/resources/wireframe-map.js', 'shared/resources/tests/wireframe-map.test.mjs']
+    - id: 'TASK-243-CR11-2'
+      action: 'Correct the comment at wireframe-map.js:725: --by/--date skip unquote because readMap does not read the Confirmed cell, not because the cell starts with the date.'
+      refs: ['shared/resources/wireframe-map.js']
+    - id: 'TASK-243-CR8-1'
+      action: 'Drop the two existsSync assertions in the resolve unset test, or mark them documentary: resolve has no write path, so they cannot fail.'
+      refs: ['shared/resources/tests/wireframe-map.test.mjs']
+      carried_from: gate 8
+    - id: 'TASK-243-CR7-1'
+      action: 'Assert the unreadable-arm text (cannot be read (jq exit 127)) instead of /HALT/ in the no-jq test.'
+      refs: ['evals/shared/tests/wireframe-mapping-hooks.test.mjs']
+      carried_from: gate 7
+    - action: 'CR7-2 to CR7-4, the resume-detector current_step reading, grant-qa-cycles.sh re-entry (obs #130), and gate 1-2 lows: unchanged from gate 7.'
+      refs: ['shared/resources/develop-pipeline-step-2-review.md', 'shared/resources/pipeline-resume-detector-prompt.md', 'shared/resources/grant-qa-cycles.sh', 'shared/resources/wireframe-map.js']
+
+bug_resolution:
+  bugs_fixed: 17
+  bugs_remaining: 0
+  fix_date: '2026-10-29'
+  total_iterations: 8
+  verification_method: 'Cycle 10 fix 97035bae: both arms of the round-trip check mutation-proven at QA (each off -> the refusal test red, 18/19; restored 19/19); cli: probe 79 executed, 0 reproduced, 0 escaped'
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []

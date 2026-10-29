@@ -1,0 +1,119 @@
+[
+  {
+    "id": "s2.no-held-file",
+    "sink": "path",
+    "input": "docs/tasks/task.9.x/task.9.x.md",
+    "why": "No answers are held; the block's first line (node … ensure) fails in the sandbox and writes only to stderr.",
+    "correct": "Pass (exit 0, empty stdout).",
+    "direction": "legitimate",
+    "expected": {
+      "stdout": "",
+      "exit": 0
+    }
+  },
+  {
+    "id": "s2.this-document",
+    "sink": "path",
+    "input": "docs/tasks/task.9.x/task.9.x.md",
+    "why": "This document's held answers are the ones Step 2 writes.",
+    "correct": "Pass (exit 0, empty stdout); the file is kept for the write step.",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        ".claude/state/wireframe-answers.json": "{\"document\":\"docs/tasks/task.9.x/task.9.x.md\",\"answers\":[]}"
+      }
+    },
+    "expected": {
+      "stdout": "",
+      "exit": 0
+    }
+  },
+  {
+    "id": "s2.this-document-dot-slash",
+    "sink": "path",
+    "input": "./docs/tasks/task.9.x/task.9.x.md",
+    "why": "A ./ spelling of the same document must not discard the user's answers.",
+    "correct": "Pass (exit 0, empty stdout), not discarded.",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        ".claude/state/wireframe-answers.json": "{\"document\":\"docs/tasks/task.9.x/task.9.x.md\",\"answers\":[]}"
+      }
+    },
+    "expected": {
+      "stdout": "",
+      "exit": 0
+    }
+  },
+  {
+    "id": "s2.other-document",
+    "sink": "path",
+    "input": "docs/tasks/task.9.x/task.9.x.md",
+    "why": "A stale file from a run on another document must not be written into this one (bug.9).",
+    "correct": "Discard it with the stated message and remove the file.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        ".claude/state/wireframe-answers.json": "{\"document\":\"docs/tasks/task.8.y/task.8.y.md\",\"answers\":[{\"signature\":\"*>button\",\"component\":\"Button\",\"confirmed\":true}]}"
+      }
+    },
+    "expected": {
+      "stdout": "wireframe answers in .claude/state/wireframe-answers.json belong to another document — discarded\n",
+      "exit": 0,
+      "removed": [
+        ".claude/state/wireframe-answers.json"
+      ]
+    }
+  },
+  {
+    "id": "s2.missing-document-key",
+    "sink": "path",
+    "input": "docs/tasks/task.9.x/task.9.x.md",
+    "why": "A file with no document key must not be deleted as another document's (bug.12).",
+    "correct": "HALT with the cannot-be-read message (jq exit 5) and keep the file.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        ".claude/state/wireframe-answers.json": "{\"answers\":[{\"signature\":\"*>button\",\"component\":\"Button\",\"confirmed\":true}]}"
+      }
+    },
+    "expected": {
+      "stdout": "HALT: .claude/state/wireframe-answers.json cannot be read (jq exit 5) — kept; repair or delete it, then re-run Step 2\n",
+      "exit": 1
+    }
+  },
+  {
+    "id": "s2.numeric-document-key",
+    "sink": "path",
+    "input": "docs/tasks/task.9.x/task.9.x.md",
+    "why": "A non-string document key.",
+    "correct": "HALT with the cannot-be-read message (jq exit 5).",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        ".claude/state/wireframe-answers.json": "{\"document\":9,\"answers\":[]}"
+      }
+    },
+    "expected": {
+      "stdout": "HALT: .claude/state/wireframe-answers.json cannot be read (jq exit 5) — kept; repair or delete it, then re-run Step 2\n",
+      "exit": 1
+    }
+  },
+  {
+    "id": "s2.not-json",
+    "sink": "path",
+    "input": "docs/tasks/task.9.x/task.9.x.md",
+    "why": "A truncated file must not be deleted silently.",
+    "correct": "HALT with the cannot-be-read message (jq 1.8 exits 5 on an input parse error) and keep the file.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        ".claude/state/wireframe-answers.json": "{\"document\": \"docs/tasks/task.9.x/task.9.x.md\""
+      }
+    },
+    "expected": {
+      "stdout": "HALT: .claude/state/wireframe-answers.json cannot be read (jq exit 5) — kept; repair or delete it, then re-run Step 2\n",
+      "exit": 1
+    }
+  }
+]

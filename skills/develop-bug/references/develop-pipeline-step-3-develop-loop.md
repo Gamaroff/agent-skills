@@ -12,6 +12,40 @@ Loaded by `/develop-story` and `/develop-task` during Step 3. Story/task variant
 
 ---
 
+## Held wireframe answers (develop-story, develop-task)
+
+Only when `skills-config.yaml` sets `ui.wireframeMap` **and** the document holds a ` ```wireloom `
+block, the gate of [Step 2 § Wireframe writes](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/develop-pipeline-step-2-review.md#wireframe-writes-before-the-gate-check);
+otherwise skip. The two must share one gate: this check sends the run to that section, and a
+section that skips would send it straight back here. `develop-bug` asks no wireframe questions and
+skips this section. With the gate false, held answers are not written, because the feature is off
+for this document. The next fresh run's 0c-wire deletes the file.
+
+Step 2 writes Phase 0's wireframe answers into the document and then deletes the file that held
+them. A resume can land here without Step 2 having run: the detector can recommend Step 3 for a
+run that stopped inside Step 2. So, first, with Step 2's own key check:
+
+```bash
+HELD=.claude/state/wireframe-answers.json
+DOC='{document-file}'
+if [ -f "$HELD" ]; then
+  jq -e --arg d "$DOC" 'if (.document | type) != "string" then error("no document key")
+    else (.document | ltrimstr("./")) == ($d | ltrimstr("./")) end' "$HELD" >/dev/null
+  rc=$?
+  case $rc in
+    0) echo "HALT: $HELD still holds this document's wireframe answers — run Step 2 § Wireframe writes, then return to Step 3"; exit 1 ;;
+    1) ;; # another document's answers: not this run's to write
+    *) echo "HALT: $HELD cannot be read (jq exit $rc) — kept; repair or delete it, then re-run Step 3"; exit 1 ;;
+  esac
+fi
+```
+
+On the first `HALT`, run Step 2 § Wireframe writes now, then start Step 3 again. Do not delete the
+file to get past the check: it holds the user's answers. The second `HALT` is the one Step 2 raises
+on the same file, for the same reason.
+
+---
+
 ## Pre-develop Codebase Mapping (CRITICAL for context efficiency)
 
 > This step invokes `/develop`, but the Explore subagent and plan file discovery below must run first. Do not invoke `/develop` until those are complete.
@@ -40,6 +74,7 @@ Ask it to find: all files likely affected by the success criteria and implementa
   ...
   ```
   If `ALWAYS_LOAD_FILES` is empty (all files were missing), log a warning and proceed without them.
+- **Wireframe component table** (when `ui.wireframeMap` is set and the document holds a ` ```wireloom ` block): pass the document's component table, which Step 2 completed with 0d's answers, labelled `Wireframe nodes → components (build each node from the component named; import from {ui.componentImport})`, followed by every assumption 0d logged, labelled `Assumed, not confirmed — QA checks these`. `/develop` builds from the table, never from the Wireloom primitive alone.
 - See `/develop` SKILL.md **Caller-Supplied Context** section for the full contract on how orchestrators may prepend context (surface map, plan file path, always-load files, iteration hint) and how `/develop` must honour it.
 
 ---

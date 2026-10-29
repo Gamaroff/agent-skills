@@ -1,0 +1,96 @@
+schema: 2
+task: 'task.243.wireframe-component-mapping'
+task_title: "Link Wireloom wireframe nodes to the project's UI components, and ask when unsure"
+gate: CONCERNS
+status_reason: 'The cycle 12 fix holds: every node signature now reads back to its node, bug.15 is closed, all three arms are mutation-proven at QA, and the probe re-run measures 114 executed, 0 reproduced, 0 escaped. The reviewer found a new medium the decoding introduced: record compares raw signature text, so re-recording a node in the other spelling adds a second row and the older answer keeps winning (CR-1, bug.16).'
+reviewer: 'QA Engineer'
+head: '5fb5865a5338c2eacfe451c4b59f3984c9a6427b'
+updated: '2026-10-29T17:52:58Z'
+
+top_issues:
+  - id: 'TASK-243-CR13-1'
+    severity: medium
+    file: 'shared/resources/wireframe-map.js'
+    finding: 'Since decodeValue, two signature texts can mean the same value (v=é and v=%C3%A9, v=72% and v=72%25), but record finds the row to replace by raw text, so it adds a second row and match keeps returning the older answer (bug.16).'
+    suggested_action: 'Compare parsed signatures (or one canonical encoded form) plus the label when finding the row to replace, and test recording over a hand-written row in the other encoding.'
+    suggested_owner: dev
+    bug_ref: 'task.243.bug.16.record-adds-a-second-row-for-an-equivalent-signature.md'
+    status: open
+  - id: 'TASK-243-CR13-2'
+    severity: low
+    file: 'shared/resources/tests/wireframe-map.test.mjs'
+    finding: 'The no-merge check in the round-trip test passes whatever the encoding does, because each value sits under its own key (k0, k1, ...), so no two values are ever compared under one key.'
+    suggested_action: 'Put the cross-check values under one shared key, or add same-key pairs such as 1,500 and 1, 72% and 72%25.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90 # one medium finding
+
+evidence:
+  tests_reviewed: 20
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 114
+    escaped: 0
+    notes: 'boundary: true. The DoD run 3 plan (11 controls: two fence guards, parsePattern, eight record flags) re-run against 5fb5865a: 114 executed, 0 reproduced, 0 escaped, 0 refusals, every control executed (task.243.qa.13.security.run.json). CR13-1 is an identity defect in record, not a refusal gap.'
+  performance:
+    status: PASS
+    notes: 'encodeValue and decodeValue are one pass per value; READABLE is compiled once at module load.'
+  reliability:
+    status: CONCERNS
+    notes: 'A corrected answer can be silently ignored when the existing row is spelled the other way (CR13-1).'
+  maintainability:
+    status: PASS
+    notes: 'One encoding shared by writer and reader; sixteen bundled copies match their sources; bundle:check clean.'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-243-CR13-1 (bug.16): record must replace a row whose signature means the same thing.'
+      refs: ['shared/resources/wireframe-map.js', 'shared/resources/tests/wireframe-map.test.mjs']
+  future:
+    - id: 'TASK-243-CR13-3'
+      action: 'The procedure and configuration.md list only some of the characters encodeValue encodes (non-ASCII, quotes and brackets are missing); say every character outside the unreserved set plus / : # @ + = is encoded, or say to copy the signature exactly as resolve prints it.'
+      refs: ['shared/resources/wireframe-component-mapping.md', 'docs/reference/configuration.md']
+    - id: 'TASK-243-CR12-2'
+      action: 'readUiConfig returns null for an unreadable skills-config.yaml as for a missing one; return null only on ENOENT.'
+      refs: ['shared/resources/wireframe-map.js']
+      carried_from: gate 12
+    - id: 'TASK-243-CR12-3'
+      action: 'The candidate filter matches a component by substring, and a missing catalogue section disables it as if empty.'
+      refs: ['shared/resources/wireframe-map.js']
+      carried_from: gate 12
+    - id: 'TASK-243-CR12-4'
+      action: 'ensure and record rewrite every line ending of a CRLF map as LF.'
+      refs: ['shared/resources/wireframe-map.js']
+      carried_from: gate 12
+    - id: 'TASK-243-CR12-5'
+      action: 'Cleanups: record re-finds the header readMap already found, and calls the whole ensure command to create a missing map.'
+      refs: ['shared/resources/wireframe-map.js']
+      carried_from: gate 12
+    - id: 'TASK-243-PARSELINE-1'
+      action: 'A Wireloom line holding U+2028 yields no node, because parseLine''s .*$ cannot cross it (found during fix cycle 12).'
+      refs: ['shared/resources/wireframe-map.js']
+    - action: 'CR11-1, CR11-2, CR8-1, CR7-1 to CR7-4 and the gate 1-2 lows: unchanged from gate 12.'
+      refs: ['shared/resources/wireframe-map.js', 'shared/resources/tests/wireframe-map.test.mjs', 'evals/shared/tests/wireframe-mapping-hooks.test.mjs']
+
+bug_resolution:
+  bugs_fixed: 18
+  bugs_remaining: 1
+  fix_date: '2026-10-29'
+  total_iterations: 10
+  verification_method: 'Cycle 12 fix 5fb5865a: bug.15 reproduction reads every value back unchanged; three mutations (encode off, decode off, strict decode) each turn the round-trip test red (19/20), restored 20/20, in a scratch worktree; probe 114 executed, 0 reproduced, 0 escaped'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-243-CR13-1 fixed and re-gated']

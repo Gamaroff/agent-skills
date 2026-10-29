@@ -1,0 +1,103 @@
+schema: 2
+task: 'task.243.wireframe-component-mapping'
+task_title: "Link Wireloom wireframe nodes to the project's UI components, and ask when unsure"
+gate: CONCERNS
+status_reason: 'All five phases are delivered and the 23 new tests pass, but QA reproduced four medium engine defects and one Phase 0 block that fails on a fresh checkout. code_review_blocking promoted them, with one low.'
+reviewer: 'QA Engineer'
+head: '716d2a9c97f88e880387642e0cc2913c06730450'
+updated: '2026-10-29T13:55:29Z'
+
+top_issues:
+  - id: 'TASK-243-CR-1'
+    severity: medium
+    file: 'shared/resources/wireframe-map.js'
+    finding: 'With catalogueSection at level 3 or deeper, the inserted ### Added heading ends the section, so each ensure run appends the added rows again (3 runs: 3 headings, 3 Button rows). This breaks SC-2 for such sections.'
+    suggested_action: 'Nest the Added heading below the section level, or scan past it; test ensure twice with a ### section.'
+    suggested_owner: dev
+    bug_ref: 'task.243.bug.1.ensure-duplicates-rows-under-a-level-3-section.md'
+    status: open
+  - id: 'TASK-243-CR-2'
+    severity: medium
+    file: 'shared/resources/wireframe-map.js'
+    finding: 'parseLine strips from the first whitespace-# even inside quotes: text "Order #1234" resolves with label Orde.'
+    suggested_action: 'Strip only a # outside quoted strings, or drop the stripping; add a test.'
+    suggested_owner: dev
+    bug_ref: 'task.243.bug.2.hash-in-a-quoted-label-truncates-it.md'
+    status: open
+  - id: 'TASK-243-CR-3'
+    severity: medium
+    file: 'shared/resources/wireframe-map.js'
+    finding: 'The header example componentExclude: [ThemeProvider] parses as a string under yaml-subset and is silently replaced by [].'
+    suggested_action: 'Parse a one-line list or report a non-array value; show the block-list form in the header.'
+    suggested_owner: dev
+    bug_ref: 'task.243.bug.3.flow-list-component-exclude-is-silently-ignored.md'
+    status: open
+  - id: 'TASK-243-CR-4'
+    severity: medium
+    file: 'shared/resources/wireframe-map.js'
+    finding: 'barrelExports keeps only ^[A-Z][a-z]... names (lines 494, 501), so HStack, VStack, QRCode and OTPInput are never catalogued.'
+    suggested_action: 'Accept ^[A-Z][A-Za-z0-9]*$ minus all-caps constants in both regexes; add HStack to the seeding test.'
+    suggested_owner: dev
+    bug_ref: 'task.243.bug.4.component-names-with-two-leading-capitals-are-dropped.md'
+    status: open
+  - id: 'TASK-243-4B-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-0-resolve-and-prepare.md'
+    finding: 'The 0c-wire block redirects into .claude/state before any Phase 0 block creates it; executed as delivered with no .claude/state it exits 1 (No such file or directory). Reported by the reviewer as CR-5 at medium confidence; the high confidence here comes from the Step 4b execution failure.'
+    suggested_action: 'Add mkdir -p .claude/state at the top of the 0c-wire block.'
+    suggested_owner: dev
+    bug_ref: 'task.243.bug.5.0c-wire-fails-on-a-fresh-checkout.md'
+    status: open
+  - id: 'TASK-243-CR-7'
+    severity: low
+    file: 'shared/resources/wireframe-map.js'
+    finding: 'purposeOf lazy body crosses */, so a file header doc comment becomes the component purpose in the seeded catalogue.'
+    suggested_action: 'Stop the doc-comment body at a comment terminator.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 50 # 100 - 10 x 5 medium findings
+
+evidence:
+  tests_reviewed: 23
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [1, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false. Candidates named in the QA report: match/score (a matcher whose miss leads to a question, not a refusal), readMap returning null (a parse fallback that writes nothing), labelMatches (compiles a regex from the project''s own person-edited map). No secrets, no network, no shell-out.'
+  performance:
+    status: PASS
+    notes: 'Offline, one pass per file; the real-world dry run read 99 exports and 37 nodes.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1 breaks the never-duplicate contract for ### sections; 4B-1 fails the first develop run; CR-6 (advisory) reports an unreadable map as ok.'
+  maintainability:
+    status: PASS
+    notes: 'One engine and one procedure cited by every hook; header documents every reason value.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1, CR-2, CR-3, CR-4, 4B-1 and CR-7, each with a regression test that goes red without it.'
+      refs: ['shared/resources/wireframe-map.js', 'shared/resources/develop-pipeline-step-0-resolve-and-prepare.md']
+  future:
+    - action: 'CR-6: resolve answers ok with every node open when the map exists but is unreadable, and no caller reads mapState. Consider a non-ok reason (advisory, medium confidence).'
+      refs: ['shared/resources/wireframe-map.js']
+    - action: 'CR-8: record finds the row to replace by exact string, so an equivalent hand-written signature is duplicated (advisory, low confidence).'
+      refs: ['shared/resources/wireframe-map.js']
+    - action: 'CR-9: the candidate filter uses substring containment (ButtonGroup passes because Button is catalogued).'
+      refs: ['shared/resources/wireframe-map.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['The five medium findings fixed and re-gated']

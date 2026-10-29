@@ -1,0 +1,92 @@
+[
+  {
+    "id": "dod4.label.same-label",
+    "sink": "markdown-structure",
+    "input": "Save",
+    "why": "Equivalent signature (re-spelled in the template) and the same label: replace the labelled row, not the label-less one, and do not add.",
+    "correct": "Replace line 4; the other rows untouched.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n| `*>button[primary,muted]{kind=warning}` |  | Button | primary |  |  | 2026-10-01, t |\n| `*>button[primary,muted]{kind=warning}` | `Save` | Button | primary |  |  | 2026-10-01, t |\n"
+      }
+    },
+    "expected": {
+      "stdout": "{\"reason\":\"ok\",\"action\":\"replaced\",\"line\":4,\"map\":\"docs/wireframe-map.md\"}\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "dod4.label.empty-label",
+    "sink": "markdown-structure",
+    "input": "",
+    "why": "Empty --label means no label: replace the label-less row, never the labelled one.",
+    "correct": "Replace line 3; the other rows untouched.",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n| `*>button[primary,muted]{kind=warning}` |  | Button | primary |  |  | 2026-10-01, t |\n| `*>button[primary,muted]{kind=warning}` | `Save` | Button | primary |  |  | 2026-10-01, t |\n"
+      }
+    },
+    "expected": {
+      "stdout": "{\"reason\":\"ok\",\"action\":\"replaced\",\"line\":3,\"map\":\"docs/wireframe-map.md\"}\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "dod4.label.other-label",
+    "sink": "markdown-structure",
+    "input": "Cancel",
+    "why": "A different label is a different row (CR14-2: the label term in the replace lookup).",
+    "correct": "Add at line 5; the other rows untouched.",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n| `*>button[primary,muted]{kind=warning}` |  | Button | primary |  |  | 2026-10-01, t |\n| `*>button[primary,muted]{kind=warning}` | `Save` | Button | primary |  |  | 2026-10-01, t |\n"
+      }
+    },
+    "expected": {
+      "stdout": "{\"reason\":\"ok\",\"action\":\"added\",\"line\":5,\"map\":\"docs/wireframe-map.md\"}\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "dod4.label.regex-label",
+    "sink": "markdown-structure",
+    "input": "/Save/",
+    "why": "A regex label is a different label string from the plain one.",
+    "correct": "Add at line 5; the other rows untouched.",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n| `*>button[primary,muted]{kind=warning}` |  | Button | primary |  |  | 2026-10-01, t |\n| `*>button[primary,muted]{kind=warning}` | `Save` | Button | primary |  |  | 2026-10-01, t |\n"
+      }
+    },
+    "expected": {
+      "stdout": "{\"reason\":\"ok\",\"action\":\"added\",\"line\":5,\"map\":\"docs/wireframe-map.md\"}\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "dod4.label.case-label",
+    "sink": "markdown-structure",
+    "input": "save",
+    "why": "Labels compare exactly; a different case is a different row.",
+    "correct": "Add at line 5; the other rows untouched.",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/wireframe-map.md\n",
+        "docs/wireframe-map.md": "| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |\n| --- | --- | --- | --- | --- | --- | --- |\n| `*>button[primary,muted]{kind=warning}` |  | Button | primary |  |  | 2026-10-01, t |\n| `*>button[primary,muted]{kind=warning}` | `Save` | Button | primary |  |  | 2026-10-01, t |\n"
+      }
+    },
+    "expected": {
+      "stdout": "{\"reason\":\"ok\",\"action\":\"added\",\"line\":5,\"map\":\"docs/wireframe-map.md\"}\n",
+      "exit": 0
+    }
+  }
+]

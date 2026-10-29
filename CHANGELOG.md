@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **Wireframe nodes are linked to the project's own UI components, and the skills ask when unsure
+  (task 243).** A Wireloom wireframe keeps a screen's parts and their order, not which component
+  draws each part, so agents built from the primitive and got components, variants and icons wrong.
+  Opt in with a `ui:` block in `skills-config.yaml` (`wireframeMap` turns it on):
+  - **`create-story` and `create-task`** embed the screen's own wireframe document when one exists,
+    rather than drawing from the brief, and resolve each node while the author is present.
+    `create-task` gains the wireframe step it lacked (2.6).
+  - **`develop-story` and `develop-task`** resolve the nodes in Phase 0 (`0c-wire`) and ask about
+    the open ones in 0d. Under `--defaults` they take the best proposal, and log it under
+    `### Wireframe mapping assumptions` in the report's Decisions Log. It is never written to the map
+    as a confirmation. Step 3 passes the table to `/develop`.
+  - **`review-story`, `review-task`, QA and `review-pr`** flag an unmapped node, a component
+    missing from the catalogue, a node rebuilt by hand, and an assumption QA never checked.
+  - **The engine** `shared/resources/wireframe-map.js` has three commands:
+    - `ensure` creates a missing catalogue (one row per component the barrel exports) and a missing
+      map, adds rows for new exports, and never overwrites;
+    - `resolve` matches nodes against the map's confirmed links, where the most specific row wins;
+    - `record` remembers an answer.
+
+  Without a `ui:` block nothing changes. Procedure:
+  [`wireframe-component-mapping.md`](shared/resources/wireframe-component-mapping.md).
+
 ### Changed
 
 - **A `/finalise` re-run now judges a fixed scope, so a DoD loop has a fixed point (task 242).**

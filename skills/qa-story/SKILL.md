@@ -1514,6 +1514,7 @@ See NFR Assessment section below for detailed process.
 - **Review TypeScript Compliance Agent findings (Phase 1.5)** against project TypeScript standards
 - **Review Accessibility Agent findings (Phase 1.5)** against project accessibility standards
 - **Cross-check Definition of Done Agent (Phase 1.5)** for standards compliance
+- **Wireframe conformance** (only when the story has a wireframe component table and `skills-config.yaml` sets `ui.wireframeMap`; procedure: `references/wireframe-component-mapping.md`). For each row, the changed UI builds that node from the component named, imported from `ui.componentImport`, with the variant the row gives; a node rebuilt by hand or from another component is a `category: coverage` finding. For each entry under `### Wireframe mapping assumptions` in the implementation report's Decisions Log, check the assumed component against the design source the wireframe came from, and record the verdict in the QA report; a wrong assumption is a `high` finding, and a right one may then be recorded in the map with `wireframe-map.js record` (`references/wireframe-map.js`).
 
 **Run the validation commands your coding standards name, not only the test runner.** The coding
 standards file is loaded on every pipeline run (`devLoadAlwaysFiles`). For each command it lists

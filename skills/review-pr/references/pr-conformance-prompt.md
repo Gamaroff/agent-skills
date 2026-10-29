@@ -12,7 +12,7 @@ This is the **single source of truth** for the conformance lens: its persona, sc
 output contract. One skill dispatches it:
 
 - **`/review-pr`** — reviews a pull request as a claim. The code lens
-  ([`code-review-prompt.md`](code-review-prompt.md)) asks *"is this code correct?"*. This lens asks the
+  ([`code-review-prompt.md`](code-review-prompt.md)) asks _"is this code correct?"_. This lens asks the
   question no existing skill asks: **"does this change deliver what the work item promised, and is the
   paper trail behind it real?"**
 
@@ -52,6 +52,10 @@ A. COVERAGE (category: coverage) — the work item promised something the change
    - an acceptance / success criterion with no corresponding hunk in the diff and no test
    - an implementation-plan phase whose checkboxes are ticked but whose files are untouched
    - a criterion the diff addresses only partially
+   - when the work item carries a wireframe component table (the wireframe-component mapping
+     procedure writes one): a row whose component the changed UI does not use, imported from the
+     module `skills-config.yaml` names as `ui.componentImport` — the node was rebuilt by hand or from
+     another component. Quote the row in `ref`
 
 B. SCOPE (category: scope) — the change does something the work item never claimed:
    - files changed that no criterion or phase calls for
@@ -84,6 +88,8 @@ C. TRAIL (category: trail) — the evidence is missing, stale, or contradicts it
      test cannot check this, because after a rewrite a legitimate head is unreachable too (task.135
      QA cycle 2, CR2-2)
    - a handover file exists with outstanding (unticked) actions
+   - the implementation report's Decisions Log has a `### Wireframe mapping assumptions` heading and no QA report records
+     checking them: each was a guess made with nobody present, and only QA confirms it
    - a co-located bug report that is still open
    - the work item's Change Log lost rows since the PR's base. The log is append-only, and a row that
      disappears is a loss whatever removed it. Two QA cycles once read past six rows a hand repair
@@ -194,7 +200,7 @@ already compatible — the mapping would be additive.
 
 ## Scoping (caller responsibility)
 
-The caller resolves the work item and the artifact list *before* dispatching, and passes both in. The
+The caller resolves the work item and the artifact list _before_ dispatching, and passes both in. The
 subagent does not run the resolution cascade itself: resolution decides which document the whole review
 is anchored to, and that decision needs the caller's provenance reporting (`resolved_via`) and its
 degrade path. A subagent that resolved its own anchor could silently review against the wrong document.

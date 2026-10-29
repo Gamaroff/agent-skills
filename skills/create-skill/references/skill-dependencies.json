@@ -49,7 +49,8 @@
   "create-task": [
     "ensure-task-github-issue",
     "ensure-task-jira-issue",
-    "mermaid-architect"
+    "mermaid-architect",
+    "wireframe"
   ],
   "deep-research-prompt": [],
   "deploy-remote": [],
