@@ -1104,7 +1104,15 @@ const CONFIGURED_FILES = {
 };
 
 test("a decline (false, off, OFF) makes ensure, resolve and record answer declined and write nothing", () => {
-  for (const value of ["false", "off", "OFF", "'Off'"]) {
+  for (const value of [
+    "false",
+    "False",
+    "FALSE",
+    '"false"',
+    "off",
+    "OFF",
+    "'Off'",
+  ]) {
     const root = consumer({
       config: CONFIG.replace(/wireframeMap: .*$/m, `wireframeMap: ${value}`),
     });
@@ -1238,7 +1246,6 @@ test("detect reads tsconfig.json as JSONC: a /* alias, a ** glob, comments and t
   const cases = [
     // [tsconfig text, the import detect must propose]
     [tsconfig("@app/components"), "@app/components"],
-    [tsconfig("@app/components/*"), "@app/components"],
     [tsconfig("@app/components", ","), "@app/components"],
     // The control: plain JSON, no comment and no trailing comma.
     [
@@ -1261,6 +1268,191 @@ test("detect reads tsconfig.json as JSONC: a /* alias, a ** glob, comments and t
     } finally {
       cleanup(root);
     }
+  }
+});
+
+test("detect proposes only an exact tsconfig alias; a wildcard one is named in the evidence, not proposed", () => {
+  const cases = [
+    // [paths, the value detect proposes, a word the evidence holds]
+    [{ "@ui/*": ["src/components/*"] }, null, "@ui/*"],
+    [{ "@ui/*": ["src/components/index.ts"] }, null, "@ui/*"],
+    // An exact alias wins over a wildcard that also lands, in either order.
+    [
+      { "@ui/*": ["src/components/*"], "@ui": ["src/components"] },
+      "@ui",
+      "@ui",
+    ],
+    [
+      { "@ui": ["src/components/index.ts"], "@ui/*": ["src/components/*"] },
+      "@ui",
+      "@ui",
+    ],
+    // A wildcard that lands elsewhere says nothing.
+    [{ "@/*": ["src/*"] }, null, "no package name"],
+  ];
+  for (const [paths, want, says] of cases) {
+    const root = project({
+      ...CONFIGURED_FILES,
+      "package.json": JSON.stringify({ name: "the-repo" }),
+      "tsconfig.json": JSON.stringify({ compilerOptions: { paths } }),
+    });
+    try {
+      const got = detect(root).proposal.componentImport;
+      assert.equal(got.value, want, JSON.stringify(paths));
+      assert.ok(
+        got.evidence.includes(says),
+        `${JSON.stringify(paths)}: ${got.evidence}`,
+      );
+    } finally {
+      cleanup(root);
+    }
+  }
+});
+
+test("configure refuses a --map that reads as a decline, in any case, and writes nothing", () => {
+  for (const map of ["false", "False", "OFF", " off "]) {
+    const root = project({ "skills-config.yaml": "x: 1\n" });
+    try {
+      const cli = runCli([
+        "configure",
+        ...flagsOf({ ...SETUP, map }),
+        "--root",
+        root,
+      ]);
+      assert.equal(cli.exitCode, 2, JSON.stringify(map));
+      assert.match(cli.error, /reads as a decline: use --decline/);
+      assert.equal(config(root), "x: 1\n");
+    } finally {
+      cleanup(root);
+    }
+  }
+  // Control: a path that only starts with the word is a path.
+  const root = project();
+  try {
+    assert.equal(configure(root, { ...SETUP, map: "offline.md" }).reason, "ok");
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("a list under a path key is no value: detect reads partial, configure needs --barrel and replaces the list", () => {
+  const before =
+    "ui:\n  componentBarrel:\n    - src/components/index.ts\n  componentCatalogue: docs/c.md\nother: 1\n";
+  const root = project({ ...CONFIGURED_FILES, "skills-config.yaml": before });
+  try {
+    const d = detect(root);
+    assert.equal(d.state, "partial");
+    assert.ok(!d.present.includes("componentBarrel"));
+    assert.equal(d.proposal.componentBarrel.value, "src/components/index.ts");
+    const none = runCli(["configure", "--map", "m.md", "--root", root]);
+    assert.equal(none.exitCode, 2);
+    assert.equal(config(root), before);
+    const r = configure(root, {
+      barrel: "src/components/index.ts",
+      map: "m.md",
+    });
+    assert.equal(r.reason, "ok");
+    assert.equal(
+      config(root),
+      'ui:\n  componentBarrel: "src/components/index.ts"\n  componentCatalogue: docs/c.md\n  wireframeMap: "m.md"\nother: 1\n',
+    );
+    assert.equal(detect(root).state, "configured");
+    assert.equal(readUiConfig(root).componentBarrel, "src/components/index.ts");
+  } finally {
+    cleanup(root);
+  }
+  // A list for componentExclude is a value, and is kept.
+  const kept = project({
+    "skills-config.yaml":
+      "ui:\n  componentBarrel: b.ts\n  componentExclude:\n    - Provider\n",
+  });
+  try {
+    assert.deepEqual(detect(kept).present, [
+      "componentBarrel",
+      "componentExclude",
+    ]);
+    assert.equal(configure(kept, { map: "m.md" }).reason, "ok");
+    assert.deepEqual(readUiConfig(kept).componentExclude, ["Provider"]);
+  } finally {
+    cleanup(kept);
+  }
+});
+
+test("detect and configure find a ui: key quoted or after a byte-order mark, as yaml-subset does", () => {
+  for (const before of [
+    `${String.fromCharCode(0xfeff)}ui:\n  componentBarrel: b.ts\n`,
+    "'ui':\n  componentBarrel: b.ts\n",
+    'develop:\r\n  x: 1\r\n"ui":\r\n  componentBarrel: b.ts\r\n',
+  ]) {
+    const root = project({ "skills-config.yaml": before });
+    try {
+      assert.equal(detect(root).state, "partial", JSON.stringify(before));
+      const r = configure(root, { map: "m.md" });
+      assert.equal(r.reason, "ok", JSON.stringify(before));
+      assert.equal(r.action, "inserted");
+      const eol = before.includes("\r\n") ? "\r\n" : "\n";
+      assert.equal(config(root), `${before}  wireframeMap: "m.md"${eol}`);
+      assert.equal(detect(root).state, "configured");
+    } finally {
+      cleanup(root);
+    }
+  }
+});
+
+test("configure takes the block indent from its first key line, never a comment", () => {
+  const cases = [
+    // [before, after]
+    [
+      "ui:\n    # note\n  componentBarrel: b.ts\n  wireframeMap:\n",
+      'ui:\n    # note\n  componentBarrel: b.ts\n  wireframeMap: "m.md"\n',
+    ],
+    [
+      "ui:\n    # note\n  componentBarrel: b.ts\n",
+      'ui:\n    # note\n  componentBarrel: b.ts\n  wireframeMap: "m.md"\n',
+    ],
+    [
+      "ui:\n  componentBarrel: b.ts\n      # deep trailing note\nother: 1\n",
+      'ui:\n  componentBarrel: b.ts\n  wireframeMap: "m.md"\n      # deep trailing note\nother: 1\n',
+    ],
+  ];
+  for (const [before, after] of cases) {
+    const root = project({ "skills-config.yaml": before });
+    try {
+      assert.equal(configure(root, { map: "m.md" }).reason, "ok", before);
+      assert.equal(config(root), after, before);
+    } finally {
+      cleanup(root);
+    }
+  }
+});
+
+test("record accepts NEL in a cell, which only a config value refuses", () => {
+  const root = consumer();
+  try {
+    const r = record(root, {
+      signature: "*>chip",
+      component: "Pill",
+      label: "Save\u0085now",
+      by: "t",
+    });
+    assert.equal(r.reason, "ok");
+    const text = readFileSync(
+      join(root, readUiConfig(root).wireframeMap),
+      "utf8",
+    );
+    assert.ok(readMap(text).rows.some((row) => row.label === "Save\u0085now"));
+    // The config value keeps refusing it.
+    assert.equal(
+      runCli([
+        "configure",
+        ...flagsOf({ ...SETUP, map: "m\u0085.md" }),
+        "--root",
+        root,
+      ]).exitCode,
+      2,
+    );
+  } finally {
+    cleanup(root);
   }
 });
 
@@ -1724,33 +1916,31 @@ test("configure --decline round-trips to declined, from no block and from a part
 });
 
 test("configure restores the original bytes when the file does not read back as written", () => {
-  // A map of `off` is written as given but reads back as a decline, so the feature is not on.
-  const before = "develop:\r\n  x: 1\r\n";
-  const appended = project({ "skills-config.yaml": before });
-  const partial = project({
-    "skills-config.yaml": "ui:\n  componentBarrel: b.ts\n",
-  });
-  const created = project();
-  try {
-    const cli = runCli([
-      "configure",
-      ...flagsOf({ ...SETUP, map: "off" }),
-      "--root",
-      appended,
-      "--json",
-    ]);
-    assert.equal(cli.exitCode, 1);
-    assert.equal(cli.payload.reason, "write-failed");
-    assert.equal(config(appended), before);
-    assert.equal(configure(partial, { map: "Off" }).reason, "write-failed");
-    assert.equal(config(partial), "ui:\n  componentBarrel: b.ts\n");
-    assert.equal(
-      configure(created, { ...SETUP, map: "OFF" }).reason,
-      "write-failed",
-    );
-    assert.equal(existsSync(join(created, "skills-config.yaml")), false);
-  } finally {
-    for (const r of [appended, partial, created]) cleanup(r);
+  // Two top-level ui: blocks: configure fills the first, yaml-subset reads the last, so the
+  // keys written do not read back. Every value that cannot be stored is now a usage error before
+  // the write, so an ambiguous file is the input left that reaches the restore.
+  const cases = [
+    "ui:\n  componentBarrel: b.ts\nother: 1\nui:\n  componentExclude: Provider\n",
+    "develop:\r\n  x: 1\r\nui:\r\n  componentBarrel: b.ts\r\nui:\r\n  componentExclude: Provider\r\n",
+  ];
+  for (const before of cases) {
+    const root = project({ "skills-config.yaml": before });
+    try {
+      const cli = runCli([
+        "configure",
+        ...flagsOf({ ...SETUP }),
+        "--root",
+        root,
+        "--json",
+      ]);
+      assert.equal(cli.exitCode, 1, JSON.stringify(before));
+      assert.equal(cli.payload.reason, "write-failed");
+      assert.equal(config(root), before);
+      assert.equal(configure(root, { decline: true }).reason, "write-failed");
+      assert.equal(config(root), before);
+    } finally {
+      cleanup(root);
+    }
   }
 });
 

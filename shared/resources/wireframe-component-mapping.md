@@ -95,7 +95,7 @@ on to step 1. Read its `reason`:
 | `ok`           | the block was written and read back                                  | continue; `skills-config.yaml` is a change to commit with the work item |
 | `exists`       | the file changed since `detect`, or `key` already holds another value | re-run `detect` once; if `configure` refuses again, report `key` and skip |
 | `write-failed` | the file did not read back as written and was restored               | report it and skip; nothing changed                                     |
-| `usage` (exit 2) | a value the file cannot hold — a line break, a `"`, a `\` or another control character — or no `--map`/`--barrel`; the error names the flag | nothing was written; ask for that value again ("Adjust"), or skip |
+| `usage` (exit 2) | a value the file cannot hold — a line break, a `"`, a `\` or another control character — a `--map` of `false` or `off` (that is `--decline`), or no `--map`/`--barrel`; the error names the flag | nothing was written; ask for that value again ("Adjust"), or skip |
 
 ### 1. Ensure
 

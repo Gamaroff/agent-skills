@@ -149,9 +149,11 @@ const rawUiOf = (text) => {
   return cfg && typeof cfg.ui === "object" && cfg.ui ? cfg.ui : null;
 };
 
-// `false`, or `off` in any case: the project said no, which is not the same as never asked.
+// `false` or `off`, in any case and quoted or not: the project said no, which is not the same as
+// never asked. yaml-subset reads only a bare lowercase `false` as the boolean.
 const isDecline = (v) =>
-  v === false || (typeof v === "string" && v.trim().toLowerCase() === "off");
+  v === false ||
+  (typeof v === "string" && ["false", "off"].includes(v.trim().toLowerCase()));
 
 function readUiConfig(root) {
   const text = readConfigText(root);
@@ -401,12 +403,15 @@ function readMap(text) {
   return { rows, headerLine: start, tableEnd: end, columns: head.length };
 }
 
-// ECMAScript's whole LineTerminator set, plus NEL. A value is one cell on one line: \r and \n
-// split the row, and U+2028/U+2029 — which neither readMap nor Markdown ends a line at — stop
-// unquote's `.` from crossing, so the cell reads back with its backticks and the row never
-// matches. NEL (U+0085) is a YAML 1.1 line break, so a config value holding one is two lines to
-// any reader but yaml-subset.
+// ECMAScript's whole LineTerminator set. A value is one cell on one line: \r and \n split the
+// row, and U+2028/U+2029 — which neither readMap nor Markdown ends a line at — stop unquote's
+// `.` from crossing, so the cell reads back with its backticks and the row never matches.
 const LINE_TERMINATOR = new RegExp(
+  `[\\r\\n${String.fromCharCode(0x2028, 0x2029)}]`,
+);
+// A config value adds NEL (U+0085), a YAML 1.1 line break: one holding it is two lines to any
+// YAML reader but yaml-subset. The map is Markdown, where NEL is an ordinary character.
+const YAML_LINE_BREAK = new RegExp(
   `[\\r\\n${String.fromCharCode(0x85, 0x2028, 0x2029)}]`,
 );
 
@@ -991,8 +996,10 @@ const DEFAULT_CATALOGUE = "docs/architecture/components.md";
 const DEFAULT_SECTION = "## Components";
 const DEFAULT_MAP = "docs/architecture/wireframe-component-map.md";
 // A top-level `ui` key. An indented `ui:` belongs to another block, and an empty `ui:` parses as
-// null, so the text is what says a block is there.
-const UI_KEY = /^ui\s*:/m;
+// null, so the text is what says a block is there. It matches what yaml-subset reads as the key:
+// quoted or not, and after a byte-order mark on line 1.
+const UI_LINE = new RegExp(`^${String.fromCharCode(0xfeff)}?(["']?)ui\\1\\s*:`);
+const UI_KEY = new RegExp(UI_LINE.source, "m");
 
 // Everything detect reads, and nothing else: these barrels, one level of these workspace
 // directories, and docs/ to this depth without these work-item trees.
@@ -1017,15 +1024,15 @@ const isFile = (p) => {
 };
 const byName = (a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
 
-// The keys a raw `ui:` mapping sets to a value: a non-empty string or list.
+// The keys a raw `ui:` mapping gives a value readUiConfig can use: a non-empty string, or for
+// componentExclude any non-empty name list. A list under a path key reads as no value there.
 const presentKeys = (raw) =>
   raw
-    ? UI_KEYS.filter((k) => {
-        const v = raw[k];
-        return (
-          (typeof v === "string" && v.trim()) || (Array.isArray(v) && v.length)
-        );
-      })
+    ? UI_KEYS.filter((k) =>
+        k === "componentExclude"
+          ? nameList(raw[k]).length > 0
+          : typeof raw[k] === "string" && raw[k].trim() !== "",
+      )
     : [];
 
 // The barrel with the most component exports; on a tie, the earlier in the list.
@@ -1103,7 +1110,8 @@ function jsonFile(file, jsonc) {
 }
 
 // The module code imports the barrel's components from: the nearest package.json name above the
-// barrel (not the repository's own), else a tsconfig.json path alias that lands on it.
+// barrel (not the repository's own), else an exact tsconfig.json path alias that lands on it. A
+// wildcard alias (`@ui/*`) names no module of its own: TypeScript matches it only for `@ui/<x>`.
 function importOf(root, barrelRel) {
   const barrel = path.resolve(root, barrelRel);
   for (
@@ -1127,15 +1135,24 @@ function importOf(root, barrelRel) {
       barrel.replace(/\.[jt]sx?$/, ""),
       path.dirname(barrel),
     ];
+    let wildcard = null;
     for (const [alias, targets] of Object.entries(options.paths))
       for (const t of [].concat(targets)) {
         if (typeof t !== "string") continue;
-        if (lands.includes(path.resolve(base, t.replace(/\/?\*$/, ""))))
+        if (!lands.includes(path.resolve(base, t.replace(/\/?\*$/, ""))))
+          continue;
+        if (!alias.includes("*"))
           return {
-            value: alias.replace(/\/?\*$/, ""),
+            value: alias,
             evidence: `tsconfig.json paths alias ${alias}`,
           };
+        if (!wildcard) wildcard = alias;
       }
+    if (wildcard)
+      return {
+        value: null,
+        evidence: `tsconfig.json paths alias ${wildcard} is a wildcard, which names no single module`,
+      };
   }
   return {
     value: null,
@@ -1317,7 +1334,7 @@ function configure(root, opts) {
   for (const flag of [...Object.keys(flags), "exclude"]) {
     if (opts[flag] == null) continue;
     const v = String(opts[flag]);
-    if (LINE_TERMINATOR.test(v))
+    if (YAML_LINE_BREAK.test(v))
       throw new UsageError(`--${flag} must be one line`);
     // A value is written double-quoted, and yaml-subset reads a quoted value verbatim: any
     // character JSON.stringify escapes would read back as its escape, not as given.
@@ -1327,6 +1344,10 @@ function configure(root, opts) {
         `--${flag} cannot hold U+${ch.codePointAt(0).toString(16).toUpperCase().padStart(4, "0")}: skills-config.yaml would not read it back`,
       );
   }
+  if (opts.map != null && isDecline(String(opts.map)))
+    throw new UsageError(
+      `--map ${String(opts.map).trim()} reads as a decline: use --decline`,
+    );
   const given = {};
   if (opts.decline) given.wireframeMap = false;
   else
@@ -1376,10 +1397,10 @@ function configure(root, opts) {
       return out("exists", { key: "wireframeMap" });
     // Split after each newline, so joining the pieces gives back every byte.
     const pieces = before.split(/(?<=\n)/);
-    const at = pieces.findIndex((p) => /^ui\s*:/.test(p));
+    const at = pieces.findIndex((p) => UI_LINE.test(p));
     const inline = pieces[at]
       .replace(/\r?\n$/, "")
-      .replace(/^ui\s*:/, "")
+      .replace(UI_LINE, "")
       .replace(/(^|\s)#.*$/, "")
       .trim();
     if (inline) return out("exists", { key: "ui" });
@@ -1394,31 +1415,46 @@ function configure(root, opts) {
       if (!present.includes(k) && Object.prototype.hasOwnProperty.call(raw, k))
         blank[k] = v;
     }
-    // The block ends at its last indented line before the next column-0 key. Blank lines and
-    // column-0 comments inside it do not end it, and are not where it ends.
-    let last = at;
-    let indent = null;
-    for (let j = at + 1; j < pieces.length; j++) {
-      const line = pieces[j].replace(/\r?\n$/, "");
-      if (!line.trim() || line.startsWith("#")) continue;
-      if (!/^\s/.test(line)) break;
-      last = j;
-      if (indent === null) indent = /^\s*/.exec(line)[0];
-    }
+    // The block ends at its last indented line before the next column-0 key, and its indent is
+    // that of its first key line. Blank lines and comments, at any indent, set neither.
+    const scan = () => {
+      let last = at;
+      let indent = null;
+      for (let j = at + 1; j < pieces.length; j++) {
+        const line = pieces[j].replace(/\r?\n$/, "");
+        if (!line.trim() || /^\s*#/.test(line)) continue;
+        if (!/^\s/.test(line)) break;
+        last = j;
+        if (indent === null) indent = /^\s*/.exec(line)[0];
+      }
+      return { last, indent: indent || "  " };
+    };
     const eol = eolOf(before);
-    for (const [k, v] of Object.entries(blank)) {
-      const key = new RegExp(`^${indent}["']?${k}["']?\\s*:`);
-      const j = pieces.findIndex((p, n) => n > at && n <= last && key.test(p));
-      if (j < 0) return out("exists", { key: k });
-      const end = /\r?\n$/.exec(pieces[j]);
-      pieces[j] = yamlLines(k, v, indent).join(eol) + (end ? end[0] : "");
-    }
+    const { last, indent } = scan();
     const lines = Object.entries(written)
       .filter(([k]) => !(k in blank))
-      .flatMap(([k, v]) => yamlLines(k, v, indent || "  "));
+      .flatMap(([k, v]) => yamlLines(k, v, indent));
     if (lines.length) {
       const lead = pieces[last].endsWith("\n") ? "" : eol;
       pieces.splice(last + 1, 0, lead + lines.join(eol) + eol);
+    }
+    // A blank key is rewritten where it stands, with any list under it: a list under a path key
+    // is no value there, and left in place it would hang off the new one.
+    const under = new RegExp(`^${indent}(\\s|-(\\s|$))`);
+    for (const [k, v] of Object.entries(blank)) {
+      const end = scan().last;
+      const key = new RegExp(`^${indent}["']?${k}["']?\\s*:`);
+      const j = pieces.findIndex((p, n) => n > at && n <= end && key.test(p));
+      if (j < 0) return out("exists", { key: k });
+      let n = j + 1;
+      while (n < pieces.length && pieces[n].trim() && under.test(pieces[n]))
+        n++;
+      const tail = /\r?\n$/.exec(pieces[n - 1]);
+      pieces.splice(
+        j,
+        n - j,
+        yamlLines(k, v, indent).join(eol) + (tail ? tail[0] : ""),
+      );
     }
     text = pieces.join("");
     action = "inserted";

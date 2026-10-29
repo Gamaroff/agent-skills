@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'Medium'
 created: '2026-10-30'
@@ -12,7 +12,7 @@ description: 'detect cannot read a tsconfig whose paths use a /* alias with a **
 
 **Bug ID**: TASK-246-BUG-1
 **Related**: [task.246](./task.246.wireframe-mapping-setup-offer.md)
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Priority**: Medium
 **Severity**: Major
 **Created**: 2026-10-30
@@ -121,6 +121,7 @@ alias and `**` glob, then trailing commas); `detect` proposes `@app/components` 
 | 2026-10-30 | New          | QA Engineer | Bug created                                    |
 | 2026-10-30 | In Progress  | qa-fix      | Investigation started                          |
 | 2026-10-30 | Ready for QA | qa-fix      | String-aware JSONC strip; tests mutation-proven |
+| 2026-10-30 | Closed | qa-task | Verified by task.246.qa.2.wireframe-mapping-setup-offer.md |
 
 ---
 

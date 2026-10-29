@@ -115,6 +115,39 @@ read-back comparison each turn the test red.
 **Verification Steps for QA**: rerun the cycle 1 reproduction; `configure` answers `ok` and `detect`
 then answers `configured`.
 
+### Iteration 2
+
+#### Investigation (Reopened → In Progress)
+
+**Date**: 2026-10-30
+**Developer**: qa-fix (develop-task, QA cycle 2)
+
+**Root Cause Analysis** (CR2-5): the block scan skipped only column-0 comments, so an indented
+comment as the block's first line set the indent. The blank key was then searched for at the
+comment's indent (false `exists`), and inserted keys nested under the previous key (`write-failed`).
+A BOM or a quoted `"ui":` (CR2-4) hid the block from both commands the same way.
+
+#### Fix Implementation (In Progress → Ready for QA)
+
+**Date**: 2026-10-30
+
+**Fix Description**: comments at any indent are skipped, so the indent comes from the first key
+line. One `ui:` line pattern (`UI_LINE`) accepts a leading BOM and a quoted key, as yaml-subset
+does, and `detect` and `configure` both use it.
+
+**Files Modified**:
+
+- `shared/resources/wireframe-map.js` — `UI_LINE`/`UI_KEY`, `configure` block scan
+- `shared/resources/tests/wireframe-map.test.mjs` — "configure takes the block indent from its
+  first key line…", "detect and configure find a ui: key quoted or after a byte-order mark…"
+
+**Testing**: three comment placements (fill, insert, a deep trailing comment) and three key
+spellings (BOM, single-quoted, double-quoted with CRLF). Mutation-proven: the old comment rule, no
+BOM and no quotes each turn a test red.
+
+**Verification Steps for QA**: rerun the CR2-4 and CR2-5 reproductions; both answer `ok`, then
+`detect` answers `configured`.
+
 ---
 
 ## Status History
@@ -124,6 +157,9 @@ then answers `configured`.
 | 2026-10-30 | New          | QA Engineer | Bug created                                       |
 | 2026-10-30 | In Progress  | qa-fix      | Investigation started                             |
 | 2026-10-30 | Ready for QA | qa-fix      | One presence rule; blank key filled where it stands |
+| 2026-10-30 | Reopened | qa-task | Partial (CR2-5): a blank key under a deeper first comment is not found; see task.246.qa.2.wireframe-mapping-setup-offer.md |
+| 2026-10-30 | In Progress | qa-fix | Investigation started (cycle 2) |
+| 2026-10-30 | Ready for QA | qa-fix | Fixed in QA cycle 2; see Developer Fix Cycle |
 
 ---
 

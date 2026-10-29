@@ -618,25 +618,24 @@ the primitive in the middle of a segment (`Rebutton`), which must not match `but
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-30
-**Quality Score**: 80/100
+**Quality Score**: 70/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.246.qa.1.wireframe-mapping-setup-offer.md](./task.246.qa.1.wireframe-mapping-setup-offer.md)
-- **Gate File**: [task.246.gate.1.wireframe-mapping-setup-offer.yml](./task.246.gate.1.wireframe-mapping-setup-offer.yml)
+- **Full Report**: [task.246.qa.2.wireframe-mapping-setup-offer.md](./task.246.qa.2.wireframe-mapping-setup-offer.md)
+- **Gate File**: [task.246.gate.2.wireframe-mapping-setup-offer.yml](./task.246.gate.2.wireframe-mapping-setup-offer.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 128
+- **Tests Executed**: 132 (changed suites); `ci:fast` 6883, 0 failed
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Two medium bugs in new engine code: `detect` cannot parse a tsconfig with a `/*` alias and a `**`
-glob, or trailing commas (BUG-1); an empty `ui:` key is missing to `detect` and present to
-`configure`, so setup is offered and always refused (BUG-2). Three low items: NEL accepted in a
-`configure` value, a double quote refused as `write-failed`, and the PR body omits the breaking
-changes.
+Cycle 1's findings are fixed (BUG-1 closed). The cycle 2 refute pass found three medium bugs: a
+wildcard alias proposed as a bare prefix (BUG-3), `False` not declining (BUG-4), and a block-list
+path key crashing `detect` (BUG-5). It also found three low ones: a BOM hiding `ui:`, the indent
+taken from a comment (BUG-2 reopened), and NEL refused by `record`.
 
 <!-- change-log-start -->
 ## Change Log
@@ -649,6 +648,8 @@ changes.
 | 2026-10-30 |         | Implemented — 9 source files (+16 bundled copies), 25 new tests; status → ready-for-review | develop |
 | 2026-10-30 |         | QA gate CONCERNS (80/100) — 5 findings | qa-task |
 | 2026-10-30 |         | QA findings fixed — cycle 1: 2 bugs and 3 low findings, plus advisory CR-3 and CR-4; 4 new tests | qa-fix |
+| 2026-10-30 |         | QA gate CONCERNS (70/100) — 6 findings | qa-task |
+| 2026-10-30 |         | QA findings fixed — cycle 2: 3 bugs and 3 low findings, plus a quoted `ui:` key; 6 new tests | qa-fix |
 <!-- change-log-end -->
 
 ---
