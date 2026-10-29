@@ -420,6 +420,59 @@ test("Step 3b.1: the runner refuses an owned flag in its --flag=value spelling (
   assert.match(out.refusals[0].reason, /plan-entry-owns-flag: --repo-root/);
 });
 
+// obs #133: the security agent's reply came back with `>` as `&gt;`, so every control ran against an
+// argument the code never holds and refused it, which read as legitimate cases over-blocked.
+test("Step 3b.1: the runner refuses an argv holding an HTML entity, and runs the clean entry", () => {
+  const entry = "lib/engaging-control.mjs#validateHost";
+  const work = probeRepo([
+    { argv: ["--sink", "url-authority", "--entry", entry] },
+    {
+      argv: [
+        "--sink",
+        "url-authority",
+        "--entry",
+        entry,
+        "--name",
+        "*&gt;chip",
+      ],
+    },
+  ]);
+  const r = run("bash", stepBlock(), { cwd: work });
+  assert.equal(r.status, 0, r.stderr);
+  const out = result(work);
+  assert.deepEqual(
+    out.runs.map((x) => x.index),
+    [0],
+  );
+  assert.deepEqual(
+    out.refusals.map((x) => [x.index, x.reason]),
+    [[1, "plan-entry-html-entity: &gt;"]],
+  );
+});
+
+test("planArgvAllowed refuses each transport escape, and allows a literal & or >", async () => {
+  const { planArgvAllowed } = await import(RUNNER);
+  const base = ["--sink", "path", "--entry", "lib/x.js#isSafe"];
+  for (const e of [
+    "&gt;",
+    "&lt;",
+    "&amp;",
+    "&quot;",
+    "&apos;",
+    "&#62;",
+    "&#x3E;",
+  ])
+    assert.equal(
+      planArgvAllowed([...base, "--name", `a${e}b`]),
+      null,
+      `${e} allowed`,
+    );
+  for (const ok of ["*>chip", "a & b", "&gt", "&nbsp;", "AT&T;"]) {
+    const argv = [...base, "--name", ok];
+    assert.deepEqual(planArgvAllowed(argv), argv, `${ok} refused`);
+  }
+});
+
 test("the runner reports an unfoldable record as record-unreadable, never as zero executed (CR-4)", async () => {
   const { runPlan } = await import(RUNNER);
   const { work } = fixtureRepo();

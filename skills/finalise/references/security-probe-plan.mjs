@@ -33,7 +33,9 @@
  * --timeout: this script owns them, so a plan cannot redirect the record or the containment root,
  * or lift the engine's per-case time budget. An entry that does is refused (`plan-entry-owns-flag`)
  * and never run. Each engine run is also bounded as a whole (ENGINE_TIMEOUT_MS); one that outlives
- * it is killed and recorded as a refusal, never as executed (task.189 CR2-4).
+ * it is killed and recorded as a refusal, never as executed (task.189 CR2-4). An entry whose argv
+ * holds an HTML entity (`&gt;`, `&lt;`, `&amp;`, `&quot;`, `&apos;`, `&#…;`) is refused as
+ * `plan-entry-html-entity`: it is a transport escape from the agent's reply, not a probe (obs #133).
  *
  * Output (--json): {
  *   reason:          "ran" | "empty-plan" | "record-unreadable" (entries ran, but the record
@@ -119,7 +121,24 @@ export function planArgvAllowed(argv) {
     !argv.every((a) => typeof a === "string")
   )
     return null;
-  return ownedFlagIn(argv) === null ? argv : null;
+  return ownedFlagIn(argv) === null && htmlEntityIn(argv) === null
+    ? argv
+    : null;
+}
+
+// The escapes a subagent's reply can introduce in transport. On task.243 every `>` came back as
+// `&gt;`, so each control ran against `*&gt;chip`. The control rightly refused it, and that read as
+// 49 legitimate cases over-blocked (obs #133). Only argv is checked: a case's `input` may carry an
+// entity on purpose, but the engine's arguments name code and are never HTML.
+const HTML_ENTITY = /&(?:gt|lt|amp|quot|apos|#[0-9]+|#x[0-9a-fA-F]+);/;
+
+/** The first HTML entity in a plan entry's argv, or null. */
+export function htmlEntityIn(argv) {
+  for (const a of argv) {
+    const m = HTML_ENTITY.exec(String(a));
+    if (m) return m[0];
+  }
+  return null;
 }
 
 /** The flag a plan entry may not carry, or null. Matches `--flag` and `--flag=value`. */
@@ -232,7 +251,10 @@ export async function runPlan(options) {
       out.refusals.push({
         index: i,
         entry: entryName,
-        reason: `plan-entry-owns-flag: ${ownedFlagIn(argv)}`,
+        reason:
+          ownedFlagIn(argv) !== null
+            ? `plan-entry-owns-flag: ${ownedFlagIn(argv)}`
+            : `plan-entry-html-entity: ${htmlEntityIn(argv)}`,
       });
       continue;
     }
