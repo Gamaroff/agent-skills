@@ -169,6 +169,26 @@ test("listNodes gives each node a path id, its file line and a signature", () =>
   assert.deepEqual(rows, ["b1/window/row", "b1/window/section/row"]);
 });
 
+// U+2028/U+2029 split no line in a wireloom block, so a node holding one is still a node, and its
+// signature reads back to it (PARSELINE-1: the line used to yield no node at all).
+test("listNodes keeps a node whose label or attribute holds U+2028 or U+2029", () => {
+  for (const sep of [LS, PS]) {
+    const block = {
+      index: 1,
+      line: 1,
+      lines: [`window:`, `  button "Save${sep}now" primary tip="a${sep}b":`],
+    };
+    const button = listNodes([block]).find((n) => n.primitive === "button");
+    assert.ok(button, `${sep.charCodeAt(0).toString(16)}: no node`);
+    assert.equal(button.label, `Save${sep}now`);
+    assert.deepEqual(button.flags, ["primary"]);
+    assert.equal(button.attrs.tip, `a${sep}b`);
+    const p = parsePattern(button.signature);
+    assert.deepEqual(p.attrs, { tip: `a${sep}b` });
+    assert.equal(p.parent, "window");
+  }
+});
+
 test("ensure is a no-op without a ui: block", () => {
   const root = consumer({ config: "tracker: jira\n" });
   try {
@@ -246,6 +266,72 @@ test("ensure adds only a new export to an existing catalogue, under its own head
     const added = text.indexOf("### Added by wireframe-map");
     assert.ok(added > 0 && added < text.indexOf("## Something else"));
     assert.equal(ensure(root).catalogue, "unchanged");
+  } finally {
+    cleanup(root);
+  }
+});
+
+// record creates a missing map and nothing else: it used to call all of ensure, which also wrote
+// the component catalogue (CR12-5). The catalogue is ensure's, run first by the procedure.
+test("record creates a missing map, and leaves the catalogue to ensure", () => {
+  const root = consumer();
+  try {
+    const r = record(root, {
+      signature: "*>chip",
+      component: "Chip",
+      by: "a developer",
+      date: "2026-10-29",
+    });
+    assert.equal(r.action, "added");
+    assert.ok(existsSync(join(root, "docs/wireframe-map.md")));
+    assert.equal(existsSync(join(root, "docs/components.md")), false);
+    assert.equal(ensure(root).catalogue, "created");
+  } finally {
+    cleanup(root);
+  }
+});
+
+// A CRLF file keeps CRLF: joining with LF rewrote every line of it to add one row (CR12-4).
+test("ensure and record keep a CRLF file's line endings", () => {
+  const crlf = (lines) => lines.join("\r\n");
+  const onlyCrlf = (text) =>
+    text
+      .split("\n")
+      .every((l, i, all) => i === all.length - 1 || l.endsWith("\r"));
+  const catalogue = crlf([
+    "## Components",
+    "",
+    "| Component | Tier | Use it for |",
+    "| --- | --- | --- |",
+    "| `Button` | atoms | Ours |",
+    "",
+  ]);
+  const map = crlf([
+    "| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
+    "",
+  ]);
+  const root = consumer({
+    files: { "docs/components.md": catalogue, "docs/wireframe-map.md": map },
+  });
+  try {
+    assert.equal(ensure(root).catalogue, "updated");
+    const cat = readFileSync(join(root, "docs/components.md"), "utf8");
+    assert.ok(onlyCrlf(cat), "the catalogue lost CRLF");
+    const opts = { component: "Chip", by: "a developer", date: "2026-10-29" };
+    const mapFile = join(root, "docs/wireframe-map.md");
+    const before = readFileSync(mapFile, "utf8").split("\n").length;
+    assert.equal(
+      record(root, { ...opts, signature: "*>chip" }).action,
+      "added",
+    );
+    assert.equal(
+      record(root, { ...opts, signature: "*>chip" }).action,
+      "replaced",
+    );
+    const after = readFileSync(mapFile, "utf8");
+    assert.ok(onlyCrlf(after), "the map lost CRLF");
+    assert.equal(after.split("\n").length, before + 1);
   } finally {
     cleanup(root);
   }
@@ -385,6 +471,69 @@ const MAP = [
   "| `text[bold]` |  | Heading |  |  |  | 2026-10-29, a |",
   "",
 ].join("\n");
+
+// The catalogue filters candidates by whole component name, and a catalogue without its section is
+// reported rather than read as empty (CR12-3: `ButtonGroup` passed on `Button` by substring).
+test("resolve filters candidates by whole catalogue names and reports the catalogue's state", () => {
+  const map = [
+    "| Signature | Label | Component | Variant / props | Source hint | Notes | Confirmed |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
+    "| `icon{name=lock}` |  | ButtonGroup |  |  |  | 2026-10-29, a |",
+    "| `icon{name=star}` |  | Button in ActionRow |  |  |  | 2026-10-29, a |",
+    "| `icon{name=heart}` |  | Button. |  |  |  | 2026-10-29, a |",
+    "",
+  ].join("\n");
+  const catalogue = (section) =>
+    [
+      section,
+      "",
+      "| Component | Tier | Use it for |",
+      "| --- | --- | --- |",
+      "| `Button` | atoms | A call to action |",
+      "",
+    ].join("\n");
+  const open = (root) => {
+    const r = resolve(root, "docs/story.md");
+    const icon = r.unresolved.find(
+      (n) => n.signature === "row>icon{name=leader}",
+    );
+    return { r, from: icon.candidates.map((c) => c.from) };
+  };
+  const cases = [
+    [catalogue("## Components"), "ok", ["icon{name=star}", "icon{name=heart}"]],
+    [
+      catalogue("## Something else"),
+      "no-section",
+      ["icon{name=lock}", "icon{name=star}", "icon{name=heart}"],
+    ],
+    [
+      null,
+      "missing",
+      ["icon{name=lock}", "icon{name=star}", "icon{name=heart}"],
+    ],
+  ];
+  for (const [text, state, from] of cases) {
+    const files = { "docs/wireframe-map.md": map };
+    if (text !== null) files["docs/components.md"] = text;
+    const root = consumer({ files });
+    try {
+      const got = open(root);
+      assert.equal(got.r.catalogueState, state);
+      assert.deepEqual(got.from, from, state);
+    } finally {
+      cleanup(root);
+    }
+  }
+  const noKey = consumer({
+    config: CONFIG.replace(/^ {2}componentCatalogue: .*\n/m, ""),
+    files: { "docs/wireframe-map.md": map },
+  });
+  try {
+    assert.equal(open(noKey).r.catalogueState, "unset");
+  } finally {
+    cleanup(noKey);
+  }
+});
 
 test("resolve picks the most specific matching row and lists the open nodes", () => {
   const root = consumer({ files: { "docs/wireframe-map.md": MAP } });
@@ -853,5 +1002,39 @@ test("CLI: usage errors exit 2, an unknown flag is refused, a missing work item 
     assert.equal(JSON.parse(ok.stdout).catalogue, "created");
   } finally {
     cleanup(root);
+  }
+});
+
+// A config that exists and cannot be read is not "feature off" (CR12-2): it used to answer `unset`,
+// exit 0, for a project that had turned the feature on. A missing config is still `unset`.
+test("CLI: an unreadable skills-config.yaml exits 1 as config-unreadable, a missing one is unset", () => {
+  const unreadable = consumer({ config: null });
+  const missing = consumer({ config: null });
+  try {
+    mkdirSync(join(unreadable, "skills-config.yaml"));
+    for (const command of [
+      ["ensure"],
+      ["resolve", "docs/story.md"],
+      ["record", "--signature", "*>chip", "--component", "Chip", "--by", "t"],
+    ]) {
+      const run = (root) =>
+        spawnSync(
+          process.execPath,
+          [SCRIPT, ...command, "--root", root, "--json"],
+          { encoding: "utf8" },
+        );
+      const bad = run(unreadable);
+      assert.equal(bad.status, 1, `${command[0]}: ${bad.stdout}${bad.stderr}`);
+      const out = JSON.parse(bad.stdout);
+      assert.equal(out.reason, "config-unreadable", command[0]);
+      assert.match(out.error, /skills-config\.yaml cannot be read/);
+      const none = run(missing);
+      assert.equal(none.status, 0, command[0]);
+      assert.equal(JSON.parse(none.stdout).reason, "unset", command[0]);
+    }
+    assert.equal(existsSync(join(unreadable, "docs/wireframe-map.md")), false);
+  } finally {
+    cleanup(unreadable);
+    cleanup(missing);
   }
 });

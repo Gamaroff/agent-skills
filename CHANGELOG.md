@@ -176,6 +176,18 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The wireframe map engine's last task-243 lows are closed (CR12-2 to CR12-5, PARSELINE-1).**
+  - A `skills-config.yaml` that exists but cannot be read no longer reads as "feature off". Every
+    command exits 1 with `reason: config-unreadable`.
+  - Adding a row to a CRLF map or catalogue keeps CRLF, instead of rewriting every line as LF.
+  - A Wireloom line whose label or attribute holds U+2028 or U+2029 is now listed as a node, not
+    dropped.
+  - Candidates are filtered by whole catalogue names (`ButtonGroup` no longer passes on `Button`).
+    `resolve` reports `catalogueState`, so a catalogue without its section is visible rather than
+    silently unfiltered.
+  - `record` creates only a missing map. It no longer runs all of `ensure`, which also wrote the
+    catalogue.
+
 - **`/finalise` no longer runs a security probe plan whose arguments were HTML-escaped in transport
   (obs #133).** On task.243 the security agent's reply turned every `>` into `&gt;`, so each control
   ran against an argument the code never holds. The run reported 49 legitimate cases as

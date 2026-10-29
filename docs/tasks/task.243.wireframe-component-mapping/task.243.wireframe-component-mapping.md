@@ -242,9 +242,18 @@ catalogue files stay as they are.
   by gate 14. `readUiConfig` reads an unreadable config as a missing one (CR12-2); the candidate
   filter matches a component by substring, and a missing catalogue section disables it (CR12-3);
   `ensure` and `record` rewrite a CRLF map as LF (CR12-4); `record` re-finds the header `readMap`
-  already found and calls all of `ensure` to create a missing map (CR12-5).
+  already found and calls all of `ensure` to create a missing map (CR12-5). **All four fixed after
+  acceptance (2026-10-29):**
+  - CR12-2: only a missing config is `unset`; an unreadable one exits 1 as `config-unreadable`.
+  - CR12-3: candidates match catalogued names whole, and `resolve` reports `catalogueState`.
+  - CR12-4: writes keep the file's own line ending.
+  - CR12-5: `record` uses `readMap`'s header line and creates only the map.
+
+  Each fix has a test that goes red when it is reverted.
 - **TASK-243-PARSELINE-1** (LOW) — carried to gate 13, still carried by gate 14. A Wireloom line
-  holding U+2028 yields no node, because `parseLine`'s `.*$` cannot cross it.
+  holding U+2028 yields no node, because `parseLine`'s `.*$` cannot cross it. **Fixed after
+  acceptance (2026-10-29):** the line regex and the attribute regexes take the `s` flag. A test
+  covers U+2028 and U+2029 in a label and an attribute, and removing either flag turns it red.
 - **TASK-243-CR13-3** (LOW) — carried to gate 13, still carried by gate 14. The procedure and
   `configuration.md` list only some of the characters `encodeValue` encodes; say every character
   outside the unreserved set plus `/ : # @ + =` is encoded, or say to copy the signature as
@@ -378,5 +387,6 @@ The gate-14 low findings stay in Deferred Work above.
 | 2026-10-29 |  | Deferred Work: CR14-1 and CR14-2 fixed after acceptance (flags de-duplicated in parsePattern; label must-differ test) | Lorien Gamaroff |
 | 2026-10-29 |  | Deferred Work: CR7-1, CR8-1, CR11-1 and CR11-2 fixed after acceptance (test and comment cleanups) | Lorien Gamaroff |
 | 2026-10-29 |  | Deferred Work: CR13-3 fixed after acceptance (signature encoding stated in full) | Lorien Gamaroff |
+| 2026-10-29 |  | Deferred Work: CR12-2 to CR12-5 and PARSELINE-1 fixed after acceptance; no task-243 lows remain | Lorien Gamaroff |
 <!-- change-log-end -->
 
