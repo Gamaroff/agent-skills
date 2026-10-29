@@ -138,6 +138,10 @@ Each mutation was applied with the Edit tool to the file named, the named test f
 - QA loop re-entry: 1 extra cycle granted (operator request); 0 cycle(s) run outside the loop back-filled from disk. `grant-qa-cycles.sh`: `QA_CYCLE=5 extra_cycles_granted=1 qa_max_cycles=6 reenter_at=5a convergence_from_cycle=6` — re-entering at 5a (review first), so gate 6 reads the CR5-1 fix at `4c6474ad`. The escalation HALT had left the lock in place with no halt snapshot, so the script found a surviving lock and restored nothing.
 - QA Cycle 6: the traceability mapper ran (13 criteria; SC-11 and SC-13 partial, SC-12 integration). Cycles 1–5 did not run it and logged no skip reason. Gate 6 CONCERNS, HIGH 0. Convergence: one post-grant reading, no trip. Route: `continue (not-a-pass-gate)`; route 2 declined: `product-defect-signal`.
 - QA Cycle 6 — narrowing offer: Narrowing residue — every MEDIUM on gates 5 and 6 names shared/resources/finalise-rerun-scope.js (TASK-242-CR5-1, TASK-242-CR6-1); HIGH 0 on both. Passed to qa-fix Step 2.6.
+- QA loop re-entry: 1 extra cycle granted (operator request, second grant); 0 cycle(s) run outside the loop back-filled from disk. `grant-qa-cycles.sh`: `QA_CYCLE=6 extra_cycles_granted=1 qa_max_cycles=7 reenter_at=5a convergence_from_cycle=7` — re-entering at 5a (review first), so gate 7 reads the CR6-1 fix at `4c501df4`. The lock was restored from the halt snapshot.
+- QA Cycle 7: the traceability mapper ran (13 criteria; SC-11 partial; SC-12 and SC-13 have no test). Gate 7 CONCERNS, HIGH 0. Convergence: window starts at cycle 7, one reading, no trip. Route: `continue (not-a-pass-gate)`; route 2 declined: `product-defect-signal`. changes-requested → `stage-disabled`.
+- QA Cycle 7 — QA7-1 enters `top_issues[]` though the reviewer rated it confidence medium. `code_review_blocking` promotes only high confidence, and the confidence was not changed. QA raised the finding from its own execution reproduction (a FAIL on changed evidence is overturned; the control keeps it), because it breaks SC-4's merge rule. This is a judgement call made on the operator's behalf.
+- QA Cycle 7 — narrowing offer: Narrowing residue — every MEDIUM on gates 6 and 7 names shared/resources/finalise-rerun-scope.js (TASK-242-CR6-1, TASK-242-QA7-1); HIGH 0 on both. Passed to qa-fix Step 2.6.
 
 ---
 
@@ -193,6 +197,29 @@ The pipeline completed 6 qa-task/qa-fix cycles (5 plus 1 granted) without a clea
 1. Re-run `/develop-task` and take Phase 0b's "Resume the QA loop with 1 more cycle". One gate on `4c501df4` reads the restructured rule, and if it is clean the run goes to 5c and finalise.
 2. Or accept the current state: run `/review-pr --effort medium --comment --no-code`, then `/finalise`. The fix is green and mutation-proven but ungated, so the review must read `4c501df4`.
 3. Or, if another basename edge is found, drop bare-basename resolution entirely (a bare basename never resolves, so the criterion is always re-judged). This costs carry on every bare citation.
+
+### QA Loop Limit Reached — 2026-10-29
+
+The pipeline completed 7 qa-task/qa-fix cycles (5 plus 2 granted, one at a time) without a clean PASS.
+
+**Final gate status**: CONCERNS (90/100, gate 7 at `9d690e98`; cycle 7's fix `cc0da45e` is ungated)
+**HIGH findings per cycle**: 2, 3, 1, 0, 0, 0 | 0 — second grant at cycle 7; 0 since cycle 4
+**Remaining issues** (from final gate file):
+- TASK-242-QA7-1 (medium, `shared/resources/finalise-rerun-scope.js`): in merge, a multi-token new-member citation with an ambiguous changed basename read as unchanged, so the agent's FAIL was overturned. **Fixed in `cc0da45e`**: the fix failed first in the new tests, both mutations are covered, and `ci:fast` is green. No gate has read it yet.
+
+**What was attempted per cycle**:
+- Cycles 1–6: see the two escalation entries above.
+- Cycle 7 (granted): gate 7 verified CR6-1 (2 of 2 mutations covered) and found QA7-1 on the merge side. The reviewer rated it confidence medium, so it was not auto-promoted. QA raised it from its own execution reproduction. The narrowing offer fired again, and qa-fix took **consolidate**: merge now builds its index through the same `evidenceIndex`, differing only in its candidate set.
+- Route 2c (gate the last fix) was considered and declined: `medium-not-falling`. MEDIUM read 1, 1, 1 over cycles 5–7.
+
+**Likely root cause**: the same mechanism: bare-basename citation resolution. Cycle 6 made the scope-side rule complete, and gate 7 found no scope-side edge. QA7-1 was not a new case of the rule. It was the second index (merge's) built by hand with the rule switched off. After cycle 7 there is one index constructor and one ambiguity rule, and the two indexes differ only in whether gone paths are candidates. No second copy of the rule is left to drift.
+
+**Third-strike files**: none. Gates 6 and 7 raised no HIGH, so the two-gate comparison prints nothing.
+
+**Recommended next steps**:
+1. Accept the current state: run `/review-pr --effort medium --comment --no-code` on `cc0da45e`, then `/finalise`. The fix is small, consolidating and mutation-proven, and the review reads it.
+2. Or re-run `/develop-task` and take "Resume the QA loop with 1 more cycle" to gate `cc0da45e` first.
+3. Or drop bare-basename resolution entirely (a bare basename never resolves, so the criterion is always re-judged), if one more edge appears.
 
 ---
 
@@ -274,6 +301,18 @@ _Track each QA review/fix cycle._
 **Fixes Applied**: CR6-1 (narrowing offer taken: **scope the claim**). A bare basename that several files carry no longer names one: it resolves to every candidate when any of them changed since the prior head (added, modified or gone), else to nothing. This subsumes the CR4-1 gone-only rule. `merge` keeps the HEAD-alone rule (CR5-1) through an index with no `changed` set. 1 scope test added, 1 extended; both failed first. Mutations: fix removed → covered, over-widening → covered, merge's `changed: null` → absorbed (merge counts `changed` and `unresolved` alike). `ci:fast` 6783 pass, 0 fail.
 **Commit**: `4c501df4`
 **Post-fix PR state**: OPEN at `4c501df4` (pushed). Read inline with `gh pr view`; the tracker poller subagent was not dispatched.
+
+### QA Cycle 7 — 2026-10-29
+**Gate Result**: CONCERNS (90/100)
+**Issues Found**: 1. QA7-1 (medium): on the merge side, a new member whose citation has several tokens, one an ambiguous bare basename with a changed HEAD candidate, reads `unchanged`, so the agent's FAIL is overturned. `changed: null` in merge's index is the cause. Source: code-review CR-1 (bug, medium, confidence **medium**). It is not promoted under `code_review_blocking`. QA raised it from its own execution reproduction in a scratch worktree (SC-3=PASS; the control gives FAIL). CR6-1 verified: 2 of 2 mutations covered. Reviewer: dispatched 09:10:43Z, returned in 76.5 s.
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop limit reached
+**Fixes Applied**: QA7-1 (narrowing offer taken: **consolidate the contract**). The scope-side rule is sound: when no candidate changed, nothing the citation could mean changed. The defect was that merge switched it off with a hand-built `changed: null` override. `evidenceIndex(…, { goneCandidates: false })` is now merge's index. It differs from scope's only in its candidate set (no gone paths, CR5-1), and `changed` is kept. 1 merge test added (both identity directions), 1 extended; both failed first. Mutations: `changed: null` restored → covered; `goneCandidates` ignored → covered. `ci:fast` 6798 tests, 6784 pass, 0 fail; `bundle:check` clean. The first `ci:fast` run was red on prettier formatting of the two edited files; after formatting it was green. The ingester and pre-fix mapping ran inline: the orchestrator wrote gate 7 in this session, so this pass is not independent of the review.
+**Commit**: `cc0da45e`
+**Post-fix PR state**: OPEN (pushed `9d690e98..cc0da45e`). Read inline with `gh pr view`; the tracker poller subagent was not dispatched.
 
 ---
 
