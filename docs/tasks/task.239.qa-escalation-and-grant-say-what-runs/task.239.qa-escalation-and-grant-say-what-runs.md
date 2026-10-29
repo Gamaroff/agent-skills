@@ -310,6 +310,28 @@ None.
 ### Key Findings
 No critical issues identified. Granted cycle 6 adds a test that pins filling rule 1's Convergence stall row, closing DoD run 3's SC-7 gap. Mutations M17 and M18 turn it red. ci:fast is green. Two reviewer findings are advisory: a medium-confidence reading of rule 2 as a second comparison, and an unbounded slice in the test.
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS (DoD run 4)
+
+### Missing Criteria:
+
+1. **Acceptance Criteria:**
+   - [ ] SC-7 (stall member): filling rule 2 (`shared/resources/develop-pipeline-step-5-6-qa-loop.md:2118-2121`) compares cycle N's HIGH files with gate N-1's `high_files` output on a stall. The three-gate block keeps no list for it to reuse, so a stall entry carries two comparisons.
+   - [ ] SC-11: no recorded mutation for `qa-escalation-template.test.mjs:231`, `:93-96`, `:108-112` or `:113-115`; partial mapping for `:352-355`, `:190-205`, `:156` and `:210-216`
+
+### Next Steps:
+
+- [ ] Reword SC-7 to count rule 2's comparison, or change rule 2 and pin it
+- [ ] Mutation-prove the seven groups and record each in a commit message
+- [ ] Re-run `/finalise`, or accept with a recorded override
+
+**Estimated Effort:** Small
+
+**Gap Report Generated:** 2026-10-29
+
+**Detailed Verification Log:** See `task.239.dod.4.qa-escalation-and-grant-say-what-runs.md`.
+
 ## Definition of Done - Gaps Identified — run 3 (historical, superseded)
 
 **Status:** SUPERSEDED. The gap was closed on 2026-10-29 by `2eaa7268`, a test that pins the Convergence stall row (mutations M17 and M18, each red and then restored green), and verified in granted QA cycle 6 (gate 6 PASS). Kept as history; the current verdict is the newest `task.239.dod.{N}` file.
@@ -401,6 +423,7 @@ No critical issues identified. Granted cycle 6 adds a test that pins filling rul
 | 2026-10-28 |  | DoD incomplete — 1 gap identified (SC-11, run 2) | finalise |
 | 2026-10-28 |  | DoD incomplete — 1 gap identified (SC-7 stall member, run 3) | finalise |
 | 2026-10-29 |  | QA gate PASS (100/100) — 0 findings (cycle 6, granted after DoD run 3) | qa-task |
+| 2026-10-29 |  | DoD incomplete — 2 gaps identified (SC-7 stall member, SC-11; run 4) | finalise |
 <!-- change-log-end -->
 
 ---
