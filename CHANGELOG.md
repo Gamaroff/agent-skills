@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.62.0] - 2026-10-29
+
 ### Added
 
 - **Wireframe nodes are linked to the project's own UI components, and the skills ask when unsure
