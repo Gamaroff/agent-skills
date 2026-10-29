@@ -248,7 +248,9 @@ catalogue files stay as they are.
 - **TASK-243-CR13-3** (LOW) — carried to gate 13, still carried by gate 14. The procedure and
   `configuration.md` list only some of the characters `encodeValue` encodes; say every character
   outside the unreserved set plus `/ : # @ + =` is encoded, or say to copy the signature as
-  `resolve` prints it.
+  `resolve` prints it. **Fixed after acceptance (2026-10-29):** both now say to copy the signature
+  as printed, state the full rule, and name the four cases a hand-written value must encode, each
+  checked against the decoder. The same wording is used in the engine's seeded map.
 - **TASK-243-CR14-1** (LOW) — carried to gate 14. `signatureKey` de-duplicates flags but `score`
   counts them with duplicates, so `input[a,a]` and `input[a]` share a key but not a score.
   De-duplicate once in `parsePattern`. **Fixed after acceptance (2026-10-29):** `parsePattern`
@@ -375,5 +377,6 @@ The gate-14 low findings stay in Deferred Work above.
 | 2026-10-29 | 1.3 | DoD passed — accepted (PR #785); DoD run 4, 7/7 criteria, probe 136/0/0 | finalise |
 | 2026-10-29 |  | Deferred Work: CR14-1 and CR14-2 fixed after acceptance (flags de-duplicated in parsePattern; label must-differ test) | Lorien Gamaroff |
 | 2026-10-29 |  | Deferred Work: CR7-1, CR8-1, CR11-1 and CR11-2 fixed after acceptance (test and comment cleanups) | Lorien Gamaroff |
+| 2026-10-29 |  | Deferred Work: CR13-3 fixed after acceptance (signature encoding stated in full) | Lorien Gamaroff |
 <!-- change-log-end -->
 
