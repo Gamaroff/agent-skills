@@ -1,0 +1,95 @@
+schema: 2
+task: 'task.243.wireframe-component-mapping'
+task_title: "Link Wireloom wireframe nodes to the project's UI components, and ask when unsure"
+gate: CONCERNS
+status_reason: 'The DoD run 3 fix holds: one LINE_TERMINATOR constant closes U+2028/U+2029 in parsePattern and record; both arms are mutation-proven at QA, and the DoD 3 plan re-run measures 114 executed, 0 reproduced, 0 escaped. The reviewer found a new medium: an attribute value with a comma or brace does not round-trip through its own signature (CR-1), promoted under code_review_blocking.'
+reviewer: 'QA Engineer'
+head: '295974a5ee2b57c623bf9844a9f3a1cc613fa4c0'
+updated: '2026-10-29T17:40:28Z'
+
+top_issues:
+  - id: 'TASK-243-CR12-1'
+    severity: medium
+    file: 'shared/resources/wireframe-map.js'
+    finding: 'signatureOf writes attribute values unescaped, but parsePattern ends the list at } and splits it on a comma, so value="1,500" (grammar.md:820) parses back as value 1 and never matches its own node, and placeholder="a}b" does not parse (bug.15).'
+    suggested_action: 'Give attribute values one encoding that signatureOf and parsePattern both use, and add a test that every listNodes signature matches its own node through parsePattern and match.'
+    suggested_owner: dev
+    bug_ref: 'task.243.bug.15.attribute-value-signatures-do-not-round-trip.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90 # one medium finding
+
+evidence:
+  tests_reviewed: 40
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 114
+    escaped: 0
+    notes: 'boundary: true. The DoD run 3 plan (11 controls: two fence guards, parsePattern, eight record flags) re-run against 295974a5: 114 executed, 0 reproduced, 0 escaped (task.243.qa.12.security.run.json). The 9 U+2028/U+2029 cases that reproduced at DoD run 3 now score as required, so the probe is calibrated on this defect. CR-1 is an identity defect, not a refusal gap: no probe sends a signature produced by signatureOf.'
+  performance:
+    status: PASS
+    notes: 'One regex test per value, compiled once at module load.'
+  reliability:
+    status: PASS
+    notes: 'A refused record leaves the map byte-identical; the refusal tests assert it after every case.'
+  maintainability:
+    status: PASS
+    notes: 'One constant names the LineTerminator set for both checks; eight bundled copies match the source apart from the generated header; bundle:check clean.'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-243-CR12-1 (bug.15): attribute values must round-trip through their own signature.'
+      refs: ['shared/resources/wireframe-map.js', 'shared/resources/tests/wireframe-map.test.mjs']
+  future:
+    - id: 'TASK-243-CR12-2'
+      action: 'readUiConfig returns null for an unreadable skills-config.yaml as for a missing one, so the feature reads as off; return null only on ENOENT.'
+      refs: ['shared/resources/wireframe-map.js']
+    - id: 'TASK-243-CR12-3'
+      action: 'The candidate filter matches a component by substring (ButtonGroup passes on Button), and a missing catalogue section disables it as if empty; compare exactly and tell the two apart.'
+      refs: ['shared/resources/wireframe-map.js']
+    - id: 'TASK-243-CR12-4'
+      action: 'ensure and record join with LF after splitting on CRLF-or-LF, so one added row rewrites every line ending of a CRLF file.'
+      refs: ['shared/resources/wireframe-map.js']
+    - id: 'TASK-243-CR12-5'
+      action: 'Cleanups: record re-finds the header readMap already found (CR-5), and record calls the whole ensure command to create a missing map (CR-6).'
+      refs: ['shared/resources/wireframe-map.js']
+    - id: 'TASK-243-CR11-1'
+      action: 'The round-trip check refuses an odd backtick in --by/--date although readMap never reads the Confirmed cell.'
+      refs: ['shared/resources/wireframe-map.js']
+      carried_from: gate 11
+    - id: 'TASK-243-CR11-2'
+      action: 'Correct the comment on why --by/--date skip unquote.'
+      refs: ['shared/resources/wireframe-map.js']
+      carried_from: gate 11
+    - id: 'TASK-243-CR8-1'
+      action: 'Drop or mark documentary the two existsSync assertions in the resolve unset test.'
+      refs: ['shared/resources/tests/wireframe-map.test.mjs']
+      carried_from: gate 8
+    - id: 'TASK-243-CR7-1'
+      action: 'Assert the unreadable-arm text instead of /HALT/ in the no-jq test.'
+      refs: ['evals/shared/tests/wireframe-mapping-hooks.test.mjs']
+      carried_from: gate 7
+    - action: 'CR7-2 to CR7-4, the resume-detector current_step reading, grant-qa-cycles.sh re-entry (obs #130), and gate 1-2 lows: unchanged from gate 7.'
+      refs: ['shared/resources/develop-pipeline-step-2-review.md', 'shared/resources/pipeline-resume-detector-prompt.md', 'shared/resources/grant-qa-cycles.sh']
+
+bug_resolution:
+  bugs_fixed: 17
+  bugs_remaining: 1
+  fix_date: '2026-10-29'
+  total_iterations: 9
+  verification_method: 'DoD run 3 fix 295974a5: both arms mutation-proven at QA in a scratch worktree (each off -> its named test red, 18/19; restored 19/19); DoD 3 probe plan 114 executed, 0 reproduced, 0 escaped'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-243-CR12-1 fixed and re-gated']
