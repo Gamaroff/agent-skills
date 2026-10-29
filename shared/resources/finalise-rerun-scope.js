@@ -128,9 +128,11 @@ function isReopened(body) {
 
 /**
  * Resolve the paths a citation names. A token contributes a path only when it
- * resolves to a tracked file: a repo-relative path as written, or a bare
- * basename exactly one tracked file carries. An abbreviated `:N-M`, a commit
- * SHA, an ambiguous basename and `NOT_APPLICABLE: …` resolve to nothing.
+ * resolves to a tracked file, or to one gone since the prior head: a
+ * repo-relative path as written, or a bare basename exactly one file at HEAD
+ * carries (or, when HEAD carries none, exactly one gone file). An abbreviated
+ * `:N-M`, a commit SHA, an ambiguous basename and `NOT_APPLICABLE: …` resolve
+ * to nothing.
  */
 function resolveCitation(citation, tracked) {
   if (citation === null || citation === undefined) return [];
@@ -146,8 +148,13 @@ function resolveCitation(citation, tracked) {
       out.add(token);
       continue;
     }
+    if (token.includes("/")) continue;
+    // A bare basename resolves against HEAD first; only a basename HEAD no
+    // longer carries falls back to the paths gone since the prior head.
     const hits = tracked.byBase.get(token);
-    if (!token.includes("/") && hits && hits.length === 1) out.add(hits[0]);
+    const gone = tracked.goneByBase && tracked.goneByBase.get(token);
+    if (hits && hits.length === 1) out.add(hits[0]);
+    else if (!hits && gone && gone.length === 1) out.add(gone[0]);
   }
   return [...out];
 }
@@ -156,9 +163,14 @@ function resolveCitation(citation, tracked) {
 // path that changed since the prior head. A cited file deleted or renamed
 // since then is in the second set only; without it the citation resolved to
 // nothing and the criterion's other, unchanged paths carried it (task.242 QA
-// cycle 2, CR2-3).
+// cycle 2, CR2-3). The gone paths keep their own basename map: merged into
+// HEAD's, a file moved under the same name (src/b.js → lib/b.js) made its
+// bare basename ambiguous, and the move was carried (QA cycle 3, CR3-1).
 function evidenceIndex(trackedPaths, changed) {
-  return trackedIndex([...new Set([...trackedPaths, ...changed])]);
+  const head = trackedIndex(trackedPaths);
+  const gone = [...changed].filter((p) => !head.paths.has(p));
+  for (const p of gone) head.paths.add(p);
+  return { ...head, goneByBase: trackedIndex(gone).byBase };
 }
 
 function trackedIndex(paths) {
@@ -199,6 +211,9 @@ function git(cwd, args) {
   });
 }
 
+const DIFF_NAMES = ["diff", "--name-only", "--no-renames", "-z"];
+const nameList = (s) => s.split("\0").filter(Boolean);
+
 function gitIo(cwd) {
   return {
     revParse: (ref) =>
@@ -215,21 +230,18 @@ function gitIo(cwd) {
     // working tree has changed since HEAD. A superset of the committed diff,
     // so an uncommitted edit to a cited file re-judges rather than carries.
     // --no-renames: a rename is listed under both names, so a citation of the
-    // old name is seen as changed (CR2-3).
-    changed: (from, to) => {
-      const lines = (s) => s.split("\n").filter(Boolean);
-      return new Set([
-        ...lines(git(cwd, ["diff", "--name-only", "--no-renames", from, to])),
-        ...lines(git(cwd, ["diff", "--name-only", "--no-renames", "HEAD"])),
-      ]);
-    },
+    // old name is seen as changed (CR2-3). -z: raw names, as `tracked` reads
+    // them; a C-quoted non-ASCII name never matched a citation (QA cycle 3,
+    // CR3-2).
+    changed: (from, to) =>
+      new Set([
+        ...nameList(git(cwd, [...DIFF_NAMES, from, to])),
+        ...nameList(git(cwd, [...DIFF_NAMES, "HEAD"])),
+      ]),
     // The tracked files the working tree has changed since HEAD: what this
     // run's agents read and the head does not hold (CR2-4).
-    dirty: () =>
-      git(cwd, ["diff", "--name-only", "--no-renames", "HEAD"])
-        .split("\n")
-        .filter(Boolean),
-    tracked: () => git(cwd, ["ls-files", "-z"]).split("\0").filter(Boolean),
+    dirty: () => nameList(git(cwd, [...DIFF_NAMES, "HEAD"])),
+    tracked: () => nameList(git(cwd, ["ls-files", "-z"])),
   };
 }
 
@@ -457,7 +469,7 @@ function recordEntry(c, ac) {
     members: Array.isArray(ac.members) ? ac.members : [],
     // Why a FAIL rested on something other than a member (CR2-2). Kept so the
     // next run's scope can name it, and is only meaningful beside a FAIL.
-    non_member_fail: ac.status === "PASS" ? null : nonMemberFail(ac) || null,
+    non_member_fail: ac.status === "PASS" ? null : nonMemberFail(ac),
     note: ac.note ?? null,
   };
 }
@@ -494,7 +506,7 @@ function mergeReportedGap(r, agentAc, io, advisories) {
     return { ...agentAc, ac_id: r.id };
   }
   const agentMembers = new Map(
-    (agentAc && Array.isArray(agentAc.members) ? agentAc.members : [])
+    (Array.isArray(agentAc.members) ? agentAc.members : [])
       .filter((m) => m && m.member)
       .map((m) => [m.member, m]),
   );
@@ -904,6 +916,7 @@ module.exports = {
   isReopened,
   resolveCitation,
   trackedIndex,
+  evidenceIndex,
   scope,
   renderScopeText,
   merge,

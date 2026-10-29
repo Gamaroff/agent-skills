@@ -96,8 +96,8 @@ Step 3c aggregation (existing, extended: after the YAML parse, before Step 3d re
 **Criterion identity.** The engine assigns every criterion's id, and the agent echoes it. The id is the document's own leading id when the line has one (`SC-7`, `AC3`). Otherwise it is `#N`, the criterion's position in the section. Of the 14 most recent task documents, 10 carry no leading ids. A prior criterion is matched by id when the document has ids, and otherwise by text hash. An id-less criterion whose text changed is therefore `new-criterion`. `<RERUN_SCOPE>` lists the ids in full mode too, so every record is keyed the same way. `merge` joins on these ids and never on an id the agent invented.
 
 **Citation paths.** A citation contributes a path only when it resolves to a file `git ls-files` tracks:
-- a repo-relative `path:line` resolves to its path;
-- a bare basename resolves when exactly one tracked file has that basename;
+- a repo-relative `path:line` resolves to its path, including a path deleted or renamed since the prior head (it counts as changed);
+- a bare basename resolves when exactly one file at HEAD has that basename. When HEAD has none, it resolves to the one deleted or renamed path that does. HEAD wins, so a file moved under its own name resolves to its new path (QA cycles 2–3: CR2-3, CR3-1);
 - an abbreviated `:N-M`, a commit SHA, or anything ambiguous does not resolve.
 
 task.239's DoD runs cite all three unresolvable shapes. A PASS with no resolvable code, test or member-evidence path cannot be watched for change, so it is re-judged rather than carried.
@@ -369,26 +369,22 @@ None.
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-29
-**Quality Score**: 40/100
+**Quality Score**: 80/100
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.242.qa.2.scope-finalise-re-runs.md](./task.242.qa.2.scope-finalise-re-runs.md)
-- **Gate File**: [task.242.gate.2.scope-finalise-re-runs.yml](./task.242.gate.2.scope-finalise-re-runs.yml)
+- **Full Report**: [task.242.qa.3.scope-finalise-re-runs.md](./task.242.qa.3.scope-finalise-re-runs.md)
+- **Gate File**: [task.242.gate.3.scope-finalise-re-runs.yml](./task.242.gate.3.scope-finalise-re-runs.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 134
+- **Tests Executed**: 138
 - **Phases Verified**: 18/18
-- **Critical Issues**: 3
+- **Critical Issues**: 1
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: PASS
 
 ### Key Findings
-All eight cycle-1 findings are fixed and mutation-proved. The cycle-2 refute pass found three engine paths that carry or restore a PASS the evidence no longer supports:
-- CR2-1: an omitted member-shaped reported gap passes.
-- CR2-2: an invented advisory member overturns a non-member FAIL.
-- CR2-3: a deleted or renamed cited path is dropped from the evidence.
-
-Also open, as advisory: CR2-4, the record keys on HEAD, not on the tree that was judged.
+All four cycle-2 findings are fixed and mutation-proved (10 of 10 covered). The cycle-3 review found one new high defect, introduced by the CR2-3 fix:
+- CR3-1: a cited file moved to another directory under the same basename makes its bare citation ambiguous, so the criterion is carried instead of re-judged.
 
 ## Change Log
 
@@ -402,6 +398,8 @@ Also open, as advisory: CR2-4, the record keys on HEAD, not on the tree that was
 | 2026-10-29 |  | QA fix cycle 1 — all 8 findings fixed (CR-1–CR-5 from the gate, CR-6–CR-8 advisory): Steps 3a and 3c bind `STEM`/`DOD_N` in-block with a HALT guard; reported-gap merge keeps an unexplained agent FAIL and fails an unanswered re-check member; 7.6a/7.6b use this run's AC record; 8 new tests plus CR-6 assertions in an existing one, 9 mutations covered; Status → ready-for-review | qa-fix |
 | 2026-10-29 |  | QA gate FAIL (40/100) — 3 findings (all high: reported-gap merge passes an omitted criterion and an invented-member FAIL; a deleted or renamed cited path is dropped); cycle-1 fixes verified; Status → in-progress | qa-task |
 | 2026-10-29 |  | QA fix cycle 2. The 3 gate findings are fixed, plus advisory CR2-4. CR2-1: an unanswered gap keeps its prior FAIL. CR2-2: a structured `non_member_fail` keeps a non-member agent FAIL, and the overturned note is kept as an advisory. CR2-3: deleted and renamed cited paths now count as changed. CR2-4: the record carries the dirty paths, re-judged next run. § 3 merge rule restated to match. 4 new tests; 10 mutations covered. Status → ready-for-review | qa-fix |
+| 2026-10-29 |  | QA gate FAIL (80/100). 1 finding: CR3-1, a same-basename directory move makes a bare citation ambiguous and the criterion is carried, introduced by the CR2-3 fix. The cycle-2 fixes verified (10 of 10 covered). Status → in-progress | qa-task |
+| 2026-10-29 |  | QA fix cycle 3. CR3-1: a bare basename resolves against HEAD first, falling back to a gone path only when HEAD has none, so a file moved under its own name is re-judged. CR3-2: diffs read with `-z`. Two dead-code cleanups. § 3 *Citation paths* restated. 3 new tests; 6 mutations covered. Status → ready-for-review | qa-fix |
 
 ---
 

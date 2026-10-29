@@ -1114,6 +1114,70 @@ test("scope: a cited path deleted or renamed since the prior head re-judges; an 
   }
 });
 
+test("scope: a bare-cited file moved or deleted under its own basename re-judges (CR3-1)", () => {
+  for (const [label, move] of [
+    [
+      "moved, same basename",
+      (d) => {
+        mkdirSync(join(d, "lib"), { recursive: true });
+        git(d, "mv", "src/b.js", "lib/b.js");
+      },
+    ],
+    ["deleted", (d) => git(d, "rm", "-q", "src/b.js")],
+  ]) {
+    const dir = mkRepo();
+    try {
+      const prior = record(dir, git(dir, "rev-parse", "HEAD"), {
+        // Bare basename beside an unchanged full-path co-citation.
+        "SC-2": { code_citation: "b.js:1" },
+      });
+      move(dir);
+      git(dir, "commit", "-q", "-m", label);
+      assert.equal(
+        reasonOf(scopeAt(dir, prior), "SC-2"),
+        "evidence-changed",
+        label,
+      );
+    } finally {
+      cleanup(dir);
+    }
+  }
+});
+
+test("evidenceIndex: HEAD wins a bare basename; a gone path is used only when HEAD has none (CR3-1)", () => {
+  const r = (cite, tracked, changed) =>
+    eng.resolveCitation(cite, eng.evidenceIndex(tracked, new Set(changed)));
+  // Should merge: the moved file resolves to its new path, the deleted to its old.
+  assert.deepEqual(r("b.js:1", ["lib/b.js"], ["src/b.js", "lib/b.js"]), [
+    "lib/b.js",
+  ]);
+  assert.deepEqual(r("b.js:1", ["src/a.js"], ["src/b.js"]), ["src/b.js"]);
+  // Should not merge: an unrelated same-basename deletion leaves HEAD's unique
+  // file the answer, and two gone candidates resolve to nothing, never a guess.
+  assert.deepEqual(r("b.js:1", ["src/b.js"], ["old/b.js"]), ["src/b.js"]);
+  assert.deepEqual(r("b.js:1", ["src/a.js"], ["x/b.js", "y/b.js"]), []);
+  // HEAD's own ambiguity is not broken by a gone path.
+  assert.deepEqual(r("b.js:1", ["x/b.js", "y/b.js"], ["z/b.js"]), []);
+  // A full path still resolves whether it is at HEAD or gone.
+  assert.deepEqual(r("src/b.js:1", ["src/a.js"], ["src/b.js"]), ["src/b.js"]);
+});
+
+test("gitIo: a non-ASCII path reaches changed and dirty unquoted (CR3-2)", () => {
+  const dir = mkRepo({ "src/skë.js": "1\n" });
+  try {
+    const a = git(dir, "rev-parse", "HEAD");
+    commit(dir, { "src/skë.js": "2\n" });
+    writeFileSync(join(dir, "src/skë.js"), "3\n");
+    const io = eng.gitIo(dir);
+    assert.ok(io.changed(a, git(dir, "rev-parse", "HEAD")).has("src/skë.js"));
+    assert.deepEqual(io.dirty(), ["src/skë.js"]);
+    // Control: the raw tracked name is what a citation matches.
+    assert.ok(io.tracked().includes("src/skë.js"));
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test("scope → merge → scope: a cited file the agents read uncommitted, then discarded, is re-judged (CR2-4)", () => {
   const dir = mkRepo();
   try {
