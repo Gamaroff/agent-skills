@@ -261,21 +261,21 @@ catalogue files stay as they are.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.243.qa.12.wireframe-component-mapping.md](./task.243.qa.12.wireframe-component-mapping.md)
-- **Gate File**: [task.243.gate.12.wireframe-component-mapping.yml](./task.243.gate.12.wireframe-component-mapping.yml)
+- **Full Report**: [task.243.qa.13.wireframe-component-mapping.md](./task.243.qa.13.wireframe-component-mapping.md)
+- **Gate File**: [task.243.gate.13.wireframe-component-mapping.yml](./task.243.gate.13.wireframe-component-mapping.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 19 (wireframe-map suite); 6842 in the fix's fast gate
+- **Tests Executed**: 20 (wireframe-map suite); 6843 in the fix's fast gate
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0 (1 medium)
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-The DoD run 3 fix closes the U+2028/U+2029 class: re-running the DoD's 114-case plan reproduces nothing,
-and both arms are mutation-proven. The reviewer found one medium, older than this fix. An attribute
-value holding `,` or `}` does not round-trip through its own signature, so that node never matches the
-row recorded for it (TASK-243-CR12-1, [bug.15](./task.243.bug.15.attribute-value-signatures-do-not-round-trip.md)).
-Three lows are advisory.
+The cycle 12 fix holds: every node's signature reads back to the node, bug.15 is closed, and the probe
+reproduces nothing. The decoding it added lets two spellings name one value, and `record` still compares
+raw text, so a re-recorded answer can be added beside the old one and lose to it (TASK-243-CR13-1,
+[bug.16](./task.243.bug.16.record-adds-a-second-row-for-an-equivalent-signature.md)). One low and one
+cleanup are advisory.
 
 ## Definition of Done - Gaps Identified
 
@@ -354,5 +354,6 @@ copies, and the evaluator matches paths exactly while §7 names those copies as 
 | 2026-10-29 |  | DoD incomplete — 1 gap identified (security: U+2028/U+2029 accepted in a record signature or label; 9 low probes); fix-and-recheck refused (inside-files-summary) | finalise |
 | 2026-10-29 |  | QA gate CONCERNS (90/100) — cycle 12 of 13; DoD run 3 fix verified and mutation-proven (U+2028/U+2029 closed); 1 medium finding (CR12-1: an attribute value with a comma or brace does not round-trip through its own signature, bug.15), 3 low advisory; probe 114/0/0 | qa-task |
 | 2026-10-29 |  | QA findings fixed — cycle 12, 1 finding (bug.15 Ready for QA, CR12-1): attribute values are percent-encoded in a signature and decoded by parsePattern, so every node reads back to itself | qa-fix |
+| 2026-10-29 |  | QA gate CONCERNS (90/100) — 1 medium (TASK-243-CR13-1, bug.16), 1 low; bug.15 closed | qa-task |
 <!-- change-log-end -->
 

@@ -1,0 +1,25 @@
+{
+  "sink": "path",
+  "entry": "fence:shared/resources/develop-pipeline-step-3-develop-loop.md#Held wireframe answers (develop-story, develop-task)",
+  "name": "step-3 held-wireframe-answers guard",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 9,
+  "passed": 9,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": [
+    "bash"
+  ],
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": null,
+  "slot": "{document-file}",
+  "fixture_setup": null,
+  "ran_at": "2026-10-29T17:50:48.411Z"
+}

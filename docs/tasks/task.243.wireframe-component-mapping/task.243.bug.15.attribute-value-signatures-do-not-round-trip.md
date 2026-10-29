@@ -4,7 +4,7 @@
 **Bug ID**: TASK-243-BUG-15
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-10-29
 
@@ -97,3 +97,4 @@ Mutation-proven, 3 of 3 `covered`: encoding off, decoding off, and a strict deco
 | 2026-10-29 | New | qa-task | Found by task.243.qa.12.wireframe-component-mapping.md (CR-1) |
 | 2026-10-29 | In Progress | qa-fix | Investigation started (fix cycle 12) |
 | 2026-10-29 | Ready for QA | qa-fix | One percent-encoding shared by signatureOf and parsePattern; mutation-proven 3 of 3 |
+| 2026-10-29 | Closed | qa-task | Verified by task.243.qa.13.wireframe-component-mapping.md |
