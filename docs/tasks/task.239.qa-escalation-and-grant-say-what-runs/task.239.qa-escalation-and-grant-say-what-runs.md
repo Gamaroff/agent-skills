@@ -8,7 +8,7 @@ category: refactoring
 status: ready-for-review
 priority: Medium
 created: 2026-10-27
-updated: 2026-10-28
+updated: 2026-10-29
 assignee:
 estimated_effort_hours: 8
 github_issue: 769
@@ -293,26 +293,26 @@ None.
 
 **QA Status**: PASS
 **QA Engineer**: QA Engineer
-**Testing Date**: 2026-10-28
+**Testing Date**: 2026-10-29
 **Quality Score**: 100/100
 **Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.239.qa.5.qa-escalation-and-grant-say-what-runs.md](./task.239.qa.5.qa-escalation-and-grant-say-what-runs.md)
-- **Gate File**: [task.239.gate.5.qa-escalation-and-grant-say-what-runs.yml](./task.239.gate.5.qa-escalation-and-grant-say-what-runs.yml)
+- **Full Report**: [task.239.qa.6.qa-escalation-and-grant-say-what-runs.md](./task.239.qa.6.qa-escalation-and-grant-say-what-runs.md)
+- **Gate File**: [task.239.gate.6.qa-escalation-and-grant-say-what-runs.yml](./task.239.gate.6.qa-escalation-and-grant-say-what-runs.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 16
+- **Tests Executed**: 8
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-No critical issues identified. Cycle 4's fixes hold: every describer of the grant write set lists the four fields, and the window qualifier and its worked-example rows are bound to the rule by tests. Both bugs are closed. The last cycle's review asked for high-confidence, line-anchored defects only.
+No critical issues identified. Granted cycle 6 adds a test that pins filling rule 1's Convergence stall row, closing DoD run 3's SC-7 gap. Mutations M17 and M18 turn it red. ci:fast is green. Two reviewer findings are advisory: a medium-confidence reading of rule 2 as a second comparison, and an unbounded slice in the test.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 3 (historical, superseded)
 
-**Status:** IN PROGRESS (DoD run 3)
+**Status:** SUPERSEDED. The gap was closed on 2026-10-29 by `2eaa7268`, a test that pins the Convergence stall row (mutations M17 and M18, each red and then restored green), and verified in granted QA cycle 6 (gate 6 PASS). Kept as history; the current verdict is the newest `task.239.dod.{N}` file.
 
 ### Missing Criteria:
 
@@ -400,6 +400,7 @@ No critical issues identified. Cycle 4's fixes hold: every describer of the gran
 | 2026-10-28 | 1.2 | SC-7 reworded to what shipped (one comparison on a stall, two on a loop limit, per bug.1); SC-11 closed by mutation-proving five guards (M5–M9) | orchestrator |
 | 2026-10-28 |  | DoD incomplete — 1 gap identified (SC-11, run 2) | finalise |
 | 2026-10-28 |  | DoD incomplete — 1 gap identified (SC-7 stall member, run 3) | finalise |
+| 2026-10-29 |  | QA gate PASS (100/100) — 0 findings (cycle 6, granted after DoD run 3) | qa-task |
 <!-- change-log-end -->
 
 ---

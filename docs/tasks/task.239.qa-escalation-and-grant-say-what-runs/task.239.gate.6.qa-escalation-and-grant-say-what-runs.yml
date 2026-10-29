@@ -1,0 +1,60 @@
+schema: 2
+task: 'task.239.qa-escalation-and-grant-say-what-runs'
+task_title: 'QA escalation and grant say what will run'
+gate: PASS
+status_reason: 'Granted cycle 6 after DoD run 3 found SC-7''s stall member unguarded. The one change since gate 5 is a test that pins filling rule 1''s Convergence stall row; two mutations turn it red. The reviewer found no high-confidence defect, and ci:fast passed with 0 failures.'
+reviewer: 'QA Engineer'
+head: '2eaa7268d9ce90cdb76f011a54efaab73795e1a9'
+updated: '2026-10-29T03:40:35Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 8
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false. The cycle changed one test file. grant-qa-cycles.sh is unchanged since DoD run 3 probed it (task.239.dod.3.security.run.json: 30 executed, 0 reproduced).'
+  performance:
+    status: PASS
+    notes: 'No runtime change.'
+  reliability:
+    status: PASS
+    notes: 'No behaviour change; one added test.'
+  maintainability:
+    status: PASS
+    notes: 'Both rows of filling rule 1 are now pinned by a test. Advisory: the new test and the loop-limit test share their row lookup, and neither bounds its slice at the next heading (CR-2).'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Factor the filling-rules row lookup the stall and loop-limit tests share into one helper, and bound its slice at the next "#### " heading (QA6-CR-2).'
+      refs: ['evals/shared/tests/qa-escalation-template.test.mjs']
+    - action: 'Resume contract fenced block at line 492, and the detector prompt fenced block at line 69, fail under qa-execute-snippets for want of a lock fixture. Both fail identically on the merge base (pre-existing, harness seeding, not prose).'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/pipeline-resume-detector-prompt.md']
+      provenance: pre-existing
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-10-29'
+  total_iterations: 5
+  verification_method: 'Mutations M17 and M18 turn the new test red; ci:fast green (6742 tests, 0 failed)'
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []
