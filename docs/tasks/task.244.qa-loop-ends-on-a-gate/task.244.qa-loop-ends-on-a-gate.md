@@ -486,24 +486,24 @@ fix, and nothing is added.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-30
-**Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.244.qa.1.qa-loop-ends-on-a-gate.md](./task.244.qa.1.qa-loop-ends-on-a-gate.md)
-- **Gate File**: [task.244.gate.1.qa-loop-ends-on-a-gate.yml](./task.244.gate.1.qa-loop-ends-on-a-gate.yml)
+- **Full Report**: [task.244.qa.2.qa-loop-ends-on-a-gate.md](./task.244.qa.2.qa-loop-ends-on-a-gate.md)
+- **Gate File**: [task.244.gate.2.qa-loop-ends-on-a-gate.yml](./task.244.gate.2.qa-loop-ends-on-a-gate.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 5 suites reviewed; `npm test` and `eval:all` green
+- **Tests Executed**: `npm test` 6894 pass / 0 fail, `eval:all` green; 9 security probes on the helper (0 escaped)
 - **Phases Verified**: 4/4
-- **Critical Issues**: 1
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-All ten success criteria hold. One blocking defect: the qa-task Phase 0 trigger block calls `code-moved-since-gate.sh` with an empty gate path on a first review, and the helper refuses it (exit 2), so the block HALTs (T244-QA-1). Two low findings: untracked held-aside files force the grant to re-enter at 5a with no test (T244-QA-2), and a stale route-2c comment (T244-QA-3).
+Cycle 1's blocker (T244-QA-1, the first-review HALT in qa-task Phase 0) is fixed and held by a test that goes red without the fix. The refute pass over the whole branch found no new defect. Two advisory test-coverage notes are recorded as future work in the gate.
 
 <!-- change-log-start -->
 ## Change Log
@@ -517,6 +517,7 @@ All ten success criteria hold. One blocking defect: the qa-task Phase 0 trigger 
 | 2026-10-31 |         | Implemented — 86 files, 7 new tests, 4 evals; npm test + bundle:check green | develop |
 | 2026-10-31 |         | QA gate FAIL (70/100) — 1 high, 2 low findings | qa-task |
 | 2026-10-31 |         | QA findings fixed — gate FAIL (70/100) cycle 1, 1 iteration: empty-gate first-review guard in code-moved-since-gate.sh, grant comment, SC-10 wording | qa-fix |
+| 2026-10-31 |         | QA gate PASS (100/100) — 0 findings | qa-task |
 <!-- change-log-end -->
 
 ---

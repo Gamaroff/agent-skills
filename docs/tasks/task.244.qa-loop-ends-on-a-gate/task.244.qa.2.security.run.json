@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "filename",
+      "entry": "shell-argv:shared/resources/code-moved-since-gate.sh",
+      "name": null,
+      "call_site": null,
+      "verdict": "unverifiable",
+      "reason": "no-legitimate-evidence",
+      "executed": 1,
+      "passed": 1,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 8,
+      "declined_cases": [
+        {
+          "id": "moved.doc-dir@bash",
+          "reason": "case-errored",
+          "detail": "fixture: name carries a path separator or NUL"
+        },
+        {
+          "id": "moved.doc-dir-slash@bash",
+          "reason": "case-errored",
+          "detail": "fixture: name carries a path separator or NUL"
+        },
+        {
+          "id": "moved.other-doc@bash",
+          "reason": "case-errored",
+          "detail": "fixture: name carries a path separator or NUL"
+        },
+        {
+          "id": "moved.repo-root@bash",
+          "reason": "case-errored",
+          "detail": "fixture: EISDIR: illegal operation on a directory, open '/tmp/security-probe-dLXEV9/work/fixture-gETtgL/.'"
+        },
+        {
+          "id": "moved.traversal-to-root@bash",
+          "reason": "case-errored",
+          "detail": "fixture: name carries a path separator or NUL"
+        },
+        {
+          "id": "moved.missing-dir@bash",
+          "reason": "case-errored",
+          "detail": "fixture: name carries a path separator or NUL"
+        },
+        {
+          "id": "moved.empty-dir@bash",
+          "reason": "case-errored",
+          "detail": "fixture: EISDIR: illegal operation on a directory, open '/tmp/security-probe-dLXEV9/work/fixture-slO92M/'"
+        },
+        {
+          "id": "moved.command-substitution-name@bash",
+          "reason": "case-errored",
+          "detail": "fixture: name carries a path separator or NUL"
+        }
+      ],
+      "escaped": 0,
+      "shells": [
+        "bash"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "{input}",
+        "docs/tasks/task.42.example/task.42.gate.1.example.yml"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": "/home/gamaroff/Development/agent-skills/.claude/state/t244-q2-setup.sh",
+      "ran_at": "2026-10-30T23:03:25.322Z"
+    },
+    {
+      "sink": null,
+      "entry": "shell-argv:shared/resources/code-moved-since-gate.sh",
+      "name": "code-moved doc-dir via shell-argv:",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 9,
+      "passed": 9,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": [
+        "bash"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "{input}",
+        "docs/tasks/task.42.example/task.42.gate.1.example.yml"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": "/home/gamaroff/Development/agent-skills/.claude/state/t244-q2-setup.sh",
+      "ran_at": "2026-10-30T23:03:38.848Z"
+    }
+  ],
+  "totals": {
+    "executed": 10,
+    "reproduced": 0,
+    "escaped": 0
+  },
+  "updated_at": "2026-10-30T23:03:38.848Z"
+}
