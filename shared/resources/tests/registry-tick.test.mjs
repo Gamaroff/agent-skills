@@ -2424,3 +2424,26 @@ test("--stage: the network block is not vacuous — each entry point it guards t
     });
   }
 });
+
+test("--stage: a registry with an unmerged index entry is `unmerged`, exit 0, index untouched", () => {
+  const c = stageCase();
+  try {
+    const rel = "docs/tasks/task-registry.md";
+    const blob = c.g("rev-parse", `:${rel}`).trim();
+    // The three conflict stages a failed merge leaves, in place of the stage-0 entry.
+    execFileSync("git", ["-C", c.dir, "update-index", "--index-info"], {
+      input:
+        `0 ${"0".repeat(40)}\t${rel}\n` +
+        [1, 2, 3].map((s) => `100644 ${blob} ${s}\t${rel}\n`).join(""),
+    });
+    const before = c.g("ls-files", "-s", "--", rel);
+    const res = run(c.dir, ["--file", c.f, "--stage"]);
+    assert.equal(res.reason, "ticked");
+    assert.equal(res.staged, false);
+    assert.equal(res.stageReason, "unmerged");
+    assert.equal(res.exitCode, 0);
+    assert.equal(c.g("ls-files", "-s", "--", rel), before);
+  } finally {
+    rmSync(c.dir, { recursive: true, force: true });
+  }
+});
