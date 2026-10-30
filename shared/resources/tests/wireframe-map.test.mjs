@@ -1604,9 +1604,11 @@ test("detect writes nothing, in any state", () => {
   }
 });
 
-test("detect reads only its bounded set: one level of packages/, docs/ to depth 4", () => {
+test("detect reads only its bounded set: one level of packages/ and libs/, docs/ to depth 4", () => {
   const deep = project({ "packages/a/b/src/index.ts": BARREL });
   const shallow = project({ "packages/a/src/index.ts": BARREL });
+  const libsDeep = project({ "libs/a/b/src/index.ts": BARREL });
+  const libsShallow = project({ "libs/a/src/index.ts": BARREL });
   const catalogue = (rel) =>
     project({
       ...CONFIGURED_FILES,
@@ -1632,6 +1634,16 @@ test("detect reads only its bounded set: one level of packages/, docs/ to depth 
       "packages/a/src/index.ts",
     );
     assert.equal(
+      detect(libsDeep).reason,
+      "nothing-found",
+      "libs/ two levels down",
+    );
+    assert.equal(
+      detect(libsShallow).proposal.componentBarrel.value,
+      "libs/a/src/index.ts",
+      "libs/ one level down is read",
+    );
+    assert.equal(
       detect(deepDocs).proposal.componentCatalogue.value,
       "docs/architecture/components.md",
       "depth 5 is not read",
@@ -1647,7 +1659,16 @@ test("detect reads only its bounded set: one level of packages/, docs/ to depth 
       "docs/tasks is not read",
     );
   } finally {
-    for (const r of [deep, shallow, deepDocs, depth4, tasks]) cleanup(r);
+    for (const r of [
+      deep,
+      shallow,
+      libsDeep,
+      libsShallow,
+      deepDocs,
+      depth4,
+      tasks,
+    ])
+      cleanup(r);
   }
 });
 

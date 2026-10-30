@@ -661,9 +661,11 @@ is dropped. The file still reads back correctly.
 
 ### Next Steps:
 
-- [ ] Make the hooks test enumerate `skills/develop-*/SKILL.md` instead of a fixed list.
-- [ ] Add a `libs/a/src/index.ts` (found) and `libs/a/b/src/index.ts` (not found) case to the bounded-set test, and mutation-prove it.
-- [ ] Mutation-prove the fill-before-insert order (swap the order, see the last-line test go red), and record it.
+- [x] Make the hooks test enumerate `skills/develop-*/SKILL.md` instead of a fixed list.
+- [x] Add a `libs/a/src/index.ts` (found) and `libs/a/b/src/index.ts` (not found) case to the bounded-set test, and mutation-prove it.
+- [x] Mutation-prove the fill-before-insert order (swap the order, see the last-line test go red), and record it.
+
+Each fix is recorded with its mutation proof under § Testing Results. The gaps re-enter QA before `/finalise` runs again.
 
 **Estimated Effort:** Small (test-only; under an hour)
 
@@ -688,6 +690,7 @@ is dropped. The file still reads back correctly.
 | 2026-10-30 |         | QA findings fixed — cycle 3: 1 bug and 1 low finding; 1 new test | qa-fix |
 | 2026-10-30 |         | QA gate PASS (100/100) — 1 low finding, carried to future work | qa-task |
 | 2026-10-30 |  | DoD incomplete — 3 gaps identified | finalise |
+| 2026-10-30 |  | DoD gaps fixed — 3 test-only fixes (#11, #12, #13), each mutation-proven | develop |
 <!-- change-log-end -->
 
 ---
@@ -766,6 +769,15 @@ map rows by hand" section. `configuration.md`, `MAP_HEADER` and the CHANGELOG do
   5, segment → substring (`Rechip`), the five-candidate cap, and an enclosing heading.
 - Hooks mutation 4c: a `wireframe-map.js detect` line added to `develop-pipeline-step-0` turned
   "no develop pipeline step calls detect or configure" red, naming the file and line. Restored.
+- DoD run 1 gap fixes, each mutation-proven by snapshot, mutate and restore with `cp`:
+  - **#11**: the hooks test now enumerates every `skills/develop-*/SKILL.md`, all five of them.
+    A `wireframe-map.js detect` line added to `skills/develop-next/SKILL.md` turns "no develop
+    pipeline step calls detect or configure" red. The old fixed list never read that file.
+  - **#12**: the bounded-set test now carries a `libs/` pair: `libs/a/src/index.ts` is found and
+    `libs/a/b/src/index.ts` is not. `WORKSPACES = ["packages"]` turns it red.
+  - **#13**: running the insert of missing keys before the blank-key fill (the pre-cycle-3 order)
+    turns "configure removes the list under a blank key past blank lines and comments, and keeps
+    them" red.
 - `npm run ci:fast` with `.agents/skills` and `.claude/skills` moved aside, first run: 6879 tests,
   1 fail. `tests/skill-protocol.test.js` "create-story — HALTs when skills-config.yaml missing"
   compared the file's *first* `HALT` with its *first* `skills-config.yaml`, and the new Allowed

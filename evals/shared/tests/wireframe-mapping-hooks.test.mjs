@@ -125,8 +125,25 @@ const developSetupCalls = (files) =>
   );
 
 test("no develop pipeline step calls detect or configure", () => {
+  // Every skills/develop-*/SKILL.md, enumerated, so a new develop skill is held too.
+  const developSkills = readdirSync(join(ROOT, "skills"))
+    .filter(
+      (s) =>
+        /^develop-/.test(s) && existsSync(join(ROOT, "skills", s, "SKILL.md")),
+    )
+    .sort();
+  assert.ok(
+    [
+      "develop-batch",
+      "develop-bug",
+      "develop-next",
+      "develop-story",
+      "develop-task",
+    ].every((s) => developSkills.includes(s)),
+    `every develop skill was found: ${developSkills.join(", ")}`,
+  );
   const files = [
-    ...["develop-story", "develop-task", "develop-bug"].map((s) => [
+    ...developSkills.map((s) => [
       `skills/${s}/SKILL.md`,
       read(`skills/${s}/SKILL.md`),
     ]),
