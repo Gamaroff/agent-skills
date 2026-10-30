@@ -93,7 +93,7 @@ Add the `declined`/`partial` states, `detect` and `configure` to `wireframe-map.
 - GitHub board: in-review → stage-disabled (this board's `tracker-workflow.yaml` sets no in-review moment).
 - Post-PR state check (inline `gh pr view`, not the poller subagent): PR #793 state = OPEN. errors = 0.
 
-### QA Cycle 1 — qa-fix
+### qa-fix — cycle 1
 
 - QA Cycle 1 — changes-requested: stage-disabled.
 - fix_cycle: not supplied — derived from the gate (1).
@@ -103,7 +103,7 @@ Add the `declined`/`partial` states, `detect` and `configure` to `wireframe-map.
 - Mutation proofs: 9, all killed — old strip, no trailing-comma drop, old presence rule, blank key written twice, old read-back, NEL removed, character refusal off, stray-flag check off, untrimmed map check.
 - Probe (doc sweep): phrases `tsconfig`, `U+2028`, `write-failed`, `must be one line` over executed docs. Hits: `wireframe-component-mapping.md` — updated (a `usage` row in the configure reason table); `finalise/SKILL.md` — unaffected (another engine's `write-failed`); the `tsconfig` hits — unaffected (unrelated skills). CHANGELOG entry updated. Population 1 for the subject → patch.
 
-### QA Cycle 2 — qa-fix
+### qa-fix — cycle 2
 
 - QA Cycle 2 — changes-requested: stage-disabled.
 - fix_cycle: not supplied — derived from the gate (2).
@@ -116,7 +116,7 @@ Add the `declined`/`partial` states, `detect` and `configure` to `wireframe-map.
 - Mutation proofs: 10, all killed — any alias proposed, `false` not folded, decline `--map` accepted, list counts as a path, list left under a filled key, BOM not allowed, quotes not allowed, indent from a comment, configure on the shared terminator set, NEL back in the shared set.
 - Probe (doc sweep, cycle 2): phrases `off` (any case), `wildcard`, `path alias`, `reads as a decline`. Hits: `wireframe-component-mapping.md` — updated (`usage` row names a decline `--map`); `docs/reference/configuration.md` — already says "any case", now true; CHANGELOG — updated (exact alias only, quoted/BOM key, any-case `false`). Population 1 → patch.
 
-### QA Cycle 3 — qa-fix
+### qa-fix — cycle 3
 
 - QA Cycle 3 — changes-requested: not signalled separately (stage-disabled on this board, as in cycles 1–2).
 - fix_cycle: not supplied — derived from the gate (3). Findings ingested inline (2 entries).
@@ -124,7 +124,7 @@ Add the `declined`/`partial` states, `detect` and `configure` to `wireframe-map.
 - Mutation proofs: 3, all killed — stop at a blank/comment, remove comments with the list, add a final newline. The fill-before-insert order is held by the last-line test's second case but was not separately mutated.
 - Probe (doc sweep): no doc restates the list removal; the "keeps every other byte" promise is now true for comments. Population 0.
 
-### QA Cycle 4 and Step 5c
+### QA cycle 4 and Step 5c
 
 - QA cycle 4 scoped reviewer (79,954 ms) returned one low finding (CR4-1), QA-reproduced; gate PASS 100. The route classifier returned `cosmetic-residue`: CR4-1 carried to gate 4 `recommendations.future`, closed in `top_issues`, recorded under the task's `## Deferred Work`.
 - BUG-5 closed; all five bug reports closed.
@@ -144,6 +144,12 @@ Add the `declined`/`partial` states, `detect` and `configure` to `wireframe-map.
 - Decision: GAPS (3). Fix-and-recheck (8a) was not taken: there are three findings, inspection found them, and none has a severity.
 - Gaps PR comment: issuecomment-6510775286. The lock is held at 7.
 
+### Resume — QA re-entry after finalise DoD gaps
+
+- The HALT had not snapshotted or removed the lock (still live at 7), so `reenter-qa-after-finalise.sh` would have refused `lock-present`. The orchestrator wrote the snapshot (`halt_step` 7) and removed the lock, as the HALT rule says, then ran the script.
+- QA re-entry after finalise DoD gaps: "re-entered QA at step 5 / qa_phase 5a — qa_max_cycles=10 (base 8), gate_head=a0073d014200". Code moved: `ff3fb83c` changed `evals/shared/tests/wireframe-mapping-hooks.test.mjs` and `shared/resources/tests/wireframe-map.test.mjs`.
+- The base 8 is wrong: the script counts every `### QA Cycle` heading, and this report had two per cycle (Decisions Log and QA Iteration History). `report-lint` flags the same defect (`qa-cycle-duplicated` ×4). Repaired: the four Decisions Log headings are renamed `### qa-fix — cycle N`, and the lock corrected to `qa_reentry.report_entries` 4 and `qa_max_cycles` 6 (base 4 + 2). The next cycle is 5. Logged as observation #135.
+
 ---
 
 ## Issues Log
@@ -155,6 +161,11 @@ _Problems encountered and how they were resolved or escalated._
   2. **#12**: no test names `libs/`, although `WORKSPACES = ["packages", "libs"]` (`shared/resources/wireframe-map.js:1013`). Fix: add a found case at `libs/a/src/index.ts` and a not-found case at `libs/a/b/src/index.ts` to the bounded-set test, then mutation-prove it.
   3. **#13**: the cycle-3 fill-before-insert order fix is not mutation-proven. Fix: swap the order, see the last-line test go red, and record the proof.
   - These fixes change code outside the work item's directory, so the resume re-enters QA at 5a (`reenter-qa-after-finalise.sh`) before `/finalise` re-runs.
+  - **Fixed** (on request, after the HALT). Each fix was mutation-proven by snapshotting the file, mutating it, running the test, then restoring with `cp`:
+    - #11: the hooks test enumerates all five `skills/develop-*/SKILL.md`. A `detect` line added to develop-next turns it red.
+    - #12: a `libs/` found and not-found pair. `WORKSPACES = ["packages"]` turns it red.
+    - #13: the pre-cycle-3 insert-before-fill order turns the blank-key list test red.
+    - Both suites: 86/86.
 
 ---
 
@@ -196,6 +207,15 @@ _Track each QA review/fix cycle._
 **MEDIUM findings**: 0
 **PR Review**: APPROVE — `task.246.pr-review.1.wireframe-mapping-setup-offer.md` (conformance lens only, `--no-code`; 0 findings, OPEN_COVERAGE=0; comment issuecomment-6510595565)
 **Loop exit**: Cosmetic-residue exit taken — PASS gate at cycle 4 with HIGH 0 for cycles 3 and 4; all 1 open findings are LOW and are carried to the gate's recommendations.future by id (TASK-246-CR4-1). This is a CLEAN exit, not a stall: nothing is blocked and nothing is being accepted over; a full qa-fix cycle for cosmetic findings is what this route exists to avoid.
+**Action**: Proceeding to 5c (PR conformance review)
+
+### QA Cycle 5 — 2026-10-30
+**Gate Result**: PASS (100/100)
+**Issues Found**: 0 gated. Re-entry after finalise DoD run 1; DoD #11, #12 and #13 verified fixed. 1 advisory finding (CR5-1, medium/medium): skill-local develop step docs are outside the hooks test, which matches the criterion as written. Carried to `recommendations.future` and the task's `## Deferred Work`.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: pending — 5c not yet run
+**Loop exit**: route 1 — PASS with no open entry
 **Action**: Proceeding to 5c (PR conformance review)
 
 ---

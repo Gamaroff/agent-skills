@@ -1,0 +1,59 @@
+schema: 2
+task: 'task.246.wireframe-mapping-setup-offer'
+task_title: 'Wireframe mapping setup offer and first-run candidates'
+gate: PASS
+status_reason: 'QA re-entry after finalise DoD run 1. The three test-only gap fixes (#11, #12, #13) are verified: each was mutation-proven again this cycle and its test goes red. The scoped review found one advisory medium/medium finding (CR5-1), outside the criterion as written, carried to future work.'
+reviewer: 'QA Engineer'
+head: 'ff3fb83c013f0339a31cfa829ce66925a1b9960d'
+updated: '2026-10-30T03:48:23Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 86
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false for this cycle — the delta is two test files and adds no predicate. The configure value guard is unchanged since cycle 3 (task.246.qa.3.security.run.json, 17 executed, 0 escaped), and finalise DoD run 1 executed 146 cases with 0 reproduced (task.246.dod.1.security.run.json).'
+  performance:
+    status: PASS
+    notes: 'No engine code changed this cycle.'
+  reliability:
+    status: PASS
+    notes: 'No engine code changed this cycle; ci:fast 6876 pass, 0 fail.'
+  maintainability:
+    status: PASS
+    notes: 'The hooks test now enumerates every skills/develop-*/SKILL.md with a five-name floor, and the bounded-set test names libs/.'
+
+recommendations:
+  immediate: []
+  future:
+    - id: 'TASK-246-CR5-1'
+      action: 'Widen the "no develop pipeline step calls detect or configure" test to the skill-local step docs under skills/develop-*/references (those with no AUTO-GENERATED header, e.g. develop-bug-step-*.md), and amend the criterion to name them.'
+      finding: 'The test covers skills/develop-*/SKILL.md and shared/resources/develop-pipeline-*.md, which is what the success criterion names, but not the five skill-local develop-bug-step-*.md docs, so a detect call added there would pass (reviewer medium/medium; premise verified by QA).'
+      refs: ['evals/shared/tests/wireframe-mapping-hooks.test.mjs']
+    - id: 'TASK-246-CR4-1'
+      action: 'Strip the trailing newline from the last non-blank retained piece, and add this case to the last-line test table.'
+      finding: 'When the removed list ends the file without a newline and a blank line sits inside it, the blank line is deleted and the file gains a final newline (configure still answers ok and detect configured).'
+      refs: ['shared/resources/wireframe-map.js']
+      carried_from: 'gate 4 recommendations.future'
+    - action: 'Map and catalogue paths are not checked for containment in the repository (ensure/record write where the config points); pre-existing, now also reachable through configure.'
+      refs: ['shared/resources/wireframe-map.js']
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []

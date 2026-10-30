@@ -622,25 +622,29 @@ the primitive in the middle of a segment (`Rebutton`), which must not match `but
 **Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.246.qa.4.wireframe-mapping-setup-offer.md](./task.246.qa.4.wireframe-mapping-setup-offer.md)
-- **Gate File**: [task.246.gate.4.wireframe-mapping-setup-offer.yml](./task.246.gate.4.wireframe-mapping-setup-offer.yml)
+- **Full Report**: [task.246.qa.5.wireframe-mapping-setup-offer.md](./task.246.qa.5.wireframe-mapping-setup-offer.md)
+- **Gate File**: [task.246.gate.5.wireframe-mapping-setup-offer.yml](./task.246.gate.5.wireframe-mapping-setup-offer.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 139 (changed suites); `ci:fast` 6890, 0 failed
+- **Tests Executed**: 86 (changed suites); `ci:fast` 6890, 0 failed
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-All findings from four QA cycles are fixed, and all five bug reports are closed. One low
-byte-preservation defect (CR4-1) is carried to future work: a blank line inside a removed final list
-is dropped. The file still reads back correctly.
+This is the QA re-entry after finalise DoD run 1. The three test-only gap fixes (#11, #12, #13) hold,
+and each was mutation-proven again. One advisory finding (CR5-1) is carried to future work: skill-local
+develop step docs are outside the hooks test, which matches the criterion as written.
 
 ## Deferred Work
 
 - **TASK-246-CR4-1** (LOW) — carried to gate 4 `recommendations.future` (route 2b, cycle 4): when a
   removed list ends the file without a newline and holds a blank line, `configure` deletes the blank
   line and adds a final newline; strip from the last non-blank retained piece.
+- **TASK-246-CR5-1** (advisory, medium/medium): carried to gate 5 `recommendations.future`. The "no
+  develop pipeline step calls detect or configure" test reads `skills/develop-*/SKILL.md` and
+  `shared/resources/develop-pipeline-*.md`, as the criterion names, but not the skill-local step docs
+  (`skills/develop-bug/references/develop-bug-step-*.md`). Widen the test and amend the criterion.
 
 ## Definition of Done - Gaps Identified
 
@@ -691,6 +695,7 @@ Each fix is recorded with its mutation proof under § Testing Results. The gaps 
 | 2026-10-30 |         | QA gate PASS (100/100) — 1 low finding, carried to future work | qa-task |
 | 2026-10-30 |  | DoD incomplete — 3 gaps identified | finalise |
 | 2026-10-30 |  | DoD gaps fixed — 3 test-only fixes (#11, #12, #13), each mutation-proven | develop |
+| 2026-10-30 |  | QA gate PASS (100/100) — 0 gated findings, 1 advisory carried to future work | qa-task |
 <!-- change-log-end -->
 
 ---
