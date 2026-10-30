@@ -1,0 +1,224 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "bb00bd3ee215334ccb6157ecad7a01266d7569fa",
+  "dirty_paths": [
+    "docs/tasks/task.245.shared-checkout-safe-guards-and-staging/task.245.implementation.1.shared-checkout-safe-guards-and-staging-initial-run.md",
+    "docs/tasks/task.245.shared-checkout-safe-guards-and-staging/task.245.pr-review.1.shared-checkout-safe-guards-and-staging.md",
+    "docs/tasks/task.245.shared-checkout-safe-guards-and-staging/task.245.shared-checkout-safe-guards-and-staging.md"
+  ],
+  "document": "docs/tasks/task.245.shared-checkout-safe-guards-and-staging/task.245.shared-checkout-safe-guards-and-staging.md",
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 15,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "SC-1",
+      "text_hash": "6b883f307711937b78862852d70cf73419a60b31cbfed7ab8dd1b6d13c592fb7",
+      "status": "PASS",
+      "description": "--stage leaves only the document's row staged; unrelated uncommitted row stays unstaged",
+      "code_citation": "shared/resources/registry-tick.js:1185",
+      "test_citation": "shared/resources/tests/registry-tick.test.mjs:2163",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Test runs under npm test (ci:fast-c4 log, 6896 pass / 0 fail). The --annotate variant is at :2277."
+    },
+    {
+      "id": "SC-2",
+      "text_hash": "0ad79057dfe1f9a0bd3b6f2f690b5220a99e4d70216f23d85023cf5bfb42413e",
+      "status": "PASS",
+      "description": "--stage finds the row by id when the index has fewer rows than the working file",
+      "code_citation": "shared/resources/registry-tick.js:1185",
+      "test_citation": "shared/resources/tests/registry-tick.test.mjs:2183",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The :2183 test puts an extra line above the row. Mutation proof in the implementation report (stage by line number goes red)."
+    },
+    {
+      "id": "SC-3",
+      "text_hash": "fe5b74177edf4edaedd067bc956a2653ae963824f0e2bc12ce968bf9906e401b",
+      "status": "PASS",
+      "description": "every stageReason other than staged/already-staged exits 0",
+      "code_citation": "shared/resources/registry-tick.js:168",
+      "test_citation": "shared/resources/tests/registry-tick.test.mjs:2233",
+      "members": [
+        {
+          "member": "row-not-in-index",
+          "evidence": "shared/resources/tests/registry-tick.test.mjs:2233",
+          "status": "PASS"
+        },
+        {
+          "member": "not-tracked",
+          "evidence": "shared/resources/tests/registry-tick.test.mjs:2254",
+          "status": "PASS"
+        },
+        {
+          "member": "not-a-repo",
+          "evidence": "shared/resources/tests/registry-tick.test.mjs:2254",
+          "status": "PASS"
+        },
+        {
+          "member": "not-attempted",
+          "evidence": "shared/resources/tests/registry-tick.test.mjs:2330",
+          "status": "PASS"
+        },
+        {
+          "member": "unmerged",
+          "evidence": null,
+          "status": "FAIL"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Exit 0 is asserted for row-not-in-index (:2233), not-tracked and not-a-repo (:2254), and not-attempted (:2330). The unmerged reason is implemented at registry-tick.js:1206, but no test case for it was found."
+    },
+    {
+      "id": "SC-4",
+      "text_hash": "45f59dd136c81a0f3dab833ad92bbe0df42f5a6ad84179da1d6325f7218f2fd0",
+      "status": "PASS",
+      "description": "finalise 6a has no whole-file registry add; parallel row not committed",
+      "code_citation": "skills/finalise/SKILL.md:1634",
+      "test_citation": "shared/resources/tests/finalise-6a-registry-staging.test.mjs:162",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The test executes the 6a block under bash and zsh. A control test (:204) shows the parallel row rides in when the whole-file add is restored, and a shape test at :224 checks the block carries no whole-file add."
+    },
+    {
+      "id": "SC-5",
+      "text_hash": "ca30e0672af81ea0407b1d989f8731f340b4bbd584884313ad7f91686a69a75c",
+      "status": "PASS",
+      "description": "develop-next/develop-batch commit the --annotate row with --stage; resume reads the index",
+      "code_citation": "skills/develop-next/SKILL.md:603",
+      "test_citation": "evals/develop-batch/protocol/skill-shape.test.mjs:436",
+      "members": [],
+      "non_member_fail": null,
+      "note": "develop-batch prose is at skills/develop-batch/SKILL.md:643. The resume index check for develop-next is pinned at evals/develop-next/protocol/skill-shape.test.mjs:385. The evidence is prose-shape assertions; the executed staging behaviour is covered by the SC-1 tests."
+    },
+    {
+      "id": "SC-6",
+      "text_hash": "21c8050733864d7c0b29f01a01a40b64c088aa9818845b6bea0c825dae16982f",
+      "status": "PASS",
+      "description": "re-review with dirty tracked file outside change set warns and continues",
+      "code_citation": "shared/resources/qa-re-review-scope.md:222",
+      "test_citation": "shared/resources/tests/qa-scope-from-head.test.mjs:784",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Test M1 runs the block under bash and zsh. Test M6 (:827) covers the exact-dirname rule."
+    },
+    {
+      "id": "SC-7",
+      "text_hash": "7b7f64ce5d0433c8e0fa2033ee7993ad9765939e6951d9b598578a9c23536489",
+      "status": "PASS",
+      "description": "dirty tracked file in change set or beside a changed file HALTs",
+      "code_citation": "shared/resources/qa-re-review-scope.md:229",
+      "test_citation": "shared/resources/tests/qa-scope-from-head.test.mjs:798",
+      "members": [],
+      "non_member_fail": null,
+      "note": "M2 is the beside-a-changed-file case. M7 (:840) covers quoted paths."
+    },
+    {
+      "id": "SC-8",
+      "text_hash": "fe0a6125c8083797067d10d7568803e8959b16a5f0331326e3f6e387a28d8525",
+      "status": "PASS",
+      "description": "unlistable $BASE...HEAD makes every tracked dirt HALT",
+      "code_citation": "shared/resources/qa-re-review-scope.md:225",
+      "test_citation": "shared/resources/tests/qa-scope-from-head.test.mjs:808",
+      "members": [],
+      "non_member_fail": null,
+      "note": "M3 covers an unlistable base; M4 (:819) covers an unbound BASE."
+    },
+    {
+      "id": "SC-9",
+      "text_hash": "ea002b26493d45fd37dd09a80cb1d5fa06cf7c6de767f2f018adb7ab5e9fb6fe",
+      "status": "FAIL",
+      "description": "npm test wall time within 5% of develop",
+      "code_citation": "docs/tasks/task.245.shared-checkout-safe-guards-and-staging/task.245.implementation.1.shared-checkout-safe-guards-and-staging-initial-run.md:65",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "re-measure. The cited line was an uncommitted working-tree edit, recorded no uptime or load, and was taken on an earlier commit than head bb00bd3e. It did not measure npm test against develop. (After this verdict the A/B measurement was taken and recorded in the implementation report; the next run re-judges it.)"
+    },
+    {
+      "id": "SC-10",
+      "text_hash": "ec99249c6f707297f32a4b062e4b5daa8b522bb10a98bc95d7d909f464ef5aa6",
+      "status": "FAIL",
+      "description": "--stage adds no network call",
+      "code_citation": "shared/resources/registry-tick.js:170",
+      "test_citation": null,
+      "members": [],
+      "non_member_fail": "No test asserts the absence of network use. The header at registry-tick.js:170 only says 'No network is used', and the module imports only fs, path, child_process and yaml-subset. This is a behaviour criterion, so a code citation alone does not pass.",
+      "note": "The code evidence is consistent with the claim (no network imports). A per-PR assertion is missing, for example a test that --stage spawns only git."
+    },
+    {
+      "id": "SC-11",
+      "text_hash": "6ebb0605a97024e30444739f9138676b59ac2eb03693d9284f814f730978b507",
+      "status": "PASS",
+      "description": "each section 8 mutation proof goes red, recorded in implementation report",
+      "code_citation": "docs/tasks/task.245.shared-checkout-safe-guards-and-staging/task.245.implementation.1.shared-checkout-safe-guards-and-staging-initial-run.md:64",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The line records all four proofs and the red tests: stage-by-line goes red on the by-id test; prefix match goes red on M6 and test E; warn-on-everything goes red on L4, L11 and M2; whole-file add restored shows the parallel row in HEAD."
+    },
+    {
+      "id": "SC-12",
+      "text_hash": "3b44ee6331dc04acec5037a8f7bf30f8adeb2b7f4e965ffa5abf5f6b8b4d4e8d",
+      "status": "PASS",
+      "description": "npm run ci passes; bundle:check clean; test E holds three copies equal",
+      "code_citation": "package.json:24",
+      "test_citation": "shared/resources/tests/qa-scope-from-head.test.mjs:296",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Test E passes in the ci-fast-c4 log. The format:check and npm test legs are green: 6896 pass, 0 fail. The eval:all, validate:all, bundle:check and lint legs have no committed or current record (see advisories)."
+    },
+    {
+      "id": "SC-13",
+      "text_hash": "a7b5dc632434d2d1b30f3cd7ddbc84df632586086c8f27eb4dab9832740523b0",
+      "status": "FAIL",
+      "description": "npm run validate over the five skills passes",
+      "code_citation": null,
+      "test_citation": null,
+      "members": [],
+      "non_member_fail": "No cited run of the validator over the five skills existed. (After this verdict it was run once per skill, all five exit 0, and recorded in the implementation report; the next run re-judges it.)",
+      "note": "Not shown as run on head at the time of the verdict."
+    },
+    {
+      "id": "SC-14",
+      "text_hash": "aa7ad462c53fc3a5e0fbf823879770a7481e20815b5c1e3541cd7f383620897d",
+      "status": "PASS",
+      "description": "CHANGELOG entry cites (task 245)",
+      "code_citation": "CHANGELOG.md:35",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The line is the Changed entry headed 'Registry commits and the QA re-review stop sweeping up a parallel session's edits (task 245).' and describes the --stage change."
+    },
+    {
+      "id": "SC-15",
+      "text_hash": "89f9d7772fc3ab8736e7d4c76a492096ba9c331f16d4bfa219d292653f980dcd",
+      "status": "FAIL",
+      "description": "Phase 4 grep docs updated or listed as unaffected in implementation report",
+      "code_citation": "docs/standards/task-registry.md:39",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": "The implementation report had no sweep record naming the Phase 4 grep results or the unaffected docs. (After this verdict the sweep was recorded in the implementation report; the next run re-judges it.)",
+      "note": "The updates exist: docs/standards/task-registry.md gains the --stage paragraph, and the SKILL.md files and the qa-re-review-scope copies are updated."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "SC-12",
+      "note": "Full npm run ci legs eval:all, validate:all, check:generated, bundle:check and lint:shell have no committed or current-head log. The finalise CI step should supply this evidence."
+    },
+    {
+      "ac_id": "SC-3",
+      "note": "The unmerged stageReason (registry-tick.js:1206) has no test among the registry-tick --stage cases found. The exit-0 behaviour is shared by all reasons."
+    },
+    {
+      "ac_id": "SC-9",
+      "note": "The ci-fast-c3 and c4 logs are two runs of the same branch at 242 s and 176 s; a 5% bound cannot be checked without a controlled A/B run against develop."
+    }
+  ]
+}

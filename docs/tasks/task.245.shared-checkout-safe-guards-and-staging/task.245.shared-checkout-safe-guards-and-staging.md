@@ -5,18 +5,20 @@ type: task
 description: "Make the registry writers stage only the line they changed, and narrow the QA re-review's dirty-tree HALT to paths the review reads, so a parallel session's edit in the same checkout neither rides into another task's commit nor stops another task's QA."
 tags: [qa-task, qa-story, finalise, develop-next, develop-batch, registry-tick, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-29
 updated: 2026-10-30
+completed_date: 2026-10-30
 assignee:
 estimated_effort_hours: 8
 github_issue: 783
+pr_number: 796
 ---
 
 # Technical Task: Shared-checkout-safe guards and staging
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.245.review.1.shared-checkout-safe-guards-and-staging.md` implemented 2026-10-30
 **GitHub Issue**: [#783](https://github.com/Gamaroff/agent-skills/issues/783)
 
@@ -444,23 +446,73 @@ moved aside first so bundled copies are what runs.
 **Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.245.qa.5.shared-checkout-safe-guards-and-staging.md](./task.245.qa.5.shared-checkout-safe-guards-and-staging.md)
-- **Gate File**: [task.245.gate.5.shared-checkout-safe-guards-and-staging.yml](./task.245.gate.5.shared-checkout-safe-guards-and-staging.yml)
+- **Full Report**: [task.245.qa.7.shared-checkout-safe-guards-and-staging.md](./task.245.qa.7.shared-checkout-safe-guards-and-staging.md)
+- **Gate File**: [task.245.gate.7.shared-checkout-safe-guards-and-staging.yml](./task.245.gate.7.shared-checkout-safe-guards-and-staging.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 6910
+- **Tests Executed**: 6913
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-T245-QA-5 is fixed. The scoped review found one low wording point in the develop-batch `already` arm, recorded as a future item.
+The unmerged-stageReason test is sound. The scoped review found one low cleanup in the new test, recorded as a future item.
 
+## Definition of Done - run 1 (historical, superseded)
+
+**Status:** SUPERSEDED by run 2, below
+
+### QA Gate Status
+
+**QA Report**: `task.245.qa.5.shared-checkout-safe-guards-and-staging.md`
+**Gate File**: `task.245.gate.5.shared-checkout-safe-guards-and-staging.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+### Missing Criteria:
+
+- [ ] SC-10: `--stage` adds no network call. The code is consistent with it (imports only `fs`, `path`, `child_process`, `yaml-subset`), but no test asserts it.
+- [ ] SC-9: the wall-time bound was judged against an uncommitted, load-free, non-develop measurement. An A/B timing against the merge-base is now in the implementation report (head 2.8% faster); it needs a re-judge.
+- [ ] SC-13: the validator was not shown run on the five skills. It has since been run once per skill, all five pass; it needs a re-judge.
+- [ ] SC-15: the report carried no Phase 4 sweep list. It has since been recorded; it needs a re-judge.
+
+### Next Steps:
+
+- [ ] Add a behavioural test for SC-10 (sockets and DNS blocked, `--stage` still works), mutation-prove it, take it through QA.
+- [ ] Re-run `/finalise`; it re-judges only the four failed criteria.
+
+**Estimated Effort:** Small (one test, one QA cycle)
+
+**Gap Report Generated:** 2026-10-30
+**Detailed Verification Log:** See `task.245.dod.1.shared-checkout-safe-guards-and-staging.md` for complete verification evidence.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.245.qa.7.shared-checkout-safe-guards-and-staging.md`
+**Gate File**: `task.245.gate.7.shared-checkout-safe-guards-and-staging.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified (run 2):
+
+✅ **Acceptance Criteria:** 15 of 15 met. The four run-1 gaps are closed: SC-10 by a network-block test, SC-3's `unmerged` member by a conflicted-index test, SC-9 by a committed A/B timing on `529a3bc9` (+0.6% against the merge-base), SC-13 and SC-15 by committed evidence lines.
+✅ **Tests and PR:** PR #796; fast gate 6913 tests, 0 fail; CI `SUCCESS` on `4de12024`.
+✅ **Documentation:** `docs/standards/task-registry.md`, the five skills and `CHANGELOG.md:35`.
+✅ **Security Review:** the dirty-tree HALT boundary was probed in run 1 (14 executed, 0 reproduced).
+⚠️ **Compliance Review:** not applicable.
+
+**Detailed Verification Log:** See `task.245.dod.2.shared-checkout-safe-guards-and-staging.md` for complete verification evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-10-30
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                       | Author      |
-| ---------- | ------- | ------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-29 | 1.0     | Initial draft — cut from observations #126, #127  | create-task |
 | 2026-10-30 | 1.1     | Review passed (10/10) — ready for development     | review-task |
 | 2026-10-30 |         | Status → ready-for-development                    | review-task |
@@ -474,6 +526,10 @@ T245-QA-5 is fixed. The scoped review found one low wording point in the develop
 | 2026-10-30 |         | QA gate CONCERNS (90/100) — 1 finding             | qa-task     |
 | 2026-10-30 |         | QA findings fixed — cycle 4, 1 finding            | qa-fix      |
 | 2026-10-30 |         | QA gate PASS (100/100) — 0 findings               | qa-task     |
+| 2026-10-30 |         | DoD incomplete — 4 gaps identified                | finalise    |
+| 2026-10-30 |         | QA gate PASS (100/100) — 0 findings               | qa-task     |
+| 2026-10-30 |         | QA gate PASS (100/100) — 0 findings               | qa-task     |
+| 2026-10-30 | 1.2 | DoD passed — accepted (PR #796) | finalise |
 <!-- change-log-end -->
 
 ---
