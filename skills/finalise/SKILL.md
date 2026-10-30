@@ -1436,8 +1436,13 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 
    ```bash
    node .agents/skills/finalise/references/registry-tick.js \
-     --file "{document-path}" --json
+     --file "{document-path}" --stage --json
    ```
+
+   `--stage` puts **this task's row** in the index and nothing else from the registry. The registry
+   is a shared file: a parallel session's uncommitted row or counter bump in the same checkout must
+   not ride into this acceptance commit (obs #127), so 6a does not `git add` the registry — the
+   engine stages the row it wrote (task 245).
 
    > Engine source: `references/registry-tick.js` (bundled into each skill as
    > `references/registry-tick.js`).
@@ -1461,6 +1466,12 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    | `row-malformed` | The registry has a row for this task, but the parser rejected its shape — `parserReason` and `line` say why and where | **Log it and tick by hand.** Fix the row's shape so the next tick works |
    | `ambiguous-row` | The Status column could not be identified | **Log it and tick by hand** |
    | `engine-unavailable` | The registry parser could not be located | **Log it and tick by hand** |
+
+   **The `staged` / `stageReason` fields** report the index write. `staged` / `already-staged` need
+   nothing. Any other `stageReason` (`row-not-in-index`, `not-tracked`, `unmerged`, `not-a-repo`;
+   `not-attempted` follows a `reason` above that wrote nothing) means the row is **not** in the
+   acceptance commit: **log it verbatim in the DoD file's Step 5** and tick-and-commit the row by
+   hand, or CI's drift check fails. It never changes the exit code.
 
    **The `icon` field** appears only when the consumer sets `registry.task.statusIcons` in
    `skills-config.yaml` (see the configuration reference). The registry's status-icon cell is then
@@ -1620,9 +1631,9 @@ standalone.
      COMMIT_MSG="docs(${STEM}): accept — DoD, sprint review"
    fi
    # --- acceptance artefacts resolved (the executed test slices to here) ---
-   # One unmatched pathspec aborts the WHOLE `git add`, so the registry (tasks only; absent on a
-   # story or a project without one) is added on its own, behind an existence check — not folded
-   # into the list behind a `|| true` that would also swallow a real failure.
+   # The task registry is NOT added here. Step 7.4's `registry-tick.js --stage` already put this
+   # task's row in the index, so a parallel session's uncommitted row or counter bump in the same
+   # file stays out of this commit (obs #127, task 245). A whole-file add would sweep it in.
    # Read the add's exit code. A failed add — bash: "pathspec did not match" (128) — leaves the
    # index clean, and the idempotency guard below would then read that as "already committed"
    # and push nothing (task.115 5c pass 2, CR-1). The DoD path above is already resolved and
@@ -1630,13 +1641,8 @@ standalone.
    git add "${ADD_PATHS[@]}"
    ADD_EXIT=$?
    [ "$ADD_EXIT" -eq 0 ] || { echo "HALT: git add of the acceptance artefacts failed (exit $ADD_EXIT) — an artefact is missing or the DoD glob matched nothing"; exit 1; }
-   if [ -f docs/tasks/task-registry.md ]; then
-     git add docs/tasks/task-registry.md
-     ADD_EXIT=$?
-     [ "$ADD_EXIT" -eq 0 ] || { echo "HALT: git add of the task registry failed (exit $ADD_EXIT)"; exit 1; }
-   fi
    # This run's AC record (Step 3c, task 242) — stories and tasks only, and absent when agent 1's
-   # answer was unparseable, so it is added on its own behind an existence check like the registry.
+   # answer was unparseable, so it is added on its own behind an existence check.
    # THIS run's exact path, numbered from the DoD file resolved above — never the newest record in
    # the series, which on an unparseable run is an earlier run's (task.242 QA cycle 1, CR-7).
    AC_RECORD=""
@@ -2594,7 +2600,7 @@ EOF
 
 - [ ] Running summary file finalized — `## Verification Complete` appended with `**Final Status:** ✅ ACCEPTED`, and that is the file's only status line (the header carries none)
 - [ ] Story frontmatter updated: `status: accepted`, `updated`, `completed_date`, `pr_number`
-- [ ] Task only: registry row ticked — `registry-tick.js` reported `ticked` / `already` / `no-registry` (a `no-row`, `row-malformed`, `ambiguous-row` or `engine-unavailable` needs a manual tick before merge, or CI's drift check fails); with `statusIcons` configured, an `icon` of `unmapped`, `no-column` or `ambiguous` needs the icon fixed by hand
+- [ ] Task only: registry row ticked — `registry-tick.js --stage` reported `ticked` / `already` / `no-registry` with `stageReason` `staged` / `already-staged` (any other `stageReason` is logged in the DoD file and the row committed by hand; a `no-row`, `row-malformed`, `ambiguous-row` or `engine-unavailable` needs a manual tick before merge, or CI's drift check fails); with `statusIcons` configured, an `icon` of `unmapped`, `no-column` or `ambiguous` needs the icon fixed by hand
 - [ ] DoD PASSED section added to story document body
 - [ ] Running summary referenced in DoD section
 - [ ] Sprint Review summary file created at `{story-directory}/sprint-review-summary.md`

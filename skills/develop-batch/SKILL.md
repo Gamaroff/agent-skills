@@ -640,12 +640,16 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
      ```
    - **`source: task-registry`** — no roadmap row, no roadmap Change Log row; Status is
      already `accepted` (finalise wrote it via `registry-tick.js`). Record the merge with
-     `node .agents/skills/develop-batch/references/registry-tick.js --annotate --file <doc>
+     `node .agents/skills/develop-batch/references/registry-tick.js --annotate --stage --file <doc>
      --pr <PR#> [--issue "<[#N](url)>"] --json` — additive (notes cell + `Issue` cell), never a
-     second Status writer. `annotated` → commit `docs(registry): record <id> — PR #<n> merged`
-     and push; `already` → `git diff --quiet HEAD -- docs/tasks/task-registry.md` first and commit
-     when dirty (a crash between the write and its commit leaves the row edited; the resume path
-     skips the dirty-tree check), then `git push origin <baseBranch>` once, regardless (a crash
+     second Status writer. `--stage` puts only this row in the index, so no `git add` of the
+     registry and no commit pathspec follows (obs #127, task 245): a parallel session's row in the
+     same file stays out. On `annotated` or `already`, a `stageReason` other than `staged` /
+     `already-staged` means the row is not in the index: log it verbatim, make no commit and do not mark `ticked: true`, as
+     `develop-next` does. `annotated` → commit `docs(registry): record <id> — PR #<n> merged`
+     (what is staged) and push; `already` → `git diff --cached --quiet HEAD -- docs/tasks/task-registry.md`
+     first and commit when the index differs (a crash between the write and its commit leaves the
+     row edited; the resume path skips the dirty-tree check), then `git push origin <baseBranch>` once, regardless (a crash
      between commit and push leaves the record local-only; the push is idempotent), then
      `ticked: true`; every other exit-0 reason (`no-row`, `row-malformed`,
      `no-registry`, `no-cell`, `not-accepted`, `not-a-task`, `engine-unavailable`) → log, no commit.
@@ -654,7 +658,9 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
 
      On non-ff rejection: `git pull --rebase origin <baseBranch>` once and retry; still
      rejected → **HALT** (the run state preserves `merged: true, ticked: false` for
-     recovery). Mark `ticked: true` on every arm.
+     recovery). Mark `ticked: true` on every arm that ended in a push or had nothing to write
+     (the `not-attempted` exits listed above, which carry no row to stage, and `bug-registry`),
+     never on an `annotated` / `already` result whose `stageReason` is another reason.
 
 The next item's rebase (step 1) then picks up this item's code **and** its tick. Merge +
 tick is serial by nature — the roadmap/Change Log edit is a guaranteed conflict point.

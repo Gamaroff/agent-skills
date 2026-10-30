@@ -131,11 +131,14 @@ const FUTURE = new Date(Date.now() + 3 * 3600 * 1000)
  * feature: fix1 (skills/a.sh) ← gate 2 judged this; fix2 (skills/b.sh) + the gate file, committed
  * together, as the QA loop commits a gate beside the fix that follows it.
  */
-function scratch({ head = "fix1", schema = 2 } = {}) {
+function scratch({ head = "fix1", schema = 2, baseFiles = [] } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "qa-scope-head-"));
   TMP.push(dir);
   git(dir, "init", "-q", "-b", "develop");
   commitFile(dir, "base.txt", "base\n", "base");
+  // Files the feature branch never touches, committed on the base (task 245).
+  for (const [rel, body] of baseFiles)
+    commitFile(dir, rel, body, `base ${rel}`);
   // The work item's own document, on the base: the trigger requires it to exist (CR3-1).
   commitFile(dir, "docs/task.9.x.md", "status: ready-for-review\n", "the task");
   git(dir, "checkout", "-q", "-b", "feature");
@@ -773,6 +776,119 @@ for (const sh of SHELLS) {
     assert.match(r.stdout, /HALT: uncommitted changes outside the work item/);
     assert.match(r.stdout, /skills\/b\.sh/, "the HALT names the path");
     assert.equal(r.patch, "", "nothing is dispatched");
+  });
+
+  // ── M — the HALT keys on what the review reads (task 245, obs #126) ──────────
+  // The control file is neither a registry nor under docs/: the pass must not depend on the example.
+
+  test(`M1 [${sh}] — a tracked edit outside the change set and its directories warns and the review runs (obs #126)`, () => {
+    const fx = scratch({ baseFiles: [["other/x.sh", "echo x\n"]] });
+    fs.appendFileSync(path.join(fx.dir, "other", "x.sh"), "echo parallel\n");
+    const r = runScope(sh, fx);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(
+      r.stdout,
+      /warning: uncommitted changes outside the review scope[\s\S]*other\/x\.sh/,
+    );
+    assert.doesNotMatch(r.stdout, /HALT/);
+    assert.match(r.stdout, /Re-review scope: files changed since gate 2/);
+    assert.notEqual(r.patch, "", "the review is dispatched");
+  });
+
+  test(`M2 [${sh}] — a tracked edit beside a changed file HALTs`, () => {
+    const fx = scratch({ baseFiles: [["skills/c.sh", "echo c\n"]] });
+    fs.appendFileSync(path.join(fx.dir, "skills", "c.sh"), "echo fix\n");
+    const r = runScope(sh, fx);
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stdout, /HALT: uncommitted changes outside the work item/);
+    assert.match(r.stdout, /skills\/c\.sh/);
+    assert.equal(r.patch, "", "nothing is dispatched");
+  });
+
+  test(`M3 [${sh}] — an unlistable base HALTs on any tracked edit, as before`, () => {
+    const fx = scratch({ baseFiles: [["other/x.sh", "echo x\n"]] });
+    fs.appendFileSync(path.join(fx.dir, "other", "x.sh"), "echo parallel\n");
+    // The same edit M1 warns about; only the base differs. The scope arm itself needs a
+    // valid base, so the review is cycle 2 (no arm reads $BASE before the check fires).
+    const r = runScope(sh, fx, { BASE: "origin/nope", PRIOR_GATES: "1" });
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stdout, /HALT: uncommitted changes outside the work item/);
+    assert.match(r.stdout, /other\/x\.sh/);
+  });
+
+  test(`M4 [${sh}] — an unbound BASE HALTs on any tracked edit (an empty base would list nothing and warn on all)`, () => {
+    const fx = scratch({ baseFiles: [["other/x.sh", "echo x\n"]] });
+    fs.appendFileSync(path.join(fx.dir, "other", "x.sh"), "echo parallel\n");
+    const r = runScope(sh, fx, { BASE: "", PRIOR_GATES: "1" });
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stdout, /HALT: uncommitted changes outside the work item/);
+  });
+
+  test(`M6 [${sh}] — the directory match is the exact dirname, not a prefix: an ancestor directory of a changed file's directory only warns`, () => {
+    const fx = scratch({ baseFiles: [["lib/y.sh", "echo y\n"]] });
+    git(fx.dir, "checkout", "-q", "feature");
+    commitFile(fx.dir, "lib/deep/z.sh", "echo z\n", "a change two levels down");
+    fs.appendFileSync(path.join(fx.dir, "lib", "y.sh"), "echo parallel\n");
+    const r = runScope(sh, fx);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(
+      r.stdout,
+      /warning: uncommitted changes outside the review scope[\s\S]*lib\/y\.sh/,
+    );
+  });
+
+  test(`M7 [${sh}] — a dirty changed file whose path git status would quote (space, non-ASCII) HALTs (T245-QA-1)`, () => {
+    for (const rel of ["sp ace/f g.sh", "café/x.sh"]) {
+      const fx = scratch({ baseFiles: [[rel, "echo x\n"]] });
+      git(fx.dir, "checkout", "-q", "feature");
+      commitFile(fx.dir, rel, "echo changed\n", "change the quoted-path file");
+      fs.appendFileSync(path.join(fx.dir, rel), "echo uncommitted fix\n");
+      const r = runScope(sh, fx);
+      assert.equal(r.status, 1, `${rel}: ${r.stdout}${r.stderr}`);
+      assert.match(r.stdout, /HALT: uncommitted changes outside the work item/);
+      assert.equal(r.patch, "", "nothing is dispatched");
+    }
+  });
+
+  test(`M8 [${sh}] — a failing \`git status -z\` while the tree is dirty HALTs rather than passing the guard (T245-QA-2)`, () => {
+    const fx = scratch({ baseFiles: [["other/x.sh", "echo x\n"]] });
+    fs.appendFileSync(path.join(fx.dir, "other", "x.sh"), "echo parallel\n");
+    // A git shim that fails only the NUL-separated status call; every other call is real git.
+    const shim = fs.mkdtempSync(path.join(os.tmpdir(), "qa-git-shim-"));
+    TMP.push(shim);
+    const realGit = execFileSync("sh", ["-c", "command -v git"], {
+      encoding: "utf8",
+    }).trim();
+    fs.writeFileSync(
+      path.join(shim, "git"),
+      `#!/bin/sh\ncase " $* " in *" status "*" -z "*) exit 3;; esac\nexec "${realGit}" "$@"\n`,
+      { mode: 0o755 },
+    );
+    const r = runScope(sh, fx, {
+      PATH: `${shim}${path.delimiter}${process.env.PATH}`,
+    });
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stdout, /HALT: git status -z failed or came back empty/);
+    assert.equal(r.patch, "", "nothing is dispatched");
+  });
+
+  test(`M5 [${sh}] — a root-level changed file does not make every root-level edit HALT`, () => {
+    const fx = scratch({ baseFiles: [["root.txt", "r\n"]] });
+    // base.txt is already at the root; add a root-level file to the PR itself.
+    git(fx.dir, "checkout", "-q", "feature");
+    commitFile(
+      fx.dir,
+      "changed-root.txt",
+      "c\n",
+      "a root-level change in the PR",
+    );
+    fs.appendFileSync(path.join(fx.dir, "root.txt"), "parallel\n");
+    const r = runScope(sh, fx);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(
+      r.stdout,
+      /warning: uncommitted changes outside the review scope[\s\S]*root\.txt/,
+    );
   });
 
   test(`L5 [${sh}] — the work item's own files and .claude/state do not HALT (CR3-7)`, () => {

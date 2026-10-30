@@ -1,0 +1,52 @@
+schema: 2
+task: 'task.245.shared-checkout-safe-guards-and-staging'
+task_title: 'Shared-checkout-safe guards and staging'
+gate: PASS
+status_reason: 'The unmerged-stageReason test is sound. The scoped review found one low cleanup: the fixture cannot tell the two clauses of the guard apart.'
+reviewer: 'QA Engineer'
+head: '529a3bc9629fc0641423884fb4fd8f3d101e4124'
+updated: '2026-10-30T20:42:52Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 6913
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No input-accepting boundary is delivered. The new commit adds one test.'
+  performance:
+    status: PASS
+    notes: 'ci:fast at this head ran 6913 tests, 6899 pass, 0 fail. SC-9 re-measured on this head: head 0.6% slower than the merge-base, within 5%.'
+  reliability:
+    status: PASS
+    notes: 'The test edits only its own temporary repo and removes it in a finally.'
+  maintainability:
+    status: PASS
+    notes: 'One low cleanup on the new test, future.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Cycle-7 CR-1 (low/medium): the three-stage fixture makes both `entries.length > 1` and the stage check true, so the test cannot show the stage clause fires. Add a case with a single non-zero-stage entry. The author mutation removed the whole condition, not the stage clause alone.'
+      refs: ['shared/resources/tests/registry-tick.test.mjs']
+    - action: 'Carried from gate 6: widen the network preload or narrow the SC-10 test title; compare the control log by exact line and add tls, http and Socket probes.'
+      refs: ['shared/resources/tests/registry-tick.test.mjs']
+    - action: 'Carried from gate 5: the `already` arm wording of the develop-batch lane; a trap for the DIRTY_Z temp file; a distinct stageReason when hash-object or update-index fails; a re-read of the index blob before update-index; a behavioural harness for the merge lane.'
+      refs: ['skills/develop-batch/SKILL.md', 'shared/resources/qa-re-review-scope.md', 'shared/resources/registry-tick.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

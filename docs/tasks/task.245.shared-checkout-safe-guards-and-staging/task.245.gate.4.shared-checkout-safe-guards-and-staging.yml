@@ -1,0 +1,59 @@
+schema: 2
+task: 'task.245.shared-checkout-safe-guards-and-staging'
+task_title: 'Shared-checkout-safe guards and staging'
+gate: CONCERNS
+status_reason: 'T245-QA-4 is fixed. The scoped review found one new medium defect in the same sentence: the stageReason gate and the new closing tick sentence disagree for the not-attempted exits (no-row, row-malformed and the rest), which the lane says to log with no commit.'
+reviewer: 'QA Engineer'
+head: '56e710ae71ac4b133e34853ca587677959e7e457'
+updated: '2026-10-30T19:49:52Z'
+
+top_issues:
+  - id: 'T245-QA-5'
+    severity: medium
+    file: 'skills/develop-batch/SKILL.md'
+    finding: 'The merge lane says any stageReason other than staged / already-staged means "no commit, do not mark ticked: true", but registry-tick.js reports stageReason `not-attempted` for every exit that has nothing to stage (no-row, row-malformed, no-registry, no-cell, not-accepted, not-a-task, engine-unavailable), which the same lane says to log with no commit and which previously ticked. Read literally, the gate leaves those rows `ticked: false`, and the closing sentence "nothing to commit" is ambiguous between them. Reviewer CR-1, medium confidence; verified against shared/resources/registry-tick.js lines 167 and 348-351. The reviewer also noted (CR-2) that the shape test rejects only the exact old string.'
+    suggested_action: 'Scope the stageReason gate to the `annotated` and `already` results, name the not-attempted exits and bug-registry as the arms that still tick, and assert both the scoped gate and the closing sentence in the shape test.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 6910
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No input-accepting boundary is delivered.'
+  performance:
+    status: PASS
+    notes: 'Cycle 3 ci:fast reran 6910 tests, 0 fail.'
+  reliability:
+    status: CONCERNS
+    notes: 'T245-QA-5: the develop-batch tick rule is ambiguous for the not-attempted exits.'
+  maintainability:
+    status: PASS
+    notes: 'HALT block copies held by test E and bundle:check.'
+
+recommendations:
+  immediate:
+    - action: 'Fix T245-QA-5.'
+      refs: ['skills/develop-batch/SKILL.md', 'evals/develop-batch/protocol/skill-shape.test.mjs']
+  future:
+    - action: 'Carried: a trap for the DIRTY_Z temp file; a distinct stageReason when hash-object or update-index fails; a re-read of the index blob before update-index; the docs/tasks dirname rule (not reproduced).'
+      refs: ['shared/resources/qa-re-review-scope.md', 'shared/resources/registry-tick.js']
+    - action: 'Prose rules in the three registry committers (finalise 6a, develop-next Step 4, develop-batch) are held by shape tests that match text, not by a run of the lane; a behavioural harness for the merge lane would hold them.'
+      refs: ['skills/develop-batch/SKILL.md', 'skills/develop-next/SKILL.md', 'skills/finalise/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T245-QA-5 fixed']

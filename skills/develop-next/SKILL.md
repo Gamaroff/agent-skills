@@ -600,9 +600,15 @@ and, when the run created a tracker issue, the `Issue` cell — and never a seco
    # argument and it exits 2 — on exactly the case the Issue cell exists for.
    ISSUE_ARGS=()
    [ -n "$ISSUE_REF" ] && ISSUE_ARGS=(--issue "$ISSUE_REF")
-   node .agents/skills/develop-next/references/registry-tick.js --annotate \
+   node .agents/skills/develop-next/references/registry-tick.js --annotate --stage \
      --file <item.commandArg> --pr <PR#> "${ISSUE_ARGS[@]}" --json
    ```
+   `--stage` puts **this row** in the index and leaves every other edit in the registry unstaged: a
+   parallel session's uncommitted row or counter bump in the same checkout must not ride into this
+   commit (obs #127, task 245). So the commits below carry **no `git add` of the registry**, and no
+   pathspec either — `git commit -- <path>` would commit the working file, parallel row included.
+   A `stageReason` other than `staged` / `already-staged` means the row is not in the index: log it
+   verbatim and do not commit (the drift test is the backstop).
    It appends `· PR #<n> merged` to the row's last cell (the registry's notes cell — `Depends on` in
    the documented header; rows 100–106 already carry it there), fills `Issue` only when that cell
    reads as empty (`—`, `none`, `n/a`, `tbd` …), and leaves Status alone. Read `reason`:
@@ -612,10 +618,11 @@ and, when the run created a tracker issue, the `Issue` cell — and never a seco
      registry edited and uncommitted — **staged or not**: `git diff` without `HEAD` compares the
      working tree to the index and reads a staged-but-uncommitted edit as clean, which is the other
      half of the same window — and the resume path skips Step 0's dirty-tree check. So before
-     marking ticked, compare against `HEAD` and commit what may already be on disk:
+     marking ticked, compare the **index** against `HEAD` and commit what the `--stage` re-run
+     staged (the working file may differ from `HEAD` for another session's reasons, so it is not
+     the comparison):
      ```bash
-     git diff --quiet HEAD -- docs/tasks/task-registry.md || {
-       git add docs/tasks/task-registry.md
+     git diff --cached --quiet HEAD -- docs/tasks/task-registry.md || {
        git commit -m "docs(registry): record <id> — PR #<n> merged"
      }
      ```
@@ -633,8 +640,7 @@ and, when the run created a tracker issue, the `Issue` cell — and never a seco
      ticked.)
 2. Commit and push (only on `annotated`):
    ```bash
-   git add docs/tasks/task-registry.md
-   git commit -m "docs(registry): record <id> — PR #<n> merged"
+   git commit -m "docs(registry): record <id> — PR #<n> merged"   # the row `--stage` staged; no git add
    git push origin <baseBranch>
    ```
    Same non-ff rule as the roadmap arm.
