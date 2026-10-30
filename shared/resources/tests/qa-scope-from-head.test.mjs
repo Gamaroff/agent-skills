@@ -837,6 +837,19 @@ for (const sh of SHELLS) {
     );
   });
 
+  test(`M7 [${sh}] — a dirty changed file whose path git status would quote (space, non-ASCII) HALTs (T245-QA-1)`, () => {
+    for (const rel of ["sp ace/f g.sh", "café/x.sh"]) {
+      const fx = scratch({ baseFiles: [[rel, "echo x\n"]] });
+      git(fx.dir, "checkout", "-q", "feature");
+      commitFile(fx.dir, rel, "echo changed\n", "change the quoted-path file");
+      fs.appendFileSync(path.join(fx.dir, rel), "echo uncommitted fix\n");
+      const r = runScope(sh, fx);
+      assert.equal(r.status, 1, `${rel}: ${r.stdout}${r.stderr}`);
+      assert.match(r.stdout, /HALT: uncommitted changes outside the work item/);
+      assert.equal(r.patch, "", "nothing is dispatched");
+    }
+  });
+
   test(`M5 [${sh}] — a root-level changed file does not make every root-level edit HALT`, () => {
     const fx = scratch({ baseFiles: [["root.txt", "r\n"]] });
     // base.txt is already at the root; add a root-level file to the PR itself.

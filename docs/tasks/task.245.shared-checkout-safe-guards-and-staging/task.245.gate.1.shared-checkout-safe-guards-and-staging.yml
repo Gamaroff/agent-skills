@@ -1,0 +1,57 @@
+schema: 2
+task: 'task.245.shared-checkout-safe-guards-and-staging'
+task_title: 'Shared-checkout-safe guards and staging'
+gate: CONCERNS
+status_reason: 'Tests and validation are green, but the new re-review HALT filter fails open on tracked paths that git status quotes (spaces, non-ASCII): an uncommitted edit to a changed file is warned about instead of halting the review. The old rule halted on every such edit.'
+reviewer: 'QA Engineer'
+head: 'b43e26342baa3ea2998637bd6086fd0660055300'
+updated: '2026-10-30T19:19:11Z'
+
+top_issues:
+  - id: 'T245-QA-1'
+    severity: medium
+    file: 'shared/resources/qa-re-review-scope.md'
+    finding: 'The HALT/WARN classifier reads `git status --porcelain` lines, which C-quote a path containing a space or non-ASCII character (reproduced: ` M "d e/f g.txt"`, ` M "\303\251.txt"`). The quoted $p never equals a name from `git diff --name-only`, so a dirty changed file is classed as a warning and the review reads it as absent. Reviewer CR-1 (medium confidence). Reproduced here; regression against the old rule, which halted on all tracked dirt. The same block is in qa-task and qa-story.'
+    suggested_action: 'Read the dirty list with `git status --porcelain -z` (handle the rename "new\0old" entry) or unquote the path, fix the shared source, re-bundle, and add a test with a spaced and a non-ASCII changed file (mutation-prove it).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 6908
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No boundary that accepts or rejects untrusted input is delivered; the staging path passes argv arrays to git (no shell). The HALT filter fail-open is recorded as T245-QA-1 under reliability.'
+  performance:
+    status: PASS
+    notes: 'Full fast gate ran in about 84 s; no new slow suite observed. SC-9 (within 5 percent of develop) not measured against a baseline.'
+  reliability:
+    status: CONCERNS
+    notes: 'T245-QA-1: quoted-path fail-open in the HALT filter. Also CR-2 (low confidence): stageReason not-a-repo covers an index-write failure and a possible maxBuffer overflow on a very large registry.'
+  maintainability:
+    status: PASS
+    notes: 'One definition of the HALT block, held equal across three copies by test E; bundle:check clean.'
+
+recommendations:
+  immediate:
+    - action: 'Fix T245-QA-1 (quoted paths in the HALT filter) in the shared source and re-bundle.'
+      refs: ['shared/resources/qa-re-review-scope.md', 'shared/resources/tests/qa-scope-from-head.test.mjs']
+  future:
+    - action: 'CR-2: report a distinct stageReason when hash-object or update-index fails, and raise maxBuffer on the git show read.'
+      refs: ['shared/resources/registry-tick.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T245-QA-1 fixed']

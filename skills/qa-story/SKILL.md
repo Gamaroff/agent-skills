@@ -1022,16 +1022,21 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
        HALTS="" WARNS=""
        if [ -n "${BASE:-}" ] && CHANGED=$(git -c core.quotePath=false diff --name-only "$BASE...HEAD" 2>/dev/null); then
          CHANGED_DIRS=$(printf '%s\n' "$CHANGED" | sed -n 's#/[^/]*$##p' | sort -u)
-         while IFS= read -r line; do
-           p=${line#???}; p=${p##* -> }               # porcelain v1: "XY path" or "XY old -> new"
+         # -z, not the quoted default: plain --porcelain C-quotes a path with a space or a non-ASCII
+         # character ("d e/f g.txt"), the quoted text never equals the unquoted diff list, and a dirty
+         # changed file would only warn. A rename or copy entry is followed by its old path (QA cycle 1, T245-QA-1).
+         while IFS= read -r -d '' line; do
+           p=${line#???}; old=""
+           case ${line%"$p"} in *R*|*C*) IFS= read -r -d '' old ;; esac
            d=${p%/*}; [ "$d" = "$p" ] && d=""
            if printf '%s\n' "$CHANGED" | grep -qxF -- "$p" \
+              || { [ -n "$old" ] && printf '%s\n' "$CHANGED" | grep -qxF -- "$old"; } \
               || { [ -n "$d" ] && printf '%s\n' "$CHANGED_DIRS" | grep -qxF -- "$d"; }; then
              HALTS="$HALTS$line"$'\n'
            else
              WARNS="$WARNS$line"$'\n'
            fi
-         done < <(printf '%s\n' "$DIRTY")
+         done < <(git status --porcelain -z --untracked-files=no -- . ":(exclude)$WORK_ITEM_DIR" ":(exclude).claude/state")
        else
          HALTS="$DIRTY"$'\n'
        fi
