@@ -5,10 +5,12 @@ type: task
 description: "Close carried advisory finding TASK-246-CR5-1 from task.246: widen develop pipeline ban test to skill-local step docs and amend task.246 criterion (TASK-246-CR4-1 retired as byte no-op)."
 tags: [wireframe-map, testing, hooks, eval]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-10-30
 updated: 2026-10-30
+completed_date: 2026-10-30
+pr_number: 795
 assignee:
 estimated_effort_hours: 1
 github_issue: 794
@@ -16,7 +18,7 @@ github_issue: 794
 
 # Technical Task: Wireframe Mapping Pipeline Test Scope to Skill-Local Step Docs
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.247.review.1.wireframe-mapping-follow-ups.md` implemented 2026-10-30
 **GitHub Issue**: [#794](https://github.com/Gamaroff/agent-skills/issues/794)
 
@@ -246,16 +248,42 @@ None.
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.247.qa.1.wireframe-mapping-pipeline-test-scope.md`
+**Gate File**: `task.247.gate.1.wireframe-mapping-pipeline-test-scope.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (EXCELLENT)
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** All 6 criteria met with verified citations
+✅ **Unit Tests:** `evals/shared/tests/wireframe-mapping-hooks.test.mjs` passing (6/6 tests) and fast CI passing (6,876 tests)
+✅ **PR Review:** PR #795 approved via 5c PR review (`task.247.pr-review.1.wireframe-mapping-pipeline-test-scope.md`), zero findings
+✅ **Documentation:** Updated task.246 § 9 success criteria and CHANGELOG.md under [Unreleased] > Changed
+✅ **Security Review:** ✅ PASS - Read-only test assertion, no leaks, boundary false
+✅ **Compliance Review:** ✅ PASS - NOT_APPLICABLE (internal test harness enhancement)
+
+**Detailed Verification Log:** See `task.247.dod.1.wireframe-mapping-pipeline-test-scope.md` for complete verification evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-10-30
+
+---
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-30 | 1.0     | Initial draft | create-task |
 | 2026-10-30 | 1.1     | Review passed (9/10) — scoped to test widening (CR5-1); CR4-1 retired as byte no-op | review-task |
 | 2026-10-30 |         | Status → ready-for-development | review-task |
 | 2026-10-30 |         | Status → ready-for-review | develop |
 | 2026-10-30 |         | QA gate PASS (10/10) — 0 findings | qa-task |
+| 2026-10-30 | 1.2 | DoD passed — accepted (PR #795) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -316,4 +344,4 @@ None.
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
