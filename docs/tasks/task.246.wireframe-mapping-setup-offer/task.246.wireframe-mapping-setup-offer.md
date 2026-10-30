@@ -523,8 +523,9 @@ the primitive in the middle of a segment (`Rebutton`), which must not match `but
       reason line names `declined` beside `unset` as a stop; held by
       `wireframe-mapping-hooks.test.mjs`
 - [x] No develop pipeline step calls `detect` or `configure`; held by a
-      `wireframe-mapping-hooks.test.mjs` test over `skills/develop-*/SKILL.md` and
-      `shared/resources/develop-pipeline-*.md`, mutation-proven by adding one such call
+      `wireframe-mapping-hooks.test.mjs` test over `skills/develop-*/SKILL.md`,
+      `shared/resources/develop-pipeline-*.md`, and skill-local step docs under
+      `skills/develop-*/references/` (task.247), mutation-proven by adding one such call
 
 ### Performance
 

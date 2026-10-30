@@ -1,8 +1,8 @@
 # Task Registry
 
 **Purpose:** Central tracking for all task numbers in this repo.
-**Last Updated:** 2026-10-29
-**Next Available Task Number:** **247**
+**Last Updated:** 2026-10-30
+**Next Available Task Number:** **248**
 
 ## How to use
 
@@ -288,6 +288,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 244 | [The QA loop always ends on a gate](task.244.qa-loop-ends-on-a-gate/task.244.qa-loop-ends-on-a-gate.md) | planned | refactoring | High | 2026-10-29 | [#782](https://github.com/Gamaroff/agent-skills/issues/782) | — prompted by task.242's loop-limit halt, which handed over an ungated fix after route 2c declined |
 | 245 | [Shared-checkout-safe guards and staging](task.245.shared-checkout-safe-guards-and-staging/task.245.shared-checkout-safe-guards-and-staging.md) | planned | refactoring | Medium | 2026-10-29 | [#783](https://github.com/Gamaroff/agent-skills/issues/783) | — cut from observations #126, #127 (a parallel session's edit in the same checkout: swept into finalise 6a's commit; HALTed a QA re-review) |
 | 246 | [Wireframe mapping setup offer and first-run candidates](task.246.wireframe-mapping-setup-offer/task.246.wireframe-mapping-setup-offer.md) | accepted | other | High | 2026-10-29 | [#792](https://github.com/Gamaroff/agent-skills/issues/792) | — follow-up to task.243, from the rebirth-wallet confirmation of v0.62.0 |
+| 247 | [Wireframe mapping pipeline test scope and configure blank lines](task.247.wireframe-mapping-follow-ups/task.247.wireframe-mapping-follow-ups.md) | accepted | refactoring | Medium | 2026-10-30 | [#794](https://github.com/Gamaroff/agent-skills/issues/794) | task.246 — two carried advisory findings from task.246: widen develop pipeline ban test to skill-local step docs (CR5-1) and preserve blank lines in configure blank-key list removal (CR4-1) |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
@@ -342,5 +343,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 - **Tasks 228–229 are a fix and its guard (substantive → cleanup)**, filed 2026-10-22 — one shippable unit each, in dependency order: 228 replaces the testing guide's sample tokens and rewords two prose lines so `gitleaks dir .` is clean on tracked files; 229 adds the pinned-gitleaks CI lane and `npm run lint:secrets`, which is red on the tree until 228 merges. Both are ordered ahead of the registry fallback by roadmap Phase 15.
 
 - **Tasks 238–239 were cut from the 2026-10-27 observation review (cluster 4, the QA loop)**. Each is one shippable unit, and they are independent in outcome. 238 makes the loop act on the signals it holds: the 5a CI read, three fast-gate outcomes, gated log cleanup, and 5c coverage → 5b. 239 makes the escalation and the grant match what the resumed run will do: the label, the third-strike recommendation, the flat-count reading, and a convergence window reset at a grant. Both edit `develop-pipeline-step-5-6-qa-loop.md`, in different sections. Whichever lands second rebases and re-runs `npm run bundle`. Obs #11 from the same cluster was already fixed by the `fence:` probe form (PR #560) and was closed, not cut.
+
+- **Task 247 gathers two carried advisory findings from task.246 (PR #793)** — one shippable unit: CR5-1 (widen the "no develop pipeline step calls detect or configure" test in `evals/shared/tests/wireframe-mapping-hooks.test.mjs` to skill-local step docs and amend task.246 § 9) and CR4-1 (preserve blank lines in `shared/resources/wireframe-map.js` `configure` list-removal under blank keys on unterminated files). A third carried finding, map-path containment, is pre-existing and out of scope.
 
 - Filenames follow `task.[N].[kebab-case-name].md` per [AGENTS.md](../../AGENTS.md#file-naming).

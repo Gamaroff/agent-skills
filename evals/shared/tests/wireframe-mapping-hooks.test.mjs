@@ -142,6 +142,21 @@ test("no develop pipeline step calls detect or configure", () => {
     ].every((s) => developSkills.includes(s)),
     `every develop skill was found: ${developSkills.join(", ")}`,
   );
+  const skillLocalStepDocs = developSkills.flatMap((s) => {
+    const refDir = join(ROOT, "skills", s, "references");
+    if (!existsSync(refDir)) return [];
+    return readdirSync(refDir)
+      .filter((f) => /^develop-.*\.md$/.test(f))
+      .map((f) => [
+        `skills/${s}/references/${f}`,
+        read(`skills/${s}/references/${f}`),
+      ])
+      .filter(([, content]) => !content.includes("<!-- AUTO-GENERATED"));
+  });
+  assert.ok(
+    skillLocalStepDocs.some(([f]) => f.includes("develop-bug-step-0")),
+    "skill-local step docs were found",
+  );
   const files = [
     ...developSkills.map((s) => [
       `skills/${s}/SKILL.md`,
@@ -150,6 +165,7 @@ test("no develop pipeline step calls detect or configure", () => {
     ...readdirSync(join(ROOT, "shared/resources"))
       .filter((f) => /^develop-pipeline-.*\.md$/.test(f))
       .map((f) => [`shared/resources/${f}`, read(`shared/resources/${f}`)]),
+    ...skillLocalStepDocs,
   ];
   assert.ok(files.length > 8, "the develop pipeline docs were found");
   assert.deepEqual(developSetupCalls(files), []);

@@ -1,0 +1,39 @@
+schema: 2
+task: 'task.247.wireframe-mapping-follow-ups'
+task_title: 'Wireframe mapping pipeline test scope to skill-local step docs'
+gate: PASS
+status_reason: 'All success criteria verified. The develop pipeline ban test in evals/shared/tests/wireframe-mapping-hooks.test.mjs was successfully widened to include author-owned skill-local step documents under skills/develop-*/references/ (excluding auto-generated bundled copies) and verified via mutation proof. Task 246 § 9 success criterion amended. ci:fast passes with 6,876 tests passing.'
+reviewer: 'QA Engineer'
+head: '1afcfab7f85f6c548f9a6b676b2b10a1cd4d6c6a'
+updated: '2026-10-30T17:01:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 24
+  phases_verified: '2/2'
+  trace:
+    phases_covered: [1, 2]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'Test widening and documentation only — no security boundary touched.'
+  performance:
+    status: PASS
+    notes: 'Test execution time remains well under 1 second (540ms total suite).'
+  reliability:
+    status: PASS
+    notes: 'ci:fast passed 6876 tests with 0 failures; mutation proof confirmed failure detection.'
+  maintainability:
+    status: PASS
+    notes: 'Uses clean non-generated file filter, robust floor assertion, and consistent path resolution.'

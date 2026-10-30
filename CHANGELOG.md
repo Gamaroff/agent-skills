@@ -32,6 +32,11 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **Develop pipeline wireframe mapping ban test widened to skill-local step docs (task 247).**
+  The test asserting no develop pipeline step calls `detect` or `configure` in
+  `evals/shared/tests/wireframe-mapping-hooks.test.mjs` now enumerates skill-local step documents
+  under `skills/develop-*/references/` (excluding auto-generated bundled copies), closing carried
+  advisory finding TASK-246-CR5-1.
 - **`ui.wireframeMap: false` or `off`, in any case, now declines wireframe mapping (task 246).** Every engine
   command answers `reason: declined`, exit 0, and writes nothing, and no skill offers setup again.
   Before, `false` read as unset and `off` as a map file named `off`; a project whose map file is
