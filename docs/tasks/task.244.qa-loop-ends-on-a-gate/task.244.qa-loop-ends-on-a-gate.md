@@ -407,8 +407,8 @@ fix, and nothing is added.
 
 ### Migration
 
-- [ ] SC-10: the existing reports in `shared/resources/tests/fixtures/report-lint/green/` (they carry
-      `**Half-cycle**` rows) stay lint-green. The CHANGELOG states that the budget now counts gates,
+- [ ] SC-10: the existing reports that carry `**Half-cycle**` rows (task.166, task.207) and the
+      fixtures in `shared/resources/tests/fixtures/report-lint/green/` stay lint-green. The CHANGELOG states that the budget now counts gates,
       and how to keep a fix count.
 
 ---
@@ -484,6 +484,27 @@ fix, and nothing is added.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-30
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.244.qa.1.qa-loop-ends-on-a-gate.md](./task.244.qa.1.qa-loop-ends-on-a-gate.md)
+- **Gate File**: [task.244.gate.1.qa-loop-ends-on-a-gate.yml](./task.244.gate.1.qa-loop-ends-on-a-gate.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 5 suites reviewed; `npm test` and `eval:all` green
+- **Phases Verified**: 4/4
+- **Critical Issues**: 1
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+All ten success criteria hold. One blocking defect: the qa-task Phase 0 trigger block calls `code-moved-since-gate.sh` with an empty gate path on a first review, and the helper refuses it (exit 2), so the block HALTs (T244-QA-1). Two low findings: untracked held-aside files force the grant to re-enter at 5a with no test (T244-QA-2), and a stale route-2c comment (T244-QA-3).
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -494,6 +515,8 @@ fix, and nothing is added.
 | 2026-10-31 | 1.1     | Review passed (9/10): SC-7 now names the tests that hold it; `:317` anchor → `:320`; fixture 8 decision criterion stated | review-task |
 | 2026-10-31 |         | Status → ready-for-development | review-task |
 | 2026-10-31 |         | Implemented — 86 files, 7 new tests, 4 evals; npm test + bundle:check green | develop |
+| 2026-10-31 |         | QA gate FAIL (70/100) — 1 high, 2 low findings | qa-task |
+| 2026-10-31 |         | QA findings fixed — gate FAIL (70/100) cycle 1, 1 iteration: empty-gate first-review guard in code-moved-since-gate.sh, grant comment, SC-10 wording | qa-fix |
 <!-- change-log-end -->
 
 ---

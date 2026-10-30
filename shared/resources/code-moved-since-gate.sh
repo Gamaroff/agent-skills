@@ -11,7 +11,10 @@
 # run, and an off-branch head counted only what it happened not to share, so a PASS gate skipped
 # review whatever landed after it (task.168 CR4-1).
 #
-# Exit 2 on usage: a missing argument, an unreadable gate, or a work-item directory that is the
+# An empty <gate-file> (no gate on disk: a first review) prints 1 and exits 0, like a head it cannot
+# vouch for.
+#
+# Exit 2 on usage: a missing work-item directory, an unreadable non-empty gate path, or a work-item directory that is the
 # repository root (":(exclude)." would exclude the whole tree and the count would always read 0 —
 # task.135 QA cycle 3, CR3-2). Run it from inside the repository.
 #
@@ -27,13 +30,21 @@ set -u
 
 DIR=${1:-}
 GATE=${2:-}
-if [ -z "$DIR" ] || [ -z "$GATE" ]; then
+if [ -z "$DIR" ]; then
   echo "⚠️  code-moved-since-gate: usage: code-moved-since-gate.sh <work-item-dir> <gate-file>" >&2
   exit 2
 fi
 if [ ! -d "$DIR" ]; then
   echo "⚠️  code-moved-since-gate: '$DIR' is not a directory" >&2
   exit 2
+fi
+# An EMPTY gate path is a first review (qa-task Phase 0 binds $LATEST_GATE empty when no gate exists):
+# there is no gate to have judged this tree, so fail toward review — the old inline trigger read 1 here.
+# A non-empty path that is not a file is still a refusal below.
+if [ -z "$GATE" ]; then
+  echo "trigger: no gate file given (first review) — reviewing" >&2
+  echo 1
+  exit 0
 fi
 if [ ! -f "$GATE" ]; then
   echo "⚠️  code-moved-since-gate: '$GATE' is not a readable gate file" >&2

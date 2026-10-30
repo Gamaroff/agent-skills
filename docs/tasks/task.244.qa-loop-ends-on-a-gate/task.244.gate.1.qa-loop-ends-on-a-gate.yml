@@ -1,0 +1,73 @@
+schema: 2
+task: 'task.244.qa-loop-ends-on-a-gate'
+task_title: 'The QA loop always ends on a gate'
+gate: FAIL
+status_reason: 'The rule itself holds (all ten criteria verified, suites green), but the qa-task Phase 0 trigger block the change rewrote HALTs on a first review: it hands code-moved-since-gate.sh an empty gate path, which the helper refuses with exit 2.'
+reviewer: 'QA Engineer'
+head: '3d8e0313f0cf2b9c699c2d7cd8d63adac3be1690'
+updated: '2026-10-30T22:53:45Z'
+
+top_issues:
+  - id: 'T244-QA-1'
+    severity: high
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'Phase 0 step 3 now runs `CODE_MOVED=$(bash .../code-moved-since-gate.sh "$TASK_DIR" "$LATEST_GATE") || { echo HALT; exit 1; }` unconditionally. On a first review LATEST_GATE is empty (qa-cycle.sh refuses with no numbered gate), the helper treats an empty gate as a usage error (exit 2), and the block HALTs. The block''s own comment says it is designed to run with no gate ("GATE_HEAD is empty and both signals below read 1"); the old code read CODE_MOVED=1 there. Reproduced: LATEST_GATE='''' -> "usage: code-moved-since-gate.sh <work-item-dir> <gate-file>", rc=2.'
+    suggested_action: 'Call the helper only when a gate was bound (`if [ -n "$LATEST_GATE" ]; then CODE_MOVED=$(...) || HALT; else CODE_MOVED=1; fi`), or have the helper print 1 for an empty gate path; add a test that runs the Phase 0 trigger block with no gate on disk (the first-review case) and expects no HALT. Edit the qa-task source and re-run npm run bundle.'
+    suggested_owner: dev
+    status: open
+  - id: 'T244-QA-2'
+    severity: low
+    file: 'shared/resources/grant-qa-cycles.sh'
+    finding: 'The re-entry phase now follows code-moved-since-gate.sh, which counts any untracked file outside the work item as movement. A held-aside untracked file (the pipeline restores them for the whole QA loop) makes every grant re-enter at 5a on unchanged code and spend a granted gate re-reading it. Before this task a not-converging halt re-entered at 5b whatever the tree held. It fails safe (toward re-review), but no test covers the untracked case; cases (a)-(f) cover commit, uncommitted edit, missing helper, no head.'
+    suggested_action: 'Add a grant case (g) for an untracked file outside the work item and state the expected phase (5a, by the helper''s documented rule), or exclude files the pipeline holds aside. Decide and record it; do not leave it implicit.'
+    suggested_owner: dev
+    status: open
+  - id: 'T244-QA-3'
+    severity: low
+    file: 'shared/resources/grant-qa-cycles.sh'
+    finding: 'Header comment (line 12) still lists "a route-2c half-cycle" among the gates that consume a cycle number. Route 2c no longer exists.'
+    suggested_action: 'Reword to "an operator''s standalone run, a previous grant" and re-bundle.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 5
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No new input boundary. The helper reads a gate path and a directory from its caller and passes them to git as arguments and pathspecs; no eval, no shell expansion of file content.'
+  performance:
+    status: PASS
+    notes: 'One git rev-list, one git diff --quiet and one ls-files per call, as the code it replaced. At the default budget a run makes 5 gates and at most 4 fixes, no more than before (SC-7).'
+  reliability:
+    status: CONCERNS
+    notes: 'The first-review HALT (T244-QA-1) is a reliability defect in the Phase 0 trigger. The helper itself fails toward re-review on every head it cannot vouch for.'
+  maintainability:
+    status: PASS
+    notes: 'The code-movement count now exists once for qa-task and the grant (SC-9). reenter-qa-after-finalise.sh keeps its own count with different semantics (docs-only classification); out of scope, listed as future.'
+
+recommendations:
+  immediate:
+    - action: 'Fix T244-QA-1: guard the helper call on a bound gate in qa-task Phase 0 and add a first-review test.'
+      refs: ['skills/qa-task/SKILL.md', 'shared/resources/code-moved-since-gate.sh']
+  future:
+    - action: 'Decide whether the grant should ignore untracked files the pipeline holds aside (T244-QA-2), and add the test either way.'
+      refs: ['shared/resources/grant-qa-cycles.sh', 'shared/resources/grant-qa-cycles.test.sh']
+    - action: 'reenter-qa-after-finalise.sh:214 keeps a second git rev-list count; consider routing its commit count through the same helper.'
+      refs: ['shared/resources/reenter-qa-after-finalise.sh']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T244-QA-1 fixed and a first-review test added']

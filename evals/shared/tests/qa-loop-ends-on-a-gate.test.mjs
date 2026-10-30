@@ -26,6 +26,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -187,5 +188,24 @@ test("develop-bug's verify loop holds the same rule with MAX_ITER, before 5b", (
   assert.match(
     bugDoc,
     /## Loop Limit Escalation \(verify failed on cycle MAX_ITER\)/,
+  );
+});
+
+// T244-QA-1: qa-task Phase 0 passes an EMPTY $LATEST_GATE on a first review. The helper must answer 1
+// (review), not refuse with exit 2 — a refusal HALTs the first review of every work item.
+test("code-moved-since-gate.sh reads an empty gate path as a first review: rc 0, prints 1", () => {
+  const helper = join(ROOT, "shared", "resources", "code-moved-since-gate.sh");
+  const dir = join(ROOT, "docs", "tasks");
+  const run = (...args) =>
+    spawnSync("bash", [helper, ...args], { encoding: "utf8" });
+  const first = run(join(dir, "task.244.qa-loop-ends-on-a-gate"), "");
+  assert.equal(first.status, 0, first.stderr);
+  assert.equal(first.stdout.trim(), "1");
+  // The refusals that must stay refusals: no directory, and a non-empty gate path that is no file.
+  assert.equal(run("", "").status, 2);
+  assert.equal(
+    run(join(dir, "task.244.qa-loop-ends-on-a-gate"), "/nonexistent.yml")
+      .status,
+    2,
   );
 });

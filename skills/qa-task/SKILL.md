@@ -252,8 +252,8 @@ rather than reading these variables.
    # The code-movement count has ONE definition, code-moved-since-gate.sh (task.244): commits since
    # the gate's head, uncommitted edits and untracked files, all outside this task's directory. A
    # head it cannot vouch for (none, not 40-hex, not an ancestor of HEAD) reads 1 and says so on
-   # stderr — fails toward re-review, never toward "nothing moved" (task.168 CR4-1). Exit 2 is a
-   # usage refusal, a HALT here.
+   # stderr — fails toward re-review, never toward "nothing moved" (task.168 CR4-1). An empty
+   # $LATEST_GATE (a first review) reads 1 the same way. Exit 2 is a usage refusal, a HALT here.
    CODE_MOVED=$(bash .agents/skills/qa-task/references/code-moved-since-gate.sh "$TASK_DIR" "$LATEST_GATE") \
      || { echo "HALT: code-moved-since-gate.sh refused (see its line above)"; exit 1; }
    if [ -n "$GATE_HEAD" ]; then

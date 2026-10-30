@@ -9,8 +9,8 @@
 #
 #   1. RECONSTRUCTS the cycle count from the gates on disk — the highest {N} in
 #      <doc-dir>/*.gate.{N}.*.yml. The grant is relative to that count, never to
-#      the original budget of 5: every gate written since (a route-2c half-cycle,
-#      an operator's standalone run, a previous grant) has consumed a cycle number
+#      the original budget of 5: every gate written since (an operator's
+#      standalone run, a previous grant) has consumed a cycle number
 #      that "5 + k" would count against the grant (QA cycle 1, CR-1). Reading it
 #      HERE, not in a neighbouring fenced block, is what makes the value exist:
 #      every orchestrator Bash call is a fresh shell (QA cycle 2, CR-2).
@@ -254,6 +254,8 @@ if [ -z "$LATEST_GATE" ]; then
   echo "grant-qa-cycles: could not resolve the latest gate in '$DOC_DIR' — re-entering at 5a" >&2
 elif [ ! -f "$CODE_MOVED_SH" ]; then
   echo "grant-qa-cycles: code-moved-since-gate.sh not found beside this script ($CODE_MOVED_SH) — cannot tell whether code moved since the gate; re-entering at 5a (re-bundle the skill)" >&2
+# Any untracked file outside the work item counts as moved (the helper cannot tell a restored file
+# from a new fix file): a fail-safe that can spend a granted gate on unchanged code, never skip one.
 elif MOVED=$(bash "$CODE_MOVED_SH" "$DOC_DIR" "$LATEST_GATE" 2>/dev/null) && [ "$MOVED" -ge 0 ] 2>/dev/null; then
   [ "$MOVED" -eq 0 ] && REENTER=5b
 else
