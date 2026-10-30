@@ -438,14 +438,25 @@ test("Step 3 lane: the acceptance record branches on source with all three arms"
   // T245-QA-3: the staging outcome gates the commit and the ticked mark, as in develop-next.
   assert.match(
     rec,
-    /`stageReason` other than `staged` \/ `already-staged`[\s\S]{0,200}no commit[\s\S]{0,60}`ticked: true`/,
+    /`stageReason` other than `staged` \/\s+`already-staged`[\s\S]{0,200}no commit[\s\S]{0,60}`ticked: true`/,
     "a stageReason other than staged / already-staged makes no commit and no ticked mark",
   );
   // T245-QA-4: the closing sentence must not override that gate with an unconditional tick.
   assert.doesNotMatch(
     rec,
-    /Mark `ticked: true` on every arm\./,
+    /Mark `ticked: true` on every arm\.|on every arm that ended in a commit/,
     "no unconditional 'ticked: true on every arm' sentence overrides the stageReason gate",
+  );
+  // T245-QA-5: the gate applies to annotated / already only; the not-attempted exits still tick.
+  assert.match(
+    rec,
+    /On `annotated` or `already`, a `stageReason` other than/,
+    "the stageReason gate is scoped to the annotated / already results",
+  );
+  assert.match(
+    rec,
+    /Mark `ticked: true` on every arm that ended in a push or had nothing to write[\s\S]{0,200}`not-attempted`[\s\S]{0,200}never on an `annotated` \/ `already` result/,
+    "the closing tick sentence names the not-attempted exits and the stageReason exception",
   );
 });
 
