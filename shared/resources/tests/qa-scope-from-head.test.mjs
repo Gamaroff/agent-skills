@@ -850,6 +850,28 @@ for (const sh of SHELLS) {
     }
   });
 
+  test(`M8 [${sh}] — a failing \`git status -z\` while the tree is dirty HALTs rather than passing the guard (T245-QA-2)`, () => {
+    const fx = scratch({ baseFiles: [["other/x.sh", "echo x\n"]] });
+    fs.appendFileSync(path.join(fx.dir, "other", "x.sh"), "echo parallel\n");
+    // A git shim that fails only the NUL-separated status call; every other call is real git.
+    const shim = fs.mkdtempSync(path.join(os.tmpdir(), "qa-git-shim-"));
+    TMP.push(shim);
+    const realGit = execFileSync("sh", ["-c", "command -v git"], {
+      encoding: "utf8",
+    }).trim();
+    fs.writeFileSync(
+      path.join(shim, "git"),
+      `#!/bin/sh\ncase " $* " in *" status "*" -z "*) exit 3;; esac\nexec "${realGit}" "$@"\n`,
+      { mode: 0o755 },
+    );
+    const r = runScope(sh, fx, {
+      PATH: `${shim}${path.delimiter}${process.env.PATH}`,
+    });
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stdout, /HALT: git status -z failed or came back empty/);
+    assert.equal(r.patch, "", "nothing is dispatched");
+  });
+
   test(`M5 [${sh}] — a root-level changed file does not make every root-level edit HALT`, () => {
     const fx = scratch({ baseFiles: [["root.txt", "r\n"]] });
     // base.txt is already at the root; add a root-level file to the PR itself.

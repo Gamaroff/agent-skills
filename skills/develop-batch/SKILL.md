@@ -644,7 +644,9 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
      --pr <PR#> [--issue "<[#N](url)>"] --json` — additive (notes cell + `Issue` cell), never a
      second Status writer. `--stage` puts only this row in the index, so no `git add` of the
      registry and no commit pathspec follows (obs #127, task 245): a parallel session's row in the
-     same file stays out. `annotated` → commit `docs(registry): record <id> — PR #<n> merged`
+     same file stays out. A `stageReason` other than `staged` / `already-staged` means the row is
+     not in the index: log it verbatim, make no commit and do not mark `ticked: true`, as
+     `develop-next` does. `annotated` → commit `docs(registry): record <id> — PR #<n> merged`
      (what is staged) and push; `already` → `git diff --cached --quiet HEAD -- docs/tasks/task-registry.md`
      first and commit when the index differs (a crash between the write and its commit leaves the
      row edited; the resume path skips the dirty-tree check), then `git push origin <baseBranch>` once, regardless (a crash

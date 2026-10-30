@@ -435,6 +435,12 @@ test("Step 3 lane: the acceptance record branches on source with all three arms"
     /git diff --cached --quiet HEAD -- docs\/tasks\/task-registry\.md/,
     "already checks the index for a staged registry row (task 245)",
   );
+  // T245-QA-3: the staging outcome gates the commit and the ticked mark, as in develop-next.
+  assert.match(
+    rec,
+    /`stageReason` other than `staged` \/ `already-staged`[\s\S]{0,200}no commit[\s\S]{0,60}`ticked: true`/,
+    "a stageReason other than staged / already-staged makes no commit and no ticked mark",
+  );
 });
 
 // ── task.188: resume from evidence, not flags ───────────────────────────────

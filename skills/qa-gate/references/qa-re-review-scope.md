@@ -233,6 +233,14 @@ if [ "$PRIOR_GATES" -ge 1 ]; then
       # -z, not the quoted default: plain --porcelain C-quotes a path with a space or a non-ASCII
       # character ("d e/f g.txt"), the quoted text never equals the unquoted diff list, and a dirty
       # changed file would only warn. A rename or copy entry is followed by its old path (QA cycle 1, T245-QA-1).
+      # Captured once and checked: a process substitution's exit status is lost, so a failing second
+      # `git status` would leave HALTS and WARNS empty and pass the guard it exists to enforce, with
+      # DIRTY already proving the tree is dirty (QA cycle 2, T245-QA-2).
+      DIRTY_Z=$(mktemp "${TMPDIR:-/tmp}/qa-dirty.XXXXXX")
+      if ! git status --porcelain -z --untracked-files=no -- . ":(exclude)$WORK_ITEM_DIR" ":(exclude).claude/state" > "$DIRTY_Z" || [ ! -s "$DIRTY_Z" ]; then
+        rm -f "$DIRTY_Z"
+        echo "HALT: git status -z failed or came back empty while the tree is dirty — cannot classify the uncommitted changes:"; printf '%s\n' "$DIRTY"; exit 1
+      fi
       while IFS= read -r -d '' line; do
         p=${line#???}; old=""
         case ${line%"$p"} in *R*|*C*) IFS= read -r -d '' old ;; esac
@@ -244,7 +252,8 @@ if [ "$PRIOR_GATES" -ge 1 ]; then
         else
           WARNS="$WARNS$line"$'\n'
         fi
-      done < <(git status --porcelain -z --untracked-files=no -- . ":(exclude)$WORK_ITEM_DIR" ":(exclude).claude/state")
+      done < "$DIRTY_Z"
+      rm -f "$DIRTY_Z"
     else
       HALTS="$DIRTY"$'\n'
     fi
