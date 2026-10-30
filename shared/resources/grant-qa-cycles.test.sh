@@ -76,49 +76,126 @@ else
   pass "no lock → restored from snapshot (halt fields dropped, pipeline fields kept, qa_phase 5b → 5a), grant written: 6 + 2 = 8"
 fi
 
-# A not-converging halt stopped at 5a, BEFORE its 5b: the grant re-enters at 5b on the latest gate,
-# so the fix that cycle never ran happens first (obs #228). A loop-limit halt (above) re-enters at 5a.
-D="$T/not-converging"; L="$D/state/lock.json"; S="$D/state/last-halt.json"; mkdir -p "$D/state"; mkdoc "$D/doc" 1 2 3
-printf '{"skill":"develop-task","current_step":5,"qa_phase":"5a","task_or_story_directory":"%s","branch":"feature/x","halted_at":"2026-09-30T00:00:00Z","halt_reason":"not-converging","halt_step":"5"}\n' "$D/doc" > "$S"
-OUT=$(run "$L" "$S" "$D/doc" 2 2>/dev/null); RC=$?
-if [ "$RC" -eq 0 ] && [ "$(jq -r '.qa_phase' "$L")" = "5b" ] && [ "$(jq -r '.qa_max_cycles' "$L")" = "5" ] && echo "$OUT" | grep -q "reenter_at=5b"; then
-  pass "not-converging halt → re-enter at 5b on the latest gate (task.140's shape: gate 3, k=2 → budget 5)"
+# task.244: the re-entry phase is decided by EVIDENCE — did code move since the latest gate — not by
+# the halt reason. The loop ends on a gate, so every halt (loop-limit and not-converging alike) stops
+# at a gate whose queue was never handed to /qa-fix. The fixtures below are real git repositories:
+# the helper (code-moved-since-gate.sh) reads the gate's `head:` and the tree.
+git_q() { git -C "$1" -c user.name=t -c user.email=t@t "${@:2}" >/dev/null 2>&1; }
+mkgitdoc() { # $1 = repo dir, $2 = latest gate number; the work item is $1/docs/t; sets GATE_SHA
+  local r="$1" n="$2" i
+  mkdir -p "$r/src" "$r/docs/t"
+  git -C "$r" init -q -b develop
+  echo a > "$r/src/a.txt"; git_q "$r" add -A; git_q "$r" commit -m code
+  GATE_SHA=$(git -C "$r" rev-parse HEAD)
+  for i in $(seq 1 "$n"); do : > "$r/docs/t/task.42.gate.$i.example.yml"; done
+  printf "schema: 2\nhead: '%s'\n" "$GATE_SHA" > "$r/docs/t/task.42.gate.$n.example.yml"
+  git_q "$r" add -A; git_q "$r" commit -m gate
+}
+snap() { # $1 = snapshot file, $2 = doc dir, $3 = halt_reason, $4 = qa_phase
+  jq -n --arg dir "$2" --arg r "$3" --arg p "$4" '{skill:"develop-task",current_step:5,qa_phase:$p,task_or_story_directory:$dir,branch:"feature/x",halted_at:"2026-10-31T00:00:00Z",halt_reason:$r,halt_step:"5"}' > "$1"
+}
+
+# (a) Gate N sits at HEAD and nothing moved → 5b, whatever the halt reason. A loop-limit halt used to
+# re-enter at 5a, which reviews unchanged code and spends the grant (task.244; the case the old
+# script fails).
+D="$T/ev-a"; L="$D/state/lock.json"; S="$D/state/last-halt.json"; mkdir -p "$D/state"; mkgitdoc "$D/repo" 4
+snap "$S" "$D/repo/docs/t" "loop-limit: QA cycle 4 of 4 (gate 4 CONCERNS)" 5a
+OUT=$(run "$L" "$S" "$D/repo/docs/t" 2 2>/dev/null); RC=$?
+if [ "$RC" -eq 0 ] && [ "$(jq -r '.qa_phase' "$L")" = "5b" ] && [ "$(jq -r '.qa_max_cycles' "$L")" = "6" ] && echo "$OUT" | grep -q "reenter_at=5b"; then
+  pass "(a) loop-limit halt, gate 4 at HEAD, no movement → re-enter at 5b (the loop ends on a gate)"
 else
-  fail "not-converging re-entry" "rc=$RC out=$OUT lock=$(cat "$L" 2>/dev/null)"
+  fail "(a) no movement → 5b" "rc=$RC out=$OUT lock=$(cat "$L" 2>/dev/null)"
 fi
 # The snapshot is consumed by the restore (task.124): a snapshot that outlives its run is
 # offered as a resume for merged work on the next invocation (obs #88).
 [ ! -f "$S" ] && pass "snapshot consumed by the restore (task.124)" || fail "snapshot consumed" "still present: $(cat "$S")"
 
-# The HALT writes halt_reason with detail appended — every real escalation does (obs #17: four of
-# four on task.180). The reason is a token followed by ':' or a space; the phase must still be 5b.
-# A word that merely begins with the token is not the reason, and stays 5a.
-for case_ in "5b|not-converging: QA loop HIGH 1,1,1,1 at cycle 4 (gate 4 FAIL; TASK-180-012/013/014 open)" \
-             "5b|not-converging (cycle 5)" \
-             "5a|not-convergingX" \
-             "5a|loop-limit: QA cycle 7 of 7 (gate 7 CONCERNS)"; do
-  WANT=${case_%%|*}; REASON=${case_#*|}
-  D=$(mktemp -d "$T/detail.XXXXXX"); L="$D/state/lock.json"; S="$D/state/last-halt.json"; mkdir -p "$D/state"; mkdoc "$D/doc" 1 2 3
-  jq -n --arg dir "$D/doc" --arg r "$REASON" '{skill:"develop-task",current_step:5,qa_phase:"5a",task_or_story_directory:$dir,branch:"feature/x",halted_at:"2026-10-12T00:00:00Z",halt_reason:$r,halt_step:"5"}' > "$S"
-  OUT=$(run "$L" "$S" "$D/doc" 1 2>/dev/null); RC=$?
-  if [ "$RC" -eq 0 ] && [ "$(jq -r '.qa_phase' "$L")" = "$WANT" ] && echo "$OUT" | grep -q "reenter_at=$WANT"; then
-    pass "halt_reason '${REASON%% (*}…' → re-enter at $WANT"
+# (b) A commit outside the work item after the gate's head → 5a.
+D="$T/ev-b"; L="$D/state/lock.json"; S="$D/state/last-halt.json"; mkdir -p "$D/state"; mkgitdoc "$D/repo" 3
+echo b > "$D/repo/src/b.txt"; git_q "$D/repo" add -A; git_q "$D/repo" commit -m hand-fix
+snap "$S" "$D/repo/docs/t" "loop-limit: QA cycle 3 of 3" 5b
+OUT=$(run "$L" "$S" "$D/repo/docs/t" 2 2>/dev/null); RC=$?
+if [ "$RC" -eq 0 ] && [ "$(jq -r '.qa_phase' "$L")" = "5a" ] && echo "$OUT" | grep -q "reenter_at=5a"; then
+  pass "(b) a commit outside the work item after the gate's head → re-enter at 5a"
+else
+  fail "(b) commit after the gate → 5a" "rc=$RC out=$OUT lock=$(cat "$L" 2>/dev/null)"
+fi
+
+# (c) An uncommitted edit outside the work item → 5a.
+D="$T/ev-c"; L="$D/state/lock.json"; S="$D/state/last-halt.json"; mkdir -p "$D/state"; mkgitdoc "$D/repo" 3
+echo edited >> "$D/repo/src/a.txt"
+snap "$S" "$D/repo/docs/t" "not-converging" 5a
+OUT=$(run "$L" "$S" "$D/repo/docs/t" 2 2>/dev/null); RC=$?
+if [ "$RC" -eq 0 ] && [ "$(jq -r '.qa_phase' "$L")" = "5a" ] && echo "$OUT" | grep -q "reenter_at=5a"; then
+  pass "(c) an uncommitted edit outside the work item → re-enter at 5a, even on a not-converging halt"
+else
+  fail "(c) uncommitted edit → 5a" "rc=$RC out=$OUT lock=$(cat "$L" 2>/dev/null)"
+fi
+
+# (d) The helper is missing beside the script → 5a with a warning, never 5b on a gate that may be stale.
+D="$T/ev-d"; L="$D/state/lock.json"; S="$D/state/last-halt.json"; mkdir -p "$D/state" "$D/bin"; mkgitdoc "$D/repo" 3
+for f in grant-qa-cycles.sh qa-cycle.sh advance-pipeline-lock.sh; do cp "$(dirname "$SCRIPT")/$f" "$D/bin/$f"; done
+snap "$S" "$D/repo/docs/t" "not-converging" 5a
+OUT=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$D/bin/grant-qa-cycles.sh" "$D/repo/docs/t" 2 2>"$D/err"); RC=$?
+if [ "$RC" -eq 0 ] && [ "$(jq -r '.qa_phase' "$L")" = "5a" ] && grep -q "code-moved-since-gate.sh not found" "$D/err"; then
+  pass "(d) helper missing → re-enter at 5a with a warning on stderr"
+else
+  fail "(d) helper missing → 5a" "rc=$RC out=$OUT err=$(cat "$D/err") lock=$(cat "$L" 2>/dev/null)"
+fi
+
+# (e) not-converging with no movement → 5b (obs #228 still holds, now by evidence).
+D="$T/ev-e"; L="$D/state/lock.json"; S="$D/state/last-halt.json"; mkdir -p "$D/state"; mkgitdoc "$D/repo" 3
+snap "$S" "$D/repo/docs/t" "not-converging" 5a
+OUT=$(run "$L" "$S" "$D/repo/docs/t" 2 2>/dev/null); RC=$?
+if [ "$RC" -eq 0 ] && [ "$(jq -r '.qa_phase' "$L")" = "5b" ] && [ "$(jq -r '.qa_max_cycles' "$L")" = "5" ] && echo "$OUT" | grep -q "reenter_at=5b"; then
+  pass "(e) not-converging halt, no movement → re-enter at 5b (task.140's shape: gate 3, k=2 → budget 5)"
+else
+  fail "(e) not-converging, no movement → 5b" "rc=$RC out=$OUT lock=$(cat "$L" 2>/dev/null)"
+fi
+
+# (f) A gate with no usable head cannot vouch for the tree → 5a.
+D="$T/ev-f"; L="$D/state/lock.json"; S="$D/state/last-halt.json"; mkdir -p "$D/state"; mkgitdoc "$D/repo" 3
+: > "$D/repo/docs/t/task.42.gate.3.example.yml"; git_q "$D/repo" add -A; git_q "$D/repo" commit -m "schema-1 gate"
+snap "$S" "$D/repo/docs/t" "not-converging" 5a
+OUT=$(run "$L" "$S" "$D/repo/docs/t" 2 2>/dev/null); RC=$?
+if [ "$RC" -eq 0 ] && [ "$(jq -r '.qa_phase' "$L")" = "5a" ]; then
+  pass "(f) a gate with no head: → re-enter at 5a"
+else
+  fail "(f) no head → 5a" "rc=$RC out=$OUT lock=$(cat "$L" 2>/dev/null)"
+fi
+# The snapshot is consumed by the restore (task.124): a snapshot that outlives its run is
+# offered as a resume for merged work on the next invocation (obs #88).
+[ ! -f "$S" ] && pass "snapshot consumed by the restore (task.124)" || fail "snapshot consumed" "still present: $(cat "$S")"
+
+# The halt reason is NOT read (task.244): the same phase for every spelling — free text with detail
+# (obs #17), a word that merely begins with a token, and an unrelated reason — because the evidence
+# (no movement since the gate) is identical.
+for REASON in "not-converging: QA loop HIGH 1,1,1,1 at cycle 4 (gate 4 FAIL; TASK-180-012/013/014 open)" \
+              "not-converging (cycle 5)" \
+              "not-convergingX" \
+              "loop-limit: QA cycle 7 of 7 (gate 7 CONCERNS)" \
+              ""; do
+  D=$(mktemp -d "$T/detail.XXXXXX"); L="$D/state/lock.json"; S="$D/state/last-halt.json"; mkdir -p "$D/state"; mkgitdoc "$D/repo" 3
+  snap "$S" "$D/repo/docs/t" "$REASON" 5a
+  OUT=$(run "$L" "$S" "$D/repo/docs/t" 1 2>/dev/null); RC=$?
+  if [ "$RC" -eq 0 ] && [ "$(jq -r '.qa_phase' "$L")" = "5b" ] && echo "$OUT" | grep -q "reenter_at=5b"; then
+    pass "halt_reason '${REASON%% (*}…' → re-enter at 5b (the reason is not read)"
   else
-    fail "halt_reason with detail → $WANT" "reason='$REASON' rc=$RC out=$OUT lock=$(cat "$L" 2>/dev/null)"
+    fail "halt_reason '$REASON' → 5b" "rc=$RC out=$OUT lock=$(cat "$L" 2>/dev/null)"
   fi
 done
 
 # ── task.239: the grant opens a fresh Convergence window (obs #72) ───────────
 # convergence_from_cycle = base + 1, in the same write as the budget and the phase, read back
-# from the lock and printed after reenter_at=. Both halt kinds write it: a not-converging grant
-# re-enters at 5b and a loop-limit grant at 5a, but each one's first new reading is cycle base + 1.
-for case_ in "not-converging: QA loop HIGH 1,1,1 at cycle 3|3|5b" "loop-limit: QA cycle 6 of 6|6|5a"; do
+# from the lock and printed after reenter_at=. Both halt kinds write it, and (task.244) both
+# re-enter at 5b when nothing moved; each one's first new reading is cycle base + 1.
+for case_ in "not-converging: QA loop HIGH 1,1,1 at cycle 3|3|5b" "loop-limit: QA cycle 6 of 6|6|5b"; do
   REASON=${case_%%|*}; rest=${case_#*|}; BASE=${rest%%|*}; PHASE=${rest#*|}
   D=$(mktemp -d "$T/window.XXXXXX"); L="$D/state/lock.json"; S="$D/state/last-halt.json"; mkdir -p "$D/state"
-  # shellcheck disable=SC2046 # word-split the gate numbers on purpose
-  mkdoc "$D/doc" $(seq 1 "$BASE")
-  jq -n --arg dir "$D/doc" --arg r "$REASON" '{skill:"develop-task",current_step:5,qa_phase:"5a",task_or_story_directory:$dir,branch:"feature/x",halted_at:"2026-10-28T00:00:00Z",halt_reason:$r,halt_step:"5"}' > "$S"
-  OUT=$(run "$L" "$S" "$D/doc" 2 2>/dev/null); RC=$?
+  mkgitdoc "$D/repo" "$BASE"; D="$D/repo/docs/t"; D0=${D%/repo/docs/t}
+  snap "$S" "$D" "$REASON" 5a
+  OUT=$(run "$L" "$S" "$D" 2 2>/dev/null); RC=$?
+  D="$D0"
   WANT=$((BASE + 1))
   if [ "$RC" -eq 0 ] && [ "$(jq -r '.convergence_from_cycle' "$L")" = "$WANT" ] \
      && [ "$(jq -r '.qa_phase' "$L")" = "$PHASE" ] && [ "$(jq -r '.qa_max_cycles' "$L")" = "$((BASE + 2))" ] \

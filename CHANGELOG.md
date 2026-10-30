@@ -32,6 +32,18 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **The QA loop always ends on a gate (task 244).** `qa_max_cycles` now counts gates: a budget of N
+  runs at most N−1 fixes, and a fix runs only when a gate will read it. 5b is entered only when
+  `N < QA_MAX_CYCLES`; at the last gate, a gate or a 5c review that would route to a fix goes to Loop
+  Escalation instead, with its findings open. §5b step 7 no longer tests the budget. Route 2c (the
+  "gate-the-last-fix" half-cycle) is removed: no budget ends on an ungated fix, so there is nothing
+  for it to do. `classifyLoopRoute()` ignores its old `budgetSpent` / `lastCycleAction` inputs, and
+  `describeLoopRoute()` still renders an old report's `gate-the-last-fix` token. A grant now
+  re-enters at 5b when no code moved since the latest gate and at 5a when it did, decided by a new
+  `code-moved-since-gate.sh` (the same count `qa-task` Phase 0 uses for its re-review trigger),
+  instead of by the halt reason; a missing or failing helper re-enters at 5a with a warning.
+  develop-bug's verify loop gets the same rule with `MAX_ITER`. To keep five fixes, set
+  `qa_max_cycles: 6`.
 - **Registry commits and the QA re-review stop sweeping up a parallel session's edits (task 245).**
   `registry-tick.js` gains `--stage`: after its write (and on `already`) it applies the same
   one-line change to the index copy of the registry, found by task id, and leaves every other edit

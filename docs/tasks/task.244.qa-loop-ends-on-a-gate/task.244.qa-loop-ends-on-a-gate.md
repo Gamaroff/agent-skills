@@ -5,10 +5,10 @@ type: task
 description: "Count the QA budget in gates, not fix cycles, and run a fix only when a gate will read it within the budget, so no QA, verify or review loop ever hands over a fix that no gate has read."
 tags: [qa-loop, develop-task, develop-story, develop-bug, budget]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: High
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-31
 assignee:
 estimated_effort_hours: 16
 github_issue: 782
@@ -16,7 +16,8 @@ github_issue: 782
 
 # Technical Task: The QA loop always ends on a gate
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.244.review.1.qa-loop-ends-on-a-gate.md` implemented 2026-10-31
 **GitHub Issue**: [#782](https://github.com/Gamaroff/agent-skills/issues/782)
 
 ---
@@ -111,7 +112,7 @@ budget stays 5, which now means 5 gates and 4 fixes (user decision, 2026-10-29).
   (`skills/qa-task/SKILL.md`, the `CODE_MOVED=$(git rev-list --count "$GATE_HEAD"..HEAD -- .
   ":(exclude)$TASK_DIR" …)` block). It counts commits, uncommitted edits and untracked files outside
   the task directory since the gate's `head:`. `shared/resources/tests/qa-scope-from-head.test.mjs`
-  executes it (`CODE_MOVED=$CODE_MOVED` at `:317`). qa-story has no `CODE_MOVED` (grep: 0 hits in
+  executes it (`CODE_MOVED=$CODE_MOVED` at `:320`). qa-story has no `CODE_MOVED` (grep: 0 hits in
   `skills/qa-story/SKILL.md`).
 
 ### Target Architecture
@@ -292,8 +293,9 @@ Every hit is in scope or is a stated exclusion below.
 ### Files to Modify (Tests and Evals)
 
 7. ✅ `shared/resources/tests/qa-loop-route.test.mjs`: remove the route-2c rows; add the budget-blind rows.
-8. ✅ `shared/resources/tests/fixtures/qa-diminishing-returns/medium-falling-cycle5.yml`: remove it or
-   repurpose it.
+8. ✅ `shared/resources/tests/fixtures/qa-diminishing-returns/medium-falling-cycle5.yml`: repurpose it
+   as task.242's inputs for the budget-blind row if the route-2c rows were its only readers; remove it
+   only when `git grep medium-falling-cycle5` shows no reader left (decided in Phase 4).
 9. ✅ `shared/resources/grant-qa-cycles.test.sh`: re-entry-from-evidence cases.
 10. ✅ `shared/resources/tests/qa-scope-from-head.test.mjs`: still green through the helper.
 11. ✅ `evals/shared/tests/pr-review-loop-parity.test.mjs`: route 5 assertion (`:248`) and the Action-row
@@ -392,7 +394,9 @@ fix, and nothing is added.
 ### Performance
 
 - [ ] SC-7: at the default budget an escalating run runs no more cycles than today: 5 gates, at most
-      4 fixes.
+      4 fixes. Held by the rewritten step-isolation scenario 11 (§ 8: a cycle-5 CONCERNS gate with
+      budget 5 escalates with no `fix(` commit) and by `qa-loop-ends-on-a-gate.test.mjs`, which pins
+      the `N < QA_MAX_CYCLES` test on both arms that route to 5b.
 
 ### Code Quality
 
@@ -487,16 +491,19 @@ fix, and nothing is added.
 | ---------- | ------- | ------------- | ----------- |
 | 2026-10-29 | 1.0     | Initial draft. Prompted by task.242, whose loop-limit halt handed over `cc0da45e` unread after route 2c declined (`medium-not-falling`) | create-task |
 | 2026-10-29 |         | Renumbered task.243 → task.244 before first commit: `feature/task.243.wireframe-component-mapping` had already claimed 243 | operator |
+| 2026-10-31 | 1.1     | Review passed (9/10): SC-7 now names the tests that hold it; `:317` anchor → `:320`; fixture 8 decision criterion stated | review-task |
+| 2026-10-31 |         | Status → ready-for-development | review-task |
+| 2026-10-31 |         | Implemented — 86 files, 7 new tests, 4 evals; npm test + bundle:check green | develop |
 <!-- change-log-end -->
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1: The rule in the step doc
-- [ ] Phase 2: Engine and grant
-- [ ] Phase 3: develop-bug
-- [ ] Phase 4: Sweep, tests, evals, bundle
+- [x] Phase 1: The rule in the step doc
+- [x] Phase 2: Engine and grant
+- [x] Phase 3: develop-bug
+- [x] Phase 4: Sweep, tests, evals, bundle
 
 ---
 

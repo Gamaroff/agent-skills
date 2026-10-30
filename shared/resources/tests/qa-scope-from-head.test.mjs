@@ -172,7 +172,11 @@ function withoutUnset(env) {
 function installHelpers(dir, skill) {
   const refs = path.join(dir, ".agents", "skills", skill, "references");
   fs.mkdirSync(refs, { recursive: true });
-  for (const f of ["qa-cycle.sh", "qa-safety-clause1.sh"]) {
+  for (const f of [
+    "qa-cycle.sh",
+    "qa-safety-clause1.sh",
+    "code-moved-since-gate.sh",
+  ]) {
     fs.copyFileSync(
       path.join(ROOT, "shared", "resources", f),
       path.join(refs, f),
@@ -318,6 +322,9 @@ test("E — the scope block is the same in the shared rule, qa-task and qa-story
 function runTrigger(shell, fx, taskFile) {
   const script =
     triggerBlock() + '\necho "CODE_MOVED=$CODE_MOVED DOC_MOVED=$DOC_MOVED"\n';
+  // The trigger counts code movement through the bundled helper (task.244), addressed from the
+  // repository root; install it excluded so it is not itself an untracked change.
+  installHelpers(fx.dir, "qa-task");
   // TASK_FILE is repo-relative, as the skill's own argument is; the block derives TASK_DIR from it.
   const r = run(shell, fx.dir, script, {
     LATEST_GATE: fx.gate,
@@ -715,10 +722,11 @@ for (const sh of SHELLS) {
     const r = runTrigger(sh, fx, fx.doc);
     assert.equal(r.status, 0, r.stderr);
     assert.match(
-      r.stdout,
+      r.stderr,
       /gate head 'HEAD' is not a 40-hex commit on this branch/,
     );
-    assert.match(r.stdout, /CODE_MOVED=1 DOC_MOVED=1/);
+    // CODE_MOVED=1 alone forces the re-review; DOC_MOVED is measured from the gate's commit.
+    assert.match(r.stdout, /CODE_MOVED=1 DOC_MOVED=\d/);
   });
 
   test(`L2 [${sh}] — a head that is not an ancestor of HEAD re-reviews (CR4-1)`, () => {
@@ -743,8 +751,8 @@ for (const sh of SHELLS) {
     git(fx.dir, "commit", "-q", "--amend", "--no-edit");
     const r = runTrigger(sh, fx, fx.doc);
     assert.equal(r.status, 0, r.stderr);
-    assert.match(r.stdout, /is not a 40-hex commit on this branch/);
-    assert.match(r.stdout, /CODE_MOVED=1 DOC_MOVED=1/);
+    assert.match(r.stderr, /is not a 40-hex commit on this branch/);
+    assert.match(r.stdout, /CODE_MOVED=1 DOC_MOVED=\d/);
   });
 
   test(`L3 [${sh}] — a file whose name begins with \`:\` stays in the scoped patch (CR4-2)`, () => {
