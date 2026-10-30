@@ -78,7 +78,7 @@ rows are independent (`deps: none`). They share a soft edit to `qa-task`/`qa-sto
 to merge rebases.
 
 - [x] **T245** Shared-checkout-safe guards and staging · deps: none · touches: finalise!, qa-skills~, orchestrators~, bundles~ · /develop-task docs/tasks/task.245.shared-checkout-safe-guards-and-staging/task.245.shared-checkout-safe-guards-and-staging.md · ✅ **accepted + merged** ([PR #796](https://github.com/Gamaroff/agent-skills/pull/796), QA PASS 100/100)
-- [ ] **T244** The QA loop always ends on a gate · deps: none · touches: pipeline-steps!, qa-skills~, bundles~ · /develop-task docs/tasks/task.244.qa-loop-ends-on-a-gate/task.244.qa-loop-ends-on-a-gate.md
+- [x] **T244** The QA loop always ends on a gate · deps: none · touches: pipeline-steps!, qa-skills~, bundles~ · /develop-task docs/tasks/task.244.qa-loop-ends-on-a-gate/task.244.qa-loop-ends-on-a-gate.md
 
 ## Deferred / human-gated
 
@@ -230,3 +230,4 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-10-28 | **Phase 18 closed and archived** to `roadmap-history.md` (T238 and T240). No phase is open; selection falls through to the registries (next: T239). |
 | 2026-10-29 | **Phase 19 opened** with T245 (shared-checkout-safe guards and staging, cut from obs #126 and #127) then T244 (the QA loop always ends on a gate). An override of the registry order: T245 fixes the two ways a parallel session in the same checkout breaks a run, and T244's QA loop hits one of them on every cycle. Both `deps: none`; soft overlap on `qa-skills`. |
 | 2026-10-31 | **T245 accepted + merged — PR #796 merged** (`b0d1234f`). Registry edits are now staged per row so a parallel session's uncommitted row or counter bump in the same checkout no longer rides into a pipeline commit, and the QA re-review HALTs rather than proceeding when it cannot run. 7 QA gates, final gate PASS 100/100; DoD accepted. Next: T244. |
+| 2026-10-31 | **T244 accepted + merged — PR #797 merged** (`e4b9a634`). The QA budget now counts gates: the loop always ends on a gate, so a fix is never handed over unread. Gate 1 FAIL 70 (empty-gate first-review guard, fixed), gate 2 PASS 100, PR review APPROVE. |
