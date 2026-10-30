@@ -34,10 +34,10 @@ Count the QA budget in gates, not fix cycles; run a fix only when a gate will re
 | 1. create-branch           | ✅ Done | Branch `feature/task.244.*` exists in git                              | Branch created from develop | — | 2026-10-30T22:24Z |
 | 2. review-task             | ✅ Done | `task.244.review.{N}.{name}.md` exists (or skip logged)                | review.1: READY 9/10; 1 Important fixed; status → ready-for-development | — | 2026-10-30T22:24Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline via fork; npm test, bundle:check, prettier green | — | 2026-10-31T00:00Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.244.qa.{N}.*.md`; `task.244.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.244.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #797: https://github.com/Gamaroff/agent-skills/pull/797 | — | 2026-10-31T00:00Z |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.244.qa.{N}.*.md`; `task.244.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 2 gates: FAIL 70 → PASS 100; 5c APPROVE | —                    | 2026-10-31T00:00Z |
+| 7. finalise                | ✅ Done | `task.244.dod.{N}.*.md`; task `status: accepted`                       | DoD ACCEPTED; acceptance commit f30257a5; CI 6/6 green; issue #782 closed | — | 2026-10-31T00:00Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Final report commit | — | 2026-10-31T00:00Z |
 
 ---
 
@@ -71,14 +71,26 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1
+
+- **Gate**: FAIL 70/100 (`task.244.gate.1.*.yml`). T244-QA-1 HIGH: Phase 0 called `code-moved-since-gate.sh` with an empty gate path on a first review, which exits 2 and HALTs. Two LOW: untracked file forces a grant to 5a; stale route-2c comment.
+- **Action**: Proceeding to qa-fix. Fixed in `2e2780c4` (empty gate path reads as first review, prints 1; test added and mutation-proven).
+
+### QA Cycle 2
+
+- **Gate**: PASS 100/100 (`task.244.gate.2.*.yml`), refute pass, no new findings. Committed `b3f14c41`.
+- **PR Review**: APPROVE (`task.244.pr-review.1.*.md`), one low consistency finding (develop-bug MAX_ITER row), fixed in `cc7017ee`.
+- **Action**: Proceeding to 5c, then Step 7.
+- Independence: cycle 1 and 2 diff review and the 5c conformance lens were inline (a fork cannot spawn Explore); PR CI was pending at both gates.
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
-**Branch**: {populated after Step 1}
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**Finished**: 2026-10-31
+**Final Status**: Completed
+**Branch**: feature/task.244.qa-loop-ends-on-a-gate
+**PR**: https://github.com/Gamaroff/agent-skills/pull/797
+**QA Iterations**: 2 gates (gate 1 FAIL 70, gate 2 PASS 100), 1 fix cycle; 5c PR review APPROVE
+**DoD Summary**: ACCEPTED — SC-1..SC-10 met; CI reading 1 `cc7017ee` 6/6 SUCCESS, reading 2 `f30257a5` 6/6 SUCCESS; registry tick `ticked`
+**Tracker debt**: none — #782 comment `posted`, closed, board stage `already`
