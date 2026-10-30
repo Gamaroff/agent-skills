@@ -314,9 +314,9 @@ Every hit is in scope or is a stated exclusion below.
 18. ✅ `skills/develop-task/SKILL.md`, `skills/develop-story/SKILL.md` (the `reenter_at` line, `:340` and
     `:353`; the shared-budget line, `:239` and `:252`; the descriptions) and their `README.md`s.
 19. ✅ `skills/develop-bug/SKILL.md` (description and the MAX_ITER table row).
-20. ✅ `skills/review-pr/SKILL.md:1077`, `shared/resources/code-review-prompt.md:219`.
+20. ✅ `skills/review-pr/SKILL.md:1077` (updated). `shared/resources/code-review-prompt.md:219` checked, "up to 5 cycles" wording still true, left unchanged.
 21. ✅ `docs/runbooks/qa-flow.md` (diagram and table), `docs/reference/troubleshooting.md:201`,
-    `docs/operations/workflows.md`.
+    `docs/operations/workflows.md` checked, wording still true, left unchanged.
 22. ✅ `CHANGELOG.md`.
 
 **Stated exclusions:** `.agents/plans/doc-drift-audit-2026-10-07.md` (a dated audit record),
