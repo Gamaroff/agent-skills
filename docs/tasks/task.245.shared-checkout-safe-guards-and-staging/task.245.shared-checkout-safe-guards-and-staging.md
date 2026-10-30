@@ -5,10 +5,10 @@ type: task
 description: "Make the registry writers stage only the line they changed, and narrow the QA re-review's dirty-tree HALT to paths the review reads, so a parallel session's edit in the same checkout neither rides into another task's commit nor stops another task's QA."
 tags: [qa-task, qa-story, finalise, develop-next, develop-batch, registry-tick, observation]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
 assignee:
 estimated_effort_hours: 8
 github_issue: 783
@@ -16,7 +16,8 @@ github_issue: 783
 
 # Technical Task: Shared-checkout-safe guards and staging
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.245.review.1.shared-checkout-safe-guards-and-staging.md` implemented 2026-10-30
 **GitHub Issue**: [#783](https://github.com/Gamaroff/agent-skills/issues/783)
 
 ---
@@ -88,7 +89,7 @@ It writes the working file and never touches the index. Each caller then stages 
 
 | Caller | Site | Staging |
 | --- | --- | --- |
-| `/finalise` 6a | `skills/finalise/SKILL.md:1629` (`git add docs/tasks/task-registry.md`) | whole file, behind `[ -f docs/tasks/task-registry.md ]` |
+| `/finalise` 6a | `skills/finalise/SKILL.md:1634` (`git add docs/tasks/task-registry.md`) | whole file, behind `[ -f docs/tasks/task-registry.md ]` |
 | `develop-next` Step 4, `already` resume | `skills/develop-next/SKILL.md:618` (`git add docs/tasks/task-registry.md`) | whole file, behind `git diff --quiet HEAD --` |
 | `develop-next` Step 4, `annotated` | `skills/develop-next/SKILL.md:636` (`git add docs/tasks/task-registry.md`) | whole file |
 | `develop-batch` merge lane | `skills/develop-batch/SKILL.md:643` (`registry-tick.js --annotate`), commit in prose at `:645` | whole file (prose: "commit `docs(registry): record …`") |
@@ -114,7 +115,7 @@ outside the work item only warn (the `UNTRACKED=` line after it). `$BASE` is bou
 (`skills/qa-task/SKILL.md:467`, `BASE="origin/${BASE_REF:-develop}"`) and the block's arms read
 `git diff "$BASE...HEAD"` (`:544`). Test E of `shared/resources/tests/qa-scope-from-head.test.mjs:293`
 (`the scope block is the same in the shared rule, qa-task and qa-story`) holds the three copies
-equal. Tests L4 (`:765`) and L11 (`:825`) assert the HALT on a dirty `skills/b.sh`, which the fixture
+equal. Tests L4 (`:765`) and L11 (`:826`) assert the HALT on a dirty `skills/b.sh`, which the fixture
 commits on its feature branch (`scratch()`, `:153`), so it is in the change set.
 
 ### Target Architecture
@@ -214,10 +215,10 @@ No other breaking change: `--stage` is opt-in, and callers that do not pass it b
 
 **Files:** `shared/resources/registry-tick.js`, `shared/resources/tests/registry-tick.test.mjs`
 
-- [ ] Parse `--stage` for every mode; reject it with `--dry-run` (usage error, exit 2)
-- [ ] After a `ticked` / `annotated` write, and on `already`, stage the row as § 3 describes
-- [ ] Report `staged` and `stageReason`; exit code unchanged by any `stageReason`
-- [ ] Tests in a scratch repository: other edits stay unstaged; row located by id when the index has
+- [x] Parse `--stage` for every mode; reject it with `--dry-run` (usage error, exit 2)
+- [x] After a `ticked` / `annotated` write, and on `already`, stage the row as § 3 describes
+- [x] Report `staged` and `stageReason`; exit code unchanged by any `stageReason`
+- [x] Tests in a scratch repository: other edits stay unstaged; row located by id when the index has
       fewer rows; each `stageReason`; idempotent on a second run
 
 **Dependencies:** none.
@@ -226,12 +227,12 @@ No other breaking change: `--stage` is opt-in, and callers that do not pass it b
 
 **Files:** `skills/finalise/SKILL.md`, `skills/develop-next/SKILL.md`, `skills/develop-batch/SKILL.md`
 
-- [ ] `/finalise` 7.4 passes `--stage`; 6a's registry `git add` block is removed; a `stageReason`
+- [x] `/finalise` 7.4 passes `--stage`; 6a's registry `git add` block is removed; a `stageReason`
       other than `staged` / `already-staged` is logged in the DoD file
-- [ ] `develop-next` Step 4: `--annotate --stage`; both `git add docs/tasks/task-registry.md` removed;
+- [x] `develop-next` Step 4: `--annotate --stage`; both `git add docs/tasks/task-registry.md` removed;
       the resume check reads the index (`git diff --cached --quiet HEAD --`)
-- [ ] `develop-batch` merge lane: same change in its prose
-- [ ] A new executed test of the 6a block: a parallel row in the working file is absent from the
+- [x] `develop-batch` merge lane: same change in its prose
+- [x] A new executed test of the 6a block: a parallel row in the working file is absent from the
       commit. The only test today that slices 6a is `evals/shared/tests/finalise-bug-mode.test.mjs`
       (to the `--- acceptance artefacts resolved ---` marker, before the registry add), so this case
       is new, not an update
@@ -243,21 +244,21 @@ No other breaking change: `--stage` is opt-in, and callers that do not pass it b
 **Files:** `shared/resources/qa-re-review-scope.md`, `skills/qa-task/SKILL.md`,
 `skills/qa-story/SKILL.md`, `shared/resources/tests/qa-scope-from-head.test.mjs`
 
-- [ ] Split `DIRTY` into halts and warns as § 3 describes, identically in the three copies
-- [ ] Fall back to today's rule when `$BASE...HEAD` cannot be listed
-- [ ] L4 and L11 stay green unchanged (their file is in the change set)
-- [ ] New tests: a dirty file outside the change set and its directories warns and the review runs;
+- [x] Split `DIRTY` into halts and warns as § 3 describes, identically in the three copies
+- [x] Fall back to today's rule when `$BASE...HEAD` cannot be listed
+- [x] L4 and L11 stay green unchanged (their file is in the change set)
+- [x] New tests: a dirty file outside the change set and its directories warns and the review runs;
       a dirty file beside a changed file HALTs; an unlistable base HALTs as today
-- [ ] Test E still holds the three copies equal
+- [x] Test E still holds the three copies equal
 
 **Dependencies:** none (independent of Phases 1–2).
 
 ### Phase 4: Bundle and doc sweep (Risk: Low)
 
-- [ ] `npm run bundle`; `npm run bundle:check` clean
-- [ ] Sweep docs that restate either rule (`grep -rn 'uncommitted changes outside the work item'`,
+- [x] `npm run bundle`; `npm run bundle:check` clean
+- [x] Sweep docs that restate either rule (`grep -rn 'uncommitted changes outside the work item'`,
       `grep -rn 'git add docs/tasks/task-registry.md'`) and update each
-- [ ] CHANGELOG entry citing `(task 245)`
+- [x] CHANGELOG entry citing `(task 245)`
 
 **Dependencies:** Phases 1–3.
 
@@ -440,16 +441,19 @@ moved aside first so bundled copies are what runs.
 | Date       | Version | Description                                       | Author      |
 | ---------- | ------- | ------------------------------------------------- | ----------- |
 | 2026-10-29 | 1.0     | Initial draft — cut from observations #126, #127  | create-task |
+| 2026-10-30 | 1.1     | Review passed (10/10) — ready for development     | review-task |
+| 2026-10-30 |         | Status → ready-for-development                    | review-task |
+| 2026-10-30 |         | Implemented — 13 files, 22 tests added            | develop     |
 <!-- change-log-end -->
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1: `registry-tick.js --stage`
-- [ ] Phase 2: Registry callers
-- [ ] Phase 3: Re-review HALT keyed on the review's input
-- [ ] Phase 4: Bundle and doc sweep
+- [x] Phase 1: `registry-tick.js --stage`
+- [x] Phase 2: Registry callers
+- [x] Phase 3: Re-review HALT keyed on the review's input
+- [x] Phase 4: Bundle and doc sweep
 
 ---
 

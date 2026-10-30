@@ -363,6 +363,8 @@ test("no argument can make the tick conditional on pipeline mode", () => {
   // the tick itself skippable (a `--lite`, a `--mode`), and a new entry here
   // needs the same argument made for it. `--bug-status` (task 219) selects a
   // third write to a different registry; a task document still ticks.
+  // `--stage` (task 245) adds an index write AFTER the tick; the tick itself
+  // is unchanged and still runs unconditionally.
   assert.deepEqual(
     flags,
     [
@@ -375,6 +377,7 @@ test("no argument can make the tick conditional on pipeline mode", () => {
       "--json",
       "--pr",
       "--registry",
+      "--stage",
     ],
     "registry-tick accepts no flag that makes the Status tick conditional; --annotate selects a different write, it does not skip this one",
   );
@@ -2123,5 +2126,219 @@ test("display width: a cell with no trailing space still gets no padding", () =>
     );
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/**
+ * --stage (task 245). Each case runs in a scratch git repository with rows 1
+ * and 2 committed, so the index and the working file can disagree the way they
+ * do in a checkout shared by parallel sessions.
+ */
+function gitRepo(rows) {
+  const s = sandbox(rows);
+  const g = (...a) =>
+    execFileSync("git", ["-C", s.dir, ...a], { encoding: "utf8" });
+  g("init", "-q");
+  g("config", "user.email", "t@example.com");
+  g("config", "user.name", "t");
+  g("add", "-A");
+  g("commit", "-q", "-m", "base");
+  return { ...s, g };
+}
+
+function stageCase(extra) {
+  const r = gitRepo([
+    row(1, "one", "accepted"),
+    row(2, "two", "ready-for-development"),
+  ]);
+  const f = writeDoc(r.dir, 2, "two", { status: "accepted" });
+  // A parallel session's work in the same file: a new row 3 and a bumped counter.
+  const text = readFileSync(r.registry, "utf8")
+    .replace("**99**", "**100**")
+    .concat(row(3, "three", "draft") + "\n");
+  writeFileSync(r.registry, text);
+  return { ...r, f: path.relative(r.dir, f), ...extra };
+}
+
+test("--stage: the ticked row is staged, a parallel row and counter stay unstaged", () => {
+  const c = stageCase();
+  try {
+    const res = run(c.dir, ["--file", c.f, "--stage"]);
+    assert.equal(res.reason, "ticked");
+    assert.equal(res.staged, true);
+    assert.equal(res.stageReason, "staged");
+    const cached = c.g("diff", "--cached", "-U0");
+    assert.match(cached, /^\+\| 2 \|.*accepted/m);
+    assert.doesNotMatch(cached, /\| 3 \|/);
+    assert.doesNotMatch(cached, /\*\*100\*\*/);
+    const unstaged = c.g("diff", "-U0");
+    assert.match(unstaged, /\| 3 \|/);
+    assert.match(unstaged, /\*\*100\*\*/);
+    assert.doesNotMatch(unstaged, /^\+\| 2 \|/m);
+  } finally {
+    rmSync(c.dir, { recursive: true, force: true });
+  }
+});
+
+test("--stage: the row is found by id when the working file has an extra line above it", () => {
+  const c = stageCase();
+  try {
+    const lines = readFileSync(c.registry, "utf8").split("\n");
+    lines.splice(2, 0, "> a note only the working tree has");
+    writeFileSync(c.registry, lines.join("\n"));
+    const res = run(c.dir, ["--file", c.f, "--stage"]);
+    assert.equal(res.stageReason, "staged");
+    const staged = c.g("show", ":docs/tasks/task-registry.md").split("\n");
+    assert.ok(staged.find((l) => l.startsWith("| 2 |")).includes("accepted"));
+    assert.ok(!staged.includes("> a note only the working tree has"));
+    assert.equal(
+      staged.length,
+      c.g("show", "HEAD:docs/tasks/task-registry.md").split("\n").length,
+    );
+  } finally {
+    rmSync(c.dir, { recursive: true, force: true });
+  }
+});
+
+test("--stage: a second run answers `already` / `already-staged` and changes nothing", () => {
+  const c = stageCase();
+  try {
+    run(c.dir, ["--file", c.f, "--stage"]);
+    const before = c.g("diff", "--cached");
+    const res = run(c.dir, ["--file", c.f, "--stage"]);
+    assert.equal(res.reason, "already");
+    assert.equal(res.staged, true);
+    assert.equal(res.stageReason, "already-staged");
+    assert.equal(c.g("diff", "--cached"), before);
+  } finally {
+    rmSync(c.dir, { recursive: true, force: true });
+  }
+});
+
+test("--stage: a resume (`already` in the tree, row unstaged) stages the row", () => {
+  const c = stageCase();
+  try {
+    // The tick ran earlier without --stage; the working file already reads accepted.
+    run(c.dir, ["--file", c.f]);
+    assert.equal(c.g("diff", "--cached"), "");
+    const res = run(c.dir, ["--file", c.f, "--stage"]);
+    assert.equal(res.reason, "already");
+    assert.equal(res.stageReason, "staged");
+    assert.match(c.g("diff", "--cached", "-U0"), /^\+\| 2 \|.*accepted/m);
+  } finally {
+    rmSync(c.dir, { recursive: true, force: true });
+  }
+});
+
+test("--stage: a row only the working tree has is `row-not-in-index`, exit 0, index unchanged", () => {
+  const c = stageCase();
+  try {
+    writeFileSync(
+      c.registry,
+      readFileSync(c.registry, "utf8").replace(
+        row(3, "three", "draft"),
+        row(3, "three", "accepted"),
+      ),
+    );
+    const f3 = writeDoc(c.dir, 3, "three", { status: "accepted" });
+    const res = run(c.dir, ["--file", path.relative(c.dir, f3), "--stage"]);
+    assert.equal(res.staged, false);
+    assert.equal(res.stageReason, "row-not-in-index");
+    assert.equal(res.exitCode, 0);
+    assert.equal(c.g("diff", "--cached"), "");
+  } finally {
+    rmSync(c.dir, { recursive: true, force: true });
+  }
+});
+
+test("--stage: an untracked registry is `not-tracked`; outside a repository, `not-a-repo`", () => {
+  const s = sandbox([row(2, "two", "ready-for-development")]);
+  try {
+    const f = writeDoc(s.dir, 2, "two", { status: "accepted" });
+    const outside = run(s.dir, ["--file", path.relative(s.dir, f), "--stage"]);
+    assert.equal(outside.reason, "ticked");
+    assert.equal(outside.stageReason, "not-a-repo");
+    assert.equal(outside.staged, false);
+  } finally {
+    rmSync(s.dir, { recursive: true, force: true });
+  }
+  const r = gitRepo([row(1, "one", "accepted")]);
+  try {
+    r.g("rm", "-q", "--cached", "docs/tasks/task-registry.md");
+    const f = writeDoc(r.dir, 1, "one", { status: "accepted" });
+    const res = run(r.dir, ["--file", path.relative(r.dir, f), "--stage"]);
+    assert.equal(res.stageReason, "not-tracked");
+    assert.equal(res.exitCode, 0);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("--annotate --stage: the notes cell is staged, a parallel row stays unstaged", () => {
+  const r = gitRepo([row(1, "one", "accepted"), row(2, "two", "accepted")]);
+  try {
+    const f = writeDoc(r.dir, 2, "two", { status: "accepted" });
+    writeFileSync(
+      r.registry,
+      readFileSync(r.registry, "utf8").concat(row(3, "three", "draft") + "\n"),
+    );
+    const res = run(r.dir, [
+      "--annotate",
+      "--pr",
+      "77",
+      "--file",
+      path.relative(r.dir, f),
+      "--stage",
+    ]);
+    assert.equal(res.reason, "annotated");
+    assert.equal(res.stageReason, "staged");
+    const cached = r.g("diff", "--cached", "-U0");
+    assert.match(cached, /^\+\| 2 \|.*PR #77 merged/m);
+    assert.doesNotMatch(cached, /\| 3 \|/);
+    assert.match(r.g("diff", "-U0"), /\| 3 \|/);
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
+test("--stage with --dry-run is a usage error (exit 2) and writes nothing", () => {
+  const c = stageCase();
+  try {
+    const before = readFileSync(c.registry, "utf8");
+    let code = 0;
+    try {
+      execFileSync(
+        process.execPath,
+        [CLI, "--file", c.f, "--stage", "--dry-run", "--json"],
+        {
+          cwd: c.dir,
+          encoding: "utf8",
+          stdio: "pipe",
+        },
+      );
+    } catch (e) {
+      code = e.status;
+    }
+    assert.equal(code, 2);
+    assert.equal(readFileSync(c.registry, "utf8"), before);
+    assert.equal(c.g("diff", "--cached"), "");
+  } finally {
+    rmSync(c.dir, { recursive: true, force: true });
+  }
+});
+
+test("--stage: an early outcome (not-a-task) reports `staged: false`, `not-attempted`", () => {
+  const c = stageCase();
+  try {
+    const sd = path.join(c.dir, "docs", "stories", "story.1.1.thing");
+    mkdirSync(sd, { recursive: true });
+    const f = path.join(sd, "story.1.1.thing.md");
+    writeFileSync(f, doc({ type: "story", status: "accepted" }));
+    const res = run(c.dir, ["--file", path.relative(c.dir, f), "--stage"]);
+    assert.equal(res.reason, "not-a-task");
+    assert.equal(res.staged, false);
+    assert.equal(res.stageReason, "not-attempted");
+  } finally {
+    rmSync(c.dir, { recursive: true, force: true });
   }
 });

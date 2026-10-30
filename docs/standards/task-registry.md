@@ -36,6 +36,12 @@ Two things follow from that, and both matter more than they look:
    the same file precisely so the two writes share one row locator rather than drifting apart. A
    re-run answers `already`; a bug document answers `not-a-task` — the bug registry has no such
    cells and `develop-bug` closes its row itself.
+- **Both writers stage the row they wrote, not the file (task 245).** The registry is a shared
+  file: a parallel session in the same checkout may have an uncommitted row or a bumped counter in
+  it. `registry-tick.js --stage` applies the same one-line change to the index copy (found by task
+  id, never by line number) and leaves every other edit unstaged, so `/finalise` 6a,
+  `develop-next` Step 4 and `develop-batch`'s merge lane commit exactly one row with no
+  `git add` of the registry. It reports `staged` and a `stageReason` and never changes the exit code.
 - **A status-icon column is written only when configured.** A registry that carries an icon beside
   Status (`✅` for `accepted`) sets `registry.task.statusIcons` in `skills-config.yaml`, and the tick
   then writes the icon in the same line as Status, found by the header, never by position. Without

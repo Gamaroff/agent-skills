@@ -32,6 +32,18 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **Registry commits and the QA re-review stop sweeping up a parallel session's edits (task 245).**
+  `registry-tick.js` gains `--stage`: after its write (and on `already`) it applies the same
+  one-line change to the index copy of the registry, found by task id, and leaves every other edit
+  unstaged. It reports `staged` and `stageReason`; no reason changes the exit code, and `--stage`
+  with `--dry-run` is a usage error. `/finalise` 7.4 passes it and 6a no longer runs
+  `git add docs/tasks/task-registry.md`; `develop-next` Step 4 and `develop-batch`'s merge lane pass
+  it to `--annotate` and commit what is staged (the resume check reads the index). The QA
+  re-review's uncommitted-change HALT, held equal in `qa-re-review-scope.md`, `qa-task` and
+  `qa-story`, now HALTs only on a tracked path in the PR's change set or in the exact directory of a
+  changed file; any other tracked edit prints a warning, and an unlistable base still HALTs on all.
+  An uncommitted fix to a file the PR has not touched, in a directory it has not touched, is now
+  reviewed as absent with a warning rather than stopping the cycle.
 - **Develop pipeline wireframe mapping ban test widened to skill-local step docs (task 247).**
   The test asserting no develop pipeline step calls `detect` or `configure` in
   `evals/shared/tests/wireframe-mapping-hooks.test.mjs` now enumerates skill-local step documents

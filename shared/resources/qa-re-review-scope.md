@@ -219,8 +219,32 @@ if [ "$PRIOR_GATES" -ge 1 ]; then
   # left uncommitted (QA cycle 1, CR-1). .claude/state is the pipeline's own scratch — excluded from
   # both lists: a consumer that tracks .claude/ has the lock rewritten by set-qa-phase.sh just before
   # this block runs, and that is not a fix (QA cycle 2, CR-2).
+  # A tracked change HALTs only when the review READS it: a path in the PR's change set, or one in a
+  # directory (the exact dirname, never a prefix) that holds a changed file. Any other tracked edit
+  # belongs to something else in this checkout — a parallel session's registry row (obs #126) — and
+  # only warns, like an untracked file. A change set that cannot be listed (no $BASE, or a base ref
+  # this checkout lacks) falls back to the old rule: every tracked edit HALTs (task 245).
   DIRTY=$(git status --porcelain --untracked-files=no -- . ":(exclude)$WORK_ITEM_DIR" ":(exclude).claude/state")
-  [ -z "$DIRTY" ] || { echo "HALT: uncommitted changes outside the work item — commit the fix before re-review (the scope reads committed history):"; printf '%s\n' "$DIRTY"; exit 1; }
+  if [ -n "$DIRTY" ]; then
+    HALTS="" WARNS=""
+    if [ -n "${BASE:-}" ] && CHANGED=$(git -c core.quotePath=false diff --name-only "$BASE...HEAD" 2>/dev/null); then
+      CHANGED_DIRS=$(printf '%s\n' "$CHANGED" | sed -n 's#/[^/]*$##p' | sort -u)
+      while IFS= read -r line; do
+        p=${line#???}; p=${p##* -> }               # porcelain v1: "XY path" or "XY old -> new"
+        d=${p%/*}; [ "$d" = "$p" ] && d=""
+        if printf '%s\n' "$CHANGED" | grep -qxF -- "$p" \
+           || { [ -n "$d" ] && printf '%s\n' "$CHANGED_DIRS" | grep -qxF -- "$d"; }; then
+          HALTS="$HALTS$line"$'\n'
+        else
+          WARNS="$WARNS$line"$'\n'
+        fi
+      done < <(printf '%s\n' "$DIRTY")
+    else
+      HALTS="$DIRTY"$'\n'
+    fi
+    [ -z "$HALTS" ] || { echo "HALT: uncommitted changes outside the work item — commit the fix before re-review (the scope reads committed history):"; printf '%s' "$HALTS"; exit 1; }
+    [ -z "$WARNS" ] || { echo "warning: uncommitted changes outside the review scope are not in this review:"; printf '%s' "$WARNS" | sed 's/^/  /'; }
+  fi
   UNTRACKED=$(git ls-files --others --exclude-standard -- . ":(exclude)$WORK_ITEM_DIR" ":(exclude).claude/state")
   [ -z "$UNTRACKED" ] || { echo "warning: untracked files outside the work item are not in this review — commit any that belong to the fix:"; printf '%s\n' "$UNTRACKED" | sed 's/^/  /'; }
 fi
