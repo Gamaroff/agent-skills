@@ -1,0 +1,159 @@
+[
+  {
+    "id": "bool",
+    "input": "probe",
+    "direction": "hostile",
+    "why": "A missed decline would make ensure create the catalogue the project refused.",
+    "correct": "reason declined, docs/c.md not created.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  componentCatalogue: docs/c.md\n  wireframeMap: false\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "{\"reason\":\"declined\"}\n",
+      "absent": [
+        "docs/c.md"
+      ]
+    }
+  },
+  {
+    "id": "off",
+    "input": "probe",
+    "direction": "hostile",
+    "why": "off.",
+    "correct": "declined, nothing written.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  componentCatalogue: docs/c.md\n  wireframeMap: off\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "{\"reason\":\"declined\"}\n",
+      "absent": [
+        "docs/c.md"
+      ]
+    }
+  },
+  {
+    "id": "upper-off",
+    "input": "probe",
+    "direction": "hostile",
+    "why": "Any case.",
+    "correct": "declined, nothing written.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  componentCatalogue: docs/c.md\n  wireframeMap: OFF\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "{\"reason\":\"declined\"}\n",
+      "absent": [
+        "docs/c.md"
+      ]
+    }
+  },
+  {
+    "id": "title-false",
+    "input": "probe",
+    "direction": "hostile",
+    "why": "bug.4 shape.",
+    "correct": "declined, nothing written.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  componentCatalogue: docs/c.md\n  wireframeMap: False\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "{\"reason\":\"declined\"}\n",
+      "absent": [
+        "docs/c.md"
+      ]
+    }
+  },
+  {
+    "id": "dq-upper",
+    "input": "probe",
+    "direction": "hostile",
+    "why": "Quoted, upper case.",
+    "correct": "declined, nothing written.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  componentCatalogue: docs/c.md\n  wireframeMap: \"FALSE\"\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "{\"reason\":\"declined\"}\n",
+      "absent": [
+        "docs/c.md"
+      ]
+    }
+  },
+  {
+    "id": "crlf",
+    "input": "probe",
+    "direction": "hostile",
+    "why": "CRLF.",
+    "correct": "declined, nothing written.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\r\n  componentCatalogue: docs/c.md\r\n  wireframeMap: off\r\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "{\"reason\":\"declined\"}\n",
+      "absent": [
+        "docs/c.md"
+      ]
+    }
+  },
+  {
+    "id": "bom",
+    "input": "probe",
+    "direction": "hostile",
+    "why": "BOM on line 1.",
+    "correct": "declined, nothing written.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "﻿ui:\n  componentCatalogue: docs/c.md\n  wireframeMap: false\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "{\"reason\":\"declined\"}\n",
+      "absent": [
+        "docs/c.md"
+      ]
+    }
+  },
+  {
+    "id": "offline",
+    "input": "probe",
+    "direction": "legitimate",
+    "why": "A path that starts with off is configured; ensure creates the files.",
+    "correct": "ok (exit 0).",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  componentCatalogue: docs/c.md\n  wireframeMap: offline.md\n"
+      }
+    }
+  },
+  {
+    "id": "false-path",
+    "input": "probe",
+    "direction": "legitimate",
+    "why": "Contains the word.",
+    "correct": "ok (exit 0).",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  componentCatalogue: docs/c.md\n  wireframeMap: docs/false.md\n"
+      }
+    }
+  }
+]

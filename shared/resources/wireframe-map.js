@@ -12,7 +12,8 @@
  *
  * Every path comes from the consumer's skills-config.yaml `ui:` block. Nothing here names a
  * project, a design system or a component library; with no `ui:` block every command answers
- * `unset` and changes nothing.
+ * `unset` and changes nothing. `wireframeMap: false` (or `off`, any case) is a decline: every
+ * command answers `declined` and changes nothing, and no skill offers setup again.
  *
  *   ui:
  *     componentCatalogue: docs/architecture/components.md   # markdown list of the components
@@ -23,11 +24,24 @@
  *     wireframeMap: docs/architecture/wireframe-component-map.md
  *
  * Usage:
+ *   wireframe-map.js detect                         [--root <dir>] [--json]
+ *   wireframe-map.js configure --decline            [--root <dir>] [--json]
+ *   wireframe-map.js configure --map <path> [--barrel <path>] [--import <module>]
+ *                           [--catalogue <path>] [--section <heading>] [--exclude A,B]
+ *                           [--root <dir>] [--json]
  *   wireframe-map.js ensure                         [--root <dir>] [--json]
  *   wireframe-map.js resolve <work-item.md>         [--root <dir>] [--json]
  *   wireframe-map.js record --signature <sig> --component <name> --by <who>
  *                           [--label <pattern>] [--variant <text>] [--hint <text>]
  *                           [--notes <text>] [--date YYYY-MM-DD] [--root <dir>] [--json]
+ *
+ * `detect` is read-only. It reports the config's `state` — configured | declined | partial (a `ui:`
+ * key without a map path or a decline) | unset — and, for partial and unset, a `proposal`: each
+ * missing `ui:` value with the evidence for it, found by reading only a fixed list of component
+ * barrels, one level of `packages/*` and `libs/*`, `docs/` to depth 4, and the package.json and
+ * tsconfig.json files on the barrel's path. `configure` is the only writer of skills-config.yaml:
+ * it appends a `ui:` block, or inserts the keys a partial block lacks after its last line, keeps
+ * every other byte, reads the file back and restores it when the read-back differs.
  *
  * `ensure` creates what is missing and never overwrites. A missing catalogue is seeded with one row
  * per component the barrel exports; an existing one gains a row only for an export it lacks, under
@@ -51,9 +65,15 @@
  * `reason` vocabulary:
  *   ok            the command did what was asked (`ensure`: see `catalogue` and `map` for what)
  *   unset         no `ui:` block, or not the key this command needs; nothing was read or written
+ *   declined      `ui.wireframeMap` is `false` or `off`; nothing was read or written (exit 0)
+ *   nothing-found `detect`: no component barrel qualifies, so there is nothing to propose (exit 0)
+ *   exists        `configure`: the map is already set or declined, a given key holds another
+ *                 value, or `ui:` has a value on its own line; nothing was written (exit 1)
+ *   write-failed  `configure`: the file did not read back as written and was restored (exit 1)
  *   no-blocks     `resolve`: the work item holds no ```wireloom block
  *   no-file       `resolve`: the work item does not exist
  *   unparseable   `record`: the map exists but has no table this engine can append to
+ *   config-unreadable  skills-config.yaml exists and cannot be read (exit 1)
  *   usage         the invocation was wrong; always paired with exit 2
  *
  * `ensure` reports each file as created | updated | unchanged | unset | unreadable — `unreadable`
@@ -79,6 +99,9 @@ const MAP_HEADER = [
   "  percent-encoded except for letters, digits, `- _ . ! ~ * ' ( ) / : # @ + =` (`value=1%2C500`).",
   "- **Label** — empty for any label, a plain string to match it exactly, or `/regex/`.",
   "- **Component** — what the node is built from; `(layout)` for a node that draws nothing.",
+  "- **Writing rows by hand** — examples, sibling context and icons: the guide in",
+  "  `.agents/skills/create-story/references/wireframe-component-mapping.md`. Two example rows:",
+  '  `footer>button[primary]` → `Button`, variant `variant="accent"`; `*>row` → `(layout)`.',
   "",
 ];
 const MAP_COLUMNS = [
@@ -104,21 +127,40 @@ class ConfigError extends Error {}
 // Config
 // ---------------------------------------------------------------------------
 
-function readUiConfig(root) {
-  let text;
+const CONFIG_FILE = "skills-config.yaml";
+
+// The raw text, or null when the file is missing.
+function readConfigText(root) {
   try {
-    text = fs.readFileSync(path.join(root, "skills-config.yaml"), "utf8");
+    return fs.readFileSync(path.join(root, CONFIG_FILE), "utf8");
   } catch (e) {
     // Only a missing file means "no config". An unreadable one read as "feature off", and every
     // command answered `unset` for a project that had turned it on.
     if (e && e.code === "ENOENT") return null;
     throw new ConfigError(
-      `skills-config.yaml cannot be read: ${(e && e.message) || e}`,
+      `${CONFIG_FILE} cannot be read: ${(e && e.message) || e}`,
     );
   }
+}
+
+// The `ui:` mapping as written, or null. An empty `ui:` reads as null here too.
+const rawUiOf = (text) => {
   const cfg = parseYamlSubset(text);
-  const ui = cfg && typeof cfg.ui === "object" && cfg.ui ? cfg.ui : null;
+  return cfg && typeof cfg.ui === "object" && cfg.ui ? cfg.ui : null;
+};
+
+// `false` or `off`, in any case and quoted or not: the project said no, which is not the same as
+// never asked. yaml-subset reads only a bare lowercase `false` as the boolean.
+const isDecline = (v) =>
+  v === false ||
+  (typeof v === "string" && ["false", "off"].includes(v.trim().toLowerCase()));
+
+function readUiConfig(root) {
+  const text = readConfigText(root);
+  if (text === null) return null;
+  const ui = rawUiOf(text);
   if (!ui) return null;
+  if (isDecline(ui.wireframeMap)) return { declined: true };
   const str = (v) => (typeof v === "string" && v.trim() ? v.trim() : null);
   return {
     componentCatalogue: str(ui.componentCatalogue),
@@ -367,6 +409,11 @@ function readMap(text) {
 const LINE_TERMINATOR = new RegExp(
   `[\\r\\n${String.fromCharCode(0x2028, 0x2029)}]`,
 );
+// A config value adds NEL (U+0085), a YAML 1.1 line break: one holding it is two lines to any
+// YAML reader but yaml-subset. The map is Markdown, where NEL is an ordinary character.
+const YAML_LINE_BREAK = new RegExp(
+  `[\\r\\n${String.fromCharCode(0x85, 0x2028, 0x2029)}]`,
+);
 
 function parsePattern(sig) {
   // A signature is one table cell on one line. `record` writes it untrimmed, and the
@@ -490,18 +537,58 @@ function sectionBounds(lines, heading) {
   return { start, end };
 }
 
-// The component named in the first cell of each table row of the section.
-function catalogued(text, heading) {
+// A catalogue row's first cell: one backticked component name.
+const CATALOGUE_NAME = /^`([A-Za-z][\w.]*)`$/;
+
+// Each table row of the section whose first cell is a backticked component name: the name, and
+// the row's other cells as one string, for a word match on what the component is for.
+function catalogueEntries(text, heading) {
   const lines = text.split(/\r?\n/);
   const b = sectionBounds(lines, heading);
   if (!b) return null;
-  const names = [];
+  const entries = [];
   for (let i = b.start; i < b.end; i++) {
     if (!isTableLine(lines[i]) || isDivider(lines[i])) continue;
-    const m = /^`([A-Za-z][\w.]*)`$/.exec(splitRow(lines[i])[0] || "");
-    if (m) names.push(m[1]);
+    const cells = splitRow(lines[i]);
+    const m = CATALOGUE_NAME.exec(cells[0] || "");
+    if (m) entries.push({ name: m[1], text: cells.slice(1).join(" ") });
   }
-  return names;
+  return entries;
+}
+
+// The component named in the first cell of each table row of the section.
+function catalogued(text, heading) {
+  const entries = catalogueEntries(text, heading);
+  return entries && entries.map((e) => e.name);
+}
+
+// Up to five catalogue entries for an open node: those with a PascalCase name segment equal to
+// the primitive (`button` → `Button`, `IconButton`, `ButtonGroup`; never `Rebutton`), then those
+// whose other cells hold the primitive as a whole word. Proposals only; nothing is recorded.
+const CATALOGUE_CANDIDATES = 5;
+
+function catalogueCandidates(entries, node, seen) {
+  const primitive = node.primitive.toLowerCase();
+  // A primitive is `[A-Za-z][\w-]*` (parseLine), so `-` is the only character to escape.
+  const word = new RegExp(`\\b${primitive.replace(/-/g, "\\-")}\\b`, "i");
+  const segments = (name) => name.match(/[A-Z][a-z0-9]*/g) || [];
+  const byName = [];
+  const byPurpose = [];
+  for (const e of entries) {
+    if (seen.has(e.name)) continue;
+    if (segments(e.name).some((s) => s.toLowerCase() === primitive))
+      byName.push({ e, basis: "name" });
+    else if (word.test(e.text)) byPurpose.push({ e, basis: "purpose" });
+  }
+  return [...byName, ...byPurpose]
+    .slice(0, CATALOGUE_CANDIDATES)
+    .map(({ e, basis }) => ({
+      component: e.name,
+      variant: "",
+      from: "catalogue",
+      source: "catalogue",
+      basis,
+    }));
 }
 
 function resolveModule(fromFile, spec) {
@@ -618,6 +705,8 @@ function createMap(file) {
 
 function ensure(root) {
   const ui = readUiConfig(root);
+  // Before the unset check, which would read a decline as a block with no keys.
+  if (ui && ui.declined) return { reason: "declined" };
   const result = { reason: "ok", catalogue: "unset", map: "unset", added: [] };
   if (!ui || (!ui.componentCatalogue && !ui.wireframeMap))
     return { ...result, reason: "unset" };
@@ -711,6 +800,7 @@ function ensure(root) {
 
 function resolve(root, workItem) {
   const ui = readUiConfig(root);
+  if (ui && ui.declined) return { reason: "declined" };
   if (!ui || !ui.wireframeMap) return { reason: "unset" };
   const file = path.resolve(root, workItem);
   if (!fs.existsSync(file)) return { reason: "no-file", workItem };
@@ -725,16 +815,19 @@ function resolve(root, workItem) {
   // The catalogue's names filter the candidates. A catalogue without its section is reported, not
   // read as an empty catalogue: both left the filter off, and the caller could not tell (CR12-3).
   let catalogue = null;
+  let entries = [];
   let catalogueState = "unset";
   if (ui.componentCatalogue) {
     const catFile = path.resolve(root, ui.componentCatalogue);
     if (!fs.existsSync(catFile)) catalogueState = "missing";
     else {
-      catalogue = catalogued(
+      entries = catalogueEntries(
         fs.readFileSync(catFile, "utf8"),
         ui.catalogueSection,
       );
-      catalogueState = catalogue === null ? "no-section" : "ok";
+      catalogue = entries && entries.map((e) => e.name);
+      catalogueState = entries === null ? "no-section" : "ok";
+      entries = entries || [];
     }
   }
   // The component names a Component cell mentions, whole: `Button in ActionRow` names both, and
@@ -762,17 +855,23 @@ function resolve(root, workItem) {
         layout: row.component === LAYOUT,
         mapLine: row.line,
       });
-    else
-      unresolved.push({
-        ...base,
-        candidates: nearMisses(rows, node).filter(
+    else {
+      // Rows that nearly matched first, then the catalogue's own entries: on an empty map the
+      // catalogue is the only source a first run has. Only a catalogue read whole offers any.
+      const fromMap = nearMisses(rows, node)
+        .filter(
           (c) =>
             c.component === LAYOUT ||
             !catalogue ||
             !catalogue.length ||
             namesIn(c.component).some((n) => catalogue.includes(n)),
-        ),
-      });
+        )
+        .map((c) => ({ ...c, source: "map" }));
+      const seen = new Set(fromMap.flatMap((c) => namesIn(c.component)));
+      const fromCatalogue =
+        catalogueState === "ok" ? catalogueCandidates(entries, node, seen) : [];
+      unresolved.push({ ...base, candidates: [...fromMap, ...fromCatalogue] });
+    }
   }
   return {
     reason: "ok",
@@ -790,6 +889,7 @@ function resolve(root, workItem) {
 
 function record(root, opts) {
   const ui = readUiConfig(root);
+  if (ui && ui.declined) return { reason: "declined" };
   if (!ui || !ui.wireframeMap) return { reason: "unset" };
   if (!parsePattern(opts.signature))
     throw new UsageError(`--signature is not a signature: ${opts.signature}`);
@@ -880,11 +980,526 @@ function record(root, opts) {
 }
 
 // ---------------------------------------------------------------------------
+// Setup: detect and configure
+// ---------------------------------------------------------------------------
+
+// The `ui:` keys, in the order configure writes them.
+const UI_KEYS = [
+  "componentCatalogue",
+  "componentImport",
+  "componentBarrel",
+  "catalogueSection",
+  "componentExclude",
+  "wireframeMap",
+];
+const DEFAULT_CATALOGUE = "docs/architecture/components.md";
+const DEFAULT_SECTION = "## Components";
+const DEFAULT_MAP = "docs/architecture/wireframe-component-map.md";
+// A top-level `ui` key. An indented `ui:` belongs to another block, and an empty `ui:` parses as
+// null, so the text is what says a block is there. It matches what yaml-subset reads as the key:
+// quoted or not, and after a byte-order mark on line 1.
+const UI_LINE = new RegExp(`^${String.fromCharCode(0xfeff)}?(["']?)ui\\1\\s*:`);
+const UI_KEY = new RegExp(UI_LINE.source, "m");
+
+// Everything detect reads, and nothing else: these barrels, one level of these workspace
+// directories, and docs/ to this depth without these work-item trees.
+const BARREL_FILES = [
+  "src/components/index",
+  "components/index",
+  "src/ui/index",
+  "app/components/index",
+];
+const BARREL_EXTS = ["ts", "tsx", "js", "jsx"];
+const WORKSPACES = ["packages", "libs"];
+const DOCS_DEPTH = 4;
+const DOCS_SKIPPED = new Set(["tasks", "prd", "bugs"]);
+const CATALOGUE_MIN = 3;
+
+const isFile = (p) => {
+  try {
+    return fs.statSync(p).isFile();
+  } catch (_) {
+    return false;
+  }
+};
+const byName = (a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+
+// The keys a raw `ui:` mapping gives a value readUiConfig can use: a non-empty string, or for
+// componentExclude any non-empty name list. A list under a path key reads as no value there.
+const presentKeys = (raw) =>
+  raw
+    ? UI_KEYS.filter((k) =>
+        k === "componentExclude"
+          ? nameList(raw[k]).length > 0
+          : typeof raw[k] === "string" && raw[k].trim() !== "",
+      )
+    : [];
+
+// The barrel with the most component exports; on a tie, the earlier in the list.
+function findBarrel(root) {
+  const candidates = BARREL_FILES.flatMap((b) =>
+    BARREL_EXTS.map((e) => `${b}.${e}`),
+  );
+  for (const ws of WORKSPACES) {
+    let dirs = [];
+    try {
+      dirs = fs
+        .readdirSync(path.join(root, ws), { withFileTypes: true })
+        .filter((d) => d.isDirectory())
+        .sort(byName);
+    } catch (_) {
+      continue;
+    }
+    for (const d of dirs)
+      for (const e of BARREL_EXTS)
+        candidates.push(`${ws}/${d.name}/src/index.${e}`);
+  }
+  let best = null;
+  for (const rel of candidates) {
+    if (!isFile(path.join(root, rel))) continue;
+    const exports = barrelExports(root, rel, []);
+    if (exports.size && (!best || exports.size > best.exports.size))
+      best = { path: rel, exports };
+  }
+  return (
+    best && {
+      ...best,
+      evidence: `exports ${best.exports.size} components (${best.path})`,
+    }
+  );
+}
+
+// tsconfig.json is JSONC: comments and trailing commas. One scan drops both and copies each string
+// literal whole, so a "@x/*" alias or a "src/**/*.ts" glob is not read as the start of a comment.
+function stripJsonc(text) {
+  let out = "";
+  let comma = -1; // where in `out` a comma waits to be seen as trailing
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '"') {
+      let j = i + 1;
+      while (j < text.length && text[j] !== '"') j += text[j] === "\\" ? 2 : 1;
+      out += text.slice(i, j + 1);
+      comma = -1;
+      i = j;
+    } else if (c === "/" && text[i + 1] === "/") {
+      const end = text.indexOf("\n", i);
+      i = (end < 0 ? text.length : end) - 1;
+    } else if (c === "/" && text[i + 1] === "*") {
+      const end = text.indexOf("*/", i + 2);
+      i = end < 0 ? text.length : end + 1;
+    } else {
+      if ((c === "}" || c === "]") && comma >= 0)
+        out = out.slice(0, comma) + out.slice(comma + 1);
+      if (c === ",") comma = out.length;
+      else if (!/\s/.test(c)) comma = -1;
+      out += c;
+    }
+  }
+  return out;
+}
+
+// A JSON file, or null; `jsonc` reads it as tsconfig.json is written.
+function jsonFile(file, jsonc) {
+  try {
+    const text = fs.readFileSync(file, "utf8");
+    return JSON.parse(jsonc ? stripJsonc(text) : text);
+  } catch (_) {
+    return null;
+  }
+}
+
+// The module code imports the barrel's components from: the nearest package.json name above the
+// barrel (not the repository's own), else an exact tsconfig.json path alias that lands on it. A
+// wildcard alias (`@ui/*`) names no module of its own: TypeScript matches it only for `@ui/<x>`.
+function importOf(root, barrelRel) {
+  const barrel = path.resolve(root, barrelRel);
+  for (
+    let dir = path.dirname(barrel);
+    dir !== root && dir.startsWith(root + path.sep);
+    dir = path.dirname(dir)
+  ) {
+    const pkg = jsonFile(path.join(dir, "package.json"));
+    if (pkg && typeof pkg.name === "string" && pkg.name.trim())
+      return {
+        value: pkg.name.trim(),
+        evidence: `name in ${path.relative(root, path.join(dir, "package.json"))}`,
+      };
+  }
+  const ts = jsonFile(path.join(root, "tsconfig.json"), true);
+  const options = ts && ts.compilerOptions;
+  if (options && options.paths && typeof options.paths === "object") {
+    const base = path.resolve(root, options.baseUrl || ".");
+    const lands = [
+      barrel,
+      barrel.replace(/\.[jt]sx?$/, ""),
+      path.dirname(barrel),
+    ];
+    let wildcard = null;
+    for (const [alias, targets] of Object.entries(options.paths))
+      for (const t of [].concat(targets)) {
+        if (typeof t !== "string") continue;
+        if (!lands.includes(path.resolve(base, t.replace(/\/?\*$/, ""))))
+          continue;
+        if (!alias.includes("*"))
+          return {
+            value: alias,
+            evidence: `tsconfig.json paths alias ${alias}`,
+          };
+        if (!wildcard) wildcard = alias;
+      }
+    if (wildcard)
+      return {
+        value: null,
+        evidence: `tsconfig.json paths alias ${wildcard} is a wildcard, which names no single module`,
+      };
+  }
+  return {
+    value: null,
+    evidence: "no package name or path alias resolves to the barrel",
+  };
+}
+
+// Markdown files under docs/, to DOCS_DEPTH directories below it, skipping the work-item trees.
+function docsMarkdown(root) {
+  const out = [];
+  const walk = (dir, depth) => {
+    let entries;
+    try {
+      entries = fs.readdirSync(path.join(root, dir), { withFileTypes: true });
+    } catch (_) {
+      return;
+    }
+    for (const e of entries.sort(byName)) {
+      const rel = `${dir}/${e.name}`;
+      if (e.isDirectory()) {
+        if (
+          depth < DOCS_DEPTH &&
+          !e.name.startsWith(".") &&
+          !(depth === 0 && DOCS_SKIPPED.has(e.name))
+        )
+          walk(rel, depth + 1);
+      } else if (e.isFile() && e.name.endsWith(".md")) out.push(rel);
+    }
+  };
+  walk("docs", 0);
+  return out;
+}
+
+// The file and heading whose table lists the most of the barrel's exports, at least
+// CATALOGUE_MIN of them. A heading counts only the rows before the next heading of any level, so
+// the heading proposed is the one directly above the table, not a title that encloses the page.
+function findCatalogue(root, exports, files) {
+  let best = null;
+  for (const rel of files) {
+    let text;
+    try {
+      text = fs.readFileSync(path.join(root, rel), "utf8");
+    } catch (_) {
+      continue;
+    }
+    let heading = null;
+    let names = new Set();
+    const settle = () => {
+      const count = [...names].filter((n) => exports.has(n)).length;
+      if (heading && count >= CATALOGUE_MIN && (!best || count > best.count))
+        best = { rel, heading, count };
+    };
+    for (const line of text.split(/\r?\n/)) {
+      if (/^#{1,6}\s+\S/.test(line)) {
+        settle();
+        heading = line.trim();
+        names = new Set();
+      } else if (isTableLine(line) && !isDivider(line)) {
+        const m = CATALOGUE_NAME.exec(splitRow(line)[0] || "");
+        if (m) names.add(m[1]);
+      }
+    }
+    settle();
+  }
+  return best;
+}
+
+// Read-only: what the config is, and for `unset` or `partial` the missing values to propose.
+function detect(root) {
+  const text = readConfigText(root);
+  const ui = readUiConfig(root);
+  if (ui && ui.declined) return { reason: "ok", state: "declined" };
+  if (ui && ui.wireframeMap) return { reason: "ok", state: "configured" };
+  const partial = text !== null && UI_KEY.test(text);
+  const present = presentKeys(text === null ? null : rawUiOf(text));
+  const has = (k) => present.includes(k);
+  const head = partial ? { state: "partial", present } : { state: "unset" };
+
+  let barrel;
+  if (has("componentBarrel"))
+    barrel = {
+      path: ui.componentBarrel,
+      exports: barrelExports(root, ui.componentBarrel, ui.componentExclude),
+    };
+  else {
+    barrel = findBarrel(root);
+    if (!barrel) return { reason: "nothing-found", ...head, proposal: null };
+  }
+
+  const proposal = {};
+  if (!has("componentBarrel"))
+    proposal.componentBarrel = {
+      value: barrel.path,
+      evidence: barrel.evidence,
+    };
+  if (!has("componentImport"))
+    proposal.componentImport = importOf(root, barrel.path);
+  if (!has("componentCatalogue") || !has("catalogueSection")) {
+    const found = findCatalogue(
+      root,
+      barrel.exports,
+      has("componentCatalogue") ? [ui.componentCatalogue] : docsMarkdown(root),
+    );
+    if (!has("componentCatalogue"))
+      proposal.componentCatalogue = found
+        ? {
+            value: found.rel,
+            evidence: `lists ${found.count} of ${barrel.exports.size} exports under '${found.heading}'`,
+          }
+        : {
+            value: DEFAULT_CATALOGUE,
+            evidence: "no existing catalogue found; ensure will create it",
+          };
+    if (!has("catalogueSection"))
+      proposal.catalogueSection = found
+        ? { value: found.heading, evidence: "the heading above that table" }
+        : { value: DEFAULT_SECTION, evidence: "default" };
+  }
+  if (!has("componentExclude"))
+    proposal.componentExclude = { value: [], evidence: "none detected" };
+  proposal.wireframeMap = { value: DEFAULT_MAP, evidence: "default" };
+  return { reason: "ok", ...head, proposal };
+}
+
+// `key: value` lines, each string quoted so `#`, `: ` and `@` read back as written.
+const yamlLines = (key, value, indent) =>
+  Array.isArray(value)
+    ? [
+        `${indent}${key}:`,
+        ...value.map((v) => `${indent}  - ${JSON.stringify(v)}`),
+      ]
+    : [
+        `${indent}${key}: ${typeof value === "string" ? JSON.stringify(value) : String(value)}`,
+      ];
+
+const sameValue = (key, a, b) =>
+  key === "componentExclude"
+    ? JSON.stringify(nameList(a)) === JSON.stringify(nameList(b))
+    : (typeof a === "string" ? a.trim() : a) ===
+      (typeof b === "string" ? b.trim() : b);
+
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+// The file as written means what was asked and nothing else: every other top-level key and every
+// `ui` key that was there reads back unchanged, every key written reads back as given, and the
+// reader every skill uses sees the feature on (or declined).
+function readsBack(root, before, written) {
+  let cfg;
+  let ui;
+  try {
+    cfg = parseYamlSubset(readConfigText(root) || "") || {};
+    ui = readUiConfig(root);
+  } catch (_) {
+    return false;
+  }
+  const prev = (before !== null && parseYamlSubset(before)) || {};
+  for (const k of new Set([...Object.keys(prev), ...Object.keys(cfg)]))
+    if (k !== "ui" && !same(prev[k], cfg[k])) return false;
+  const prevUi = prev.ui && typeof prev.ui === "object" ? prev.ui : {};
+  const nowUi = cfg.ui && typeof cfg.ui === "object" ? cfg.ui : {};
+  for (const k of Object.keys(prevUi))
+    if (!(k in written) && !same(prevUi[k], nowUi[k])) return false;
+  for (const [k, v] of Object.entries(written))
+    if (!sameValue(k, nowUi[k], v)) return false;
+  return written.wireframeMap === false
+    ? Boolean(ui && ui.declined)
+    : Boolean(ui && ui.wireframeMap);
+}
+
+// The only writer of skills-config.yaml: a new `ui:` block, or the keys a partial one lacks.
+function configure(root, opts) {
+  const flags = {
+    catalogue: "componentCatalogue",
+    import: "componentImport",
+    barrel: "componentBarrel",
+    section: "catalogueSection",
+    map: "wireframeMap",
+  };
+  for (const flag of [...Object.keys(flags), "exclude"]) {
+    if (opts[flag] == null) continue;
+    const v = String(opts[flag]);
+    if (YAML_LINE_BREAK.test(v))
+      throw new UsageError(`--${flag} must be one line`);
+    // A value is written double-quoted, and yaml-subset reads a quoted value verbatim: any
+    // character JSON.stringify escapes would read back as its escape, not as given.
+    const ch = [...v].find((c) => JSON.stringify(c) !== `"${c}"`);
+    if (ch !== undefined)
+      throw new UsageError(
+        `--${flag} cannot hold U+${ch.codePointAt(0).toString(16).toUpperCase().padStart(4, "0")}: skills-config.yaml would not read it back`,
+      );
+  }
+  if (opts.map != null && isDecline(String(opts.map)))
+    throw new UsageError(
+      `--map ${String(opts.map).trim()} reads as a decline: use --decline`,
+    );
+  const given = {};
+  if (opts.decline) given.wireframeMap = false;
+  else
+    for (const key of UI_KEYS) {
+      if (key === "componentExclude") {
+        const list = String(opts.exclude || "")
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+        if (list.length) given[key] = list;
+        continue;
+      }
+      const flag = Object.keys(flags).find((f) => flags[f] === key);
+      const v = opts[flag] == null ? "" : String(opts[flag]).trim();
+      if (v) given[key] = v;
+    }
+
+  const file = path.join(root, CONFIG_FILE);
+  const before = readConfigText(root);
+  const out = (reason, extra) => ({ reason, file: CONFIG_FILE, ...extra });
+  const raw = (before !== null && rawUiOf(before)) || {};
+  if (
+    !opts.decline &&
+    !given.componentBarrel &&
+    !presentKeys(raw).includes("componentBarrel")
+  )
+    throw new UsageError(
+      "configure needs --barrel: the ui: block names no componentBarrel",
+    );
+
+  let text;
+  let action;
+  let written;
+  if (before === null || !UI_KEY.test(before)) {
+    const eol = before === null ? "\n" : eolOf(before);
+    const block = [
+      "ui:",
+      ...Object.entries(given).flatMap(([k, v]) => yamlLines(k, v, "  ")),
+    ];
+    const sep = before && !before.endsWith("\n") ? eol : "";
+    text = (before || "") + sep + block.join(eol) + eol;
+    action = before === null ? "created" : "appended";
+    written = given;
+  } else {
+    const ui = readUiConfig(root);
+    if (ui && (ui.declined || ui.wireframeMap))
+      return out("exists", { key: "wireframeMap" });
+    // Split after each newline, so joining the pieces gives back every byte.
+    const pieces = before.split(/(?<=\n)/);
+    const at = pieces.findIndex((p) => UI_LINE.test(p));
+    const inline = pieces[at]
+      .replace(/\r?\n$/, "")
+      .replace(UI_LINE, "")
+      .replace(/(^|\s)#.*$/, "")
+      .trim();
+    if (inline) return out("exists", { key: "ui" });
+    // Present means what `detect` means by it: a key with no value is missing, and its line is
+    // replaced where it stands rather than shadowed by a second one.
+    const present = presentKeys(raw);
+    written = {};
+    const blank = {};
+    for (const [k, v] of Object.entries(given)) {
+      if (!present.includes(k)) written[k] = v;
+      else if (!sameValue(k, raw[k], v)) return out("exists", { key: k });
+      if (!present.includes(k) && Object.prototype.hasOwnProperty.call(raw, k))
+        blank[k] = v;
+    }
+    // The block ends at its last indented line before the next column-0 key, and its indent is
+    // that of its first key line. Blank lines and comments, at any indent, set neither.
+    const scan = () => {
+      let last = at;
+      let indent = null;
+      for (let j = at + 1; j < pieces.length; j++) {
+        const line = pieces[j].replace(/\r?\n$/, "");
+        if (!line.trim() || /^\s*#/.test(line)) continue;
+        if (!/^\s/.test(line)) break;
+        last = j;
+        if (indent === null) indent = /^\s*/.exec(line)[0];
+      }
+      return { last, indent: indent || "  " };
+    };
+    const eol = eolOf(before);
+    const { indent } = scan();
+    // A blank key is rewritten where it stands, with any list under it: a list under a path key
+    // is no value there, and left in place it would hang off the new one. Blank lines and
+    // comments among the value lines stay where they are, as yaml-subset reads past both.
+    const under = new RegExp(`^${indent}(\\s|-(\\s|$))`);
+    for (const [k, v] of Object.entries(blank)) {
+      const end = scan().last;
+      const key = new RegExp(`^${indent}["']?${k}["']?\\s*:`);
+      const j = pieces.findIndex((p, n) => n > at && n <= end && key.test(p));
+      if (j < 0) return out("exists", { key: k });
+      const drop = [];
+      for (let n = j + 1; n < pieces.length; n++) {
+        if (!pieces[n].trim() || /^\s*#/.test(pieces[n])) continue;
+        if (!under.test(pieces[n])) break;
+        drop.push(n);
+      }
+      // A file that ended without a newline still does when its last line goes.
+      const unterminated =
+        drop.includes(pieces.length - 1) &&
+        !pieces[pieces.length - 1].endsWith("\n");
+      const tail = /\r?\n$/.exec(pieces[j]);
+      pieces[j] = yamlLines(k, v, indent).join(eol) + (tail ? tail[0] : "");
+      for (const n of drop.reverse()) pieces.splice(n, 1);
+      if (unterminated)
+        pieces[pieces.length - 1] = pieces[pieces.length - 1].replace(
+          /\r?\n$/,
+          "",
+        );
+    }
+    // The other missing keys go after the block's last key line, as it stands after the fills.
+    const { last } = scan();
+    const lines = Object.entries(written)
+      .filter(([k]) => !(k in blank))
+      .flatMap(([k, v]) => yamlLines(k, v, indent));
+    if (lines.length) {
+      const lead = pieces[last].endsWith("\n") ? "" : eol;
+      pieces.splice(last + 1, 0, lead + lines.join(eol) + eol);
+    }
+    text = pieces.join("");
+    action = "inserted";
+  }
+
+  fs.writeFileSync(file, text);
+  if (!readsBack(root, before, written)) {
+    if (before === null) fs.rmSync(file, { force: true });
+    else fs.writeFileSync(file, before);
+    return out("write-failed");
+  }
+  return out("ok", {
+    action,
+    written: Object.keys(written),
+    declined: Boolean(opts.decline),
+  });
+}
+
+// ---------------------------------------------------------------------------
 // CLI
 // ---------------------------------------------------------------------------
 
 const USAGE =
-  "usage: wireframe-map.js ensure | resolve <work-item.md> | record --signature <sig> --component <name> --by <who> [--label] [--variant] [--hint] [--notes] [--date] — each takes [--root <dir>] [--json]";
+  "usage: wireframe-map.js detect | configure (--decline | --map <path> [--barrel <path>] [--import <module>] [--catalogue <path>] [--section <heading>] [--exclude A,B]) | ensure | resolve <work-item.md> | record --signature <sig> --component <name> --by <who> [--label] [--variant] [--hint] [--notes] [--date] — each takes [--root <dir>] [--json]";
+
+const CONFIGURE_VALUES = [
+  "barrel",
+  "import",
+  "catalogue",
+  "section",
+  "map",
+  "exclude",
+];
 
 function parseArgs(argv) {
   const [command, ...rest] = argv;
@@ -899,10 +1514,12 @@ function parseArgs(argv) {
     "hint",
     "notes",
     "date",
+    ...CONFIGURE_VALUES,
   ]);
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
     if (a === "--json") opts.json = true;
+    else if (a === "--decline") opts.decline = true;
     else if (a.startsWith("--")) {
       const key = a.slice(2);
       if (!valued.has(key)) throw new UsageError(`unknown flag ${a}`);
@@ -910,8 +1527,20 @@ function parseArgs(argv) {
       opts[key] = rest[++i];
     } else opts.positional.push(a);
   }
-  if (!["ensure", "resolve", "record"].includes(command))
+  if (!["detect", "configure", "ensure", "resolve", "record"].includes(command))
     throw new UsageError(USAGE);
+  if (opts.decline && command !== "configure")
+    throw new UsageError("--decline is a configure flag");
+  if (command === "configure") {
+    const values = CONFIGURE_VALUES.filter((k) => opts[k] != null);
+    if (opts.decline && values.length)
+      throw new UsageError(`configure --decline takes no --${values[0]}`);
+    if (!opts.decline && !String(opts.map || "").trim())
+      throw new UsageError("configure needs --map, or --decline");
+  } else {
+    const stray = CONFIGURE_VALUES.find((k) => opts[k] != null);
+    if (stray) throw new UsageError(`--${stray} is a configure flag`);
+  }
   if (command === "resolve" && opts.positional.length !== 1)
     throw new UsageError("resolve takes one work-item path");
   if (command === "record")
@@ -934,7 +1563,9 @@ function runCli(argv) {
   const root = path.resolve(opts.root);
   let payload;
   try {
-    if (opts.command === "ensure") payload = ensure(root);
+    if (opts.command === "detect") payload = detect(root);
+    else if (opts.command === "configure") payload = configure(root, opts);
+    else if (opts.command === "ensure") payload = ensure(root);
     else if (opts.command === "resolve")
       payload = resolve(root, opts.positional[0]);
     else payload = record(root, opts);
@@ -949,11 +1580,25 @@ function runCli(argv) {
       };
     throw err;
   }
-  const ok = payload.reason === "ok" || payload.reason === "unset";
+  // A decline and an empty detection are answers, not failures.
+  const ok = ["ok", "unset", "declined", "nothing-found"].includes(
+    payload.reason,
+  );
   return { exitCode: ok ? 0 : 1, payload, json: opts.json };
 }
 
 function human(p) {
+  if (p.state)
+    return [
+      `state: ${p.state}${p.present && p.present.length ? ` (set: ${p.present.join(", ")})` : ""}${p.reason === "nothing-found" ? " — no component barrel found" : ""}`,
+      ...Object.entries(p.proposal || {}).map(
+        ([k, v]) => `  ${k}: ${JSON.stringify(v.value)}  (${v.evidence})`,
+      ),
+    ].join("\n");
+  if (p.file === CONFIG_FILE)
+    return `${p.reason}${p.action ? `: ${p.action}` : ""}${p.key ? ` (${p.key})` : ""} — ${p.file}`;
+  if (p.reason === "declined")
+    return "wireframe-map: mapping declined (ui.wireframeMap: false) — nothing to do";
   if (p.reason === "unset")
     return "wireframe-map: no ui: block configured — nothing to do";
   if (p.reason === "config-unreadable") return `wireframe-map: ${p.error}`;
@@ -989,7 +1634,10 @@ module.exports = {
   parsePattern,
   match,
   catalogued,
+  catalogueEntries,
   barrelExports,
+  detect,
+  configure,
   ensure,
   resolve,
   record,

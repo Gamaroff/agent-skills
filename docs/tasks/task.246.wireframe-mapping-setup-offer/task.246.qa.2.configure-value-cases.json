@@ -1,0 +1,138 @@
+[
+  {
+    "id": "configure.lf-injects-key",
+    "sink": "path",
+    "input": "docs/map.md\nwireframeMap: false",
+    "direction": "hostile",
+    "why": "A line feed in a value would start a new YAML line, so a value could write a second key: here it would decline the feature it was meant to configure.",
+    "correct": "Refused as a usage error (exit 2), and skills-config.yaml is not written."
+  },
+  {
+    "id": "configure.cr-injects-key",
+    "sink": "path",
+    "input": "docs/map.md\rwireframeMap: false",
+    "direction": "hostile",
+    "why": "A lone carriage return is a line break to a CRLF-aware reader.",
+    "correct": "Refused as a usage error (exit 2), nothing written."
+  },
+  {
+    "id": "configure.crlf-injects-key",
+    "sink": "path",
+    "input": "docs/map.md\r\nwireframeMap: false",
+    "direction": "hostile",
+    "why": "CRLF is the line ending the engine preserves for Windows files.",
+    "correct": "Refused as a usage error (exit 2), nothing written."
+  },
+  {
+    "id": "configure.u2028",
+    "sink": "path",
+    "input": "docs/map.md wireframeMap: false",
+    "direction": "hostile",
+    "why": "U+2028 is a line terminator to JavaScript line splitting and to YAML 1.1 readers.",
+    "correct": "Refused as a usage error (exit 2), nothing written."
+  },
+  {
+    "id": "configure.u2029",
+    "sink": "path",
+    "input": "docs/map.md wireframeMap: false",
+    "direction": "hostile",
+    "why": "U+2029 is the paragraph separator, also a line terminator.",
+    "correct": "Refused as a usage error (exit 2), nothing written."
+  },
+  {
+    "id": "configure.nel",
+    "sink": "path",
+    "input": "docs/map.md\u0085wireframeMap: false",
+    "direction": "hostile",
+    "why": "NEL (U+0085) is a YAML 1.1 line break. Cycle 1 reproduced it as accepted (PROBE-1).",
+    "correct": "Refused as a usage error (exit 2), nothing written."
+  },
+  {
+    "id": "configure.double-quote",
+    "sink": "path",
+    "input": "docs/\"quoted\".md",
+    "direction": "hostile",
+    "why": "The value is written double-quoted and yaml-subset does not unescape, so it cannot read back. Cycle 1 saw write-failed (PROBE-2); a usage error naming the character is the contract now.",
+    "correct": "Refused as a usage error (exit 2), nothing written."
+  },
+  {
+    "id": "configure.backslash",
+    "sink": "path",
+    "input": "docs\\map.md",
+    "direction": "hostile",
+    "why": "A Windows-style separator is escaped by JSON.stringify and reads back doubled.",
+    "correct": "Refused as a usage error (exit 2), nothing written."
+  },
+  {
+    "id": "configure.tab",
+    "sink": "path",
+    "input": "docs/map\t.md",
+    "direction": "hostile",
+    "why": "A tab is a control character JSON.stringify escapes as \\t.",
+    "correct": "Refused as a usage error (exit 2), nothing written."
+  },
+  {
+    "id": "configure.unit-separator",
+    "sink": "path",
+    "input": "docs/map\u001f.md",
+    "direction": "hostile",
+    "why": "U+001F is the top of the C0 range JSON.stringify escapes as \\u001f.",
+    "correct": "Refused as a usage error (exit 2), nothing written."
+  },
+  {
+    "id": "configure.plain-path",
+    "sink": "path",
+    "input": "docs/wireframe-map.md",
+    "direction": "legitimate",
+    "why": "The ordinary value.",
+    "correct": "Accepted (exit 0), written and read back."
+  },
+  {
+    "id": "configure.spaces",
+    "sink": "path",
+    "input": "docs/design notes/wireframe map.md",
+    "direction": "legitimate",
+    "why": "Spaces are quoted and read back as written.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "configure.colon-hash",
+    "sink": "path",
+    "input": "docs/a: b # c.md",
+    "direction": "legitimate",
+    "why": "A colon-space and a hash would break an unquoted YAML scalar; the writer quotes them.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "configure.unicode",
+    "sink": "path",
+    "input": "docs/maquette-écran.md",
+    "direction": "legitimate",
+    "why": "Non-ASCII that JSON.stringify keeps as itself must not be refused by the new character rule.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "configure.astral",
+    "sink": "path",
+    "input": "docs/map-😀.md",
+    "direction": "legitimate",
+    "why": "A surrogate pair is one code point and JSON.stringify keeps it; the rule iterates code points.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "configure.single-quote",
+    "sink": "path",
+    "input": "docs/o'brien.md",
+    "direction": "legitimate",
+    "why": "A single quote inside a double-quoted scalar reads back verbatim.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "configure.leading-dash",
+    "sink": "path",
+    "input": "-map.md",
+    "direction": "legitimate",
+    "why": "A value that looks like a flag is still the --map value.",
+    "correct": "Accepted (exit 0)."
+  }
+]

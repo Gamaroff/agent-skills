@@ -1,0 +1,181 @@
+[
+  {
+    "id": "lf-injects-key",
+    "input": "@scope/ui\nwireframeMap: false",
+    "direction": "hostile",
+    "why": "A line feed writes a second key.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "crlf-injects-key",
+    "input": "@scope/ui\r\nwireframeMap: false",
+    "direction": "hostile",
+    "why": "CRLF.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "cr-injects-key",
+    "input": "@scope/ui\rwireframeMap: false",
+    "direction": "hostile",
+    "why": "Lone CR.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "u2028",
+    "input": "@scope/ui wireframeMap: false",
+    "direction": "hostile",
+    "why": "U+2028.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "u2029",
+    "input": "@scope/ui wireframeMap: false",
+    "direction": "hostile",
+    "why": "U+2029.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "nel",
+    "input": "@scope/uiwireframeMap: false",
+    "direction": "hostile",
+    "why": "NEL.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "double-quote",
+    "input": "@scope/\"ui\"",
+    "direction": "hostile",
+    "why": "Cannot read back.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "backslash",
+    "input": "@scope\\ui",
+    "direction": "hostile",
+    "why": "Reads back doubled.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "tab",
+    "input": "@scope/ui\t",
+    "direction": "hostile",
+    "why": "Escaped as \\t (trailing, so trim must not hide it before the guard).",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "unit-separator",
+    "input": "@scope/u\u001fi",
+    "direction": "hostile",
+    "why": "Escaped C0 control.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "scoped",
+    "input": "@scope/ui",
+    "direction": "legitimate",
+    "why": "The ordinary value; @ would start a reserved indicator unquoted.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "alias",
+    "input": "@/components",
+    "direction": "legitimate",
+    "why": "A path alias form.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "bare",
+    "input": "ui-kit",
+    "direction": "legitimate",
+    "why": "Unscoped package name.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "colon-hash",
+    "input": "pkg: a # b",
+    "direction": "legitimate",
+    "why": "Quoted by the writer.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "unicode",
+    "input": "@échelle/ui",
+    "direction": "legitimate",
+    "why": "Non-ASCII kept.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "single-quote",
+    "input": "o'brien-ui",
+    "direction": "legitimate",
+    "why": "Reads back verbatim.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "leading-dash",
+    "input": "-ui",
+    "direction": "legitimate",
+    "why": "Flag-shaped value.",
+    "correct": "Accepted (exit 0)."
+  }
+]

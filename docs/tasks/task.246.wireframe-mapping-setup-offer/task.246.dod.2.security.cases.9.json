@@ -1,0 +1,173 @@
+[
+  {
+    "id": "bool",
+    "input": "probe",
+    "direction": "hostile",
+    "why": "A missed decline would let configure insert a map path beside it.",
+    "correct": "exists (wireframeMap), exit 1.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: false\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "{\"reason\":\"exists\",\"file\":\"skills-config.yaml\",\"key\":\"wireframeMap\"}\n"
+    }
+  },
+  {
+    "id": "off",
+    "input": "probe",
+    "direction": "hostile",
+    "why": "off.",
+    "correct": "exists, exit 1.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: off\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "{\"reason\":\"exists\",\"file\":\"skills-config.yaml\",\"key\":\"wireframeMap\"}\n"
+    }
+  },
+  {
+    "id": "upper-off",
+    "input": "probe",
+    "direction": "hostile",
+    "why": "Any case.",
+    "correct": "exists, exit 1.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: OFF\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "{\"reason\":\"exists\",\"file\":\"skills-config.yaml\",\"key\":\"wireframeMap\"}\n"
+    }
+  },
+  {
+    "id": "title-false",
+    "input": "probe",
+    "direction": "hostile",
+    "why": "bug.4 shape.",
+    "correct": "exists, exit 1.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: False\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "{\"reason\":\"exists\",\"file\":\"skills-config.yaml\",\"key\":\"wireframeMap\"}\n"
+    }
+  },
+  {
+    "id": "sq-off",
+    "input": "probe",
+    "direction": "hostile",
+    "why": "Quoted.",
+    "correct": "exists, exit 1.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: 'off'\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "{\"reason\":\"exists\",\"file\":\"skills-config.yaml\",\"key\":\"wireframeMap\"}\n"
+    }
+  },
+  {
+    "id": "crlf",
+    "input": "probe",
+    "direction": "hostile",
+    "why": "CRLF file.",
+    "correct": "exists, exit 1.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\r\n  wireframeMap: false\r\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "{\"reason\":\"exists\",\"file\":\"skills-config.yaml\",\"key\":\"wireframeMap\"}\n"
+    }
+  },
+  {
+    "id": "bom",
+    "input": "probe",
+    "direction": "hostile",
+    "why": "BOM: UI_KEY must still see the block, or configure appends a second ui:.",
+    "correct": "exists, exit 1.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "﻿ui:\n  wireframeMap: false\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "{\"reason\":\"exists\",\"file\":\"skills-config.yaml\",\"key\":\"wireframeMap\"}\n"
+    }
+  },
+  {
+    "id": "among-keys",
+    "input": "probe",
+    "direction": "hostile",
+    "why": "Decline beside a barrel key.",
+    "correct": "exists, exit 1.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  componentBarrel: src/c/index.ts\n  wireframeMap: off # never\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "{\"reason\":\"exists\",\"file\":\"skills-config.yaml\",\"key\":\"wireframeMap\"}\n"
+    }
+  },
+  {
+    "id": "partial",
+    "input": "probe",
+    "direction": "legitimate",
+    "why": "A partial block with no map is completed.",
+    "correct": "ok inserted (exit 0).",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  componentBarrel: src/c/index.ts\n"
+      }
+    }
+  },
+  {
+    "id": "blank-key",
+    "input": "probe",
+    "direction": "legitimate",
+    "why": "An empty wireframeMap is not a decline; its line is filled.",
+    "correct": "ok (exit 0).",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  componentBarrel: src/c/index.ts\n  wireframeMap:\n"
+      }
+    }
+  },
+  {
+    "id": "empty-quoted",
+    "input": "probe",
+    "direction": "legitimate",
+    "why": "An empty quoted value is not a decline.",
+    "correct": "ok (exit 0).",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: \"\"\n"
+      }
+    }
+  },
+  {
+    "id": "no-config",
+    "input": "probe",
+    "direction": "legitimate",
+    "why": "No file: configure creates the block.",
+    "correct": "ok created (exit 0)."
+  }
+]

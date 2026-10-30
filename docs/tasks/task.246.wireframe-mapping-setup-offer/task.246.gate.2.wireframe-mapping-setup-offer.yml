@@ -1,0 +1,95 @@
+schema: 2
+task: 'task.246.wireframe-mapping-setup-offer'
+task_title: 'Wireframe mapping setup offer and first-run candidates'
+gate: CONCERNS
+status_reason: 'All five cycle 1 findings are fixed and the configure value guard now engages on all 17 probe cases, but the cycle 2 refute pass found three more medium correctness bugs in new detect/configure code (wildcard alias, case of false, block-list path keys) and three low ones, two of them introduced by cycle 1 fixes.'
+reviewer: 'QA Engineer'
+head: '11b1cfd2900b14b61cac9f146e61eb8fe12207dd'
+updated: '2026-10-29T22:37:37Z'
+
+top_issues:
+  - id: 'TASK-246-CR2-1'
+    severity: medium
+    file: 'shared/resources/wireframe-map.js'
+    finding: 'importOf strips /* from a wildcard paths alias and proposes the bare prefix: "@ui/*" → componentImport "@ui", which TypeScript does not resolve; the cycle 1 JSONC test pins the wrong value (BUG-3).'
+    suggested_action: 'Propose an alias only for an exact (non-wildcard) key that lands on the barrel or its directory; report a wildcard-only match as value null with evidence naming the alias; fix the JSONC test expectation.'
+    suggested_owner: dev
+    bug_ref: 'task.246.bug.3.wildcard-alias-proposes-bare-prefix.md'
+    status: open
+  - id: 'TASK-246-CR2-2'
+    severity: medium
+    file: 'shared/resources/wireframe-map.js'
+    finding: 'isDecline case-folds only off, so wireframeMap False, FALSE or "false" reads as a map path (detect configured, ensure creates a file named False), against the documented any-case decline; configure --map false writes a path (BUG-4).'
+    suggested_action: 'Decline any value whose trimmed lowercase is false or off; refuse a --map value that would read as a decline as a usage error; test both.'
+    suggested_owner: dev
+    bug_ref: 'task.246.bug.4.decline-false-not-case-folded.md'
+    status: open
+  - id: 'TASK-246-CR2-3'
+    severity: medium
+    file: 'shared/resources/wireframe-map.js'
+    finding: 'presentKeys counts a non-empty list as present for path keys that readUiConfig reads only as strings: a block list under componentBarrel makes detect throw a TypeError and lets configure write a block whose barrel reads null (BUG-5).'
+    suggested_action: 'One presence predicate matching readUiConfig: a non-empty string for path and string keys, a non-empty nameList for componentExclude; test the block-list case for detect and configure.'
+    suggested_owner: dev
+    bug_ref: 'task.246.bug.5.block-list-path-key-crashes-detect.md'
+    status: open
+  - id: 'TASK-246-CR2-4'
+    severity: low
+    file: 'shared/resources/wireframe-map.js'
+    finding: 'A UTF-8 BOM before ui: on line 1 hides the block from UI_KEY while yaml-subset still parses it: detect says unset and every configure appends a second ui: block and answers write-failed, so setup cannot succeed.'
+    suggested_action: 'Strip a leading U+FEFF before the UI_KEY test and before splitting into pieces in configure, and write it back unchanged; test detect and configure on a BOM file.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-246-CR2-5'
+    severity: low
+    file: 'shared/resources/wireframe-map.js'
+    finding: 'configure takes the block indent from the first indented line even when it is a comment: with "    # note" first, a blank key at two spaces is not found (false exists), and inserted keys land at the comment indent, nest under the previous key and answer write-failed (reviewer confidence medium; QA reproduced both).'
+    suggested_action: 'Take the indent from the first indented key line, not a comment; test a block whose first indented line is a deeper comment, for both the fill and the insert.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-246-CR2-6'
+    severity: low
+    file: 'shared/resources/wireframe-map.js'
+    finding: 'Cycle 1 added NEL to the shared LINE_TERMINATOR, which record and parsePattern also use, so record --label now refuses a U+0085 value the Markdown map stores and reads back (reviewer confidence medium; QA reproduced: --label must be one line).'
+    suggested_action: 'Restore the map terminator set and refuse NEL only in configure values, with a separate YAML constant; test that record accepts NEL and configure refuses it.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 132
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 17
+    escaped: 0
+    notes: 'boundary: true — configure --map value guard probed with the cli: form, 17 cases (task.246.qa.2.configure-value-cases.json, record task.246.qa.2.security.run.json): 10 hostile (LF, CR, CRLF, U+2028, U+2029, NEL, double quote, backslash, tab, U+001F) refused; 7 legitimate (plain, spaces, colon-hash, accented, astral, single quote, leading dash) accepted. Verdict engages. Map paths are still not containment-checked (pre-existing).'
+  performance:
+    status: PASS
+    notes: 'stripJsonc is one linear pass; detect still reads only its bounded set.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR2-3 is an uncaught throw from detect on a partial block; CR2-4 and CR2-5 leave setup unable to complete (configure restores the file each time, so nothing is corrupted).'
+  maintainability:
+    status: PASS
+    notes: 'Prettier clean; one presence predicate (CR2-3) and one decline predicate (CR2-2) would remove the two remaining disagreements between detect, configure and readUiConfig.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Map and catalogue paths are not checked for containment in the repository (ensure/record write where the config points); pre-existing, now also reachable through configure.'
+      refs: ['shared/resources/wireframe-map.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-246-CR2-1, CR2-2 and CR2-3 fixed and re-reviewed']

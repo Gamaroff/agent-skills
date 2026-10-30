@@ -39,7 +39,7 @@ This skill produces **the story document and its co-located plan file**, and the
 
 **Forbidden during this skill** (regardless of how compelling it seems):
 
-- ❌ Editing, creating, or deleting any source file outside the story's directory
+- ❌ Editing, creating, or deleting any source file outside the story's directory, except the **Allowed writes** below
 - ❌ Running migrations, codegen, build, lint-fix, or refactor commands
 - ❌ Creating branches, committing, or pushing code changes
 - ❌ Installing/removing dependencies or modifying `package.json`
@@ -54,6 +54,7 @@ This skill produces **the story document and its co-located plan file**, and the
 - ✅ `story.{P}.{E}.{S}.plan.{name}.md` (plan doc — MUST be co-located in the story directory above)
 - ✅ `${PRD_ROOT}/sprint-status.yaml` status field update (Step 6.2)
 - ✅ *(only after the user opts in at Step 5.2a)* Creating the tracker issue(s) and writing `github_issue` / `jira_key` / `jira_url` back into the story frontmatter
+- ✅ *(only in the wireframe mapping step, 5.4.6 step 3)* the `ui:` block `wireframe-map.js configure` writes to `skills-config.yaml` when the author accepts setup, and the component catalogue and wireframe map that `ensure` and `record` write. Name each one changed in the completion summary (6.4) as a change to commit with the story
 
 **Forbidden plan locations** (the plan file is part of the repo, not agent scratch):
 
@@ -759,7 +760,10 @@ After Dev Notes, plan, and diagrams are considered, check to see if the story do
    - Add a task/subtask to the story's **Tasks / Subtasks** section to implement the UI it shows:
      - `- [ ] Implement the UI to match the wireframe (see Dev Notes › Visual Layout / Wireframe)`
 
-3. **Link the wireframe's nodes to components** (only when `skills-config.yaml` sets `ui.wireframeMap`; otherwise skip silently). Follow `references/wireframe-component-mapping.md` (engine: `references/wireframe-map.js`) with the author present: `ensure`, `resolve`, propose, ask about every open node, then write the component table into Dev Notes and each confirmed answer into the map. A story whose wireframe nodes are all in that table is one `develop-story` can build without asking.
+3. **Link the wireframe's nodes to components.** Run `command node .agents/skills/create-story/references/wireframe-map.js detect --json` and branch on its `state`, as `references/wireframe-component-mapping.md` step 0 sets out:
+   - `configured`: follow the procedure (engine: `references/wireframe-map.js`) with the author present: `ensure`, `resolve`, propose, ask about every open node, then write the component table into Dev Notes and each confirmed answer into the map. A story whose wireframe nodes are all in that table is one `develop-story` can build without asking.
+   - `declined`: skip silently.
+   - `unset` or `partial`: ask the one setup question (Set up with these values (Recommended) / Adjust / Not now / Never for this repo), showing each proposed value and its evidence, and on `partial` the keys already set. On Set up or Adjust, run `configure` and continue as `configured`; on Never, run `configure --decline`; on Not now, skip. `skills-config.yaml`, when `configure` changed it, is a change to commit with the story.
 
 ### 5.5 Add Testing Guidance
 
@@ -988,6 +992,10 @@ Architecture documents consulted: [list files read]
 ### Deviations or Conflicts
 
 [List any noted conflicts between epic and architecture, or state "None"]
+
+### Changed Outside the Story Directory
+
+[Only when 5.4.6 step 3 wrote them: `skills-config.yaml` (the `ui:` block), the component catalogue and the wireframe map — each a change to commit with the story. Omit this section otherwise.]
 
 ### Checklist Results
 

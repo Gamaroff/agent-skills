@@ -77,7 +77,7 @@ This skill produces **task documentation and the co-located plan file**, and the
 
 **Forbidden during this skill** (regardless of how compelling it seems):
 
-- ❌ Editing, creating, or deleting any source file outside `docs/tasks/task.[ID].[name]/` (and, only after the user opts in at step 4.5, the tracker issue)
+- ❌ Editing, creating, or deleting any source file outside `docs/tasks/task.[ID].[name]/`, except the **Allowed writes** below (the tracker issue only after the user opts in at step 4.5)
 - ❌ Running migrations, codegen, build, lint-fix, or refactor commands
 - ❌ Creating branches, committing, or pushing code changes
 - ❌ Installing/removing dependencies or modifying `package.json`
@@ -92,6 +92,7 @@ This skill produces **task documentation and the co-located plan file**, and the
 - ✅ `task.[ID].plan.[name].md` (plan doc — MUST be co-located in the task directory above)
 - ✅ `${PRD_ROOT}/sprint-status.yaml` status field update (step 5)
 - ✅ *(only after the user opts in at step 4.5)* Creating the tracker issue via `gh` / Jira API and writing `github_issue` / `jira_key` / `jira_url` back into the task frontmatter
+- ✅ *(only in the wireframe mapping step, 2.6 step 3)* the `ui:` block `wireframe-map.js configure` writes to `skills-config.yaml` when the author accepts setup, and the component catalogue and wireframe map that `ensure` and `record` write. Name each one changed in the completion message as a change to commit with the task
 
 **Forbidden plan locations** (the plan file is part of the repo, not agent scratch):
 
@@ -508,7 +509,10 @@ Most tasks draw nothing. A task that does — it migrates a screen onto shared c
    - **If the screen already has a wireframe document** made from its design source (`<stem>.wireframe.md` beside it), copy its blocks verbatim and link the file. Otherwise invoke `wireframe` and follow its **Working from a brief** section, with the task's Scope and Success Criteria as the brief.
    - Embed it in Section 3 (Technical Background) under a `### Visual Layout / Wireframe` subheading: the rendered SVG beside the task file, then its ` ```wireloom ` source. Run `wireframe`'s `check` until it reports `ok`.
    - Add an Implementation Plan step: `Implement the UI to match the wireframe (see Technical Background › Visual Layout / Wireframe)`.
-3. **Link the wireframe's nodes to components** (only when `skills-config.yaml` sets `ui.wireframeMap`; otherwise skip silently). Follow `references/wireframe-component-mapping.md` (engine: `references/wireframe-map.js`) with the author present, exactly as `create-story` does: `ensure`, `resolve`, propose, ask about every open node, then write the component table under the wireframe and each confirmed answer into the map.
+3. **Link the wireframe's nodes to components.** Run `command node .agents/skills/create-task/references/wireframe-map.js detect --json` and branch on its `state`, as `references/wireframe-component-mapping.md` step 0 sets out:
+   - `configured`: follow the procedure (engine: `references/wireframe-map.js`) with the author present, exactly as `create-story` does: `ensure`, `resolve`, propose, ask about every open node, then write the component table under the wireframe and each confirmed answer into the map.
+   - `declined`: skip silently.
+   - `unset` or `partial`: ask the one setup question (Set up with these values (Recommended) / Adjust / Not now / Never for this repo), showing each proposed value and its evidence, and on `partial` the keys already set. On Set up or Adjust, run `configure` and continue as `configured`; on Never, run `configure --decline`; on Not now, skip. `skills-config.yaml`, when `configure` changed it, is a change to commit with the task.
 
 ### 3. Validation Before File Creation
 
@@ -789,6 +793,9 @@ Actions:
     Read `reason`. `ok` is success. Report any other value verbatim and continue: parking never
     blocks the document, and an entry left `open` is visible, not lost. Name each parked id in the
     completion message.
+2c. **Wireframe mapping writes** (only when 2.6 step 3 made them): name `skills-config.yaml` (the
+    `ui:` block `configure` wrote), the component catalogue and the wireframe map in the completion
+    message, each as a change to commit with the task.
 3. If `${PRD_ROOT}/sprint-status.yaml` exists, update it:
    - Load the full file, preserving all comments and structure
    - Find the entry matching this task's ID/key

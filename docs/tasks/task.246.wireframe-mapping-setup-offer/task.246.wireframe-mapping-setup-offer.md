@@ -5,10 +5,12 @@ type: task
 description: "When a wireframe is added and no ui: block exists, create-story and create-task detect the project's components and offer to set mapping up (or record a decline); resolve offers catalogue-derived candidates on an empty map; and the map rows people write by hand get a documented guide with the two limits a consumer found."
 tags: [wireframe, wireframe-map, create-story, create-task, consumer-onboarding]
 category: other
-status: planned
+status: accepted
 priority: High
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-30
+completed_date: 2026-10-30
+pr_number: 793
 assignee:
 estimated_effort_hours: 16
 github_issue: 792
@@ -16,7 +18,8 @@ github_issue: 792
 
 # Wireframe mapping setup offer and first-run candidates
 
-**Status:** Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.246.review.1.wireframe-mapping-setup-offer.md` implemented 2026-10-29
 **GitHub Issue**: [#792](https://github.com/Gamaroff/agent-skills/issues/792)
 
 ---
@@ -38,8 +41,9 @@ reference and the seeded map header, documenting the sibling-context and icon-gl
 
 **Key deliverables**
 
-1. `wireframe-map.js detect` (read-only) and `configure` (writes the `ui:` block or a decline), and
-   `reason: declined` from every command when `ui.wireframeMap` is `false` or `off`.
+1. `wireframe-map.js detect` (read-only) and `configure` (writes the `ui:` block or a decline, or
+   completes a `partial` block that lacks `wireframeMap`), and `reason: declined` from every command
+   when `ui.wireframeMap` is `false` or `off`.
 2. `create-story` 5.4.6 and `create-task` 2.6 offer setup when the engine reports `unset`, and stay
    silent when it reports `declined`.
 3. `resolve` returns catalogue-derived candidates, marked `source: catalogue`, for an open node no
@@ -131,7 +135,7 @@ flowchart TD
   A[create-story 5.4.6 / create-task 2.6:<br/>wireframe embedded] --> B[wireframe-map.js detect --json]
   B -->|configured| P[procedure: ensure, resolve,<br/>propose, ask, record]
   B -->|declined| S[skip silently]
-  B -->|unset| Q{AskUserQuestion:<br/>set up component mapping?}
+  B -->|unset or partial| Q{AskUserQuestion:<br/>set up component mapping?}
   Q -->|Set up with detected values| C[configure --barrel … --map …]
   Q -->|Adjust| C2[configure with the author's values]
   Q -->|Not now| S
@@ -144,12 +148,21 @@ flowchart TD
 - **`declined` state.** `readUiConfig` reads `ui.wireframeMap: false` (boolean) or `off` (any case)
   as a decline. `ensure`, `resolve` and `record` return `reason: declined`, exit 0, and write
   nothing. A decline is not `unset`: `unset` invites the offer, `declined` silences it.
+- **`partial` state.** `skills-config.yaml` has a top-level `ui:` key (by `/^ui\s*:/m` on the raw
+  text) but `ui.wireframeMap` is neither a path nor a decline: a project that wrote a catalogue but
+  never turned mapping on, or an empty `ui:`, which `readUiConfig` reads as `null`. Before this
+  review the plan read it as `unset`, so the offer fired, `configure` refused `exists`, and
+  re-running `detect` answered `unset` again: a loop (review 1, I1). `partial` is offered like
+  `unset`, but the proposal and the write cover only the missing keys.
 - **`detect`** (read-only, always exit 0 unless usage): reports `state` (`configured | declined |
-  unset`) and, when `unset`, a `proposal` with each value and the evidence for it:
+  partial | unset`). When `partial`, it adds `present` (the `ui` keys already set). When `unset` or
+  `partial`, it adds a `proposal` with each missing value and the evidence for it:
   - `componentBarrel`: the first candidate barrel that exports at least one component, from a fixed
     list (`src/components/index.{ts,tsx,js,jsx}`, `components/index.*`, `src/ui/index.*`) plus each
-    workspace package (`packages/*/src/index.*`, `libs/*/src/index.*`) ranked by its count of
-    component exports (`barrelExports`);
+    workspace package (`packages/*/src/index.*`, `libs/*/src/index.*`, one level only) ranked by
+    its count of component exports (`barrelExports`). `detect` reads nothing else outside `docs/`
+    (to depth 4) and the `package.json` / `tsconfig.json` files on the barrel's path; that bound is
+    what a test asserts, in place of a time limit;
   - `componentImport`: the `name` of the nearest `package.json` above the barrel when it is a
     workspace package, else a `tsconfig.json` `compilerOptions.paths` alias that resolves to the
     barrel, else `null` with the reason;
@@ -161,12 +174,20 @@ flowchart TD
 
   `reason: nothing-found` when no barrel qualifies; the skill then offers only Adjust, Not now and
   Never.
-- **`configure`** appends a `ui:` block to `skills-config.yaml` (creating the file when it is
-  missing), keeping the existing bytes and line ending. `--decline` writes `ui:` with
-  `wireframeMap: false`. It refuses with `reason: exists` (exit 1, nothing written) when the file
-  already has a top-level `ui:` key, whatever its value. It refuses a value holding a line
-  terminator. After writing it re-reads the file with `readUiConfig`. If the values do not read
-  back, it restores the original bytes and returns `reason: write-failed` (exit 1).
+- **`configure`** has two write paths, chosen by the file, never by a flag:
+  - **no `ui:` key**: append a `ui:` block to `skills-config.yaml` (creating the file when it is
+    missing), keeping the existing bytes and line ending;
+  - **`partial`**: insert only the keys the block lacks, after the block's last indented line, at
+    the indent of its first child (two spaces when it has none). Every byte outside the inserted
+    lines is kept. A key given that the block already holds with a different value, or a `ui:` with
+    a value on its own line (`ui: {…}`), is refused with `reason: exists`, naming the key.
+
+  `--decline` writes `wireframeMap: false` by whichever path applies. Either path refuses with
+  `reason: exists` (exit 1, nothing written) when `ui.wireframeMap` is already a path or a decline.
+  It refuses a value holding a line terminator. After writing it re-reads the file with
+  `readUiConfig`: every key that was present must read back unchanged and every key written must
+  read back as given. Otherwise it restores the original bytes and returns `reason: write-failed`
+  (exit 1).
 - **Catalogue candidates.** `catalogued` gains a sibling, `catalogueEntries`, that returns
   `{ name, text }` per row (`text` = the row's other cells, for a word match). For an open node,
   `resolve` returns near-miss candidates first, each now marked `source: "map"`. Then come up to
@@ -184,7 +205,16 @@ flowchart TD
 - **Authoring skills only.** Only `create-story` and `create-task` offer setup or call `configure`.
   The develop pipelines never do. Their Phase 0 must leave the tree clean
   (`wireframe-component-mapping.md:56`), and a `--defaults` run has nobody to ask. When they read
-  `unset` or `declined` they skip, as today.
+  `unset`, `partial` or `declined` they skip, as today.
+- **"Sets `ui.wireframeMap`" is defined once.** Twelve sites gate on those words, and after this
+  task `wireframeMap: off` is literally set but means off. They are found by
+  `grep -rn 'ui.wireframeMap\` is set\|sets \`ui.wireframeMap\`' shared/resources/*.md skills/*/SKILL.md | grep -v /references/`
+  (12 lines on 2026-10-29: develop-pipeline step 0, step 2 and step 3 ×2, `develop-story`,
+  `develop-task`, `create-story`, `create-task`, `review-story`, `review-task`, `qa-story`,
+  `qa-task`). They stay as written. The procedure's three-state paragraph defines the phrase as
+  "names a map path; `false` or `off` is a decline", and its reason line (`:43`) names `declined`
+  beside `unset` as a stop. Every site already routes through the procedure or `resolve`, so the
+  one definition reaches all twelve. The two create-* sites are rewritten anyway by Phase 3.
 - **The config write is a tracked change.** The authoring skill names `skills-config.yaml` in its
   completion message as a change to commit with the work item, beside the map and catalogue
   `ensure` creates.
@@ -202,18 +232,19 @@ flowchart TD
 
 ### In Scope
 
-- ✅ `wireframe-map.js`: the `declined` state, the `detect` and `configure` commands,
+- ✅ `wireframe-map.js`: the `declined` and `partial` states, the `detect` and `configure` commands,
   `catalogueEntries` and catalogue candidates in `resolve`, `source` on every candidate, and an
   updated `MAP_HEADER` with example rows.
 - ✅ `create-story` 5.4.6 step 3 and `create-task` 2.6 step 3: the setup offer. Both skills'
   **Allowed writes** lists gain the map, the catalogue and the `ui:` block in `skills-config.yaml`,
   each conditional on the mapping step.
-- ✅ `wireframe-component-mapping.md`: *Off unless configured* rewritten, the decline rule, step 4
-  naming catalogue candidates, and a new "Writing map rows by hand" section.
+- ✅ `wireframe-component-mapping.md`: *Off unless configured* rewritten with the definition of
+  "sets `ui.wireframeMap`", the reason line naming `declined`, step 4 naming catalogue candidates,
+  and a new "Writing map rows by hand" section.
 - ✅ `docs/reference/configuration.md` § "UI — wireframes and components": the setup offer, the
-  decline value, and a pointer to the guide.
-- ✅ Tests in `shared/resources/tests/wireframe-map.test.mjs`, `npm run bundle`, and a CHANGELOG
-  entry.
+  decline value, and a pointer to the guide; the key table's `ui.wireframeMap` row.
+- ✅ Tests in `shared/resources/tests/wireframe-map.test.mjs` and
+  `evals/shared/tests/wireframe-mapping-hooks.test.mjs`, `npm run bundle`, and a CHANGELOG entry.
 
 ### Out of Scope
 
@@ -257,15 +288,17 @@ flowchart TD
 **Risk**: Medium (writes `skills-config.yaml`)
 **Files**: `shared/resources/wireframe-map.js`, `shared/resources/tests/wireframe-map.test.mjs`
 
-- [ ] `readUiConfig` returns `{ declined: true }` for `wireframeMap: false` or `off` (any case);
+- [x] `readUiConfig` returns `{ declined: true }` for `wireframeMap: false` or `off` (any case);
       `ensure`, `resolve` and `record` return `reason: declined` and write nothing
-- [ ] `detect`: `state` plus, when `unset`, a `proposal` with evidence per field; `nothing-found`
-      when no barrel qualifies; read-only
-- [ ] `configure --barrel --import --catalogue --section --map [--exclude]` and
-      `configure --decline`: append the block, keep bytes and line ending, refuse `exists`, refuse
-      line terminators, read back and restore on `write-failed`
-- [ ] `USAGE`, `parseArgs`, `runCli` and `human()` cover both commands
-- [ ] Tests for each, mutation-proven
+- [x] `detect`: `state` (`configured | declined | partial | unset`) plus, when `unset` or
+      `partial`, a `proposal` with evidence per missing field, and `present` when `partial`;
+      `nothing-found` when no barrel qualifies; read-only
+- [x] `configure --barrel --import --catalogue --section --map [--exclude]` and
+      `configure --decline`: append the block, or insert the missing keys into a `partial` block;
+      keep bytes and line ending, refuse `exists` (a set or declined `wireframeMap`, a conflicting
+      key, a one-line `ui: {…}`), refuse line terminators, read back and restore on `write-failed`
+- [x] `USAGE`, `parseArgs`, `runCli` and `human()` cover both commands
+- [x] Tests for each, mutation-proven
 
 **Dependencies**: none
 
@@ -274,12 +307,12 @@ flowchart TD
 **Risk**: Low
 **Files**: `shared/resources/wireframe-map.js`, `shared/resources/tests/wireframe-map.test.mjs`
 
-- [ ] `catalogueEntries(text, heading)` returns `{ name, text }` per row; `catalogued` keeps its
+- [x] `catalogueEntries(text, heading)` returns `{ name, text }` per row; `catalogued` keeps its
       contract
-- [ ] Near-miss candidates gain `source: "map"`
-- [ ] `resolve` appends up to five catalogue candidates (`source: "catalogue"`, `basis`) not already
+- [x] Near-miss candidates gain `source: "map"`
+- [x] `resolve` appends up to five catalogue candidates (`source: "catalogue"`, `basis`) not already
       listed, only when `catalogueState` is `ok`
-- [ ] Tests for each, mutation-proven
+- [x] Tests for each, mutation-proven
 
 **Dependencies**: none (independent of Phase 1)
 
@@ -287,16 +320,23 @@ flowchart TD
 
 **Risk**: Medium (prose that drives a write)
 **Files**: `skills/create-story/SKILL.md`, `skills/create-task/SKILL.md`,
-`shared/resources/wireframe-component-mapping.md`
+`shared/resources/wireframe-component-mapping.md`, `evals/shared/tests/wireframe-mapping-hooks.test.mjs`
 
-- [ ] `create-story` 5.4.6 step 3 and `create-task` 2.6 step 3 run `detect --json` and branch on
-      `state`. `configured` runs the procedure. `declined` skips silently. `unset` asks one
-      `AskUserQuestion` (Set up with detected values (Recommended), Adjust, Not now, Never for this
-      repo), then runs `configure` and continues into the procedure, or skips
-- [ ] Both **Allowed writes** lists name the map, the catalogue and the `ui:` block, conditional on
+- [x] `create-story` 5.4.6 step 3 and `create-task` 2.6 step 3 run `detect --json` and branch on
+      `state`. `configured` runs the procedure. `declined` skips silently. `unset` and `partial` ask
+      one `AskUserQuestion` (Set up with detected values (Recommended), Adjust, Not now, Never for
+      this repo), then run `configure` and continue into the procedure, or skip. On `partial` the
+      question shows the keys present and proposes only the missing ones
+- [x] Both **Allowed writes** lists name the map, the catalogue and the `ui:` block, conditional on
       the mapping step; the completion message names each as a change to commit
-- [ ] The procedure's *Off unless configured* paragraph states the three states and who may offer
-      setup
+- [x] The procedure's *Off unless configured* paragraph states the four states, who may offer
+      setup, and what "sets `ui.wireframeMap`" means (a map path; `false` or `off` is a decline);
+      its reason line (`:43`) names `declined` beside `unset` as a stop
+- [x] `evals/shared/tests/wireframe-mapping-hooks.test.mjs`: "the hooks are off unless
+      ui.wireframeMap is set" keeps its assertion for the six other skills and asserts instead that
+      create-story and create-task step 3 run `detect --json` and name `configured`, `declined`,
+      `partial` and `unset`; a new test asserts the procedure's reason line names `declined`; the
+      develop-pipeline grep criterion in § 9 becomes a test here
 
 **Dependencies**: Phase 1
 
@@ -306,14 +346,19 @@ flowchart TD
 **Files**: `shared/resources/wireframe-component-mapping.md`, `docs/reference/configuration.md`,
 `shared/resources/wireframe-map.js` (`MAP_HEADER`)
 
-- [ ] Procedure step 4 names catalogue candidates and their `basis`
-- [ ] New section "Writing map rows by hand", with worked example rows: a variant row, a
+- [x] Procedure step 4 names catalogue candidates and their `basis`
+- [x] New section "Writing map rows by hand", with worked example rows: a variant row, a
       label-pattern row, an icon row and a `(layout)` row. It covers how specific a signature
       should be, the sibling-context limit and its label-pattern workaround, and the icon-glyph
       rule (record the component, read the icon name from the design source)
-- [ ] `configuration.md` § "UI — wireframes and components": the setup offer, `wireframeMap: false`,
-      and a pointer to the guide
-- [ ] `MAP_HEADER` gains two example rows and one line pointing at the procedure's guide
+- [x] The guide says a catalogue candidate's `basis: name` is a hint, not a role: `text` matches
+      `TextField` by segment
+- [x] `configuration.md` § "UI — wireframes and components": the setup offer, `wireframeMap: false`,
+      and a pointer to the guide. The key table's `ui.wireframeMap` row (`:335`, "Setting it turns
+      the feature on") gains `false` / `off` as a decline
+- [x] `MAP_HEADER` gains two example rows and one line pointing at the guide by the path a consumer
+      has (`.agents/skills/create-story/references/wireframe-component-mapping.md`), never a
+      `shared/resources/` literal, which the bundler rewrites in `.js` files
 
 **Dependencies**: Phase 2 (step 4 describes its output)
 
@@ -321,10 +366,10 @@ flowchart TD
 
 **Risk**: Low
 
-- [ ] `npm run bundle`, then `npm run bundle:check` clean
-- [ ] CHANGELOG `[Unreleased]`: Added (setup offer, catalogue candidates) and Changed
+- [x] `npm run bundle`, then `npm run bundle:check` clean
+- [x] CHANGELOG `[Unreleased]`: Added (setup offer, catalogue candidates) and Changed
       (`wireframeMap: false|off` means declined)
-- [ ] `npm run ci:fast` green; doc links checked on every changed `.md`
+- [x] `npm run ci:fast` green; doc links checked on every changed `.md`
 
 **Dependencies**: Phases 1–4
 
@@ -343,6 +388,13 @@ flowchart TD
 
 4. ✅ `shared/resources/tests/wireframe-map.test.mjs`: 29 tests today
    (`grep -c 'test(' shared/resources/tests/wireframe-map.test.mjs`)
+5. ✅ `evals/shared/tests/wireframe-mapping-hooks.test.mjs`: its "the hooks are off unless
+   ui.wireframeMap is set" test asserts every hooked `SKILL.md` mentions `ui.wireframeMap`, which
+   the create-* rewrite changes (found by `git grep -n 'ui.wireframeMap' -- '*.test.*'`). Already
+   reached by the runner: it is under `evals/shared/tests/`, whose glob `npm run test:suite` lists (`package.json:27`).
+5a. ✅ `tests/skill-protocol.test.js` (found by `ci:fast`, not planned): its create-story HALT test
+   compared first occurrences, and the new Allowed writes line moved the first `skills-config.yaml`
+   mention. Anchored on the config-load step.
 
 ### Files to Modify (Dependencies)
 
@@ -350,10 +402,10 @@ None. No `package.json` change.
 
 ### Files to Modify (Documentation)
 
-5. ✅ `shared/resources/wireframe-component-mapping.md`
-6. ✅ `docs/reference/configuration.md`
-7. ✅ `CHANGELOG.md`
-8. ✅ Generated: `skills/{create-story,create-task,develop-story,develop-task,review-story,review-task,qa-story,qa-task}/references/wireframe-map.js`
+6. ✅ `shared/resources/wireframe-component-mapping.md`
+7. ✅ `docs/reference/configuration.md`
+8. ✅ `CHANGELOG.md`
+9. ✅ Generated: `skills/{create-story,create-task,develop-story,develop-task,review-story,review-task,qa-story,qa-task}/references/wireframe-map.js`
    and the procedure's bundled copies, refreshed by `npm run bundle` and never edited by hand.
    The skill list comes from `grep -l 'wireframe-map.js' skills/*/SKILL.md`.
 
@@ -379,23 +431,39 @@ None.
     - an existing catalogue table matching three or more exports is proposed with its heading;
     - an empty project returns `nothing-found`;
     - a configured project returns `state: configured`, and a declined one `declined`;
-    - **`detect` writes nothing**: snapshot the tree before and after.
+    - a `ui:` block holding only `componentCatalogue`, and an empty `ui:`, return `state: partial`
+      with `present` and a proposal for the missing keys only;
+    - **`detect` writes nothing**: snapshot the tree before and after;
+    - **`detect` reads only its bounded set**: a barrel at `packages/a/b/src/index.ts` (two levels)
+      and a catalogue at `docs/a/b/c/d/e/x.md` (depth 5) are not found.
   - `configure`:
     - appends to an existing file and keeps its bytes;
     - keeps CRLF;
     - creates a missing file;
-    - refuses `exists` on a file with any top-level `ui:`;
+    - refuses `exists` when `wireframeMap` is a path or a decline, when a given key conflicts with
+      one present, and on a one-line `ui: {…}`;
+    - on a `partial` block (`componentCatalogue` only, then an empty `ui:`, then a `ui:` followed by
+      another top-level key), inserts the missing keys inside the block, keeps every other byte,
+      and the result reads back as `configured`; the other top-level key stays outside `ui`;
     - refuses a newline in a value;
-    - `--decline` round-trips to `declined`;
-    - **read-back failure restores the original bytes**: force a mismatch with a value
-      yaml-subset reads differently.
+    - `--decline` round-trips to `declined`, from no block and from a `partial` one;
+    - **read-back failure restores the original bytes**: force a mismatch with a value holding a
+      backslash, which yaml-subset does not unescape (`"a\\b"` reads back as `a\\b`, checked
+      2026-10-29).
   - candidates:
     - an empty map with a catalogue holding `Button`, `IconButton` and `Card` gives a `button`
       node `Button` and `IconButton` (`basis: name`), not `Card`;
     - a purpose cell naming "button" gives `basis: purpose`;
     - at most five catalogue candidates;
     - near-miss candidates come first and are not duplicated;
+    - **near-miss output is unchanged**: the existing near-miss fixture's candidates, with `source`
+      removed, deep-equal the `{component, variant, from}` list `nearMisses` returns today;
     - `catalogueState: no-section` gives no catalogue candidates.
+  - skill and procedure text, in `evals/shared/tests/wireframe-mapping-hooks.test.mjs`:
+    - create-story and create-task step 3 run `detect --json` and name the four states;
+    - the six other hooked skills still gate on `ui.wireframeMap`;
+    - the procedure's reason line names `declined` as a stop;
+    - no develop-pipeline file calls `detect` or `configure`.
 
 ### Integration Tests
 
@@ -408,8 +476,8 @@ None.
 
 ### Performance Tests
 
-Not applicable. `detect` walks at most the fixed barrel list plus the workspace packages' entry
-files.
+No timing test. The bound is on what `detect` reads (the "reads only its bounded set" unit test
+above), which a per-PR test can assert and a wall-clock figure cannot.
 
 ### Consumer Tests
 
@@ -431,41 +499,51 @@ the primitive in the middle of a segment (`Rebutton`), which must not match `but
 
 ### Functional
 
-- [ ] `resolve`, `ensure` and `record` return `reason: declined` and write nothing when
+- [x] `resolve`, `ensure` and `record` return `reason: declined` and write nothing when
       `ui.wireframeMap` is `false` or `off` (Phase 1 states the branch)
-- [ ] `detect` on a project with no `ui:` block and a `src/components/index.ts` exporting
+- [x] `detect` on a project with no `ui:` block and a `src/components/index.ts` exporting
       components returns `state: unset` and a `proposal` naming that barrel (Phase 1)
-- [ ] `detect` writes no file in any state
-- [ ] `configure` appends a `ui:` block that `readUiConfig` reads back with the given values, and
+- [x] `detect` writes no file in any state
+- [x] `configure` appends a `ui:` block that `readUiConfig` reads back with the given values, and
       refuses with `reason: exists` when a `ui:` key is present (Phase 1)
-- [ ] `configure --decline` leaves a config for which `detect` returns `state: declined`
-- [ ] On an empty map with `catalogueState: ok`, an open `button` node's candidates include each
+- [x] `configure --decline` leaves a config for which `detect` returns `state: declined`
+- [x] On a `ui:` block without `wireframeMap` (catalogue only, or empty), `detect` returns
+      `state: partial`, and `configure` inserts only the missing keys inside the block, keeping
+      every other byte, so that `detect` then returns `state: configured` (Phase 1; unit tests in
+      § 8)
+- [x] On an empty map with `catalogueState: ok`, an open `button` node's candidates include each
       catalogued name with a `Button` segment, each with `source: catalogue` (Phase 2)
-- [ ] `create-story` 5.4.6 and `create-task` 2.6 offer setup on `unset`, skip on `declined`, and run
-      the procedure on `configured`; neither offers setup when no wireframe was added
-- [ ] No develop pipeline step calls `detect` or `configure`:
-      `grep -n 'wireframe-map.js \(detect\|configure\)' skills/develop-*/SKILL.md shared/resources/develop-pipeline-*.md`
-      returns nothing
+- [x] `resolve`'s candidates for a node with near-miss rows, with `source` removed, deep-equal
+      today's `{component, variant, from}` list (Phase 2; the "near-miss output is unchanged" test)
+- [x] `skills/create-story/SKILL.md` 5.4.6 step 3 and `skills/create-task/SKILL.md` 2.6 step 3 say
+      they run `detect --json`, offer setup on `unset` and `partial`, skip on `declined`, and run the
+      procedure on `configured`, all inside the step that runs only when a wireframe was added; held
+      by `wireframe-mapping-hooks.test.mjs`
+- [x] `wireframe-component-mapping.md` defines "sets `ui.wireframeMap`" as a map path, and its
+      reason line names `declined` beside `unset` as a stop; held by
+      `wireframe-mapping-hooks.test.mjs`
+- [x] No develop pipeline step calls `detect` or `configure`; held by a
+      `wireframe-mapping-hooks.test.mjs` test over `skills/develop-*/SKILL.md` and
+      `shared/resources/develop-pipeline-*.md`, mutation-proven by adding one such call
 
 ### Performance
 
-- [ ] `detect` completes in under one second on this repository and on a fixture with five
-      workspace packages
-- [ ] `resolve`'s output for a node with near-miss rows is unchanged apart from the added
-      `source: map`
+- [x] `detect` reads only the fixed barrel list, one level of `packages/*` and `libs/*`, `docs/` to
+      depth 4, and the `package.json` / `tsconfig.json` files on the barrel's path; held by the
+      "reads only its bounded set" unit test
 
 ### Code Quality
 
-- [ ] Every new branch has a test, and each fix is mutation-proven (revert it, see its test go red)
-- [ ] `npm run ci:fast` green; `npm run bundle:check` clean; `prettier --check` on changed files
-- [ ] `npm run validate -- skills/create-story/` and `npm run validate -- skills/create-task/` pass
+- [x] Every new branch has a test, and each fix is mutation-proven (revert it, see its test go red)
+- [x] `npm run ci:fast` green; `npm run bundle:check` clean; `prettier --check` on changed files
+- [x] `npm run validate -- skills/create-story/` and `npm run validate -- skills/create-task/` pass
 
 ### Migration
 
-- [ ] CHANGELOG `[Unreleased]` names the setup offer, catalogue candidates and the new meaning of
+- [x] CHANGELOG `[Unreleased]` names the setup offer, catalogue candidates and the new meaning of
       `wireframeMap: false|off`
-- [ ] `configuration.md` documents the decline value and the offer
-- [ ] The procedure's "Writing map rows by hand" section exists and is linked from the map header
+- [x] `configuration.md` documents the decline value and the offer
+- [x] The procedure's "Writing map rows by hand" section exists and is linked from the map header
 
 ---
 
@@ -479,6 +557,14 @@ the primitive in the middle of a segment (`Rebutton`), which must not match `but
      through the same reader every skill uses; restore the original bytes on mismatch. Tests cover
      CRLF, a missing file and the restore path.
    - **Rollback**: `git checkout -- skills-config.yaml` in the consumer.
+2. **`configure` inserts into a `partial` block at the wrong place**
+   - **Probability**: Medium (the only write inside existing YAML). **Impact**: High (a key that
+     lands under the next top-level key changes that key, not `ui`).
+   - **Mitigation**: insert after the block's last indented line, never elsewhere; refuse a
+     one-line `ui: {…}`; the read-back checks every pre-existing `ui` key is unchanged and every
+     written key reads back; a test puts another top-level key straight after `ui:` and asserts it
+     is untouched; any mismatch restores the original bytes.
+   - **Rollback**: as above.
 
 ### Medium Risk Areas
 
@@ -507,7 +593,8 @@ the primitive in the middle of a segment (`Rebutton`), which must not match `but
 - **Triggers**: a consumer's `skills-config.yaml` is damaged by `configure`, or `detect` writes a
   file.
 - **Steps**: revert the merge commit on `develop`, run `npm run bundle`, release a patch.
-- **Validation**: `wireframe-map.test.mjs` back to its 29 tests and green; `bundle:check` clean.
+- **Validation**: `wireframe-map.test.mjs` back to its 29 tests and green,
+  `wireframe-mapping-hooks.test.mjs` green; `bundle:check` clean.
 
 ### Partial Rollback (1-2 hours)
 
@@ -528,12 +615,115 @@ the primitive in the middle of a segment (`Rebutton`), which must not match `but
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-30
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.246.qa.5.wireframe-mapping-setup-offer.md](./task.246.qa.5.wireframe-mapping-setup-offer.md)
+- **Gate File**: [task.246.gate.5.wireframe-mapping-setup-offer.yml](./task.246.gate.5.wireframe-mapping-setup-offer.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 86 (changed suites); `ci:fast` 6890, 0 failed
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+This is the QA re-entry after finalise DoD run 1. The three test-only gap fixes (#11, #12, #13) hold,
+and each was mutation-proven again. One advisory finding (CR5-1) is carried to future work: skill-local
+develop step docs are outside the hooks test, which matches the criterion as written.
+
+## Deferred Work
+
+- **TASK-246-CR4-1** (LOW) — carried to gate 4 `recommendations.future` (route 2b, cycle 4): when a
+  removed list ends the file without a newline and holds a blank line, `configure` deletes the blank
+  line and adds a final newline; strip from the last non-blank retained piece.
+- **TASK-246-CR5-1** (advisory, medium/medium): carried to gate 5 `recommendations.future`. The "no
+  develop pipeline step calls detect or configure" test reads `skills/develop-*/SKILL.md` and
+  `shared/resources/develop-pipeline-*.md`, as the criterion names, but not the skill-local step docs
+  (`skills/develop-bug/references/develop-bug-step-*.md`). Widen the test and amend the criterion.
+
+## Definition of Done - Gaps Identified — run 1 (historical, superseded by run 2)
+
+**Status:** IN PROGRESS at run 1. Superseded: the three gaps were fixed in `ff3fb83c`, re-gated in QA cycle 5, and accepted in DoD run 2 (below).
+
+### QA Gate Status
+
+**QA Report**: `task.246.qa.4.wireframe-mapping-setup-offer.md`
+**Gate File**: `task.246.gate.4.wireframe-mapping-setup-offer.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+### Missing Criteria:
+
+- [ ] #11: the `wireframe-mapping-hooks.test.mjs` test "no develop pipeline step calls detect or configure" checks develop-story, develop-task and develop-bug only. `skills/develop-next/SKILL.md` and `skills/develop-batch/SKILL.md`, which the criterion's `skills/develop-*/SKILL.md` covers, are unchecked.
+- [ ] #12: no test holds the `libs/*` workspace bound of `detect` (`WORKSPACES`, `wireframe-map.js:1013`). Removing `libs`, or letting it go two levels deep, turns nothing red.
+- [ ] #13: the cycle-3 fill-before-insert order fix has a test but no mutation proof (implementation report, QA Cycle 3).
+
+### Next Steps:
+
+- [x] Make the hooks test enumerate `skills/develop-*/SKILL.md` instead of a fixed list.
+- [x] Add a `libs/a/src/index.ts` (found) and `libs/a/b/src/index.ts` (not found) case to the bounded-set test, and mutation-prove it.
+- [x] Mutation-prove the fill-before-insert order (swap the order, see the last-line test go red), and record it.
+
+Each fix is recorded with its mutation proof under § Testing Results. The gaps re-enter QA before `/finalise` runs again.
+
+**Estimated Effort:** Small (test-only; under an hour)
+
+**Gap Report Generated:** 2026-10-30
+**QA Gate Reference**: See `task.246.gate.4.wireframe-mapping-setup-offer.yml` for full details
+
+**Detailed Verification Log:** See `task.246.dod.1.wireframe-mapping-setup-offer.md` for the complete verification evidence.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.246.qa.5.wireframe-mapping-setup-offer.md`
+**Gate File**: `task.246.gate.5.wireframe-mapping-setup-offer.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+Every Definition of Done criterion was verified in DoD run 2:
+
+✅ **Acceptance Criteria:** 18 of 18 met. 14 were re-judged and 4 carried from run 1. The three run-1 gaps (#11, #12, #13) are closed by committed, mutation-proven tests.
+✅ **Tests & PR:** PR #793. The Step 5c PR review 2 is APPROVE. CI is SUCCESS on `93ebdb87` across 6 checks.
+✅ **Documentation:** The configuration reference, the mapping procedure (with its "Writing map rows by hand" guide), both authoring SKILL.md files, and four CHANGELOG `[Unreleased]` entries.
+✅ **Security Review:** The checklist passes. The boundary probe executed 146 cases against four controls in `wireframe-map.js`: 0 reproduced, 0 escaped.
+⚠️ **Compliance Review:** Not applicable. This is developer tooling with no personal data, payments, end-user UI or health data.
+
+**Carried to future work:** TASK-246-CR5-1, TASK-246-CR4-1 and map-path containment (gate 5 `recommendations.future`).
+
+**Task marked as ACCEPTED on:** 2026-10-30
+
+**Detailed Verification Log:** See `task.246.dod.2.wireframe-mapping-setup-offer.md` for the complete verification evidence.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-29 | 1.0     | Initial draft, from the rebirth-wallet confirmation of v0.62.0 | create-task |
+| 2026-10-29 | 1.1     | Review 1 (7/10 → 9/10): added the `partial` state (a `ui:` block without `wireframeMap` looped); defined "sets `ui.wireframeMap`" once for its 12 gate sites; listed `wireframe-mapping-hooks.test.mjs`; held the offer, near-miss and bounded-read criteria with tests | review-task |
+| 2026-10-29 |         | Status → ready-for-development | review-task |
+| 2026-10-30 |         | Implemented — 9 source files (+16 bundled copies), 25 new tests; status → ready-for-review | develop |
+| 2026-10-30 |         | QA gate CONCERNS (80/100) — 5 findings | qa-task |
+| 2026-10-30 |         | QA findings fixed — cycle 1: 2 bugs and 3 low findings, plus advisory CR-3 and CR-4; 4 new tests | qa-fix |
+| 2026-10-30 |         | QA gate CONCERNS (70/100) — 6 findings | qa-task |
+| 2026-10-30 |         | QA findings fixed — cycle 2: 3 bugs and 3 low findings, plus a quoted `ui:` key; 6 new tests | qa-fix |
+| 2026-10-30 |         | QA gate CONCERNS (90/100) — 2 findings | qa-task |
+| 2026-10-30 |         | QA findings fixed — cycle 3: 1 bug and 1 low finding; 1 new test | qa-fix |
+| 2026-10-30 |         | QA gate PASS (100/100) — 1 low finding, carried to future work | qa-task |
+| 2026-10-30 |  | DoD incomplete — 3 gaps identified | finalise |
+| 2026-10-30 |  | DoD gaps fixed — 3 test-only fixes (#11, #12, #13), each mutation-proven | develop |
+| 2026-10-30 |  | QA gate PASS (100/100) — 0 gated findings, 1 advisory carried to future work | qa-task |
+| 2026-10-30 | 1.2 | DoD passed — accepted (PR #793) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -541,26 +731,99 @@ the primitive in the middle of a segment (`Rebutton`), which must not match `but
 ## Progress Tracking
 
 ### Phase 1: Engine: the decline state, `detect` and `configure`
-- [ ] Decline state
-- [ ] `detect`
-- [ ] `configure`
+- [x] Decline state
+- [x] `partial` state
+- [x] `detect`
+- [x] `configure`
 
 ### Phase 2: Engine: catalogue-derived candidates
-- [ ] `catalogueEntries`
-- [ ] Candidates in `resolve`
+- [x] `catalogueEntries`
+- [x] Candidates in `resolve`
 
 ### Phase 3: Skills: the setup offer
-- [ ] `create-story` 5.4.6
-- [ ] `create-task` 2.6
-- [ ] Procedure
+- [x] `create-story` 5.4.6
+- [x] `create-task` 2.6
+- [x] Procedure
+- [x] `wireframe-mapping-hooks.test.mjs`
 
 ### Phase 4: Documentation: writing map rows by hand
-- [ ] Procedure guide
-- [ ] `configuration.md`
-- [ ] `MAP_HEADER`
+- [x] Procedure guide
+- [x] `configuration.md`
+- [x] `MAP_HEADER`
 
 ### Phase 5: Bundle, changelog and verification
-- [ ] Bundle, CHANGELOG, `ci:fast`
+- [x] Bundle, CHANGELOG, `ci:fast`
+
+---
+
+## Implementation Record
+
+**Completion Date**: 2026-10-30
+
+### Implementation Summary
+
+`wireframe-map.js` gains the `declined` state (`wireframeMap: false` or `off`, any case), the
+`partial` state, and two commands. `detect` is read-only and reports `configured | declined |
+partial | unset` with a proposal and its evidence. `configure` appends a `ui:` block or inserts the
+keys a partial one lacks, reads the file back and restores it on a mismatch. `resolve` now adds up
+to five catalogue candidates (`source: catalogue`, `basis: name | purpose`) after the near-miss rows
+(`source: map`). `create-story` 5.4.6 and `create-task` 2.6 step 3 run `detect` and offer setup.
+The procedure gains step 0, the four-state definition of "sets `ui.wireframeMap`", and a "Writing
+map rows by hand" section. `configuration.md`, `MAP_HEADER` and the CHANGELOG document the change.
+
+### Implementation Approach
+
+1. **Phase 1**: `readUiConfig` returns `{ declined: true }` before any key is read; `ensure`,
+   `resolve` and `record` check it before their `unset` checks. `detect` reads only the fixed
+   barrel list, one level of `packages/*` and `libs/*`, `docs/` to depth 4 (skipping `tasks`, `prd`
+   and `bugs`), and the `package.json` / `tsconfig.json` files on the barrel's path. `configure`
+   splits the file after each newline, so the pieces join back to the same bytes, and inserts one
+   piece. The read-back compares every other top-level key, every `ui` key that was there, and every
+   written key.
+2. **Phase 2**: `catalogueEntries` returns `{ name, text }`, and `catalogued` is now a map over it.
+   `catalogueCandidates` matches a PascalCase segment first, then a whole word in the other cells.
+3. **Phase 3**: both skills' step 3, Allowed writes (and the Forbidden line it contradicted) and
+   completion summary. The hooks test splits its gate assertion and adds three tests.
+4. **Phase 4**: the guide, `configuration.md` (row and section), and `MAP_HEADER`.
+5. **Two deviations from the plan, both found by tests.** `findCatalogue` counts only the rows
+   directly under a heading: counting a heading's whole section proposed a page's `# Title` over the
+   heading above the table. `configure` needs `--map`, and `--barrel` only when the block has no
+   `componentBarrel`: a partial block's proposal omits the keys it has, so requiring `--barrel`
+   would make the skill repeat a value the block already holds.
+
+### Testing Results
+
+- `command node --test shared/resources/tests/wireframe-map.test.mjs`: 51/51 pass (29 before).
+- `command node --test evals/shared/tests/wireframe-mapping-hooks.test.mjs`: 24/24 pass.
+- Mutation proofs on scratch copies of the engine, never the repository file: all 10 killed:
+  the resolve decline guard, a write in `detect`, the `exists` check (it **survived** first, because
+  the key-conflict check covered every case with a different value; the same-value case was added
+  and it is now killed), the restore, insert-at-end-of-file, a second `packages/` level, docs depth
+  5, segment → substring (`Rechip`), the five-candidate cap, and an enclosing heading.
+- Hooks mutation 4c: a `wireframe-map.js detect` line added to `develop-pipeline-step-0` turned
+  "no develop pipeline step calls detect or configure" red, naming the file and line. Restored.
+- DoD run 1 gap fixes, each mutation-proven by snapshot, mutate and restore with `cp`:
+  - **#11**: the hooks test now enumerates every `skills/develop-*/SKILL.md`, all five of them.
+    A `wireframe-map.js detect` line added to `skills/develop-next/SKILL.md` turns "no develop
+    pipeline step calls detect or configure" red. The old fixed list never read that file.
+  - **#12**: the bounded-set test now carries a `libs/` pair: `libs/a/src/index.ts` is found and
+    `libs/a/b/src/index.ts` is not. `WORKSPACES = ["packages"]` turns it red.
+  - **#13**: running the insert of missing keys before the blank-key fill (the pre-cycle-3 order)
+    turns "configure removes the list under a blank key past blank lines and comments, and keeps
+    them" red.
+- `npm run ci:fast` with `.agents/skills` and `.claude/skills` moved aside, first run: 6879 tests,
+  1 fail. `tests/skill-protocol.test.js` "create-story — HALTs when skills-config.yaml missing"
+  compared the file's *first* `HALT` with its *first* `skills-config.yaml`, and the new Allowed
+  writes line is now that first mention. The test is anchored on the config-load step instead.
+  Mutation-proven: removing that step's `**HALT**` turns it red; restored.
+- `npm run bundle:check` clean; `npm run validate` passes for create-story and create-task; doc
+  links ok on every changed `.md` (the `configuration.md` anchor resolves once the procedure is
+  staged, because the checker reads the index).
+
+### Deferred Work
+
+- The consumer test in § 8 (re-run the `rebirth-wallet` confirmation with the `ui:` block removed)
+  is manual and runs after release.
 
 ---
 
@@ -581,7 +844,7 @@ the primitive in the middle of a segment (`Rebutton`), which must not match `but
 ### Important Reminders
 
 - `configure` is the only writer of `skills-config.yaml` this repository's skills have. Keep it
-  append-only and read-back-verified.
+  append-or-insert-missing-keys only, never rewriting a key, and read-back-verified.
 - Edit `shared/resources/` sources, never the bundled `references/` copies.
 - The develop pipelines must not gain the offer. The success criterion's grep holds that.
 

@@ -1,0 +1,32 @@
+{
+  "sink": null,
+  "entry": "cli:shared/resources/wireframe-map.js",
+  "name": "configure --map value guard",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 20,
+  "passed": 20,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": [
+    "configure",
+    "--barrel",
+    "src/c/index.ts",
+    "--map",
+    "{input}",
+    "--root",
+    "{fixture}",
+    "--json"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-30T03:56:38.067Z"
+}

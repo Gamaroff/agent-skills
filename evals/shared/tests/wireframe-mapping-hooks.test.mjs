@@ -50,8 +50,11 @@ for (const [skill, phrase] of HOOKS) {
   });
 }
 
+// The authoring skills offer setup instead of skipping (task.246); the others still gate on the key.
+const AUTHORING = ["create-story", "create-task"];
+
 test("the hooks are off unless ui.wireframeMap is set", () => {
-  for (const [skill] of HOOKS) {
+  for (const [skill] of HOOKS.filter(([s]) => !AUTHORING.includes(s))) {
     const body = read(`skills/${skill}/SKILL.md`);
     assert.match(
       body,
@@ -59,6 +62,107 @@ test("the hooks are off unless ui.wireframeMap is set", () => {
       `${skill} does not gate on ui.wireframeMap`,
     );
   }
+});
+
+test("create-story and create-task step 3 run detect and branch on its four states", () => {
+  const sections = {
+    "create-story": "### 5.4.6 Check for UI/Wireframe Opportunity",
+    "create-task": "### 2.6 Check for UI/Wireframe Opportunity",
+  };
+  for (const skill of AUTHORING) {
+    const body = read(`skills/${skill}/SKILL.md`);
+    // The step, inside the section that runs only when a wireframe was added.
+    const start = body.indexOf(sections[skill]);
+    assert.ok(start >= 0, `${skill} lost its wireframe section`);
+    const end = body.indexOf("\n#", start + 1);
+    const section = body.slice(start, end === -1 ? body.length : end);
+    const step = section.slice(
+      section.indexOf("Link the wireframe's nodes to components"),
+    );
+    assert.ok(step.length > 40, `${skill}: step 3 is not in its section`);
+    assert.ok(
+      step.includes(
+        `command node .agents/skills/${skill}/references/wireframe-map.js detect --json`,
+      ),
+      `${skill} step 3 does not run detect --json`,
+    );
+    for (const state of ["configured", "declined", "partial", "unset"])
+      assert.match(step, new RegExp(`\`${state}\``), `${skill}: ${state}`);
+    assert.match(step, /configure --decline/, skill);
+    assert.match(step, /Never for this repo/, skill);
+    // Allowed writes names the config the offer writes.
+    assert.match(
+      body,
+      /✅ \*\(only in the wireframe mapping step[^\n]*`skills-config\.yaml`/,
+      `${skill}: Allowed writes does not name skills-config.yaml`,
+    );
+  }
+});
+
+test("the procedure defines 'sets ui.wireframeMap' once, and its reason line stops on declined", () => {
+  const proc = read("shared/resources/wireframe-component-mapping.md");
+  assert.match(
+    proc,
+    /That phrase, wherever a skill gates on it, means one thing: `wireframeMap` names a map path\.\n`false` or `off` \(any case\) is a decline/,
+  );
+  assert.match(
+    proc,
+    /^Read `reason` from every call\. `unset` and `declined` mean the feature is off: stop here\./m,
+  );
+  assert.match(proc, /^### 0\. Set up \(authoring skills only\)$/m);
+});
+
+// The develop pipelines must never offer setup: their Phase 0 leaves the tree clean, and a
+// --defaults run has nobody to ask (task.246). A grep criterion, held as a test.
+const developSetupCalls = (files) =>
+  files.flatMap(([rel, text]) =>
+    text
+      .split("\n")
+      .map((line, i) => [rel, i + 1, line])
+      .filter(([, , line]) =>
+        /wireframe-map\.js\s+(detect|configure)\b/.test(line),
+      ),
+  );
+
+test("no develop pipeline step calls detect or configure", () => {
+  // Every skills/develop-*/SKILL.md, enumerated, so a new develop skill is held too.
+  const developSkills = readdirSync(join(ROOT, "skills"))
+    .filter(
+      (s) =>
+        /^develop-/.test(s) && existsSync(join(ROOT, "skills", s, "SKILL.md")),
+    )
+    .sort();
+  assert.ok(
+    [
+      "develop-batch",
+      "develop-bug",
+      "develop-next",
+      "develop-story",
+      "develop-task",
+    ].every((s) => developSkills.includes(s)),
+    `every develop skill was found: ${developSkills.join(", ")}`,
+  );
+  const files = [
+    ...developSkills.map((s) => [
+      `skills/${s}/SKILL.md`,
+      read(`skills/${s}/SKILL.md`),
+    ]),
+    ...readdirSync(join(ROOT, "shared/resources"))
+      .filter((f) => /^develop-pipeline-.*\.md$/.test(f))
+      .map((f) => [`shared/resources/${f}`, read(`shared/resources/${f}`)]),
+  ];
+  assert.ok(files.length > 8, "the develop pipeline docs were found");
+  assert.deepEqual(developSetupCalls(files), []);
+  // Calibration: the probe catches the call it exists to catch.
+  assert.equal(
+    developSetupCalls([
+      [
+        "probe.md",
+        "command node .agents/skills/develop-task/references/wireframe-map.js detect --json",
+      ],
+    ]).length,
+    1,
+  );
 });
 
 test("develop Phase 0 resolves in 0c-wire and asks in 0d", () => {
@@ -431,8 +535,13 @@ test("an unattended assumption is flagged, never recorded as confirmed", () => {
 test("the configuration reference documents every ui key the engine reads", () => {
   const doc = read("docs/reference/configuration.md");
   const engine = read("shared/resources/wireframe-map.js");
-  const keys = [...engine.matchAll(/\bui\.(\w+)/g)].map((m) => m[1]);
+  // `ui.declined` is the state readUiConfig returns for `wireframeMap: false`, not a key a config
+  // author writes; the decline itself is documented under `ui.wireframeMap` (task.246).
+  const keys = [...engine.matchAll(/\bui\.(\w+)/g)]
+    .map((m) => m[1])
+    .filter((k) => k !== "declined");
   assert.ok(keys.length >= 6, "engine names its ui keys");
+  assert.ok(keys.includes("wireframeMap"));
   for (const key of new Set(keys))
     assert.ok(
       doc.includes(`\`ui.${key}\``),
