@@ -440,21 +440,21 @@ moved aside first so bundled copies are what runs.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-30
-**Quality Score**: 80/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.245.qa.2.shared-checkout-safe-guards-and-staging.md](./task.245.qa.2.shared-checkout-safe-guards-and-staging.md)
-- **Gate File**: [task.245.gate.2.shared-checkout-safe-guards-and-staging.yml](./task.245.gate.2.shared-checkout-safe-guards-and-staging.yml)
+- **Full Report**: [task.245.qa.3.shared-checkout-safe-guards-and-staging.md](./task.245.qa.3.shared-checkout-safe-guards-and-staging.md)
+- **Gate File**: [task.245.gate.3.shared-checkout-safe-guards-and-staging.yml](./task.245.gate.3.shared-checkout-safe-guards-and-staging.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 6909
+- **Tests Executed**: 6910
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Cycle 1's finding is fixed. The refute pass found an unchecked second git status call in the HALT loop (T245-QA-2) and a develop-batch commit that ignores stageReason (T245-QA-3).
+Cycle 2's findings are fixed. The scoped review found one medium defect: the develop-batch merge lane ends with "Mark ticked: true on every arm", which contradicts the new stageReason gate (T245-QA-4).
 
 <!-- change-log-start -->
 ## Change Log
@@ -469,6 +469,7 @@ Cycle 1's finding is fixed. The refute pass found an unchecked second git status
 | 2026-10-30 |         | QA findings fixed — cycle 1, 1 finding            | qa-fix      |
 | 2026-10-30 |         | QA gate CONCERNS (80/100) — 2 findings            | qa-task     |
 | 2026-10-30 |         | QA findings fixed — cycle 2, 2 findings           | qa-fix      |
+| 2026-10-30 |         | QA gate CONCERNS (90/100) — 1 finding             | qa-task     |
 <!-- change-log-end -->
 
 ---

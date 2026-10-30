@@ -658,7 +658,8 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
 
      On non-ff rejection: `git pull --rebase origin <baseBranch>` once and retry; still
      rejected → **HALT** (the run state preserves `merged: true, ticked: false` for
-     recovery). Mark `ticked: true` on every arm.
+     recovery). Mark `ticked: true` on every arm that ended in a commit or had nothing to commit,
+     never on the `stageReason` case above.
 
 The next item's rebase (step 1) then picks up this item's code **and** its tick. Merge +
 tick is serial by nature — the roadmap/Change Log edit is a guaranteed conflict point.

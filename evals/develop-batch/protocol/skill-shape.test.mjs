@@ -441,6 +441,12 @@ test("Step 3 lane: the acceptance record branches on source with all three arms"
     /`stageReason` other than `staged` \/ `already-staged`[\s\S]{0,200}no commit[\s\S]{0,60}`ticked: true`/,
     "a stageReason other than staged / already-staged makes no commit and no ticked mark",
   );
+  // T245-QA-4: the closing sentence must not override that gate with an unconditional tick.
+  assert.doesNotMatch(
+    rec,
+    /Mark `ticked: true` on every arm\./,
+    "no unconditional 'ticked: true on every arm' sentence overrides the stageReason gate",
+  );
 });
 
 // ── task.188: resume from evidence, not flags ───────────────────────────────
