@@ -2342,3 +2342,85 @@ test("--stage: an early outcome (not-a-task) reports `staged: false`, `not-attem
     rmSync(c.dir, { recursive: true, force: true });
   }
 });
+
+/**
+ * SC-10 (task 245): `--stage` adds no network call. The CLI runs under a
+ * preload that records and refuses every socket, DNS and fetch entry point of
+ * the node process. git runs as a child, outside the preload; the subcommands
+ * --stage spawns (ls-files, hash-object, update-index) read and write the
+ * local index only.
+ */
+function withNetBlock(fn) {
+  const d = mkdtempSync(path.join(os.tmpdir(), "rt-net-"));
+  const preload = path.join(d, "block-net.cjs");
+  const log = path.join(d, "attempts.log");
+  writeFileSync(
+    preload,
+    [
+      'const fs = require("fs");',
+      'const trip = (what) => () => { fs.appendFileSync(process.env.NET_LOG, what + "\\n"); throw new Error("network blocked: " + what); };',
+      'const net = require("net"), dns = require("dns"), tls = require("tls");',
+      'const http = require("http"), https = require("https");',
+      'net.Socket.prototype.connect = trip("net.Socket.connect");',
+      'net.connect = net.createConnection = trip("net.connect");',
+      'tls.connect = trip("tls.connect");',
+      'dns.lookup = dns.resolve = trip("dns");',
+      'http.request = http.get = trip("http");',
+      'https.request = https.get = trip("https");',
+      'globalThis.fetch = trip("fetch");',
+    ].join("\n"),
+  );
+  const attempts = () => {
+    try {
+      return readFileSync(log, "utf8");
+    } catch {
+      return "";
+    }
+  };
+  try {
+    return fn({ preload, env: { ...process.env, NET_LOG: log }, attempts });
+  } finally {
+    rmSync(d, { recursive: true, force: true });
+  }
+}
+
+test("--stage: runs to `staged` with every network entry point blocked and makes no attempt (SC-10)", () => {
+  const c = stageCase();
+  try {
+    withNetBlock(({ preload, env, attempts }) => {
+      const out = execFileSync(
+        process.execPath,
+        ["--require", preload, CLI, "--file", c.f, "--stage", "--json"],
+        { cwd: c.dir, encoding: "utf8", env },
+      );
+      const res = JSON.parse(out);
+      assert.equal(res.reason, "ticked");
+      assert.equal(res.stageReason, "staged");
+      assert.equal(attempts(), "");
+    });
+  } finally {
+    rmSync(c.dir, { recursive: true, force: true });
+  }
+});
+
+test("--stage: the network block is not vacuous — each entry point it guards trips it (SC-10 control)", () => {
+  const probes = [
+    ["net.connect", 'require("net").connect(9, "127.0.0.1")'],
+    ["dns", 'require("dns").lookup("example.invalid", () => {})'],
+    ["fetch", 'fetch("http://127.0.0.1:9")'],
+  ];
+  for (const [name, code] of probes) {
+    withNetBlock(({ preload, env, attempts }) => {
+      assert.throws(
+        () =>
+          execFileSync(process.execPath, ["--require", preload, "-e", code], {
+            env,
+            stdio: "pipe",
+          }),
+        undefined,
+        `${name} must exit non-zero under the block`,
+      );
+      assert.ok(attempts().includes(name), `${name} must be recorded`);
+    });
+  }
+});
