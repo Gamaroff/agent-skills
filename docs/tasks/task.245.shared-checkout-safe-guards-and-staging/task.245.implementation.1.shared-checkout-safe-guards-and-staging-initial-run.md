@@ -36,8 +36,8 @@ Make the registry writers stage only the row they changed (`registry-tick.js --s
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Implemented inline from the plan; 3 fast-gate iterations (prettier, then 2 prose-shape tests); final 6894 pass / 0 fail | —                    | 2026-10-30T19:12Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #796 → develop; issue 783 commented; leak check OK | —                    | 2026-10-30T19:13Z |
 | 5–6. qa-task / qa-fix loop | ✅ Done | `task.245.qa.{N}.*.md`; `task.245.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 5 QA cycles (CONCERNS 90, 80, 90, 90, then PASS 100); every medium fixed and mutation-proven; 5c CONCERNS with its coverage finding cleared by the carry | —                    | 2026-10-30T20:10Z |
-| 7. finalise                | ⏳ Pending | `task.245.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 7. finalise                | ✅ Done | `task.245.dod.2.shared-checkout-safe-guards-and-staging.md`; task `status: accepted` (run 1 recorded 4 gaps) |       | —                    |                 |
+| 8. commit-changes          | ✅ Done | Report and Completion section committed and pushed                     |       | —                    |                 |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -128,10 +128,10 @@ _Problems encountered and how they were resolved or escalated._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-10-30
+**Final Status**: Completed
 **Branch**: feature/task.245.shared-checkout-safe-guards-and-staging
 **PR**: https://github.com/Gamaroff/agent-skills/pull/796
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**QA Iterations**: 7 (CONCERNS 90, 80, 90, 90, then PASS 100 three times; gates 6 and 7 followed DoD gaps SC-10 and SC-3)
+**DoD Summary**: `task.245.dod.2.shared-checkout-safe-guards-and-staging.md` — ACCEPTED, 15 of 15. CI reading 1: SUCCESS @ `4de120247224`; CI reading 2: SUCCESS @ `42946f8528a0` over 6 checks.
+**Tracker debt**: none. Issue #783 closed; the board card was already at Done. The PR is open and not merged.
