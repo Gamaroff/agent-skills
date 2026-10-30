@@ -10,8 +10,8 @@
 #
 #   1. RECONSTRUCTS the cycle count from the gates on disk — the highest {N} in
 #      <doc-dir>/*.gate.{N}.*.yml. The grant is relative to that count, never to
-#      the original budget of 5: every gate written since (a route-2c half-cycle,
-#      an operator's standalone run, a previous grant) has consumed a cycle number
+#      the original budget of 5: every gate written since (an operator's
+#      standalone run, a previous grant) has consumed a cycle number
 #      that "5 + k" would count against the grant (QA cycle 1, CR-1). Reading it
 #      HERE, not in a neighbouring fenced block, is what makes the value exist:
 #      every orchestrator Bash call is a fresh shell (QA cycle 2, CR-2).
@@ -70,14 +70,17 @@
 #   • otherwise → writes extra_cycles_granted, qa_max_cycles, qa_phase AND convergence_from_cycle
 #     (= base + 1, the first cycle the Convergence check reads after the grant — task.239) in one
 #     write. qa_phase is the
-#     RE-ENTRY POINT, and it depends on where the halt stopped (obs #228):
-#       - the restored candidate's halt_reason is `not-converging`, alone or followed by `:` or a space
-#         and detail (the HALT's own spelling, obs #17) → 5b. The Convergence check fires
-#         at 5a, BEFORE 5b, so the last gate's queue was never handed to /qa-fix; re-entering at 5a
-#         would review unchanged code, re-raise the same HIGH and trip the check again, spending
-#         the grant with no fix attempted. 5b on the latest gate finishes that cycle first.
-#       - anything else (`loop-limit`, or a lock that already exists, whose halt fields the
-#         restore dropped) → 5a: the last cycle ran its 5b, so its fix is what the next gate reads.
+#     RE-ENTRY POINT, and it depends on evidence, not on the halt reason (task.244; obs #228, #17):
+#       - no code moved since the latest gate (code-moved-since-gate.sh prints 0) → 5b. Every halt
+#         now stops at a gate whose queue was never handed to /qa-fix: the Convergence check fires
+#         at 5a BEFORE 5b, and the loop limit is reached at a gate (the loop ends on a gate).
+#         Re-entering at 5a would review unchanged code, re-raise the same findings and spend the
+#         grant with no fix attempted. 5b on the latest gate finishes that cycle first.
+#       - code moved (a commit, an uncommitted edit or an untracked file outside the work item) →
+#         5a: the gate no longer describes the tree, so a fresh review + gate must read it.
+#       - the helper is missing, or cannot answer, or the gate cannot be resolved → 5a, with a
+#         warning on stderr: a stale gate is never trusted.
+#     The halt reason is not read. (Before task.244 only `not-converging` re-entered at 5b.)
 #     Either way a Stop between this write and a separate set-qa-phase call would otherwise name the
 #     wrong phase (task.123 QA cycle 3, CR-3). Then prints
 #     `grant-qa-cycles: QA_CYCLE=<base> extra_cycles_granted=<k> qa_max_cycles=<n> reenter_at=<5a|5b> convergence_from_cycle=<base+1>`
@@ -103,6 +106,10 @@ ADVANCE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/advance-pipeline-lock.sh"
 # earlier in the same procedure, read cycle 8.
 # bundle-dependency: shared/resources/qa-cycle.sh
 QA_CYCLE_SH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/qa-cycle.sh"
+# The re-entry phase reads whether code moved since the latest gate, and that has ONE definition
+# too (task.244): the sibling code-moved-since-gate.sh, also called by qa-task Phase 0.
+# bundle-dependency: shared/resources/code-moved-since-gate.sh
+CODE_MOVED_SH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/code-moved-since-gate.sh"
 
 usage() {
   echo "Usage: grant-qa-cycles.sh <doc-dir> <k> [<implementation-report>]   (k = positive integer, no leading zero)" >&2
@@ -179,13 +186,10 @@ read_budget() { # $1 = json file → integer budget, 0 when absent; warns on a n
 }
 NEW_MAX=$((QA_CYCLE + K))
 CHOSEN=""
-HALT_REASON=""
 if [ -f "$LOCK" ]; then
   EXISTING=$(read_budget "$LOCK")
 elif [ -f "$ADVANCE" ] && CHOSEN=$(bash "$ADVANCE" --restore --which "$DOC_DIR" 2>/dev/null) && [ -n "$CHOSEN" ]; then
   EXISTING=$(read_budget "$CHOSEN")
-  # Read BEFORE the restore, which drops halt_reason (obs #228): it decides the re-entry phase.
-  HALT_REASON=$(jq -r '.halt_reason // ""' "$CHOSEN" 2>/dev/null)
 else
   # Nothing --which would restore from (or the helper is missing): the guard has nothing to
   # protect, and step 3's own --restore call names the reason on stderr.
@@ -228,7 +232,7 @@ fi
 # and after a restore that CONSUMED its snapshot the lock is now the only copy of the
 # run's state — so it is kept, not removed. A lock at halt_step with no grant is a
 # resumable state; no lock and no snapshot is not.
-# qa_phase in the SAME write — 5b after a not-converging halt (the last gate's fix never ran),
+# qa_phase in the SAME write — 5b when no code moved since the latest gate (its fix never ran),
 # else 5a — so a Stop hook firing between this write and a separate set-qa-phase call never
 # reads the snapshot's phase and names the wrong step (obs #228).
 # convergence_from_cycle in the SAME write — base + 1, the first cycle whose reading the grant
@@ -237,15 +241,27 @@ fi
 # still trip from the third granted cycle on, when HIGH stays present and stops falling.
 undo_restore() { [ -n "$RESTORED" ] && echo "grant-qa-cycles: lock restored from $RESTORED is kept (its snapshot was consumed); the grant was not written" >&2; return 0; }
 TMP=$(mktemp "$(dirname "$LOCK")/.grant-qa-cycles.XXXXXX") || { undo_restore; exit 1; }
+# The re-entry phase is decided by EVIDENCE, not by the halt reason (task.244). The loop ends on a
+# gate, so a loop-limit halt leaves a gate whose queue was never handed to /qa-fix: when no code
+# moved since that gate, 5b on it is the next step, exactly as after a not-converging halt (obs
+# #228, obs #17). When code moved (a commit, an uncommitted edit or an untracked file outside the
+# work item — an operator's hand fix, a rebase), the gate no longer describes the tree and 5a must
+# read it afresh. The helper that answers is the ONE definition of "code moved since the gate" that
+# qa-task Phase 0 also uses; if it cannot answer, the safe re-entry is 5a, which re-reads, with a
+# warning — never 5b on a gate that may be stale.
+LATEST_GATE=$(bash "$QA_CYCLE_SH" "$DOC_DIR" --path gate 2>/dev/null)
 REENTER=5a
-# The token, then optionally ':' or a space and the detail the HALT appends. The orchestrator writes
-# halt_reason as free text ("not-converging: QA loop HIGH 1,1,1 at cycle 3 (…)"), and SKILL.md matches
-# it as a pattern; an exact compare sent every real not-converging halt to 5a, which re-reviews
-# unchanged code and spends the grant (obs #17: four of four on task.180, 2026-10-12). A token that
-# merely STARTS with the word ("not-convergingX") is not this reason.
-case "$HALT_REASON" in
-  not-converging | not-converging:* | "not-converging "*) REENTER=5b ;;
-esac
+if [ -z "$LATEST_GATE" ]; then
+  echo "grant-qa-cycles: could not resolve the latest gate in '$DOC_DIR' — re-entering at 5a" >&2
+elif [ ! -f "$CODE_MOVED_SH" ]; then
+  echo "grant-qa-cycles: code-moved-since-gate.sh not found beside this script ($CODE_MOVED_SH) — cannot tell whether code moved since the gate; re-entering at 5a (re-bundle the skill)" >&2
+# Any untracked file outside the work item counts as moved (the helper cannot tell a restored file
+# from a new fix file): a fail-safe that can spend a granted gate on unchanged code, never skip one.
+elif MOVED=$(bash "$CODE_MOVED_SH" "$DOC_DIR" "$LATEST_GATE" 2>/dev/null) && [ "$MOVED" -ge 0 ] 2>/dev/null; then
+  [ "$MOVED" -eq 0 ] && REENTER=5b
+else
+  echo "grant-qa-cycles: code-moved-since-gate.sh could not answer for '$LATEST_GATE' — re-entering at 5a" >&2
+fi
 if ! jq --argjson k "$K" --argjson c "$QA_CYCLE" --arg p "$REENTER" \
      '.extra_cycles_granted = $k | .qa_max_cycles = ($c + $k) | .qa_phase = $p
       | .convergence_from_cycle = ($c + 1)' "$LOCK" > "$TMP"; then

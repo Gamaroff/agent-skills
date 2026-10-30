@@ -1,0 +1,82 @@
+{
+  "name": "develop-task-step-05-qa-budget-spent-ends-on-a-gate",
+  "skill": "develop-task",
+  "description": "Steps 5–6, the budget counts gates (task.244): five CONCERNS gates with MEDIUM 5, 4, 3, 2, 1 and a budget of 5. Gate 5 still routes to a fix, but a fix may run only when a gate will read it within the budget, so Loop Escalation fires AT gate 5 with its finding open and unfixed — no fifth qa-fix, no gate.6, no review-pr. Fixture records qa-task×5, qa-fix×4. (This scenario was the route-2c half-cycle until task.244 removed that route.)",
+  "prompt": "Run steps 5–6 (qa loop) of the develop-task pipeline for task.42.example. Cycles 1–5 read CONCERNS with HIGH 0 and MEDIUM 5, 4, 3, 2, 1; the budget is 5 gates.",
+  "assertions": [
+    {
+      "fn": "fileExists",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.example/task.42.gate.5.example.yml"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.example/task.42.gate.5.example.yml",
+        "gate: CONCERNS"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.example/task.42.gate.5.example.yml",
+        "status: open"
+      ]
+    },
+    {
+      "fn": "pipelineStepsRan",
+      "args": [
+        "$SANDBOX/.eval/pipeline-events.json",
+        [
+          "qa-task",
+          "qa-fix",
+          "qa-task",
+          "qa-fix",
+          "qa-task",
+          "qa-fix",
+          "qa-task",
+          "qa-fix",
+          "qa-task"
+        ]
+      ]
+    },
+    {
+      "fn": "loopBoundedAt",
+      "args": [
+        "$SANDBOX/.eval/pipeline-events.json",
+        "qa-fix",
+        4
+      ]
+    },
+    {
+      "fn": "loopBoundedAt",
+      "args": [
+        "$SANDBOX/.eval/pipeline-events.json",
+        "qa-task",
+        5
+      ]
+    },
+    {
+      "fn": "fileDoesNotMatch",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md",
+        "Half-cycle|half-cycle|### QA Cycle 6"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md",
+        "### QA Cycle 5[\\s\\S]*\\*\\*Action\\*\\*: Escalating — loop limit reached"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md",
+        "## QA Loop Limit Reached"
+      ]
+    }
+  ]
+}

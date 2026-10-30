@@ -309,15 +309,20 @@ test("qa_reentry: the writer and every reader and describer name it (task.182)",
   // patched again, and this test holds the one-statement shape (TASK-182-001, TASK-182-003).
   assert.match(
     text.pauseDoc,
-    /`grant-qa-cycles\.sh` \(task\.123\) writes `5b` when it restores the lock from a halt snapshot whose `halt_reason` is not-converging[^|]*`5a` otherwise — a loop-limit halt, or a lock that already exists[^|]*`reenter-qa-after-finalise\.sh` \(task\.170\) always writes `5a`/,
+    /`grant-qa-cycles\.sh` \(task\.123\) writes `5b` when no code moved since the latest gate[^|]*`5a` when code moved or the helper cannot answer[^|]*`reenter-qa-after-finalise\.sh` \(task\.170\) always writes `5a`/,
     "the pause reference's qa_phase row must state which value each re-entry writer writes",
   );
-  // The writer the statement describes: 5b only on a not-converging RESTORE (halt_reason is read
-  // from the snapshot it restores, never from a live lock).
+  // The writer the statement describes (task.244): 5b only when code-moved-since-gate.sh prints 0,
+  // 5a for everything else, and the halt reason is never read.
   assert.match(
     text.grantScript,
-    /not-converging[^\n]*\) REENTER=5b/,
-    "grant-qa-cycles.sh no longer writes 5b after not-converging — re-check the pause reference's qa_phase row",
+    /\[ "\$MOVED" -eq 0 \] && REENTER=5b/,
+    "grant-qa-cycles.sh no longer writes 5b on 'no code moved' — re-check the pause reference's qa_phase row",
+  );
+  assert.doesNotMatch(
+    text.grantScript,
+    /HALT_REASON/,
+    "grant-qa-cycles.sh must not read the halt reason: the re-entry phase is decided by evidence (task.244)",
   );
   // No other describer restates the grant's value. The population is DERIVED — every shared
   // resource and SKILL.md that names the grant — not the hand-kept FILES map, which missed
@@ -618,7 +623,7 @@ test("qa_phase has exactly the three values, and the writer and the reader agree
   );
   const CALL =
     /bash \.agents\/skills\/\{develop-story\|develop-task\}\/references\/set-qa-phase\.sh 5[abc]/g;
-  // Four call sites, each located by the section it belongs to — not a bare count, which
+  // Three call sites (the half-cycle's fourth went with route 2c, task.244), each located by the section it belongs to — not a bare count, which
   // could be satisfied by four calls in one section.
   const section = (from, to) => {
     const i = text.loopDoc.indexOf(from);
@@ -638,7 +643,6 @@ test("qa_phase has exactly the three values, and the writer and the reader agree
       "#### Assert the trail is on the branch",
       "5c",
     ],
-    ["### Gate-the-last-fix half-cycle (shared)", "**On `continue`:**", "5a"],
   ];
   for (const [from, to, ph] of SITES) {
     const calls = section(from, to).match(CALL) || [];

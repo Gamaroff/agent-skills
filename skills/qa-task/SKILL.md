@@ -242,36 +242,21 @@ rather than reading these variables.
    [ -f "$TASK_FILE" ] || { echo "HALT: TASK_FILE ('$TASK_FILE') is not a file — bind this skill's work-item path in this shell"; exit 1; }
    TASK_DIR=$(dirname "$TASK_FILE")
    [ -n "${LATEST_GATE:-}" ] || LATEST_GATE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR" --path gate)
-   # ":(exclude)$TASK_DIR" below must exclude the task's directory, not the tree: a task file at the
+   # The helper's ":(exclude)<dir>" must exclude the task's directory, not the tree: a task file at the
    # repository root would make it ":(exclude)." and CODE_MOVED always 0 (task.135 QA cycle 3, CR3-2).
    [ -n "$(git -C "$TASK_DIR" rev-parse --show-prefix 2>/dev/null)" ] || { echo "HALT: the task directory ('$TASK_DIR') is the repository root — the trigger cannot tell the task's own files from the code"; exit 1; }
    # The commit the gate judged (its `head:`), never its typed `updated:` — a timestamp in the
    # future made `git log --since` hide every later commit from this check (task.135).
    GATE_HEAD=$(grep -E '^head:' "$LATEST_GATE" 2>/dev/null | head -1 | sed -E "s/^head:[[:space:]]*//; s/[[:space:]]+#.*$//; s/['\"]//g; s/[[:space:]]*$//")
    DOC_STATUS=$(grep -E '^status:' "$TASK_FILE" | head -1 | awk '{print $(2)}')
-   # A head the trigger cannot vouch for fails toward re-review, never toward "nothing moved": a
-   # hand-typed `head: HEAD` counted 0 commits on every run, and an off-branch head counted only what
-   # it happened not to share, so a PASS gate skipped review whatever landed after it (task.168
-   # CR4-1). Step 3b HALTs on the same heads; here the safe answer is to re-review.
-   if [ -n "$GATE_HEAD" ] && ! { printf '%s' "$GATE_HEAD" | grep -qE '^[0-9a-f]{40}$' \
-        && git cat-file -e "${GATE_HEAD}^{commit}" 2>/dev/null \
-        && git merge-base --is-ancestor "$GATE_HEAD" HEAD 2>/dev/null; }; then
-     echo "trigger: gate head '$GATE_HEAD' is not a 40-hex commit on this branch — re-reviewing"
-     CODE_MOVED=1; DOC_MOVED=1
-   elif [ -n "$GATE_HEAD" ]; then
-     # Commits since the commit the gate judged, on EVERY path except this task's own directory —
-     # the gate, the QA report, the task document and the implementation report live there and move
-     # on every cycle. A fixed list of source directories missed scripts/, tests/ and a consumer's
-     # src/ (task.135 CR-3); excluding all of docs/ hid a documentation deliverable (CR2-4).
-     # `|| echo 1` fails toward re-review when git cannot answer (a head this checkout lacks).
-     CODE_MOVED=$(git rev-list --count "$GATE_HEAD"..HEAD -- . ":(exclude)$TASK_DIR" 2>/dev/null || echo 1)
-     # Uncommitted and untracked changes outside the task directory are movement too: the gate
-     # never read them (CR2-5). An untracked file counts here even though Step 3b only WARNS on one
-     # (a held file the develop pipeline restored is the normal state of a healthy branch): the
-     # trigger cannot tell a restored file from a new fix file, so it fails toward re-review and the
-     # cost is one cycle (task.168 QA cycle 2, CR-3).
-     git diff --quiet HEAD -- . ":(exclude)$TASK_DIR" 2>/dev/null || CODE_MOVED=$((CODE_MOVED + 1))
-     [ -z "$(git ls-files --others --exclude-standard -- . ":(exclude)$TASK_DIR" 2>/dev/null)" ] || CODE_MOVED=$((CODE_MOVED + 1))
+   # The code-movement count has ONE definition, code-moved-since-gate.sh (task.244): commits since
+   # the gate's head, uncommitted edits and untracked files, all outside this task's directory. A
+   # head it cannot vouch for (none, not 40-hex, not an ancestor of HEAD) reads 1 and says so on
+   # stderr — fails toward re-review, never toward "nothing moved" (task.168 CR4-1). An empty
+   # $LATEST_GATE (a first review) reads 1 the same way. Exit 2 is a usage refusal, a HALT here.
+   CODE_MOVED=$(bash .agents/skills/qa-task/references/code-moved-since-gate.sh "$TASK_DIR" "$LATEST_GATE") \
+     || { echo "HALT: code-moved-since-gate.sh refused (see its line above)"; exit 1; }
+   if [ -n "$GATE_HEAD" ]; then
      # The document is compared from the commit that last wrote the GATE, not from the head: a QA
      # cycle edits the task document itself (QA Results, Change Log) after the head it records, and
      # those edits land beside the gate. Measured from the head, every gate would read "document
@@ -286,7 +271,7 @@ rather than reading these variables.
        DOC_MOVED=1                   # gate not committed yet — nothing to measure from
      fi
    else
-     CODE_MOVED=1; DOC_MOVED=1       # a gate with no head (schema 1) cannot vouch for the present tree
+     DOC_MOVED=1                     # a gate with no head (schema 1) cannot vouch for the present tree
    fi
    ```
 

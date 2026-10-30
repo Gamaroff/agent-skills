@@ -332,7 +332,7 @@ Every default applied must be recorded in the Decisions Log. See [`references/de
 | Bug severity `Blocker`/`Critical`                                                | Never run in lite mode — full QA verification in Steps 5–6 regardless of size.                                                                             |
 | Branch model ambiguous (Phase 0d Q1)                                             | Default **bugfix off `develop`**. Choose hotfix only when the bug is explicitly a production regression (frontmatter/desc says so) or the user selects it. |
 | Bug already `closed` at Phase 0                                                  | HALT — nothing to do; report the existing Resolution Summary to the user.                                                                                  |
-| qa-fix reopens the bug ≥5 times (MAX_ITER)                                       | HALT — escalate; the fix approach is not converging.                                                                                                       |
+| The bug still fails on the last of `MAX_ITER` verify gates (qa-fix ran at most `MAX_ITER − 1` times) | HALT — escalate; the fix approach is not converging.                                                                                                       |
 
 If a situation arises that is not in this table or the shared defaults table and the stakes are non-trivial, **HALT and ask the user**. Log the question and the answer in the Decisions Log.
 
