@@ -1,0 +1,32 @@
+{
+  "sink": null,
+  "entry": "cli:shared/resources/wireframe-map.js",
+  "name": "configure --map decline-word guard",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 13,
+  "passed": 13,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": [
+    "configure",
+    "--barrel",
+    "src/c/index.ts",
+    "--map",
+    "{input}",
+    "--root",
+    "{fixture}",
+    "--json"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-30T03:56:41.231Z"
+}

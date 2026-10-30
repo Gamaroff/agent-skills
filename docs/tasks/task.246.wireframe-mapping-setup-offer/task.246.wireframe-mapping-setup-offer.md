@@ -5,10 +5,12 @@ type: task
 description: "When a wireframe is added and no ui: block exists, create-story and create-task detect the project's components and offer to set mapping up (or record a decline); resolve offers catalogue-derived candidates on an empty map; and the map rows people write by hand get a documented guide with the two limits a consumer found."
 tags: [wireframe, wireframe-map, create-story, create-task, consumer-onboarding]
 category: other
-status: ready-for-review
+status: accepted
 priority: High
 created: 2026-10-29
 updated: 2026-10-30
+completed_date: 2026-10-30
+pr_number: 793
 assignee:
 estimated_effort_hours: 16
 github_issue: 792
@@ -16,7 +18,7 @@ github_issue: 792
 
 # Wireframe mapping setup offer and first-run candidates
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.246.review.1.wireframe-mapping-setup-offer.md` implemented 2026-10-29
 **GitHub Issue**: [#792](https://github.com/Gamaroff/agent-skills/issues/792)
 
@@ -646,9 +648,9 @@ develop step docs are outside the hooks test, which matches the criterion as wri
   `shared/resources/develop-pipeline-*.md`, as the criterion names, but not the skill-local step docs
   (`skills/develop-bug/references/develop-bug-step-*.md`). Widen the test and amend the criterion.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded by run 2)
 
-**Status:** IN PROGRESS
+**Status:** IN PROGRESS at run 1. Superseded: the three gaps were fixed in `ff3fb83c`, re-gated in QA cycle 5, and accepted in DoD run 2 (below).
 
 ### QA Gate Status
 
@@ -677,6 +679,31 @@ Each fix is recorded with its mutation proof under § Testing Results. The gaps 
 **QA Gate Reference**: See `task.246.gate.4.wireframe-mapping-setup-offer.yml` for full details
 
 **Detailed Verification Log:** See `task.246.dod.1.wireframe-mapping-setup-offer.md` for the complete verification evidence.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.246.qa.5.wireframe-mapping-setup-offer.md`
+**Gate File**: `task.246.gate.5.wireframe-mapping-setup-offer.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+Every Definition of Done criterion was verified in DoD run 2:
+
+✅ **Acceptance Criteria:** 18 of 18 met. 14 were re-judged and 4 carried from run 1. The three run-1 gaps (#11, #12, #13) are closed by committed, mutation-proven tests.
+✅ **Tests & PR:** PR #793. The Step 5c PR review 2 is APPROVE. CI is SUCCESS on `93ebdb87` across 6 checks.
+✅ **Documentation:** The configuration reference, the mapping procedure (with its "Writing map rows by hand" guide), both authoring SKILL.md files, and four CHANGELOG `[Unreleased]` entries.
+✅ **Security Review:** The checklist passes. The boundary probe executed 146 cases against four controls in `wireframe-map.js`: 0 reproduced, 0 escaped.
+⚠️ **Compliance Review:** Not applicable. This is developer tooling with no personal data, payments, end-user UI or health data.
+
+**Carried to future work:** TASK-246-CR5-1, TASK-246-CR4-1 and map-path containment (gate 5 `recommendations.future`).
+
+**Task marked as ACCEPTED on:** 2026-10-30
+
+**Detailed Verification Log:** See `task.246.dod.2.wireframe-mapping-setup-offer.md` for the complete verification evidence.
 <!-- change-log-start -->
 ## Change Log
 
@@ -696,6 +723,7 @@ Each fix is recorded with its mutation proof under § Testing Results. The gaps 
 | 2026-10-30 |  | DoD incomplete — 3 gaps identified | finalise |
 | 2026-10-30 |  | DoD gaps fixed — 3 test-only fixes (#11, #12, #13), each mutation-proven | develop |
 | 2026-10-30 |  | QA gate PASS (100/100) — 0 gated findings, 1 advisory carried to future work | qa-task |
+| 2026-10-30 | 1.2 | DoD passed — accepted (PR #793) | finalise |
 <!-- change-log-end -->
 
 ---

@@ -1,0 +1,355 @@
+{
+  "schema": 1,
+  "dod_n": 2,
+  "head": "93ebdb87b7d8f2340ff297518649139dba28e31a",
+  "dirty_paths": [
+    "docs/tasks/task.246.wireframe-mapping-setup-offer/task.246.implementation.1.wireframe-mapping-setup-offer-initial-run.md",
+    "docs/tasks/task.246.wireframe-mapping-setup-offer/task.246.pr-review.2.wireframe-mapping-setup-offer.md"
+  ],
+  "document": "docs/tasks/task.246.wireframe-mapping-setup-offer/task.246.wireframe-mapping-setup-offer.md",
+  "scope": {
+    "mode": "scoped",
+    "reason": "prior-record",
+    "rejudged": 14,
+    "carried": 4
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "f475205a37dd4d70708a555eb79c008e768725ac49a8f9a37db17a88ac0a854b",
+      "status": "PASS",
+      "description": "resolve/ensure/record return declined, write nothing, on wireframeMap false/off",
+      "code_citation": "shared/resources/wireframe-map.js:154",
+      "test_citation": "shared/resources/tests/wireframe-map.test.mjs:1106",
+      "members": [],
+      "non_member_fail": null,
+      "note": "isDecline (:154) feeds readUiConfig (:163). ensure (:709), resolve (:803) and record (:892) return declined. The test covers false/False/FALSE/\\\"false\\\"/off/OFF/'Off', snapshots the tree before and after (API and CLI) and uses offline.md as a control. The engine has not changed since 12d6bf03 and the test line is the same. It runs in test.yml `npm test` (shared/resources/tests/*.test.mjs), on every pull_request."
+    },
+    {
+      "id": "#2",
+      "text_hash": "67ace3998d77538f3061d011a504d913f8138b5cdd06cb3c762409e0549b4464",
+      "status": "PASS",
+      "description": "detect with no ui: block and src/components barrel returns unset plus proposal",
+      "code_citation": "shared/resources/wireframe-map.js:1224",
+      "test_citation": "shared/resources/tests/wireframe-map.test.mjs:1155",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The test asserts state unset, present undefined, and proposal.componentBarrel.value == src/components/index.ts with 'exports 3 components' evidence. The line is the same as in run 1."
+    },
+    {
+      "id": "#3",
+      "text_hash": "e83795ca68bcacd58b658f47d8cfb5290c739b01fdd15d63ae10393b0e56a203",
+      "status": "PASS",
+      "description": "detect writes no file in any state",
+      "code_citation": "shared/resources/wireframe-map.js:1224",
+      "test_citation": "shared/resources/tests/wireframe-map.test.mjs:1584",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The test snapshots the tree before and after detect (API and CLI) for five configs: none, empty ui:, partial, declined (false) and configured. The 'write in detect' mutation was killed (task.md:770)."
+    },
+    {
+      "id": "#4",
+      "text_hash": "3ad444cdc2fd217ac3710489f13f459f15bdf578a4741b376d9bebaeec642ab2",
+      "status": "PASS",
+      "description": "configure appends a ui: block readUiConfig reads back; refuses exists",
+      "code_citation": "shared/resources/wireframe-map.js:1384",
+      "test_citation": "shared/resources/tests/wireframe-map.test.mjs:1683",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The append branch is at :1384-1393. The test at :1683 reads every key back through readUiConfig and detect then returns configured. The refusals are at :1396 (map set or declined), :1406 (inline ui:) and :1414 (key conflict), and the test at :1721 asserts exit 1, reason exists and an unchanged file. Since run 1 the test lines have moved by 21 and the code has not changed. #6 narrows 'refuses when a ui: key is present' for a partial block, and both behaviours are tested."
+    },
+    {
+      "id": "#5",
+      "text_hash": "1d87a90ea8f3a3d564d16abe22891469990467b3446ded82629406931b338d0b",
+      "status": "PASS",
+      "description": "configure --decline leaves config where detect returns declined",
+      "code_citation": "shared/resources/wireframe-map.js:1352",
+      "test_citation": "shared/resources/tests/wireframe-map.test.mjs:1973",
+      "members": [],
+      "non_member_fail": null,
+      "note": "decline sets given.wireframeMap=false (:1352). The test round-trips from no file, from an unrelated config and from a partial block, and asserts that detect returns declined and ensure returns declined."
+    },
+    {
+      "id": "#6",
+      "text_hash": "759b5411f773b4ea6578f62ac115b9199aba9a24d4d31071c405542e7bb847f3",
+      "status": "PASS",
+      "description": "ui: block without wireframeMap: detect partial; configure inserts only missing keys",
+      "code_citation": "shared/resources/wireframe-map.js:1409",
+      "test_citation": "shared/resources/tests/wireframe-map.test.mjs:1750",
+      "members": [],
+      "non_member_fail": null,
+      "note": "detect returns partial for catalogue-only, empty ui: and ui: followed by a sibling key (:1562). The test at :1750 asserts one insertion with every other byte kept, inserted lines inside the block, present keys not rewritten, sibling keys unchanged, and detect then configured. The blank-key fill is tested at :1807."
+    },
+    {
+      "id": "#7",
+      "text_hash": "f0676240218f29b49dd324f01097cae35230c7c6f76804e5a42d1d9060371e40",
+      "status": "PASS",
+      "description": "empty map, catalogueState ok: button candidates include each Button-segment name",
+      "code_citation": "shared/resources/wireframe-map.js:570",
+      "test_citation": "shared/resources/tests/wireframe-map.test.mjs:2078",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The test expects button candidates Button, IconButton and ButtonGroup, each with source catalogue, and excludes Rebutton as a control. Its fixture has no map file. An empty map takes the same path because both give rows=[] (:812-815), and catalogue candidates are added whenever catalogueState is ok (:872)."
+    },
+    {
+      "id": "#8",
+      "text_hash": "9eead6a800dd36309fc02819812bec7b17e4671d61ea6075b733ae94e9f55605",
+      "status": "PASS",
+      "description": "near-miss candidates with source removed deep-equal the previous shape",
+      "code_citation": "shared/resources/wireframe-map.js:869",
+      "test_citation": "shared/resources/tests/wireframe-map.test.mjs:2151",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Map rows get source: 'map' (:869). The test strips source (asserting it is 'map'), then deep-equals the {component, variant, from} lists for the existing MAP fixture nodes."
+    },
+    {
+      "id": "#9",
+      "text_hash": "e707540e4c503b6b04283cc85fd3e9201b95d1365e20bc1fb5784e143d53de9d",
+      "status": "PASS",
+      "description": "create-story 5.4.6 / create-task 2.6 step 3 run detect, branch on states",
+      "code_citation": "skills/create-story/SKILL.md:763",
+      "test_citation": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:67",
+      "members": [
+        {
+          "member": "skills/create-story/SKILL.md 5.4.6 step 3",
+          "evidence": "skills/create-story/SKILL.md:763",
+          "status": "PASS"
+        },
+        {
+          "member": "skills/create-task/SKILL.md 2.6 step 3",
+          "evidence": "skills/create-task/SKILL.md:512",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Both steps run `detect --json` and handle configured (follow the procedure), declined (skip), and unset/partial (offer setup with Set up/Adjust/Not now/Never, which runs configure or configure --decline). The test slices each step from its own section heading. It asserts the detect command, all four states, configure --decline and 'Never for this repo'. It runs in npm test (evals/shared/tests/*.test.mjs)."
+    },
+    {
+      "id": "#10",
+      "text_hash": "9e7dff947dcb24bcbc3b11088a5e97f389c51e6fd4d7b75aeed55748f0117d20",
+      "status": "PASS",
+      "description": "procedure defines 'sets ui.wireframeMap' as a map path; reason line names declined",
+      "code_citation": "shared/resources/wireframe-component-mapping.md:9",
+      "test_citation": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:102",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Line 9 says the phrase means wireframeMap names a map path, and that false/off (any case) is a decline. Line 63 reads '`unset` and `declined` mean the feature is off: stop here.' The test pins both lines with a regex."
+    },
+    {
+      "id": "#11",
+      "text_hash": "ee5745974f9268615480f8fc7fa43e8604b3be9f699004da6476e949431c105a",
+      "status": "PASS",
+      "description": "No develop pipeline step calls detect/configure; test over develop-* SKILLs",
+      "code_citation": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:129",
+      "test_citation": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:127",
+      "members": [
+        {
+          "member": "skills/develop-story/SKILL.md",
+          "evidence": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:129",
+          "status": "PASS"
+        },
+        {
+          "member": "skills/develop-task/SKILL.md",
+          "evidence": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:129",
+          "status": "PASS"
+        },
+        {
+          "member": "skills/develop-bug/SKILL.md",
+          "evidence": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:129",
+          "status": "PASS"
+        },
+        {
+          "member": "skills/develop-next/SKILL.md",
+          "evidence": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:135",
+          "status": "PASS"
+        },
+        {
+          "member": "skills/develop-batch/SKILL.md",
+          "evidence": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:135",
+          "status": "PASS"
+        },
+        {
+          "member": "shared/resources/develop-pipeline-*.md",
+          "evidence": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:150",
+          "status": "PASS"
+        },
+        {
+          "member": "mutation proof (adding one such call)",
+          "evidence": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:157",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "PASS from merged members (7 counted)"
+    },
+    {
+      "id": "#12",
+      "text_hash": "b28a603b822cd3741c663de145a48d40d53f6454a3e07996e408ff2501a4d199",
+      "status": "PASS",
+      "description": "detect reads only barrel list, packages/*, libs/*, docs depth 4, path json files",
+      "code_citation": "shared/resources/wireframe-map.js:1006",
+      "test_citation": "shared/resources/tests/wireframe-map.test.mjs:1607",
+      "members": [
+        {
+          "member": "fixed barrel list",
+          "evidence": "shared/resources/tests/wireframe-map.test.mjs:1547",
+          "status": "PASS"
+        },
+        {
+          "member": "one level of packages/*",
+          "evidence": "shared/resources/tests/wireframe-map.test.mjs:1630",
+          "status": "PASS"
+        },
+        {
+          "member": "one level of libs/*",
+          "evidence": "shared/resources/tests/wireframe-map.test.mjs:1636",
+          "status": "PASS"
+        },
+        {
+          "member": "docs/ to depth 4 (work-item trees skipped)",
+          "evidence": "shared/resources/tests/wireframe-map.test.mjs:1646",
+          "status": "PASS"
+        },
+        {
+          "member": "package.json / tsconfig.json on the barrel's path",
+          "evidence": "shared/resources/tests/wireframe-map.test.mjs:1190",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "PASS from merged members (5 counted)"
+    },
+    {
+      "id": "#13",
+      "text_hash": "6f0f8a4b50bcbcbb098fe283cdfb484ba2774a0671be829bbaf94f93ba003f90",
+      "status": "PASS",
+      "description": "Every new branch tested; each fix mutation-proven",
+      "code_citation": "docs/tasks/task.246.wireframe-mapping-setup-offer/task.246.wireframe-mapping-setup-offer.md:777",
+      "test_citation": "shared/resources/tests/wireframe-map.test.mjs:1381",
+      "members": [
+        {
+          "member": "initial engine branches (10 mutations)",
+          "evidence": "docs/tasks/task.246.wireframe-mapping-setup-offer/task.246.wireframe-mapping-setup-offer.md:770",
+          "status": "PASS"
+        },
+        {
+          "member": "skill-protocol HALT test re-anchor",
+          "evidence": "tests/skill-protocol.test.js:382",
+          "status": "PASS"
+        },
+        {
+          "member": "BUG-1 JSONC strip (CR-1)",
+          "evidence": "shared/resources/tests/wireframe-map.test.mjs:1234",
+          "status": "PASS"
+        },
+        {
+          "member": "BUG-2 blank ui key presence (CR-2)",
+          "evidence": "shared/resources/tests/wireframe-map.test.mjs:1807",
+          "status": "PASS"
+        },
+        {
+          "member": "cycle 1 PROBE-1/PROBE-2/CR-3/CR-4",
+          "evidence": "shared/resources/tests/wireframe-map.test.mjs:1874",
+          "status": "PASS"
+        },
+        {
+          "member": "BUG-3 wildcard alias (CR2-1)",
+          "evidence": "shared/resources/tests/wireframe-map.test.mjs:1274",
+          "status": "PASS"
+        },
+        {
+          "member": "BUG-4 false not case-folded (CR2-2)",
+          "evidence": "shared/resources/tests/wireframe-map.test.mjs:1312",
+          "status": "PASS"
+        },
+        {
+          "member": "BUG-5 list under path key (CR2-3, CR3-1, CR3-2)",
+          "evidence": "shared/resources/tests/wireframe-map.test.mjs:1338",
+          "status": "PASS"
+        },
+        {
+          "member": "cycle 2 BOM/quoted ui key, comment indent, NEL split (CR2-4..6)",
+          "evidence": "shared/resources/tests/wireframe-map.test.mjs:1438",
+          "status": "PASS"
+        },
+        {
+          "member": "cycle 3 final-newline preservation",
+          "evidence": "shared/resources/tests/wireframe-map.test.mjs:1413",
+          "status": "PASS"
+        },
+        {
+          "member": "cycle 3 fill blank keys before inserting missing keys (order fix)",
+          "evidence": "shared/resources/tests/wireframe-map.test.mjs:1421",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "PASS from merged members (11 counted)"
+    },
+    {
+      "id": "#14",
+      "text_hash": "8a6ce4d560022cbfd5f4c3c1b7022fba0a238c1c8f1e934d5804878c04737132",
+      "status": "PASS",
+      "description": "ci:fast green; bundle:check clean; prettier --check on changed files",
+      "code_citation": ".github/workflows/test.yml:55",
+      "test_citation": ".github/workflows/validate.yml:128",
+      "members": [],
+      "non_member_fail": null,
+      "note": "test.yml runs `npm run format:check` (:55) and then `npm test` (:58), which together make up ci:fast. validate.yml runs `bundle_skill.py --check` (:128). On head 12d6bf03, `gh pr checks 793` shows test passed (5m10s), and validate, link-check, shellcheck and secret-scan passed."
+    },
+    {
+      "id": "#15",
+      "text_hash": "e0e48e1446207e970f890765c9f33fa382e9bcc51e8ba5780d49a7ecd4b3b1a9",
+      "status": "PASS",
+      "description": "npm run validate passes for create-story and create-task",
+      "code_citation": ".github/workflows/validate.yml:73",
+      "test_citation": ".github/workflows/validate.yml:68",
+      "members": [],
+      "non_member_fail": null,
+      "note": "'Validate all skills' runs quick_validate.py over every skills/*/ directory, including create-story and create-task. The validate job passed on PR 793 head 12d6bf03."
+    },
+    {
+      "id": "#16",
+      "text_hash": "c7ca1c893789d1eb718b61276a70780dfd03347c2d20cf3d72193b3742a97193",
+      "status": "PASS",
+      "description": "CHANGELOG [Unreleased] names setup offer, catalogue candidates, decline meaning",
+      "code_citation": "CHANGELOG.md:9",
+      "test_citation": "evals/shared/tests/changelog-entry-drift.test.mjs:1",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Documentation criterion. Under [Unreleased], :9 names the setup offer (task 246), :23 names the catalogue candidates (task 246), and :35 says false/off in any case now declines (task 246). The changelog-entry-drift corpus guard runs in npm test, as a post-merge guard for accepted tasks."
+    },
+    {
+      "id": "#17",
+      "text_hash": "7ab033741dac79de9fb79b414ba05c1bc92a991e4d887eb83a678adcc15eb16f",
+      "status": "PASS",
+      "description": "configuration.md documents the decline value and the offer",
+      "code_citation": "docs/reference/configuration.md:336",
+      "test_citation": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:535",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Documentation criterion. The :336 row types ui.wireframeMap as 'path, or false / off'; a path turns the feature on, and false/off (any case) declines it so no skill offers setup again. :347-354 describes the offer: detect barrel, import and catalogue, ask once (set up / adjust / not now / never), and Never writes wireframeMap: false. Since run 1 the guard has moved from :518 to :535. It pins that every engine ui key, wireframeMap included, is documented, but not the offer wording itself. It runs in npm test."
+    },
+    {
+      "id": "#18",
+      "text_hash": "0c7e09c02f761c2459daf6a6002187f64072e37f01696fced06a9c7679c0bdb2",
+      "status": "PASS",
+      "description": "'Writing map rows by hand' section exists, linked from map header",
+      "code_citation": "shared/resources/wireframe-component-mapping.md:183",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Documentation criterion. The section at :183 has worked rows and covers both limits (:199 sibling context, :203 icon glyph). The seeded MAP_HEADER (wireframe-map.js:102-104) names the reference file in a 'Writing rows by hand' bullet, and configuration.md:371 links the #writing-map-rows-by-hand anchor."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#11",
+      "note": "QA5 CR5-1, outside the criterion as written: the hooks test (:129-153) reads only each develop skill's SKILL.md and shared/resources/develop-pipeline-*.md. Skill-local step docs such as skills/develop-bug/references/develop-bug-step-*.md are not read, so a detect or configure call added there would pass. None contains one today (grep is empty). It is routed to future work as TASK-246-CR5-1."
+    },
+    {
+      "ac_id": "#14",
+      "note": "On PR head 93ebdb87, `gh pr checks 793` shows the `test` job still pending. validate, link-check, shellcheck, secret-scan and the branch check have passed. #14 is carried from head 12d6bf03, where test passed. Confirm test is green on 93ebdb87 before merging."
+    }
+  ]
+}

@@ -1,0 +1,214 @@
+[
+  {
+    "id": "lf-injects-key",
+    "input": "docs/map.md\nwireframeMap: false",
+    "direction": "hostile",
+    "why": "A line feed starts a new YAML line, so the value would write a second key (here a decline).",
+    "correct": "Usage error (exit 2); skills-config.yaml not written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "cr-injects-key",
+    "input": "docs/map.md\rwireframeMap: false",
+    "direction": "hostile",
+    "why": "A lone CR is a line break to a CRLF-aware reader.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "crlf-injects-key",
+    "input": "docs/map.md\r\nwireframeMap: false",
+    "direction": "hostile",
+    "why": "CRLF is the line ending the engine preserves.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "u2028",
+    "input": "docs/map.md wireframeMap: false",
+    "direction": "hostile",
+    "why": "U+2028 is a line terminator to JS line splitting and YAML 1.1.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "u2029",
+    "input": "docs/map.md wireframeMap: false",
+    "direction": "hostile",
+    "why": "U+2029 paragraph separator, also a line terminator.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "nel",
+    "input": "docs/map.mdwireframeMap: false",
+    "direction": "hostile",
+    "why": "NEL is a YAML 1.1 line break (cycle 1 PROBE-1).",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "vt",
+    "input": "docs/map\u000b.md",
+    "direction": "hostile",
+    "why": "Vertical tab: a C0 control JSON.stringify escapes, so it cannot read back.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "ff",
+    "input": "docs/map\f.md",
+    "direction": "hostile",
+    "why": "Form feed: escaped as \\f by JSON.stringify.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "double-quote",
+    "input": "docs/\"quoted\".md",
+    "direction": "hostile",
+    "why": "Written double-quoted, and yaml-subset does not unescape (cycle 1 PROBE-2).",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "backslash",
+    "input": "docs\\map.md",
+    "direction": "hostile",
+    "why": "Escaped by JSON.stringify, so it reads back doubled.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "tab",
+    "input": "docs/map\t.md",
+    "direction": "hostile",
+    "why": "Tab is escaped as \\t.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "unit-separator",
+    "input": "docs/map\u001f.md",
+    "direction": "hostile",
+    "why": "Top of the C0 range JSON.stringify escapes.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "plain-path",
+    "input": "docs/wireframe-map.md",
+    "direction": "legitimate",
+    "why": "The ordinary value.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "spaces",
+    "input": "docs/design notes/wireframe map.md",
+    "direction": "legitimate",
+    "why": "Spaces are quoted and read back.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "colon-hash",
+    "input": "docs/a: b # c.md",
+    "direction": "legitimate",
+    "why": "Colon-space and hash would break a bare scalar; the writer quotes them.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "unicode",
+    "input": "docs/maquette-écran.md",
+    "direction": "legitimate",
+    "why": "Non-ASCII that JSON.stringify keeps.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "astral",
+    "input": "docs/map-😀.md",
+    "direction": "legitimate",
+    "why": "A surrogate pair is one code point and is kept.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "single-quote",
+    "input": "docs/o'brien.md",
+    "direction": "legitimate",
+    "why": "A single quote inside a double-quoted scalar reads back verbatim.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "leading-dash",
+    "input": "-map.md",
+    "direction": "legitimate",
+    "why": "A flag-shaped value is still the value.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "padded",
+    "input": "  docs/wireframe-map.md  ",
+    "direction": "legitimate",
+    "why": "Surrounding whitespace is trimmed on write and on read-back.",
+    "correct": "Accepted (exit 0)."
+  }
+]
