@@ -3,7 +3,7 @@
 **Task**: `task.246.wireframe-mapping-setup-offer.md`
 **Run Number**: 1
 **Started**: 2026-10-29 21:48
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -36,9 +36,9 @@ Add the `declined`/`partial` states, `detect` and `configure` to `wireframe-map.
 | 2. review-task             | ✅ Done    | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               | skipped — already reviewed (`task.246.review.1.wireframe-mapping-setup-offer.md`) | —                    | 2026-10-29T21:50Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | inline (plan + surface map); 1 iteration, 5/5 phases; gate green on run 2 | —                    | 2026-10-29T22:09Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #793: https://github.com/Gamaroff/agent-skills/pull/793 | —                    | 2026-10-29T22:11Z |
-| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 4 cycles; gate.4 PASS (100); cosmetic-residue exit (CR4-1 carried); PR review APPROVE (`task.246.pr-review.1…`) | —                    | 2026-10-29T23:10Z |
-| 7. finalise                | ⚠️ HALT    | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      | DoD run 1: 3 gaps (#11, #12, #13; test-only) — `task.246.dod.1.wireframe-mapping-setup-offer.md` | —                    | 2026-10-30 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 4 cycles; gate.4 PASS (100); cosmetic-residue exit (CR4-1 carried); PR review APPROVE (`task.246.pr-review.1…`). Re-entered after DoD run 1: cycle 5 gate.5 PASS (100), PR review 2 APPROVE | —                    | 2026-10-29T23:10Z |
+| 7. finalise                | ✅ Done    | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      | DoD run 1: 3 gaps (#11, #12, #13; test-only), fixed and re-gated (cycle 5). DoD run 2: ACCEPTED 18/18; acceptance commit `e0eec8fe`; CI 2 SUCCESS; #792 closed | —                    | 2026-10-30T04:04Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Implementation report committed and pushed (the acceptance artefacts went in finalise 6a, `e0eec8fe`) | —                    | 2026-10-30T04:04Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -149,6 +149,23 @@ Add the `declined`/`partial` states, `detect` and `configure` to `wireframe-map.
 - The HALT had not snapshotted or removed the lock (still live at 7), so `reenter-qa-after-finalise.sh` would have refused `lock-present`. The orchestrator wrote the snapshot (`halt_step` 7) and removed the lock, as the HALT rule says, then ran the script.
 - QA re-entry after finalise DoD gaps: "re-entered QA at step 5 / qa_phase 5a — qa_max_cycles=10 (base 8), gate_head=a0073d014200". Code moved: `ff3fb83c` changed `evals/shared/tests/wireframe-mapping-hooks.test.mjs` and `shared/resources/tests/wireframe-map.test.mjs`.
 - The base 8 is wrong: the script counts every `### QA Cycle` heading, and this report had two per cycle (Decisions Log and QA Iteration History). `report-lint` flags the same defect (`qa-cycle-duplicated` ×4). Repaired: the four Decisions Log headings are renamed `### qa-fix — cycle N`, and the lock corrected to `qa_reentry.report_entries` 4 and `qa_max_cycles` 6 (base 4 + 2). The next cycle is 5. Logged as observation #135.
+- QA cycle 5 (`/qa-task`, re-review scoped to the 2 test files changed since gate 4's head): PASS 100. The scoped reviewer took 71,394 ms and returned one advisory finding, CR5-1 (medium/medium). It is not promoted, and is carried to future work: skill-local develop step docs are outside the hooks test, which matches the criterion as written. Three mutations were all `covered`. `ci:fast` 6876 pass, 0 fail. CI on `ff3fb83c`: pending at gate time. The traceability mapper was skipped because the Success Criteria are a checklist, not a table. Committed `93ebdb87` and pushed.
+- 5c `/review-pr --effort medium --comment --no-code`, second pass: the conformance lens took 45,490 ms and returned no findings; verdict APPROVE; OPEN_COVERAGE=0. Report `task.246.pr-review.2.wireframe-mapping-setup-offer.md` is staged for the acceptance commit; the carry list is empty. GitHub board ready-for-merge: stage-disabled.
+
+### Step 7 — finalise (DoD run 2)
+
+- **ACCEPTED.** The re-run was scoped from `task.246.dod.1.ac.json`: 14 criteria re-judged, 4 carried, 18/18 PASS. The three run-1 gaps are closed. Security PASS. Compliance NOT_APPLICABLE. Docs PASS, with CHANGELOG citing task 246.
+- **Security probe.** The agent's plan is run 1's 10 `cli:` controls with their inline cases. Before the run, the orchestrator verified the on-disk plan byte-identical to the `dod.1` cases files, so no hand-retyping happened. The probe executed 146 cases: 0 reproduced, 0 escapes, 0 refusals. Record: `task.246.dod.2.security.run.json`, committed with its cases, the same way run 1's was.
+- **CI.** Reading 1: SUCCESS @ `93ebdb87b7d8` over 6 checks; the first sample was PENDING on `test`. Reading 2: SUCCESS (tree-equivalent to `93ebdb87b7d8`) @ `e0eec8fe9a1f`; the acceptance commit changes only files under `docs/`.
+- **Acceptance commit.** `e0eec8fe`, pushed. It contains the DoD, the sprint review, the AC record, the security record, the registry tick (`ticked`, planned → accepted), and the carried 5c PR review 2. Run 1's gap section in the task body is retitled historical/superseded.
+- **Side effects.** PR canonical comment: issuecomment-6514664781 (posted). Tracker #792: Document link already on `develop`; completion comment `posted`; closed and verified CLOSED. Board `done`: `already`.
+- DoD summary: `docs/tasks/task.246.wireframe-mapping-setup-offer/task.246.dod.2.wireframe-mapping-setup-offer.md`
+- CI reading 1: SUCCESS @ `93ebdb87b7d8`; CI reading 2: SUCCESS (tree-equivalent to `93ebdb87b7d8`) @ `e0eec8fe9a1f`
+- DoD body posted to PR: https://github.com/Gamaroff/agent-skills/pull/793#issuecomment-6514664781
+- GitHub Issue #792 — close: CLOSED ✅ (state read back with `gh issue view`; errors = 0)
+- GitHub Issue #792 — board: done → already (`gh-stage.js` read the column as `Done`)
+- Accept gap: the tracker-actions journal is empty (`access.tracker` = full), so there is no tracker debt
+- ✅ Task completed — DoD run 2 accepted
 
 ---
 
@@ -214,7 +231,7 @@ _Track each QA review/fix cycle._
 **Issues Found**: 0 gated. Re-entry after finalise DoD run 1; DoD #11, #12 and #13 verified fixed. 1 advisory finding (CR5-1, medium/medium): skill-local develop step docs are outside the hooks test, which matches the criterion as written. Carried to `recommendations.future` and the task's `## Deferred Work`.
 **HIGH findings**: 0
 **MEDIUM findings**: 0
-**PR Review**: pending — 5c not yet run
+**PR Review**: APPROVE — `task.246.pr-review.2.wireframe-mapping-setup-offer.md` (conformance lens only, `--no-code`; 0 findings, OPEN_COVERAGE=0; comment issuecomment-6510595565 updated in place)
 **Loop exit**: route 1 — PASS with no open entry
 **Action**: Proceeding to 5c (PR conformance review)
 
@@ -222,10 +239,12 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
-**Branch**: {populated after Step 1}
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**Finished**: 2026-10-30T04:04Z
+**Final Status**: Completed
+**Branch**: `feature/task.246.wireframe-mapping-setup-offer`
+**PR**: [#793](https://github.com/Gamaroff/agent-skills/pull/793)
+**QA Iterations**: 5. Cycles 1–3 were CONCERNS and fixed through qa-fix. Cycle 4 was PASS. Cycle 5 was the PASS re-entry after DoD run 1's three test gaps.
+**DoD Summary**: `task.246.dod.2.wireframe-mapping-setup-offer.md` (ACCEPTED; run 1 `task.246.dod.1…` found 3 gaps)
+**Tracker debt**: none
+
+**Completion Summary**: Implemented the wireframe mapping setup offer. `wireframe-map.js` gains the `declined` and `partial` states, a read-only bounded `detect`, and a comment-preserving `configure` (with `--decline`). `resolve` offers catalogue-derived candidates on an empty map. `create-story` and `create-task` step 3 now run `detect` and offer setup once. The mapping procedure gains a "Writing map rows by hand" guide. The run took 5 QA cycles and fixed 5 bugs, mainly in the edge cases of `configure`'s line-level YAML editing: quoting, CRLF, BOM, NEL, and blank keys carrying lists. Notable decisions: the setup offer stays out of every develop pipeline step, and a test enforces that. DoD run 1 found three test-coverage gaps; they were fixed, re-gated in QA cycle 5, and accepted in DoD run 2. Three advisories are carried to future work: CR5-1, CR4-1, and map-path containment.
