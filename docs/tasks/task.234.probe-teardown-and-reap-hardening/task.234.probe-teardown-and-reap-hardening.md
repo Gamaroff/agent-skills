@@ -117,7 +117,9 @@ results are read. This task closes all four:
   `chmod -R u+rwx <root>` as a child process (`spawnSync`, argv form, no shell). GNU and BSD
   `chmod -R` both descend without following symlinks by default, and the measurement showed it
   clears the deep tree. The in-process walk is removed. An alternative the plan may choose instead:
-  a walk using relative paths. Either way, the PATH_MAX test (§ 8) decides.
+  a walk using relative paths. Either way, the PATH_MAX test (§ 8) decides. *(QA 1: on Node 22,
+  `rmSync` itself fails a deep tree with `ENAMETOOLONG`, so the removal after the restore is
+  `rm -rf` too, and `ENAMETOOLONG` enters the fallback.)*
 - **B.** With `chmod -R`, the in-process `lstat`-then-`chmod` race is gone. Any race left inside
   `chmod -R` is written into `probe-boundary-rule.md` as a stated limit (the doc already states
   limits this way, e.g. `:424`, `:584`; it has no process-group limit today). If the plan keeps an in-process walk, it re-`lstat`s after each
@@ -286,7 +288,8 @@ running process.
 ### Functional
 
 - [x] A case that nests past PATH_MAX with a mode-000 leaf no longer crashes `runProbeSpec`, and its
-      sandbox is removed.
+      sandbox is removed. *(QA 1 found it failing on Node 22 — TASK-234-QA-1; after the fix it
+      passes on Node 22.23.4, 24.21.0 and 26.8.2.)*
 - [x] Teardown never changes the mode of anything outside the sandbox.
 - [x] A background write that lands after the foreground exits is killed before `absent`/`removed`
       are read.
@@ -305,6 +308,7 @@ running process.
 
 - [x] Each fix is mutation-proved.
 - [x] `npm run ci` (with `.agents/skills` aside), `bundle:check` and `scripts/lint-shell.sh` pass.
+      *(QA 1: the A test failed on Node 22, which CI runs; fixed in QA fix cycle 1.)*
 
 ### Migration
 
@@ -358,6 +362,28 @@ stays as the judge.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-31
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.234.qa.1.probe-teardown-and-reap-hardening.md](./task.234.qa.1.probe-teardown-and-reap-hardening.md)
+- **Gate File**: [task.234.gate.1.probe-teardown-and-reap-hardening.yml](./task.234.gate.1.probe-teardown-and-reap-hardening.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 6 task.234 tests on Node 22, 24 and 26; full suite on Node 26
+- **Phases Verified**: 3/4
+- **Critical Issues**: 1
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: PASS
+
+### Key Findings
+- TASK-234-QA-1 (high): on Node 22, the version CI and `engines` pin, the first `rmSync` of a deep sandbox throws `ENAMETOOLONG`, which `removeSandbox` does not handle, so `runProbeSpec` still crashes. It holds on Node 24 and 26.
+- TASK-234-QA-2 (low): the D tests have no committed positive control that the background writer started.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -367,6 +393,8 @@ stays as the judge.
 | 2026-10-31 | 1.1 | Review 1 (8/10 after fixes): the D red test now has its grandchild release the case's stdio (as drafted it could never go green); case-form trace and search recorded; setup-spawn reap stated; `t.skip` signature noted | review-task |
 | 2026-10-31 |  | Status → ready-for-development | review-task |
 | 2026-10-31 |  | Implemented — 3 source files (+6 bundled copies), 5 tests added, 2 hardened | develop |
+| 2026-10-31 |  | QA gate FAIL (70/100) — 2 findings (1 high: A fails on Node 22) | qa-task |
+| 2026-10-31 |  | QA findings fixed — TASK-234-QA-1 (Node 22 teardown), QA-2 (D positive controls), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

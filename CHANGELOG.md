@@ -69,9 +69,10 @@ All notable changes to this project will be documented in this file. Format foll
 ### Fixed
 
 - **security-probe: sandbox teardown and background writes (task 234).** A case that left a
-  mode-000 directory nested past `PATH_MAX` crashed `runProbeSpec` with `ENAMETOOLONG`; the
-  teardown now restores permissions with `chmod -R u+rwx`, which descends by relative path and
-  follows no symlink, so the sandbox is removed and nothing outside it changes mode. Each case (and
+  mode-000 directory nested past `PATH_MAX` crashed `runProbeSpec` with `ENAMETOOLONG`; on
+  `EACCES`, `EPERM` or `ENAMETOOLONG` (Node 22's `rmSync` hits the last on a deep tree) the
+  teardown now runs `chmod -R u+rwx` and `rm -rf`, which descend by relative path and follow no
+  symlink, so the sandbox is removed and nothing outside it changes mode. Each case (and
   a shell-argv setup) now runs `detached` and its process group is killed before its side effects
   are read: a background grandchild that released the case's stdio could otherwise write after the
   after-snapshot, turning an `absent` or `removed` check into a false pass. A grandchild that calls

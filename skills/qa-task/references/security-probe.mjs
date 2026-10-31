@@ -962,32 +962,32 @@ const SOURCE_LINE =
 /**
  * Remove a probe sandbox, including one a case left unreadable. A case
  * controls its directory, so it can leave a mode-000 directory that `rmSync`
- * cannot list (task.232 QA2-1). On EACCES or EPERM every directory gets owner
- * rwx back and the removal is retried. The restore is `chmod -R`, not a walk
- * in this process: it descends by relative path, so a tree deeper than
- * PATH_MAX does not stop it where an absolute-path walk hit ENAMETOOLONG, and
- * it follows no symlink by default on GNU and BSD, so nothing outside the
- * sandbox changes mode (task.234).
+ * cannot list (task.232 QA2-1), or nest it past PATH_MAX, which Node 22's
+ * `rmSync` (an absolute-path walk) fails with ENAMETOOLONG. On EACCES, EPERM
+ * or ENAMETOOLONG every directory gets owner rwx back and the tree is removed
+ * by `chmod -R` and `rm -rf`, not by a walk in this process: both descend by
+ * relative path, so depth does not stop them, and neither follows a symlink,
+ * so nothing outside the sandbox changes mode or is removed (task.234).
  */
 function removeSandbox(root) {
   try {
     rmSync(root, { recursive: true, force: true });
     return;
   } catch (e) {
-    if (e.code !== "EACCES" && e.code !== "EPERM") throw e;
+    if (!["EACCES", "EPERM", "ENAMETOOLONG"].includes(e.code)) throw e;
   }
-  const chmod = spawnSync("chmod", ["-R", "u+rwx", "--", root], {
-    encoding: "utf8",
-    stdio: ["ignore", "ignore", "pipe"],
-  });
-  try {
-    rmSync(root, { recursive: true, force: true });
-  } catch (e) {
-    if (chmod.status !== 0) {
-      const why = chmod.error?.code ?? `exit ${chmod.status}`;
-      e.message += ` (chmod -R ${why}: ${String(chmod.stderr ?? "").trim()})`;
-    }
-    throw e;
+  const run = (cmd, argv) => {
+    const r = spawnSync(cmd, argv, {
+      encoding: "utf8",
+      stdio: ["ignore", "ignore", "pipe"],
+    });
+    const why = r.error?.code ?? `exit ${r.status}`;
+    return `${cmd} ${why}${r.stderr ? `: ${r.stderr.trim()}` : ""}`;
+  };
+  const chmod = run("chmod", ["-R", "u+rwx", "--", root]);
+  const rm = run("rm", ["-rf", "--", root]);
+  if (existsSync(root)) {
+    throw new Error(`removeSandbox: ${root} is still there (${chmod}; ${rm})`);
   }
 }
 

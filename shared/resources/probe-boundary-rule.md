@@ -230,10 +230,11 @@ takes it.
   for it. **The limit:** a grandchild that calls `setsid` (or `setpgid`) leaves the
   group and is not reached (task.234).
 - **Removes the sandbox even when a case left it unreadable.** A case can leave a
-  mode-000 directory, or one nested past `PATH_MAX`. On `EACCES`/`EPERM` the
-  teardown runs `chmod -R u+rwx` and removes again: `chmod -R` descends by
-  relative path, so depth does not stop it, and it follows no symlink, so nothing
-  outside the sandbox changes mode. A process still running inside the sandbox
+  mode-000 directory, or one nested past `PATH_MAX` (which Node 22's `rmSync`
+  fails with `ENAMETOOLONG`). On `EACCES`, `EPERM` or `ENAMETOOLONG` the teardown
+  runs `chmod -R u+rwx` then `rm -rf`: both descend by relative path, so depth
+  does not stop them, and neither follows a symlink, so nothing outside the
+  sandbox changes mode or is removed. A process still running inside the sandbox
   could change a mode between the two calls; the group kill above leaves only a
   `setsid` grandchild able to (task.234).
 

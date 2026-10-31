@@ -7477,8 +7477,10 @@ function withFreshTmpdir(fn) {
   } finally {
     if (saved === undefined) delete process.env.TMPDIR;
     else process.env.TMPDIR = saved;
-    spawnSync("chmod", ["-R", "u+rwx", tmp], { stdio: "ignore" });
-    rmSync(tmp, { recursive: true, force: true });
+    // Relative-path removal: if the teardown under test failed, `tmp` holds a
+    // tree past PATH_MAX that Node 22's rmSync cannot remove.
+    spawnSync("chmod", ["-R", "u+rwx", "--", tmp], { stdio: "ignore" });
+    spawnSync("rm", ["-rf", "--", tmp], { stdio: "ignore" });
   }
 }
 
@@ -7583,9 +7585,12 @@ const sleepMs = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 test("runProbeSpec: a shell case's background write that lands after the case exits is killed before it lands (task.234 D, watchedSpawn)", async () => {
   // The grandchild releases the case's stdio; one that keeps it holds
-  // spawnSync open until it finishes, and its write is seen in time.
+  // spawnSync open until it finishes, and its write is seen in time. It
+  // touches `started` first and the case waits for it, so an absent `late`
+  // means the write was killed, not that the grandchild never ran.
   const markerDir = mkdtempSync(join(tmpdir(), "t234-marker-"));
   const marker = join(markerDir, "late");
+  const started = join(markerDir, "started");
   const root = fenceRoot(OK_BLOCK);
   try {
     const r = runProbeSpec({
@@ -7595,13 +7600,17 @@ test("runProbeSpec: a shell case's background write that lands after the case ex
         fenceCase(
           "f.late",
           "hostile",
-          `(sleep 0.3; touch '${marker}') >/dev/null 2>&1 </dev/null &`,
+          `(touch '${started}'; sleep 0.3; touch '${marker}') >/dev/null 2>&1 </dev/null & i=0; while [ ! -e '${started}' ] && [ $i -lt 200 ]; do sleep 0.01; i=$((i+1)); done`,
           { expected: { exit: 0, stdout: "ok\n" } },
         ),
       ],
       repoRoot: root,
     });
     assert.equal(r.cases.length, probeShells().length, JSON.stringify(r.cases));
+    for (const row of r.cases) {
+      assert.equal(row.outcome, "rejected", JSON.stringify(row));
+    }
+    assert.ok(existsSync(started), "the background grandchild never started");
     await sleepMs(600);
     assert.equal(existsSync(marker), false, "the background write landed");
   } finally {
@@ -7613,16 +7622,23 @@ test("runProbeSpec: a shell case's background write that lands after the case ex
 test("runProbeSpec: a module case's background write that lands after the case exits is killed before it lands (task.234 D, module runner)", async () => {
   const markerDir = mkdtempSync(join(tmpdir(), "t234-marker-"));
   const marker = join(markerDir, "late");
-  // Not `detached`: the grandchild stays in the case's process group.
+  const started = join(markerDir, "started");
+  // Not `detached`: the grandchild stays in the case's process group. It
+  // writes `started` at once and the export waits for it (up to 2 s), so an
+  // absent `late` means the write was killed, not that it never ran.
+  const grandchild = [
+    `const fs = require("node:fs");`,
+    `fs.writeFileSync(${JSON.stringify(started)}, "");`,
+    `setTimeout(() => fs.writeFileSync(${JSON.stringify(marker)}, ""), 300);`,
+  ].join(" ");
   const root = fenceRoot({
     "late.mjs": [
       'import { spawn } from "node:child_process";',
+      'import { existsSync } from "node:fs";',
       "export function validateHost(input) {",
-      "  spawn(",
-      "    process.execPath,",
-      `    ["-e", ${JSON.stringify(`setTimeout(() => require("node:fs").writeFileSync(${JSON.stringify(marker)}, ""), 300)`)}],`,
-      '    { stdio: "ignore" },',
-      "  ).unref();",
+      `  spawn(process.execPath, ["-e", ${JSON.stringify(grandchild)}], { stdio: "ignore" }).unref();`,
+      "  const nap = new Int32Array(new SharedArrayBuffer(4));",
+      `  for (let i = 0; i < 200 && !existsSync(${JSON.stringify(started)}); i++) Atomics.wait(nap, 0, 0, 10);`,
       "  return input;",
       "}",
       "",
@@ -7636,6 +7652,7 @@ test("runProbeSpec: a module case's background write that lands after the case e
       repoRoot: root,
     });
     assert.equal(r.executed, 1, JSON.stringify(r.cases));
+    assert.ok(existsSync(started), "the background grandchild never started");
     await sleepMs(600);
     assert.equal(existsSync(marker), false, "the background write landed");
   } finally {
