@@ -5,17 +5,19 @@ type: task
 description: "When the probe script Node resolved earlier in the process is deleted and a different resolution appears (a directory's index.js in place of a .js file, or the reverse), the probe finds the replacement instead of reporting it missing until restart."
 tags: [loop-supervisor, adapters, probe]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Low
 estimated_effort_hours: 2
 created: 2026-10-22
 updated: 2026-10-31
+completed_date: 2026-10-31
+pr_number: 798
 github_issue: 725
 ---
 
 # Technical Task: loop-supervisor: find a replacement probe script after a stale hit
 
-**Status:** Ready for Review
+**Status:** Accepted
 **GitHub Issue**: [#725](https://github.com/Gamaroff/agent-skills/issues/725)
 
 ---
@@ -173,7 +175,7 @@ The existing QA-3 pair (same file deleted and restored) and the five agreement c
 ### Code Quality
 
 - [x] SC6: mutation-proven. With the fallback replaced by `return false`, the SC1 and SC2 tests fail.
-- [ ] SC7: the loop-supervisor unit suite passes locally, with the symlink moved aside, and in CI. `npm run validate -- skills/loop-supervisor/` passes.
+- [x] SC7: the loop-supervisor unit suite passes locally, with the symlink moved aside, and in CI. `npm run validate -- skills/loop-supervisor/` passes.
 
 ### Migration
 
@@ -246,6 +248,30 @@ For a timeout or a message problem, fix it forward in `resolveInFreshNode`.
 
 ### Key Findings
 No critical issues identified. SC1–SC6 and SC8 hold, test-backed and mutation-proven (2 of 2 covered). SC7's CI half is pending and is read at `/finalise`. Two advisory findings (CR-1, a spawn failure reads as "not found"; CR-2, a repeated spawn after a swap) are routed to the gate's `recommendations.future`.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.225.qa.1.loop-supervisor-probe-stale-hit-replacement.md`
+**Gate File**: `task.225.gate.1.loop-supervisor-probe-stale-hit-replacement.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** SC1–SC8 met, each traced to code and a per-PR test (SC8 to its CHANGELOG line)
+✅ **Tests:** two swap tests and a spawn-count test; loop-supervisor suite 255 pass / 0 fail; mutation-proven (2 of 2)
+✅ **PR Review:** PR #798 — Step 5c `/review-pr` APPROVE; CI SUCCESS over 6 checks on `df3db764`
+✅ **Documentation:** CHANGELOG `[Unreleased]` cites task 225; `resolvesAsMain` / `resolveInFreshNode` doc comments updated
+✅ **Security Review:** PASS — boundary probe ran 8 cases, 0 reproduced, 0 escaped
+✅ **Compliance Review:** not applicable (internal tooling)
+
+**Task marked as ACCEPTED on:** 2026-10-31
+
+**Detailed Verification Log:** See `task.225.dod.1.loop-supervisor-probe-stale-hit-replacement.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
@@ -256,6 +282,7 @@ No critical issues identified. SC1–SC6 and SC8 hold, test-backed and mutation-
 | 2026-10-31 |  | Status → ready-for-development | review-task |
 | 2026-10-31 |  | Implemented — 3 files, 3 tests | develop |
 | 2026-10-31 |  | QA gate PASS (100/100) — 0 gate findings, 2 advisory | qa-task |
+| 2026-10-31 | 1.2 | DoD passed — accepted (PR #798) | finalise |
 <!-- change-log-end -->
 
 ---
