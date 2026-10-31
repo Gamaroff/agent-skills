@@ -1,0 +1,61 @@
+schema: 2
+task: 'task.234.probe-teardown-and-reap-hardening'
+task_title: 'Probe sandbox teardown and process-group reap'
+gate: CONCERNS
+status_reason: 'QA-9 holds (test plus mutation). One medium finding remains, and it needs a host whose PATH holds a relative or empty entry and keeps sleep/ps outside /usr/bin:/bin. Gate 5 is the last in the QA budget, so it is recorded for a follow-up rather than fixed ungated.'
+reviewer: 'QA Engineer'
+head: 'a32dd8f0dd8113395f3a54bd2f3b0fc96a60fe7e'
+updated: '2026-10-31T10:11:02Z'
+
+top_issues:
+  - id: 'TASK-234-QA-10'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'leashEnv() appends process.env.PATH unfiltered, so a relative or empty entry (".", "::", a leading/trailing ":") reaches the leash shell, whose cwd is the case''s writable sandbox; where sleep/ps/tr are not in /usr/bin:/bin, a case could plant ./sleep or ./ps for the watcher to run and stall its own leash. Arch and Ubuntu are unaffected: /usr/bin is searched first.'
+    suggested_action: 'Keep only absolute entries of process.env.PATH in leashEnv(), with a test where PATH holds "" and "." and the leash PATH has no non-absolute entry.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 10
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false. TASK-234-QA-10 lets a case influence its own leash only on a host with a relative or empty PATH entry and no sleep/ps in /usr/bin:/bin.'
+  performance:
+    status: PASS
+    notes: 'QA-9 fixed: the watcher finds sleep on the host PATH.'
+  reliability:
+    status: PASS
+    notes: 'CI Test (Node 22) passed on 3820a0de; a32dd8f0 pending.'
+  maintainability:
+    status: PASS
+    notes: 'Section 5 states the leash PATH.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'TASK-234-QA-10: keep only absolute entries of the probe PATH in leashEnv().'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'The QA-8 stderr assertion only bites where /bin/sh is bash; the leashed tests call leashed() directly rather than through a spawn site.'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+    - action: 'reapGroup EPERM ambiguity and watcher pid reuse (cycle-3 CR-3, CR-4).'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: READY
+  production: CONDITIONAL
+  conditions: ['TASK-234-QA-10 followed up']

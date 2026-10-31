@@ -377,18 +377,18 @@ stays as the judge.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.234.qa.4.probe-teardown-and-reap-hardening.md](./task.234.qa.4.probe-teardown-and-reap-hardening.md)
-- **Gate File**: [task.234.gate.4.probe-teardown-and-reap-hardening.yml](./task.234.gate.4.probe-teardown-and-reap-hardening.yml)
+- **Full Report**: [task.234.qa.5.probe-teardown-and-reap-hardening.md](./task.234.qa.5.probe-teardown-and-reap-hardening.md)
+- **Gate File**: [task.234.gate.5.probe-teardown-and-reap-hardening.yml](./task.234.gate.5.probe-teardown-and-reap-hardening.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: security-probe suite on Node 22 (272/272), `ci:fast` (6922, 0 fail)
+- **Tests Executed**: the security-probe suite on Node 22 (273/273) and `ci:fast` (6923 tests, 0 failed)
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- QA-7 (argv0) and QA-8 (leash environment) hold.
-- TASK-234-QA-9 (medium): the leash shell's `PATH` no longer includes the host `PATH`, so the watcher can spin where `sleep` is outside `/usr/bin:/bin`.
+- Every high finding from cycles 1–4 is fixed, each with a test and a mutation proof.
+- TASK-234-QA-10 (medium, follow-up): `leashEnv()` keeps relative `PATH` entries. This matters only on a host whose `PATH` holds one and that has no `sleep` or `ps` in `/usr/bin:/bin`.
 
 <!-- change-log-start -->
 ## Change Log
@@ -407,6 +407,7 @@ stays as the judge.
 | 2026-10-31 |  | QA findings fixed — TASK-234-QA-7 (case keeps its argv0), QA-8 (leash shell under a fixed env), 1 iteration | qa-fix |
 | 2026-10-31 |  | QA gate CONCERNS (90/100) — 1 medium finding (leash PATH drops the host PATH) | qa-task |
 | 2026-10-31 |  | QA findings fixed — TASK-234-QA-9 (leash PATH is the probe's own), 1 iteration | qa-fix |
+| 2026-10-31 |  | QA gate CONCERNS (90/100) — 1 medium follow-up (relative PATH entries reach the leash shell); QA budget exhausted | qa-task |
 <!-- change-log-end -->
 
 ---
