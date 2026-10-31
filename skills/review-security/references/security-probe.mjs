@@ -1069,12 +1069,16 @@ function leashScript(extraFds) {
  * is the probe's own, after /usr/bin:/bin, so the watcher finds `sleep` and
  * `ps` on a host that keeps them elsewhere (NixOS): there, a bare
  * /usr/bin:/bin left `sleep` failing and the watcher spinning (TASK-234-QA-9).
- * The host chooses this PATH, never the case.
+ * The host chooses this PATH, never the case — and only its absolute entries:
+ * the leash shell runs in the case's own directory, so `.`, an empty entry or
+ * any relative one would let the case plant the `sleep` or `ps` the watcher
+ * runs (TASK-234-QA-10).
  */
 function leashEnv() {
-  return {
-    PATH: ["/usr/bin:/bin", process.env.PATH].filter(Boolean).join(":"),
-  };
+  const host = (process.env.PATH ?? "")
+    .split(":")
+    .filter((entry) => entry.startsWith("/"));
+  return { PATH: ["/usr/bin", "/bin", ...host].join(":") };
 }
 
 /**

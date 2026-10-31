@@ -7790,6 +7790,43 @@ test("leashed: the leash shell finds tools on the host PATH, not the case's (TAS
   }
 });
 
+test("leashed: a relative or empty entry on the host PATH never lets the case plant the watcher's tools (TASK-234-QA-10)", () => {
+  // The leash shell runs in the case's cwd. A tool the case could write there
+  // must not resolve, whichever spelling of "here" the host PATH carries.
+  const cwd = mkdtempSync(join(tmpdir(), "t234-relpath-"));
+  const saved = process.env.PATH;
+  try {
+    mkdirSync(join(cwd, "rel"));
+    for (const d of [cwd, join(cwd, "rel")]) {
+      writeFileSync(join(d, "t234-planted"), "#!/bin/sh\n", { mode: 0o755 });
+    }
+    process.env.PATH = `.::rel:${saved}:`;
+    const l = leashed("true", [], { env: { PATH: "/usr/bin:/bin" }, cwd });
+    process.env.PATH = saved;
+    const r = spawnSync("/bin/sh", ["-c", "command -v t234-planted"], {
+      cwd,
+      env: l.env,
+      encoding: "utf8",
+    });
+    assert.equal(r.stdout, "", `the leash shell resolved ${r.stdout.trim()}`);
+    // Positive control: the same lookup with the relative entries kept does
+    // find the planted tool, so the empty result above is the filter's.
+    const control = spawnSync("/bin/sh", ["-c", "command -v t234-planted"], {
+      cwd,
+      env: { PATH: `.::rel:${saved}` },
+      encoding: "utf8",
+    });
+    assert.notEqual(
+      control.stdout.trim(),
+      "",
+      "the plant is not findable at all",
+    );
+  } finally {
+    process.env.PATH = saved;
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
 test("forceRemoveTree: a sandbox root replaced by a symlink is removed as a link, and its target keeps its modes (TASK-234-QA-4)", (t) => {
   if (process.getuid?.() === 0) return t.skip("root reads through mode 000");
   const dir = mkdtempSync(join(tmpdir(), "t234-rootlink-"));

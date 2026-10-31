@@ -408,6 +408,7 @@ stays as the judge.
 | 2026-10-31 |  | QA gate CONCERNS (90/100) — 1 medium finding (leash PATH drops the host PATH) | qa-task |
 | 2026-10-31 |  | QA findings fixed — TASK-234-QA-9 (leash PATH is the probe's own), 1 iteration | qa-fix |
 | 2026-10-31 |  | QA gate CONCERNS (90/100) — 1 medium follow-up (relative PATH entries reach the leash shell); QA budget exhausted | qa-task |
+| 2026-10-31 |  | QA findings fixed — TASK-234-QA-10 (leash PATH keeps absolute entries only), 1 iteration; one QA cycle granted | qa-fix |
 <!-- change-log-end -->
 
 ---
