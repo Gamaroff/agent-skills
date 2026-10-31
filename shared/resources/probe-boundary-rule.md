@@ -234,9 +234,12 @@ takes it.
   probe holding its timeout is gone. So each case runs on a leash: it is `exec`'d
   under `/bin/sh` beside a watcher in its group, which kills the group within
   about 0.2 s of the case's parent ceasing to be the probe. The case's pid,
-  signals, exit status and environment are its own (it runs through `env -i`
-  with its environment spelled out). The cost is a few milliseconds per case
-  (TASK-234-QA-3).
+  signals, exit status, argv0 and environment are its own: it runs through
+  `env -i` with its environment spelled out and its command name as given (a
+  shell names itself by argv0 in its launch errors, TASK-234-QA-7), and the
+  leash shell runs under a fixed `PATH` only, so nothing in the case's
+  environment can retune it (TASK-234-QA-8). The cost is a few milliseconds per
+  case (TASK-234-QA-3).
 - **Removes the sandbox even when a case left it unreadable.** A case can leave a
   mode-000 directory, or one nested past `PATH_MAX` (which Node 22's `rmSync`
   fails with `ENAMETOOLONG`). On `EACCES`, `EPERM` or `ENAMETOOLONG` the teardown

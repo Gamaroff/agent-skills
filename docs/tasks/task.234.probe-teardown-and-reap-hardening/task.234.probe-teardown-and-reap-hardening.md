@@ -370,27 +370,26 @@ stays as the judge.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-31
-**Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.234.qa.2.probe-teardown-and-reap-hardening.md](./task.234.qa.2.probe-teardown-and-reap-hardening.md)
-- **Gate File**: [task.234.gate.2.probe-teardown-and-reap-hardening.yml](./task.234.gate.2.probe-teardown-and-reap-hardening.yml)
+- **Full Report**: [task.234.qa.3.probe-teardown-and-reap-hardening.md](./task.234.qa.3.probe-teardown-and-reap-hardening.md)
+- **Gate File**: [task.234.gate.3.probe-teardown-and-reap-hardening.yml](./task.234.gate.3.probe-teardown-and-reap-hardening.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: the security-probe suite on Node 22 (269/269); the task.234 tests on Node 22, 24 and 26; `ci:fast` on Node 26
-- **Phases Verified**: 2/4
-- **Critical Issues**: 1
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: FAIL, Maintainability: PASS
+- **Tests Executed**: the security-probe suite on Node 22 (271/271), the task.234 tests on Node 22 and 26, and `ci:fast` on Node 26
+- **Phases Verified**: 3/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- Both cycle-1 fixes hold.
-- TASK-234-QA-3 (high): `detached: true` lets a case survive a group kill of the probe, with no time limit (measured).
-- TASK-234-QA-4 (medium): `chmod -R` follows a symlinked sandbox root (measured on GNU chmod 9.12).
-- TASK-234-QA-5 and QA-6 (low): `reapGroup` throws on EPERM; the B test has no positive control.
+- The cycle-2 fixes hold: the leash, the root lstat, EPERM and the B control.
+- TASK-234-QA-7 (medium): the leash makes bash's argv0 the resolved path, so a fence launch failure is no longer recognised.
+- TASK-234-QA-8 (medium): the case environment (for example `SHELLOPTS`) reaches the leash shell and traces onto the case's stderr.
 
 <!-- change-log-start -->
 ## Change Log
@@ -405,6 +404,8 @@ stays as the judge.
 | 2026-10-31 |  | QA findings fixed — TASK-234-QA-1 (Node 22 teardown), QA-2 (D positive controls), 1 iteration | qa-fix |
 | 2026-10-31 |  | QA gate FAIL (70/100) — 4 findings (1 high: a group-killed probe orphans its case) | qa-task |
 | 2026-10-31 |  | QA findings fixed — TASK-234-QA-3 (case leash), QA-4 (root lstat), QA-5 (EPERM), QA-6 (B control), 1 iteration | qa-fix |
+| 2026-10-31 |  | QA gate CONCERNS (80/100) — 2 medium findings in the leash (argv0, leash env) | qa-task |
+| 2026-10-31 |  | QA findings fixed — TASK-234-QA-7 (case keeps its argv0), QA-8 (leash shell under a fixed env), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

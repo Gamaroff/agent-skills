@@ -53,6 +53,7 @@ import {
   FENCE_PREFIX,
   fixtureProblem,
   forceRemoveTree,
+  leashed,
   isLaunchFailure,
   isPythonCrash,
   main,
@@ -7717,6 +7718,51 @@ test("runProbeSpec: a probe killed as a group mid-case takes the running case wi
     spawnSync("chmod", ["-R", "u+rwx", "--", markerDir], { stdio: "ignore" });
     spawnSync("rm", ["-rf", "--", markerDir], { stdio: "ignore" });
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("leashed: the case sees its own argv0, exactly its own environment, and nothing of the leash on stderr (TASK-234-QA-7, QA-8)", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "t234-leashed-"));
+  // SHELLOPTS=xtrace retunes any bash that inherits it, the leash shell
+  // included; the case below is `env`, which it does not affect.
+  const env = {
+    PATH: process.env.PATH,
+    HOME: cwd,
+    SHELLOPTS: "xtrace",
+    "-DASH": "x",
+    MULTI: "a\nb",
+  };
+  const run = (command, argv) => {
+    const l = leashed(command, argv, { env, cwd });
+    assert.equal(l.command, "/bin/sh", "the case was not leashed");
+    return spawnSync(l.command, l.args, {
+      cwd,
+      env: l.env,
+      encoding: "utf8",
+      detached: true,
+    });
+  };
+  try {
+    // The command name, not the resolved path: bash names itself by argv0,
+    // and isLaunchFailure reads that name.
+    const named = run("bash", ["-c", 'printf %s "$0"']);
+    assert.equal(named.stdout, "bash", named.stderr);
+    // `env -0` prints the environment it was given, NUL-separated (values
+    // hold newlines), and is not itself retuned by SHELLOPTS.
+    const seen = run("env", ["-0"]);
+    assert.equal(seen.stderr, "", "the leash wrote to the case's stderr");
+    const got = Object.fromEntries(
+      seen.stdout
+        .split("\0")
+        .filter(Boolean)
+        .map((kv) => [
+          kv.slice(0, kv.indexOf("=")),
+          kv.slice(kv.indexOf("=") + 1),
+        ]),
+    );
+    assert.deepEqual(got, env);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
   }
 });
 

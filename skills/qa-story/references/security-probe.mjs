@@ -1065,24 +1065,41 @@ function leashScript(extraFds) {
   ].join("\n");
 }
 
+/** The leash shell's own environment: nothing of the case's reaches it. */
+const LEASH_ENV = Object.freeze({ PATH: "/usr/bin:/bin" });
+
 /**
- * `[command, argv]` to spawn a case on a leash (leashScript). The case is
- * exec'd through `env -i` with its environment spelled out, because `sh` adds
- * its own variables (SHLVL, `_`) to what it exports and a case's environment is
- * part of what is probed. A command that does not resolve on the child's PATH
- * is returned unchanged, so `spawnSync` reports ENOENT exactly as before: there
- * is no process to leash. So is one whose path holds `=`, which `env` would
- * read as an assignment.
+ * `{command, args, env}` to spawn a case on a leash (leashScript). The leash
+ * must be invisible to the case, so the case gets exactly what it would have
+ * got unleashed:
+ * - its environment, spelled out through `env -i`: `sh` adds its own variables
+ *   (SHLVL, `_`) to what it exports;
+ * - its command name, not the resolved path, which `env` looks up on the
+ *   case's own PATH as `spawnSync` would. A shell names itself by its argv0
+ *   (`bash: <script>: No such file…`), and isLaunchFailure reads that name
+ *   (TASK-234-QA-7).
+ *
+ * The leash shell itself runs under LEASH_ENV, never the case environment,
+ * which could otherwise retune it (`SHELLOPTS=xtrace` traced the leash onto the
+ * case's stderr, TASK-234-QA-8). A command that does not resolve on the case's
+ * PATH is returned unchanged, so `spawnSync` reports ENOENT exactly as before:
+ * there is no process to leash. So is one that holds `=`, which `env` would
+ * read as an assignment. Exported for its test.
  */
-function leashed(command, argv, { env = process.env, cwd, extraFds = 0 }) {
-  const exe = onPath(command, env.PATH ?? "", cwd);
-  if (exe === null || exe.includes("=")) return [command, argv];
+export function leashed(
+  command,
+  argv,
+  { env = process.env, cwd, extraFds = 0 },
+) {
+  if (command.includes("=") || onPath(command, env.PATH ?? "", cwd) === null) {
+    return { command, args: argv, env };
+  }
   const assignments = Object.entries(env)
     .filter(([k, v]) => k !== "" && !k.includes("=") && v !== undefined)
     .map(([k, v]) => `${k}=${v}`);
-  return [
-    "/bin/sh",
-    [
+  return {
+    command: "/bin/sh",
+    args: [
       "-c",
       leashScript(extraFds),
       "sh",
@@ -1091,10 +1108,11 @@ function leashed(command, argv, { env = process.env, cwd, extraFds = 0 }) {
       "-i",
       "--",
       ...assignments,
-      exe,
+      command,
       ...argv,
     ],
-  ];
+    env: LEASH_ENV,
+  };
 }
 
 /** The executable `command` names on `pathVar`, searched as execvp would. */
@@ -2033,29 +2051,27 @@ export function runProbeSpec({
       }
       const before = snapshotTree(sandboxRoot, workDirName);
 
-      const caseEnv = sandboxEnv({ cwd: workDir });
-      const child = spawnSync(
-        ...leashed(process.execPath, ["--input-type=module", "-e", RUNNER], {
-          env: caseEnv,
-          cwd: workDir,
-        }),
-        {
-          input: JSON.stringify({
-            entryPath: resolved.entryPath,
-            exportName: resolved.exportName,
-            input: c.input,
-            // null when --args-json was not given; the runner's own
-            // Array.isArray default is the one place the fallback lives.
-            extraArgs: base.args,
-          }),
-          cwd: workDir,
-          env: caseEnv,
-          encoding: "utf8",
-          timeout: perCaseTimeout,
-          maxBuffer: 8 * 1024 * 1024,
-          detached: true,
-        },
+      const leash = leashed(
+        process.execPath,
+        ["--input-type=module", "-e", RUNNER],
+        { env: sandboxEnv({ cwd: workDir }), cwd: workDir },
       );
+      const child = spawnSync(leash.command, leash.args, {
+        input: JSON.stringify({
+          entryPath: resolved.entryPath,
+          exportName: resolved.exportName,
+          input: c.input,
+          // null when --args-json was not given; the runner's own
+          // Array.isArray default is the one place the fallback lives.
+          extraArgs: base.args,
+        }),
+        cwd: workDir,
+        env: leash.env,
+        encoding: "utf8",
+        timeout: perCaseTimeout,
+        maxBuffer: 8 * 1024 * 1024,
+        detached: true,
+      });
       reapGroup(child.pid);
 
       const after = snapshotTree(sandboxRoot, workDirName);
@@ -2417,10 +2433,11 @@ function watchedSpawn(
   const before = snapshotTree(sandboxRoot, workDirName);
   const scriptDirBefore = listDirStamps(scriptDir);
   // extraFds: further pipes after stderr, read back as child.output[3…].
-  const child = spawnSync(...leashed(command, argv, { env, cwd, extraFds }), {
+  const leash = leashed(command, argv, { env, cwd, extraFds });
+  const child = spawnSync(leash.command, leash.args, {
     input: "",
     cwd,
-    env,
+    env: leash.env,
     encoding: "utf8",
     timeout: timeoutMs,
     maxBuffer: 8 * 1024 * 1024,
