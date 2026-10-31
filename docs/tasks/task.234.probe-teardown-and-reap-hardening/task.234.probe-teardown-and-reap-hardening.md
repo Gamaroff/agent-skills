@@ -5,18 +5,20 @@ type: task
 description: "Close task.232 QA gate 3's four low follow-ups in security-probe.mjs: a teardown that survives a tree deeper than PATH_MAX, the chmod symlink-swap race, a hardened QA2-1 test, and a reap of each case's process group before its path assertions are read."
 tags: [security-probe, finalise, qa-task, testing]
 category: testing
-status: ready-for-review
+status: accepted
 priority: Low
 created: 2026-10-26
 updated: 2026-10-31
 assignee:
 estimated_effort_hours: 16
 github_issue: 750
+pr_number: 800
+completed_date: 2026-10-31
 ---
 
 # Technical Task: Probe sandbox teardown and process-group reap
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.234.review.1.probe-teardown-and-reap-hardening.md` implemented 2026-10-31
 **GitHub Issue**: [#750](https://github.com/Gamaroff/agent-skills/issues/750)
 
@@ -305,7 +307,8 @@ running process.
 - [x] The suite's wall time grows by no more than the D tests' waits (about 0.6 s per spawn site).
       *(QA fix 2: the leash for TASK-234-QA-3 adds a few ms per case, measured as +1.7 to +3.2 s
       (about 7–10%) on the 265 pre-existing probe tests at load 3.3–4.4, beyond the D waits. That
-      is accepted as the cost of bounding a case past a killed probe.)*
+      is accepted as the cost of bounding a case past a killed probe — amendment approved by
+      Lorien Gamaroff at `/finalise`, 2026-10-31.)*
       *(2026-10-31, load ~1.0–1.2: the 265 existing tests 25.86/25.90 s on develop vs 26.00/26.03 s
       on the branch, +0.14 s; the whole file grows ~1.3 s, the two 0.6 s D waits plus the A and B
       runs.)*
@@ -390,6 +393,27 @@ stays as the judge.
 - Every finding from QA cycles 1–6 is closed: TASK-234-QA-1 through QA-12.
 - One low cleanup in a test helper is carried to `recommendations.future`.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.234.qa.7.probe-teardown-and-reap-hardening.md`
+**Gate File**: `task.234.gate.7.probe-teardown-and-reap-hardening.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100
+
+✅ **Success Criteria:** 9/9. #5 (wall time) passes as amended; the owner approved that amendment on 2026-10-31.
+✅ **Tests & PR:** PR #800. The 5c review was CONCERNS, with two doc-only findings, both fixed. CI is green on `ce15a175`.
+✅ **Documentation:** `probe-boundary-rule.md` § 5 and the CHANGELOG `[Unreleased]` entry.
+✅ **Security Review:** the checklist is clean. The zero-probe guard is cleared by a human override, approved by the owner, resting on the QA-4 test and the stated race limit. The engine has not probed this guard.
+⚠️ **Compliance Review:** not applicable (internal tooling).
+
+**Task marked as ACCEPTED on:** 2026-10-31
+
+**Detailed Verification Log:** See `task.234.dod.1.probe-teardown-and-reap-hardening.md` for the complete verification evidence and the owner decisions.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -412,6 +436,7 @@ stays as the judge.
 | 2026-10-31 |  | QA gate FAIL (70/100) — CI red since a32dd8f0 (ci-tool-skips reads test stand-ins as tools); granted budget exhausted | qa-task |
 | 2026-10-31 |  | QA findings fixed — TASK-234-QA-11 (stand-in names passed as argv), QA-12 (tests assert the leash), 1 iteration; one more QA cycle granted | qa-fix |
 | 2026-10-31 |  | QA gate PASS (95/100) — all findings closed; CI green on f9040a87 | qa-task |
+| 2026-10-31 | 1.2 | DoD verified — accepted (PR #800); #5 wall-time amendment and security probe override approved by the owner | finalise |
 <!-- change-log-end -->
 
 ---
