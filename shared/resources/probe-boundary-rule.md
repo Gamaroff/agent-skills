@@ -237,8 +237,9 @@ takes it.
   signals, exit status, argv0 and environment are its own: it runs through
   `env -i` with its environment spelled out and its command name as given (a
   shell names itself by argv0 in its launch errors, TASK-234-QA-7), and the
-  leash shell runs under a fixed `PATH` only, so nothing in the case's
-  environment can retune it (TASK-234-QA-8). The cost is a few milliseconds per
+  leash shell runs under the probe's own `PATH` only, so nothing in the case's
+  environment can retune it (TASK-234-QA-8) and the watcher still finds `sleep`
+  and `ps` where a host keeps them outside `/usr/bin:/bin` (TASK-234-QA-9). The cost is a few milliseconds per
   case (TASK-234-QA-3).
 - **Removes the sandbox even when a case left it unreadable.** A case can leave a
   mode-000 directory, or one nested past `PATH_MAX` (which Node 22's `rmSync`

@@ -1050,7 +1050,6 @@ function leashScript(extraFds) {
   return [
     "p=$1; shift",
     "(",
-    "  PATH=/usr/bin:/bin:$PATH",
     // Sleep first: most cases end inside one interval and never pay for `ps`.
     // Never `while sleep`: a sleep that fails would kill the case at once.
     "  while :; do",
@@ -1065,8 +1064,18 @@ function leashScript(extraFds) {
   ].join("\n");
 }
 
-/** The leash shell's own environment: nothing of the case's reaches it. */
-const LEASH_ENV = Object.freeze({ PATH: "/usr/bin:/bin" });
+/**
+ * The leash shell's own environment: nothing of the case's reaches it. Its PATH
+ * is the probe's own, after /usr/bin:/bin, so the watcher finds `sleep` and
+ * `ps` on a host that keeps them elsewhere (NixOS): there, a bare
+ * /usr/bin:/bin left `sleep` failing and the watcher spinning (TASK-234-QA-9).
+ * The host chooses this PATH, never the case.
+ */
+function leashEnv() {
+  return {
+    PATH: ["/usr/bin:/bin", process.env.PATH].filter(Boolean).join(":"),
+  };
+}
 
 /**
  * `{command, args, env}` to spawn a case on a leash (leashScript). The leash
@@ -1079,7 +1088,7 @@ const LEASH_ENV = Object.freeze({ PATH: "/usr/bin:/bin" });
  *   (`bash: <script>: No such file…`), and isLaunchFailure reads that name
  *   (TASK-234-QA-7).
  *
- * The leash shell itself runs under LEASH_ENV, never the case environment,
+ * The leash shell itself runs under leashEnv(), never the case environment,
  * which could otherwise retune it (`SHELLOPTS=xtrace` traced the leash onto the
  * case's stderr, TASK-234-QA-8). A command that does not resolve on the case's
  * PATH is returned unchanged, so `spawnSync` reports ENOENT exactly as before:
@@ -1111,7 +1120,7 @@ export function leashed(
       command,
       ...argv,
     ],
-    env: LEASH_ENV,
+    env: leashEnv(),
   };
 }
 

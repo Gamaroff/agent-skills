@@ -373,23 +373,22 @@ stays as the judge.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-31
-**Quality Score**: 80/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.234.qa.3.probe-teardown-and-reap-hardening.md](./task.234.qa.3.probe-teardown-and-reap-hardening.md)
-- **Gate File**: [task.234.gate.3.probe-teardown-and-reap-hardening.yml](./task.234.gate.3.probe-teardown-and-reap-hardening.yml)
+- **Full Report**: [task.234.qa.4.probe-teardown-and-reap-hardening.md](./task.234.qa.4.probe-teardown-and-reap-hardening.md)
+- **Gate File**: [task.234.gate.4.probe-teardown-and-reap-hardening.yml](./task.234.gate.4.probe-teardown-and-reap-hardening.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: the security-probe suite on Node 22 (271/271), the task.234 tests on Node 22 and 26, and `ci:fast` on Node 26
-- **Phases Verified**: 3/4
+- **Tests Executed**: security-probe suite on Node 22 (272/272), `ci:fast` (6922, 0 fail)
+- **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- The cycle-2 fixes hold: the leash, the root lstat, EPERM and the B control.
-- TASK-234-QA-7 (medium): the leash makes bash's argv0 the resolved path, so a fence launch failure is no longer recognised.
-- TASK-234-QA-8 (medium): the case environment (for example `SHELLOPTS`) reaches the leash shell and traces onto the case's stderr.
+- QA-7 (argv0) and QA-8 (leash environment) hold.
+- TASK-234-QA-9 (medium): the leash shell's `PATH` no longer includes the host `PATH`, so the watcher can spin where `sleep` is outside `/usr/bin:/bin`.
 
 <!-- change-log-start -->
 ## Change Log
@@ -406,6 +405,8 @@ stays as the judge.
 | 2026-10-31 |  | QA findings fixed — TASK-234-QA-3 (case leash), QA-4 (root lstat), QA-5 (EPERM), QA-6 (B control), 1 iteration | qa-fix |
 | 2026-10-31 |  | QA gate CONCERNS (80/100) — 2 medium findings in the leash (argv0, leash env) | qa-task |
 | 2026-10-31 |  | QA findings fixed — TASK-234-QA-7 (case keeps its argv0), QA-8 (leash shell under a fixed env), 1 iteration | qa-fix |
+| 2026-10-31 |  | QA gate CONCERNS (90/100) — 1 medium finding (leash PATH drops the host PATH) | qa-task |
+| 2026-10-31 |  | QA findings fixed — TASK-234-QA-9 (leash PATH is the probe's own), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

@@ -7766,6 +7766,30 @@ test("leashed: the case sees its own argv0, exactly its own environment, and not
   }
 });
 
+test("leashed: the leash shell finds tools on the host PATH, not the case's (TASK-234-QA-9)", () => {
+  // A host that keeps `sleep` and `ps` outside /usr/bin:/bin (NixOS) is stood
+  // in for by a tool that exists only in a directory on the probe's PATH.
+  const dir = mkdtempSync(join(tmpdir(), "t234-hostpath-"));
+  const saved = process.env.PATH;
+  try {
+    writeFileSync(join(dir, "t234-host-tool"), "#!/bin/sh\n", { mode: 0o755 });
+    process.env.PATH = `${dir}:${saved}`;
+    const l = leashed("true", [], {
+      env: { PATH: "/usr/bin:/bin" },
+      cwd: dir,
+    });
+    process.env.PATH = saved;
+    const r = spawnSync("/bin/sh", ["-c", "command -v t234-host-tool"], {
+      env: l.env,
+      encoding: "utf8",
+    });
+    assert.equal(r.stdout.trim(), join(dir, "t234-host-tool"), r.stderr);
+  } finally {
+    process.env.PATH = saved;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("forceRemoveTree: a sandbox root replaced by a symlink is removed as a link, and its target keeps its modes (TASK-234-QA-4)", (t) => {
   if (process.getuid?.() === 0) return t.skip("root reads through mode 000");
   const dir = mkdtempSync(join(tmpdir(), "t234-rootlink-"));
