@@ -5,17 +5,17 @@ type: task
 description: "When the probe script Node resolved earlier in the process is deleted and a different resolution appears (a directory's index.js in place of a .js file, or the reverse), the probe finds the replacement instead of reporting it missing until restart."
 tags: [loop-supervisor, adapters, probe]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: Low
 estimated_effort_hours: 2
 created: 2026-10-22
-updated: 2026-10-22
+updated: 2026-10-31
 github_issue: 725
 ---
 
 # Technical Task: loop-supervisor: find a replacement probe script after a stale hit
 
-**Status:** Planned
+**Status:** Ready for Review
 **GitHub Issue**: [#725](https://github.com/Gamaroff/agent-skills/issues/725)
 
 ---
@@ -103,20 +103,20 @@ None - API stable. `resolvesAsMain` gains an optional second parameter and becom
 
 **Risk:** Low. **Dependencies:** task.224 (merged).
 
-- [ ] Add `resolveInFreshNode(file)` (no shell, timeout, `null` on failure).
-- [ ] Give `resolvesAsMain` the `freshResolve` parameter, and call it only when the resolved file is gone.
-- [ ] Update `resolvesAsMain`'s doc comment: why a stale hit goes to a fresh process, and why `Module._pathCache` cannot be used.
-- [ ] Export `resolvesAsMain`.
+- [x] Add `resolveInFreshNode(file)` (no shell, timeout, `null` on failure).
+- [x] Give `resolvesAsMain` the `freshResolve` parameter, and call it only when the resolved file is gone.
+- [x] Update `resolvesAsMain`'s doc comment: why a stale hit goes to a fresh process, and why `Module._pathCache` cannot be used.
+- [x] Export `resolvesAsMain`.
 
 ### Phase 2: Tests and changelog
 
 **Risk:** Low. **Dependencies:** Phase 1.
 
-- [ ] One-process replace tests, both directions (§ 8).
-- [ ] A stale hit with nothing replacing it still reads as missing.
-- [ ] Counting-`freshResolve` tests: no call on a live hit or a miss, one call on a stale hit.
-- [ ] Mutation-prove: replace the fallback with `return false` and confirm both replace tests go red. Restore it, then check `git diff --stat`.
-- [ ] CHANGELOG entry. Run the loop-supervisor suite with the `.agents/skills` symlink moved aside, and `npm run validate -- skills/loop-supervisor/`.
+- [x] One-process replace tests, both directions (§ 8).
+- [x] A stale hit with nothing replacing it still reads as missing.
+- [x] Counting-`freshResolve` tests: no call on a live hit or a miss, one call on a stale hit.
+- [x] Mutation-prove: replace the fallback with `return false` and confirm both replace tests go red. Restore it, then check `git diff --stat`.
+- [x] CHANGELOG entry. Run the loop-supervisor suite with the `.agents/skills` symlink moved aside, and `npm run validate -- skills/loop-supervisor/`.
 
 ---
 
@@ -161,23 +161,23 @@ The existing QA-3 pair (same file deleted and restored) and the five agreement c
 
 ### Functional
 
-- [ ] SC1: in one process, after `tools/select.js` resolves and is replaced by `tools/select/index.js`, `probeMissing` returns `null` (Phase 1 adds the branch that returns it).
-- [ ] SC2: the reverse swap (`tools/select/index.js` → `tools/select.js`) also returns `null`.
-- [ ] SC3: a stale hit with no replacement still returns a reason starting `probe script not found:`.
-- [ ] SC4: the five agreement tests and the QA-3 pair pass unchanged.
+- [x] SC1: in one process, after `tools/select.js` resolves and is replaced by `tools/select/index.js`, `probeMissing` returns `null` (Phase 1 adds the branch that returns it).
+- [x] SC2: the reverse swap (`tools/select/index.js` → `tools/select.js`) also returns `null`.
+- [x] SC3: a stale hit with no replacement still returns a reason starting `probe script not found:`.
+- [x] SC4: the five agreement tests and the QA-3 pair pass unchanged.
 
 ### Performance
 
-- [ ] SC5: `freshResolve` runs only on a stale hit, with 0 calls on a live hit or a miss (spawn-count test). `probeMissing` still makes one `exists` call per probe (`adapters.test.mjs:597` passes unchanged).
+- [x] SC5: `freshResolve` runs only on a stale hit, with 0 calls on a live hit or a miss (spawn-count test). `probeMissing` still makes one `exists` call per probe (`adapters.test.mjs:597` passes unchanged).
 
 ### Code Quality
 
-- [ ] SC6: mutation-proven. With the fallback replaced by `return false`, the SC1 and SC2 tests fail.
+- [x] SC6: mutation-proven. With the fallback replaced by `return false`, the SC1 and SC2 tests fail.
 - [ ] SC7: the loop-supervisor unit suite passes locally, with the symlink moved aside, and in CI. `npm run validate -- skills/loop-supervisor/` passes.
 
 ### Migration
 
-- [ ] SC8: CHANGELOG `[Unreleased]` cites task 225.
+- [x] SC8: CHANGELOG `[Unreleased]` cites task 225.
 
 ---
 
@@ -225,21 +225,45 @@ For a timeout or a message problem, fix it forward in `resolveInFreshNode`.
 - **Non-critical**: wording. Fix it forward.
 
 ---
-
 <!-- change-log-start -->
 ## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-10-22 | 1.0 | Initial draft — follow-up to task.224 QA gate 4 CR-1 | create-task |
+| 2026-10-31 | 1.1 | Review passed (9/10) — no changes required; stale-hit and fresh-resolve claims re-run on Node v26.8.2 | review-task |
+| 2026-10-31 |  | Status → ready-for-development | review-task |
+| 2026-10-31 |  | Implemented — 3 files, 3 tests | develop |
 <!-- change-log-end -->
+
+---
+
+## Implementation Summary
+
+**Completion Date:** 2026-10-31
+
+`resolvesAsMain` now resolves a stale `require.resolve` hit again in a fresh `node` process, so a probe script replaced in another shape is found without a restart. A live hit and a miss behave as before and spawn nothing.
+
+### Approach
+
+`adapters.js` adds `resolveInFreshNode(file)`: `execFileSync(process.execPath, ["-e", "process.stdout.write(require.resolve(process.argv[1]))", file])`, no shell, stdin and stderr ignored, a 10 s timeout, and `null` on any failure or empty output. `resolvesAsMain(file, freshResolve = resolveInFreshNode)` keeps its two existing exits (a throw → `false`; the resolved file exists → `true`) and adds a third: when the resolved file is gone, it returns `freshResolve(file) !== null`. The doc comment says why a stale hit goes to a fresh process and why `Module._pathCache` cannot be used. `resolvesAsMain` is exported so a test can inject `freshResolve`. `probeMissing` is unchanged.
+
+### Testing Results
+
+- `command node --test 'evals/loop-supervisor/unit/*.test.mjs'` with the gitignored `.agents/skills` symlink moved aside: 256 tests, 255 pass, 0 fail, 1 skipped. Three tests are new: "probeMissing finds a replacement after a stale hit: file → directory" and "…: directory → file" (SC1, SC2, and SC3 as each test's last step), and "resolvesAsMain spawns a fresh resolve only on a stale hit" (SC5: 0 calls on a miss and a live hit, exactly one on a stale hit). The five agreement tests, the QA-3 pair and the one-`exists`-call test pass unchanged (SC4).
+- **Mutation-proven (SC6):** with `return freshResolve(file) !== null;` replaced by `return false;`, both swap tests and the spawn-count test fail (63 pass / 3 fail in `adapters.test.mjs`). The file was restored from a backup and `git diff --stat` checked.
+- `npm run validate -- skills/loop-supervisor/`: passes. Prettier: the three changed source files pass. Fast gate (`npm run ci:fast`) and CI: recorded in the implementation report.
+
+### Deferred Work
+
+None. The review's optional hardening (check that the fresh result exists, against a `NODE_OPTIONS` hook that prints to stdout) was not taken: the plan keeps `!== null`, and the environment is the operator's.
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1: The fallback
-- [ ] Phase 2: Tests and changelog
+- [x] Phase 1: The fallback
+- [x] Phase 2: Tests and changelog
 
 ## References
 
