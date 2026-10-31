@@ -68,6 +68,21 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **security-probe: sandbox teardown and background writes (task 234).** A case that left a
+  mode-000 directory nested past `PATH_MAX` crashed `runProbeSpec` with `ENAMETOOLONG`; on
+  `EACCES`, `EPERM` or `ENAMETOOLONG` (Node 22's `rmSync` hits the last on a deep tree) the
+  teardown now runs `chmod -R u+rwx` and `rm -rf`, which descend by relative path and follow no
+  symlink below the root; a root that is not a real directory is removed as an entry, its target
+  untouched, so nothing outside the sandbox changes mode. Each case (and a shell-argv setup) now
+  runs `detached` and its process group is killed before its side effects are read: a background
+  grandchild that released the case's stdio could otherwise write after the after-snapshot,
+  turning an `absent` or `removed` check into a false pass. Each case also runs on a leash that
+  kills its group once the probe is gone, so a group-killed probe (Ctrl-C, a timeout) no longer
+  leaves its case running unbounded. The leash is invisible to the case: the case keeps its own
+  argv0 and exactly its own environment. The leash runs under the probe's `PATH`, keeping only its
+  absolute entries, so a case cannot plant the tools the leash calls. A grandchild that calls `setsid` is not reached;
+  `probe-boundary-rule.md` § 5 states the limit. The QA2-1 test now
+  asserts its sandbox is gone, and the two root-guarded tests report a skip instead of a pass.
 - **loop-supervisor: a replacement probe script is found after a stale hit (task 225).** When the
   probe script Node resolved earlier is deleted and another shape replaces it (`tools/select/index.js`
   for `tools/select.js`, or the reverse), the probe resolves it again in a fresh `node` process and

@@ -220,6 +220,40 @@ takes it.
   and reports any write that escapes, whatever the probe claimed to do.
 - Takes its per-case timeout from the **shared spawn budget**
   (`spawn-budget.mjs`), never a literal.
+- **Kills the case's process group before reading its side effects.** Each case,
+  and a shell-argv case's setup, is spawned `detached`, so it leads its own
+  process group; once the spawn returns, the group gets `SIGKILL`. A background
+  grandchild that released the case's stdio (`… >/dev/null 2>&1 &`, or
+  `spawn(…, { stdio: "ignore" }).unref()`) outlives the spawn, and a write it
+  makes after the after-snapshot would otherwise turn an `absent` or `removed`
+  check into a false pass. One that keeps the stdio needs no kill: the spawn waits
+  for it. **The limit:** a grandchild that calls `setsid` (or `setpgid`) leaves the
+  group and is not reached (task.234).
+- **Takes the case down with the probe.** Its own group also puts a case out of
+  reach of a group kill of the probe (Ctrl-C, a tool or CI timeout), and the
+  probe holding its timeout is gone. So each case runs on a leash: it is `exec`'d
+  under `/bin/sh` beside a watcher in its group, which kills the group within
+  about 0.2 s of the case's parent ceasing to be the probe. The case's pid,
+  signals, exit status, argv0 and environment are its own: it runs through
+  `env -i` with its environment spelled out and its command name as given (a
+  shell names itself by argv0 in its launch errors, TASK-234-QA-7), and the
+  leash shell runs under the probe's own `PATH` only, so nothing in the case's
+  environment can retune it (TASK-234-QA-8) and the watcher still finds `sleep`
+  and `ps` where a host keeps them outside `/usr/bin:/bin` (TASK-234-QA-9). Only
+  the absolute entries of that `PATH` are kept: the leash shell runs in the
+  case's directory, where a relative entry would find a tool the case planted
+  (TASK-234-QA-10). The cost is a few milliseconds per
+  case (TASK-234-QA-3).
+- **Removes the sandbox even when a case left it unreadable.** A case can leave a
+  mode-000 directory, or one nested past `PATH_MAX` (which Node 22's `rmSync`
+  fails with `ENAMETOOLONG`). On `EACCES`, `EPERM` or `ENAMETOOLONG` the teardown
+  runs `chmod -R u+rwx` then `rm -rf`: both descend by relative path, so depth
+  does not stop them, and neither follows a symlink below the root. GNU `chmod`
+  does follow a symlink named as its argument, so the root is `lstat`'d first and
+  anything but a real directory is removed as an entry and reported, its target
+  untouched (TASK-234-QA-4). A process still running inside the sandbox could
+  change a mode, or swap the root, between those calls; the group kill above
+  leaves only a `setsid` grandchild able to (task.234).
 
 **What it does not do, stated honestly:**
 
@@ -323,10 +357,11 @@ takes it.
     another directory **ahead of the trip-wire on `PATH`** (`export
     PATH="/usr/local/bin:$PATH"`) — with `--fake-gh` given this bypasses the
     fixture too, and the record still names the fixture; and a `gh` call
-    **backgrounded past the spawn**, which runs after the sandbox and its
-    trip-wire are gone. Rows pin the absolute path and the `PATH` prepend
-    (task.140 QA cycles 2 and 4). All three behave the same before task.140;
-    closing them is follow-up work. Otherwise: run bare, the real `gh` fails from the
+    **backgrounded past the spawn** by a grandchild that called `setsid`, which
+    leaves the case's process group, escapes the group kill (§ 5) and runs after
+    the sandbox and its trip-wire are gone. Rows pin the absolute path and the
+    `PATH` prepend (task.140 QA cycles 2 and 4). All three behave the same before
+    task.140; closing them is follow-up work. Otherwise: run bare, the real `gh` fails from the
     sandbox cwd, the function takes its read-failed passthrough, and the verdict
     would land on `absent` / `present-but-inert` — the values a missing control
     produces — with nothing but `fake_gh: null` to say "could not look". The

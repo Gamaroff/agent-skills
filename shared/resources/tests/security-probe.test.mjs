@@ -16,7 +16,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   chmodSync,
@@ -28,6 +28,7 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -51,6 +52,8 @@ import {
   extractFencedBlock,
   FENCE_PREFIX,
   fixtureProblem,
+  forceRemoveTree,
+  leashed,
   isLaunchFailure,
   isPythonCrash,
   main,
@@ -7453,28 +7456,162 @@ test("fence entry: an absent path the run left unreadable is a reproduction even
   }
 });
 
-test("runProbeSpec: a case that leaves a mode-000 directory still returns its results — the sandbox teardown restores permissions (QA2-1)", () => {
+/** A fence document whose one block runs the case's input, then prints `ok`. */
+const OK_BLOCK = {
+  "doc.md": ["## Block", "", "```bash", "<slot>", 'echo "ok"', "```", ""].join(
+    "\n",
+  ),
+};
+
+/**
+ * Run `fn` with TMPDIR pointed at a fresh directory, so the probe's sandbox
+ * (`mkdtempSync(join(tmpdir(), …))`) lands there. Returns `fn`'s result and
+ * what is left in that directory afterwards: a sandbox the teardown did not
+ * remove (task.234).
+ */
+function withFreshTmpdir(fn) {
+  const tmp = mkdtempSync(join(tmpdir(), "t234-tmp-"));
+  const saved = process.env.TMPDIR;
+  process.env.TMPDIR = tmp;
+  try {
+    const result = fn();
+    return { result, left: readdirSync(tmp) };
+  } finally {
+    if (saved === undefined) delete process.env.TMPDIR;
+    else process.env.TMPDIR = saved;
+    // Relative-path removal: if the teardown under test failed, `tmp` holds a
+    // tree past PATH_MAX that Node 22's rmSync cannot remove.
+    spawnSync("chmod", ["-R", "u+rwx", "--", tmp], { stdio: "ignore" });
+    spawnSync("rm", ["-rf", "--", tmp], { stdio: "ignore" });
+  }
+}
+
+test("runProbeSpec: a case that leaves a mode-000 directory still returns its results — the sandbox teardown restores permissions (QA2-1)", (t) => {
   // Root reads through mode 000, so rmSync never fails there.
-  if (process.getuid?.() === 0) return;
-  const root = fenceRoot({
-    "doc.md": [
-      "## Block",
-      "",
-      "```bash",
-      "<slot>",
-      'echo "ok"',
-      "```",
-      "",
-    ].join("\n"),
-  });
+  if (process.getuid?.() === 0) return t.skip("root reads through mode 000");
+  const root = fenceRoot(OK_BLOCK);
+  try {
+    const { result: r, left } = withFreshTmpdir(() =>
+      runProbeSpec({
+        entry: "fence:doc.md#Block",
+        slot: "<slot>",
+        cases: [
+          fenceCase(
+            "f.lock",
+            "hostile",
+            "mkdir -p locked && chmod 000 locked",
+            {
+              expected: { exit: 0, stdout: "ok\n", absent: ["pwned"] },
+            },
+          ),
+        ],
+        repoRoot: root,
+      }),
+    );
+    assert.equal(r.cases.length, probeShells().length, JSON.stringify(r.cases));
+    for (const row of r.cases) {
+      assert.equal(row.outcome, "rejected", JSON.stringify(row));
+    }
+    assert.deepEqual(left, [], "the probe sandbox was not removed");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("runProbeSpec: a case that nests past PATH_MAX and leaves a mode-000 leaf still returns its results, and its sandbox is removed (task.234 A)", (t) => {
+  if (process.getuid?.() === 0) return t.skip("root reads through mode 000");
+  // Built by relative mkdir + cd, so the case never needs a path past PATH_MAX;
+  // 30 × 200 bytes is ~6,000, past Linux's 4,096. An absolute-path walk stops
+  // at ENAMETOOLONG and never reaches the leaf.
+  const seg = "a".repeat(200);
+  const deep = `for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do mkdir ${seg} && cd ${seg} || exit 1; done; { mkdir locked && chmod 000 locked; } || exit 9`;
+  const root = fenceRoot(OK_BLOCK);
+  try {
+    const { result: r, left } = withFreshTmpdir(() =>
+      runProbeSpec({
+        entry: "fence:doc.md#Block",
+        slot: "<slot>",
+        cases: [
+          fenceCase("f.deep", "hostile", deep, {
+            expected: { exit: 0, stdout: "ok\n", absent: ["pwned"] },
+          }),
+        ],
+        repoRoot: root,
+      }),
+    );
+    assert.equal(r.cases.length, probeShells().length, JSON.stringify(r.cases));
+    for (const row of r.cases) {
+      assert.equal(row.outcome, "rejected", JSON.stringify(row));
+    }
+    assert.deepEqual(left, [], "the probe sandbox was not removed");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("runProbeSpec: the teardown never follows a symlink out of the sandbox — a directory outside keeps its mode (task.234 B)", (t) => {
+  if (process.getuid?.() === 0) return t.skip("root reads through mode 000");
+  const outside = mkdtempSync(join(tmpdir(), "t234-outside-"));
+  chmodSync(outside, 0o500);
+  const root = fenceRoot(OK_BLOCK);
+  try {
+    // Positive control (TASK-234-QA-6): the chain exits 9 if any step fails,
+    // so a `rejected` row means the link was planted and `locked` is mode 000,
+    // which the first rmSync cannot list: the fallback ran.
+    const { result: r, left } = withFreshTmpdir(() =>
+      runProbeSpec({
+        entry: "fence:doc.md#Block",
+        slot: "<slot>",
+        cases: [
+          fenceCase(
+            "f.link",
+            "hostile",
+            `{ mkdir locked && ln -s '${outside}' locked/link && chmod 000 locked; } || exit 9`,
+            { expected: { exit: 0, stdout: "ok\n", absent: ["pwned"] } },
+          ),
+        ],
+        repoRoot: root,
+      }),
+    );
+    assert.equal(r.cases.length, probeShells().length, JSON.stringify(r.cases));
+    for (const row of r.cases) {
+      assert.equal(row.outcome, "rejected", JSON.stringify(row));
+    }
+    assert.deepEqual(left, [], "the probe sandbox was not removed");
+    assert.equal(
+      (statSync(outside).mode & 0o777).toString(8),
+      "500",
+      "the teardown changed the mode of a directory outside the sandbox",
+    );
+  } finally {
+    chmodSync(outside, 0o700);
+    rmSync(outside, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+const sleepMs = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+test("runProbeSpec: a shell case's background write that lands after the case exits is killed before it lands (task.234 D, watchedSpawn)", async () => {
+  // The grandchild releases the case's stdio; one that keeps it holds
+  // spawnSync open until it finishes, and its write is seen in time. It
+  // touches `started` first and the case waits for it, so an absent `late`
+  // means the write was killed, not that the grandchild never ran.
+  const markerDir = mkdtempSync(join(tmpdir(), "t234-marker-"));
+  const marker = join(markerDir, "late");
+  const started = join(markerDir, "started");
+  const root = fenceRoot(OK_BLOCK);
   try {
     const r = runProbeSpec({
       entry: "fence:doc.md#Block",
       slot: "<slot>",
       cases: [
-        fenceCase("f.lock", "hostile", "mkdir -p locked && chmod 000 locked", {
-          expected: { exit: 0, stdout: "ok\n", absent: ["pwned"] },
-        }),
+        fenceCase(
+          "f.late",
+          "hostile",
+          `(touch '${started}'; sleep 0.3; touch '${marker}') >/dev/null 2>&1 </dev/null & i=0; while [ ! -e '${started}' ] && [ $i -lt 200 ]; do sleep 0.01; i=$((i+1)); done`,
+          { expected: { exit: 0, stdout: "ok\n" } },
+        ),
       ],
       repoRoot: root,
     });
@@ -7482,12 +7619,259 @@ test("runProbeSpec: a case that leaves a mode-000 directory still returns its re
     for (const row of r.cases) {
       assert.equal(row.outcome, "rejected", JSON.stringify(row));
     }
+    assert.ok(existsSync(started), "the background grandchild never started");
+    await sleepMs(600);
+    assert.equal(existsSync(marker), false, "the background write landed");
   } finally {
+    rmSync(markerDir, { recursive: true, force: true });
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("compareExpected: a path the run left unreadable — a symlink loop, a mode-000 ancestor — is a mismatch, never a throw (QA1-4)", () => {
+test("runProbeSpec: a module case's background write that lands after the case exits is killed before it lands (task.234 D, module runner)", async () => {
+  const markerDir = mkdtempSync(join(tmpdir(), "t234-marker-"));
+  const marker = join(markerDir, "late");
+  const started = join(markerDir, "started");
+  // Not `detached`: the grandchild stays in the case's process group. It
+  // writes `started` at once and the export waits for it (up to 2 s), so an
+  // absent `late` means the write was killed, not that it never ran.
+  const grandchild = [
+    `const fs = require("node:fs");`,
+    `fs.writeFileSync(${JSON.stringify(started)}, "");`,
+    `setTimeout(() => fs.writeFileSync(${JSON.stringify(marker)}, ""), 300);`,
+  ].join(" ");
+  const root = fenceRoot({
+    "late.mjs": [
+      'import { spawn } from "node:child_process";',
+      'import { existsSync } from "node:fs";',
+      "export function validateHost(input) {",
+      `  spawn(process.execPath, ["-e", ${JSON.stringify(grandchild)}], { stdio: "ignore" }).unref();`,
+      "  const nap = new Int32Array(new SharedArrayBuffer(4));",
+      `  for (let i = 0; i < 200 && !existsSync(${JSON.stringify(started)}); i++) Atomics.wait(nap, 0, 0, 10);`,
+      "  return input;",
+      "}",
+      "",
+    ].join("\n"),
+  });
+  try {
+    const r = runProbeSpec({
+      sink: "url-authority",
+      entry: "late.mjs#validateHost",
+      cases: [CASES[0]],
+      repoRoot: root,
+    });
+    assert.equal(r.executed, 1, JSON.stringify(r.cases));
+    assert.ok(existsSync(started), "the background grandchild never started");
+    await sleepMs(600);
+    assert.equal(existsSync(marker), false, "the background write landed");
+  } finally {
+    rmSync(markerDir, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("runProbeSpec: a probe killed as a group mid-case takes the running case with it (TASK-234-QA-3)", async () => {
+  // A case is spawned `detached`, so a group kill of the probe — Ctrl-C, a tool
+  // or CI timeout — does not reach it, and the probe holding its timeout is
+  // gone. The leash kills the case once its parent is no longer the probe.
+  const markerDir = mkdtempSync(join(tmpdir(), "t234-leash-"));
+  const started = join(markerDir, "started");
+  const late = join(markerDir, "late");
+  const tmp = join(markerDir, "tmp");
+  mkdirSync(tmp);
+  const root = fenceRoot(OK_BLOCK);
+  const driver = join(markerDir, "driver.mjs");
+  const probeUrl = new URL("../security-probe.mjs", import.meta.url).href;
+  const slowCase = fenceCase(
+    "f.slow",
+    "hostile",
+    `touch '${started}'; sleep 1; touch '${late}'`,
+    { expected: { exit: 0, stdout: "ok\n" } },
+  );
+  writeFileSync(
+    driver,
+    [
+      `import { runProbeSpec } from ${JSON.stringify(probeUrl)};`,
+      `runProbeSpec(${JSON.stringify({ entry: "fence:doc.md#Block", slot: "<slot>", cases: [slowCase], repoRoot: root })});`,
+      "",
+    ].join("\n"),
+  );
+  // Its own group, so the kill below is the harness-timeout shape and does
+  // not reach this test runner.
+  const probe = spawn(process.execPath, [driver], {
+    detached: true,
+    stdio: "ignore",
+    env: { ...process.env, TMPDIR: tmp },
+  });
+  try {
+    for (let i = 0; i < 100 && !existsSync(started); i++) await sleepMs(50);
+    assert.ok(existsSync(started), "the case never started");
+    process.kill(-probe.pid, "SIGKILL");
+    await sleepMs(1600);
+    assert.equal(existsSync(late), false, "the case outlived the killed probe");
+  } finally {
+    try {
+      process.kill(-probe.pid, "SIGKILL");
+    } catch {
+      // already gone
+    }
+    spawnSync("chmod", ["-R", "u+rwx", "--", markerDir], { stdio: "ignore" });
+    spawnSync("rm", ["-rf", "--", markerDir], { stdio: "ignore" });
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("leashed: the case sees its own argv0, exactly its own environment, and nothing of the leash on stderr (TASK-234-QA-7, QA-8)", () => {
+  const cwd = mkdtempSync(join(tmpdir(), "t234-leashed-"));
+  // SHELLOPTS=xtrace retunes any bash that inherits it, the leash shell
+  // included; the case below is `env`, which it does not affect.
+  const env = {
+    PATH: process.env.PATH,
+    HOME: cwd,
+    SHELLOPTS: "xtrace",
+    "-DASH": "x",
+    MULTI: "a\nb",
+  };
+  const run = (command, argv) => {
+    const l = leashed(command, argv, { env, cwd });
+    assert.equal(l.command, "/bin/sh", "the case was not leashed");
+    return spawnSync(l.command, l.args, {
+      cwd,
+      env: l.env,
+      encoding: "utf8",
+      detached: true,
+    });
+  };
+  try {
+    // The command name, not the resolved path: bash names itself by argv0,
+    // and isLaunchFailure reads that name.
+    const named = run("bash", ["-c", 'printf %s "$0"']);
+    assert.equal(named.stdout, "bash", named.stderr);
+    // `env -0` prints the environment it was given, NUL-separated (values
+    // hold newlines), and is not itself retuned by SHELLOPTS.
+    const seen = run("env", ["-0"]);
+    assert.equal(seen.stderr, "", "the leash wrote to the case's stderr");
+    const got = Object.fromEntries(
+      seen.stdout
+        .split("\0")
+        .filter(Boolean)
+        .map((kv) => [
+          kv.slice(0, kv.indexOf("=")),
+          kv.slice(kv.indexOf("=") + 1),
+        ]),
+    );
+    assert.deepEqual(got, env);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+// What `/bin/sh` resolves `name` to under `env` from `cwd` ("" when nothing).
+// The name travels as an argument, never inside the script text: a literal
+// `command -v <name>` reads to tests/ci-tool-skips.test.js as a tool CI must
+// install, and these names are stand-ins the tests plant (TASK-234-QA-11).
+function shLookup(name, { env, cwd }) {
+  return spawnSync("/bin/sh", ["-c", 'command -v "$1"', "sh", name], {
+    cwd,
+    env,
+    encoding: "utf8",
+  }).stdout.trim();
+}
+
+// leashed() for a case whose command is /bin/sh, under a host PATH of
+// `hostPath`, asserting the case WAS leashed: an unleashed result carries the
+// case env, and a lookup under it would test nothing (TASK-234-QA-12).
+function leashUnderHostPath(hostPath, cwd) {
+  const saved = process.env.PATH;
+  try {
+    process.env.PATH = hostPath;
+    const l = leashed("/bin/sh", [], { env: { PATH: "/usr/bin:/bin" }, cwd });
+    assert.equal(l.command, "/bin/sh", "the case was not leashed");
+    assert.match(l.args[0], /^-c$/, "the case was not leashed");
+    return l;
+  } finally {
+    if (saved === undefined) delete process.env.PATH;
+    else process.env.PATH = saved;
+  }
+}
+
+test("leashed: the leash shell finds tools on the host PATH, not the case's (TASK-234-QA-9)", () => {
+  // A host that keeps `sleep` and `ps` outside /usr/bin:/bin (NixOS) is stood
+  // in for by a tool that exists only in a directory on the probe's PATH.
+  const dir = mkdtempSync(join(tmpdir(), "t234-hostpath-"));
+  try {
+    writeFileSync(join(dir, "t234-host-tool"), "#!/bin/sh\n", { mode: 0o755 });
+    const l = leashUnderHostPath(`${dir}:${process.env.PATH ?? ""}`, dir);
+    assert.equal(
+      shLookup("t234-host-tool", { env: l.env }),
+      join(dir, "t234-host-tool"),
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("leashed: a relative or empty entry on the host PATH never lets the case plant the watcher's tools (TASK-234-QA-10)", () => {
+  // The leash shell runs in the case's cwd. A tool the case could write there
+  // must not resolve, whichever spelling of "here" the host PATH carries.
+  const cwd = mkdtempSync(join(tmpdir(), "t234-relpath-"));
+  const host = process.env.PATH ?? "";
+  try {
+    mkdirSync(join(cwd, "rel"));
+    for (const d of [cwd, join(cwd, "rel")]) {
+      writeFileSync(join(d, "t234-planted"), "#!/bin/sh\n", { mode: 0o755 });
+    }
+    // Each spelling of "here" on its own, so a lookup that stops at the first
+    // match cannot hide one behind another.
+    for (const spelling of [".", "", "rel"]) {
+      // Positive control: this spelling does reach the plant when kept, so an
+      // empty result under the leash is the filter's, not an unfindable plant.
+      assert.notEqual(
+        shLookup("t234-planted", {
+          env: { PATH: `${spelling}:/nonexistent` },
+          cwd,
+        }),
+        "",
+        `the plant is not findable through "${spelling}"`,
+      );
+      const l = leashUnderHostPath(`${spelling}:${host}`, cwd);
+      assert.equal(
+        shLookup("t234-planted", { env: l.env, cwd }),
+        "",
+        `the leash shell resolved the plant through "${spelling}"`,
+      );
+    }
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("forceRemoveTree: a sandbox root replaced by a symlink is removed as a link, and its target keeps its modes (TASK-234-QA-4)", (t) => {
+  if (process.getuid?.() === 0) return t.skip("root reads through mode 000");
+  const dir = mkdtempSync(join(tmpdir(), "t234-rootlink-"));
+  const outside = join(dir, "outside");
+  mkdirSync(join(outside, "sub"), { recursive: true });
+  chmodSync(join(outside, "sub"), 0o500);
+  chmodSync(outside, 0o500);
+  const link = join(dir, "sandbox");
+  symlinkSync(outside, link);
+  try {
+    assert.throws(() => forceRemoveTree(link), /replaced by a symlink/);
+    assert.equal(existsSync(link), false, "the link was left in place");
+    for (const p of [outside, join(outside, "sub")]) {
+      assert.equal(
+        (statSync(p).mode & 0o777).toString(8),
+        "500",
+        `the restore changed the mode of ${p}, the link's target`,
+      );
+    }
+  } finally {
+    spawnSync("chmod", ["-R", "u+rwx", "--", dir], { stdio: "ignore" });
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("compareExpected: a path the run left unreadable — a symlink loop, a mode-000 ancestor — is a mismatch, never a throw (QA1-4)", (t) => {
   const run = { stdout: "", stderr: "", status: 0 };
   const loop = mkdtempSync(join(tmpdir(), "t232-eloop-"));
   try {
@@ -7504,7 +7888,7 @@ test("compareExpected: a path the run left unreadable — a symlink loop, a mode
     rmSync(loop, { recursive: true, force: true });
   }
   // Root reads through mode 000, so the EACCES half has nothing to measure there.
-  if (process.getuid?.() === 0) return;
+  if (process.getuid?.() === 0) return t.skip("root reads through mode 000");
   const locked = mkdtempSync(join(tmpdir(), "t232-eacces-"));
   try {
     mkdirSync(join(locked, "locked"));
