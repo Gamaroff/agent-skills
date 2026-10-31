@@ -98,8 +98,12 @@ assertion must go red.
 
 - `:1908`, the module runner inside `runProbeSpec`;
 - `:2287`, inside `watchedSpawn` (`:2278`), which `runShellCase` (`:2329`), `runCliCase` (`:2661`),
-  `runShellArgvCase` (`:2994`) and `runFenceCase` (`:3517`) go through. Confirm each of the four calls
-  `watchedSpawn` before relying on this.
+  `runShellArgvCase` (`:2994`) and `runFenceCase` (`:3517`) go through. Review 1 traced it with
+  `grep -n "watchedSpawn(\|caseWatchedSpawn(\|spawnSync(" shared/resources/security-probe.mjs`:
+  `runShellCase` and `runCliCase` call `watchedSpawn` directly (`:2469`, `:2750`);
+  `runShellArgvCase` (`:3100` setup, `:3134` case) and `runFenceCase` (`:3636`) go through
+  `caseWatchedSpawn` (`:2912` → `:2930`). Re-run the search before relying on it. The shell-argv
+  setup spawn is reaped too (task § 5).
 
 The other four (`:479` git, `:1169` python3, `:1185` zsh, `:3334` `-n` syntax check) run no case.
 
@@ -129,11 +133,20 @@ the child's own pid as its pgid; without `detached` it printed the parent's.
 For the module runner at `:1908`, the reap must also run before `compareExpected` reads `absent` /
 `removed`. Read the lines after the call and move the reap above the first read.
 
-**Red test D**, one per site. The case runs:
+**Red test D**, one per site. The grandchild must release the case's stdout/stderr: `spawnSync`
+returns only when every holder of those pipes has closed them, so a grandchild that keeps them holds
+the call open and its write lands before the snapshot, on develop and after the fix alike (review 1,
+measured: 306 ms with the marker written, against 3 ms and a later write when redirected).
+
+For `:2287`, a shell-form case runs:
 
 ```bash
-(sleep 0.3; touch "$MARKER") & exit 0
+(sleep 0.3; touch "$MARKER") >/dev/null 2>&1 </dev/null & exit 0
 ```
+
+For `:1908`, a module entry the test writes, whose export does
+`spawn("sh", ["-c", 'sleep 0.3; touch "$0"', MARKER], { stdio: "ignore" }).unref()` and returns.
+No `detached` on that spawn: the grandchild must stay in the case's group.
 
 `$MARKER` is a path outside the sandbox that the test owns. After `runProbeSpec` returns, wait 600 ms
 (`Atomics.wait` on a `SharedArrayBuffer`, or an async test with `setTimeout`), then assert

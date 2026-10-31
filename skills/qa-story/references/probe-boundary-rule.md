@@ -221,6 +221,22 @@ takes it.
   and reports any write that escapes, whatever the probe claimed to do.
 - Takes its per-case timeout from the **shared spawn budget**
   (`spawn-budget.mjs`), never a literal.
+- **Kills the case's process group before reading its side effects.** Each case,
+  and a shell-argv case's setup, is spawned `detached`, so it leads its own
+  process group; once the spawn returns, the group gets `SIGKILL`. A background
+  grandchild that released the case's stdio (`… >/dev/null 2>&1 &`, or
+  `spawn(…, { stdio: "ignore" }).unref()`) outlives the spawn, and a write it
+  makes after the after-snapshot would otherwise turn an `absent` or `removed`
+  check into a false pass. One that keeps the stdio needs no kill: the spawn waits
+  for it. **The limit:** a grandchild that calls `setsid` (or `setpgid`) leaves the
+  group and is not reached (task.234).
+- **Removes the sandbox even when a case left it unreadable.** A case can leave a
+  mode-000 directory, or one nested past `PATH_MAX`. On `EACCES`/`EPERM` the
+  teardown runs `chmod -R u+rwx` and removes again: `chmod -R` descends by
+  relative path, so depth does not stop it, and it follows no symlink, so nothing
+  outside the sandbox changes mode. A process still running inside the sandbox
+  could change a mode between the two calls; the group kill above leaves only a
+  `setsid` grandchild able to (task.234).
 
 **What it does not do, stated honestly:**
 
@@ -324,10 +340,11 @@ takes it.
     another directory **ahead of the trip-wire on `PATH`** (`export
     PATH="/usr/local/bin:$PATH"`) — with `--fake-gh` given this bypasses the
     fixture too, and the record still names the fixture; and a `gh` call
-    **backgrounded past the spawn**, which runs after the sandbox and its
-    trip-wire are gone. Rows pin the absolute path and the `PATH` prepend
-    (task.140 QA cycles 2 and 4). All three behave the same before task.140;
-    closing them is follow-up work. Otherwise: run bare, the real `gh` fails from the
+    **backgrounded past the spawn** by a grandchild that called `setsid`, which
+    leaves the case's process group, escapes the group kill (§ 5) and runs after
+    the sandbox and its trip-wire are gone. Rows pin the absolute path and the
+    `PATH` prepend (task.140 QA cycles 2 and 4). All three behave the same before
+    task.140; closing them is follow-up work. Otherwise: run bare, the real `gh` fails from the
     sandbox cwd, the function takes its read-failed passthrough, and the verdict
     would land on `absent` / `present-but-inert` — the values a missing control
     produces — with nothing but `fake_gh: null` to say "could not look". The

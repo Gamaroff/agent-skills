@@ -274,7 +274,6 @@ import { spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import {
   accessSync,
-  chmodSync,
   constants as fsConstants,
   mkdtempSync,
   mkdirSync,
@@ -963,9 +962,12 @@ const SOURCE_LINE =
 /**
  * Remove a probe sandbox, including one a case left unreadable. A case
  * controls its directory, so it can leave a mode-000 directory that `rmSync`
- * cannot list. On EACCES or EPERM every directory gets owner rwx back and the
- * removal is retried. The walk uses `lstat`, so a symlink is never followed
- * out of the sandbox (task.232 QA2-1).
+ * cannot list (task.232 QA2-1). On EACCES or EPERM every directory gets owner
+ * rwx back and the removal is retried. The restore is `chmod -R`, not a walk
+ * in this process: it descends by relative path, so a tree deeper than
+ * PATH_MAX does not stop it where an absolute-path walk hit ENAMETOOLONG, and
+ * it follows no symlink by default on GNU and BSD, so nothing outside the
+ * sandbox changes mode (task.234).
  */
 function removeSandbox(root) {
   try {
@@ -974,15 +976,35 @@ function removeSandbox(root) {
   } catch (e) {
     if (e.code !== "EACCES" && e.code !== "EPERM") throw e;
   }
-  const open = (dir) => {
-    chmodSync(dir, 0o700);
-    for (const name of readdirSync(dir)) {
-      const p = join(dir, name);
-      if (lstatSync(p).isDirectory()) open(p);
+  const chmod = spawnSync("chmod", ["-R", "u+rwx", "--", root], {
+    encoding: "utf8",
+    stdio: ["ignore", "ignore", "pipe"],
+  });
+  try {
+    rmSync(root, { recursive: true, force: true });
+  } catch (e) {
+    if (chmod.status !== 0) {
+      const why = chmod.error?.code ?? `exit ${chmod.status}`;
+      e.message += ` (chmod -R ${why}: ${String(chmod.stderr ?? "").trim()})`;
     }
-  };
-  open(root);
-  rmSync(root, { recursive: true, force: true });
+    throw e;
+  }
+}
+
+/**
+ * Kill whatever is left of a case's process group — a background grandchild
+ * that released the case's stdio outlives `spawnSync` and could write after
+ * the case's side effects are read. The case was spawned `detached`, so its
+ * pid is its group id. ESRCH means the group is already gone. A grandchild
+ * that calls `setsid` leaves the group and is not reached (task.234).
+ */
+function reapGroup(pid) {
+  if (!pid) return;
+  try {
+    process.kill(-pid, "SIGKILL");
+  } catch (e) {
+    if (e.code !== "ESRCH") throw e;
+  }
 }
 
 /**
@@ -1923,8 +1945,10 @@ export function runProbeSpec({
           encoding: "utf8",
           timeout: perCaseTimeout,
           maxBuffer: 8 * 1024 * 1024,
+          detached: true,
         },
       );
+      reapGroup(child.pid);
 
       const after = snapshotTree(sandboxRoot, workDirName);
       for (const [path, stamp] of after) {
@@ -2292,10 +2316,12 @@ function watchedSpawn(
     encoding: "utf8",
     timeout: timeoutMs,
     maxBuffer: 8 * 1024 * 1024,
+    detached: true,
     ...(extraFds > 0
       ? { stdio: ["pipe", "pipe", "pipe", ...Array(extraFds).fill("pipe")] }
       : {}),
   });
+  reapGroup(child.pid);
   const tag = shell === null ? {} : { shell };
   const after = snapshotTree(sandboxRoot, workDirName);
   for (const [path, stamp] of after) {
