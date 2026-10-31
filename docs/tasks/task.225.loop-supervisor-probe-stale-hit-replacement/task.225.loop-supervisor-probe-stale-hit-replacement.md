@@ -225,6 +225,27 @@ For a timeout or a message problem, fix it forward in `resolveInFreshNode`.
 - **Non-critical**: wording. Fix it forward.
 
 ---
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-31
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.225.qa.1.loop-supervisor-probe-stale-hit-replacement.md](./task.225.qa.1.loop-supervisor-probe-stale-hit-replacement.md)
+- **Gate File**: [task.225.gate.1.loop-supervisor-probe-stale-hit-replacement.yml](./task.225.gate.1.loop-supervisor-probe-stale-hit-replacement.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 256 (255 pass, 0 fail, 1 skipped)
+- **Phases Verified**: 2/2
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues identified. SC1–SC6 and SC8 hold, test-backed and mutation-proven (2 of 2 covered). SC7's CI half is pending and is read at `/finalise`. Two advisory findings (CR-1, a spawn failure reads as "not found"; CR-2, a repeated spawn after a swap) are routed to the gate's `recommendations.future`.
 <!-- change-log-start -->
 ## Change Log
 
@@ -234,6 +255,7 @@ For a timeout or a message problem, fix it forward in `resolveInFreshNode`.
 | 2026-10-31 | 1.1 | Review passed (9/10) — no changes required; stale-hit and fresh-resolve claims re-run on Node v26.8.2 | review-task |
 | 2026-10-31 |  | Status → ready-for-development | review-task |
 | 2026-10-31 |  | Implemented — 3 files, 3 tests | develop |
+| 2026-10-31 |  | QA gate PASS (100/100) — 0 gate findings, 2 advisory | qa-task |
 <!-- change-log-end -->
 
 ---
