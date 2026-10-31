@@ -370,19 +370,48 @@ function resolveAdapter(name, config, { cwd = process.cwd() } = {}) {
  * directory that does not (task 224 QA-2). require.resolve caches a hit for
  * the process and returns it without touching the disk, and the loop probes
  * every iteration, so the hit is re-checked: a script deleted mid-run reads
- * as missing (QA-3).
+ * as missing (QA-3). A stale hit is resolved again in a fresh process, so a
+ * replacement in another shape (a directory's index.js for a .js file, or the
+ * reverse) is found without a restart (task 225, CR-1). A miss is not cached,
+ * so it needs no fallback.
  *
  * @param {string} file an absolute path
+ * @param {(f: string) => string | null} [freshResolve] injectable for tests
  * @returns {boolean}
  */
-function resolvesAsMain(file) {
+function resolvesAsMain(file, freshResolve = resolveInFreshNode) {
   let resolved;
   try {
     resolved = require.resolve(file);
   } catch {
     return false;
   }
-  return fs.existsSync(resolved);
+  if (fs.existsSync(resolved)) return true;
+  // A stale cached hit: the file it named is gone, but another may now resolve.
+  return freshResolve(file) !== null;
+}
+
+/**
+ * The path `node <file>` would run, resolved in a fresh process, or null.
+ * A fresh process has an empty resolution cache. In this process a stale hit
+ * survives clearing Module._pathCache (Node v26.8.2), so it cannot be dropped
+ * here (task 225). No shell, and `file` is an argument, never code.
+ *
+ * @param {string} file an absolute path
+ * @returns {string | null}
+ */
+function resolveInFreshNode(file) {
+  try {
+    return (
+      execFileSync(
+        process.execPath,
+        ["-e", "process.stdout.write(require.resolve(process.argv[1]))", file],
+        { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 10000 },
+      ) || null
+    );
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -427,6 +456,7 @@ module.exports = {
   findExisting,
   firstExisting,
   probeMissing,
+  resolvesAsMain,
   PROBE_STATUSES,
   interpretProbe,
   tickCommitOracle,
