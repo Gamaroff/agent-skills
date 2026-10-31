@@ -7766,26 +7766,47 @@ test("leashed: the case sees its own argv0, exactly its own environment, and not
   }
 });
 
+// What `/bin/sh` resolves `name` to under `env` from `cwd` ("" when nothing).
+// The name travels as an argument, never inside the script text: a literal
+// `command -v <name>` reads to tests/ci-tool-skips.test.js as a tool CI must
+// install, and these names are stand-ins the tests plant (TASK-234-QA-11).
+function shLookup(name, { env, cwd }) {
+  return spawnSync("/bin/sh", ["-c", 'command -v "$1"', "sh", name], {
+    cwd,
+    env,
+    encoding: "utf8",
+  }).stdout.trim();
+}
+
+// leashed() for a case whose command is /bin/sh, under a host PATH of
+// `hostPath`, asserting the case WAS leashed: an unleashed result carries the
+// case env, and a lookup under it would test nothing (TASK-234-QA-12).
+function leashUnderHostPath(hostPath, cwd) {
+  const saved = process.env.PATH;
+  try {
+    process.env.PATH = hostPath;
+    const l = leashed("/bin/sh", [], { env: { PATH: "/usr/bin:/bin" }, cwd });
+    assert.equal(l.command, "/bin/sh", "the case was not leashed");
+    assert.match(l.args[0], /^-c$/, "the case was not leashed");
+    return l;
+  } finally {
+    if (saved === undefined) delete process.env.PATH;
+    else process.env.PATH = saved;
+  }
+}
+
 test("leashed: the leash shell finds tools on the host PATH, not the case's (TASK-234-QA-9)", () => {
   // A host that keeps `sleep` and `ps` outside /usr/bin:/bin (NixOS) is stood
   // in for by a tool that exists only in a directory on the probe's PATH.
   const dir = mkdtempSync(join(tmpdir(), "t234-hostpath-"));
-  const saved = process.env.PATH;
   try {
     writeFileSync(join(dir, "t234-host-tool"), "#!/bin/sh\n", { mode: 0o755 });
-    process.env.PATH = `${dir}:${saved}`;
-    const l = leashed("true", [], {
-      env: { PATH: "/usr/bin:/bin" },
-      cwd: dir,
-    });
-    process.env.PATH = saved;
-    const r = spawnSync("/bin/sh", ["-c", "command -v t234-host-tool"], {
-      env: l.env,
-      encoding: "utf8",
-    });
-    assert.equal(r.stdout.trim(), join(dir, "t234-host-tool"), r.stderr);
+    const l = leashUnderHostPath(`${dir}:${process.env.PATH ?? ""}`, dir);
+    assert.equal(
+      shLookup("t234-host-tool", { env: l.env }),
+      join(dir, "t234-host-tool"),
+    );
   } finally {
-    process.env.PATH = saved;
     rmSync(dir, { recursive: true, force: true });
   }
 });
@@ -7794,35 +7815,33 @@ test("leashed: a relative or empty entry on the host PATH never lets the case pl
   // The leash shell runs in the case's cwd. A tool the case could write there
   // must not resolve, whichever spelling of "here" the host PATH carries.
   const cwd = mkdtempSync(join(tmpdir(), "t234-relpath-"));
-  const saved = process.env.PATH;
+  const host = process.env.PATH ?? "";
   try {
     mkdirSync(join(cwd, "rel"));
     for (const d of [cwd, join(cwd, "rel")]) {
       writeFileSync(join(d, "t234-planted"), "#!/bin/sh\n", { mode: 0o755 });
     }
-    process.env.PATH = `.::rel:${saved}:`;
-    const l = leashed("true", [], { env: { PATH: "/usr/bin:/bin" }, cwd });
-    process.env.PATH = saved;
-    const r = spawnSync("/bin/sh", ["-c", "command -v t234-planted"], {
-      cwd,
-      env: l.env,
-      encoding: "utf8",
-    });
-    assert.equal(r.stdout, "", `the leash shell resolved ${r.stdout.trim()}`);
-    // Positive control: the same lookup with the relative entries kept does
-    // find the planted tool, so the empty result above is the filter's.
-    const control = spawnSync("/bin/sh", ["-c", "command -v t234-planted"], {
-      cwd,
-      env: { PATH: `.::rel:${saved}` },
-      encoding: "utf8",
-    });
-    assert.notEqual(
-      control.stdout.trim(),
-      "",
-      "the plant is not findable at all",
-    );
+    // Each spelling of "here" on its own, so a lookup that stops at the first
+    // match cannot hide one behind another.
+    for (const spelling of [".", "", "rel"]) {
+      // Positive control: this spelling does reach the plant when kept, so an
+      // empty result under the leash is the filter's, not an unfindable plant.
+      assert.notEqual(
+        shLookup("t234-planted", {
+          env: { PATH: `${spelling}:/nonexistent` },
+          cwd,
+        }),
+        "",
+        `the plant is not findable through "${spelling}"`,
+      );
+      const l = leashUnderHostPath(`${spelling}:${host}`, cwd);
+      assert.equal(
+        shLookup("t234-planted", { env: l.env, cwd }),
+        "",
+        `the leash shell resolved the plant through "${spelling}"`,
+      );
+    }
   } finally {
-    process.env.PATH = saved;
     rmSync(cwd, { recursive: true, force: true });
   }
 });

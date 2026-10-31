@@ -411,6 +411,7 @@ stays as the judge.
 | 2026-10-31 |  | QA gate CONCERNS (90/100) — 1 medium follow-up (relative PATH entries reach the leash shell); QA budget exhausted | qa-task |
 | 2026-10-31 |  | QA findings fixed — TASK-234-QA-10 (leash PATH keeps absolute entries only), 1 iteration; one QA cycle granted | qa-fix |
 | 2026-10-31 |  | QA gate FAIL (70/100) — CI red since a32dd8f0 (ci-tool-skips reads test stand-ins as tools); granted budget exhausted | qa-task |
+| 2026-10-31 |  | QA findings fixed — TASK-234-QA-11 (stand-in names passed as argv), QA-12 (tests assert the leash), 1 iteration; one more QA cycle granted | qa-fix |
 <!-- change-log-end -->
 
 ---
