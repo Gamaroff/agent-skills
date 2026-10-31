@@ -370,25 +370,26 @@ stays as the judge.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-31
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.234.qa.5.probe-teardown-and-reap-hardening.md](./task.234.qa.5.probe-teardown-and-reap-hardening.md)
-- **Gate File**: [task.234.gate.5.probe-teardown-and-reap-hardening.yml](./task.234.gate.5.probe-teardown-and-reap-hardening.yml)
+- **Full Report**: [task.234.qa.6.probe-teardown-and-reap-hardening.md](./task.234.qa.6.probe-teardown-and-reap-hardening.md)
+- **Gate File**: [task.234.gate.6.probe-teardown-and-reap-hardening.yml](./task.234.gate.6.probe-teardown-and-reap-hardening.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: the security-probe suite on Node 22 (273/273) and `ci:fast` (6923 tests, 0 failed)
+- **Tests Executed**: the security-probe suite on Node 22 (274/274), `ci:fast` (6924 tests, 0 failed, run without `CI` set), and the CI guard under `CI=true` (failed)
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **Critical Issues**: 1
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: PASS
 
 ### Key Findings
-- Every high finding from cycles 1–4 is fixed, each with a test and a mutation proof.
-- TASK-234-QA-10 (medium, follow-up): `leashEnv()` keeps relative `PATH` entries. This matters only on a host whose `PATH` holds one and that has no `sleep` or `ps` in `/usr/bin:/bin`.
+- QA-10 holds.
+- TASK-234-QA-11 (high): CI has been red since `a32dd8f0`. The `ci-tool-skips` guard reads the tests' stand-in `command -v` names as missing CI tools.
+- TASK-234-QA-12 (medium): the QA-10 test does not assert that the case was leashed.
 
 <!-- change-log-start -->
 ## Change Log
@@ -409,6 +410,7 @@ stays as the judge.
 | 2026-10-31 |  | QA findings fixed — TASK-234-QA-9 (leash PATH is the probe's own), 1 iteration | qa-fix |
 | 2026-10-31 |  | QA gate CONCERNS (90/100) — 1 medium follow-up (relative PATH entries reach the leash shell); QA budget exhausted | qa-task |
 | 2026-10-31 |  | QA findings fixed — TASK-234-QA-10 (leash PATH keeps absolute entries only), 1 iteration; one QA cycle granted | qa-fix |
+| 2026-10-31 |  | QA gate FAIL (70/100) — CI red since a32dd8f0 (ci-tool-skips reads test stand-ins as tools); granted budget exhausted | qa-task |
 <!-- change-log-end -->
 
 ---

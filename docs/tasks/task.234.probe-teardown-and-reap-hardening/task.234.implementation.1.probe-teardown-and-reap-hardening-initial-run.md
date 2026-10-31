@@ -140,6 +140,33 @@ Severity fell every cycle (high → medium ×2 → medium → medium, narrower e
 2. Or accept CONCERNS: run Step 5c (`/review-pr --effort medium --comment --no-code`), then `/finalise`, and file QA-10 as a follow-up task.
 3. Separately, decide whether the leash should resolve `sleep`, `ps` and `tr` to absolute paths once at module load. That would close QA-9 and QA-10 together, with no `PATH` lookup inside the sandbox.
 
+**Resolution**: the user chose option 1, and one cycle was granted (budget 6). QA-10 was fixed in fix cycle 5. The loop then escalated again at gate 6 (below).
+
+### QA Loop Limit Reached — 2026-10-31 (granted cycle)
+
+The pipeline ran 6 qa-task gates and 5 qa-fix cycles without a clean PASS. The last gate's findings are unfixed.
+
+**Final gate status**: FAIL (70/100)
+**HIGH findings per cycle**: 1, 1, 0, 0, 0 | 1. The grant was made at cycle 6.
+**Remaining issues** (from `task.234.gate.6.probe-teardown-and-reap-hardening.yml`):
+- TASK-234-QA-11, high, `shared/resources/tests/security-probe.test.mjs`: CI is red because `tests/ci-tool-skips.test.js` reads the stand-in `command -v t234-host-tool` / `t234-planted` as tools CI must install.
+- TASK-234-QA-12, medium, `shared/resources/tests/security-probe.test.mjs`: the QA-10 test never asserts that the case was leashed.
+
+**What was attempted per cycle**:
+- Cycles 1–4 are as listed in the first escalation above.
+- Cycle 5 (granted): QA-10, the leash keeps only the absolute entries of `PATH`.
+- Cycle 6: gate only.
+
+**Likely root cause**: the product code converged; QA-10 was the last product finding. Both open findings are in tests:
+- QA-11 is a CI-only guard that every local run skipped. The local gate in this pipeline runs `ci:fast` without `CI=true`, and gate 5 accepted a pending CI run.
+- QA-12 is a missing precondition assertion.
+
+**Third-strike files**: none. Gates 4–6 carry a HIGH only in gate 6.
+
+**Recommended next steps**:
+1. Grant one more cycle. Pass each stand-in name through argv (`command -v "$1"`), assert `l.command === "/bin/sh"` in the QA-10 test, and verify with `CI=true node --test tests/ci-tool-skips.test.js` before pushing. Both changes are to tests only.
+2. As a follow-up, run the local fast gate with `CI=true`, or make the `ci-tool-skips` guard tolerate tools that a test plants itself. Then this class of failure is seen before push.
+
 ---
 
 ## QA Iteration History
@@ -283,6 +310,28 @@ Committed as `a32dd8f0`.
 **Action**: Escalating — loop limit reached
 
 Gate 5 and qa.5 were committed as `aa82accf`. A Step 5c `/review-pr` was started before the budget test was applied, and stopped before any lens was dispatched: no review report exists.
+
+**Re-entry, 2026-10-31.** The user chose escalation option 1, so one cycle was granted: `grant-qa-cycles.sh` → `QA_CYCLE=5 extra_cycles_granted=1 qa_max_cycles=6 reenter_at=5b convergence_from_cycle=6`.
+
+#### QA Fix Cycle 5
+
+- **TASK-234-QA-10**: `leashEnv()` keeps only the absolute entries of the probe's `PATH`, after `/usr/bin` and `/bin`.
+- **New test**: a tool is planted in the case's cwd and in a relative `rel/` directory, and the host `PATH` is set to `.::rel:<PATH>:`. Under the leash environment, `command -v` must find nothing. A positive control shows that the same lookup with the relative entries kept does find the planted tool.
+- **Mutation proof**: an unfiltered host `PATH` turns the test red. The code was restored and `cmp` is clean.
+
+Committed as `1d98769c`.
+
+### QA Cycle 6 — 2026-10-31
+**Gate Result**: FAIL (70/100). Scoped to the changes since gate 5; Explore reviewer, `duration_ms` 38012.
+**Issues Found**: 4. QA-10 was verified FIXED.
+- TASK-234-QA-11 (high): CI `Test` has been red since `a32dd8f0`, failing on `e21adc05` in run 41191890806. `tests/ci-tool-skips.test.js` reads the QA-9 and QA-10 stand-ins, `command -v t234-host-tool` and `command -v t234-planted`, as tools that CI must install. That guard runs only when `CI` is set, so every local `ci:fast` in this run skipped it. Gate 5 read the `a32dd8f0` run as pending.
+- TASK-234-QA-12 (medium): the QA-10 test never asserts that the case was leashed.
+- Two lows were routed to `recommendations.future`.
+**HIGH findings**: 1
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — a FAIL gate takes neither exit
+**Action**: Escalating — loop limit reached
 
 ---
 
