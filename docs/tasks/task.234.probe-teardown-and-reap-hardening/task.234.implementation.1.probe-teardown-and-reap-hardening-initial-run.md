@@ -3,7 +3,7 @@
 **Task**: `task.234.probe-teardown-and-reap-hardening.md`
 **Run Number**: 1
 **Started**: 2026-10-31 12:00
-**Status**: Escalated
+**Status**: Completed
 
 ---
 
@@ -35,9 +35,9 @@ Run task.234 end to end: a sandbox teardown that survives a tree deeper than PAT
 | 2. review-task             | ✅ Done    | `task.234.review.{N}.{name}.md` exists (or skip logged)               | `task.234.review.1.probe-teardown-and-reap-hardening.md` — READY TO IMPLEMENT 8/10 after fixes; Planned → Ready for Development | —                    | 2026-10-31T08:53Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; 4/4 phases; commit `3fa12b01`; `npm run ci` 6919 tests, 0 failures | —                    | 2026-10-31T09:06Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #800: https://github.com/Gamaroff/agent-skills/pull/800 | —                    | 2026-10-31T09:06Z |
-| 5–6. qa-task / qa-fix loop | ⚠️ Escalated — loop limit reached (gate 5 CONCERNS, QA-10 open) | `task.234.qa.{N}.*.md`; `task.234.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.234.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.234.qa.{N}.*.md`; `task.234.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 7 gates (budget 5 + 2 granted, two loop-limit escalations); gate 7 PASS 95/100; 5c CONCERNS, 2 doc-only findings fixed | —                    | 2026-10-31T13:20Z |
+| 7. finalise                | ✅ Done    | `task.234.dod.{N}.*.md`; task `status: accepted`                      | dod.1 ACCEPTED; acceptance commit `5a3b191c`; CI reading 2 SUCCESS | —                    | 2026-10-31T13:45Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | implementation report committed | —                    | 2026-10-31T13:50Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -100,6 +100,17 @@ Run task.234 end to end: a sandbox teardown that survives a tree deeper than PAT
 - Tracker: in-review comment `posted` on #750. GitHub board: in-review → `stage-disabled` (this board's `tracker-workflow` fires no in-review move).
 - Post-PR state check (inline `gh pr view`): PR #800 state = OPEN. errors = 0.
 - Lock `pr_url` set.
+
+### Step 7 — finalise (2026-10-31)
+
+- DoD run 1, re-run scope `full (no-prior-record)`. The four agents returned: AC PARTIAL (#5 FAIL), security FAIL (zero probes executed, because the guard is not probeable), compliance NOT_APPLICABLE, docs PASS.
+- **Owner decisions**, asked via AskUserQuestion:
+  1. The #5 wall-time amendment is approved. That clause had been self-annotated during QA fix 2 with no approver, and it is now recorded in the criterion.
+  2. The security zero-guard is cleared by a recorded human override. The evidence is the QA-4 test and the race limit stated in `probe-boundary-rule.md`. Gate 7 was not edited; the DoD records both the disagreement and the override.
+- CHANGELOG task 234 entry: extended for the leash hardening (QA-7 to QA-12). It rode the acceptance commit along with the 5c review report.
+- CI reading 1: SUCCESS @ `ce15a175e5ca` (6 checks). CI reading 2: SUCCESS (tree-equivalent to `ce15a175e5ca`) @ `5a3b191c5aaf`.
+- Acceptance commit `5a3b191c` was pushed. Registry `ticked` / `staged`. 6b assertions passed, and 6d cites task 234.
+- PR canonical comment posted. Tracker `done` comment `posted`. Issue #750 CLOSED (verified). Board `done` → `already`. The Document link already pointed at develop, so it was left unchanged.
 
 ---
 
@@ -187,7 +198,7 @@ Committed as `f9040a87`.
 - Low: the `l.command` assertion in `leashUnderHostPath` cannot fail. Carried to `recommendations.future`.
 **HIGH findings**: 0
 **MEDIUM findings**: 0
-**PR Review**: {pending — Step 5c}
+**PR Review**: CONCERNS — `task.234.pr-review.1.probe-teardown-and-reap-hardening.md`, conformance lens only (`--no-code`). Two doc-only findings, both fixed in the acceptance commit: PC-2 (medium), `pr_number` was missing from the frontmatter; PC-1 (low), the steps 5–6 progress row was stale. `open-coverage.js` reports `OPEN_COVERAGE=0`, so the loop exits to Step 7.
 **Loop exit**: n/a — this exit not taken
 **Action**: Proceeding to 5c (PR conformance review)
 
@@ -361,10 +372,10 @@ Committed as `1d98769c`.
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-10-31T13:50Z
+**Final Status**: Completed
 **Branch**: feature/task.234.probe-teardown-and-reap-hardening
 **PR**: #800 — https://github.com/Gamaroff/agent-skills/pull/800
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 7 (budget 5 + 2 granted)
+**DoD Summary**: `task.234.dod.1.probe-teardown-and-reap-hardening.md` — ACCEPTED (two owner decisions recorded)
+**Tracker debt**: none
