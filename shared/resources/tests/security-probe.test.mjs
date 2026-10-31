@@ -16,7 +16,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   chmodSync,
@@ -52,6 +52,7 @@ import {
   extractFencedBlock,
   FENCE_PREFIX,
   fixtureProblem,
+  forceRemoveTree,
   isLaunchFailure,
   isPythonCrash,
   main,
@@ -7522,7 +7523,7 @@ test("runProbeSpec: a case that nests past PATH_MAX and leaves a mode-000 leaf s
   // 30 × 200 bytes is ~6,000, past Linux's 4,096. An absolute-path walk stops
   // at ENAMETOOLONG and never reaches the leaf.
   const seg = "a".repeat(200);
-  const deep = `for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do mkdir ${seg} && cd ${seg} || exit 1; done; mkdir locked && chmod 000 locked`;
+  const deep = `for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do mkdir ${seg} && cd ${seg} || exit 1; done; { mkdir locked && chmod 000 locked; } || exit 9`;
   const root = fenceRoot(OK_BLOCK);
   try {
     const { result: r, left } = withFreshTmpdir(() =>
@@ -7553,7 +7554,10 @@ test("runProbeSpec: the teardown never follows a symlink out of the sandbox — 
   chmodSync(outside, 0o500);
   const root = fenceRoot(OK_BLOCK);
   try {
-    const { left } = withFreshTmpdir(() =>
+    // Positive control (TASK-234-QA-6): the chain exits 9 if any step fails,
+    // so a `rejected` row means the link was planted and `locked` is mode 000,
+    // which the first rmSync cannot list: the fallback ran.
+    const { result: r, left } = withFreshTmpdir(() =>
       runProbeSpec({
         entry: "fence:doc.md#Block",
         slot: "<slot>",
@@ -7561,13 +7565,17 @@ test("runProbeSpec: the teardown never follows a symlink out of the sandbox — 
           fenceCase(
             "f.link",
             "hostile",
-            `mkdir locked && ln -s '${outside}' locked/link && chmod 000 locked`,
+            `{ mkdir locked && ln -s '${outside}' locked/link && chmod 000 locked; } || exit 9`,
             { expected: { exit: 0, stdout: "ok\n", absent: ["pwned"] } },
           ),
         ],
         repoRoot: root,
       }),
     );
+    assert.equal(r.cases.length, probeShells().length, JSON.stringify(r.cases));
+    for (const row of r.cases) {
+      assert.equal(row.outcome, "rejected", JSON.stringify(row));
+    }
     assert.deepEqual(left, [], "the probe sandbox was not removed");
     assert.equal(
       (statSync(outside).mode & 0o777).toString(8),
@@ -7658,6 +7666,82 @@ test("runProbeSpec: a module case's background write that lands after the case e
   } finally {
     rmSync(markerDir, { recursive: true, force: true });
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("runProbeSpec: a probe killed as a group mid-case takes the running case with it (TASK-234-QA-3)", async () => {
+  // A case is spawned `detached`, so a group kill of the probe — Ctrl-C, a tool
+  // or CI timeout — does not reach it, and the probe holding its timeout is
+  // gone. The leash kills the case once its parent is no longer the probe.
+  const markerDir = mkdtempSync(join(tmpdir(), "t234-leash-"));
+  const started = join(markerDir, "started");
+  const late = join(markerDir, "late");
+  const tmp = join(markerDir, "tmp");
+  mkdirSync(tmp);
+  const root = fenceRoot(OK_BLOCK);
+  const driver = join(markerDir, "driver.mjs");
+  const probeUrl = new URL("../security-probe.mjs", import.meta.url).href;
+  const slowCase = fenceCase(
+    "f.slow",
+    "hostile",
+    `touch '${started}'; sleep 1; touch '${late}'`,
+    { expected: { exit: 0, stdout: "ok\n" } },
+  );
+  writeFileSync(
+    driver,
+    [
+      `import { runProbeSpec } from ${JSON.stringify(probeUrl)};`,
+      `runProbeSpec(${JSON.stringify({ entry: "fence:doc.md#Block", slot: "<slot>", cases: [slowCase], repoRoot: root })});`,
+      "",
+    ].join("\n"),
+  );
+  // Its own group, so the kill below is the harness-timeout shape and does
+  // not reach this test runner.
+  const probe = spawn(process.execPath, [driver], {
+    detached: true,
+    stdio: "ignore",
+    env: { ...process.env, TMPDIR: tmp },
+  });
+  try {
+    for (let i = 0; i < 100 && !existsSync(started); i++) await sleepMs(50);
+    assert.ok(existsSync(started), "the case never started");
+    process.kill(-probe.pid, "SIGKILL");
+    await sleepMs(1600);
+    assert.equal(existsSync(late), false, "the case outlived the killed probe");
+  } finally {
+    try {
+      process.kill(-probe.pid, "SIGKILL");
+    } catch {
+      // already gone
+    }
+    spawnSync("chmod", ["-R", "u+rwx", "--", markerDir], { stdio: "ignore" });
+    spawnSync("rm", ["-rf", "--", markerDir], { stdio: "ignore" });
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("forceRemoveTree: a sandbox root replaced by a symlink is removed as a link, and its target keeps its modes (TASK-234-QA-4)", (t) => {
+  if (process.getuid?.() === 0) return t.skip("root reads through mode 000");
+  const dir = mkdtempSync(join(tmpdir(), "t234-rootlink-"));
+  const outside = join(dir, "outside");
+  mkdirSync(join(outside, "sub"), { recursive: true });
+  chmodSync(join(outside, "sub"), 0o500);
+  chmodSync(outside, 0o500);
+  const link = join(dir, "sandbox");
+  symlinkSync(outside, link);
+  try {
+    assert.throws(() => forceRemoveTree(link), /replaced by a symlink/);
+    assert.equal(existsSync(link), false, "the link was left in place");
+    for (const p of [outside, join(outside, "sub")]) {
+      assert.equal(
+        (statSync(p).mode & 0o777).toString(8),
+        "500",
+        `the restore changed the mode of ${p}, the link's target`,
+      );
+    }
+  } finally {
+    spawnSync("chmod", ["-R", "u+rwx", "--", dir], { stdio: "ignore" });
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 

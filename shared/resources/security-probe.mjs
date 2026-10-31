@@ -964,9 +964,8 @@ const SOURCE_LINE =
  * cannot list (task.232 QA2-1), or nest it past PATH_MAX, which Node 22's
  * `rmSync` (an absolute-path walk) fails with ENAMETOOLONG. On EACCES, EPERM
  * or ENAMETOOLONG every directory gets owner rwx back and the tree is removed
- * by `chmod -R` and `rm -rf`, not by a walk in this process: both descend by
- * relative path, so depth does not stop them, and neither follows a symlink,
- * so nothing outside the sandbox changes mode or is removed (task.234).
+ * by `chmod -R` and `rm -rf` (forceRemoveTree), not by a walk in this process
+ * (task.234).
  */
 function removeSandbox(root) {
   try {
@@ -974,6 +973,29 @@ function removeSandbox(root) {
     return;
   } catch (e) {
     if (!["EACCES", "EPERM", "ENAMETOOLONG"].includes(e.code)) throw e;
+  }
+  forceRemoveTree(root);
+}
+
+/**
+ * Give every directory under `root` owner rwx back, then remove the tree.
+ * `chmod -R` and `rm -rf` descend by relative path, so depth does not stop
+ * them, and follow no symlink below `root`. GNU chmod DOES follow a symlink
+ * named as its argument, so `root` is lstat'd first and anything but a real
+ * directory is removed as an entry, its target untouched, and reported: a case
+ * that swapped the sandbox for a link must not turn the restore onto the link's
+ * target (TASK-234-QA-4). A swap between the lstat and the chmod is left to a
+ * process outside the case's group (probe-boundary-rule.md § 5). Exported for
+ * its test.
+ */
+export function forceRemoveTree(root) {
+  const st = lstatSync(root, { throwIfNoEntry: false });
+  if (st === undefined) return;
+  if (!st.isDirectory()) {
+    rmSync(root, { force: true });
+    throw new Error(
+      `removeSandbox: ${root} was replaced by a ${st.isSymbolicLink() ? "symlink" : "non-directory"}; removed the entry, followed nothing`,
+    );
   }
   const run = (cmd, argv) => {
     const r = spawnSync(cmd, argv, {
@@ -994,16 +1016,99 @@ function removeSandbox(root) {
  * Kill whatever is left of a case's process group — a background grandchild
  * that released the case's stdio outlives `spawnSync` and could write after
  * the case's side effects are read. The case was spawned `detached`, so its
- * pid is its group id. ESRCH means the group is already gone. A grandchild
- * that calls `setsid` leaves the group and is not reached (task.234).
+ * pid is its group id. ESRCH means the group is already gone; EPERM means the
+ * id now names a group this process may not signal — a group of zombies on
+ * some kernels, or a reused id — so there is nothing of the case's left to
+ * kill either (TASK-234-QA-5). A grandchild that calls `setsid` leaves the
+ * group and is not reached (task.234).
  */
 function reapGroup(pid) {
   if (!pid) return;
   try {
     process.kill(-pid, "SIGKILL");
   } catch (e) {
-    if (e.code !== "ESRCH") throw e;
+    if (e.code !== "ESRCH" && e.code !== "EPERM") throw e;
   }
+}
+
+/**
+ * The script a leashed case runs under (TASK-234-QA-3). `detached` puts the
+ * case in its own session, so a group kill of the probe — Ctrl-C, a tool or CI
+ * timeout — no longer reaches it, and its timeout is held by the probe it
+ * outlives. A watcher in the case's group kills the group once the case's
+ * parent is no longer the probe; the case itself is `exec`'d, so its pid,
+ * signals and exit status are its own. The watcher holds none of the case's
+ * pipes (0–2 and any extra fd closed), or `spawnSync` would wait for it.
+ * `ps` unavailable falls back to `kill -0` on the probe's pid.
+ */
+function leashScript(extraFds) {
+  const closeExtra = Array.from(
+    { length: extraFds },
+    (_, i) => ` ${i + 3}>&-`,
+  ).join("");
+  return [
+    "p=$1; shift",
+    "(",
+    "  PATH=/usr/bin:/bin:$PATH",
+    // Sleep first: most cases end inside one interval and never pay for `ps`.
+    // Never `while sleep`: a sleep that fails would kill the case at once.
+    "  while :; do",
+    "    sleep 0.2",
+    '    q=$(ps -o ppid= -p $$ 2>/dev/null | tr -d " ")',
+    '    if [ -n "$q" ]; then [ "$q" = "$p" ] || break',
+    '    else kill -0 "$p" 2>/dev/null || break; fi',
+    "  done",
+    "  kill -KILL 0",
+    `) </dev/null >/dev/null 2>&1${closeExtra} &`,
+    'exec "$@"',
+  ].join("\n");
+}
+
+/**
+ * `[command, argv]` to spawn a case on a leash (leashScript). The case is
+ * exec'd through `env -i` with its environment spelled out, because `sh` adds
+ * its own variables (SHLVL, `_`) to what it exports and a case's environment is
+ * part of what is probed. A command that does not resolve on the child's PATH
+ * is returned unchanged, so `spawnSync` reports ENOENT exactly as before: there
+ * is no process to leash. So is one whose path holds `=`, which `env` would
+ * read as an assignment.
+ */
+function leashed(command, argv, { env = process.env, cwd, extraFds = 0 }) {
+  const exe = onPath(command, env.PATH ?? "", cwd);
+  if (exe === null || exe.includes("=")) return [command, argv];
+  const assignments = Object.entries(env)
+    .filter(([k, v]) => k !== "" && !k.includes("=") && v !== undefined)
+    .map(([k, v]) => `${k}=${v}`);
+  return [
+    "/bin/sh",
+    [
+      "-c",
+      leashScript(extraFds),
+      "sh",
+      String(process.pid),
+      "/usr/bin/env",
+      "-i",
+      "--",
+      ...assignments,
+      exe,
+      ...argv,
+    ],
+  ];
+}
+
+/** The executable `command` names on `pathVar`, searched as execvp would. */
+function onPath(command, pathVar, cwd) {
+  if (command.includes("/")) return command;
+  for (const entry of pathVar.split(":")) {
+    const file = resolve(cwd ?? process.cwd(), entry || ".", command);
+    try {
+      accessSync(file, fsConstants.X_OK);
+      if (statSync(file).isFile()) return file;
+    } catch {
+      // not here
+    }
+  }
+  return null;
 }
 
 /**
@@ -1927,9 +2032,12 @@ export function runProbeSpec({
       }
       const before = snapshotTree(sandboxRoot, workDirName);
 
+      const caseEnv = sandboxEnv({ cwd: workDir });
       const child = spawnSync(
-        process.execPath,
-        ["--input-type=module", "-e", RUNNER],
+        ...leashed(process.execPath, ["--input-type=module", "-e", RUNNER], {
+          env: caseEnv,
+          cwd: workDir,
+        }),
         {
           input: JSON.stringify({
             entryPath: resolved.entryPath,
@@ -1940,7 +2048,7 @@ export function runProbeSpec({
             extraArgs: base.args,
           }),
           cwd: workDir,
-          env: sandboxEnv({ cwd: workDir }),
+          env: caseEnv,
           encoding: "utf8",
           timeout: perCaseTimeout,
           maxBuffer: 8 * 1024 * 1024,
@@ -2308,7 +2416,7 @@ function watchedSpawn(
   const before = snapshotTree(sandboxRoot, workDirName);
   const scriptDirBefore = listDirStamps(scriptDir);
   // extraFds: further pipes after stderr, read back as child.output[3…].
-  const child = spawnSync(command, argv, {
+  const child = spawnSync(...leashed(command, argv, { env, cwd, extraFds }), {
     input: "",
     cwd,
     env,

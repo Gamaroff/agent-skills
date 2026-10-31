@@ -229,14 +229,24 @@ takes it.
   check into a false pass. One that keeps the stdio needs no kill: the spawn waits
   for it. **The limit:** a grandchild that calls `setsid` (or `setpgid`) leaves the
   group and is not reached (task.234).
+- **Takes the case down with the probe.** Its own group also puts a case out of
+  reach of a group kill of the probe (Ctrl-C, a tool or CI timeout), and the
+  probe holding its timeout is gone. So each case runs on a leash: it is `exec`'d
+  under `/bin/sh` beside a watcher in its group, which kills the group within
+  about 0.2 s of the case's parent ceasing to be the probe. The case's pid,
+  signals, exit status and environment are its own (it runs through `env -i`
+  with its environment spelled out). The cost is a few milliseconds per case
+  (TASK-234-QA-3).
 - **Removes the sandbox even when a case left it unreadable.** A case can leave a
   mode-000 directory, or one nested past `PATH_MAX` (which Node 22's `rmSync`
   fails with `ENAMETOOLONG`). On `EACCES`, `EPERM` or `ENAMETOOLONG` the teardown
   runs `chmod -R u+rwx` then `rm -rf`: both descend by relative path, so depth
-  does not stop them, and neither follows a symlink, so nothing outside the
-  sandbox changes mode or is removed. A process still running inside the sandbox
-  could change a mode between the two calls; the group kill above leaves only a
-  `setsid` grandchild able to (task.234).
+  does not stop them, and neither follows a symlink below the root. GNU `chmod`
+  does follow a symlink named as its argument, so the root is `lstat`'d first and
+  anything but a real directory is removed as an entry and reported, its target
+  untouched (TASK-234-QA-4). A process still running inside the sandbox could
+  change a mode, or swap the root, between those calls; the group kill above
+  leaves only a `setsid` grandchild able to (task.234).
 
 **What it does not do, stated honestly:**
 

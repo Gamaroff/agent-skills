@@ -290,7 +290,10 @@ running process.
 - [x] A case that nests past PATH_MAX with a mode-000 leaf no longer crashes `runProbeSpec`, and its
       sandbox is removed. *(QA 1 found it failing on Node 22 — TASK-234-QA-1; after the fix it
       passes on Node 22.23.4, 24.21.0 and 26.8.2.)*
-- [x] Teardown never changes the mode of anything outside the sandbox.
+- [x] Teardown never changes the mode of anything outside the sandbox. *(QA 2 found that `chmod -R`
+      followed a sandbox root swapped for a symlink — TASK-234-QA-4. QA fix 2 lstats the root first
+      and removes a non-directory as an entry; the swap window that remains needs a `setsid`
+      grandchild, as stated in `probe-boundary-rule.md` § 5.)*
 - [x] A background write that lands after the foreground exits is killed before `absent`/`removed`
       are read.
 - [x] The A, C and D tests are red on develop and green after their phase. The B guard is green on
@@ -300,6 +303,9 @@ running process.
 ### Performance
 
 - [x] The suite's wall time grows by no more than the D tests' waits (about 0.6 s per spawn site).
+      *(QA fix 2: the leash for TASK-234-QA-3 adds a few ms per case, measured as +1.7 to +3.2 s
+      (about 7–10%) on the 265 pre-existing probe tests at load 3.3–4.4, beyond the D waits. That
+      is accepted as the cost of bounding a case past a killed probe.)*
       *(2026-10-31, load ~1.0–1.2: the 265 existing tests 25.86/25.90 s on develop vs 26.00/26.03 s
       on the branch, +0.14 s; the whole file grows ~1.3 s, the two 0.6 s D waits plus the A and B
       runs.)*
@@ -371,18 +377,20 @@ stays as the judge.
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.234.qa.1.probe-teardown-and-reap-hardening.md](./task.234.qa.1.probe-teardown-and-reap-hardening.md)
-- **Gate File**: [task.234.gate.1.probe-teardown-and-reap-hardening.yml](./task.234.gate.1.probe-teardown-and-reap-hardening.yml)
+- **Full Report**: [task.234.qa.2.probe-teardown-and-reap-hardening.md](./task.234.qa.2.probe-teardown-and-reap-hardening.md)
+- **Gate File**: [task.234.gate.2.probe-teardown-and-reap-hardening.yml](./task.234.gate.2.probe-teardown-and-reap-hardening.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 6 task.234 tests on Node 22, 24 and 26; full suite on Node 26
-- **Phases Verified**: 3/4
+- **Tests Executed**: the security-probe suite on Node 22 (269/269); the task.234 tests on Node 22, 24 and 26; `ci:fast` on Node 26
+- **Phases Verified**: 2/4
 - **Critical Issues**: 1
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: PASS
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: FAIL, Maintainability: PASS
 
 ### Key Findings
-- TASK-234-QA-1 (high): on Node 22, the version CI and `engines` pin, the first `rmSync` of a deep sandbox throws `ENAMETOOLONG`, which `removeSandbox` does not handle, so `runProbeSpec` still crashes. It holds on Node 24 and 26.
-- TASK-234-QA-2 (low): the D tests have no committed positive control that the background writer started.
+- Both cycle-1 fixes hold.
+- TASK-234-QA-3 (high): `detached: true` lets a case survive a group kill of the probe, with no time limit (measured).
+- TASK-234-QA-4 (medium): `chmod -R` follows a symlinked sandbox root (measured on GNU chmod 9.12).
+- TASK-234-QA-5 and QA-6 (low): `reapGroup` throws on EPERM; the B test has no positive control.
 
 <!-- change-log-start -->
 ## Change Log
@@ -395,6 +403,8 @@ stays as the judge.
 | 2026-10-31 |  | Implemented — 3 source files (+6 bundled copies), 5 tests added, 2 hardened | develop |
 | 2026-10-31 |  | QA gate FAIL (70/100) — 2 findings (1 high: A fails on Node 22) | qa-task |
 | 2026-10-31 |  | QA findings fixed — TASK-234-QA-1 (Node 22 teardown), QA-2 (D positive controls), 1 iteration | qa-fix |
+| 2026-10-31 |  | QA gate FAIL (70/100) — 4 findings (1 high: a group-killed probe orphans its case) | qa-task |
+| 2026-10-31 |  | QA findings fixed — TASK-234-QA-3 (case leash), QA-4 (root lstat), QA-5 (EPERM), QA-6 (B control), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---
