@@ -372,12 +372,14 @@ function resolveAdapter(name, config, { cwd = process.cwd() } = {}) {
  * every iteration, so the hit is re-checked: a script deleted mid-run reads
  * as missing (QA-3). A stale hit is resolved again in a fresh process, so a
  * replacement in another shape (a directory's index.js for a .js file, or the
- * reverse) is found without a restart (task 225, CR-1). A miss is not cached,
- * so it needs no fallback.
+ * reverse) is found without a restart (task 225, CR-1). The fresh answer is
+ * remembered while its file exists, so a swapped path costs one spawn, not one
+ * per probe. A miss is not cached, so it needs no fallback.
  *
  * @param {string} file an absolute path
  * @param {(f: string) => string | null} [freshResolve] injectable for tests
  * @returns {boolean}
+ * @throws when the fresh resolve could not run (resolveInFreshNode)
  */
 function resolvesAsMain(file, freshResolve = resolveInFreshNode) {
   let resolved;
@@ -388,30 +390,52 @@ function resolvesAsMain(file, freshResolve = resolveInFreshNode) {
   }
   if (fs.existsSync(resolved)) return true;
   // A stale cached hit: the file it named is gone, but another may now resolve.
-  return freshResolve(file) !== null;
+  const remembered = freshHits.get(file);
+  if (remembered && fs.existsSync(remembered)) return true;
+  const fresh = freshResolve(file);
+  if (fresh === null) {
+    freshHits.delete(file);
+    return false;
+  }
+  freshHits.set(file, fresh);
+  return true;
 }
 
+/** file → the path a fresh resolve found for it after a stale hit. */
+const freshHits = new Map();
+
 /**
- * The path `node <file>` would run, resolved in a fresh process, or null.
- * A fresh process has an empty resolution cache. In this process a stale hit
- * survives clearing Module._pathCache (Node v26.8.2), so it cannot be dropped
- * here (task 225). No shell, and `file` is an argument, never code.
+ * The path `node <file>` would run, resolved in a fresh process, or null when
+ * it does not resolve. A fresh process has an empty resolution cache. In this
+ * process a stale hit survives clearing Module._pathCache (Node v26.8.2), so it
+ * cannot be dropped here (task 225). No shell, and `--` ends node's options, so
+ * `file` is an argument even when it looks like one (`--require=…`).
  *
  * @param {string} file an absolute path
+ * @param {typeof execFileSync} [run] injectable for tests
  * @returns {string | null}
+ * @throws when the child could not run or did not finish (spawn error,
+ *   timeout, crash): "could not check" is not "not found"
  */
-function resolveInFreshNode(file) {
+function resolveInFreshNode(file, run = execFileSync) {
+  let out;
   try {
-    return (
-      execFileSync(
-        process.execPath,
-        ["-e", "process.stdout.write(require.resolve(process.argv[1]))", file],
-        { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 10000 },
-      ) || null
+    out = run(
+      process.execPath,
+      [
+        "-e",
+        "try { process.stdout.write(require.resolve(process.argv[1])) } catch {}",
+        "--",
+        file,
+      ],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 10000 },
     );
-  } catch {
-    return null;
+  } catch (e) {
+    throw new Error("fresh resolve failed: " + (e.code || e.message), {
+      cause: e,
+    });
   }
+  return out || null;
 }
 
 /**
@@ -421,7 +445,7 @@ function resolveInFreshNode(file) {
  * symlink problem this is not. `path.resolve`, not `path.join`, so an absolute
  * override stays absolute — the same path the spawn, run in `cwd`, would use.
  * "Exists" means Node would run it (resolvesAsMain), not that the exact path
- * is on disk.
+ * is on disk. A check that could not run is its own error, never "not found".
  *
  * @param {object} adapter a resolved adapter (resolveAdapter)
  * @param {string} cwd the project root the probe runs in
@@ -431,7 +455,17 @@ function resolveInFreshNode(file) {
 function probeMissing(adapter, cwd, exists = resolvesAsMain) {
   const script = adapter && adapter.probeScript;
   if (!script) return null;
-  if (exists(path.resolve(cwd, script))) return null;
+  let found;
+  try {
+    found = exists(path.resolve(cwd, script));
+  } catch (e) {
+    return {
+      status: "error",
+      reason:
+        "probe script could not be checked: " + script + " (" + e.message + ").",
+    };
+  }
+  if (found) return null;
   const searched = adapter.probeSearched;
   const reason = searched
     ? "probe script not found: " +
@@ -457,6 +491,7 @@ module.exports = {
   firstExisting,
   probeMissing,
   resolvesAsMain,
+  resolveInFreshNode,
   PROBE_STATUSES,
   interpretProbe,
   tickCommitOracle,
