@@ -73,6 +73,11 @@ All notable changes to this project will be documented in this file. Format foll
   for `tools/select.js`, or the reverse), the probe resolves it again in a fresh `node` process and
   reads it as present, instead of reporting it missing until the loop restarts. A live hit and a miss
   spawn nothing.
+- **loop-supervisor: the fresh probe resolve is tighter and cheaper (task 225 follow-ups).** A fresh
+  resolve that could not run (spawn error, timeout) now reports `probe script could not be checked`
+  instead of `probe script not found`. The path found after a swap is remembered while it exists, so
+  the swap costs one `node` spawn rather than one per probe. The path is passed after `--`, so a name
+  shaped like a Node option is read as a path, never as an option.
 
 ## [v0.62.0] - 2026-10-29
 

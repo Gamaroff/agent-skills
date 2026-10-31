@@ -30,6 +30,7 @@ import {
   interpretProbe,
   probeMissing,
   resolveAdapter,
+  resolveInFreshNode,
   resolvesAsMain,
   tickCommitOracle,
   anyCommitOracle,
@@ -674,6 +675,77 @@ test("resolvesAsMain spawns a fresh resolve only on a stale hit", () => {
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
+});
+
+// Follow-ups to task 225's QA (CR-1, CR-2) and its finalise security advisory.
+test("resolvesAsMain remembers a fresh hit: one spawn per swap, not per probe", () => {
+  const cwd = mkdtempSync(path.join(os.tmpdir(), "ls-remember-"));
+  const file = path.join(cwd, "tools", "select");
+  const put = (rel) => {
+    mkdirSync(path.dirname(path.join(cwd, rel)), { recursive: true });
+    writeFileSync(path.join(cwd, rel), "");
+  };
+  const calls = [];
+  const fresh = (f) => {
+    calls.push(f);
+    return resolveInFreshNode(f);
+  };
+  try {
+    put("tools/select.js");
+    assert.equal(resolvesAsMain(file, fresh), true, "live hit");
+    rmSync(path.join(cwd, "tools"), { recursive: true });
+    put("tools/select/index.js");
+    assert.equal(resolvesAsMain(file, fresh), true, "replacement found");
+    assert.equal(resolvesAsMain(file, fresh), true, "still found");
+    assert.equal(resolvesAsMain(file, fresh), true, "and again");
+    assert.equal(calls.length, 1, "one spawn for the swap");
+    // The remembered file goes too: spawn again, and report missing.
+    rmSync(path.join(cwd, "tools"), { recursive: true });
+    assert.equal(resolvesAsMain(file, fresh), false, "gone");
+    assert.equal(calls.length, 2, "a vanished remembered file re-checks");
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("resolveInFreshNode reads an option-shaped name as a path, never a node option", () => {
+  // Without `--`, node takes `--version` as its own option and prints its
+  // version, which read as a resolved path.
+  assert.equal(resolveInFreshNode("--version"), null);
+  assert.equal(resolveInFreshNode("--print=1"), null);
+});
+
+test("resolveInFreshNode throws when the check could not run, null when it does not resolve", () => {
+  const timedOut = () => {
+    const e = new Error("spawnSync node ETIMEDOUT");
+    e.code = "ETIMEDOUT";
+    throw e;
+  };
+  assert.throws(
+    () => resolveInFreshNode("/nowhere/select", timedOut),
+    /fresh resolve failed: ETIMEDOUT/,
+  );
+  assert.equal(resolveInFreshNode("/nowhere/select"), null, "real miss");
+});
+
+test("probeMissing reports a check that could not run, not 'not found'", () => {
+  const a = resolveAdapter(
+    "develop-next",
+    {
+      loopSupervisor: {
+        adapters: { "develop-next": { probeScript: "tools/select" } },
+      },
+    },
+    { cwd: "/proj" },
+  );
+  const r = probeMissing(a, "/proj", () => {
+    throw new Error("fresh resolve failed: ETIMEDOUT");
+  });
+  assert.equal(r && r.status, "error");
+  assert.equal(
+    r.reason,
+    "probe script could not be checked: tools/select (fresh resolve failed: ETIMEDOUT).",
+  );
 });
 
 test("probeMissing makes one exists call for a probe, none without one", () => {
