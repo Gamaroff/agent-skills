@@ -66,6 +66,14 @@ All notable changes to this project will be documented in this file. Format foll
   Before, `false` read as unset and `off` as a map file named `off`; a project whose map file is
   literally named `off` must rename it.
 
+### Fixed
+
+- **loop-supervisor: a replacement probe script is found after a stale hit (task 225).** When the
+  probe script Node resolved earlier is deleted and another shape replaces it (`tools/select/index.js`
+  for `tools/select.js`, or the reverse), the probe resolves it again in a fresh `node` process and
+  reads it as present, instead of reporting it missing until the loop restarts. A live hit and a miss
+  spawn nothing.
+
 ## [v0.62.0] - 2026-10-29
 
 ### Added

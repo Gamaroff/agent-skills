@@ -1,0 +1,53 @@
+schema: 2
+task: 'task.225.loop-supervisor-probe-stale-hit-replacement'
+task_title: 'loop-supervisor: find a replacement probe script after a stale hit'
+gate: PASS
+status_reason: 'A stale require.resolve hit is now resolved again in a fresh node process, so a replacement in another shape reads as present. SC1-SC6 and SC8 hold, each test-backed and mutation-proven (2 of 2 mutations covered). The diff review returned one low, medium-confidence bug (CR-1) and one cleanup (CR-2), both advisory and routed to recommendations.future.'
+reviewer: 'QA Engineer'
+head: '159f41a35ac4bfa974755742cabfb89929ff7c25'
+updated: '2026-10-31T07:06:01Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 256
+  phases_verified: 2/2
+  ci: 'CI on 159f41a35ac4: pending (read once; QA does not wait on CI)'
+  trace:
+    phases_covered: [1, 2]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 8
+    escaped: 0
+    notes: 'boundary: true. resolvesAsMain is newly exported and returns a verdict. security-probe.mjs (cases file task.225.qa.1.security.cases.json) ran 8 cases: 6 hostile rejected, 2 legitimate accepted, verdict engages. The engine child has no stale hit, so the spawn path was probed by hand: four hostile names (command substitution, backticks, separators, option-shaped) given a real stale hit ran the real resolveInFreshNode, read as missing, and wrote nothing. The spawn uses no shell and passes the path as an argument.'
+  performance:
+    status: PASS
+    notes: 'A live hit and a miss spawn nothing (spawn-count test). After a swap, every later probe of that path spawns one node process (CR-2), which the task accepts (section 10, risk 2): iterations are minutes apart.'
+  reliability:
+    status: PASS
+    notes: 'A spawn failure or timeout reads as missing, which is the answer before this change (CR-1, advisory). 10 s timeout on the child.'
+  maintainability:
+    status: PASS
+    notes: 'Small, commented change. The doc comment says why a fresh process is needed (Module._pathCache does not drop the stale hit on Node v26.8.2).'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (cycle 1): resolveInFreshNode returns null both for "does not resolve" and for "could not run the child" (spawn failure, timeout). Tell them apart and report the second as its own probe error rather than "probe script not found".'
+      refs: ['skills/loop-supervisor/references/adapters.js']
+    - action: 'CR-2 (cycle 1): the stale cache entry is never replaced, so after one swap every later probe spawns. Remember the last fresh-resolved path and check it before spawning again, or state the repeat in the doc comment.'
+      refs: ['skills/loop-supervisor/references/adapters.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

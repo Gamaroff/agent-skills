@@ -1,0 +1,23 @@
+{
+  "sink": null,
+  "entry": "skills/loop-supervisor/references/adapters.js#resolvesAsMain",
+  "name": "resolvesAsMain",
+  "call_site": "skills/loop-supervisor/references/adapters.js:382",
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 8,
+  "passed": 8,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-10-31T07:05:09.948Z"
+}

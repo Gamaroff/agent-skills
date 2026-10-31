@@ -12,7 +12,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -24,6 +30,7 @@ import {
   interpretProbe,
   probeMissing,
   resolveAdapter,
+  resolvesAsMain,
   tickCommitOracle,
   anyCommitOracle,
 } from "../../../skills/loop-supervisor/references/adapters.js";
@@ -593,6 +600,81 @@ for (const script of ["tools/select", "tools/select.js"]) {
     assert.equal(probeMissing(a, cwd), null, "back");
   });
 }
+
+// task 225 (CR-1): a stale hit whose file is replaced by another shape. The
+// in-process cache keeps the deleted path; a fresh node finds the replacement.
+const SWAPS = [
+  {
+    name: "file → directory",
+    before: "tools/select.js",
+    after: "tools/select/index.js",
+  },
+  {
+    name: "directory → file",
+    before: "tools/select/index.js",
+    after: "tools/select.js",
+  },
+];
+for (const s of SWAPS) {
+  test(`probeMissing finds a replacement after a stale hit: ${s.name}`, () => {
+    const cwd = mkdtempSync(path.join(os.tmpdir(), "ls-replace-"));
+    const put = (rel) => {
+      mkdirSync(path.dirname(path.join(cwd, rel)), { recursive: true });
+      writeFileSync(path.join(cwd, rel), "");
+    };
+    try {
+      put(s.before);
+      const a = resolveAdapter(
+        "develop-next",
+        {
+          loopSupervisor: {
+            adapters: { "develop-next": { probeScript: "tools/select" } },
+          },
+        },
+        { cwd },
+      );
+      assert.equal(probeMissing(a, cwd), null, "before");
+      rmSync(path.join(cwd, "tools"), { recursive: true });
+      put(s.after);
+      assert.equal(probeMissing(a, cwd), null, "replacement found");
+      // Stale with nothing replacing it: still missing.
+      rmSync(path.join(cwd, "tools"), { recursive: true });
+      const r = probeMissing(a, cwd);
+      assert.ok(
+        r && r.reason.startsWith("probe script not found: tools/select"),
+        r && r.reason,
+      );
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+}
+
+test("resolvesAsMain spawns a fresh resolve only on a stale hit", () => {
+  const cwd = mkdtempSync(path.join(os.tmpdir(), "ls-spawn-"));
+  const file = path.join(cwd, "select.js");
+  const calls = [];
+  const fresh = (f) => {
+    calls.push(f);
+    return null;
+  };
+  try {
+    assert.equal(resolvesAsMain(file, fresh), false, "miss");
+    assert.equal(calls.length, 0, "a miss spawns nothing");
+    writeFileSync(file, "");
+    assert.equal(resolvesAsMain(file, fresh), true, "live hit");
+    assert.equal(calls.length, 0, "a live hit spawns nothing");
+    unlinkSync(file);
+    assert.equal(
+      resolvesAsMain(file, fresh),
+      false,
+      "stale hit, nothing found",
+    );
+    assert.deepEqual(calls, [file], "a stale hit spawns once");
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
 
 test("probeMissing makes one exists call for a probe, none without one", () => {
   const calls = [];
