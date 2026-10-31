@@ -370,26 +370,25 @@ stays as the judge.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-10-31
-**Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Quality Score**: 95/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.234.qa.6.probe-teardown-and-reap-hardening.md](./task.234.qa.6.probe-teardown-and-reap-hardening.md)
-- **Gate File**: [task.234.gate.6.probe-teardown-and-reap-hardening.yml](./task.234.gate.6.probe-teardown-and-reap-hardening.yml)
+- **Full Report**: [task.234.qa.7.probe-teardown-and-reap-hardening.md](./task.234.qa.7.probe-teardown-and-reap-hardening.md)
+- **Gate File**: [task.234.gate.7.probe-teardown-and-reap-hardening.yml](./task.234.gate.7.probe-teardown-and-reap-hardening.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: the security-probe suite on Node 22 (274/274), `ci:fast` (6924 tests, 0 failed, run without `CI` set), and the CI guard under `CI=true` (failed)
+- **Tests Executed**: the security-probe suite on Node 22 (274/274), `ci:fast` (6924 tests, 0 failed), the CI guard under `CI=true`, and CI on `f9040a87` (all six checks green)
 - **Phases Verified**: 4/4
-- **Critical Issues**: 1
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: PASS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- QA-10 holds.
-- TASK-234-QA-11 (high): CI has been red since `a32dd8f0`. The `ci-tool-skips` guard reads the tests' stand-in `command -v` names as missing CI tools.
-- TASK-234-QA-12 (medium): the QA-10 test does not assert that the case was leashed.
+- Every finding from QA cycles 1–6 is closed: TASK-234-QA-1 through QA-12.
+- One low cleanup in a test helper is carried to `recommendations.future`.
 
 <!-- change-log-start -->
 ## Change Log
@@ -412,6 +411,7 @@ stays as the judge.
 | 2026-10-31 |  | QA findings fixed — TASK-234-QA-10 (leash PATH keeps absolute entries only), 1 iteration; one QA cycle granted | qa-fix |
 | 2026-10-31 |  | QA gate FAIL (70/100) — CI red since a32dd8f0 (ci-tool-skips reads test stand-ins as tools); granted budget exhausted | qa-task |
 | 2026-10-31 |  | QA findings fixed — TASK-234-QA-11 (stand-in names passed as argv), QA-12 (tests assert the leash), 1 iteration; one more QA cycle granted | qa-fix |
+| 2026-10-31 |  | QA gate PASS (95/100) — all findings closed; CI green on f9040a87 | qa-task |
 <!-- change-log-end -->
 
 ---
