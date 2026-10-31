@@ -3,7 +3,7 @@
 **Task**: `task.225.loop-supervisor-probe-stale-hit-replacement.md`
 **Run Number**: 1
 **Started**: 2026-10-31 06:49
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -35,10 +35,10 @@ First run of task.225: give `resolvesAsMain` a fresh-process fallback on a stale
 | 1. create-branch           | ✅ Done    | Branch `feature/task.225.*` exists in git                              | Branch created at `e923736d`; pushed with tracking | —                    | 2026-10-31T06:50Z |
 | 2. review-task             | ✅ Done    | `task.225.review.{N}.{name}.md` exists (or skip logged)                | `task.225.review.1.*.md` — READY TO IMPLEMENT 9/10; Planned → Ready for Development | —                    | 2026-10-31T06:52Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + surface map); 1 iteration, 9/9 phase boxes; fast gate green on run 2 | `.summaries/step-3-iteration-audit-1.json`, `.summaries/step-3-test-triage-1.json` | 2026-10-31T07:00Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.225.qa.{N}.*.md`; `task.225.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.225.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #798: https://github.com/Gamaroff/agent-skills/pull/798 | —                    | 2026-10-31T07:02Z |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.225.qa.{N}.*.md`; `task.225.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 1 cycle; gate 1 PASS 100/100; PR review APPROVE (`task.225.pr-review.1.*.md`) | — | 2026-10-31T07:10Z |
+| 7. finalise                | ✅ Done    | `task.225.dod.{N}.*.md`; task `status: accepted`                       | `task.225.dod.1.*.md` ACCEPTED; acceptance commit `4b30bbee`; #725 closed | — | 2026-10-31T07:18Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Report-only docs commit | — | 2026-10-31T07:19Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -91,6 +91,37 @@ First run of task.225: give `resolvesAsMain` a fresh-process fallback on a stale
 - Development completion comment posted to github issue 725 (`posted`).
 - Observation logged: #137 (planned test code with no temp-dir cleanup trips the tmp-leak ratchet; review does not check it).
 
+### Step 4 — 2026-10-31
+
+- SCOPE_PATHS: `docs/tasks/task.225.loop-supervisor-probe-stale-hit-replacement`, `CHANGELOG.md`, `evals/loop-supervisor/unit`, `skills/loop-supervisor/references`. Pre-flight guard held 0 files. Report links: 0, resolve.
+- /create-pr --base develop --issue 725 + the four scopes. /commit-changes made 2 commits: `a066fa3f` fix(loop-supervisor) (code, tests, CHANGELOG) and `159f41a3` docs(task.225) (task doc, review, this report). Leak check: OK.
+- PR body written by the orchestrator, not the Explore summariser: the diff is ~110 lines authored this session.
+- PR created: https://github.com/Gamaroff/agent-skills/pull/798. Issue #725 in-review comment: `posted`. Lock `pr_url` set; develop-next run state `prNumber: 798`.
+- Post-PR state check (inline `gh pr view`): PR #798 state = OPEN. errors = 0.
+- GitHub board: in-review → stage-disabled.
+
+### Steps 5–6 — 2026-10-31
+
+- GitHub board: QA-start re-assert → stage-disabled.
+- Traceability mapper skipped: lite mode.
+- /qa-task cycle 1 (lite, direct tools, `code_review_blocking=true`). Diff reviewer (Explore) returned in 44.7 s: CR-1 bug low/medium, CR-2 cleanup; anchors ok; neither maps to the gate. Tests and two mutations run in a scratch worktree at HEAD (no `.agents/skills` symlink): 256 / 255 pass / 0 fail / 1 skipped; both mutations covered.
+- Boundary: `true` (the newly exported `resolvesAsMain` returns a verdict). `security-probe.mjs` with a committed cases file: 8 executed, verdict `engages`, escaped 0. The spawn path is unreachable from the engine's child (no stale hit), so it was probed by hand with four hostile names: none ran.
+- CI read once: pending. Gate 1: PASS 100/100, no open entry → route 1 → 5c. PR comment and #725 `qa-gate-1` comment `posted`.
+- Path-1 commit `df3db764` (gate, QA report, task doc, security record), pushed once; trail asserted on `origin`.
+- 5c: `/review-pr --effort low --comment --no-code` (lite). Conformance lens (Explore, 20.6 s): 0 findings. Verdict APPROVE; `OPEN_COVERAGE=0`. Report `task.225.pr-review.1.loop-supervisor-probe-stale-hit-replacement.md`, staged for 6a (0 doc-only findings to carry). PR summary comment posted. `ready-for-merge` → stage-disabled.
+
+### Step 7 — 2026-10-31
+
+- `/finalise` (lite mode does not change Step 7). DoD `task.225.dod.1.loop-supervisor-probe-stale-hit-replacement.md`: ACCEPTED. Re-run scope: full (no-prior-record), 8 re-judged.
+- Four Explore agents in parallel, each told to read its prompt file with the placeholders given rather than receiving the template inline: AC PASS 8/8, security PASS (`boundary: true`), compliance NOT_APPLICABLE, docs PASS. The AC agent's YAML came back with `->` escaped as `&gt;`; restored before the merge (obs #133 shape, prose only, no plan affected).
+- Probe plan run by /finalise: 8 executed, 0 reproduced, 0 escaped, 0 refusals; record `task.225.dod.1.security.run.json`.
+- Security advisory (not reproduced, not a gap): Node parses an option-shaped argument after `-e <code>` as a Node option, so `resolveInFreshNode`'s "never code" claim relies on the caller passing absolute paths, which `probeMissing` always does. A `--` before `file` removes the dependency. Logged as a follow-up candidate beside CR-1 and CR-2.
+- CI reading 1: SUCCESS @ `df3db764a416` over 6 checks (waited for the `test` lane). CI reading 2: SUCCESS (tree-equivalent to 159f41a35ac4) @ `4b30bbeec58b` over 6 checks.
+- Acceptance commit `4b30bbee` (task doc, DoD, AC record, security record, sprint review, registry tick, carried 5c review), pushed; tracked-and-pushed assertions passed; PR head equals the acceptance head. 6d: CHANGELOG cites task 225.
+- Registry: `ticked` (`planned` → `accepted`), `staged`. Change Log row `1.2 DoD passed — accepted (PR #798)`.
+- Canonical PR comment posted. #725: link already on a durable branch, `done` comment `posted`, closed (CLOSED confirmed), board `done` → already.
+- The poll script was written with the Write tool, not the heredoc in the step doc (global shell-safety rule).
+
 ---
 
 ## Issues Log
@@ -105,14 +136,28 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-10-31
+**Gate Result**: PASS
+**Issues Found**: none in the gate; 2 advisory from the diff review (CR-1: a fresh-resolve spawn failure reads as "not found"; CR-2: after a swap every later probe spawns), both in `recommendations.future`
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+**Carried to 6a**: docs/tasks/task.225.loop-supervisor-probe-stale-hit-replacement/task.225.pr-review.1.loop-supervisor-probe-stale-hit-replacement.md
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-10-31 07:19
+**Final Status**: Completed
 **Branch**: `feature/task.225.loop-supervisor-probe-stale-hit-replacement`
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/798
+**QA Iterations**: 1
+**DoD Summary**: `task.225.dod.1.loop-supervisor-probe-stale-hit-replacement.md` — ACCEPTED
+**Tracker debt**: none
+
+### Completion Summary
+
+Implemented a fresh-process `require.resolve` fallback in `resolvesAsMain`: on a stale cached hit it resolves again in a new `node` process, so a probe script replaced in another shape (file ↔ directory index) reads as present without a restart. Three tests were added (two swap tests and a spawn-count test), plus a CHANGELOG `### Fixed` entry. One QA cycle: gate PASS 100/100, mutation-proven, 5c review APPROVE. Finalise accepted with CI green on both readings. Follow-up candidates, none blocking: CR-1 (a spawn failure reads as "not found"), CR-2 (a repeated spawn after a swap), and a `--` before `file` in the spawn argv.
