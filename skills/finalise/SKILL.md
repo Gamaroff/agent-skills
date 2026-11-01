@@ -671,6 +671,24 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
    shares, so an `id` match can put one control's grade on another's probe (task.189 CR2-1). A probe
    it does not grade stays without, and halts. Without this step every reproduced probe would
    halt, and the low-severity fix-and-recheck path Step 8a offers would never open.
+3a. **Check each inline case's verdict against its `spec_ref`** (task 249, obs #81). Do this before
+   grading. An inline case's verdict (`direction`, `correct`) is the security agent's own, so it can
+   be stricter than the work item. Corpus cases are exempt: their verdict is the shared corpus's.
+   Read the cases files this run saved (`$DOC_DIR/$STEM.dod.$DOD_N.security.cases.json`, or
+   `….security.cases.<i>.json` for entry *i*). Then:
+   - **An inline case without `spec_ref`** is a plan-shape error. Add a
+     `probe case without spec_ref: {id}` FAIL check with `severity: low`. When that case reproduced,
+     drop its probe from `probes[]`. A verdict nobody tied to the specification is not evidence
+     against code that follows it, and the check keeps the defect visible.
+   - **A reproduced inline case**: find it by its `id` (the probe's `id` is the case id) and read the
+     line its `spec_ref` names. When that line allows what the case's `direction` says the control
+     must refuse, or refuses what it says the control must accept, the case contradicts its
+     specification. Move the probe out of `probes[]` and into `SECURITY_RESULT.spec_questions[]`
+     (`{id, input, spec_ref, direction, correct, what the line says}`). It is not a security FAIL.
+     Like `spec_challenges[]`, it renders under **Recommendations for the owner**. In a hands-free
+     run it is also a question for the operator, recorded as **Spec question** in the pipeline's
+     Issues Log. A case whose verdict matches its line stays in `probes[]`, which is a real finding.
+   - Recompute `overall` after the moves, as item 6 says.
 4. **An escape is a finding, whatever the verdict.** Each `escapes[]` entry is a case the engine saw
    write outside its sandbox — the engine exits 1 on one even when the control engages. Add a
    `probe escaped its sandbox: {entry} ({id} → {path})` FAIL check per entry, with no `severity`.
@@ -773,7 +791,9 @@ not answer counts as `FAIL`, and an agent `FAIL` stands when it names no failing
 recomputed from the merged `acs` and `docs` — never copied from the agent, and
 `NEEDS_MANUAL_REVIEW` when no criterion verdict exists at all. Steps 3d and 6 read that. `id_mismatches` names any `ac_id` the agent returned that the
 scope did not issue; such a verdict is not merged, and the criterion it was meant for reads `FAIL`
-with `no verdict returned under id …`.
+with `no verdict returned under id …`. A `DEFERRED-CI` criterion (a CI-state criterion, task 249)
+is kept as `DEFERRED-CI` in the merged result and the record, and folds as **not met**: `AC_OVERALL`
+here is at best `PARTIAL` until Step 6 action 2a grades it from CI reading 1 and re-folds it.
 
 A bug run skips this with the rest of `rerun-scope` (Step 3a's marker): no merge runs and no record
 is written; `AC_RESULT` is the fix-evidence agent's answer, as Step 3b says.
@@ -798,7 +818,7 @@ Append sections to the running summary file. **One append per section** — not 
 
 #### {ac.ac_id}: {ac.description}
 
-**Status:** {✅ PASS | ❌ FAIL}{ac.carried ? " (carried from the prior run)" : ""}
+**Status:** {✅ PASS | ❌ FAIL | ⏳ DEFERRED-CI — graded at Step 6 from CI reading 1}{ac.carried ? " (carried from the prior run)" : ""}
 
 - Code evidence: `{ac.code_citation or "not found — FAIL"}`
 - Test evidence: `{ac.test_citation or "not found — FAIL"}`
@@ -905,6 +925,22 @@ boundary rule's §5.1) is evidence for that override, labelled so, never a closu
   anything reproduced — it can only appear when the count is non-zero and nothing was found.
 -->
 
+{if security_result.spec_challenges or security_result.spec_questions is non-empty:}
+### Recommendations for the owner
+
+These are not security findings, and they do not count against the verdict above. Each is an input the
+work item's specification allows, which may be a risk (task 249, obs #81). Tightening the
+specification is the owner's decision.
+
+{for each c in security_result.spec_challenges:}
+- **Spec challenge:** `{c.input}` — allowed by `{c.spec_ref}`. {c.risk}
+{endfor}
+{for each q in security_result.spec_questions:}
+- **Spec question:** case `{q.id}` (`{q.input}`) expected `{q.direction}` ({q.correct}), but
+  `{q.spec_ref}` says {q.what the line says}. The code follows the specification.
+{endfor}
+{endif}
+
 **Agent summary:** {security_result.summary}
 
 ---
@@ -1006,7 +1042,7 @@ Use the **Decision Matrix** from `references/definition-of-done-checklist.md` to
 
 | Decision matrix column       | Source variable                                     |
 | ---------------------------- | --------------------------------------------------- |
-| All Acceptance Criteria Met? | `AC_OVERALL` (PASS/PARTIAL/FAIL)                    |
+| All Acceptance Criteria Met? | `AC_OVERALL` (PASS/PARTIAL/FAIL), as action 2a rebinds it |
 | Tests & PR Approved?         | `ac_result.pr_review_decision` (APPROVED)           |
 | **CI green?**                | **`CI_ROLLUP` (see below) — a hard blocker**        |
 | Docs Updated?                | `DOCS_OVERALL` (PASS/NOT_APPLICABLE counts as pass) |
@@ -1240,8 +1276,52 @@ with `ci.docsOnly.enabled: false` ([`docs/reference/configuration.md`](../../doc
 
 **Actions:**
 
-1. **Use the aggregated results** from Step 3c (`AC_OVERALL`, `SEC_OVERALL`, `COMP_OVERALL`, `DOCS_OVERALL`) — do not re-read the running summary file for this step
+1. **Use the aggregated results** from Step 3c (`AC_OVERALL`, `SEC_OVERALL`, `COMP_OVERALL`, `DOCS_OVERALL`) — do not re-read the running summary file for this step. `AC_OVERALL` is rebound once more, by action 2a, after CI reading 1
 2. **Resolve `CI_ROLLUP`** using the command above, and record the raw per-job conclusions in the DoD running summary so the decision is auditable. **Record the head it was read on** in the same line — `CI_HEAD_1=$(git rev-parse HEAD)` — as `CI reading 1: {CI_ROLLUP} @ {CI_HEAD_1}` — or, when the docs-only arm resolved it, `CI reading 1: SUCCESS (tree-equivalent to {CI_TREE_EQ}) @ {CI_HEAD_1}`. This is the reading that gates the *decision*; it is structurally an ancestor of the commit that will carry the acceptance, and Step 7's publish boundary takes a second reading on that commit before anything leaves the repo (task.115, obs #40).
+2a. **Grade the CI-state criteria from CI reading 1, and rebind `AC_OVERALL`** (task 249, obs #110).
+   The AC agent ran at Step 3b, before this reading existed, so a criterion whose only evidence is CI
+   state came back `DEFERRED-CI` (`references/finalise-dod-ac-prompt.md` Step 3) and Step 3c folded it
+   as not met. This block grades each one — `SUCCESS` → PASS (a tree-equivalent `SUCCESS` included,
+   with its green sha in the note), `FAILURE` → FAIL, anything else leaves it deferred and the CI table
+   above decides — rewrites the merged result and the AC record, and **rebinds `AC_OVERALL` from the
+   re-folded verdict**. Rewriting the entries alone would leave `AC_OVERALL` at the `PARTIAL`/`FAIL`
+   Step 3c folded. A bug run, or a Step 3c answer that was not `merged`, has no merged result and
+   skips it with `AC_OVERALL` unchanged:
+
+   ```bash
+   # Step 6 action 2a — grade DEFERRED-CI criteria from CI reading 1 (task 249). INPUTS, substituted into
+   # THIS block: STEM and DOD_N exactly as Step 0 bound them; {document-directory}; CI_ROLLUP, CI_HEAD_1
+   # and CI_TREE_EQ from action 2 (CI_TREE_EQ empty unless the docs-only arm set it); AC_OVERALL from Step 3c.
+   STEM="{story.{P}.{E}.{S} | task.{id}}"
+   DOD_N="{Step 0's DOD_N}"
+   DOC_DIR="{document-directory}"
+   CI_ROLLUP="{CI_ROLLUP from action 2}"
+   CI_HEAD_1="{CI_HEAD_1 from action 2}"
+   CI_TREE_EQ="{CI_TREE_EQ, or empty}"
+   AC_OVERALL="{AC_OVERALL from Step 3c}"
+   case "$STEM$DOD_N$DOC_DIR$CI_ROLLUP$CI_HEAD_1$CI_TREE_EQ$AC_OVERALL" in
+     *'{'*) echo "HALT: substitute every input of Step 6 action 2a (an unsubstituted placeholder found)"; exit 1 ;;
+   esac
+   AC_MERGED_FILE=".claude/state/finalise-ac-merged-${DOD_N}.json"
+   AC_RECORD="$DOC_DIR/${STEM}.dod.${DOD_N}.ac.json"
+   if [ -f "$AC_MERGED_FILE" ] && [ "$(jq -r '.reason' "$AC_MERGED_FILE" 2>/dev/null)" = "merged" ]; then
+     RECORD_ARGS=()
+     [ -f "$AC_RECORD" ] && RECORD_ARGS=(--record "$AC_RECORD")
+     RESOLVE_CI=$(command node .agents/skills/finalise/references/finalise-rerun-scope.js resolve-ci \
+       --merged "$AC_MERGED_FILE" --rollup "$CI_ROLLUP" --ci-head "$CI_HEAD_1" --tree-eq "$CI_TREE_EQ" \
+       "${RECORD_ARGS[@]}" --json) \
+       || { echo "HALT: finalise-rerun-scope.js resolve-ci failed — $RESOLVE_CI"; exit 1; }
+     AC_OVERALL=$(printf '%s' "$RESOLVE_CI" | jq -r '.overall')
+     echo "CI-state criteria: $(printf '%s' "$RESOLVE_CI" | jq -c '{reason, resolved, undecided}')"
+   fi
+   echo "AC_OVERALL=$AC_OVERALL"
+   ```
+
+   Read `reason`: `none-deferred` changes nothing; `resolved` names each graded criterion — append
+   `**CI-state criteria:** {ac_id} → {status} ({CI reading 1 line}) — AC_OVERALL re-folded: {AC_OVERALL}`
+   under the running summary's `## Step 2` section; `ci-undecided` leaves each listed criterion
+   `DEFERRED-CI` and `AC_OVERALL` not PASS, and the `CI_ROLLUP` row above (PENDING, CANCELLED, NONE,
+   UNKNOWN) is what this run does next. A re-sample that turns the rollup `SUCCESS` re-runs this block.
 3. **Determine pass/fail** for each decision matrix column using the mapping above
 4. **Write the acceptance decision to the running summary:**
 

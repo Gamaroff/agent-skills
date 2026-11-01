@@ -957,6 +957,7 @@ check passing a document the sync then publishes thin. Full contract:
 - **Previous story continuity**: Are patterns, file locations, and decisions from the previous story carried forward correctly?
 - **Missing acceptance criteria coverage**: Does every AC map to at least one task?
 - **Security or performance requirements**: If relevant, are they stated explicitly (not implied)?
+- **A measurement or record with nowhere committed to live** (obs #105, #77, task 249): an acceptance criterion graded by a measurement (a runtime, size, count or rate bound) or one that demands a record ("recorded", "logged", "listed in") names **where** the figure or record goes — the QA report, the QA gate file or the DoD, each committed by the time the story is accepted. Never the implementation report: the pipeline commits it after `/finalise` grades the criterion. `review-story` reports a criterion that names no location.
 
 #### ✨ Nice to Have
 

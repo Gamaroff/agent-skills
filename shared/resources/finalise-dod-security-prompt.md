@@ -180,6 +180,22 @@ runs gave opposite verdicts on unchanged code, and the earlier run's inputs no l
 the next DoD run, and the earlier DoD file's probe count then cites a record that no longer holds it
 (obs #302).
 
+**Every inline case you write carries a `spec_ref`** (task 249, obs #81). A case's verdict is its
+`direction` (`hostile` | `legitimate`) and its `correct` prose, and for an inline case that verdict is
+yours, not the corpus's. `spec_ref` names the line it comes from: the work item's own line, or a line
+of a reference document the work item cites, as `path:line`. The verdict must be what that line says
+the control does. On task.200 an inline case marked `hostile` an input the task's own specification
+accepted, and code that did exactly what the task asked FAILed security. Corpus cases need no
+`spec_ref` — their verdict is the shared corpus's, and you do not write it.
+
+- **No line to cite means the case does not go in `cases:`.** An inline case without `spec_ref` is a
+  plan-shape error: `/finalise` reports it in the DoD and does not count the case against security.
+- **A case the spec allows but you think it should forbid goes in `spec_challenges[]`**, never in
+  `cases:` with a verdict the spec does not give it. Each entry is the input, the `spec_ref` that
+  allows it, and why it is a risk. `/finalise` renders the list as a recommendation to the work item's
+  owner, outside `checks[]`: a specification that is too loose is the owner's decision to tighten, not
+  a defect in code that follows it.
+
 **3. Plan the run — `/finalise` executes it.** For each control, return one `probe_plan` entry: the
 arguments you would give the probe engine (`shared/resources/security-probe.mjs`), as a **list with
 one element per argument**, plus any inline `cases`. `/finalise` Step 3b.1 runs every entry against
@@ -373,7 +389,12 @@ security_review:
     - argv: ["--sink", "<sink>", "--entry", "<path-from-repo-root>#<exportName>"] # one element
         # per argument; never --record, --repo-root, --cases-file, --json, --emit-block or
         # --timeout (the runner owns them)
-      cases: null # or the JSON array of cases, verbatim, when the corpus does not fit (Step 4.2)
+      cases: null # or the JSON array of cases, verbatim, when the corpus does not fit (Step 4.2);
+        # every inline case carries spec_ref: "path:line" — the line its direction/correct come from
+  spec_challenges: # inputs the spec ALLOWS that you judge risky — never as cases (Step 4.2); [] when none
+    - input: "the input, verbatim"
+      spec_ref: "path/to/work-item.md:NN" # the line that allows it
+      risk: "why the owner may want to forbid it"
   # The two fields below are FILLED BY /finalise Step 3b.1 from the run record — do not emit them.
   probes_executed: 0 # totals.executed from the run record: every candidate actually run,
     # including the legitimate inputs of step 5 — copied, never composed by hand.

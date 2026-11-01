@@ -1722,6 +1722,13 @@ test("computeOverall: PASS, PARTIAL and FAIL", () => {
     eng.computeOverall([{ status: "PASS" }], [{ status: "FAIL" }]),
     "PARTIAL",
   );
+  // task 249: an unresolved DEFERRED-CI criterion is not met. The full set of
+  // DEFERRED-CI readers is held in finalise-deferred-ci.test.mjs.
+  assert.equal(
+    eng.computeOverall([{ status: "PASS" }, { status: eng.DEFERRED_CI }], []),
+    "PARTIAL",
+  );
+  assert.equal(eng.computeOverall([{ status: eng.DEFERRED_CI }], []), "FAIL");
   // CR-6: no criterion verdict at all is not "every criterion passed".
   assert.equal(eng.computeOverall([], []), "NEEDS_MANUAL_REVIEW");
   assert.equal(

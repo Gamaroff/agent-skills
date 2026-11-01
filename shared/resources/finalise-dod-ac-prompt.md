@@ -56,7 +56,8 @@ For each AC item extracted in Step 1:
 - An AC ticked complete with **no test written at all**. When the assertion was finally written it went **red immediately**, having concealed a live defect for the whole period it was assumed present.
 - A test written and cited, but placed in a **smoke/e2e directory excluded from the per-PR job** — so it would never have guarded the PR it was authored for.
 
-**Three kinds of criterion may carry `test_citation: "NOT_APPLICABLE: …"`, and only these three:**
+**Five kinds of criterion may carry `test_citation: "NOT_APPLICABLE: …"`, and only these five:**
+(the last of them, a CI-state criterion, is not graded here at all — task 249)
 
 - **"No unit tests applicable."** A task that says so explicitly (cite that line). Mark `PASS` with a note.
 - **A documentation criterion.** Its whole deliverable is what a document says — a CHANGELOG entry cites the work item, a reference doc is updated, a doc agrees with the code — not what code does. Classify by what the criterion *requires*, not how it is worded: if it can be stated as "file F says S", it is a documentation criterion; if meeting it needs code to do something when run, it is not. For a documentation criterion:
@@ -64,12 +65,22 @@ For each AC item extracted in Step 1:
   - `test_citation` is a test that pins that document when one exists — for a CHANGELOG citation, the repository's changelog corpus guard if it has one; name it, and say in `note` when it runs (a post-merge guard is still a guard). Otherwise `"NOT_APPLICABLE: documentation criterion"`.
   - `PASS` when the cited text is present and says what the criterion requires. `FAIL` when it is absent or says something else.
 - **A measured criterion.** A non-functional bound (a runtime, size, count or rate the criterion states as a number) whose natural evidence is a measurement, not a per-PR test. Classify it by what it bounds **and** by whether a per-PR test could assert that bound: if one could, it is a behaviour criterion and takes the normal path. For a measured criterion:
-  - `code_citation` is the line of a **committed** artifact that records the measurement and the command that produced it (typically the implementation report or a QA report). **Read that line.** `note` states the bound, the measured value and the command.
+  - `code_citation` is the line of a **committed** artifact that records the measurement and the command that produced it — one committed by the time the work is accepted: a QA report, the QA gate file, or this run's DoD file. **Read that line.** `note` states the bound, the measured value and the command.
+  - **The implementation report is not one of them.** The pipeline commits it in its last step, after this check runs, so a citation of it is uncommitted on every run (obs #105). A measurement found only there is `FAIL` with `note: "cite the QA report or DoD"` — the fix is to record the figure where it is committed, not to accept it from the report.
   - `test_citation` is `"NOT_APPLICABLE: measured criterion"`.
   - `PASS` when the criterion states a bound, the cited measurement meets it, and the command is named. `FAIL` when the measurement is uncited or uncommitted, or when it misses the bound. A criterion that states no numeric bound ("no measurable change", "fast enough") is not a measured criterion: it takes the behaviour path, and fails there without a test.
   - A wall-clock bound decays with every later commit and every change in machine load. Its cited measurement must record the load it ran under (`uptime` beside `time`) and be taken on the PR's head commit. A figure from an earlier commit, or with no load recorded, is `FAIL` with `note: "re-measure"`.
+- **A process criterion.** Its deliverable is how the work was verified, not what the code does — "each fix is mutation-proven", "every finding is reproduced before it is fixed", "each phase is reviewed". Classify by what the criterion *requires*: if it names a verification step applied to units of the work, it is a process criterion; if it names a behaviour the code must have, it is not (obs #82). For a process criterion:
+  - Find where the work item defines the units — its Testing Strategy, its phase list, the fixes its QA reports name — and apply the **quantifier rule** (rule 6) to that set: each unit is a member.
+  - `code_citation` is the committed record the work item names for the process (a QA report's fix section, a gate's evidence line, the DoD). Each member's `evidence` is the line recording that unit's step — for a mutation proof, the revert and the test that went red. **Read each line.**
+  - `test_citation` is `"NOT_APPLICABLE: process criterion"`.
+  - `PASS` when every unit has a committed record of the step. `FAIL` naming the uncovered units in `note`. A record that says the step happened without saying what it found ("mutation-tested ✅") is not evidence of it.
+- **A CI-state criterion.** Its only evidence is the state of the PR's CI run — "CI is green on the PR head", "every required check passes". You run before `/finalise` reads CI, so you cannot see the reading that decides it, and a grade you give now would be a guess (obs #110). Return it **ungraded**:
+  - `status: DEFERRED-CI`. `code_citation` is the CI configuration that defines the run (e.g. `.github/workflows/ci.yml:1`); `test_citation` is `"NOT_APPLICABLE: CI-state criterion"`; `note` names what the criterion asks of CI.
+  - `/finalise` Step 6 grades it from CI reading 1 — `SUCCESS` → PASS, `FAILURE` → FAIL, anything else leaves it deferred and the CI decision table decides. Until then it counts as **not met**, so a `DEFERRED-CI` you return can only lower `overall`, never raise it.
+  - Only a criterion whose **whole** evidence is CI state takes this path. "The new test passes in CI" is a behaviour criterion: cite the test, and the execution rule covers the lane. "CI is green *and* the docs are updated" is two criteria; judge the doc half by its own path and say so in `note`.
 
-`test_runs_per_pr` is `null` on all three kinds: the execution rule reads a test lane, and none has a test in one. **A behaviour criterion never takes any of these paths**, and a bound a per-PR test could assert is a behaviour criterion. "Hard to test" is not "no unit tests applicable", and describing a behaviour in a document does not make it a documentation criterion. Before this rule existed, every run failed its CHANGELOG criterion for having no test and the orchestrator overrode it by hand; a check that is overridden on every run is not a check.
+`test_runs_per_pr` is `null` on all five kinds: the execution rule reads a test lane, and none has a test in one. **A behaviour criterion never takes any of these paths**, and a bound a per-PR test could assert is a behaviour criterion. "Hard to test" is not "no unit tests applicable", and describing a behaviour in a document does not make it a documentation criterion. Before this rule existed, every run failed its CHANGELOG criterion for having no test and the orchestrator overrode it by hand; a check that is overridden on every run is not a check.
 
 ### Step 4: Check documentation updates
 
@@ -96,7 +107,7 @@ ac_traceability:
   acs:
     - ac_id: "AC1"
       description: "brief AC description (≤15 words)"
-      status: PASS | FAIL
+      status: PASS | FAIL | DEFERRED-CI      # DEFERRED-CI only for a CI-state criterion (Step 3)
       code_citation: "path/to/file.ts:NN"   # null if not found
       test_citation: "path/to/file.spec.ts:NN"  # null if not found, or "NOT_APPLICABLE: reason"
       test_runs_per_pr: true | false | null     # false → status must be FAIL; name the lane in note. null only when test_citation is NOT_APPLICABLE
