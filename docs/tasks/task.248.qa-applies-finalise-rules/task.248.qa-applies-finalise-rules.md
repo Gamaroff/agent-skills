@@ -5,10 +5,12 @@ type: task
 description: "Make qa-task and qa-story apply, mechanically and from one definition each, the four rules /finalise's DoD agents apply and QA currently skips or judges by eye: the boundary classification of the Success Criteria, the per-member quantifier rule, the ban on unapproved criterion amendments, and the CHANGELOG citation — so each failure surfaces in the QA loop, where a fix is cheap, instead of halting /finalise."
 tags: [qa-task, qa-story, finalise, qa-fix, develop, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-11-01
 updated: 2026-11-01
+completed_date: 2026-11-01
+pr_number: 803
 assignee:
 estimated_effort_hours: 16
 github_issue: 801
@@ -16,7 +18,7 @@ github_issue: 801
 
 # Technical Task: QA applies the finalise DoD's rules before finalise does
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.248.review.1.qa-applies-finalise-rules.md` implemented 2026-11-01
 **GitHub Issue**: [#801](https://github.com/Gamaroff/agent-skills/issues/801)
 
@@ -168,8 +170,9 @@ after this task, whose `boundary: false` sits beside a non-empty `boundary_signa
 
 **Migration path:** none for existing gates. New QA runs write the keys.
 
-**6d behaviour is unchanged.** The same check moves into a script; the HALT reasons and messages
-stay the same.
+**6d's existing behaviour is unchanged.** The same check moves into a script; the existing HALT
+reasons and messages stay the same. One HALT is added: `changelog-stem`, raised when the stem bound
+into 6d is not a work-item id `changelog-cites.sh` accepts.
 
 ## 6. Implementation Plan
 
@@ -404,11 +407,35 @@ engine stays unused but tested.
 ### Key Findings
 No open issues. T248-QA3-1 is fixed and mutation-proved: the read-back re-derives the criteria drift whenever the document has criteria. Three advisory items (CR-2, CR-3, CR-4) are carried as future recommendations.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.248.qa.4.qa-applies-finalise-rules.md`
+**Gate File**: `task.248.gate.4.qa-applies-finalise-rules.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (4 QA cycles)
+**PR Review (5c)**: ✅ APPROVE — `task.248.pr-review.1.qa-applies-finalise-rules.md`
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 10/10 success criteria met, each with code evidence and a per-PR test or a read documentation citation
+✅ **PR Review:** PR #803. The host requires no reviews, so the 5c review (APPROVE) is the review evidence. Its one low finding, PC-1, was fixed at acceptance: Section 5 now names the added `changelog-stem` HALT
+✅ **CI:** green on `ab20b7be` (6/6 checks)
+✅ **Documentation:** CHANGELOG cites (task 248); five SKILL.md files and the task-development runbook updated
+✅ **Security Review:** ✅ PASS. Static checks are clean. `changelog-cites.sh` was probed with 9 cases (0 reproduced, 0 escaped)
+✅ **Compliance Review:** NOT_APPLICABLE (internal tooling, with no personal, payment, UI or health data)
+
+**Task marked as ACCEPTED on:** 2026-11-01
+
+**Detailed Verification Log:** See `task.248.dod.1.qa-applies-finalise-rules.md` for the full verification evidence.
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
-| Date       | Version | Description | Author      |
-| ---------- | ------- | ----------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-01 | 1.0     | Initial draft — cut from observations #23, #43, #139, #140 | create-task |
 | 2026-11-01 | 1.1     | Review passed (8/10) — drift engine splits reworded/appended (owner decision); changelog-cites.sh gains exit 4 (unknown) and story/bug → 3; wiring test and drift fixtures named; integration criteria name their tests | review-task |
 | 2026-11-01 |         | Status → ready-for-development | review-task |
@@ -420,6 +447,7 @@ No open issues. T248-QA3-1 is fixed and mutation-proved: the read-back re-derive
 | 2026-11-01 |         | QA gate CONCERNS (90/100) — 1 finding (1 medium) | qa-task |
 | 2026-11-01 |         | QA finding fixed (T248-QA3-1) — fix cycle 3, 1 iteration; mutation-proved; status → ready-for-review | qa-fix |
 | 2026-11-01 |         | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-11-01 | 1.3 | DoD verified — accepted (PR #803); Section 5 names the added changelog-stem HALT (5c PC-1) | finalise |
 <!-- change-log-end -->
 
 ---

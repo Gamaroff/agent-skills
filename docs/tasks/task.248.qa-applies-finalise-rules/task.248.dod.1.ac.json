@@ -1,0 +1,255 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "ab20b7be5f698d9aa36cbc696a8ad607f19ad268",
+  "dirty_paths": [
+    "docs/tasks/task.248.qa-applies-finalise-rules/task.248.implementation.1.qa-applies-finalise-rules-initial-run.md",
+    "docs/tasks/task.248.qa-applies-finalise-rules/task.248.pr-review.1.qa-applies-finalise-rules.md"
+  ],
+  "document": "docs/tasks/task.248.qa-applies-finalise-rules/task.248.qa-applies-finalise-rules.md",
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 10,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "1c614dd42fa18bd5ab5e80a2ea621ed361ca9b8ff79e4a0f6cdc0f84bb606a7c",
+      "status": "PASS",
+      "description": "Boundary CLI: task.234 true/never; no signal false; no criteria no-criteria exit 1",
+      "code_citation": "shared/resources/probe-boundary-signals.mjs:140",
+      "test_citation": "shared/resources/tests/probe-boundary-signals.test.mjs:420",
+      "members": [
+        {
+          "member": "task.234 document reports boundary: true with matched never",
+          "evidence": "shared/resources/tests/probe-boundary-signals.test.mjs:420",
+          "status": "PASS"
+        },
+        {
+          "member": "no signal word reports boundary: false",
+          "evidence": "shared/resources/tests/probe-boundary-signals.test.mjs:457",
+          "status": "PASS"
+        },
+        {
+          "member": "no criteria section reports no-criteria, exit 1",
+          "evidence": "shared/resources/tests/probe-boundary-signals.test.mjs:475",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "CLI entry at probe-boundary-signals.mjs:119-166 with the no-criteria arm at :140. Tests run per PR via npm test. criteria-drift --base-from-review: clean."
+    },
+    {
+      "id": "#2",
+      "text_hash": "0eb04fb1adc0d80311e87e6784a86faa9a1d0f9b6042c485c0d831c6879c3325",
+      "status": "PASS",
+      "description": "criteria-drift: task.234 amendment appended/unapproved; approved; reworded; tick-only clean",
+      "code_citation": "shared/resources/criteria-drift.js:58",
+      "test_citation": "shared/resources/tests/criteria-drift.test.mjs:37",
+      "members": [
+        {
+          "member": "task.234 #5 amendment before approval is appended, unapproved",
+          "evidence": "shared/resources/tests/criteria-drift.test.mjs:37",
+          "status": "PASS"
+        },
+        {
+          "member": "approved wording is approved",
+          "evidence": "shared/resources/tests/criteria-drift.test.mjs:46",
+          "status": "PASS"
+        },
+        {
+          "member": "checkbox-line rewording is reworded",
+          "evidence": "shared/resources/tests/criteria-drift.test.mjs:79",
+          "status": "PASS"
+        },
+        {
+          "member": "tick-only change is clean",
+          "evidence": "shared/resources/tests/criteria-drift.test.mjs:61",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "RE_APPROVED at criteria-drift.js:58; appended kind at :163. Runs per PR via npm test."
+    },
+    {
+      "id": "#3",
+      "text_hash": "0222ed865301fcee9caece0c0ed9ad9033668654f534a363cf14a796cc37b98b",
+      "status": "PASS",
+      "description": "changelog-cites.sh exits 0-4 on fixtures under bash and zsh; prefix controls",
+      "code_citation": "shared/resources/changelog-cites.sh:43",
+      "test_citation": "shared/resources/tests/changelog-cites.test.mjs:92",
+      "members": [
+        {
+          "member": "exit 0 cited / exit 1 missing",
+          "evidence": "shared/resources/tests/changelog-cites.test.mjs:92",
+          "status": "PASS"
+        },
+        {
+          "member": "exit 2 malformed stem",
+          "evidence": "shared/resources/tests/changelog-cites.test.mjs:146",
+          "status": "PASS"
+        },
+        {
+          "member": "exit 3 not applicable",
+          "evidence": "shared/resources/tests/changelog-cites.test.mjs:124",
+          "status": "PASS"
+        },
+        {
+          "member": "exit 4 enforcement unknown",
+          "evidence": "shared/resources/tests/changelog-cites.test.mjs:187",
+          "status": "PASS"
+        },
+        {
+          "member": "prefix controls in both directions",
+          "evidence": "shared/resources/tests/changelog-cites.test.mjs:108",
+          "status": "PASS"
+        },
+        {
+          "member": "same under bash and zsh",
+          "evidence": "shared/resources/tests/changelog-cites.test.mjs:92 (loop over SHELLS)",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Tests parameterised over SHELLS; test.yml installs zsh so the zsh variants run in CI."
+    },
+    {
+      "id": "#4",
+      "text_hash": "3c39bfc432028f8a71f886427412f04da32848e2b861d4c87392891f3e706ede",
+      "status": "PASS",
+      "description": "finalise 6d calls changelog-cites.sh; HALT messages unchanged (pinned)",
+      "code_citation": "skills/finalise/SKILL.md:1986",
+      "test_citation": "shared/resources/tests/changelog-cites.test.mjs:219",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Test runs the extracted 6d block and asserts the existing HALT strings verbatim. changelog-stem (SKILL.md:1995) is new and a declared deviation; no existing message changed."
+    },
+    {
+      "id": "#5",
+      "text_hash": "e3171476cc5b1f51964e874dab3849518357693e3be769dfda4a8a6425adade9",
+      "status": "PASS",
+      "description": "qa-task boundary block records boundary_signals; read-back fails false without reason",
+      "code_citation": "skills/qa-task/SKILL.md:794",
+      "test_citation": "shared/resources/tests/qa-finalise-rules-wiring.test.mjs:175",
+      "members": [
+        {
+          "member": "boundary block records boundary_signals",
+          "evidence": "shared/resources/tests/qa-finalise-rules-wiring.test.mjs:175",
+          "status": "PASS"
+        },
+        {
+          "member": "read-back fails boundary: false with no boundary_reason",
+          "evidence": "shared/resources/tests/qa-finalise-rules-wiring.test.mjs:224",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Wiring test extracts and runs the fenced blocks of qa-task and qa-story under each shell."
+    },
+    {
+      "id": "#6",
+      "text_hash": "ced52705b29667a31ec51ca255d0ede120ec487ee4743064e04369b8b8edb7c9",
+      "status": "PASS",
+      "description": "QA skills cite DoD AC prompt Step 3 rule 6; rule text only there",
+      "code_citation": "skills/qa-task/SKILL.md:1069",
+      "test_citation": "shared/resources/tests/qa-finalise-rules-wiring.test.mjs:271",
+      "members": [
+        {
+          "member": "qa-task cites rule 6",
+          "evidence": "skills/qa-task/SKILL.md:1069",
+          "status": "PASS"
+        },
+        {
+          "member": "qa-story cites rule 6",
+          "evidence": "skills/qa-story/SKILL.md:1608",
+          "status": "PASS"
+        },
+        {
+          "member": "rule text has one home (finalise-dod-ac-prompt.md:51)",
+          "evidence": "shared/resources/tests/qa-finalise-rules-wiring.test.mjs:271",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "git grep asserts a single home and both citations."
+    },
+    {
+      "id": "#7",
+      "text_hash": "9f8d8e4719e6fc1eb4906220c4d2ccb3f2b897bba65ffd414a755527fbc69080",
+      "status": "PASS",
+      "description": "npm run ci passes with .agents/skills moved aside",
+      "code_citation": "package.json:24",
+      "test_citation": ".github/workflows/test.yml:56",
+      "members": [],
+      "non_member_fail": null,
+      "note": ".agents/skills is gitignored, so a CI checkout is the moved-aside state; all 6 checks green on ab20b7be; clean-checkout npm run ci at b42d8232: 6965 pass, 0 fail."
+    },
+    {
+      "id": "#8",
+      "text_hash": "6b5c4d50aebbca0f311c6839590c060dd484d0bff7bb02c2c08eb79bf99dbd48",
+      "status": "PASS",
+      "description": "npm run bundle:check reports 0 problems, no UNREACHED copy",
+      "code_citation": "skills/create-skill/scripts/bundle_skill.py:486",
+      "test_citation": ".github/workflows/validate.yml:128",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Re-run at ab20b7be: 128 skills checked, 0 problems, 0 UNREACHED."
+    },
+    {
+      "id": "#9",
+      "text_hash": "041110669d28983ec68137a64fed65190b54c6c8aad2c1120694f41452a137c0",
+      "status": "PASS",
+      "description": "Each engine fix mutation-proved, recorded per engine in implementation report",
+      "code_citation": "docs/tasks/task.248.qa-applies-finalise-rules/task.248.implementation.1.qa-applies-finalise-rules-initial-run.md:90",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [
+        {
+          "member": "boundary CLI (no-criteria arm)",
+          "evidence": "task.248.implementation.1...md:92",
+          "status": "PASS"
+        },
+        {
+          "member": "criteria-drift (approved match)",
+          "evidence": "task.248.implementation.1...md:93",
+          "status": "PASS"
+        },
+        {
+          "member": "criteria-drift (continuation read)",
+          "evidence": "task.248.implementation.1...md:94",
+          "status": "PASS"
+        },
+        {
+          "member": "changelog-cites (3-vs-0 split)",
+          "evidence": "task.248.implementation.1...md:95",
+          "status": "PASS"
+        },
+        {
+          "member": "qa-read-back / qa-task drift block wiring",
+          "evidence": "task.248.implementation.1...md:96-97",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Mutation-proof table at :88-97 names engine, mutation and the test that went red; QA-cycle fixes recorded at :151, :179, :211."
+    },
+    {
+      "id": "#10",
+      "text_hash": "6aeefd058ff5a6da930f8446405d7e4320b6337166b38ef3a395ed45506f9d2f",
+      "status": "PASS",
+      "description": "CHANGELOG [Unreleased] cites task 248",
+      "code_citation": "CHANGELOG.md:9",
+      "test_citation": "evals/shared/tests/changelog-entry-drift.test.mjs:76",
+      "members": [],
+      "non_member_fail": null,
+      "note": "CHANGELOG.md:9 under [Unreleased] cites (task 248)."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#7",
+      "note": "PR 803's reviewDecision is empty because the host requires no reviews; the review evidence is the Step 5c report task.248.pr-review.1.qa-applies-finalise-rules.md (APPROVE)."
+    }
+  ]
+}
