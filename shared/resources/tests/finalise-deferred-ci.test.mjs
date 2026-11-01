@@ -317,6 +317,43 @@ test("resolve (control): a green CI reading does not lift an ordinary behaviour 
   assert.equal(r.overall, "PARTIAL");
 });
 
+test("resolve: a retaken reading re-grades an already graded criterion — FAILURE then SUCCESS ends PASS (Step 8a, T249-QA-3)", () => {
+  const first = resolveFrom(
+    { "SC-1": D, "SC-2": "PASS", "SC-3": "PASS" },
+    { rollup: "FAILURE", ciHead: "aaa111" },
+  );
+  assert.equal(first.acs.find((a) => a.ac_id === "SC-1").status, "FAIL");
+  const second = eng.resolveDeferredCi(
+    { acs: first.acs, docs: [], overall: first.overall },
+    { rollup: "SUCCESS", ciHead: "bbb222" },
+  );
+  SEEN.add(second.reason);
+  assert.equal(second.reason, "resolved");
+  assert.equal(second.overall, "PASS");
+  const sc1 = second.acs.find((a) => a.ac_id === "SC-1");
+  assert.equal(sc1.status, "PASS");
+  assert.equal(sc1.non_member_fail, null);
+  assert.match(sc1.ci_reading, /SUCCESS @ bbb222/);
+  // The note names the new reading once and drops the old one, not stacks it.
+  assert.doesNotMatch(sc1.note, /FAILURE/);
+  assert.equal(sc1.note.match(/resolved from/g).length, 1);
+});
+
+test("resolve: an undecided retaken reading folds a graded criterion as not met, never as its old verdict", () => {
+  const first = resolveFrom(
+    { "SC-1": D, "SC-2": "PASS", "SC-3": "PASS" },
+    { rollup: "SUCCESS", ciHead: "aaa111" },
+  );
+  assert.equal(first.overall, "PASS");
+  const second = eng.resolveDeferredCi(
+    { acs: first.acs, docs: [], overall: first.overall },
+    { rollup: "PENDING" },
+  );
+  assert.equal(second.reason, "ci-undecided");
+  assert.deepEqual(second.undecided, ["SC-1"]);
+  assert.notEqual(second.overall, "PASS");
+});
+
 test("resolve (control): nothing deferred → none-deferred, overall unchanged", () => {
   const r = resolveFrom(
     { "SC-1": "PASS", "SC-2": "PASS", "SC-3": "PASS" },
@@ -464,6 +501,38 @@ for (const shell of SHELLS) {
     }
   });
 
+  test(`fence (${shell}): Step 8a re-entry — FAILURE, then a retaken SUCCESS, rebinds AC_OVERALL to PASS (T249-QA-3)`, () => {
+    const { dir, overall } = stage({
+      "SC-1": D,
+      "SC-2": "PASS",
+      "SC-3": "PASS",
+    });
+    try {
+      const red = runFence(shell, dir, {
+        CI_ROLLUP: "FAILURE",
+        AC_OVERALL: overall,
+      });
+      assert.equal(red.acOverall, "PARTIAL", red.stderr + red.stdout);
+      const green = runFence(shell, dir, {
+        CI_ROLLUP: "SUCCESS",
+        CI_HEAD_1: "fix456",
+        AC_OVERALL: red.acOverall,
+      });
+      assert.equal(green.status, 0, green.stderr + green.stdout);
+      assert.equal(green.acOverall, "PASS");
+      const rec = readJson(join(dir, "doc", "task.9.dod.1.ac.json"));
+      const sc1 = rec.criteria.find((c) => c.id === "SC-1");
+      assert.equal(sc1.status, "PASS");
+      assert.match(sc1.ci_reading, /SUCCESS @ fix456/);
+      const m = readJson(
+        join(dir, ".claude", "state", "finalise-ac-merged-1.json"),
+      );
+      assert.equal(m.ac_result.ac_traceability.overall, "PASS");
+    } finally {
+      cleanup(dir);
+    }
+  });
+
   test(`fence (${shell}): PENDING leaves the criterion deferred, AC_OVERALL not PASS, files untouched`, () => {
     const { dir, overall } = stage({
       "SC-1": D,
@@ -493,6 +562,8 @@ for (const shell of SHELLS) {
 
   test(`fence (${shell}): no merged result (bug mode) skips and keeps AC_OVERALL`, () => {
     const dir = mkdtempSync(join(tmpdir(), "deferred-ci-fence-"));
+    // A bug run has its own directory; it has no merged result and no AC record.
+    mkdirSync(join(dir, "doc"), { recursive: true });
     try {
       const r = runFence(shell, dir, {
         CI_ROLLUP: "SUCCESS",
@@ -515,11 +586,45 @@ for (const shell of SHELLS) {
       });
       assert.equal(r.status, 1, r.stderr + r.stdout);
       assert.match(r.stdout, /HALT: .*task\.9\.dod\.1\.ac\.json exists but/);
+      // The recovery it names must be one that can run when the state is gone (T249-QA-6).
+      assert.match(
+        r.stdout,
+        /move .* aside .* re-run Step 3a, the AC agent and Step 3c/,
+      );
       assert.equal(r.acOverall, null, "a HALT binds no AC_OVERALL");
     } finally {
       cleanup(dir);
     }
   });
+
+  for (const [name, vals, re] of [
+    ["an empty STEM", { STEM: "" }, /HALT: STEM is empty/],
+    ["a non-numeric DOD_N", { DOD_N: "" }, /HALT: DOD_N \(''\)/],
+    ["a DOC_DIR that is not a directory", { DOC_DIR: "" }, /HALT: DOC_DIR/],
+  ]) {
+    test(`fence (${shell}): ${name} HALTs instead of skipping silently (T249-QA-4)`, () => {
+      const { dir } = stage({ "SC-1": D, "SC-2": "PASS", "SC-3": "PASS" });
+      try {
+        const r = runFence(shell, dir, {
+          CI_ROLLUP: "SUCCESS",
+          AC_OVERALL: "PARTIAL",
+          ...vals,
+        });
+        assert.equal(r.status, 1, r.stderr + r.stdout);
+        assert.match(r.stdout, re);
+        assert.equal(r.acOverall, null);
+        // Nothing was graded: the record still holds the deferred entry.
+        assert.equal(
+          readJson(join(dir, "doc", "task.9.dod.1.ac.json")).criteria.find(
+            (c) => c.id === "SC-1",
+          ).status,
+          D,
+        );
+      } finally {
+        cleanup(dir);
+      }
+    });
+  }
 
   test(`fence (${shell}): an unsubstituted input HALTs before anything runs`, () => {
     const { dir } = stage({ "SC-1": D, "SC-2": "PASS", "SC-3": "PASS" });

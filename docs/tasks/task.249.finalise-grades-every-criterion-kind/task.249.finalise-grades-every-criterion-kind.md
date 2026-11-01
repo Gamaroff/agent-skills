@@ -313,17 +313,20 @@ Step 6 together).
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.249.qa.1.finalise-grades-every-criterion-kind.md](./task.249.qa.1.finalise-grades-every-criterion-kind.md)
-- **Gate File**: [task.249.gate.1.finalise-grades-every-criterion-kind.yml](./task.249.gate.1.finalise-grades-every-criterion-kind.yml)
+- **Full Report**: [task.249.qa.2.finalise-grades-every-criterion-kind.md](./task.249.qa.2.finalise-grades-every-criterion-kind.md)
+- **Gate File**: [task.249.gate.2.finalise-grades-every-criterion-kind.yml](./task.249.gate.2.finalise-grades-every-criterion-kind.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 7026
+- **Tests Executed**: 7028
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Two MEDIUM: a resolved CI-state PASS is carried to a later DoD run without re-grading (T249-QA-1); Step 3b.1 item 3a looks inline probe cases up by id alone (T249-QA-2).
+Cycle 1's two findings are fixed. The cycle 2 refute pass found three MEDIUM defects:
+- T249-QA-3: a graded CI-state criterion cannot be re-graded by Step 8a's retaken reading.
+- T249-QA-4: Step 6 action 2a has no empty-input guards.
+- T249-QA-5: a missing spec_ref becomes a security FAIL.
 
 ## Change Log
 
@@ -336,6 +339,8 @@ Two MEDIUM: a resolved CI-state PASS is carried to a later DoD run without re-gr
 | 2026-11-01 |         | Implemented — 18 files, 21 tests | develop |
 | 2026-11-01 |         | QA gate CONCERNS (80/100) — 2 findings | qa-task |
 | 2026-11-01 |         | QA findings fixed — T249-QA-1, T249-QA-2, CR-3, CR-4; 1 iteration | qa-fix |
+| 2026-11-01 |         | QA gate CONCERNS (80/100) — 4 findings | qa-task |
+| 2026-11-01 |         | QA findings fixed — T249-QA-3 to T249-QA-6; 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

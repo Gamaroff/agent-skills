@@ -842,15 +842,33 @@ function ciReadingText({ rollup, ciHead, treeEq }) {
   return `CI reading 1: ${rollup}${treeEq ? ` (tree-equivalent to ${treeEq})` : ""}${ciHead ? ` @ ${ciHead}` : ""}`;
 }
 
-/** One DEFERRED-CI verdict (an `acs` entry or a record entry) graded. */
+/**
+ * A CI-state entry: still deferred, or already graded from a CI reading. Both
+ * are graded again from each new reading — Step 8a retakes CI reading 1 on a
+ * fix head and re-enters Step 6, and a verdict from the earlier head's reading
+ * must not survive it (task 249, QA cycle 2, T249-QA-3).
+ */
+function isCiState(entry) {
+  return (
+    Boolean(entry) &&
+    (entry.status === DEFERRED_CI || Boolean(entry.ci_reading))
+  );
+}
+
+/** One CI-state verdict (an `acs` entry or a record entry) graded from `reading`. */
 function gradeDeferred(entry, to, reading) {
+  // A re-grade replaces the previous reading's note prefix rather than stacking it.
+  let note = entry.note || null;
+  const prior = entry.ci_reading ? `resolved from ${entry.ci_reading}` : null;
+  if (note && prior && note.startsWith(prior))
+    note = note.slice(prior.length).replace(/^ — /, "") || null;
   return {
     ...entry,
     status: to,
     ci_reading: reading,
     // A FAIL rests on the reading, not on a member: the next run's scope names it.
     non_member_fail: to === "FAIL" ? reading : null,
-    note: `resolved from ${reading}${entry.note ? ` — ${entry.note}` : ""}`,
+    note: `resolved from ${reading}${note ? ` — ${note}` : ""}`,
   };
 }
 
@@ -865,7 +883,7 @@ function gradeDeferred(entry, to, reading) {
 function resolveDeferredCi(ac, ci) {
   const acs = Array.isArray(ac && ac.acs) ? ac.acs : [];
   const docs = Array.isArray(ac && ac.docs) ? ac.docs : [];
-  const deferred = acs.filter((a) => a && a.status === DEFERRED_CI);
+  const deferred = acs.filter(isCiState);
   if (deferred.length === 0) {
     return {
       reason: "none-deferred",
@@ -877,9 +895,17 @@ function resolveDeferredCi(ac, ci) {
   }
   const to = ciResolution(ci.rollup);
   if (to === null) {
+    // An undecided reading decides nothing, and an earlier head's verdict is
+    // not this head's: fold every CI-state entry as not met. Nothing is
+    // written on this path, so the files keep the last decided reading.
+    const held = acs.map((a) =>
+      isCiState(a) && a.status !== DEFERRED_CI
+        ? { ...a, status: DEFERRED_CI }
+        : a,
+    );
     return {
       reason: "ci-undecided",
-      overall: computeOverall(acs, docs),
+      overall: computeOverall(held, docs),
       acs,
       resolved: [],
       undecided: deferred.map((a) => String(a.ac_id)),
@@ -888,7 +914,7 @@ function resolveDeferredCi(ac, ci) {
   const reading = ciReadingText(ci);
   const resolved = [];
   const out = acs.map((a) => {
-    if (!a || a.status !== DEFERRED_CI) return a;
+    if (!isCiState(a)) return a;
     resolved.push({ ac_id: String(a.ac_id), status: to });
     return gradeDeferred(a, to, reading);
   });
@@ -1088,9 +1114,7 @@ function resolveCiCli(opts, cwd) {
   const r = resolveDeferredCi(ac, ci);
   if (r.reason === "resolved") {
     const grade = (e) =>
-      e && e.status === DEFERRED_CI
-        ? gradeDeferred(e, ciResolution(ci.rollup), r.reading)
-        : e;
+      isCiState(e) ? gradeDeferred(e, ciResolution(ci.rollup), r.reading) : e;
     payload.ac_result.ac_traceability = {
       ...ac,
       acs: r.acs,

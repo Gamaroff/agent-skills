@@ -682,10 +682,15 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
    cases are in the plan result's `cases_files` (`.claude/state/probe-plan-result.json`) as `$DOC_DIR/$STEM.dod.$DOD_N.security.cases.json` when the
    plan has one entry, else `….security.cases.<i+1>.json`. When entry `i` wrote no cases file, it
    had no inline `cases`: its probes are corpus probes and are exempt. Then:
-   - **An inline case without `spec_ref`** is a plan-shape error. Add a
-     `probe case without spec_ref: {id}` FAIL check with `severity: low`. When that case reproduced,
-     drop its probe from `probes[]`. A verdict nobody tied to the specification is not evidence
-     against code that follows it, and the check keeps the defect visible.
+   - **An inline case without `spec_ref`** is a plan-shape error, and it never counts against
+     security: the security prompt promises exactly that, and no code commit could clear a check
+     the plan's author failed (task 249, QA cycle 2, T249-QA-5). Re-dispatch the security agent
+     once, as item 5 does for a refused entry, asking for the corrected **whole** plan with a
+     `spec_ref` on every inline case, and re-run this step on it. A case still without one: drop
+     its probe from `probes[]` and record it in `SECURITY_RESULT.spec_questions[]` as
+     `{id, input, spec_ref: null, direction, correct, what the line says: "no spec_ref given"}`,
+     so it renders under **Recommendations for the owner**. It adds no FAIL check and no
+     `checks[]` entry, and `overall` does not move for it.
    - **A reproduced inline case**: take entry `i`'s cases file from the probe's `key`, find the case
      whose `id` is the key's `<id>` within that one file, and read the line its `spec_ref` names. When that line allows what the case's `direction` says the control
      must refuse, or refuses what it says the control must accept, the case contradicts its
@@ -942,8 +947,14 @@ specification is the owner's decision.
 - **Spec challenge:** `{c.input}` — allowed by `{c.spec_ref}`. {c.risk}
 {endfor}
 {for each q in security_result.spec_questions:}
+{if q.spec_ref is null:}
+- **Unanchored probe case:** case `{q.id}` (`{q.input}`) expected `{q.direction}` ({q.correct}),
+  but the security agent tied it to no line of the specification, even when asked again. It was not
+  counted; decide whether the specification should say what the case assumes.
+{else:}
 - **Spec question:** case `{q.id}` (`{q.input}`) expected `{q.direction}` ({q.correct}), but
   `{q.spec_ref}` says {q.what the line says}. The code follows the specification.
+{endif}
 {endfor}
 {endif}
 
@@ -1291,8 +1302,10 @@ with `ci.docsOnly.enabled: false` ([`docs/reference/configuration.md`](../../doc
    with its green sha in the note), `FAILURE` → FAIL, anything else leaves it deferred and the CI table
    above decides — rewrites the merged result and the AC record, and **rebinds `AC_OVERALL` from the
    re-folded verdict**. Rewriting the entries alone would leave `AC_OVERALL` at the `PARTIAL`/`FAIL`
-   Step 3c folded. A bug run, or a Step 3c answer that was not `merged`, has no merged result and
-   skips it with `AC_OVERALL` unchanged:
+   Step 3c folded. A criterion an earlier reading already graded is graded again from this one, so
+   Step 8a's retaken CI reading 1 on the fix head replaces the red reading rather than leaving its
+   FAIL in place; an undecided retaken reading folds it as not met. A bug run, or a Step 3c answer
+   that was not `merged`, has no merged result and skips it with `AC_OVERALL` unchanged:
 
    ```bash
    # Step 6 action 2a — grade DEFERRED-CI criteria from CI reading 1 (task 249). INPUTS, substituted into
@@ -1308,6 +1321,12 @@ with `ci.docsOnly.enabled: false` ([`docs/reference/configuration.md`](../../doc
    case "$STEM$DOD_N$DOC_DIR$CI_ROLLUP$CI_HEAD_1$CI_TREE_EQ$AC_OVERALL" in
      *'{'*) echo "HALT: substitute every input of Step 6 action 2a (an unsubstituted placeholder found)"; exit 1 ;;
    esac
+   # An input substituted as empty would make both -f tests below miss and skip silently — the
+   # could-not-look state the record HALT exists to name (task 249, QA cycle 2, T249-QA-4).
+   [ -n "$STEM" ] || { echo "HALT: STEM is empty — substitute the work item's filename stem"; exit 1; }
+   case "$DOD_N" in ''|*[!0-9]*) echo "HALT: DOD_N ('$DOD_N') is not Step 0's run number"; exit 1 ;; esac
+   [ -n "$DOC_DIR" ] && [ -d "$DOC_DIR" ] || { echo "HALT: DOC_DIR ('$DOC_DIR') is not the work item's directory"; exit 1; }
+   [ -n "$AC_OVERALL" ] || { echo "HALT: AC_OVERALL is empty — substitute Step 3c's verdict"; exit 1; }
    AC_MERGED_FILE=".claude/state/finalise-ac-merged-${DOD_N}.json"
    AC_RECORD="$DOC_DIR/${STEM}.dod.${DOD_N}.ac.json"
    if [ -f "$AC_MERGED_FILE" ] && [ "$(jq -r '.reason' "$AC_MERGED_FILE" 2>/dev/null)" = "merged" ]; then
@@ -1323,7 +1342,9 @@ with `ci.docsOnly.enabled: false` ([`docs/reference/configuration.md`](../../doc
      # A record means Step 3c merged this run; only its merged result is gone or unreadable
      # (state cleaned on resume, or no jq). Skipping would keep AC_OVERALL short of PASS with
      # no reason given, so stop and say why (task 249, QA cycle 1, CR-3).
-     echo "HALT: $AC_RECORD exists but $AC_MERGED_FILE is missing or not 'merged' — re-run Step 3c's merge, then this action"
+     # Step 3c's merge inputs live in the same .claude/state directory, so re-running the merge
+     # alone cannot work when the state was cleaned (T249-QA-6).
+     echo "HALT: $AC_RECORD exists but $AC_MERGED_FILE is missing or not 'merged' — move $AC_RECORD aside (or Step 3a reads this run's own record as the prior one), then re-run Step 3a, the AC agent and Step 3c, then this action"
      exit 1
    fi
    echo "AC_OVERALL=$AC_OVERALL"

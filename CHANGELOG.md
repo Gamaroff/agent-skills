@@ -12,8 +12,9 @@ All notable changes to this project will be documented in this file. Format foll
     Step 6 action 2a grades it from CI reading 1 with `finalise-rerun-scope.js resolve-ci`:
     `SUCCESS` → PASS, `FAILURE` → FAIL, anything else leaves it to the CI table. It rewrites the
     merged result and the AC record, and rebinds `AC_OVERALL` from the re-folded verdict. A re-run
-    re-judges every CI-state criterion (scope reason `ci-state`), so no head is accepted on an
-    earlier head's CI reading. `shared/resources/tests/finalise-deferred-ci.test.mjs` runs that
+    re-judges every CI-state criterion (scope reason `ci-state`), and `resolve-ci` re-grades one an
+    earlier reading graded, so no head is accepted (or refused) on an earlier head's CI reading —
+    Step 8a's retaken reading included. `shared/resources/tests/finalise-deferred-ci.test.mjs` runs that
     block as written.
   - A **process criterion** ("each fix is mutation-proven") is checked per unit under the quantifier
     rule, against the committed record of each step. The AC prompt now lists five test-free kinds.
@@ -22,7 +23,9 @@ All notable changes to this project will be documented in this file. Format foll
     committed after `/finalise` runs.
   - Each **inline probe case** the security agent writes carries a `spec_ref`. Step 3b.1 routes a
     reproduced case that contradicts its spec line to the owner as a spec question, not a security
-    FAIL. It finds the case through the probe's `key`, never its shared `id`. Inputs the spec allows but the agent thinks risky go in `spec_challenges[]`. The DoD
+    FAIL. It finds the case through the probe's `key`, never its shared `id`. A case with no
+    `spec_ref` is asked for once more and, still missing, reported to the owner without counting
+    against security. Inputs the spec allows but the agent thinks risky go in `spec_challenges[]`. The DoD
     renders both under **Recommendations for the owner**.
   - `review-task` (check 22) and `review-story` (check 18) report a criterion that demands a record
     but names no location for it as Important. `create-task` and `create-story` say the same at
