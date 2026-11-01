@@ -9,7 +9,7 @@
 # Exit  stdout                                   meaning
 # 0     cites (task N)                           [Unreleased] cites the task
 # 1     missing (task N)                         enforcement on, CHANGELOG.md exists, no citation
-# 2     usage: …                                 no stem, or a stem doc-id.js cannot read
+# 2     usage: …                                 enforcement on, and no stem, a path, or a stem doc-id.js cannot read
 # 3     not-applicable: <why>                    enforcement off, no CHANGELOG.md, or a story/bug stem
 # 4     unknown: <the resolver's answer>         the opt-in could not be read — never read as off
 #
@@ -32,20 +32,9 @@
 _dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 STEM="${1:-}"
 
-if [ -z "$STEM" ] || [ "$#" -ne 1 ]; then
-  echo "usage: changelog-cites.sh <stem> (task.N, story.P.E.S, bug.N …)"
-  exit 2
-fi
-
-# doc-id.js reads a basename, so `../task.248` would parse as task.248 — or a story path as a story,
-# whose exit 3 6d passes through silently. A stem is an id, never a path (task.248 QA cycle 1, T248-QA-3).
-case "$STEM" in
-  */*)
-    echo "usage: '${STEM}' is a path, not a work-item id — pass the id alone, e.g. task.248"
-    exit 2
-    ;;
-esac
-
+# The opt-in before the stem, too: a repository that has not opted in is told so whatever it was
+# passed, rather than HALTing over an argument the check would never use (task.248 QA cycle 2,
+# T248-QA2-5).
 CL=$(bash "$_dir/changelog-enforce.sh")
 case "$CL" in
   on) ;;
@@ -57,6 +46,20 @@ case "$CL" in
     # Exactly the resolver's answer after the prefix, so 6d's changelog-unknown HALT quotes it.
     echo "unknown: ${CL}"
     exit 4
+    ;;
+esac
+
+if [ -z "$STEM" ] || [ "$#" -ne 1 ]; then
+  echo "usage: changelog-cites.sh <stem> (task.N, story.P.E.S, bug.N …)"
+  exit 2
+fi
+
+# doc-id.js reads a basename, so `../task.248` would parse as task.248 — or a story path as a story,
+# whose exit 3 6d passes through silently. A stem is an id, never a path (task.248 QA cycle 1, T248-QA-3).
+case "$STEM" in
+  */*)
+    echo "usage: '${STEM}' is a path, not a work-item id — pass the id alone, e.g. task.248"
+    exit 2
     ;;
 esac
 

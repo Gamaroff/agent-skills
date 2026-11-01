@@ -72,7 +72,9 @@ function fencesOf(skill, heading) {
 // block mentions qa-read-back.js" forbade every later guard.
 function blockOf(skill, heading) {
   const fences = fencesOf(skill, heading).filter((m) =>
-    /qa-read-back\.js --doc "[^"]*"[ \t]*$/m.test(m[2]),
+    /qa-read-back\.js --doc "[^"]*"(?: --target "\$TARGET")?[ \t]*$/m.test(
+      m[2],
+    ),
   );
   assert.equal(
     fences.length,
@@ -182,11 +184,21 @@ test.describe("read-back blocks, as delivered", { concurrency: true }, () => {
     const block = blockOf(s.skill, s.heading);
     test(`${s.skill}: the block names its input only by placeholder`, () => {
       assert.ok(block.includes(`--doc "${s.placeholder}"`), block);
-      assert.doesNotMatch(
-        block,
-        /\$\{?[A-Z_]+/,
-        "no shell variable — nothing to leave unbound",
+      // Nothing to leave unbound: every variable the block reads, it assigns itself
+      // (TARGET, the PR base the read-back's drift re-run needs — task.248 QA cycle 2).
+      const code = block
+        .split("\n")
+        .filter((l) => !/^\s*#/.test(l))
+        .join("\n");
+      const reads = [...code.matchAll(/\$\{?([A-Z_][A-Z0-9_]*)/g)].map(
+        (m) => m[1],
       );
+      for (const v of reads)
+        assert.match(
+          code,
+          new RegExp(`^\\s*${v}=`, "m"),
+          `${v} is read but not assigned in the block`,
+        );
     });
     for (const shell of SHELLS) {
       for (const c of CASES) {

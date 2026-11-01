@@ -51,6 +51,7 @@ const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
 const { readCriteriaEntries } = require("./criteria-section.js");
+const { parse: parseDocId } = require("./doc-id.js");
 
 const RE_LEADING_ID =
   /^(?:\*\*)?([A-Z]{1,6}-?\d+[A-Za-z]?)(?:\*\*)?\s*(?:[:.)—–-]|\*\*)\s*/;
@@ -187,15 +188,31 @@ function git(args, cwd) {
 class Usage extends Error {}
 
 function repoPath(doc) {
-  const abs = path.resolve(doc);
+  // git's toplevel is a real path, so the document must be one too: through a symlink
+  // (macOS /var → /private/var, /proc/self/cwd) the relative path left the repository and every
+  // base read as new-document at exit 0 (task.248 QA cycle 2, T248-QA2-3).
+  let abs;
+  try {
+    abs = fs.realpathSync(path.resolve(doc));
+  } catch {
+    throw new Usage(`${doc} cannot be resolved`);
+  }
   const dir = path.dirname(abs);
   let top;
   try {
-    top = git(["rev-parse", "--show-toplevel"], dir).trim();
+    top = fs.realpathSync(git(["rev-parse", "--show-toplevel"], dir).trim());
   } catch {
     throw new Usage(`${doc} is not inside a git repository`);
   }
-  return { abs, top, rel: path.relative(top, abs).split(path.sep).join("/") };
+  const rel = path.relative(top, abs).split(path.sep).join("/");
+  if (
+    rel === "" ||
+    rel === ".." ||
+    rel.startsWith("../") ||
+    path.isAbsolute(rel)
+  )
+    throw new Usage(`${doc} resolves outside its repository (${top})`);
+  return { abs, top, rel };
 }
 
 function isCommit(ref, cwd) {
@@ -235,12 +252,26 @@ function showBlob(sha, p) {
   }
 }
 
-// The newest review report beside the document, by its review.{N}. index.
+// The prefix the document's own review reports carry: its id, or for a bug filed beside its parent
+// the bug's prefix (task.67.bug.3). null when doc-id.js cannot read the name.
+function reviewPrefix(p) {
+  const d = parseDocId(path.basename(p.abs));
+  if (!d.ok || d.id === null) return null;
+  return d.artifact && d.seq !== null ? `${d.id}.${d.artifact}.${d.seq}` : d.id;
+}
+
+// The newest review report OF THIS DOCUMENT, by its review.{N}. index. A co-located bug's review
+// (task.9.bug.1.review.2.*) shares the directory and must never become the task's base (task.248
+// QA cycle 2, T248-QA2-2).
 function newestReviewBlob(p) {
   const dir = path.dirname(p.abs);
+  const prefix = reviewPrefix(p);
+  if (prefix === null) return null;
+  const head = `${prefix}.review.`;
   let best = null;
   for (const f of fs.readdirSync(dir)) {
-    const m = /\.review\.(\d+)\.[^/]*\.md$/.exec(f);
+    if (!f.startsWith(head)) continue;
+    const m = /^(\d+)\.[^/]*\.md$/.exec(f.slice(head.length));
     if (!m) continue;
     const n = Number(m[1]);
     if (!best || n > best.n) best = { n, f };

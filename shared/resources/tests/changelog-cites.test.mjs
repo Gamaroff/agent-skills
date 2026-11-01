@@ -154,6 +154,21 @@ for (const shell of SHELLS) {
       assert.equal(cites(shell, stem).rc, 2, `'${stem}'`);
   });
 
+  // task.248 QA cycle 2, T248-QA2-5: the opt-in is read before the stem. The same refused stems,
+  // in a repository that has not opted in, are not applicable rather than a usage HALT.
+  test(`[${shell}] 3 not applicable: a refused stem is not a usage error when enforcement is off`, () => {
+    for (const stem of ["", "task.x", "../task.248"]) {
+      assert.deepEqual(
+        cites(shell, stem, { config: null }),
+        {
+          rc: 3,
+          out: "not-applicable: changelog checks not enabled",
+        },
+        `'${stem}'`,
+      );
+    }
+  });
+
   // task.248 QA cycle 1, T248-QA-3: doc-id.js reads a basename, so a path parsed
   // as its last segment and a story path exited 3, which 6d passes silently.
   test(`[${shell}] 2 usage: a path is never a stem`, () => {
@@ -203,7 +218,13 @@ const UNKNOWN =
 for (const shell of SHELLS) {
   test(`[${shell}] 6d's HALT and not-applicable lines are unchanged by the move`, () => {
     const run = (stem, opts) =>
-      inConsumer(shell, `STEM='${stem}'\n${sixDBlock()}`, opts);
+      // Substituted into the block's own STEM line, as an agent does: 6d binds STEM itself, and a
+      // value prepended here would be overwritten (task.248 QA cycle 2, T248-QA2-1).
+      inConsumer(
+        shell,
+        sixDBlock().replace(/^STEM="\{[^"\n]*\}"/m, `STEM='${stem}'`),
+        opts,
+      );
     let r = run("task.303");
     assert.equal(r.status, 1);
     assert.equal(r.stdout.trim(), NO_ENTRY);

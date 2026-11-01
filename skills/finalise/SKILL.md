@@ -1967,7 +1967,12 @@ POLLEOF
 
    ```bash
    # Tasks only in this version; `(bug N)` is the documented follow-on once bugs 13 and 15 are
-   # backfilled. `STEM` is the work item's filename stem from 6a.
+   # backfilled. STEM is substituted into THIS block, as in 6a and 6b: no block inherits another's
+   # variables, and an unbound STEM made changelog-cites.sh refuse it, so 6d HALTed on every run
+   # (task.248 QA cycle 2, T248-QA2-1).
+   STEM="{story.{P}.{E}.{S} | task.{id}}"   # the work item's filename stem
+   case "$STEM" in *'{'*) echo "HALT: STEM must be bound in this block — a substituted input, not a value carried over from 6a (an unsubstituted placeholder found)"; exit 1 ;; esac
+   [ -n "$STEM" ] || { echo "HALT: STEM must be bound in this block — it is empty"; exit 1; }
    # Parameter expansion, NOT `[[ =~ ]]` + BASH_REMATCH: zsh — the shell this pipeline runs in —
    # leaves BASH_REMATCH unset (it populates $match), so N was empty there and the grep pattern
    # degenerated to one that matches any [Unreleased] text. The warning could never fire under
@@ -1987,7 +1992,7 @@ POLLEOF
           "not-applicable: changelog checks not enabled") echo "6d: changelog checks not enabled" ;;
           "not-applicable: no CHANGELOG.md") echo "6d: no CHANGELOG.md — not applicable" ;;
         esac ;;
-     2) echo "HALT: changelog-stem — changelog-cites.sh refused STEM '${STEM}' (${CITES}); 6a's STEM is the work item's id, e.g. task.248"; exit 1 ;;
+     2) echo "HALT: changelog-stem — changelog-cites.sh refused STEM '${STEM}' (${CITES}); substitute the work item's id into this block, e.g. task.248"; exit 1 ;;
      *) CL="${CITES#unknown: }"; [ "$rc" -eq 4 ] || CL=""
         echo "HALT: changelog-unknown — changelog-enforce.sh answered '${CL}', not on or off; check .agents/skills/finalise/references/ holds changelog-enforce.sh and read-config.sh, then re-run /finalise"; exit 1 ;;
    esac

@@ -14,7 +14,8 @@ All notable changes to this project will be documented in this file. Format foll
     `boundary_reason`.
   - `criteria-drift.js` compares the criteria, continuation lines included, with the text that was
     reviewed. An unapproved rewording is a MEDIUM finding at QA and a FAIL at the DoD
-    ("amendment unapproved"). An appended note must say whether it relaxes the criterion.
+    ("amendment unapproved"). An appended note must say whether it relaxes the criterion. QA's
+    read-back re-runs the comparison, so a gate that leaves a changed criterion out halts.
   - `changelog-cites.sh` is 6d's citation check, moved into a script. 6d, `develop`'s completion
     checklist and QA's docs check all run it, and 6d's messages are unchanged. A new
     `changelog-stem` HALT covers a stem the script cannot read.

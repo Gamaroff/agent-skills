@@ -595,11 +595,25 @@ function runSixD(
   config = OPTED_IN,
   installed = SIXD_INSTALL,
 ) {
-  return runInConsumer(shell, `STEM='${stem}'\n${sixDBlock()}`, {
+  return runInConsumer(shell, bindStem(sixDBlock(), stem), {
     changelog,
     config,
     installed,
   });
+}
+
+/**
+ * Substitute 6d's STEM placeholder the way an agent running the block does. The block binds STEM
+ * itself, so a value in the environment never reaches it (task.248 QA cycle 2, T248-QA2-1).
+ */
+function bindStem(block, stem) {
+  const line = /^STEM="\{[^"\n]*\}"/m;
+  assert.match(
+    block,
+    line,
+    "6d binds STEM from a placeholder in its own block",
+  );
+  return block.replace(line, `STEM='${stem}'`);
 }
 
 /** Run a shipped block in the consumer-shaped temp repo runSixD describes. */
@@ -666,6 +680,19 @@ for (const shell of SHELLS) {
 
     const story = runSixD(shell, "story.1.2.3", CHANGELOG_FIXTURE);
     assert.equal(story.status, 0, "a story stem is not checked");
+  });
+
+  // T248-QA2-1: run unsubstituted, with STEM exported as an earlier block would have left it. The
+  // block must refuse its own placeholder, and must never reach the check with a stem it did not bind.
+  test(`[${shell}] 6d binds STEM itself: run as shipped, it HALTs on the placeholder, not changelog-stem`, () => {
+    const r = runInConsumer(shell, `export STEM=task.301\n${sixDBlock()}`, {
+      changelog: CHANGELOG_FIXTURE,
+      config: OPTED_IN,
+      installed: SIXD_INSTALL,
+    });
+    assert.equal(r.status, 1, `${r.stdout}${r.stderr}`);
+    assert.match(r.stdout, /^HALT: STEM must be bound in this block/m);
+    assert.doesNotMatch(r.stdout, /changelog-stem|no-changelog-entry/);
   });
 
   test(`[${shell}] 6d is not applicable, and does not HALT, when the repository has no CHANGELOG.md`, () => {

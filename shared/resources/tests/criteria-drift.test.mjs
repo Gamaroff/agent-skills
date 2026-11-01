@@ -16,6 +16,7 @@ import {
   rmSync,
   writeFileSync,
   mkdirSync,
+  symlinkSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -296,4 +297,55 @@ test("CLI: an unstamped review report still makes the review's commit the base",
   assert.equal(r.j.base.exact, false); // nothing vouches for the bytes
   assert.equal(r.j.reason, "clean");
   assert.equal(r.status, 0);
+});
+
+// task.248 QA cycle 2, T248-QA2-2: review-bug writes {BUG_PREFIX}.review.{N} into the task's
+// directory. Both directions: the bug's review is never the task's base, and is the bug's own.
+test("CLI: a co-located bug's review report is the bug's base, never the task's", (t) => {
+  const { dir, g } = repo();
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const doc = join(dir, "task.9.x.md");
+  const bug = join(dir, "task.9.bug.1.y.md");
+  writeFileSync(doc, fx("reviewed"));
+  writeFileSync(bug, fx("evidence"));
+  g("add", ".");
+  g("commit", "-qm", "base");
+  g("update-ref", "refs/remotes/origin/develop", "HEAD");
+  const stamp = (f) => g("hash-object", f);
+  writeFileSync(
+    join(dir, "task.9.review.1.x.md"),
+    `# R\n\n**reviewed_blob:** \`${stamp(doc)}\`\n`,
+  );
+  writeFileSync(
+    join(dir, "task.9.bug.1.review.2.y.md"),
+    `# R\n\n**reviewed_blob:** \`${stamp(bug)}\`\n`,
+  );
+  g("add", ".");
+  g("commit", "-qm", "reviews");
+  const task = cli(dir, "--doc", doc, "--base-from-review", "develop");
+  assert.equal(task.j.base.report, "task.9.review.1.x.md");
+  assert.equal(task.j.reason, "clean");
+  const own = cli(dir, "--doc", bug, "--base-from-review", "develop");
+  assert.equal(own.j.base.report, "task.9.bug.1.review.2.y.md");
+  assert.equal(own.j.reason, "clean");
+});
+
+// task.248 QA cycle 2, T248-QA2-3: git's toplevel is a real path. A document reached through a
+// symlink (macOS's /var → /private/var) must read the same as through its real path.
+test("CLI: a document path through a symlink reads the same as its real path", (t) => {
+  const { dir, g } = repo();
+  const link = `${dir}-link`;
+  t.after(() => {
+    rmSync(link, { force: true });
+    rmSync(dir, { recursive: true, force: true });
+  });
+  writeFileSync(join(dir, "task.1.x.md"), fx("reviewed"));
+  g("add", ".");
+  g("commit", "-qm", "base");
+  symlinkSync(dir, link);
+  const real = cli(dir, "--doc", join(dir, "task.1.x.md"), "--base", "HEAD");
+  const via = cli(dir, "--doc", join(link, "task.1.x.md"), "--base", "HEAD");
+  assert.equal(real.j.reason, "clean");
+  assert.equal(via.status, 0);
+  assert.equal(via.j.reason, "clean");
 });

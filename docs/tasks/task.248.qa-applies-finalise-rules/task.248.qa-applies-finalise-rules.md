@@ -385,24 +385,24 @@ engine stays unused but tested.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-01
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 40/100
+**Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.248.qa.1.qa-applies-finalise-rules.md](./task.248.qa.1.qa-applies-finalise-rules.md)
-- **Gate File**: [task.248.gate.1.qa-applies-finalise-rules.yml](./task.248.gate.1.qa-applies-finalise-rules.yml)
+- **Full Report**: [task.248.qa.2.qa-applies-finalise-rules.md](./task.248.qa.2.qa-applies-finalise-rules.md)
+- **Gate File**: [task.248.gate.2.qa-applies-finalise-rules.yml](./task.248.gate.2.qa-applies-finalise-rules.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 129
+- **Tests Executed**: 6970
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 2
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
 
 ### Key Findings
-Two reproduced MEDIUM defects in `criteria-drift.js`. T248-QA-1: an unstamped review report drops the base to merge-base. T248-QA-2: a bound changed by extension reads as appended. One LOW: T248-QA-3, a path-prefixed stem skips 6d silently.
+The cycle-2 refute pass found two HIGH defects. T248-QA2-1: finalise 6d reads an unbound `STEM` and HALTs on every run. T248-QA2-2: `criteria-drift.js` can take a co-located bug's review report as its base. It also found two MEDIUMs: T248-QA2-3, a symlinked path reads as `new-document`, and T248-QA2-4, the read-back trusts the gate's own drift block. One LOW: T248-QA2-5. All three cycle-1 findings are fixed.
 
 ## Change Log
 
@@ -415,6 +415,8 @@ Two reproduced MEDIUM defects in `criteria-drift.js`. T248-QA-1: an unstamped re
 | 2026-11-01 | 1.2     | Implemented all four phases; status → ready-for-review. Gate read-back checks went into `qa-read-back.js`, not per-skill blocks; 6d gains HALT `changelog-stem` | develop |
 | 2026-11-01 |         | QA gate CONCERNS (80/100) — 3 findings (2 medium, 1 low) | qa-task |
 | 2026-11-01 |         | QA findings fixed (T248-QA-1, -2, -3) — 1 iteration; each fix mutation-proved | qa-fix |
+| 2026-11-01 |         | QA gate FAIL (40/100) — 5 findings (2 high, 2 medium, 1 low); status → in-progress | qa-task |
+| 2026-11-01 |         | QA findings fixed (T248-QA2-1 to -5) — fix cycle 2, 1 iteration; each fix mutation-proved; status → ready-for-review | qa-fix |
 <!-- change-log-end -->
 
 ---
@@ -466,7 +468,8 @@ prompts and `develop` run it rather than restating it.
   `reviewed_blob`, then the commit that added the report, then the merge-base.
 - `changelog-cites.sh` is 6d's check, moved into a script.
 - `qa-read-back.js` gained check 6: the gate answers the boundary signal and each appended
-  criterion.
+  criterion. It re-runs `criteria-drift.js` (`--target`, the PR base) and halts on a changed
+  criterion the gate's block leaves out (QA cycle 2, T248-QA2-4).
 
 **Deviations.**
 

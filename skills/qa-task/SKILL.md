@@ -1776,8 +1776,10 @@ Step 13**: a check that runs before the claim is written cannot check it.
 ```bash
 # From the repository root. {task-file} is the task document this QA run just edited — substitute it; the script
 # refuses an unsubstituted placeholder (exit 2), so a block run as delivered
-# cannot pass by reading nothing.
-command node .agents/skills/qa-task/references/qa-read-back.js --doc "{task-file}"
+# cannot pass by reading nothing. --target is the PR's base, as Step 5's drift block resolves it:
+# the read-back re-runs criteria-drift.js and needs the same merge-base fallback.
+TARGET=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo develop)
+command node .agents/skills/qa-task/references/qa-read-back.js --doc "{task-file}" --target "$TARGET"
 ```
 
 `qa-read-back.js` is the read-back, defined once for both QA skills and tested directly
@@ -1811,9 +1813,11 @@ checks six things:
    the section from this gate and append the `QA gate <TOKEN>` row, then re-run.
 6. **The gate answers the finalise rules** (task.248). It re-runs Step 3b item 3's criteria
    classifier itself. When the criteria carry a signal, the gate must record `boundary_signals`,
-   and either `boundary: true` or a `boundary_reason`. Every `appended` entry under
-   `criteria_drift.changed` must answer `relaxes: true|false` with a `relaxes_reason`. A gate
-   written before task.248, with no `criteria_drift` block, is not refused for the missing block.
+   and either `boundary: true` or a `boundary_reason`. It re-runs Step 5's `criteria-drift.js`
+   too, against `--target`: every criterion the engine reports changed must be in
+   `criteria_drift.changed` with the engine's kind, and every `appended` entry must answer
+   `relaxes: true|false` with a `relaxes_reason`. A gate with neither task.248 key (no
+   `criteria_drift`, no `boundary_signals`) was written before task.248 and is not asked.
 
 **Do not post the PR comment (Step 13) over exit 1 or 2.** Posting over it reproduces task.141: a PR comment linked
 a report that did not exist, found only by CI's `link-check`, and a row was dated after `updated:`,
@@ -1861,7 +1865,8 @@ fi
 ```bash
 # Step 12b's rule, re-checked here: every block runs as its own shell, and a run that
 # batches 12b and 13 drops the prose between them (obs #226).
-command node .agents/skills/qa-task/references/qa-read-back.js --doc "{task-file}" >/dev/null || { echo "HALT: read-back not clean — not posting"; exit 1; }
+TARGET=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo develop)
+command node .agents/skills/qa-task/references/qa-read-back.js --doc "{task-file}" --target "$TARGET" >/dev/null || { echo "HALT: read-back not clean — not posting"; exit 1; }
 mkdir -p .claude/state
 BODY_FILE=.claude/state/qa-comment-body.md
 cat > "$BODY_FILE" <<'EOF'
