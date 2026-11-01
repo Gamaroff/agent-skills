@@ -304,6 +304,27 @@ Step 6 together).
 
 **Forward fix.** Prompt wording issues: fix forward.
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-01
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.249.qa.1.finalise-grades-every-criterion-kind.md](./task.249.qa.1.finalise-grades-every-criterion-kind.md)
+- **Gate File**: [task.249.gate.1.finalise-grades-every-criterion-kind.yml](./task.249.gate.1.finalise-grades-every-criterion-kind.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 7026
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+Two MEDIUM: a resolved CI-state PASS is carried to a later DoD run without re-grading (T249-QA-1); Step 3b.1 item 3a looks inline probe cases up by id alone (T249-QA-2).
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -313,6 +334,8 @@ Step 6 together).
 | 2026-11-01 | 1.1     | Review passed (8/10) — Step 6 re-folds `AC_OVERALL`; `spec_ref` scoped to inline cases (`direction`/`correct`); clean-checkout criterion; Step 6 test named; anchors refreshed | review-task |
 | 2026-11-01 |         | Status → ready-for-development | review-task |
 | 2026-11-01 |         | Implemented — 18 files, 21 tests | develop |
+| 2026-11-01 |         | QA gate CONCERNS (80/100) — 2 findings | qa-task |
+| 2026-11-01 |         | QA findings fixed — T249-QA-1, T249-QA-2, CR-3, CR-4; 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

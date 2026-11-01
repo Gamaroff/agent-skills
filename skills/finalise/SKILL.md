@@ -518,7 +518,8 @@ doubt: no prior record (`no-prior-record`), a record it cannot read (`prior-unre
 reopened under Step 2's rule (`reopened`), a prior head that is not an ancestor of `HEAD`
 (`head-not-ancestor`, a rebase or force-push), or no criterion line it can key (`no-criteria`).
 `scoped` re-judges the criteria the prior run failed (`reported-gap`), the ones whose text changed
-(`new-criterion`, `criterion-changed`), the passes whose cited code, test or member evidence changed
+(`new-criterion`, `criterion-changed`), every CI-state criterion, deferred or already graded from an
+earlier head's CI (`ci-state`, task 249: its verdict is one head's reading, never carried), the passes whose cited code, test or member evidence changed
 since the prior head (`evidence-changed`) or resolves to no tracked file (`evidence-unresolved`), and
 carries every other pass (`unchanged`). Without this, each re-run judged every criterion afresh and
 more finely than the last, and found a gap the run before had passed — task.239 needed five runs and a
@@ -670,18 +671,23 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
    with that `key`, never by `id`: `id` is the corpus case id, which every control on the same sink
    shares, so an `id` match can put one control's grade on another's probe (task.189 CR2-1). A probe
    it does not grade stays without, and halts. Without this step every reproduced probe would
-   halt, and the low-severity fix-and-recheck path Step 8a offers would never open.
-3a. **Check each inline case's verdict against its `spec_ref`** (task 249, obs #81). Do this before
-   grading. An inline case's verdict (`direction`, `correct`) is the security agent's own, so it can
-   be stricter than the work item. Corpus cases are exempt: their verdict is the shared corpus's.
-   Read the cases files this run saved (`$DOC_DIR/$STEM.dod.$DOD_N.security.cases.json`, or
-   `….security.cases.<i>.json` for entry *i*). Then:
+   halt, and the low-severity fix-and-recheck path Step 8a offers would never open. **Run item 3a
+   first**, before this re-dispatch: a probe 3a moves out of `probes[]` must not be graded.
+3a. **Check each inline case's verdict against its `spec_ref`** (task 249, obs #81). Run this
+   before item 3's grading re-dispatch. An inline case's verdict (`direction`, `correct`) is the
+   security agent's own, so it can be stricter than the work item. Corpus cases are exempt: their
+   verdict is the shared corpus's. **Find every case through the probe's `key`, never its `id`**:
+   ids are unique only within one plan entry, and a corpus id is shared by every control on a sink
+   (task.189 CR2-1). The `key` is `<i>:<id>`, with `i` the 0-based plan entry. Entry `i`'s inline
+   cases are in the plan result's `cases_files` (`.claude/state/probe-plan-result.json`) as `$DOC_DIR/$STEM.dod.$DOD_N.security.cases.json` when the
+   plan has one entry, else `….security.cases.<i+1>.json`. When entry `i` wrote no cases file, it
+   had no inline `cases`: its probes are corpus probes and are exempt. Then:
    - **An inline case without `spec_ref`** is a plan-shape error. Add a
      `probe case without spec_ref: {id}` FAIL check with `severity: low`. When that case reproduced,
      drop its probe from `probes[]`. A verdict nobody tied to the specification is not evidence
      against code that follows it, and the check keeps the defect visible.
-   - **A reproduced inline case**: find it by its `id` (the probe's `id` is the case id) and read the
-     line its `spec_ref` names. When that line allows what the case's `direction` says the control
+   - **A reproduced inline case**: take entry `i`'s cases file from the probe's `key`, find the case
+     whose `id` is the key's `<id>` within that one file, and read the line its `spec_ref` names. When that line allows what the case's `direction` says the control
      must refuse, or refuses what it says the control must accept, the case contradicts its
      specification. Move the probe out of `probes[]` and into `SECURITY_RESULT.spec_questions[]`
      (`{id, input, spec_ref, direction, correct, what the line says}`). It is not a security FAIL.
@@ -1313,6 +1319,12 @@ with `ci.docsOnly.enabled: false` ([`docs/reference/configuration.md`](../../doc
        || { echo "HALT: finalise-rerun-scope.js resolve-ci failed — $RESOLVE_CI"; exit 1; }
      AC_OVERALL=$(printf '%s' "$RESOLVE_CI" | jq -r '.overall')
      echo "CI-state criteria: $(printf '%s' "$RESOLVE_CI" | jq -c '{reason, resolved, undecided}')"
+   elif [ -f "$AC_RECORD" ]; then
+     # A record means Step 3c merged this run; only its merged result is gone or unreadable
+     # (state cleaned on resume, or no jq). Skipping would keep AC_OVERALL short of PASS with
+     # no reason given, so stop and say why (task 249, QA cycle 1, CR-3).
+     echo "HALT: $AC_RECORD exists but $AC_MERGED_FILE is missing or not 'merged' — re-run Step 3c's merge, then this action"
+     exit 1
    fi
    echo "AC_OVERALL=$AC_OVERALL"
    ```

@@ -356,6 +356,24 @@ test("scope: a criterion added → new-criterion; reworded → criterion-changed
   }
 });
 
+test("scope: a CI-state entry (resolved PASS or still deferred) → ci-state, never carried (task 249)", () => {
+  const dir = mkRepo();
+  try {
+    const a = git(dir, "rev-parse", "HEAD");
+    const prior = record(dir, a, {
+      "SC-1": { ci_reading: `CI reading 1: SUCCESS @ ${a}` },
+      "SC-2": { status: eng.DEFERRED_CI },
+    });
+    commit(dir, { "README.md": "unrelated\n" });
+    const s = scopeAt(dir, prior);
+    assert.equal(reasonOf(s, "SC-1"), "ci-state");
+    assert.equal(reasonOf(s, "SC-2"), "ci-state");
+    assert.equal(reasonOf(s, "SC-3"), "unchanged");
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test("scope: a FAIL is a reported-gap", () => {
   const dir = mkRepo();
   try {

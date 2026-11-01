@@ -73,10 +73,12 @@ const RESOLVE_CI_REASONS = Object.freeze([
   "ci-undecided", // the reading is neither SUCCESS nor FAILURE: entries stay deferred
 ]);
 
-// The six per-criterion outcomes of a scoped run (task § 3's table).
+// The per-criterion outcomes of a scoped run (task § 3's table, plus task
+// 249's ci-state).
 const CRITERION_REASONS = Object.freeze([
   "new-criterion",
   "criterion-changed",
+  "ci-state", // a CI-state criterion: graded from each run's own CI reading, never carried
   "reported-gap",
   "evidence-changed",
   "evidence-unresolved",
@@ -379,6 +381,15 @@ function scopeOf(input, io) {
     }
     if (p.text_hash !== c.text_hash) {
       rejudge.push({ id: c.id, reason: "criterion-changed" });
+      continue;
+    }
+    // A CI-state criterion's verdict is a reading of ONE head's CI. Its
+    // citation is the CI config, which rarely changes, so the evidence rule
+    // below would carry a PASS graded on an earlier head's run (task 249,
+    // QA cycle 1, T249-QA-1). resolve-ci stamps ci_reading on every entry it
+    // grades; an unresolved one still reads DEFERRED-CI.
+    if (p.status === DEFERRED_CI || p.ci_reading) {
+      rejudge.push({ id: c.id, reason: "ci-state" });
       continue;
     }
     if (p.status !== "PASS") {

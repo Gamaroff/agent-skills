@@ -163,7 +163,7 @@ test("merge (reported-gap with members): an agent DEFERRED-CI is kept, not membe
   assert.notEqual(ac.overall, "PASS");
 });
 
-test("scope: a prior DEFERRED-CI criterion is re-judged, never carried", () => {
+test("scope: a prior CI-state criterion — deferred or already resolved — is re-judged as ci-state, never carried", () => {
   const dir = mkdtempSync(join(tmpdir(), "deferred-ci-"));
   const GIT = [
     "-c",
@@ -208,6 +208,12 @@ test("scope: a prior DEFERRED-CI criterion is re-judged, never carried", () => {
         test_citation: "src/a.js:1",
         members: [],
         note: null,
+        // SC-2 is a CI-state criterion resolve-ci already graded on head A:
+        // its citation (src/a.js) does not change, so the evidence rule
+        // alone would carry it onto a head CI never read (T249-QA-1).
+        ...(c.id === "SC-2"
+          ? { ci_reading: `CI reading 1: SUCCESS @ ${a}` }
+          : {}),
       })),
       advisories: [],
     };
@@ -224,11 +230,18 @@ test("scope: a prior DEFERRED-CI criterion is re-judged, never carried", () => {
       eng.gitIo(dir),
     );
     assert.equal(s.mode, "scoped");
-    assert.equal(
-      s.rejudge.find((r) => r.id === "SC-1")?.reason,
-      "reported-gap",
+    const reasonFor = (id) => s.rejudge.find((r) => r.id === id)?.reason;
+    assert.equal(reasonFor("SC-1"), "ci-state");
+    // The resolved PASS from an earlier head's CI is re-judged too.
+    assert.equal(reasonFor("SC-2"), "ci-state");
+    assert.ok(!s.carry.some((c) => c.id === "SC-1" || c.id === "SC-2"));
+    // Control: an ordinary PASS with the same unchanged citation is carried,
+    // so the rule keys on the CI-state marker, not on every PASS.
+    const ordinary = CRITERIA.map((c) => c.id).find(
+      (id) => id !== "SC-1" && id !== "SC-2",
     );
-    assert.ok(!s.carry.some((c) => c.id === "SC-1"));
+    assert.ok(ordinary, "the fixture needs a third, ordinary criterion");
+    assert.ok(s.carry.some((c) => c.id === ordinary));
   } finally {
     cleanup(dir);
   }
@@ -487,6 +500,22 @@ for (const shell of SHELLS) {
       });
       assert.equal(r.status, 0, r.stderr + r.stdout);
       assert.equal(r.acOverall, "FAIL");
+    } finally {
+      cleanup(dir);
+    }
+  });
+
+  test(`fence (${shell}): a record without its merged result HALTs, never skips silently (CR-3)`, () => {
+    const { dir } = stage({ "SC-1": D, "SC-2": "PASS", "SC-3": "PASS" });
+    try {
+      rmSync(join(dir, ".claude", "state", "finalise-ac-merged-1.json"));
+      const r = runFence(shell, dir, {
+        CI_ROLLUP: "SUCCESS",
+        AC_OVERALL: "PARTIAL",
+      });
+      assert.equal(r.status, 1, r.stderr + r.stdout);
+      assert.match(r.stdout, /HALT: .*task\.9\.dod\.1\.ac\.json exists but/);
+      assert.equal(r.acOverall, null, "a HALT binds no AC_OVERALL");
     } finally {
       cleanup(dir);
     }
