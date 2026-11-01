@@ -154,6 +154,21 @@ for (const shell of SHELLS) {
       assert.equal(cites(shell, stem).rc, 2, `'${stem}'`);
   });
 
+  // task.248 QA cycle 1, T248-QA-3: doc-id.js reads a basename, so a path parsed
+  // as its last segment and a story path exited 3, which 6d passes silently.
+  test(`[${shell}] 2 usage: a path is never a stem`, () => {
+    for (const stem of [
+      "../task.248",
+      "docs/tasks/task.248",
+      "x/story.1.2.3",
+      "/task.248",
+    ]) {
+      const r = cites(shell, stem);
+      assert.equal(r.rc, 2, `'${stem}': ${r.out}`);
+      assert.match(r.out, /is a path, not a work-item id/);
+    }
+  });
+
   test(`[${shell}] 4 unknown: an opt-in that cannot be read is never read as off`, () => {
     const r = cites(shell, "task.303", {
       installed: INSTALL.filter((f) => f !== "read-config.sh"),

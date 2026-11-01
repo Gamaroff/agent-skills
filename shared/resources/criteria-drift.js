@@ -16,8 +16,9 @@
 //   reworded  the criterion's existing words changed — on its own line, or in
 //             a continuation line it already had. Unapproved → a finding.
 //   appended  the criterion line is unchanged and its old continuation text is
-//             a prefix of the new: text was only added. The QA gate records
-//             whether the addition relaxes the criterion.
+//             a prefix of the new, ending at a word boundary: text was only
+//             added. "within 5" → "within 50 ms" is reworded, not appended. The
+//             QA gate records whether the addition relaxes the criterion.
 //   added     a criterion with no counterpart at the base.
 //   removed   a criterion with no counterpart now. Never approved: there is no
 //             new text to carry an approver.
@@ -63,6 +64,16 @@ function shape(entry) {
   const line = norm(entry.line);
   const cont = norm(entry.continuation.filter((l) => l !== "").join(" "));
   return { line, cont, full: cont ? `${line} ${cont}` : line };
+}
+
+// `after` keeps all of `before` and adds whole words after it. A bare prefix test
+// read "within 5" → "within 50 ms" as an addition (task.248 QA cycle 1, T248-QA-2).
+// The added text must start with a space, or with a punctuation mark that is
+// followed by a space or ends the text ("5 s" → "5 s, measured by x").
+function extendsAtBoundary(before, after) {
+  if (before === "") return true;
+  if (!after.startsWith(before)) return false;
+  return /^(?:\s|[,;:.!?)](?:\s|$))/.test(after.slice(before.length));
 }
 
 function approvals(text) {
@@ -147,7 +158,8 @@ function diffCriteria(beforeBody, afterBody) {
     let kind;
     if (!b) kind = "added";
     else if (!a) kind = "removed";
-    else if (a.line === b.line && a.cont.startsWith(b.cont)) kind = "appended";
+    else if (a.line === b.line && extendsAtBoundary(b.cont, a.cont))
+      kind = "appended";
     else kind = "reworded";
     const approvers = a ? newApprovers(b ? b.full : "", a.full) : [];
     changed.push({
@@ -236,7 +248,10 @@ function newestReviewBlob(p) {
   if (!best) return null;
   const text = fs.readFileSync(path.join(dir, best.f), "utf8");
   const b = /^\*\*reviewed_blob:\*\*\s*`?([0-9a-f]{7,64})`?\s*$/m.exec(text);
-  return b ? { sha: b[1], report: best.f } : null;
+  // The report is returned without a stamp too: a review never halts over a
+  // missing reviewed_blob line, and the commit that added the report is still
+  // a better base than the merge-base (task.248 QA cycle 1, T248-QA-1).
+  return { sha: b ? b[1] : null, report: best.f };
 }
 
 // The commit that first added a review report beside the document, or null.
@@ -265,21 +280,25 @@ function resolveBase(opts, p) {
     };
   const rb = newestReviewBlob(p);
   if (rb) {
-    try {
-      return {
-        base: { kind: "reviewed-blob", ref: rb.sha, report: rb.report },
-        body: showBlob(rb.sha, p),
-      };
-    } catch {
-      // The stamp is a `git hash-object` of the document; nothing writes that
-      // object to the store, so it is readable only once a commit carries the
-      // exact reviewed bytes. Next best: the commit that added the report.
+    if (rb.sha) {
+      try {
+        return {
+          base: { kind: "reviewed-blob", ref: rb.sha, report: rb.report },
+          body: showBlob(rb.sha, p),
+        };
+      } catch {
+        // The stamp is a `git hash-object` of the document; nothing writes that
+        // object to the store, so it is readable only once a commit carries the
+        // exact reviewed bytes. Next best: the commit that added the report.
+      }
     }
     const added = reportCommit(rb.report, p);
     if (added) {
       const body = showAtRef(added, p);
       if (body !== null) {
+        // Unstamped, nothing says the bytes are the reviewed ones: never exact.
         const exact =
+          rb.sha !== null &&
           git(["rev-parse", `${added}:${p.rel}`], p.top).trim() === rb.sha;
         return {
           base: { kind: "review-commit", ref: added, report: rb.report, exact },
@@ -302,7 +321,7 @@ function resolveBase(opts, p) {
       kind: "merge-base",
       ref: mb,
       target,
-      ...(rb ? { unreadableBlob: rb.sha } : {}),
+      ...(rb && rb.sha ? { unreadableBlob: rb.sha } : {}),
     },
     body: showAtRef(mb, p),
   };

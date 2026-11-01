@@ -383,6 +383,27 @@ engine stays unused but tested.
 
 **Forward fix.** For wording or threshold issues in a single engine, fix forward with a test.
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-01
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.248.qa.1.qa-applies-finalise-rules.md](./task.248.qa.1.qa-applies-finalise-rules.md)
+- **Gate File**: [task.248.gate.1.qa-applies-finalise-rules.yml](./task.248.gate.1.qa-applies-finalise-rules.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 129
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+Two reproduced MEDIUM defects in `criteria-drift.js`. T248-QA-1: an unstamped review report drops the base to merge-base. T248-QA-2: a bound changed by extension reads as appended. One LOW: T248-QA-3, a path-prefixed stem skips 6d silently.
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -392,6 +413,8 @@ engine stays unused but tested.
 | 2026-11-01 | 1.1     | Review passed (8/10) — drift engine splits reworded/appended (owner decision); changelog-cites.sh gains exit 4 (unknown) and story/bug → 3; wiring test and drift fixtures named; integration criteria name their tests | review-task |
 | 2026-11-01 |         | Status → ready-for-development | review-task |
 | 2026-11-01 | 1.2     | Implemented all four phases; status → ready-for-review. Gate read-back checks went into `qa-read-back.js`, not per-skill blocks; 6d gains HALT `changelog-stem` | develop |
+| 2026-11-01 |         | QA gate CONCERNS (80/100) — 3 findings (2 medium, 1 low) | qa-task |
+| 2026-11-01 |         | QA findings fixed (T248-QA-1, -2, -3) — 1 iteration; each fix mutation-proved | qa-fix |
 <!-- change-log-end -->
 
 ---

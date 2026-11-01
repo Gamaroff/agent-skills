@@ -90,6 +90,31 @@ test("a changed word inside an existing continuation line is reworded", () => {
   assert.equal(perf(diffCriteria(fx("evidence"), after)).kind, "reworded");
 });
 
+// task.248 QA cycle 1, T248-QA-2: "appended" means whole words were added after
+// the old text. Both directions: a pair that must read as appended, and a pair
+// that shares a prefix but must read as reworded.
+const bound = (cont) =>
+  `## Success Criteria\n\n- [ ] 1. The check runs fast.\n      ${cont}\n`;
+const kindOf = (b, a) => diffCriteria(bound(b), bound(a)).changed[0].kind;
+
+test("T248-QA-2: a bound edited by extension is reworded, not appended", () => {
+  assert.equal(kindOf("Bound: within 5", "Bound: within 50 ms"), "reworded");
+  assert.equal(kindOf("Bound: within 5 s", "Bound: within 5 s5"), "reworded");
+  assert.equal(kindOf("Bound: within 5", "Bound: within 5.5 s"), "reworded");
+});
+
+test("T248-QA-2: text added after a word boundary is still appended", () => {
+  assert.equal(
+    kindOf("Bound: within 5 s.", "Bound: within 5 s. Evidence: run 3"),
+    "appended",
+  );
+  assert.equal(
+    kindOf("Bound: within 5 s", "Bound: within 5 s, measured by x"),
+    "appended",
+  );
+  assert.equal(kindOf("Bound: within 5 s", "Bound: within 5 s."), "appended");
+});
+
 test("an approval already in the base does not approve a later change", () => {
   const after = fx("approved").replace(
     "(about 0.6 s per spawn site).",
@@ -248,4 +273,27 @@ test("CLI: --base-from-review prefers the reviewed blob, then the review's commi
   assert.equal(r.j.base.kind, "review-commit");
   assert.equal(r.j.base.exact, false);
   assert.equal(r.j.changed[0].kind, "reworded");
+});
+
+// task.248 QA cycle 1, T248-QA-1: a review never halts over a missing stamp, so
+// an unstamped report is normal. Its commit is the base, not the merge-base —
+// otherwise the review's own edit reads as an unapproved rewording.
+test("CLI: an unstamped review report still makes the review's commit the base", (t) => {
+  const { dir, g } = repo();
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const doc = join(dir, "task.1.x.md");
+  writeFileSync(doc, fx("reviewed"));
+  g("add", ".");
+  g("commit", "-qm", "base");
+  g("update-ref", "refs/remotes/origin/develop", "HEAD");
+  // The review step edits the criteria and writes a report with no stamp line.
+  writeFileSync(doc, fx("evidence"));
+  writeFileSync(join(dir, "task.1.review.1.x.md"), "# Review\n\nNo stamp.\n");
+  g("add", ".");
+  g("commit", "-qm", "review");
+  const r = cli(dir, "--doc", doc, "--base-from-review", "develop");
+  assert.equal(r.j.base.kind, "review-commit");
+  assert.equal(r.j.base.exact, false); // nothing vouches for the bytes
+  assert.equal(r.j.reason, "clean");
+  assert.equal(r.status, 0);
 });

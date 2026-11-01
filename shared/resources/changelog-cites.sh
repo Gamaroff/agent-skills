@@ -37,6 +37,15 @@ if [ -z "$STEM" ] || [ "$#" -ne 1 ]; then
   exit 2
 fi
 
+# doc-id.js reads a basename, so `../task.248` would parse as task.248 — or a story path as a story,
+# whose exit 3 6d passes through silently. A stem is an id, never a path (task.248 QA cycle 1, T248-QA-3).
+case "$STEM" in
+  */*)
+    echo "usage: '${STEM}' is a path, not a work-item id — pass the id alone, e.g. task.248"
+    exit 2
+    ;;
+esac
+
 CL=$(bash "$_dir/changelog-enforce.sh")
 case "$CL" in
   on) ;;
