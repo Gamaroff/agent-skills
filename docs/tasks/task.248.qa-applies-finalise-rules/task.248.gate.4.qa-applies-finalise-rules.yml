@@ -1,0 +1,61 @@
+schema: 2
+task: 'task.248.qa-applies-finalise-rules'
+task_title: "QA applies the finalise DoD's rules before finalise does"
+gate: PASS
+status_reason: 'T248-QA3-1 is fixed: the read-back re-derives the criteria drift whenever the document has criteria, and the fix was mutation-proved again this cycle. The scoped diff review found nothing new.'
+reviewer: 'QA Engineer'
+head: 'b42d8232c5af22b355d36d3ed03952be6a968996'
+updated: '2026-11-01T19:59:15Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 6979
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 8
+    escaped: 0
+    boundary: true
+    boundary_signals: ["never"]
+    notes: 'changelog-cites.sh re-probed at b42d8232 with the cycle-3 cases (run record task.248.qa.4.security.run.json): 7 hostile stems refused, the cited stem accepted, 0 escaped. qa-read-back.js reads only pipeline-written artefacts; its change widens when it looks, not what it accepts.'
+  performance:
+    status: PASS
+    notes: 'The read-back now runs criteria-drift.js once per QA cycle on every document with criteria, as Step 5 already does.'
+  reliability:
+    status: PASS
+    notes: 'T248-QA3-1 closed. Every caller already halts at Step 5 when criteria-drift.js cannot resolve a base, so no real path newly halts at the read-back. CR-2 stays advisory.'
+  maintainability:
+    status: PASS
+    notes: 'CR-4 (a second reviewed_blob parser) stays advisory.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-2: send a doc-id.js, node or jq failure in changelog-cites.sh to a could-not-look exit, not the bad-stem exit 2'
+      refs: ['shared/resources/changelog-cites.sh']
+    - action: 'CR-3: the --target and drift call sites derive the PR base with gh pr view, which cannot address a Bitbucket PR; derive it per VCS'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'CR-4: reuse reportReviewedBlob from review-report-freshness.js in criteria-drift.js'
+      refs: ['shared/resources/criteria-drift.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

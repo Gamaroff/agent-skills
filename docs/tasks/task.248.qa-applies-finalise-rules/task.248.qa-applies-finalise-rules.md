@@ -385,24 +385,24 @@ engine stays unused but tested.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-01
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.248.qa.3.qa-applies-finalise-rules.md](./task.248.qa.3.qa-applies-finalise-rules.md)
-- **Gate File**: [task.248.gate.3.qa-applies-finalise-rules.yml](./task.248.gate.3.qa-applies-finalise-rules.yml)
+- **Full Report**: [task.248.qa.4.qa-applies-finalise-rules.md](./task.248.qa.4.qa-applies-finalise-rules.md)
+- **Gate File**: [task.248.gate.4.qa-applies-finalise-rules.yml](./task.248.gate.4.qa-applies-finalise-rules.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 6964
+- **Tests Executed**: 6979
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Four of the five cycle-2 findings are fixed outright. One MEDIUM remains, T248-QA3-1: the read-back re-derives the criteria drift only when the gate carries a task.248 key, so a gate that leaves both keys out reads clean over an amended criterion.
+No open issues. T248-QA3-1 is fixed and mutation-proved: the read-back re-derives the criteria drift whenever the document has criteria. Three advisory items (CR-2, CR-3, CR-4) are carried as future recommendations.
 
 ## Change Log
 
@@ -419,6 +419,7 @@ Four of the five cycle-2 findings are fixed outright. One MEDIUM remains, T248-Q
 | 2026-11-01 |         | QA findings fixed (T248-QA2-1 to -5) — fix cycle 2, 1 iteration; each fix mutation-proved; status → ready-for-review | qa-fix |
 | 2026-11-01 |         | QA gate CONCERNS (90/100) — 1 finding (1 medium) | qa-task |
 | 2026-11-01 |         | QA finding fixed (T248-QA3-1) — fix cycle 3, 1 iteration; mutation-proved; status → ready-for-review | qa-fix |
+| 2026-11-01 |         | QA gate PASS (100/100) — 0 findings | qa-task |
 <!-- change-log-end -->
 
 ---
