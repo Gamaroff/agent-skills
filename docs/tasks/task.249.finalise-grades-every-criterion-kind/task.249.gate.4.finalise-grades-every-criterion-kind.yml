@@ -1,0 +1,66 @@
+schema: 2
+task: 'task.249.finalise-grades-every-criterion-kind'
+task_title: '/finalise grades every kind of criterion fairly'
+gate: PASS
+status_reason: 'All three cycle 3 findings are fixed. T249-QA-7 is held by six fence tests and two mutation proofs. The scoped review of the cycle 3 fix found no HIGH or MEDIUM defect. One LOW is recorded: a missing record beside this run''s own merged result reads as a skip, not a HALT. It is reachable only by a wrong DOC_DIR substitution or by ignoring the HALT''s recovery, and it fails safe (AC_OVERALL stays short of PASS).'
+reviewer: 'QA Engineer'
+head: '1ed99a9b87401df960b2c6a64cfb89026472daaa'
+updated: '2026-11-01T21:38:21Z'
+
+top_issues:
+  - id: 'T249-QA-10'
+    severity: low
+    file: 'skills/finalise/SKILL.md'
+    finding: 'Step 6 action 2a skips without opening the merged file whenever this run''s AC record is absent. So "Step 3c never merged" and "this item''s run-N merged result is present but its record is not where DOC_DIR points" both print the same skipped line (code review CR-1, re-rated medium → low).'
+    suggested_action: 'In the no-record branch, HALT when the merged file reads merged and its record.document and record.dod_n are this run''s. Skip only when the file is absent or belongs to another item or run, and add a fence test for that state.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 7039
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 13
+    escaped: 0
+    boundary: true
+    boundary_signals: ["never"]
+    notes: 'Boundary unchanged: ciResolution (finalise-rerun-scope.js) re-probed with 11 hostile rollups and 2 legitimate ones. 13 executed, 0 reproduced, 0 escaped. Record: task.249.qa.4.security.run.json. Cases: task.249.qa.4.security.cases.json.'
+  performance:
+    status: PASS
+    notes: 'No hot path.'
+  reliability:
+    status: PASS
+    notes: 'The stale merged result is refused or skipped as appropriate. T249-QA-10 is a fail-safe message ambiguity on a misuse path.'
+  maintainability:
+    status: PASS
+    notes: 'Fix is local to one block. Population of 2 sites checked.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'T249-QA-10: HALT, rather than skip, when this run''s own merged result is present without its record.'
+      refs: ['skills/finalise/SKILL.md']
+    - action: 'CR-2 (low/low, platform-variance): the ownership check splits record.document on "/" only. Normalise backslashes if a Windows-shell consumer ever passes one.'
+      refs: ['skills/finalise/SKILL.md']
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []

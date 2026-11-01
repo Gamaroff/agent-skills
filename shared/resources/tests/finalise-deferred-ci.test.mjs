@@ -689,6 +689,26 @@ for (const shell of SHELLS) {
     }
   });
 
+  test(`fence (${shell}): this run's own merged result without its record HALTs, never skips (T249-QA-10)`, () => {
+    const { dir } = stage({ "SC-1": D, "SC-2": "PASS", "SC-3": "PASS" });
+    // The record is not where DOC_DIR points (a wrong substitution, or a record moved aside).
+    rmSync(join(dir, "doc", "task.9.dod.1.ac.json"));
+    try {
+      const r = runFence(shell, dir, {
+        CI_ROLLUP: "SUCCESS",
+        AC_OVERALL: "PARTIAL",
+      });
+      assert.equal(r.status, 1, r.stderr + r.stdout);
+      assert.match(
+        r.stdout,
+        /HALT: .*is task\.9 run 1's merged result, but .*task\.9\.dod\.1\.ac\.json does not exist/,
+      );
+      assert.equal(r.acOverall, null);
+    } finally {
+      cleanup(dir);
+    }
+  });
+
   test(`fence (${shell}): a record without its merged result HALTs, never skips silently (CR-3)`, () => {
     const { dir } = stage({ "SC-1": D, "SC-2": "PASS", "SC-3": "PASS" });
     try {

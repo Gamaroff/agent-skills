@@ -1311,7 +1311,8 @@ with `ci.docsOnly.enabled: false` ([`docs/reference/configuration.md`](../../doc
    signal that Step 3c merged**: a bug run, or a Step 3c answer that was not `merged`, has none and
    skips with `AC_OVERALL` unchanged. The merged-result file alone proves nothing, because it is keyed
    by `DOD_N` and outlives its run, so with a record present the block also checks that the file's
-   `record.document` and `record.dod_n` are this run's, and HALTs when they are not:
+   `record.document` and `record.dod_n` are this run's, and HALTs when they are not. With no record but
+   a merged result that *is* this run's, it HALTs too: the record is not where `DOC_DIR` points:
 
    ```bash
    # Step 6 action 2a — grade DEFERRED-CI criteria from CI reading 1 (task 249). INPUTS, substituted into
@@ -1335,18 +1336,29 @@ with `ci.docsOnly.enabled: false` ([`docs/reference/configuration.md`](../../doc
    [ -n "$AC_OVERALL" ] || { echo "HALT: AC_OVERALL is empty — substitute Step 3c's verdict"; exit 1; }
    AC_MERGED_FILE=".claude/state/finalise-ac-merged-${DOD_N}.json"
    AC_RECORD="$DOC_DIR/${STEM}.dod.${DOD_N}.ac.json"
+   # Whose merged result is this? The file is keyed by DOD_N alone and never removed, so it can be
+   # another work item's from an earlier run (task 249, QA cycle 3, T249-QA-7).
+   MERGED_REASON=""; MERGED_DOC=""; MERGED_N=""
+   if [ -f "$AC_MERGED_FILE" ]; then
+     MERGED_REASON=$(jq -r '.reason' "$AC_MERGED_FILE" 2>/dev/null)
+     MERGED_DOC=$(jq -r '.record.document // ""' "$AC_MERGED_FILE" 2>/dev/null)
+     MERGED_N=$(jq -r '.record.dod_n // ""' "$AC_MERGED_FILE" 2>/dev/null)
+   fi
+   OWN_DOC=0
+   case "${MERGED_DOC##*/}" in "$STEM".*) OWN_DOC=1 ;; esac
    if [ ! -f "$AC_RECORD" ]; then
      # No AC record: Step 3c did not merge in this run (a bug run, or an answer that was not
-     # `merged`). The merged-result file is NOT read here: it is keyed by DOD_N alone and never
-     # removed, so it can be another work item's from an earlier run (task 249, QA cycle 3, T249-QA-7).
+     # `merged`) — unless the merged result is this run's own, which means the record is not where
+     # DOC_DIR points: skipping would leave AC_OVERALL short of PASS for a reason nobody named
+     # (QA cycle 4, T249-QA-10).
+     if [ "$MERGED_REASON" = "merged" ] && [ "$OWN_DOC" = 1 ] && [ "$MERGED_N" = "$DOD_N" ]; then
+       echo "HALT: $AC_MERGED_FILE is $STEM run $DOD_N's merged result, but $AC_RECORD does not exist — check DOC_DIR is the directory Step 3c wrote the record to, else re-run Step 3a, the AC agent and Step 3c, then this action"
+       exit 1
+     fi
      echo "CI-state criteria: skipped — no AC record for $STEM run $DOD_N"
-   elif [ -f "$AC_MERGED_FILE" ] && [ "$(jq -r '.reason' "$AC_MERGED_FILE" 2>/dev/null)" = "merged" ]; then
-     MERGED_DOC=$(jq -r '.record.document // ""' "$AC_MERGED_FILE")
-     MERGED_N=$(jq -r '.record.dod_n // ""' "$AC_MERGED_FILE")
-     case "${MERGED_DOC##*/}" in
-       "$STEM".*) ;;
-       *) echo "HALT: $AC_MERGED_FILE is the merged result of '${MERGED_DOC:-no document}', not $STEM — move $AC_RECORD aside, then re-run Step 3a, the AC agent and Step 3c, then this action"; exit 1 ;;
-     esac
+   elif [ "$MERGED_REASON" = "merged" ]; then
+     [ "$OWN_DOC" = 1 ] \
+       || { echo "HALT: $AC_MERGED_FILE is the merged result of '${MERGED_DOC:-no document}', not $STEM — move $AC_RECORD aside, then re-run Step 3a, the AC agent and Step 3c, then this action"; exit 1; }
      [ "$MERGED_N" = "$DOD_N" ] \
        || { echo "HALT: $AC_MERGED_FILE is run ${MERGED_N:-unknown}'s merged result, not run $DOD_N — move $AC_RECORD aside, then re-run Step 3a, the AC agent and Step 3c, then this action"; exit 1; }
      RESOLVE_CI=$(command node .agents/skills/finalise/references/finalise-rerun-scope.js resolve-ci \

@@ -306,27 +306,25 @@ Step 6 together).
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-01
-**Quality Score**: 60/100
-**Gate Decision**: FAIL
+**Quality Score**: 95/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.249.qa.3.finalise-grades-every-criterion-kind.md](./task.249.qa.3.finalise-grades-every-criterion-kind.md)
-- **Gate File**: [task.249.gate.3.finalise-grades-every-criterion-kind.yml](./task.249.gate.3.finalise-grades-every-criterion-kind.yml)
+- **Full Report**: [task.249.qa.4.finalise-grades-every-criterion-kind.md](./task.249.qa.4.finalise-grades-every-criterion-kind.md)
+- **Gate File**: [task.249.gate.4.finalise-grades-every-criterion-kind.yml](./task.249.gate.4.finalise-grades-every-criterion-kind.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 7034
+- **Tests Executed**: 7039
 - **Phases Verified**: 4/4
-- **Critical Issues**: 1
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: PASS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-All four cycle 2 findings are fixed. The cycle 3 scoped review found:
-- T249-QA-7 (HIGH): Step 6 action 2a can grade another work item's stale merged result on a bug run.
-- T249-QA-8: action 2a has no bug-mode STEM, so a bug run HALTs instead of skipping.
-- T249-QA-9: the spec_ref re-dispatch does not go back through item 2's runner.
+All findings from QA cycles 1–3 are fixed. One LOW remains as a follow-up:
+- T249-QA-10: with no AC record, Step 6 action 2a skips. It does so even when this run's own merged result is present. The failure is safe: AC_OVERALL stays short of PASS.
 
 ## Change Log
 
@@ -343,6 +341,8 @@ All four cycle 2 findings are fixed. The cycle 3 scoped review found:
 | 2026-11-01 |         | QA findings fixed — T249-QA-3 to T249-QA-6; 1 iteration | qa-fix |
 | 2026-11-01 |         | QA gate FAIL (60/100) — 3 findings | qa-task |
 | 2026-11-01 |         | QA findings fixed — T249-QA-7 to T249-QA-9; 1 iteration | qa-fix |
+| 2026-11-01 |         | QA gate PASS (95/100) — 1 low finding | qa-task |
+| 2026-11-01 |         | QA findings fixed — T249-QA-10; 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---
