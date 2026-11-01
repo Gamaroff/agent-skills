@@ -5,10 +5,12 @@ type: task
 description: "Give /finalise's AC and security agents a defined path for the criteria they currently mis-grade — process criteria, CI-state criteria, records in the implementation report, and probe cases stricter than the spec — and make review-task require a criterion that demands a record to name where the record lives."
 tags: [finalise, review-task, create-task, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-11-01
 updated: 2026-11-01
+completed_date: 2026-11-01
+pr_number: 805
 assignee:
 estimated_effort_hours: 14
 github_issue: 802
@@ -16,7 +18,7 @@ github_issue: 802
 
 # Technical Task: /finalise grades every kind of criterion fairly
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.249.review.1.finalise-grades-every-criterion-kind.md` implemented 2026-11-01
 **GitHub Issue**: [#802](https://github.com/Gamaroff/agent-skills/issues/802)
 
@@ -325,11 +327,34 @@ Step 6 together).
 ### Key Findings
 All ten findings from QA cycles 1–4 are fixed. No finding is open. Three non-blocking cleanups are recorded in the gate as future recommendations.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.249.qa.5.finalise-grades-every-criterion-kind.md`
+**Gate File**: `task.249.gate.5.finalise-grades-every-criterion-kind.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 97/100 (5 QA cycles; all ten findings fixed)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 8/8 met. #6, a CI-state criterion, was graded PASS at Step 6 from CI reading 1 by the mechanism this task delivers.
+✅ **Tests & PR Review:** PR #805. The PR review report `task.249.pr-review.1…` is APPROVE with 0 findings, and the host requires no reviews.
+✅ **CI:** CI reading 1 was SUCCESS @ `d5170bae` (6 checks).
+✅ **Documentation:** CHANGELOG cites task 249, and the skill and shared-prompt docs are updated.
+✅ **Security Review:** ✅ PASS. The `ciResolution` probe ran 20 cases: 0 reproduced, 0 escaped.
+⚠️ **Compliance Review:** NOT_APPLICABLE (internal tooling, no regulated data).
+
+**Task marked as ACCEPTED on:** 2026-11-01
+
+**Detailed Verification Log:** See `task.249.dod.1.finalise-grades-every-criterion-kind.md` for the complete verification evidence.
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
-| Date       | Version | Description | Author      |
-| ---------- | ------- | ----------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-01 | 1.0     | Initial draft — cut from observations #77, #81, #82, #105, #110 | create-task |
 | 2026-11-01 | 1.1     | Review passed (8/10) — Step 6 re-folds `AC_OVERALL`; `spec_ref` scoped to inline cases (`direction`/`correct`); clean-checkout criterion; Step 6 test named; anchors refreshed | review-task |
 | 2026-11-01 |         | Status → ready-for-development | review-task |
@@ -343,6 +368,7 @@ All ten findings from QA cycles 1–4 are fixed. No finding is open. Three non-b
 | 2026-11-01 |         | QA gate PASS (95/100) — 1 low finding | qa-task |
 | 2026-11-01 |         | QA findings fixed — T249-QA-10; 1 iteration | qa-fix |
 | 2026-11-01 |         | QA gate PASS (97/100) — 0 findings | qa-task |
+| 2026-11-01 | 1.2 | DoD passed — accepted (PR #805) | finalise |
 <!-- change-log-end -->
 
 ---
