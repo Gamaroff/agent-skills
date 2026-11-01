@@ -33,6 +33,11 @@ const ENGINES = [
   "change-log.js",
   "qa-results.js", // task.192 — the verdict check reads the QA section through it
   "qa-cycle.sh",
+  // task.248 — the gate's boundary and drift answers: the gate parser, and the
+  // criteria classifier the read-back re-runs with the reader it imports.
+  "yaml-subset.js",
+  "probe-boundary-signals.mjs",
+  "criteria-section.js",
 ];
 const DOC_DIR = "docs/tasks/task.9.x";
 const DOC = `${DOC_DIR}/task.9.x.md`;

@@ -390,3 +390,123 @@ test("every block that states a cli: control's record identity names --name (tas
     `only ${sites} block(s) state cli: identity — the predicate no longer matches`,
   );
 });
+
+// ── the criteria CLI (task.248, obs #140) ───────────────────────────────────
+//
+// QA and the DoD security agent run this one command for the criteria signal,
+// so the two can no longer reach opposite answers by reading the rule.
+
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { spawnSync } from "node:child_process";
+import { classifyCriteriaDoc } from "../probe-boundary-signals.mjs";
+
+const CLI = join(here, "..", "probe-boundary-signals.mjs");
+const runCli = (...args) => {
+  const r = spawnSync(process.execPath, [CLI, ...args], { encoding: "utf8" });
+  return { status: r.status, out: r.stdout, err: r.stderr };
+};
+const cliDir = mkdtempSync(join(tmpdir(), "boundary-cli-"));
+test.after(() => rmSync(cliDir, { recursive: true, force: true }));
+const docWith = (name, criteria) => {
+  const p = join(cliDir, name);
+  writeFileSync(
+    p,
+    `# Task\n\n## 8. Testing Strategy\n\nIt never refuses.\n\n## 9. Success Criteria\n\n${criteria}\n\n## 10. Risk Assessment\n\nNothing must not happen.\n`,
+  );
+  return p;
+};
+
+test("CLI: task.234's own document matches criterion #2's \"never\"", () => {
+  const r = runCli(
+    "--doc",
+    join(
+      REPO_ROOT,
+      "docs/tasks/task.234.probe-teardown-and-reap-hardening/task.234.probe-teardown-and-reap-hardening.md",
+    ),
+    "--json",
+  );
+  assert.equal(r.status, 0, r.err);
+  const j = JSON.parse(r.out);
+  assert.equal(j.reason, "classified");
+  assert.equal(j.boundary, true);
+  assert.ok(
+    j.matched.some((m) => m.phrase.toLowerCase() === "never"),
+    r.out,
+  );
+});
+
+test('CLI control: a criteria section whose only signal is "must not"', () => {
+  const r = runCli(
+    "--doc",
+    docWith(
+      "must-not.md",
+      "- [ ] The reaper must not touch a path outside the sandbox.",
+    ),
+    "--json",
+  );
+  assert.equal(r.status, 0, r.err);
+  const j = JSON.parse(r.out);
+  assert.equal(j.boundary, true);
+  assert.deepEqual(
+    j.matched.map((m) => m.phrase),
+    ["must not"],
+  );
+});
+
+test("CLI correct instance: no signal word in the criteria reports boundary: false, whatever other sections say", () => {
+  // "never" and "must not" sit in Testing Strategy and Risk Assessment: only the
+  // criteria section is read.
+  const r = runCli(
+    "--doc",
+    docWith(
+      "plain.md",
+      "- [ ] The output is sorted.\n- [x] The command exits 0.",
+    ),
+    "--json",
+  );
+  assert.equal(r.status, 0, r.err);
+  const j = JSON.parse(r.out);
+  assert.equal(j.reason, "classified");
+  assert.equal(j.boundary, false);
+  assert.deepEqual(j.matched, []);
+});
+
+test("CLI: a document with no criteria section is no-criteria, exit 1, boundary null — never false", () => {
+  const p = join(cliDir, "none.md");
+  writeFileSync(p, "# Notes\n\n## Overview\n\nIt never refuses.\n");
+  const r = runCli("--doc", p, "--json");
+  assert.equal(r.status, 1);
+  const j = JSON.parse(r.out);
+  assert.equal(j.reason, "no-criteria");
+  assert.equal(j.boundary, null);
+  // The pure form agrees, so the arm is held without a spawn too.
+  assert.equal(classifyCriteriaDoc("## Overview\n\nnever\n").boundary, null);
+});
+
+test("CLI: usage is exit 2 — no --doc, an unknown flag, an unreadable file", () => {
+  for (const args of [
+    [],
+    ["--doc"],
+    ["--bogus"],
+    ["--doc", join(cliDir, "missing.md")],
+  ]) {
+    const r = runCli(...args, "--json");
+    assert.equal(r.status, 2, `${args.join(" ")}: ${r.out}${r.err}`);
+    assert.equal(JSON.parse(r.out).reason, "usage");
+  }
+});
+
+test("CLI: importing the module runs nothing", async () => {
+  const r = spawnSync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "-e",
+      `await import(${JSON.stringify(CLI)}); await import(${JSON.stringify(join(here, "..", "security-probe.mjs"))});`,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout + r.stderr, "");
+});

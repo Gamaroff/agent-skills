@@ -758,3 +758,119 @@ test("the CLI waits out a lock another process releases in real time", async () 
     w.done();
   }
 });
+
+// task.248 — the gate answers two finalise rules: the boundary signal in the
+// criteria (obs #140) and an appended criterion (obs #139).
+const SIGNAL_CRITERIA = [
+  "## Success Criteria",
+  "",
+  "- [ ] 1. The parser must never accept a path outside the root.",
+  "",
+].join("\n");
+const withCriteria = ({ doc }) =>
+  edit(
+    doc,
+    "## QA Testing Results",
+    `${SIGNAL_CRITERIA}\n## QA Testing Results`,
+  );
+const gateWith =
+  (yaml) =>
+  ({ dir, stem }) =>
+    fs.writeFileSync(
+      path.join(dir, `${stem}.gate.1.x.yml`),
+      `gate: FAIL\n${yaml}`,
+    );
+const both =
+  (...fs_) =>
+  (w) =>
+    fs_.forEach((f) => f(w));
+
+test("task.248: a criteria signal with boundary: false and no reason halts, naming the phrase", () => {
+  const r = verdict(
+    "task",
+    both(
+      withCriteria,
+      gateWith(
+        "nfr_validation:\n  security:\n    status: PASS\n    boundary: false\n",
+      ),
+    ),
+  );
+  assert.equal(r.exitCode, 1);
+  assert.ok(
+    r.problems.some((p) =>
+      /no nfr_validation\.security\.boundary_signals.*"never"/.test(p),
+    ),
+    r.problems.join("\n"),
+  );
+  assert.ok(
+    r.problems.some((p) =>
+      /boundary: false beside the criteria signal "never" with no boundary_reason/.test(
+        p,
+      ),
+    ),
+    r.problems.join("\n"),
+  );
+});
+
+test("task.248: the same signal reads clean with boundary_signals and a boundary_reason, or with boundary: true", () => {
+  for (const sec of [
+    '    boundary: false\n    boundary_signals: ["never"]\n    boundary_reason: "a criterion about wording, no input gate"\n',
+    '    boundary: true\n    boundary_signals: ["never"]\n',
+  ]) {
+    const r = verdict(
+      "task",
+      both(
+        withCriteria,
+        gateWith(`nfr_validation:\n  security:\n    status: PASS\n${sec}`),
+      ),
+    );
+    assert.equal(r.exitCode, 0, r.problems.join("\n"));
+  }
+});
+
+test("task.248: no criteria signal asks nothing of the gate (control)", () => {
+  const r = verdict(
+    "task",
+    gateWith(
+      "nfr_validation:\n  security:\n    status: PASS\n    boundary: false\n",
+    ),
+  );
+  assert.equal(r.exitCode, 0, r.problems.join("\n"));
+});
+
+test("task.248: an appended criteria_drift entry must answer relaxes with a reason", () => {
+  const drift = (entry) =>
+    `criteria_drift:\n  reason: drift\n  changed:\n    - id: "#1"\n      kind: appended\n${entry}`;
+  let r = verdict("task", gateWith(drift("      approved: false\n")));
+  assert.equal(r.exitCode, 1);
+  assert.ok(
+    r.problems.some((p) =>
+      /criteria_drift entry #1 .* is appended but does not answer relaxes/.test(
+        p,
+      ),
+    ),
+    r.problems.join("\n"),
+  );
+  r = verdict(
+    "task",
+    gateWith(drift('      relaxes: true\n      relaxes_reason: ""\n')),
+  );
+  assert.equal(r.exitCode, 1, "an empty reason is no answer");
+  r = verdict(
+    "task",
+    gateWith(
+      drift(
+        '      relaxes: false\n      relaxes_reason: "an evidence note; the bound is unchanged"\n',
+      ),
+    ),
+  );
+  assert.equal(r.exitCode, 0, r.problems.join("\n"));
+  // A reworded entry is QA's MEDIUM finding, not an answer the read-back asks for.
+  r = verdict(
+    "task",
+    gateWith(
+      'criteria_drift:\n  reason: drift\n  changed:\n    - id: "#1"\n      kind: reworded\n',
+    ),
+  );
+  assert.equal(r.exitCode, 0, r.problems.join("\n"));
+});

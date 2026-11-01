@@ -35,7 +35,11 @@ const path = require("path");
 const crypto = require("crypto");
 const { execFileSync } = require("child_process");
 const { parseYamlSubset } = require("./yaml-subset.js");
-const { extractSection } = require("./jira-sync.js");
+const {
+  criteriaSection,
+  RE_CHECKBOX,
+  RE_NUMBERED,
+} = require("./criteria-section.js");
 
 const SCHEMA = 1;
 
@@ -62,11 +66,10 @@ const CRITERION_REASONS = Object.freeze([
 
 // ── criteria ────────────────────────────────────────────────────────────────
 
-// A criterion is a top-level checkbox line (tasks, and stories that use them)
-// or a top-level numbered item (stories). Indented lines are sub-points of the
-// criterion above them and are not criteria of their own.
-const RE_CHECKBOX = /^[-*]\s+\[[ xX]\]\s+(.*)$/;
-const RE_NUMBERED = /^\d+[.)]\s+(.*)$/;
+// What a criterion is, and where the section is, are criteria-section.js's
+// (RE_CHECKBOX, RE_NUMBERED, criteriaSection): one reader for this engine,
+// criteria-drift.js and the boundary CLI. This engine reads the criterion line
+// only; criteria-drift.js also reads its continuation lines.
 // A leading id the document wrote itself: `SC-7:`, `AC3.`, `**AC1**:`, `SC-12 —`.
 const RE_LEADING_ID =
   /^(?:\*\*)?([A-Z]{1,6}-?\d+[A-Za-z]?)(?:\*\*)?\s*(?:[:.)—–-]|\*\*)\s*/;
@@ -90,9 +93,7 @@ function hashText(text) {
  * an id, an id-less sibling still gets `#N`, so every criterion has exactly one.
  */
 function readCriteria(body) {
-  const section =
-    extractSection(body, "Success Criteria") ??
-    extractSection(body, "Acceptance Criteria");
+  const section = criteriaSection(body);
   if (section === null) return [];
   const out = [];
   for (const line of section.split("\n")) {

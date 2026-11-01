@@ -49,6 +49,8 @@ Signals — any **one** is sufficient:
 
 The list is data as well as prose: `probe-boundary-signals.mjs` (beside `security-probe.mjs`) exports it, and `classifyBoundaryText` applies the text-shaped signals to a header or a criteria section. Five QA gates on task.121 read a bash script that says "refuses rather than guesses" and recorded no boundary, because every signal above the last one is JS-shaped; the last one is what a script's own words match.
 
+**Run the criteria signal; do not read for it.** From the repository root: `command node .agents/skills/finalise/references/probe-boundary-signals.mjs --doc "<STORY_FILE>" --json`. `boundary: true` with its `matched[]` is the criteria signal above; quote the matched phrases in `summary`. Exit 1 (`no-criteria`) means the document has no criteria section, so the signal is absent. Any other exit means the classifier did not run: say so in `summary`, and decide from the other signals. The QA skills run the same command and record its answer as the gate's `boundary_signals`. A gate whose `boundary: false` sits beside a non-empty list carries a `boundary_reason`. Weigh that reason, but it does not bind you (task.248, obs #140).
+
 **The negative case is explicit, and it is the common case.** A CRUD endpoint, a renderer, a report
 writer, a formatter, a schema migration, a logging change — none of these are boundaries, however
 security-adjacent they look. Probe mode must **not** fire on them.

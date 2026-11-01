@@ -24,7 +24,9 @@
  *             in the document resolves against the index, `updated:` accounts
  *             for the newest row, and the document's verdict is this cycle's: the
  *             QA section's `**Gate Decision**` and the newest qa-task/qa-story
- *             Change Log row both name the gate's `gate:` token (task.192, obs #205)
+ *             Change Log row both name the gate's `gate:` token (task.192, obs #205),
+ *             and the gate answers the criteria's boundary signal and every
+ *             appended criteria_drift entry (task.248, obs #139, #140)
  *     exit 1  HALT — one of those does not hold; each problem is printed with the
  *             remedy. Do not post the PR comment / QA summary over it.
  *     exit 2  could not look — the check as a whole could not run: bad arguments,
@@ -59,6 +61,7 @@
  * requiring it would pull a tracker CLI into the qa-* bundles.
  *
  * bundle-dependency: shared/resources/qa-cycle.sh
+ * bundle-dependency: shared/resources/probe-boundary-signals.mjs
  */
 
 const fs = require("fs");
@@ -71,6 +74,7 @@ function load() {
       docLinks: require("./doc-links.js"),
       changeLog: require("./change-log.js"),
       qaResults: require("./qa-results.js"),
+      yaml: require("./yaml-subset.js"),
     };
   } catch (e) {
     return { error: e.message };
@@ -170,6 +174,78 @@ function verdictProblems(engines, text, gateFile) {
     problems.push(
       `the newest QA gate row ("${cells(rows[at]).at(-2)}") comes before a qa-fix row — this cycle's gate ${base} has no Change Log row of its own`,
     );
+  return problems;
+}
+
+const present = (v) => v !== undefined && v !== null && String(v).trim() !== "";
+
+/**
+ * The answers the gate owes to two finalise rules (task.248, obs #140, #139).
+ *
+ * Boundary: the criteria CLI is re-run on the document here, so the check does
+ * not rest on what the gate says about itself. When the criteria carry a
+ * boundary signal, the gate records `boundary_signals` and either
+ * `boundary: true` or a `boundary_reason` — a stated reason replaces the silent
+ * `false` that QA and the DoD disagreed over on task.234.
+ *
+ * Drift: when the gate carries a `criteria_drift` block (criteria-drift.js's
+ * result), every `appended` entry answers `relaxes: true|false` with a
+ * `relaxes_reason`. The engine cannot tell an evidence note from an amendment;
+ * the gate must say which it is.
+ *
+ * A CLI that does not answer is "could not look" (a throw, so exit 2), never a pass.
+ */
+function answerProblems(engines, doc, gateFile) {
+  const base = path.basename(gateFile);
+  const g =
+    engines.yaml.parseYamlSubset(fs.readFileSync(gateFile, "utf8")) || {};
+  const sec = (g.nfr_validation && g.nfr_validation.security) || {};
+  const problems = [];
+
+  const cli = spawnSync(
+    process.execPath,
+    [
+      path.join(__dirname, "probe-boundary-signals.mjs"),
+      "--doc",
+      doc,
+      "--json",
+    ],
+    { encoding: "utf8" },
+  );
+  let sig;
+  try {
+    sig = JSON.parse(cli.stdout);
+  } catch {
+    sig = null;
+  }
+  if (!sig || !["classified", "no-criteria"].includes(sig.reason))
+    throw new Error(
+      `probe-boundary-signals.mjs did not classify the document (exit ${cli.status}): ${(cli.stderr || cli.stdout || "").trim()}`,
+    );
+  if (sig.boundary === true) {
+    const phrases = sig.matched.map((m) => `"${m.phrase}"`).join(", ");
+    if (!("boundary_signals" in sec))
+      problems.push(
+        `this cycle's gate ${base} has no nfr_validation.security.boundary_signals, but the criteria carry ${phrases} — record the CLI's matched[]`,
+      );
+    if (sec.boundary !== true && !present(sec.boundary_reason))
+      problems.push(
+        `this cycle's gate ${base} records boundary: ${sec.boundary === undefined ? "(absent)" : sec.boundary} beside the criteria signal ${phrases} with no boundary_reason — record boundary: true, or state why not`,
+      );
+  }
+
+  // The block is the QA step's to write; its absence is not checked here, so a
+  // gate written before task.248 still reads back. An appended entry it does
+  // carry must be answered.
+  const cd = g.criteria_drift;
+  if (cd && typeof cd === "object")
+    for (const c of Array.isArray(cd.changed) ? cd.changed : []) {
+      if (!c || c.kind !== "appended") continue;
+      if (typeof c.relaxes !== "boolean" || !present(c.relaxes_reason))
+        problems.push(
+          `criteria_drift entry ${c.id ?? "(no id)"} in ${base} is appended but does not answer relaxes: true|false with a relaxes_reason — say whether the added text relaxes the criterion`,
+        );
+    }
   return problems;
 }
 
@@ -400,6 +476,7 @@ function readBackUnguarded(docArg, { sleepMs = sleepSync } = {}) {
 
   const text = fs.readFileSync(doc, "utf8");
   if (gate) out.problems.push(...verdictProblems(engines, text, gate));
+  if (gate) out.problems.push(...answerProblems(engines, doc, gate));
 
   const coherence = engines.changeLog.checkUpdatedCoherence(text);
   out.changeLog = coherence;

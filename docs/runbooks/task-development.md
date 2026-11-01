@@ -281,9 +281,20 @@ missing from `.agents/skills/finalise/references/` (a partial or stale install).
 rather than reading a broken install as "not enabled", which would silently drop an opted-in
 project's check.
 **Fix:**
-1. Reinstall or re-bundle the `finalise` skill so both files are present.
+1. Reinstall or re-bundle the `finalise` skill so both files are present. Since task.248, 6d runs
+   `changelog-cites.sh`, which also needs `changelog-cites.sh` and `doc-id.js` there.
 2. Check it: `bash .agents/skills/finalise/references/changelog-enforce.sh` prints `on` or `off`.
 3. Re-invoke `/finalise`.
+
+### `/finalise` halts with `changelog-stem`
+
+**You see:** `HALT: changelog-stem — changelog-cites.sh refused STEM '…'` at Step 7 action 6d.
+**Cause:** 6d was given a `STEM` that `doc-id.js` cannot read as a work-item id. `STEM` is the work
+item's id from 6a (`task.248`, `story.1.2.3`), not its file name or its slug.
+**Fix:**
+1. Check it: `bash .agents/skills/finalise/references/changelog-cites.sh task.248` prints
+   `cites`, `missing` or `not-applicable`, never `usage`.
+2. Re-invoke `/finalise` with the work item's own path.
 
 ### Task registry shows a duplicate "Next Available" number
 

@@ -362,10 +362,17 @@ test("6d derives the task number without BASH_REMATCH, so it fires under zsh too
     /N="\$\{STEM#task\.\}"/,
     "6d derives N by parameter expansion",
   );
+  // Since task.248 the check itself is changelog-cites.sh, which the stem's shape is doc-id.js's to
+  // decide; the zsh behaviour is held by the runSixD cases, which run the block under each shell.
+  const cites = read("shared/resources/changelog-cites.sh");
+  assert.ok(
+    !codeLines(cites).some((l) => /BASH_REMATCH/.test(l)),
+    "changelog-cites.sh must not read BASH_REMATCH either",
+  );
   assert.match(
-    sixD,
-    /\[\[ "\$N" =~ \^\[0-9\]\+\$ \]\]/,
-    "6d guards N with a capture-free numeric match",
+    cites,
+    /N="\$\{STEM#task\.\}"/,
+    "changelog-cites.sh derives N by parameter expansion",
   );
 });
 
@@ -565,10 +572,19 @@ function sixDBlock() {
 
 const OPTED_IN = "changelog:\n  enforce: true\n";
 
+// What 6d runs, as bundled: the check (task.248), the resolver it asks, the reader that sources,
+// and the id parser that reads the stem.
+const SIXD_INSTALL = [
+  "changelog-cites.sh",
+  "changelog-enforce.sh",
+  "read-config.sh",
+  "doc-id.js",
+];
+
 /**
  * Run the shipped 6d block in a consumer-shaped temp repo. 6d calls
- * `.agents/skills/finalise/references/changelog-enforce.sh`, so the bundled resolver and the reader
- * it sources are laid out at that exact path — the test runs the block as written, not a copy with
+ * `.agents/skills/finalise/references/changelog-cites.sh`, so the bundled check and everything it
+ * runs are laid out at that exact path — the test runs the block as written, not a copy with
  * the path rewritten. `config` is the skills-config.yaml text; null means the repo has none, which
  * is every consumer that never opted in (task.241).
  */
@@ -577,7 +593,7 @@ function runSixD(
   stem,
   changelog,
   config = OPTED_IN,
-  installed = ["changelog-enforce.sh", "read-config.sh"],
+  installed = SIXD_INSTALL,
 ) {
   return runInConsumer(shell, `STEM='${stem}'\n${sixDBlock()}`, {
     changelog,
@@ -707,9 +723,11 @@ for (const shell of SHELLS) {
 
   // An opted-in repository whose resolver cannot run must HALT, not read as "not enabled": the
   // uncited task.303 is the oracle — a silent off would pass it (task.241 QA cycle 2, CR2-1).
+  const without = (...gone) => SIXD_INSTALL.filter((f) => !gone.includes(f));
   for (const [label, installed] of [
-    ["the resolver is missing", ["read-config.sh"]],
-    ["the resolver cannot load read-config.sh", ["changelog-enforce.sh"]],
+    ["the resolver is missing", without("changelog-enforce.sh")],
+    ["the resolver cannot load read-config.sh", without("read-config.sh")],
+    ["changelog-cites.sh itself is missing", without("changelog-cites.sh")],
   ]) {
     test(`[${shell}] 6d HALTs \`changelog-unknown\` when ${label}`, () => {
       const r = runSixD(

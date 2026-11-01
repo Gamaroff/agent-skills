@@ -844,6 +844,13 @@ Iterate until:
 - ✅ Status (see Status Rule below)
 - ✅ Bug Reports section (update bug statuses when fixes applied)
 
+**A criterion's bound you cannot meet stays an open finding. It is never an edit to the
+criterion** (task.248, obs #139). Success and Acceptance Criteria are outside the sections above.
+That includes an "amendment" written inside an evidence note. Leave the finding `open`, and say in
+the fix summary that the bound is unmet and why. The pipeline's convergence check then escalates to
+a human, who may amend the criterion with `approved by <name>`. On task.234 a qa-fix cycle rewrote
+criterion #5 to fit what it could deliver. Five QA gates and 5c passed it, and only the DoD caught it.
+
 **CRITICAL - Bug Report File Authorization**: Dev agent may update these sections in bug reports:
 
 - ✅ Bug Status (New → In Progress → Ready for QA)
