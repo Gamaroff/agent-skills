@@ -1,8 +1,8 @@
 # Task Registry
 
 **Purpose:** Central tracking for all task numbers in this repo.
-**Last Updated:** 2026-10-30
-**Next Available Task Number:** **248**
+**Last Updated:** 2026-11-01
+**Next Available Task Number:** **250**
 
 ## How to use
 
@@ -289,6 +289,8 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 245 | [Shared-checkout-safe guards and staging](task.245.shared-checkout-safe-guards-and-staging/task.245.shared-checkout-safe-guards-and-staging.md) | accepted | refactoring | Medium | 2026-10-29 | [#783](https://github.com/Gamaroff/agent-skills/issues/783) | — cut from observations #126, #127 (a parallel session's edit in the same checkout: swept into finalise 6a's commit; HALTed a QA re-review) |
 | 246 | [Wireframe mapping setup offer and first-run candidates](task.246.wireframe-mapping-setup-offer/task.246.wireframe-mapping-setup-offer.md) | accepted | other | High | 2026-10-29 | [#792](https://github.com/Gamaroff/agent-skills/issues/792) | — follow-up to task.243, from the rebirth-wallet confirmation of v0.62.0 |
 | 247 | [Wireframe mapping pipeline test scope and configure blank lines](task.247.wireframe-mapping-follow-ups/task.247.wireframe-mapping-follow-ups.md) | accepted | refactoring | Medium | 2026-10-30 | [#794](https://github.com/Gamaroff/agent-skills/issues/794) | task.246 — two carried advisory findings from task.246: widen develop pipeline ban test to skill-local step docs (CR5-1) and preserve blank lines in configure blank-key list removal (CR4-1) |
+| 248 | [QA applies the finalise DoD's rules before finalise does](task.248.qa-applies-finalise-rules/task.248.qa-applies-finalise-rules.md) | planned | refactoring | Medium | 2026-11-01 | [#801](https://github.com/Gamaroff/agent-skills/issues/801) | — cut from observations #23, #43, #139, #140 (2026-11-01 review, cluster 1A: boundary, quantifier, criterion amendments, CHANGELOG) |
+| 249 | [/finalise grades every kind of criterion fairly](task.249.finalise-grades-every-criterion-kind/task.249.finalise-grades-every-criterion-kind.md) | planned | refactoring | Medium | 2026-11-01 | [#802](https://github.com/Gamaroff/agent-skills/issues/802) | — cut from observations #77, #81, #82, #105, #110 (2026-11-01 review, cluster 1B: process, CI-state, record location, spec-tied probes) |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
@@ -306,6 +308,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 
 ## Notes
 
+- **Tasks 248–249 split the QA–finalise criteria cluster (2026-11-01)** — one shippable unit each, independent of each other: 248 makes QA run the four DoD rules it currently skips or judges by eye (boundary classification, quantifier rule, unapproved criterion amendments, CHANGELOG citation), so those failures surface in the QA loop; 249 gives `/finalise` a defined grading path for the criterion kinds it mis-grades (process, CI-state, implementation-report records, stricter-than-spec probe cases). Land 248 first: it moves failures earlier, and 249's new kinds then reach QA through 248's citation of the AC prompt with no extra edit.
 - **Tasks 213–214 are the loop-supervisor multi-engine handoff (2026-10-18)** — one shippable unit each, independent of one another: 213 ships the engine registry, `--engine`/`--model`/`--effort` and the normalised result envelope together, because an engine whose result line is never parsed is classified without its error signal and is not mergeable alone; 214 fixes the `probeScript` default and touches `adapters.js` and one `resolveAdapter` call, so it may land in either order (213 edits `run-loop.mjs` near that call; rebase whichever lands second).
 - **Tasks 202–207 are the hierarchical document numbering sequence** (`prd.P` → `epic.P.E` → `story.P.E.S`; design: [`.agents/plans/hierarchical-doc-numbering.md`](../../.agents/plans/hierarchical-doc-numbering.md)) — one shippable unit each, in dependency order: 202 ships the `doc-id.js` engine and PRD registry with no call site moved; 203 ships the migration script and renumbers this repo's onboarding tree; 204 (PRD skills) and 205 (epic skills) both depend on 203 and are independent of each other; 206 (story and pipeline code) depends on 205, because both edit `review-pipeline-step-0a-branch-setup.md`; 207 (corpus and chokepoint tests, prose sweep) runs last.
 - **Tasks 196–199 are the 2026-10-07 doc-drift audit follow-ups** (`.agents/plans/doc-drift-audit-2026-10-07.md`) — one shippable unit each, independent of one another: they split the audit's 94 medium/low findings by theme, each finding in exactly one task. All four start after PR #598 (the 12 high-severity fixes) merges, since it edits some of the same files. Where two of them edit one file, they touch different findings, so they may land in any order.
