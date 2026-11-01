@@ -40,6 +40,16 @@ reaches `.agents/skills/…` from the repository root resolves it here and nowhe
 71/71 locally, 19 red in CI). Build the test's cwd with `makeConsumerRoot()`
 (`evals/shared/lib/consumer-root.mjs`), and check a local green with `npm run test:clean-checkout`,
 which runs `npm test` in a clone of HEAD that has no ignored paths. `scripts/release.sh` gates on it.
+Set `CLEAN_CHECKOUT_CMD="npm run ci"` for the whole CI chain.
+
+**Never move the links aside to get a link-free tree.** Claude Code loads every project skill through
+`.claude/skills -> ../.agents/skills`. Move either link and every project skill drops out of the
+running session, and the skills come back only some minutes after the link is restored. On
+2026-11-01 four move-asides during task.248 each emptied the skills list, and `Skill(qa-task)`
+answered "Unknown skill" three minutes after a restore, stopping `/develop-task` mid-loop. The shared
+`.claude/settings.json` installs `scripts/hooks/guard-skills-symlink.mjs`, a `PreToolUse` hook that
+refuses a Bash command moving or removing either link (or `.agents` / `.claude`). Other agents do
+not read that file, so for them this paragraph is the rule.
 
 ### Never edit `skills/*/references/` — it is generated
 
