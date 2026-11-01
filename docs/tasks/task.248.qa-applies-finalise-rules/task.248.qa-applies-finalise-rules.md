@@ -5,7 +5,7 @@ type: task
 description: "Make qa-task and qa-story apply, mechanically and from one definition each, the four rules /finalise's DoD agents apply and QA currently skips or judges by eye: the boundary classification of the Success Criteria, the per-member quantifier rule, the ban on unapproved criterion amendments, and the CHANGELOG citation — so each failure surfaces in the QA loop, where a fix is cheap, instead of halting /finalise."
 tags: [qa-task, qa-story, finalise, qa-fix, develop, observation]
 category: refactoring
-status: planned
+status: ready-for-development
 priority: Medium
 created: 2026-11-01
 updated: 2026-11-01
@@ -16,7 +16,8 @@ github_issue: 801
 
 # Technical Task: QA applies the finalise DoD's rules before finalise does
 
-**Status:** Planned
+**Status:** Ready for Development
+**Review**: ✅ All review recommendations from `task.248.review.1.qa-applies-finalise-rules.md` implemented 2026-11-01
 **GitHub Issue**: [#801](https://github.com/Gamaroff/agent-skills/issues/801)
 
 ---
@@ -112,13 +113,32 @@ evidence.
   same command for the criteria signal.
 - A new engine, `shared/resources/criteria-drift.js`, compares the criteria section, **including
   each criterion's continuation lines**, between the PR base (`git merge-base HEAD origin/<base>`) and
-  the working tree. It ignores checkbox ticks. It reports each changed criterion and whether its new
-  text carries `approved by <name>`. QA turns each unapproved change into a MEDIUM `top_issues[]`
-  entry. The finalise AC prompt reads an unapproved amendment as FAIL, `note: "amendment unapproved"`.
-- `shared/resources/changelog-cites.sh <stem>` moves 6d's check into one script. It exits 0 when the
-  entry cites the stem, 1 when it is missing, and 3 when the check does not apply (enforcement off, or
-  no `CHANGELOG.md`). Exit 2 is reserved for usage errors. 6d, `develop`'s completion checklist and
-  QA's docs check all call it.
+  the working tree. It ignores checkbox ticks. It reports each changed criterion with a `kind` and
+  whether its new text carries `approved by <name>`:
+  - `reworded`: the criterion's existing words changed (on the checkbox line or a continuation line).
+    QA turns each unapproved `reworded` change into a MEDIUM `top_issues[]` entry.
+  - `appended`: the old text survives unchanged and text was only added. Develop and QA legitimately
+    append evidence notes this way (task.234 criteria #1, #2 and #4), and the task.234 amendment was
+    itself written inside one. So the engine does not decide: the QA gate must record, per `appended`
+    criterion, whether the added text relaxes the criterion (`criteria_drift[].relaxes: true|false`,
+    with a one-line `reason`). An `appended` change recorded `relaxes: true` without an approver is a
+    MEDIUM finding; an `appended` criterion with no recorded answer is a gate read-back failure.
+    *(Decided at review, 2026-11-01: split reworded/appended — the engine forces the answer, as the
+    boundary CLI does.)*
+
+  The finalise AC prompt reads an unapproved `reworded` change, or an `appended` change that relaxes
+  the bound without an approver, as FAIL, `note: "amendment unapproved"`.
+- `shared/resources/changelog-cites.sh <stem>` moves 6d's check into one script. Exit codes:
+  - 0: `[Unreleased]` cites the stem.
+  - 1: `CHANGELOG.md` exists, enforcement is on, and the entry is missing.
+  - 2: usage (no argument, or a stem `doc-id.js` cannot read).
+  - 3: not applicable: enforcement off, no `CHANGELOG.md`, or a valid non-task stem (story, bug).
+    6d checks tasks only today, so a story or bug stem must stay a pass-through, or "6d behaviour is
+    unchanged" is false.
+  - 4: unknown: `changelog-enforce.sh` answered neither `on` nor `off`. 6d maps this to its existing
+    `changelog-unknown` HALT, word for word.
+
+  6d, `develop`'s completion checklist and QA's docs check all call it.
 - The QA skills **cite** `finalise-dod-ac-prompt.md` Step 3 rule 6 rather than restating it, and
   turn every unmapped member into a MEDIUM finding.
 
@@ -173,22 +193,31 @@ stay the same.
 
 - [ ] Read each criterion **with its continuation lines** (indented lines up to the next criterion
       or heading), both at `--base <ref>` and in the working tree.
-- [ ] Report `{ reason, changed: [{ id, before, after, approved, approver }] }`. A checkbox tick
-      alone is not a change. `approved` means the new text carries `approved by <name>`.
+- [ ] Report `{ reason, changed: [{ id, kind, before, after, approved, approver }] }`, `kind` one of
+      `reworded` or `appended` (see Target Architecture). A checkbox tick alone is not a change.
+      `approved` means the new text carries `approved by <name>`.
 - [ ] Reasons: `clean`, `drift` (exit 0, both of them), `new-document` (the file did not exist at base),
       and `usage` (exit 2). A base the engine cannot read is `usage`, never `clean`.
-- [ ] Tests: the task.234 amendment shape (a continuation line, no approver) is reported unapproved;
-      the same amendment with `approved by <name>` is reported approved; a tick-only change is clean;
-      a criterion reworded on its checkbox line is reported.
+- [ ] Tests, on committed fixture documents (a before and an after copy under
+      `shared/resources/tests/fixtures/criteria-drift/`, never read from git history): the task.234
+      criterion #5 amendment as it stood before approval is `appended`, unapproved; the same text with
+      `approved by <name>` is `appended`, approved; a tick-only change is `clean`; a criterion
+      reworded on its checkbox line is `reworded`; a changed word inside an existing continuation line
+      is `reworded`; edits to QA Results and the Change Log only are `clean`.
 
 ### Phase 3: CHANGELOG citation script (Risk: Low)
 
 **Files:** `shared/resources/changelog-cites.sh` (new), `shared/resources/tests/changelog-cites.test.mjs` (new), `skills/finalise/SKILL.md`
 
 - [ ] Move 6d's `awk` and `grep` into the script, gated on `changelog-enforce.sh`. Exit codes:
-      0 cites, 1 missing, 3 not applicable, 2 usage.
-- [ ] 6d calls the script and keeps its HALT messages word for word.
-- [ ] Tests under bash and zsh: cites, missing, enforce off, no `CHANGELOG.md`, and a non-numeric stem.
+      0 cites, 1 missing, 2 usage, 3 not applicable (including a story or bug stem), 4 enforcement
+      unknown.
+- [ ] 6d calls the script and keeps its HALT messages (`no-changelog-entry`, `changelog-unknown`) and
+      its two "not applicable" lines word for word.
+- [ ] Tests under bash and zsh (CI installs zsh, `test.yml`): cites, missing, enforce off, enforce
+      unknown, no `CHANGELOG.md`, a story stem (3), a malformed stem (2), and both directions of the
+      prefix control: a `(task 24)` entry does not satisfy `task.248`, and a `(task 248)` entry does
+      not satisfy `task.24`. A test pins the 6d HALT strings.
 
 ### Phase 4: Wire the QA skills, qa-fix and develop (Risk: Medium)
 
@@ -200,8 +229,13 @@ stay the same.
       signals matched.
 - [ ] Criterion classification (`qa-task:1037`, `qa-story:1576`): cite `finalise-dod-ac-prompt.md`
       Step 3 rule 6; each unmapped member is a MEDIUM `top_issues[]` entry.
-- [ ] Same step: run `criteria-drift.js`; each unapproved change is a MEDIUM `top_issues[]` entry
-      whose remedy is "escalate for an approver, or restore the criterion".
+- [ ] Same step: run `criteria-drift.js`. Each unapproved `reworded` change is a MEDIUM
+      `top_issues[]` entry whose remedy is "escalate for an approver, or restore the criterion". Each
+      `appended` change gets a gate `criteria_drift[]` entry with `relaxes` and `reason`; `relaxes: true`
+      without an approver is the same MEDIUM finding.
+- [ ] Gate read-back (a fenced block in each QA skill, beside the existing gate read-back): fail when
+      `boundary: false` sits beside a non-empty `boundary_signals` with no `boundary_reason`, or when
+      an `appended` criterion has no `criteria_drift[]` answer.
 - [ ] Docs check: run `changelog-cites.sh`; exit 1 is a MEDIUM finding.
 - [ ] `qa-fix` Step 5: state that a criterion bound qa-fix cannot meet is recorded as an open
       finding for Loop Escalation, never as an edit to the criterion.
@@ -209,6 +243,14 @@ stay the same.
 - [ ] `finalise-dod-security-prompt.md` Step 1b: run the Phase 1 CLI for the criteria signal.
       `finalise-dod-ac-prompt.md`: run `criteria-drift.js`, and read an unapproved amendment as FAIL.
 - [ ] `npm run bundle`, and commit the regenerated `references/` copies.
+- [ ] Wiring test `shared/resources/tests/qa-finalise-rules-wiring.test.mjs` (new; reached by the
+      `shared/resources/tests/*.test.mjs` glob in `package.json`): extracts the new fenced blocks from
+      `skills/qa-task/SKILL.md` and `skills/qa-story/SKILL.md` with `extractBlocks`
+      (`qa-execute-snippets.mjs`) and runs them on fixtures — the boundary block writes
+      `boundary_signals`; the read-back block fails a `boundary: false` gate with signals and no
+      `boundary_reason`, and passes one with it; the drift block produces a MEDIUM for an unapproved
+      `reworded` fixture. It also holds the single-home rule: the quantifier rule's text appears in
+      `finalise-dod-ac-prompt.md` only, and both QA skills cite it.
 
 ## 7. Files Summary
 
@@ -234,6 +276,8 @@ stay the same.
 12. `shared/resources/tests/probe-boundary-signals.test.mjs`
 13. `shared/resources/tests/criteria-drift.test.mjs` (new)
 14. `shared/resources/tests/changelog-cites.test.mjs` (new)
+15. `shared/resources/tests/qa-finalise-rules-wiring.test.mjs` (new)
+16. `shared/resources/tests/fixtures/criteria-drift/` (new fixture documents)
 
 **Generated:** `skills/*/references/` copies from `npm run bundle`.
 
@@ -249,7 +293,8 @@ case the task text never mentions:
 
 - boundary CLI: a criteria section whose only signal is "must not";
 - drift: an amendment written on the checkbox line itself rather than a continuation;
-- CHANGELOG: a `(task 24)` entry must not satisfy stem `task.248`.
+- CHANGELOG: a `(task 248)` entry must not satisfy stem `task.24` (the direction that could
+  false-pass), and a `(task 24)` entry must not satisfy `task.248`.
 
 There is also one correct instance per engine that it must leave alone.
 
@@ -260,9 +305,11 @@ There is also one correct instance per engine that it must leave alone.
 - the 3-vs-0 split in `changelog-cites.sh`;
 - the `no-criteria` arm in the CLI.
 
-**Prose wiring.** QA's use of the engines is asserted through the executed-block tests that already
-run fenced bash from `SKILL.md` (`qa-execute-snippets`), not by grepping the source (memory: assert
-behaviour, not source text).
+**Prose wiring.** QA's use of the engines is asserted by `qa-finalise-rules-wiring.test.mjs`, which
+extracts the new fenced blocks with `qa-execute-snippets.mjs`'s `extractBlocks` and runs them on
+fixtures, not by grepping the source (memory: assert behaviour, not source text). Note that
+`qa-execute-snippets` is QA's run-time snippet executor, not a per-PR test of `qa-task`'s blocks;
+without this file no per-PR test would hold the integration criteria.
 
 ## 9. Success Criteria
 
@@ -271,19 +318,24 @@ behaviour, not source text).
 - [ ] The boundary CLI on task.234's document reports `boundary: true` with a matched `never`
       signal. On a criteria section with no signal word it reports `boundary: false`. On a document
       with no criteria section it reports `no-criteria`, exit 1.
-- [ ] `criteria-drift.js` reports task.234's criterion #5 amendment, as it stood before the owner
-      approved it, as changed and unapproved. It reports the approved wording as approved, and a
-      tick-only change as clean.
-- [ ] `changelog-cites.sh` returns 0, 1 and 3 on the cited, missing and not-applicable fixtures, the
-      same under bash and zsh. A `(task 24)` entry does not satisfy stem `task.248`.
-- [ ] `finalise` 6d calls `changelog-cites.sh`, and its HALT messages are unchanged.
+- [ ] `criteria-drift.js` reports task.234's criterion #5 amendment (fixture), as it stood before the
+      owner approved it, as `appended` and unapproved. It reports the approved wording as approved, a
+      checkbox-line rewording as `reworded`, and a tick-only change as clean
+      (`criteria-drift.test.mjs`).
+- [ ] `changelog-cites.sh` returns 0, 1, 2, 3 and 4 on the cited, missing, malformed-stem,
+      not-applicable and enforcement-unknown fixtures, the same under bash and zsh. Neither prefix
+      control (`task 24` vs `task.248`, `task 248` vs `task.24`) is satisfied
+      (`changelog-cites.test.mjs`).
+- [ ] `finalise` 6d calls `changelog-cites.sh`, and its HALT messages are unchanged (pinned by
+      `changelog-cites.test.mjs`).
 
 ### Integration
 
-- [ ] A `qa-task` gate written on a document whose criteria match a boundary signal records
-      `boundary_signals`. When it records `boundary: false`, it carries `boundary_reason`.
+- [ ] The `qa-task` boundary block, run on a document whose criteria match a boundary signal, records
+      `boundary_signals`; the gate read-back fails `boundary: false` without `boundary_reason`
+      (`qa-finalise-rules-wiring.test.mjs`).
 - [ ] The QA skills cite `finalise-dod-ac-prompt.md` Step 3 rule 6. The rule's text appears in that
-      prompt only.
+      prompt only (`qa-finalise-rules-wiring.test.mjs`).
 
 ### Code Quality
 
@@ -304,7 +356,9 @@ behaviour, not source text).
      strays outside the criteria section would flag those edits.
    - Probability: Medium. Impact: noisy MEDIUM findings.
    - Mitigation: the engine reads the criteria section only, ignores ticks, and has a test where
-     QA Results and the Change Log change and the result is `clean`.
+     QA Results and the Change Log change and the result is `clean`. Evidence notes appended under a
+     criterion are reported as `appended`, not as findings: QA records whether each relaxes the
+     bound, so a note costs one gate line, not a MEDIUM.
 2. **Boundary signals fire on ordinary criteria wording.**
    - Risk: "never" in a criterion is common.
    - Probability: Medium. Impact: more `boundary_reason` lines to write.
@@ -335,6 +389,8 @@ engine stays unused but tested.
 | Date       | Version | Description | Author      |
 | ---------- | ------- | ----------- | ----------- |
 | 2026-11-01 | 1.0     | Initial draft — cut from observations #23, #43, #139, #140 | create-task |
+| 2026-11-01 | 1.1     | Review passed (8/10) — drift engine splits reworded/appended (owner decision); changelog-cites.sh gains exit 4 (unknown) and story/bug → 3; wiring test and drift fixtures named; integration criteria name their tests | review-task |
+| 2026-11-01 |         | Status → ready-for-development | review-task |
 <!-- change-log-end -->
 
 ---

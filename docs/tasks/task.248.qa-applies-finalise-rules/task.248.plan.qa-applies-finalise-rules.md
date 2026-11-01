@@ -42,13 +42,18 @@ tested, before any prose calls it.
   is `new-document`.
 - Normalise before comparing: strip the checkbox state (`[ ]`/`[x]`), collapse whitespace.
 - The approver match is `/\bapproved by\s+[^,.;\n]+/i` on the new text. A test pins one form that
-  must not match (`approval pending`).
+  must not match (`approval pending`). It matches task.234's real wording ("amendment approved by
+  Lorien Gamaroff at `/finalise`").
+- `kind`: `appended` when the normalised old text is a prefix of, or wholly contained in order
+  within, the normalised new text; otherwise `reworded`. Decide it per criterion, after normalising.
 
 ### Phase 3
 
 - Same `awk` range and `grep -qiE "\btask[ .]${N}\b"` as 6d today. Lift them, don't rewrite them.
 - The stem argument is validated as `task.N` or a story/bug id via `doc-id.js` when it is not a
-  task. Reject anything else with exit 2.
+  task. Reject anything else with exit 2. A valid story or bug stem exits 3: 6d checks tasks only.
+- `changelog-enforce.sh` answering neither `on` nor `off` exits 4, which 6d maps to its
+  `changelog-unknown` HALT. Order: enforcement first (3 or 4), then the file test, then the grep.
 
 ### Phase 4
 
