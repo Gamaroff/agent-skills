@@ -1,0 +1,87 @@
+schema: 2
+task: 'task.249.finalise-grades-every-criterion-kind'
+task_title: '/finalise grades every kind of criterion fairly'
+gate: CONCERNS
+status_reason: 'Both cycle 1 findings are fixed and mutation-proven. The refute pass found three verified MEDIUM defects: resolve-ci never re-grades a criterion it already graded, so a retaken CI reading cannot change it (CR-1, promoted); Step 6 action 2a lacks the empty-input guards its sibling blocks carry (CR-2); and a missing spec_ref is folded into a security FAIL, against the prompt''s own promise (CR-4).'
+reviewer: 'QA Engineer'
+head: '75152aa4dc6f667ca57df5441888f4321ca9b5b3'
+updated: '2026-11-01T21:15:37Z'
+
+top_issues:
+  - id: 'T249-QA-3'
+    severity: medium
+    file: 'shared/resources/finalise-rerun-scope.js'
+    finding: 'resolveDeferredCi grades only DEFERRED-CI entries, so once CI reading 1 is FAILURE the entry is FAIL in the merged file and record; Step 8a then retakes CI reading 1 on the fix head and re-enters Step 6, action 2a answers none-deferred, and AC_OVERALL stays FAIL on the stale red reading — closing the docs-link fix-and-recheck path for any work item with a CI-state criterion (code review CR-1, confidence high, promoted; verified against Step 8a steps 3 and 5).'
+    suggested_action: 'Have resolve-ci re-grade every entry that carries ci_reading as well as DEFERRED-CI ones, so each reading replaces the last, with a test that runs FAILURE then SUCCESS on one merged file.'
+    suggested_owner: dev
+    status: open
+  - id: 'T249-QA-4'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The Step 6 action 2a block guards only against an unsubstituted {placeholder}; an empty STEM, DOD_N or DOC_DIR makes both -f tests miss, and the block skips silently with AC_OVERALL short of PASS, the could-not-look state the cycle 1 CR-3 HALT exists to name (code review CR-2, verified: the Step 3a/3c blocks at lines 498-499 and 773-774 carry these guards).'
+    suggested_action: 'Add the Step 3c guards to the block: non-empty STEM, numeric DOD_N, non-empty DOC_DIR, each a HALT naming the input; cover one with a fence test.'
+    suggested_owner: dev
+    status: open
+  - id: 'T249-QA-5'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'Step 3b.1 item 3a adds an inline case with no spec_ref as a FAIL check, which item 6 folds into a security FAIL, while finalise-dod-security-prompt.md:192 promises the case is not counted against security; a plan-shape omission no code commit can fix then blocks acceptance (code review CR-4, verified).'
+    suggested_action: 'Treat a missing spec_ref the way item 5 treats a refused entry — re-dispatch once for a corrected plan — and if it is still missing, report it as a non-gating advisory, so the prompt and the DoD agree.'
+    suggested_owner: dev
+    status: open
+  - id: 'T249-QA-6'
+    severity: low
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The cycle 1 HALT names "state cleaned on resume" as a cause and says to re-run Step 3c''s merge, but that merge reads the scope and agent-result files from the same .claude/state directory, so the named recovery cannot run in the named case (code review CR-3).'
+    suggested_action: 'Name a recovery that works: re-run Step 3a, the AC agent and Step 3c with this run''s own record moved aside first.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 7028
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 13
+    escaped: 0
+    boundary: true
+    boundary_signals: ["never"]
+    notes: 'Boundary unchanged since cycle 1: ciResolution (finalise-rerun-scope.js) re-probed, 11 hostile rollups and 2 legitimate, 13 executed, 0 reproduced, 0 escaped. Record task.249.qa.2.security.run.json; cases task.249.qa.2.security.cases.json. T249-QA-5 is a routing defect in the DoD prose, recorded under reliability, not a boundary hole.'
+  performance:
+    status: PASS
+    notes: 'No hot path.'
+  reliability:
+    status: CONCERNS
+    notes: 'T249-QA-3: a CI-state verdict cannot be re-graded by a later reading. T249-QA-4: a silent skip on empty inputs. T249-QA-5: a plan-shape omission becomes a security FAIL.'
+  maintainability:
+    status: PASS
+    notes: 'Cycle 1 fixes are small and tested; 3 mutation proofs this cycle, all covered.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T249-QA-3, T249-QA-4 and T249-QA-5; T249-QA-6 is a one-line message fix in the same block as T249-QA-4.'
+      refs: ['shared/resources/finalise-rerun-scope.js', 'skills/finalise/SKILL.md']
+  future:
+    - action: 'CR-5 (low/low): item 3a computes the cases file name, so a stale cases file from an earlier plan under the same DOD_N could be read; resolve entry i through the current run''s cases_files list only.'
+      refs: ['skills/finalise/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T249-QA-3, T249-QA-4 and T249-QA-5 fixed and re-reviewed']

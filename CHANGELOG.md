@@ -6,6 +6,32 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`/finalise` grades every kind of criterion fairly (task 249).** Five observations (#77, #81, #82,
+  #105, #110) each named a criterion `/finalise` could only fail or have overridden by hand.
+  - A **CI-state criterion** comes back from the AC agent as `DEFERRED-CI` and counts as not met.
+    Step 6 action 2a grades it from CI reading 1 with `finalise-rerun-scope.js resolve-ci`:
+    `SUCCESS` → PASS, `FAILURE` → FAIL, anything else leaves it to the CI table. It rewrites the
+    merged result and the AC record, and rebinds `AC_OVERALL` from the re-folded verdict. A re-run
+    re-judges every CI-state criterion (scope reason `ci-state`), and `resolve-ci` re-grades one an
+    earlier reading graded, so no head is accepted (or refused) on an earlier head's CI reading —
+    Step 8a's retaken reading included. The block acts only when this run wrote an AC record, and
+    HALTs on a merged result that names another document or run, so a bug run never grades a stale
+    file another work item left under the same run number. `shared/resources/tests/finalise-deferred-ci.test.mjs`
+    runs that block as written.
+  - A **process criterion** ("each fix is mutation-proven") is checked per unit under the quantifier
+    rule, against the committed record of each step. The AC prompt now lists five test-free kinds.
+  - A **measured criterion** cites the QA report, the gate or the DoD. A figure found only in the
+    implementation report fails with `note: "cite the QA report or DoD"`, because that report is
+    committed after `/finalise` runs.
+  - Each **inline probe case** the security agent writes carries a `spec_ref`. Step 3b.1 routes a
+    reproduced case that contradicts its spec line to the owner as a spec question, not a security
+    FAIL. It finds the case through the probe's `key`, never its shared `id`. A case with no
+    `spec_ref` is asked for once more and, still missing, reported to the owner without counting
+    against security. Inputs the spec allows but the agent thinks risky go in `spec_challenges[]`. The DoD
+    renders both under **Recommendations for the owner**.
+  - `review-task` (check 22) and `review-story` (check 18) report a criterion that demands a record
+    but names no location for it as Important. `create-task` and `create-story` say the same at
+    authoring.
 - **QA applies the finalise DoD's rules before finalise does (task 248).** Four checks that only
   `/finalise` made now run in the QA loop, so their findings enter the fix loop instead of halting
   acceptance. They are one engine each, and QA and the DoD run the same one.

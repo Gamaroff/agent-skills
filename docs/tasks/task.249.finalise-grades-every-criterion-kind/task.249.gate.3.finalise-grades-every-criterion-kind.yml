@@ -1,0 +1,78 @@
+schema: 2
+task: 'task.249.finalise-grades-every-criterion-kind'
+task_title: '/finalise grades every kind of criterion fairly'
+gate: FAIL
+status_reason: 'All four cycle 2 findings are fixed and two are mutation-proven. The scoped review of the files changed since 75152aa4 found one verified HIGH: Step 6 action 2a trusts any merged-result file under this DOD_N, and a bug run (which skips Step 3c) grades another work item''s stale criteria and rebinds AC_OVERALL from them (CR-1, promoted). Two verified MEDIUM defects follow in the same area.'
+reviewer: 'QA Engineer'
+head: 'fdb1914b123475295fb7a8ebf64d1168314efa2a'
+updated: '2026-11-01T21:29:02Z'
+
+top_issues:
+  - id: 'T249-QA-7'
+    severity: high
+    file: 'skills/finalise/SKILL.md'
+    finding: 'Action 2a decides a merged result is this run''s by checking only that .claude/state/finalise-ac-merged-${DOD_N}.json exists and reads merged; the file is keyed by DOD_N alone and never removed, and a bug run skips Step 3c, so a bug run with DOD_N 1 grades the criteria task.248 left in finalise-ac-merged-1.json, rewrites that file and rebinds AC_OVERALL from another document (code review CR-1, confidence high, promoted; verified: this checkout holds finalise-ac-merged-1.json for task.248 and -2.json for task.245).'
+    suggested_action: 'Run the resolve branch only when this run''s AC record exists and the merged payload''s record.document is this work item (its basename starts with STEM.), and add a fence test that plants another document''s merged file.'
+    suggested_owner: dev
+    status: open
+  - id: 'T249-QA-8'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The action 2a STEM placeholder offers only story and task stems, unlike Steps 0, 3b.1 and 7, so a bug run that reaches the block (the prose says it does, to skip) has no stem to substitute and now meets the cycle 2 empty-STEM HALT instead of the promised skip (code review CR-3, verified at line 1314 against lines 170 and 1719).'
+    suggested_action: 'Give the placeholder its bug-mode alternative, as the sibling blocks have, and cover a bug-shaped run in the fence tests.'
+    suggested_owner: dev
+    status: open
+  - id: 'T249-QA-9'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'Item 3a''s missing-spec_ref re-dispatch says to "re-run this step on it", but 3a reads spec_ref from the cases files that only item 2''s runner writes, so re-applying 3a alone re-reads the first plan''s files and reports even a corrected case as unanchored (code review CR-2, verified).'
+    suggested_action: 'Say that the corrected whole plan goes back through item 2''s runner, whose result replaces the first as item 5 describes, and that 3a is then applied to the new cases files.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 7034
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 13
+    escaped: 0
+    boundary: true
+    boundary_signals: ["never"]
+    notes: 'Boundary unchanged: ciResolution (finalise-rerun-scope.js) re-probed, 11 hostile rollups and 2 legitimate, 13 executed, 0 reproduced, 0 escaped. Record task.249.qa.3.security.run.json; cases task.249.qa.3.security.cases.json.'
+  performance:
+    status: PASS
+    notes: 'No hot path.'
+  reliability:
+    status: FAIL
+    notes: 'T249-QA-7: a bug run can grade and rewrite another work item''s merged result. T249-QA-8: a bug run HALTs where the prose promises a skip.'
+  maintainability:
+    status: PASS
+    notes: 'Cycle 2 fixes are small; 2 mutation proofs, both covered.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T249-QA-7 and T249-QA-8 together in the action 2a block; T249-QA-9 is a prose fix in item 3a.'
+      refs: ['skills/finalise/SKILL.md']
+  future: []
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T249-QA-7 fixed and re-reviewed']

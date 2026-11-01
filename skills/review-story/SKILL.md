@@ -1128,6 +1128,17 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
       artefact it wrote)
     - Flag as **Important** a field the producer does not emit. A plan that reads a field nobody
       writes passes every review and fails only at runtime, as a silently empty value
+18. **A criterion that demands a record names where it lives** (obs #77, #105; task 249):
+    - Trigger: an acceptance criterion demands a record or a measurement — it says "recorded",
+      "logged", "listed in", "documented", or it states a numeric bound graded by a measurement
+    - Require the criterion to name the record's location: the QA report, the QA gate file or the
+      DoD. Each is committed by the time the story is accepted. The implementation report does not
+      count, because the pipeline commits it after `/finalise` grades the criterion
+    - Counter-example: "each finding is recorded" names no location. At finalise the AC agent
+      searches for the record and fails when it guesses the wrong file. "Each finding is recorded in
+      the QA report's Findings table" names one
+    - Flag as **Important** a criterion that names no location, or names only the implementation
+      report. The fix costs one clause now and a failed DoD later
 
 **Common Hallucination Patterns to Detect**:
 
@@ -1148,6 +1159,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 - ❌ A new test file the project's test runner never reaches (check 14)
 - ❌ A resume or reconstruction rule changed with no list of the states it must hold in (check 15)
 - ❌ A hand-written site list with no search recorded beside it (check 16)
+- ❌ A criterion that demands a record or measurement without naming where it is committed (check 18)
 
 **Issues to Flag**:
 

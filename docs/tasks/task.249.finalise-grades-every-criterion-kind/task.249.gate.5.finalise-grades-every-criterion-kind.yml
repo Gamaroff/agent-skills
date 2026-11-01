@@ -1,0 +1,61 @@
+schema: 2
+task: 'task.249.finalise-grades-every-criterion-kind'
+task_title: '/finalise grades every kind of criterion fairly'
+gate: PASS
+status_reason: 'T249-QA-10 is fixed and mutation-proven. The scoped review of the cycle 4 fix traced all three branches of Step 6 action 2a against Step 3c''s writer and the bug-mode skip and found no correctness defect. It raised two non-blocking cleanups: two more skip-path tests, and binding the "this run''s own" test once. Both are recorded as future recommendations.'
+reviewer: 'QA Engineer'
+head: '84f2b4486c39d0c9048652259011686ad666b358'
+updated: '2026-11-01T21:45:08Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 97
+
+evidence:
+  tests_reviewed: 7040
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 13
+    escaped: 0
+    boundary: true
+    boundary_signals: ["never"]
+    notes: 'The boundary is unchanged. ciResolution (finalise-rerun-scope.js) was re-probed with 11 hostile rollups and 2 legitimate ones: 13 executed, 0 reproduced, 0 escaped. Record task.249.qa.5.security.run.json; cases task.249.qa.5.security.cases.json.'
+  performance:
+    status: PASS
+    notes: 'No hot path.'
+  reliability:
+    status: PASS
+    notes: 'Action 2a HALTs on every could-not-look state and skips only when no merged result is this run''s own.'
+  maintainability:
+    status: PASS
+    notes: 'One block, fence-tested in its executed form, with 10 mutation proofs across the QA loop.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Cycle 5 CR-1 (cleanup): add two no-record skip tests next to the T249-QA-10 test. In one, the merged result is this item''s own but from another DOD_N. In the other, it carries a reason other than merged. Without them, dropping either condition from the no-record HALT goes unseen.'
+      refs: ['shared/resources/tests/finalise-deferred-ci.test.mjs']
+    - action: 'Cycle 5 CR-2 (cleanup): bind OWN_RUN once beside OWN_DOC and use it in the no-record condition, so the two branches cannot drift on what counts as this run''s result.'
+      refs: ['skills/finalise/SKILL.md']
+    - action: 'Cycle 4 CR-2 (low/low, platform-variance): normalise backslashes in record.document before the basename cut, if a Windows-shell consumer ever passes one.'
+      refs: ['skills/finalise/SKILL.md']
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []

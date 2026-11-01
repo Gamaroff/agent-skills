@@ -562,6 +562,7 @@ Most tasks draw nothing. A task that does — it migrates a screen onto shared c
 #### ⚡ Should Add (present to user for confirmation)
 
 - **Missing performance baselines**: If the task claims performance improvements, does it document current baselines to measure against?
+- **A measurement or record with nowhere committed to live** (obs #105, #77, task 249): a success criterion graded by a measurement (a runtime, size, count or rate bound) or one that demands a record ("recorded", "logged", "listed in") names **where** the figure or record goes — the QA report, the QA gate file or the DoD, each committed by the time the work is accepted. Never the implementation report: the pipeline commits it after `/finalise` grades the criterion, so a figure only there fails as uncommitted on every run. `review-task` Step 3 check 22 reports a criterion that names no location.
 - **Uncovered test scenarios**: Does the Testing Strategy cover regression risks, not just happy paths?
 - **Scope creep risk**: Are any implementation steps implicitly larger than stated?
 

@@ -27,6 +27,11 @@ and skill prose, and are independent of one another.
 
 - The Step 6 resolution runs after `CI_ROLLUP` is known and before the acceptance decision. It
   rewrites the record entry's status and adds `note: "resolved from CI reading 1 @ {CI_HEAD_1}"`.
+- The subcommand returns the re-folded section verdict (`computeOverall` over the resolved
+  entries) and the block rebinds `AC_OVERALL` from it: `AC_OVERALL` was bound at Step 3c
+  (`skills/finalise/SKILL.md:759`) and is otherwise never re-read (review I-1).
+- `recordEntry` coerces every non-PASS status to `FAIL` today (`finalise-rerun-scope.js:482`); it
+  must keep `DEFERRED-CI`.
 - The resolution must be an executed block (fenced bash calling a small `finalise-rerun-scope.js`
   subcommand, or a pure function with a CLI), so the snippet suite can run it. Prose-only resolution
   is what obs #110 reported.
@@ -45,6 +50,7 @@ and skill prose, and are independent of one another.
 
 ## Verification
 
-- `npm test` for `finalise-rerun-scope.test.mjs` and the snippet suite; `npm run ci` with
-  `.agents/skills` moved aside.
+- `npm test` for `finalise-rerun-scope.test.mjs` and `finalise-deferred-ci.test.mjs`; `npm run ci`;
+  `npm run test:clean-checkout` (never move the `.agents/skills` symlink aside — it unloads every
+  project skill mid-session).
 - Mutation proofs listed in the task's Testing Strategy, recorded in the implementation report.

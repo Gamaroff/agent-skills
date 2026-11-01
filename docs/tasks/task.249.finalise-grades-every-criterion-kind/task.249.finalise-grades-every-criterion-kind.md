@@ -5,10 +5,12 @@ type: task
 description: "Give /finalise's AC and security agents a defined path for the criteria they currently mis-grade — process criteria, CI-state criteria, records in the implementation report, and probe cases stricter than the spec — and make review-task require a criterion that demands a record to name where the record lives."
 tags: [finalise, review-task, create-task, observation]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 created: 2026-11-01
 updated: 2026-11-01
+completed_date: 2026-11-01
+pr_number: 805
 assignee:
 estimated_effort_hours: 14
 github_issue: 802
@@ -16,7 +18,8 @@ github_issue: 802
 
 # Technical Task: /finalise grades every kind of criterion fairly
 
-**Status:** Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.249.review.1.finalise-grades-every-criterion-kind.md` implemented 2026-11-01
 **GitHub Issue**: [#802](https://github.com/Gamaroff/agent-skills/issues/802)
 
 ---
@@ -54,16 +57,18 @@ verdict than the work item's own rule. Each mis-grade ends in an operator overri
   \`test_citation: "NOT_APPLICABLE: …"\`, and only these three:**`) gives it no `NOT_APPLICABLE`
   route, so it FAILs for having no test.
 - **A CI-green criterion is graded too early** (obs #110). The AC agent runs at Step 3b. CI reading 1
-  is taken later (`skills/finalise/SKILL.md:1240`). A criterion whose only evidence is CI state comes
+  is taken later (`skills/finalise/SKILL.md:1244`). A criterion whose only evidence is CI state comes
   back PARTIAL or FAIL from an agent that cannot see the reading that will decide acceptance.
 - **The implementation report is not committed evidence at finalise** (obs #105). The measured kind
   says its `code_citation` is a line in "a committed artifact … (typically the implementation report
   or a QA report)". The implementation report is committed by the pipeline's last step, after
   finalise, so a criterion that cites it is FAIL "uncommitted" on every run.
-- **Probe cases can be stricter than the spec** (obs #81). The security agent writes each probe
-  case's expected verdict from its own judgement (`finalise-dod-security-prompt.md` Step 4). Code
-  that does exactly what the work item specifies can FAIL security, and `finalise` Step 3b.1
-  (`skills/finalise/SKILL.md:562`) has no disposition for "the case contradicts the spec".
+- **Probe cases can be stricter than the spec** (obs #81). When the shared corpus does not fit the
+  control, the security agent writes inline `cases:` (`finalise-dod-security-prompt.md` Step 4.2), and
+  each case's verdict — its `direction` (`hostile` | `legitimate`) and `correct` prose — comes from the
+  agent's own judgement. Code that does exactly what the work item specifies can FAIL security, and
+  `finalise` Step 3b.1 (`skills/finalise/SKILL.md:566`) has no disposition for "the case contradicts
+  the spec". Corpus cases are not affected: their verdict is the shared corpus's.
 - **A criterion can demand a record without naming where it lives** (obs #77). "Each finding is
   recorded" passes `review-task`. At finalise the agent searches for the record and fails when it
   guesses the wrong file.
@@ -85,13 +90,18 @@ verdict than the work item's own rule. Each mis-grade ends in an operator overri
   output is YAML: `status` PASS/FAIL/PARTIAL, `code_citation`, `test_citation`, `test_runs_per_pr`,
   `members`.
 - **The AC record and re-run scope** (`shared/resources/finalise-rerun-scope.js`) merge the
-  agent's YAML. `computeOverall` (`:466`) folds statuses into the section verdict, and it knows no
-  `DEFERRED-CI`.
-- **CI reading 1** is taken in finalise Step 6 (`skills/finalise/SKILL.md:1240`), after the agents
+  agent's YAML. `computeOverall` (`:467`) folds statuses into the section verdict, and it knows no
+  `DEFERRED-CI`. `recordEntry` (`:478`) coerces every non-PASS status to `FAIL`.
+- **`AC_OVERALL`** is bound once, at Step 3c, from the merged record (`skills/finalise/SKILL.md:759`),
+  and Step 6 decides on it as-is (`:1243`).
+- **CI reading 1** is taken in finalise Step 6 (`skills/finalise/SKILL.md:1244`), after the agents
   return.
-- **Probe plan.** The security agent emits cases with an `expected` field. Step 3b.1 runs them with
-  `security-probe.mjs`. A reproduced case whose result differs from `expected` counts against
-  security.
+- **Probe plan.** The security agent emits a `probe_plan`; its cases come from the corpus or, when
+  the corpus does not fit, inline `cases:` the agent writes, which `/finalise` saves as
+  `<stem>.dod.<N>.security.cases.json`. A case's verdict is `direction` plus `correct` (prose) and an
+  optional machine `expected` (`security-input-corpus.mjs:39-57`). Step 3b.1 runs the plan with
+  `security-probe.mjs`; the run record's `reproduced[]` holds case **ids** (`security-probe.mjs:2221`),
+  and every reproduced case counts against security.
 
 ### Target Architecture
 
@@ -100,16 +110,23 @@ verdict than the work item's own rule. Each mis-grade ends in an operator overri
     Testing Strategy), applies the quantifier rule to that unit, and cites the committed record per
     unit. PASS when every unit is covered; FAIL naming the uncovered units.
   - **CI-state criterion.** The agent returns `status: DEFERRED-CI` and does not grade it.
-    `finalise` Step 6 resolves it from CI reading 1: SUCCESS → PASS, FAILURE → FAIL, anything else
-    → the existing CI HALT path. `computeOverall` treats an unresolved `DEFERRED-CI` as not PASS.
+    `finalise` Step 6 resolves it from CI reading 1: SUCCESS → PASS (a `SUCCESS (tree-equivalent to
+    {sha})` reading included, with the sha in the note), FAILURE → FAIL, anything else → the existing
+    CI HALT path. `computeOverall` treats an unresolved `DEFERRED-CI` as not PASS. The resolution
+    **returns the re-folded section verdict** (`computeOverall` over the resolved entries), and Step 6
+    rebinds `AC_OVERALL` from it before the acceptance decision — rewriting the entry alone would leave
+    `AC_OVERALL` at the `PARTIAL`/`FAIL` Step 3c folded.
 - **Measured criteria cite only artefacts committed at acceptance**: the QA report, the gate, or the
   DoD file. `create-task`'s performance-criterion guidance says the same. A citation of the
   implementation report reads `note: "cite the QA report or DoD"` instead of a bare FAIL.
-- **Security probe cases** each carry a `spec_ref`: the work-item line the `expected` verdict comes
-  from. A case the agent thinks the spec should forbid, but that the spec allows, goes in
-  `spec_challenges[]`. The DoD renders that list as an owner recommendation, outside `checks[]`.
-  Step 3b.1 routes a reproduced case whose `expected` contradicts its `spec_ref` to the operator as
-  a spec question, not a security FAIL.
+- **Agent-authored inline probe cases** each carry a `spec_ref`: the work-item line (or cited
+  reference-doc line) the case's `direction` and `correct` verdict come from. Corpus cases need none —
+  their verdict is the corpus's. An inline case without `spec_ref` is a plan-shape error the DoD
+  reports. A case the agent thinks the spec should forbid, but that the spec allows, goes in
+  `spec_challenges[]`, not in `cases:`. The DoD renders that list as an owner recommendation, outside
+  `checks[]`. Step 3b.1 maps each reproduced case id to its entry in
+  `<stem>.dod.<N>.security.cases.json`, reads its `spec_ref`, and routes a reproduced case whose verdict
+  contradicts its `spec_ref` to the operator as a spec question, not a security FAIL.
 - **review-task / review-story** gain a check: a criterion that demands a record ("recorded",
   "logged", "listed in") must name the record's location. A criterion that does not is an
   Important finding.
@@ -152,39 +169,43 @@ are optional to readers; old plans stay valid.
 **Files:** `shared/resources/finalise-dod-ac-prompt.md`, `shared/resources/finalise-rerun-scope.js`,
 `shared/resources/tests/finalise-rerun-scope.test.mjs`, `skills/finalise/SKILL.md`
 
-- [ ] AC prompt: define the CI-state kind and the `DEFERRED-CI` status.
-- [ ] `finalise-rerun-scope.js`: accept `DEFERRED-CI` in `merge` and the record. `computeOverall`
-      never folds it to PASS.
-- [ ] Finalise Step 6: after CI reading 1, resolve each `DEFERRED-CI` criterion and rewrite its
-      record entry.
-- [ ] Tests: each reader on a `DEFERRED-CI` entry; the three resolutions (SUCCESS, FAILURE, other).
+- [x] AC prompt: define the CI-state kind and the `DEFERRED-CI` status.
+- [x] `finalise-rerun-scope.js`: accept `DEFERRED-CI` in `merge` and the record (`recordEntry` keeps
+      it rather than coercing it to `FAIL`). `computeOverall` never folds it to PASS.
+- [x] Finalise Step 6: after CI reading 1, one fenced block calls a `finalise-rerun-scope.js`
+      subcommand that resolves each `DEFERRED-CI` criterion, rewrites its record entry, and returns
+      the re-folded section verdict; the block rebinds `AC_OVERALL` from it.
+- [x] Tests: each reader on a `DEFERRED-CI` entry; the three resolutions (SUCCESS, FAILURE, other);
+      one `DEFERRED-CI` + one PASS under SUCCESS re-folds to `PASS`.
 
 ### Phase 2: Process criteria and record location (Risk: Low)
 
 **Files:** `shared/resources/finalise-dod-ac-prompt.md`, `skills/create-task/SKILL.md`, `skills/create-story/SKILL.md`
 
-- [ ] AC prompt: the process kind, citing rule 6 for its per-unit check.
-- [ ] Measured kind: allowed record locations are the QA report, gate and DoD; an implementation-report
+- [x] AC prompt: the process kind, citing rule 6 for its per-unit check.
+- [x] Measured kind: allowed record locations are the QA report, gate and DoD; an implementation-report
       citation gets the named note.
-- [ ] create-task / create-story criterion guidance: name the committed-at-acceptance artefact a
+- [x] create-task / create-story criterion guidance: name the committed-at-acceptance artefact a
       measurement goes in.
 
 ### Phase 3: Spec-tied probe verdicts (Risk: Medium)
 
 **Files:** `shared/resources/finalise-dod-security-prompt.md`, `skills/finalise/SKILL.md` (Step 3b.1 and the DoD render)
 
-- [ ] Security prompt Step 4: each case carries `spec_ref`; a stricter-than-spec case goes in
-      `spec_challenges[]`.
-- [ ] Step 3b.1: a reproduced case whose `expected` contradicts its `spec_ref` is routed as a spec
-      question. `spec_challenges[]` renders under a "Recommendations for the owner" heading.
+- [x] Security prompt Step 4: each agent-authored inline case carries `spec_ref`; a
+      stricter-than-spec case goes in `spec_challenges[]`.
+- [x] Step 3b.1: a reproduced inline case (looked up by id in the cases file) whose verdict
+      contradicts its `spec_ref` is routed as a spec question; an inline case without `spec_ref` is
+      reported as a plan-shape error. `spec_challenges[]` renders under a "Recommendations for the
+      owner" heading.
 
 ### Phase 4: Record-location check at review (Risk: Low)
 
 **Files:** `skills/review-task/SKILL.md`, `skills/review-story/SKILL.md`
 
-- [ ] A new numbered Step 3 check after check 21 (`skills/review-task/SKILL.md:1075`), with its obs
+- [x] A new numbered Step 3 check after check 21 (`skills/review-task/SKILL.md:1076`), with its obs
       reference, mirrored in review-story.
-- [ ] `npm run bundle`, and commit the regenerated `references/` copies.
+- [x] `npm run bundle`, and commit the regenerated `references/` copies.
 
 ## 7. Files Summary
 
@@ -203,7 +224,9 @@ are optional to readers; old plans stay valid.
 **Tests**
 
 7. `shared/resources/tests/finalise-rerun-scope.test.mjs`
-8. A finalise snippet test for the Step 6 resolution block (in the existing executed-block suite)
+8. `shared/resources/tests/finalise-deferred-ci.test.mjs` (new; reached by `test:suite`'s
+   `shared/resources/tests/*.test.mjs` glob): extracts the Step 6 resolution fence from
+   `skills/finalise/SKILL.md` and runs it
 
 **Generated:** `skills/*/references/` copies from `npm run bundle`.
 
@@ -212,8 +235,12 @@ are optional to readers; old plans stay valid.
 ## 8. Testing Strategy
 
 **Unit tests (per PR).** `finalise-rerun-scope.test.mjs` covers `DEFERRED-CI` through `merge`,
-`computeOverall` and the record. The Step 6 resolution block runs as an executed snippet, with
-SUCCESS, FAILURE and PENDING rollups.
+`computeOverall` and the record. `finalise-deferred-ci.test.mjs` runs the Step 6 resolution block as
+an executed snippet, with SUCCESS, FAILURE and PENDING rollups, and asserts the rebound `AC_OVERALL`.
+
+**Removed literals (searched).** The AC prompt's "Three kinds … only these three" and "typically the
+implementation report or a QA report" are rewritten. `git grep -n "Three kinds\|only these three\|implementation report or a QA report" -- '*.test.*' 'evals/**'`
+found no test pinning either (2026-11-01).
 
 **Controls (obs #176).** A CI-state criterion beside an ordinary behaviour criterion, which must
 still need its test. Also a measured criterion that cites the QA report, which must still PASS.
@@ -232,16 +259,17 @@ recorded as reviewed-only in the implementation report, with the reason.
 - [ ] `computeOverall` never returns PASS while any criterion is `DEFERRED-CI`. A test holds this,
       and the mutation that breaks it turns the test red.
 - [ ] Finalise Step 6 resolves `DEFERRED-CI` from CI reading 1: SUCCESS → PASS, FAILURE → FAIL,
-      anything else → the existing CI HALT. An executed snippet test covers all three.
+      anything else → the existing CI HALT, and rebinds `AC_OVERALL` from the re-folded verdict.
+      `finalise-deferred-ci.test.mjs` covers all three, and the re-fold.
 - [ ] The AC prompt defines the process and CI-state kinds. Its list of test-free kinds names five,
       and the measured kind names the QA report, gate and DoD as record locations.
-- [ ] The security prompt requires `spec_ref` on each case and defines `spec_challenges[]`.
-      Step 3b.1 states the disposition for a case that contradicts its `spec_ref`.
+- [ ] The security prompt requires `spec_ref` on each agent-authored inline case and defines
+      `spec_challenges[]`. Step 3b.1 states the disposition for a case that contradicts its `spec_ref`.
 - [ ] `review-task` and `review-story` carry the record-location check as an Important finding.
 
 ### Code Quality
 
-- [ ] `npm run ci` passes, run with `.agents/skills` moved aside.
+- [ ] `npm run ci` passes, and `npm run test:clean-checkout` passes.
 - [ ] `npm run bundle:check` reports 0 problems.
 
 ### Migration
@@ -278,12 +306,69 @@ Step 6 together).
 
 **Forward fix.** Prompt wording issues: fix forward.
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-01
+**Quality Score**: 97/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.249.qa.5.finalise-grades-every-criterion-kind.md](./task.249.qa.5.finalise-grades-every-criterion-kind.md)
+- **Gate File**: [task.249.gate.5.finalise-grades-every-criterion-kind.yml](./task.249.gate.5.finalise-grades-every-criterion-kind.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 7040
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+All ten findings from QA cycles 1–4 are fixed. No finding is open. Three non-blocking cleanups are recorded in the gate as future recommendations.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.249.qa.5.finalise-grades-every-criterion-kind.md`
+**Gate File**: `task.249.gate.5.finalise-grades-every-criterion-kind.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 97/100 (5 QA cycles; all ten findings fixed)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 8/8 met. #6, a CI-state criterion, was graded PASS at Step 6 from CI reading 1 by the mechanism this task delivers.
+✅ **Tests & PR Review:** PR #805. The PR review report `task.249.pr-review.1…` is APPROVE with 0 findings, and the host requires no reviews.
+✅ **CI:** CI reading 1 was SUCCESS @ `d5170bae` (6 checks).
+✅ **Documentation:** CHANGELOG cites task 249, and the skill and shared-prompt docs are updated.
+✅ **Security Review:** ✅ PASS. The `ciResolution` probe ran 20 cases: 0 reproduced, 0 escaped.
+⚠️ **Compliance Review:** NOT_APPLICABLE (internal tooling, no regulated data).
+
+**Task marked as ACCEPTED on:** 2026-11-01
+
+**Detailed Verification Log:** See `task.249.dod.1.finalise-grades-every-criterion-kind.md` for the complete verification evidence.
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
-| Date       | Version | Description | Author      |
-| ---------- | ------- | ----------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-01 | 1.0     | Initial draft — cut from observations #77, #81, #82, #105, #110 | create-task |
+| 2026-11-01 | 1.1     | Review passed (8/10) — Step 6 re-folds `AC_OVERALL`; `spec_ref` scoped to inline cases (`direction`/`correct`); clean-checkout criterion; Step 6 test named; anchors refreshed | review-task |
+| 2026-11-01 |         | Status → ready-for-development | review-task |
+| 2026-11-01 |         | Implemented — 18 files, 21 tests | develop |
+| 2026-11-01 |         | QA gate CONCERNS (80/100) — 2 findings | qa-task |
+| 2026-11-01 |         | QA findings fixed — T249-QA-1, T249-QA-2, CR-3, CR-4; 1 iteration | qa-fix |
+| 2026-11-01 |         | QA gate CONCERNS (80/100) — 4 findings | qa-task |
+| 2026-11-01 |         | QA findings fixed — T249-QA-3 to T249-QA-6; 1 iteration | qa-fix |
+| 2026-11-01 |         | QA gate FAIL (60/100) — 3 findings | qa-task |
+| 2026-11-01 |         | QA findings fixed — T249-QA-7 to T249-QA-9; 1 iteration | qa-fix |
+| 2026-11-01 |         | QA gate PASS (95/100) — 1 low finding | qa-task |
+| 2026-11-01 |         | QA findings fixed — T249-QA-10; 1 iteration | qa-fix |
+| 2026-11-01 |         | QA gate PASS (97/100) — 0 findings | qa-task |
+| 2026-11-01 | 1.2 | DoD passed — accepted (PR #805) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -291,16 +376,16 @@ Step 6 together).
 ## Progress Tracking
 
 ### Phase 1: DEFERRED-CI
-- [ ] Prompt, engine, Step 6, tests
+- [x] Prompt, engine, Step 6, tests
 
 ### Phase 2: Process criteria and record location
-- [ ] AC prompt, create-task, create-story
+- [x] AC prompt, create-task, create-story
 
 ### Phase 3: Spec-tied probe verdicts
-- [ ] Security prompt, Step 3b.1, DoD render
+- [x] Security prompt, Step 3b.1, DoD render
 
 ### Phase 4: Review check
-- [ ] review-task, review-story, bundle
+- [x] review-task, review-story, bundle
 
 ---
 

@@ -1,0 +1,15 @@
+[
+  {"id": "ci-pending", "sink": "filename", "input": "PENDING", "direction": "hostile", "why": "an undecided CI run must not grade a DEFERRED-CI criterion", "correct": "Reject: null, criterion stays deferred and the CI table decides"},
+  {"id": "ci-none", "sink": "filename", "input": "NONE", "direction": "hostile", "why": "no CI at all is not a green run", "correct": "Reject: null"},
+  {"id": "ci-cancelled", "sink": "filename", "input": "CANCELLED", "direction": "hostile", "why": "a cancelled run decided nothing", "correct": "Reject: null"},
+  {"id": "ci-unknown", "sink": "filename", "input": "UNKNOWN", "direction": "hostile", "why": "a failed read is not a reading", "correct": "Reject: null"},
+  {"id": "ci-empty", "sink": "filename", "input": "", "direction": "hostile", "why": "an unbound CI_ROLLUP substitutes as empty", "correct": "Reject: null"},
+  {"id": "ci-lowercase", "sink": "filename", "input": "success", "direction": "hostile", "why": "the rollup vocabulary is upper-case; a case-folded value is not the reading Step 6 bound", "correct": "Reject: null"},
+  {"id": "ci-trailing-space", "sink": "filename", "input": "SUCCESS ", "direction": "hostile", "why": "a padded token is not the exact rollup", "correct": "Reject: null"},
+  {"id": "ci-trailing-newline", "sink": "filename", "input": "SUCCESS\n", "direction": "hostile", "why": "a captured line with its newline is not the exact rollup", "correct": "Reject: null"},
+  {"id": "ci-tree-eq-line", "sink": "filename", "input": "SUCCESS (tree-equivalent to abc123)", "direction": "hostile", "why": "the tree-equivalent sha travels in --tree-eq; the whole recorded line is not a rollup token", "correct": "Reject: null"},
+  {"id": "ci-neutral", "sink": "filename", "input": "NEUTRAL", "direction": "hostile", "why": "a check conclusion is not a rollup state", "correct": "Reject: null"},
+  {"id": "ci-proto", "sink": "filename", "input": "__proto__", "direction": "hostile", "why": "a prototype key must not resolve through an object lookup", "correct": "Reject: null"},
+  {"id": "ci-success", "sink": "filename", "input": "SUCCESS", "direction": "legitimate", "why": "a green CI reading decides a CI-state criterion", "correct": "Accept: PASS"},
+  {"id": "ci-failure", "sink": "filename", "input": "FAILURE", "direction": "legitimate", "why": "a red CI reading decides a CI-state criterion", "correct": "Accept: FAIL"}
+]

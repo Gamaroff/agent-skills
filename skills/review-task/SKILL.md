@@ -1080,6 +1080,17 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
       artefact it wrote)
     - Flag as **Important** a field the producer does not emit. A plan that reads a field nobody
       writes passes every review and fails only at runtime, as a silently empty value
+22. **A criterion that demands a record names where it lives** (obs #77, #105; task 249):
+    - Trigger: a success criterion demands a record or a measurement — it says "recorded", "logged",
+      "listed in", "documented", or it states a numeric bound graded by a measurement
+    - Require the criterion to name the record's location: the QA report, the QA gate file or the
+      DoD. Each is committed by the time the work is accepted. The implementation report does not
+      count, because the pipeline commits it after `/finalise` grades the criterion
+    - Counter-example: "each finding is recorded" names no location. At finalise the AC agent
+      searches for the record and fails when it guesses the wrong file. "Each finding is recorded in
+      the QA report's Findings table" names one
+    - Flag as **Important** a criterion that names no location, or names only the implementation
+      report. The fix costs one clause now and a failed DoD later
 
 **Common Hallucination Patterns to Detect**:
 
@@ -1244,8 +1255,10 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
      ([`references/finalise-dod-ac-prompt.md`](references/finalise-dod-ac-prompt.md#step-3-check-each-acceptance-criterion)
      Step 3) sorts every criterion into a behaviour criterion, which needs a per-PR test, or one of
      the test-free kinds that Step 3 lists: "no unit tests applicable", a documentation criterion
-     ("file F says S"), or a measured criterion (a stated bound, met by a committed, cited
-     measurement). Step 3 owns that list and its count; this check names the kinds and never counts
+     ("file F says S"), a measured criterion (a stated bound, met by a committed, cited
+     measurement), a process criterion (a verification step applied to each unit of the work, met
+     by a committed record per unit), or a CI-state criterion (only the PR's CI run is evidence;
+     `/finalise` grades it from CI reading 1). Step 3 owns that list and its count; this check names the kinds and never counts
      them. A criterion
      that fits no kind fails at acceptance by construction, two steps after the one edit that would
      have fixed it. Three shapes reach that point, and each is **Important** here:

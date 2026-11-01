@@ -1,0 +1,182 @@
+[
+  {
+    "id": "ci-pending",
+    "sink": "filename",
+    "input": "PENDING",
+    "direction": "hostile",
+    "why": "an undecided CI run must not grade a DEFERRED-CI criterion",
+    "correct": "Reject: null, criterion stays deferred and the CI table decides",
+    "spec_ref": "skills/finalise/SKILL.md:1268"
+  },
+  {
+    "id": "ci-none",
+    "sink": "filename",
+    "input": "NONE",
+    "direction": "hostile",
+    "why": "no CI at all is not a green run",
+    "correct": "Reject: null",
+    "spec_ref": "skills/finalise/SKILL.md:1270"
+  },
+  {
+    "id": "ci-cancelled",
+    "sink": "filename",
+    "input": "CANCELLED",
+    "direction": "hostile",
+    "why": "a cancelled run decided nothing",
+    "correct": "Reject: null",
+    "spec_ref": "skills/finalise/SKILL.md:1269"
+  },
+  {
+    "id": "ci-unknown",
+    "sink": "filename",
+    "input": "UNKNOWN",
+    "direction": "hostile",
+    "why": "a failed read is not a reading",
+    "correct": "Reject: null",
+    "spec_ref": "skills/finalise/SKILL.md:1271"
+  },
+  {
+    "id": "ci-empty",
+    "sink": "filename",
+    "input": "",
+    "direction": "hostile",
+    "why": "an unbound CI_ROLLUP substitutes as empty",
+    "correct": "Reject: null",
+    "spec_ref": "docs/tasks/task.249.finalise-grades-every-criterion-kind/task.249.finalise-grades-every-criterion-kind.md:112"
+  },
+  {
+    "id": "ci-lowercase",
+    "sink": "filename",
+    "input": "success",
+    "direction": "hostile",
+    "why": "the rollup vocabulary is upper-case",
+    "correct": "Reject: null",
+    "spec_ref": "docs/tasks/task.249.finalise-grades-every-criterion-kind/task.249.finalise-grades-every-criterion-kind.md:112"
+  },
+  {
+    "id": "ci-titlecase",
+    "sink": "filename",
+    "input": "Success",
+    "direction": "hostile",
+    "why": "a title-cased value is not the exact rollup token",
+    "correct": "Reject: null",
+    "spec_ref": "docs/tasks/task.249.finalise-grades-every-criterion-kind/task.249.finalise-grades-every-criterion-kind.md:112"
+  },
+  {
+    "id": "ci-trailing-space",
+    "sink": "filename",
+    "input": "SUCCESS ",
+    "direction": "hostile",
+    "why": "a padded token is not the exact rollup",
+    "correct": "Reject: null",
+    "spec_ref": "docs/tasks/task.249.finalise-grades-every-criterion-kind/task.249.finalise-grades-every-criterion-kind.md:112"
+  },
+  {
+    "id": "ci-trailing-newline",
+    "sink": "filename",
+    "input": "SUCCESS\n",
+    "direction": "hostile",
+    "why": "a captured line with its newline is not the exact rollup",
+    "correct": "Reject: null",
+    "spec_ref": "docs/tasks/task.249.finalise-grades-every-criterion-kind/task.249.finalise-grades-every-criterion-kind.md:112"
+  },
+  {
+    "id": "ci-trailing-cr",
+    "sink": "filename",
+    "input": "SUCCESS\r",
+    "direction": "hostile",
+    "why": "a CRLF-captured token is not the exact rollup",
+    "correct": "Reject: null",
+    "spec_ref": "docs/tasks/task.249.finalise-grades-every-criterion-kind/task.249.finalise-grades-every-criterion-kind.md:112"
+  },
+  {
+    "id": "ci-zero-width-prefix",
+    "sink": "filename",
+    "input": "​SUCCESS",
+    "direction": "hostile",
+    "why": "an invisible prefix makes a token that only looks like SUCCESS",
+    "correct": "Reject: null",
+    "spec_ref": "docs/tasks/task.249.finalise-grades-every-criterion-kind/task.249.finalise-grades-every-criterion-kind.md:112"
+  },
+  {
+    "id": "ci-homoglyph",
+    "sink": "filename",
+    "input": "SUCCЕSS",
+    "direction": "hostile",
+    "why": "a Cyrillic E homoglyph is not the rollup token SUCCESS",
+    "correct": "Reject: null",
+    "spec_ref": "docs/tasks/task.249.finalise-grades-every-criterion-kind/task.249.finalise-grades-every-criterion-kind.md:112"
+  },
+  {
+    "id": "ci-tree-eq-line",
+    "sink": "filename",
+    "input": "SUCCESS (tree-equivalent to abc123)",
+    "direction": "hostile",
+    "why": "the tree-equivalent sha travels separately in --tree-eq, so the recorded line is not a rollup token",
+    "correct": "Reject: null",
+    "spec_ref": "skills/finalise/SKILL.md:1244"
+  },
+  {
+    "id": "ci-neutral",
+    "sink": "filename",
+    "input": "NEUTRAL",
+    "direction": "hostile",
+    "why": "a check conclusion is not a rollup state",
+    "correct": "Reject: null",
+    "spec_ref": "docs/tasks/task.249.finalise-grades-every-criterion-kind/task.249.finalise-grades-every-criterion-kind.md:112"
+  },
+  {
+    "id": "ci-pass-verdict",
+    "sink": "filename",
+    "input": "PASS",
+    "direction": "hostile",
+    "why": "a criterion verdict is not a CI rollup state",
+    "correct": "Reject: null",
+    "spec_ref": "docs/tasks/task.249.finalise-grades-every-criterion-kind/task.249.finalise-grades-every-criterion-kind.md:112"
+  },
+  {
+    "id": "ci-failure-padded",
+    "sink": "filename",
+    "input": "FAILURE ",
+    "direction": "hostile",
+    "why": "a padded token must not grade the criterion either way",
+    "correct": "Reject: null",
+    "spec_ref": "docs/tasks/task.249.finalise-grades-every-criterion-kind/task.249.finalise-grades-every-criterion-kind.md:112"
+  },
+  {
+    "id": "ci-proto",
+    "sink": "filename",
+    "input": "__proto__",
+    "direction": "hostile",
+    "why": "a prototype key must not resolve through an object lookup",
+    "correct": "Reject: null",
+    "spec_ref": "docs/tasks/task.249.finalise-grades-every-criterion-kind/task.249.finalise-grades-every-criterion-kind.md:112"
+  },
+  {
+    "id": "ci-constructor",
+    "sink": "filename",
+    "input": "constructor",
+    "direction": "hostile",
+    "why": "an inherited Object key must not resolve through an object lookup",
+    "correct": "Reject: null",
+    "spec_ref": "docs/tasks/task.249.finalise-grades-every-criterion-kind/task.249.finalise-grades-every-criterion-kind.md:112"
+  },
+  {
+    "id": "ci-success",
+    "sink": "filename",
+    "input": "SUCCESS",
+    "direction": "legitimate",
+    "why": "a green CI reading decides a CI-state criterion",
+    "correct": "Accept: PASS",
+    "spec_ref": "docs/tasks/task.249.finalise-grades-every-criterion-kind/task.249.finalise-grades-every-criterion-kind.md:111"
+  },
+  {
+    "id": "ci-failure",
+    "sink": "filename",
+    "input": "FAILURE",
+    "direction": "legitimate",
+    "why": "a red CI reading decides a CI-state criterion",
+    "correct": "Accept: FAIL",
+    "spec_ref": "docs/tasks/task.249.finalise-grades-every-criterion-kind/task.249.finalise-grades-every-criterion-kind.md:112"
+  }
+]

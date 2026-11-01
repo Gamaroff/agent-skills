@@ -518,7 +518,8 @@ doubt: no prior record (`no-prior-record`), a record it cannot read (`prior-unre
 reopened under Step 2's rule (`reopened`), a prior head that is not an ancestor of `HEAD`
 (`head-not-ancestor`, a rebase or force-push), or no criterion line it can key (`no-criteria`).
 `scoped` re-judges the criteria the prior run failed (`reported-gap`), the ones whose text changed
-(`new-criterion`, `criterion-changed`), the passes whose cited code, test or member evidence changed
+(`new-criterion`, `criterion-changed`), every CI-state criterion, deferred or already graded from an
+earlier head's CI (`ci-state`, task 249: its verdict is one head's reading, never carried), the passes whose cited code, test or member evidence changed
 since the prior head (`evidence-changed`) or resolves to no tracked file (`evidence-unresolved`), and
 carries every other pass (`unchanged`). Without this, each re-run judged every criterion afresh and
 more finely than the last, and found a gap the run before had passed — task.239 needed five runs and a
@@ -670,7 +671,38 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
    with that `key`, never by `id`: `id` is the corpus case id, which every control on the same sink
    shares, so an `id` match can put one control's grade on another's probe (task.189 CR2-1). A probe
    it does not grade stays without, and halts. Without this step every reproduced probe would
-   halt, and the low-severity fix-and-recheck path Step 8a offers would never open.
+   halt, and the low-severity fix-and-recheck path Step 8a offers would never open. **Run item 3a
+   first**, before this re-dispatch: a probe 3a moves out of `probes[]` must not be graded.
+3a. **Check each inline case's verdict against its `spec_ref`** (task 249, obs #81). Run this
+   before item 3's grading re-dispatch. An inline case's verdict (`direction`, `correct`) is the
+   security agent's own, so it can be stricter than the work item. Corpus cases are exempt: their
+   verdict is the shared corpus's. **Find every case through the probe's `key`, never its `id`**:
+   ids are unique only within one plan entry, and a corpus id is shared by every control on a sink
+   (task.189 CR2-1). The `key` is `<i>:<id>`, with `i` the 0-based plan entry. Entry `i`'s inline
+   cases are in the plan result's `cases_files` (`.claude/state/probe-plan-result.json`) as `$DOC_DIR/$STEM.dod.$DOD_N.security.cases.json` when the
+   plan has one entry, else `….security.cases.<i+1>.json`. When entry `i` wrote no cases file, it
+   had no inline `cases`: its probes are corpus probes and are exempt. Then:
+   - **An inline case without `spec_ref`** is a plan-shape error, and it never counts against
+     security: the security prompt promises exactly that, and no code commit could clear a check
+     the plan's author failed (task 249, QA cycle 2, T249-QA-5). Re-dispatch the security agent
+     once, as item 5 does for a refused entry, asking for the corrected **whole** plan with a
+     `spec_ref` on every inline case. Run that plan through item 2's runner, whose result replaces
+     the first as item 5 describes, then apply this item 3a to the new cases files and probes: 3a
+     reads `spec_ref` from the cases files the runner writes, so re-applying it to the first run's
+     files would report a corrected case as unanchored (QA cycle 3, T249-QA-9). A case still without one: drop
+     its probe from `probes[]` and record it in `SECURITY_RESULT.spec_questions[]` as
+     `{id, input, spec_ref: null, direction, correct, what the line says: "no spec_ref given"}`,
+     so it renders under **Recommendations for the owner**. It adds no FAIL check and no
+     `checks[]` entry, and `overall` does not move for it.
+   - **A reproduced inline case**: take entry `i`'s cases file from the probe's `key`, find the case
+     whose `id` is the key's `<id>` within that one file, and read the line its `spec_ref` names. When that line allows what the case's `direction` says the control
+     must refuse, or refuses what it says the control must accept, the case contradicts its
+     specification. Move the probe out of `probes[]` and into `SECURITY_RESULT.spec_questions[]`
+     (`{id, input, spec_ref, direction, correct, what the line says}`). It is not a security FAIL.
+     Like `spec_challenges[]`, it renders under **Recommendations for the owner**. In a hands-free
+     run it is also a question for the operator, recorded as **Spec question** in the pipeline's
+     Issues Log. A case whose verdict matches its line stays in `probes[]`, which is a real finding.
+   - Recompute `overall` after the moves, as item 6 says.
 4. **An escape is a finding, whatever the verdict.** Each `escapes[]` entry is a case the engine saw
    write outside its sandbox — the engine exits 1 on one even when the control engages. Add a
    `probe escaped its sandbox: {entry} ({id} → {path})` FAIL check per entry, with no `severity`.
@@ -773,7 +805,9 @@ not answer counts as `FAIL`, and an agent `FAIL` stands when it names no failing
 recomputed from the merged `acs` and `docs` — never copied from the agent, and
 `NEEDS_MANUAL_REVIEW` when no criterion verdict exists at all. Steps 3d and 6 read that. `id_mismatches` names any `ac_id` the agent returned that the
 scope did not issue; such a verdict is not merged, and the criterion it was meant for reads `FAIL`
-with `no verdict returned under id …`.
+with `no verdict returned under id …`. A `DEFERRED-CI` criterion (a CI-state criterion, task 249)
+is kept as `DEFERRED-CI` in the merged result and the record, and folds as **not met**: `AC_OVERALL`
+here is at best `PARTIAL` until Step 6 action 2a grades it from CI reading 1 and re-folds it.
 
 A bug run skips this with the rest of `rerun-scope` (Step 3a's marker): no merge runs and no record
 is written; `AC_RESULT` is the fix-evidence agent's answer, as Step 3b says.
@@ -798,7 +832,7 @@ Append sections to the running summary file. **One append per section** — not 
 
 #### {ac.ac_id}: {ac.description}
 
-**Status:** {✅ PASS | ❌ FAIL}{ac.carried ? " (carried from the prior run)" : ""}
+**Status:** {✅ PASS | ❌ FAIL | ⏳ DEFERRED-CI — graded at Step 6 from CI reading 1}{ac.carried ? " (carried from the prior run)" : ""}
 
 - Code evidence: `{ac.code_citation or "not found — FAIL"}`
 - Test evidence: `{ac.test_citation or "not found — FAIL"}`
@@ -905,6 +939,28 @@ boundary rule's §5.1) is evidence for that override, labelled so, never a closu
   anything reproduced — it can only appear when the count is non-zero and nothing was found.
 -->
 
+{if security_result.spec_challenges or security_result.spec_questions is non-empty:}
+### Recommendations for the owner
+
+These are not security findings, and they do not count against the verdict above. Each is an input the
+work item's specification allows, which may be a risk (task 249, obs #81). Tightening the
+specification is the owner's decision.
+
+{for each c in security_result.spec_challenges:}
+- **Spec challenge:** `{c.input}` — allowed by `{c.spec_ref}`. {c.risk}
+{endfor}
+{for each q in security_result.spec_questions:}
+{if q.spec_ref is null:}
+- **Unanchored probe case:** case `{q.id}` (`{q.input}`) expected `{q.direction}` ({q.correct}),
+  but the security agent tied it to no line of the specification, even when asked again. It was not
+  counted; decide whether the specification should say what the case assumes.
+{else:}
+- **Spec question:** case `{q.id}` (`{q.input}`) expected `{q.direction}` ({q.correct}), but
+  `{q.spec_ref}` says {q.what the line says}. The code follows the specification.
+{endif}
+{endfor}
+{endif}
+
 **Agent summary:** {security_result.summary}
 
 ---
@@ -1006,7 +1062,7 @@ Use the **Decision Matrix** from `references/definition-of-done-checklist.md` to
 
 | Decision matrix column       | Source variable                                     |
 | ---------------------------- | --------------------------------------------------- |
-| All Acceptance Criteria Met? | `AC_OVERALL` (PASS/PARTIAL/FAIL)                    |
+| All Acceptance Criteria Met? | `AC_OVERALL` (PASS/PARTIAL/FAIL), as action 2a rebinds it |
 | Tests & PR Approved?         | `ac_result.pr_review_decision` (APPROVED)           |
 | **CI green?**                | **`CI_ROLLUP` (see below) — a hard blocker**        |
 | Docs Updated?                | `DOCS_OVERALL` (PASS/NOT_APPLICABLE counts as pass) |
@@ -1240,8 +1296,94 @@ with `ci.docsOnly.enabled: false` ([`docs/reference/configuration.md`](../../doc
 
 **Actions:**
 
-1. **Use the aggregated results** from Step 3c (`AC_OVERALL`, `SEC_OVERALL`, `COMP_OVERALL`, `DOCS_OVERALL`) — do not re-read the running summary file for this step
+1. **Use the aggregated results** from Step 3c (`AC_OVERALL`, `SEC_OVERALL`, `COMP_OVERALL`, `DOCS_OVERALL`) — do not re-read the running summary file for this step. `AC_OVERALL` is rebound once more, by action 2a, after CI reading 1
 2. **Resolve `CI_ROLLUP`** using the command above, and record the raw per-job conclusions in the DoD running summary so the decision is auditable. **Record the head it was read on** in the same line — `CI_HEAD_1=$(git rev-parse HEAD)` — as `CI reading 1: {CI_ROLLUP} @ {CI_HEAD_1}` — or, when the docs-only arm resolved it, `CI reading 1: SUCCESS (tree-equivalent to {CI_TREE_EQ}) @ {CI_HEAD_1}`. This is the reading that gates the *decision*; it is structurally an ancestor of the commit that will carry the acceptance, and Step 7's publish boundary takes a second reading on that commit before anything leaves the repo (task.115, obs #40).
+2a. **Grade the CI-state criteria from CI reading 1, and rebind `AC_OVERALL`** (task 249, obs #110).
+   The AC agent ran at Step 3b, before this reading existed, so a criterion whose only evidence is CI
+   state came back `DEFERRED-CI` (`references/finalise-dod-ac-prompt.md` Step 3) and Step 3c folded it
+   as not met. This block grades each one — `SUCCESS` → PASS (a tree-equivalent `SUCCESS` included,
+   with its green sha in the note), `FAILURE` → FAIL, anything else leaves it deferred and the CI table
+   above decides — rewrites the merged result and the AC record, and **rebinds `AC_OVERALL` from the
+   re-folded verdict**. Rewriting the entries alone would leave `AC_OVERALL` at the `PARTIAL`/`FAIL`
+   Step 3c folded. A criterion an earlier reading already graded is graded again from this one, so
+   Step 8a's retaken CI reading 1 on the fix head replaces the red reading rather than leaving its
+   FAIL in place; an undecided retaken reading folds it as not met. **This run's AC record is the
+   signal that Step 3c merged**: a bug run, or a Step 3c answer that was not `merged`, has none and
+   skips with `AC_OVERALL` unchanged. The merged-result file alone proves nothing, because it is keyed
+   by `DOD_N` and outlives its run, so with a record present the block also checks that the file's
+   `record.document` and `record.dod_n` are this run's, and HALTs when they are not. With no record but
+   a merged result that *is* this run's, it HALTs too: the record is not where `DOC_DIR` points:
+
+   ```bash
+   # Step 6 action 2a — grade DEFERRED-CI criteria from CI reading 1 (task 249). INPUTS, substituted into
+   # THIS block: STEM and DOD_N exactly as Step 0 bound them; {document-directory}; CI_ROLLUP, CI_HEAD_1
+   # and CI_TREE_EQ from action 2 (CI_TREE_EQ empty unless the docs-only arm set it); AC_OVERALL from Step 3c.
+   STEM="{story.{P}.{E}.{S} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"
+   DOD_N="{Step 0's DOD_N}"
+   DOC_DIR="{document-directory}"
+   CI_ROLLUP="{CI_ROLLUP from action 2}"
+   CI_HEAD_1="{CI_HEAD_1 from action 2}"
+   CI_TREE_EQ="{CI_TREE_EQ, or empty}"
+   AC_OVERALL="{AC_OVERALL from Step 3c}"
+   case "$STEM$DOD_N$DOC_DIR$CI_ROLLUP$CI_HEAD_1$CI_TREE_EQ$AC_OVERALL" in
+     *'{'*) echo "HALT: substitute every input of Step 6 action 2a (an unsubstituted placeholder found)"; exit 1 ;;
+   esac
+   # An input substituted as empty would make both -f tests below miss and skip silently — the
+   # could-not-look state the record HALT exists to name (task 249, QA cycle 2, T249-QA-4).
+   [ -n "$STEM" ] || { echo "HALT: STEM is empty — substitute the work item's filename stem"; exit 1; }
+   case "$DOD_N" in ''|*[!0-9]*) echo "HALT: DOD_N ('$DOD_N') is not Step 0's run number"; exit 1 ;; esac
+   [ -n "$DOC_DIR" ] && [ -d "$DOC_DIR" ] || { echo "HALT: DOC_DIR ('$DOC_DIR') is not the work item's directory"; exit 1; }
+   [ -n "$AC_OVERALL" ] || { echo "HALT: AC_OVERALL is empty — substitute Step 3c's verdict"; exit 1; }
+   AC_MERGED_FILE=".claude/state/finalise-ac-merged-${DOD_N}.json"
+   AC_RECORD="$DOC_DIR/${STEM}.dod.${DOD_N}.ac.json"
+   # Whose merged result is this? The file is keyed by DOD_N alone and never removed, so it can be
+   # another work item's from an earlier run (task 249, QA cycle 3, T249-QA-7).
+   MERGED_REASON=""; MERGED_DOC=""; MERGED_N=""
+   if [ -f "$AC_MERGED_FILE" ]; then
+     MERGED_REASON=$(jq -r '.reason' "$AC_MERGED_FILE" 2>/dev/null)
+     MERGED_DOC=$(jq -r '.record.document // ""' "$AC_MERGED_FILE" 2>/dev/null)
+     MERGED_N=$(jq -r '.record.dod_n // ""' "$AC_MERGED_FILE" 2>/dev/null)
+   fi
+   OWN_DOC=0
+   case "${MERGED_DOC##*/}" in "$STEM".*) OWN_DOC=1 ;; esac
+   if [ ! -f "$AC_RECORD" ]; then
+     # No AC record: Step 3c did not merge in this run (a bug run, or an answer that was not
+     # `merged`) — unless the merged result is this run's own, which means the record is not where
+     # DOC_DIR points: skipping would leave AC_OVERALL short of PASS for a reason nobody named
+     # (QA cycle 4, T249-QA-10).
+     if [ "$MERGED_REASON" = "merged" ] && [ "$OWN_DOC" = 1 ] && [ "$MERGED_N" = "$DOD_N" ]; then
+       echo "HALT: $AC_MERGED_FILE is $STEM run $DOD_N's merged result, but $AC_RECORD does not exist — check DOC_DIR is the directory Step 3c wrote the record to, else re-run Step 3a, the AC agent and Step 3c, then this action"
+       exit 1
+     fi
+     echo "CI-state criteria: skipped — no AC record for $STEM run $DOD_N"
+   elif [ "$MERGED_REASON" = "merged" ]; then
+     [ "$OWN_DOC" = 1 ] \
+       || { echo "HALT: $AC_MERGED_FILE is the merged result of '${MERGED_DOC:-no document}', not $STEM — move $AC_RECORD aside, then re-run Step 3a, the AC agent and Step 3c, then this action"; exit 1; }
+     [ "$MERGED_N" = "$DOD_N" ] \
+       || { echo "HALT: $AC_MERGED_FILE is run ${MERGED_N:-unknown}'s merged result, not run $DOD_N — move $AC_RECORD aside, then re-run Step 3a, the AC agent and Step 3c, then this action"; exit 1; }
+     RESOLVE_CI=$(command node .agents/skills/finalise/references/finalise-rerun-scope.js resolve-ci \
+       --merged "$AC_MERGED_FILE" --rollup "$CI_ROLLUP" --ci-head "$CI_HEAD_1" --tree-eq "$CI_TREE_EQ" \
+       --record "$AC_RECORD" --json) \
+       || { echo "HALT: finalise-rerun-scope.js resolve-ci failed — $RESOLVE_CI"; exit 1; }
+     AC_OVERALL=$(printf '%s' "$RESOLVE_CI" | jq -r '.overall')
+     echo "CI-state criteria: $(printf '%s' "$RESOLVE_CI" | jq -c '{reason, resolved, undecided}')"
+   else
+     # A record means Step 3c merged this run; only its merged result is gone or unreadable
+     # (state cleaned on resume, or no jq). Skipping would keep AC_OVERALL short of PASS with
+     # no reason given, so stop and say why (task 249, QA cycle 1, CR-3).
+     # Step 3c's merge inputs live in the same .claude/state directory, so re-running the merge
+     # alone cannot work when the state was cleaned (T249-QA-6).
+     echo "HALT: $AC_RECORD exists but $AC_MERGED_FILE is missing or not 'merged' — move $AC_RECORD aside (or Step 3a reads this run's own record as the prior one), then re-run Step 3a, the AC agent and Step 3c, then this action"
+     exit 1
+   fi
+   echo "AC_OVERALL=$AC_OVERALL"
+   ```
+
+   Read `reason`: `none-deferred` changes nothing; `resolved` names each graded criterion — append
+   `**CI-state criteria:** {ac_id} → {status} ({CI reading 1 line}) — AC_OVERALL re-folded: {AC_OVERALL}`
+   under the running summary's `## Step 2` section; `ci-undecided` leaves each listed criterion
+   `DEFERRED-CI` and `AC_OVERALL` not PASS, and the `CI_ROLLUP` row above (PENDING, CANCELLED, NONE,
+   UNKNOWN) is what this run does next. A re-sample that turns the rollup `SUCCESS` re-runs this block.
 3. **Determine pass/fail** for each decision matrix column using the mapping above
 4. **Write the acceptance decision to the running summary:**
 
