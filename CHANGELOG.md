@@ -14,8 +14,10 @@ All notable changes to this project will be documented in this file. Format foll
     merged result and the AC record, and rebinds `AC_OVERALL` from the re-folded verdict. A re-run
     re-judges every CI-state criterion (scope reason `ci-state`), and `resolve-ci` re-grades one an
     earlier reading graded, so no head is accepted (or refused) on an earlier head's CI reading —
-    Step 8a's retaken reading included. `shared/resources/tests/finalise-deferred-ci.test.mjs` runs that
-    block as written.
+    Step 8a's retaken reading included. The block acts only when this run wrote an AC record, and
+    HALTs on a merged result that names another document or run, so a bug run never grades a stale
+    file another work item left under the same run number. `shared/resources/tests/finalise-deferred-ci.test.mjs`
+    runs that block as written.
   - A **process criterion** ("each fix is mutation-proven") is checked per unit under the quantifier
     rule, against the committed record of each step. The AC prompt now lists five test-free kinds.
   - A **measured criterion** cites the QA report, the gate or the DoD. A figure found only in the

@@ -93,8 +93,10 @@ function agentYaml(statuses) {
   return `ac_traceability:\n  acs:\n${body}\n  docs: []\n  overall: PASS\n`;
 }
 
-const merged = (statuses) =>
-  eng.merge(fullScope(), agentYaml(statuses), { dodN: 1 }, NO_IO);
+// `document` is what Step 3c's merge records from the scope's `--doc`; the Step 6 fence checks
+// it, so the fixture carries a real-shaped one for the work item the fence runs as (task.9).
+const merged = (statuses, document = "doc/task.9.deferred-ci-fixture.md") =>
+  eng.merge(fullScope(), agentYaml(statuses), { dodN: 1, document }, NO_IO);
 
 // ── 1. every reader accepts DEFERRED-CI, none folds it to PASS ─────────────
 
@@ -571,6 +573,117 @@ for (const shell of SHELLS) {
       });
       assert.equal(r.status, 0, r.stderr + r.stdout);
       assert.equal(r.acOverall, "FAIL");
+    } finally {
+      cleanup(dir);
+    }
+  });
+
+  test(`fence (${shell}): a bug run beside another work item's merged result skips and leaves it untouched (T249-QA-7, T249-QA-8)`, () => {
+    // An earlier task's run left its merged result under the same DOD_N, as task.248's did.
+    const { dir } = stage({ "SC-1": D, "SC-2": "PASS", "SC-3": "PASS" });
+    const mergedPath = join(
+      dir,
+      ".claude",
+      "state",
+      "finalise-ac-merged-1.json",
+    );
+    rmSync(join(dir, "doc", "task.9.dod.1.ac.json"));
+    const before = readFileSync(mergedPath, "utf8");
+    try {
+      const r = runFence(shell, dir, {
+        STEM: "task.67.bug.3",
+        CI_ROLLUP: "SUCCESS",
+        AC_OVERALL: "FAIL",
+      });
+      assert.equal(r.status, 0, r.stderr + r.stdout);
+      assert.equal(
+        r.acOverall,
+        "FAIL",
+        "AC_OVERALL is the bug run's own, unchanged",
+      );
+      assert.match(
+        r.stdout,
+        /skipped — no AC record for task\.67\.bug\.3 run 1/,
+      );
+      assert.equal(
+        readFileSync(mergedPath, "utf8"),
+        before,
+        "the other item's file is not rewritten",
+      );
+    } finally {
+      cleanup(dir);
+    }
+  });
+
+  for (const [name, doc, re] of [
+    [
+      "another work item's",
+      "docs/tasks/task.248.x/task.248.x.md",
+      /merged result of 'docs\/tasks\/task\.248/,
+    ],
+    [
+      "a stem-prefix sibling's",
+      "doc/task.99.other.md",
+      /merged result of 'doc\/task\.99/,
+    ],
+    ["a document-less", null, /merged result of 'no document'/],
+  ]) {
+    test(`fence (${shell}): with a record, ${name} merged result HALTs and grades nothing (T249-QA-7)`, () => {
+      const { dir } = stage({ "SC-1": D, "SC-2": "PASS", "SC-3": "PASS" });
+      const mergedPath = join(
+        dir,
+        ".claude",
+        "state",
+        "finalise-ac-merged-1.json",
+      );
+      writeFileSync(
+        mergedPath,
+        JSON.stringify(
+          merged({ "SC-1": D, "SC-2": "PASS", "SC-3": "PASS" }, doc),
+          null,
+          2,
+        ),
+      );
+      const before = readFileSync(mergedPath, "utf8");
+      try {
+        const r = runFence(shell, dir, {
+          CI_ROLLUP: "SUCCESS",
+          AC_OVERALL: "PARTIAL",
+        });
+        assert.equal(r.status, 1, r.stderr + r.stdout);
+        assert.match(r.stdout, re);
+        assert.equal(r.acOverall, null);
+        assert.equal(readFileSync(mergedPath, "utf8"), before);
+        assert.equal(
+          readJson(join(dir, "doc", "task.9.dod.1.ac.json")).criteria.find(
+            (c) => c.id === "SC-1",
+          ).status,
+          D,
+        );
+      } finally {
+        cleanup(dir);
+      }
+    });
+  }
+
+  test(`fence (${shell}): with a record, another run's merged result of this item HALTs (T249-QA-7)`, () => {
+    const { dir } = stage({ "SC-1": D, "SC-2": "PASS", "SC-3": "PASS" });
+    const mergedPath = join(
+      dir,
+      ".claude",
+      "state",
+      "finalise-ac-merged-1.json",
+    );
+    const m = JSON.parse(readFileSync(mergedPath, "utf8"));
+    m.record.dod_n = 4;
+    writeFileSync(mergedPath, JSON.stringify(m, null, 2));
+    try {
+      const r = runFence(shell, dir, {
+        CI_ROLLUP: "SUCCESS",
+        AC_OVERALL: "PARTIAL",
+      });
+      assert.equal(r.status, 1, r.stderr + r.stdout);
+      assert.match(r.stdout, /is run 4's merged result, not run 1/);
     } finally {
       cleanup(dir);
     }

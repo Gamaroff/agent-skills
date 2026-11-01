@@ -686,7 +686,10 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
      security: the security prompt promises exactly that, and no code commit could clear a check
      the plan's author failed (task 249, QA cycle 2, T249-QA-5). Re-dispatch the security agent
      once, as item 5 does for a refused entry, asking for the corrected **whole** plan with a
-     `spec_ref` on every inline case, and re-run this step on it. A case still without one: drop
+     `spec_ref` on every inline case. Run that plan through item 2's runner, whose result replaces
+     the first as item 5 describes, then apply this item 3a to the new cases files and probes: 3a
+     reads `spec_ref` from the cases files the runner writes, so re-applying it to the first run's
+     files would report a corrected case as unanchored (QA cycle 3, T249-QA-9). A case still without one: drop
      its probe from `probes[]` and record it in `SECURITY_RESULT.spec_questions[]` as
      `{id, input, spec_ref: null, direction, correct, what the line says: "no spec_ref given"}`,
      so it renders under **Recommendations for the owner**. It adds no FAIL check and no
@@ -1304,14 +1307,17 @@ with `ci.docsOnly.enabled: false` ([`docs/reference/configuration.md`](../../doc
    re-folded verdict**. Rewriting the entries alone would leave `AC_OVERALL` at the `PARTIAL`/`FAIL`
    Step 3c folded. A criterion an earlier reading already graded is graded again from this one, so
    Step 8a's retaken CI reading 1 on the fix head replaces the red reading rather than leaving its
-   FAIL in place; an undecided retaken reading folds it as not met. A bug run, or a Step 3c answer
-   that was not `merged`, has no merged result and skips it with `AC_OVERALL` unchanged:
+   FAIL in place; an undecided retaken reading folds it as not met. **This run's AC record is the
+   signal that Step 3c merged**: a bug run, or a Step 3c answer that was not `merged`, has none and
+   skips with `AC_OVERALL` unchanged. The merged-result file alone proves nothing, because it is keyed
+   by `DOD_N` and outlives its run, so with a record present the block also checks that the file's
+   `record.document` and `record.dod_n` are this run's, and HALTs when they are not:
 
    ```bash
    # Step 6 action 2a — grade DEFERRED-CI criteria from CI reading 1 (task 249). INPUTS, substituted into
    # THIS block: STEM and DOD_N exactly as Step 0 bound them; {document-directory}; CI_ROLLUP, CI_HEAD_1
    # and CI_TREE_EQ from action 2 (CI_TREE_EQ empty unless the docs-only arm set it); AC_OVERALL from Step 3c.
-   STEM="{story.{P}.{E}.{S} | task.{id}}"
+   STEM="{story.{P}.{E}.{S} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"
    DOD_N="{Step 0's DOD_N}"
    DOC_DIR="{document-directory}"
    CI_ROLLUP="{CI_ROLLUP from action 2}"
@@ -1329,16 +1335,27 @@ with `ci.docsOnly.enabled: false` ([`docs/reference/configuration.md`](../../doc
    [ -n "$AC_OVERALL" ] || { echo "HALT: AC_OVERALL is empty — substitute Step 3c's verdict"; exit 1; }
    AC_MERGED_FILE=".claude/state/finalise-ac-merged-${DOD_N}.json"
    AC_RECORD="$DOC_DIR/${STEM}.dod.${DOD_N}.ac.json"
-   if [ -f "$AC_MERGED_FILE" ] && [ "$(jq -r '.reason' "$AC_MERGED_FILE" 2>/dev/null)" = "merged" ]; then
-     RECORD_ARGS=()
-     [ -f "$AC_RECORD" ] && RECORD_ARGS=(--record "$AC_RECORD")
+   if [ ! -f "$AC_RECORD" ]; then
+     # No AC record: Step 3c did not merge in this run (a bug run, or an answer that was not
+     # `merged`). The merged-result file is NOT read here: it is keyed by DOD_N alone and never
+     # removed, so it can be another work item's from an earlier run (task 249, QA cycle 3, T249-QA-7).
+     echo "CI-state criteria: skipped — no AC record for $STEM run $DOD_N"
+   elif [ -f "$AC_MERGED_FILE" ] && [ "$(jq -r '.reason' "$AC_MERGED_FILE" 2>/dev/null)" = "merged" ]; then
+     MERGED_DOC=$(jq -r '.record.document // ""' "$AC_MERGED_FILE")
+     MERGED_N=$(jq -r '.record.dod_n // ""' "$AC_MERGED_FILE")
+     case "${MERGED_DOC##*/}" in
+       "$STEM".*) ;;
+       *) echo "HALT: $AC_MERGED_FILE is the merged result of '${MERGED_DOC:-no document}', not $STEM — move $AC_RECORD aside, then re-run Step 3a, the AC agent and Step 3c, then this action"; exit 1 ;;
+     esac
+     [ "$MERGED_N" = "$DOD_N" ] \
+       || { echo "HALT: $AC_MERGED_FILE is run ${MERGED_N:-unknown}'s merged result, not run $DOD_N — move $AC_RECORD aside, then re-run Step 3a, the AC agent and Step 3c, then this action"; exit 1; }
      RESOLVE_CI=$(command node .agents/skills/finalise/references/finalise-rerun-scope.js resolve-ci \
        --merged "$AC_MERGED_FILE" --rollup "$CI_ROLLUP" --ci-head "$CI_HEAD_1" --tree-eq "$CI_TREE_EQ" \
-       "${RECORD_ARGS[@]}" --json) \
+       --record "$AC_RECORD" --json) \
        || { echo "HALT: finalise-rerun-scope.js resolve-ci failed — $RESOLVE_CI"; exit 1; }
      AC_OVERALL=$(printf '%s' "$RESOLVE_CI" | jq -r '.overall')
      echo "CI-state criteria: $(printf '%s' "$RESOLVE_CI" | jq -c '{reason, resolved, undecided}')"
-   elif [ -f "$AC_RECORD" ]; then
+   else
      # A record means Step 3c merged this run; only its merged result is gone or unreadable
      # (state cleaned on resume, or no jq). Skipping would keep AC_OVERALL short of PASS with
      # no reason given, so stop and say why (task 249, QA cycle 1, CR-3).

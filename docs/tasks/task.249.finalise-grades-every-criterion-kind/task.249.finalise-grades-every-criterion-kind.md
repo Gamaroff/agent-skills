@@ -306,27 +306,27 @@ Step 6 together).
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-01
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 60/100
+**Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.249.qa.2.finalise-grades-every-criterion-kind.md](./task.249.qa.2.finalise-grades-every-criterion-kind.md)
-- **Gate File**: [task.249.gate.2.finalise-grades-every-criterion-kind.yml](./task.249.gate.2.finalise-grades-every-criterion-kind.yml)
+- **Full Report**: [task.249.qa.3.finalise-grades-every-criterion-kind.md](./task.249.qa.3.finalise-grades-every-criterion-kind.md)
+- **Gate File**: [task.249.gate.3.finalise-grades-every-criterion-kind.yml](./task.249.gate.3.finalise-grades-every-criterion-kind.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 7028
+- **Tests Executed**: 7034
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 1
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: PASS
 
 ### Key Findings
-Cycle 1's two findings are fixed. The cycle 2 refute pass found three MEDIUM defects:
-- T249-QA-3: a graded CI-state criterion cannot be re-graded by Step 8a's retaken reading.
-- T249-QA-4: Step 6 action 2a has no empty-input guards.
-- T249-QA-5: a missing spec_ref becomes a security FAIL.
+All four cycle 2 findings are fixed. The cycle 3 scoped review found:
+- T249-QA-7 (HIGH): Step 6 action 2a can grade another work item's stale merged result on a bug run.
+- T249-QA-8: action 2a has no bug-mode STEM, so a bug run HALTs instead of skipping.
+- T249-QA-9: the spec_ref re-dispatch does not go back through item 2's runner.
 
 ## Change Log
 
@@ -341,6 +341,8 @@ Cycle 1's two findings are fixed. The cycle 2 refute pass found three MEDIUM def
 | 2026-11-01 |         | QA findings fixed — T249-QA-1, T249-QA-2, CR-3, CR-4; 1 iteration | qa-fix |
 | 2026-11-01 |         | QA gate CONCERNS (80/100) — 4 findings | qa-task |
 | 2026-11-01 |         | QA findings fixed — T249-QA-3 to T249-QA-6; 1 iteration | qa-fix |
+| 2026-11-01 |         | QA gate FAIL (60/100) — 3 findings | qa-task |
+| 2026-11-01 |         | QA findings fixed — T249-QA-7 to T249-QA-9; 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---
