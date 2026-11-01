@@ -810,7 +810,7 @@ After status validation passes:
 - [ ] Task documentation complete: Implementation Summary, Approach, Testing Results, Completion Date, Deferred Work
 - [ ] Files Summary complete and accurate (all created/modified/deleted files)
 - [ ] Change Log has dated entries for all significant changes
-- [ ] CHANGELOG.md updated (if public behaviour/API/feature changed; skip for internal refactors only)
+- [ ] CHANGELOG.md updated (if public behaviour/API/feature changed; skip for internal refactors only). Check it with `/finalise` 6d's own check: `bash .agents/skills/develop/references/changelog-cites.sh task.{N}`. Exit 0 or 3 passes. Exit 1 means an entry is missing, so add one citing `(task N)` under `[Unreleased]` before handing to QA (task.248)
 - [ ] **Pipeline bypass applied**: If invoked by `develop-task`, `/finalise` was NOT called here — pipeline Step 7 handles it
 - [ ] Task status set to `Ready for Review`
 

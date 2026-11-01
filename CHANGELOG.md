@@ -6,6 +6,26 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **QA applies the finalise DoD's rules before finalise does (task 248).** Four checks that only
+  `/finalise` made now run in the QA loop, so their findings enter the fix loop instead of halting
+  acceptance. They are one engine each, and QA and the DoD run the same one.
+  - `probe-boundary-signals.mjs --doc` classifies a work item's criteria for a boundary signal.
+    The gate records `boundary_signals`, and a `boundary: false` beside a signal needs a
+    `boundary_reason`.
+  - `criteria-drift.js` compares the criteria, continuation lines included, with the text that was
+    reviewed. An unapproved rewording is a MEDIUM finding at QA and a FAIL at the DoD
+    ("amendment unapproved"). An appended note must say whether it relaxes the criterion. QA's
+    read-back re-runs the comparison, so a gate that leaves a changed criterion out halts.
+  - `changelog-cites.sh` is 6d's citation check, moved into a script. 6d, `develop`'s completion
+    checklist and QA's docs check all run it, and 6d's messages are unchanged. A new
+    `changelog-stem` HALT covers a stem the script cannot read.
+  - The QA skills cite the DoD's quantifier rule, and turn each unmapped member into a MEDIUM.
+
+  `qa-read-back.js` now refuses a gate that leaves the boundary or drift answers out. `qa-fix`
+  records a criterion bound it cannot meet as an open finding, never as an edit to the criterion.
+  The criteria-section reader moved to `criteria-section.js`, which `finalise-rerun-scope.js` now
+  uses.
+
 - **`create-story` and `create-task` offer to set wireframe mapping up (task 246).** When a
   wireframe is added and `skills-config.yaml` has no `ui:` block, or one without a map path, the
   skill detects the project's component barrel, import module and any existing catalogue table, and

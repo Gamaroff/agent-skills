@@ -1,0 +1,80 @@
+schema: 2
+task: 'task.248.qa-applies-finalise-rules'
+task_title: "QA applies the finalise DoD's rules before finalise does"
+gate: CONCERNS
+status_reason: 'All four rules are wired and 129 targeted tests pass, but criteria-drift.js misclassifies in two reproduced cases: a review report with no reviewed_blob stamp drops the base to merge-base, and a bound edited by extension reads as appended.'
+reviewer: 'QA Engineer'
+head: '5c4d7e3a799bfcc708b97473681baa54f59c4142'
+updated: '2026-11-01T18:34:05Z'
+
+top_issues:
+  - id: 'T248-QA-1'
+    severity: medium
+    file: 'shared/resources/criteria-drift.js'
+    finding: 'resolveBase tries the review-commit fallback only when the newest review report carries a reviewed_blob stamp; with no stamp it drops to the merge-base, so the review step''s own edits to the criteria report as unapproved rewordings (reproduced: reason drift, base merge-base, #1 reworded approved false; with the stamp, clean). Code review CR-1, reviewer confidence medium.'
+    suggested_action: 'Find the newest review report independently of its stamp and try the commit that added it before falling back to merge-base; add a test for the unstamped report.'
+    suggested_owner: dev
+    status: open
+  - id: 'T248-QA-2'
+    severity: medium
+    file: 'shared/resources/criteria-drift.js'
+    finding: 'diffCriteria classifies a change as appended by a bare string-prefix test, so "within 5" changed to "within 50 ms" reads as appended rather than reworded and escapes the automatic MEDIUM (reproduced). Code review CR-2, reviewer confidence medium.'
+    suggested_action: 'Count a change as appended only when the old continuation is empty or the new text continues it after a whitespace or punctuation boundary; add the "within 5" case as a test.'
+    suggested_owner: dev
+    status: open
+  - id: 'T248-QA-3'
+    severity: low
+    file: 'shared/resources/changelog-cites.sh'
+    finding: 'A path-prefixed stem such as ../task.248 parses as task.248 (doc-id reads the basename) and exits 3 "not a task"; 6d''s rc-3 arm prints nothing for that text and continues, so the changelog check is skipped silently (reproduced by hand; the probe engine could not materialise the case).'
+    suggested_action: 'Refuse a stem containing "/" with exit 2, and give 6d''s inner rc-3 case a default arm that HALTs on unrecognised text.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 129
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 6
+    escaped: 0
+    boundary: true
+    boundary_signals: ["never"]
+    notes: 'changelog-cites.sh probed with the shell-argv form (run record task.248.qa.1.security.run.json): 5 hostile stems refused with exit 2, the legitimate stem cited, nothing escaped. The path-prefix case could not be materialised by the engine and is T248-QA-3 (low).'
+  performance:
+    status: PASS
+    notes: 'Offline engines; no network; each runs once per QA cycle.'
+  reliability:
+    status: CONCERNS
+    notes: 'criteria-drift.js reports false drift on an unstamped review report and misses a reworded bound (T248-QA-1, T248-QA-2).'
+  maintainability:
+    status: PASS
+    notes: 'One definition per rule; shared criteria reader; CR-4 notes a second reviewed_blob matcher beside reportReviewedBlob (advisory).'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T248-QA-1 and T248-QA-2 in criteria-drift.js with tests'
+      refs: ['shared/resources/criteria-drift.js']
+  future:
+    - action: 'CR-4: reuse reportReviewedBlob from review-report-freshness.js; CR-3: tell a missing node, jq or doc-id.js (exit 4) apart from a bad stem (exit 2)'
+      refs: ['shared/resources/criteria-drift.js', 'shared/resources/changelog-cites.sh']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T248-QA-1 and T248-QA-2 fixed']

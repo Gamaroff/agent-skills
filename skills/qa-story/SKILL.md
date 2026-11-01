@@ -1286,6 +1286,26 @@ JSON
    have covered it: a 14-star glob compiled to `[^/]*` × 14 passed five green cycles and was found at
    finalise (obs #20).
 
+   **Run the criteria's own signal before deciding** (task.248, obs #140). The DoD's Step 1b reads
+   the work item's criteria for a boundary signal ("never", "must not", "rejects"…) with this same
+   classifier, so run it here and copy its answer into the gate. QA and the DoD then read one result:
+
+   ```bash
+   # From the repository root. {story-file} is this story document — substitute it.
+   SIG=$(command node .agents/skills/qa-story/references/probe-boundary-signals.mjs --doc "{story-file}" --json); rc=$?
+   case $rc in
+     0) echo "boundary_signals: $(printf '%s' "$SIG" | jq -c '[.matched[].phrase]')" ;;
+     1) echo "boundary_signals: []  # no criteria section — nothing to classify" ;;
+     *) echo "HALT: probe-boundary-signals.mjs could not classify {story-file} (rc $rc) — check the bundled path; never write boundary_signals by hand"; exit 1 ;;
+   esac
+   ```
+
+   Write the printed line under `nfr_validation.security` in the gate. A non-empty list beside
+   `boundary: false` needs a `boundary_reason:` line saying why the criteria's wording is not an
+   input gate. The signal does not decide the boundary; it makes the answer explicit, because
+   task.234's QA recorded a silent `false` that the DoD then overturned. Item 3e's read-back re-runs
+   the classifier and halts on a gate that leaves either line out.
+
 4. **Platform variance — run the other value.** For every fixture path or environment-derived value
    the diff passes to a **validating** consumer (a function that refuses some inputs — a containment
    check, a path-prefix test, a deny-list), a green run on this machine is evidence about this
@@ -1585,6 +1605,36 @@ because no test carries them (obs #210). A behaviour criterion whose only eviden
 with no committed per-PR test, is a **MEDIUM** finding in `top_issues[]`, so it enters the fix loop
 rather than halting at finalise (obs #224).
 
+**A criterion over a set is checked member by member**, by the quantifier rule: rule 6 of
+`finalise-dod-ac-prompt.md` Step 3, in the `finalise` skill, which owns its wording. Each member it
+leaves unmapped is a **MEDIUM** `top_issues[]` entry naming the member (obs #23).
+
+**Read the criteria against the text that was reviewed** (task.248, obs #139). A criterion edited
+after review is not the one that was reviewed, and finalise's AC agent fails an unapproved edit:
+
+```bash
+# From the repository root. {story-file} is this story document — substitute it.
+TARGET=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo develop)
+DRIFT=$(command node .agents/skills/qa-story/references/criteria-drift.js --doc "{story-file}" --base-from-review "$TARGET" --json); rc=$?
+case $rc in
+  0) printf '%s' "$DRIFT" | jq -r '
+       "criteria-drift: \(.reason) (base: \(.base.kind // "none"))",
+       (.changed[] | select(.kind != "appended" and (.approved | not))
+         | "MEDIUM: criterion \(.id) \(.kind) without an approver — escalate for an approver, or restore the criterion"),
+       (.changed[] | select(.kind == "appended")
+         | "ANSWER: criterion \(.id) appended — record relaxes: true|false and relaxes_reason under criteria_drift")' ;;
+  1) echo "criteria-drift: no criteria section — nothing to compare" ;;
+  *) echo "HALT: criteria-drift.js could not compare {story-file} (rc $rc): $(printf '%s' "$DRIFT" | jq -r '.error // empty' 2>/dev/null)"; exit 1 ;;
+esac
+```
+
+Each `MEDIUM` line is a `top_issues[]` entry. Record the result in the gate's `criteria_drift`
+block. For each `ANSWER` line, read the appended text and say whether it relaxes the criterion: an
+evidence note does not, but a widened bound or an added exception does. An appended change with
+`relaxes: true` and no `approved by <name>` is the same MEDIUM finding. Never edit a criterion back
+yourself; the remedy belongs to the owner. Item 3e's read-back halts on an appended entry with no
+answer.
+
 **A residual that says a check cannot run is a claim. Re-test its premise before you restate it.**
 When the work item, the implementation report or a previous QA report says a criterion is unverified
 because the environment lacks something ("CI has no zsh lane", "no Bitbucket credential", "this host
@@ -1600,6 +1650,23 @@ cycles had read showed the check passing (obs #119).
 - Verify code is self-documenting where possible
 - Add comments for complex logic if missing
 - Ensure any API changes are documented
+
+**CHANGELOG citation.** This is the check `/finalise` 6d HALTs on. Running it here sends a missing
+entry into the fix loop instead (task.248, obs #43). A story stem is not applicable today, because 6d
+cites tasks only. The check still runs, so a story never reads as checked when it was skipped:
+
+```bash
+# From the repository root. {story-file} is this story (or task) document — substitute it.
+STEM=$(command node .agents/skills/qa-story/references/doc-id.js parse "$(basename "{story-file}")" --json | jq -r '.id // empty')
+CITES=$(bash .agents/skills/qa-story/references/changelog-cites.sh "$STEM"); rc=$?
+case $rc in
+  0|3) echo "changelog: $CITES" ;;
+  1) echo "MEDIUM: changelog $CITES — add an [Unreleased] entry citing (task N); /finalise 6d HALTs without it" ;;
+  *) echo "HALT: changelog-cites.sh could not answer for '$STEM' (rc $rc): $CITES"; exit 1 ;;
+esac
+```
+
+A `MEDIUM` line is a `top_issues[]` entry with `file: CHANGELOG.md`.
 
 ### Story Review Outputs
 
@@ -2010,6 +2077,8 @@ nfr_validation:
     evidence: measured|reasoned|unverified
     probes_executed: 0 # REQUIRED when evidence: measured; `measured` with 0 is a schema error
     escaped: 0 # the run record's totals.escaped; non-zero is a top_issues[] finding, never PASS
+    boundary_signals: [] # Phase 1.6 item 3's criteria classifier, copied (task.248)
+    boundary_reason: '' # required when boundary: false sits beside a non-empty boundary_signals
     notes: 'Specific findings'
   performance:
     status: PASS|CONCERNS|FAIL
@@ -2020,6 +2089,16 @@ nfr_validation:
   maintainability:
     status: PASS|CONCERNS|FAIL
     notes: 'Specific findings'
+
+criteria_drift: # the criteria-drift.js result (task.248)
+  reason: clean|drift|new-document|no-criteria
+  base: reviewed-blob|review-commit|merge-base
+  changed: # one entry per changed criterion; empty when clean
+    - id: '#5'
+      kind: reworded|appended|added|removed
+      approved: false # the new text carries `approved by <name>`
+      relaxes: false # appended only: does the added text relax the criterion?
+      relaxes_reason: 'An evidence note; the bound is unchanged'
 
 recommendations:
   immediate: # Must fix before production
@@ -2246,15 +2325,17 @@ After review:
    ```bash
    # From the repository root. {story-file} is the story (or task) document items 3a–3d just edited — substitute it; the script
    # refuses an unsubstituted placeholder (exit 2), so a block run as delivered
-   # cannot pass by reading nothing.
-   command node .agents/skills/qa-story/references/qa-read-back.js --doc "{story-file}"
+   # cannot pass by reading nothing. --target is the PR's base, as the drift block resolves it:
+   # the read-back re-runs criteria-drift.js and needs the same merge-base fallback.
+   TARGET=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo develop)
+   command node .agents/skills/qa-story/references/qa-read-back.js --doc "{story-file}" --target "$TARGET"
    ```
 
    `qa-read-back.js` is the read-back, defined once for both QA skills and tested directly
    (`references/tests/qa-read-back.test.mjs`). It **decides**: exit 0 is clean, exit 1 is a
    item 3e HALT with each problem and its remedy printed, and exit 2 is "could not look" (bad
    arguments, an unreadable document, a sibling engine that did not load). Exit 2 is never a pass. It
-   checks five things:
+   checks six things:
 
    1. **The claims exist.** This cycle's gate and QA report are in the work item's directory, the
       document links **those two files** — not an earlier cycle's (task.158) — and it has a Change
@@ -2279,6 +2360,14 @@ After review:
       cycle wrote no row of its own, which a repeated verdict would otherwise hide. A missing
       section, decision line, `QA gate` row or `gate:` token halts too. When it halts, re-render
       the section from this gate and append the `QA gate <TOKEN>` row, then re-run.
+   6. **The gate answers the finalise rules** (task.248). It re-runs Phase 1.6 item 3's criteria
+      classifier itself. When the criteria carry a signal, the gate must record `boundary_signals`,
+      and either `boundary: true` or a `boundary_reason`. It re-runs the drift block's
+      `criteria-drift.js` too, against `--target`: every criterion the engine reports changed must
+      be in `criteria_drift.changed` with the engine's kind, and every `appended` entry must answer
+      `relaxes: true|false` with a `relaxes_reason`. The drift is re-derived whenever the document
+      has criteria, whatever keys the gate carries: a gate that leaves `criteria_drift` out is
+      asked all the same.
 
    **Do not post the QA summary (item 6) over exit 1 or 2.** Posting over it reproduces task.141: a PR comment linked
    a report that did not exist, found only by CI's `link-check`, and a row was dated after `updated:`,
@@ -2321,7 +2410,8 @@ fi
 ```bash
 # Item 3e's rule, re-checked here: every block runs as its own shell, and a run that
 # batches 3e and 6 drops the prose between them (obs #226, #288).
-command node .agents/skills/qa-story/references/qa-read-back.js --doc "{story-file}" >/dev/null || { echo "HALT: read-back not clean — not posting"; exit 1; }
+TARGET=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo develop)
+command node .agents/skills/qa-story/references/qa-read-back.js --doc "{story-file}" --target "$TARGET" >/dev/null || { echo "HALT: read-back not clean — not posting"; exit 1; }
 mkdir -p .claude/state
 BODY_FILE=.claude/state/qa-comment-body.md
 cat > "$BODY_FILE" <<'EOF'

@@ -460,8 +460,9 @@ file, so a HALT stops the commit rather than scrolling past it:
 
 ```bash
 RB_LOG=".claude/state/qa-read-back-${QA_CYCLE}.log"
+TARGET=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo develop)
 command node .agents/skills/{qa-task|qa-story}/references/qa-read-back.js --doc "{work item file}" \
-  > "$RB_LOG" 2>&1 || { cat "$RB_LOG"; exit 1; }
+  --target "$TARGET" > "$RB_LOG" 2>&1 || { cat "$RB_LOG"; exit 1; }
 git commit -m "{the path-1 message}"
 ```
 

@@ -1,0 +1,71 @@
+[
+  {
+    "id": "stem.task",
+    "sink": "filename",
+    "input": "task.248",
+    "why": "The stem 6d passes for a task whose entry is present.",
+    "correct": "cites, exit 0.",
+    "direction": "legitimate",
+    "fixture": { "files": { "skills-config.yaml": "changelog:\n  enforce: true\n", "CHANGELOG.md": "# Changelog\n\n## [Unreleased]\n\n- **Work (task 248).** Body.\n" } }
+  },
+  {
+    "id": "stem.semicolon",
+    "sink": "filename",
+    "input": "task.248;touch PWNED",
+    "why": "A stem that reaches a second parse would run the command.",
+    "correct": "usage, exit 2; PWNED not created.",
+    "direction": "hostile",
+    "expected": { "exit": 2, "absent": ["PWNED"] },
+    "fixture": { "files": { "skills-config.yaml": "changelog:\n  enforce: true\n", "CHANGELOG.md": "# Changelog\n\n## [Unreleased]\n\n- **Work (task 248).** Body.\n" } }
+  },
+  {
+    "id": "stem.substitution",
+    "sink": "filename",
+    "input": "task.248$(touch PWNED)",
+    "why": "Command substitution in the stem.",
+    "correct": "usage, exit 2; PWNED not created.",
+    "direction": "hostile",
+    "expected": { "exit": 2, "absent": ["PWNED"] },
+    "fixture": { "files": { "skills-config.yaml": "changelog:\n  enforce: true\n", "CHANGELOG.md": "# Changelog\n\n## [Unreleased]\n\n- **Work (task 248).** Body.\n" } }
+  },
+  {
+    "id": "stem.regex-wildcard",
+    "sink": "filename",
+    "input": "task.2.8",
+    "why": "N reaches grep -E unescaped; a dot would match any character and cite (task 248) for a stem that is not task 248.",
+    "correct": "Never cites: usage (exit 2), or missing (exit 1); never exit 0.",
+    "direction": "hostile",
+    "expected": { "exit": 2 },
+    "fixture": { "files": { "skills-config.yaml": "changelog:\n  enforce: true\n", "CHANGELOG.md": "# Changelog\n\n## [Unreleased]\n\n- **Work (task 248).** Body.\n" } }
+  },
+  {
+    "id": "stem.path-prefix",
+    "sink": "filename",
+    "input": "../task.248",
+    "why": "doc-id reads the basename, so a path-prefixed stem parses as task.248 but is not a stem.",
+    "correct": "usage, exit 2 — not 'not a task' (exit 3), which QA and 6d read as a pass.",
+    "direction": "hostile",
+    "expected": { "exit": 2 },
+    "fixture": { "files": { "skills-config.yaml": "changelog:\n  enforce: true\n", "CHANGELOG.md": "# Changelog\n\n## [Unreleased]\n\n- **Work (task 248).** Body.\n" } }
+  },
+  {
+    "id": "stem.flag",
+    "sink": "filename",
+    "input": "-x",
+    "why": "A stem that looks like an option.",
+    "correct": "usage, exit 2.",
+    "direction": "hostile",
+    "expected": { "exit": 2 },
+    "fixture": { "files": { "skills-config.yaml": "changelog:\n  enforce: true\n", "CHANGELOG.md": "# Changelog\n\n## [Unreleased]\n\n- **Work (task 248).** Body.\n" } }
+  },
+  {
+    "id": "stem.newline",
+    "sink": "filename",
+    "input": "task.248\ntask.1",
+    "why": "Line tools read a newline-bearing stem as two values.",
+    "correct": "usage, exit 2.",
+    "direction": "hostile",
+    "expected": { "exit": 2 },
+    "fixture": { "files": { "skills-config.yaml": "changelog:\n  enforce: true\n", "CHANGELOG.md": "# Changelog\n\n## [Unreleased]\n\n- **Work (task 248).** Body.\n" } }
+  }
+]
