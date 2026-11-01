@@ -309,22 +309,21 @@ Step 6 together).
 **QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-01
-**Quality Score**: 95/100
+**Quality Score**: 97/100
 **Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.249.qa.4.finalise-grades-every-criterion-kind.md](./task.249.qa.4.finalise-grades-every-criterion-kind.md)
-- **Gate File**: [task.249.gate.4.finalise-grades-every-criterion-kind.yml](./task.249.gate.4.finalise-grades-every-criterion-kind.yml)
+- **Full Report**: [task.249.qa.5.finalise-grades-every-criterion-kind.md](./task.249.qa.5.finalise-grades-every-criterion-kind.md)
+- **Gate File**: [task.249.gate.5.finalise-grades-every-criterion-kind.yml](./task.249.gate.5.finalise-grades-every-criterion-kind.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 7039
+- **Tests Executed**: 7040
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-All findings from QA cycles 1–3 are fixed. One LOW remains as a follow-up:
-- T249-QA-10: with no AC record, Step 6 action 2a skips. It does so even when this run's own merged result is present. The failure is safe: AC_OVERALL stays short of PASS.
+All ten findings from QA cycles 1–4 are fixed. No finding is open. Three non-blocking cleanups are recorded in the gate as future recommendations.
 
 ## Change Log
 
@@ -343,6 +342,7 @@ All findings from QA cycles 1–3 are fixed. One LOW remains as a follow-up:
 | 2026-11-01 |         | QA findings fixed — T249-QA-7 to T249-QA-9; 1 iteration | qa-fix |
 | 2026-11-01 |         | QA gate PASS (95/100) — 1 low finding | qa-task |
 | 2026-11-01 |         | QA findings fixed — T249-QA-10; 1 iteration | qa-fix |
+| 2026-11-01 |         | QA gate PASS (97/100) — 0 findings | qa-task |
 <!-- change-log-end -->
 
 ---
