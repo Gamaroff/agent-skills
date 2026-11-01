@@ -385,24 +385,24 @@ engine stays unused but tested.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-01
-**Quality Score**: 40/100
-**Gate Decision**: FAIL
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.248.qa.2.qa-applies-finalise-rules.md](./task.248.qa.2.qa-applies-finalise-rules.md)
-- **Gate File**: [task.248.gate.2.qa-applies-finalise-rules.yml](./task.248.gate.2.qa-applies-finalise-rules.yml)
+- **Full Report**: [task.248.qa.3.qa-applies-finalise-rules.md](./task.248.qa.3.qa-applies-finalise-rules.md)
+- **Gate File**: [task.248.gate.3.qa-applies-finalise-rules.yml](./task.248.gate.3.qa-applies-finalise-rules.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 6970
+- **Tests Executed**: 6964
 - **Phases Verified**: 4/4
-- **Critical Issues**: 2
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-The cycle-2 refute pass found two HIGH defects. T248-QA2-1: finalise 6d reads an unbound `STEM` and HALTs on every run. T248-QA2-2: `criteria-drift.js` can take a co-located bug's review report as its base. It also found two MEDIUMs: T248-QA2-3, a symlinked path reads as `new-document`, and T248-QA2-4, the read-back trusts the gate's own drift block. One LOW: T248-QA2-5. All three cycle-1 findings are fixed.
+Four of the five cycle-2 findings are fixed outright. One MEDIUM remains, T248-QA3-1: the read-back re-derives the criteria drift only when the gate carries a task.248 key, so a gate that leaves both keys out reads clean over an amended criterion.
 
 ## Change Log
 
@@ -417,6 +417,8 @@ The cycle-2 refute pass found two HIGH defects. T248-QA2-1: finalise 6d reads an
 | 2026-11-01 |         | QA findings fixed (T248-QA-1, -2, -3) — 1 iteration; each fix mutation-proved | qa-fix |
 | 2026-11-01 |         | QA gate FAIL (40/100) — 5 findings (2 high, 2 medium, 1 low); status → in-progress | qa-task |
 | 2026-11-01 |         | QA findings fixed (T248-QA2-1 to -5) — fix cycle 2, 1 iteration; each fix mutation-proved; status → ready-for-review | qa-fix |
+| 2026-11-01 |         | QA gate CONCERNS (90/100) — 1 finding (1 medium) | qa-task |
+| 2026-11-01 |         | QA finding fixed (T248-QA3-1) — fix cycle 3, 1 iteration; mutation-proved; status → ready-for-review | qa-fix |
 <!-- change-log-end -->
 
 ---

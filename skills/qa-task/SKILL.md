@@ -1816,8 +1816,9 @@ checks six things:
    and either `boundary: true` or a `boundary_reason`. It re-runs Step 5's `criteria-drift.js`
    too, against `--target`: every criterion the engine reports changed must be in
    `criteria_drift.changed` with the engine's kind, and every `appended` entry must answer
-   `relaxes: true|false` with a `relaxes_reason`. A gate with neither task.248 key (no
-   `criteria_drift`, no `boundary_signals`) was written before task.248 and is not asked.
+   `relaxes: true|false` with a `relaxes_reason`. The drift is re-derived whenever the document
+   has criteria, whatever keys the gate carries: a gate that leaves `criteria_drift` out is asked
+   all the same.
 
 **Do not post the PR comment (Step 13) over exit 1 or 2.** Posting over it reproduces task.141: a PR comment linked
 a report that did not exist, found only by CI's `link-check`, and a row was dated after `updated:`,

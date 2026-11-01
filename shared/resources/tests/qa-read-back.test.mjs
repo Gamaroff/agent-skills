@@ -935,7 +935,8 @@ test("task.248: the same gate reads clean when it records the engine's entry, an
   assert.equal(r.exitCode, 0, r.problems.join("\n"));
 });
 
-test("task.248: a gate with no task.248 key is not asked to re-derive (written before task.248)", () => {
+// task.248 QA cycle 3, T248-QA3-1: the document decides whether to look, not the gate's keys.
+test("task.248: a gate with no task.248 key is still asked to re-derive, and halts over an amended criterion", () => {
   // No boundary signal in this criterion, so the gate owes no boundary answer either.
   const plain = [
     "## Success Criteria",
@@ -946,6 +947,32 @@ test("task.248: a gate with no task.248 key is not asked to re-derive (written b
   const r = verdict(
     "task",
     both((w) => amendedSinceBase(w, plain), gateWith("")),
+  );
+  assert.equal(r.exitCode, 1, r.problems.join("\n"));
+  assert.ok(
+    r.problems.some((p) =>
+      /has no criteria_drift block, but criteria-drift\.js reports 1 changed criteria/.test(
+        p,
+      ),
+    ),
+    r.problems.join("\n"),
+  );
+});
+
+test("task.248: a key-less gate over unchanged criteria reads clean", () => {
+  const plain = [
+    "## Success Criteria",
+    "",
+    "- [ ] 1. The parser reads a path outside the root.",
+    "",
+  ].join("\n");
+  const r = verdict(
+    "task",
+    both((w) => {
+      amendedSinceBase(w, plain);
+      // Undo the amendment: the criterion now matches its base.
+      edit(w.doc, "  Evidence: t.test.js.\n", "");
+    }, gateWith("")),
   );
   assert.equal(r.exitCode, 0, r.problems.join("\n"));
 });

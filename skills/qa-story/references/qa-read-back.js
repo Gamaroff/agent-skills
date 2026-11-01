@@ -193,7 +193,7 @@ const present = (v) => v !== undefined && v !== null && String(v).trim() !== "";
  * `false` that QA and the DoD disagreed over on task.234.
  *
  * Drift: criteria-drift.js is re-run here too (`--base-from-review <target>`),
- * for any gate carrying a task.248 key, and every criterion it reports changed
+ * whenever the document has criteria, and every criterion it reports changed
  * must appear in the gate's `criteria_drift` block with the engine's kind. Every
  * `appended` entry answers `relaxes: true|false` with a `relaxes_reason`. The
  * engine cannot tell an evidence note from an amendment; the gate must say which
@@ -243,14 +243,15 @@ function answerProblems(engines, doc, gateFile, target) {
   // The block is re-derived, not trusted: criteria-drift.js runs again here, as
   // the boundary CLI does above, and every criterion it reports changed must be
   // in the gate's block. A gate that left the block out, or dropped an entry,
-  // read clean (task.248 QA cycle 2, T248-QA2-4). A gate with neither task.248
-  // key was written before task.248 and is not asked.
+  // read clean (task.248 QA cycle 2, T248-QA2-4). Whether to look is decided by
+  // the document, never by keys the gate chose to write: the read-back only reads
+  // the gate this cycle wrote, so a gate that leaves both task.248 keys out is a
+  // gate that skipped the check, not one written before it (QA cycle 3, T248-QA3-1).
   const cd = g.criteria_drift;
-  const task248 = cd !== undefined || "boundary_signals" in sec;
   const criteria = engines.criteriaSection.readCriteriaEntries(
     fs.readFileSync(doc, "utf8"),
   );
-  if (task248 && criteria !== null) {
+  if (criteria !== null) {
     const run = spawnSync(
       process.execPath,
       [
