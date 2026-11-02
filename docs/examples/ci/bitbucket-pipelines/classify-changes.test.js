@@ -377,9 +377,17 @@ test("is_docs is identical to the GitHub Actions template's, default and overrid
         script,
         ...paths,
       ],
-      { encoding: "utf8", env: { ...process.env, ...env } },
+      // `env` is already the whole, cleaned environment: re-spreading process.env here would put
+      // back a DOCS_PATTERNS the runner's own environment sets, into the default case.
+      { encoding: "utf8", env },
     ).stdout;
-  for (const env of [{}, { DOCS_PATTERNS: "*.md .agents/*" }]) {
+  // Each case's verdicts are pinned, not only compared: a DOCS_PATTERNS leaking in from the
+  // runner's environment reaches both variants equally, so equality alone cannot see it.
+  const cases = [
+    [{}, "docs docs docs code code code docs"],
+    [{ DOCS_PATTERNS: "*.md .agents/*" }, "docs code docs code code docs docs"],
+  ];
+  for (const [env, expected] of cases) {
     const e = { ...env };
     if (!("DOCS_PATTERNS" in e)) e.DOCS_PATTERNS = undefined;
     const clean = Object.fromEntries(
@@ -388,7 +396,7 @@ test("is_docs is identical to the GitHub Actions template's, default and overrid
       ),
     );
     const bb = verdicts(SCRIPT, clean);
-    assert.ok(bb.includes("docs") && bb.includes("code"), bb);
+    assert.equal(bb.trim().split("\n").join(" "), expected);
     assert.equal(bb, verdicts(GITHUB_SCRIPT, clean));
   }
 });

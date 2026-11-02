@@ -123,11 +123,23 @@ merges need the merge result tested, keep a merge queue, or do not adopt this.
 
 ## `cancel-in-progress`
 
-With `concurrency: { cancel-in-progress: true }`, a newer push cancels the older run. A cancelled
-run is not a success, so on its own it never grants a skip. Any success on the same SHA does, so a
-cancelled run and a successful re-run of `before` still grant one. Two quick pushes in a row (code,
-then docs) can mean `before` (the code push) never finished. Then the docs push finds no evidence
-and runs in full. That is the safe direction.
+**Cancel pull-request runs only.** The snippet groups a PR's runs by PR number and sets
+`cancel-in-progress: ${{ github.event_name == 'pull_request' }}`. Each push run gets a group of its
+own (its run id), because a shared group drops a *pending* run when a newer one queues, even with
+`cancel-in-progress` off. tinker-city's `ci.yml` likewise supersedes PR runs only. Once the
+classifier is in place this is not optional.
+
+On a pull request, a newer push cancels the older run. A cancelled run is not a success, so on its
+own it never grants a skip. Any success on the same SHA does, so a cancelled run and a successful
+re-run of `before` still grant one. Two quick pushes in a row (code, then docs) can mean `before`
+(the code push) never finished. Then the docs push finds no evidence and runs in full. That is the
+safe direction.
+
+On the base branch the classifier asks for no evidence: a docs-only `before..after` push skips
+whether or not `before` went green. So a base-branch run must always finish. With
+`cancel-in-progress: true` on every event, a docs-only merge landing while a code merge's run is in
+flight cancels that run and then skips its own, and the code merge never gets a full run on the
+base.
 
 ## Wiring — Bitbucket Pipelines
 

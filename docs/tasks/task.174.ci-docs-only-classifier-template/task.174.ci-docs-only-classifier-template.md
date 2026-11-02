@@ -350,6 +350,30 @@ None.
 - **Non-critical:** a docs-only push that still runs the full suite.
 
 ---
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-02
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.174.qa.1.ci-docs-only-classifier-template.md](./task.174.qa.1.ci-docs-only-classifier-template.md)
+- **Gate File**: [task.174.gate.1.ci-docs-only-classifier-template.yml](./task.174.gate.1.ci-docs-only-classifier-template.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 69 new (45 + 22 + 2); `ci:fast` 7114, 0 failures
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+- TASK-174-QA-1 (medium): the GitHub snippet cancels push runs on the base branch, which the push path then skips over. Bug report: [task.174.bug.1.snippet-cancels-base-branch-push-runs.md](./task.174.bug.1.snippet-cancels-base-branch-push-runs.md)
+- TASK-174-QA-2 (low): the cross-variant `is_docs` test re-spreads `process.env`.
+- Boundary probes: 28 executed, 0 escaped, 0 reproduced.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -361,6 +385,8 @@ None.
 | 2026-11-02 | 1.1     | Review 7/10 → 9/10 after fixes (1 critical, 8 important applied): evidence lookup re-described from the merged code (workflow runs keyed by `CI_WORKFLOW_PATH`, not `ci-ok` check runs); `engine` output dropped; spec renamed `*.test.js` and its glob made reachable; Bitbucket `BEFORE` = `HEAD^`; Phase 3 ships in this PR; criteria name their record locations | review-task |
 | 2026-11-02 |         | Status → ready-for-development | review-task |
 | 2026-11-02 |  | Implemented — 11 files, 69 tests | develop |
+| 2026-11-02 |  | QA gate CONCERNS (90/100) — 1 medium, 1 low | qa-task |
+| 2026-11-02 |  | QA findings fixed — TASK-174-QA-1, QA-2; 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

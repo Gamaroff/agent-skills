@@ -1,0 +1,72 @@
+schema: 2
+task: 'task.174.ci-docs-only-classifier-template'
+task_title: 'Publish the docs-only CI classifier as an optional consumer template'
+gate: CONCERNS
+status_reason: 'All 4 phases verified, 69 new tests green, 28 boundary probes clean, every criterion met. One medium: the GitHub snippet cancels in-progress push runs on the base branch, which the push path then skips over without green evidence — tinker-city supersedes PR runs only.'
+reviewer: 'QA Engineer'
+head: 'b5bfc3fb70df5b4b3f6ffdcf3e4c3b1ba0efb602'
+updated: '2026-11-02T14:05:57Z'
+
+top_issues:
+  - id: 'TASK-174-QA-1'
+    severity: medium
+    file: 'docs/examples/ci/github-actions/changes-job.yml'
+    finding: 'concurrency cancel-in-progress: true applies to push runs on main/develop as well as PR runs; a docs-only merge then cancels a code merge''s still-running push run, and the push path emits code=false on a docs-only diff without asking whether before passed, so the merged code never gets a full run on the base. The source (tinker-city ci.yml:193-196) supersedes PR runs only. From code review CR-1 (reviewer: medium/medium), verified by QA against classify-changes.sh:186-205 and the source workflow.'
+    suggested_action: 'Group by PR number and cancel only PR runs (cancel-in-progress: github.event_name == pull_request, group keyed on the PR number || ref), and correct the guide''s cancel-in-progress section to say push runs on the base always complete.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-174-QA-2'
+    severity: low
+    file: 'docs/examples/ci/bitbucket-pipelines/classify-changes.test.js'
+    finding: 'The cross-variant is_docs test spreads process.env back over its cleaned env, so a DOCS_PATTERNS set in the runner''s environment leaks into the default-patterns case. From code review CR-2 (cleanup, low/high).'
+    suggested_action: 'Pass the cleaned env to spawnSync directly, without re-spreading process.env.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 69
+  phases_verified: 4/4
+  trace:
+    phases_covered: [0, 1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 28
+    escaped: 0
+    boundary: true
+    boundary_signals: []
+    notes: 'is_docs in both variants probed via shell-fn (14 cases each, bash; zsh absent on host, and the scripts run under bash by design): 10 hostile names (code path, workflow file, docsx/ prefix, bare docs, a.md.sh, C-quoted name, *, -n, ../, empty) all read as code; 4 legitimate docs names accepted; a $(...) name never executed. Credentials go to curl on stdin, never argv (tested in both specs). Record: task.174.qa.1.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'Measured on tinker-city: 37 min 27 s full vs 2 min 52 s / 3 min 42 s skipped (runs 41439187444, 41445192250, 41444278348).'
+  reliability:
+    status: CONCERNS
+    notes: 'Every uncertain path emits code=true and writes code on every exit (tested). TASK-174-QA-1: the snippet''s concurrency block can leave a code merge on the base without a completed run.'
+  maintainability:
+    status: PASS
+    notes: 'Lifted spec kept whole minus engine cases; parity test ties the default docs set to ci-tree-equivalence DEFAULT_PATTERNS; specs reached by test-runner-reach.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Restrict cancel-in-progress to PR runs in changes-job.yml and correct the guide (TASK-174-QA-1).'
+      refs: ['docs/examples/ci/github-actions/changes-job.yml', 'docs/runbooks/ci-docs-only-skip.md']
+  future: []
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'TASK-174-QA-1 fixed: a push run on the base branch is never cancelled by a later push.'

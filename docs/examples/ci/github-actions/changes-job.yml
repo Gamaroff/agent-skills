@@ -11,12 +11,17 @@ on:
   push:
     branches: [main, develop]
 
-# Optional, and independent of the classifier: a newer push to the same PR cancels the older run.
-# A cancelled run is not a success, so it never grants a skip; a later green run of the same head
-# does.
+# Optional: a newer push to the same PR cancels that PR's older run. A cancelled run is not a
+# success, so it never grants a skip; a later green run of the same head does.
+#
+# PR runs ONLY. A push to the base branch must never cancel the run before it: the push path skips
+# a docs-only `before..after` diff without asking whether `before` went green, so a docs merge that
+# cancelled a code merge's run would leave that code with no full run on the base at all. Each push
+# run gets a group of its own (its run id): a shared group would still drop a PENDING run when a
+# newer one queued, even with cancel-in-progress off.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   changes:
