@@ -4,7 +4,7 @@
 **Bug ID**: TASK-174-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 2 refute pass; code review CR-2, verified against the code)
 **Date Found**: 2026-11-02
 
@@ -81,3 +81,4 @@ The push path's no-evidence skip is unchanged: it is the lifted behaviour.
 | --- | --- | --- | --- |
 | 2026-11-02 | New | qa-task | Filed in QA cycle 2 |
 | 2026-11-02 | Ready for QA | qa-fix | Fixed in QA cycle 2 fix pass |
+| 2026-11-02 | Closed | qa-task | Verified by task.174.qa.3.ci-docs-only-classifier-template.md |

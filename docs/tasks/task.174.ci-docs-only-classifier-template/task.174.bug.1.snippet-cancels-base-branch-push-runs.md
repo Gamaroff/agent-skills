@@ -4,7 +4,7 @@
 **Bug ID**: TASK-174-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 1; from code review CR-1, verified)
 **Date Found**: 2026-11-02
 
@@ -124,3 +124,4 @@ repository-wide, so another workflow copying the block would cancel this one (TA
 | 2026-11-02 | Ready for QA | qa-fix | Fix implemented and mutation-proven |
 | 2026-11-02 | Reopened | qa-task | Partly fixed by task.174.qa.2.ci-docs-only-classifier-template.md: yml right, its guard vacuous (BUG-2), group not workflow-scoped (QA-5) |
 | 2026-11-02 | Ready for QA | qa-fix | Fixed in QA cycle 2 fix pass |
+| 2026-11-02 | Closed | qa-task | Verified by task.174.qa.3.ci-docs-only-classifier-template.md |

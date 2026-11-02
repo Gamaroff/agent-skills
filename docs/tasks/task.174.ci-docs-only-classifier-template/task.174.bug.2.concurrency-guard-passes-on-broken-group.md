@@ -4,7 +4,7 @@
 **Bug ID**: TASK-174-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 2 refute pass; code review CR-1, reproduced)
 **Date Found**: 2026-11-02
 
@@ -72,3 +72,4 @@ comment or an extra key fails.
 | --- | --- | --- | --- |
 | 2026-11-02 | New | qa-task | Filed in QA cycle 2 |
 | 2026-11-02 | Ready for QA | qa-fix | Fixed in QA cycle 2 fix pass |
+| 2026-11-02 | Closed | qa-task | Verified by task.174.qa.3.ci-docs-only-classifier-template.md |
