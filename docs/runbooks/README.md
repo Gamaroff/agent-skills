@@ -40,6 +40,7 @@ After those, pick a runbook from the table below as the work in front of you dem
 | [Restricted Access](./restricted-access.md) | Agent must not write to the tracker: configure an access model, run the pipeline, work the handover checklist on the real board. |
 | [Unattended Overnight Runs](./unattended-overnight-runs.md) | Leaving `loop-supervisor` to work the roadmap for hours with a fresh context per iteration — caps, watching from a second terminal, and morning triage of the ledger. |
 | [Release & Install](./release-and-install.md) | Cutting a versioned release (maintainers) and running the consumer setup wizard to install skills into a project. |
+| [Docs-Only CI Skip](./ci-docs-only-skip.md) | Optional template: your CI skips its heavy jobs on a docs-only push over a green head (GitHub Actions and Bitbucket Pipelines). |
 
 ## Runbook conventions
 
