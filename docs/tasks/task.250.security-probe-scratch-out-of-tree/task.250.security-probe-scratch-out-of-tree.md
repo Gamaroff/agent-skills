@@ -5,7 +5,7 @@ type: task
 description: "Move every scratch directory security-probe.test.mjs creates inside the live repository into a disposable temp root passed to the engine as repoRoot, so no parallel suite that walks the tree can see a half-deleted file."
 tags: [tests, security-probe, flake, parallel-tests]
 category: testing
-status: planned
+status: ready-for-review
 priority: Low
 created: 2026-11-02
 updated: 2026-11-02
@@ -16,7 +16,8 @@ github_issue: 812
 
 # Security-probe tests write no scratch files into the repository
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.250.review.1.security-probe-scratch-out-of-tree.md` implemented 2026-11-02
 
 **GitHub Issue**: [#812](https://github.com/Gamaroff/agent-skills/issues/812)
 
@@ -107,6 +108,7 @@ Fixture constants (`security-probe.test.mjs:1242-1245`): `FN_LIB = "shared/resou
 ✅ **The 12 sites** in the table above, including the 15 tests reached through `t140Libs`.
 ✅ **The helper**: generalise `fenceRoot`, or add one sibling that copies fixtures.
 ✅ **The guard** that no security-probe test writes under `REPO_ROOT`.
+✅ **The dead `.gitignore` rule.** `.gitignore` ignores `tests/fixtures/shell-fn/.t140-*/` (the block that starts `# Per-run library dirs from shared/resources/tests/security-probe.test.mjs`) so a run killed mid-test left no visible dirt. Once no test writes there, the rule only hides a regression: a reintroduced in-tree `.t140-*` directory would stay invisible to `git status`. Remove the rule and its comment.
 ✅ **A CHANGELOG `[Unreleased]` entry** citing task 250.
 
 ### Out of Scope
@@ -135,7 +137,7 @@ None. This changes only a test file. No shipped skill, engine, configuration key
 
 **Changes**:
 
-- [ ] Add the guard (plan § Phase 1). Run it against today's file and confirm it is red, naming all 12 sites. That run is the calibration: a guard that has never caught the defect proves nothing.
+- [x] Add the guard (plan § Phase 1). Run it against today's file and confirm it is red, naming all 12 sites. That run is the calibration: a guard that has never caught the defect proves nothing.
 
 **Dependencies**: None.
 
@@ -147,10 +149,10 @@ None. This changes only a test file. No shipped skill, engine, configuration key
 
 **Changes**:
 
-- [ ] Generalise `fenceRoot` (or add `probeRoot` beside it) to copy repository-relative fixtures into the temp root.
-- [ ] Convert the `shell:` sites at lines 737, 854 and 884 (`.t128-launch-`, `.t128-errall-`, `.obs73-`).
-- [ ] Convert the `.t131-mutant-` site at line 4348: copy the three shared sources into the temp root, and pass `repoRoot`.
-- [ ] Convert the four `.t136-*` sites at lines 1374, 1582, 1699 and 1729: copy `FAKE_GH` into the root, and pass `repoRoot` and `fakeGh` relative to it.
+- [x] Generalise `fenceRoot` (or add `probeRoot` beside it) to copy repository-relative fixtures into the temp root.
+- [x] Convert the `shell:` sites at lines 737, 854 and 884 (`.t128-launch-`, `.t128-errall-`, `.obs73-`).
+- [x] Convert the `.t131-mutant-` site at line 4348: copy the three shared sources into the temp root, and pass `repoRoot`.
+- [x] Convert the four `.t136-*` sites at lines 1374, 1582, 1699 and 1729: copy `FAKE_GH` into the root, and pass `repoRoot` and `fakeGh` relative to it.
 
 **Dependencies**: Phase 1.
 
@@ -162,9 +164,9 @@ None. This changes only a test file. No shipped skill, engine, configuration key
 
 **Changes**:
 
-- [ ] Change `t140Libs` to build a temp root with `FN_LIB` and `FAKE_GH` copied in, returning `{ root, dir }`. Update every caller: entries relative to `root`, `repoRoot: root`, `namesGh(…, root)`.
-- [ ] Repoint the absolute `source` path in `if-source.sh` (near line 2163) at the copy in the root.
-- [ ] Each caller's `finally` removes the root, not just `dir`.
+- [x] Change `t140Libs` to build a temp root with `FN_LIB` and `FAKE_GH` copied in, returning `{ root, dir }`. Update every caller: entries relative to `root`, `repoRoot: root`, `namesGh(…, root)`.
+- [x] Repoint the absolute `source` path in `if-source.sh` (near line 2163) at the copy in the root.
+- [x] Each caller's `finally` removes the root, not just `dir`.
 
 **Dependencies**: Phase 2 (the helper).
 
@@ -176,8 +178,8 @@ None. This changes only a test file. No shipped skill, engine, configuration key
 
 **Changes**:
 
-- [ ] Lines 1951 (`.t140-symlink-`), 2036 (`.t140-fakegh-`) and 2341 (`.t140-missing-`): build the scratch directory inside a temp root R, keep `outside` as a separate temp directory, and assert against R. Rewrite the premise checks to "outside is outside R". Each in-tree symlink (lines 1972 and 2053) points at R's copy of the fixture.
-- [ ] Keep every assertion's meaning, row for row. The plan lists each one and what it becomes.
+- [x] Lines 1951 (`.t140-symlink-`), 2036 (`.t140-fakegh-`) and 2341 (`.t140-missing-`): build the scratch directory inside a temp root R, keep `outside` as a separate temp directory, and assert against R. Rewrite the premise checks to "outside is outside R". Each in-tree symlink (lines 1972 and 2053) points at R's copy of the fixture.
+- [x] Keep every assertion's meaning, row for row. The plan lists each one and what it becomes.
 
 **Dependencies**: Phase 2.
 
@@ -185,13 +187,14 @@ None. This changes only a test file. No shipped skill, engine, configuration key
 
 **Risk Level**: Low
 
-**Files**: `CHANGELOG.md`
+**Files**: `CHANGELOG.md`, `.gitignore`
 
 **Changes**:
 
-- [ ] The guard is green and the suite passes alone and under `npm test`.
+- [x] Remove the `tests/fixtures/shell-fn/.t140-*/` rule and its comment block from `.gitignore` (see Scope).
+- [x] The guard is green and the suite passes alone and under `npm test`.
 - [ ] Run the before/after untracked-file check (Testing Strategy) and record its output in the QA report.
-- [ ] Add a CHANGELOG `[Unreleased]` → Fixed entry citing task 250.
+- [x] Add a CHANGELOG `[Unreleased]` → Fixed entry citing task 250.
 
 **Dependencies**: Phases 1-4.
 
@@ -206,6 +209,10 @@ None. This changes only a test file. No shipped skill, engine, configuration key
 **Documentation:**
 
 2. ✅ `CHANGELOG.md`: `[Unreleased]` entry citing task 250.
+
+**Configuration:**
+
+3. ✅ `.gitignore`: remove the now-dead `tests/fixtures/shell-fn/.t140-*/` rule.
 
 No other file changes. `shared/resources/security-probe.mjs` is read, not edited.
 
@@ -238,8 +245,8 @@ No other file changes. `shared/resources/security-probe.mjs` is read, not edited
 
 ### Performance
 
-- [ ] The suite's runtime alone does not grow by more than 10% (median of 3 runs before and after, recorded in the QA report). Copying two small fixtures per test should cost milliseconds.
-- [ ] No temp roots are left behind after a run: the suite's existing `tmp-leak` ratchet passes.
+- [ ] The suite's runtime alone does not grow by more than 10%: the median of 3 runs of `uptime; time command node --test shared/resources/tests/security-probe.test.mjs` on the base commit and on the PR's head commit, taken back to back on one machine with no other suite running, recorded with the `uptime` load line in the QA report. Copying two small fixtures per test should cost milliseconds.
+- [ ] No temp roots are left behind after a run: `npm test`'s temp-directory ratchet (`scripts/test-tmpdir.mjs`) reports no new or over-count prefix for this suite. Every new temp root is removed in its test's `finally`, so no ratchet entry is added.
 
 ### Code Quality
 
@@ -293,16 +300,19 @@ No other file changes. `shared/resources/security-probe.mjs` is read, not edited
 | Date | Version | Description | Author |
 | ---- | ------- | ----------- | ------ |
 | 2026-11-02 | 1.0 | Initial draft | create-task |
+| 2026-11-02 | 1.1 | Review passed (9/10): added removal of the dead `.t140-*` `.gitignore` rule; Performance criteria now name the timing command and the `scripts/test-tmpdir.mjs` ratchet | review-task |
+| 2026-11-02 |  | Status → ready-for-development | review-task |
+| 2026-11-02 |  | Implemented — 3 files, 2 tests | develop |
 
 <!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 1: Guard first, red
-- [ ] Phase 2: The helper and the simple sites
-- [ ] Phase 3: `t140Libs` and its 15 callers
-- [ ] Phase 4: The three containment tests
-- [ ] Phase 5: Green and recorded
+- [x] Phase 1: Guard first, red
+- [x] Phase 2: The helper and the simple sites
+- [x] Phase 3: `t140Libs` and its 15 callers
+- [x] Phase 4: The three containment tests
+- [x] Phase 5: Green and recorded
 
 ## References
 

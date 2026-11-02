@@ -86,6 +86,10 @@ Move every scratch directory `security-probe.test.mjs` creates inside the reposi
 - Fast gate (`npm run ci:fast`): 7127 tests, 7113 pass, 0 fail, 14 skipped; `tmp-leak: ratchet ok`.
 - Task status → Ready for Review; one develop Change Log row written (inline path). Development completion comment posted to github issue 812 (`posted`).
 
+### Step 4 — create-pr
+
+- SCOPE_PATHS: `docs/tasks/task.250.security-probe-scratch-out-of-tree`, `CHANGELOG.md`, `.gitignore`, `shared/resources/tests`. Pre-flight guard: no untracked path outside scope, nothing held. Report links: ok.
+
 ---
 
 ## Issues Log
