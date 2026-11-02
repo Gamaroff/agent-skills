@@ -3,7 +3,7 @@
 **Task**: `task.174.ci-docs-only-classifier-template.md`
 **Run Number**: 1
 **Started**: 2026-11-02 13:40
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -35,10 +35,10 @@ Lift tinker-city task.127's docs-only CI classifier, its spec and a `changes`-jo
 | 1. create-branch           | ✅ Done    | Branch `feature/task.174.*` exists in git                              | Branch created at `faded6cd` | —                    | 2026-11-02T13:41Z |
 | 2. review-task             | ✅ Done    | `task.174.review.{N}.{name}.md` exists (or skip logged)                | `task.174.review.1.ci-docs-only-classifier-template.md` — 7/10 → 9/10, READY TO IMPLEMENT after fixes; Planned → Ready for Development | —                    | 2026-11-02T13:47Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration: 11 files, 69 tests; 7 mutation proofs red; ci:fast green | —                    | 2026-11-02T14:00Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.174.qa.{N}.*.md`; `task.174.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.174.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #808: https://github.com/Gamaroff/agent-skills/pull/808 | —                    | 2026-11-02T14:01Z |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.174.qa.{N}.*.md`; `task.174.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 3 cycles: CONCERNS 90 → CONCERNS 80 → PASS 100; 5c APPROVE | —                    | 2026-11-02T14:28Z |
+| 7. finalise                | ✅ Done    | `task.174.dod.{N}.*.md`; task `status: accepted`                       | `task.174.dod.1.ci-docs-only-classifier-template.md` — ACCEPTED; acceptance commit `29309cd5` | —                    | 2026-11-02T14:45Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Implementation report only | —                    | 2026-11-02T14:47Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -113,6 +113,25 @@ Lift tinker-city task.127's docs-only CI classifier, its spec and a `changes`-jo
 - Development completion comment posted to github issue 541 (`develop-complete`, `posted`).
 - Task doc: all four phases ticked; success criteria ticked except the two that close in QA (mutation proofs recorded in the QA report; `npm run ci` + `docs-link-check`). Status → `ready-for-review`; one Change Log row (`develop`).
 
+### Step 4 — create-pr
+
+- Base pre-supplied: develop. Committed in three: review + plan, the template (feat), the implementation report. Head `b5bfc3fb`, pushed.
+- PR created: https://github.com/Gamaroff/agent-skills/pull/808 (`Closes #541`). Body written in-session, not by the summariser subagent: the diff was authored this session.
+- Tracker comment `in-review`: posted. GitHub board: in-review → stage-disabled (no `pipeline.in-review` moment on this board).
+- Post-PR state check: PR #808 state = OPEN (direct `gh pr view`, no poller agent). Lock `pr_url` set; develop-next run state `prNumber: 808`.
+
+### Step 7 — finalise
+
+- DoD file `task.174.dod.1.ci-docs-only-classifier-template.md`. There were four agents: AC, security, compliance and docs. Re-run scope: full (no-prior-record).
+- AC first pass: #7 FAIL on the amendment rule. The 5c carry had appended "(M1–M13 across QA reports 1–3)" to the criterion while ticking it. The reviewed wording was restored, so only the tick remains, and `criteria-drift.js` now reads clean. Re-judged #7: PASS.
+- Security: PASS, `boundary: true`. The probe plan ran in /finalise: 2 `shell-fn:` controls (`is_docs`, both variants) × 17 cases = 34 executed, 0 reproduced, 0 escaped, 0 refused. Three spec challenges went to the owner in the DoD file.
+- Compliance: NOT_APPLICABLE. Docs: PASS.
+- CI reading 1: SUCCESS @ `1a8ac32879d9` over 5 checks. #8 was graded PASS by `resolve-ci`, giving AC_OVERALL PASS → ACCEPTED.
+- 6a: commit `29309cd5` "docs(task.174): accept — DoD, sprint review; registry ticked; 5c review carried", pushed. 6b: 4 artifacts tracked and pushed. 6d: CHANGELOG cites (task 174).
+- CI reading 2: SUCCESS @ `29309cd59042` over 5 checks after 30s (the head's own CI, not tree-equivalence).
+- The first two background polls wrote no result. The script extracted from SKILL.md had been cut at a fixed line range, before its final `printf`. The full script was rebuilt and re-run, and it concluded correctly.
+- PR canonical comment posted (issuecomment-6580023697). Tracker #541: the Document link was already on develop or absent; `done` comment posted; issue closed (state CLOSED); `gh-stage` done → `already`.
+
 ---
 
 ## Issues Log
@@ -125,14 +144,87 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-11-02
+**Gate Result**: CONCERNS
+**Issues Found**: 2 — TASK-174-QA-1 (medium: `changes-job.yml` cancels push runs on the base branch, which the push path then skips over; from code review CR-1, verified against tinker-city `ci.yml:193-196`), TASK-174-QA-2 (low: cross-variant test re-spreads `process.env`)
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken (cycle 1: Convergence needs prior cycles; Diminishing-returns needs cycle ≥ 3; Cosmetic-residue is PASS-only)
+**Action**: Running qa-fix (cycle 1 of 5)
+
+- Boundary probes: 28 executed (`is_docs`, both variants, `shell-fn:`), 0 reproduced, 0 escaped — `task.174.qa.1.security.run.json`.
+- Criteria drift: the stamped `reviewed_blob` was never committed (review report and reviewed document landed in separate Step 4 commits), so the engine fell back to the pre-review commit and reported `/review-task`'s own fixes as drift. Reviewed bytes reconstructed (hash matched `40dbf136…` exactly) and written to the local object store; drift then `clean`.
+- QA Cycle 1 — changes-requested: `stage-disabled`.
+- qa-fix (5b): findings taken from the gate directly (this session wrote it; 2 entries, no ambiguity), so no ingester dispatch.
+  - **QA-1**: `changes-job.yml` concurrency → group `pr-<number>` for PRs, `github.run_id` for pushes; `cancel-in-progress: ${{ github.event_name == 'pull_request' }}`. Departed from the bug's "fall back to the ref": a ref-keyed push group still drops a *pending* run when a newer one queues. Guide § `cancel-in-progress` rewritten. New `changes-job.test.js` (2 tests, text-level — Actions expressions cannot run locally). M8: literal `true` restored → 1 red; group back to `github.ref` → 1 red.
+  - **QA-2**: `env` passed directly. The fix alone turned nothing red (the leak reaches both variants equally), so each case's verdict vector is now pinned. M9: old re-spread with `DOCS_PATTERNS='*.md'` in the runner env → 1 red; fixed → 22/22.
+  - Probe: `cancel-in-progress` over SKILL.md / references / shared resources → `skills/finalise/SKILL.md` — unaffected (it handles CANCELLED CI states, not this snippet). Work item lines 65/128 name the case without restating the rule — unaffected; CHANGELOG entry does not mention concurrency — unaffected. Population 1.
+  - Bug 1 → Ready for QA (`registry-tick`: `not-a-general-bug`).
+- Cycle 1 commit `0d69112b` (fix + gate 1 + QA report 1 + bug 1 + probe record), one push. `ci:fast` 7116 / 0 fail.
+
+### QA Cycle 2 — 2026-11-02
+**Gate Result**: CONCERNS
+**Issues Found**: 3 — TASK-174-QA-3 (medium: `changes-job.test.js` guard passes on a broken group — `github.ref_name` slips the `\b` check; CR-1 promoted), TASK-174-QA-4 (medium: guide claims PR-only cancellation ensures every base run finishes, but the push path skips over a red/unfinished base run; CR-2, QA-verified), TASK-174-QA-5 (low: group not workflow-scoped; CR-3)
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken (Loop route: continue (not-a-pass-gate) — route 2b is PASS-only; route 2 declined: below-cycle-floor)
+**Action**: Running qa-fix (cycle 2 of 5)
+
+- Refute pass: full branch diff (12 files, 2191-line patch); reviewer 120.2 s; 4 anchors `ok`.
+- QA-2 ✅ FIXED; QA-1 ⚠️ PARTIAL → bug 1 reopened (`status-history.js`). Bugs 2 and 3 filed.
+- M8, M9 re-proven against `0d69112b` (cp-snapshot, tree restored).
+- Probe re-run: 28 executed, 0 reproduced, 0 escaped (`task.174.qa.2.security.run.json`). Drift clean; CHANGELOG cites; CI pending.
+- Convergence: HIGH 0,0 — no trip. Narrowing-residue offer: not sent (gate-1 and gate-2 MEDIUMs name different files); trigger (b) repeat subject applies — see 5b.
+- QA Cycle 2 — changes-requested: `stage-disabled`.
+- qa-fix (5b, cycle 2): findings from gate 2 directly (3 entries, no ambiguity).
+  - Narrowing residue: the concurrency block (repeat subject). Moves: **consolidate** for QA-3/QA-5 — the test pins the whole block byte for byte (one expected definition) instead of three substring checks; **scope the claim** for QA-4 — the guide now says PR-only cancellation removes one case and lists what remains (red, hand-cancelled/timed-out/lost, still running), with the adopter's remedy (heavy jobs on every `push`, or a merge queue). Push path unchanged (lifted behaviour).
+  - QA-5: group `${{ github.workflow }}-…`; comment + guide say why.
+  - Mutation proofs on the new guard: M10 `ref_name` evasion, M11 workflow dropped, M8 literal `true`, M12 trailing comment, M13 job-level `concurrency:` → 1 red each; restored byte-for-byte.
+  - Probe: `cancel-in-progress` → `skills/finalise/SKILL.md` unaffected (CANCELLED CI states). `base-branch run` → 0 in the executed-doc population (the subject lives only under `docs/`, outside the command); checked `docs/` + CHANGELOG directly: guide + test header, consistent. Population 1.
+  - Bugs 1–3 → Ready for QA (`registry-tick`: `not-a-general-bug` ×3).
+- Cycle 2 commit `08ccb5d2` (fix + gate 2 + QA report 2 + bugs 2–3 + probe record), one push. `ci:fast` 7116 / 0 fail.
+
+### QA Cycle 3 — 2026-11-02
+**Gate Result**: PASS
+**Issues Found**: none (1 advisory cleanup: guide "not optional" vs snippet "Optional" → gate `recommendations.future`)
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE — task.174.pr-review.1.ci-docs-only-classifier-template.md (conformance lens only, `--no-code`; 1 low consistency finding; OPEN_COVERAGE=0)
+**Loop exit**: n/a — this exit not taken (PASS with no open entry → §5c route 1)
+**Action**: Proceeding to 5c (PR conformance review)
+**Carried to 6a**: task.174.pr-review.1.ci-docs-only-classifier-template.md task.174.ci-docs-only-classifier-template.md (PC-1 fixed: mutation-proof criterion ticked)
+
+- Scoped re-review: files changed since gate 2 head `0d69112bc6c1` (12 files); reviewer 75.9 s, 1 anchor `ok`.
+- QA-3/4/5 ✅ FIXED; bugs 1–3 closed (`status-history.js`). M10 re-run by QA against `08ccb5d2` → red.
+- Probe: 28 / 0 reproduced / 0 escaped (`task.174.qa.3.security.run.json`). Drift clean; CHANGELOG cites; CI on `08ccb5d2` pending.
+- Note: qa-task for cycle 3 was followed from its already-loaded instructions (loaded in full for cycle 2), not re-invoked.
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-11-02 16:47
+**Final Status**: Completed
 **Branch**: `feature/task.174.ci-docs-only-classifier-template`
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/808
+**QA Iterations**: 3
+**DoD Summary**: `task.174.dod.1.ci-docs-only-classifier-template.md`
+**Tracker debt**: none
+
+### Completion Summary
+
+This run implemented an optional consumer CI template, lifted from tinker-city task.127. It has a GitHub Actions classifier with its `changes`-job snippet, a Bitbucket Pipelines variant, a parity test against task.172's docs set, and the guide `docs/runbooks/ci-docs-only-skip.md`: 71 tests across 4 specs, reached by `npm test`.
+
+It took 3 QA cycles:
+
+1. **Cycle 1:** the snippet cancelled push runs, and the cross-variant verdicts were not pinned.
+2. **Cycle 2:** the concurrency block was guarded by shape rather than pinned; the base-run claim was too broad; and the group was not workflow-scoped.
+3. **Cycle 3:** PASS 100.
+
+Notable decisions:
+
+- The template lifts what merged upstream, not what the upstream plan described.
+- Cancellation is PR-only.
+- A Bitbucket 403 means "no evidence", never green.
