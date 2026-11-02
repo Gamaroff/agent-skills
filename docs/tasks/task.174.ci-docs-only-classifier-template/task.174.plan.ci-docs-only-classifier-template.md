@@ -20,7 +20,7 @@ written.
 ### Phase 0: precondition
 
 ```bash
-TC=~/Development/Projects/tinker-city
+TC=${TINKER_CITY:-$HOME/Development/tinker-city}   # was ~/Development/Projects/… on the old Mac
 # 1. The task document says accepted.
 grep -m1 '^status:' "$TC"/docs/tasks/task.127.ci-docs-only-increment-skip/task.127.ci-docs-only-increment-skip.md
 # 2. Its PR merged.
@@ -40,15 +40,25 @@ repository). If it has not, option (a), `env` plus a parity test, is the default
 ### Phase 1: lift
 
 - Copy `scripts/ci/classify-changes.sh` and `scripts/ci/classify-changes.spec.js` from the merged
-  tinker-city tree. Replace each literal `ci-ok` with `${AGGREGATE_CHECK:?}`, so an unset name makes
-  the script fail, and the workflow's fail-safe turns that into `code=true`. Confirm that path in
-  the spec. Replace the `case` pattern list with `DOCS_PATTERNS` (space-separated shell patterns).
+  tinker-city tree (`git show origin/develop:<path>`); the spec lands as `classify-changes.test.js`.
+- **The evidence is a workflow-runs lookup, not a `ci-ok` check run** (task § 3). The
+  tinker-city-specific value is `CI_WORKFLOW_PATH=".github/workflows/ci.yml"`; make it an env input.
+  An unset or empty value must `emit true` with a `::warning::` — never `${CI_WORKFLOW_PATH:?}`,
+  which aborts with no output and leaves the snippet's gate reading an empty `code`. A spec case
+  pins it.
+- Replace the `is_docs` `case` list with a loop over `DOCS_PATTERNS` (space-separated shell
+  patterns, default `*.md docs/*`). Use `case "$1" in $p)` with `$p` unquoted, so each entry stays a
+  pattern; set `-f` around the split so an entry is not glob-expanded against the runner's tree.
+- Remove `engine`, `is_engine`, `any_engine` and the spec's `engine` cases (tinker-city task.128,
+  out of scope). `emit` takes one argument.
 - The `node:test` spec must not import anything from tinker-city. Fixtures are temporary git repos
-  plus a stub for the check-runs `curl`, as in the original.
+  plus `CI_OK_LOOKUP_FILE` and the fake `curl`, as in the original.
 - `changes-job.yml`: a commented snippet only, not a runnable workflow in this repository's
   `.github/`. A real workflow file here would run in this repository's CI.
-- `package.json`: add `'docs/examples/ci/**/*.spec.js'` to the `test` script's `node --test` list,
-  or the spec runs nowhere (project memory: hand-listed test globs orphan new suites).
+- `package.json`: add `'docs/examples/ci/*/*.test.js'` to `scripts["test:suite"]`'s `node --test`
+  list. `tests/test-runner-reach.test.js` only recognises quoted `*.test.(m)js` globs with
+  single-segment `*`, so a `**` or `.spec.js` glob would leave the new suites unchecked.
+- `npm run lint:shell`: the new `.sh` files are in the shellcheck lane's file list.
 
 ### Phase 2: guide and parity
 
@@ -63,16 +73,21 @@ The guide's sections:
 7. How it relates to `/finalise` and `/develop-next`'s pipeline rule (task.172)
 8. Bitbucket
 
-The parity test runs task.172's `matchesAnyGlob(path, DEFAULT_PATTERNS)` and the template's shell
-classifier on the same fixed path list, and asserts that each path gets the same answer. Spell out
-any deliberate divergence, path by path.
+The parity test runs task.172's `matchesAnyGlob(path, DEFAULT_PATTERNS)` (`glob-match.js`, with
+`DEFAULT_PATTERNS` from `ci-tree-equivalence.js`) and the template's `is_docs` (the script
+sourced, which stops before running) on the same fixed path list, and asserts that each path gets
+the same answer. Spell out any deliberate divergence, path by path. Run at review: no divergence on
+the § 8 list.
 
 ### Phase 3: Bitbucket
 
-Use `curl` with the credential order `bitbucket-auth.sh` defines, against
-`/repositories/{ws}/{repo}/pipelines/?target.commit.hash={BEFORE}`. A status other than 200, a
-`403` in particular, means `code=true`. Copy the warning text from `/finalise`'s Bitbucket block
-into the guide by citation, not by restatement.
+Bitbucket Pipelines has no push `before` SHA. Use `BEFORE=$(git rev-parse HEAD^)` (first parent);
+the rule fires only when `HEAD^..HEAD` is non-empty and all docs. Then `curl`, with the credential
+order `bitbucket-auth.sh` defines, against
+`/2.0/repositories/{ws}/{repo}/pipelines/?target.commit.hash={BEFORE}`, and skip only when a
+completed pipeline's `state.result.name` is `SUCCESSFUL`. A status other than 200, a `403` in
+particular, means `code=true`. Copy the warning text from `/finalise`'s Bitbucket block into the
+guide by citation, not by restatement.
 
 ## Key Patterns and References
 
