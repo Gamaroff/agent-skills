@@ -2,22 +2,21 @@
 id: task.174
 title: "[Task 174] Publish the docs-only CI classifier as an optional consumer template"
 type: task
-description: "Lift tinker-city task.127's classify-changes.sh and its spec into agent-skills as an optional consumer template with a GitHub Actions changes-job snippet and a guide, so a consumer's CI skips its heavy jobs on a docs-only push over a green head. Blocked until tinker-city task.127 has merged and run on a real PR."
-tags: [ci, consumer-template, github-actions, bitbucket, performance, consumer-handoff, blocked-external]
+description: "Lift tinker-city task.127's classify-changes.sh and its spec into agent-skills as an optional consumer template with a GitHub Actions changes-job snippet and a guide, so a consumer's CI skips its heavy jobs on a docs-only push over a green head. tinker-city task.127 has merged (PR #984) and skipped the heavy jobs on a real docs-only push (run 41445192250)."
+tags: [ci, consumer-template, github-actions, bitbucket, performance, consumer-handoff]
 category: infrastructure
 status: planned
 priority: Low
 created: 2026-10-01
-updated: 2026-10-27
+updated: 2026-11-02
 assignee:
 estimated_effort_hours: 8
 github_issue: 541
-blocked_on_external: "tinker-city task.127 (#982) merged and run on a real PR"
 ---
 
 # Technical Task: Publish the docs-only CI classifier as an optional consumer template
 
-**Status:** Planned (blocked on tinker-city task.127; see Phase 0)
+**Status:** Planned (precondition met 2026-11-02; Phase 0 still checks it)
 
 **GitHub Issue**: [#541](https://github.com/Gamaroff/agent-skills/issues/541)
 
@@ -302,6 +301,7 @@ None.
 |------|---------|-------------|--------|
 | 2026-10-01 | 1.0     | Initial draft | create-task |
 | 2026-10-27 |  | Frontmatter: `blocked_on_external:` set, so the develop-next registry fallback passes this task over until tinker-city task.127 lands (task.235). Phase 0 HALT unchanged. | develop |
+| 2026-11-02 |  | Frontmatter: `blocked_on_external:` cleared. Its condition holds: tinker-city task.127 merged as PR #984 (2026-10-02), and CI run 41445192250 (head `d88b1f96`, a 3-file `.md` push) skipped all 5 heavy jobs. Phase 0 HALT unchanged. | develop |
 <!-- change-log-end -->
 
 ---
