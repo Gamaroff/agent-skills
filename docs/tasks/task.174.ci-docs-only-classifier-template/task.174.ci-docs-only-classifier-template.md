@@ -5,18 +5,20 @@ type: task
 description: "Lift tinker-city task.127's classify-changes.sh and its spec into agent-skills as an optional consumer template with a GitHub Actions changes-job snippet and a guide, so a consumer's CI skips its heavy jobs on a docs-only push over a green head. tinker-city task.127 has merged (PR #984) and skipped the heavy jobs on a real docs-only push (run 41445192250)."
 tags: [ci, consumer-template, github-actions, bitbucket, performance, consumer-handoff]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Low
 created: 2026-10-01
 updated: 2026-11-02
+completed_date: 2026-11-02
 assignee:
 estimated_effort_hours: 8
 github_issue: 541
+pr_number: 808
 ---
 
 # Technical Task: Publish the docs-only CI classifier as an optional consumer template
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.174.review.1.ci-docs-only-classifier-template.md` implemented 2026-11-02
 
 **GitHub Issue**: [#541](https://github.com/Gamaroff/agent-skills/issues/541)
@@ -292,7 +294,7 @@ None.
 ### Code Quality
 
 - [x] The specs run in `npm test` (reached per `tests/test-runner-reach.test.js`)
-- [ ] Each mutation proof in § 8 turns a test red, recorded in the QA report
+- [x] Each mutation proof in § 8 turns a test red, recorded in the QA report
 - [ ] `npm run ci` green (it includes `lint:shell`); `docs-link-check` clean on the new guide
 
 ### Migration
@@ -374,6 +376,29 @@ None.
 - Two advisory cleanups recorded in the gate's `recommendations.future`.
 - Boundary probes: 28 executed, 0 escaped.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.174.qa.3.ci-docs-only-classifier-template.md`
+**Gate File**: `task.174.gate.3.ci-docs-only-classifier-template.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 10/10 met. #8 (`npm run ci` green, link check clean) was graded from CI on `1a8ac32879d9`.
+✅ **Tests:** 71 template tests, reached by `npm test`. M1–M13 mutation-proven across three QA cycles.
+✅ **PR Review:** PR #808. The 5c conformance review reads APPROVE, and the host requires no reviewers.
+✅ **Documentation:** The guide `docs/runbooks/ci-docs-only-skip.md`, the runbook index row and the CHANGELOG `[Unreleased]` entry.
+✅ **Security Review:** PASS. The `is_docs` boundary in both variants was probed: 34 executed, 0 reproduced, 0 escaped.
+✅ **Compliance Review:** Not applicable (internal CI tooling).
+
+**Task marked as ACCEPTED on:** 2026-11-02
+
+**Detailed Verification Log:** See `task.174.dod.1.ci-docs-only-classifier-template.md` for complete verification evidence.
 <!-- change-log-start -->
 ## Change Log
 
@@ -390,6 +415,7 @@ None.
 | 2026-11-02 |  | QA gate CONCERNS (80/100) — 2 medium, 1 low | qa-task |
 | 2026-11-02 |  | QA findings fixed — TASK-174-QA-3, QA-4, QA-5; 2 iterations | qa-fix |
 | 2026-11-02 |  | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-11-02 | 1.2 | DoD passed — accepted (PR #808) | finalise |
 <!-- change-log-end -->
 
 ---

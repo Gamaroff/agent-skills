@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "filename",
+      "entry": "shell-fn:docs/examples/ci/bitbucket-pipelines/classify-changes.sh#is_docs",
+      "name": "bitbucket-pipelines is_docs",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 17,
+      "passed": 17,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": [
+        "bash"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-11-02T14:34:03.367Z"
+    },
+    {
+      "sink": "filename",
+      "entry": "shell-fn:docs/examples/ci/github-actions/classify-changes.sh#is_docs",
+      "name": "github-actions is_docs",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 17,
+      "passed": 17,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": [
+        "bash"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-11-02T14:34:03.247Z"
+    }
+  ],
+  "totals": {
+    "executed": 34,
+    "reproduced": 0,
+    "escaped": 0
+  },
+  "updated_at": "2026-11-02T14:34:03.367Z"
+}

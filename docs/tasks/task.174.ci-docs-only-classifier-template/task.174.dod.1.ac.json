@@ -1,0 +1,239 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "1a8ac32879d91b62663dbc2bee6ae66d9db61fa4",
+  "dirty_paths": [
+    "docs/tasks/task.174.ci-docs-only-classifier-template/task.174.ci-docs-only-classifier-template.md",
+    "docs/tasks/task.174.ci-docs-only-classifier-template/task.174.implementation.1.ci-docs-only-classifier-template-initial-run.md",
+    "docs/tasks/task.174.ci-docs-only-classifier-template/task.174.pr-review.1.ci-docs-only-classifier-template.md"
+  ],
+  "document": "docs/tasks/task.174.ci-docs-only-classifier-template/task.174.ci-docs-only-classifier-template.md",
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 10,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "67d1bf7f8b5d2853db97bea28bb5c7b788c37faea31fc12542d820ca518e3aee",
+      "status": "PASS",
+      "description": "Phase 0 evidence recorded in the guide's Measured section",
+      "code_citation": "docs/runbooks/ci-docs-only-skip.md:49",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Documentation criterion. The guide's '## Measured' section (lines 49-63) names tinker-city task.127 merged as PR #984 on 2026-10-02 (line 51). It also gives the real skipped run 41445192250 (line 59: docs-only, 3 .md files, d88b1f96, all heavy jobs skipped). These are the task's PR and one real skipped run, which is what the criterion asks for."
+    },
+    {
+      "id": "#2",
+      "text_hash": "f10a494d82391147f084b236d23b35d04a2a996ca55987a7385e40e3249c29ba",
+      "status": "PASS",
+      "description": "Docs-only synchronize over green pull_request run of CI_WORKFLOW_PATH gives code=false",
+      "code_citation": "docs/examples/ci/github-actions/classify-changes.sh:160",
+      "test_citation": "docs/examples/ci/github-actions/classify-changes.test.js:393",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Line 160 runs the jq check of the CI_WORKFLOW_PATH workflow's successful pull_request runs, and line 227 then emits false. The test 'docs increment on a successful PR run of the workflow → false' asserts code=false. The spec is reached by package.json test:suite glob 'docs/examples/ci/*/*.test.js', and .github/workflows/test.yml runs npm test on every pull_request with no path filter. NEEDS_JQ cannot silently skip on Actions because the guard at classify-changes.test.js:378 fails when jq is missing."
+    },
+    {
+      "id": "#3",
+      "text_hash": "f496dcf3e480355a0c4f01da28958342ed9c236a8d434a0e2d74aaf3484963a2",
+      "status": "PASS",
+      "description": "Every lookup failure and unset CI_WORKFLOW_PATH gives code=true, both platforms",
+      "code_citation": "docs/examples/ci/github-actions/classify-changes.sh:175",
+      "test_citation": "docs/examples/ci/github-actions/classify-changes.test.js:746",
+      "members": [
+        {
+          "member": "GitHub: CI_WORKFLOW_PATH unset",
+          "evidence": "docs/examples/ci/github-actions/classify-changes.test.js:746",
+          "status": "PASS"
+        },
+        {
+          "member": "GitHub: CI_WORKFLOW_PATH empty",
+          "evidence": "docs/examples/ci/github-actions/classify-changes.test.js:746",
+          "status": "PASS"
+        },
+        {
+          "member": "GitHub: API error body",
+          "evidence": "docs/examples/ci/github-actions/classify-changes.test.js:510",
+          "status": "PASS"
+        },
+        {
+          "member": "GitHub: unparseable lookup",
+          "evidence": "docs/examples/ci/github-actions/classify-changes.test.js:531",
+          "status": "PASS"
+        },
+        {
+          "member": "GitHub: lookup file missing",
+          "evidence": "docs/examples/ci/github-actions/classify-changes.test.js:545",
+          "status": "PASS"
+        },
+        {
+          "member": "GitHub: jq absent",
+          "evidence": "docs/examples/ci/github-actions/classify-changes.test.js:578",
+          "status": "PASS"
+        },
+        {
+          "member": "GitHub: real request failing (curl non-zero)",
+          "evidence": "docs/examples/ci/github-actions/classify-changes.test.js:659",
+          "status": "PASS"
+        },
+        {
+          "member": "Bitbucket: no credential",
+          "evidence": "docs/examples/ci/bitbucket-pipelines/classify-changes.test.js:271",
+          "status": "PASS"
+        },
+        {
+          "member": "Bitbucket: 403",
+          "evidence": "docs/examples/ci/bitbucket-pipelines/classify-changes.test.js:281",
+          "status": "PASS"
+        },
+        {
+          "member": "Bitbucket: 401",
+          "evidence": "docs/examples/ci/bitbucket-pipelines/classify-changes.test.js:293",
+          "status": "PASS"
+        },
+        {
+          "member": "Bitbucket: 404",
+          "evidence": "docs/examples/ci/bitbucket-pipelines/classify-changes.test.js:294",
+          "status": "PASS"
+        },
+        {
+          "member": "Bitbucket: non-JSON body",
+          "evidence": "docs/examples/ci/bitbucket-pipelines/classify-changes.test.js:295",
+          "status": "PASS"
+        },
+        {
+          "member": "Bitbucket: curl failing",
+          "evidence": "docs/examples/ci/bitbucket-pipelines/classify-changes.test.js:313",
+          "status": "PASS"
+        },
+        {
+          "member": "Bitbucket: jq absent",
+          "evidence": "docs/examples/ci/bitbucket-pipelines/classify-changes.test.js:320",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "No unmapped members. Bitbucket's 403 handling is in bitbucket-pipelines/classify-changes.sh:115. The Bitbucket variant has no CI_WORKFLOW_PATH input: its evidence is the parent's pull-request pipelines (classify-changes.sh:74). So the unset-CI_WORKFLOW_PATH half applies to GitHub only. Both specs run in npm test via test.yml on every PR."
+    },
+    {
+      "id": "#4",
+      "text_hash": "fa695b093eee6825ca22bf2ec3709204c956e3904f929a3a2f845f08b435b991",
+      "status": "PASS",
+      "description": "Parity test passes on the fixed path list",
+      "code_citation": "docs/examples/ci/github-actions/classify-changes.sh:64",
+      "test_citation": "docs/examples/ci/github-actions/docs-set-parity.test.js:58",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The test compares the template's DEFAULT_DOCS_PATTERNS ('*.md docs/*', via the sourced is_docs) with task.172 DEFAULT_PATTERNS via matchesAnyGlob, on FIXED_PATHS (line 27). Line 54 pins the pipeline default as non-vacuous. QA cycle 3 records ci:fast with 7116 tests and 0 failures. The test is reached by the 'docs/examples/ci/*/*.test.js' glob, and test.yml runs it per PR."
+    },
+    {
+      "id": "#5",
+      "text_hash": "be3f8e8b5c9225194ec28257eb70113b28ed2355a3b20026bb6cebb44aaa4b86",
+      "status": "PASS",
+      "description": "Guide quotes measured before/after from Phase 0's real run",
+      "code_citation": "docs/runbooks/ci-docs-only-skip.md:57",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Documentation criterion. The criterion states no numeric bound, so it is not a measured criterion; its deliverable is what the guide says. Lines 57-59 quote real run IDs on the same ci.yml: 41439187444, a code push at 37 min 27 s; 41444278348, docs-only at 3 min 42 s; 41445192250, docs-only at 2 min 52 s. These are measured run figures, not an estimate."
+    },
+    {
+      "id": "#6",
+      "text_hash": "b18ecad8f29974657384329d5ef00945df0a7330b434da8f79448aac0c3d4d96",
+      "status": "PASS",
+      "description": "Specs run in npm test, reached per test-runner-reach.test.js",
+      "code_citation": "package.json:27",
+      "test_citation": "tests/test-runner-reach.test.js:107",
+      "members": [
+        {
+          "member": "docs/examples/ci/github-actions/classify-changes.test.js",
+          "evidence": "package.json:27",
+          "status": "PASS"
+        },
+        {
+          "member": "docs/examples/ci/github-actions/changes-job.test.js",
+          "evidence": "package.json:27",
+          "status": "PASS"
+        },
+        {
+          "member": "docs/examples/ci/github-actions/docs-set-parity.test.js",
+          "evidence": "package.json:27",
+          "status": "PASS"
+        },
+        {
+          "member": "docs/examples/ci/bitbucket-pipelines/classify-changes.test.js",
+          "evidence": "package.json:27",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "test:suite ends with the glob 'docs/examples/ci/*/*.test.js', which matches all four new spec files. 'every tracked test file is reached by npm test' (line 107) runs in the 'tests/*.test.js' glob, which test.yml runs on every pull_request. QA report 1 records M7: removing the glob makes the reach test name all the suites (3 at that time)."
+    },
+    {
+      "id": "#7",
+      "text_hash": "eb8bf86b5823d5866125f4c151e0298b52a1feef3de92ae81886133b2917f2c4",
+      "status": "PASS",
+      "description": "Each § 8 mutation proof turns a test red, recorded in QA report",
+      "code_citation": "docs/tasks/task.174.ci-docs-only-classifier-template/task.174.qa.1.ci-docs-only-classifier-template.md:158",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "lookup failure returns code=false",
+          "evidence": "docs/tasks/task.174.ci-docs-only-classifier-template/task.174.qa.1.ci-docs-only-classifier-template.md:158",
+          "status": "PASS"
+        },
+        {
+          "member": "unset CI_WORKFLOW_PATH skips",
+          "evidence": "docs/tasks/task.174.ci-docs-only-classifier-template/task.174.qa.1.ci-docs-only-classifier-template.md:159",
+          "status": "PASS"
+        },
+        {
+          "member": "Bitbucket 403 treated as green",
+          "evidence": "docs/tasks/task.174.ci-docs-only-classifier-template/task.174.qa.1.ci-docs-only-classifier-template.md:162",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Process criterion; the units are the three mutation proofs named in task § 8. criteria-drift.js re-run gives reason clean, changed [], exit 0. Line 295 now reads the reviewed text, '…recorded in the QA report'. Each unit has a committed record in QA report 1 (tracked and unmodified) naming the mutation and the test that went red. Line 158: lookup failure returns 0, caught by the lookup-file-missing and curl-non-zero tests (classify-changes.test.js:545, :659). Line 159: CI_WORKFLOW_PATH guard disabled, caught by the unset and empty tests (:746). Line 162: Bitbucket 403 treated as 200, caught by '403 → true' (bitbucket classify-changes.test.js:281). No uncovered units."
+    },
+    {
+      "id": "#8",
+      "text_hash": "99a27c2263a388de3e990de99411e95cfdc347924253a266e2cafdc47803ef3c",
+      "status": "PASS",
+      "description": "npm run ci green incl. lint:shell; docs-link-check clean on guide",
+      "code_citation": ".github/workflows/test.yml:1",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 1a8ac32879d91b62663dbc2bee6ae66d9db61fa4 — CI-state criterion. Both halves are CI lanes on the PR head. The npm run ci composite (package.json:24) is mirrored by test.yml, shellcheck.yml (lint:shell twin) and validate.yml. docs-link-check is .github/workflows/docs-link-check.yml, which fires because the PR changes docs/**/*.md including docs/runbooks/ci-docs-only-skip.md. Step 6 grades it from CI reading 1.",
+      "ci_reading": "CI reading 1: SUCCESS @ 1a8ac32879d91b62663dbc2bee6ae66d9db61fa4"
+    },
+    {
+      "id": "#9",
+      "text_hash": "4e08d78403f1d228e62b41a14890928fc1d734db841eb4b96d7054ac18a94674",
+      "status": "PASS",
+      "description": "Guide states adoption is optional and the fail-safe contract",
+      "code_citation": "docs/runbooks/ci-docs-only-skip.md:3",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Documentation criterion. Lines 3-4 call it an **optional** CI template that nothing installs, and line 13 says 'Adopting it is optional'. Lines 33-47 ('The contract: every uncertain path runs the full suite') list each uncertain path giving code=true, and say code is written on every exit. Line 132's 'this is not optional' applies only to PR-only cancellation once adopted. QA cycle 3 flagged that wording as advisory; it does not contradict optional adoption."
+    },
+    {
+      "id": "#10",
+      "text_hash": "c8ee0519e0beeb578ce5c46c80da2777b5b415a43012e6121986153a8509e573",
+      "status": "PASS",
+      "description": "CHANGELOG entry",
+      "code_citation": "CHANGELOG.md:9",
+      "test_citation": "evals/shared/tests/changelog-entry-drift.test.mjs:1",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Documentation criterion. CHANGELOG.md:9-18, under [Unreleased], has the entry 'An optional CI template that skips the heavy jobs on a docs-only push (task 174)'. It describes both variants, the 403 trap, the guide link and the measured 37 min 27 s against 2 min 52 s. changelog-entry-drift.test.mjs is the corpus guard and runs in npm test. It is a post-merge guard: it checks accepted tasks whose PR merged since the last tag, so it pins this entry only after merge."
+    }
+  ],
+  "advisories": []
+}
