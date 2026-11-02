@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.63.0] - 2026-11-02
+
 ### Added
 
 - **An optional CI template that skips the heavy jobs on a docs-only push (task 174).** Lifted from a
