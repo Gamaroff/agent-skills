@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **The bundle comment-origin scan no longer races another suite's scratch files (obs #145).**
+  `tests/bundle-comment-origin.test.js` §2 walked the directories, so it also listed
+  `security-probe.test.mjs`'s `.t131-mutant-*` scratch copies inside `shared/resources/tests/`.
+  Under parallel `node --test`, that suite sometimes deleted them before §2 read them, and §2
+  failed with ENOENT. It did so three times in two days, and the third failure stopped the
+  v0.63.0 `release.sh --tag`. The scan now lists git-tracked files only (`git ls-files`, so a
+  staged file is still scanned) and reads the same 240 sources as before. The new §2a checks this
+  against a throwaway repo, so the test never writes into the tree it scans.
+
 ## [v0.63.0] - 2026-11-02
 
 ### Added

@@ -99,21 +99,6 @@ const EXCLUDE_DIRS = new Set([
   ".DS_Store",
 ]);
 
-function walk(dir, out, skip) {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (EXCLUDE_DIRS.has(entry.name)) continue;
-    const abs = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      // `skip` applies at EVERY depth, matching discover_needed's
-      // `'references' not in f.relative_to(skill_path).parts`.
-      if (skip && skip(entry.name)) continue;
-      walk(abs, out, skip);
-    } else if (/\.(js|mjs)$/.test(entry.name)) {
-      out.push(path.relative(REPO_ROOT, abs));
-    }
-  }
-}
-
 /**
  * A deliberate SUPERSET of the JS/MJS files the bundler's discovery reads.
  * `discover_needed` seeds from a skill's own files and then follows only the
@@ -124,15 +109,39 @@ function walk(dir, out, skip) {
  * `references/` copies, which `discover_needed` excludes at any depth. Wider
  * than the bundler on purpose: a comment-only path in a file the bundler does
  * not read TODAY becomes a live origin the day something references that file.
+ *
+ * GIT-TRACKED FILES ONLY (index included, so a staged new file is scanned).
+ * The list used to come from a directory walk, which also saw scratch
+ * directories other suites create inside the tree — security-probe's
+ * `shared/resources/tests/.t131-mutant-*`. Under parallel `node --test` that
+ * suite deleted its directory between this walk and the read, and §2 failed
+ * ENOENT: three times in two days, the third stopping the v0.63.0 `--tag`
+ * (obs #145). A file that is not in the index cannot be committed or bundled
+ * from a tarball, so it was never this guard's subject. A tracked file deleted
+ * in the working tree but not yet staged is skipped, not read.
  */
-function liveSources() {
+function liveSources(root = REPO_ROOT) {
+  const listed = execFileSync(
+    "git",
+    ["ls-files", "-z", "--", "shared/resources", "skills"],
+    { cwd: root, encoding: "utf-8" },
+  )
+    .split("\0")
+    .filter(Boolean);
   const out = [];
-  walk(path.join(REPO_ROOT, "shared", "resources"), out, null);
-  const skills = path.join(REPO_ROOT, "skills");
-  for (const d of fs.readdirSync(skills)) {
-    const abs = path.join(skills, d);
-    if (!fs.statSync(abs).isDirectory()) continue;
-    walk(abs, out, (name) => name === "references");
+  for (const rel of listed) {
+    if (!/\.(js|mjs)$/.test(rel)) continue;
+    const parts = rel.split("/");
+    if (parts.some((p) => EXCLUDE_DIRS.has(p))) continue;
+    // `skills/<name>/…/references/…` is generated, at EVERY depth below the
+    // skill directory, matching discover_needed's
+    // `'references' not in f.relative_to(skill_path).parts`.
+    if (parts[0] === "skills") {
+      if (parts.length < 3) continue; // a file directly under skills/ is no skill's
+      if (parts.slice(2, -1).includes("references")) continue;
+    }
+    if (!fs.existsSync(path.join(root, rel))) continue;
+    out.push(rel);
   }
   return out.sort();
 }
@@ -285,6 +294,38 @@ test("§2 the live tree has no undeclared comment-only shared/resources referenc
       `\`// bundle-dependency: shared/resources/X\`, or allowlist WITH A REASON:\n` +
       offenders.join("\n"),
   );
+});
+
+test("§2a the live scan reads tracked sources only — not another suite's scratch files (obs #145)", () => {
+  // A throwaway repo, so this test never writes into the tree it shares with
+  // other scanners — which is the hazard it guards against.
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "bundle-comment-origin-git-"),
+  );
+  const put = (rel, body) => {
+    fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
+    fs.writeFileSync(path.join(root, rel), body);
+  };
+  try {
+    put("shared/resources/kept.js", "module.exports = 1;\n");
+    put("shared/resources/tests/kept.test.mjs", "export {};\n");
+    put("skills/s/scripts/tool.js", "module.exports = 2;\n");
+    put("skills/s/references/copy.js", "module.exports = 3;\n");
+    put("skills/s/scripts/references/deep.js", "module.exports = 4;\n");
+    put("shared/resources/gone.js", "module.exports = 5;\n");
+    execFileSync("git", ["init", "-q"], { cwd: root });
+    execFileSync("git", ["add", "-A"], { cwd: root });
+    put("shared/resources/tests/.t131-mutant-x/change-log.js", "// scratch\n");
+    put("skills/s/scripts/untracked.js", "// scratch\n");
+    fs.rmSync(path.join(root, "shared/resources/gone.js"));
+    assert.deepEqual(liveSources(root), [
+      "shared/resources/kept.js",
+      "shared/resources/tests/kept.test.mjs",
+      "skills/s/scripts/tool.js",
+    ]);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("§3 every allowlist entry still names a live hit and states a reason", () => {
