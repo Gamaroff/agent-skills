@@ -303,19 +303,19 @@ No other file changes. `shared/resources/security-probe.mjs` is read, not edited
 
 ### QA Report
 
-- **Full Report**: [task.250.qa.1.security-probe-scratch-out-of-tree.md](./task.250.qa.1.security-probe-scratch-out-of-tree.md)
-- **Gate File**: [task.250.gate.1.security-probe-scratch-out-of-tree.yml](./task.250.gate.1.security-probe-scratch-out-of-tree.yml)
+- **Full Report**: [task.250.qa.2.security-probe-scratch-out-of-tree.md](./task.250.qa.2.security-probe-scratch-out-of-tree.md)
+- **Gate File**: [task.250.gate.2.security-probe-scratch-out-of-tree.yml](./task.250.gate.2.security-probe-scratch-out-of-tree.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 276
+- **Tests Executed**: 277
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
 
-The new guard's stale-allowlist check is vacuous: it matches its own string literal (TASK-250-CR-1, medium, reproduced). Temp roots can leak on a throw before `try` (TASK-250-CR-4, low). Every success criterion is met: 0 in-tree creates (61 before), the premise controls fail under the wrong root, and runtime is unchanged.
+Cycle 1's fixes hold, and each goes red when reverted. The cycle-2 refute pass found that the in-tree write guard can still be blinded: a quote in a comment inside an argument list (TASK-250-CR2-1, medium) and a backtick or `/*` in a regex literal (TASK-250-CR2-2, low) each hide a write. Both were reproduced in memory. No real write is hidden today.
 
 ## Change Log
 
@@ -329,6 +329,8 @@ The new guard's stale-allowlist check is vacuous: it matches its own string lite
 | 2026-11-02 |  | Implemented — 3 files, 2 tests | develop |
 | 2026-11-02 |  | QA gate CONCERNS (90/100) — 2 findings | qa-task |
 | 2026-11-02 |  | QA findings fixed — CR-1, CR-4 (plus advisory CR-2, CR-3), 1 iteration | qa-fix |
+| 2026-11-02 |  | QA gate CONCERNS (90/100) — 2 findings | qa-task |
+| 2026-11-02 |  | QA findings fixed — CR2-1, CR2-2 (plus advisory CR2-3, CR2-4, CR2-5), 1 iteration | qa-fix |
 
 <!-- change-log-end -->
 

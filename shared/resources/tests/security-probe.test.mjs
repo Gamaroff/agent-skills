@@ -988,6 +988,15 @@ test("shell entry: side effects in HOME, TMPDIR or beside the script are escapes
   // The script writes beside itself, so it runs from a copy in a temp root: in
   // the real fixtures directory its PWNED-self was a file a parallel suite
   // walking the repository could list and find gone (task.250).
+  // A PWNED-self already in the repository is a leftover of a run from before
+  // task.250, not this run's doing: say so, rather than fail below with a
+  // message that reads as a regression (QA cycle 2, CR2-4).
+  const inTreeSelf = join(REPO_ROOT, SHELL_FIXTURES, "PWNED-self");
+  assert.equal(
+    existsSync(inTreeSelf),
+    false,
+    `${inTreeSelf} is left over from an earlier run — delete it; this run has not started`,
+  );
   const root = fenceRoot(
     {},
     {
@@ -1017,9 +1026,9 @@ test("shell entry: side effects in HOME, TMPDIR or beside the script are escapes
       `PWNED-self is not under the temp root ${root}: ${JSON.stringify(self)}`,
     );
     assert.equal(
-      existsSync(join(REPO_ROOT, SHELL_FIXTURES, "PWNED-self")),
+      existsSync(inTreeSelf),
       false,
-      "the script wrote beside the repository's own fixture",
+      "the script wrote beside the repository's own fixture during this run",
     );
     // Every escape names the shell it happened under.
     assert.ok(r.escapes.every((e) => e.shell && e.id.endsWith(`@${e.shell}`)));
@@ -2155,8 +2164,10 @@ test("namesGh: quoted or backslashed gh, a non-line-initial source, and a root r
     "clean.sh":
       "f() { printf 'high ghost %s\\n' \"$1\"; }  # ends in gh-less words\n",
   });
-  const viaLink = mkdtempSync(join(tmpdir(), "t140-rootlink-"));
+  // Created inside `try`, so a throw here cannot leak the root (QA cycle 2, CR2-3).
+  let viaLink;
   try {
+    viaLink = mkdtempSync(join(tmpdir(), "t140-rootlink-"));
     for (const lib of [
       "dq.sh",
       "sq.sh",
@@ -2180,7 +2191,7 @@ test("namesGh: quoted or backslashed gh, a non-line-initial source, and a root r
     );
   } finally {
     rmSync(root, { recursive: true, force: true });
-    rmSync(viaLink, { recursive: true, force: true });
+    if (viaLink) rmSync(viaLink, { recursive: true, force: true });
   }
 });
 
@@ -8078,17 +8089,44 @@ const T250_WRITE_ARG = {
  * scan runs on this, so a call name written INSIDE a string — an allowlist key,
  * a test sample, a shell snippet — is never counted as a call (task.250 QA
  * cycle 1, CR-1: the allowlist key matched itself, and its stale check could
- * never fail). Quote strings end at the end of the line, as JavaScript's do, so
- * a stray quote in a regex literal blanks one line at most.
+ * never fail). Regex literals are blanked too, so a quote, a backtick or a `/*`
+ * inside one opens nothing (QA cycle 2, CR2-2).
+ *
+ * This is a tokenizer heuristic, not a JavaScript parser — the repository
+ * carries none. So the guard does not claim it never misreads: it fails LOUD
+ * when it does. A matched call whose argument list cannot be closed fails the
+ * guard (`unparsed`), and so does a code-only view that hides more call names
+ * than T250_MAX_MASKED (`masked`), rather than either passing quietly.
  */
 function t250CodeOnly(src) {
   const out = src.split("");
   const blank = (from, to) => {
     for (let k = from; k < to; k++) if (out[k] !== "\n") out[k] = " ";
   };
+  // A `/` opens a regex literal when what precedes it cannot end an operand.
+  const regexAfter =
+    /(^|[(,=:[!&|?{};+\-*%<>~^]|\b(?:return|typeof|case|void|in|of|delete|throw|new|yield|await))\s*$/;
   for (let i = 0; i < src.length; i++) {
     const ch = src[i];
-    if (ch === "/" && src[i + 1] === "/") {
+    if (
+      ch === "/" &&
+      src[i + 1] !== "/" &&
+      src[i + 1] !== "*" &&
+      regexAfter.test(out.slice(Math.max(0, i - 16), i).join(""))
+    ) {
+      let j = i + 1;
+      let inClass = false;
+      for (; j < src.length && src[j] !== "\n"; j++) {
+        if (src[j] === "\\") j++;
+        else if (src[j] === "[") inClass = true;
+        else if (src[j] === "]") inClass = false;
+        else if (src[j] === "/" && !inClass) break;
+      }
+      if (src[j] === "/") {
+        blank(i, j + 1);
+        i = j;
+      }
+    } else if (ch === "/" && src[i + 1] === "/") {
       const end = src.indexOf("\n", i);
       const stop = end === -1 ? src.length : end;
       blank(i, stop);
@@ -8112,89 +8150,129 @@ function t250CodeOnly(src) {
 }
 
 /**
- * Split the argument list that starts just after `open` (the index of a `(`)
- * into top-level argument strings. Strings and template literals are skipped
- * whole, so a comma or a paren inside one never splits or closes the list.
+ * The top-level argument spans ([start, end) indexes) of the call whose `(` is
+ * at `open`, read from the CODE-ONLY view `code`, or null when the list never
+ * closes. Literals and comments are already blank there, so nothing inside one
+ * can split or close the list. The caller slices the RAW source with the same
+ * indexes: one view decides the structure, the other supplies the text (QA
+ * cycle 2, CR2-1 — two parsers over two views let a quote in a comment drop a
+ * call silently).
  */
-function t250Args(src, open) {
-  const args = [];
+function t250Args(code, open) {
+  const spans = [];
   let depth = 0;
   let start = open + 1;
-  for (let i = open + 1; i < src.length; i++) {
-    const ch = src[i];
-    if (ch === '"' || ch === "'" || ch === "`") {
-      for (i++; i < src.length && src[i] !== ch; i++) if (src[i] === "\\") i++;
-      continue;
-    }
+  for (let i = open + 1; i < code.length; i++) {
+    const ch = code[i];
     if (ch === "(" || ch === "[" || ch === "{") depth++;
     else if (ch === ")" || ch === "]" || ch === "}") {
       if (depth === 0) {
-        args.push(src.slice(start, i).trim());
-        return args;
+        spans.push([start, i]);
+        return spans;
       }
       depth--;
     } else if (ch === "," && depth === 0) {
-      args.push(src.slice(start, i).trim());
+      spans.push([start, i]);
       start = i + 1;
     }
   }
   return null;
 }
 
-/** Every write call in `src` whose write argument is built from REPO_ROOT, as `line → call`. */
+/** The most call names the code-only view may hide (they sit in strings or comments). */
+const T250_MAX_MASKED = 8;
+
+/**
+ * Every write call in `src` whose write argument is built from REPO_ROOT, as
+ * `line → call`; `unparsed`, the matched calls whose argument list never
+ * closes; and `masked`, the lines of call names the code-only view hid.
+ */
 function t250InTreeWrites(src) {
   const call = new RegExp(
     `\\b(${Object.keys(T250_WRITE_ARG).join("|")})\\(`,
     "g",
   );
+  const code = t250CodeOnly(src);
   const lineOf = (idx) => src.slice(0, idx).split("\n").length;
   const found = [];
+  const unparsed = [];
   let total = 0;
   // Matched on the code-only view: a name in a comment or a string is not a call.
-  for (const m of t250CodeOnly(src).matchAll(call)) {
+  for (const m of code.matchAll(call)) {
     const ln = lineOf(m.index);
-    const args = t250Args(src, m.index + m[0].length - 1);
-    if (!args) continue;
+    const spans = t250Args(code, m.index + m[0].length - 1);
+    if (!spans) {
+      unparsed.push(`${ln} → ${m[1]}(`);
+      continue;
+    }
     total++;
-    const target = args[T250_WRITE_ARG[m[1]]] ?? "";
+    const span = spans[T250_WRITE_ARG[m[1]]];
+    const target = span ? src.slice(span[0], span[1]).trim() : "";
     // Any write path that names REPO_ROOT: join(…), resolve(…), path.join(…)
     // and a template literal alike (CR-2).
     if (/\bREPO_ROOT\b/.test(target)) {
       found.push(`${ln} → ${m[1]}(${target.replace(/\s+/g, " ")}, …)`);
     }
   }
-  return { found, total };
+  const masked = [];
+  for (const m of src.matchAll(call)) {
+    if (code.slice(m.index, m.index + m[0].length) !== m[0])
+      masked.push(String(lineOf(m.index)));
+  }
+  return { found, total, unparsed, masked };
 }
 
 /**
  * In-tree writes kept on purpose, keyed on the call's write argument (line
- * numbers drift), each with its reason. A new entry needs the same: a reason
- * the write cannot race a parallel suite.
+ * numbers drift), each with how many such calls it covers and its reason. A
+ * new entry needs the same: a reason the write cannot race a parallel suite.
+ * The count is exact, so a second copy of an approved call is not approved by
+ * the first's reason (QA cycle 2, CR2-5).
  */
 const T250_ALLOWED = new Map([
   [
     'rmSync(join(REPO_ROOT, FIXTURES, "__pycache__"), …)',
-    "clears a bytecode directory a MANUAL run left behind, before asserting the probe wrote none; " +
-      "it creates nothing, and on a clean checkout there is nothing to remove",
+    {
+      count: 1,
+      reason:
+        "clears a bytecode directory a MANUAL run left behind, before asserting the probe wrote none; " +
+        "it creates nothing, and on a clean checkout there is nothing to remove",
+    },
   ],
 ]);
 
 test("task.250: no write call in this suite builds its write path from REPO_ROOT", () => {
   const src = readFileSync(fileURLToPath(import.meta.url), "utf8");
-  const { found, total } = t250InTreeWrites(src);
+  const { found, total, unparsed, masked } = t250InTreeWrites(src);
   // Non-vacuity floor: a scanner that matched nothing would also report no
   // in-tree write. This file holds well over a hundred write calls.
   assert.ok(
     total >= 150,
     `the scan found only ${total} write calls — the scanner is broken`,
   );
+  // A call the scanner matched but could not read is a failure, never a skip.
+  assert.deepEqual(
+    unparsed,
+    [],
+    `write calls the scan could not read:\n${unparsed.join("\n")}`,
+  );
+  // The code-only view hides only names in strings and comments — a handful.
+  // More means a literal or comment was mis-closed and swallowed real code.
+  assert.ok(
+    masked.length <= T250_MAX_MASKED,
+    `the code-only view hid ${masked.length} call names (max ${T250_MAX_MASKED}), on lines ${masked.join(", ")} — a literal or comment was mis-read`,
+  );
   const unexpected = found.filter((f) => !T250_ALLOWED.has(f.split(" → ")[1]));
   assert.deepEqual(unexpected, [], `in-tree writes:\n${unexpected.join("\n")}`);
-  // An allowlist entry no call matches any more is stale: delete it.
-  for (const key of T250_ALLOWED.keys()) {
-    assert.ok(
-      found.some((f) => f.split(" → ")[1] === key),
-      `stale T250_ALLOWED entry: ${key}`,
+  // Each entry covers exactly its count; zero matches means it is stale: delete it.
+  for (const [key, { count }] of T250_ALLOWED) {
+    const hits = found.filter((f) => f.split(" → ")[1] === key).length;
+    assert.equal(
+      hits,
+      count,
+      hits === 0
+        ? `stale T250_ALLOWED entry: ${key}`
+        : `T250_ALLOWED entry covers ${count} call(s) but ${hits} match: ${key}`,
     );
   }
 });
@@ -8258,16 +8336,31 @@ test("task.250: the scanner flags a REPO_ROOT write and ignores a REPO_ROOT read
     `${w("writeFile")}(` + "`${REPO_ROOT}/t`" + `, "x");`,
     `${w("appendFile")}(join(REPO_ROOT, "log"), "x");`,
     "const t = `" + w("rm") + '(join(REPO_ROOT, "q"))`;',
+    // A quote in a comment inside the argument list (QA cycle 2, CR2-1).
+    `${w("mkdir")}(join(REPO_ROOT, "c1") // it's a note`,
+    ", { recursive: true });",
+    // A backtick, and a `/*`, inside regex literals open nothing (CR2-2) —
+    // and division is not a regex.
+    "const r1 = /`/;",
+    `${w("mkdir")}(join(REPO_ROOT, "c2"));`,
+    "const r2 = /x\\/*/;",
+    `${w("mkdir")}(join(REPO_ROOT, "c3"));`,
+    'const q = a / b; const z = "it\'s" / c;',
+    `${w("mkdir")}(join(REPO_ROOT, "c4"));`,
+    // A call whose argument list never closes is reported, never skipped.
+    `${w("rm")}(join(REPO_ROOT, "u")`,
   ].join("\n");
-  const { found, total } = t250InTreeWrites(sample);
+  const { found, total, unparsed, masked } = t250InTreeWrites(sample);
   assert.equal(
     total,
-    12,
+    16,
     "every call outside a comment or a literal is counted",
   );
   assert.deepEqual(
     found.map((f) => f.split(" → ")[0]),
-    ["1", "2", "8", "9", "12", "15", "16", "17"],
+    ["1", "2", "8", "9", "12", "15", "16", "17", "19", "22", "24", "26"],
     found.join("\n"),
   );
+  assert.deepEqual(unparsed, [`27 → ${w("rm")}(`]);
+  assert.deepEqual(masked, ["10", "13", "14", "18"]);
 });
