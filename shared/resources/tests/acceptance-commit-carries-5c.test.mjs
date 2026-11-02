@@ -364,6 +364,99 @@ for (const shell of SHELLS) {
     assert.equal(g("diff", "--cached", "--name-only", "--", IMPL_PATH), "");
   });
 
+  // obs #147: on task.174 the 5c fix for "tick criterion #7" also appended an evidence note to the
+  // criterion's own line. criteria-drift reads that as `reworded`, and /finalise's AC agent failed
+  // #7 as an unapproved amendment. The stage block now refuses it at 5c, where it is cheap.
+  test(`[${shell}] 5c carry: a criterion tick carries; an edit to a criterion's text is NOT CARRIED and undone (obs #147)`, () => {
+    const TASK = "docs/tasks/task.9.x/task.9.x.md";
+    const doc = (lines) =>
+      `# Task 9\n\n## 9. Success Criteria\n\n${lines.join("\n")}\n\n## 10. Risk\n\nnone\n`;
+    const C1 =
+      "Each mutation proof turns a test red, recorded in the QA report";
+    const C2 = "The guide states adoption is optional";
+    for (const [name, after, carried] of [
+      ["tick only", [`- [x] ${C1}`, `- [ ] ${C2}`], true],
+      [
+        "tick + evidence on an indented line",
+        [
+          `- [x] ${C1}`,
+          "  Evidence: QA report 1, lines 158-162.",
+          `- [ ] ${C2}`,
+        ],
+        true,
+      ],
+      [
+        "tick + note on the criterion's own line",
+        [`- [x] ${C1} (M1–M13 across QA reports 1–3)`, `- [ ] ${C2}`],
+        false,
+      ],
+      ["a criterion removed", [`- [x] ${C1}`], false],
+    ]) {
+      const { root, g, write, qaHead } = fiveCRepo();
+      write(TASK, doc([`- [ ] ${C1}`, `- [ ] ${C2}`]));
+      g("add", "--", TASK);
+      g("commit", "-q", "-m", "criteria at the last QA push");
+      const head = g("rev-parse", "HEAD");
+      assert.equal(run(shell, root, classifyBlock()).status, 0, name);
+      write(TASK, doc(after));
+      const r = run(shell, root, stageBlock([TASK]));
+      assert.equal(r.status, 0, `${name}: ${r.stderr}${r.stdout}`);
+      assert.equal(g("rev-parse", "HEAD"), head, `${name}: HEAD must not move`);
+      assert.notEqual(head, qaHead);
+      if (carried) {
+        assert.match(r.stdout, /^Carried to 6a: .*task\.9\.x\.md$/m, name);
+        assert.equal(
+          g("diff", "--cached", "--name-only", "--", TASK),
+          TASK,
+          `${name}: staged`,
+        );
+      } else {
+        assert.match(
+          r.stdout,
+          /NOT CARRIED: docs\/tasks\/task\.9\.x\/task\.9\.x\.md — the 5c edit changed criterion text: .*\((reworded|removed)\)/,
+          `${name}: ${r.stdout}`,
+        );
+        assert.equal(
+          g("status", "--porcelain", "--", TASK),
+          "",
+          `${name}: the edit is undone, not left dirty or staged`,
+        );
+      }
+    }
+  });
+
+  test(`[${shell}] 5c carry: criteria-drift that cannot run HALTs with the edit kept, unstaged (obs #147)`, () => {
+    const { root, g, write } = fiveCRepo();
+    assert.equal(run(shell, root, classifyBlock()).status, 0);
+    write("docs/tasks/task.9.x/task.9.notes.md", "# Notes\n\nfixed\n");
+    // A drift engine that exits 2 (usage) — the check could not judge, so nothing may be decided.
+    // The fake lives in the scratch root and the block is pointed at it: .agents/skills there is a
+    // symlink to this repository's skills/, so editing the bundled engine would edit the real one.
+    write("fake-drift.js", "process.exit(2);\n");
+    const block = stageBlock(["docs/tasks/task.9.x/task.9.notes.md"]).replace(
+      /^CRITERIA_DRIFT="[^"\n]*"$/m,
+      'CRITERIA_DRIFT="fake-drift.js"',
+    );
+    assert.match(block, /^CRITERIA_DRIFT="fake-drift\.js"$/m);
+    const r = run(shell, root, block);
+    assert.equal(r.status, 1, r.stdout);
+    assert.match(r.stdout, /HALT: criteria-drift\.js could not judge/);
+    assert.equal(
+      g(
+        "diff",
+        "--cached",
+        "--name-only",
+        "--",
+        "docs/tasks/task.9.x/task.9.notes.md",
+      ),
+      "",
+    );
+    assert.match(
+      readFileSync(join(root, "docs/tasks/task.9.x/task.9.notes.md"), "utf8"),
+      /fixed/,
+    );
+  });
+
   test(`[${shell}] 5c carry: a path the classifier did not clear HALTs and is left exactly as it was (CR-1)`, () => {
     const { root, g, write, qaHead } = fiveCRepo();
     assert.equal(run(shell, root, classifyBlock()).status, 0);

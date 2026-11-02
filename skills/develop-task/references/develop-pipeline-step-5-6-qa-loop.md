@@ -1699,9 +1699,16 @@ while IFS=' ' read -r VERDICT ID REST; do
 done < "$CLASSIFIED"
 ```
 
-Apply the `doc-only` findings — and only those — then run the block below. It stages the review
-report (`/review-pr` already staged it; staging again is a no-op) and each changed path the classifier
-cleared, once it passes `doc-links.js`. A cleared path that fails the link check is restored to
+Apply the `doc-only` findings — and only those — then run the block below. **A fix that touches a
+success criterion ticks its checkbox and nothing else.** Evidence goes on an indented line under
+the criterion, or into the QA report, never onto the criterion's own line. `/finalise` judges each
+criterion against its reviewed text, and an edit to that line reads as an unapproved amendment
+(obs #147). The block enforces this.
+
+It stages the review report (`/review-pr` already staged it; staging again is a no-op) and each
+changed path the classifier cleared, once it passes `doc-links.js` and, for a document with a
+criteria section, `criteria-drift.js` against `HEAD`. A path whose criterion text changed is NOT
+CARRIED and restored to `HEAD`, exactly like a dead link. A cleared path that fails the link check is restored to
 `HEAD`, which undoes only the 5c edit because the path was clean when cleared; its finding is
 recorded, not fixed. A path the classifier did **not** clear is a HALT and is left untouched: this
 block never discards work it cannot prove is its own. When the classify block cleared no path, or no
@@ -1721,6 +1728,11 @@ ELIGIBLE=.claude/state/5c-carry-eligible.txt   # written by the classify block a
 DOC_LINKS=".agents/skills/{develop-story|develop-task}/references/doc-links.js"
 case "$DOC_LINKS" in *'{'*) printf '%s\n' "HALT: substitute the skill name in DOC_LINKS"; exit 1 ;; esac
 [ -f "$DOC_LINKS" ] || { printf '%s\n' "HALT: $DOC_LINKS not found"; exit 1; }
+# A 5c fix may tick a criterion; it may not reword one (obs #147). criteria-drift.js compares each
+# carried .md against HEAD — the last QA push — so only this pass's edit is judged.
+CRITERIA_DRIFT=".agents/skills/{develop-story|develop-task}/references/criteria-drift.js"
+case "$CRITERIA_DRIFT" in *'{'*) printf '%s\n' "HALT: substitute the skill name in CRITERIA_DRIFT"; exit 1 ;; esac
+[ -f "$CRITERIA_DRIFT" ] || { printf '%s\n' "HALT: $CRITERIA_DRIFT not found"; exit 1; }
 command -v node >/dev/null 2>&1 || { printf '%s\n' "HALT: node is not on PATH — the link check cannot run"; exit 1; }
 HEAD_BEFORE=$(git rev-parse HEAD)
 git --literal-pathspecs add -- "$PR_REVIEW" || { printf '%s\n' "HALT: cannot stage $PR_REVIEW"; exit 1; }
@@ -1738,7 +1750,37 @@ for p in "${CARRY_FIXED[@]}"; do
   case "$p" in
     *.md) command node "$DOC_LINKS" --file "$p"; LINKS_RC=$? ;;
   esac
+  # criteria-drift.js against HEAD: exit 0 reports changed[] (empty when clean), exit 1 is
+  # `no-criteria` (not a work-item document — nothing to judge), anything else could not run.
+  # A tick is not a change. `appended` (a new continuation line under an unchanged criterion) is an
+  # evidence note and carries; `reworded`, `added` and `removed` are amendments no 5c fix may make.
+  # On task.174 an evidence note appended to the criterion's OWN line read as `reworded`, and the
+  # DoD AC agent failed the criterion as an unapproved amendment (obs #147).
+  REWRITTEN=""
   if [ "$LINKS_RC" -eq 0 ]; then
+    case "$p" in
+      *.md)
+        DRIFT_RC=0
+        DRIFT=$(command node "$CRITERIA_DRIFT" --doc "$p" --base HEAD --json) || DRIFT_RC=$?
+        if [ "$DRIFT_RC" -eq 0 ]; then
+          REWRITTEN=$(printf '%s' "$DRIFT" | command node -e '
+            let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => {
+              const r = JSON.parse(s);
+              process.stdout.write((r.changed || []).filter((c) => c.kind !== "appended")
+                .map((c) => `${c.id} (${c.kind})`).join(", "));
+            });') || DRIFT_RC=3
+        fi
+        if [ "$DRIFT_RC" -ne 0 ] && [ "$DRIFT_RC" -ne 1 ]; then
+          git --literal-pathspecs restore --staged -- "$p" \
+            || { printf '%s\n' "HALT: criteria-drift.js could not judge $p, and $p is STILL STAGED — unstage it by hand"; exit 1; }
+          printf '%s\n' "HALT: criteria-drift.js could not judge $p (rc $DRIFT_RC) — the edit is kept, unstaged"; exit 1
+        fi ;;
+    esac
+  fi
+  if [ "$LINKS_RC" -eq 0 ] && [ -n "$REWRITTEN" ]; then
+    printf '%s\n' "NOT CARRIED: $p — the 5c edit changed criterion text: $REWRITTEN; tick the box only, and put evidence on an indented line under it; the 5c edit is undone, finding recorded"
+    git --literal-pathspecs checkout HEAD -- "$p" || { printf '%s\n' "HALT: cannot restore $p"; exit 1; }
+  elif [ "$LINKS_RC" -eq 0 ]; then
     CARRIED+=("$p")
   elif [ "$LINKS_RC" -ne 1 ]; then
     # Unstaged, edit kept: staged, a resume would carry a fix whose check never ran (QA-3, CR-2).
