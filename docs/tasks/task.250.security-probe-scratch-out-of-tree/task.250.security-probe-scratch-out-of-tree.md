@@ -303,8 +303,8 @@ No other file changes. `shared/resources/security-probe.mjs` is read, not edited
 
 ### QA Report
 
-- **Full Report**: [task.250.qa.3.security-probe-scratch-out-of-tree.md](./task.250.qa.3.security-probe-scratch-out-of-tree.md)
-- **Gate File**: [task.250.gate.3.security-probe-scratch-out-of-tree.yml](./task.250.gate.3.security-probe-scratch-out-of-tree.yml)
+- **Full Report**: [task.250.qa.4.security-probe-scratch-out-of-tree.md](./task.250.qa.4.security-probe-scratch-out-of-tree.md)
+- **Gate File**: [task.250.gate.4.security-probe-scratch-out-of-tree.yml](./task.250.gate.4.security-probe-scratch-out-of-tree.yml)
 
 ### Test Coverage Summary
 
@@ -315,7 +315,7 @@ No other file changes. `shared/resources/security-probe.mjs` is read, not edited
 
 ### Key Findings
 
-Cycle 2's fixes hold, and each goes red when reverted. The regex-literal handling they added reads a division after a string literal or a `//` comment as a regex start, which hides a write without failing the guard (TASK-250-CR3-1, medium, reproduced). The calibration row meant to cover this case cannot catch it (TASK-250-CR3-3, low).
+Cycle 3's fixes hold. One misread path remains: a phantom regex inside an argument list can merge two arguments, so a three-argument write-at-index-1 call is checked on the wrong argument and the guard still passes (TASK-250-CR4-1, medium, reproduced; no such code in the file today).
 
 ## Change Log
 
@@ -333,6 +333,8 @@ Cycle 2's fixes hold, and each goes red when reverted. The regex-literal handlin
 | 2026-11-02 |  | QA findings fixed — CR2-1, CR2-2 (plus advisory CR2-3, CR2-4, CR2-5), 1 iteration | qa-fix |
 | 2026-11-02 |  | QA gate CONCERNS (90/100) — 2 findings | qa-task |
 | 2026-11-02 |  | QA findings fixed — CR3-1, CR3-3 (plus advisory CR3-2), 1 iteration | qa-fix |
+| 2026-11-02 |  | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-11-02 |  | QA findings fixed — CR4-1 (plus cleanup CR4-2), 1 iteration | qa-fix |
 
 <!-- change-log-end -->
 

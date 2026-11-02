@@ -8100,7 +8100,7 @@ const T250_WRITE_ARG = {
  * a misread that hides a real call adds a site no entry names, whatever the
  * heuristic got wrong (QA cycle 3, CR3-2 — an allow-list, not a cap).
  */
-function t250CodeOnly(src) {
+function t250CodeOnly(src, regexes = []) {
   const out = src.split("");
   const blank = (from, to) => {
     for (let k = from; k < to; k++) if (out[k] !== "\n") out[k] = " ";
@@ -8110,22 +8110,37 @@ function t250CodeOnly(src) {
   // bracket, or a keyword that takes an expression. The token is tracked as the
   // scan goes, so whitespace and comments are skipped, and a string, template
   // or regex literal counts as an operand — `"a" / b` is division (QA cycle 3,
-  // CR3-1: a window over the blanked text read a literal as nothing).
-  const OPENS = new Set("(,=:[!&|?{};+-*%<>~^".split(""));
+  // CR3-1: a window over the blanked text read a literal as nothing). Postfix
+  // `++`/`--` ends an operand, and so does a property name, even one spelled
+  // like a keyword (`a.of`) (QA cycle 4, CR4-1). Each blanked regex literal is
+  // recorded in `regexes` as [start, end), for the caller's tripwire.
+  const OPENS = new Set("(,=:[!&|?{};+-*%<>~^/".split(""));
   const KEYWORDS = new Set(
     "return typeof case void in of delete throw new yield await".split(" "),
   );
-  let last = null; // null: start of source; "operand"; or the last punctuator
+  // null: start of source; "operand"; "word" (`word` holds it); or the last
+  // punctuator.
+  let last = null;
   let word = "";
+  let wordAfterDot = false;
   const regexStarts = () =>
-    last === null || OPENS.has(last) || (last === "word" && KEYWORDS.has(word));
+    last === null ||
+    OPENS.has(last) ||
+    (last === "word" && !wordAfterDot && KEYWORDS.has(word));
   for (let i = 0; i < src.length; i++) {
     const ch = src[i];
     if (/\s/.test(ch)) continue;
     if (/[A-Za-z0-9_$]/.test(ch)) {
-      word =
-        last === "word" && /[A-Za-z0-9_$]/.test(src[i - 1]) ? word + ch : ch;
+      if (last === "word" && /[A-Za-z0-9_$]/.test(src[i - 1])) word += ch;
+      else {
+        wordAfterDot = last === ".";
+        word = ch;
+      }
       last = "word";
+      continue;
+    }
+    if ((ch === "+" || ch === "-") && src[i - 1] === ch && last === ch) {
+      last = "operand"; // the second character of a postfix `++` / `--`
       continue;
     }
     if (
@@ -8144,6 +8159,7 @@ function t250CodeOnly(src) {
       }
       if (src[j] === "/") {
         blank(i, j + 1);
+        regexes.push([i, j + 1]);
         i = j;
         last = "operand";
       } else last = "/";
@@ -8211,13 +8227,21 @@ function t250Args(code, open) {
  * code-only view hid, as `line → text` — the trimmed line with every call name
  * written `⟨call⟩(`, so a T250_MASKED key never spells a call name itself
  * (which would make it one more masked site: the cycle-1 CR-1 trap).
+ *
+ * A call is also `unparsed` when a regex literal the view blanked inside its
+ * argument list holds a comma or a bracket. Such a blank decides how the list
+ * splits, and a misread one (a phantom regex) merges arguments without hiding
+ * the call name, so neither `masked` nor an unclosed list would catch it. Real
+ * code puts no such regex in a write call's arguments, so the tripwire costs
+ * nothing (QA cycle 4, CR4-1: it closes the class, not one tokenizer cause).
  */
 function t250InTreeWrites(src) {
   const call = new RegExp(
     `\\b(${Object.keys(T250_WRITE_ARG).join("|")})\\(`,
     "g",
   );
-  const code = t250CodeOnly(src);
+  const regexes = [];
+  const code = t250CodeOnly(src, regexes);
   const lines = src.split("\n");
   const lineOf = (idx) => src.slice(0, idx).split("\n").length;
   const found = [];
@@ -8226,9 +8250,14 @@ function t250InTreeWrites(src) {
   // Matched on the code-only view: a name in a comment or a string is not a call.
   for (const m of code.matchAll(call)) {
     const ln = lineOf(m.index);
-    const spans = t250Args(code, m.index + m[0].length - 1);
+    const open = m.index + m[0].length - 1;
+    const spans = t250Args(code, open);
     const span = spans?.[T250_WRITE_ARG[m[1]]];
-    if (!span) {
+    const close = spans?.length ? spans[spans.length - 1][1] : open;
+    const splitsOnRegex = regexes.some(
+      ([s, e]) => s > open && e <= close && /[,()[\]{}]/.test(src.slice(s, e)),
+    );
+    if (!span || splitsOnRegex) {
       unparsed.push(`${ln} → ${m[1]}(`);
       continue;
     }
@@ -8419,6 +8448,15 @@ test("task.250: the scanner flags a REPO_ROOT write and ignores a REPO_ROOT read
     `const z = "it's" / c; ${w("mkdir")}(join(REPO_ROOT, "c5")); const v = e / f;`,
     "total // a long comment",
     `  / count; ${w("mkdir")}(join(REPO_ROOT, "c6")); const k = 1 / 2;`,
+    // Division after postfix `++` and after a property spelled like a keyword:
+    // a phantom regex would merge arguments 0 and 1 (QA cycle 4, CR4-1).
+    `${w("cp")}(i++ / 2, join(REPO_ROOT, "d1") / 1, opts);`,
+    `${w("cp")}(a.of / 2, join(REPO_ROOT, "d2") / k, opts);`,
+    // A regex holding a comma inside the argument list decides the split, so
+    // the call is reported, never trusted (the CR4-1 tripwire).
+    `${w("cp")}(s.replace(/a,b/, ""), join(REPO_ROOT, "d3"));`,
+    // A regex after a division sign is a regex (CR4-2).
+    `const d = x / /'/.source; ${w("mkdir")}(join(REPO_ROOT, "c7"));`,
     // A call without its write argument is reported, never skipped.
     `${w("cp")}(join(REPO_ROOT, "only-src"));`,
     // A call whose argument list never closes is reported, never skipped.
@@ -8427,18 +8465,22 @@ test("task.250: the scanner flags a REPO_ROOT write and ignores a REPO_ROOT read
   const { found, total, unparsed, masked } = t250InTreeWrites(sample);
   assert.equal(
     total,
-    18,
+    21,
     "every call outside a comment or a literal is counted",
   );
   assert.deepEqual(
     found.map((f) => f.split(" → ")[0]),
     [
       ...["1", "2", "8", "9", "12", "15", "16", "17"],
-      ...["19", "22", "24", "26", "27", "29"],
+      ...["19", "22", "24", "26", "27", "29", "30", "31", "33"],
     ],
     found.join("\n"),
   );
-  assert.deepEqual(unparsed, [`30 → ${w("cp")}(`, `31 → ${w("rm")}(`]);
+  assert.deepEqual(unparsed, [
+    `32 → ${w("cp")}(`,
+    `34 → ${w("cp")}(`,
+    `35 → ${w("rm")}(`,
+  ]);
   assert.deepEqual(
     masked.map((m) => m.split(" → ")[0]),
     ["10", "13", "14", "18"],
