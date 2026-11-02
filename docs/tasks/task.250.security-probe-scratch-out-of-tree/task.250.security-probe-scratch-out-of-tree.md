@@ -293,6 +293,30 @@ No other file changes. `shared/resources/security-probe.mjs` is read, not edited
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-02
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.250.qa.1.security-probe-scratch-out-of-tree.md](./task.250.qa.1.security-probe-scratch-out-of-tree.md)
+- **Gate File**: [task.250.gate.1.security-probe-scratch-out-of-tree.yml](./task.250.gate.1.security-probe-scratch-out-of-tree.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 276
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+
+The new guard's stale-allowlist check is vacuous: it matches its own string literal (TASK-250-CR-1, medium, reproduced). Temp roots can leak on a throw before `try` (TASK-250-CR-4, low). Every success criterion is met: 0 in-tree creates (61 before), the premise controls fail under the wrong root, and runtime is unchanged.
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -303,6 +327,8 @@ No other file changes. `shared/resources/security-probe.mjs` is read, not edited
 | 2026-11-02 | 1.1 | Review passed (9/10): added removal of the dead `.t140-*` `.gitignore` rule; Performance criteria now name the timing command and the `scripts/test-tmpdir.mjs` ratchet | review-task |
 | 2026-11-02 |  | Status → ready-for-development | review-task |
 | 2026-11-02 |  | Implemented — 3 files, 2 tests | develop |
+| 2026-11-02 |  | QA gate CONCERNS (90/100) — 2 findings | qa-task |
+| 2026-11-02 |  | QA findings fixed — CR-1, CR-4 (plus advisory CR-2, CR-3), 1 iteration | qa-fix |
 
 <!-- change-log-end -->
 

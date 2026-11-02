@@ -1008,6 +1008,19 @@ test("shell entry: side effects in HOME, TMPDIR or beside the script are escapes
         `${marker} not reported as an escape: ${JSON.stringify(paths.slice(0, 6))}`,
       );
     }
+    // The beside-the-script write landed in the temp root's copy, not in the
+    // repository's fixtures directory (task.250 QA cycle 1, CR-3).
+    const self = paths.filter((p) => p.endsWith("PWNED-self"));
+    assert.ok(
+      self.length > 0 &&
+        self.every((p) => realpathSync(dirname(p)).startsWith(root + sep)),
+      `PWNED-self is not under the temp root ${root}: ${JSON.stringify(self)}`,
+    );
+    assert.equal(
+      existsSync(join(REPO_ROOT, SHELL_FIXTURES, "PWNED-self")),
+      false,
+      "the script wrote beside the repository's own fixture",
+    );
     // Every escape names the shell it happened under.
     assert.ok(r.escapes.every((e) => e.shell && e.id.endsWith(`@${e.shell}`)));
     // Neither the real HOME nor the reader's real temp dir was written to.
@@ -1824,17 +1837,23 @@ test("shell-fn entry: a library that names gh without --fake-gh is declined need
  * engine as `repoRoot`, and remove it in the `finally` (task.250).
  */
 function t140Libs(tag, libs) {
+  // Written inside fenceRoot's build, so a throw here removes the root (CR-4).
   const root = fenceRoot(
     {},
-    { copy: [FN_LIB, FAKE_GH], prefix: `t140-${tag}-` },
+    {
+      copy: [FN_LIB, FAKE_GH],
+      prefix: `t140-${tag}-`,
+      build: (r) => {
+        const d = join(r, FN_FIXTURES, tag);
+        mkdirSync(d, { recursive: true });
+        const named = typeof libs === "function" ? libs(r) : libs;
+        for (const [name, text] of Object.entries(named)) {
+          writeFileSync(join(d, name), text, { mode: 0o644 });
+        }
+      },
+    },
   );
-  const dir = join(root, FN_FIXTURES, tag);
-  mkdirSync(dir, { recursive: true });
-  const named = typeof libs === "function" ? libs(root) : libs;
-  for (const [name, text] of Object.entries(named)) {
-    writeFileSync(join(dir, name), text, { mode: 0o644 });
-  }
-  return { root, dir };
+  return { root, dir: join(root, FN_FIXTURES, tag) };
 }
 
 test("shell-fn entry: a library that installs its own EXIT trap before a guard is still a named decline (task.140, c3-CR-1)", () => {
@@ -1984,13 +2003,14 @@ test("resolveEntry: a symlink inside the root that points outside it is refused 
   // The containment root is a temp root R holding a copy of FN_LIB, not the
   // repository: the scratch symlinks below are then never created in the tree
   // (task.250). What is "inside" and "outside" is decided against R.
-  // The root first: fenceRoot() throws on a TMPDIR inside the repository, and
-  // nothing may be created before it that the throw would leak.
+  // fenceRoot() removes its own root on a throw; everything created after it is
+  // created inside `try`, so the `finally` removes it on any path (CR-4).
   const root = fenceRoot({}, { copy: [FN_LIB], prefix: "t140-symlink-" });
-  const outside = mkdtempSync(join(tmpdir(), "t140-outside-"));
   const dir = join(root, FN_FIXTURES, "symlink");
-  mkdirSync(dir, { recursive: true });
+  let outside;
   try {
+    outside = mkdtempSync(join(tmpdir(), "t140-outside-"));
+    mkdirSync(dir, { recursive: true });
     // The row proves nothing if `outside` lies inside the root (QA cycle 1, CR-5).
     assert.ok(
       !(realpathSync(outside) + sep).startsWith(root + sep),
@@ -2019,7 +2039,7 @@ test("resolveEntry: a symlink inside the root that points outside it is refused 
     assert.equal(inTree.entryPath, join(root, FN_LIB));
   } finally {
     rmSync(root, { recursive: true, force: true });
-    rmSync(outside, { recursive: true, force: true });
+    if (outside) rmSync(outside, { recursive: true, force: true });
   }
 });
 
@@ -2081,10 +2101,11 @@ test("shell-fn entry: --fake-gh containment is decided on real paths, like an en
     {},
     { copy: [FN_LIB, FAKE_GH], prefix: "t140-fakegh-" },
   );
-  const outside = mkdtempSync(join(tmpdir(), "t140-fake-outside-"));
   const dir = join(root, FN_FIXTURES, "fakegh");
-  mkdirSync(dir, { recursive: true });
+  let outside;
   try {
+    outside = mkdtempSync(join(tmpdir(), "t140-fake-outside-"));
+    mkdirSync(dir, { recursive: true });
     assert.ok(
       !(realpathSync(outside) + sep).startsWith(root + sep),
       `${outside} must be outside ${root} for this row to test anything`,
@@ -2117,7 +2138,7 @@ test("shell-fn entry: --fake-gh containment is decided on real paths, like an en
     assert.equal(ok.verdict, "engages", JSON.stringify(ok.declined));
   } finally {
     rmSync(root, { recursive: true, force: true });
-    rmSync(outside, { recursive: true, force: true });
+    if (outside) rmSync(outside, { recursive: true, force: true });
   }
 });
 
@@ -2344,8 +2365,9 @@ test("shell entry forms: gh called under env -i still trips the wire — the mar
 
 test("shell entry forms: an ABSOLUTE path to a gh binary bypasses the trip-wire — a stated limit this row pins (task.140 QA cycle 2, probe-boundary-rule.md §5)", () => {
   const { root, dir } = t140Libs("gh-abs", {});
-  const outside = mkdtempSync(join(tmpdir(), "t140-abs-gh-"));
+  let outside;
   try {
+    outside = mkdtempSync(join(tmpdir(), "t140-abs-gh-"));
     const bin = join(outside, "gh");
     const mark = join(outside, "ran");
     writeFileSync(bin, `#!/bin/sh\n: > ${JSON.stringify(mark)}\n`, {
@@ -2370,14 +2392,15 @@ test("shell entry forms: an ABSOLUTE path to a gh binary bypasses the trip-wire 
     assert.ok(existsSync(mark), "the absolute-path binary did run");
   } finally {
     rmSync(root, { recursive: true, force: true });
-    rmSync(outside, { recursive: true, force: true });
+    if (outside) rmSync(outside, { recursive: true, force: true });
   }
 });
 
 test("shell entry forms: a library that puts another directory ahead of the trip-wire on PATH reaches it — a stated limit this row pins (task.140 QA cycle 4, TASK-140-BUG-7)", () => {
   const { root, dir } = t140Libs("gh-prepend", {});
-  const outside = mkdtempSync(join(tmpdir(), "t140-prepend-gh-"));
+  let outside;
   try {
+    outside = mkdtempSync(join(tmpdir(), "t140-prepend-gh-"));
     mkdirSync(join(outside, "bin"));
     const mark = join(outside, "ran");
     writeFileSync(
@@ -2406,7 +2429,7 @@ test("shell entry forms: a library that puts another directory ahead of the trip
     assert.ok(existsSync(mark), "the prepended gh did run");
   } finally {
     rmSync(root, { recursive: true, force: true });
-    rmSync(outside, { recursive: true, force: true });
+    if (outside) rmSync(outside, { recursive: true, force: true });
   }
 });
 
@@ -2414,10 +2437,11 @@ test("resolveEntry: a missing path is contained by its deepest existing ancestor
   // The scratch link lives in a temp root R, the containment root for the
   // escape row, so nothing is created in the tree (task.250).
   const root = fenceRoot({}, { prefix: "t140-missing-root-" });
-  const outside = mkdtempSync(join(tmpdir(), "t140-missing-"));
   const dir = join(root, FN_FIXTURES, "missing");
-  mkdirSync(dir, { recursive: true });
+  let outside;
   try {
+    outside = mkdtempSync(join(tmpdir(), "t140-missing-"));
+    mkdirSync(dir, { recursive: true });
     assert.ok(
       !(realpathSync(outside) + sep).startsWith(root + sep),
       `${outside} must be outside ${root} for this row to test anything`,
@@ -2436,7 +2460,7 @@ test("resolveEntry: a missing path is contained by its deepest existing ancestor
     assert.equal(ok.ok, true, JSON.stringify(ok));
   } finally {
     rmSync(root, { recursive: true, force: true });
-    rmSync(outside, { recursive: true, force: true });
+    if (outside) rmSync(outside, { recursive: true, force: true });
   }
 });
 
@@ -4498,26 +4522,37 @@ const FENCE_DOC = [
  * copies of `copy` (repository-relative files or directories). Never inside
  * REPO_ROOT: a test passes the root to the engine as `repoRoot`, so nothing a
  * test creates is visible to a parallel suite walking the repository (obs #145).
- * The caller removes the root in its `finally`.
+ * The caller removes the root in its `finally`. `build(root)`, when given, runs
+ * last, inside the same guard: a throw anywhere here removes the root before
+ * it propagates, so a root that never reaches the caller's `try` is not leaked
+ * (task.250 QA cycle 1, CR-4).
  */
-function fenceRoot(files = {}, { copy = [], prefix = "probe-fence-" } = {}) {
+function fenceRoot(
+  files = {},
+  { copy = [], prefix = "probe-fence-", build } = {},
+) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), prefix)));
-  const repo = realpathSync(REPO_ROOT);
-  if ((root + sep).startsWith(repo + sep)) {
+  try {
+    const repo = realpathSync(REPO_ROOT);
+    if ((root + sep).startsWith(repo + sep)) {
+      throw new Error(
+        `scratch root ${root} is inside the repository ${repo} — set TMPDIR outside it (task.250)`,
+      );
+    }
+    for (const rel of copy) {
+      mkdirSync(dirname(join(root, rel)), { recursive: true });
+      cpSync(join(REPO_ROOT, rel), join(root, rel), { recursive: true });
+    }
+    for (const [rel, value] of Object.entries(files)) {
+      const { text, mode } =
+        typeof value === "string" ? { text: value, mode: undefined } : value;
+      mkdirSync(dirname(join(root, rel)), { recursive: true });
+      writeFileSync(join(root, rel), text, mode === undefined ? {} : { mode });
+    }
+    if (build) build(root);
+  } catch (err) {
     rmSync(root, { recursive: true, force: true });
-    throw new Error(
-      `scratch root ${root} is inside the repository ${repo} — set TMPDIR outside it (task.250)`,
-    );
-  }
-  for (const rel of copy) {
-    mkdirSync(dirname(join(root, rel)), { recursive: true });
-    cpSync(join(REPO_ROOT, rel), join(root, rel), { recursive: true });
-  }
-  for (const [rel, value] of Object.entries(files)) {
-    const { text, mode } =
-      typeof value === "string" ? { text: value, mode: undefined } : value;
-    mkdirSync(dirname(join(root, rel)), { recursive: true });
-    writeFileSync(join(root, rel), text, mode === undefined ? {} : { mode });
+    throw err;
   }
   return root;
 }
@@ -8032,7 +8067,49 @@ const T250_WRITE_ARG = {
   cpSync: 1, // argument 0 is the SOURCE: copying out of the repository is a read
   symlinkSync: 1, // argument 0 is the link's TARGET: pointing at the repository is a read
   renameSync: 1,
+  appendFileSync: 0,
+  copyFileSync: 1,
+  linkSync: 1,
 };
+
+/**
+ * `src` with every comment and every string or template literal blanked to
+ * spaces (newlines kept, so indexes and line numbers are unchanged). The call
+ * scan runs on this, so a call name written INSIDE a string — an allowlist key,
+ * a test sample, a shell snippet — is never counted as a call (task.250 QA
+ * cycle 1, CR-1: the allowlist key matched itself, and its stale check could
+ * never fail). Quote strings end at the end of the line, as JavaScript's do, so
+ * a stray quote in a regex literal blanks one line at most.
+ */
+function t250CodeOnly(src) {
+  const out = src.split("");
+  const blank = (from, to) => {
+    for (let k = from; k < to; k++) if (out[k] !== "\n") out[k] = " ";
+  };
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
+    if (ch === "/" && src[i + 1] === "/") {
+      const end = src.indexOf("\n", i);
+      const stop = end === -1 ? src.length : end;
+      blank(i, stop);
+      i = stop;
+    } else if (ch === "/" && src[i + 1] === "*") {
+      const end = src.indexOf("*/", i + 2);
+      const stop = end === -1 ? src.length : end + 2;
+      blank(i, stop);
+      i = stop - 1;
+    } else if (ch === '"' || ch === "'" || ch === "`") {
+      let j = i + 1;
+      for (; j < src.length && src[j] !== ch; j++) {
+        if (src[j] === "\\") j++;
+        else if (src[j] === "\n" && ch !== "`") break;
+      }
+      blank(i, Math.min(j + 1, src.length));
+      i = j;
+    }
+  }
+  return out.join("");
+}
 
 /**
  * Split the argument list that starts just after `open` (the index of a `(`)
@@ -8070,22 +8147,19 @@ function t250InTreeWrites(src) {
     `\\b(${Object.keys(T250_WRITE_ARG).join("|")})\\(`,
     "g",
   );
-  const lines = src.split("\n");
   const lineOf = (idx) => src.slice(0, idx).split("\n").length;
   const found = [];
   let total = 0;
-  for (const m of src.matchAll(call)) {
+  // Matched on the code-only view: a name in a comment or a string is not a call.
+  for (const m of t250CodeOnly(src).matchAll(call)) {
     const ln = lineOf(m.index);
-    const text = lines[ln - 1];
-    const col = m.index - src.lastIndexOf("\n", m.index - 1) - 1;
-    // A mention in a comment is not a call.
-    if (/^\s*(\/\/|\*)/.test(text) || text.slice(0, col).includes("//"))
-      continue;
     const args = t250Args(src, m.index + m[0].length - 1);
     if (!args) continue;
     total++;
     const target = args[T250_WRITE_ARG[m[1]]] ?? "";
-    if (/^join\(\s*REPO_ROOT\b/.test(target) || /^REPO_ROOT\b/.test(target)) {
+    // Any write path that names REPO_ROOT: join(…), resolve(…), path.join(…)
+    // and a template literal alike (CR-2).
+    if (/\bREPO_ROOT\b/.test(target)) {
       found.push(`${ln} → ${m[1]}(${target.replace(/\s+/g, " ")}, …)`);
     }
   }
@@ -8125,6 +8199,39 @@ test("task.250: no write call in this suite builds its write path from REPO_ROOT
   }
 });
 
+test("task.250: a root whose build throws is removed before the throw propagates (QA cycle 1, CR-4)", () => {
+  // The root never reaches a caller's `try`, so only fenceRoot can remove it.
+  let seen;
+  assert.throws(
+    () =>
+      fenceRoot(
+        { "a.txt": "x" },
+        {
+          prefix: "t250-cr4-",
+          build: (r) => {
+            seen = r;
+            throw new Error("build failed");
+          },
+        },
+      ),
+    /build failed/,
+  );
+  assert.ok(seen, "build ran");
+  assert.equal(existsSync(seen), false, `${seen} leaked`);
+  // The same through t140Libs: a library function that throws.
+  let libRoot;
+  assert.throws(
+    () =>
+      t140Libs("cr4", (r) => {
+        libRoot = r;
+        throw new Error("libs failed");
+      }),
+    /libs failed/,
+  );
+  assert.ok(libRoot, "libs ran");
+  assert.equal(existsSync(libRoot), false, `${libRoot} leaked`);
+});
+
 test("task.250: the scanner flags a REPO_ROOT write and ignores a REPO_ROOT read (calibration)", () => {
   // Built at run time, so the sample is not itself a call in this file's source.
   const w = (name) => `${name}Sync`;
@@ -8141,12 +8248,26 @@ test("task.250: the scanner flags a REPO_ROOT write and ignores a REPO_ROOT read
     `// ${w("mkdtemp")}(join(REPO_ROOT, "comment"))`,
     `const f = ${w("mkdtemp")}(join(tmpdir(), "ok-"));`,
     `${w("rm")}(join(REPO_ROOT, "y"), { force: true });`,
+    // A call written inside a string or a template literal is not a call —
+    // an allowlist key is one (QA cycle 1, CR-1) — and neither is one in a
+    // block comment.
+    `const s = "${w("rm")}(join(REPO_ROOT, 'z'))";`,
+    `/* ${w("mkdir")}(join(REPO_ROOT, "c")) */`,
+    // Other spellings of a REPO_ROOT path, and other write calls (CR-2).
+    `${w("mkdir")}(resolve(REPO_ROOT, "r"), { recursive: true });`,
+    `${w("writeFile")}(` + "`${REPO_ROOT}/t`" + `, "x");`,
+    `${w("appendFile")}(join(REPO_ROOT, "log"), "x");`,
+    "const t = `" + w("rm") + '(join(REPO_ROOT, "q"))`;',
   ].join("\n");
   const { found, total } = t250InTreeWrites(sample);
-  assert.equal(total, 9, "every call outside the comment is counted");
+  assert.equal(
+    total,
+    12,
+    "every call outside a comment or a literal is counted",
+  );
   assert.deepEqual(
     found.map((f) => f.split(" → ")[0]),
-    ["1", "2", "8", "9", "12"],
+    ["1", "2", "8", "9", "12", "15", "16", "17"],
     found.join("\n"),
   );
 });
