@@ -5,18 +5,21 @@ type: task
 description: "Lift tinker-city task.127's classify-changes.sh and its spec into agent-skills as an optional consumer template with a GitHub Actions changes-job snippet and a guide, so a consumer's CI skips its heavy jobs on a docs-only push over a green head. tinker-city task.127 has merged (PR #984) and skipped the heavy jobs on a real docs-only push (run 41445192250)."
 tags: [ci, consumer-template, github-actions, bitbucket, performance, consumer-handoff]
 category: infrastructure
-status: planned
+status: accepted
 priority: Low
 created: 2026-10-01
 updated: 2026-11-02
+completed_date: 2026-11-02
 assignee:
 estimated_effort_hours: 8
 github_issue: 541
+pr_number: 808
 ---
 
 # Technical Task: Publish the docs-only CI classifier as an optional consumer template
 
-**Status:** Planned (precondition met 2026-11-02; Phase 0 still checks it)
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.174.review.1.ci-docs-only-classifier-template.md` implemented 2026-11-02
 
 **GitHub Issue**: [#541](https://github.com/Gamaroff/agent-skills/issues/541)
 
@@ -25,10 +28,10 @@ github_issue: 541
 ## 1. Overview
 
 task.172 and task.173 stop the **pipeline** waiting on docs-only commits. A consumer's own CI still
-runs its full suite on every docs-only push and occupies its runners. tinker-city task.127 (#982)
-fixes that on the CI side: its `changes` job reports `code=false` when a PR push adds only docs on
-top of a head whose aggregate check (`ci-ok`) succeeded, and the heavy jobs skip. That fix exists
-only in tinker-city.
+runs its full suite on every docs-only push and occupies its runners. tinker-city task.127 (#982,
+merged as PR #984) fixes that on the CI side: its `changes` job reports `code=false` when a PR
+`synchronize` push adds only docs on top of a head that has a successful `pull_request` run of its
+CI workflow, and the heavy jobs skip. That fix exists only in tinker-city.
 
 This task lifts it into agent-skills as an **optional consumer template**: the classifier script,
 its `node:test` spec, a GitHub Actions `changes`-job snippet and a short guide. It is a recommended
@@ -36,15 +39,16 @@ pattern, not a required install.
 
 **Ordering is the point.** The template is lifted from code that has run on real CI. It is not
 written fresh. Phase 0 refuses to start until tinker-city task.127 has merged and run on at least
-one real docs-only push.
+one real docs-only push. Both held on 2026-11-02 (PR #984; run 41445192250); Phase 0 re-checks them.
 
 **Key deliverables:**
 
-1. `docs/examples/ci/github-actions/`: `classify-changes.sh`, `classify-changes.spec.js` and
-   `changes-job.yml` (snippet).
+1. `docs/examples/ci/github-actions/`: `classify-changes.sh`, `classify-changes.test.js` (the
+   lifted spec, renamed to this repository's `*.test.js` convention) and `changes-job.yml` (snippet).
 2. `docs/runbooks/ci-docs-only-skip.md`: when to adopt it, how to wire it, and its contract.
-3. The configurable docs patterns and aggregate check name (see § 3 for where they live).
-4. A Bitbucket Pipelines variant, as a later phase that ships separately.
+3. The configurable docs patterns and CI workflow path (see § 3 for where they live).
+4. A Bitbucket Pipelines variant (Phase 3). It ships in this PR, because the success criteria
+   cover both platforms; it stays separable for rollback.
 
 **Expected outcome:** a consumer that adopts the template sees its required check go green in
 minutes on a docs-only push over a green head, instead of after a full run.
@@ -58,10 +62,10 @@ minutes on a docs-only push over a green head, instead of after a full run.
 1. **Runner time is still spent on every docs-only push.** tinker-city story 46.5 ran five
    34-minute CI runs; three followed markdown-only commits (hand-off, "The measurement").
    task.172 removes the wait, but not the runs.
-2. **The only implementation lives in one consumer.** tinker-city task.127 is `planned` (checked
-   2026-10-01: `docs/tasks/task.127.ci-docs-only-increment-skip/…md` frontmatter, and issue #982
-   `OPEN`). Every other consumer would have to rediscover the classifier and its traps: merge-result
-   semantics, `cancel-in-progress` supersession, and a token without `checks: read`.
+2. **The only implementation lives in one consumer.** tinker-city task.127 merged as PR #984 on
+   2026-10-02 and reads `accepted` (re-checked 2026-11-02). Every other consumer would have to
+   rediscover the classifier and its traps: merge-result semantics, `cancel-in-progress`
+   supersession, rename detection hiding a code deletion, and a token without `actions: read`.
 3. **Bitbucket has a trap of its own.** A `403` from the pipelines API means the token lacks
    `read:pipeline`. It does not mean "no CI". `/finalise` already documents this trap for its own
    reads. A CI-side classifier that reads `403` as "no CI" would skip the suite on every push.
@@ -80,44 +84,65 @@ minutes on a docs-only push over a green head, instead of after a full run.
 
 - **agent-skills ships no CI templates today.** `docs/examples/` holds `architecture/` and
   `tracker-workflow.default.yaml` (`ls docs/examples`, 2026-10-01).
-- **tinker-city task.127 (planned), as designed in its document:**
-  - `scripts/ci/classify-changes.sh` writes `code=true|false`.
-  - Whole-PR classification runs first. The increment rule fires only on a PR `synchronize` event
-    whose `BEFORE..AFTER` diff is non-empty and all docs. It then reads
-    `GET /repos/{repo}/commits/{BEFORE_SHA}/check-runs?check_name=ci-ok`, and any completed
-    `success` means `code=false`.
-  - Every lookup failure is `code=true`.
+- **tinker-city task.127, as merged** (`scripts/ci/classify-changes.sh` and `.spec.js` on
+  tinker-city `develop`, last changed `88f98a27`, 2026-10-02; read 2026-11-02):
+  - `classify-changes.sh` writes `code=true|false` and a second output, `engine=true|false`
+    (tinker-city task.128's per-lane gate), to `$GITHUB_OUTPUT`, or to stdout when it is unset.
+  - Whole-PR classification runs first (three-dot diff against the fetched base; `before..after`
+    on a `push`). Every diff passes `--no-renames` (task.127 BUG-1).
+  - The increment rule fires only on a PR `synchronize` event whose `BEFORE..AFTER` diff is
+    non-empty and all docs. It then reads
+    `GET /repos/{repo}/actions/runs?head_sha={BEFORE}&event=pull_request&exclude_pull_requests=true&per_page=100`
+    and skips when any run of the workflow at `CI_WORKFLOW_PATH` (`.github/workflows/ci.yml`)
+    concluded `success`. **The evidence is a workflow run, not the `ci-ok` check run**: a check
+    run belongs to a commit, not an event, and a `push` run's green `ci-ok` proves nothing
+    (task.127 BUG-2).
+  - Every lookup failure is `code=true`, with a `::warning::`. A test-only `CI_OK_LOOKUP_FILE`
+    replaces the API call; the token goes in on stdin, never on argv (task.127 CR-4).
+  - The docs set is a shell `case`: `*.md|docs/*|.agents/*|scripts/server-dashboard/*|scripts/server/*`.
+    The last three are tinker-city's own.
   - The runner host has `git`, `jq` and `curl`, with no `gh` and no `node` on the default `PATH`.
-  - The job declares `permissions: { contents: read, checks: read }`.
+  - The job declares `permissions: { contents: read, actions: read }` and `fetch-depth: 0`.
 - **The docs set:** task.172's `ci.docsOnly.patterns` (default `["**/*.md", "docs/**"]`) is the one
   definition on the pipeline side. tinker-city's classifier uses shell `case` patterns
   (`*.md|docs/*|…`), which are a different syntax.
 
 ### Target Architecture
 
-- `docs/examples/ci/github-actions/classify-changes.sh`: the task.127 script as merged. The only
-  change is that the tinker-city-specific values become inputs:
-  - `DOCS_PATTERNS`: the docs set
-  - `AGGREGATE_CHECK`: the required check's name (`ci-ok` in tinker-city)
-- `classify-changes.spec.js`: the task.127 spec, run against temporary git repos and a stubbed
-  check-runs lookup. It also runs in this repository's `npm test`, so the template cannot rot.
-- `changes-job.yml`: a commented snippet showing the `changes` job, its `permissions`, its outputs,
-  and the `if: needs.changes.outputs.code == 'true'` gate on a heavy job.
+- `docs/examples/ci/github-actions/classify-changes.sh`: the task.127 script as merged, with three
+  changes only:
+  - `DOCS_PATTERNS` (env, space-separated shell `case` patterns; default `*.md docs/*`) replaces
+    the hard-coded docs list, whose last three entries are tinker-city's.
+  - `CI_WORKFLOW_PATH` (env; the workflow file whose `pull_request` runs are the evidence)
+    replaces the hard-coded `.github/workflows/ci.yml`. **Unset or empty emits `code=true` with a
+    `::warning::`**, through the script's own `emit`, never a `${VAR:?}` abort: an abort writes no
+    output, and the snippet's gate would then read an empty `code`.
+  - The `engine` output, `is_engine` and `any_engine` are removed. They are tinker-city task.128's
+    per-lane gate, which § 4 puts out of scope.
+- `classify-changes.test.js`: the task.127 spec, with its `engine` cases removed and the same
+  temporary-git-repo fixtures and `CI_OK_LOOKUP_FILE` / fake-`curl` stubs. It runs in this
+  repository's `npm test`, so the template cannot rot.
+- `changes-job.yml`: a commented snippet showing the `changes` job, its `permissions`
+  (`contents: read`, `actions: read`), `fetch-depth: 0`, its `code` output, and the
+  `if: needs.changes.outputs.code == 'true'` gate on a heavy job. A snippet, not a workflow under
+  this repository's `.github/`.
 - `docs/runbooks/ci-docs-only-skip.md`: covers adoption, the fail-safe contract, the merge-result
-  trade-off (see Risk 1), the `cancel-in-progress` case, and how this relates to task.172's
-  pipeline rule.
+  trade-off (see Risk 1), the `cancel-in-progress` case, host requirements (`bash`, `git`, `jq`,
+  `curl`), and how this relates to task.172's pipeline rule.
 
-**Open decision, resolved in Phase 0 with evidence, not guessed now.** The hand-off asks for the
-patterns and the check name in `skills-config.yaml`. tinker-city's runner has no `node`, so the
-script cannot use `yaml-subset.js`. Phase 0 picks one of these, and the guide states which:
+**Config decision: option (a), resolved at review on 2026-11-02.** The hand-off asks for the
+patterns in `skills-config.yaml`. A consumer's runner need not have `node` (tinker-city's has
+none), so the script cannot use `yaml-subset.js`, and a `jq`/`awk` reader (option b) would be a
+second YAML parser to keep honest. So the workflow snippet passes `DOCS_PATTERNS` and
+`CI_WORKFLOW_PATH` as `env`, and the parity test (Phase 2) compares the template's default
+`DOCS_PATTERNS` with task.172's `DEFAULT_PATTERNS`. Phase 0 re-confirms that tinker-city's runner
+still has no `node`; the guide states the choice.
 
-- (a) The workflow snippet passes `DOCS_PATTERNS` and `AGGREGATE_CHECK` as `env`, and a parity
-  test in the template compares them with `ci.docsOnly.patterns`.
-- (b) A `jq`/`awk` reader for the two keys only.
-
-Whichever is chosen, the patterns' meaning must match task.172's matcher. A `**/*.md` in config
-and a `*.md` in a shell `case` match different sets, so the parity test checks behaviour on a fixed
-path list, not string equality.
+The patterns' meaning must match task.172's matcher. A `**/*.md` glob and a `*.md` shell `case`
+are different syntaxes (in a `case`, `*` matches `/`), so the parity test checks behaviour on a
+fixed path list, not string equality. Run at review on the § 8 list: both rules call
+`skills/x/SKILL.md`, `docs/a/b.yml` and `README.md` docs, and `.github/workflows/ci.yml` and
+`src/a.ts` code.
 
 ### Same-class mechanism inventory (obs #103)
 
@@ -137,12 +162,12 @@ path list, not string equality.
 - ✅ The GitHub Actions template, spec, snippet and guide
 - ✅ The config decision (env + parity, or a reader) and its test
 - ✅ `npm test` wiring for the spec (`package.json` lists test globs by hand; a new path runs nowhere until added)
-- ✅ A Bitbucket Pipelines variant, as Phase 3, shippable separately
+- ✅ A Bitbucket Pipelines variant, as Phase 3, in this PR (separable for rollback)
 
 ### Out of Scope
 
 - ❌ Installing the template into any consumer (`setup-consumer.sh` stays unchanged; adoption is the consumer's decision)
-- ❌ Per-lane path filters (tinker-city task.128)
+- ❌ Per-lane path filters (tinker-city task.128), including the classifier's `engine` output
 - ❌ Changing task.172's engine
 
 ---
@@ -159,31 +184,51 @@ path list, not string equality.
 
 ### Phase 0: precondition (Risk: Low)
 
-- [ ] **HALT unless** tinker-city task.127 reads `accepted` and its PR is merged
-- [ ] Record one real PR where a docs-only push over a green `ci-ok` skipped the heavy jobs (run URL, minutes)
-- [ ] Re-read the merged script and spec. This task lifts what merged, not what task.127's document planned
-- [ ] Decide config option (a) or (b), and record why in the implementation report
+- [x] **HALT unless** tinker-city task.127 reads `accepted` and its PR is merged
+- [x] Measure one real PR where a docs-only push over a green head skipped the heavy jobs (run
+      41445192250: run URL, wall-clock minutes), and one full run of the same workflow for the
+      "before" figure. Both go in the guide's "Measured" section (Phase 2)
+- [x] Re-read the merged script and spec. This task lifts what merged, not what task.127's document planned
+- [x] Re-confirm config option (a) (§ 3): tinker-city's `changes` host still lists only
+      `git`/`jq`/`curl`, and the template assumes no `node` on any consumer runner
 
 ### Phase 1: GitHub Actions template (Risk: Low)
 
 Depends on Phase 0.
 
-- [ ] Lift the script and spec, and parameterise `DOCS_PATTERNS` and `AGGREGATE_CHECK`
-- [ ] `changes-job.yml` snippet
-- [ ] Wire the spec into `npm test`
+- [x] Lift the script and spec (spec renamed `classify-changes.test.js`); parameterise
+      `DOCS_PATTERNS` and `CI_WORKFLOW_PATH`, with an unset `CI_WORKFLOW_PATH` emitting `code=true`;
+      remove the `engine` output and its cases
+- [x] `changes-job.yml` snippet
+- [x] Wire the spec into `npm test`: add `'docs/examples/ci/*/*.test.js'` to `package.json`
+      `scripts["test:suite"]`, so `tests/test-runner-reach.test.js` sees it reached
+- [x] `npm run lint:shell` clean: the shellcheck lane lints every tracked `*.sh` outside
+      `skills/*/references/`, so the new scripts are in its file list
 
 ### Phase 2: guide and parity (Risk: Low)
 
-- [ ] `docs/runbooks/ci-docs-only-skip.md`, linked from `docs/runbooks/README.md`
-- [ ] Parity test: the template's docs set and task.172's default classify a fixed path list the same way
-- [ ] CHANGELOG `[Unreleased]`
+- [x] `docs/runbooks/ci-docs-only-skip.md`, linked from `docs/runbooks/README.md`
+- [x] Parity test: the template's docs set and task.172's default classify a fixed path list the same way
+- [x] CHANGELOG `[Unreleased]`
 
 ### Phase 3: Bitbucket Pipelines variant (Risk: Medium)
 
-Separately shippable.
+Ships in this PR; separable for rollback.
 
-- [ ] Same contract, with `curl` against the pipelines API. **A `403` means run the full suite**, and it has a test
-- [ ] Guide section for Bitbucket
+- [x] `docs/examples/ci/bitbucket-pipelines/classify-changes.sh` plus its `*.test.js`, with the same
+      contract. Bitbucket Pipelines has no push `before` SHA, so **`BEFORE` is the pushed commit's
+      first parent** (`BITBUCKET_COMMIT^`, not `HEAD^`: in a pull-request pipeline `HEAD` may be
+      Bitbucket's merge commit). Only pull-request pipelines classify; a branch pipeline runs in
+      full. The rule fires when `BEFORE..BITBUCKET_COMMIT` is non-empty and all docs,
+      and `GET /2.0/repositories/{ws}/{repo}/pipelines/?target.commit.hash={BEFORE}` lists a
+      completed pull-request pipeline whose `state.result.name` is `SUCCESSFUL` **and whose own
+      `target.commit.hash` equals `BEFORE`**. The second check is required: that the API honours the
+      `target.commit.hash` filter is unverified, and a filter it ignored would return other
+      commits' pipelines and grant a wrong skip. A test feeds such a list. A multi-commit docs push whose
+      `HEAD^` never ran a pipeline finds no evidence and runs the full suite: the safe direction
+- [x] Credentials in the order `bitbucket-auth.sh` defines. **Any status other than 200, a `403`
+      in particular, means run the full suite**, and it has a test
+- [x] Guide section for Bitbucket
 
 ---
 
@@ -192,16 +237,18 @@ Separately shippable.
 ### Files to Add
 
 1. `docs/examples/ci/github-actions/classify-changes.sh`
-2. `docs/examples/ci/github-actions/classify-changes.spec.js`
+2. `docs/examples/ci/github-actions/classify-changes.test.js`
 3. `docs/examples/ci/github-actions/changes-job.yml`
 4. `docs/runbooks/ci-docs-only-skip.md`
-5. `docs/examples/ci/bitbucket-pipelines/…` (Phase 3)
+5. `docs/examples/ci/bitbucket-pipelines/classify-changes.sh`, `classify-changes.test.js` and a
+   `bitbucket-pipelines.yml` snippet (Phase 3)
+6. The parity test (Phase 2), beside the GitHub spec: `docs/examples/ci/github-actions/docs-set-parity.test.js`
 
 ### Files to Modify
 
-6. `package.json`: the `test` script gains the spec path
-7. `docs/runbooks/README.md`: one row
-8. `CHANGELOG.md`
+7. `package.json`: `scripts["test:suite"]` gains `'docs/examples/ci/*/*.test.js'`
+8. `docs/runbooks/README.md`: one row
+9. `CHANGELOG.md`
 
 ### Files to Delete
 
@@ -211,16 +258,20 @@ None.
 
 ## 8. Testing Strategy
 
-- **The lifted spec**, unchanged in its cases. It covers every existing classification branch, the
-  increment rule, and each lookup failure giving `code=true`.
-- **Parameterisation:** a non-default `AGGREGATE_CHECK` name is the one queried. An unset
-  `AGGREGATE_CHECK` gives `code=true`, never a skip.
+- **The lifted spec**, unchanged in its cases except that the `engine` cases go. It covers every
+  existing classification branch, the increment rule, and each lookup failure giving `code=true`.
+- **Parameterisation:** a run of a non-default `CI_WORKFLOW_PATH` is the evidence that counts, and
+  a success of another workflow does not. An unset or empty `CI_WORKFLOW_PATH` gives `code=true`,
+  never a skip. A non-default `DOCS_PATTERNS` changes what counts as docs.
 - **Parity:** the fixed path list from task.172 § 8 (`skills/x/SKILL.md`, `docs/a/b.yml`,
-  `README.md`, `.github/workflows/ci.yml`, `src/a.ts`) classifies identically under both rules.
-- **Bitbucket (Phase 3):** `403`, `401`, a non-JSON body and an empty list each give
-  `code=true`.
-- **Mutation proofs:** make a lookup failure return `code=false`, and treat a Bitbucket `403` as
-  green. Each must turn a test red.
+  `README.md`, `.github/workflows/ci.yml`, `src/a.ts`) classifies identically under task.172's
+  `DEFAULT_PATTERNS` (through `glob-match.js` `matchesAnyGlob`) and the template's default
+  `DOCS_PATTERNS` (through the sourced script's `is_docs`).
+- **Bitbucket (Phase 3):** `403`, `401`, a non-JSON body, an empty list, and a non-`SUCCESSFUL`
+  result each give `code=true`; a docs-only `HEAD^..HEAD` over a `SUCCESSFUL` pipeline gives
+  `code=false`.
+- **Mutation proofs:** make a lookup failure return `code=false`, make an unset `CI_WORKFLOW_PATH`
+  skip, and treat a Bitbucket `403` as green. Each must turn a test red.
 
 ---
 
@@ -228,24 +279,28 @@ None.
 
 ### Functional
 
-- [ ] Phase 0 evidence recorded: tinker-city task.127 merged, plus one real skipped run
-- [ ] A docs-only `synchronize` over a green aggregate check gives `code=false` (lifted spec)
-- [ ] Every lookup failure gives `code=true`, on both platforms
-- [ ] The parity test passes on the fixed path list
+- [x] Phase 0 evidence is recorded in the guide's "Measured" section
+      (`docs/runbooks/ci-docs-only-skip.md`): tinker-city task.127's PR, plus one real skipped run
+- [x] A docs-only `synchronize` over a head with a successful `pull_request` run of
+      `CI_WORKFLOW_PATH` gives `code=false` (lifted spec)
+- [x] Every lookup failure, and an unset `CI_WORKFLOW_PATH`, gives `code=true`, on both platforms
+      (the two platforms' `classify-changes.test.js`)
+- [x] The parity test passes on the fixed path list (`docs-set-parity.test.js`)
 
 ### Performance
 
-- [ ] The guide quotes the measured before/after from Phase 0's real run, not an estimate
+- [x] The guide quotes the measured before/after from Phase 0's real run, not an estimate
 
 ### Code Quality
 
-- [ ] The spec runs in `npm test`, and the mutation proofs go red
-- [ ] `npm run ci` green; `docs-link-check` clean on the new guide
+- [x] The specs run in `npm test` (reached per `tests/test-runner-reach.test.js`)
+- [x] Each mutation proof in § 8 turns a test red, recorded in the QA report
+- [ ] `npm run ci` green (it includes `lint:shell`); `docs-link-check` clean on the new guide
 
 ### Migration
 
-- [ ] The guide states that adoption is optional, and the fail-safe contract
-- [ ] CHANGELOG entry
+- [x] The guide states that adoption is optional, and the fail-safe contract
+- [x] CHANGELOG entry
 
 ---
 
@@ -263,10 +318,13 @@ None.
 2. **The template drifts from tinker-city after the lift.** Mitigation: the spec runs here, so drift
    in this copy is caught. Drift in tinker-city is the consumer's business.
 3. **Bitbucket `403` read as no CI.** Mitigation: an explicit test (Phase 3).
+4. **The lift drops a guard the source had.** Removing `engine` and parameterising two values
+   touch every `emit` call. Mitigation: the lifted spec's cases stay, minus the `engine` ones only,
+   so a dropped fail-safe exit turns an existing case red.
 
 ### Low Risk Areas
 
-4. **Nobody adopts it.** That is acceptable for an optional template, and task.172 already removes
+5. **Nobody adopts it.** That is acceptable for an optional template, and task.172 already removes
    the pipeline wait.
 
 ---
@@ -294,6 +352,53 @@ None.
 - **Non-critical:** a docs-only push that still runs the full suite.
 
 ---
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-02
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.174.qa.3.ci-docs-only-classifier-template.md](./task.174.qa.3.ci-docs-only-classifier-template.md)
+- **Gate File**: [task.174.gate.3.ci-docs-only-classifier-template.yml](./task.174.gate.3.ci-docs-only-classifier-template.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 71 in the template suites; `ci:fast` 7116, 0 failures
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+- All five findings from cycles 1–2 are fixed and mutation-proven; bugs 1–3 closed.
+- Two advisory cleanups recorded in the gate's `recommendations.future`.
+- Boundary probes: 28 executed, 0 escaped.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.174.qa.3.ci-docs-only-classifier-template.md`
+**Gate File**: `task.174.gate.3.ci-docs-only-classifier-template.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 10/10 met. #8 (`npm run ci` green, link check clean) was graded from CI on `1a8ac32879d9`.
+✅ **Tests:** 71 template tests, reached by `npm test`. M1–M13 mutation-proven across three QA cycles.
+✅ **PR Review:** PR #808. The 5c conformance review reads APPROVE, and the host requires no reviewers.
+✅ **Documentation:** The guide `docs/runbooks/ci-docs-only-skip.md`, the runbook index row and the CHANGELOG `[Unreleased]` entry.
+✅ **Security Review:** PASS. The `is_docs` boundary in both variants was probed: 34 executed, 0 reproduced, 0 escaped.
+✅ **Compliance Review:** Not applicable (internal CI tooling).
+
+**Task marked as ACCEPTED on:** 2026-11-02
+
+**Detailed Verification Log:** See `task.174.dod.1.ci-docs-only-classifier-template.md` for complete verification evidence.
 <!-- change-log-start -->
 ## Change Log
 
@@ -302,16 +407,25 @@ None.
 | 2026-10-01 | 1.0     | Initial draft | create-task |
 | 2026-10-27 |  | Frontmatter: `blocked_on_external:` set, so the develop-next registry fallback passes this task over until tinker-city task.127 lands (task.235). Phase 0 HALT unchanged. | develop |
 | 2026-11-02 |  | Frontmatter: `blocked_on_external:` cleared. Its condition holds: tinker-city task.127 merged as PR #984 (2026-10-02), and CI run 41445192250 (head `d88b1f96`, a 3-file `.md` push) skipped all 5 heavy jobs. Phase 0 HALT unchanged. | develop |
+| 2026-11-02 | 1.1     | Review 7/10 → 9/10 after fixes (1 critical, 8 important applied): evidence lookup re-described from the merged code (workflow runs keyed by `CI_WORKFLOW_PATH`, not `ci-ok` check runs); `engine` output dropped; spec renamed `*.test.js` and its glob made reachable; Bitbucket `BEFORE` = `HEAD^`; Phase 3 ships in this PR; criteria name their record locations | review-task |
+| 2026-11-02 |         | Status → ready-for-development | review-task |
+| 2026-11-02 |  | Implemented — 11 files, 69 tests | develop |
+| 2026-11-02 |  | QA gate CONCERNS (90/100) — 1 medium, 1 low | qa-task |
+| 2026-11-02 |  | QA findings fixed — TASK-174-QA-1, QA-2; 1 iteration | qa-fix |
+| 2026-11-02 |  | QA gate CONCERNS (80/100) — 2 medium, 1 low | qa-task |
+| 2026-11-02 |  | QA findings fixed — TASK-174-QA-3, QA-4, QA-5; 2 iterations | qa-fix |
+| 2026-11-02 |  | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-11-02 | 1.2 | DoD passed — accepted (PR #808) | finalise |
 <!-- change-log-end -->
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 0: precondition
-- [ ] Phase 1: GitHub Actions template
-- [ ] Phase 2: guide and parity
-- [ ] Phase 3: Bitbucket Pipelines variant
+- [x] Phase 0: precondition
+- [x] Phase 1: GitHub Actions template
+- [x] Phase 2: guide and parity
+- [x] Phase 3: Bitbucket Pipelines variant
 
 ---
 

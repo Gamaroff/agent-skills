@@ -6,6 +6,17 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **An optional CI template that skips the heavy jobs on a docs-only push (task 174).** Lifted from a
+  consumer's merged classifier, with its spec, into `docs/examples/ci/`. A `changes` job writes
+  `code=false` when a pull request is all docs, or when a push adds only docs to a head whose
+  previous run of the same workflow passed. Every uncertain path runs the full suite. A GitHub
+  Actions variant and a Bitbucket Pipelines variant ship together. On Bitbucket, a `403` from the
+  pipelines API means a missing `read:pipeline` scope, never "no CI". Guide:
+  [`docs/runbooks/ci-docs-only-skip.md`](docs/runbooks/ci-docs-only-skip.md). It quotes the
+  measured runs: 37 min 27 s in full against 2 min 52 s skipped. Nothing installs the template;
+  adoption is the consumer's choice. A parity test keeps its default docs set in step with
+  `ci.docsOnly.patterns`, and the specs run in `npm test`.
+
 - **`/finalise` grades every kind of criterion fairly (task 249).** Five observations (#77, #81, #82,
   #105, #110) each named a criterion `/finalise` could only fail or have overridden by hand.
   - A **CI-state criterion** comes back from the AC agent as `DEFERRED-CI` and counts as not met.

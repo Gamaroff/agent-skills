@@ -1,0 +1,83 @@
+schema: 2
+task: 'task.174.ci-docs-only-classifier-template'
+task_title: 'Publish the docs-only CI classifier as an optional consumer template'
+gate: CONCERNS
+status_reason: 'Cycle 2 refute pass. The cycle-1 snippet fix is right but its guard passes on a broken group, the guide overstates what the fix guarantees, and the group is not scoped to the workflow. No high findings.'
+reviewer: 'QA Engineer'
+head: '0d69112bc6c15b303d6fa05315f2dd1e646426b3'
+updated: '2026-11-02T14:17:45Z'
+
+top_issues:
+  - id: 'TASK-174-QA-3'
+    severity: medium
+    file: 'docs/examples/ci/github-actions/changes-job.test.js'
+    finding: 'The concurrency guard only checks substrings: `github.ref_name` passes the `\bgithub\.ref\b` check, so a group that shares one group per branch for base-branch pushes passes both tests, and a job-level concurrency block is never read (code review CR-1, bug/high, promoted; reproduced). Bug: task.174.bug.2.concurrency-guard-passes-on-broken-group.md'
+    suggested_action: 'Pin the whole group value as an exact string and assert that no job-level concurrency key exists.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-174-QA-4'
+    severity: medium
+    file: 'docs/runbooks/ci-docs-only-skip.md'
+    finding: 'The guide says a base-branch run must always finish and presents PR-only cancellation as what ensures it, but the push path (classify-changes.sh:225) skips any docs-only diff without evidence, so a code merge run that is red, cancelled by hand, timed out, lost or still running still leaves a green docs merge over untested code (code review CR-2, bug/medium/medium; QA verified against the code and raised it). Bug: task.174.bug.3.guide-overstates-base-run-guarantee.md'
+    suggested_action: 'Scope the claim: say the push path checks no evidence, list the cases concurrency does not cover, and say what an adopter should watch for.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-174-QA-5'
+    severity: low
+    file: 'docs/examples/ci/github-actions/changes-job.yml'
+    finding: 'Concurrency groups are repository-wide and `ci-pr-N` names no workflow, so a second workflow that copies the block cancels this one on the same PR push (code review CR-3, bug/low/medium).'
+    suggested_action: 'Put github.workflow in the group and update the pinned test value and the guide to match.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 71
+  phases_verified: 4/4
+  trace:
+    phases_covered: [0, 1, 2, 3]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 28
+    escaped: 0
+    boundary: true
+    boundary_signals: []
+    notes: 'is_docs in both variants re-probed under shell-fn at this head (task.174.qa.2.security.run.json): 28 executed, 0 reproduced, 0 escaped.'
+  performance:
+    status: PASS
+    notes: 'Unchanged since cycle 1; measured upstream runs quoted in the guide.'
+  reliability:
+    status: CONCERNS
+    notes: 'TASK-174-QA-4: the guide overstates the base-branch guarantee; the push path skips without evidence.'
+  maintainability:
+    status: CONCERNS
+    notes: 'TASK-174-QA-3: the snippet guard passes on a broken group.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Pin the concurrency group exactly in changes-job.test.js (TASK-174-QA-3).'
+      refs: ['docs/examples/ci/github-actions/changes-job.test.js']
+    - action: 'Scope the guide claim about base-branch runs (TASK-174-QA-4).'
+      refs: ['docs/runbooks/ci-docs-only-skip.md']
+  future:
+    - action: 'Code review CR-4 (cleanup): "docs-only PR → false, no lookup" in the Bitbucket spec never checks that curl did not run and matches code=false by regex; route it through classify() with the fake curl.'
+      refs: ['docs/examples/ci/bitbucket-pipelines/classify-changes.test.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'TASK-174-QA-3 and TASK-174-QA-4 fixed'

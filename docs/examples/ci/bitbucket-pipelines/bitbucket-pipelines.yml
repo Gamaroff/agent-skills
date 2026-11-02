@@ -1,0 +1,44 @@
+# bitbucket-pipelines.yml — SNIPPET, not a complete pipeline. Optional consumer template
+# (agent-skills task.174, Phase 3); guide: docs/runbooks/ci-docs-only-skip.md in agent-skills.
+#
+# Copy classify-changes.sh into your repository (here: scripts/ci/classify-changes.sh). It needs
+# bash, git, jq, curl and base64 in the step image. It does not need node.
+#
+# Bitbucket has no job-level `if:` on a previous step's output, so the classifier writes its
+# decision to an artifact and each heavy step reads it first. A missing or unreadable artifact is
+# not `code=false`, so the step runs: the gate fails safe.
+
+clone:
+  # A shallow clone may not reach the merge base with the destination branch; the three-dot diff
+  # then fails, and fails safe (the suite runs) — on every push. Full depth makes the skip possible.
+  depth: full
+
+definitions:
+  steps:
+    - step: &changes
+        name: changes
+        image: atlassian/default-image:4
+        script:
+          # Repository variables (secured): BITBUCKET_ACCESS_TOKEN with read:pipeline:bitbucket,
+          # or BITBUCKET_USERNAME + BITBUCKET_API_TOKEN. Without read:pipeline the API answers 403;
+          # the classifier reads that as "could not look", never as "no CI", and runs the suite.
+          # Optional: DOCS_PATTERNS ("*.md docs/*" by default; `*` matches `/`).
+          - CLASSIFY_OUTPUT=ci-changes.env bash scripts/ci/classify-changes.sh
+        artifacts:
+          - ci-changes.env
+    - step: &tests
+        name: tests
+        script:
+          # The gate: skip only on an explicit `code=false`.
+          - if [ "$(sed -n 's/^code=//p' ci-changes.env 2>/dev/null)" = "false" ]; then echo "docs-only change over a green head — skipped"; exit 0; fi
+          - npm ci && npm test
+
+pipelines:
+  # Only pull-request pipelines classify. A branch pipeline has no before SHA and always runs in full.
+  pull-requests:
+    "**":
+      - step: *changes
+      - step: *tests
+  branches:
+    develop:
+      - step: *tests
