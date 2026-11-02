@@ -123,11 +123,13 @@ merges need the merge result tested, keep a merge queue, or do not adopt this.
 
 ## `cancel-in-progress`
 
-**Cancel pull-request runs only.** The snippet groups a PR's runs by PR number and sets
+**Cancel pull-request runs only.** The snippet groups a PR's runs by workflow and PR number, and sets
 `cancel-in-progress: ${{ github.event_name == 'pull_request' }}`. Each push run gets a group of its
 own (its run id), because a shared group drops a *pending* run when a newer one queues, even with
-`cancel-in-progress` off. tinker-city's `ci.yml` likewise supersedes PR runs only. Once the
-classifier is in place this is not optional.
+`cancel-in-progress` off. The workflow name is in every group because concurrency groups are
+repository-wide: without it, a second workflow that copied the block would cancel this one's run on
+the same PR push. tinker-city's `ci.yml` likewise supersedes PR runs only. Once the classifier is
+in place this is not optional.
 
 On a pull request, a newer push cancels the older run. A cancelled run is not a success, so on its
 own it never grants a skip. Any success on the same SHA does, so a cancelled run and a successful
@@ -136,10 +138,21 @@ re-run of `before` still grant one. Two quick pushes in a row (code, then docs) 
 safe direction.
 
 On the base branch the classifier asks for no evidence: a docs-only `before..after` push skips
-whether or not `before` went green. So a base-branch run must always finish. With
-`cancel-in-progress: true` on every event, a docs-only merge landing while a code merge's run is in
-flight cancels that run and then skips its own, and the code merge never gets a full run on the
-base.
+whether or not `before` went green. With `cancel-in-progress: true` on every event, a docs-only
+merge landing while a code merge's run is in flight would cancel that run and then skip its own.
+PR-only cancellation removes that one case. It does **not** make the base-branch run of a code merge
+always reach a verdict, and nothing in the template does. The docs merge after it still skips, and
+the base head still shows green, when the code merge's run:
+
+- failed (it is red on its own commit, and the green docs commit sits on top of it);
+- was cancelled by hand, hit `timeout-minutes`, or lost its runner;
+- was still running when the docs merge landed (it goes on to finish, and may go red).
+
+This is the lifted behaviour, accepted for the same reason as the merge-result trade-off above. So
+read the base branch by commit, not by its head: a red or unfinished run on a code merge is not
+cleared by the green docs merge after it. If you need the base head itself to prove the code under
+it passed, do not adopt the push-path skip: make the heavy jobs' `if:` run on every `push`
+(`github.event_name == 'push' || needs.changes.outputs.code == 'true'`), or keep a merge queue.
 
 ## Wiring — Bitbucket Pipelines
 

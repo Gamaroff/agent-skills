@@ -18,9 +18,10 @@ on:
 # a docs-only `before..after` diff without asking whether `before` went green, so a docs merge that
 # cancelled a code merge's run would leave that code with no full run on the base at all. Each push
 # run gets a group of its own (its run id): a shared group would still drop a PENDING run when a
-# newer one queued, even with cancel-in-progress off.
+# newer one queued, even with cancel-in-progress off. Groups are repository-wide, so the workflow
+# name is in the group: another workflow copying this block must not cancel this one's run.
 concurrency:
-  group: ci-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:

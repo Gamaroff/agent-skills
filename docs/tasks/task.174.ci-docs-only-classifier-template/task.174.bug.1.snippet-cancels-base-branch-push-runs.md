@@ -96,6 +96,25 @@ Mutation-proven: `cancel-in-progress: true` restored → 1 red; group restored t
 1. Read `changes-job.yml`'s `concurrency:` block: PR-only cancellation, run-id push groups.
 2. `command node --test docs/examples/ci/github-actions/changes-job.test.js` → 2/2.
 
+### Iteration 2
+
+#### Re-Investigation (Reopened → In Progress)
+
+**Date**: 2026-11-02
+
+**QA Reopening Reason**: Gate 2 found the yml right for this workflow, but (a) its guard passes on
+a broken group (TASK-174-BUG-2) and (b) the group is not workflow-scoped. Concurrency groups are
+repository-wide, so another workflow copying the block would cancel this one (TASK-174-QA-5).
+
+#### Fix Implementation (In Progress → Ready for QA)
+
+**Date**: 2026-11-02
+
+- The group is now `${{ github.workflow }}-…`, and the snippet comment and guide say why.
+- The guard is now pinned (see bug 2).
+
+**Verification**: M11 (workflow prefix dropped) → 1 red in `changes-job.test.js`.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -103,3 +122,5 @@ Mutation-proven: `cancel-in-progress: true` restored → 1 red; group restored t
 | 2026-11-02 | New | qa-task | Filed in QA cycle 1 |
 | 2026-11-02 | In Progress | qa-fix | Investigation started |
 | 2026-11-02 | Ready for QA | qa-fix | Fix implemented and mutation-proven |
+| 2026-11-02 | Reopened | qa-task | Partly fixed by task.174.qa.2.ci-docs-only-classifier-template.md: yml right, its guard vacuous (BUG-2), group not workflow-scoped (QA-5) |
+| 2026-11-02 | Ready for QA | qa-fix | Fixed in QA cycle 2 fix pass |
