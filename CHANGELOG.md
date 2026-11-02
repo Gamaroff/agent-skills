@@ -114,6 +114,18 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **A killed tree-equivalence check no longer leaves its test suite running (obs #94).** With
+  `ci.docsOnly.checkCommand` set, `ci-tree-equivalence.js` runs that command inside the call. It
+  ran it with `spawnSync`, which blocks every signal handler, so `timeout 120 node …` killed the
+  engine and the command's `npm` child ran on beside the real `npm run ci`. The check now runs
+  asynchronously, and a SIGTERM, SIGINT or SIGHUP to the engine kills the check's whole process
+  group before the engine exits on that signal. The engine's own timeout already did this. The
+  call blocks in `finalise`, `develop-next` and `develop-batch` warned against a foreground call,
+  but the code under each warning was the foreground form. Each block is now the background form:
+  the check's output goes to `.claude/state/ci-tree-eq.log`, and the answer is a final
+  `CI_ROLLUP=… CI_TREE_EQ=…` line. `ci-tree-equivalence.test.mjs` sends both signals to a real
+  engine process (`SEC-1b`) and runs each block against a stand-in engine. Both tests failed
+  before the fix.
 - **security-probe: sandbox teardown and background writes (task 234).** A case that left a
   mode-000 directory nested past `PATH_MAX` crashed `runProbeSpec` with `ENAMETOOLONG`; on
   `EACCES`, `EPERM` or `ENAMETOOLONG` (Node 22's `rmSync` hits the last on a deep tree) the

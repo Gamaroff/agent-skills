@@ -517,26 +517,32 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
      and for nothing else** — every other answer, including a failed read, exits 1:
 
      ```bash
+     # RUN BACKGROUNDED (run_in_background) — never in the foreground, never under `timeout` (obs #94).
      # INPUT, re-bound in THIS block (a fresh shell has none): the rollup read above. Run from the item's
      # worktree: the engine judges the checked-out HEAD of its working directory and refuses any other.
      : "${CI_ROLLUP:?bind CI_ROLLUP from the rollup read above}"
      CI_TREE_EQ=""
      case "$CI_ROLLUP" in
        PENDING|NONE)
+         mkdir -p .claude/state
          if TE=$(command node .agents/skills/develop-batch/references/ci-tree-equivalence.js \
-                   --head-rollup "$CI_ROLLUP" --head "$(git rev-parse HEAD)" --pr <PR#> --json); then
+                   --head-rollup "$CI_ROLLUP" --head "$(git rev-parse HEAD)" --pr <PR#> --json \
+                   2> .claude/state/ci-tree-eq.log); then
            CI_TREE_EQ=$(printf '%s' "$TE" | jq -r '.greenSha[0:12] // empty')
            [ -n "$CI_TREE_EQ" ] && CI_ROLLUP=SUCCESS    # an empty sha stays PENDING: fail closed
          fi ;;
      esac
+     # The result, for the notification: the next block re-binds both from this line.
+     echo "CI_ROLLUP=$CI_ROLLUP CI_TREE_EQ=$CI_TREE_EQ"
      ```
 
-     **The engine is not always a quick check.** With `ci.docsOnly.checkCommand` configured, it runs
-     that command inside the call, and a test suite there can outlive the tool timeout. So either
-     re-sample the head's rollup once first and call the engine only if the head is still pending, or
-     run the block backgrounded with its output in a file (`> .claude/state/ci-tree-eq.log 2>&1`),
-     ending it with `echo "CI_TREE_EQ=$CI_TREE_EQ"`, and read that line on the notification — never
-     as a foreground call (obs #270).
+     **The engine is not always a quick check, so the block above is already the background form.**
+     With `ci.docsOnly.checkCommand` configured, the engine runs that command inside the call, and a
+     test suite there can outlive the tool timeout (obs #270). Run the block as a background command
+     and read its last line on the notification; the check's own output is in the worktree's
+     `.claude/state/ci-tree-eq.log`. The cheaper alternative is to re-sample the head's rollup once
+     first and run the block only if the head is still pending. A killed engine takes the check's
+     process group with it (obs #94), but a foreground call still loses the answer.
 
      When `CI_TREE_EQ` is set, the PR head's own CI has **not** finished and the reading is satisfied
      because every file changed since a green first-parent ancestor is documentation (per
