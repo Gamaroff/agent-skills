@@ -64,7 +64,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { execFileSync, spawnSync } = require("child_process");
+const { execFileSync, spawn: spawnAsync } = require("child_process");
 
 const { matchesAnyGlob, normalisePath } = require("./glob-match.js");
 const { parseYamlSubset } = require("./yaml-subset.js");
@@ -852,6 +852,68 @@ function killProcessGroup(pid) {
   }
 }
 
+/** Signals a caller sends to stop the engine (`timeout`, Ctrl-C, a closed terminal). */
+const FORWARDED_SIGNALS = ["SIGTERM", "SIGINT", "SIGHUP"];
+
+/**
+ * Run the check, asynchronously, and own its process group against every way the engine can stop
+ * short of SIGKILL. Resolves with the `spawnSync`-shaped `{ pid, status, signal, error }` the caller
+ * reads, so an injected synchronous `spawn` in a test is a drop-in.
+ *
+ * Why not `spawnSync` (obs #94): it blocks the event loop, so a SIGTERM to the engine (e.g. from
+ * `timeout 120 node ci-tree-equivalence.js …`) ran no handler — node died at once and the detached
+ * group, an `npm run ci:fast` in practice, ran on beside the real gate. Here a forwarded signal
+ * kills the group, then re-raises itself so the engine's own exit still says it was signalled.
+ */
+function spawnCheck(file, args, { timeout, ...opts } = {}) {
+  return new Promise((resolve) => {
+    let child;
+    try {
+      child = spawnAsync(file, args, { ...opts, detached: true });
+    } catch (error) {
+      resolve({ pid: undefined, status: null, signal: null, error });
+      return;
+    }
+    const pid = child.pid;
+    let timedOut = false;
+    let timer = null;
+    const handlers = new Map();
+    const release = () => {
+      if (timer) clearTimeout(timer);
+      for (const [sig, fn] of handlers) process.removeListener(sig, fn);
+      handlers.clear();
+    };
+    for (const sig of FORWARDED_SIGNALS) {
+      const fn = () => {
+        release();
+        killProcessGroup(pid);
+        process.kill(process.pid, sig);
+      };
+      handlers.set(sig, fn);
+      process.on(sig, fn);
+    }
+    if (timeout > 0) {
+      timer = setTimeout(() => {
+        timedOut = true;
+        killProcessGroup(pid);
+      }, timeout);
+    }
+    child.on("error", (error) => {
+      release();
+      resolve({ pid, status: null, signal: null, error });
+    });
+    child.on("exit", (status, signal) => {
+      release();
+      const error = timedOut
+        ? Object.assign(new Error("checkCommand timed out"), {
+            code: "ETIMEDOUT",
+          })
+        : undefined;
+      resolve({ pid, status, signal, error });
+    });
+  });
+}
+
 /**
  * Paths with uncommitted changes (staged, unstaged or untracked) that are NOT documentation per
  * `patterns`, or `null` when git status cannot be read. A rename lists both names.
@@ -894,7 +956,7 @@ async function run({
   cwd = process.cwd(),
   stdout = process.stdout,
   stderr = process.stderr,
-  spawn = spawnSync,
+  spawn = spawnCheck,
   now = Date.now,
 } = {}) {
   let result;
@@ -985,8 +1047,9 @@ async function run({
       // stall the poll past its own MAX_WAIT without ever writing a result (CR2-7).
       // `detached` makes `sh` the leader of its own process group, so the whole tree it starts can
       // be signalled (below): the timeout kills only the `sh` pid, and `npm run ci:fast && …`
-      // leaves its children running, holding our stderr open (DoD security gate).
-      const r = spawn("sh", ["-c", cfg.checkCommand], {
+      // leaves its children running, holding our stderr open (DoD security gate). The spawn is
+      // asynchronous so a signal sent to the engine kills that group too (spawnCheck, obs #94).
+      const r = await spawn("sh", ["-c", cfg.checkCommand], {
         cwd: root,
         stdio: ["ignore", 2, 2],
         timeout: cfg.checkTimeoutSeconds * 1000,

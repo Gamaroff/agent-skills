@@ -1226,24 +1226,41 @@ nothing else** — every other answer, including a failed read, exits 1 — so t
 "no" up to green.
 
 **This call costs whatever `ci.docsOnly.checkCommand` costs (obs #262).** When that key is set, the
-engine runs the command before it answers — often minutes, longer than a tool call's timeout. Run
-the block backgrounded with its result written to a file you read on a later turn, as the Step 7.6c
-poll does; or re-sample the head's rollup once more first and call the engine only if it is still
-`PENDING`/`NONE`:
+engine runs the command before it answers — often minutes, longer than a tool call's timeout. The
+block below is therefore written in its **background form**: run it as a background command (the
+Bash tool's `run_in_background`), never in the foreground and never under `timeout`, and read its
+last line, `CI_ROLLUP=… CI_TREE_EQ=…`, on the completion notification. The check's own output goes
+to `.claude/state/ci-tree-eq.log`, so the notification stays readable. The cheaper alternative is
+to re-sample the head's rollup once more first and run the block only if it is still
+`PENDING`/`NONE`. A killed engine now takes the check's whole process group with it, so a
+foreground call no longer leaves the suite running beside the real gate (obs #94) — but it still
+loses the answer, which is why the block is the background form. **The block marks and clears its
+own wait** (`set-waiting-on.sh "step-6 tree-equivalence check"`), as the probe-plan block does, so
+inside a `/develop-*` pipeline the yielded turn is not re-prompted as a stall; standalone there is
+no lock and both calls are silent no-ops:
 
 ```bash
+# RUN BACKGROUNDED (run_in_background) — never in the foreground, never under `timeout` (obs #94).
 # INPUTS, re-bound in THIS block (a fresh shell has none): the rollup read above and the PR number.
 # Unbound, the rule would be skipped silently and the wait would run as if it did not exist.
+# The wait's budget is the engine's default check bound (checkTimeoutSeconds 1500 s = 25 min) plus 5;
+# a longer configured bound is re-prompted once the 30 minutes pass, never left marked forever.
 : "${CI_ROLLUP:?bind CI_ROLLUP from the rollup read above}" "${PR_NUMBER:?bind PR_NUMBER}"
 CI_TREE_EQ=""
 case "$CI_ROLLUP" in
   PENDING|NONE)
+    mkdir -p .claude/state
+    bash .agents/skills/finalise/references/set-waiting-on.sh "step-6 tree-equivalence check" --kind task --budget-minutes 30
     if TE=$(command node .agents/skills/finalise/references/ci-tree-equivalence.js \
-              --head-rollup "$CI_ROLLUP" --head "$(git rev-parse HEAD)" --pr "$PR_NUMBER" --json); then
+              --head-rollup "$CI_ROLLUP" --head "$(git rev-parse HEAD)" --pr "$PR_NUMBER" --json \
+              2> .claude/state/ci-tree-eq.log); then
       CI_TREE_EQ=$(printf '%s' "$TE" | jq -r '.greenSha[0:12] // empty')
       [ -n "$CI_TREE_EQ" ] && CI_ROLLUP=SUCCESS    # an empty sha stays PENDING: fail closed
-    fi ;;
+    fi
+    bash .agents/skills/finalise/references/set-waiting-on.sh --clear ;;
 esac
+# The result, for the notification: the next block re-binds both from this line.
+echo "CI_ROLLUP=$CI_ROLLUP CI_TREE_EQ=$CI_TREE_EQ"
 ```
 
 The engine decides on four things and this step re-derives none of them: the head's rollup is

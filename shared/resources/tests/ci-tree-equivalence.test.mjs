@@ -2536,6 +2536,88 @@ for (const { skill, text } of waitSites) {
   });
 }
 
+// obs #94: the block under each call site's "never as a foreground call" warning WAS the foreground
+// form, so copying it reproduced the defect. The block is now the background form: the check's
+// noise goes to a log, and the answer is one last line a notification carries. RUN it against a
+// stand-in engine that writes noise to stderr and a green answer to stdout.
+for (const { skill, text } of waitSites) {
+  test(`${skill}: the arm block is the background form — the check's output goes to the log, the answer is the last line (obs #94)`, () => {
+    const block = armBlock(text).replace(/<PR#>/g, "7");
+    const work = mkdtempSync(join(tmpdir(), "ci-tree-eq-arm-"));
+    try {
+      execFileSync("git", ["init", "-q"], { cwd: work });
+      execFileSync(
+        "git",
+        [
+          "-c",
+          "user.name=t",
+          "-c",
+          "user.email=t@t",
+          "commit",
+          "-q",
+          "--allow-empty",
+          "-m",
+          "x",
+        ],
+        { cwd: work },
+      );
+      const refs = join(work, ".agents", "skills", skill, "references");
+      mkdirSync(refs, { recursive: true });
+      // A block that marks its wait calls the real helper; with no lock it is a silent no-op.
+      if (block.includes("set-waiting-on.sh")) {
+        writeFileSync(
+          join(refs, "set-waiting-on.sh"),
+          readFileSync(join(REPO, "shared", "resources", "set-waiting-on.sh")),
+        );
+      }
+      writeFileSync(
+        join(refs, "ci-tree-equivalence.js"),
+        'process.stderr.write("NOISE-FROM-THE-CHECK\\n");\n' +
+          'process.stdout.write(JSON.stringify({ reason: "tree-equivalent", greenSha: "0123456789abcdef" }) + "\\n");\n',
+      );
+      const r = spawnSync("bash", ["-c", block], {
+        cwd: work,
+        env: {
+          PATH: process.env.PATH,
+          CI_ROLLUP: "PENDING",
+          PR_HEAD: execFileSync("git", ["rev-parse", "HEAD"], {
+            cwd: work,
+            encoding: "utf8",
+          }).trim(),
+          PR_ID: "7",
+          PR_NUMBER: "7",
+        },
+        encoding: "utf8",
+        timeout: CLI_BUDGET.timeoutMs,
+      });
+      assert.equal(r.status, 0, r.stderr);
+      assert.equal(
+        r.stderr,
+        "",
+        `${skill}: the block runs clean as written (a helper it names must exist)`,
+      );
+      const last = r.stdout.trim().split("\n").pop();
+      assert.equal(
+        last,
+        "CI_ROLLUP=SUCCESS CI_TREE_EQ=0123456789ab",
+        `${skill}: the last line must carry the answer`,
+      );
+      assert.doesNotMatch(
+        r.stdout + r.stderr,
+        /NOISE-FROM-THE-CHECK/,
+        `${skill}: the check's output must not reach the notification`,
+      );
+      assert.match(
+        readFileSync(join(work, ".claude", "state", "ci-tree-eq.log"), "utf8"),
+        /NOISE-FROM-THE-CHECK/,
+        `${skill}: the check's output goes to .claude/state/ci-tree-eq.log`,
+      );
+    } finally {
+      rmSync(work, { recursive: true, force: true });
+    }
+  });
+}
+
 test('develop-next\'s arm also refuses an unbound PR_HEAD, so `--head ""` is unreachable', () => {
   const next = waitSites.find((s) => s.skill === "develop-next");
   const block = armBlock(next.text);
@@ -3000,6 +3082,78 @@ test("SEC-1: a checkCommand that times out leaves no child process running", asy
     cleanup(dir);
   }
 });
+
+// obs #94: `timeout 120 node ci-tree-equivalence.js …` killed the ENGINE, and the check's npm
+// child ran on beside the real gate. The engine's own timeout already killed the group (SEC-1);
+// an external signal never reached it, because the synchronous spawn blocked every handler.
+for (const signal of ["SIGTERM", "SIGINT"]) {
+  test(`SEC-1b: an external ${signal} to the engine kills the check's whole process group (obs #94)`, async () => {
+    if (process.platform === "win32") return;
+    const pidFile = join(tmpdir(), `ci-tree-eq-ext-${signal}-${process.pid}`);
+    rmSync(pidFile, { force: true });
+    const { dir, green } = greenThenDocs(1, {
+      config: `ci:\n  docsOnly:\n    checkTimeoutSeconds: 120\n    checkCommand: "sleep 30 & echo $! > ${pidFile}; wait"\n`,
+    });
+    const bin = fakeGhOnPath(green);
+    const alive = (p) => {
+      try {
+        process.kill(p, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+    let pid = 0;
+    let engine;
+    try {
+      engine = require("node:child_process").spawn(
+        process.execPath,
+        [ENGINE_PATH, "--head-rollup", "PENDING", "--json"],
+        {
+          cwd: dir,
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH}`,
+            VCS: "github",
+          },
+          stdio: "ignore",
+        },
+      );
+      const exited = new Promise((res) =>
+        engine.on("exit", (code, sig) => res({ code, sig })),
+      );
+      for (let i = 0; i < 200 && !pid; i += 1) {
+        await sleep(50);
+        try {
+          pid = Number(readFileSync(pidFile, "utf8").trim()) || 0;
+        } catch {
+          /* the check has not started yet */
+        }
+      }
+      assert.ok(pid > 1, "the check recorded its child's pid");
+      engine.kill(signal);
+      const { code, sig } = await exited;
+      assert.ok(
+        sig === signal || (code !== null && code !== 0),
+        `the engine must not report success after ${signal} (code ${code}, signal ${sig})`,
+      );
+      for (let i = 0; i < 20 && alive(pid); i += 1) await sleep(50);
+      assert.equal(
+        alive(pid),
+        false,
+        `the check's child must die with the engine on ${signal}`,
+      );
+    } finally {
+      if (engine && engine.exitCode === null && engine.signalCode === null)
+        engine.kill("SIGKILL");
+      if (pid > 1 && alive(pid)) process.kill(pid, "SIGKILL");
+      rmSync(pidFile, { force: true });
+      cleanup(dir);
+      cleanup(bin);
+    }
+  });
+}
 
 // A reference implementation of the glob semantics, as a RegExp, for SMALL inputs only. The matcher
 // used to BE this (with a run-collapse guard) and was exponential on `*a` repeated; it is kept here
