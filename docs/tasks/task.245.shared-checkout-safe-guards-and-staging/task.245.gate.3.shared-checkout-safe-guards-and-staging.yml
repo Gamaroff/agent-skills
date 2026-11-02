@@ -1,0 +1,61 @@
+schema: 2
+task: 'task.245.shared-checkout-safe-guards-and-staging'
+task_title: 'Shared-checkout-safe guards and staging'
+gate: CONCERNS
+status_reason: 'T245-QA-2 and T245-QA-3 are fixed and held by tests. The scoped review found one new medium defect: the develop-batch merge lane still ends with an unconditional "Mark ticked: true on every arm" that contradicts the new stageReason gate.'
+reviewer: 'QA Engineer'
+head: '2d44d5639530d910b4d7654e87e67f035aacfe32'
+updated: '2026-10-30T19:40:50Z'
+
+top_issues:
+  - id: 'T245-QA-4'
+    severity: medium
+    file: 'skills/develop-batch/SKILL.md'
+    finding: 'The merge lane now says a stageReason other than staged / already-staged means "make no commit and do not mark ticked: true" (line 648), but the closing sentence of the same list (line 661) still says "Mark ticked: true on every arm". An agent that follows the later line ticks a row that was never staged or committed. Reviewer CR-1, high confidence; verified by reading lines 643-661. The shape test added in cycle 2 matches only the proximity of the new sentence, so it passes with the contradiction in place (reviewer CR-4).'
+    suggested_action: 'Reword line 661 so it does not override the stageReason gate (tick on every arm that committed or has nothing to commit, never on a failed stage), and extend the shape test to fail on an unconditional "on every arm" tick sentence.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 6910
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No input-accepting boundary is delivered; git is called with argv arrays and the temp file holds only git status output.'
+  performance:
+    status: PASS
+    notes: 'Cycle 2 ci:fast reran 6910 tests, 0 fail. SC-9 baseline not measured.'
+  reliability:
+    status: CONCERNS
+    notes: 'T245-QA-4: contradictory tick instruction in the develop-batch merge lane.'
+  maintainability:
+    status: PASS
+    notes: 'HALT block held equal across shared source, qa-task and qa-story by test E; bundled references/ copies held by bundle:check.'
+
+recommendations:
+  immediate:
+    - action: 'Fix T245-QA-4.'
+      refs: ['skills/develop-batch/SKILL.md', 'evals/develop-batch/protocol/skill-shape.test.mjs']
+  future:
+    - action: 'Cycle-3 CR-2 (low/medium): a trap to remove the DIRTY_Z temp file when the block is interrupted between mktemp and the final rm.'
+      refs: ['shared/resources/qa-re-review-scope.md']
+    - action: 'Cycle-3 CR-3 (low/medium) not raised as a finding: test E already holds the shared source and both skill copies equal, and bundle:check holds the references/ copies. Recorded because the reviewer read neither.'
+      refs: ['shared/resources/tests/qa-scope-from-head.test.mjs']
+    - action: 'Carried from earlier cycles: a distinct stageReason when hash-object or update-index fails, a re-read of the index blob before update-index, and the docs/tasks dirname rule (not reproduced).'
+      refs: ['shared/resources/registry-tick.js', 'shared/resources/qa-re-review-scope.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T245-QA-4 fixed']

@@ -1,0 +1,94 @@
+schema: 2
+task: 'task.248.qa-applies-finalise-rules'
+task_title: "QA applies the finalise DoD's rules before finalise does"
+gate: FAIL
+status_reason: 'The cycle-2 refute pass found two HIGH defects: 6d reads an unbound STEM and now HALTs on every run, and criteria-drift.js takes a co-located bug review report as the base. It also found two MEDIUMs: a symlinked document path reads as new-document, and the read-back trusts the gate''s own drift block. Three were reproduced by execution.'
+reviewer: 'QA Engineer'
+head: '1da9f7f025b792ecbfc580350892973c5c05187f'
+updated: '2026-11-01T18:47:39Z'
+
+top_issues:
+  - id: 'T248-QA2-1'
+    severity: high
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The 6d block reads $STEM, but no line in the block binds it; its comment says the value comes "from 6a", which is another shell. Empty, changelog-cites.sh exits 2, so 6d HALTs changelog-stem on every run, including repositories with changelog.enforce off. On the base the same unbound read skipped the check silently. Code review CR-1, high/high, promoted.'
+    suggested_action: 'Bind STEM inside the 6d block from the work-item placeholder, with the unsubstituted-placeholder and empty-value guards the other STEM blocks in finalise use; add a test that runs the shipped 6d block with no STEM in the environment.'
+    suggested_owner: dev
+    status: open
+  - id: 'T248-QA2-2'
+    severity: high
+    file: 'shared/resources/criteria-drift.js'
+    finding: 'newestReviewBlob accepts any *.review.N.*.md in the directory, so the review report of a task bug filed beside the task (review-bug writes {BUG_PREFIX}.review.{N} into BUG_DIR) can become the base. Reproduced: with task.9.bug.1.review.2.y.md present, the base is that report, the reason is drift, and both criteria read as unapproved "added", which the DoD AC rule fails as amendment unapproved. Code review CR-2, high/medium; no such report is on disk in this repository today, but review-bug can write one.'
+    suggested_action: 'Accept only reports named <the document''s own stem>.review.<N>.*.md, using doc-id.js for the stem; add a test with a co-located bug review at a higher index.'
+    suggested_owner: dev
+    status: open
+  - id: 'T248-QA2-3'
+    severity: medium
+    file: 'shared/resources/criteria-drift.js'
+    finding: 'platform-variance: the document path is relativised with path.resolve, but the repository root comes from git and is a real path. A document reached through a symlink therefore gives a ../ rel, the read at the base fails, and the engine reports new-document at exit 0, so "could not look" reads as clean. Reproduced through /proc/self/cwd, and with TMPDIR set to a symlinked directory (the macOS default): 3 CLI tests go red. Code review CR-3, medium/high, promoted.'
+    suggested_action: 'Resolve the document with realpathSync before relativising; throw Usage when the rel leaves the repository.'
+    suggested_owner: dev
+    status: open
+  - id: 'T248-QA2-4'
+    severity: medium
+    file: 'shared/resources/qa-read-back.js'
+    finding: 'The read-back re-runs the boundary classifier but trusts the gate''s own criteria_drift block. A gate that omits the block, or drops an appended entry, passes, so the read-back cannot catch the task.234 shape it was added for. Code review CR-4, medium/medium, verified by reading answerProblems; the missing-block exemption was a deliberate development decision.'
+    suggested_action: 'Re-run criteria-drift.js in the read-back and require an answered entry for each appended id the engine reports; keep the missing-block exemption only for a gate with no task.248 keys at all.'
+    suggested_owner: dev
+    status: open
+  - id: 'T248-QA2-5'
+    severity: low
+    file: 'shared/resources/changelog-cites.sh'
+    finding: 'Stem refusals (empty, two args, a path, an unreadable id) exit 2 before the opt-in is read, contrary to the header''s "the opt-in first", so a repository with enforcement off can HALT in 6d. Code review CR-5.'
+    suggested_action: 'Read changelog-enforce.sh first and exit 3 on off before validating the stem; keep the usage exit for on.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 40
+
+evidence:
+  tests_reviewed: 6970
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 6
+    escaped: 0
+    boundary: true
+    boundary_signals: ["never"]
+    notes: 'changelog-cites.sh re-probed at 1da9f7f0 (run record task.248.qa.2.security.run.json): 5 hostile stems refused, the legitimate stem cited, 0 escaped. The path stem is now refused (T248-QA-3 fixed).'
+  performance:
+    status: PASS
+    notes: 'Offline engines, one run per cycle.'
+  reliability:
+    status: FAIL
+    notes: '6d HALTs on every finalise run (T248-QA2-1), and the drift engine can take the wrong base (T248-QA2-2, T248-QA2-3).'
+  maintainability:
+    status: CONCERNS
+    notes: 'The read-back trusts a self-written block (T248-QA2-4); CR-6 (boundary_signals compared only by key) is advisory.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T248-QA2-1 and T248-QA2-2 (HIGH), then T248-QA2-3 and T248-QA2-4'
+      refs: ['skills/finalise/SKILL.md', 'shared/resources/criteria-drift.js', 'shared/resources/qa-read-back.js']
+  future:
+    - action: 'CR-6: compare the gate''s boundary_signals with the CLI''s matched phrases, not only the key'
+      refs: ['shared/resources/qa-read-back.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T248-QA2-1 to -4 fixed']

@@ -33,6 +33,6 @@ is why these files are named for what they exercise rather than for their proven
 | `concerns-low-only.yml` | route 2b's PASS-only exclusion — the same queue under a CONCERNS token must go to 5b |
 | `pass-mixed-open.yml` | a PASS gate with an open MEDIUM beside the LOW — not cosmetic |
 | `pass-low-closed.yml` | a PASS gate whose LOWs are all closed — route 1's, and 2b must not fire on an empty open set |
-| `medium-falling-cycle5.yml` | route 2c — cycle 5 of a HIGH-0 loop whose MEDIUM fell 4, 3, 2 and now raises 1 (task.117, obs #112) |
-| `medium-flat-cycle5.yml` | route 2c's negative — MEDIUM 2, 2, 2 at the budget: not falling, escalate as today |
+| `medium-falling-cycle5.yml` | a CONCERNS gate raising one MEDIUM — route 2c's positive until task.244 removed the route; still read by the `countRaised` test and by the legacy-input test in `qa-loop-route.test.mjs` |
+| `medium-flat-cycle5.yml` | a CONCERNS gate raising two MEDIUM — route 2c's negative until task.244; still read by the `countRaised` and `readGateToken` tests |
 

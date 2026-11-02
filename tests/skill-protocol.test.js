@@ -382,14 +382,20 @@ test("create-story — naming convention examples are accepted by validator", ()
 test("create-story — HALTs when skills-config.yaml missing", () => {
   const { content } = loadSkill("create-story");
   assert.match(content, /skills-config\.yaml/);
-  // The HALT clause and the config name must co-occur within the same 500-char window.
-  const haltIdx = content.indexOf("HALT");
-  const configIdx = content.indexOf("skills-config.yaml");
-  assert.ok(haltIdx >= 0 && configIdx >= 0);
-  assert.ok(
-    Math.abs(haltIdx - configIdx) < 500,
+  // The HALT clause must sit in the step that loads the config, within 500 chars of it. Anchored on
+  // that step rather than the file's first mention: the Allowed writes list names
+  // skills-config.yaml earlier (task.246), and a first-occurrence check read that as the HALT's.
+  const configIdx = content.indexOf(
+    "Load configuration from skills-config.yaml",
+  );
+  assert.ok(configIdx >= 0, "create-story lost its config-load step");
+  const step = content.slice(configIdx, configIdx + 500);
+  assert.match(
+    step,
+    /\*\*HALT\*\*/,
     "HALT clause and skills-config.yaml reference should be near each other",
   );
+  assert.match(step, /skills-config\.yaml not found/);
 });
 
 // ===========================================================================

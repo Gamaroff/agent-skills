@@ -20,12 +20,15 @@
  * the structural move; a fourth patch to two copies of prose was not.
  *
  * Contract:
- *   node qa-read-back.js --doc <work-item.md> [--json]
+ *   node qa-read-back.js --doc <work-item.md> [--target <PR base branch>] [--json]
+ *     --target defaults to develop; it is criteria-drift.js's merge-base fallback
  *     exit 0  clean — the gate, the report and a Change Log row exist, every link
  *             in the document resolves against the index, `updated:` accounts
  *             for the newest row, and the document's verdict is this cycle's: the
  *             QA section's `**Gate Decision**` and the newest qa-task/qa-story
- *             Change Log row both name the gate's `gate:` token (task.192, obs #205)
+ *             Change Log row both name the gate's `gate:` token (task.192, obs #205),
+ *             and the gate answers the criteria's boundary signal and every
+ *             appended criteria_drift entry (task.248, obs #139, #140)
  *     exit 1  HALT — one of those does not hold; each problem is printed with the
  *             remedy. Do not post the PR comment / QA summary over it.
  *     exit 2  could not look — the check as a whole could not run: bad arguments,
@@ -60,6 +63,8 @@
  * requiring it would pull a tracker CLI into the qa-* bundles.
  *
  * bundle-dependency: shared/resources/qa-cycle.sh
+ * bundle-dependency: shared/resources/probe-boundary-signals.mjs
+ * bundle-dependency: shared/resources/criteria-drift.js
  */
 
 const fs = require("fs");
@@ -72,6 +77,8 @@ function load() {
       docLinks: require("./doc-links.js"),
       changeLog: require("./change-log.js"),
       qaResults: require("./qa-results.js"),
+      yaml: require("./yaml-subset.js"),
+      criteriaSection: require("./criteria-section.js"),
     };
   } catch (e) {
     return { error: e.message };
@@ -174,6 +181,130 @@ function verdictProblems(engines, text, gateFile) {
   return problems;
 }
 
+const present = (v) => v !== undefined && v !== null && String(v).trim() !== "";
+
+/**
+ * The answers the gate owes to two finalise rules (task.248, obs #140, #139).
+ *
+ * Boundary: the criteria CLI is re-run on the document here, so the check does
+ * not rest on what the gate says about itself. When the criteria carry a
+ * boundary signal, the gate records `boundary_signals` and either
+ * `boundary: true` or a `boundary_reason` — a stated reason replaces the silent
+ * `false` that QA and the DoD disagreed over on task.234.
+ *
+ * Drift: criteria-drift.js is re-run here too (`--base-from-review <target>`),
+ * whenever the document has criteria, and every criterion it reports changed
+ * must appear in the gate's `criteria_drift` block with the engine's kind. Every
+ * `appended` entry answers `relaxes: true|false` with a `relaxes_reason`. The
+ * engine cannot tell an evidence note from an amendment; the gate must say which
+ * it is.
+ *
+ * A CLI that does not answer is "could not look" (a throw, so exit 2), never a pass.
+ */
+function answerProblems(engines, doc, gateFile, target) {
+  const base = path.basename(gateFile);
+  const g =
+    engines.yaml.parseYamlSubset(fs.readFileSync(gateFile, "utf8")) || {};
+  const sec = (g.nfr_validation && g.nfr_validation.security) || {};
+  const problems = [];
+
+  const cli = spawnSync(
+    process.execPath,
+    [
+      path.join(__dirname, "probe-boundary-signals.mjs"),
+      "--doc",
+      doc,
+      "--json",
+    ],
+    { encoding: "utf8" },
+  );
+  let sig;
+  try {
+    sig = JSON.parse(cli.stdout);
+  } catch {
+    sig = null;
+  }
+  if (!sig || !["classified", "no-criteria"].includes(sig.reason))
+    throw new Error(
+      `probe-boundary-signals.mjs did not classify the document (exit ${cli.status}): ${(cli.stderr || cli.stdout || "").trim()}`,
+    );
+  if (sig.boundary === true) {
+    const phrases = sig.matched.map((m) => `"${m.phrase}"`).join(", ");
+    if (!("boundary_signals" in sec))
+      problems.push(
+        `this cycle's gate ${base} has no nfr_validation.security.boundary_signals, but the criteria carry ${phrases} — record the CLI's matched[]`,
+      );
+    if (sec.boundary !== true && !present(sec.boundary_reason))
+      problems.push(
+        `this cycle's gate ${base} records boundary: ${sec.boundary === undefined ? "(absent)" : sec.boundary} beside the criteria signal ${phrases} with no boundary_reason — record boundary: true, or state why not`,
+      );
+  }
+
+  // The block is re-derived, not trusted: criteria-drift.js runs again here, as
+  // the boundary CLI does above, and every criterion it reports changed must be
+  // in the gate's block. A gate that left the block out, or dropped an entry,
+  // read clean (task.248 QA cycle 2, T248-QA2-4). Whether to look is decided by
+  // the document, never by keys the gate chose to write: the read-back only reads
+  // the gate this cycle wrote, so a gate that leaves both task.248 keys out is a
+  // gate that skipped the check, not one written before it (QA cycle 3, T248-QA3-1).
+  const cd = g.criteria_drift;
+  const criteria = engines.criteriaSection.readCriteriaEntries(
+    fs.readFileSync(doc, "utf8"),
+  );
+  if (criteria !== null) {
+    const run = spawnSync(
+      process.execPath,
+      [
+        path.join(__dirname, "criteria-drift.js"),
+        "--doc",
+        doc,
+        "--base-from-review",
+        target,
+        "--json",
+      ],
+      { encoding: "utf8" },
+    );
+    let drift;
+    try {
+      drift = JSON.parse(run.stdout);
+    } catch {
+      drift = null;
+    }
+    if (!drift || run.status !== 0)
+      throw new Error(
+        `criteria-drift.js could not compare the criteria (exit ${run.status}): ${(drift && drift.error) || (run.stderr || "").trim()} — pass --target <the PR's base branch>`,
+      );
+    const recorded = new Map(
+      (cd && Array.isArray(cd.changed) ? cd.changed : [])
+        .filter((c) => c && c.id !== undefined)
+        .map((c) => [String(c.id), c.kind]),
+    );
+    if (drift.changed.length && !(cd && typeof cd === "object"))
+      problems.push(
+        `this cycle's gate ${base} has no criteria_drift block, but criteria-drift.js reports ${drift.changed.length} changed criteria (${drift.reason}) — record its result`,
+      );
+    else
+      for (const c of drift.changed) {
+        const kind = recorded.get(String(c.id));
+        if (kind !== c.kind)
+          problems.push(
+            `criteria-drift.js reports criterion ${c.id} ${c.kind}, but ${base}'s criteria_drift block ${kind === undefined ? "leaves it out" : `records it ${kind}`} — record the engine's result`,
+          );
+      }
+  }
+
+  // An appended entry the gate carries must be answered.
+  if (cd && typeof cd === "object")
+    for (const c of Array.isArray(cd.changed) ? cd.changed : []) {
+      if (!c || c.kind !== "appended") continue;
+      if (typeof c.relaxes !== "boolean" || !present(c.relaxes_reason))
+        problems.push(
+          `criteria_drift entry ${c.id ?? "(no id)"} in ${base} is appended but does not answer relaxes: true|false with a relaxes_reason — say whether the added text relaxes the criterion`,
+        );
+    }
+  return problems;
+}
+
 /**
  * The QA cycle is the highest-numbered gate in the directory. ONE definition —
  * the bundled qa-cycle.sh every other QA block calls — so this script and the
@@ -248,7 +379,11 @@ function readBack(docArg, opts = {}) {
 }
 
 // opts.sleepMs replaces the backoff's sleep — a test seam, as in gh-stage.js withRetry.
-function readBackUnguarded(docArg, { sleepMs = sleepSync } = {}) {
+// opts.target is the PR's base branch, for criteria-drift.js's merge-base fallback.
+function readBackUnguarded(
+  docArg,
+  { sleepMs = sleepSync, target = "develop" } = {},
+) {
   const out = { problems: [], staged: [], links: [], stageAttempts: {} };
   const engines = load();
   if (engines.error)
@@ -401,6 +536,7 @@ function readBackUnguarded(docArg, { sleepMs = sleepSync } = {}) {
 
   const text = fs.readFileSync(doc, "utf8");
   if (gate) out.problems.push(...verdictProblems(engines, text, gate));
+  if (gate) out.problems.push(...answerProblems(engines, doc, gate, target));
 
   const coherence = engines.changeLog.checkUpdatedCoherence(text);
   out.changeLog = coherence;
@@ -425,6 +561,7 @@ function readBackUnguarded(docArg, { sleepMs = sleepSync } = {}) {
 function main(argv) {
   const json = argv.includes("--json");
   let doc = null;
+  let target = "develop";
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === "--json") continue;
     if (
@@ -433,6 +570,15 @@ function main(argv) {
       !argv[i + 1].startsWith("--")
     ) {
       doc = argv[(i += 1)];
+      continue;
+    }
+    if (
+      argv[i] === "--target" &&
+      argv[i + 1] !== undefined &&
+      argv[i + 1] !== "" &&
+      !argv[i + 1].startsWith("--")
+    ) {
+      target = argv[(i += 1)];
       continue;
     }
     return report(
@@ -455,7 +601,7 @@ function main(argv) {
       },
       json,
     );
-  return report(readBack(doc), json);
+  return report(readBack(doc, { target }), json);
 }
 
 function report(r, json) {
@@ -465,7 +611,7 @@ function report(r, json) {
   }
   if (r.exitCode === 2) {
     process.stderr.write(
-      `qa-read-back: could not look — ${r.error}\nusage: qa-read-back.js --doc <work-item.md> [--json]\n`,
+      `qa-read-back: could not look — ${r.error}\nusage: qa-read-back.js --doc <work-item.md> [--target <branch>] [--json]\n`,
     );
     return 2;
   }

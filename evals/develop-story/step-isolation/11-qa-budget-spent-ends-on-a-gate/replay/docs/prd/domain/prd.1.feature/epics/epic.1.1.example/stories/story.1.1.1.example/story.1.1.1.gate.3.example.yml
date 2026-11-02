@@ -1,0 +1,35 @@
+schema: 1
+gate: CONCERNS
+status_reason: "Cycle 3 — HIGH 0, MEDIUM 3 raised (falling), all fixed by cycle 3's qa-fix."
+reviewer: "QA Engineer"
+updated: "2026-09-18T12:00:00Z"
+
+top_issues:
+  - id: "EX-300"
+    severity: medium
+    file: "src/example.ts"
+    finding: "MEDIUM 1 of cycle 3."
+    suggested_owner: dev
+    status: closed
+  - id: "EX-301"
+    severity: medium
+    file: "src/example.ts"
+    finding: "MEDIUM 2 of cycle 3."
+    suggested_owner: dev
+    status: closed
+  - id: "EX-302"
+    severity: medium
+    file: "src/example.ts"
+    finding: "MEDIUM 3 of cycle 3."
+    suggested_owner: dev
+    status: closed
+
+waiver:
+  active: false
+
+quality_score: 80
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged."

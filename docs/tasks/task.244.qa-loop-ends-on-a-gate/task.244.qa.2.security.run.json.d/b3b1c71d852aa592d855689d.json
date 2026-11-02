@@ -1,0 +1,28 @@
+{
+  "sink": null,
+  "entry": "shell-argv:shared/resources/code-moved-since-gate.sh",
+  "name": "code-moved doc-dir via shell-argv:",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 9,
+  "passed": 9,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": [
+    "bash"
+  ],
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": [
+    "{input}",
+    "docs/tasks/task.42.example/task.42.gate.1.example.yml"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": "/home/gamaroff/Development/agent-skills/.claude/state/t244-q2-setup.sh",
+  "ran_at": "2026-10-30T23:03:38.848Z"
+}

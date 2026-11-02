@@ -232,7 +232,7 @@ Three things to know if you pick it:
 | 2    | `review-story`        | Runs `review-story` in validate-and-apply mode (no questions). Skipped when a `story.{P}.{E}.{S}.review.*.md` report exists and the status is Ready for Development or In Progress. |
 | 3    | `develop`             | Implements the story. Bounded loop, `MAX_ITER=5`. Each iteration: plan → code → test → DoD check.                                                                   |
 | 4    | `create-pr`           | Pushes the branch, opens a PR with auto-generated description. `--base` is the Q2 answer, pre-supplied from Phase 0.                                                |
-| 5–6  | `qa-story` → `qa-fix` → `review-pr` | QA review produces a gate file (`PASS` / `CONCERNS` / `FAIL` / `WAIVED`). `qa-fix` runs on `FAIL`, or on an open `top_issues[]` entry that no active waiver covers; a gate in the accepting-route set (any of the QA loop's §5c five routes) hands to `review-pr`. Up to `QA_MAX_CYCLES` cycles (default 5). **Step 5c is the loop's exit gate**: a gate in the accepting-route set hands to `review-pr`, which reviews the PR against the story. `REQUEST CHANGES` returns to `qa-fix` and consumes a cycle from the same cycle budget; `APPROVE`/`CONCERNS` exit to Step 7. Leaves `story.{P}.{E}.{S}.pr-review.{n}.{name}.md`. |
+| 5–6  | `qa-story` → `qa-fix` → `review-pr` | QA review produces a gate file (`PASS` / `CONCERNS` / `FAIL` / `WAIVED`). `qa-fix` runs on `FAIL`, or on an open `top_issues[]` entry that no active waiver covers; a gate in the accepting-route set (any of the QA loop's §5c four routes) hands to `review-pr`. Up to `QA_MAX_CYCLES` cycles (default 5). **Step 5c is the loop's exit gate**: a gate in the accepting-route set hands to `review-pr`, which reviews the PR against the story. `REQUEST CHANGES` returns to `qa-fix` and consumes a cycle from the same cycle budget; `APPROVE`/`CONCERNS` exit to Step 7. Leaves `story.{P}.{E}.{S}.pr-review.{n}.{name}.md`. |
 | 7    | `finalise`            | Validates against the Definition of Done, posts DoD summary to the PR, comments the tracker issue, updates the board. **Runs full side-effects even in lite mode.** |
 | 8    | `commit-changes`      | Commits the final implementation report and pushes. The DoD summary and `status: accepted` were already committed by `/finalise` (6a). |
 
@@ -291,7 +291,7 @@ After the pipeline completes, confirm:
 
 ```bash
 # Gate file exists, and the last QA cycle's Action row (implementation report) reads
-# 'Proceeding to 5c' — the record that the gate took one of §5c's five routes
+# 'Proceeding to 5c' — the record that the gate took one of §5c's four routes
 ls docs/prd/.../story.{P}.{E}.{S}.{name}/*.gate.*.yml
 grep '^gate:' docs/prd/.../story.{P}.{E}.{S}.{name}/*.gate.*.yml
 # Expected output: exactly one line reading `**Action**: Proceeding to 5c (PR conformance review)`.

@@ -44,6 +44,8 @@ function repo(shape = "task", mutate) {
   fs.writeFileSync(path.join(root, ".gitignore"), "*.log\n");
   git("add", ".gitignore");
   git("commit", "-qm", "init");
+  // The PR base: criteria-drift.js's merge-base fallback, which the read-back re-runs (task.248).
+  git("update-ref", "refs/remotes/origin/develop", "HEAD");
   const { dir: d, stem, qa } = SHAPES[shape];
   const dir = path.join(root, d);
   fs.mkdirSync(dir, { recursive: true });
@@ -758,4 +760,229 @@ test("the CLI waits out a lock another process releases in real time", async () 
   } finally {
     w.done();
   }
+});
+
+// task.248 — the gate answers two finalise rules: the boundary signal in the
+// criteria (obs #140) and an appended criterion (obs #139).
+const SIGNAL_CRITERIA = [
+  "## Success Criteria",
+  "",
+  "- [ ] 1. The parser must never accept a path outside the root.",
+  "",
+].join("\n");
+const withCriteria = ({ doc }) =>
+  edit(
+    doc,
+    "## QA Testing Results",
+    `${SIGNAL_CRITERIA}\n## QA Testing Results`,
+  );
+const gateWith =
+  (yaml) =>
+  ({ dir, stem }) =>
+    fs.writeFileSync(
+      path.join(dir, `${stem}.gate.1.x.yml`),
+      `gate: FAIL\n${yaml}`,
+    );
+const both =
+  (...fs_) =>
+  (w) =>
+    fs_.forEach((f) => f(w));
+
+test("task.248: a criteria signal with boundary: false and no reason halts, naming the phrase", () => {
+  const r = verdict(
+    "task",
+    both(
+      withCriteria,
+      gateWith(
+        "nfr_validation:\n  security:\n    status: PASS\n    boundary: false\n",
+      ),
+    ),
+  );
+  assert.equal(r.exitCode, 1);
+  assert.ok(
+    r.problems.some((p) =>
+      /no nfr_validation\.security\.boundary_signals.*"never"/.test(p),
+    ),
+    r.problems.join("\n"),
+  );
+  assert.ok(
+    r.problems.some((p) =>
+      /boundary: false beside the criteria signal "never" with no boundary_reason/.test(
+        p,
+      ),
+    ),
+    r.problems.join("\n"),
+  );
+});
+
+test("task.248: the same signal reads clean with boundary_signals and a boundary_reason, or with boundary: true", () => {
+  for (const sec of [
+    '    boundary: false\n    boundary_signals: ["never"]\n    boundary_reason: "a criterion about wording, no input gate"\n',
+    '    boundary: true\n    boundary_signals: ["never"]\n',
+  ]) {
+    const r = verdict(
+      "task",
+      both(
+        withCriteria,
+        gateWith(`nfr_validation:\n  security:\n    status: PASS\n${sec}`),
+      ),
+    );
+    assert.equal(r.exitCode, 0, r.problems.join("\n"));
+  }
+});
+
+test("task.248: no criteria signal asks nothing of the gate (control)", () => {
+  const r = verdict(
+    "task",
+    gateWith(
+      "nfr_validation:\n  security:\n    status: PASS\n    boundary: false\n",
+    ),
+  );
+  assert.equal(r.exitCode, 0, r.problems.join("\n"));
+});
+
+test("task.248: an appended criteria_drift entry must answer relaxes with a reason", () => {
+  const drift = (entry) =>
+    `criteria_drift:\n  reason: drift\n  changed:\n    - id: "#1"\n      kind: appended\n${entry}`;
+  let r = verdict("task", gateWith(drift("      approved: false\n")));
+  assert.equal(r.exitCode, 1);
+  assert.ok(
+    r.problems.some((p) =>
+      /criteria_drift entry #1 .* is appended but does not answer relaxes/.test(
+        p,
+      ),
+    ),
+    r.problems.join("\n"),
+  );
+  r = verdict(
+    "task",
+    gateWith(drift('      relaxes: true\n      relaxes_reason: ""\n')),
+  );
+  assert.equal(r.exitCode, 1, "an empty reason is no answer");
+  r = verdict(
+    "task",
+    gateWith(
+      drift(
+        '      relaxes: false\n      relaxes_reason: "an evidence note; the bound is unchanged"\n',
+      ),
+    ),
+  );
+  assert.equal(r.exitCode, 0, r.problems.join("\n"));
+  // A reworded entry is QA's MEDIUM finding, not an answer the read-back asks for.
+  // (Here the document has no criteria, so the engine reports nothing to compare.)
+  r = verdict(
+    "task",
+    gateWith(
+      'criteria_drift:\n  reason: drift\n  changed:\n    - id: "#1"\n      kind: reworded\n',
+    ),
+  );
+  assert.equal(r.exitCode, 0, r.problems.join("\n"));
+});
+
+// task.248 QA cycle 2, T248-QA2-4: the read-back re-derives the drift rather than trusting the
+// gate's block. The criterion is committed at the PR base, then text is appended to it.
+const amendedSinceBase = ({ root, doc }, criteria = SIGNAL_CRITERIA) => {
+  edit(doc, "## QA Testing Results", `${criteria}\n## QA Testing Results`);
+  const git = (...a) =>
+    execFileSync("git", ["-c", "user.email=a@b", "-c", "user.name=a", ...a], {
+      cwd: root,
+      stdio: "ignore",
+    });
+  git("add", ".");
+  git("commit", "-qm", "base");
+  git("update-ref", "refs/remotes/origin/develop", "HEAD");
+  // A continuation line: text added under the criterion, its own line unchanged.
+  edit(
+    doc,
+    "outside the root.\n",
+    "outside the root.\n  Evidence: t.test.js.\n",
+  );
+};
+const SIGNAL_SEC =
+  'nfr_validation:\n  security:\n    status: PASS\n    boundary: true\n    boundary_signals: ["never"]\n';
+
+test("task.248: a gate that leaves out a criterion the engine reports changed halts", () => {
+  for (const [label, block] of [
+    ["no block at all", ""],
+    ["an empty block", "criteria_drift:\n  reason: clean\n  changed: []\n"],
+  ]) {
+    const r = verdict(
+      "task",
+      both(amendedSinceBase, gateWith(SIGNAL_SEC + block)),
+    );
+    assert.equal(r.exitCode, 1, label);
+    assert.ok(
+      r.problems.some((p) =>
+        /criteria-drift\.js reports (criterion #1 appended|1 changed criteria)/.test(
+          p,
+        ),
+      ),
+      `${label}: ${r.problems.join("\n")}`,
+    );
+  }
+});
+
+test("task.248: the same gate reads clean when it records the engine's entry, answered", () => {
+  const r = verdict(
+    "task",
+    both(
+      amendedSinceBase,
+      gateWith(
+        SIGNAL_SEC +
+          'criteria_drift:\n  reason: drift\n  changed:\n    - id: "#1"\n      kind: appended\n      approved: false\n      relaxes: false\n      relaxes_reason: "an evidence note"\n',
+      ),
+    ),
+  );
+  assert.equal(r.exitCode, 0, r.problems.join("\n"));
+});
+
+// task.248 QA cycle 3, T248-QA3-1: the document decides whether to look, not the gate's keys.
+test("task.248: a gate with no task.248 key is still asked to re-derive, and halts over an amended criterion", () => {
+  // No boundary signal in this criterion, so the gate owes no boundary answer either.
+  const plain = [
+    "## Success Criteria",
+    "",
+    "- [ ] 1. The parser reads a path outside the root.",
+    "",
+  ].join("\n");
+  const r = verdict(
+    "task",
+    both((w) => amendedSinceBase(w, plain), gateWith("")),
+  );
+  assert.equal(r.exitCode, 1, r.problems.join("\n"));
+  assert.ok(
+    r.problems.some((p) =>
+      /has no criteria_drift block, but criteria-drift\.js reports 1 changed criteria/.test(
+        p,
+      ),
+    ),
+    r.problems.join("\n"),
+  );
+});
+
+test("task.248: a key-less gate over unchanged criteria reads clean", () => {
+  const plain = [
+    "## Success Criteria",
+    "",
+    "- [ ] 1. The parser reads a path outside the root.",
+    "",
+  ].join("\n");
+  const r = verdict(
+    "task",
+    both((w) => {
+      amendedSinceBase(w, plain);
+      // Undo the amendment: the criterion now matches its base.
+      edit(w.doc, "  Evidence: t.test.js.\n", "");
+    }, gateWith("")),
+  );
+  assert.equal(r.exitCode, 0, r.problems.join("\n"));
+});
+
+test("task.248: an engine that cannot resolve a base is could-not-look, never a pass", () => {
+  const r = verdict("task", both(amendedSinceBase, gateWith(SIGNAL_SEC)), {
+    target: "no-such-branch",
+  });
+  // The reviewed criterion still resolves from the merge-base only through the target.
+  assert.equal(r.exitCode, 2, JSON.stringify(r));
+  assert.match(r.error, /criteria-drift\.js could not compare.*--target/);
 });

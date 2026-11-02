@@ -1,0 +1,194 @@
+[
+  {
+    "id": "lf-injects-key",
+    "input": "src/c/index.ts\nwireframeMap: false",
+    "direction": "hostile",
+    "why": "A line feed writes a second key.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "cr-injects-key",
+    "input": "src/c/index.ts\rwireframeMap: false",
+    "direction": "hostile",
+    "why": "Lone CR line break.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "crlf-injects-key",
+    "input": "src/c/index.ts\r\nwireframeMap: false",
+    "direction": "hostile",
+    "why": "CRLF line break.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "u2028",
+    "input": "src/c/index.ts wireframeMap: false",
+    "direction": "hostile",
+    "why": "U+2028 line terminator.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "u2029",
+    "input": "src/c/index.ts wireframeMap: false",
+    "direction": "hostile",
+    "why": "U+2029 line terminator.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "nel",
+    "input": "src/c/index.tswireframeMap: false",
+    "direction": "hostile",
+    "why": "NEL, a YAML 1.1 line break.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "vt",
+    "input": "src/c/index\u000b.ts",
+    "direction": "hostile",
+    "why": "Escaped C0 control.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "double-quote",
+    "input": "src/\"c\"/index.ts",
+    "direction": "hostile",
+    "why": "Cannot read back from a double-quoted scalar.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "backslash",
+    "input": "src\\c\\index.ts",
+    "direction": "hostile",
+    "why": "Reads back doubled.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "tab",
+    "input": "src/c/index\t.ts",
+    "direction": "hostile",
+    "why": "Escaped as \\t.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "unit-separator",
+    "input": "src/c/index\u001f.ts",
+    "direction": "hostile",
+    "why": "Escaped C0 control.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "plain-path",
+    "input": "src/components/index.ts",
+    "direction": "legitimate",
+    "why": "The ordinary value.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "spaces",
+    "input": "src/my components/index.ts",
+    "direction": "legitimate",
+    "why": "Spaces are quoted.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "colon-hash",
+    "input": "src/a: b # c/index.ts",
+    "direction": "legitimate",
+    "why": "Quoted by the writer.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "unicode",
+    "input": "src/composants-écran/index.ts",
+    "direction": "legitimate",
+    "why": "Non-ASCII kept by JSON.stringify.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "astral",
+    "input": "src/😀/index.ts",
+    "direction": "legitimate",
+    "why": "A surrogate pair is kept.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "single-quote",
+    "input": "src/o'brien/index.ts",
+    "direction": "legitimate",
+    "why": "Reads back verbatim.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "leading-dash",
+    "input": "-index.ts",
+    "direction": "legitimate",
+    "why": "A flag-shaped value is still the value.",
+    "correct": "Accepted (exit 0)."
+  }
+]

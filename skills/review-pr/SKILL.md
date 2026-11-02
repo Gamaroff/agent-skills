@@ -1056,7 +1056,7 @@ After editing, run `npm run bundle`.
 ## Relationship to the develop pipelines
 
 `/develop-story` and `/develop-task` **do** call `/review-pr`, as **Step 5c** — the exit gate of
-their Steps 5–6 QA loop. It runs once a QA gate reaches it by any of §5c's five routes — the cycle entry's `**Action**` row reads `Proceeding to 5c` — and nothing leaves that
+their Steps 5–6 QA loop. It runs once a QA gate reaches it by any of §5c's four routes — the cycle entry's `**Action**` row reads `Proceeding to 5c` — and nothing leaves that
 loop without passing through it. The full routing lives in the pipelines' Steps 5–6 QA loop step
 file, §5c — deliberately not linked by path, because the bundler follows such a reference and would
 copy that file and its transitive dependencies into this skill, which does not need them to run.
@@ -1074,7 +1074,7 @@ The distinction is the whole reason the wiring is legitimate:
 - `/review-pr` **reports** a verdict. It writes no gate `.yml`, never submits a formal GitHub
   review, and never edits code — exactly as before.
 - The **orchestrator** acts on that verdict: `REQUEST CHANGES` sends the run back to `/qa-fix` on
-  the shared 5-cycle budget, and so does a `CONCERNS` holding an open `category: coverage` finding
+  the shared 5-gate budget (on the last gate it escalates unfixed), and so does a `CONCERNS` holding an open `category: coverage` finding
   (one without `provenance: pre-existing`; task.238); `APPROVE` and any other `CONCERNS` exit to
   Step 7, with `CONCERNS` findings recorded rather than blocking; on either, doc-only findings are fixed when the carry clears
   them, and ride the acceptance commit.

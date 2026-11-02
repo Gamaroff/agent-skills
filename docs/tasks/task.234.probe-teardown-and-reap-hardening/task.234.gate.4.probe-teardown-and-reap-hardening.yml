@@ -1,0 +1,61 @@
+schema: 2
+task: 'task.234.probe-teardown-and-reap-hardening'
+task_title: 'Probe sandbox teardown and process-group reap'
+gate: CONCERNS
+status_reason: 'QA-7 and QA-8 hold (test plus two mutations). Fixing QA-8 narrowed the leash shell PATH to /usr/bin:/bin, which drops the host PATH the watcher used to find sleep and ps; on a host without them there, the watcher spins.'
+reviewer: 'QA Engineer'
+head: '3820a0de25db06d4079b0299fe251a0ea3fa8d70'
+updated: '2026-10-31T10:00:26Z'
+
+top_issues:
+  - id: 'TASK-234-QA-9'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'LEASH_ENV is PATH=/usr/bin:/bin and the watcher prefix PATH=/usr/bin:/bin:$PATH no longer appends the host PATH; where sleep/ps/tr live elsewhere (NixOS, Guix), `sleep 0.2` fails without ending the loop and the watcher becomes a fork-per-pass hot loop for every leashed case.'
+    suggested_action: 'Build LEASH_ENV.PATH from the probe''s own process.env.PATH (host-controlled, not case-controlled) after /usr/bin:/bin, and drop the now-redundant prefix in leashScript.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 9
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false. The case environment no longer reaches the leash shell; argv0 is the caller''s again, so isLaunchFailure reads fence launch failures as before.'
+  performance:
+    status: CONCERNS
+    notes: 'TASK-234-QA-9: a hot watcher loop on hosts where sleep is outside /usr/bin:/bin.'
+  reliability:
+    status: PASS
+    notes: 'CI Test (Node 22) passed on 7646e7be.'
+  maintainability:
+    status: PASS
+    notes: 'Section 5 states argv0 and the leash environment.'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-234-QA-9.'
+      refs: ['shared/resources/security-probe.mjs']
+  future:
+    - action: 'The QA-8 stderr assertion is only meaningful where /bin/sh is bash (dash ignores SHELLOPTS), and the test calls leashed() directly rather than through a spawn site (reviewer CR-2, low).'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+    - action: 'reapGroup EPERM ambiguity and watcher pid reuse (cycle-3 CR-3, CR-4), carried forward.'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-234-QA-9 fixed']

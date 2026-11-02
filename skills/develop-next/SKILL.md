@@ -376,26 +376,39 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
      and for nothing else** — every other answer, including a failed read, exits 1:
 
      ```bash
+     # RUN BACKGROUNDED (run_in_background) — never in the foreground, never under `timeout` (obs #94).
      # INPUTS, re-bound in THIS block (a fresh shell has none): the rollup read above, the PR head and the
      # PR id. Unbound, the rule would be skipped silently, or `--head ""` would judge another commit.
      : "${CI_ROLLUP:?bind CI_ROLLUP from the rollup read above}" "${PR_HEAD:?bind PR_HEAD}" "${PR_ID:?bind PR_ID}"
      CI_TREE_EQ=""
      case "$CI_ROLLUP" in
        PENDING|NONE)
+         mkdir -p .claude/state
          if TE=$(command node .agents/skills/develop-next/references/ci-tree-equivalence.js \
-                   --head-rollup "$CI_ROLLUP" --head "$PR_HEAD" --pr "$PR_ID" --json); then
+                   --head-rollup "$CI_ROLLUP" --head "$PR_HEAD" --pr "$PR_ID" --json \
+                   2> .claude/state/ci-tree-eq.log); then
            CI_TREE_EQ=$(printf '%s' "$TE" | jq -r '.greenSha[0:12] // empty')
            [ -n "$CI_TREE_EQ" ] && CI_ROLLUP=SUCCESS    # an empty sha stays PENDING: fail closed
          fi ;;
      esac
+     # The result, for the notification: the next block re-binds both from this line.
+     echo "CI_ROLLUP=$CI_ROLLUP CI_TREE_EQ=$CI_TREE_EQ"
      ```
 
-     **The engine is not always a quick check.** With `ci.docsOnly.checkCommand` configured, it runs
-     that command inside the call, and a test suite there can outlive the tool timeout. So either
-     re-sample the head's rollup once first and call the engine only if the head is still pending, or
-     run the block backgrounded with its output in a file (`> .claude/state/ci-tree-eq.log 2>&1`),
-     ending it with `echo "CI_TREE_EQ=$CI_TREE_EQ"`, and read that line on the notification — never
-     as a foreground call (obs #270).
+     **The engine is not always a quick check, so the block above is already the background form.**
+     With `ci.docsOnly.checkCommand` configured, the engine runs that command inside the call, and a
+     test suite there can outlive the tool timeout (obs #270). Run the block as a background command
+     and read its last line on the notification; the check's own output is in
+     `.claude/state/ci-tree-eq.log`. The cheaper alternative is to re-sample the head's rollup once
+     first and run the block only if the head is still pending. A killed engine takes the check's
+     process group with it (obs #94), but a foreground call still loses the answer.
+
+     **Never run this block alongside `<qualityGateCommand>`. Run them one after the other: this
+     block first, the quality gate after its notification.** Both are full suites when
+     `checkCommand` is set, and two of them on one machine false-fail load-sensitive tests. The
+     engine then latches `check-failed` on a green ancestor, and the docs-only rule buys nothing: on
+     task.174 one test failed under the doubled load and passed 3 times out of 3 alone (obs #149).
+     Being backgrounded is what makes running both at once the easy mistake.
 
      When `CI_TREE_EQ` is set, the PR head's own CI has **not** finished and the reading is satisfied
      because every file changed since a green first-parent ancestor is documentation (per
@@ -600,9 +613,15 @@ and, when the run created a tracker issue, the `Issue` cell — and never a seco
    # argument and it exits 2 — on exactly the case the Issue cell exists for.
    ISSUE_ARGS=()
    [ -n "$ISSUE_REF" ] && ISSUE_ARGS=(--issue "$ISSUE_REF")
-   node .agents/skills/develop-next/references/registry-tick.js --annotate \
+   node .agents/skills/develop-next/references/registry-tick.js --annotate --stage \
      --file <item.commandArg> --pr <PR#> "${ISSUE_ARGS[@]}" --json
    ```
+   `--stage` puts **this row** in the index and leaves every other edit in the registry unstaged: a
+   parallel session's uncommitted row or counter bump in the same checkout must not ride into this
+   commit (obs #127, task 245). So the commits below carry **no `git add` of the registry**, and no
+   pathspec either — `git commit -- <path>` would commit the working file, parallel row included.
+   A `stageReason` other than `staged` / `already-staged` means the row is not in the index: log it
+   verbatim and do not commit (the drift test is the backstop).
    It appends `· PR #<n> merged` to the row's last cell (the registry's notes cell — `Depends on` in
    the documented header; rows 100–106 already carry it there), fills `Issue` only when that cell
    reads as empty (`—`, `none`, `n/a`, `tbd` …), and leaves Status alone. Read `reason`:
@@ -612,10 +631,11 @@ and, when the run created a tracker issue, the `Issue` cell — and never a seco
      registry edited and uncommitted — **staged or not**: `git diff` without `HEAD` compares the
      working tree to the index and reads a staged-but-uncommitted edit as clean, which is the other
      half of the same window — and the resume path skips Step 0's dirty-tree check. So before
-     marking ticked, compare against `HEAD` and commit what may already be on disk:
+     marking ticked, compare the **index** against `HEAD` and commit what the `--stage` re-run
+     staged (the working file may differ from `HEAD` for another session's reasons, so it is not
+     the comparison):
      ```bash
-     git diff --quiet HEAD -- docs/tasks/task-registry.md || {
-       git add docs/tasks/task-registry.md
+     git diff --cached --quiet HEAD -- docs/tasks/task-registry.md || {
        git commit -m "docs(registry): record <id> — PR #<n> merged"
      }
      ```
@@ -633,8 +653,7 @@ and, when the run created a tracker issue, the `Issue` cell — and never a seco
      ticked.)
 2. Commit and push (only on `annotated`):
    ```bash
-   git add docs/tasks/task-registry.md
-   git commit -m "docs(registry): record <id> — PR #<n> merged"
+   git commit -m "docs(registry): record <id> — PR #<n> merged"   # the row `--stage` staged; no git add
    git push origin <baseBranch>
    ```
    Same non-ff rule as the roadmap arm.

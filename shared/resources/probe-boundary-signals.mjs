@@ -4,7 +4,9 @@
 // probe-boundary-rule.md, which argue the rule. This module is what a test can
 // call: `classifyBoundaryText` applies the text-shaped signals to a script's
 // header, a function's doc comment or a work item's Success Criteria, and
-// returns which phrase fired. Nothing here reads a file or runs anything.
+// returns which phrase fired. The library reads no file and runs nothing; the
+// CLI at the bottom (task.248) is the one exception, and it runs only when this
+// file is executed directly, never on import.
 //
 // Why this exists (task.128, obs #121). On task.121 five QA gates read the same
 // change set and recorded "No boundary delivered"; the finalise security agent
@@ -15,6 +17,12 @@
 // guesses". A script that SAYS it refuses matched none of them, and "not JS"
 // was read as "not a boundary". The fifth signal below is the one the header
 // carries, and it is language-neutral by construction.
+
+import { readFileSync, realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import criteriaReader from "./criteria-section.js";
+
+const { criteriaSection } = criteriaReader;
 
 /**
  * The signals. Any ONE is sufficient; the negative case (a CRUD endpoint, a
@@ -105,3 +113,104 @@ export function classifyBoundaryText(text, { scope = "doc" } = {}) {
 export function renderSignalBullets() {
   return BOUNDARY_SIGNALS.map((s) => `- ${s.description}`).join("\n");
 }
+
+// ── CLI: the criteria signal, for QA and the DoD security agent (task.248) ──
+//
+// Usage: probe-boundary-signals.mjs --doc <work-item.md> [--json]
+//
+// Reads the work item's criteria section with criteria-section.js (the reader
+// finalise-rerun-scope.js and criteria-drift.js use) and applies
+// classifyBoundaryText with scope "criteria". On task.234 seven QA gates
+// recorded `boundary: false` and the DoD security agent recorded `true` on the
+// same diff, citing criterion #2's "never" (obs #140): both read the rule and
+// decided. This prints the signal so neither side has to.
+//
+// The CLI does not decide the boundary. A matched signal obliges the reader to
+// record `boundary: true` or to state why not; it is not a verdict.
+//
+// reason       exit  boundary
+// classified   0     true | false
+// no-criteria  1     null — absence of a section is not a negative answer
+// usage        2     null — no --doc, an unknown flag, or an unreadable file
+
+/** The CLI's decision, pure over the document text. */
+export function classifyCriteriaDoc(body) {
+  const section = criteriaSection(body);
+  if (section === null) {
+    return { reason: "no-criteria", boundary: null, matched: [], exitCode: 1 };
+  }
+  const r = classifyBoundaryText(section, { scope: "criteria" });
+  return {
+    reason: "classified",
+    boundary: r.boundary,
+    matched: r.matched,
+    exitCode: 0,
+  };
+}
+
+function runCli(argv) {
+  let doc = null;
+  let json = false;
+  let error = null;
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === "--json") json = true;
+    else if (a === "--doc") {
+      // A flag where the path belongs is a missing path, not a file named "--json".
+      const v = argv[i + 1];
+      if (v === undefined || v.startsWith("--")) error ??= "--doc needs a path";
+      else doc = argv[++i];
+    } else error ??= `unknown argument: ${a}`;
+  }
+  let result;
+  if (!error && !doc) error = "--doc <work-item.md> is required";
+  if (!error) {
+    try {
+      result = classifyCriteriaDoc(readFileSync(doc, "utf8"));
+    } catch (e) {
+      error = `cannot read ${doc}: ${e.code || e.message}`;
+    }
+  }
+  if (error)
+    result = {
+      reason: "usage",
+      boundary: null,
+      matched: [],
+      exitCode: 2,
+      error,
+    };
+  if (json) {
+    process.stdout.write(JSON.stringify(result, null, 2) + "\n");
+  } else if (result.reason === "classified") {
+    const phrases = result.matched.map((m) => `"${m.phrase}"`).join(", ");
+    process.stdout.write(
+      result.boundary
+        ? `boundary signal in the criteria: ${phrases} — record boundary: true, or boundary_reason\n`
+        : "no boundary signal in the criteria\n",
+    );
+  } else {
+    process.stderr.write(
+      result.reason === "no-criteria"
+        ? `no-criteria: ${doc} has no Success or Acceptance Criteria section\n`
+        : `usage: ${result.error}\n`,
+    );
+  }
+  process.exitCode = result.exitCode;
+}
+
+// Real paths on both sides: through the .agents/skills symlink, argv[1] and
+// import.meta.url name the same file differently, and a plain compare runs
+// nothing and exits 0 (obs #126).
+function isInvokedDirectly() {
+  if (!process.argv[1]) return false;
+  try {
+    return (
+      realpathSync(process.argv[1]) ===
+      realpathSync(fileURLToPath(import.meta.url))
+    );
+  } catch {
+    return false;
+  }
+}
+
+if (isInvokedDirectly()) runCli(process.argv.slice(2));

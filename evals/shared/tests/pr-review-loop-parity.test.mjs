@@ -229,24 +229,25 @@ test("5b is entered on an open finding, never on the verdict token", () => {
   const s5c = section5c();
   assert.match(
     s5c,
-    /five routes out of 5a/,
-    "5c must state that five routes reach it — the accepting-route set is stated once, in 5c",
+    /four routes out of 5a/,
+    "5c must state that four routes reach it — the accepting-route set is stated once, in 5c",
   );
   assert.match(
     s5c,
     /3\. a gate that reads \*\*`CONCERNS` with no open entry in `top_issues\[\]`\*\*/,
     "5c must enumerate route 3 (CONCERNS with no open top_issues[] entry) in its numbered list",
   );
-  // task.123: routes 2b and 2c join the set in the same list, not as a paraphrase elsewhere.
+  // task.123: route 2b joins the set in the same list, not as a paraphrase elsewhere. (Route 2c,
+  // the gate-the-last-fix half-cycle's gate, joined it too and was removed in task.244.)
   assert.match(
     s5c,
     /4\. \*\*\(route 2b\)\*\* a gate that took the \*\*Cosmetic-residue exit\*\*/,
     "5c must enumerate route 2b (the Cosmetic-residue exit) as item 4 of its numbered list",
   );
-  assert.match(
+  assert.doesNotMatch(
     s5c,
-    /5\. \*\*\(route 2c\)\*\* the gate written by the \*\*Gate-the-last-fix half-cycle\*\*/,
-    "5c must enumerate route 2c (the Gate-the-last-fix half-cycle's gate) as item 5 of its numbered list",
+    /5\. \*\*\(route 2c\)\*\*/,
+    "5c must not enumerate route 2c: the gate-the-last-fix half-cycle was removed in task.244",
   );
 });
 
@@ -473,10 +474,10 @@ test("the accepting-route set is stated once: consumers point at §5c and read t
       `${name} must decide "reached 5c" from the cycle entry's Action row, not from the gate`,
     );
   }
-  // And the set itself lives in exactly one enumerated list: §5c's "five routes out of 5a".
+  // And the set itself lives in exactly one enumerated list: §5c's "four routes out of 5a".
   assert.match(
     section5c(),
-    /five routes out of 5a/,
+    /four routes out of 5a/,
     "§5c must be the one enumerated statement of the set",
   );
   assert.doesNotMatch(
@@ -553,13 +554,15 @@ test("the Action row the consumers read has a writer on every route: post-guard 
   // C3-CR-1: the loop-limit write is Action-ONLY — a real REQUEST CHANGES on cycle N's PR Review
   // row (loop-limit-via-review) must survive it. The "On continue" step must say so, and must not
   // pair the Action value with the not-reached PR Review value as one write.
+  // task.244: the half-cycle section that carried the "On `continue`" step is gone; the loop-limit
+  // write now sits in the paragraph that says the limit is written at 5a or 5c, never after a fix.
   const onContinue = sectionBetween(
-    "**On `continue`:**",
+    "**The loop limit is written at 5a or 5c, never after a fix.**",
     "Before halting, write a thorough escalation entry",
-  );
+  ).replace(/\s+/g, " ");
   assert.match(
     onContinue,
-    /overwrite cycle `N`'s `\*\*Action\*\*` row[^.]*\*\*and only that row\*\*/,
+    /overwrite cycle `N`'s `\*\*Action\*\*` row[^.]*\*\*and only that row\*\*/i,
     "the loop-limit 'On continue' write must name the Action row and only that row (C3-CR-1)",
   );
   assert.doesNotMatch(

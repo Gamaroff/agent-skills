@@ -138,12 +138,43 @@
  *   no-registry, no-row, row-malformed, ambiguous-row, engine-unavailable
  *                          as for the tick
  * Exit 2: usage error, including `--bug-status` with `--annotate`.
+ *
+ * ## `--stage` — stage the row, not the file (task 245)
+ *
+ *   node registry-tick.js [--annotate --pr <n> | --bug-status] --stage --file <doc.md> [--json]
+ *
+ * The registry is a shared file: in a checkout used by parallel sessions it can
+ * hold another session's uncommitted row, and a caller that commits with
+ * `git add <registry>` sweeps that row into its own commit (obs #127). With
+ * `--stage`, after the working-tree write — and also on `already`, the resume
+ * case — the engine applies the SAME row change to the INDEX copy of the file
+ * and leaves every other edit in the working file unstaged:
+ *
+ *   1. read the index copy (`git show :<registry>`) and its mode (`git ls-files -s`);
+ *   2. find the row BY ID in the index text, with the parser that found it in the
+ *      working file (never by line number — the index may hold fewer rows above it);
+ *   3. replace that one line with the working file's line;
+ *   4. `git hash-object -w` the result and `git update-index --cacheinfo` it.
+ *
+ * The caller then commits what is staged, without a `git add` of the registry.
+ * The payload gains `staged` (boolean) and `stageReason`:
+ *   staged          the row was written to the index
+ *   already-staged  the index row already equals the working row
+ *   row-not-in-index the row exists only in the working tree (never committed)
+ *   not-tracked     the registry is not in the index
+ *   unmerged        the registry has conflict stages — nothing is staged
+ *   not-a-repo      git could not read an index here
+ *   not-attempted   an earlier outcome (no-row, not-a-task, …) left nothing to stage
+ * No `stageReason` changes the exit code: acceptance has already happened, and
+ * the drift test is the backstop. `--stage` with `--dry-run` is a usage error —
+ * a dry run writes nothing, so there is no row to stage. No network is used.
  */
 
 "use strict";
 
 const fs = require("fs");
 const path = require("path");
+const { execFileSync } = require("child_process");
 const { parseYamlSubset } = require("./yaml-subset.js");
 
 const DEFAULT_REGISTRY = "docs/tasks/task-registry.md";
@@ -194,7 +225,7 @@ function normaliseBugRegistryStatus(cell) {
 
 function usage(msg) {
   process.stderr.write(
-    `registry-tick: ${msg}\n\nUsage:\n  node registry-tick.js --file <document.md> [--registry <path>] [--dry-run] [--json]\n  node registry-tick.js --annotate --file <document.md> --pr <n> [--issue <ref>] [--registry <path>] [--dry-run] [--json]\n  node registry-tick.js --bug-status --file <bug.md> [--registry <path>] [--dry-run] [--json]\n`,
+    `registry-tick: ${msg}\n\nUsage:\n  node registry-tick.js --file <document.md> [--registry <path>] [--dry-run | --stage] [--json]\n  node registry-tick.js --annotate --file <document.md> --pr <n> [--issue <ref>] [--registry <path>] [--dry-run | --stage] [--json]\n  node registry-tick.js --bug-status --file <bug.md> [--registry <path>] [--dry-run | --stage] [--json]\n`,
   );
   process.exitCode = 2;
 }
@@ -204,6 +235,7 @@ function parseArgs(argv) {
     file: null,
     registry: null,
     dryRun: false,
+    stage: false,
     json: false,
     annotate: false,
     bugStatus: false,
@@ -231,6 +263,7 @@ function parseArgs(argv) {
       else if (a === "--pr") out.pr = takeValue(a, i++);
       else if (a === "--issue") out.issue = takeValue(a, i++);
       else if (a === "--dry-run") out.dryRun = true;
+      else if (a === "--stage") out.stage = true;
       else if (a === "--json") out.json = true;
       else if (a === "--help" || a === "-h") out.help = true;
       else return { error: `unknown argument ${JSON.stringify(a)}` };
@@ -310,6 +343,13 @@ function emit(opts, payload) {
   } else if (payload.ticked === undefined) {
     payload.ticked = false;
   }
+  // Every outcome of a `--stage` call reports the staging fields, including the
+  // early exits that never reach a row: a `--json` consumer reads `staged`
+  // either way, and `not-attempted` says nothing was there to stage.
+  if (opts.stage && payload.staged === undefined) {
+    payload.staged = false;
+    payload.stageReason = "not-attempted";
+  }
   if (opts.json) process.stdout.write(JSON.stringify(payload, null, 2) + "\n");
   else process.stdout.write(`${payload.reason}: ${payload.message}\n`);
   process.exitCode = payload.exitCode;
@@ -319,6 +359,11 @@ async function main() {
   const opts = parseArgs(process.argv.slice(2));
   if (opts.error) return usage(opts.error);
   if (opts.help) return usage("help");
+  if (opts.stage && opts.dryRun) {
+    return usage(
+      "--stage and --dry-run are exclusive: a dry run writes nothing to stage",
+    );
+  }
   if (!opts.file) return usage("--file is required");
   if (!fs.existsSync(opts.file)) return usage(`--file not found: ${opts.file}`);
   if (opts.bugStatus) {
@@ -488,6 +533,7 @@ async function main() {
       row,
       taskId,
       docColumnNames: DOC_COLUMN_NAMES || [],
+      parseRegistry,
     });
   }
 
@@ -498,6 +544,7 @@ async function main() {
     // state this column's handling was added to stop. Without a repair here,
     // `already` could never heal it: every re-run would leave the icon alone.
     let icon;
+    let currentText = registryText;
     if (icons) {
       const repair = rewriteStatusCell(registryText, row, null, {
         ...icons,
@@ -506,7 +553,10 @@ async function main() {
       icon = repair.ok ? repair.icon : { outcome: "ambiguous" };
       if (icon.outcome === "written") {
         icon = { ...icon, outcome: "repaired" };
-        if (!opts.dryRun) fs.writeFileSync(registryRel, repair.text, "utf8");
+        if (!opts.dryRun) {
+          fs.writeFileSync(registryRel, repair.text, "utf8");
+          currentText = repair.text;
+        }
       }
     }
     const repaired = icon && icon.outcome === "repaired";
@@ -519,6 +569,14 @@ async function main() {
       taskId,
       line: row.line,
       ...(icon ? { icon: icon.outcome } : {}),
+      ...stageFields(opts, {
+        registryRel,
+        parseRegistry,
+        kind: "task",
+        id: taskId,
+        text: currentText,
+        line: row.line,
+      }),
       ticked: false,
       exitCode: 0,
     });
@@ -555,6 +613,14 @@ async function main() {
     from: row.registryStatus,
     to: "accepted",
     ...(rewrite.icon ? { icon: rewrite.icon.outcome } : {}),
+    ...stageFields(opts, {
+      registryRel,
+      parseRegistry,
+      kind: "task",
+      id: taskId,
+      text: rewrite.text,
+      line: row.line,
+    }),
     ticked: !opts.dryRun,
     exitCode: 0,
   });
@@ -801,6 +867,14 @@ async function bugStatus(opts) {
       line: row.line,
       status,
       vocabulary,
+      ...stageFields(opts, {
+        registryRel,
+        parseRegistry,
+        kind: "bug",
+        id: bugId,
+        text: registryText,
+        line: row.line,
+      }),
       exitCode: 0,
     });
   }
@@ -828,6 +902,14 @@ async function bugStatus(opts) {
     to,
     status,
     vocabulary,
+    ...stageFields(opts, {
+      registryRel,
+      parseRegistry,
+      kind: "bug",
+      id: bugId,
+      text: rewrite.text,
+      line: row.line,
+    }),
     mirrored: !opts.dryRun,
     exitCode: 0,
   });
@@ -964,7 +1046,7 @@ function findHeader(parts, rowLine) {
  */
 function annotate(
   opts,
-  { registryRel, registryText, row, taskId, docColumnNames },
+  { registryRel, registryText, row, taskId, docColumnNames, parseRegistry },
 ) {
   const parts = registryText.split(/(\r?\n)/);
   const idx = (row.line - 1) * 2;
@@ -1046,6 +1128,14 @@ function annotate(
       line: row.line,
       notes,
       issue,
+      ...stageFields(opts, {
+        registryRel,
+        parseRegistry,
+        kind: "task",
+        id: taskId,
+        text: registryText,
+        line: row.line,
+      }),
       annotated: false,
       exitCode: 0,
     });
@@ -1062,9 +1152,84 @@ function annotate(
     line: row.line,
     notes,
     issue,
+    ...stageFields(opts, {
+      registryRel,
+      parseRegistry,
+      kind: "task",
+      id: taskId,
+      text: parts.join(""),
+      line: row.line,
+    }),
     annotated: !opts.dryRun,
     exitCode: 0,
   });
+}
+
+/**
+ * The `--stage` fields for a payload: `{}` when the flag is off, else
+ * `{staged, stageReason}`. `text` is the registry as it now stands on disk and
+ * `line` is the row's 1-based line in it. See the header's `--stage` section.
+ */
+function stageFields(opts, ctx) {
+  return opts.stage ? stageRow(ctx) : {};
+}
+
+/**
+ * Stage ONE row: put the working file's line for row `id` into the index copy of
+ * the registry, leave every other byte of the index copy as it was, and touch
+ * nothing in the working tree. The row is found in the index text by id, with
+ * the caller's parser (`parseRegistry`) — the index may hold fewer rows above
+ * it, so the working file's line number means nothing there. Separators are
+ * kept (`split(/(\r?\n)/)`), so only the one line changes, as in the rewrite.
+ */
+function stageRow({ registryRel, parseRegistry, kind, id, text, line }) {
+  const git = (args, input) =>
+    execFileSync("git", args, {
+      input,
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+  let entries;
+  try {
+    // `--full-name` makes the path repo-root-relative, which `update-index
+    // --cacheinfo` needs whatever directory the caller runs from.
+    entries = git(["ls-files", "-s", "--full-name", "--", registryRel])
+      .split("\n")
+      .filter(Boolean);
+  } catch (_) {
+    return { staged: false, stageReason: "not-a-repo" };
+  }
+  if (entries.length === 0)
+    return { staged: false, stageReason: "not-tracked" };
+  const m = entries[0].match(/^(\d+) ([0-9a-f]+) (\d)\t(.+)$/);
+  if (!m || entries.length > 1 || m[3] !== "0") {
+    return { staged: false, stageReason: "unmerged" };
+  }
+  const [, mode, , , fullName] = m;
+  let indexText;
+  try {
+    indexText = git(["show", `:${fullName}`]);
+  } catch (_) {
+    return { staged: false, stageReason: "not-a-repo" };
+  }
+  const { rows } = parseRegistry(indexText, kind, registryRel);
+  const indexRow = rows.find((r) => r.n === id);
+  if (!indexRow) return { staged: false, stageReason: "row-not-in-index" };
+
+  const working = text.split(/(\r?\n)/);
+  const parts = indexText.split(/(\r?\n)/);
+  const want = working[(line - 1) * 2];
+  const at = (indexRow.line - 1) * 2;
+  if (parts[at] === want)
+    return { staged: true, stageReason: "already-staged" };
+  parts[at] = want;
+  try {
+    const hash = git(["hash-object", "-w", "--stdin"], parts.join("")).trim();
+    git(["update-index", "--cacheinfo", `${mode},${hash},${fullName}`]);
+  } catch (_) {
+    return { staged: false, stageReason: "not-a-repo" };
+  }
+  return { staged: true, stageReason: "staged" };
 }
 
 // Run only as a CLI. The drift test requires this file for the label map, and

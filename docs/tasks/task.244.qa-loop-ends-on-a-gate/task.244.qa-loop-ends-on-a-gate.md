@@ -5,18 +5,21 @@ type: task
 description: "Count the QA budget in gates, not fix cycles, and run a fix only when a gate will read it within the budget, so no QA, verify or review loop ever hands over a fix that no gate has read."
 tags: [qa-loop, develop-task, develop-story, develop-bug, budget]
 category: refactoring
-status: planned
+status: accepted
 priority: High
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-10-31
+completed_date: 2026-10-31
 assignee:
 estimated_effort_hours: 16
 github_issue: 782
+pr_number: 797
 ---
 
 # Technical Task: The QA loop always ends on a gate
 
-**Status:** Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.244.review.1.qa-loop-ends-on-a-gate.md` implemented 2026-10-31
 **GitHub Issue**: [#782](https://github.com/Gamaroff/agent-skills/issues/782)
 
 ---
@@ -111,7 +114,7 @@ budget stays 5, which now means 5 gates and 4 fixes (user decision, 2026-10-29).
   (`skills/qa-task/SKILL.md`, the `CODE_MOVED=$(git rev-list --count "$GATE_HEAD"..HEAD -- .
   ":(exclude)$TASK_DIR" …)` block). It counts commits, uncommitted edits and untracked files outside
   the task directory since the gate's `head:`. `shared/resources/tests/qa-scope-from-head.test.mjs`
-  executes it (`CODE_MOVED=$CODE_MOVED` at `:317`). qa-story has no `CODE_MOVED` (grep: 0 hits in
+  executes it (`CODE_MOVED=$CODE_MOVED` at `:320`). qa-story has no `CODE_MOVED` (grep: 0 hits in
   `skills/qa-story/SKILL.md`).
 
 ### Target Architecture
@@ -226,29 +229,29 @@ flowchart TD
 
 **Files:** `shared/resources/develop-pipeline-step-5-6-qa-loop.md`
 
-- [ ] Loop Setup: the limit is `QA_MAX_CYCLES` **gates**. State the one rule ("5b runs only when a gate
+- [x] Loop Setup: the limit is `QA_MAX_CYCLES` **gates**. State the one rule ("5b runs only when a gate
       will follow it within the budget") once, and point every other site at it.
-- [ ] Outcome branching: after the Convergence check and routes 2/2b resolve to 5b, test
+- [x] Outcome branching: after the Convergence check and routes 2/2b resolve to 5b, test
       `N == QA_MAX_CYCLES` → Loop Escalation (*Loop limit*), with Action `Escalating — loop limit
       reached` and PR Review `not reached — gate did not exit the loop`.
-- [ ] §5c REQUEST CHANGES / open-coverage arm: on `N == QA_MAX_CYCLES`, escalate (*Loop limit via
+- [x] §5c REQUEST CHANGES / open-coverage arm: on `N == QA_MAX_CYCLES`, escalate (*Loop limit via
       review*) instead of entering 5b.
-- [ ] §5b step 7: drop the budget test; always increment and return to 5a.
-- [ ] Loop Escalation: the trigger table, the "cycles that actually ran" sentence, and both escalation
+- [x] §5b step 7: drop the budget test; always increment and return to 5a.
+- [x] Loop Escalation: the trigger table, the "cycles that actually ran" sentence, and both escalation
       commits (now carrying gate N and QA report N). Delete § *Gate-the-last-fix half-cycle*, the
       `**Half-cycle**` template row, §5c route 5 and the guard table's budget row.
-- [ ] The HALT message's option 4 and the shared-budget paragraph (`:1781`, `:1993`).
+- [x] The HALT message's option 4 and the shared-budget paragraph (`:1781`, `:1993`).
 
 ### Phase 2: Engine and grant (Risk: Medium)
 
 **Files:** `shared/resources/qa-diminishing-returns.js`, `shared/resources/grant-qa-cycles.sh`,
 `shared/resources/code-moved-since-gate.sh` (new), `skills/qa-task/SKILL.md`
 
-- [ ] Delete the `budgetSpent` branch, `ROUTES.GATE_THE_LAST_FIX` and `RUNNING_QA_FIX_RE`. Keep the
+- [x] Delete the `budgetSpent` branch, `ROUTES.GATE_THE_LAST_FIX` and `RUNNING_QA_FIX_RE`. Keep the
       `describeLoopRoute()` legacy token branch.
-- [ ] Extract the qa-task Phase 0 `CODE_MOVED` computation into `code-moved-since-gate.sh`, with a
+- [x] Extract the qa-task Phase 0 `CODE_MOVED` computation into `code-moved-since-gate.sh`, with a
       `bundle-dependency:` comment like `qa-cycle.sh`'s. qa-task Phase 0 calls it.
-- [ ] `grant-qa-cycles.sh`: re-entry from the helper's count (> 0 → 5a, 0 → 5b), replacing the
+- [x] `grant-qa-cycles.sh`: re-entry from the helper's count (> 0 → 5a, 0 → 5b), replacing the
       `HALT_REASON` case. A helper that cannot answer fails toward 5a, which re-gates, never toward a
       fix on unread code.
 
@@ -256,17 +259,17 @@ flowchart TD
 
 **Files:** `skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md`
 
-- [ ] At the end of 5a, when the verify fails and `N == MAX_ITER`, go to Loop Limit Escalation instead
+- [x] At the end of 5a, when the verify fails and `N == MAX_ITER`, go to Loop Limit Escalation instead
       of 5b. 5b step 5 always increments and returns to 5a. The escalation heading says "after
       `MAX_ITER` verify cycles".
 
 ### Phase 4: Sweep, tests, evals, bundle (Risk: Medium)
 
-- [ ] Sweep the population in § 7 *Documentation*. Each site is either updated or recorded as
+- [x] Sweep the population in § 7 *Documentation*. Each site is either updated or recorded as
       unaffected.
-- [ ] Tests and evals per § 8. Run `npm run bundle`, then `npm run generate-catalog` (SKILL.md
+- [x] Tests and evals per § 8. Run `npm run bundle`, then `npm run generate-catalog` (SKILL.md
       descriptions change).
-- [ ] Add the CHANGELOG entry.
+- [x] Add the CHANGELOG entry.
 
 ---
 
@@ -292,8 +295,9 @@ Every hit is in scope or is a stated exclusion below.
 ### Files to Modify (Tests and Evals)
 
 7. ✅ `shared/resources/tests/qa-loop-route.test.mjs`: remove the route-2c rows; add the budget-blind rows.
-8. ✅ `shared/resources/tests/fixtures/qa-diminishing-returns/medium-falling-cycle5.yml`: remove it or
-   repurpose it.
+8. ✅ `shared/resources/tests/fixtures/qa-diminishing-returns/medium-falling-cycle5.yml`: repurpose it
+   as task.242's inputs for the budget-blind row if the route-2c rows were its only readers; remove it
+   only when `git grep medium-falling-cycle5` shows no reader left (decided in Phase 4).
 9. ✅ `shared/resources/grant-qa-cycles.test.sh`: re-entry-from-evidence cases.
 10. ✅ `shared/resources/tests/qa-scope-from-head.test.mjs`: still green through the helper.
 11. ✅ `evals/shared/tests/pr-review-loop-parity.test.mjs`: route 5 assertion (`:248`) and the Action-row
@@ -312,9 +316,9 @@ Every hit is in scope or is a stated exclusion below.
 18. ✅ `skills/develop-task/SKILL.md`, `skills/develop-story/SKILL.md` (the `reenter_at` line, `:340` and
     `:353`; the shared-budget line, `:239` and `:252`; the descriptions) and their `README.md`s.
 19. ✅ `skills/develop-bug/SKILL.md` (description and the MAX_ITER table row).
-20. ✅ `skills/review-pr/SKILL.md:1077`, `shared/resources/code-review-prompt.md:219`.
+20. ✅ `skills/review-pr/SKILL.md:1077` (updated). `shared/resources/code-review-prompt.md:219` checked, "up to 5 cycles" wording still true, left unchanged.
 21. ✅ `docs/runbooks/qa-flow.md` (diagram and table), `docs/reference/troubleshooting.md:201`,
-    `docs/operations/workflows.md`.
+    `docs/operations/workflows.md` checked, wording still true, left unchanged.
 22. ✅ `CHANGELOG.md`.
 
 **Stated exclusions:** `.agents/plans/doc-drift-audit-2026-10-07.md` (a dated audit record),
@@ -376,35 +380,37 @@ fix, and nothing is added.
 
 ### Functional
 
-- [ ] SC-1: the step doc routes to 5b only when `N < QA_MAX_CYCLES`, in both places that route there
+- [x] SC-1: the step doc routes to 5b only when `N < QA_MAX_CYCLES`, in both places that route there
       (Phase 1). At `N == QA_MAX_CYCLES` both escalate with the gate's or review's findings unfixed.
-- [ ] SC-2: §5b step 7 always increments and returns to 5a. No budget test remains after a fix
+- [x] SC-2: §5b step 7 always increments and returns to 5a. No budget test remains after a fix
       (Phase 1).
-- [ ] SC-3: route 2c is gone. Phase 2 deletes its engine branch: `classifyLoopRoute()` returns the
+- [x] SC-3: route 2c is gone. Phase 2 deletes its engine branch: `classifyLoopRoute()` returns the
       same route for `budgetSpent: true` and `false` on identical inputs. The step doc has no
       half-cycle section and no §5c route 5 (Phase 1).
-- [ ] SC-4: `grant-qa-cycles.sh` writes `qa_phase=5b` when `code-moved-since-gate.sh` reports 0 and
+- [x] SC-4: `grant-qa-cycles.sh` writes `qa_phase=5b` when `code-moved-since-gate.sh` reports 0 and
       `5a` when it reports more than 0 or cannot answer (Phase 2). Test cases (a)–(e) pass.
-- [ ] SC-5: develop-bug's verify loop escalates at `N == MAX_ITER` on a failed verify, with no fifth
+- [x] SC-5: develop-bug's verify loop escalates at `N == MAX_ITER` on a failed verify, with no fifth
       fix (Phase 3).
-- [ ] SC-6: an escalation commit at 5a carries gate N and QA report N (Phase 1).
+- [x] SC-6: an escalation commit at 5a carries gate N and QA report N (Phase 1).
 
 ### Performance
 
-- [ ] SC-7: at the default budget an escalating run runs no more cycles than today: 5 gates, at most
-      4 fixes.
+- [x] SC-7: at the default budget an escalating run runs no more cycles than today: 5 gates, at most
+      4 fixes. Held by the rewritten step-isolation scenario 11 (§ 8: a cycle-5 CONCERNS gate with
+      budget 5 escalates with no `fix(` commit) and by `qa-loop-ends-on-a-gate.test.mjs`, which pins
+      the `N < QA_MAX_CYCLES` test on both arms that route to 5b.
 
 ### Code Quality
 
-- [ ] SC-8: `npm run ci:fast` and `npm run bundle:check` are green. `npm run validate -- skills/develop-task/ skills/develop-story/ skills/develop-bug/ skills/qa-task/`
+- [x] SC-8: `npm run ci:fast` and `npm run bundle:check` are green. `npm run validate -- skills/develop-task/ skills/develop-story/ skills/develop-bug/ skills/qa-task/`
       passes. The new integration test is mutation-proven (restore the old step-7 placement → red).
-- [ ] SC-9: the code-movement computation exists once. qa-task Phase 0 and the grant both call
+- [x] SC-9: the code-movement computation exists once. qa-task Phase 0 and the grant both call
       `code-moved-since-gate.sh`, and neither carries its own `git rev-list` count.
 
 ### Migration
 
-- [ ] SC-10: the existing reports in `shared/resources/tests/fixtures/report-lint/green/` (they carry
-      `**Half-cycle**` rows) stay lint-green. The CHANGELOG states that the budget now counts gates,
+- [x] SC-10: the existing reports that carry `**Half-cycle**` rows (task.166, task.207) and the
+      fixtures in `shared/resources/tests/fixtures/report-lint/green/` stay lint-green. The CHANGELOG states that the budget now counts gates,
       and how to keep a fix count.
 
 ---
@@ -480,23 +486,71 @@ fix, and nothing is added.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-10-30
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.244.qa.2.qa-loop-ends-on-a-gate.md](./task.244.qa.2.qa-loop-ends-on-a-gate.md)
+- **Gate File**: [task.244.gate.2.qa-loop-ends-on-a-gate.yml](./task.244.gate.2.qa-loop-ends-on-a-gate.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: `npm test` 6894 pass / 0 fail, `eval:all` green; 9 security probes on the helper (0 escaped)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+Cycle 1's blocker (T244-QA-1, the first-review HALT in qa-task Phase 0) is fixed and held by a test that goes red without the fix. The refute pass over the whole branch found no new defect. Two advisory test-coverage notes are recorded as future work in the gate.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report**: `task.244.qa.2.qa-loop-ends-on-a-gate.md`
+**Gate File**: `task.244.gate.2.qa-loop-ends-on-a-gate.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** SC-1 to SC-10 met, each with code and test evidence
+✅ **Tests and PR:** PR #797, `npm test` 6894 pass / 0 fail, CI green on `cc7017ee`, PR review APPROVE
+✅ **Documentation:** step doc, resume contract, prompts, runbooks, troubleshooting and CHANGELOG updated
+✅ **Security Review:** PASS, the one boundary (`code-moved-since-gate.sh`) probed, 10 executed, 0 reproduced, 0 escaped
+⚠️ **Compliance Review:** not applicable
+
+**Detailed Verification Log:** See `task.244.dod.1.qa-loop-ends-on-a-gate.md` for the full verification evidence.
+
+**Task marked as ACCEPTED on:** 2026-10-31
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-10-29 | 1.0     | Initial draft. Prompted by task.242, whose loop-limit halt handed over `cc0da45e` unread after route 2c declined (`medium-not-falling`) | create-task |
 | 2026-10-29 |         | Renumbered task.243 → task.244 before first commit: `feature/task.243.wireframe-component-mapping` had already claimed 243 | operator |
+| 2026-10-31 | 1.1     | Review passed (9/10): SC-7 now names the tests that hold it; `:317` anchor → `:320`; fixture 8 decision criterion stated | review-task |
+| 2026-10-31 |         | Status → ready-for-development | review-task |
+| 2026-10-31 |         | Implemented — 86 files, 7 new tests, 4 evals; npm test + bundle:check green | develop |
+| 2026-10-31 |         | QA gate FAIL (70/100) — 1 high, 2 low findings | qa-task |
+| 2026-10-31 |         | QA findings fixed — gate FAIL (70/100) cycle 1, 1 iteration: empty-gate first-review guard in code-moved-since-gate.sh, grant comment, SC-10 wording | qa-fix |
+| 2026-10-31 |         | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-10-31 | 1.2 | DoD passed — accepted (PR #797) | finalise |
 <!-- change-log-end -->
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1: The rule in the step doc
-- [ ] Phase 2: Engine and grant
-- [ ] Phase 3: develop-bug
-- [ ] Phase 4: Sweep, tests, evals, bundle
+- [x] Phase 1: The rule in the step doc
+- [x] Phase 2: Engine and grant
+- [x] Phase 3: develop-bug
+- [x] Phase 4: Sweep, tests, evals, bundle
 
 ---
 

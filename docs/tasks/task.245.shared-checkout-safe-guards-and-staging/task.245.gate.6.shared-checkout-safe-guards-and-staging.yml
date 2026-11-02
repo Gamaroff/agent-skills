@@ -1,0 +1,52 @@
+schema: 2
+task: 'task.245.shared-checkout-safe-guards-and-staging'
+task_title: 'Shared-checkout-safe guards and staging'
+gate: PASS
+status_reason: 'The SC-10 test is sound and mutation-proven. The scoped review found two low-severity cleanups in the new test, which do not gate.'
+reviewer: 'QA Engineer'
+head: '2d7660bcc56ae2aed482743a811d34ed46c4ac19'
+updated: '2026-10-30T20:28:16Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 6912
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No input-accepting boundary is delivered. The new commit adds tests only.'
+  performance:
+    status: PASS
+    notes: 'ci:fast at this head ran 6912 tests, 6898 pass, 0 fail.'
+  reliability:
+    status: PASS
+    notes: 'The preload logs before it throws, so a swallowed throw cannot hide an attempt. Temp directories are removed in a finally.'
+  maintainability:
+    status: PASS
+    notes: 'Two low cleanups on the new test, both future.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Cycle-6 CR-1 (low/medium): the preload patches only dns.lookup and dns.resolve; also trip dns.promises, dgram and http2, or narrow the test title to the entry points patched. registry-tick.js imports none of them.'
+      refs: ['shared/resources/tests/registry-tick.test.mjs']
+    - action: 'Cycle-6 CR-2 (low/medium): the control matches the log by substring and probes only net, dns and fetch; compare lines exactly and add tls, http and Socket probes.'
+      refs: ['shared/resources/tests/registry-tick.test.mjs']
+    - action: 'Carried from gate 5: the `already` arm wording of the develop-batch lane; a trap for the DIRTY_Z temp file; a distinct stageReason when hash-object or update-index fails; a re-read of the index blob before update-index; a behavioural harness for the merge lane.'
+      refs: ['skills/develop-batch/SKILL.md', 'shared/resources/qa-re-review-scope.md', 'shared/resources/registry-tick.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

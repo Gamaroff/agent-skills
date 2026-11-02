@@ -381,8 +381,8 @@ test("Step 4 registry arm: calls registry-tick.js --annotate, never writes Statu
   // QA-7 (task.113 cycle 2): `already` is idempotent on the row, not on the commit.
   assert.match(
     arm,
-    /git diff --quiet HEAD -- docs\/tasks\/task-registry\.md \|\| \{/,
-    "already checks for a dirty registry before marking ticked",
+    /git diff --cached --quiet HEAD -- docs\/tasks\/task-registry\.md \|\| \{/,
+    "already checks the index for a staged registry row before marking ticked (task 245)",
   );
   // QA-15 (cycle 4): a clean tree proves the commit exists, not that it was pushed.
   const alreadyArm = arm.slice(arm.indexOf("`already`"));

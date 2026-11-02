@@ -1,0 +1,66 @@
+schema: 2
+task: 'task.245.shared-checkout-safe-guards-and-staging'
+task_title: 'Shared-checkout-safe guards and staging'
+gate: CONCERNS
+status_reason: 'T245-QA-1 is fixed and held by M7. The refute pass found two new medium defects: the HALT loop reads a second unchecked git status call (fail-open if it fails), and develop-batch commits without gating on stageReason.'
+reviewer: 'QA Engineer'
+head: '93b76ddefd8351dd21fcafa966cb45dd3c55fe22'
+updated: '2026-10-30T19:29:12Z'
+
+top_issues:
+  - id: 'T245-QA-2'
+    severity: medium
+    file: 'shared/resources/qa-re-review-scope.md'
+    finding: 'The HALT/WARN loop reads a second `git status --porcelain -z` through process substitution whose exit status is never checked. If that call fails or returns nothing while the first call (DIRTY) was non-empty, HALTS and WARNS stay empty and the guard passes silently. Reviewer CR-1, high confidence; the reviewer anchored it at line 162, the line is 246 (location unverified). Same block in skills/qa-task/SKILL.md and skills/qa-story/SKILL.md.'
+    suggested_action: 'Capture the -z output once into a temp file with its exit code checked, HALT when it fails or is empty while DIRTY is non-empty, and parse that single capture; fix the shared source, both skill copies and add a test.'
+    suggested_owner: dev
+    status: open
+  - id: 'T245-QA-3'
+    severity: medium
+    file: 'skills/develop-batch/SKILL.md'
+    finding: 'The develop-batch merge lane commits the `annotated` row without reading `stageReason`, unlike develop-next (which logs any reason other than staged/already-staged and does not commit). A failed staging (index lock, row-not-in-index) leaves nothing of this row to commit, and `already` with a clean index still ends in `ticked: true`. Reviewer CR-2 (medium confidence); verified by reading skills/develop-batch/SKILL.md lines 643-652 against skills/develop-next/SKILL.md lines 610-612.'
+    suggested_action: 'Add the develop-next stageReason rule to the develop-batch merge lane: commit and mark ticked only when stageReason is staged or already-staged, otherwise log it verbatim and do not commit; add a shape test.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 6909
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No input-accepting boundary is delivered; git is called with argv arrays.'
+  performance:
+    status: PASS
+    notes: 'Full fast gate about 84 s on cycle 1; cycle 2 reran 6909 tests, 0 fail. SC-9 baseline not measured.'
+  reliability:
+    status: CONCERNS
+    notes: 'T245-QA-2 (unchecked second git status) and T245-QA-3 (develop-batch ignores stageReason).'
+  maintainability:
+    status: PASS
+    notes: 'Block held equal across three copies by test E.'
+
+recommendations:
+  immediate:
+    - action: 'Fix T245-QA-2 and T245-QA-3.'
+      refs: ['shared/resources/qa-re-review-scope.md', 'skills/develop-batch/SKILL.md']
+  future:
+    - action: 'CR-2 (cycle 1) and cycle-2 CR-4: a distinct stageReason when hash-object or update-index fails, and re-read the index blob before update-index.'
+      refs: ['shared/resources/registry-tick.js']
+    - action: 'Cycle-2 CR-3 (low confidence): a PR that changes a file directly under docs/tasks puts docs/tasks in the changed directories, so a parallel registry edit HALTs rather than warns. Not reproduced.'
+      refs: ['shared/resources/qa-re-review-scope.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T245-QA-2 fixed', 'T245-QA-3 fixed']

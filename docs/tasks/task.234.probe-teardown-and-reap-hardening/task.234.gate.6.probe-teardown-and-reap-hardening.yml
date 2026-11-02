@@ -1,0 +1,70 @@
+schema: 2
+task: 'task.234.probe-teardown-and-reap-hardening'
+task_title: 'Probe sandbox teardown and process-group reap'
+gate: FAIL
+status_reason: 'QA-10 holds (test plus mutation, positive control). But CI Test has been red since a32dd8f0: the QA-9 test (and now the QA-10 test) write `command -v <name>` for a stand-in tool, which tests/ci-tool-skips.test.js reads as a tool CI must install. Local ci:fast never set CI, so the guard skipped and every local run read green.'
+reviewer: 'QA Engineer'
+head: '1d98769cb44319e838bcbe2f37997a4a568ebc00'
+updated: '2026-10-31T11:25:36Z'
+
+top_issues:
+  - id: 'TASK-234-QA-11'
+    severity: high
+    file: 'shared/resources/tests/security-probe.test.mjs'
+    finding: 'The QA-9 and QA-10 tests spell `command -v t234-host-tool` and `command -v t234-planted` literally; tests/ci-tool-skips.test.js collects every `command -v <name>` in a suite as a tool CI must have, so CI Test fails ("CI is missing t234-host-tool") on a32dd8f0 (run 41191890806 on e21adc05) and will on 1d98769c.'
+    suggested_action: 'Pass the stand-in name as an argument (`command -v "$1"` with the name in argv) so the guard does not read it as a tool; verify with `CI=true node --test tests/ci-tool-skips.test.js`.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-234-QA-12'
+    severity: medium
+    file: 'shared/resources/tests/security-probe.test.mjs'
+    finding: 'The QA-10 test does not assert the case was leashed; where `true` is not on /usr/bin:/bin, leashed() returns the case env unwrapped, leashEnv() never runs, and the empty-stdout assertion passes vacuously.'
+    suggested_action: 'Assert `l.command === "/bin/sh"` before the lookup, as the QA-7/QA-8 test does.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 11
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false. QA-10 closed: the leash PATH keeps absolute host entries only.'
+  performance:
+    status: PASS
+    notes: 'No change since gate 5.'
+  reliability:
+    status: FAIL
+    notes: 'TASK-234-QA-11: CI Test red since a32dd8f0.'
+  maintainability:
+    status: PASS
+    notes: 'Section 5 states the absolute-entry rule.'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-234-QA-11 and TASK-234-QA-12 (both test-only).'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+  future:
+    - action: 'The QA-10 positive control only exercises the `.` spelling, because command -v stops at the first match (reviewer CR-2, low).'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+    - action: 'The QA-9/QA-10 tests set PATH to "undefined" when the host has none; use `saved ?? ""` and delete on restore (reviewer CR-3, low).'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+    - action: 'reapGroup EPERM ambiguity, watcher pid reuse, and the dash caveat on the QA-8 stderr assertion, carried forward.'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['CI green (TASK-234-QA-11)']

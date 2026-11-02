@@ -1,0 +1,246 @@
+[
+  {
+    "id": "legit-root-readme",
+    "sink": "filename",
+    "input": "README.md",
+    "direction": "legitimate",
+    "why": "A root markdown file is docs under the default set.",
+    "correct": "Docs: exit 0, no output.",
+    "expected": {
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "spec_ref": "docs/tasks/task.174.ci-docs-only-classifier-template/task.174.ci-docs-only-classifier-template.md:142"
+  },
+  {
+    "id": "legit-nested-skill-md",
+    "sink": "filename",
+    "input": "skills/x/SKILL.md",
+    "direction": "legitimate",
+    "why": "A nested .md must match *.md (case-pattern * spans /).",
+    "correct": "Docs: exit 0.",
+    "expected": {
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "spec_ref": "docs/tasks/task.174.ci-docs-only-classifier-template/task.174.ci-docs-only-classifier-template.md:142"
+  },
+  {
+    "id": "legit-docs-non-md",
+    "sink": "filename",
+    "input": "docs/a/b.yml",
+    "direction": "legitimate",
+    "why": "Anything under docs/ is docs regardless of extension.",
+    "correct": "Docs: exit 0.",
+    "expected": {
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "spec_ref": "docs/tasks/task.174.ci-docs-only-classifier-template/task.174.ci-docs-only-classifier-template.md:142"
+  },
+  {
+    "id": "legit-docs-runbook",
+    "sink": "filename",
+    "input": "docs/runbooks/ci-docs-only-skip.md",
+    "direction": "legitimate",
+    "why": "Matches both default patterns.",
+    "correct": "Docs: exit 0.",
+    "expected": {
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "spec_ref": "docs/tasks/task.174.ci-docs-only-classifier-template/task.174.ci-docs-only-classifier-template.md:112"
+  },
+  {
+    "id": "legit-deep-md",
+    "sink": "filename",
+    "input": "a/b/c/notes.md",
+    "direction": "legitimate",
+    "why": "*.md covers **/*.md at any depth.",
+    "correct": "Docs: exit 0.",
+    "expected": {
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "spec_ref": "docs/runbooks/ci-docs-only-skip.md:103"
+  },
+  {
+    "id": "hostile-src-code",
+    "sink": "filename",
+    "input": "src/a.ts",
+    "direction": "hostile",
+    "why": "A source file read as docs would skip the suite on a code change.",
+    "correct": "Code: exit 1, no output.",
+    "expected": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    "spec_ref": "docs/tasks/task.174.ci-docs-only-classifier-template/task.174.ci-docs-only-classifier-template.md:143"
+  },
+  {
+    "id": "hostile-workflow-file",
+    "sink": "filename",
+    "input": ".github/workflows/ci.yml",
+    "direction": "hostile",
+    "why": "A CI workflow change read as docs would skip the run that tests it.",
+    "correct": "Code: exit 1.",
+    "expected": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    "spec_ref": "docs/tasks/task.174.ci-docs-only-classifier-template/task.174.ci-docs-only-classifier-template.md:142"
+  },
+  {
+    "id": "hostile-docs-prefix-sibling",
+    "sink": "filename",
+    "input": "docsx/a.ts",
+    "direction": "hostile",
+    "why": "A prefix match without the slash would treat docsx/ as docs/.",
+    "correct": "Code: exit 1.",
+    "expected": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    "spec_ref": "docs/examples/ci/github-actions/classify-changes.sh:52"
+  },
+  {
+    "id": "hostile-bare-docs",
+    "sink": "filename",
+    "input": "docs",
+    "direction": "hostile",
+    "why": "A root file named docs is not under docs/.",
+    "correct": "Code: exit 1.",
+    "expected": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    "spec_ref": "docs/examples/ci/github-actions/classify-changes.sh:52"
+  },
+  {
+    "id": "hostile-md-then-sh",
+    "sink": "filename",
+    "input": "a.md.sh",
+    "direction": "hostile",
+    "why": "A substring match on .md would accept a shell script.",
+    "correct": "Code: exit 1.",
+    "expected": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    "spec_ref": "docs/examples/ci/github-actions/classify-changes.sh:52"
+  },
+  {
+    "id": "hostile-mdx",
+    "sink": "filename",
+    "input": "README.mdx",
+    "direction": "hostile",
+    "why": "MDX is executable JSX, not plain markdown; not *.md.",
+    "correct": "Code: exit 1.",
+    "expected": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    "spec_ref": "docs/examples/ci/github-actions/classify-changes.sh:52"
+  },
+  {
+    "id": "hostile-c-quoted-name",
+    "sink": "filename",
+    "input": "\"src/caf\\303\\251.md\"",
+    "direction": "hostile",
+    "why": "git C-quotes non-ASCII paths; a classifier stripping quotes would be guessing.",
+    "correct": "Ends in a double quote, matches no pattern, code: exit 1.",
+    "expected": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    "spec_ref": "docs/examples/ci/github-actions/classify-changes.sh:58"
+  },
+  {
+    "id": "hostile-command-substitution",
+    "sink": "filename",
+    "input": "$(touch PWNED).ts",
+    "direction": "hostile",
+    "why": "A name re-parsed would run the substitution.",
+    "correct": "Code: exit 1; PWNED never created.",
+    "expected": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": "",
+      "absent": [
+        "PWNED"
+      ]
+    },
+    "spec_ref": "docs/examples/ci/github-actions/classify-changes.sh:52"
+  },
+  {
+    "id": "hostile-backtick-substitution",
+    "sink": "filename",
+    "input": "`touch PWNED2`.ts",
+    "direction": "hostile",
+    "why": "Legacy substitution form.",
+    "correct": "Code: exit 1; PWNED2 never created.",
+    "expected": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": "",
+      "absent": [
+        "PWNED2"
+      ]
+    },
+    "spec_ref": "docs/examples/ci/github-actions/classify-changes.sh:52"
+  },
+  {
+    "id": "hostile-glob-star",
+    "sink": "filename",
+    "input": "*",
+    "direction": "hostile",
+    "why": "Input used as a pattern rather than a subject would match everything.",
+    "correct": "Code: exit 1.",
+    "expected": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    "spec_ref": "docs/examples/ci/github-actions/classify-changes.sh:52"
+  },
+  {
+    "id": "hostile-flag-form",
+    "sink": "filename",
+    "input": "-n",
+    "direction": "hostile",
+    "why": "An option-shaped name passed to test/echo could change the verdict.",
+    "correct": "Code: exit 1.",
+    "expected": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    "spec_ref": "docs/examples/ci/github-actions/classify-changes.sh:52"
+  },
+  {
+    "id": "hostile-empty",
+    "sink": "filename",
+    "input": "",
+    "direction": "hostile",
+    "why": "Unparseable case: an empty name must not default-match.",
+    "correct": "Not docs: exit 1.",
+    "expected": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    "spec_ref": "docs/examples/ci/github-actions/classify-changes.sh:52"
+  }
+]

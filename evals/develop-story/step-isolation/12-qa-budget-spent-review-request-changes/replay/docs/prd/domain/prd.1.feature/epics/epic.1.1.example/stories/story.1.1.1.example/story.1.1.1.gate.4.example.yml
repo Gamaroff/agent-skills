@@ -1,0 +1,29 @@
+schema: 1
+gate: CONCERNS
+status_reason: "Cycle 4 — HIGH 0, MEDIUM 2 raised (falling), all fixed by cycle 4's qa-fix."
+reviewer: "QA Engineer"
+updated: "2026-09-18T12:00:00Z"
+
+top_issues:
+  - id: "EX-400"
+    severity: medium
+    file: "src/example.ts"
+    finding: "MEDIUM 1 of cycle 4."
+    suggested_owner: dev
+    status: closed
+  - id: "EX-401"
+    severity: medium
+    file: "src/example.ts"
+    finding: "MEDIUM 2 of cycle 4."
+    suggested_owner: dev
+    status: closed
+
+waiver:
+  active: false
+
+quality_score: 80
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged."

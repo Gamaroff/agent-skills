@@ -3,18 +3,20 @@
 // ---------------------------------------------------------------------------
 // The fixture table for the QA loop's route classifier (task.123).
 //
-// `classifyLoopRoute` is a predicate over (cycle, HIGH sequence, MEDIUM
-// sequence, the latest gate's token and queue, the budget state, the last
-// cycle's Action row) → route. The table below IS the spec: the step-5-6 doc's
-// prose for routes 2b and 2c is written from these rows, and a change to a row
+// `classifyLoopRoute` is a predicate over (cycle, HIGH sequence, the latest
+// gate's token and queue) → route. The table below IS the spec: the step-5-6
+// doc's prose for route 2b is written from these rows, and a change to a row
 // is a change to the rule. Every route has its positive row and the negatives
 // that distinguish it from its neighbours, because each route was carved out of
 // a shape the loop used to improvise on:
 //
 //   route 2b (cosmetic residue, obs #100)  — task.110 ran cycles 12–13 for two
 //     LOW nits on a PASS gate.
-//   route 2c (gate the last fix, obs #112) — task.117 spent five CONCERNS gates
-//     with HIGH 0 throughout and MEDIUM falling, then escalated an ungated fix.
+//
+// Route 2c (gate the last fix, obs #112) lived here until task.244: the budget
+// now counts gates, so no budget ends on an ungated fix and the route has
+// nothing to do. Its rows were removed with it; one test below pins that the
+// legacy inputs (`budgetSpent`, `lastCycleAction`) are ignored.
 //
 // Rules the rows pin, and which mutation each guards:
 //
@@ -26,14 +28,7 @@
 //                             not cosmetic.
 //   4. Route 2 still wins.    The `7,7,7,7,4` and `0,0,0` rows behave as the
 //                             Diminishing-returns suite already pins them.
-//   5. 2c fires only at the budget, only after a 5b cycle, only with HIGH 0
-//                             on the LAST gate, only with MEDIUM strictly
-//                             falling. Each negative row removes exactly one of
-//                             those. HIGH keys on the last gate, not on the
-//                             whole history (obs #139): a blocker raised and
-//                             fixed at cycle 2 is not the stall this route
-//                             refuses, and the HIGH-0-throughout clause declined
-//                             task.130 (0,1,0,1,0) and task.125 (1,1,0,1,0).
+//   5. Route 2c is gone (task.244): the legacy inputs are ignored, not obeyed.
 //   6. The MEDIUM count is the engine's, the HIGH count is not (property 2 of
 //                             the engine — group 7 of its own suite reads the
 //                             source for that; here it is asserted from the API).
@@ -70,13 +65,11 @@ const nr = (name) => readFileSync(join(NR, name), "utf8");
 const GLOBS = ["**/*.spec.ts", "**/*.test.*", "tests/**", "**/fixtures/**"];
 
 const FIX = "Running qa-fix (cycle 5 of 5)";
-const TO_5C = "Proceeding to 5c (PR conformance review)";
 
 // ── the fixture table ───────────────────────────────────────────────────────
 //
-// One row per (label, input, expected route, expected reason). `budgetSpent`
-// selects the moment: false = after 5a read the gate (routes 2 → 2b → continue),
-// true = at the loop-limit trigger (route 2c → continue).
+// One row per (label, input, expected route, expected reason): the classifier is called after 5a
+// read the gate (routes 2 → 2b → continue). The budget is not an input (task.244).
 
 const ROWS = [
   // ── the pre-existing sequences behave as before ──
@@ -202,148 +195,6 @@ const ROWS = [
     route: ROUTES.CONTINUE,
   },
 
-  // ── route 2c — gate the last fix ──
-  {
-    label:
-      "2c fires: budget spent, last cycle routed to 5b, HIGH 0 throughout, MEDIUM 3,2 → 1 (task.117)",
-    input: {
-      cycle: 5,
-      highCounts: [0, 0, 0, 0, 0],
-      mediumCounts: [5, 4, 3, 2],
-      latestGateContent: fixture("medium-falling-cycle5.yml"),
-      budgetSpent: true,
-      lastCycleAction: FIX,
-    },
-    route: ROUTES.GATE_THE_LAST_FIX,
-    reason: "gate-the-last-fix",
-  },
-  {
-    label:
-      "2c negative: the last cycle reached 5c and REQUEST CHANGES sent it back — no half-cycle",
-    input: {
-      cycle: 5,
-      highCounts: [0, 0, 0, 0, 0],
-      mediumCounts: [5, 4, 3, 2],
-      latestGateContent: fixture("medium-falling-cycle5.yml"),
-      budgetSpent: true,
-      lastCycleAction: TO_5C,
-    },
-    route: ROUTES.CONTINUE,
-    reason: "last-cycle-not-a-fix",
-  },
-  {
-    label:
-      "2c fires: a HIGH raised at cycle 1 and fixed — HIGH keys on the last gate, not the history (obs #139)",
-    input: {
-      cycle: 5,
-      highCounts: [1, 0, 0, 0, 0],
-      mediumCounts: [5, 4, 3, 2],
-      latestGateContent: fixture("medium-falling-cycle5.yml"),
-      budgetSpent: true,
-      lastCycleAction: FIX,
-    },
-    route: ROUTES.GATE_THE_LAST_FIX,
-    reason: "gate-the-last-fix",
-  },
-  {
-    label:
-      "2c fires: HIGH alternating 0,1,0,1,0 with MEDIUM falling — task.130's shape, declined by the old clause (obs #139)",
-    input: {
-      cycle: 5,
-      highCounts: [0, 1, 0, 1, 0],
-      mediumCounts: [5, 4, 3, 2],
-      latestGateContent: fixture("medium-falling-cycle5.yml"),
-      budgetSpent: true,
-      lastCycleAction: FIX,
-    },
-    route: ROUTES.GATE_THE_LAST_FIX,
-    reason: "gate-the-last-fix",
-  },
-  {
-    label:
-      "2c negative: HIGH on the LAST gate — the fix answers a blocker, which is escalated, not gated",
-    input: {
-      cycle: 5,
-      highCounts: [0, 0, 0, 0, 1],
-      mediumCounts: [5, 4, 3, 2],
-      latestGateContent: fixture("medium-falling-cycle5.yml"),
-      budgetSpent: true,
-      lastCycleAction: FIX,
-    },
-    route: ROUTES.CONTINUE,
-    reason: "high-on-last-gate",
-  },
-  {
-    label:
-      "2c negative: MEDIUM flat 2,2 → 2 — no evidence one more gate would clear",
-    input: {
-      cycle: 5,
-      highCounts: [0, 0, 0, 0, 0],
-      mediumCounts: [3, 2, 2, 2],
-      latestGateContent: fixture("medium-flat-cycle5.yml"),
-      budgetSpent: true,
-      lastCycleAction: FIX,
-    },
-    route: ROUTES.CONTINUE,
-    reason: "medium-not-falling",
-  },
-  {
-    label:
-      "2c negative: MEDIUM fell then plateaued 3,2 → 2 — strictly falling means all three steps",
-    input: {
-      cycle: 5,
-      highCounts: [0, 0, 0, 0, 0],
-      mediumCounts: [5, 4, 3, 2],
-      latestGateContent: fixture("medium-flat-cycle5.yml"),
-      budgetSpent: true,
-      lastCycleAction: FIX,
-    },
-    route: ROUTES.CONTINUE,
-    reason: "medium-not-falling",
-  },
-  {
-    label:
-      "2c negative: the MEDIUM sequence for earlier cycles is missing — cannot establish falling",
-    input: {
-      cycle: 5,
-      highCounts: [0, 0, 0, 0, 0],
-      mediumCounts: [5, 4],
-      latestGateContent: fixture("medium-falling-cycle5.yml"),
-      budgetSpent: true,
-      lastCycleAction: FIX,
-    },
-    route: ROUTES.CONTINUE,
-    reason: "medium-counts-missing",
-  },
-  {
-    label:
-      "2c is not evaluated mid-loop: the same inputs with budgetSpent false go through routes 2/2b",
-    input: {
-      cycle: 5,
-      highCounts: [0, 0, 0, 0, 0],
-      mediumCounts: [5, 4, 3, 2],
-      latestGateContent: fixture("medium-falling-cycle5.yml"),
-      budgetSpent: false,
-      lastCycleAction: FIX,
-    },
-    route: ROUTES.CONTINUE,
-    reason: "not-a-pass-gate",
-  },
-  {
-    label:
-      "2c negative: budget spent with HIGH on the last gate — a granted budget of 7 with HIGH at cycle 7",
-    input: {
-      cycle: 7,
-      highCounts: [0, 0, 0, 0, 0, 0, 2],
-      mediumCounts: [6, 5, 4, 3, 3, 2],
-      latestGateContent: fixture("medium-falling-cycle5.yml"),
-      budgetSpent: true,
-      lastCycleAction: FIX,
-    },
-    route: ROUTES.CONTINUE,
-    reason: "high-on-last-gate",
-  },
-
   // ── task.148: task.143's real route decisions, pinned ──
   // These pin what the route classifier returns on the narrowing shape; they
   // do not by themselves prove the signal is not a route (a route folded in
@@ -364,44 +215,15 @@ const ROWS = [
   },
   {
     label:
-      "2c fires: MEDIUM held at 0, 0 → 0 with LOW-only entries on a PASS gate — task.173 cycle 9 (obs #300)",
-    input: {
-      cycle: 9,
-      highCounts: [1, 0, 1, 0, 0, 0, 1, 1, 0],
-      mediumCounts: [3, 2, 2, 1, 1, 0, 0, 0],
-      latestGateContent: fixture("pass-low-only.yml"),
-      budgetSpent: true,
-      lastCycleAction: FIX,
-    },
-    route: ROUTES.GATE_THE_LAST_FIX,
-    reason: "gate-the-last-fix",
-  },
-  {
-    label:
-      "2c fires: MEDIUM fell to 0 without falling strictly, 1, 1 → 0 — task.143 run 2 (obs #300)",
-    input: {
-      cycle: 7,
-      highCounts: [0, 0, 0, 0, 0, 0, 0],
-      mediumCounts: [2, 1, 2, 0, 1, 1],
-      latestGateContent: fixture("pass-low-only.yml"),
-      budgetSpent: true,
-      lastCycleAction: FIX,
-    },
-    route: ROUTES.GATE_THE_LAST_FIX,
-    reason: "gate-the-last-fix",
-  },
-  {
-    label: "task.143 cycle 5 at the budget — the real run's route 2c decline",
+      "task.143 cycle 5 — a CONCERNS gate with a MEDIUM that is not cosmetic routes continue",
     input: {
       cycle: 5,
       highCounts: [0, 0, 0, 0, 0],
       mediumCounts: [2, 1, 2, 0],
       latestGateContent: nr("task143-gate-5.yml"),
-      budgetSpent: true,
-      lastCycleAction: FIX,
     },
     route: ROUTES.CONTINUE,
-    reason: "medium-not-falling",
+    reason: "not-a-pass-gate",
   },
 ];
 
@@ -540,20 +362,31 @@ test("countRaised counts MEDIUM and LOW as raised — closed entries included �
   assert.equal(countRaised(null), null);
 });
 
-test("route 2c reads MEDIUM_N from the gate, not from the sequence's last element", () => {
-  // The sequence claims cycle 5 raised 0 MEDIUM; the gate raises 1. If the engine
-  // read the sequence, 2,1,0 would be falling and the route would fire.
-  const r = classifyLoopRoute({
-    cycle: 5,
-    highCounts: [0, 0, 0, 0, 0],
-    mediumCounts: [5, 4, 2, 1, 0],
-    latestGateContent: fixture("medium-flat-cycle5.yml"), // raises 2
+// ── route 2c is removed (task.244): the budget counts gates, so no budget ends on a fix ──
+
+test("route 2c is gone: no GATE_THE_LAST_FIX route, and the legacy inputs are ignored, not obeyed", () => {
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(ROUTES, "GATE_THE_LAST_FIX"),
+    false,
+  );
+  // task.242's shape — HIGH 2,3,1,0,0,0,0, MEDIUM 3,0,0,1,1,1 at gate 7 — would have taken route 2c
+  // at the spent budget. A stale caller that still passes budgetSpent must get exactly what it
+  // gets without it: the mid-loop routes 2/2b, then continue.
+  const base = {
+    cycle: 7,
+    highCounts: [2, 3, 1, 0, 0, 0, 0],
+    mediumCounts: [3, 0, 0, 1, 1, 1],
+    latestGateContent: fixture("medium-falling-cycle5.yml"),
+  };
+  const without = classifyLoopRoute(base);
+  const withLegacy = classifyLoopRoute({
+    ...base,
     budgetSpent: true,
     lastCycleAction: FIX,
   });
-  assert.equal(r.route, ROUTES.CONTINUE);
-  assert.equal(r.reason, "medium-not-falling");
-  assert.deepEqual(r.mediumSequence, [2, 1, 2]);
+  assert.deepEqual(withLegacy, without);
+  assert.notEqual(withLegacy.route, "gate-the-last-fix");
+  assert.equal(withLegacy.mediumSequence, undefined);
 });
 
 test("readGateToken reads the top-level gate: key, upper-cased, and null when absent", () => {
@@ -579,8 +412,6 @@ test("never throws on the shapes a pipeline produces on a bad day", () => {
       highCounts: [0, 0, 0, 0, 0],
       mediumCounts: "4,3,2",
       latestGateContent: "",
-      budgetSpent: true,
-      lastCycleAction: FIX,
     },
     { cycle: 2, highCounts: [0, 0], latestGateContent: 42 },
     {
@@ -593,7 +424,6 @@ test("never throws on the shapes a pipeline produces on a bad day", () => {
       highCounts: [0, 0, 0, 0, 0],
       mediumCounts: [1, 2, 3, 4],
       latestGateContent: fixture("medium-falling-cycle5.yml"),
-      budgetSpent: true,
       lastCycleAction: 7,
     },
   ];
@@ -630,18 +460,17 @@ test("describeLoopRoute names each route in words a six-months-later reader can 
   assert.match(crMsg, /COSM-001, COSM-002/);
   assert.match(crMsg, /CLEAN exit, not a stall/);
 
-  const gl = classifyLoopRoute({
-    cycle: 5,
-    highCounts: [0, 0, 0, 0, 0],
-    mediumCounts: [5, 4, 3, 2],
-    latestGateContent: fixture("medium-falling-cycle5.yml"),
-    budgetSpent: true,
-    lastCycleAction: FIX,
+  // task.244: route 2c is gone, but an old report's `**Loop exit**` row may still carry its token.
+  const glMsg = describeLoopRoute({
+    route: "gate-the-last-fix",
+    reason: "gate-the-last-fix",
+    detail: "the 5-cycle budget is spent",
   });
-  const glMsg = describeLoopRoute(gl);
-  assert.match(glMsg, /^Gate-the-last-fix half-cycle granted — /);
-  assert.match(glMsg, /MEDIUM falling 3 → 2 → 1/);
-  assert.match(glMsg, /NOT an exit and NOT an escalation/);
+  assert.match(
+    glMsg,
+    /^Loop route: gate-the-last-fix \(route 2c, removed in task\.244\) — /,
+  );
+  assert.match(glMsg, /the 5-cycle budget is spent/);
 
   const cont = classifyLoopRoute({
     cycle: 2,

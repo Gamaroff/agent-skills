@@ -185,7 +185,7 @@ See [Status lifecycle](../standards/status-lifecycle.md).
 
 ## QA fix loop hits 5 cycles
 
-**Symptom:** `qa-fix` ran five times (the default `QA_MAX_CYCLES`) and the gate still has open findings.
+**Symptom:** the loop ran five gates (the default `QA_MAX_CYCLES`, counting gates) and the last gate still has open findings. `qa-fix` ran at most four times: a fix runs only when a gate will read it, so the last gate's findings are handed over unfixed.
 
 **Cause:** The fixes don't address root cause, or the gate findings are infrastructure-level and need human attention.
 
@@ -198,7 +198,6 @@ See [Status lifecycle](../standards/status-lifecycle.md).
 | No open finding | a gate with no open `top_issues[]` entry — `PASS`, an active `WAIVED`, or a `CONCERNS` whose queue is empty or all closed | The work is done. Hands to Step 5c |
 | **Diminishing returns** | Two consecutive **zero-HIGH** gates, the residue is entirely test machinery, **and** nothing implicates product behaviour | The loop **finished working**. Exits cleanly and hands to Step 5c, exactly as a gate with no open finding does |
 | **Cosmetic residue** | Two consecutive **zero-HIGH** gates (from cycle 2), and a `PASS` gate whose only open entries are LOW | What is left is not worth a fix cycle. Hands to Step 5c |
-| **Gate the last fix** (half-cycle) | Cycle 3 or later, the budget is spent, the last cycle ran `qa-fix` from 5a (not after a 5c `REQUEST CHANGES`), so its fix has no gate; the last gate raised no HIGH; and MEDIUM fell strictly over the last three gates or is 0 on the last gate | One more review and gate, with no fix: no open entry hands to Step 5c, anything open escalates |
 | Convergence check | HIGH findings **remain and stop falling** | The loop **stopped working**. Escalates (not an exit) |
 
 The two guards are opposites, and neither can claim the other's run: the diminishing-returns exit requires two consecutive zero-HIGH gates, so a flat non-zero sequence is never its business. If you are seeing cycle 4 and 5 spent refining test pins while the product has been finished since cycle 2, that is the case the exit was added for — check `qa.testArtifactGlobs` in `skills-config.yaml`, which is what tells it which paths count as machinery.

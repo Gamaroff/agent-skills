@@ -11,6 +11,7 @@ created: 2026-10-14
 updated: 2026-10-14
 assignee:
 depends_on: [task.209]
+blocked_on_external: "a real macOS terminal (Terminal.app or iTerm2) run by the owner; the dev machine is Linux"
 ---
 
 # Technical Task: macOS check of the setup-consumer agent checkbox list

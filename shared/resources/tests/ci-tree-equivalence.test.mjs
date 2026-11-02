@@ -1700,7 +1700,7 @@ test("CR3-8: the gitlink marker is rejected before any pattern, so a broad `**` 
 
 test("review CR-10: the 6c poll turns the rule OFF when jq is missing, so a configured check is not re-run every 30 s", () => {
   assert.match(
-    finalise,
+    POLL_SRC,
     /command -v jq >\/dev\/null 2>&1 \|\| \{[^\n]*ENGINE=""; \}/,
   );
   const { dir, green } = greenThenDocs(1);
@@ -2008,28 +2008,109 @@ for (const { skill, text } of waitSites) {
   });
 }
 
+// obs #149: the engine runs ci.docsOnly.checkCommand — a full suite — inside the call. Run beside a
+// second suite it false-failed a load-sensitive test and latched check-failed on a green ancestor.
+// Every CI-wait site (derived above) must say so; a site with a quality gate must order the two.
+for (const { skill, text } of waitSites) {
+  test(`${skill}: the docs-only engine is never run alongside another full suite (obs #149)`, () => {
+    const gateSite = text.includes("<qualityGateCommand>");
+    const rule = gateSite
+      ? /\*\*Never run this block alongside `<qualityGateCommand>`\. Run them one after the other: this\s+block first, the quality gate after its notification\.\*\*/
+      : /\*\*Never start another full suite while the poll runs\.\*\*/;
+    assert.match(
+      text,
+      rule,
+      `${skill} must state the no-concurrency rule for the tree-equivalence engine`,
+    );
+  });
+}
+
 // ── the 6c poll: the writer and the reader, run together ──────────────────
 
 const finalise = readFileSync(
   join(REPO, "skills", "finalise", "SKILL.md"),
   "utf8",
 );
-const pollMatch = /cat > "\$POLL" <<'POLLEOF'\n([\s\S]*?)\nPOLLEOF/.exec(
-  finalise,
-);
+// The poll is a shipped script, run by 6c — not a heredoc copied out of SKILL.md (obs #148).
+const POLL_PATH = join(REPO, "shared", "resources", "finalise-ci-poll.sh");
+const POLL_SRC = readFileSync(POLL_PATH, "utf8");
+const ROLLUP_FN = /^rollup\(\) \{\n[\s\S]*?\n\}$/m;
 
 function pollScript() {
   assert.ok(
-    pollMatch,
-    "the 6c poll heredoc was not found in skills/finalise/SKILL.md",
+    ROLLUP_FN.test(POLL_SRC),
+    "finalise-ci-poll.sh's rollup() changed shape; update this extraction",
   );
-  const stub = /^rollup\(\) \{ : [^\n]*\}$/m;
-  assert.ok(
-    stub.test(pollMatch[1]),
-    "the heredoc's rollup() stub changed shape; update this extraction",
-  );
-  return pollMatch[1].replace(stub, 'rollup() { cat "$FAKE_ROLLUP_FILE"; }');
+  return POLL_SRC.replace(ROLLUP_FN, 'rollup() { cat "$FAKE_ROLLUP_FILE"; }');
 }
+
+/** A jq program with its `#` comments and all whitespace removed, so layout is not a difference. */
+function normaliseJq(q) {
+  return q
+    .split("\n")
+    .map((l) => l.replace(/#.*$/, ""))
+    .join(" ")
+    .replace(/\s+/g, "");
+}
+const ROLLUP_QUERY_RE = /statusCheckRollup\s*\\?\s*\n?\s*-q '([^']*)'/;
+
+test("6c runs the bundled poll script, and the bundled copy exists", () => {
+  assert.match(
+    finalise,
+    /^\s*POLL=\.agents\/skills\/finalise\/references\/finalise-ci-poll\.sh$/m,
+    "6c must point POLL at the bundled script",
+  );
+  assert.doesNotMatch(
+    finalise,
+    /<<'POLLEOF'/,
+    "6c must not carry the poll as a heredoc to copy out (obs #148)",
+  );
+  assert.ok(
+    existsSync(
+      join(REPO, "skills", "finalise", "references", "finalise-ci-poll.sh"),
+    ),
+    "finalise-ci-poll.sh is not bundled into finalise — run npm run bundle",
+  );
+});
+
+test("the 6c poll's rollup() is Step 6's query — one jq program, two copies held equal", () => {
+  const step6 =
+    /^CI_ROLLUP=\$\(gh pr view "\$PR_NUMBER" --json statusCheckRollup[\s\S]*?\|\| echo "UNKNOWN"\)$/m.exec(
+      finalise,
+    );
+  assert.ok(
+    step6,
+    "the Step 6 CI_ROLLUP block was not found in skills/finalise/SKILL.md",
+  );
+  const fn = ROLLUP_FN.exec(POLL_SRC);
+  assert.ok(fn, "rollup() not found in finalise-ci-poll.sh");
+  const a = ROLLUP_QUERY_RE.exec(step6[0]);
+  const b = ROLLUP_QUERY_RE.exec(fn[0]);
+  assert.ok(a && b, "a -q query was not found in one of the two copies");
+  assert.ok(normaliseJq(a[1]).length > 100, "the extracted query is vacuous");
+  assert.equal(
+    normaliseJq(b[1]),
+    normaliseJq(a[1]),
+    "finalise-ci-poll.sh's rollup() has drifted from the Step 6 CI_ROLLUP query",
+  );
+});
+
+test("the 6c poll refuses a missing argument with exit 2 and writes nothing", () => {
+  // Hermetic: a fake gh and a no-op sleep, so a poll that ignored its guard would finish fast
+  // (and fail on the empty result path) instead of calling GitHub for MAX_WAIT seconds.
+  const bin = pollBin("a".repeat(40), "b".repeat(40));
+  try {
+    const r = spawnSync("bash", [POLL_PATH, "808", "abc", "60"], {
+      encoding: "utf8",
+      timeout: CLI_BUDGET.timeoutMs,
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+    });
+    assert.equal(r.status, 2, r.stderr);
+    assert.match(r.stderr, /^usage: finalise-ci-poll\.sh/);
+  } finally {
+    rmSync(bin, { recursive: true, force: true });
+  }
+});
 
 /**
  * A bin dir with a fake gh (PR head, check count, ancestor checks) and a no-op sleep.
@@ -2203,9 +2284,9 @@ test("6c poll: without an ENGINE argument the rule is off and the poll waits exa
 // and the poll ran out its whole MAX_WAIT on a green head.
 
 const COUNT_QUERY_RE = /statusCheckRollup -q '([^']*)'/;
-function countQuery(re, what) {
-  const m = re.exec(finalise);
-  assert.ok(m, `${what} not found in skills/finalise/SKILL.md`);
+function countQuery(re, what, src = finalise) {
+  const m = re.exec(src);
+  assert.ok(m, `${what} not found`);
   const q = COUNT_QUERY_RE.exec(m[0]);
   assert.ok(q, `${what} carries no statusCheckRollup -q query`);
   return q[1];
@@ -2216,7 +2297,11 @@ const READING_1_QUERY = () =>
     "the Step 6 CI_CHECKS_1 line",
   );
 const POLL_QUERY = () =>
-  countQuery(/^checks\(\) \{ gh pr view[^\n]*$/m, "the 6c poll's checks()");
+  countQuery(
+    /^checks\(\) \{ gh pr view[^\n]*$/m,
+    "the 6c poll's checks()",
+    POLL_SRC,
+  );
 
 /** A rollup with the given check names: CheckRuns by `name`, plus StatusContexts by `context`. */
 function rollupFile(names, contexts = []) {
@@ -2532,6 +2617,88 @@ for (const { skill, text } of waitSites) {
         0,
         `${sh}: bound inputs run clean (the engine is absent, so the rule says no): ${bound.stderr}`,
       );
+    }
+  });
+}
+
+// obs #94: the block under each call site's "never as a foreground call" warning WAS the foreground
+// form, so copying it reproduced the defect. The block is now the background form: the check's
+// noise goes to a log, and the answer is one last line a notification carries. RUN it against a
+// stand-in engine that writes noise to stderr and a green answer to stdout.
+for (const { skill, text } of waitSites) {
+  test(`${skill}: the arm block is the background form — the check's output goes to the log, the answer is the last line (obs #94)`, () => {
+    const block = armBlock(text).replace(/<PR#>/g, "7");
+    const work = mkdtempSync(join(tmpdir(), "ci-tree-eq-arm-"));
+    try {
+      execFileSync("git", ["init", "-q"], { cwd: work });
+      execFileSync(
+        "git",
+        [
+          "-c",
+          "user.name=t",
+          "-c",
+          "user.email=t@t",
+          "commit",
+          "-q",
+          "--allow-empty",
+          "-m",
+          "x",
+        ],
+        { cwd: work },
+      );
+      const refs = join(work, ".agents", "skills", skill, "references");
+      mkdirSync(refs, { recursive: true });
+      // A block that marks its wait calls the real helper; with no lock it is a silent no-op.
+      if (block.includes("set-waiting-on.sh")) {
+        writeFileSync(
+          join(refs, "set-waiting-on.sh"),
+          readFileSync(join(REPO, "shared", "resources", "set-waiting-on.sh")),
+        );
+      }
+      writeFileSync(
+        join(refs, "ci-tree-equivalence.js"),
+        'process.stderr.write("NOISE-FROM-THE-CHECK\\n");\n' +
+          'process.stdout.write(JSON.stringify({ reason: "tree-equivalent", greenSha: "0123456789abcdef" }) + "\\n");\n',
+      );
+      const r = spawnSync("bash", ["-c", block], {
+        cwd: work,
+        env: {
+          PATH: process.env.PATH,
+          CI_ROLLUP: "PENDING",
+          PR_HEAD: execFileSync("git", ["rev-parse", "HEAD"], {
+            cwd: work,
+            encoding: "utf8",
+          }).trim(),
+          PR_ID: "7",
+          PR_NUMBER: "7",
+        },
+        encoding: "utf8",
+        timeout: CLI_BUDGET.timeoutMs,
+      });
+      assert.equal(r.status, 0, r.stderr);
+      assert.equal(
+        r.stderr,
+        "",
+        `${skill}: the block runs clean as written (a helper it names must exist)`,
+      );
+      const last = r.stdout.trim().split("\n").pop();
+      assert.equal(
+        last,
+        "CI_ROLLUP=SUCCESS CI_TREE_EQ=0123456789ab",
+        `${skill}: the last line must carry the answer`,
+      );
+      assert.doesNotMatch(
+        r.stdout + r.stderr,
+        /NOISE-FROM-THE-CHECK/,
+        `${skill}: the check's output must not reach the notification`,
+      );
+      assert.match(
+        readFileSync(join(work, ".claude", "state", "ci-tree-eq.log"), "utf8"),
+        /NOISE-FROM-THE-CHECK/,
+        `${skill}: the check's output goes to .claude/state/ci-tree-eq.log`,
+      );
+    } finally {
+      rmSync(work, { recursive: true, force: true });
     }
   });
 }
@@ -3000,6 +3167,78 @@ test("SEC-1: a checkCommand that times out leaves no child process running", asy
     cleanup(dir);
   }
 });
+
+// obs #94: `timeout 120 node ci-tree-equivalence.js …` killed the ENGINE, and the check's npm
+// child ran on beside the real gate. The engine's own timeout already killed the group (SEC-1);
+// an external signal never reached it, because the synchronous spawn blocked every handler.
+for (const signal of ["SIGTERM", "SIGINT"]) {
+  test(`SEC-1b: an external ${signal} to the engine kills the check's whole process group (obs #94)`, async () => {
+    if (process.platform === "win32") return;
+    const pidFile = join(tmpdir(), `ci-tree-eq-ext-${signal}-${process.pid}`);
+    rmSync(pidFile, { force: true });
+    const { dir, green } = greenThenDocs(1, {
+      config: `ci:\n  docsOnly:\n    checkTimeoutSeconds: 120\n    checkCommand: "sleep 30 & echo $! > ${pidFile}; wait"\n`,
+    });
+    const bin = fakeGhOnPath(green);
+    const alive = (p) => {
+      try {
+        process.kill(p, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+    let pid = 0;
+    let engine;
+    try {
+      engine = require("node:child_process").spawn(
+        process.execPath,
+        [ENGINE_PATH, "--head-rollup", "PENDING", "--json"],
+        {
+          cwd: dir,
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH}`,
+            VCS: "github",
+          },
+          stdio: "ignore",
+        },
+      );
+      const exited = new Promise((res) =>
+        engine.on("exit", (code, sig) => res({ code, sig })),
+      );
+      for (let i = 0; i < 200 && !pid; i += 1) {
+        await sleep(50);
+        try {
+          pid = Number(readFileSync(pidFile, "utf8").trim()) || 0;
+        } catch {
+          /* the check has not started yet */
+        }
+      }
+      assert.ok(pid > 1, "the check recorded its child's pid");
+      engine.kill(signal);
+      const { code, sig } = await exited;
+      assert.ok(
+        sig === signal || (code !== null && code !== 0),
+        `the engine must not report success after ${signal} (code ${code}, signal ${sig})`,
+      );
+      for (let i = 0; i < 20 && alive(pid); i += 1) await sleep(50);
+      assert.equal(
+        alive(pid),
+        false,
+        `the check's child must die with the engine on ${signal}`,
+      );
+    } finally {
+      if (engine && engine.exitCode === null && engine.signalCode === null)
+        engine.kill("SIGKILL");
+      if (pid > 1 && alive(pid)) process.kill(pid, "SIGKILL");
+      rmSync(pidFile, { force: true });
+      cleanup(dir);
+      cleanup(bin);
+    }
+  });
+}
 
 // A reference implementation of the glob semantics, as a RegExp, for SMALL inputs only. The matcher
 // used to BE this (with a run-collapse guard) and was exponential on `*a` repeated; it is kept here

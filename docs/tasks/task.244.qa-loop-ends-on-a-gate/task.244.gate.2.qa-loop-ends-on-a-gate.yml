@@ -1,0 +1,56 @@
+schema: 2
+task: 'task.244.qa-loop-ends-on-a-gate'
+task_title: 'The QA loop always ends on a gate'
+gate: PASS
+status_reason: 'Cycle 1''s blocker is fixed: code-moved-since-gate.sh reads an empty gate path as a first review (rc 0, prints 1), a committed test goes red without the guard, and the refusals that must stay refusals still do. The refute pass over the whole branch found no new defect; two advisory test-coverage notes are recorded as future work.'
+reviewer: 'QA Engineer'
+head: '2e2780c4e0412fb8c53b1cdc9d43b752f594a8e9'
+updated: '2026-10-30T23:04:02Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 6
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 9
+    escaped: 0
+    notes: 'code-moved-since-gate.sh decides whether a PASS gate may skip re-review, so it was probed with the engine (shell-argv form, 9 cases, bash): the work-item directory, a trailing slash, another work item and a directory named like a command substitution are accepted; the repository root, a traversal to the root, a missing directory, an empty path and a leading-dash path are refused with exit 2. No escape. Run record: task.244.qa.2.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'One git rev-list, one git diff --quiet and one ls-files per call, as the code it replaced.'
+  reliability:
+    status: PASS
+    notes: 'The first-review HALT (T244-QA-1) is closed. The helper fails toward re-review on every head it cannot vouch for, and the grant falls back to 5a when the helper is missing or silent.'
+  maintainability:
+    status: PASS
+    notes: 'The code-movement count exists once for qa-task and the grant. Stale route-2c wording is gone from the step doc, the engine and the grant header.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Add a test that runs the qa-task Phase 0 trigger block (not only the helper) with no gate on disk; the cycle 1 defect lived in the block, and the new test pins the helper.'
+      refs: ['skills/qa-task/SKILL.md', 'evals/shared/tests/qa-loop-ends-on-a-gate.test.mjs']
+    - action: 'The budget-rule tests in qa-loop-ends-on-a-gate.test.mjs read the step doc as text; the behaviour is held by step-isolation evals 11 and 12 in replay only. Consider a live run of eval 11 when live evals are taken up.'
+      refs: ['evals/shared/tests/qa-loop-ends-on-a-gate.test.mjs']
+    - action: 'reenter-qa-after-finalise.sh:214 keeps a second git rev-list count with different semantics; consider routing its commit count through code-moved-since-gate.sh.'
+      refs: ['shared/resources/reenter-qa-after-finalise.sh']
+    - action: 'T244-QA-2 carried forward as accepted: an untracked file outside the work item makes a grant re-enter at 5a (fail-safe, documented in grant-qa-cycles.sh). A grant case for it would hold the decision.'
+      refs: ['shared/resources/grant-qa-cycles.sh', 'shared/resources/grant-qa-cycles.test.sh']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

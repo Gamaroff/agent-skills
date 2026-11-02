@@ -19,11 +19,8 @@ flowchart TD
     A[qa-planning] -->|risk profile + test design| B[qa-story / qa-task]
     B -->|gate file + NFR + traceability| C[qa-gate]
     B -->|FAIL, or an open finding no active waiver covers| D[qa-fix]
-    D -->|budget not spent| B
-    D -->|budget spent, HIGH 0 throughout, MEDIUM falling: route 2c half-cycle| H[qa-story / qa-task — gate the last fix]
-    H -->|PASS, or CONCERNS with no open entry| E
-    H -->|open entry| G
-    D -->|budget spent, half-cycle declined| G[escalate — Loop Escalation]
+    D -->|always: the fix is gated again| B
+    B -->|last gate of the budget, findings still open: no fix runs| G[escalate — Loop Escalation]
     B -->|HIGH remains and stops falling: Convergence check| G
     B -->|no open finding, or active WAIVED: route 1 / 3| E[review-pr]
     B -->|HIGH 0 ×2 and residue is all test machinery: route 2| E
@@ -76,11 +73,11 @@ If the gate is `FAIL`, or carries an open `top_issues[]` entry no active waiver 
 
 **A gate that reaches 5c is no longer where this ends.** Inside `/develop-story` and
 `/develop-task` a clean gate hands to **Step 5c**, `review-pr` — see below. `qa-fix` also runs on
-that step's `REQUEST CHANGES` verdict, and those cycles come out of the same 5-cycle budget.
+that step's `REQUEST CHANGES` verdict, and those cycles come out of the same 5-gate budget (on the last gate it escalates unfixed).
 
 ### How the loop ends
 
-Six ways it ends, and they are not interchangeable — the first five hand to Step 5c (§5c's accepting-route set), the sixth escalates:
+Five ways it ends, and they are not interchangeable — the first four hand to Step 5c (§5c's accepting-route set), the fifth escalates:
 
 | Exit | Fires when | Effect |
 |---|---|---|
@@ -88,10 +85,11 @@ Six ways it ends, and they are not interchangeable — the first five hand to St
 | **Reservation without a queue** | `CONCERNS` whose `top_issues[]` is empty or all closed (route 3) | Hands to Step 5c — nothing for `qa-fix` to act on |
 | **Diminishing returns** (route 2) | All three conditions below hold | Hands to Step 5c — the loop *finished working* |
 | **Cosmetic residue** (route 2b) | A `PASS` gate — and only `PASS` — whose open entries are all LOW, after two HIGH-0 gates (cycle ≥ 2) | Hands to Step 5c — the LOWs move to `recommendations.future` by id; a fix cycle for nits is what this avoids (task.110, obs #100) |
-| **Gate the last fix** (route 2c) | The budget is spent, the last cycle landed a fix, HIGH was 0 throughout and MEDIUM fell strictly for three cycles | One review + gate on the fix's head, no `qa-fix`; a clean half-cycle gate hands to Step 5c, an open entry escalates (task.117, obs #112) |
 | Convergence check | HIGH findings **remain and stop falling** | Escalates — the loop *stopped working* |
 
-Routes 2, 2b and 2c are one engine call — `classifyLoopRoute()` in `qa-diminishing-returns.js`, with
+The budget counts **gates**, and the loop always ends on one (task.244): a fix runs only when a gate
+will read it, so a budget of 5 runs at most 4 fixes, and the former route 2c (gating the last fix) is
+gone. Routes 2 and 2b are one engine call — `classifyLoopRoute()` in `qa-diminishing-returns.js`, with
 its fixture table at `shared/resources/tests/qa-loop-route.test.mjs` — and the loop's lock position
 throughout is `current_step: 5` with a `qa_phase` of `5a`, `5b` or `5c`. A run halted at the
 budget can be re-invoked with a grant of extra cycles (`extra_cycles_granted` on the lock), and any
@@ -193,7 +191,7 @@ Tasks follow the same pattern under `docs/tasks/task.{N}.{name}/`. See [Story do
 - `qa-planning` → `qa-story`: risk profile and test design feed into review assessments.
 - `qa-story` → `qa-gate`: NFR validation, trace data, and issues feed into gate decisions.
 - `qa-planning` → `qa-gate`: risk summary directly influences gate status (≥9 → FAIL, ≥6 → CONCERNS).
-- `qa-story` / `qa-task` → `review-pr`: a gate in the accepting-route set (any of §5c's five routes) hands to Step 5c, which reads the gate and the rest of the artifact trail as the evidence it audits.
+- `qa-story` / `qa-task` → `review-pr`: a gate in the accepting-route set (any of §5c's four routes) hands to Step 5c, which reads the gate and the rest of the artifact trail as the evidence it audits.
 - `review-pr` → `qa-fix`: a `REQUEST CHANGES` verdict re-enters the fix cycle with the review's findings.
 
 ## See also

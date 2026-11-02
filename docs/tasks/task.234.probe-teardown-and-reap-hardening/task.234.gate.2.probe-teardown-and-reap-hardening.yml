@@ -1,0 +1,78 @@
+schema: 2
+task: 'task.234.probe-teardown-and-reap-hardening'
+task_title: 'Probe sandbox teardown and process-group reap'
+gate: FAIL
+status_reason: 'Cycle 1 fixes hold (A green on Node 22, 24 and 26; D positive controls). The refute pass found that detached: true leaves a case running, unbounded by its parent-held timeout, when the probe is group-killed (measured), and that chmod -R follows a symlinked sandbox root.'
+reviewer: 'QA Engineer'
+head: '3cd1bc623e49c373504f534a8bedd4a5accb5d69'
+updated: '2026-10-31T09:21:38Z'
+
+top_issues:
+  - id: 'TASK-234-QA-3'
+    severity: high
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'detached: true (both case spawn sites, :1947 and the watchedSpawn site) puts each case in its own session, so a group kill of the probe (terminal Ctrl-C, a tool or CI timeout) no longer reaches the case, and the case timeout is enforced only by the now-dead parent: measured with spawnSync(sh -c "sleep 2; touch M", {detached, timeout: 60000}) under setsid + kill -TERM -pgid, detached:true -> M written after the parent died; detached:false (the base) -> not written. A hostile case now outlives the run with no time limit.'
+    suggested_action: 'Bound each case independently of the parent (for example a wrapper that kills its own group when its parent pid changes, or a per-case watchdog that survives the parent), or reap without a new session; add a test that group-kills the probe mid-case and asserts the case is gone, and state the remaining limit in probe-boundary-rule.md section 5.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-234-QA-4'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'The removeSandbox fallback runs chmod -R u+rwx -- root, and GNU chmod 9.12 follows a symlink given as the command-line root (measured: a symlinked root to a 500/500 tree became 700/700), so a root swapped for a symlink between the failed rmSync and the chmod changes modes outside the sandbox; success criterion B and section 5 say it follows no symlink. On base the lstat walk did not follow the root.'
+    suggested_action: 'lstat the root before the fallback and refuse unless it is a real directory, and run chmod against the root so a symlink argument is not followed (for example -P, or by relative name from the parent); add a B-style test with the root itself replaced by a symlink.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-234-QA-5'
+    severity: low
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'reapGroup rethrows any kill error other than ESRCH, so an EPERM (a reused pgid owned by another user, or a zombie-only group on some kernels) aborts runProbeSpec over a best-effort cleanup.'
+    suggested_action: 'Treat EPERM as nothing-to-reap, or record it on the case instead of throwing.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-234-QA-6'
+    severity: low
+    file: 'shared/resources/tests/security-probe.test.mjs'
+    finding: 'The task.234 B test discards the run result and has no positive control that the case planted locked/link and reached chmod 000, so the outside-mode assertion would pass if the fallback never ran.'
+    suggested_action: 'Assert each row is rejected (the case ran to ok) and that the fallback path was taken.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 6
+  phases_verified: 3/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false (removeSandbox and reapGroup refuse no input). TASK-234-QA-4: chmod -R follows a symlinked sandbox root, reachable only through the residual race the reap leaves (a setsid grandchild), but it changes modes outside the sandbox.'
+  performance:
+    status: PASS
+    notes: 'Unchanged from cycle 1: +0.14 s on the 265 pre-existing probe tests; the file grows about 1.3 s.'
+  reliability:
+    status: FAIL
+    notes: 'TASK-234-QA-3: a group-killed probe leaves its current case running with no time limit (measured).'
+  maintainability:
+    status: PASS
+    notes: 'Section 5 and CHANGELOG describe the teardown once; they need the QA-3 and QA-4 limits once fixed.'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-234-QA-3 and TASK-234-QA-4.'
+      refs: ['shared/resources/security-probe.mjs']
+  future: []
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

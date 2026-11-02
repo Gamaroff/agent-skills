@@ -9,15 +9,20 @@
  * (observation #121). Nothing kept a machine-readable record of what the last
  * run passed, so nothing could be carried.
  *
- * Two commands:
+ * Three commands:
  *
- *   scope  — read the newest prior AC record and decide what this run re-judges.
- *            `full` (judge everything — today's behaviour) or `scoped` (re-judge
- *            the reported gaps, the criteria whose text or evidence changed, and
- *            carry every other verdict). Every doubt fails toward `full`.
- *   merge  — enforce the scope on the agent's YAML: restore every carried verdict
- *            whatever the agent said, send a differing verdict to `advisories[]`,
- *            recompute `overall`, and build this run's record.
+ *   scope      — read the newest prior AC record and decide what this run re-judges.
+ *                `full` (judge everything — today's behaviour) or `scoped` (re-judge
+ *                the reported gaps, the criteria whose text or evidence changed, and
+ *                carry every other verdict). Every doubt fails toward `full`.
+ *   merge      — enforce the scope on the agent's YAML: restore every carried verdict
+ *                whatever the agent said, send a differing verdict to `advisories[]`,
+ *                recompute `overall`, and build this run's record.
+ *   resolve-ci — at Step 6, grade every `DEFERRED-CI` criterion from CI reading 1
+ *                (SUCCESS → PASS, FAILURE → FAIL, anything else stays deferred),
+ *                rewrite the merged result and the record, and return the
+ *                re-folded section verdict the caller rebinds `AC_OVERALL` from
+ *                (task 249).
  *
  * Peer of `tracker-comment.js` and `registry-tick.js`: `--json` prints a
  * `reason`, every answer exits 0, and only a usage error exits 2. Read `mode`
@@ -35,7 +40,11 @@ const path = require("path");
 const crypto = require("crypto");
 const { execFileSync } = require("child_process");
 const { parseYamlSubset } = require("./yaml-subset.js");
-const { extractSection } = require("./jira-sync.js");
+const {
+  criteriaSection,
+  RE_CHECKBOX,
+  RE_NUMBERED,
+} = require("./criteria-section.js");
 
 const SCHEMA = 1;
 
@@ -50,10 +59,26 @@ const FULL_REASONS = Object.freeze([
   "no-criteria",
 ]);
 
-// The six per-criterion outcomes of a scoped run (task § 3's table).
+// A CI-state criterion's status until Step 6 grades it from CI reading 1
+// (task 249, obs #110). The AC agent runs before that reading exists, so it
+// defers rather than guesses. It is never PASS: `computeOverall` folds it like
+// any other non-PASS verdict, so an entry nothing resolved fails loudly.
+const DEFERRED_CI = "DEFERRED-CI";
+
+// The three answers of `resolve-ci`. Every one exits 0; the caller reads
+// `overall` on all three and the CI decision table still governs the rest.
+const RESOLVE_CI_REASONS = Object.freeze([
+  "none-deferred", // no DEFERRED-CI criterion: nothing to resolve, overall unchanged
+  "resolved", // every DEFERRED-CI criterion graded from the reading
+  "ci-undecided", // the reading is neither SUCCESS nor FAILURE: entries stay deferred
+]);
+
+// The per-criterion outcomes of a scoped run (task § 3's table, plus task
+// 249's ci-state).
 const CRITERION_REASONS = Object.freeze([
   "new-criterion",
   "criterion-changed",
+  "ci-state", // a CI-state criterion: graded from each run's own CI reading, never carried
   "reported-gap",
   "evidence-changed",
   "evidence-unresolved",
@@ -62,11 +87,10 @@ const CRITERION_REASONS = Object.freeze([
 
 // ── criteria ────────────────────────────────────────────────────────────────
 
-// A criterion is a top-level checkbox line (tasks, and stories that use them)
-// or a top-level numbered item (stories). Indented lines are sub-points of the
-// criterion above them and are not criteria of their own.
-const RE_CHECKBOX = /^[-*]\s+\[[ xX]\]\s+(.*)$/;
-const RE_NUMBERED = /^\d+[.)]\s+(.*)$/;
+// What a criterion is, and where the section is, are criteria-section.js's
+// (RE_CHECKBOX, RE_NUMBERED, criteriaSection): one reader for this engine,
+// criteria-drift.js and the boundary CLI. This engine reads the criterion line
+// only; criteria-drift.js also reads its continuation lines.
 // A leading id the document wrote itself: `SC-7:`, `AC3.`, `**AC1**:`, `SC-12 —`.
 const RE_LEADING_ID =
   /^(?:\*\*)?([A-Z]{1,6}-?\d+[A-Za-z]?)(?:\*\*)?\s*(?:[:.)—–-]|\*\*)\s*/;
@@ -90,9 +114,7 @@ function hashText(text) {
  * an id, an id-less sibling still gets `#N`, so every criterion has exactly one.
  */
 function readCriteria(body) {
-  const section =
-    extractSection(body, "Success Criteria") ??
-    extractSection(body, "Acceptance Criteria");
+  const section = criteriaSection(body);
   if (section === null) return [];
   const out = [];
   for (const line of section.split("\n")) {
@@ -361,6 +383,15 @@ function scopeOf(input, io) {
       rejudge.push({ id: c.id, reason: "criterion-changed" });
       continue;
     }
+    // A CI-state criterion's verdict is a reading of ONE head's CI. Its
+    // citation is the CI config, which rarely changes, so the evidence rule
+    // below would carry a PASS graded on an earlier head's run (task 249,
+    // QA cycle 1, T249-QA-1). resolve-ci stamps ci_reading on every entry it
+    // grades; an unresolved one still reads DEFERRED-CI.
+    if (p.status === DEFERRED_CI || p.ci_reading) {
+      rejudge.push({ id: c.id, reason: "ci-state" });
+      continue;
+    }
     if (p.status !== "PASS") {
       const members = Array.isArray(p.members) ? p.members : [];
       const carried = members.filter(
@@ -466,6 +497,8 @@ function renderScopeText(s) {
 function computeOverall(acs, docs) {
   // No criterion verdict at all is not "every criterion passed".
   if (acs.length === 0) return "NEEDS_MANUAL_REVIEW";
+  // Only a literal PASS counts: a DEFERRED-CI criterion Step 6 has not resolved
+  // is not met, so the section is PARTIAL or FAIL until it is (task 249).
   const docOk = (d) =>
     d && (d.status === "PASS" || d.status === "NOT_APPLICABLE");
   const allPass = acs.every((a) => a.status === "PASS") && docs.every(docOk);
@@ -474,18 +507,26 @@ function computeOverall(acs, docs) {
   return "PARTIAL";
 }
 
+// The record keeps three statuses: PASS, DEFERRED-CI (Step 6 rewrites it) and
+// FAIL for everything else. Coercing DEFERRED-CI to FAIL here would leave
+// Step 6 nothing to resolve in the record (task 249).
+function recordStatus(status) {
+  return status === "PASS" || status === DEFERRED_CI ? status : "FAIL";
+}
+
 function recordEntry(c, ac) {
+  const status = recordStatus(ac.status);
   return {
     id: c.id,
     text_hash: c.text_hash,
-    status: ac.status === "PASS" ? "PASS" : "FAIL",
+    status,
     description: ac.description ?? null,
     code_citation: ac.code_citation ?? null,
     test_citation: ac.test_citation ?? null,
     members: Array.isArray(ac.members) ? ac.members : [],
     // Why a FAIL rested on something other than a member (CR2-2). Kept so the
     // next run's scope can name it, and is only meaningful beside a FAIL.
-    non_member_fail: ac.status === "PASS" ? null : nonMemberFail(ac),
+    non_member_fail: status === "FAIL" ? nonMemberFail(ac) : null,
     note: ac.note ?? null,
   };
 }
@@ -517,8 +558,10 @@ function mergeReportedGap(r, agentAc, io, advisories) {
       note: `no verdict returned for ${r.id}; prior FAIL stands`,
     };
   }
-  if (r.known_members.length === 0) {
-    // The prior gap was not member-shaped: an ordinary re-judge.
+  if (r.known_members.length === 0 || agentAc.status === DEFERRED_CI) {
+    // The prior gap was not member-shaped, or the agent deferred the criterion
+    // to CI reading 1 (a CI-state criterion has no members to merge): an
+    // ordinary re-judge.
     return { ...agentAc, ac_id: r.id };
   }
   const agentMembers = new Map(
@@ -780,12 +823,118 @@ function finish(s, ac, acs, docs, advisories, idMismatches, entries, opts) {
   };
 }
 
+// ── resolve-ci ──────────────────────────────────────────────────────────────
+
+/**
+ * The status a DEFERRED-CI criterion takes from CI reading 1's rollup, or
+ * `null` when the reading decides nothing. Only SUCCESS passes: PENDING, NONE,
+ * CANCELLED and UNKNOWN are undecided, and Step 6's CI table owns them (task
+ * 249). A docs-only head the tree-equivalence arm satisfied arrives here as
+ * SUCCESS, with its green sha passed separately.
+ */
+function ciResolution(rollup) {
+  if (rollup === "SUCCESS") return "PASS";
+  if (rollup === "FAILURE") return "FAIL";
+  return null;
+}
+
+function ciReadingText({ rollup, ciHead, treeEq }) {
+  return `CI reading 1: ${rollup}${treeEq ? ` (tree-equivalent to ${treeEq})` : ""}${ciHead ? ` @ ${ciHead}` : ""}`;
+}
+
+/**
+ * A CI-state entry: still deferred, or already graded from a CI reading. Both
+ * are graded again from each new reading — Step 8a retakes CI reading 1 on a
+ * fix head and re-enters Step 6, and a verdict from the earlier head's reading
+ * must not survive it (task 249, QA cycle 2, T249-QA-3).
+ */
+function isCiState(entry) {
+  return (
+    Boolean(entry) &&
+    (entry.status === DEFERRED_CI || Boolean(entry.ci_reading))
+  );
+}
+
+/** One CI-state verdict (an `acs` entry or a record entry) graded from `reading`. */
+function gradeDeferred(entry, to, reading) {
+  // A re-grade replaces the previous reading's note prefix rather than stacking it.
+  let note = entry.note || null;
+  const prior = entry.ci_reading ? `resolved from ${entry.ci_reading}` : null;
+  if (note && prior && note.startsWith(prior))
+    note = note.slice(prior.length).replace(/^ — /, "") || null;
+  return {
+    ...entry,
+    status: to,
+    ci_reading: reading,
+    // A FAIL rests on the reading, not on a member: the next run's scope names it.
+    non_member_fail: to === "FAIL" ? reading : null,
+    note: `resolved from ${reading}${note ? ` — ${note}` : ""}`,
+  };
+}
+
+/**
+ * Grade every DEFERRED-CI criterion of a merged `ac_traceability` from CI
+ * reading 1 and re-fold the section verdict. Pure: the CLI does the I/O.
+ *
+ * @param {object} ac    `ac_result.ac_traceability` from a `merge`
+ * @param {object} ci    { rollup, ciHead, treeEq }
+ * @returns {{reason: string, overall: string, acs: object[], resolved: object[], undecided: string[]}}
+ */
+function resolveDeferredCi(ac, ci) {
+  const acs = Array.isArray(ac && ac.acs) ? ac.acs : [];
+  const docs = Array.isArray(ac && ac.docs) ? ac.docs : [];
+  const deferred = acs.filter(isCiState);
+  if (deferred.length === 0) {
+    return {
+      reason: "none-deferred",
+      overall: computeOverall(acs, docs),
+      acs,
+      resolved: [],
+      undecided: [],
+    };
+  }
+  const to = ciResolution(ci.rollup);
+  if (to === null) {
+    // An undecided reading decides nothing, and an earlier head's verdict is
+    // not this head's: fold every CI-state entry as not met. Nothing is
+    // written on this path, so the files keep the last decided reading.
+    const held = acs.map((a) =>
+      isCiState(a) && a.status !== DEFERRED_CI
+        ? { ...a, status: DEFERRED_CI }
+        : a,
+    );
+    return {
+      reason: "ci-undecided",
+      overall: computeOverall(held, docs),
+      acs,
+      resolved: [],
+      undecided: deferred.map((a) => String(a.ac_id)),
+    };
+  }
+  const reading = ciReadingText(ci);
+  const resolved = [];
+  const out = acs.map((a) => {
+    if (!isCiState(a)) return a;
+    resolved.push({ ac_id: String(a.ac_id), status: to });
+    return gradeDeferred(a, to, reading);
+  });
+  return {
+    reason: "resolved",
+    overall: computeOverall(out, docs),
+    acs: out,
+    resolved,
+    undecided: [],
+    reading,
+  };
+}
+
 // ── CLI ─────────────────────────────────────────────────────────────────────
 
 const USAGE = [
   "usage:",
   "  finalise-rerun-scope.js scope --doc <document> --head <rev> [--prior <record.ac.json>] [--json]",
   "  finalise-rerun-scope.js merge --scope <scope.json> --result <agent.yaml> [--dod-n <N>] [--record-out <path>] [--json]",
+  "  finalise-rerun-scope.js resolve-ci --merged <merged.json> --rollup <CI_ROLLUP> [--ci-head <sha>] [--tree-eq <sha>] [--record <record.ac.json>] [--json]",
 ].join("\n");
 
 function parseArgs(argv) {
@@ -799,6 +948,11 @@ function parseArgs(argv) {
     "--dod-n",
     "--record-out",
     "--cwd",
+    "--merged",
+    "--rollup",
+    "--ci-head",
+    "--tree-eq",
+    "--record",
   ]);
   for (let i = 1; i < argv.length; i++) {
     const a = argv[i];
@@ -914,10 +1068,82 @@ function main(argv) {
     }
     return emit(opts.json, r);
   }
+  if (opts.cmd === "resolve-ci") return resolveCiCli(opts, cwd);
   return usage(
     opts.json,
     opts.cmd ? `unknown command: ${opts.cmd}` : "a command is required",
   );
+}
+
+// `resolve-ci`: rewrite the merged result (and the record, when named) in
+// place, and print the re-folded verdict. Writes only on `resolved` — the
+// other two answers change nothing on disk.
+function resolveCiCli(opts, cwd) {
+  if (!opts.merged || !opts.rollup)
+    return usage(opts.json, "resolve-ci needs --merged and --rollup");
+  const mergedPath = path.resolve(cwd, opts.merged);
+  let payload;
+  try {
+    payload = JSON.parse(fs.readFileSync(mergedPath, "utf8"));
+  } catch {
+    return usage(opts.json, `--merged is not readable JSON: ${opts.merged}`);
+  }
+  const ac =
+    payload &&
+    payload.reason === "merged" &&
+    payload.ac_result &&
+    payload.ac_result.ac_traceability;
+  if (!ac || !Array.isArray(ac.acs))
+    return usage(opts.json, `--merged is not a merged result: ${opts.merged}`);
+  let record = null;
+  const recordPath = opts.record ? path.resolve(cwd, opts.record) : null;
+  if (recordPath) {
+    try {
+      record = JSON.parse(fs.readFileSync(recordPath, "utf8"));
+    } catch {
+      return usage(opts.json, `--record is not readable JSON: ${opts.record}`);
+    }
+    if (!record || !Array.isArray(record.criteria))
+      return usage(opts.json, `--record is not an AC record: ${opts.record}`);
+  }
+  const ci = {
+    rollup: opts.rollup,
+    ciHead: opts.ciHead || null,
+    treeEq: opts.treeEq || null,
+  };
+  const r = resolveDeferredCi(ac, ci);
+  if (r.reason === "resolved") {
+    const grade = (e) =>
+      isCiState(e) ? gradeDeferred(e, ciResolution(ci.rollup), r.reading) : e;
+    payload.ac_result.ac_traceability = {
+      ...ac,
+      acs: r.acs,
+      overall: r.overall,
+    };
+    if (payload.record && Array.isArray(payload.record.criteria))
+      payload.record.criteria = payload.record.criteria.map(grade);
+    fs.writeFileSync(
+      mergedPath,
+      JSON.stringify(payload, null, 2) + "\n",
+      "utf8",
+    );
+    if (record) {
+      record.criteria = record.criteria.map(grade);
+      fs.writeFileSync(
+        recordPath,
+        JSON.stringify(record, null, 2) + "\n",
+        "utf8",
+      );
+    }
+  }
+  return emit(opts.json, {
+    reason: r.reason,
+    exitCode: 0,
+    overall: r.overall,
+    resolved: r.resolved,
+    undecided: r.undecided,
+    message: `overall ${r.overall}`,
+  });
 }
 
 if (require.main === module) {
@@ -935,6 +1161,10 @@ module.exports = {
   SCHEMA,
   FULL_REASONS,
   CRITERION_REASONS,
+  DEFERRED_CI,
+  RESOLVE_CI_REASONS,
+  ciResolution,
+  resolveDeferredCi,
   readCriteria,
   hashText,
   isReopened,

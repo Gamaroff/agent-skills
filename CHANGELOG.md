@@ -4,6 +4,186 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.63.0] - 2026-11-02
+
+### Added
+
+- **An optional CI template that skips the heavy jobs on a docs-only push (task 174).** Lifted from a
+  consumer's merged classifier, with its spec, into `docs/examples/ci/`. A `changes` job writes
+  `code=false` when a pull request is all docs, or when a push adds only docs to a head whose
+  previous run of the same workflow passed. Every uncertain path runs the full suite. A GitHub
+  Actions variant and a Bitbucket Pipelines variant ship together. On Bitbucket, a `403` from the
+  pipelines API means a missing `read:pipeline` scope, never "no CI". Guide:
+  [`docs/runbooks/ci-docs-only-skip.md`](docs/runbooks/ci-docs-only-skip.md). It quotes the
+  measured runs: 37 min 27 s in full against 2 min 52 s skipped. Nothing installs the template;
+  adoption is the consumer's choice. A parity test keeps its default docs set in step with
+  `ci.docsOnly.patterns`, and the specs run in `npm test`.
+
+- **`/finalise` grades every kind of criterion fairly (task 249).** Five observations (#77, #81, #82,
+  #105, #110) each named a criterion `/finalise` could only fail or have overridden by hand.
+  - A **CI-state criterion** comes back from the AC agent as `DEFERRED-CI` and counts as not met.
+    Step 6 action 2a grades it from CI reading 1 with `finalise-rerun-scope.js resolve-ci`:
+    `SUCCESS` → PASS, `FAILURE` → FAIL, anything else leaves it to the CI table. It rewrites the
+    merged result and the AC record, and rebinds `AC_OVERALL` from the re-folded verdict. A re-run
+    re-judges every CI-state criterion (scope reason `ci-state`), and `resolve-ci` re-grades one an
+    earlier reading graded, so no head is accepted (or refused) on an earlier head's CI reading —
+    Step 8a's retaken reading included. The block acts only when this run wrote an AC record, and
+    HALTs on a merged result that names another document or run, so a bug run never grades a stale
+    file another work item left under the same run number. `shared/resources/tests/finalise-deferred-ci.test.mjs`
+    runs that block as written.
+  - A **process criterion** ("each fix is mutation-proven") is checked per unit under the quantifier
+    rule, against the committed record of each step. The AC prompt now lists five test-free kinds.
+  - A **measured criterion** cites the QA report, the gate or the DoD. A figure found only in the
+    implementation report fails with `note: "cite the QA report or DoD"`, because that report is
+    committed after `/finalise` runs.
+  - Each **inline probe case** the security agent writes carries a `spec_ref`. Step 3b.1 routes a
+    reproduced case that contradicts its spec line to the owner as a spec question, not a security
+    FAIL. It finds the case through the probe's `key`, never its shared `id`. A case with no
+    `spec_ref` is asked for once more and, still missing, reported to the owner without counting
+    against security. Inputs the spec allows but the agent thinks risky go in `spec_challenges[]`. The DoD
+    renders both under **Recommendations for the owner**.
+  - `review-task` (check 22) and `review-story` (check 18) report a criterion that demands a record
+    but names no location for it as Important. `create-task` and `create-story` say the same at
+    authoring.
+- **QA applies the finalise DoD's rules before finalise does (task 248).** Four checks that only
+  `/finalise` made now run in the QA loop, so their findings enter the fix loop instead of halting
+  acceptance. They are one engine each, and QA and the DoD run the same one.
+  - `probe-boundary-signals.mjs --doc` classifies a work item's criteria for a boundary signal.
+    The gate records `boundary_signals`, and a `boundary: false` beside a signal needs a
+    `boundary_reason`.
+  - `criteria-drift.js` compares the criteria, continuation lines included, with the text that was
+    reviewed. An unapproved rewording is a MEDIUM finding at QA and a FAIL at the DoD
+    ("amendment unapproved"). An appended note must say whether it relaxes the criterion. QA's
+    read-back re-runs the comparison, so a gate that leaves a changed criterion out halts.
+  - `changelog-cites.sh` is 6d's citation check, moved into a script. 6d, `develop`'s completion
+    checklist and QA's docs check all run it, and 6d's messages are unchanged. A new
+    `changelog-stem` HALT covers a stem the script cannot read.
+  - The QA skills cite the DoD's quantifier rule, and turn each unmapped member into a MEDIUM.
+
+  `qa-read-back.js` now refuses a gate that leaves the boundary or drift answers out. `qa-fix`
+  records a criterion bound it cannot meet as an open finding, never as an edit to the criterion.
+  The criteria-section reader moved to `criteria-section.js`, which `finalise-rerun-scope.js` now
+  uses.
+
+- **`create-story` and `create-task` offer to set wireframe mapping up (task 246).** When a
+  wireframe is added and `skills-config.yaml` has no `ui:` block, or one without a map path, the
+  skill detects the project's component barrel, import module and any existing catalogue table, and
+  asks once: set up with those values, adjust them, not now, or never for this repo. Two new engine
+  commands do the work: `wireframe-map.js detect` (read-only; reports `configured`, `declined`,
+  `partial` or `unset` with a proposal and its evidence) and `configure` (the only writer of
+  `skills-config.yaml`: it appends the block or inserts the keys a partial one lacks, fills a key
+  written with no value where it stands, keeps every other byte and the file's line endings, and
+  restores the file if it does not read back). A value the file cannot hold — a line break, a `"`,
+  a `\` or another control character — is a usage error naming the flag, and so is a `--map` that
+  reads as a decline (use `--decline`). `detect` reads `tsconfig.json` as JSONC, so comments and
+  trailing commas no longer hide the import alias; it proposes only an exact alias, since a
+  wildcard one (`@ui/*`) names no module of its own. Both commands find a `ui:` key that is quoted
+  or follows a byte-order mark, as the YAML reader does. The develop pipelines never offer setup.
+- **A first run gets candidates from the catalogue (task 246).** On an empty map, `resolve` offered
+  nothing for every open node. It now adds up to five catalogue entries per node, after any near-miss
+  map rows: those with a PascalCase name segment equal to the primitive (`basis: name`), then those
+  whose description names it (`basis: purpose`). Every candidate now carries `source` (`map` or
+  `catalogue`).
+- **A guide to writing map rows by hand**, in `wireframe-component-mapping.md`, with worked example
+  rows and the two things a signature cannot say: a sibling's context (use a label pattern) and
+  which icon a generic glyph stands for (record the component; read the icon from the design
+  source). Newly created maps link to it from their header.
+
+### Changed
+
+- **The QA loop always ends on a gate (task 244).** `qa_max_cycles` now counts gates: a budget of N
+  runs at most N−1 fixes, and a fix runs only when a gate will read it. 5b is entered only when
+  `N < QA_MAX_CYCLES`; at the last gate, a gate or a 5c review that would route to a fix goes to Loop
+  Escalation instead, with its findings open. §5b step 7 no longer tests the budget. Route 2c (the
+  "gate-the-last-fix" half-cycle) is removed: no budget ends on an ungated fix, so there is nothing
+  for it to do. `classifyLoopRoute()` ignores its old `budgetSpent` / `lastCycleAction` inputs, and
+  `describeLoopRoute()` still renders an old report's `gate-the-last-fix` token. A grant now
+  re-enters at 5b when no code moved since the latest gate and at 5a when it did, decided by a new
+  `code-moved-since-gate.sh` (the same count `qa-task` Phase 0 uses for its re-review trigger),
+  instead of by the halt reason; a missing or failing helper re-enters at 5a with a warning.
+  develop-bug's verify loop gets the same rule with `MAX_ITER`. To keep five fixes, set
+  `qa_max_cycles: 6`.
+- **Registry commits and the QA re-review stop sweeping up a parallel session's edits (task 245).**
+  `registry-tick.js` gains `--stage`: after its write (and on `already`) it applies the same
+  one-line change to the index copy of the registry, found by task id, and leaves every other edit
+  unstaged. It reports `staged` and `stageReason`; no reason changes the exit code, and `--stage`
+  with `--dry-run` is a usage error. `/finalise` 7.4 passes it and 6a no longer runs
+  `git add docs/tasks/task-registry.md`; `develop-next` Step 4 and `develop-batch`'s merge lane pass
+  it to `--annotate` and commit what is staged (the resume check reads the index). The QA
+  re-review's uncommitted-change HALT, held equal in `qa-re-review-scope.md`, `qa-task` and
+  `qa-story`, now HALTs only on a tracked path in the PR's change set or in the exact directory of a
+  changed file; any other tracked edit prints a warning, and an unlistable base still HALTs on all.
+  An uncommitted fix to a file the PR has not touched, in a directory it has not touched, is now
+  reviewed as absent with a warning rather than stopping the cycle.
+- **Develop pipeline wireframe mapping ban test widened to skill-local step docs (task 247).**
+  The test asserting no develop pipeline step calls `detect` or `configure` in
+  `evals/shared/tests/wireframe-mapping-hooks.test.mjs` now enumerates skill-local step documents
+  under `skills/develop-*/references/` (excluding auto-generated bundled copies), closing carried
+  advisory finding TASK-246-CR5-1.
+- **`ui.wireframeMap: false` or `off`, in any case, now declines wireframe mapping (task 246).** Every engine
+  command answers `reason: declined`, exit 0, and writes nothing, and no skill offers setup again.
+  Before, `false` read as unset and `off` as a map file named `off`; a project whose map file is
+  literally named `off` must rename it.
+
+### Fixed
+
+- **A 5c doc-only fix can no longer reword a success criterion (obs #147).** On task.174, the fix
+  for "tick criterion #7" also appended a note to the criterion's own line. `criteria-drift.js`
+  reads that as `reworded`, and `/finalise` failed #7 as an unapproved amendment. The 5c stage
+  block now runs `criteria-drift.js --base HEAD` on each carried document. A criterion `reworded`,
+  `added` or `removed` makes that file NOT CARRIED, with the edit undone, exactly like a dead link.
+  A tick, or an evidence note on an indented line under the criterion, still carries.
+- **The `/finalise` CI-reading-2 poll is a shipped script, not a heredoc to copy (obs #148).** It
+  lived in `finalise/SKILL.md` with a `rollup()` placeholder to fill by hand. Copied out by line
+  range, it lost its final `printf` and exited 0 with no result, which the reader cannot tell from
+  a killed poll. It is now `shared/resources/finalise-ci-poll.sh`, bundled into finalise and run by
+  6c, with the Step 6 rollup query inlined. A test holds that query equal to Step 6's, and a
+  missing argument exits 2.
+- **The docs-only engine is no longer run beside another full suite (obs #149).** develop-next and
+  develop-batch Step 3 ran the tree-equivalence block and `<qualityGateCommand>` in the background
+  with no ordering. With `ci.docsOnly.checkCommand` set, both are full suites, and on task.174 one
+  load-sensitive test false-failed and latched `check-failed`. Step 3 now orders them (engine
+  first, gate after), and finalise 6c says not to start a suite while its poll runs. A test checks
+  every CI-wait site for the rule.
+
+- **A killed tree-equivalence check no longer leaves its test suite running (obs #94).** With
+  `ci.docsOnly.checkCommand` set, `ci-tree-equivalence.js` runs that command inside the call. It
+  ran it with `spawnSync`, which blocks every signal handler, so `timeout 120 node …` killed the
+  engine and the command's `npm` child ran on beside the real `npm run ci`. The check now runs
+  asynchronously, and a SIGTERM, SIGINT or SIGHUP to the engine kills the check's whole process
+  group before the engine exits on that signal. The engine's own timeout already did this. The
+  call blocks in `finalise`, `develop-next` and `develop-batch` warned against a foreground call,
+  but the code under each warning was the foreground form. Each block is now the background form:
+  the check's output goes to `.claude/state/ci-tree-eq.log`, and the answer is a final
+  `CI_ROLLUP=… CI_TREE_EQ=…` line. `ci-tree-equivalence.test.mjs` sends both signals to a real
+  engine process (`SEC-1b`) and runs each block against a stand-in engine. Both tests failed
+  before the fix.
+- **security-probe: sandbox teardown and background writes (task 234).** A case that left a
+  mode-000 directory nested past `PATH_MAX` crashed `runProbeSpec` with `ENAMETOOLONG`; on
+  `EACCES`, `EPERM` or `ENAMETOOLONG` (Node 22's `rmSync` hits the last on a deep tree) the
+  teardown now runs `chmod -R u+rwx` and `rm -rf`, which descend by relative path and follow no
+  symlink below the root; a root that is not a real directory is removed as an entry, its target
+  untouched, so nothing outside the sandbox changes mode. Each case (and a shell-argv setup) now
+  runs `detached` and its process group is killed before its side effects are read: a background
+  grandchild that released the case's stdio could otherwise write after the after-snapshot,
+  turning an `absent` or `removed` check into a false pass. Each case also runs on a leash that
+  kills its group once the probe is gone, so a group-killed probe (Ctrl-C, a timeout) no longer
+  leaves its case running unbounded. The leash is invisible to the case: the case keeps its own
+  argv0 and exactly its own environment. The leash runs under the probe's `PATH`, keeping only its
+  absolute entries, so a case cannot plant the tools the leash calls. A grandchild that calls `setsid` is not reached;
+  `probe-boundary-rule.md` § 5 states the limit. The QA2-1 test now
+  asserts its sandbox is gone, and the two root-guarded tests report a skip instead of a pass.
+- **loop-supervisor: a replacement probe script is found after a stale hit (task 225).** When the
+  probe script Node resolved earlier is deleted and another shape replaces it (`tools/select/index.js`
+  for `tools/select.js`, or the reverse), the probe resolves it again in a fresh `node` process and
+  reads it as present, instead of reporting it missing until the loop restarts. A live hit and a miss
+  spawn nothing.
+- **loop-supervisor: the fresh probe resolve is tighter and cheaper (task 225 follow-ups).** A fresh
+  resolve that could not run (spawn error, timeout) now reports `probe script could not be checked`
+  instead of `probe script not found`. The path found after a swap is remembered while it exists, so
+  the swap costs one `node` spawn rather than one per probe. The path is passed after `--`, so a name
+  shaped like a Node option is read as a path, never as an option.
+
 ## [v0.62.0] - 2026-10-29
 
 ### Added

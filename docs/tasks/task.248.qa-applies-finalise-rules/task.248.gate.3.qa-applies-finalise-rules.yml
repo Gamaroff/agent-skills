@@ -1,0 +1,70 @@
+schema: 2
+task: 'task.248.qa-applies-finalise-rules'
+task_title: "QA applies the finalise DoD's rules before finalise does"
+gate: CONCERNS
+status_reason: 'All five cycle-2 findings are fixed, and two of the fixes were mutation-proved again this cycle. One new MEDIUM remains: the read-back decides whether to re-derive the criteria drift from keys the gate chooses to write, so a gate that leaves both out reads clean over an amended criterion.'
+reviewer: 'QA Engineer'
+head: '080430fd4a85a0fb8abf0c091f510f3f9d8ab896'
+updated: '2026-11-01T19:48:16Z'
+
+top_issues:
+  - id: 'T248-QA3-1'
+    severity: medium
+    file: 'shared/resources/qa-read-back.js'
+    finding: 'answerProblems re-runs criteria-drift.js only when the gate carries criteria_drift or boundary_signals (line 248). A new gate that leaves out both keys skips the re-derivation and reads clean over an amended criterion, the T248-QA2-4 shape. The committed test "a gate with no task.248 key is not asked to re-derive" asserts exit 0 for exactly that case: an amended criterion, a key-less gate. Code review CR-1, medium/high, promoted.'
+    suggested_action: 'Decide from something the gate cannot leave out: re-derive whenever the document has criteria and the engine can compare them, and keep the exemption only for a gate this cycle did not write (for example one whose head predates task.248), with a test of a key-less gate over an amended criterion halting.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 6964
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 8
+    escaped: 0
+    boundary: true
+    boundary_signals: ["never"]
+    notes: 'changelog-cites.sh re-probed at 080430fd after the opt-in moved ahead of the stem checks (run record task.248.qa.3.security.run.json, cases task.248.qa.3.security.cases.json): with enforcement on, 7 hostile stems refused (separator, substitution, wildcard, flag, newline, empty, uncited) and the cited stem accepted; 0 escaped.'
+  performance:
+    status: PASS
+    notes: 'Offline engines; the read-back adds one criteria-drift.js run per QA cycle.'
+  reliability:
+    status: CONCERNS
+    notes: 'T248-QA3-1: the drift re-derivation can be skipped by a gate that omits its keys. CR-2 (a failed doc-id.js run reads as a bad stem) is advisory.'
+  maintainability:
+    status: PASS
+    notes: 'CR-4 (a second reviewed_blob parser) is advisory; cycle 1 declined reuse to keep review-report-freshness.js out of four closures.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T248-QA3-1'
+      refs: ['shared/resources/qa-read-back.js']
+  future:
+    - action: 'CR-2: send a doc-id.js, node or jq failure in changelog-cites.sh to a could-not-look exit, not the bad-stem exit 2'
+      refs: ['shared/resources/changelog-cites.sh']
+    - action: 'CR-3: the --target and drift call sites derive the PR base with gh pr view, which cannot address a Bitbucket PR; derive it per VCS'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'CR-4: reuse reportReviewedBlob from review-report-freshness.js in criteria-drift.js'
+      refs: ['shared/resources/criteria-drift.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T248-QA3-1 fixed']

@@ -1,0 +1,135 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "ce15a175e5ca2a1b7e370dcb27d8bed5bc99c3fb",
+  "dirty_paths": [
+    "docs/tasks/task.234.probe-teardown-and-reap-hardening/task.234.implementation.1.probe-teardown-and-reap-hardening-initial-run.md",
+    "docs/tasks/task.234.probe-teardown-and-reap-hardening/task.234.pr-review.1.probe-teardown-and-reap-hardening.md",
+    "docs/tasks/task.234.probe-teardown-and-reap-hardening/task.234.probe-teardown-and-reap-hardening.md"
+  ],
+  "document": "docs/tasks/task.234.probe-teardown-and-reap-hardening/task.234.probe-teardown-and-reap-hardening.md",
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 9,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "7e2db25b4c9772018f3aa5a93025a933ae5b2a38431af73488e2ab4a06c34b93",
+      "status": "PASS",
+      "description": "PATH_MAX-deep mode-000 leaf no longer crashes runProbeSpec; sandbox removed",
+      "code_citation": "shared/resources/security-probe.mjs:970",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:7521",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#2",
+      "text_hash": "edd01c2f096b08304790102bfeaf2fe676e1d628f54892fa48af0d5195a01244",
+      "status": "PASS",
+      "description": "Teardown never changes mode of anything outside the sandbox",
+      "code_citation": "shared/resources/security-probe.mjs:992",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:7552",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#3",
+      "text_hash": "5471b79b2e960ec1f3b4fa9baf52c154ea21cf363602ecfbb808fe014bc62a10",
+      "status": "PASS",
+      "description": "Late background write killed before absent/removed are read",
+      "code_citation": "shared/resources/security-probe.mjs:2456",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:7595",
+      "members": [
+        {
+          "member": "watchedSpawn case spawn",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:7595",
+          "status": "PASS"
+        },
+        {
+          "member": "module runner case spawn",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:7631",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#4",
+      "text_hash": "ff9d4dbb7d6d5453a2e6ddc0edcf03ac14582f242d8c851676842cef414b893b",
+      "status": "PASS",
+      "description": "A, C, D red on develop and green after; B guard red under mutation",
+      "code_citation": "docs/tasks/task.234.probe-teardown-and-reap-hardening/task.234.implementation.1.probe-teardown-and-reap-hardening-initial-run.md:80",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:7489",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#5",
+      "text_hash": "4d3ae23e68b486898c33999c65d78c1f6a7c1b31324c48c4fdfb11a4dd89e17b",
+      "status": "FAIL",
+      "description": "Suite wall time grows no more than D waits (~0.6 s per site)",
+      "code_citation": "docs/tasks/task.234.probe-teardown-and-reap-hardening/task.234.implementation.1.probe-teardown-and-reap-hardening-initial-run.md:274",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": "latest measurement after the leash is +1.7 to +3.2 s beyond the D waits (load 3.3-4.4); the bound is missed and the 'accepted' annotation has no approver",
+      "note": null
+    },
+    {
+      "id": "#6",
+      "text_hash": "489de891e8f6d607c44e658c4d19eaf5b7442b3887e802f16332de08852d350f",
+      "status": "PASS",
+      "description": "Each fix is mutation-proved",
+      "code_citation": "docs/tasks/task.234.probe-teardown-and-reap-hardening/task.234.implementation.1.probe-teardown-and-reap-hardening-initial-run.md:81",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:7521",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#7",
+      "text_hash": "dae12fa325dc65d4b70fe5ff996ec892310314e4372813cf88ec25f1ae1c4894",
+      "status": "PASS",
+      "description": "npm run ci, bundle:check and lint-shell pass",
+      "code_citation": "docs/tasks/task.234.probe-teardown-and-reap-hardening/task.234.qa.7.probe-teardown-and-reap-hardening.md:60",
+      "test_citation": ".github/workflows/test.yml:58",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#8",
+      "text_hash": "fd3ffb3fc150cba42e82476154f76d5ef1aecfa0da5c0a97ac91f9661ec0ddbb",
+      "status": "PASS",
+      "description": "probe-boundary-rule.md states the reap and its setsid limit",
+      "code_citation": "shared/resources/probe-boundary-rule.md:223",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#9",
+      "text_hash": "052fa41cd7125d5ffec02c677b4d5bcde411cc54cb50a4d7997f8b719c2632fe",
+      "status": "PASS",
+      "description": "CHANGELOG [Unreleased] records the change",
+      "code_citation": "CHANGELOG.md:71",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#6",
+      "note": "QA-cycle fix TASK-234-QA-5 (reapGroup EPERM) is reasoned only, not mutation-proved."
+    }
+  ]
+}

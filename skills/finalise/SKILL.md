@@ -518,7 +518,8 @@ doubt: no prior record (`no-prior-record`), a record it cannot read (`prior-unre
 reopened under Step 2's rule (`reopened`), a prior head that is not an ancestor of `HEAD`
 (`head-not-ancestor`, a rebase or force-push), or no criterion line it can key (`no-criteria`).
 `scoped` re-judges the criteria the prior run failed (`reported-gap`), the ones whose text changed
-(`new-criterion`, `criterion-changed`), the passes whose cited code, test or member evidence changed
+(`new-criterion`, `criterion-changed`), every CI-state criterion, deferred or already graded from an
+earlier head's CI (`ci-state`, task 249: its verdict is one head's reading, never carried), the passes whose cited code, test or member evidence changed
 since the prior head (`evidence-changed`) or resolves to no tracked file (`evidence-unresolved`), and
 carries every other pass (`unchanged`). Without this, each re-run judged every criterion afresh and
 more finely than the last, and found a gap the run before had passed — task.239 needed five runs and a
@@ -554,6 +555,10 @@ as off would drop an opted-in repository's changelog check with no line saying w
 | 4. Docs & changelog  | `references/finalise-dod-docs-prompt.md`       | `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`, `<DIFF_FILE>`, `<CHANGELOG_ENFORCE>` |
 
 Each agent returns YAML. Capture: `AC_RESULT`, `SECURITY_RESULT`, `COMPLIANCE_RESULT`, `DOCS_RESULT`.
+
+Agent 1 runs `references/criteria-drift.js` (Step 3 rule 7, the amendment rule) and agent 2 runs
+`references/probe-boundary-signals.mjs` (Step 1b, the criteria signal). The QA skills run the same
+two engines, so QA and the DoD read one answer (task.248).
 
 **Bug mode (`ac-agent`):** skip — a bug report has no acceptance criteria, so agent 1's prompt has nothing to trace. Its slot is taken by the fix-evidence agent below; still four agents, still one message.
 
@@ -666,7 +671,38 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
    with that `key`, never by `id`: `id` is the corpus case id, which every control on the same sink
    shares, so an `id` match can put one control's grade on another's probe (task.189 CR2-1). A probe
    it does not grade stays without, and halts. Without this step every reproduced probe would
-   halt, and the low-severity fix-and-recheck path Step 8a offers would never open.
+   halt, and the low-severity fix-and-recheck path Step 8a offers would never open. **Run item 3a
+   first**, before this re-dispatch: a probe 3a moves out of `probes[]` must not be graded.
+3a. **Check each inline case's verdict against its `spec_ref`** (task 249, obs #81). Run this
+   before item 3's grading re-dispatch. An inline case's verdict (`direction`, `correct`) is the
+   security agent's own, so it can be stricter than the work item. Corpus cases are exempt: their
+   verdict is the shared corpus's. **Find every case through the probe's `key`, never its `id`**:
+   ids are unique only within one plan entry, and a corpus id is shared by every control on a sink
+   (task.189 CR2-1). The `key` is `<i>:<id>`, with `i` the 0-based plan entry. Entry `i`'s inline
+   cases are in the plan result's `cases_files` (`.claude/state/probe-plan-result.json`) as `$DOC_DIR/$STEM.dod.$DOD_N.security.cases.json` when the
+   plan has one entry, else `….security.cases.<i+1>.json`. When entry `i` wrote no cases file, it
+   had no inline `cases`: its probes are corpus probes and are exempt. Then:
+   - **An inline case without `spec_ref`** is a plan-shape error, and it never counts against
+     security: the security prompt promises exactly that, and no code commit could clear a check
+     the plan's author failed (task 249, QA cycle 2, T249-QA-5). Re-dispatch the security agent
+     once, as item 5 does for a refused entry, asking for the corrected **whole** plan with a
+     `spec_ref` on every inline case. Run that plan through item 2's runner, whose result replaces
+     the first as item 5 describes, then apply this item 3a to the new cases files and probes: 3a
+     reads `spec_ref` from the cases files the runner writes, so re-applying it to the first run's
+     files would report a corrected case as unanchored (QA cycle 3, T249-QA-9). A case still without one: drop
+     its probe from `probes[]` and record it in `SECURITY_RESULT.spec_questions[]` as
+     `{id, input, spec_ref: null, direction, correct, what the line says: "no spec_ref given"}`,
+     so it renders under **Recommendations for the owner**. It adds no FAIL check and no
+     `checks[]` entry, and `overall` does not move for it.
+   - **A reproduced inline case**: take entry `i`'s cases file from the probe's `key`, find the case
+     whose `id` is the key's `<id>` within that one file, and read the line its `spec_ref` names. When that line allows what the case's `direction` says the control
+     must refuse, or refuses what it says the control must accept, the case contradicts its
+     specification. Move the probe out of `probes[]` and into `SECURITY_RESULT.spec_questions[]`
+     (`{id, input, spec_ref, direction, correct, what the line says}`). It is not a security FAIL.
+     Like `spec_challenges[]`, it renders under **Recommendations for the owner**. In a hands-free
+     run it is also a question for the operator, recorded as **Spec question** in the pipeline's
+     Issues Log. A case whose verdict matches its line stays in `probes[]`, which is a real finding.
+   - Recompute `overall` after the moves, as item 6 says.
 4. **An escape is a finding, whatever the verdict.** Each `escapes[]` entry is a case the engine saw
    write outside its sandbox — the engine exits 1 on one even when the control engages. Add a
    `probe escaped its sandbox: {entry} ({id} → {path})` FAIL check per entry, with no `severity`.
@@ -769,7 +805,9 @@ not answer counts as `FAIL`, and an agent `FAIL` stands when it names no failing
 recomputed from the merged `acs` and `docs` — never copied from the agent, and
 `NEEDS_MANUAL_REVIEW` when no criterion verdict exists at all. Steps 3d and 6 read that. `id_mismatches` names any `ac_id` the agent returned that the
 scope did not issue; such a verdict is not merged, and the criterion it was meant for reads `FAIL`
-with `no verdict returned under id …`.
+with `no verdict returned under id …`. A `DEFERRED-CI` criterion (a CI-state criterion, task 249)
+is kept as `DEFERRED-CI` in the merged result and the record, and folds as **not met**: `AC_OVERALL`
+here is at best `PARTIAL` until Step 6 action 2a grades it from CI reading 1 and re-folds it.
 
 A bug run skips this with the rest of `rerun-scope` (Step 3a's marker): no merge runs and no record
 is written; `AC_RESULT` is the fix-evidence agent's answer, as Step 3b says.
@@ -794,7 +832,7 @@ Append sections to the running summary file. **One append per section** — not 
 
 #### {ac.ac_id}: {ac.description}
 
-**Status:** {✅ PASS | ❌ FAIL}{ac.carried ? " (carried from the prior run)" : ""}
+**Status:** {✅ PASS | ❌ FAIL | ⏳ DEFERRED-CI — graded at Step 6 from CI reading 1}{ac.carried ? " (carried from the prior run)" : ""}
 
 - Code evidence: `{ac.code_citation or "not found — FAIL"}`
 - Test evidence: `{ac.test_citation or "not found — FAIL"}`
@@ -901,6 +939,28 @@ boundary rule's §5.1) is evidence for that override, labelled so, never a closu
   anything reproduced — it can only appear when the count is non-zero and nothing was found.
 -->
 
+{if security_result.spec_challenges or security_result.spec_questions is non-empty:}
+### Recommendations for the owner
+
+These are not security findings, and they do not count against the verdict above. Each is an input the
+work item's specification allows, which may be a risk (task 249, obs #81). Tightening the
+specification is the owner's decision.
+
+{for each c in security_result.spec_challenges:}
+- **Spec challenge:** `{c.input}` — allowed by `{c.spec_ref}`. {c.risk}
+{endfor}
+{for each q in security_result.spec_questions:}
+{if q.spec_ref is null:}
+- **Unanchored probe case:** case `{q.id}` (`{q.input}`) expected `{q.direction}` ({q.correct}),
+  but the security agent tied it to no line of the specification, even when asked again. It was not
+  counted; decide whether the specification should say what the case assumes.
+{else:}
+- **Spec question:** case `{q.id}` (`{q.input}`) expected `{q.direction}` ({q.correct}), but
+  `{q.spec_ref}` says {q.what the line says}. The code follows the specification.
+{endif}
+{endfor}
+{endif}
+
 **Agent summary:** {security_result.summary}
 
 ---
@@ -1002,7 +1062,7 @@ Use the **Decision Matrix** from `references/definition-of-done-checklist.md` to
 
 | Decision matrix column       | Source variable                                     |
 | ---------------------------- | --------------------------------------------------- |
-| All Acceptance Criteria Met? | `AC_OVERALL` (PASS/PARTIAL/FAIL)                    |
+| All Acceptance Criteria Met? | `AC_OVERALL` (PASS/PARTIAL/FAIL), as action 2a rebinds it |
 | Tests & PR Approved?         | `ac_result.pr_review_decision` (APPROVED)           |
 | **CI green?**                | **`CI_ROLLUP` (see below) — a hard blocker**        |
 | Docs Updated?                | `DOCS_OVERALL` (PASS/NOT_APPLICABLE counts as pass) |
@@ -1073,8 +1133,9 @@ CI_ROLLUP=$(gh pr view "$PR_NUMBER" --json statusCheckRollup \
 # lanes have not yet appeared is not a decision (obs #87). Record it beside CI_ROLLUP.
 # DISTINCT checks (a CheckRun's name, a StatusContext's context), never rollup entries: one check
 # can be listed twice, and a floor counted in entries could never be met by a head that listed it
-# once — the poll then ran out its whole MAX_WAIT on a green head (obs #3, PR #625). The poll's
-# checks() below uses the same query, so the floor and the reading count one unit.
+# once — the poll then ran out its whole MAX_WAIT on a green head (obs #3, PR #625). The 6c poll's
+# checks() (references/finalise-ci-poll.sh) uses the same query, and so does its rollup(): a test
+# holds both equal to this block, so the floor and the reading count one unit.
 CI_CHECKS_1=$(gh pr view "$PR_NUMBER" --json statusCheckRollup -q '[.statusCheckRollup[] | (.name // .context // "")] | unique | length' 2>/dev/null || echo 0)
 ```
 
@@ -1166,24 +1227,41 @@ nothing else** — every other answer, including a failed read, exits 1 — so t
 "no" up to green.
 
 **This call costs whatever `ci.docsOnly.checkCommand` costs (obs #262).** When that key is set, the
-engine runs the command before it answers — often minutes, longer than a tool call's timeout. Run
-the block backgrounded with its result written to a file you read on a later turn, as the Step 7.6c
-poll does; or re-sample the head's rollup once more first and call the engine only if it is still
-`PENDING`/`NONE`:
+engine runs the command before it answers — often minutes, longer than a tool call's timeout. The
+block below is therefore written in its **background form**: run it as a background command (the
+Bash tool's `run_in_background`), never in the foreground and never under `timeout`, and read its
+last line, `CI_ROLLUP=… CI_TREE_EQ=…`, on the completion notification. The check's own output goes
+to `.claude/state/ci-tree-eq.log`, so the notification stays readable. The cheaper alternative is
+to re-sample the head's rollup once more first and run the block only if it is still
+`PENDING`/`NONE`. A killed engine now takes the check's whole process group with it, so a
+foreground call no longer leaves the suite running beside the real gate (obs #94) — but it still
+loses the answer, which is why the block is the background form. **The block marks and clears its
+own wait** (`set-waiting-on.sh "step-6 tree-equivalence check"`), as the probe-plan block does, so
+inside a `/develop-*` pipeline the yielded turn is not re-prompted as a stall; standalone there is
+no lock and both calls are silent no-ops:
 
 ```bash
+# RUN BACKGROUNDED (run_in_background) — never in the foreground, never under `timeout` (obs #94).
 # INPUTS, re-bound in THIS block (a fresh shell has none): the rollup read above and the PR number.
 # Unbound, the rule would be skipped silently and the wait would run as if it did not exist.
+# The wait's budget is the engine's default check bound (checkTimeoutSeconds 1500 s = 25 min) plus 5;
+# a longer configured bound is re-prompted once the 30 minutes pass, never left marked forever.
 : "${CI_ROLLUP:?bind CI_ROLLUP from the rollup read above}" "${PR_NUMBER:?bind PR_NUMBER}"
 CI_TREE_EQ=""
 case "$CI_ROLLUP" in
   PENDING|NONE)
+    mkdir -p .claude/state
+    bash .agents/skills/finalise/references/set-waiting-on.sh "step-6 tree-equivalence check" --kind task --budget-minutes 30
     if TE=$(command node .agents/skills/finalise/references/ci-tree-equivalence.js \
-              --head-rollup "$CI_ROLLUP" --head "$(git rev-parse HEAD)" --pr "$PR_NUMBER" --json); then
+              --head-rollup "$CI_ROLLUP" --head "$(git rev-parse HEAD)" --pr "$PR_NUMBER" --json \
+              2> .claude/state/ci-tree-eq.log); then
       CI_TREE_EQ=$(printf '%s' "$TE" | jq -r '.greenSha[0:12] // empty')
       [ -n "$CI_TREE_EQ" ] && CI_ROLLUP=SUCCESS    # an empty sha stays PENDING: fail closed
-    fi ;;
+    fi
+    bash .agents/skills/finalise/references/set-waiting-on.sh --clear ;;
 esac
+# The result, for the notification: the next block re-binds both from this line.
+echo "CI_ROLLUP=$CI_ROLLUP CI_TREE_EQ=$CI_TREE_EQ"
 ```
 
 The engine decides on four things and this step re-derives none of them: the head's rollup is
@@ -1236,8 +1314,94 @@ with `ci.docsOnly.enabled: false` ([`docs/reference/configuration.md`](../../doc
 
 **Actions:**
 
-1. **Use the aggregated results** from Step 3c (`AC_OVERALL`, `SEC_OVERALL`, `COMP_OVERALL`, `DOCS_OVERALL`) — do not re-read the running summary file for this step
+1. **Use the aggregated results** from Step 3c (`AC_OVERALL`, `SEC_OVERALL`, `COMP_OVERALL`, `DOCS_OVERALL`) — do not re-read the running summary file for this step. `AC_OVERALL` is rebound once more, by action 2a, after CI reading 1
 2. **Resolve `CI_ROLLUP`** using the command above, and record the raw per-job conclusions in the DoD running summary so the decision is auditable. **Record the head it was read on** in the same line — `CI_HEAD_1=$(git rev-parse HEAD)` — as `CI reading 1: {CI_ROLLUP} @ {CI_HEAD_1}` — or, when the docs-only arm resolved it, `CI reading 1: SUCCESS (tree-equivalent to {CI_TREE_EQ}) @ {CI_HEAD_1}`. This is the reading that gates the *decision*; it is structurally an ancestor of the commit that will carry the acceptance, and Step 7's publish boundary takes a second reading on that commit before anything leaves the repo (task.115, obs #40).
+2a. **Grade the CI-state criteria from CI reading 1, and rebind `AC_OVERALL`** (task 249, obs #110).
+   The AC agent ran at Step 3b, before this reading existed, so a criterion whose only evidence is CI
+   state came back `DEFERRED-CI` (`references/finalise-dod-ac-prompt.md` Step 3) and Step 3c folded it
+   as not met. This block grades each one — `SUCCESS` → PASS (a tree-equivalent `SUCCESS` included,
+   with its green sha in the note), `FAILURE` → FAIL, anything else leaves it deferred and the CI table
+   above decides — rewrites the merged result and the AC record, and **rebinds `AC_OVERALL` from the
+   re-folded verdict**. Rewriting the entries alone would leave `AC_OVERALL` at the `PARTIAL`/`FAIL`
+   Step 3c folded. A criterion an earlier reading already graded is graded again from this one, so
+   Step 8a's retaken CI reading 1 on the fix head replaces the red reading rather than leaving its
+   FAIL in place; an undecided retaken reading folds it as not met. **This run's AC record is the
+   signal that Step 3c merged**: a bug run, or a Step 3c answer that was not `merged`, has none and
+   skips with `AC_OVERALL` unchanged. The merged-result file alone proves nothing, because it is keyed
+   by `DOD_N` and outlives its run, so with a record present the block also checks that the file's
+   `record.document` and `record.dod_n` are this run's, and HALTs when they are not. With no record but
+   a merged result that *is* this run's, it HALTs too: the record is not where `DOC_DIR` points:
+
+   ```bash
+   # Step 6 action 2a — grade DEFERRED-CI criteria from CI reading 1 (task 249). INPUTS, substituted into
+   # THIS block: STEM and DOD_N exactly as Step 0 bound them; {document-directory}; CI_ROLLUP, CI_HEAD_1
+   # and CI_TREE_EQ from action 2 (CI_TREE_EQ empty unless the docs-only arm set it); AC_OVERALL from Step 3c.
+   STEM="{story.{P}.{E}.{S} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"
+   DOD_N="{Step 0's DOD_N}"
+   DOC_DIR="{document-directory}"
+   CI_ROLLUP="{CI_ROLLUP from action 2}"
+   CI_HEAD_1="{CI_HEAD_1 from action 2}"
+   CI_TREE_EQ="{CI_TREE_EQ, or empty}"
+   AC_OVERALL="{AC_OVERALL from Step 3c}"
+   case "$STEM$DOD_N$DOC_DIR$CI_ROLLUP$CI_HEAD_1$CI_TREE_EQ$AC_OVERALL" in
+     *'{'*) echo "HALT: substitute every input of Step 6 action 2a (an unsubstituted placeholder found)"; exit 1 ;;
+   esac
+   # An input substituted as empty would make both -f tests below miss and skip silently — the
+   # could-not-look state the record HALT exists to name (task 249, QA cycle 2, T249-QA-4).
+   [ -n "$STEM" ] || { echo "HALT: STEM is empty — substitute the work item's filename stem"; exit 1; }
+   case "$DOD_N" in ''|*[!0-9]*) echo "HALT: DOD_N ('$DOD_N') is not Step 0's run number"; exit 1 ;; esac
+   [ -n "$DOC_DIR" ] && [ -d "$DOC_DIR" ] || { echo "HALT: DOC_DIR ('$DOC_DIR') is not the work item's directory"; exit 1; }
+   [ -n "$AC_OVERALL" ] || { echo "HALT: AC_OVERALL is empty — substitute Step 3c's verdict"; exit 1; }
+   AC_MERGED_FILE=".claude/state/finalise-ac-merged-${DOD_N}.json"
+   AC_RECORD="$DOC_DIR/${STEM}.dod.${DOD_N}.ac.json"
+   # Whose merged result is this? The file is keyed by DOD_N alone and never removed, so it can be
+   # another work item's from an earlier run (task 249, QA cycle 3, T249-QA-7).
+   MERGED_REASON=""; MERGED_DOC=""; MERGED_N=""
+   if [ -f "$AC_MERGED_FILE" ]; then
+     MERGED_REASON=$(jq -r '.reason' "$AC_MERGED_FILE" 2>/dev/null)
+     MERGED_DOC=$(jq -r '.record.document // ""' "$AC_MERGED_FILE" 2>/dev/null)
+     MERGED_N=$(jq -r '.record.dod_n // ""' "$AC_MERGED_FILE" 2>/dev/null)
+   fi
+   OWN_DOC=0
+   case "${MERGED_DOC##*/}" in "$STEM".*) OWN_DOC=1 ;; esac
+   if [ ! -f "$AC_RECORD" ]; then
+     # No AC record: Step 3c did not merge in this run (a bug run, or an answer that was not
+     # `merged`) — unless the merged result is this run's own, which means the record is not where
+     # DOC_DIR points: skipping would leave AC_OVERALL short of PASS for a reason nobody named
+     # (QA cycle 4, T249-QA-10).
+     if [ "$MERGED_REASON" = "merged" ] && [ "$OWN_DOC" = 1 ] && [ "$MERGED_N" = "$DOD_N" ]; then
+       echo "HALT: $AC_MERGED_FILE is $STEM run $DOD_N's merged result, but $AC_RECORD does not exist — check DOC_DIR is the directory Step 3c wrote the record to, else re-run Step 3a, the AC agent and Step 3c, then this action"
+       exit 1
+     fi
+     echo "CI-state criteria: skipped — no AC record for $STEM run $DOD_N"
+   elif [ "$MERGED_REASON" = "merged" ]; then
+     [ "$OWN_DOC" = 1 ] \
+       || { echo "HALT: $AC_MERGED_FILE is the merged result of '${MERGED_DOC:-no document}', not $STEM — move $AC_RECORD aside, then re-run Step 3a, the AC agent and Step 3c, then this action"; exit 1; }
+     [ "$MERGED_N" = "$DOD_N" ] \
+       || { echo "HALT: $AC_MERGED_FILE is run ${MERGED_N:-unknown}'s merged result, not run $DOD_N — move $AC_RECORD aside, then re-run Step 3a, the AC agent and Step 3c, then this action"; exit 1; }
+     RESOLVE_CI=$(command node .agents/skills/finalise/references/finalise-rerun-scope.js resolve-ci \
+       --merged "$AC_MERGED_FILE" --rollup "$CI_ROLLUP" --ci-head "$CI_HEAD_1" --tree-eq "$CI_TREE_EQ" \
+       --record "$AC_RECORD" --json) \
+       || { echo "HALT: finalise-rerun-scope.js resolve-ci failed — $RESOLVE_CI"; exit 1; }
+     AC_OVERALL=$(printf '%s' "$RESOLVE_CI" | jq -r '.overall')
+     echo "CI-state criteria: $(printf '%s' "$RESOLVE_CI" | jq -c '{reason, resolved, undecided}')"
+   else
+     # A record means Step 3c merged this run; only its merged result is gone or unreadable
+     # (state cleaned on resume, or no jq). Skipping would keep AC_OVERALL short of PASS with
+     # no reason given, so stop and say why (task 249, QA cycle 1, CR-3).
+     # Step 3c's merge inputs live in the same .claude/state directory, so re-running the merge
+     # alone cannot work when the state was cleaned (T249-QA-6).
+     echo "HALT: $AC_RECORD exists but $AC_MERGED_FILE is missing or not 'merged' — move $AC_RECORD aside (or Step 3a reads this run's own record as the prior one), then re-run Step 3a, the AC agent and Step 3c, then this action"
+     exit 1
+   fi
+   echo "AC_OVERALL=$AC_OVERALL"
+   ```
+
+   Read `reason`: `none-deferred` changes nothing; `resolved` names each graded criterion — append
+   `**CI-state criteria:** {ac_id} → {status} ({CI reading 1 line}) — AC_OVERALL re-folded: {AC_OVERALL}`
+   under the running summary's `## Step 2` section; `ci-undecided` leaves each listed criterion
+   `DEFERRED-CI` and `AC_OVERALL` not PASS, and the `CI_ROLLUP` row above (PENDING, CANCELLED, NONE,
+   UNKNOWN) is what this run does next. A re-sample that turns the rollup `SUCCESS` re-runs this block.
 3. **Determine pass/fail** for each decision matrix column using the mapping above
 4. **Write the acceptance decision to the running summary:**
 
@@ -1436,8 +1600,13 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 
    ```bash
    node .agents/skills/finalise/references/registry-tick.js \
-     --file "{document-path}" --json
+     --file "{document-path}" --stage --json
    ```
+
+   `--stage` puts **this task's row** in the index and nothing else from the registry. The registry
+   is a shared file: a parallel session's uncommitted row or counter bump in the same checkout must
+   not ride into this acceptance commit (obs #127), so 6a does not `git add` the registry — the
+   engine stages the row it wrote (task 245).
 
    > Engine source: `references/registry-tick.js` (bundled into each skill as
    > `references/registry-tick.js`).
@@ -1461,6 +1630,12 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    | `row-malformed` | The registry has a row for this task, but the parser rejected its shape — `parserReason` and `line` say why and where | **Log it and tick by hand.** Fix the row's shape so the next tick works |
    | `ambiguous-row` | The Status column could not be identified | **Log it and tick by hand** |
    | `engine-unavailable` | The registry parser could not be located | **Log it and tick by hand** |
+
+   **The `staged` / `stageReason` fields** report the index write. `staged` / `already-staged` need
+   nothing. Any other `stageReason` (`row-not-in-index`, `not-tracked`, `unmerged`, `not-a-repo`;
+   `not-attempted` follows a `reason` above that wrote nothing) means the row is **not** in the
+   acceptance commit: **log it verbatim in the DoD file's Step 5** and tick-and-commit the row by
+   hand, or CI's drift check fails. It never changes the exit code.
 
    **The `icon` field** appears only when the consumer sets `registry.task.statusIcons` in
    `skills-config.yaml` (see the configuration reference). The registry's status-icon cell is then
@@ -1620,9 +1795,9 @@ standalone.
      COMMIT_MSG="docs(${STEM}): accept — DoD, sprint review"
    fi
    # --- acceptance artefacts resolved (the executed test slices to here) ---
-   # One unmatched pathspec aborts the WHOLE `git add`, so the registry (tasks only; absent on a
-   # story or a project without one) is added on its own, behind an existence check — not folded
-   # into the list behind a `|| true` that would also swallow a real failure.
+   # The task registry is NOT added here. Step 7.4's `registry-tick.js --stage` already put this
+   # task's row in the index, so a parallel session's uncommitted row or counter bump in the same
+   # file stays out of this commit (obs #127, task 245). A whole-file add would sweep it in.
    # Read the add's exit code. A failed add — bash: "pathspec did not match" (128) — leaves the
    # index clean, and the idempotency guard below would then read that as "already committed"
    # and push nothing (task.115 5c pass 2, CR-1). The DoD path above is already resolved and
@@ -1630,13 +1805,8 @@ standalone.
    git add "${ADD_PATHS[@]}"
    ADD_EXIT=$?
    [ "$ADD_EXIT" -eq 0 ] || { echo "HALT: git add of the acceptance artefacts failed (exit $ADD_EXIT) — an artefact is missing or the DoD glob matched nothing"; exit 1; }
-   if [ -f docs/tasks/task-registry.md ]; then
-     git add docs/tasks/task-registry.md
-     ADD_EXIT=$?
-     [ "$ADD_EXIT" -eq 0 ] || { echo "HALT: git add of the task registry failed (exit $ADD_EXIT)"; exit 1; }
-   fi
    # This run's AC record (Step 3c, task 242) — stories and tasks only, and absent when agent 1's
-   # answer was unparseable, so it is added on its own behind an existence check like the registry.
+   # answer was unparseable, so it is added on its own behind an existence check.
    # THIS run's exact path, numbered from the DoD file resolved above — never the newest record in
    # the series, which on an unparseable run is an earlier run's (task.242 QA cycle 1, CR-7).
    AC_RECORD=""
@@ -1783,90 +1953,15 @@ standalone.
    # poll re-prompted the last 15 minutes of every legitimate wait (task.124 QA cycle 1, CR-2).
    bash .agents/skills/finalise/references/set-waiting-on.sh "step-7 CI poll (reading 2)" --kind task \
      --budget-minutes "$(( ${FINALISE_CI_MAX_WAIT:-1500} / 60 + 1 ))"
-   POLL=.claude/state/finalise-ci-poll.sh
+   # The poll is a bundled script, RUN, never copied out of this file (obs #148): copied by line
+   # range it lost its final printf and exited 0 with no result — indistinguishable, to the reader
+   # below, from a poll that was killed. Its decision rules (stale-head, check floor, stable count,
+   # the docs-only latch) are documented in the script itself.
+   POLL=.agents/skills/finalise/references/finalise-ci-poll.sh
+   [ -f "$POLL" ] || { echo "HALT: $POLL is missing — re-run the bundler (npm run bundle)"; exit 1; }
    RESULT=.claude/state/finalise-ci-result.txt
    PIDFILE=.claude/state/finalise-ci-poll.pid
    rm -f "$RESULT" "$PIDFILE"
-   # Terminator and body at COLUMN 0 — an indented terminator does not close the heredoc and
-   # bash swallows the nohup line below into the script, so the poll never starts.
-   cat > "$POLL" <<'POLLEOF'
-#!/usr/bin/env bash
-# usage: finalise-ci-poll.sh <PR_NUMBER> <EXPECTED_HEAD> <MAX_WAIT_SECONDS> <RESULT_FILE> [EXPECTED_CHECKS] [ENGINE]
-# Writes ONE line to RESULT_FILE when it concludes: "<STATE> <HEAD> <CHECKS> <WAITED>s TREE_EQ=<sha12 or empty>".
-# <STATE> is the rollup token, or UNDECIDED when MAX_WAIT ran out on a SUCCESS that never qualified.
-# ENGINE is the path of ci-tree-equivalence.js; absent means the docs-only rule is off for this poll.
-PR_NUMBER=${1}; EXPECTED_HEAD=${2}; MAX_WAIT=${3}; RESULT=${4}; EXPECTED_CHECKS=${5:-0}; ENGINE=${6:-}
-TREE_EQ=""; TE_LATCHED=0
-# The docs-only arm parses the engine's JSON with jq. Without jq nothing could ever be latched and a
-# configured checkCommand would be re-run every 30 s for the whole wait, so the rule is OFF here and the
-# poll waits as before (QA cycle 3, review CR-10).
-command -v jq >/dev/null 2>&1 || { [ -z "$ENGINE" ] || echo "ci-tree-equivalence off: jq not found" >&2; ENGINE=""; }
-rollup() { : ...the Step 6 rollup query for this platform, verbatim — copy it, do not re-derive it...; }
-# The head CI was actually sampled on — read from the PR, never echoed back from the argument.
-# GitHub form shown; Bitbucket: the PR's .source.commit.hash. "unknown" on failure makes the
-# later-turn head check HALT rather than pass.
-sampled_head() { gh pr view "$PR_NUMBER" --json headRefOid -q .headRefOid 2>/dev/null || echo unknown; }
-# How many checks the rollup is green OVER. A push registers its fast lanes first; a rollup
-# sampled in that window is SUCCESS across three checks while the slow lanes have not yet
-# appeared (obs #87). Distinct checks, the same query as CI_CHECKS_1 (obs #3).
-# Bitbucket: the pipeline count for the head commit.
-checks() { gh pr view "$PR_NUMBER" --json statusCheckRollup -q '[.statusCheckRollup[] | (.name // .context // "")] | unique | length' 2>/dev/null || echo 0; }
-WAITED=0; PREV_CHECKS=-1
-STATE=$(rollup); CHECKS=$(checks)
-# A terminal state is accepted only when ALL of:
-#   (1) WAITED > 0 — the pre-loop sample can still be the PREVIOUS head's rollup, which a
-#       fresh push has not yet replaced (obs #108: a stale SUCCESS accepted at 0s);
-#   (2) the sampled head is the expected head — never gate one commit and read another;
-#   (3) the check count is at least reading 1's count and unchanged since the previous sample —
-#       a rollup that is still growing is not decided, whatever its state says.
-# FAILURE is terminal under (1) and (2) only: a red on a partial rollup is still a red.
-# A PENDING/NONE head may also conclude as SUCCESS when the docs-only rule (task.172) holds —
-# still under (1) and (2), so it is never taken on a stale or foreign head. The engine exits 0 for
-# tree-equivalent and for nothing else. Once it has answered code-changed, check-failed or disabled
-# the answer cannot change (the head is pinned), so it is latched and not re-run every 30 s — a
-# configured checkCommand is a full local suite. code-changed is only ever reported when no nearer
-# ancestor was left undecided, so it IS final; behind an undecided ancestor the engine says
-# no-green-ancestor instead (a CANCELLED ancestor counts as undecided and is re-asked too: that
-# costs polling, never a wrong answer). no-green-ancestor / unverifiable can change (an ancestor's
-# run may finish), so those are asked again.
-tree_equivalent() {
-  [ -n "$ENGINE" ] && [ "$TE_LATCHED" -eq 0 ] || return 1
-  local out sha
-  if out=$(command node "$ENGINE" --head-rollup "$STATE" --head "$EXPECTED_HEAD" --pr "$PR_NUMBER" --json 2>/dev/null); then
-    sha=$(printf '%s' "$out" | jq -r '.greenSha[0:12] // empty')
-    [ -n "$sha" ] || return 1
-    TREE_EQ=$sha; return 0
-  fi
-  case "$(printf '%s' "$out" | jq -r '.reason // empty' 2>/dev/null)" in
-    code-changed|check-failed|disabled) TE_LATCHED=1 ;;
-  esac
-  return 1
-}
-decided() {
-  [ "$WAITED" -gt 0 ] || return 1
-  [ "$(sampled_head | cut -c1-12)" = "$(printf '%s' "$EXPECTED_HEAD" | cut -c1-12)" ] || return 1
-  case "$STATE" in
-    FAILURE) return 0 ;;
-    SUCCESS) [ "$CHECKS" -ge "$EXPECTED_CHECKS" ] && [ "$CHECKS" -eq "$PREV_CHECKS" ] ;;
-    PENDING|NONE) if tree_equivalent; then STATE=SUCCESS; return 0; fi; return 1 ;;
-    *) return 1 ;;
-  esac
-}
-DECIDED=0
-while [ "$WAITED" -lt "$MAX_WAIT" ]; do
-  decided && { DECIDED=1; break; }
-  sleep 30; WAITED=$((WAITED + 30)); PREV_CHECKS=$CHECKS; STATE=$(rollup); CHECKS=$(checks)
-done
-# MAX_WAIT ran out. The last sample was taken after the loop's last decided(), so judge it once.
-# Only a SUCCESS is re-judged: decided() on a PENDING/NONE head asks the engine, and FAILURE is
-# terminal for the reader anyway. A SUCCESS that still fails the floor or the stable-count rule is
-# NOT a green reading: printed as sampled, the reader accepted a rollup that stayed partial for the
-# whole wait, which is the case the floor exists to refuse (obs #4). UNDECIDED makes the reader HALT.
-if [ "$DECIDED" -eq 0 ] && [ "$STATE" = SUCCESS ]; then
-  decided || STATE=UNDECIDED
-fi
-printf '%s %s %s %ss TREE_EQ=%s\n' "$STATE" "$(sampled_head)" "$CHECKS" "$WAITED" "$TREE_EQ" > "$RESULT"
-POLLEOF
    # CI_CHECKS_1 is the check count reading 1 was green over (Step 6 records it beside CI_ROLLUP).
    nohup bash "$POLL" "$PR_NUMBER" "$CI_HEAD_2" "${FINALISE_CI_MAX_WAIT:-1500}" "$RESULT" "${CI_CHECKS_1:-0}" \
      .agents/skills/finalise/references/ci-tree-equivalence.js \
@@ -1874,6 +1969,11 @@ POLLEOF
    echo $! > "$PIDFILE"
    echo "CI poll backgrounded (pid $(cat "$PIDFILE")) — read $RESULT on a later turn; absent means still polling"
    ```
+
+   **Never start another full suite while the poll runs.** On a PENDING head the poll asks the
+   tree-equivalence engine, which runs `ci.docsOnly.checkCommand` when one is set. A second suite
+   alongside it can false-fail a load-sensitive test, and the poll then latches `check-failed` for
+   the rest of its wait (obs #149).
 
    **On a later turn**, read the result — never `sleep` for it in the foreground:
 
@@ -1938,7 +2038,7 @@ POLLEOF
    recorded in the implementation report's Decisions Log (`CI reading 1: … @ …; CI reading 2: … @
    …`) and in the PR comment body below — both outside the verified commit.
 
-6d. **CHANGELOG citation check (blocking — HALT `no-changelog-entry`; HALT `changelog-unknown` when the opt-in cannot be read).** Every accepted work item
+6d. **CHANGELOG citation check (blocking — HALT `no-changelog-entry`; HALT `changelog-unknown` when the opt-in cannot be read; HALT `changelog-stem` when `STEM` is not a work-item id).** Every accepted work item
    must be cited in `CHANGELOG.md` under `## [Unreleased]` as `(task N)` / `(bug N)` — the
    convention in `docs/contributing/releases.md`. **It runs only when the project opts in** with
    `changelog.enforce: true` in `skills-config.yaml`; otherwise the block prints
@@ -1946,7 +2046,10 @@ POLLEOF
    `(task N)` convention is one repository's release practice, and a consumer's changelog — absent,
    generated, or citing Jira keys — is its own business. `references/changelog-enforce.sh` is the one
    answer, and Step 3's docs-subagent dispatch reads the same one, so the two checks cannot disagree
-   again (task.241, obs #118). **When on, a repository with no `CHANGELOG.md` is still not
+   again (task.241, obs #118). The whole check — opt-in, file, citation — is
+   `references/changelog-cites.sh`, which `develop`'s completion checklist and the QA skills' docs
+   check also run, so a missing entry surfaces in the QA loop rather than here (task.248, obs #43).
+   This block maps its exit to 6d's messages, which are unchanged. **When on, a repository with no `CHANGELOG.md` is still not
    applicable**: the block prints `6d: no CHANGELOG.md — not applicable` and continues, because a
    project that keeps no changelog cannot cite anything in one. A `CHANGELOG.md` that exists but does
    not cite the task HALTs. Until task.115 this was the one release-checklist
@@ -1954,7 +2057,12 @@ POLLEOF
 
    ```bash
    # Tasks only in this version; `(bug N)` is the documented follow-on once bugs 13 and 15 are
-   # backfilled. `STEM` is the work item's filename stem from 6a.
+   # backfilled. STEM is substituted into THIS block, as in 6a and 6b: no block inherits another's
+   # variables, and an unbound STEM made changelog-cites.sh refuse it, so 6d HALTed on every run
+   # (task.248 QA cycle 2, T248-QA2-1).
+   STEM="{story.{P}.{E}.{S} | task.{id}}"   # the work item's filename stem
+   case "$STEM" in *'{'*) echo "HALT: STEM must be bound in this block — a substituted input, not a value carried over from 6a (an unsubstituted placeholder found)"; exit 1 ;; esac
+   [ -n "$STEM" ] || { echo "HALT: STEM must be bound in this block — it is empty"; exit 1; }
    # Parameter expansion, NOT `[[ =~ ]]` + BASH_REMATCH: zsh — the shell this pipeline runs in —
    # leaves BASH_REMATCH unset (it populates $match), so N was empty there and the grep pattern
    # degenerated to one that matches any [Unreleased] text. The warning could never fire under
@@ -1962,22 +2070,22 @@ POLLEOF
    # The opt-in is read FIRST: an unset key must never reach the file test or the grep below.
    # Exactly on or off: an empty or `unknown` answer is a resolver that could not run, not an
    # unset key, and must not read as "not enabled" (task.241 QA cycle 2, CR2-1).
-   CL=$(bash .agents/skills/finalise/references/changelog-enforce.sh)
-   case "$CL" in
-     on | off) ;;
-     *) echo "HALT: changelog-unknown — changelog-enforce.sh answered '${CL}', not on or off; check .agents/skills/finalise/references/ holds changelog-enforce.sh and read-config.sh, then re-run /finalise"; exit 1 ;;
+   # The check is changelog-cites.sh (task.248); this block only maps its exit to 6d's messages.
+   # A missing or unrunnable script lands on the `*` arm: the same changelog-unknown HALT a missing
+   # resolver always reached, never a silent pass.
+   CITES=$(bash .agents/skills/finalise/references/changelog-cites.sh "$STEM"); rc=$?
+   N="${STEM#task.}"
+   case $rc in
+     0) ;;
+     1) echo "HALT: no-changelog-entry — CHANGELOG.md [Unreleased] does not cite (task ${N}). Add the entry, commit and push it, then re-run /finalise: 6a skips the acceptance commit it already made and 6c re-reads CI on the new head"; exit 1 ;;
+     3) case "$CITES" in
+          "not-applicable: changelog checks not enabled") echo "6d: changelog checks not enabled" ;;
+          "not-applicable: no CHANGELOG.md") echo "6d: no CHANGELOG.md — not applicable" ;;
+        esac ;;
+     2) echo "HALT: changelog-stem — changelog-cites.sh refused STEM '${STEM}' (${CITES}); substitute the work item's id into this block, e.g. task.248"; exit 1 ;;
+     *) CL="${CITES#unknown: }"; [ "$rc" -eq 4 ] || CL=""
+        echo "HALT: changelog-unknown — changelog-enforce.sh answered '${CL}', not on or off; check .agents/skills/finalise/references/ holds changelog-enforce.sh and read-config.sh, then re-run /finalise"; exit 1 ;;
    esac
-   N=""
-   case "$STEM" in task.*) N="${STEM#task.}" ;; esac
-   if [ "$CL" = off ]; then
-     echo "6d: changelog checks not enabled"
-   elif [ ! -f CHANGELOG.md ]; then
-     echo "6d: no CHANGELOG.md — not applicable"
-   elif [ -n "$N" ] && [[ "$N" =~ ^[0-9]+$ ]]; then
-     awk '/^## \[Unreleased\]/{p=1;next} /^## \[/{p=0} p' CHANGELOG.md \
-       | grep -qiE "\btask[ .]${N}\b" \
-       || { echo "HALT: no-changelog-entry — CHANGELOG.md [Unreleased] does not cite (task ${N}). Add the entry, commit and push it, then re-run /finalise: 6a skips the acceptance commit it already made and 6c re-reads CI on the new head"; exit 1; }
-   fi
    ```
 
    **Blocking from the first release after v0.59.0; advisory from task.115 (v0.47.0) until then.** The HALT comes
@@ -2594,13 +2702,13 @@ EOF
 
 - [ ] Running summary file finalized — `## Verification Complete` appended with `**Final Status:** ✅ ACCEPTED`, and that is the file's only status line (the header carries none)
 - [ ] Story frontmatter updated: `status: accepted`, `updated`, `completed_date`, `pr_number`
-- [ ] Task only: registry row ticked — `registry-tick.js` reported `ticked` / `already` / `no-registry` (a `no-row`, `row-malformed`, `ambiguous-row` or `engine-unavailable` needs a manual tick before merge, or CI's drift check fails); with `statusIcons` configured, an `icon` of `unmapped`, `no-column` or `ambiguous` needs the icon fixed by hand
+- [ ] Task only: registry row ticked — `registry-tick.js --stage` reported `ticked` / `already` / `no-registry` with `stageReason` `staged` / `already-staged` (any other `stageReason` is logged in the DoD file and the row committed by hand; a `no-row`, `row-malformed`, `ambiguous-row` or `engine-unavailable` needs a manual tick before merge, or CI's drift check fails); with `statusIcons` configured, an `icon` of `unmapped`, `no-column` or `ambiguous` needs the icon fixed by hand
 - [ ] DoD PASSED section added to story document body
 - [ ] Running summary referenced in DoD section
 - [ ] Sprint Review summary file created at `{story-directory}/sprint-review-summary.md`
 - [ ] **Publish boundary (6a–6c) crossed before any side-effect**: acceptance commit made with output and exit status read (never suppressed), pushed; document, DoD summary and sprint review asserted **tracked and on `origin/<branch>`** (`git ls-files --error-unmatch` + `git show origin/<branch>:<path>`), not merely present; PR head equals the pushed head; **CI reading 2 read `SUCCESS` on that head** — anything else is HALT `ci-not-green-on-acceptance-head`, with no comment, close or board move issued
 - [ ] Both CI readings recorded with their heads — reading 1 in the running summary (Step 6), reading 2 on the PR canonical comment and in the implementation report
-- [ ] CHANGELOG citation checked (6d) — `6d: changelog checks not enabled` when `changelog.enforce` is not `true`; otherwise `(task N)` present under `[Unreleased]`, or `6d: no CHANGELOG.md — not applicable` when the repository has no `CHANGELOG.md`; otherwise HALT `no-changelog-entry` before the PR comment; HALT `changelog-unknown` when `changelog-enforce.sh` answers neither `on` nor `off`
+- [ ] CHANGELOG citation checked (6d) — `6d: changelog checks not enabled` when `changelog.enforce` is not `true`; otherwise `(task N)` present under `[Unreleased]`, or `6d: no CHANGELOG.md — not applicable` when the repository has no `CHANGELOG.md`; otherwise HALT `no-changelog-entry` before the PR comment; HALT `changelog-unknown` when `changelog-enforce.sh` answers neither `on` nor `off`; HALT `changelog-stem` when `changelog-cites.sh` refuses `STEM`
 - [ ] PR comment posted (GitHub: `gh pr comment`, Bitbucket: REST API) — **after** 6a–6c
 - [ ] Tracker issue closed: Jira issue transitioned via MCP (`transitionJiraIssue`) **OR** GitHub issue closed via `gh issue close` + closure confirmed with `gh issue view --json state` **OR** warning comment posted (if close failed after retry)
 - [ ] **Jira only — terminal status RE-READ after the Document-link re-point**, and re-asserted if the

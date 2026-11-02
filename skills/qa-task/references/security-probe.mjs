@@ -274,7 +274,6 @@ import { spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import {
   accessSync,
-  chmodSync,
   constants as fsConstants,
   mkdtempSync,
   mkdirSync,
@@ -963,26 +962,185 @@ const SOURCE_LINE =
 /**
  * Remove a probe sandbox, including one a case left unreadable. A case
  * controls its directory, so it can leave a mode-000 directory that `rmSync`
- * cannot list. On EACCES or EPERM every directory gets owner rwx back and the
- * removal is retried. The walk uses `lstat`, so a symlink is never followed
- * out of the sandbox (task.232 QA2-1).
+ * cannot list (task.232 QA2-1), or nest it past PATH_MAX, which Node 22's
+ * `rmSync` (an absolute-path walk) fails with ENAMETOOLONG. On EACCES, EPERM
+ * or ENAMETOOLONG every directory gets owner rwx back and the tree is removed
+ * by `chmod -R` and `rm -rf` (forceRemoveTree), not by a walk in this process
+ * (task.234).
  */
 function removeSandbox(root) {
   try {
     rmSync(root, { recursive: true, force: true });
     return;
   } catch (e) {
-    if (e.code !== "EACCES" && e.code !== "EPERM") throw e;
+    if (!["EACCES", "EPERM", "ENAMETOOLONG"].includes(e.code)) throw e;
   }
-  const open = (dir) => {
-    chmodSync(dir, 0o700);
-    for (const name of readdirSync(dir)) {
-      const p = join(dir, name);
-      if (lstatSync(p).isDirectory()) open(p);
-    }
+  forceRemoveTree(root);
+}
+
+/**
+ * Give every directory under `root` owner rwx back, then remove the tree.
+ * `chmod -R` and `rm -rf` descend by relative path, so depth does not stop
+ * them, and follow no symlink below `root`. GNU chmod DOES follow a symlink
+ * named as its argument, so `root` is lstat'd first and anything but a real
+ * directory is removed as an entry, its target untouched, and reported: a case
+ * that swapped the sandbox for a link must not turn the restore onto the link's
+ * target (TASK-234-QA-4). A swap between the lstat and the chmod is left to a
+ * process outside the case's group (probe-boundary-rule.md § 5). Exported for
+ * its test.
+ */
+export function forceRemoveTree(root) {
+  const st = lstatSync(root, { throwIfNoEntry: false });
+  if (st === undefined) return;
+  if (!st.isDirectory()) {
+    rmSync(root, { force: true });
+    throw new Error(
+      `removeSandbox: ${root} was replaced by a ${st.isSymbolicLink() ? "symlink" : "non-directory"}; removed the entry, followed nothing`,
+    );
+  }
+  const run = (cmd, argv) => {
+    const r = spawnSync(cmd, argv, {
+      encoding: "utf8",
+      stdio: ["ignore", "ignore", "pipe"],
+    });
+    const why = r.error?.code ?? `exit ${r.status}`;
+    return `${cmd} ${why}${r.stderr ? `: ${r.stderr.trim()}` : ""}`;
   };
-  open(root);
-  rmSync(root, { recursive: true, force: true });
+  const chmod = run("chmod", ["-R", "u+rwx", "--", root]);
+  const rm = run("rm", ["-rf", "--", root]);
+  if (existsSync(root)) {
+    throw new Error(`removeSandbox: ${root} is still there (${chmod}; ${rm})`);
+  }
+}
+
+/**
+ * Kill whatever is left of a case's process group — a background grandchild
+ * that released the case's stdio outlives `spawnSync` and could write after
+ * the case's side effects are read. The case was spawned `detached`, so its
+ * pid is its group id. ESRCH means the group is already gone; EPERM means the
+ * id now names a group this process may not signal — a group of zombies on
+ * some kernels, or a reused id — so there is nothing of the case's left to
+ * kill either (TASK-234-QA-5). A grandchild that calls `setsid` leaves the
+ * group and is not reached (task.234).
+ */
+function reapGroup(pid) {
+  if (!pid) return;
+  try {
+    process.kill(-pid, "SIGKILL");
+  } catch (e) {
+    if (e.code !== "ESRCH" && e.code !== "EPERM") throw e;
+  }
+}
+
+/**
+ * The script a leashed case runs under (TASK-234-QA-3). `detached` puts the
+ * case in its own session, so a group kill of the probe — Ctrl-C, a tool or CI
+ * timeout — no longer reaches it, and its timeout is held by the probe it
+ * outlives. A watcher in the case's group kills the group once the case's
+ * parent is no longer the probe; the case itself is `exec`'d, so its pid,
+ * signals and exit status are its own. The watcher holds none of the case's
+ * pipes (0–2 and any extra fd closed), or `spawnSync` would wait for it.
+ * `ps` unavailable falls back to `kill -0` on the probe's pid.
+ */
+function leashScript(extraFds) {
+  const closeExtra = Array.from(
+    { length: extraFds },
+    (_, i) => ` ${i + 3}>&-`,
+  ).join("");
+  return [
+    "p=$1; shift",
+    "(",
+    // Sleep first: most cases end inside one interval and never pay for `ps`.
+    // Never `while sleep`: a sleep that fails would kill the case at once.
+    "  while :; do",
+    "    sleep 0.2",
+    '    q=$(ps -o ppid= -p $$ 2>/dev/null | tr -d " ")',
+    '    if [ -n "$q" ]; then [ "$q" = "$p" ] || break',
+    '    else kill -0 "$p" 2>/dev/null || break; fi',
+    "  done",
+    "  kill -KILL 0",
+    `) </dev/null >/dev/null 2>&1${closeExtra} &`,
+    'exec "$@"',
+  ].join("\n");
+}
+
+/**
+ * The leash shell's own environment: nothing of the case's reaches it. Its PATH
+ * is the probe's own, after /usr/bin:/bin, so the watcher finds `sleep` and
+ * `ps` on a host that keeps them elsewhere (NixOS): there, a bare
+ * /usr/bin:/bin left `sleep` failing and the watcher spinning (TASK-234-QA-9).
+ * The host chooses this PATH, never the case — and only its absolute entries:
+ * the leash shell runs in the case's own directory, so `.`, an empty entry or
+ * any relative one would let the case plant the `sleep` or `ps` the watcher
+ * runs (TASK-234-QA-10).
+ */
+function leashEnv() {
+  const host = (process.env.PATH ?? "")
+    .split(":")
+    .filter((entry) => entry.startsWith("/"));
+  return { PATH: ["/usr/bin", "/bin", ...host].join(":") };
+}
+
+/**
+ * `{command, args, env}` to spawn a case on a leash (leashScript). The leash
+ * must be invisible to the case, so the case gets exactly what it would have
+ * got unleashed:
+ * - its environment, spelled out through `env -i`: `sh` adds its own variables
+ *   (SHLVL, `_`) to what it exports;
+ * - its command name, not the resolved path, which `env` looks up on the
+ *   case's own PATH as `spawnSync` would. A shell names itself by its argv0
+ *   (`bash: <script>: No such file…`), and isLaunchFailure reads that name
+ *   (TASK-234-QA-7).
+ *
+ * The leash shell itself runs under leashEnv(), never the case environment,
+ * which could otherwise retune it (`SHELLOPTS=xtrace` traced the leash onto the
+ * case's stderr, TASK-234-QA-8). A command that does not resolve on the case's
+ * PATH is returned unchanged, so `spawnSync` reports ENOENT exactly as before:
+ * there is no process to leash. So is one that holds `=`, which `env` would
+ * read as an assignment. Exported for its test.
+ */
+export function leashed(
+  command,
+  argv,
+  { env = process.env, cwd, extraFds = 0 },
+) {
+  if (command.includes("=") || onPath(command, env.PATH ?? "", cwd) === null) {
+    return { command, args: argv, env };
+  }
+  const assignments = Object.entries(env)
+    .filter(([k, v]) => k !== "" && !k.includes("=") && v !== undefined)
+    .map(([k, v]) => `${k}=${v}`);
+  return {
+    command: "/bin/sh",
+    args: [
+      "-c",
+      leashScript(extraFds),
+      "sh",
+      String(process.pid),
+      "/usr/bin/env",
+      "-i",
+      "--",
+      ...assignments,
+      command,
+      ...argv,
+    ],
+    env: leashEnv(),
+  };
+}
+
+/** The executable `command` names on `pathVar`, searched as execvp would. */
+function onPath(command, pathVar, cwd) {
+  if (command.includes("/")) return command;
+  for (const entry of pathVar.split(":")) {
+    const file = resolve(cwd ?? process.cwd(), entry || ".", command);
+    try {
+      accessSync(file, fsConstants.X_OK);
+      if (statSync(file).isFile()) return file;
+    } catch {
+      // not here
+    }
+  }
+  return null;
 }
 
 /**
@@ -1906,25 +2064,28 @@ export function runProbeSpec({
       }
       const before = snapshotTree(sandboxRoot, workDirName);
 
-      const child = spawnSync(
+      const leash = leashed(
         process.execPath,
         ["--input-type=module", "-e", RUNNER],
-        {
-          input: JSON.stringify({
-            entryPath: resolved.entryPath,
-            exportName: resolved.exportName,
-            input: c.input,
-            // null when --args-json was not given; the runner's own
-            // Array.isArray default is the one place the fallback lives.
-            extraArgs: base.args,
-          }),
-          cwd: workDir,
-          env: sandboxEnv({ cwd: workDir }),
-          encoding: "utf8",
-          timeout: perCaseTimeout,
-          maxBuffer: 8 * 1024 * 1024,
-        },
+        { env: sandboxEnv({ cwd: workDir }), cwd: workDir },
       );
+      const child = spawnSync(leash.command, leash.args, {
+        input: JSON.stringify({
+          entryPath: resolved.entryPath,
+          exportName: resolved.exportName,
+          input: c.input,
+          // null when --args-json was not given; the runner's own
+          // Array.isArray default is the one place the fallback lives.
+          extraArgs: base.args,
+        }),
+        cwd: workDir,
+        env: leash.env,
+        encoding: "utf8",
+        timeout: perCaseTimeout,
+        maxBuffer: 8 * 1024 * 1024,
+        detached: true,
+      });
+      reapGroup(child.pid);
 
       const after = snapshotTree(sandboxRoot, workDirName);
       for (const [path, stamp] of after) {
@@ -2285,17 +2446,20 @@ function watchedSpawn(
   const before = snapshotTree(sandboxRoot, workDirName);
   const scriptDirBefore = listDirStamps(scriptDir);
   // extraFds: further pipes after stderr, read back as child.output[3…].
-  const child = spawnSync(command, argv, {
+  const leash = leashed(command, argv, { env, cwd, extraFds });
+  const child = spawnSync(leash.command, leash.args, {
     input: "",
     cwd,
-    env,
+    env: leash.env,
     encoding: "utf8",
     timeout: timeoutMs,
     maxBuffer: 8 * 1024 * 1024,
+    detached: true,
     ...(extraFds > 0
       ? { stdio: ["pipe", "pipe", "pipe", ...Array(extraFds).fill("pipe")] }
       : {}),
   });
+  reapGroup(child.pid);
   const tag = shell === null ? {} : { shell };
   const after = snapshotTree(sandboxRoot, workDirName);
   for (const [path, stamp] of after) {

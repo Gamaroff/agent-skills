@@ -1,0 +1,286 @@
+[
+  {
+    "id": "h.changed-file",
+    "sink": "filename",
+    "input": "git init -q . && git config user.email a@b.c && git config user.name n && mkdir -p wi src src2 \"d e\" .claude/state && echo 1 > src/a.txt && echo 1 > src/b.txt && echo 1 > src2/c.txt && echo 1 > \"d e/f g.txt\" && echo 1 > é.txt && echo 1 > top.txt && echo 1 > other.txt && echo 1 > wi/r.md && echo 1 > .claude/state/lock && git add src src2 \"d e\" é.txt top.txt other.txt wi .claude && git -c commit.gpgsign=false commit -qm base && git branch base && echo 2 > src/a.txt && echo 2 > \"d e/f g.txt\" && echo 2 > é.txt && echo 2 > top.txt && git add -u && git -c commit.gpgsign=false commit -qm change && echo 3 > src/a.txt; if [ \"$PRIOR_GATES\" -ge 1 ]; then",
+    "why": "tracked edit to a file in the PR change set",
+    "correct": "reject",
+    "direction": "hostile",
+    "fixture": {
+      "env": {
+        "PRIOR_GATES": "1",
+        "WORK_ITEM_DIR": "wi",
+        "BASE": "base",
+        "DIFF_FILE": "out.diff",
+        "LATEST_GATE": "",
+        "SAFETY_REPROBE": "false"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: uncommitted changes outside the work item — commit the fix before re-review (the scope reads committed history):\n M src/a.txt\n"
+    }
+  },
+  {
+    "id": "h.space-path",
+    "sink": "filename",
+    "input": "git init -q . && git config user.email a@b.c && git config user.name n && mkdir -p wi src src2 \"d e\" .claude/state && echo 1 > src/a.txt && echo 1 > src/b.txt && echo 1 > src2/c.txt && echo 1 > \"d e/f g.txt\" && echo 1 > é.txt && echo 1 > top.txt && echo 1 > other.txt && echo 1 > wi/r.md && echo 1 > .claude/state/lock && git add src src2 \"d e\" é.txt top.txt other.txt wi .claude && git -c commit.gpgsign=false commit -qm base && git branch base && echo 2 > src/a.txt && echo 2 > \"d e/f g.txt\" && echo 2 > é.txt && echo 2 > top.txt && git add -u && git -c commit.gpgsign=false commit -qm change && echo 3 > \"d e/f g.txt\"; if [ \"$PRIOR_GATES\" -ge 1 ]; then",
+    "why": "a path with a space must still match the changed list",
+    "correct": "reject",
+    "direction": "hostile",
+    "fixture": {
+      "env": {
+        "PRIOR_GATES": "1",
+        "WORK_ITEM_DIR": "wi",
+        "BASE": "base",
+        "DIFF_FILE": "out.diff",
+        "LATEST_GATE": "",
+        "SAFETY_REPROBE": "false"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: uncommitted changes outside the work item — commit the fix before re-review (the scope reads committed history):\n M d e/f g.txt\n"
+    }
+  },
+  {
+    "id": "h.non-ascii-path",
+    "sink": "filename",
+    "input": "git init -q . && git config user.email a@b.c && git config user.name n && mkdir -p wi src src2 \"d e\" .claude/state && echo 1 > src/a.txt && echo 1 > src/b.txt && echo 1 > src2/c.txt && echo 1 > \"d e/f g.txt\" && echo 1 > é.txt && echo 1 > top.txt && echo 1 > other.txt && echo 1 > wi/r.md && echo 1 > .claude/state/lock && git add src src2 \"d e\" é.txt top.txt other.txt wi .claude && git -c commit.gpgsign=false commit -qm base && git branch base && echo 2 > src/a.txt && echo 2 > \"d e/f g.txt\" && echo 2 > é.txt && echo 2 > top.txt && git add -u && git -c commit.gpgsign=false commit -qm change && echo 3 > é.txt; if [ \"$PRIOR_GATES\" -ge 1 ]; then",
+    "why": "a non-ASCII path must still match",
+    "correct": "reject",
+    "direction": "hostile",
+    "fixture": {
+      "env": {
+        "PRIOR_GATES": "1",
+        "WORK_ITEM_DIR": "wi",
+        "BASE": "base",
+        "DIFF_FILE": "out.diff",
+        "LATEST_GATE": "",
+        "SAFETY_REPROBE": "false"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: uncommitted changes outside the work item — commit the fix before re-review (the scope reads committed history):\n M é.txt\n"
+    }
+  },
+  {
+    "id": "h.sibling-in-changed-dir",
+    "sink": "filename",
+    "input": "git init -q . && git config user.email a@b.c && git config user.name n && mkdir -p wi src src2 \"d e\" .claude/state && echo 1 > src/a.txt && echo 1 > src/b.txt && echo 1 > src2/c.txt && echo 1 > \"d e/f g.txt\" && echo 1 > é.txt && echo 1 > top.txt && echo 1 > other.txt && echo 1 > wi/r.md && echo 1 > .claude/state/lock && git add src src2 \"d e\" é.txt top.txt other.txt wi .claude && git -c commit.gpgsign=false commit -qm base && git branch base && echo 2 > src/a.txt && echo 2 > \"d e/f g.txt\" && echo 2 > é.txt && echo 2 > top.txt && git add -u && git -c commit.gpgsign=false commit -qm change && echo 3 > src/b.txt; if [ \"$PRIOR_GATES\" -ge 1 ]; then",
+    "why": "an unchanged file in a directory holding a changed file",
+    "correct": "reject",
+    "direction": "hostile",
+    "fixture": {
+      "env": {
+        "PRIOR_GATES": "1",
+        "WORK_ITEM_DIR": "wi",
+        "BASE": "base",
+        "DIFF_FILE": "out.diff",
+        "LATEST_GATE": "",
+        "SAFETY_REPROBE": "false"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: uncommitted changes outside the work item — commit the fix before re-review (the scope reads committed history):\n M src/b.txt\n"
+    }
+  },
+  {
+    "id": "h.staged-change",
+    "sink": "filename",
+    "input": "git init -q . && git config user.email a@b.c && git config user.name n && mkdir -p wi src src2 \"d e\" .claude/state && echo 1 > src/a.txt && echo 1 > src/b.txt && echo 1 > src2/c.txt && echo 1 > \"d e/f g.txt\" && echo 1 > é.txt && echo 1 > top.txt && echo 1 > other.txt && echo 1 > wi/r.md && echo 1 > .claude/state/lock && git add src src2 \"d e\" é.txt top.txt other.txt wi .claude && git -c commit.gpgsign=false commit -qm base && git branch base && echo 2 > src/a.txt && echo 2 > \"d e/f g.txt\" && echo 2 > é.txt && echo 2 > top.txt && git add -u && git -c commit.gpgsign=false commit -qm change && echo 3 > top.txt && git add top.txt; if [ \"$PRIOR_GATES\" -ge 1 ]; then",
+    "why": "an index-only edit of a changed file",
+    "correct": "reject",
+    "direction": "hostile",
+    "fixture": {
+      "env": {
+        "PRIOR_GATES": "1",
+        "WORK_ITEM_DIR": "wi",
+        "BASE": "base",
+        "DIFF_FILE": "out.diff",
+        "LATEST_GATE": "",
+        "SAFETY_REPROBE": "false"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: uncommitted changes outside the work item — commit the fix before re-review (the scope reads committed history):\nM  top.txt\n"
+    }
+  },
+  {
+    "id": "h.rename-old-path",
+    "sink": "filename",
+    "input": "git init -q . && git config user.email a@b.c && git config user.name n && mkdir -p wi src src2 \"d e\" .claude/state && echo 1 > src/a.txt && echo 1 > src/b.txt && echo 1 > src2/c.txt && echo 1 > \"d e/f g.txt\" && echo 1 > é.txt && echo 1 > top.txt && echo 1 > other.txt && echo 1 > wi/r.md && echo 1 > .claude/state/lock && git add src src2 \"d e\" é.txt top.txt other.txt wi .claude && git -c commit.gpgsign=false commit -qm base && git branch base && echo 2 > src/a.txt && echo 2 > \"d e/f g.txt\" && echo 2 > é.txt && echo 2 > top.txt && git add -u && git -c commit.gpgsign=false commit -qm change && git mv top.txt moved.txt; if [ \"$PRIOR_GATES\" -ge 1 ]; then",
+    "why": "a rename whose old path is a changed file",
+    "correct": "reject",
+    "direction": "hostile",
+    "fixture": {
+      "env": {
+        "PRIOR_GATES": "1",
+        "WORK_ITEM_DIR": "wi",
+        "BASE": "base",
+        "DIFF_FILE": "out.diff",
+        "LATEST_GATE": "",
+        "SAFETY_REPROBE": "false"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: uncommitted changes outside the work item — commit the fix before re-review (the scope reads committed history):\nR  moved.txt\n"
+    }
+  },
+  {
+    "id": "h.base-unset",
+    "sink": "filename",
+    "input": "git init -q . && git config user.email a@b.c && git config user.name n && mkdir -p wi src src2 \"d e\" .claude/state && echo 1 > src/a.txt && echo 1 > src/b.txt && echo 1 > src2/c.txt && echo 1 > \"d e/f g.txt\" && echo 1 > é.txt && echo 1 > top.txt && echo 1 > other.txt && echo 1 > wi/r.md && echo 1 > .claude/state/lock && git add src src2 \"d e\" é.txt top.txt other.txt wi .claude && git -c commit.gpgsign=false commit -qm base && git branch base && echo 2 > src/a.txt && echo 2 > \"d e/f g.txt\" && echo 2 > é.txt && echo 2 > top.txt && git add -u && git -c commit.gpgsign=false commit -qm change && echo 3 > other.txt; if [ \"$PRIOR_GATES\" -ge 1 ]; then",
+    "why": "an unlistable change set falls back to halting on every tracked edit",
+    "correct": "reject",
+    "direction": "hostile",
+    "fixture": {
+      "env": {
+        "PRIOR_GATES": "1",
+        "WORK_ITEM_DIR": "wi",
+        "BASE": "",
+        "DIFF_FILE": "out.diff",
+        "LATEST_GATE": "",
+        "SAFETY_REPROBE": "false"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: uncommitted changes outside the work item — commit the fix before re-review (the scope reads committed history):\n M other.txt\n"
+    }
+  },
+  {
+    "id": "h.work-item-unbound",
+    "sink": "filename",
+    "input": "git init -q . && git config user.email a@b.c && git config user.name n && mkdir -p wi src src2 \"d e\" .claude/state && echo 1 > src/a.txt && echo 1 > src/b.txt && echo 1 > src2/c.txt && echo 1 > \"d e/f g.txt\" && echo 1 > é.txt && echo 1 > top.txt && echo 1 > other.txt && echo 1 > wi/r.md && echo 1 > .claude/state/lock && git add src src2 \"d e\" é.txt top.txt other.txt wi .claude && git -c commit.gpgsign=false commit -qm base && git branch base && echo 2 > src/a.txt && echo 2 > \"d e/f g.txt\" && echo 2 > é.txt && echo 2 > top.txt && git add -u && git -c commit.gpgsign=false commit -qm change; if [ \"$PRIOR_GATES\" -ge 1 ]; then",
+    "why": "an unbound WORK_ITEM_DIR",
+    "correct": "reject",
+    "direction": "hostile",
+    "fixture": {
+      "env": {
+        "PRIOR_GATES": "1",
+        "WORK_ITEM_DIR": "",
+        "BASE": "base",
+        "DIFF_FILE": "out.diff",
+        "LATEST_GATE": "",
+        "SAFETY_REPROBE": "false"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: WORK_ITEM_DIR ('') is not a work-item directory below the repository root — bind it in this shell\n"
+    }
+  },
+  {
+    "id": "l.clean-tree",
+    "sink": "filename",
+    "input": "git init -q . && git config user.email a@b.c && git config user.name n && mkdir -p wi src src2 \"d e\" .claude/state && echo 1 > src/a.txt && echo 1 > src/b.txt && echo 1 > src2/c.txt && echo 1 > \"d e/f g.txt\" && echo 1 > é.txt && echo 1 > top.txt && echo 1 > other.txt && echo 1 > wi/r.md && echo 1 > .claude/state/lock && git add src src2 \"d e\" é.txt top.txt other.txt wi .claude && git -c commit.gpgsign=false commit -qm base && git branch base && echo 2 > src/a.txt && echo 2 > \"d e/f g.txt\" && echo 2 > é.txt && echo 2 > top.txt && git add -u && git -c commit.gpgsign=false commit -qm change; if [ \"$PRIOR_GATES\" -ge 1 ]; then",
+    "why": "nothing uncommitted",
+    "correct": "accept",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {
+        "PRIOR_GATES": "1",
+        "WORK_ITEM_DIR": "wi",
+        "BASE": "base",
+        "DIFF_FILE": "out.diff",
+        "LATEST_GATE": "",
+        "SAFETY_REPROBE": "false"
+      }
+    }
+  },
+  {
+    "id": "l.unrelated-tracked-edit",
+    "sink": "filename",
+    "input": "git init -q . && git config user.email a@b.c && git config user.name n && mkdir -p wi src src2 \"d e\" .claude/state && echo 1 > src/a.txt && echo 1 > src/b.txt && echo 1 > src2/c.txt && echo 1 > \"d e/f g.txt\" && echo 1 > é.txt && echo 1 > top.txt && echo 1 > other.txt && echo 1 > wi/r.md && echo 1 > .claude/state/lock && git add src src2 \"d e\" é.txt top.txt other.txt wi .claude && git -c commit.gpgsign=false commit -qm base && git branch base && echo 2 > src/a.txt && echo 2 > \"d e/f g.txt\" && echo 2 > é.txt && echo 2 > top.txt && git add -u && git -c commit.gpgsign=false commit -qm change && echo 3 > other.txt; if [ \"$PRIOR_GATES\" -ge 1 ]; then",
+    "why": "a tracked edit outside the change set only warns",
+    "correct": "accept",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {
+        "PRIOR_GATES": "1",
+        "WORK_ITEM_DIR": "wi",
+        "BASE": "base",
+        "DIFF_FILE": "out.diff",
+        "LATEST_GATE": "",
+        "SAFETY_REPROBE": "false"
+      }
+    }
+  },
+  {
+    "id": "l.dir-prefix-not-dirname",
+    "sink": "filename",
+    "input": "git init -q . && git config user.email a@b.c && git config user.name n && mkdir -p wi src src2 \"d e\" .claude/state && echo 1 > src/a.txt && echo 1 > src/b.txt && echo 1 > src2/c.txt && echo 1 > \"d e/f g.txt\" && echo 1 > é.txt && echo 1 > top.txt && echo 1 > other.txt && echo 1 > wi/r.md && echo 1 > .claude/state/lock && git add src src2 \"d e\" é.txt top.txt other.txt wi .claude && git -c commit.gpgsign=false commit -qm base && git branch base && echo 2 > src/a.txt && echo 2 > \"d e/f g.txt\" && echo 2 > é.txt && echo 2 > top.txt && git add -u && git -c commit.gpgsign=false commit -qm change && echo 3 > src2/c.txt; if [ \"$PRIOR_GATES\" -ge 1 ]; then",
+    "why": "a directory sharing a name prefix with a changed directory is not that directory",
+    "correct": "accept",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {
+        "PRIOR_GATES": "1",
+        "WORK_ITEM_DIR": "wi",
+        "BASE": "base",
+        "DIFF_FILE": "out.diff",
+        "LATEST_GATE": "",
+        "SAFETY_REPROBE": "false"
+      }
+    }
+  },
+  {
+    "id": "l.work-item-edit",
+    "sink": "filename",
+    "input": "git init -q . && git config user.email a@b.c && git config user.name n && mkdir -p wi src src2 \"d e\" .claude/state && echo 1 > src/a.txt && echo 1 > src/b.txt && echo 1 > src2/c.txt && echo 1 > \"d e/f g.txt\" && echo 1 > é.txt && echo 1 > top.txt && echo 1 > other.txt && echo 1 > wi/r.md && echo 1 > .claude/state/lock && git add src src2 \"d e\" é.txt top.txt other.txt wi .claude && git -c commit.gpgsign=false commit -qm base && git branch base && echo 2 > src/a.txt && echo 2 > \"d e/f g.txt\" && echo 2 > é.txt && echo 2 > top.txt && git add -u && git -c commit.gpgsign=false commit -qm change && echo 3 > wi/r.md; if [ \"$PRIOR_GATES\" -ge 1 ]; then",
+    "why": "the work item directory is excluded",
+    "correct": "accept",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {
+        "PRIOR_GATES": "1",
+        "WORK_ITEM_DIR": "wi",
+        "BASE": "base",
+        "DIFF_FILE": "out.diff",
+        "LATEST_GATE": "",
+        "SAFETY_REPROBE": "false"
+      }
+    }
+  },
+  {
+    "id": "l.pipeline-scratch",
+    "sink": "filename",
+    "input": "git init -q . && git config user.email a@b.c && git config user.name n && mkdir -p wi src src2 \"d e\" .claude/state && echo 1 > src/a.txt && echo 1 > src/b.txt && echo 1 > src2/c.txt && echo 1 > \"d e/f g.txt\" && echo 1 > é.txt && echo 1 > top.txt && echo 1 > other.txt && echo 1 > wi/r.md && echo 1 > .claude/state/lock && git add src src2 \"d e\" é.txt top.txt other.txt wi .claude && git -c commit.gpgsign=false commit -qm base && git branch base && echo 2 > src/a.txt && echo 2 > \"d e/f g.txt\" && echo 2 > é.txt && echo 2 > top.txt && git add -u && git -c commit.gpgsign=false commit -qm change && echo 3 > .claude/state/lock; if [ \"$PRIOR_GATES\" -ge 1 ]; then",
+    "why": "pipeline scratch is excluded",
+    "correct": "accept",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {
+        "PRIOR_GATES": "1",
+        "WORK_ITEM_DIR": "wi",
+        "BASE": "base",
+        "DIFF_FILE": "out.diff",
+        "LATEST_GATE": "",
+        "SAFETY_REPROBE": "false"
+      }
+    }
+  },
+  {
+    "id": "l.untracked-only",
+    "sink": "filename",
+    "input": "git init -q . && git config user.email a@b.c && git config user.name n && mkdir -p wi src src2 \"d e\" .claude/state && echo 1 > src/a.txt && echo 1 > src/b.txt && echo 1 > src2/c.txt && echo 1 > \"d e/f g.txt\" && echo 1 > é.txt && echo 1 > top.txt && echo 1 > other.txt && echo 1 > wi/r.md && echo 1 > .claude/state/lock && git add src src2 \"d e\" é.txt top.txt other.txt wi .claude && git -c commit.gpgsign=false commit -qm base && git branch base && echo 2 > src/a.txt && echo 2 > \"d e/f g.txt\" && echo 2 > é.txt && echo 2 > top.txt && git add -u && git -c commit.gpgsign=false commit -qm change && echo x > new.txt; if [ \"$PRIOR_GATES\" -ge 1 ]; then",
+    "why": "an untracked file only warns",
+    "correct": "accept",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {
+        "PRIOR_GATES": "1",
+        "WORK_ITEM_DIR": "wi",
+        "BASE": "base",
+        "DIFF_FILE": "out.diff",
+        "LATEST_GATE": "",
+        "SAFETY_REPROBE": "false"
+      }
+    }
+  }
+]

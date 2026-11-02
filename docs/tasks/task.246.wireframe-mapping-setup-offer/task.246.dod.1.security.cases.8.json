@@ -1,0 +1,272 @@
+[
+  {
+    "id": "bool",
+    "input": "probe",
+    "direction": "hostile",
+    "why": "A recorded decline missed means the offer fires again.",
+    "correct": "state declined.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: false\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "{\"reason\":\"ok\",\"state\":\"declined\"}\n"
+    }
+  },
+  {
+    "id": "off",
+    "input": "probe",
+    "direction": "hostile",
+    "why": "off is a decline.",
+    "correct": "state declined.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: off\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "{\"reason\":\"ok\",\"state\":\"declined\"}\n"
+    }
+  },
+  {
+    "id": "upper-off",
+    "input": "probe",
+    "direction": "hostile",
+    "why": "Any case.",
+    "correct": "state declined.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: OFF\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "{\"reason\":\"ok\",\"state\":\"declined\"}\n"
+    }
+  },
+  {
+    "id": "title-false",
+    "input": "probe",
+    "direction": "hostile",
+    "why": "yaml-subset reads False as a string; isDecline must fold it (bug.4).",
+    "correct": "state declined.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: False\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "{\"reason\":\"ok\",\"state\":\"declined\"}\n"
+    }
+  },
+  {
+    "id": "dq-false",
+    "input": "probe",
+    "direction": "hostile",
+    "why": "Quoted or not.",
+    "correct": "state declined.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: \"false\"\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "{\"reason\":\"ok\",\"state\":\"declined\"}\n"
+    }
+  },
+  {
+    "id": "sq-off",
+    "input": "probe",
+    "direction": "hostile",
+    "why": "Single-quoted, title case.",
+    "correct": "state declined.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: 'Off'\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "{\"reason\":\"ok\",\"state\":\"declined\"}\n"
+    }
+  },
+  {
+    "id": "padded-quoted",
+    "input": "probe",
+    "direction": "hostile",
+    "why": "Quoted with inner spaces.",
+    "correct": "state declined.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: \" off \"\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "{\"reason\":\"ok\",\"state\":\"declined\"}\n"
+    }
+  },
+  {
+    "id": "trailing-comment",
+    "input": "probe",
+    "direction": "hostile",
+    "why": "A comment after the value.",
+    "correct": "state declined.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: false # never ask again\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "{\"reason\":\"ok\",\"state\":\"declined\"}\n"
+    }
+  },
+  {
+    "id": "crlf",
+    "input": "probe",
+    "direction": "hostile",
+    "why": "Windows line endings.",
+    "correct": "state declined.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\r\n  wireframeMap: false\r\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "{\"reason\":\"ok\",\"state\":\"declined\"}\n"
+    }
+  },
+  {
+    "id": "bom",
+    "input": "probe",
+    "direction": "hostile",
+    "why": "A byte-order mark on line 1.",
+    "correct": "state declined.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "﻿ui:\n  wireframeMap: false\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "{\"reason\":\"ok\",\"state\":\"declined\"}\n"
+    }
+  },
+  {
+    "id": "tab-indent",
+    "input": "probe",
+    "direction": "hostile",
+    "why": "Tab indentation.",
+    "correct": "state declined.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n\twireframeMap: false\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "{\"reason\":\"ok\",\"state\":\"declined\"}\n"
+    }
+  },
+  {
+    "id": "among-keys",
+    "input": "probe",
+    "direction": "hostile",
+    "why": "A decline beside other ui keys must win over partial.",
+    "correct": "state declined.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  componentBarrel: src/c/index.ts\n  componentCatalogue: docs/c.md\n  wireframeMap: off\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "{\"reason\":\"ok\",\"state\":\"declined\"}\n"
+    }
+  },
+  {
+    "id": "offline",
+    "input": "probe",
+    "direction": "legitimate",
+    "why": "The task's control: a path is not a decline.",
+    "correct": "state configured.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: offline.md\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "{\"reason\":\"ok\",\"state\":\"configured\"}\n"
+    }
+  },
+  {
+    "id": "false-path",
+    "input": "probe",
+    "direction": "legitimate",
+    "why": "Contains the word.",
+    "correct": "state configured.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/false.md\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "{\"reason\":\"ok\",\"state\":\"configured\"}\n"
+    }
+  },
+  {
+    "id": "comment-false",
+    "input": "probe",
+    "direction": "legitimate",
+    "why": "The word only in a comment.",
+    "correct": "state configured.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "ui:\n  wireframeMap: docs/m.md # false\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "{\"reason\":\"ok\",\"state\":\"configured\"}\n"
+    }
+  },
+  {
+    "id": "other-block",
+    "input": "probe",
+    "direction": "legitimate",
+    "why": "A decline under another top-level key is not ui's.",
+    "correct": "state configured.",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "other:\n  wireframeMap: false\nui:\n  wireframeMap: docs/m.md\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "{\"reason\":\"ok\",\"state\":\"configured\"}\n"
+    }
+  },
+  {
+    "id": "no-config-read-only",
+    "input": "probe",
+    "direction": "legitimate",
+    "why": "detect is read-only: no config means unset/nothing-found, and no file is created.",
+    "correct": "nothing-found, unset, nothing written.",
+    "expected": {
+      "exit": 0,
+      "stdout": "{\"reason\":\"nothing-found\",\"state\":\"unset\",\"proposal\":null}\n",
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  }
+]

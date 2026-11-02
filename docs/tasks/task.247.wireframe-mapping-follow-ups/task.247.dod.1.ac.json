@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "78cb112c6af3470150925b489ee6c6c1380c00ee",
+  "dirty_paths": [
+    "docs/tasks/task.247.wireframe-mapping-follow-ups/task.247.implementation.1.wireframe-mapping-pipeline-test-scope.md",
+    "docs/tasks/task.247.wireframe-mapping-follow-ups/task.247.pr-review.1.wireframe-mapping-pipeline-test-scope.md"
+  ],
+  "document": "docs/tasks/task.247.wireframe-mapping-follow-ups/task.247.wireframe-mapping-follow-ups.md",
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 6,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "61dab7f69bd349a689a91134b1f72619375006b3c417a1b423d461d25caec10c",
+      "status": "PASS",
+      "description": "Test \\\"no develop pipeline step calls detect or configure\\\" in `evals/shared/tests/wireframe-mapping-hooks.test.mjs` covers skill-local step docs under `skills/develop-*/references/` that lack the `<!-- AUTO-GENERATED` banner.",
+      "code_citation": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:145-169",
+      "test_citation": "evals/shared/tests/wireframe-mapping-hooks.test.mjs:145-171",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The test enumerates developSkills and scans each skills/${s}/references/ for develop-*.md files lacking <!-- AUTO-GENERATED, asserts skill-local step docs are found, and verifies no developSetupCalls exist."
+    },
+    {
+      "id": "#2",
+      "text_hash": "fd5f44663b91f0f691a09e5ad36cfa4afc7a5ebb253fd5512a95f834bd0f9fbf",
+      "status": "PASS",
+      "description": "The success criterion in `docs/tasks/task.246.wireframe-mapping-setup-offer/task.246.wireframe-mapping-setup-offer.md` § 9 is updated to name skill-local step docs.",
+      "code_citation": "docs/tasks/task.246.wireframe-mapping-setup-offer/task.246.wireframe-mapping-setup-offer.md:525-528",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Criterion in task.246 § 9 was updated to cite 'skill-local step docs under skills/develop-*/references/ (task.247)'."
+    },
+    {
+      "id": "#3",
+      "text_hash": "d2668796a2522310dd5e0d368f0ff013c33e442f5a1971269b6fe20a4cd6d6f3",
+      "status": "PASS",
+      "description": "Fix is verified with mutation proof (seeing the test turn red upon fault injection and green upon restore).",
+      "code_citation": "docs/tasks/task.247.wireframe-mapping-follow-ups/task.247.qa.1.wireframe-mapping-pipeline-test-scope.md:56",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Mutation fault injection verified on skills/develop-bug/references/develop-bug-step-0-resolve-bug.md (recorded in QA report and PR review report line 39)."
+    },
+    {
+      "id": "#4",
+      "text_hash": "c0437beff7c3add404bde7fe551940303ac9b9a88b685217fb17d88266eb8437",
+      "status": "PASS",
+      "description": "`npm run ci:fast` passes with 0 failures.",
+      "code_citation": "docs/tasks/task.247.wireframe-mapping-follow-ups/task.247.qa.1.wireframe-mapping-pipeline-test-scope.md:57",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "QA report and gate record npm run ci:fast passed with 6,876 tests passing and 0 failures."
+    },
+    {
+      "id": "#5",
+      "text_hash": "34dec6a8d7213e0b5c5ffdcdd488c2b6f7edd195ffb472fbe3111be82af4ec8b",
+      "status": "PASS",
+      "description": "Prettier formatting is verified on all modified files.",
+      "code_citation": "docs/tasks/task.247.wireframe-mapping-follow-ups/task.247.qa.1.wireframe-mapping-pipeline-test-scope.md:58",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Prettier check verified on all modified files as recorded in QA report and implementation report."
+    },
+    {
+      "id": "#6",
+      "text_hash": "5e1a5c1f4a917d42412ab65c0e943b55cbeab0fe0bd89059b876c5bfd3506cd0",
+      "status": "PASS",
+      "description": "`CHANGELOG.md` under `[Unreleased]` documents the widened test coverage.",
+      "code_citation": "CHANGELOG.md:35-39",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "CHANGELOG.md under [Unreleased] > Changed documents develop pipeline wireframe mapping ban test widened to skill-local step docs (task 247)."
+    }
+  ],
+  "advisories": []
+}

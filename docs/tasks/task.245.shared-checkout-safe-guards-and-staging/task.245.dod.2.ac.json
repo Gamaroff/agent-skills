@@ -1,0 +1,221 @@
+{
+  "schema": 1,
+  "dod_n": 2,
+  "head": "4de1202472245e6d92fd643de3d955ea805378c4",
+  "dirty_paths": [
+    "docs/tasks/task.245.shared-checkout-safe-guards-and-staging/task.245.gate.6.shared-checkout-safe-guards-and-staging.yml",
+    "docs/tasks/task.245.shared-checkout-safe-guards-and-staging/task.245.gate.7.shared-checkout-safe-guards-and-staging.yml",
+    "docs/tasks/task.245.shared-checkout-safe-guards-and-staging/task.245.pr-review.1.shared-checkout-safe-guards-and-staging.md",
+    "docs/tasks/task.245.shared-checkout-safe-guards-and-staging/task.245.qa.6.shared-checkout-safe-guards-and-staging.md",
+    "docs/tasks/task.245.shared-checkout-safe-guards-and-staging/task.245.qa.7.shared-checkout-safe-guards-and-staging.md",
+    "docs/tasks/task.245.shared-checkout-safe-guards-and-staging/task.245.shared-checkout-safe-guards-and-staging.md"
+  ],
+  "document": "docs/tasks/task.245.shared-checkout-safe-guards-and-staging/task.245.shared-checkout-safe-guards-and-staging.md",
+  "scope": {
+    "mode": "scoped",
+    "reason": "prior-record",
+    "rejudged": 8,
+    "carried": 7
+  },
+  "criteria": [
+    {
+      "id": "SC-1",
+      "text_hash": "6b883f307711937b78862852d70cf73419a60b31cbfed7ab8dd1b6d13c592fb7",
+      "status": "PASS",
+      "description": "--stage leaves only the document's row staged; unrelated uncommitted row stays unstaged",
+      "code_citation": "shared/resources/registry-tick.js:1185",
+      "test_citation": "shared/resources/tests/registry-tick.test.mjs:2163",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "SC-2",
+      "text_hash": "0ad79057dfe1f9a0bd3b6f2f690b5220a99e4d70216f23d85023cf5bfb42413e",
+      "status": "PASS",
+      "description": "--stage finds the row by id when the index has fewer rows than the working file",
+      "code_citation": "shared/resources/registry-tick.js:1185",
+      "test_citation": "shared/resources/tests/registry-tick.test.mjs:2183",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "SC-3",
+      "text_hash": "fe5b74177edf4edaedd067bc956a2653ae963824f0e2bc12ce968bf9906e401b",
+      "status": "PASS",
+      "description": "every stageReason other than staged/already-staged exits 0",
+      "code_citation": "shared/resources/registry-tick.js:168",
+      "test_citation": "shared/resources/tests/registry-tick.test.mjs:2233",
+      "members": [
+        "{ member: \"row-not-in-index\", evidence: \"shared/resources/tests/registry-tick.test.mjs:2233\", status: PASS }",
+        "{ member: \"not-tracked\", evidence: \"shared/resources/tests/registry-tick.test.mjs:2254\", status: PASS }",
+        "{ member: \"not-a-repo\", evidence: \"shared/resources/tests/registry-tick.test.mjs:2254\", status: PASS }",
+        "{ member: \"not-attempted\", evidence: \"shared/resources/tests/registry-tick.test.mjs:2330\", status: PASS }",
+        "{ member: \"unmerged\", evidence: \"shared/resources/tests/registry-tick.test.mjs:2428\", status: PASS }"
+      ],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "SC-4",
+      "text_hash": "45f59dd136c81a0f3dab833ad92bbe0df42f5a6ad84179da1d6325f7218f2fd0",
+      "status": "PASS",
+      "description": "finalise 6a has no whole-file registry add; parallel row not committed",
+      "code_citation": "skills/finalise/SKILL.md:1634",
+      "test_citation": "shared/resources/tests/finalise-6a-registry-staging.test.mjs:162",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The test executes the 6a block under bash and zsh. A control test (:204) shows the parallel row rides in when the whole-file add is restored, and a shape test at :224 checks the block carries no whole-file add."
+    },
+    {
+      "id": "SC-5",
+      "text_hash": "ca30e0672af81ea0407b1d989f8731f340b4bbd584884313ad7f91686a69a75c",
+      "status": "PASS",
+      "description": "develop-next/develop-batch commit the --annotate row with --stage; resume reads the index",
+      "code_citation": "skills/develop-next/SKILL.md:603",
+      "test_citation": "evals/develop-batch/protocol/skill-shape.test.mjs:436",
+      "members": [],
+      "non_member_fail": null,
+      "note": "develop-batch prose is at skills/develop-batch/SKILL.md:643. The resume index check for develop-next is pinned at evals/develop-next/protocol/skill-shape.test.mjs:385. The evidence is prose-shape assertions; the executed staging behaviour is covered by the SC-1 tests."
+    },
+    {
+      "id": "SC-6",
+      "text_hash": "21c8050733864d7c0b29f01a01a40b64c088aa9818845b6bea0c825dae16982f",
+      "status": "PASS",
+      "description": "re-review with dirty tracked file outside change set warns and continues",
+      "code_citation": "shared/resources/qa-re-review-scope.md:222",
+      "test_citation": "shared/resources/tests/qa-scope-from-head.test.mjs:784",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Test M1 runs the block under bash and zsh. Test M6 (:827) covers the exact-dirname rule."
+    },
+    {
+      "id": "SC-7",
+      "text_hash": "7b7f64ce5d0433c8e0fa2033ee7993ad9765939e6951d9b598578a9c23536489",
+      "status": "PASS",
+      "description": "dirty tracked file in change set or beside a changed file HALTs",
+      "code_citation": "shared/resources/qa-re-review-scope.md:229",
+      "test_citation": "shared/resources/tests/qa-scope-from-head.test.mjs:798",
+      "members": [],
+      "non_member_fail": null,
+      "note": "M2 is the beside-a-changed-file case. M7 (:840) covers quoted paths."
+    },
+    {
+      "id": "SC-8",
+      "text_hash": "fe0a6125c8083797067d10d7568803e8959b16a5f0331326e3f6e387a28d8525",
+      "status": "PASS",
+      "description": "unlistable $BASE...HEAD makes every tracked dirt HALT",
+      "code_citation": "shared/resources/qa-re-review-scope.md:225",
+      "test_citation": "shared/resources/tests/qa-scope-from-head.test.mjs:808",
+      "members": [],
+      "non_member_fail": null,
+      "note": "M3 covers an unlistable base; M4 (:819) covers an unbound BASE."
+    },
+    {
+      "id": "SC-9",
+      "text_hash": "ea002b26493d45fd37dd09a80cb1d5fa06cf7c6de767f2f018adb7ab5e9fb6fe",
+      "status": "PASS",
+      "description": "npm test wall time within 5% of develop",
+      "code_citation": "docs/tasks/task.245.shared-checkout-safe-guards-and-staging/task.245.implementation.1.shared-checkout-safe-guards-and-staging-initial-run.md:67",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Committed line 67 records the alternating npm test A/B on code head 529a3bc9 vs base 2471b6a8: base mean 80.1 s, head mean 80.5 s, +0.6%, load averages recorded. HEAD 4de12024 is docs-only on top of 529a3bc9."
+    },
+    {
+      "id": "SC-10",
+      "text_hash": "ec99249c6f707297f32a4b062e4b5daa8b522bb10a98bc95d7d909f464ef5aa6",
+      "status": "PASS",
+      "description": "--stage adds no network call",
+      "code_citation": "shared/resources/registry-tick.js:170",
+      "test_citation": "shared/resources/tests/registry-tick.test.mjs:2387",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "SC-11",
+      "text_hash": "6ebb0605a97024e30444739f9138676b59ac2eb03693d9284f814f730978b507",
+      "status": "PASS",
+      "description": "each mutation proof in section 8 goes red with its fix reverted, recorded in implementation report",
+      "code_citation": "docs/tasks/task.245.shared-checkout-safe-guards-and-staging/task.245.implementation.1.shared-checkout-safe-guards-and-staging-initial-run.md:64",
+      "test_citation": "shared/resources/tests/registry-tick.test.mjs:2183",
+      "members": [
+        "{ member: \"restore whole-file registry add in 6a harness: parallel-row case fails\", evidence: \"shared/resources/tests/finalise-6a-registry-staging.test.mjs:204\", status: PASS }",
+        "{ member: \"stage by line number: fewer-rows-in-index case fails\", evidence: \"shared/resources/tests/registry-tick.test.mjs:2183\", status: PASS }",
+        "{ member: \"warn-on-everything: L4 and L11 fail\", evidence: \"shared/resources/tests/qa-scope-from-head.test.mjs:765\", status: PASS }",
+        "{ member: \"prefix match instead of exact dirname: outside-the-change-set case fails\", evidence: \"shared/resources/tests/qa-scope-from-head.test.mjs:827\", status: PASS }"
+      ],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "SC-12",
+      "text_hash": "3b44ee6331dc04acec5037a8f7bf30f8adeb2b7f4e965ffa5abf5f6b8b4d4e8d",
+      "status": "PASS",
+      "description": "npm run ci passes; bundle:check clean; test E holds three copies equal",
+      "code_citation": "package.json:24",
+      "test_citation": "shared/resources/tests/qa-scope-from-head.test.mjs:296",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Test E passes in the ci-fast-c4 log. The format:check and npm test legs are green: 6896 pass, 0 fail. The eval:all, validate:all, bundle:check and lint legs have no committed or current record (see advisories)."
+    },
+    {
+      "id": "SC-13",
+      "text_hash": "a7b5dc632434d2d1b30f3cd7ddbc84df632586086c8f27eb4dab9832740523b0",
+      "status": "PASS",
+      "description": "npm run validate passes over finalise, develop-next, develop-batch, qa-task, qa-story",
+      "code_citation": "docs/tasks/task.245.shared-checkout-safe-guards-and-staging/task.245.implementation.1.shared-checkout-safe-guards-and-staging-initial-run.md:69",
+      "test_citation": "tests/skill-frontmatter.test.js:66",
+      "members": [
+        "{ member: \"skills/finalise/\", evidence: \"report:69; re-run at HEAD exit 0\", status: PASS }",
+        "{ member: \"skills/develop-next/\", evidence: \"report:69; re-run at HEAD exit 0\", status: PASS }",
+        "{ member: \"skills/develop-batch/\", evidence: \"report:69; re-run at HEAD exit 0\", status: PASS }",
+        "{ member: \"skills/qa-task/\", evidence: \"report:69; re-run at HEAD exit 0\", status: PASS }",
+        "{ member: \"skills/qa-story/\", evidence: \"report:69; re-run at HEAD exit 0\", status: PASS }"
+      ],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "SC-14",
+      "text_hash": "aa7ad462c53fc3a5e0fbf823879770a7481e20815b5c1e3541cd7f383620897d",
+      "status": "PASS",
+      "description": "CHANGELOG entry cites (task 245)",
+      "code_citation": "CHANGELOG.md:35",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The line is the Changed entry headed 'Registry commits and the QA re-review stop sweeping up a parallel session's edits (task 245).' and describes the --stage change."
+    },
+    {
+      "id": "SC-15",
+      "text_hash": "89f9d7772fc3ab8736e7d4c76a492096ba9c331f16d4bfa219d292653f980dcd",
+      "status": "PASS",
+      "description": "every doc the Phase 4 greps return is updated or listed as unaffected in implementation report",
+      "code_citation": "docs/tasks/task.245.shared-checkout-safe-guards-and-staging/task.245.implementation.1.shared-checkout-safe-guards-and-staging-initial-run.md:70",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [
+        "{ member: \"grep 'uncommitted changes outside the work item' results\", evidence: \"report:70\", status: PASS }",
+        "{ member: \"grep 'git add docs/tasks/task-registry.md' results\", evidence: \"report:70\", status: PASS }"
+      ],
+      "non_member_fail": null,
+      "note": null
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "SC-13",
+      "note": "The criterion text names a single multi-directory validate call the validator cannot run; the per-skill runs pass. Consider amending the criterion wording."
+    },
+    {
+      "ac_id": "SC-12",
+      "note": "Carried. The eval:all, validate:all, check:generated, bundle:check and lint:shell legs have no committed current-head log; CI supplies it."
+    },
+    {
+      "ac_id": "SC-9",
+      "note": "Measured on code head 529a3bc9; PR head 4de12024 is docs-only. The base worktree showed 2 known scratch-checkout failures."
+    }
+  ]
+}

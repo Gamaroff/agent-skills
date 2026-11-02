@@ -356,6 +356,24 @@ test("scope: a criterion added → new-criterion; reworded → criterion-changed
   }
 });
 
+test("scope: a CI-state entry (resolved PASS or still deferred) → ci-state, never carried (task 249)", () => {
+  const dir = mkRepo();
+  try {
+    const a = git(dir, "rev-parse", "HEAD");
+    const prior = record(dir, a, {
+      "SC-1": { ci_reading: `CI reading 1: SUCCESS @ ${a}` },
+      "SC-2": { status: eng.DEFERRED_CI },
+    });
+    commit(dir, { "README.md": "unrelated\n" });
+    const s = scopeAt(dir, prior);
+    assert.equal(reasonOf(s, "SC-1"), "ci-state");
+    assert.equal(reasonOf(s, "SC-2"), "ci-state");
+    assert.equal(reasonOf(s, "SC-3"), "unchanged");
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test("scope: a FAIL is a reported-gap", () => {
   const dir = mkRepo();
   try {
@@ -1722,6 +1740,13 @@ test("computeOverall: PASS, PARTIAL and FAIL", () => {
     eng.computeOverall([{ status: "PASS" }], [{ status: "FAIL" }]),
     "PARTIAL",
   );
+  // task 249: an unresolved DEFERRED-CI criterion is not met. The full set of
+  // DEFERRED-CI readers is held in finalise-deferred-ci.test.mjs.
+  assert.equal(
+    eng.computeOverall([{ status: "PASS" }, { status: eng.DEFERRED_CI }], []),
+    "PARTIAL",
+  );
+  assert.equal(eng.computeOverall([{ status: eng.DEFERRED_CI }], []), "FAIL");
   // CR-6: no criterion verdict at all is not "every criterion passed".
   assert.equal(eng.computeOverall([], []), "NEEDS_MANUAL_REVIEW");
   assert.equal(

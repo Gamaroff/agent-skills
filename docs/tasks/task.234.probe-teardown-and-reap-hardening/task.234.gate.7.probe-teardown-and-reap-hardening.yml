@@ -1,0 +1,58 @@
+schema: 2
+task: 'task.234.probe-teardown-and-reap-hardening'
+task_title: 'Probe sandbox teardown and process-group reap'
+gate: PASS
+status_reason: 'QA-11 and QA-12 hold: CI is green on f9040a87 (all six checks), the ci-tool-skips guard under CI=true lists no stand-in, and both leash tests go red when the leash is skipped. The scoped review found one low cleanup, carried to recommendations.future.'
+reviewer: 'QA Engineer'
+head: 'f9040a87523f6d7b1ef431ca2529c52939ef7cce'
+updated: '2026-10-31T13:08:17Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 11
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false. The leash keeps the case out of its own watcher: absolute host PATH only, fixed leash environment, argv0 preserved.'
+  performance:
+    status: PASS
+    notes: 'The leash adds about 7-10% wall time to the pre-existing probe tests, recorded against the performance criterion.'
+  reliability:
+    status: PASS
+    notes: 'CI Test (Node 22) green on f9040a87; locally 274/274 on Node 22, ci:fast 6924/0.'
+  maintainability:
+    status: PASS
+    notes: 'Section 5 of probe-boundary-rule.md states the leash, its environment, its PATH rule and its cost.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'In leashUnderHostPath, `l.command === "/bin/sh"` cannot fail because the case command is also /bin/sh; only the args[0] check distinguishes leashed from unleashed. Drop it or replace it with a check that can fail (gate-7 reviewer CR-1, low).'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+    - action: 'reapGroup treats every EPERM as nothing left; EPERM is also returned when only unsignalable live members remain.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'The watcher keys on the case pid; a reused pid while spawnSync waits on a stdio-holding grandchild could kill that grandchild early.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'The QA-8 stderr assertion only bites where /bin/sh is bash (dash ignores SHELLOPTS).'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+    - action: 'Run the pipeline''s local fast gate with CI=true, or let tests/ci-tool-skips.test.js tolerate tools a test plants itself, so a CI-only guard is seen before push.'
+      refs: ['tests/ci-tool-skips.test.js']
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []

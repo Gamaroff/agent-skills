@@ -123,9 +123,11 @@ flowchart TD
     S5conv -- yes --> HALTCONV[HALT: not converging]
     S5conv -- no --> S5route{Route classifier<br/>classifyLoopRoute}
     S5route -- route 2 / 2b exit --> S5c
-    S5route -- fix --> S6[Step 6: qa-fix]
+    S5route -- fix --> S5bud{cycle &lt; QA_MAX_CYCLES?<br/>lock qa_max_cycles, default 5<br/>budget counts gates}
+    S5bud -- yes --> S6[Step 6: qa-fix]
+    S5bud -- "no: findings stay unfixed" --> HALTQA[HALT: QA loop limit reached]
     S5c --> S5cv{Verdict}
-    S5cv -- REQUEST CHANGES, or CONCERNS with open coverage<br/>commit only, push already spent --> S6
+    S5cv -- REQUEST CHANGES, or CONCERNS with open coverage<br/>commit only, push already spent --> S5bud
     S5cv -- APPROVE / CONCERNS, no open coverage --> S5cm[signal ready-for-merge] --> S7
     S6 --> S6chg{Code changed?}
     S6chg -- no --> HALTNOFIX[HALT: qa-fix made no changes]
@@ -133,13 +135,7 @@ flowchart TD
     S6commit --> S6poll[Post-fix tracker state poller subagent]
     S6poll --> S6prc{PR open?}
     S6prc -- merged/closed --> HALTPR[HALT: PR state diverged]
-    S6prc -- open --> S6cyc{cycle &lt; QA_MAX_CYCLES?<br/>lock qa_max_cycles, default 5}
-    S6cyc -- yes --> S5pre
-    S6cyc -- no --> S6half{Route 2c applies?<br/>cycle ≥ 3, last 5a fix ungated,<br/>HIGH 0, MEDIUM falling or 0}
-    S6half -- yes --> S5half[Half-cycle: 5a only, no 5b]
-    S5half -- no open entry --> S5c
-    S5half -- open entry --> HALTQA
-    S6half -- no --> HALTQA[HALT: QA loop limit reached]
+    S6prc -- open --> S5pre
     HALTQA -.->|"resume: Resume the QA loop with k more cycles<br/>grant-qa-cycles.sh"| S5pre
     HALTCONV -.->|"resume: Resume the QA loop with k more cycles<br/>grant-qa-cycles.sh re-enters at 5b"| S6
 
@@ -367,7 +363,7 @@ sequenceDiagram
         end
     end
 
-    alt cycle > QA_MAX_CYCLES without clearing 5c (after a route 2c half-cycle, when it applies)
+    alt cycle == QA_MAX_CYCLES and its gate (or 5c) still routes to a fix — escalate, findings unfixed
         H->>FS: write escalation entry<br/>(per-cycle summaries, root cause, next steps)
         H->>+CC: docs(story.{P}.{E}.{S}): implementation report — qa loop escalation
         CC-->>-H: hash

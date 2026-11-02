@@ -1,0 +1,121 @@
+[
+  {
+    "id": "lf-injects-key",
+    "input": "## Components\nwireframeMap: false",
+    "direction": "hostile",
+    "why": "A line feed writes a second key.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "crlf-injects-key",
+    "input": "## Components\r\nwireframeMap: false",
+    "direction": "hostile",
+    "why": "CRLF.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "u2028",
+    "input": "## Components wireframeMap: false",
+    "direction": "hostile",
+    "why": "U+2028.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "nel",
+    "input": "## ComponentswireframeMap: false",
+    "direction": "hostile",
+    "why": "NEL.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "double-quote",
+    "input": "## \"Components\"",
+    "direction": "hostile",
+    "why": "Cannot read back.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "backslash",
+    "input": "## Components\\",
+    "direction": "hostile",
+    "why": "Reads back doubled.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "tab",
+    "input": "##\tComponents",
+    "direction": "hostile",
+    "why": "Escaped as \\t.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "default",
+    "input": "## Components",
+    "direction": "legitimate",
+    "why": "The default heading; a leading # would be a comment unquoted.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "deep",
+    "input": "### UI kit: primitives",
+    "direction": "legitimate",
+    "why": "Colon-space in a heading is quoted.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "unicode",
+    "input": "## Composants d'écran",
+    "direction": "legitimate",
+    "why": "Non-ASCII and a single quote.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "astral",
+    "input": "## 😀 Components",
+    "direction": "legitimate",
+    "why": "Surrogate pair kept.",
+    "correct": "Accepted (exit 0)."
+  }
+]

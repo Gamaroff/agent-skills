@@ -517,26 +517,39 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
      and for nothing else** — every other answer, including a failed read, exits 1:
 
      ```bash
+     # RUN BACKGROUNDED (run_in_background) — never in the foreground, never under `timeout` (obs #94).
      # INPUT, re-bound in THIS block (a fresh shell has none): the rollup read above. Run from the item's
      # worktree: the engine judges the checked-out HEAD of its working directory and refuses any other.
      : "${CI_ROLLUP:?bind CI_ROLLUP from the rollup read above}"
      CI_TREE_EQ=""
      case "$CI_ROLLUP" in
        PENDING|NONE)
+         mkdir -p .claude/state
          if TE=$(command node .agents/skills/develop-batch/references/ci-tree-equivalence.js \
-                   --head-rollup "$CI_ROLLUP" --head "$(git rev-parse HEAD)" --pr <PR#> --json); then
+                   --head-rollup "$CI_ROLLUP" --head "$(git rev-parse HEAD)" --pr <PR#> --json \
+                   2> .claude/state/ci-tree-eq.log); then
            CI_TREE_EQ=$(printf '%s' "$TE" | jq -r '.greenSha[0:12] // empty')
            [ -n "$CI_TREE_EQ" ] && CI_ROLLUP=SUCCESS    # an empty sha stays PENDING: fail closed
          fi ;;
      esac
+     # The result, for the notification: the next block re-binds both from this line.
+     echo "CI_ROLLUP=$CI_ROLLUP CI_TREE_EQ=$CI_TREE_EQ"
      ```
 
-     **The engine is not always a quick check.** With `ci.docsOnly.checkCommand` configured, it runs
-     that command inside the call, and a test suite there can outlive the tool timeout. So either
-     re-sample the head's rollup once first and call the engine only if the head is still pending, or
-     run the block backgrounded with its output in a file (`> .claude/state/ci-tree-eq.log 2>&1`),
-     ending it with `echo "CI_TREE_EQ=$CI_TREE_EQ"`, and read that line on the notification — never
-     as a foreground call (obs #270).
+     **The engine is not always a quick check, so the block above is already the background form.**
+     With `ci.docsOnly.checkCommand` configured, the engine runs that command inside the call, and a
+     test suite there can outlive the tool timeout (obs #270). Run the block as a background command
+     and read its last line on the notification; the check's own output is in the worktree's
+     `.claude/state/ci-tree-eq.log`. The cheaper alternative is to re-sample the head's rollup once
+     first and run the block only if the head is still pending. A killed engine takes the check's
+     process group with it (obs #94), but a foreground call still loses the answer.
+
+     **Never run this block alongside `<qualityGateCommand>`. Run them one after the other: this
+     block first, the quality gate after its notification.** Both are full suites when
+     `checkCommand` is set, and two of them on one machine false-fail load-sensitive tests. The
+     engine then latches `check-failed` on a green ancestor, and the docs-only rule buys nothing: on
+     task.174 one test failed under the doubled load and passed 3 times out of 3 alone (obs #149).
+     Being backgrounded is what makes running both at once the easy mistake.
 
      When `CI_TREE_EQ` is set, the PR head's own CI has **not** finished and the reading is satisfied
      because every file changed since a green first-parent ancestor is documentation (per
@@ -640,12 +653,16 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
      ```
    - **`source: task-registry`** — no roadmap row, no roadmap Change Log row; Status is
      already `accepted` (finalise wrote it via `registry-tick.js`). Record the merge with
-     `node .agents/skills/develop-batch/references/registry-tick.js --annotate --file <doc>
+     `node .agents/skills/develop-batch/references/registry-tick.js --annotate --stage --file <doc>
      --pr <PR#> [--issue "<[#N](url)>"] --json` — additive (notes cell + `Issue` cell), never a
-     second Status writer. `annotated` → commit `docs(registry): record <id> — PR #<n> merged`
-     and push; `already` → `git diff --quiet HEAD -- docs/tasks/task-registry.md` first and commit
-     when dirty (a crash between the write and its commit leaves the row edited; the resume path
-     skips the dirty-tree check), then `git push origin <baseBranch>` once, regardless (a crash
+     second Status writer. `--stage` puts only this row in the index, so no `git add` of the
+     registry and no commit pathspec follows (obs #127, task 245): a parallel session's row in the
+     same file stays out. On `annotated` or `already`, a `stageReason` other than `staged` /
+     `already-staged` means the row is not in the index: log it verbatim, make no commit and do not mark `ticked: true`, as
+     `develop-next` does. `annotated` → commit `docs(registry): record <id> — PR #<n> merged`
+     (what is staged) and push; `already` → `git diff --cached --quiet HEAD -- docs/tasks/task-registry.md`
+     first and commit when the index differs (a crash between the write and its commit leaves the
+     row edited; the resume path skips the dirty-tree check), then `git push origin <baseBranch>` once, regardless (a crash
      between commit and push leaves the record local-only; the push is idempotent), then
      `ticked: true`; every other exit-0 reason (`no-row`, `row-malformed`,
      `no-registry`, `no-cell`, `not-accepted`, `not-a-task`, `engine-unavailable`) → log, no commit.
@@ -654,7 +671,9 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
 
      On non-ff rejection: `git pull --rebase origin <baseBranch>` once and retry; still
      rejected → **HALT** (the run state preserves `merged: true, ticked: false` for
-     recovery). Mark `ticked: true` on every arm.
+     recovery). Mark `ticked: true` on every arm that ended in a push or had nothing to write
+     (the `not-attempted` exits listed above, which carry no row to stage, and `bug-registry`),
+     never on an `annotated` / `already` result whose `stageReason` is another reason.
 
 The next item's rebase (step 1) then picks up this item's code **and** its tick. Merge +
 tick is serial by nature — the roadmap/Change Log edit is a guaranteed conflict point.

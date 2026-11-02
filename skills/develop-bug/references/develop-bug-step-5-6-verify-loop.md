@@ -15,6 +15,8 @@ Maintain a **fix cycle counter** starting at 1. Loop limit = **5 cycles** (`MAX_
 
 Each cycle = one **Verify** (5a) + one **Fix** (5b, only when Verify fails).
 
+**The budget counts verifies, and the loop always ends on one (task.244).** A fix runs only when a verify will follow within `MAX_ITER`: 5b is entered only when `N < MAX_ITER`. A verify that fails at `N == MAX_ITER` goes to **Loop Limit Escalation** with its failure unfixed — a fix at that point would land on a head no verify reads. At the default budget that is 5 verifies and at most 4 fixes.
+
 A PR exists from Step 4, so `/qa-fix` (which requires an active PR) applies cleanly in 5b.
 
 ### Signal the `in-qa` stage (when `TRACKER_ISSUE` is set)
@@ -58,7 +60,7 @@ Run the bug-appropriate verification signals, in order. **All must pass** for a 
 Determine the verdict:
 
 - **PASS** — regression test green, suite + lint green, no blocking review-code findings → go to **On PASS**.
-- **FAIL** — any signal fails (bug still reproduces, a regression appeared, or a blocking correctness finding) → go to **5b**.
+- **FAIL** — any signal fails (bug still reproduces, a regression appeared, or a blocking correctness finding) → if `N == MAX_ITER`, go to **Loop Limit Escalation** (the failure stays unfixed: no verify remains to read a fix); otherwise go to **5b**.
 
 Log the cycle in the implementation report's QA Iteration History:
 
@@ -281,25 +283,25 @@ Exit the loop and proceed to Step 7.
    ```
    Invoke `/commit-changes` with `exclude={bug-prefix}.implementation.*.md,{bug-prefix}.*.implementation.*.md` (both report shapes — TASK-125-BUG-17) and message `fix({bug-prefix}): fix cycle {N} — {brief summary}`. Then `git push origin HEAD`. Record the commit hash in the Verify Cycle entry.
 
-5. Increment the counter and return to **5a**.
+5. Increment the counter and return to **5a**. No budget test here: it was made at 5a, before this 5b was entered, so a verify always follows.
 
 6. **Emit the Remaining Work Status block** before re-entering 5a — position line `Steps 5–6/8 — VERIFY LOOP ⏳ in progress, cycle {N}/5`. Format: [`references/develop-pipeline-remaining-work-banner.md`](develop-pipeline-remaining-work-banner.md).
 
 ---
 
-## Loop Limit Escalation (after 5 cycles without PASS)
+## Loop Limit Escalation (verify failed on cycle MAX_ITER)
 
 Write a thorough escalation entry in the Issues Log:
 
 ```
 ### Fix Loop Limit Reached — {YYYY-MM-DD}
 
-The pipeline completed 5 verify/qa-fix cycles without the bug scenario clearing.
+The pipeline completed 5 verifies and 4 qa-fix cycles without the bug scenario clearing; the 5th verify's failure is unfixed.
 
 **Still failing**: {failing test / regression / review finding}
 **What was attempted per cycle**:
 - Cycle 1: {fix applied}
-- … Cycle 5: {fix applied}
+- … Cycle 4: {fix applied}
 **Likely root cause**: {assessment — e.g. the reported behaviour is a spec question,
 the fix has an unaddressed dependency, or the repro is environment-specific}
 **Recommended next steps**:
@@ -313,7 +315,7 @@ Set the report's Final Status to `Escalated`, leave the bug `reopened` (do NOT c
 ⚠️ Bug Fix Paused — Fix Loop Limit Reached
 
 Bug:                 {bug-prefix}
-Fix cycles completed: 5
+Verify cycles:       5 (fix cycles: 4)
 Still failing:       {short description}
 Implementation Report: {report file path}
 

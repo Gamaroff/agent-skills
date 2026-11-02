@@ -147,14 +147,23 @@ test("loop-limit escalation lists a file struck at the last two gates; the three
   const row = rules.split("\n").find((l) => /^\s*\| Loop limit/.test(l));
   assert.ok(row, "the filling rules have no Loop limit row");
   const cells = row.split(" | ").map((c) => c.trim());
-  // cells[0] is the text before the row's first pipe; cells[4] is "Run now", cells[5] "List as".
-  const loopLimitCmd = cells[4].replace(/^`|`$/g, "");
-  assert.match(
-    loopLimitCmd,
-    /^comm -12 <\(high_files "\$GATE_N1"\) <\(high_files "\$GATE_N"\)$/,
+  // task.244: a loop-limit halt is written at a gate, so a grant re-enters at 5b (5a only when code
+  // moved since gate N) and the resumed 5b runs the stall's three-gate comparison: the row's own
+  // command is that block, listed as struck. The two-gate command survives in the prose below the
+  // table, for the 5a re-entry, where a file HIGH at N-1 and N is one strike from the rule.
+  // cells[0] is the text before the row's first pipe; cells[2] is "Re-enters at", cells[4] "Run now".
+  assert.match(cells[2], /^5b \(or 5a when code moved since gate N\)$/);
+  assert.equal(cells[4], "that rule's three-gate `comm -12` block");
+  assert.equal(cells[5].replace(/\s*\|$/, ""), "struck");
+  const twoGate = rules.match(
+    /`(comm -12 <\(high_files "\$GATE_N1"\) <\(high_files "\$GATE_N"\))`/,
   );
-  assert.match(cells[5], /one strike from the third-strike rule/);
-  assert.match(cells[5], /struck when the three-gate block also prints it/);
+  assert.ok(
+    twoGate,
+    "the prose must carry the two-gate command for the 5a re-entry",
+  );
+  const loopLimitCmd = twoGate[1];
+  assert.match(rules, /one strike from the rule/);
 
   const dir = mkdtempSync(join(tmpdir(), "t239-strike-"));
   try {

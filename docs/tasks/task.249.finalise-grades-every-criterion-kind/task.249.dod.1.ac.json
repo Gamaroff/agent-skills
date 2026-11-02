@@ -1,0 +1,140 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "d5170baec0e71a575694a5ce0c21273c7384fd9d",
+  "dirty_paths": [
+    "docs/tasks/task.249.finalise-grades-every-criterion-kind/task.249.implementation.1.finalise-grades-every-criterion-kind-initial-run.md",
+    "docs/tasks/task.249.finalise-grades-every-criterion-kind/task.249.pr-review.1.finalise-grades-every-criterion-kind.md"
+  ],
+  "document": "docs/tasks/task.249.finalise-grades-every-criterion-kind/task.249.finalise-grades-every-criterion-kind.md",
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 8,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "fad969053bf582b665bc2faede7853df5abb8bb77c9e7a3059066a8bfc8e092b",
+      "status": "PASS",
+      "description": "computeOverall never PASS while any DEFERRED-CI; test is mutation-proven",
+      "code_citation": "shared/resources/finalise-rerun-scope.js:497",
+      "test_citation": "shared/resources/tests/finalise-deferred-ci.test.mjs:103",
+      "members": [],
+      "non_member_fail": null,
+      "note": "computeOverall counts only a literal PASS (lines 500-504), so [PASS, DEFERRED-CI] gives PARTIAL and [DEFERRED-CI] gives FAIL. The test at :103 asserts both and has a PASS control. The test file is matched by 'shared/resources/tests/*.test.mjs' in test:suite (package.json:27), which .github/workflows/test.yml runs on pull_request through 'npm test'. The mutation proof is recorded in the committed QA report docs/tasks/task.249.finalise-grades-every-criterion-kind/task.249.qa.1.finalise-grades-every-criterion-kind.md:190: making computeOverall treat DEFERRED-CI as PASS turns that test red. finalise-rerun-scope.test.mjs:1743-1749 pins the same rule a second time. criteria-drift: clean."
+    },
+    {
+      "id": "#2",
+      "text_hash": "c55c47a71186e37dc133487d45bec752b83d8c79cb30a37ae5ee0480e5b429b0",
+      "status": "PASS",
+      "description": "Step 6 resolves DEFERRED-CI from CI reading 1 and rebinds AC_OVERALL; tests cover all",
+      "code_citation": "skills/finalise/SKILL.md:1301",
+      "test_citation": "shared/resources/tests/finalise-deferred-ci.test.mjs:263",
+      "members": [
+        {
+          "member": "SUCCESS -> PASS",
+          "evidence": "shared/resources/tests/finalise-deferred-ci.test.mjs:263",
+          "status": "PASS"
+        },
+        {
+          "member": "FAILURE -> FAIL",
+          "evidence": "shared/resources/tests/finalise-deferred-ci.test.mjs:287",
+          "status": "PASS"
+        },
+        {
+          "member": "anything else -> stays deferred, the CI table/HALT decides",
+          "evidence": "shared/resources/tests/finalise-deferred-ci.test.mjs:300",
+          "status": "PASS"
+        },
+        {
+          "member": "AC_OVERALL rebound from the re-folded verdict",
+          "evidence": "shared/resources/tests/finalise-deferred-ci.test.mjs:453",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Step 6 action 2a (SKILL.md:1301-1316) calls 'finalise-rerun-scope.js resolve-ci' and rebinds AC_OVERALL from .overall (SKILL.md:1364-1368). ciResolution (finalise-rerun-scope.js:829) maps SUCCESS to PASS, FAILURE to FAIL and anything else to null, which leaves the criterion deferred. SKILL.md:1385 hands an undecided reading to the CI_ROLLUP table. The fence tests at :453, :486, :506 and :538 run the Step 6 block as written, under each shell. All of these run per PR through test.yml 'npm test'. No member is unmapped."
+    },
+    {
+      "id": "#3",
+      "text_hash": "fc4811302d1a4faa2b86a47aab2db193dc7642439dc3a69a2be182e1b4fe483e",
+      "status": "PASS",
+      "description": "AC prompt defines process and CI-state kinds; five test-free kinds; measured names QA/gate/DoD",
+      "code_citation": "shared/resources/finalise-dod-ac-prompt.md:59",
+      "test_citation": "shared/resources/tests/finalise-dod-ac-kinds.test.mjs:52",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Documentation criterion. Line 59 reads 'Five kinds of criterion may carry test_citation NOT_APPLICABLE, and only these five'. Line 73 defines the process criterion and line 78 the CI-state criterion. Line 68 says a measured criterion's citation must be 'a QA report, the QA gate file, or this run's DoD file', and line 69 excludes the implementation report. The test at :52 pins that the stated count equals the bulleted kinds and that each kind has its test_citation string. The test at :138 pins that the bundled copies match the source. Both run per PR through test.yml 'npm test'. No test pins the wording of the measured kind's record locations; I read that text directly."
+    },
+    {
+      "id": "#4",
+      "text_hash": "a8a432f54d0368295ca90d88602a123ead0d86e4e0245c33d16a23f05887d12a",
+      "status": "PASS",
+      "description": "Security prompt requires spec_ref, defines spec_challenges[]; Step 3b.1 states the disposition",
+      "code_citation": "shared/resources/finalise-dod-security-prompt.md:183",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Documentation criterion. Line 183 reads 'Every inline case you write carries a spec_ref'. Line 193 says a case the spec allows goes in spec_challenges[], with the input, its spec_ref and the risk, and line 394 shows the field in the output schema. skills/finalise/SKILL.md:676 (Step 3b.1 item 3a) states the disposition. A reproduced inline case that contradicts its spec_ref line goes from probes[] to spec_questions[] and is not a security FAIL (lines 697-701). A case with no spec_ref is re-dispatched once and then reported, not counted (lines 685-696). No test pins this prose."
+    },
+    {
+      "id": "#5",
+      "text_hash": "019126f77f10a4ee6ba74a28a0235f18a4e7cfb5aa244877cca359fbca347d19",
+      "status": "PASS",
+      "description": "review-task and review-story carry the record-location check as Important",
+      "code_citation": "skills/review-task/SKILL.md:1083",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [
+        {
+          "member": "review-task",
+          "evidence": "skills/review-task/SKILL.md:1092",
+          "status": "PASS"
+        },
+        {
+          "member": "review-story",
+          "evidence": "skills/review-story/SKILL.md:1140",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Documentation criterion. review-task check 22 (:1083) and review-story check 18 (:1131) are both titled 'A criterion that demands a record names where it lives'. Each requires the location to be the QA report, the QA gate file or the DoD, and each says to 'Flag as **Important** a criterion that names no location, or names only the implementation report' (:1092 and :1140). The same rule was added to the create-task and create-story checklists. No test pins this prose."
+    },
+    {
+      "id": "#6",
+      "text_hash": "6a341565b7770cf5d4803ad8c4e9c5c8ecb23074eb73c4135ae895398e729fe8",
+      "status": "PASS",
+      "description": "npm run ci passes, and npm run test:clean-checkout passes",
+      "code_citation": ".github/workflows/test.yml:1",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ d5170baec0e71a575694a5ce0c21273c7384fd9d — CI-state criterion, as the caller directed. It asks that the PR's CI run of the 'npm run ci' chain is green. The jobs that run it are test.yml ('format:check', 'npm test', 'eval:all'), validate.yml (validate and bundle --check), shellcheck.yml and secret-scan.yml. test:clean-checkout (scripts/test-clean-checkout.sh) runs 'npm test' in a fresh clone of HEAD. That is the same setup as test.yml's fresh fetch-depth-0 checkout, but the script itself runs in no workflow. Its only committed local run is task.249.qa.1...md:96 ('exited 0', at 58cdf4f9). That is four fix commits before the head d5170bae. The same report's full 'CI=true npm run ci' at qa.1:90-95 had 2 failures attributed to the environment. Ungraded until Step 6 CI reading 1. For information: 'gh pr checks 805' showed test, validate, shellcheck, secret-scan, link-check and branch-policy all passing at read time.",
+      "ci_reading": "CI reading 1: SUCCESS @ d5170baec0e71a575694a5ce0c21273c7384fd9d"
+    },
+    {
+      "id": "#7",
+      "text_hash": "bb86fa63779aeb81f504727c49e00ec3008cd9d4c4a45687eb508efefc13550c",
+      "status": "PASS",
+      "description": "npm run bundle:check reports 0 problems",
+      "code_citation": "docs/tasks/task.249.finalise-grades-every-criterion-kind/task.249.qa.5.finalise-grades-every-criterion-kind.md:30",
+      "test_citation": ".github/workflows/validate.yml:128",
+      "members": [],
+      "non_member_fail": null,
+      "note": "QA cycle 5 recorded 'bundle:check: 0 problems' at 84f2b448. The only later commit, d5170bae, touches nothing outside docs/tasks/task.249.* ('git diff --name-only 84f2b448 d5170bae'), so no bundled source changed after that run. validate.yml:128 runs 'bundle_skill.py --check', which is what 'npm run bundle:check' runs (package.json:66). The job triggers on pull_request for skills/** and shared/resources/**, and this PR touches both, so it runs per PR. The validate check passed on PR 805. finalise-dod-ac-kinds.test.mjs:138 also pins the AC prompt copies. I did not run the command; this grade rests on the cited evidence."
+    },
+    {
+      "id": "#8",
+      "text_hash": "a4e30e42265679423cd74350ca2e1114b9bbe24c13b81281379d4b4b2a8223d3",
+      "status": "PASS",
+      "description": "CHANGELOG [Unreleased] cites task 249",
+      "code_citation": "CHANGELOG.md:9",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Documentation criterion. CHANGELOG.md:9 sits under '## [Unreleased]' (line 5) and reads '/finalise grades every kind of criterion fairly (task 249).' That cites the task. No corpus guard pins this entry: shared/resources/tests/changelog-cites.test.mjs tests the changelog-cites.sh script, not the repository's CHANGELOG. QA cycle 1 recorded 'changelog-cites.sh -> cites (task 249)' (qa.1:88)."
+    }
+  ],
+  "advisories": []
+}

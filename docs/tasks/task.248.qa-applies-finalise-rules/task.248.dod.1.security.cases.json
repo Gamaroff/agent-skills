@@ -1,0 +1,119 @@
+[
+  {
+    "id": "stem.task",
+    "input": "task.248",
+    "why": "the work item's own stem, cited under [Unreleased] — the one input the check exists for",
+    "correct": "accept",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "changelog:\n  enforce: true\n",
+        "CHANGELOG.md": "# Changelog\n\n## [Unreleased]\n\n- Something (task 248).\n"
+      }
+    }
+  },
+  {
+    "id": "stem.semicolon",
+    "input": "task.248;touch pwned",
+    "why": "a shell separator in the stem",
+    "correct": "reject",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "changelog:\n  enforce: true\n",
+        "CHANGELOG.md": "# Changelog\n\n## [Unreleased]\n\n- Something (task 248).\n"
+      }
+    }
+  },
+  {
+    "id": "stem.substitution",
+    "input": "task.$(touch pwned)",
+    "why": "a command substitution in the stem",
+    "correct": "reject",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "changelog:\n  enforce: true\n",
+        "CHANGELOG.md": "# Changelog\n\n## [Unreleased]\n\n- Something (task 248).\n"
+      }
+    }
+  },
+  {
+    "id": "stem.regex-wildcard",
+    "input": "task.2.*",
+    "why": "a regex wildcard that would match another task's citation",
+    "correct": "reject",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "changelog:\n  enforce: true\n",
+        "CHANGELOG.md": "# Changelog\n\n## [Unreleased]\n\n- Something (task 248).\n"
+      }
+    }
+  },
+  {
+    "id": "stem.flag",
+    "input": "-e",
+    "why": "a flag in the stem position",
+    "correct": "reject",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "changelog:\n  enforce: true\n",
+        "CHANGELOG.md": "# Changelog\n\n## [Unreleased]\n\n- Something (task 248).\n"
+      }
+    }
+  },
+  {
+    "id": "stem.newline",
+    "input": "task.248\ntask.1",
+    "why": "a newline smuggling a second stem",
+    "correct": "reject",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "changelog:\n  enforce: true\n",
+        "CHANGELOG.md": "# Changelog\n\n## [Unreleased]\n\n- Something (task 248).\n"
+      }
+    }
+  },
+  {
+    "id": "stem.empty",
+    "input": "",
+    "why": "an empty stem with enforcement on",
+    "correct": "reject",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "changelog:\n  enforce: true\n",
+        "CHANGELOG.md": "# Changelog\n\n## [Unreleased]\n\n- Something (task 248).\n"
+      }
+    }
+  },
+  {
+    "id": "stem.uncited",
+    "input": "task.7",
+    "why": "a well-formed stem the CHANGELOG does not cite must not pass",
+    "correct": "reject",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "changelog:\n  enforce: true\n",
+        "CHANGELOG.md": "# Changelog\n\n## [Unreleased]\n\n- Something (task 248).\n"
+      }
+    }
+  },
+  {
+    "id": "stem.path-prefix",
+    "input": "../task.248",
+    "why": "a path whose basename doc-id.js would parse as task.248",
+    "correct": "reject",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "changelog:\n  enforce: true\n",
+        "CHANGELOG.md": "# Changelog\n\n## [Unreleased]\n\n- Something (task 248).\n"
+      }
+    }
+  }
+]

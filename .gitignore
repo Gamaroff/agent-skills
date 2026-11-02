@@ -15,8 +15,11 @@ skills/*/*.zip
 skills/*/*/SKILL.md
 CLAUDE.md
 
-# Claude Code session state — pipeline locks and other runtime artifacts
-.claude/
+# Claude Code session state — pipeline locks and other runtime artifacts. The one tracked file is
+# the shared project settings, which install the skills-symlink guard hook for every contributor;
+# personal settings go in .claude/settings.local.json, which stays ignored.
+.claude/*
+!.claude/settings.json
 .windsurf/
 .agents/state/
 .agents/skills

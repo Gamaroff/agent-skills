@@ -1,0 +1,128 @@
+[
+  {
+    "id": "lf-injects-key",
+    "input": "ThemeProvider\nwireframeMap: false",
+    "direction": "hostile",
+    "why": "A line feed in a list item writes a second key.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "crlf-injects-key",
+    "input": "ThemeProvider\r\nwireframeMap: false",
+    "direction": "hostile",
+    "why": "CRLF.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "u2028",
+    "input": "ThemeProvider wireframeMap: false",
+    "direction": "hostile",
+    "why": "U+2028.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "nel",
+    "input": "ThemeProviderwireframeMap: false",
+    "direction": "hostile",
+    "why": "NEL.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "double-quote-in-item",
+    "input": "A,\"B\"",
+    "direction": "hostile",
+    "why": "A quote in the second comma-split item cannot read back.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "backslash",
+    "input": "Theme\\Provider",
+    "direction": "hostile",
+    "why": "Reads back doubled.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "tab-in-item",
+    "input": "A,\tB",
+    "direction": "hostile",
+    "why": "A tab is escaped even where split/trim would remove it; the guard runs on the raw value first.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "single",
+    "input": "ThemeProvider",
+    "direction": "legitimate",
+    "why": "The ordinary value.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "list",
+    "input": "ThemeProvider, Portal,Slot",
+    "direction": "legitimate",
+    "why": "Comma list with mixed spacing.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "colon-hash",
+    "input": "A: b # c",
+    "direction": "legitimate",
+    "why": "Quoted per list item.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "single-quote",
+    "input": "O'Brien",
+    "direction": "legitimate",
+    "why": "Reads back verbatim.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "leading-dash",
+    "input": "-Thing",
+    "direction": "legitimate",
+    "why": "Must not turn into a nested list item.",
+    "correct": "Accepted (exit 0)."
+  }
+]

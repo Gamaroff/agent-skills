@@ -9,13 +9,12 @@
 //
 // Since task.123 this module is also the loop's ROUTE CLASSIFIER —
 // `classifyLoopRoute()` at the bottom — and the Diminishing-returns predicate is
-// one arm of it. The other arms are route 2b (cosmetic residue: a PASS gate
-// whose open entries are all LOW, after two HIGH-0 gates) and route 2c (gate the
-// last fix: the budget is spent, HIGH was 0 throughout, MEDIUM fell strictly for
-// three cycles, and the last budgeted cycle landed a fix no gate has read). Each
-// is a predicate over the gate sequence, the latest gate's queue and the budget
-// state, so each lives here as a fixture row first and prose second. The five
-// properties below apply to every arm.
+// one arm of it. The other arm is route 2b (cosmetic residue: a PASS gate whose
+// open entries are all LOW, after two HIGH-0 gates). (Route 2c, gate the last
+// fix, was removed in task.244: the budget now counts gates, so no budget ends
+// on a fix.) Each arm is a predicate over the gate sequence and the latest
+// gate's queue, so each lives here as a fixture row first and prose second. The
+// five properties below apply to every arm.
 //
 // THE QUESTION, AND WHY IT IS NOT THE CONVERGENCE CHECK'S QUESTION
 //
@@ -479,15 +478,12 @@ function describeDiminishingReturns(result) {
 const ROUTES = Object.freeze({
   DIMINISHING_RETURNS: "diminishing-returns", // route 2  — obs #100's sibling, pre-existing
   COSMETIC_RESIDUE: "cosmetic-residue", //       route 2b — obs #100
-  GATE_THE_LAST_FIX: "gate-the-last-fix", //     route 2c — obs #112
-  CONTINUE: "continue", //                       5b, or the escalation as written
+  CONTINUE: "continue", //                       5b
 });
 
-// The 5b Action row 5a writes on the road to a fix cycle. Route 2c reads the LAST
-// budgeted cycle's row to establish that a fix exists on the head which no gate
-// has read; a cycle that reached 5c has its gate already, and a fix driven by
-// 5c's REQUEST CHANGES is outside the gate sequence the route reasons over.
-const RUNNING_QA_FIX_RE = /^Running qa-fix\b/;
+// The token an old report's `**Loop exit**` row may still carry (route 2c, removed
+// in task.244). describeLoopRoute() renders it, so an old ROUTE_JSON still reads.
+const LEGACY_GATE_THE_LAST_FIX = "gate-the-last-fix";
 
 /**
  * The gate's verdict token — `PASS`, `CONCERNS`, `FAIL`, `WAIVED` — read from the
@@ -548,46 +544,32 @@ function route(routeName, reason, detail, extra) {
 /**
  * Which route does the QA loop take from here?
  *
- * Two moments call this, and `budgetSpent` says which:
- *
- *   budgetSpent: false — after 5a has read cycle N's gate and the Convergence
- *     check did not trip. Evaluates route 2 (Diminishing-returns) and then route
- *     2b (cosmetic residue); `continue` means 5b.
- *   budgetSpent: true  — at the loop-limit trigger, after 5b of the LAST budgeted
- *     cycle and BEFORE the escalation entry is written. Evaluates route 2c only;
- *     `continue` means the escalation as written.
+ * Called after 5a has read cycle N's gate and the Convergence check did not
+ * trip. Evaluates route 2 (Diminishing-returns) and then route 2b (cosmetic
+ * residue); `continue` means 5b — unless the budget is spent (N == QA_MAX_CYCLES),
+ * which the step doc tests AFTER this call, so a spent budget escalates instead
+ * of entering 5b. The budget is not an input here: since task.244 no route
+ * depends on it. `budgetSpent` / `lastCycleAction` (the removed route 2c's
+ * inputs) are ignored, not rejected, so a stale caller keeps routing mid-loop.
  *
  * @param {object} input
  * @param {number}   input.cycle              the cycle whose gate was last read (1-based)
  * @param {number[]} input.highCounts         HIGH_N per cycle from QA Iteration History (index 0 = cycle 1)
- * @param {number[]} [input.mediumCounts]     MEDIUM_N per cycle from QA Iteration History, same shape;
- *   cycle N's own reading is taken from `latestGateContent` via `countRaised`, so the array
- *   needs only cycles 1..N-1 (a longer array is fine; index N-1 is ignored)
  * @param {string|null} input.latestGateContent  full text of the latest gate
  * @param {string[]} [input.testArtifactGlobs]   resolved `qa.testArtifactGlobs`, default `[]`
- * @param {boolean}  [input.budgetSpent]      true at the loop-limit trigger (N == QA_MAX_CYCLES)
- * @param {string|null} [input.lastCycleAction]  the `**Action**` row of cycle N's entry; route 2c
- *   requires it to read `Running qa-fix …`
  * @returns {{route: string, reason: string, detail: string, findings: Array,
- *            verdict?: string, lowIds?: string[], residueIds?: string[],
- *            mediumSequence?: number[]}}
+ *            verdict?: string, lowIds?: string[], residueIds?: string[]}}
  */
 function classifyLoopRoute(input) {
   let cycle;
   let highCounts;
-  let mediumCounts;
   let latestGateContent;
   let testArtifactGlobs;
-  let budgetSpent;
-  let lastCycleAction;
   try {
     cycle = input && input.cycle;
     highCounts = input && input.highCounts;
-    mediumCounts = (input && input.mediumCounts) || [];
     latestGateContent = input && input.latestGateContent;
     testArtifactGlobs = (input && input.testArtifactGlobs) || [];
-    budgetSpent = Boolean(input && input.budgetSpent);
-    lastCycleAction = input && input.lastCycleAction;
   } catch {
     return route(
       ROUTES.CONTINUE,
@@ -601,89 +583,6 @@ function classifyLoopRoute(input) {
       ROUTES.CONTINUE,
       "cycle-missing",
       `cycle ${describe(cycle)} is not a positive integer`,
-    );
-  }
-
-  if (budgetSpent) {
-    // ── route 2c — gate the last fix (obs #112) ──────────────────────────────
-    if (
-      typeof lastCycleAction !== "string" ||
-      !RUNNING_QA_FIX_RE.test(lastCycleAction.trim())
-    ) {
-      return route(
-        ROUTES.CONTINUE,
-        "last-cycle-not-a-fix",
-        `cycle ${cycle}'s Action row reads ${describe(lastCycleAction)} — route 2c gates a fix that no gate has read, and only a cycle that routed to 5b from 5a has one; a cycle that reached 5c has its gate, and a fix driven by 5c's REQUEST CHANGES is outside the gate sequence this route reasons over`,
-      );
-    }
-    if (cycle < 3) {
-      return route(
-        ROUTES.CONTINUE,
-        "below-cycle-floor",
-        `cycle ${cycle} — three MEDIUM readings are needed to see a strictly falling sequence`,
-      );
-    }
-    if (!allInts(highCounts, cycle)) {
-      return route(
-        ROUTES.CONTINUE,
-        "high-counts-missing",
-        "the HIGH sequence from QA Iteration History is absent, shorter than the cycle count, or carries a non-integer reading",
-      );
-    }
-    // The gate this route grants is owed to the LAST fix, so the HIGH reading
-    // that matters is the last gate's — the one that fix answers. An earlier
-    // clause required HIGH 0 at EVERY cycle, which keyed on history: a loop
-    // that raised a blocker at cycle 2, fixed it at cycle 2, and ended on a
-    // HIGH-0 gate was declined twice (task.130 HIGH 0,1,0,1,0; task.125
-    // 1,1,0,1,0 — obs #139), and each time an operator granted the cycle by
-    // hand and the fix read clean. The flat-MEDIUM stall this route was
-    // written against (task.117) is still refused by the MEDIUM clause below.
-    const lastHigh = highCounts[cycle - 1];
-    if (lastHigh !== 0) {
-      return route(
-        ROUTES.CONTINUE,
-        "high-on-last-gate",
-        `HIGH is ${lastHigh} on cycle ${cycle}'s gate (sequence ${highCounts.slice(0, cycle).join(", ")}) — the fix this route would gate answers a blocker, and a blocker is escalated with its evidence, not gated on a half-cycle`,
-      );
-    }
-    const raised = countRaised(latestGateContent);
-    if (raised === null) {
-      return route(
-        ROUTES.CONTINUE,
-        "gate-unreadable",
-        "no gate content was supplied, so MEDIUM_N could not be counted",
-      );
-    }
-    if (!allInts(mediumCounts, cycle - 1)) {
-      return route(
-        ROUTES.CONTINUE,
-        "medium-counts-missing",
-        `the MEDIUM sequence from QA Iteration History needs cycles 1..${cycle - 1} and does not have them`,
-      );
-    }
-    const mN = raised.medium;
-    const m1 = mediumCounts[cycle - 2];
-    const m2 = mediumCounts[cycle - 3];
-    const seq = [m2, m1, mN];
-    // A strictly falling test needs room to fall. A last gate that raised no
-    // MEDIUM (HIGH is already 0 above) left only LOW entries for the last fix,
-    // which is the fix one more gate is most likely to clear. Requiring
-    // 0 < m1 < m2 there escalated task.173's PASS-100 gate (MEDIUM 0, 0, 0)
-    // and task.143's (1, 1, 0) — obs #300.
-    const atFloor = mN === 0;
-    if (!atFloor && !(mN < m1 && m1 < m2)) {
-      return route(
-        ROUTES.CONTINUE,
-        "medium-not-falling",
-        `MEDIUM reads ${seq.join(", ")} over cycles ${cycle - 2}–${cycle} — route 2c needs it strictly falling, or 0 on the last gate, which is the evidence that one more gate would clear`,
-        { mediumSequence: seq },
-      );
-    }
-    return route(
-      ROUTES.GATE_THE_LAST_FIX,
-      "gate-the-last-fix",
-      `the ${cycle}-cycle budget is spent with HIGH 0 on cycle ${cycle}'s gate and MEDIUM ${atFloor ? `at 0 on that gate (${seq.join(" → ")})` : `falling ${seq.join(" → ")}`}; cycle ${cycle}'s fix has landed and no gate has read it, so one ordinary 5a (review + gate, no 5b) runs on that head before any escalation entry is written`,
-      { mediumSequence: seq },
     );
   }
 
@@ -968,8 +867,8 @@ function describeLoopRoute(result) {
           ? ` (${result.lowIds.join(", ")})`
           : ""
       }. This is a CLEAN exit, not a stall: nothing is blocked and nothing is being accepted over; a full qa-fix cycle for cosmetic findings is what this route exists to avoid.`;
-    case ROUTES.GATE_THE_LAST_FIX:
-      return `Gate-the-last-fix half-cycle granted — ${result.detail}. This is NOT an exit and NOT an escalation: it is one review + gate on the last fix's head, and its gate decides between 5c and the escalation.`;
+    case LEGACY_GATE_THE_LAST_FIX:
+      return `Loop route: gate-the-last-fix (route 2c, removed in task.244) — ${result.detail}.`;
     default:
       return `Loop route: continue (${result.reason}) — ${result.detail}.`;
   }

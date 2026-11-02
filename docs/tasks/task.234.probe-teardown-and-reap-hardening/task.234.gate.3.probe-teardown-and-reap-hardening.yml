@@ -1,0 +1,68 @@
+schema: 2
+task: 'task.234.probe-teardown-and-reap-hardening'
+task_title: 'Probe sandbox teardown and process-group reap'
+gate: CONCERNS
+status_reason: 'The cycle-2 fixes hold (QA-3 to QA-6 verified by test and mutation). The leash they added changes two things a case can observe: argv0 becomes the resolved path, so a fence-script launch failure no longer reads as one, and the leash shell runs under the case environment, so SHELLOPTS reaches it.'
+reviewer: 'QA Engineer'
+head: '7646e7bec20602c5bc4632f26d8c3354a97396db'
+updated: '2026-10-31T09:49:53Z'
+
+top_issues:
+  - id: 'TASK-234-QA-7'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'leashed() hands env the PATH-resolved absolute path as the program, so bash runs with argv0 /usr/bin/bash and a script it cannot open prints "/usr/bin/bash: <script>: No such file or directory" (measured), which isLaunchFailure''s ^(?:bash|<script>): pattern no longer matches: a launch failure is scored as a real run instead of errored.'
+    suggested_action: 'Pass the caller''s command name to env (execvp resolves it on the case''s own PATH exactly as before) and use the resolved path only to decide whether to leash; add a test that a fence case whose script cannot be opened is errored.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-234-QA-8'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'The leash /bin/sh is spawned with the full case environment, so SHELLOPTS=xtrace (or PS4, BASHOPTS) in a fixture env makes the leash script trace "+ p=1" and "+ exec ..." onto the case''s stderr before the exec (measured with SHELLOPTS=xtrace under bash-as-sh); the environment also reaches ARG_MAX twice.'
+    suggested_action: 'Spawn the leash shell with a fixed minimal environment (PATH=/usr/bin:/bin only), since env -i passes the case its own environment; add a test with SHELLOPTS=xtrace that asserts the case stderr is the case''s own.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 8
+  phases_verified: 3/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    notes: 'boundary: false (leashed, onPath, forceRemoveTree and reapGroup refuse no input). TASK-234-QA-7 turns a fence launch failure into a scored run, which can report a false reproduction.'
+  performance:
+    status: PASS
+    notes: 'The leash adds about 7-10% wall time to the 265 pre-existing probe tests (+1.7 to +3.2 s at load 3-4), recorded against the performance criterion.'
+  reliability:
+    status: CONCERNS
+    notes: 'TASK-234-QA-8: a case environment can alter the leash script and the case stderr.'
+  maintainability:
+    status: PASS
+    notes: 'Section 5 states the leash, its cost and the root lstat.'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-234-QA-7 and TASK-234-QA-8.'
+      refs: ['shared/resources/security-probe.mjs']
+  future:
+    - action: 'reapGroup treats every EPERM as nothing left; EPERM is also returned when only unsignalable live members remain (reviewer CR-3, low/medium). Decide whether to decline the case then.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'The watcher keys on the case pid; a reused pid while spawnSync waits on a stdio-holding grandchild could kill that grandchild early (reviewer CR-4, low/low).'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-234-QA-7 and TASK-234-QA-8 fixed']

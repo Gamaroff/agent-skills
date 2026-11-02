@@ -242,36 +242,21 @@ rather than reading these variables.
    [ -f "$TASK_FILE" ] || { echo "HALT: TASK_FILE ('$TASK_FILE') is not a file — bind this skill's work-item path in this shell"; exit 1; }
    TASK_DIR=$(dirname "$TASK_FILE")
    [ -n "${LATEST_GATE:-}" ] || LATEST_GATE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR" --path gate)
-   # ":(exclude)$TASK_DIR" below must exclude the task's directory, not the tree: a task file at the
+   # The helper's ":(exclude)<dir>" must exclude the task's directory, not the tree: a task file at the
    # repository root would make it ":(exclude)." and CODE_MOVED always 0 (task.135 QA cycle 3, CR3-2).
    [ -n "$(git -C "$TASK_DIR" rev-parse --show-prefix 2>/dev/null)" ] || { echo "HALT: the task directory ('$TASK_DIR') is the repository root — the trigger cannot tell the task's own files from the code"; exit 1; }
    # The commit the gate judged (its `head:`), never its typed `updated:` — a timestamp in the
    # future made `git log --since` hide every later commit from this check (task.135).
    GATE_HEAD=$(grep -E '^head:' "$LATEST_GATE" 2>/dev/null | head -1 | sed -E "s/^head:[[:space:]]*//; s/[[:space:]]+#.*$//; s/['\"]//g; s/[[:space:]]*$//")
    DOC_STATUS=$(grep -E '^status:' "$TASK_FILE" | head -1 | awk '{print $(2)}')
-   # A head the trigger cannot vouch for fails toward re-review, never toward "nothing moved": a
-   # hand-typed `head: HEAD` counted 0 commits on every run, and an off-branch head counted only what
-   # it happened not to share, so a PASS gate skipped review whatever landed after it (task.168
-   # CR4-1). Step 3b HALTs on the same heads; here the safe answer is to re-review.
-   if [ -n "$GATE_HEAD" ] && ! { printf '%s' "$GATE_HEAD" | grep -qE '^[0-9a-f]{40}$' \
-        && git cat-file -e "${GATE_HEAD}^{commit}" 2>/dev/null \
-        && git merge-base --is-ancestor "$GATE_HEAD" HEAD 2>/dev/null; }; then
-     echo "trigger: gate head '$GATE_HEAD' is not a 40-hex commit on this branch — re-reviewing"
-     CODE_MOVED=1; DOC_MOVED=1
-   elif [ -n "$GATE_HEAD" ]; then
-     # Commits since the commit the gate judged, on EVERY path except this task's own directory —
-     # the gate, the QA report, the task document and the implementation report live there and move
-     # on every cycle. A fixed list of source directories missed scripts/, tests/ and a consumer's
-     # src/ (task.135 CR-3); excluding all of docs/ hid a documentation deliverable (CR2-4).
-     # `|| echo 1` fails toward re-review when git cannot answer (a head this checkout lacks).
-     CODE_MOVED=$(git rev-list --count "$GATE_HEAD"..HEAD -- . ":(exclude)$TASK_DIR" 2>/dev/null || echo 1)
-     # Uncommitted and untracked changes outside the task directory are movement too: the gate
-     # never read them (CR2-5). An untracked file counts here even though Step 3b only WARNS on one
-     # (a held file the develop pipeline restored is the normal state of a healthy branch): the
-     # trigger cannot tell a restored file from a new fix file, so it fails toward re-review and the
-     # cost is one cycle (task.168 QA cycle 2, CR-3).
-     git diff --quiet HEAD -- . ":(exclude)$TASK_DIR" 2>/dev/null || CODE_MOVED=$((CODE_MOVED + 1))
-     [ -z "$(git ls-files --others --exclude-standard -- . ":(exclude)$TASK_DIR" 2>/dev/null)" ] || CODE_MOVED=$((CODE_MOVED + 1))
+   # The code-movement count has ONE definition, code-moved-since-gate.sh (task.244): commits since
+   # the gate's head, uncommitted edits and untracked files, all outside this task's directory. A
+   # head it cannot vouch for (none, not 40-hex, not an ancestor of HEAD) reads 1 and says so on
+   # stderr — fails toward re-review, never toward "nothing moved" (task.168 CR4-1). An empty
+   # $LATEST_GATE (a first review) reads 1 the same way. Exit 2 is a usage refusal, a HALT here.
+   CODE_MOVED=$(bash .agents/skills/qa-task/references/code-moved-since-gate.sh "$TASK_DIR" "$LATEST_GATE") \
+     || { echo "HALT: code-moved-since-gate.sh refused (see its line above)"; exit 1; }
+   if [ -n "$GATE_HEAD" ]; then
      # The document is compared from the commit that last wrote the GATE, not from the head: a QA
      # cycle edits the task document itself (QA Results, Change Log) after the head it records, and
      # those edits land beside the gate. Measured from the head, every gate would read "document
@@ -286,7 +271,7 @@ rather than reading these variables.
        DOC_MOVED=1                   # gate not committed yet — nothing to measure from
      fi
    else
-     CODE_MOVED=1; DOC_MOVED=1       # a gate with no head (schema 1) cannot vouch for the present tree
+     DOC_MOVED=1                     # a gate with no head (schema 1) cannot vouch for the present tree
    fi
    ```
 
@@ -526,8 +511,46 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
      # left uncommitted (QA cycle 1, CR-1). .claude/state is the pipeline's own scratch — excluded from
      # both lists: a consumer that tracks .claude/ has the lock rewritten by set-qa-phase.sh just before
      # this block runs, and that is not a fix (QA cycle 2, CR-2).
+     # A tracked change HALTs only when the review READS it: a path in the PR's change set, or one in a
+     # directory (the exact dirname, never a prefix) that holds a changed file. Any other tracked edit
+     # belongs to something else in this checkout — a parallel session's registry row (obs #126) — and
+     # only warns, like an untracked file. A change set that cannot be listed (no $BASE, or a base ref
+     # this checkout lacks) falls back to the old rule: every tracked edit HALTs (task 245).
      DIRTY=$(git status --porcelain --untracked-files=no -- . ":(exclude)$WORK_ITEM_DIR" ":(exclude).claude/state")
-     [ -z "$DIRTY" ] || { echo "HALT: uncommitted changes outside the work item — commit the fix before re-review (the scope reads committed history):"; printf '%s\n' "$DIRTY"; exit 1; }
+     if [ -n "$DIRTY" ]; then
+       HALTS="" WARNS=""
+       if [ -n "${BASE:-}" ] && CHANGED=$(git -c core.quotePath=false diff --name-only "$BASE...HEAD" 2>/dev/null); then
+         CHANGED_DIRS=$(printf '%s\n' "$CHANGED" | sed -n 's#/[^/]*$##p' | sort -u)
+         # -z, not the quoted default: plain --porcelain C-quotes a path with a space or a non-ASCII
+         # character ("d e/f g.txt"), the quoted text never equals the unquoted diff list, and a dirty
+         # changed file would only warn. A rename or copy entry is followed by its old path (QA cycle 1, T245-QA-1).
+         # Captured once and checked: a process substitution's exit status is lost, so a failing second
+         # `git status` would leave HALTS and WARNS empty and pass the guard it exists to enforce, with
+         # DIRTY already proving the tree is dirty (QA cycle 2, T245-QA-2).
+         DIRTY_Z=$(mktemp "${TMPDIR:-/tmp}/qa-dirty.XXXXXX")
+         if ! git status --porcelain -z --untracked-files=no -- . ":(exclude)$WORK_ITEM_DIR" ":(exclude).claude/state" > "$DIRTY_Z" || [ ! -s "$DIRTY_Z" ]; then
+           rm -f "$DIRTY_Z"
+           echo "HALT: git status -z failed or came back empty while the tree is dirty — cannot classify the uncommitted changes:"; printf '%s\n' "$DIRTY"; exit 1
+         fi
+         while IFS= read -r -d '' line; do
+           p=${line#???}; old=""
+           case ${line%"$p"} in *R*|*C*) IFS= read -r -d '' old ;; esac
+           d=${p%/*}; [ "$d" = "$p" ] && d=""
+           if printf '%s\n' "$CHANGED" | grep -qxF -- "$p" \
+              || { [ -n "$old" ] && printf '%s\n' "$CHANGED" | grep -qxF -- "$old"; } \
+              || { [ -n "$d" ] && printf '%s\n' "$CHANGED_DIRS" | grep -qxF -- "$d"; }; then
+             HALTS="$HALTS$line"$'\n'
+           else
+             WARNS="$WARNS$line"$'\n'
+           fi
+         done < "$DIRTY_Z"
+         rm -f "$DIRTY_Z"
+       else
+         HALTS="$DIRTY"$'\n'
+       fi
+       [ -z "$HALTS" ] || { echo "HALT: uncommitted changes outside the work item — commit the fix before re-review (the scope reads committed history):"; printf '%s' "$HALTS"; exit 1; }
+       [ -z "$WARNS" ] || { echo "warning: uncommitted changes outside the review scope are not in this review:"; printf '%s' "$WARNS" | sed 's/^/  /'; }
+     fi
      UNTRACKED=$(git ls-files --others --exclude-standard -- . ":(exclude)$WORK_ITEM_DIR" ":(exclude).claude/state")
      [ -z "$UNTRACKED" ] || { echo "warning: untracked files outside the work item are not in this review — commit any that belong to the fix:"; printf '%s\n' "$UNTRACKED" | sed 's/^/  /'; }
    fi
@@ -761,6 +784,26 @@ JSON
    read at QA and executed only at the Step 7 DoD probe lands its defect after the gate that should
    have covered it: a 14-star glob compiled to `[^/]*` × 14 passed five green cycles and was found at
    finalise (obs #20).
+
+   **Run the criteria's own signal before deciding** (task.248, obs #140). The DoD's Step 1b reads
+   the work item's criteria for a boundary signal ("never", "must not", "rejects"…) with this same
+   classifier, so run it here and copy its answer into the gate. QA and the DoD then read one result:
+
+   ```bash
+   # From the repository root. {task-file} is this task document — substitute it.
+   SIG=$(command node .agents/skills/qa-task/references/probe-boundary-signals.mjs --doc "{task-file}" --json); rc=$?
+   case $rc in
+     0) echo "boundary_signals: $(printf '%s' "$SIG" | jq -c '[.matched[].phrase]')" ;;
+     1) echo "boundary_signals: []  # no criteria section — nothing to classify" ;;
+     *) echo "HALT: probe-boundary-signals.mjs could not classify {task-file} (rc $rc) — check the bundled path; never write boundary_signals by hand"; exit 1 ;;
+   esac
+   ```
+
+   Write the printed line under `nfr_validation.security` in the gate. A non-empty list beside
+   `boundary: false` needs a `boundary_reason:` line saying why the criteria's wording is not an
+   input gate. The signal does not decide the boundary; it makes the answer explicit, because
+   task.234's QA recorded a silent `false` that the DoD then overturned. Step 12b's read-back re-runs
+   the classifier and halts on a gate that leaves either line out.
 
 4. **Platform variance — run the other value.** For every fixture path or environment-derived value
    the diff passes to a **validating** consumer (a function that refuses some inputs — a containment
@@ -1023,6 +1066,36 @@ because no test carries them (obs #210). A behaviour criterion whose only eviden
 with no committed per-PR test, is a **MEDIUM** finding in `top_issues[]`, so it enters the fix loop
 rather than halting at finalise (obs #224).
 
+**A criterion over a set is checked member by member**, by the quantifier rule: rule 6 of
+`finalise-dod-ac-prompt.md` Step 3, in the `finalise` skill, which owns its wording. Each member it
+leaves unmapped is a **MEDIUM** `top_issues[]` entry naming the member (obs #23).
+
+**Read the criteria against the text that was reviewed** (task.248, obs #139). A criterion edited
+after review is not the one that was reviewed, and finalise's AC agent fails an unapproved edit:
+
+```bash
+# From the repository root. {task-file} is this task document — substitute it.
+TARGET=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo develop)
+DRIFT=$(command node .agents/skills/qa-task/references/criteria-drift.js --doc "{task-file}" --base-from-review "$TARGET" --json); rc=$?
+case $rc in
+  0) printf '%s' "$DRIFT" | jq -r '
+       "criteria-drift: \(.reason) (base: \(.base.kind // "none"))",
+       (.changed[] | select(.kind != "appended" and (.approved | not))
+         | "MEDIUM: criterion \(.id) \(.kind) without an approver — escalate for an approver, or restore the criterion"),
+       (.changed[] | select(.kind == "appended")
+         | "ANSWER: criterion \(.id) appended — record relaxes: true|false and relaxes_reason under criteria_drift")' ;;
+  1) echo "criteria-drift: no criteria section — nothing to compare" ;;
+  *) echo "HALT: criteria-drift.js could not compare {task-file} (rc $rc): $(printf '%s' "$DRIFT" | jq -r '.error // empty' 2>/dev/null)"; exit 1 ;;
+esac
+```
+
+Each `MEDIUM` line is a `top_issues[]` entry. Record the result in the gate's `criteria_drift`
+block (Step 10). For each `ANSWER` line, read the appended text and say whether it relaxes the
+criterion: an evidence note does not, but a widened bound or an added exception does. An appended
+change with `relaxes: true` and no `approved by <name>` is the same MEDIUM finding. Never edit a
+criterion back yourself; the remedy belongs to the owner. Step 12b's read-back halts on an appended
+entry with no answer.
+
 **A residual that says a check cannot run is a claim. Re-test its premise before you restate it.**
 When the work item, the implementation report or a previous QA report says a criterion is unverified
 because the environment lacks something ("CI has no zsh lane", "no Bitbucket credential", "this host
@@ -1056,6 +1129,22 @@ cycles had read showed the check passing (obs #119).
 | Linting                | 0 errors | 0 errors | PASS   |       |
 | TypeScript compilation | 0 errors | 0 errors | PASS   |       |
 | Documentation          | Updated  | Complete | PASS   |       |
+
+**CHANGELOG citation.** This is the check `/finalise` 6d HALTs on. Running it here sends a missing
+entry into the fix loop instead (task.248, obs #43):
+
+```bash
+# From the repository root. {task-file} is this task document — substitute it.
+STEM=$(command node .agents/skills/qa-task/references/doc-id.js parse "$(basename "{task-file}")" --json | jq -r '.id // empty')
+CITES=$(bash .agents/skills/qa-task/references/changelog-cites.sh "$STEM"); rc=$?
+case $rc in
+  0|3) echo "changelog: $CITES" ;;
+  1) echo "MEDIUM: changelog $CITES — add an [Unreleased] entry citing (task N); /finalise 6d HALTs without it" ;;
+  *) echo "HALT: changelog-cites.sh could not answer for '$STEM' (rc $rc): $CITES"; exit 1 ;;
+esac
+```
+
+A `MEDIUM` line is a `top_issues[]` entry with `file: CHANGELOG.md`.
 
 **Wireframe conformance** (only when the task has a wireframe component table and `skills-config.yaml` sets `ui.wireframeMap`; procedure: `references/wireframe-component-mapping.md`). For each row, the changed UI builds that node from the component named, imported from `ui.componentImport`, with the variant the row gives; a node rebuilt by hand or from another component is a `category: coverage` finding. For each entry under `### Wireframe mapping assumptions` in the implementation report's Decisions Log, check the assumed component against the design source the wireframe came from, and record the verdict in the QA report; a wrong assumption is a `high` finding, and a right one may then be recorded in the map with `wireframe-map.js record` (`references/wireframe-map.js`).
 
@@ -1277,6 +1366,8 @@ nfr_validation:
     evidence: measured|reasoned|unverified
     probes_executed: 0 # REQUIRED when evidence: measured; `measured` with 0 is a schema error
     escaped: 0 # the run record's totals.escaped; non-zero is a top_issues[] finding, never PASS
+    boundary_signals: [] # Step 3b item 3's criteria classifier, copied (task.248)
+    boundary_reason: '' # required when boundary: false sits beside a non-empty boundary_signals
     notes: 'Specific findings'
   performance:
     status: PASS|CONCERNS|FAIL
@@ -1287,6 +1378,16 @@ nfr_validation:
   maintainability:
     status: PASS|CONCERNS|FAIL
     notes: 'Specific findings'
+
+criteria_drift: # Step 5's criteria-drift.js result (task.248)
+  reason: clean|drift|new-document|no-criteria
+  base: reviewed-blob|review-commit|merge-base
+  changed: # one entry per changed criterion; empty when clean
+    - id: '#5'
+      kind: reworded|appended|added|removed
+      approved: false # the new text carries `approved by <name>`
+      relaxes: false # appended only: does the added text relax the criterion?
+      relaxes_reason: 'An evidence note; the bound is unchanged'
 
 recommendations:
   immediate: # Blocking issues — must fix before merge
@@ -1675,15 +1776,17 @@ Step 13**: a check that runs before the claim is written cannot check it.
 ```bash
 # From the repository root. {task-file} is the task document this QA run just edited — substitute it; the script
 # refuses an unsubstituted placeholder (exit 2), so a block run as delivered
-# cannot pass by reading nothing.
-command node .agents/skills/qa-task/references/qa-read-back.js --doc "{task-file}"
+# cannot pass by reading nothing. --target is the PR's base, as Step 5's drift block resolves it:
+# the read-back re-runs criteria-drift.js and needs the same merge-base fallback.
+TARGET=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo develop)
+command node .agents/skills/qa-task/references/qa-read-back.js --doc "{task-file}" --target "$TARGET"
 ```
 
 `qa-read-back.js` is the read-back, defined once for both QA skills and tested directly
 (`references/tests/qa-read-back.test.mjs`). It **decides**: exit 0 is clean, exit 1 is a
 Step 12b HALT with each problem and its remedy printed, and exit 2 is "could not look" (bad
 arguments, an unreadable document, a sibling engine that did not load). Exit 2 is never a pass. It
-checks five things:
+checks six things:
 
 1. **The claims exist.** This cycle's gate and QA report are in the work item's directory, the
    document links **those two files** — not an earlier cycle's (task.158) — and it has a Change Log
@@ -1708,6 +1811,14 @@ checks five things:
    cycle wrote no row of its own, which a repeated verdict would otherwise hide. A missing
    section, decision line, `QA gate` row or `gate:` token halts too. When it halts, re-render
    the section from this gate and append the `QA gate <TOKEN>` row, then re-run.
+6. **The gate answers the finalise rules** (task.248). It re-runs Step 3b item 3's criteria
+   classifier itself. When the criteria carry a signal, the gate must record `boundary_signals`,
+   and either `boundary: true` or a `boundary_reason`. It re-runs Step 5's `criteria-drift.js`
+   too, against `--target`: every criterion the engine reports changed must be in
+   `criteria_drift.changed` with the engine's kind, and every `appended` entry must answer
+   `relaxes: true|false` with a `relaxes_reason`. The drift is re-derived whenever the document
+   has criteria, whatever keys the gate carries: a gate that leaves `criteria_drift` out is asked
+   all the same.
 
 **Do not post the PR comment (Step 13) over exit 1 or 2.** Posting over it reproduces task.141: a PR comment linked
 a report that did not exist, found only by CI's `link-check`, and a row was dated after `updated:`,
@@ -1755,7 +1866,8 @@ fi
 ```bash
 # Step 12b's rule, re-checked here: every block runs as its own shell, and a run that
 # batches 12b and 13 drops the prose between them (obs #226).
-command node .agents/skills/qa-task/references/qa-read-back.js --doc "{task-file}" >/dev/null || { echo "HALT: read-back not clean — not posting"; exit 1; }
+TARGET=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo develop)
+command node .agents/skills/qa-task/references/qa-read-back.js --doc "{task-file}" --target "$TARGET" >/dev/null || { echo "HALT: read-back not clean — not posting"; exit 1; }
 mkdir -p .claude/state
 BODY_FILE=.claude/state/qa-comment-body.md
 cat > "$BODY_FILE" <<'EOF'

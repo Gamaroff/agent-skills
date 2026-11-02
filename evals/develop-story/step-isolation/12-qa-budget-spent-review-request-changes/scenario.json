@@ -1,0 +1,83 @@
+{
+  "name": "develop-story-step-05-qa-budget-spent-review-request-changes",
+  "skill": "develop-story",
+  "description": "Steps 5–6, the budget counts gates (task.244), the review arm: gate 5 reads PASS and hands to 5c, and the review returns REQUEST CHANGES with the budget spent (cycle 5 of 5). A fix would land on a head no gate reads, so Loop Escalation fires with the `Loop limit via review` trigger and the review's findings unfixed — no fifth qa-fix. Fixture records qa-story×5, qa-fix×4, review-pr×1.",
+  "prompt": "Run steps 5–6 (qa loop) of the develop-story pipeline for story.1.1.1.example. Cycles 1–4 read CONCERNS and were fixed; cycle 5's gate reads PASS, and 5c's review returns REQUEST CHANGES. The budget is 5 gates.",
+  "assertions": [
+    {
+      "fn": "fileExists",
+      "args": [
+        "$SANDBOX/docs/prd/domain/prd.1.feature/epics/epic.1.1.example/stories/story.1.1.1.example/story.1.1.1.gate.5.example.yml"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/prd/domain/prd.1.feature/epics/epic.1.1.example/stories/story.1.1.1.example/story.1.1.1.gate.5.example.yml",
+        "gate: PASS"
+      ]
+    },
+    {
+      "fn": "pipelineStepsRan",
+      "args": [
+        "$SANDBOX/.eval/pipeline-events.json",
+        [
+          "qa-story",
+          "qa-fix",
+          "qa-story",
+          "qa-fix",
+          "qa-story",
+          "qa-fix",
+          "qa-story",
+          "qa-fix",
+          "qa-story",
+          "review-pr"
+        ]
+      ]
+    },
+    {
+      "fn": "loopBoundedAt",
+      "args": [
+        "$SANDBOX/.eval/pipeline-events.json",
+        "qa-fix",
+        4
+      ]
+    },
+    {
+      "fn": "loopBoundedAt",
+      "args": [
+        "$SANDBOX/.eval/pipeline-events.json",
+        "qa-story",
+        5
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/prd/domain/prd.1.feature/epics/epic.1.1.example/stories/story.1.1.1.example/story.1.1.1.implementation.1.example.md",
+        "### QA Cycle 5[\\s\\S]*\\*\\*PR Review\\*\\*: REQUEST CHANGES"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/prd/domain/prd.1.feature/epics/epic.1.1.example/stories/story.1.1.1.example/story.1.1.1.implementation.1.example.md",
+        "### QA Cycle 5[\\s\\S]*\\*\\*Action\\*\\*: Escalating — loop limit reached"
+      ]
+    },
+    {
+      "fn": "fileDoesNotMatch",
+      "args": [
+        "$SANDBOX/docs/prd/domain/prd.1.feature/epics/epic.1.1.example/stories/story.1.1.1.example/story.1.1.1.implementation.1.example.md",
+        "Half-cycle|half-cycle|### QA Cycle 6"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/prd/domain/prd.1.feature/epics/epic.1.1.example/stories/story.1.1.1.example/story.1.1.1.implementation.1.example.md",
+        "## QA Loop Limit Reached"
+      ]
+    }
+  ]
+}

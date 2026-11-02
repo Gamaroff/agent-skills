@@ -1,0 +1,66 @@
+schema: 2
+task: 'task.174.ci-docs-only-classifier-template'
+task_title: 'Publish the docs-only CI classifier as an optional consumer template'
+gate: PASS
+status_reason: 'Cycle 3. QA-3, QA-4 and QA-5 verified fixed: the concurrency guard is pinned and mutation-proven against five evasions, the group is workflow-scoped, and the guide states what PR-only cancellation does and does not guarantee. One advisory wording cleanup.'
+reviewer: 'QA Engineer'
+head: '08ccb5d2471c1150ae918182ea52c299a1a5df0b'
+updated: '2026-11-02T14:26:06Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 71
+  phases_verified: 4/4
+  trace:
+    phases_covered: [0, 1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 28
+    escaped: 0
+    boundary: true
+    boundary_signals: []
+    notes: 'is_docs in both variants re-probed under shell-fn at this head (task.174.qa.3.security.run.json): 28 executed, 0 reproduced, 0 escaped.'
+  performance:
+    status: PASS
+    notes: 'Unchanged; measured upstream runs quoted in the guide.'
+  reliability:
+    status: PASS
+    notes: 'QA-4 fixed: the guide scopes the base-branch claim and lists the remaining cases with the adopter remedy. QA-5 fixed: workflow-scoped group.'
+  maintainability:
+    status: PASS
+    notes: 'QA-3 fixed: the concurrency block is pinned; M8, M10-M13 each turn one test red.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Code review CR-1 (cycle 3, cleanup): the guide says "Once the classifier is in place this is not optional" while the snippet comment opens the concurrency block with "Optional"; say that the block is optional but, if kept, PR-only cancellation and per-run push groups are not.'
+      refs: ['docs/runbooks/ci-docs-only-skip.md', 'docs/examples/ci/github-actions/changes-job.yml']
+    - action: 'Code review CR-4 (cycle 2, cleanup): "docs-only PR → false, no lookup" in the Bitbucket spec never checks that curl did not run; route it through classify() with the fake curl.'
+      refs: ['docs/examples/ci/bitbucket-pipelines/classify-changes.test.js']
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 0
+  fix_date: '2026-11-02'
+  total_iterations: 2
+  verification_method: 'Mutation proofs against the committed tree + read against classify-changes.sh'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

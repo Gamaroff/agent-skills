@@ -1,0 +1,152 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "df3db764a416fb7876847ec4226fc5df0a2e069e",
+  "dirty_paths": [
+    "docs/tasks/task.225.loop-supervisor-probe-stale-hit-replacement/task.225.implementation.1.loop-supervisor-probe-stale-hit-replacement-initial-run.md",
+    "docs/tasks/task.225.loop-supervisor-probe-stale-hit-replacement/task.225.pr-review.1.loop-supervisor-probe-stale-hit-replacement.md"
+  ],
+  "document": "docs/tasks/task.225.loop-supervisor-probe-stale-hit-replacement/task.225.loop-supervisor-probe-stale-hit-replacement.md",
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 8,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "SC1",
+      "text_hash": "b96e7b75df829ac8e47730f6f579d22242ca73d9dc65eb72689ef3fdec907768",
+      "status": "PASS",
+      "description": "File to directory swap in one process: probeMissing returns null",
+      "code_citation": "skills/loop-supervisor/references/adapters.js:391",
+      "test_citation": "evals/loop-supervisor/unit/adapters.test.mjs:639",
+      "members": [],
+      "non_member_fail": null,
+      "note": "SWAPS[0] (adapters.test.mjs:607-611) puts tools/select.js, probes it (null), replaces it with tools/select/index.js and asserts null. The stale-hit branch `return freshResolve(file) !== null` at adapters.js:391 produces that null. The test runs per-PR: test.yml runs on every pull_request with no paths filter, and `npm test` -> test:suite includes 'evals/loop-supervisor/unit/*.test.mjs'. No code or test file has changed between QA head 159f41a3 and PR head df3db764."
+    },
+    {
+      "id": "SC2",
+      "text_hash": "b94ce90facea660fe6e4ce33304b98da6dee5f4dafc22e3698c489c5f6cd0db4",
+      "status": "PASS",
+      "description": "Reverse swap, directory to file, also returns null",
+      "code_citation": "skills/loop-supervisor/references/adapters.js:391",
+      "test_citation": "evals/loop-supervisor/unit/adapters.test.mjs:639",
+      "members": [],
+      "non_member_fail": null,
+      "note": "SWAPS[1] ('directory → file', before tools/select/index.js, after tools/select.js) runs the same loop test at adapters.test.mjs:619. It runs per-PR through npm test in test.yml."
+    },
+    {
+      "id": "SC3",
+      "text_hash": "ab1f60f970f3ed3161cd17e0a9ba6a4fd30f275833d403ec2054edbf2e14715c",
+      "status": "PASS",
+      "description": "Stale hit with no replacement still reports probe script not found",
+      "code_citation": "skills/loop-supervisor/references/adapters.js:391",
+      "test_citation": "evals/loop-supervisor/unit/adapters.test.mjs:644",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Both swap tests end by removing tools/ and asserting that the reason starts with 'probe script not found: tools/select'. In that case resolveInFreshNode returns null, so resolvesAsMain returns false. The test runs per-PR through npm test."
+    },
+    {
+      "id": "SC4",
+      "text_hash": "26d4a899645e45fda2860bc06192777a7e12fa9bdf18e154d8fc99f3748a735b",
+      "status": "PASS",
+      "description": "Five agreement tests and QA-3 pair pass unchanged",
+      "code_citation": "skills/loop-supervisor/references/adapters.js:384-390",
+      "test_citation": "evals/loop-supervisor/unit/adapters.test.mjs:541",
+      "members": [
+        {
+          "member": "agreement: exact file",
+          "evidence": "evals/loop-supervisor/unit/adapters.test.mjs:541 (RESOLUTION_CASES, line ~509)",
+          "status": "PASS"
+        },
+        {
+          "member": "agreement: extensionless, .js beside it",
+          "evidence": "evals/loop-supervisor/unit/adapters.test.mjs:541 (RESOLUTION_CASES, line ~515)",
+          "status": "PASS"
+        },
+        {
+          "member": "agreement: extensionless, nothing beside it",
+          "evidence": "evals/loop-supervisor/unit/adapters.test.mjs:541 (RESOLUTION_CASES, line ~521)",
+          "status": "PASS"
+        },
+        {
+          "member": "agreement: directory with index.js",
+          "evidence": "evals/loop-supervisor/unit/adapters.test.mjs:541 (RESOLUTION_CASES, line ~527)",
+          "status": "PASS"
+        },
+        {
+          "member": "agreement: directory without an index",
+          "evidence": "evals/loop-supervisor/unit/adapters.test.mjs:541 (RESOLUTION_CASES, line ~533)",
+          "status": "PASS"
+        },
+        {
+          "member": "QA-3: tools/select",
+          "evidence": "evals/loop-supervisor/unit/adapters.test.mjs:578",
+          "status": "PASS"
+        },
+        {
+          "member": "QA-3: tools/select.js",
+          "evidence": "evals/loop-supervisor/unit/adapters.test.mjs:578",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "The diff touches only the import block (lines 15-33) and inserts new tests after line 601. It leaves the RESOLUTION_CASES table, the agreement loop and the QA-3 loop untouched. The throw path and the live-hit path at adapters.js:384-390 are unchanged. The QA report records the full suite at 255 pass, 0 fail. All seven members run per-PR through npm test."
+    },
+    {
+      "id": "SC5",
+      "text_hash": "51b3bed75485248310fb6534a929f368b6adb018c38a27aad07622056aa6f06b",
+      "status": "PASS",
+      "description": "freshResolve called only on stale hit; one exists call per probe",
+      "code_citation": "skills/loop-supervisor/references/adapters.js:390-391",
+      "test_citation": "evals/loop-supervisor/unit/adapters.test.mjs:653",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The test 'resolvesAsMain spawns a fresh resolve only on a stale hit' asserts 0 calls on a miss, 0 on a live hit and exactly [file] on a stale hit. freshResolve is reached only after the `if (fs.existsSync(resolved)) return true` check at line 390. The one-exists-call test at adapters.test.mjs:679 (formerly :597) is unchanged. A second mutation in the QA report (live hit also calls freshResolve) turned the spawn-count test red. Both tests run per-PR."
+    },
+    {
+      "id": "SC6",
+      "text_hash": "fa7ec9096e1f7ab7036afc831cb217ea50e60310b221cc640498bc65be790dbd",
+      "status": "PASS",
+      "description": "Mutation-proven: return false fallback makes SC1/SC2 tests fail",
+      "code_citation": "skills/loop-supervisor/references/adapters.js:391",
+      "test_citation": "evals/loop-supervisor/unit/adapters.test.mjs:639",
+      "members": [],
+      "non_member_fail": null,
+      "note": "QA report M1 (task.225.qa.1...md:141) records the mutation: `return freshResolve(file) !== null;` changed to `return false;` turned both swap tests and the spawn-count test red (63 pass / 3 fail), so the mutation was covered. The mutated line is unchanged at the PR head, and the killing tests run per-PR."
+    },
+    {
+      "id": "SC7",
+      "text_hash": "5af361f852b09767dfccbf722220db9cf8bc9389919e4af45f7726f8923998f1",
+      "status": "PASS",
+      "description": "Loop-supervisor suite passes locally (symlink aside) and in CI; validate passes",
+      "code_citation": "docs/tasks/task.225.loop-supervisor-probe-stale-hit-replacement/task.225.qa.1.loop-supervisor-probe-stale-hit-replacement.md:152",
+      "test_citation": "evals/loop-supervisor/unit/adapters.test.mjs:619",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Local half: QA ran the loop-supervisor unit suite in a scratch worktree at HEAD with no .agents/skills symlink and got 256 tests, 255 pass, 0 fail, 1 skipped (QA report lines 44, 152). QA also recorded `npm run validate -- skills/loop-supervisor/` passing. No code or test file changed between 159f41a3 and head df3db764. The suite is in the per-PR test.yml lane through npm test. CI half: read by the orchestrator (CI reading 1/2)."
+    },
+    {
+      "id": "SC8",
+      "text_hash": "c6d6af98a80646fdf470cbac29317317f069fb3cdaa0bff38410f3ce17574566",
+      "status": "PASS",
+      "description": "CHANGELOG [Unreleased] cites task 225",
+      "code_citation": "CHANGELOG.md:71",
+      "test_citation": "evals/shared/tests/changelog-entry-drift.test.mjs:1",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Documentation criterion. CHANGELOG.md:69-75 has an `### Fixed` entry citing task 225 under `## [Unreleased]`. The corpus guard changelog-entry-drift.test.mjs runs in npm test as a post-merge guard."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "SC7",
+      "note": "The QA report records CI on 159f41a3 as pending, and the PR head is now df3db764 (docs-only commits since then). The CI half of SC7 is read on the head by the orchestrator."
+    },
+    {
+      "ac_id": "SC3",
+      "note": "QA CR-1, advisory: resolveInFreshNode returns null both for 'does not resolve' and for 'spawn failed/timed out'. A spawn failure therefore reads as 'probe script not found', matching the pre-change behaviour; routed to recommendations.future."
+    }
+  ]
+}

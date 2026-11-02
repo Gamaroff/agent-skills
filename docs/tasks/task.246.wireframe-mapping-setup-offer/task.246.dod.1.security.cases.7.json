@@ -1,0 +1,141 @@
+[
+  {
+    "id": "false",
+    "input": "false",
+    "direction": "hostile",
+    "why": "--map false would be a decline written through the path flag.",
+    "correct": "Usage error naming --decline (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "off",
+    "input": "off",
+    "direction": "hostile",
+    "why": "off is a decline.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "upper-false",
+    "input": "FALSE",
+    "direction": "hostile",
+    "why": "Decline is case-folded (bug.4).",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "title-off",
+    "input": "Off",
+    "direction": "hostile",
+    "why": "Case-folded.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "mixed-off",
+    "input": "oFf",
+    "direction": "hostile",
+    "why": "Case-folded.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "padded",
+    "input": "  false  ",
+    "direction": "hostile",
+    "why": "Trimmed on write, so it would read back as a decline.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "nbsp",
+    "input": "off ",
+    "direction": "hostile",
+    "why": "NBSP passes the escape rule, and String#trim strips it on read-back, so it would read as a decline.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "bom",
+    "input": "﻿false",
+    "direction": "hostile",
+    "why": "U+FEFF is kept by JSON.stringify and stripped by trim.",
+    "correct": "Usage error (exit 2); nothing written.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "skills-config.yaml"
+      ]
+    }
+  },
+  {
+    "id": "offline",
+    "input": "offline.md",
+    "direction": "legitimate",
+    "why": "The task's own control: a path beginning with off.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "false-dir",
+    "input": "docs/false.md",
+    "direction": "legitimate",
+    "why": "Contains the word but is a path.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "title-false-file",
+    "input": "False.md",
+    "direction": "legitimate",
+    "why": "A path, not the bare word.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "no",
+    "input": "no",
+    "direction": "legitimate",
+    "why": "Only false/off decline; no is written quoted and reads as a path.",
+    "correct": "Accepted (exit 0)."
+  },
+  {
+    "id": "off-dir",
+    "input": "docs/off/map.md",
+    "direction": "legitimate",
+    "why": "Path segment named off.",
+    "correct": "Accepted (exit 0)."
+  }
+]

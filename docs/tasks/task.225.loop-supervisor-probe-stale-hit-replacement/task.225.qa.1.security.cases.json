@@ -1,0 +1,58 @@
+[
+  {
+    "id": "resolves.missing-relative",
+    "input": "./no-such-probe-script.js",
+    "direction": "hostile",
+    "why": "A probe script that does not exist must read as missing, so probeMissing returns the not-found error.",
+    "correct": "false (rejected)."
+  },
+  {
+    "id": "resolves.command-substitution",
+    "input": "./$(touch PWNED).js",
+    "direction": "hostile",
+    "why": "If the name ever reached a shell, the substitution would run. The fresh resolve passes the name as an argument, never as a string.",
+    "correct": "false (rejected), and nothing is written."
+  },
+  {
+    "id": "resolves.backtick-substitution",
+    "input": "./`touch PWNED2`.js",
+    "direction": "hostile",
+    "why": "The older substitution syntax.",
+    "correct": "false (rejected), and nothing is written."
+  },
+  {
+    "id": "resolves.option-shaped",
+    "input": "--version",
+    "direction": "hostile",
+    "why": "A name shaped like a node option must not be read as one by the fresh node process.",
+    "correct": "false (rejected)."
+  },
+  {
+    "id": "resolves.nul-byte",
+    "input": "./adapters.js\u0000.txt",
+    "direction": "hostile",
+    "why": "A NUL byte truncates the path in some APIs, so the name could resolve to adapters.js.",
+    "correct": "false (rejected): require.resolve throws on a NUL byte and the throw is read as missing."
+  },
+  {
+    "id": "resolves.empty",
+    "input": "",
+    "direction": "hostile",
+    "why": "An empty name names no script.",
+    "correct": "false (rejected)."
+  },
+  {
+    "id": "resolves.live-file",
+    "input": "./adapters.js",
+    "direction": "legitimate",
+    "why": "Control: a script Node would run must read as present.",
+    "correct": "true (accepted)."
+  },
+  {
+    "id": "resolves.live-file-no-extension",
+    "input": "./adapters",
+    "direction": "legitimate",
+    "why": "Control: Node resolves an extensionless name to its .js file, and the probe must agree.",
+    "correct": "true (accepted)."
+  }
+]

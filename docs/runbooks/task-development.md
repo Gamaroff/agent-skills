@@ -111,7 +111,7 @@ develop
 | 2 | `review-task` | Runs `review-task` with its prompts auto-answered (no questions). Skipped when a `task.{N}.review.*.md` report exists and the status is Ready for Development or In Progress, or the status is Planned and the report is current for the task document as it stands. |
 | 3 | `develop` | Implements the task. Bounded loop, `MAX_ITER=5`. Each iteration: plan → code → test → success-criteria check. |
 | 4 | `create-pr` | Pushes the branch, opens a PR against the chosen base with `--base` pre-supplied. |
-| 5–6 | `qa-task` → `qa-fix` → `review-pr` | QA review produces a gate file. `qa-fix` runs on `FAIL`, or on an open `top_issues[]` entry that no active waiver covers; a gate in the accepting-route set (any of the QA loop's §5c five routes) hands to `review-pr`. Up to `QA_MAX_CYCLES` cycles (default 5). `qa-task` focuses on success-criteria validation, implementation-phase verification, and NFRs for infra/refactor work. **Step 5c is the loop's exit gate**: a gate in the accepting-route set hands to `review-pr`, which reviews the PR against the task. `REQUEST CHANGES` returns to `qa-fix` and consumes a cycle from the same cycle budget; `APPROVE`/`CONCERNS` exit to Step 7. Leaves `task.{N}.pr-review.{n}.{name}.md`. |
+| 5–6 | `qa-task` → `qa-fix` → `review-pr` | QA review produces a gate file. `qa-fix` runs on `FAIL`, or on an open `top_issues[]` entry that no active waiver covers; a gate in the accepting-route set (any of the QA loop's §5c four routes) hands to `review-pr`. Up to `QA_MAX_CYCLES` cycles (default 5). `qa-task` focuses on success-criteria validation, implementation-phase verification, and NFRs for infra/refactor work. **Step 5c is the loop's exit gate**: a gate in the accepting-route set hands to `review-pr`, which reviews the PR against the task. `REQUEST CHANGES` returns to `qa-fix` and consumes a cycle from the same cycle budget; `APPROVE`/`CONCERNS` exit to Step 7. Leaves `task.{N}.pr-review.{n}.{name}.md`. |
 | 7 | `finalise` | Validates against the Definition of Done, posts DoD summary to the PR, comments the tracker issue, updates the board. **Full side-effects in lite mode too.** Also flips the task registry row to the final status. |
 | 8 | `commit-changes` | Commits the final implementation report and pushes. The DoD summary, `status: accepted` and the registry tick were already committed by `/finalise` (6a). |
 
@@ -177,7 +177,7 @@ Everything else — `create-branch`, `develop`, `create-pr`, `qa-fix`, `finalise
 gh pr view --json baseRefName,statusCheckRollup
 
 # Gate file exists, and the last QA cycle's Action row (implementation report) reads
-# 'Proceeding to 5c' — the record that the gate took one of §5c's five routes
+# 'Proceeding to 5c' — the record that the gate took one of §5c's four routes
 ls docs/tasks/task.{N}.{name}/*.gate.*.yml
 grep '^gate:' docs/tasks/task.{N}.{name}/*.gate.*.yml
 # Expected output: exactly one line reading `**Action**: Proceeding to 5c (PR conformance review)`.
@@ -281,9 +281,20 @@ missing from `.agents/skills/finalise/references/` (a partial or stale install).
 rather than reading a broken install as "not enabled", which would silently drop an opted-in
 project's check.
 **Fix:**
-1. Reinstall or re-bundle the `finalise` skill so both files are present.
+1. Reinstall or re-bundle the `finalise` skill so both files are present. Since task.248, 6d runs
+   `changelog-cites.sh`, which also needs `changelog-cites.sh` and `doc-id.js` there.
 2. Check it: `bash .agents/skills/finalise/references/changelog-enforce.sh` prints `on` or `off`.
 3. Re-invoke `/finalise`.
+
+### `/finalise` halts with `changelog-stem`
+
+**You see:** `HALT: changelog-stem — changelog-cites.sh refused STEM '…'` at Step 7 action 6d.
+**Cause:** 6d was given a `STEM` that `doc-id.js` cannot read as a work-item id. `STEM` is the work
+item's id from 6a (`task.248`, `story.1.2.3`), not its file name or its slug.
+**Fix:**
+1. Check it: `bash .agents/skills/finalise/references/changelog-cites.sh task.248` prints
+   `cites`, `missing` or `not-applicable`, never `usage`.
+2. Re-invoke `/finalise` with the work item's own path.
 
 ### Task registry shows a duplicate "Next Available" number
 
