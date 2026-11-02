@@ -303,8 +303,8 @@ No other file changes. `shared/resources/security-probe.mjs` is read, not edited
 
 ### QA Report
 
-- **Full Report**: [task.250.qa.2.security-probe-scratch-out-of-tree.md](./task.250.qa.2.security-probe-scratch-out-of-tree.md)
-- **Gate File**: [task.250.gate.2.security-probe-scratch-out-of-tree.yml](./task.250.gate.2.security-probe-scratch-out-of-tree.yml)
+- **Full Report**: [task.250.qa.3.security-probe-scratch-out-of-tree.md](./task.250.qa.3.security-probe-scratch-out-of-tree.md)
+- **Gate File**: [task.250.gate.3.security-probe-scratch-out-of-tree.yml](./task.250.gate.3.security-probe-scratch-out-of-tree.yml)
 
 ### Test Coverage Summary
 
@@ -315,7 +315,7 @@ No other file changes. `shared/resources/security-probe.mjs` is read, not edited
 
 ### Key Findings
 
-Cycle 1's fixes hold, and each goes red when reverted. The cycle-2 refute pass found that the in-tree write guard can still be blinded: a quote in a comment inside an argument list (TASK-250-CR2-1, medium) and a backtick or `/*` in a regex literal (TASK-250-CR2-2, low) each hide a write. Both were reproduced in memory. No real write is hidden today.
+Cycle 2's fixes hold, and each goes red when reverted. The regex-literal handling they added reads a division after a string literal or a `//` comment as a regex start, which hides a write without failing the guard (TASK-250-CR3-1, medium, reproduced). The calibration row meant to cover this case cannot catch it (TASK-250-CR3-3, low).
 
 ## Change Log
 
@@ -331,6 +331,8 @@ Cycle 1's fixes hold, and each goes red when reverted. The cycle-2 refute pass f
 | 2026-11-02 |  | QA findings fixed — CR-1, CR-4 (plus advisory CR-2, CR-3), 1 iteration | qa-fix |
 | 2026-11-02 |  | QA gate CONCERNS (90/100) — 2 findings | qa-task |
 | 2026-11-02 |  | QA findings fixed — CR2-1, CR2-2 (plus advisory CR2-3, CR2-4, CR2-5), 1 iteration | qa-fix |
+| 2026-11-02 |  | QA gate CONCERNS (90/100) — 2 findings | qa-task |
+| 2026-11-02 |  | QA findings fixed — CR3-1, CR3-3 (plus advisory CR3-2), 1 iteration | qa-fix |
 
 <!-- change-log-end -->
 

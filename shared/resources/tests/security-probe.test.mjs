@@ -8094,25 +8094,45 @@ const T250_WRITE_ARG = {
  *
  * This is a tokenizer heuristic, not a JavaScript parser — the repository
  * carries none. So the guard does not claim it never misreads: it fails LOUD
- * when it does. A matched call whose argument list cannot be closed fails the
- * guard (`unparsed`), and so does a code-only view that hides more call names
- * than T250_MAX_MASKED (`masked`), rather than either passing quietly.
+ * when it does. A matched call whose argument list cannot be closed, or that
+ * lacks its write argument, fails the guard (`unparsed`). And every call name
+ * the code-only view hides must be one of T250_MASKED's known sites, exactly:
+ * a misread that hides a real call adds a site no entry names, whatever the
+ * heuristic got wrong (QA cycle 3, CR3-2 — an allow-list, not a cap).
  */
 function t250CodeOnly(src) {
   const out = src.split("");
   const blank = (from, to) => {
     for (let k = from; k < to; k++) if (out[k] !== "\n") out[k] = " ";
   };
-  // A `/` opens a regex literal when what precedes it cannot end an operand.
-  const regexAfter =
-    /(^|[(,=:[!&|?{};+\-*%<>~^]|\b(?:return|typeof|case|void|in|of|delete|throw|new|yield|await))\s*$/;
+  // A `/` opens a regex literal when the last significant token before it
+  // cannot end an operand: the start of the source, an operator or opening
+  // bracket, or a keyword that takes an expression. The token is tracked as the
+  // scan goes, so whitespace and comments are skipped, and a string, template
+  // or regex literal counts as an operand — `"a" / b` is division (QA cycle 3,
+  // CR3-1: a window over the blanked text read a literal as nothing).
+  const OPENS = new Set("(,=:[!&|?{};+-*%<>~^".split(""));
+  const KEYWORDS = new Set(
+    "return typeof case void in of delete throw new yield await".split(" "),
+  );
+  let last = null; // null: start of source; "operand"; or the last punctuator
+  let word = "";
+  const regexStarts = () =>
+    last === null || OPENS.has(last) || (last === "word" && KEYWORDS.has(word));
   for (let i = 0; i < src.length; i++) {
     const ch = src[i];
+    if (/\s/.test(ch)) continue;
+    if (/[A-Za-z0-9_$]/.test(ch)) {
+      word =
+        last === "word" && /[A-Za-z0-9_$]/.test(src[i - 1]) ? word + ch : ch;
+      last = "word";
+      continue;
+    }
     if (
       ch === "/" &&
       src[i + 1] !== "/" &&
       src[i + 1] !== "*" &&
-      regexAfter.test(out.slice(Math.max(0, i - 16), i).join(""))
+      regexStarts()
     ) {
       let j = i + 1;
       let inClass = false;
@@ -8125,8 +8145,10 @@ function t250CodeOnly(src) {
       if (src[j] === "/") {
         blank(i, j + 1);
         i = j;
-      }
+        last = "operand";
+      } else last = "/";
     } else if (ch === "/" && src[i + 1] === "/") {
+      // A comment changes nothing about the last token.
       const end = src.indexOf("\n", i);
       const stop = end === -1 ? src.length : end;
       blank(i, stop);
@@ -8144,6 +8166,9 @@ function t250CodeOnly(src) {
       }
       blank(i, Math.min(j + 1, src.length));
       i = j;
+      last = "operand";
+    } else {
+      last = ch;
     }
   }
   return out.join("");
@@ -8179,13 +8204,13 @@ function t250Args(code, open) {
   return null;
 }
 
-/** The most call names the code-only view may hide (they sit in strings or comments). */
-const T250_MAX_MASKED = 8;
-
 /**
  * Every write call in `src` whose write argument is built from REPO_ROOT, as
  * `line → call`; `unparsed`, the matched calls whose argument list never
- * closes; and `masked`, the lines of call names the code-only view hid.
+ * closes or lacks the write argument; and `masked`, each call name the
+ * code-only view hid, as `line → text` — the trimmed line with every call name
+ * written `⟨call⟩(`, so a T250_MASKED key never spells a call name itself
+ * (which would make it one more masked site: the cycle-1 CR-1 trap).
  */
 function t250InTreeWrites(src) {
   const call = new RegExp(
@@ -8193,6 +8218,7 @@ function t250InTreeWrites(src) {
     "g",
   );
   const code = t250CodeOnly(src);
+  const lines = src.split("\n");
   const lineOf = (idx) => src.slice(0, idx).split("\n").length;
   const found = [];
   const unparsed = [];
@@ -8201,13 +8227,13 @@ function t250InTreeWrites(src) {
   for (const m of code.matchAll(call)) {
     const ln = lineOf(m.index);
     const spans = t250Args(code, m.index + m[0].length - 1);
-    if (!spans) {
+    const span = spans?.[T250_WRITE_ARG[m[1]]];
+    if (!span) {
       unparsed.push(`${ln} → ${m[1]}(`);
       continue;
     }
     total++;
-    const span = spans[T250_WRITE_ARG[m[1]]];
-    const target = span ? src.slice(span[0], span[1]).trim() : "";
+    const target = src.slice(span[0], span[1]).trim();
     // Any write path that names REPO_ROOT: join(…), resolve(…), path.join(…)
     // and a template literal alike (CR-2).
     if (/\bREPO_ROOT\b/.test(target)) {
@@ -8216,8 +8242,9 @@ function t250InTreeWrites(src) {
   }
   const masked = [];
   for (const m of src.matchAll(call)) {
-    if (code.slice(m.index, m.index + m[0].length) !== m[0])
-      masked.push(String(lineOf(m.index)));
+    if (code.slice(m.index, m.index + m[0].length) === m[0]) continue;
+    const ln = lineOf(m.index);
+    masked.push(`${ln} → ${lines[ln - 1].trim().replace(call, "⟨call⟩(")}`);
   }
   return { found, total, unparsed, masked };
 }
@@ -8241,6 +8268,33 @@ const T250_ALLOWED = new Map([
   ],
 ]);
 
+/**
+ * Every call name this file writes inside a string or comment, which the
+ * code-only view therefore hides — keyed on the trimmed line with the name
+ * written `⟨call⟩(` (see t250InTreeWrites), with how many such sites the line
+ * holds and why it is not a call. The set is exact: a hidden name no entry
+ * names fails, so a tokenizer misread that swallows a real call cannot pass,
+ * and an entry nothing matches is stale (QA cycle 3, CR3-2).
+ */
+const T250_MASKED = new Map([
+  [
+    "* (`⟨call⟩(join(tmpdir(), …))`) lands there. Returns `fn`'s result and",
+    { count: 1, reason: "a JSDoc mention" },
+  ],
+  [
+    '`fs.⟨call⟩(${JSON.stringify(started)}, "");`,',
+    { count: 1, reason: "source text of a child-process driver script" },
+  ],
+  [
+    '`setTimeout(() => fs.⟨call⟩(${JSON.stringify(marker)}, ""), 300);`,',
+    { count: 1, reason: "source text of a child-process driver script" },
+  ],
+  [
+    `'⟨call⟩(join(REPO_ROOT, FIXTURES, "__pycache__"), …)',`,
+    { count: 1, reason: "the T250_ALLOWED key" },
+  ],
+]);
+
 test("task.250: no write call in this suite builds its write path from REPO_ROOT", () => {
   const src = readFileSync(fileURLToPath(import.meta.url), "utf8");
   const { found, total, unparsed, masked } = t250InTreeWrites(src);
@@ -8256,12 +8310,24 @@ test("task.250: no write call in this suite builds its write path from REPO_ROOT
     [],
     `write calls the scan could not read:\n${unparsed.join("\n")}`,
   );
-  // The code-only view hides only names in strings and comments — a handful.
-  // More means a literal or comment was mis-closed and swallowed real code.
-  assert.ok(
-    masked.length <= T250_MAX_MASKED,
-    `the code-only view hid ${masked.length} call names (max ${T250_MAX_MASKED}), on lines ${masked.join(", ")} — a literal or comment was mis-read`,
+  // Every hidden call name is a known string-or-comment site, exactly. Any
+  // other means a literal or comment was mis-read and swallowed real code.
+  const hidden = new Map();
+  for (const m of masked) {
+    const text = m.slice(m.indexOf(" → ") + 3);
+    hidden.set(text, [...(hidden.get(text) ?? []), m.split(" → ")[0]]);
+  }
+  const misread = [...hidden]
+    .filter(([text, at]) => T250_MASKED.get(text)?.count !== at.length)
+    .map(([text, at]) => `line ${at.join(", ")}: ${text}`);
+  assert.deepEqual(
+    misread,
+    [],
+    `the code-only view hid call names at sites T250_MASKED does not list (a literal or comment was mis-read):\n${misread.join("\n")}`,
   );
+  for (const key of T250_MASKED.keys()) {
+    assert.ok(hidden.has(key), `stale T250_MASKED entry: ${key}`);
+  }
   const unexpected = found.filter((f) => !T250_ALLOWED.has(f.split(" → ")[1]));
   assert.deepEqual(unexpected, [], `in-tree writes:\n${unexpected.join("\n")}`);
   // Each entry covers exactly its count; zero matches means it is stale: delete it.
@@ -8347,20 +8413,34 @@ test("task.250: the scanner flags a REPO_ROOT write and ignores a REPO_ROOT read
     `${w("mkdir")}(join(REPO_ROOT, "c3"));`,
     'const q = a / b; const z = "it\'s" / c;',
     `${w("mkdir")}(join(REPO_ROOT, "c4"));`,
+    // Division after a string literal, and after a `//` comment, is division:
+    // with a second `/` on the line, a phantom regex would hide the write
+    // between them (QA cycle 3, CR3-1, CR3-3).
+    `const z = "it's" / c; ${w("mkdir")}(join(REPO_ROOT, "c5")); const v = e / f;`,
+    "total // a long comment",
+    `  / count; ${w("mkdir")}(join(REPO_ROOT, "c6")); const k = 1 / 2;`,
+    // A call without its write argument is reported, never skipped.
+    `${w("cp")}(join(REPO_ROOT, "only-src"));`,
     // A call whose argument list never closes is reported, never skipped.
     `${w("rm")}(join(REPO_ROOT, "u")`,
   ].join("\n");
   const { found, total, unparsed, masked } = t250InTreeWrites(sample);
   assert.equal(
     total,
-    16,
+    18,
     "every call outside a comment or a literal is counted",
   );
   assert.deepEqual(
     found.map((f) => f.split(" → ")[0]),
-    ["1", "2", "8", "9", "12", "15", "16", "17", "19", "22", "24", "26"],
+    [
+      ...["1", "2", "8", "9", "12", "15", "16", "17"],
+      ...["19", "22", "24", "26", "27", "29"],
+    ],
     found.join("\n"),
   );
-  assert.deepEqual(unparsed, [`27 → ${w("rm")}(`]);
-  assert.deepEqual(masked, ["10", "13", "14", "18"]);
+  assert.deepEqual(unparsed, [`30 → ${w("cp")}(`, `31 → ${w("rm")}(`]);
+  assert.deepEqual(
+    masked.map((m) => m.split(" → ")[0]),
+    ["10", "13", "14", "18"],
+  );
 });
