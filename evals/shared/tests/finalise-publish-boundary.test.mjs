@@ -57,6 +57,9 @@ const DRIFT_TEST = "evals/shared/tests/changelog-entry-drift.test.mjs";
 const RUNBOOK = "docs/runbooks/task-development.md";
 
 const finalise = read(FINALISE);
+// The 6c poll: a shipped script that 6c runs, never a heredoc to copy out (obs #148).
+const POLL = "shared/resources/finalise-ci-poll.sh";
+const poll = read(POLL);
 
 /** The text between two headings/markers, asserting both exist and are ordered. */
 function between(text, startMarker, endMarker, file) {
@@ -315,17 +318,16 @@ test("6c never sleeps in the foreground — the poll is a backgrounded script re
     "6d. **CHANGELOG citation check",
     FINALISE,
   );
-  // Strip the poll script's own body (the quoted heredoc) — a `sleep` INSIDE the background
-  // script is the design; a `sleep` OUTSIDE it is the foreground wait this test forbids.
-  const outsideHeredoc = sixC.replace(
-    /cat > "\$POLL" <<'POLLEOF'[\s\S]*?\nPOLLEOF\n/,
-    "",
-  );
+  // The `sleep` lives in the shipped poll script, which 6c runs in the background — that is the
+  // design. A `sleep` anywhere in 6c itself is the foreground wait this test forbids. 6c carries
+  // no script body to strip any more (obs #148), so nothing is excluded from the scan.
+  const outsideHeredoc = sixC;
   assert.match(
     sixC,
-    /<<'POLLEOF'[\s\S]*\nPOLLEOF\n/,
-    "6c must write the poll loop to a script via a heredoc",
+    /POLL=\.agents\/skills\/finalise\/references\/finalise-ci-poll\.sh/,
+    "6c must run the bundled poll script, not write one",
   );
+  assert.match(poll, /\bsleep 30\b/, "the poll script is where the wait lives");
   assert.match(
     sixC,
     /nohup bash "\$POLL"[\s\S]*?&\s*$/m,
@@ -507,13 +509,14 @@ test("6c head-binds the second reading: the poll records the sampled PR head and
     "6d. **CHANGELOG citation check",
     FINALISE,
   );
+  // The poll's internals are in the shipped script (obs #148); the reader is still in 6c.
   assert.match(
-    sixC,
+    poll,
     /sampled_head\(\) \{ gh pr view "\$PR_NUMBER" --json headRefOid/,
     "the poll script must read the head CI was sampled on from the PR, not echo its argument (5c pass 2, CR-4)",
   );
   assert.match(
-    sixC,
+    poll,
     // task.172: a fifth field, TREE_EQ=<sha12 or empty>, names the commit a docs-only SUCCESS rests on.
     /"\$\(sampled_head\)" "\$CHECKS" "\$WAITED" "\$TREE_EQ" > "\$RESULT"/,
     "the result line carries the sampled head AND the check count it was green over (obs #87)",
@@ -521,12 +524,12 @@ test("6c head-binds the second reading: the poll records the sampled PR head and
   // The stop condition, not the sample, decides (obs #87, #108): never at 0s, never on a
   // different head, and SUCCESS only over a count that is ≥ reading 1's and stable.
   assert.match(
-    sixC,
+    poll,
     /\[ "\$WAITED" -gt 0 \] \|\| return 1/,
     "a 0s sample is never terminal",
   );
   assert.match(
-    sixC,
+    poll,
     /SUCCESS\) \[ "\$CHECKS" -ge "\$EXPECTED_CHECKS" \] && \[ "\$CHECKS" -eq "\$PREV_CHECKS" \]/,
     "SUCCESS needs a complete, stable rollup",
   );

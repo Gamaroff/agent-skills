@@ -544,6 +544,13 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
      first and run the block only if the head is still pending. A killed engine takes the check's
      process group with it (obs #94), but a foreground call still loses the answer.
 
+     **Never run this block alongside `<qualityGateCommand>`. Run them one after the other: this
+     block first, the quality gate after its notification.** Both are full suites when
+     `checkCommand` is set, and two of them on one machine false-fail load-sensitive tests. The
+     engine then latches `check-failed` on a green ancestor, and the docs-only rule buys nothing: on
+     task.174 one test failed under the doubled load and passed 3 times out of 3 alone (obs #149).
+     Being backgrounded is what makes running both at once the easy mistake.
+
      When `CI_TREE_EQ` is set, the PR head's own CI has **not** finished and the reading is satisfied
      because every file changed since a green first-parent ancestor is documentation (per
      `ci.docsOnly.patterns`, and `ci.docsOnly.checkCommand` passed when one is configured). **Record it

@@ -125,6 +125,25 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **A 5c doc-only fix can no longer reword a success criterion (obs #147).** On task.174, the fix
+  for "tick criterion #7" also appended a note to the criterion's own line. `criteria-drift.js`
+  reads that as `reworded`, and `/finalise` failed #7 as an unapproved amendment. The 5c stage
+  block now runs `criteria-drift.js --base HEAD` on each carried document. A criterion `reworded`,
+  `added` or `removed` makes that file NOT CARRIED, with the edit undone, exactly like a dead link.
+  A tick, or an evidence note on an indented line under the criterion, still carries.
+- **The `/finalise` CI-reading-2 poll is a shipped script, not a heredoc to copy (obs #148).** It
+  lived in `finalise/SKILL.md` with a `rollup()` placeholder to fill by hand. Copied out by line
+  range, it lost its final `printf` and exited 0 with no result, which the reader cannot tell from
+  a killed poll. It is now `shared/resources/finalise-ci-poll.sh`, bundled into finalise and run by
+  6c, with the Step 6 rollup query inlined. A test holds that query equal to Step 6's, and a
+  missing argument exits 2.
+- **The docs-only engine is no longer run beside another full suite (obs #149).** develop-next and
+  develop-batch Step 3 ran the tree-equivalence block and `<qualityGateCommand>` in the background
+  with no ordering. With `ci.docsOnly.checkCommand` set, both are full suites, and on task.174 one
+  load-sensitive test false-failed and latched `check-failed`. Step 3 now orders them (engine
+  first, gate after), and finalise 6c says not to start a suite while its poll runs. A test checks
+  every CI-wait site for the rule.
+
 - **A killed tree-equivalence check no longer leaves its test suite running (obs #94).** With
   `ci.docsOnly.checkCommand` set, `ci-tree-equivalence.js` runs that command inside the call. It
   ran it with `spawnSync`, which blocks every signal handler, so `timeout 120 node …` killed the
