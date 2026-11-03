@@ -1,0 +1,69 @@
+schema: 2
+task: 'task.252.migrate-doc-numbering-name-blockers'
+task_title: 'migrate-doc-numbering: name every document it cannot classify'
+gate: CONCERNS
+status_reason: 'All ten success criteria are met and mutation-proven, but the new loose-file rule blocks the section shards of a sharded L1 PRD, which shard-prd writes into the PRD directory; reproduced, one MEDIUM finding.'
+reviewer: 'QA Engineer'
+head: '7228249097b92874a1630a6ad9633ff89a299799'
+updated: '2026-11-03T09:38:53Z'
+
+top_issues:
+  - id: 'T252-QA-1'
+    severity: medium
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'The loose-file rule skips only L3 PRDs, but shard-prd writes section files (goals-and-background-context.md and the like) into the L1 PRD directory beside the PRD. Reproduced on a git repo with prd.1.demo/{prd.1.demo.md, goals-and-background-context.md, index.md}: the new engine raises unclassified-document on the shard and says to move it out of the PRD tree, which contradicts shard-prd; the base engine raised no such blocker. Reviewer CR-1.'
+    suggested_action: 'Treat loose .md files in a PRD directory that also holds an index.md (a sharded PRD) as shards and do not flag them; add a test with a sharded L1 PRD directory.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 89
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    notes: 'boundary: false. Candidates read: isNonDocumentFile, isNonDocumentDir (allowlist predicates, module-private; true excuses a name, so their false only adds a blocker), suggestSpelling and unclassifiedReason (string formatting for a message). Their only input is names from the repository own directory listing, no sink in the corpus models it, and nothing here accepts external input or writes outside the sandbox.'
+  performance:
+    status: PASS
+    notes: 'Walk count held: readDir calls equal the pinned baseline of 6 on the clean fixture. The per-PRD loose-file rescan is quadratic in PRDs times files, noted as a cleanup (CR-4), not measured as a cost on this tree (22 documents).'
+  reliability:
+    status: CONCERNS
+    notes: 'A valid sharded L1 PRD is now refused (T252-QA-1). The blocker is raised in plan(), so a fully migrated tree with one bad name no longer answers already; the control test holds this.'
+  maintainability:
+    status: PASS
+    notes: 'One allowlist with a reason per entry; blocker code registered in BLOCKER_CODES and documented in review-prd SKILL.md and CHANGELOG.md; bundled copy regenerated.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T252-QA-1: do not flag section shards in a sharded L1/L2 PRD directory.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs']
+  future:
+    - action: 'CR-3 (low confidence): directories such as _archive or assets under epics/ or stories/ are blocked where the old code skipped them silently; decide whether to add a reasoned directory allowlist or an underscore rule.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs']
+    - action: 'CR-2: under a scope, an unclassified entry beneath an epics directory with no owning PRD is dropped, while an unscoped run blocks on it; decide explicitly and test it.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs']
+    - action: 'CR-4 (cleanup): group files by directory once instead of rescanning per PRD; use a Set for the duplicate check.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T252-QA-1 fixed and re-gated']

@@ -6,6 +6,20 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`migrate-doc-numbering` names every document it cannot classify (task 252).** An epic or story
+  directory, or a loose `.md` file in a PRD directory, whose name neither grammar reads (a dot in a
+  slug, a lowercase or `-N` sub-story suffix, a stray note) was skipped without a word, and `--apply`
+  then carried it half-way into the renamed tree and ended `post-check-failed`. It is now a
+  `unclassified-document` blocker with its path, the rule it broke and, for a lowercase or dash
+  suffix, the spelling that would read. The dry run, `--check` and `--apply` all raise it, and
+  `--apply` writes nothing. **Exit-code change:** a tree that migrated before, with such names left
+  behind, now answers `blocked` (dry run, `--apply`) or `needs-migration` (`--check`), exit 1, until
+  the names are fixed. The blocker is raised while planning, so a fully migrated tree whose only
+  defect is a bad name no longer answers `already`. The plan output prints `N documents classified,
+  M skipped`, and `--json` carries `classified`, `skipped` and `unclassified`. README.md, index.md,
+  `prd-registry.md`, dot-directories, underscore-prefixed directories and `assets/` are not
+  documents; a sharded PRD (a monolith, a root
+  `index.md`, or a PRD directory that holds an `index.md`) is not checked for loose files.
 - **A loop-limit residual can now be accepted in one step (task 251, obs #115, #150).** The QA
   loop HALT's option 2 ("accept the current gate status") had no writer, and the hand edits it
   invited failed twice: the 5c lens refused the cycle's `Escalating — loop limit reached` row

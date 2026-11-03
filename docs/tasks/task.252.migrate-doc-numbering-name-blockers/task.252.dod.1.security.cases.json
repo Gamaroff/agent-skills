@@ -1,0 +1,71 @@
+[
+  {
+    "id": "t252-clean",
+    "input": "docs/prd",
+    "direction": "legitimate",
+    "correct": "a tree with no unclassified name is not refused for naming",
+    "spec_ref": "docs/tasks/task.252.migrate-doc-numbering-name-blockers/task.252.migrate-doc-numbering-name-blockers.md:227",
+    "fixture": {
+      "files": {
+        "docs/prd/onb/prd.1.onb/prd.1.onb.md": "---\nname: prd.1.onb\ntitle: Onboarding\nstatus: draft\ncreated: 2026-01-01\n---\n# PRD\n",
+        "docs/prd/onb/prd.1.onb/epics/epic.1.1.alpha/epic.1.1.alpha.md": "---\nepic_number: 1\ntitle: Alpha\n---\n# Epic\n"
+      }
+    }
+  },
+  {
+    "id": "t252-stray-md",
+    "input": "docs/prd",
+    "direction": "hostile",
+    "correct": "a loose .md file in a PRD directory is refused with exit 1",
+    "spec_ref": "docs/tasks/task.252.migrate-doc-numbering-name-blockers/task.252.migrate-doc-numbering-name-blockers.md:225",
+    "fixture": {
+      "files": {
+        "docs/prd/onb/prd.1.onb/prd.1.onb.md": "---\nname: prd.1.onb\ntitle: Onboarding\nstatus: draft\ncreated: 2026-01-01\n---\n# PRD\n",
+        "docs/prd/onb/prd.1.onb/epics/epic.1.1.alpha/epic.1.1.alpha.md": "---\nepic_number: 1\ntitle: Alpha\n---\n# Epic\n",
+        "docs/prd/onb/prd.1.onb/feature-exploration-2026-07-11.md": "# stray\n"
+      }
+    }
+  },
+  {
+    "id": "t252-dot-epic",
+    "input": "docs/prd",
+    "direction": "hostile",
+    "correct": "an epic directory with a dot in its slug is refused with exit 1",
+    "spec_ref": "docs/tasks/task.252.migrate-doc-numbering-name-blockers/task.252.migrate-doc-numbering-name-blockers.md:225",
+    "fixture": {
+      "files": {
+        "docs/prd/onb/prd.1.onb/prd.1.onb.md": "---\nname: prd.1.onb\ntitle: Onboarding\nstatus: draft\ncreated: 2026-01-01\n---\n# PRD\n",
+        "docs/prd/onb/prd.1.onb/epics/epic.1.1.alpha/epic.1.1.alpha.md": "---\nepic_number: 1\ntitle: Alpha\n---\n# Epic\n",
+        "docs/prd/onb/prd.1.onb/epics/epic.1.2.discovery-2.0-thing/epic.1.2.discovery-2.0-thing.md": "---\nepic_number: 2\n---\n# e\n"
+      }
+    }
+  },
+  {
+    "id": "t252-lower-story",
+    "input": "docs/prd",
+    "direction": "hostile",
+    "correct": "a story directory with a lowercase suffix is refused with exit 1",
+    "spec_ref": "docs/tasks/task.252.migrate-doc-numbering-name-blockers/task.252.migrate-doc-numbering-name-blockers.md:225",
+    "fixture": {
+      "files": {
+        "docs/prd/onb/prd.1.onb/prd.1.onb.md": "---\nname: prd.1.onb\ntitle: Onboarding\nstatus: draft\ncreated: 2026-01-01\n---\n# PRD\n",
+        "docs/prd/onb/prd.1.onb/epics/epic.1.1.alpha/epic.1.1.alpha.md": "---\nepic_number: 1\ntitle: Alpha\n---\n# Epic\n",
+        "docs/prd/onb/prd.1.onb/epics/epic.1.1.alpha/stories/story.1.1.3a.lower/story.1.1.3a.lower.md": "---\nepic: 1\n---\n# s\n"
+      }
+    }
+  },
+  {
+    "id": "t252-two-letter-story",
+    "input": "docs/prd",
+    "direction": "hostile",
+    "correct": "a story directory with a two-letter suffix is refused with exit 1",
+    "spec_ref": "docs/tasks/task.252.migrate-doc-numbering-name-blockers/task.252.migrate-doc-numbering-name-blockers.md:225",
+    "fixture": {
+      "files": {
+        "docs/prd/onb/prd.1.onb/prd.1.onb.md": "---\nname: prd.1.onb\ntitle: Onboarding\nstatus: draft\ncreated: 2026-01-01\n---\n# PRD\n",
+        "docs/prd/onb/prd.1.onb/epics/epic.1.1.alpha/epic.1.1.alpha.md": "---\nepic_number: 1\ntitle: Alpha\n---\n# Epic\n",
+        "docs/prd/onb/prd.1.onb/epics/epic.1.1.alpha/stories/story.1.1.4Ab.control/story.1.1.4Ab.control.md": "---\nepic: 1\n---\n# s\n"
+      }
+    }
+  }
+]

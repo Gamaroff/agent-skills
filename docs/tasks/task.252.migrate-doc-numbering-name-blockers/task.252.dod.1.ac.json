@@ -1,0 +1,141 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "ec6be61430ac694b24b23a8971116687b034e3e5",
+  "dirty_paths": [
+    "docs/tasks/task.252.migrate-doc-numbering-name-blockers/task.252.implementation.1.migrate-doc-numbering-name-blockers-initial-run.md",
+    "docs/tasks/task.252.migrate-doc-numbering-name-blockers/task.252.pr-review.2.migrate-doc-numbering-name-blockers.md"
+  ],
+  "document": "docs/tasks/task.252.migrate-doc-numbering-name-blockers/task.252.migrate-doc-numbering-name-blockers.md",
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 10,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "d3d6ef330315f4589d9f13fad12cf34c446ee46c35d5356298a573cabbc664ac",
+      "status": "PASS",
+      "description": "Dry run and --check each name all bad documents on the fixture repo, exit 1",
+      "code_citation": "shared/resources/migrate-doc-numbering.mjs:627",
+      "test_citation": "shared/resources/tests/migrate-doc-numbering.test.mjs:2215",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#2",
+      "text_hash": "918971b7de7a9789e7146ece5e1becc99131ee8658730b48c0ecd6b231d7d48d",
+      "status": "PASS",
+      "description": "--apply on the fixture repo exits 1 and changes no file",
+      "code_citation": "shared/resources/migrate-doc-numbering.mjs:627",
+      "test_citation": "shared/resources/tests/migrate-doc-numbering.test.mjs:2215",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#3",
+      "text_hash": "0e505d6614e0de656701de7a1197716261772eca8582d8cca753687d7c89540a",
+      "status": "PASS",
+      "description": "After names are fixed, --apply succeeds and --check answers already",
+      "code_citation": "shared/resources/migrate-doc-numbering.mjs:627",
+      "test_citation": "shared/resources/tests/migrate-doc-numbering.test.mjs:2255",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#4",
+      "text_hash": "10e2700a1f01d3141c54ae6b26e050ebb8ca083f2b9b6851ff61e53a31da02f2",
+      "status": "PASS",
+      "description": "--json output carries classified and skipped counts",
+      "code_citation": "shared/resources/migrate-doc-numbering.mjs:2222",
+      "test_citation": "shared/resources/tests/migrate-doc-numbering.test.mjs:2215",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#5",
+      "text_hash": "aafa3990056641c86cc6711461645aeede5300192f43aef3fd5da50c60f230ac",
+      "status": "PASS",
+      "description": "Discovery walk not repeated; readDir length equals the Phase 1 baseline",
+      "code_citation": "shared/resources/migrate-doc-numbering.mjs:533",
+      "test_citation": "shared/resources/tests/migrate-doc-numbering.test.mjs:2202",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#6",
+      "text_hash": "9e1cd1c7fed9bab654341214ef9a312b351a0179a4f572a96529c8d9eef06b34",
+      "status": "PASS",
+      "description": "The migrate-doc-numbering test file passes",
+      "code_citation": "shared/resources/migrate-doc-numbering.mjs:627",
+      "test_citation": "shared/resources/tests/migrate-doc-numbering.test.mjs:2355",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#7",
+      "text_hash": "08ab509a9bf03c5cad2279539489a69c71228ecdfa3acf635c8b8bd2ebf2d225",
+      "status": "PASS",
+      "description": "npm test and bundle:check pass",
+      "code_citation": ".github/workflows/test.yml:58",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ ec6be61430ac694b24b23a8971116687b034e3e5",
+      "ci_reading": "CI reading 1: SUCCESS @ ec6be61430ac694b24b23a8971116687b034e3e5"
+    },
+    {
+      "id": "#8",
+      "text_hash": "58e8e6dd1024724ac5f55509081d21c3e67e7d93405d3f5beecb430e4bf99da2",
+      "status": "PASS",
+      "description": "Reverting Phase 3's emission turns the new test red, recorded in the QA report",
+      "code_citation": "docs/tasks/task.252.migrate-doc-numbering-name-blockers/task.252.qa.1.migrate-doc-numbering-name-blockers.md:132",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "Phase 3 emission of unclassified-document in plan()",
+          "evidence": "docs/tasks/task.252.migrate-doc-numbering-name-blockers/task.252.qa.1.migrate-doc-numbering-name-blockers.md:132",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#9",
+      "text_hash": "dee4aaed16dc1eb7ca4c76ba6c4693aba1d48908b6ae6a6818bda0a35f677a40",
+      "status": "PASS",
+      "description": "CHANGELOG.md records the new blocker and the exit-code change",
+      "code_citation": "CHANGELOG.md:9",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#10",
+      "text_hash": "8134036eecccf6262dd1c1c70df27f77120dcdfd2a5c22db8caef8d92c50d428",
+      "status": "PASS",
+      "description": "Running the tool over this repository's docs/prd reports 0 skipped, command and result in the QA report",
+      "code_citation": "docs/tasks/task.252.migrate-doc-numbering-name-blockers/task.252.qa.3.migrate-doc-numbering-name-blockers.md:84",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#1",
+      "note": "The criterion text says four documents and the implementation names five. This is a superset and criteria-drift.js reports no unapproved amendment."
+    }
+  ]
+}
