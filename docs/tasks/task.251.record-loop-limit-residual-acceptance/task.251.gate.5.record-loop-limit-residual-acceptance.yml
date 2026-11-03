@@ -1,23 +1,26 @@
 schema: 2
 task: 'task.251.record-loop-limit-residual-acceptance'
 task_title: 'Record a loop-limit residual acceptance in one writer'
-gate: CONCERNS
+gate: WAIVED
 status_reason: 'The cycle 4 status-key fix holds: the reviewer ran 14 flow-entry shapes and found no input where the writer reports success over an entry that still reads open. One low residual remains: an empty status value in a flow entry is edited to `status:waived`, which a strict YAML parser reads as a single key.'
 reviewer: 'QA Engineer'
 head: '2bd177d6bd2dbf14eda59975aa9d2a0c4ee9108d'
-updated: '2026-11-03T07:03:57Z'
+updated: '2026-11-03T07:08:19Z'
 
 top_issues:
   - id: 'T251-CR5-1'
     severity: low
     file: 'shared/resources/accept-qa-residual.js'
-    finding: 'A flow entry with an empty status value (`- {id: X, status:}`) is edited to `- {id: X, status:waived}` (no space after the colon); planGateEdit returns edit with ok true, and a strict YAML parser (PyYAML in the reviewer''s run) reads `status:waived` as one key with a null value, so the entry has no status. Reproduced by the reviewer and by QA; the probe engine scores the case accepted, verdict present-but-inert. The pipeline writes block style, never this shape.'
-    suggested_action: 'Emit `: waived` when the matched key text ends in a colon with no whitespace, or refuse an empty-value status; add the shape to the flow-entry tests.'
+    finding: 'A flow-style entry whose status key has an empty value is edited so that the waived word follows the colon with no space; planGateEdit returns edit with ok true, and a strict YAML parser (PyYAML in the reviewer''s run) reads the key and the word as one key with a null value, so the entry has no status. Reproduced by the reviewer and by QA (the exact input and output are in bug 7); the probe engine scores the case accepted, verdict present-but-inert. The pipeline writes block style, never this shape. This text avoids the literal key-colon-value form on purpose: the shared reader scans inside quoted text and read the quoted example as the entry''s status.'
+    suggested_action: 'Insert a space after the colon when the matched key text ends in a colon with none, or refuse an empty-value status; add the shape to the flow-entry tests.'
     suggested_owner: dev
-    status: open
+    status: waived
 
 waiver:
-  active: false
+  active: true
+  reason: 'Loop limit reached after 5 gates; the one open finding (T251-CR5-1, low) is an empty-value flow-style status, a shape the pipeline never writes; the pipeline''s own reader handles it.'
+  approved_by: 'Lorien Gamaroff'
+  approved_at: '2026-11-03'
 
 quality_score: 92
 

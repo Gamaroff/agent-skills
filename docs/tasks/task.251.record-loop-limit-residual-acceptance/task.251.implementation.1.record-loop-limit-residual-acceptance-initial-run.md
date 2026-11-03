@@ -101,6 +101,7 @@ First run of task.251: add `accept-qa-residual.js`, the one writer that records 
 - QA Cycle 4 — changes-requested: stage-disabled. Convergence check: HIGH sequence 0,0,0,0, no trip. Route classifier: `continue` (not-a-pass-gate). Reviewer executed 28 variants; QA reproduced both findings and the probe engine scored them (`present-but-inert`).
 - QA Cycle 4 fix (qa-fix, inline). T251-CR4-1 (medium) and T251-CR4-2 (low) are the same segment test in `waiveEntry`, so one change fixes both: it accepts a quoted key and waives every matching top-level segment. Engine suite 31/31. Mutation proof: waive-first-only → the repeated-key test red; quoted-key match dropped → both quoted-key tests red; restored. **A quoted `status` key ends in a refusal, not an edit:** the segment test now matches it, but the shared reader does not read a quoted key as a status, so the writer's own read-back refuses the plan and nothing is written. I wrote the test to that outcome rather than widen the shared reader, which other callers use. The probe engine cannot tell a correct acceptance from a wrong one, so the repeated-key case, now correctly accepted, scores `accepted` against a case file that listed it hostile; I re-scored it as legitimate in a scratchpad copy and left the committed cycle 4 cases file as the gate recorded it. Step 3.5 probe: no phrase changed. Narrowing residue: none, this cycle's two findings were not in a file both of the last two gates named at HIGH. Note: four consecutive cycles have found a flow-style shape the pipeline never writes; the next cycle is the last the budget allows.
 - Pre-existing, noted not fixed: `readKeysInto` in `qa-diminishing-returns.js` stops a quoted value at `}`.
+- QA residual accepted at the loop-limit escalation (cycle 5): gate.5 recorded as WAIVED (T251-CR5-1); approved by Lorien Gamaroff on 2026-11-03 — Loop limit reached after 5 gates; the one open finding (T251-CR5-1, low) is an empty-value flow-style status, a shape the pipeline never writes; the pipeline's own reader handles it.. Recorded by accept-qa-residual; the run resumes at Step 5c.
 
 ---
 
@@ -182,8 +183,8 @@ _Track each QA review/fix cycle._
 **HIGH findings**: 0
 **MEDIUM findings**: 0
 **PR Review**: not reached — gate did not exit the loop
-**Loop exit**: n/a — this exit not taken
-**Action**: Escalating — loop limit reached
+**Loop exit**: residual accepted by Lorien Gamaroff on 2026-11-03 (accept-qa-residual)
+**Action**: Proceeding to 5c (PR conformance review)
 
 ---
 
