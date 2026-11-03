@@ -261,6 +261,27 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-03
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.255.qa.1.probe-engine-cli-setup-gh-isolation.md](./task.255.qa.1.probe-engine-cli-setup-gh-isolation.md)
+- **Gate File**: [task.255.gate.1.probe-engine-cli-setup-gh-isolation.yml](./task.255.gate.1.probe-engine-cli-setup-gh-isolation.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 290
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues. Two low-severity advisory cleanups (CR-1, CR-2).
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -270,6 +291,7 @@ None.
 | 2026-11-03 | 1.0     | Initial draft — task.254 QA advisory CR-1; design: reuse the trip-wire | create-task |
 | 2026-11-03 | 1.1     | Review passed (9/10) — runCliCase harnessDir, env copy, errored-vs-decline order, record locations | review-task |
 | 2026-11-03 |         | Status → ready-for-development                                          | review-task |
+| 2026-11-03 |         | QA gate PASS (100/100) — 2 advisory findings                            | qa-task     |
 <!-- change-log-end -->
 
 ---
