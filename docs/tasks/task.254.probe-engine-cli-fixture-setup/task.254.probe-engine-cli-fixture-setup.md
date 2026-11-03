@@ -5,7 +5,7 @@ type: task
 description: "Let the cli: entry form take --fixture-setup (today shell-argv: only) so a Node or Python CLI that needs a git repository is probed instead of declined, and make the path-input decline say why."
 tags: [finalise, observation, security-probe]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-11-03
 updated: 2026-11-03
@@ -14,7 +14,7 @@ estimated_effort_hours: 8
 
 # Technical Task: security-probe: a cli: entry can run a fixture setup
 
-**Status:** Planned
+**Status:** Ready for Review
 
 > Cut from observation #152. **The observation's own remedy was wrong and is corrected here.** It asked for "a shell-argv entry form with a committed fixture-setup script". That form already exists (task.181) and takes a bash script. The gap is the Node and Python `cli:` form, which cannot take the setup. See Technical Background.
 
@@ -56,7 +56,9 @@ Every line below was found with `grep -n` on `shared/resources/security-probe.mj
 - The `shell-argv:` arm is `runShellArgvCase` (`:3158`). Its setup block (`:3255-3290`) runs `bash <setup> <case-dir>` through `caseWatchedSpawn`, watches the setup's writes in their own list, and marks the run `errored` if the setup fails, times out or writes outside the case directory.
 - Validation: `--fixture-setup` is accepted only when `isShellArgvForm` (`:1736`) and, on the command line, only when `isShellArgvEntry` (`:4492`).
 - The existing test `"--fixture-setup on a cli: entry"` (`shared/resources/tests/security-probe.test.mjs:6034`) asserts the refusal. It must change with the behaviour.
-- The header comment states the limit (`security-probe.mjs:207-209`) and `probe-boundary-rule.md:166` lists `bad-fixture-setup` as "any form but `shell-argv:`".
+- The limit is stated in more places than the engine header (`security-probe.mjs:207-209`) and `probe-boundary-rule.md:166`. The defining search is `grep -rn "fixture-setup\|fixture_setup" shared/resources/*.md shared/resources/security-probe.mjs`. Sites that say `--fixture-setup` is `shell-argv:`'s or unreachable on `cli:`: `finalise-dod-security-prompt.md` lines 61-65 and 257-258 (the example comment "there is no --fixture-setup here"), `probe-boundary-rule.md` lines 166, 552, 572-587 and 683, `security-review-prompt.md` lines 105 and 176. Lines 266-275 of the prompt are the `shell-argv:` example and stay.
+- **The `cli:` arm cannot call the shell-argv setup spawn as it stands.** `runShellArgvCase` runs its setup through `caseWatchedSpawn` (`:3076`), which needs `harnessDir` (it reads `${basename(harnessDir)}/${GH_TRIPPED}` at `:3092`) and a `shell`. `runCliCase` is called without `harnessDir` (`:2029-2042`) and spawns through `watchedSpawn` directly. The shared helper therefore has to make those two inputs optional or supply them to the `cli:` arm; copying the spawn into `runCliCase` is the second mechanism this task forbids.
+- Prior art for cause A: the prompt already says `--sink filename` declines input `.` and tells the reader to use a sink that is not materialised (`finalise-dod-security-prompt.md:253-256`). Phase 1 confirms that for a path such as `docs/prd`; Phase 3 makes the engine say it, so the reader does not have to find the prompt.
 - The plan engine passes entry arguments through as raw argv, so `security-probe-plan.mjs` carries no `fixtureSetup` handling and needs none **(verified: no `fixtureSetup` hit in that file)**.
 - Bundled copies of the engine live in `skills/finalise`, `skills/review-security`, `skills/qa-story` and `skills/qa-task` (`find skills -name security-probe.mjs`).
 
@@ -83,7 +85,7 @@ Every line below was found with `grep -n` on `shared/resources/security-probe.mj
 
 ✅ **Engine**: `--fixture-setup` on `cli:` (Node and Python), one shared setup helper, record field, argument and library validation.
 ✅ **Decline wording**: the `cannot materialise` message, on both arms that raise it (`:2583`, `:2897`).
-✅ **Docs**: the engine header, `probe-boundary-rule.md`, `finalise-dod-security-prompt.md`, `CHANGELOG.md`.
+✅ **Docs**: the engine header, `probe-boundary-rule.md`, `finalise-dod-security-prompt.md`, `security-review-prompt.md` and `CHANGELOG.md` — every site the § 3 search lists.
 ✅ **Proof**: the T252 probe plan re-run on `cli:` with a setup, recorded in the QA report.
 
 ### Out of Scope
@@ -123,9 +125,9 @@ Every line below was found with `grep -n` on `shared/resources/security-probe.mj
 - `shared/resources/tests/security-probe.test.mjs`
 
 **Changes**:
-- [ ] Reproduce cause B: a `cli:` entry that runs `git rev-parse --is-inside-work-tree` in its cwd, with a case that needs a repository. Show it cannot get one today (zero executed probes).
-- [ ] Reproduce cause A: a `cli:` case with `--sink filename` and input `docs/prd`, and the same case with a non-materialised sink. Record which declines and which runs.
-- [ ] Find why the by-hand clean control for `migrate-doc-numbering.mjs --check --root docs/prd` failed `post-check-failed`, using the committed cases file `task.252.dod.1.security.cases.json`.
+- [x] Reproduce cause B: a `cli:` entry that runs `git rev-parse --is-inside-work-tree` in its cwd, with a case that needs a repository. Show it cannot get one today (zero executed probes).
+- [x] Reproduce cause A: a `cli:` case with `--sink filename` and input `docs/prd`, and the same case with a non-materialised sink. Record which declines and which runs.
+- [x] Find why the by-hand clean control for `migrate-doc-numbering.mjs --check --root docs/prd` failed `post-check-failed`, using the committed cases file `task.252.dod.1.security.cases.json`.
 
 **Dependencies**: none.
 
@@ -140,11 +142,12 @@ Every line below was found with `grep -n` on `shared/resources/security-probe.mj
 - `shared/resources/tests/security-probe.test.mjs`
 
 **Changes**:
-- [ ] Extract the setup block from `runShellArgvCase` into a helper. Run the existing shell-argv setup tests first and after; they must stay green.
-- [ ] Call the helper from `runCliCase` between `writeFixtureFiles` and the spawn.
-- [ ] Accept `--fixture-setup` for `cli:` in the library check (`:1736`) and the command-line check (`:4492`); keep refusing it for the other forms.
-- [ ] Carry `fixtureSetup` into the `cli:` record.
-- [ ] Replace the `"--fixture-setup on a cli: entry"` test with its inverse and add refusals for `shell:`, `shell-fn:` and `fence:`.
+- [x] Extract the setup block from `runShellArgvCase` into a helper. Run the existing shell-argv setup tests first and after; they must stay green.
+- [x] Make the helper's spawn work without `harnessDir` and `shell` (see § 3): parameterise `caseWatchedSpawn` rather than copy it. The `cli:` setup keeps shell-argv's containment: a write to the sandbox HOME or TMPDIR, or to a sibling case directory, errors the run.
+- [x] Call the helper from `runCliCase` between `writeFixtureFiles` and the spawn, passing `setupPath` through the `runCliCase(c, {...})` call at `:2029`.
+- [x] Accept `--fixture-setup` for `cli:` in the library check (`:1736`) and the command-line check (`:4492`); keep refusing it for the other forms.
+- [x] Carry `fixtureSetup` into the `cli:` record.
+- [x] Replace the `"--fixture-setup on a cli: entry"` test with its inverse and add refusals for `shell:`, `shell-fn:` and `fence:`.
 
 **Dependencies**: Phase 1.
 
@@ -159,8 +162,8 @@ Every line below was found with `grep -n` on `shared/resources/security-probe.mj
 - `shared/resources/tests/security-probe.test.mjs`
 
 **Changes**:
-- [ ] Reword the two `cannot materialise` declines to name the sink and say that a sink listed in `MATERIALISED_SINKS` writes the input as a file name, and that a path-bearing input needs a sink that does not.
-- [ ] Test the wording and that a non-materialised sink with a path input runs (if Phase 1 shows it does).
+- [x] Reword the two `cannot materialise` declines to name the sink and say that a sink listed in `MATERIALISED_SINKS` writes the input as a file name, and that a path-bearing input needs a sink that does not.
+- [x] Test the wording and that a non-materialised sink with a path input runs (if Phase 1 shows it does).
 
 **Dependencies**: Phase 1.
 
@@ -175,9 +178,9 @@ Every line below was found with `grep -n` on `shared/resources/security-probe.mj
 - generated copies under `skills/*/references/`
 
 **Changes**:
-- [ ] Update the three docs; remove "not reachable on `cli:` yet" and the obs #221 pointer's premise.
-- [ ] `npm run bundle`, then `npm run bundle:check`.
-- [ ] Re-run the T252 probe plan on `cli:` with a committed setup script; record the command and result in the QA report.
+- [x] Update every doc site the § 3 search lists (four files, not three); remove "not reachable on `cli:` yet" and the obs #221 pointer's premise. Re-run the search afterwards: no remaining hit may say `--fixture-setup` is `shell-argv:`'s only.
+- [x] `npm run bundle`, then `npm run bundle:check`.
+- [x] Re-run the T252 probe plan on `cli:` with a committed setup script; record the command and result in the QA report.
 
 **Dependencies**: Phases 2 and 3.
 
@@ -195,15 +198,16 @@ Every line below was found with `grep -n` on `shared/resources/security-probe.mj
 
 ### Files to Modify (Documentation)
 
-3. ✅ `shared/resources/finalise-dod-security-prompt.md` - drop the "not reachable on `cli:`" limit
-4. ✅ `shared/resources/probe-boundary-rule.md` - `bad-fixture-setup` row and the form table
-5. ✅ `CHANGELOG.md` - the new capability and the changed refusal
+3. ✅ `shared/resources/finalise-dod-security-prompt.md` - drop the "not reachable on `cli:`" limit and the "no --fixture-setup here" example comment
+4. ✅ `shared/resources/probe-boundary-rule.md` - `bad-fixture-setup` row, the `--fixture-setup` bullet (lines 572-587) and the form guidance (552, 683)
+5. ✅ `shared/resources/security-review-prompt.md` - lines 105 and 176 say `--fixture-setup` belongs to `shell-argv:`
+6. ✅ `CHANGELOG.md` - the new capability and the changed refusal
 
 ### Generated (by `npm run bundle`)
 
-6. ✅ `skills/{finalise,review-security,qa-story,qa-task}/references/security-probe.mjs` and the four copies of `finalise-dod-security-prompt.md`
+7. ✅ `security-probe.mjs` in `skills/{finalise,review-security,qa-story,qa-task}/references/`, `finalise-dod-security-prompt.md` in `skills/{finalise,qa-story,qa-task}/references/` (three copies, not four), `probe-boundary-rule.md` in `skills/{qa-story,qa-task}/references/`, `security-review-prompt.md` in `skills/review-security/references/`
 
-The set of bundled copies is defined as: files named `security-probe.mjs` or `finalise-dod-security-prompt.md` under `skills/`. Command: `find skills -name security-probe.mjs -o -name finalise-dod-security-prompt.md`. The test records the count, not this document.
+The set of bundled copies is defined as: files named `security-probe.mjs`, `finalise-dod-security-prompt.md`, `probe-boundary-rule.md` or `security-review-prompt.md` under `skills/`. Command: `find skills \( -name security-probe.mjs -o -name finalise-dod-security-prompt.md -o -name probe-boundary-rule.md -o -name security-review-prompt.md \)`. Measured 10 on 2026-11-03. `npm run bundle:check` is what holds the copies, not this count.
 
 ---
 
@@ -216,7 +220,7 @@ The set of bundled copies is defined as: files named `security-probe.mjs` or `fi
 **Actions**:
 - [ ] A `cli:` Node entry that exits 0 only inside a git work tree is `accepted` with a setup that runs `git init`, and `errored` (not `rejected`) when the setup exits non-zero.
 - [ ] The same for a Python entry.
-- [ ] A setup that writes outside the case directory makes the run `errored`, named.
+- [ ] A setup that writes outside the case directory (the sandbox HOME, and a sibling case directory) makes the run `errored`, named.
 - [ ] `--fixture-setup` is refused (exit 2, `bad-fixture-setup`) with `shell:`, `shell-fn:` and `fence:`.
 - [ ] The existing shell-argv setup tests pass unchanged.
 - [ ] **Control case**: a hostile case the setup never mentions, and a legitimate case the guard must accept, so a pass does not mean the example was recognised.
@@ -229,6 +233,7 @@ The set of bundled copies is defined as: files named `security-probe.mjs` or `fi
 
 - [ ] Remove the `cli:` call to the helper: the new setup test goes red. Restore.
 - [ ] Re-add the `cli:` refusal: the new acceptance test goes red. Restore.
+- [ ] Inline a private setup spawn in the `cli:` arm in place of the helper call: the escape test (a `cli:` setup writing to a sibling case directory is `errored`) goes red. This is what holds "one helper", with the structural assertion in § 9 as a second line.
 
 ### Consumer Tests
 
@@ -351,6 +356,9 @@ The set of bundled copies is defined as: files named `security-probe.mjs` or `fi
 | Date       | Version | Description                                | Author      |
 | ---------- | ------- | ------------------------------------------ | ----------- |
 | 2026-11-03 | 1.0     | Initial draft — cut from observation #152  | create-task |
+| 2026-11-03 | 1.1     | Review passed (8/10) — added the `harnessDir` constraint on the shared helper, the full doc-site list (4 files, search recorded), corrected bundled-copy counts, and a sibling-case escape test and mutation | review-task |
+| 2026-11-03 |         | Status → ready-for-development | review-task |
+| 2026-11-03 |         | Implemented — 4 source files + 3 fixtures, 8 new tests (284 pass), 3 mutations red | develop |
 <!-- change-log-end -->
 
 ---
@@ -358,23 +366,23 @@ The set of bundled copies is defined as: files named `security-probe.mjs` or `fi
 ## Progress Tracking
 
 ### Phase 1: Reproduce both causes
-- [ ] Cause B reproduced
-- [ ] Cause A reproduced, with and without the filename sink
-- [ ] Clean-control failure explained
+- [x] Cause B reproduced
+- [x] Cause A reproduced, with and without the filename sink
+- [x] Clean-control failure explained
 
 ### Phase 2: One setup helper, used by both arms
-- [ ] Helper extracted, shell-argv tests green
-- [ ] `cli:` runs the setup
-- [ ] Argument checks and record updated
+- [x] Helper extracted, shell-argv tests green
+- [x] `cli:` runs the setup
+- [x] Argument checks and record updated
 
 ### Phase 3: Say why a path-bearing input is declined
-- [ ] Wording changed on both arms
-- [ ] Tests
+- [x] Wording changed on both arms
+- [x] Tests
 
 ### Phase 4: Documentation, bundles and proof
-- [ ] Docs and CHANGELOG
-- [ ] Bundle and bundle:check
-- [ ] T252 plan re-run recorded in the QA report
+- [x] Docs and CHANGELOG
+- [x] Bundle and bundle:check
+- [ ] T252 plan re-run recorded in the QA report (run done in Step 3; the QA report records it)
 
 ---
 
@@ -401,7 +409,7 @@ The set of bundled copies is defined as: files named `security-probe.mjs` or `fi
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review
 
 **Next Steps**:
 1. Implement according to the plan with `/develop-task`.

@@ -104,7 +104,8 @@ answer to a question nobody asked.
   `--entry 'shell:<path>'` (and a materialised sink such as `filename`); a bash script taking
   **several arguments or flags** with `--entry 'shell-argv:<path>' --argv '["--flag","{input}"]'`,
   plus `--fixture-setup <setup.sh>` when it needs a scratch repository (a setup that fails is
-  `errored`, never a refusal), asserting a side effect with `expected.absent: ["dir/file"]` and a
+  `errored`, never a refusal; a Node or Python `cli:` entry takes `--fixture-setup` the same way,
+  task.254), asserting a side effect with `expected.absent: ["dir/file"]` and a
   cleanup with `expected.removed` (paths the case's `fixture.files` creates, relative to the case
   directory, no `..`; the same on `cli:` and `fence:`, task.232); a **sourced library** — a
   header that says *source it*, or functions with no top-level call (the signal is stated once in
@@ -174,8 +175,8 @@ A shell-script boundary takes the same row with `--entry 'shell:<path>'` in plac
 materialises each case as a fixture directory and runs the script against it under bash and zsh, so
 "it is not JS" is never the reason a control row reads `unverifiable`. A Node or Python CLI takes it with
 `--entry 'cli:<path>' --argv '[…"{input}"…]'`, a shell script that takes several arguments or flags
-with `--entry 'shell-argv:<path>' --argv '[…"{input}"…]'` (and `--fixture-setup` for a repository it
-reads), and "it takes several flags" is never that reason either. A fenced bash block takes it with `--entry 'fence:<doc.md>#<heading>' --slot '<placeholder>'`.
+with `--entry 'shell-argv:<path>' --argv '[…"{input}"…]'` (either form takes `--fixture-setup` for a
+repository it reads), and "it takes several flags" is never that reason either. A fenced bash block takes it with `--entry 'fence:<doc.md>#<heading>' --slot '<placeholder>'`.
 
 And the machine block, once per report, which is what a gate consumes. **It is printed, not
 written.** Every probe passes `--repo-root "$(git rev-parse --show-toplevel)"` — the engine's
