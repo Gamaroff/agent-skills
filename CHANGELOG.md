@@ -6,6 +6,20 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **A `cli:` probe can run a fixture setup (task 254, obs #152).** A Node or Python CLI that reads
+  committed or staged repository state could not be probed: fixture files are text, `--fixture-setup`
+  belonged to `shell-argv:` alone, so the engine ran zero probes, the zero-guard failed, and
+  acceptance took a recorded override (task 252). `--entry cli:<path> --fixture-setup <script>` now
+  runs the same committed script as `bash <script> <case-dir>` after the case's files are written
+  and before the CLI. One helper, `runCaseSetup`, serves both forms, so containment, the write
+  watch and the failure rule cannot drift: a non-zero exit, a timeout or a write outside the case
+  directory is `errored`, never `rejected`. **Changed refusal:** `--fixture-setup` with `cli:` was
+  exit 2 `bad-fixture-setup` and is now accepted; `shell:`, `shell-fn:`, `fence:` and the JS form
+  still refuse it, with the message `applies to the cli: and shell-argv: entry forms only`. A `cli:`
+  setup that names `gh` is declined `bad-fixture-setup` (this form has no `--fake-gh`). The
+  `cannot materialise "<input>"` decline now names the sink that wrote the input as a file name and
+  says a path-bearing input needs a sink that is not materialised.
+
 - **`migrate-doc-numbering` names every document it cannot classify (task 252).** An epic or story
   directory, or a loose `.md` file in a PRD directory, whose name neither grammar reads (a dot in a
   slug, a lowercase or `-N` sub-story suffix, a stray note) was skipped without a word, and `--apply`

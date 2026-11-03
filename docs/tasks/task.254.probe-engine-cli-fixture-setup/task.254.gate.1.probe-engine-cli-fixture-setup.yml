@@ -1,0 +1,69 @@
+schema: 2
+task: 'task.254.probe-engine-cli-fixture-setup'
+task_title: 'security-probe: a cli: entry can run a fixture setup'
+gate: CONCERNS
+status_reason: 'Behaviour delivered and mutation-proven; one success criterion (no extra process without a setup, asserted by a test) is held only by a record field, not a test.'
+reviewer: 'QA Engineer'
+head: '0c9c7f094aecc680e58931464d3daad11326e70b'
+updated: '2026-11-03T12:54:37Z'
+
+top_issues:
+  - id: 'T254-QA-1'
+    severity: medium
+    file: 'shared/resources/tests/security-probe.test.mjs'
+    finding: 'Performance criterion "a cli: run without --fixture-setup spawns no extra process (asserted by a test)" is not held by a test that observes spawns; the test at line 8571 asserts only that the run record carries fixture_setup null.'
+    suggested_action: 'Add a test that counts bash spawns (for example a PATH shim that logs each call) for a cli: run with no setup (zero) and with a setup (one per case), and mutation-prove it.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 284
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: ['never']
+    boundary: false
+    boundary_reason: 'The criteria word "never" is "errored, never rejected": outcome classification of a harness run, not an input gate. No predicate that accepts or rejects an untrusted input was added; runCaseSetup returns a setup result and cannotMaterialiseDetail builds a message. The new setup-escape detection reuses the existing watched-spawn machinery, exercised by committed tests.'
+    notes: 'A cli: setup runs with the host PATH (CR-1, low confidence, advisory); the textual gh scan is best-effort. No sandbox escape found.'
+  performance:
+    status: PASS
+    notes: 'Setup spawns only when a setup path is given; no change to the no-setup path.'
+  reliability:
+    status: PASS
+    notes: 'A failing, timed-out or escaping setup is errored with a named detail. 284 tests pass; CI green on this head.'
+  maintainability:
+    status: PASS
+    notes: 'One helper, runCaseSetup, called by both arms; a stale record-field comment remains (CR-2, cleanup).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Hold the no-extra-process criterion with a spawn-counting test (T254-QA-1).'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+  future:
+    - action: 'CR-2: update the stale fixtureSetup record-field comment (shell-argv: only) to name the cli: form too.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'CR-1: run the cli: setup with a gh-free PATH, or document the gh scan as best-effort.'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T254-QA-1 closed']

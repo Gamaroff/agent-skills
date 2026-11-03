@@ -1,0 +1,26 @@
+[
+  {
+    "id": "setup-outside-repo-root-absolute",
+    "input": "/etc/passwd",
+    "direction": "hostile",
+    "why": "An absolute setup path outside the repo root would make the engine run arbitrary host code.",
+    "correct": "Declined with bad-fixture-setup (outside repo root); the nested engine exits 2.",
+    "spec_ref": "docs/tasks/task.254.probe-engine-cli-fixture-setup/task.254.probe-engine-cli-fixture-setup.md:70"
+  },
+  {
+    "id": "setup-traversal-out-of-repo",
+    "input": "../../../../tmp/evil-setup.sh",
+    "direction": "hostile",
+    "why": "Relative traversal resolves outside the repo root.",
+    "correct": "Declined with bad-fixture-setup.",
+    "spec_ref": "docs/tasks/task.254.probe-engine-cli-fixture-setup/task.254.probe-engine-cli-fixture-setup.md:70"
+  },
+  {
+    "id": "setup-committed-fixture",
+    "input": "shared/resources/tests/fixtures/security-probe/setup-git-repo.sh",
+    "direction": "legitimate",
+    "why": "The committed in-repo setup is the intended use.",
+    "correct": "Accepted: the nested engine runs the setup and exits 0.",
+    "spec_ref": "docs/tasks/task.254.probe-engine-cli-fixture-setup/task.254.probe-engine-cli-fixture-setup.md:254"
+  }
+]

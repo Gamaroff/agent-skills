@@ -43,12 +43,13 @@
  *                        optionally "{fixture}" elements. Required with cli: and
  *                        shell-argv:, refused (exit 2, `bad-argv`) with every
  *                        other form
- *   --fixture-setup <path> the shell-argv: form's per-run setup — a committed
- *                        shell script inside the repo root, run as
- *                        `bash <path> <fixture-dir>` before each (case, shell)
- *                        run. A non-zero exit makes that run `errored`, never a
- *                        verdict. Refused (exit 2, `bad-fixture-setup`) with
- *                        every other form; recorded as `fixture_setup`
+ *   --fixture-setup <path> the cli: and shell-argv: forms' per-run setup — a
+ *                        committed shell script inside the repo root, run as
+ *                        `bash <path> <fixture-dir>` before each run (each
+ *                        (case, shell) run for shell-argv:). A non-zero exit
+ *                        makes that run `errored`, never a verdict. Refused
+ *                        (exit 2, `bad-fixture-setup`) with every other form;
+ *                        recorded as `fixture_setup`
  *   --args-json <json>   a JSON ARRAY of fixed extra arguments appended after the
  *                        case's input on every call — `fn(input, ...args)` — so a
  *                        `(text, opts)` validator is probeable (task.131). The JS
@@ -205,9 +206,13 @@
  * variable, which steer the interpreter rather than the CLI (steersInterpreter). It is how a CLI
  * that refuses on what it finds in a data directory gets a legitimate case that
  * is accepted; without it every input reads as overblocked and the verdict is
- * `rejects-every-input`. Repository state is not reachable this way: fixture
- * files are text, which make no commit and no staged index, and
- * `--fixture-setup` stays shell-argv:'s.
+ * `rejects-every-input`. Repository state is not reachable by fixture files
+ * alone: they are text, which make no commit and no staged index. A CLI that
+ * reads a repository takes `--fixture-setup` (task.254): the same committed
+ * script, contained and watched the same way as the shell-argv: form's
+ * (runCaseSetup is the one definition), run in the case directory after the
+ * files are written and before the CLI. A failing setup is `errored`, never
+ * `rejected`. A setup that names `gh` is declined: this form has no `--fake-gh`.
  *
  * THE SHELL-ARGV ENTRY FORM (task.181). A boundary delivered as a SHELL SCRIPT
  * TAKING SEVERAL ARGUMENTS OR FLAGS (`verify-push-state.sh --base … --scope …`,
@@ -1574,8 +1579,9 @@ export function runProbeSpec({
     args: null,
     // The fence: form's placeholder token, or null (task.180).
     slot: null,
-    // The shell-argv: form's per-run setup script (its real path), or null
-    // (task.181). Stated so the record says what built each case directory.
+    // The per-run setup script (its real path) of the shell-argv: and cli:
+    // forms, or null (task.181; the cli: form since task.254). Stated so the
+    // record says what built each case directory.
     fixtureSetup: null,
   };
 
@@ -1729,16 +1735,17 @@ export function runProbeSpec({
       );
     }
   }
-  // `fixtureSetup` (task.181) — the shell-argv: form's per-run setup script.
-  // Validated HERE, the boundary a library caller crosses, as `slot` and `argv`
-  // are; with the entry's own containment, because it is code the engine runs.
-  // Declined, not ignored, on any other form: a caller who passed it meant it.
+  // `fixtureSetup` (task.181; the cli: form too since task.254) — the per-run
+  // setup script of the shell-argv: and cli: forms. Validated HERE, the boundary
+  // a library caller crosses, as `slot` and `argv` are; with the entry's own
+  // containment, because it is code the engine runs. Declined, not ignored, on
+  // any other form: a caller who passed it meant it.
   let setupPath = null;
   if (fixtureSetup !== undefined && fixtureSetup !== null) {
-    if (!isShellArgvForm) {
+    if (!isShellArgvForm && !isCliForm) {
       return decline(
         "bad-fixture-setup",
-        "--fixture-setup applies to the shell-argv: entry form only",
+        "--fixture-setup applies to the cli: and shell-argv: entry forms only",
       );
     }
     if (typeof fixtureSetup !== "string" || fixtureSetup.trim() === "") {
@@ -1767,6 +1774,17 @@ export function runProbeSpec({
     }
   }
   base.fixtureSetup = setupPath;
+  // The cli: arm has no `gh` trip-wire and no `--fake-gh` (a CLI that consults
+  // gh is a networked CLI), so a setup that names `gh` would run the host
+  // binary. Declined, as the shell forms decline it without a fake (task.254).
+  if (isCliForm && setupPath !== null) {
+    if (namesGh(setupPath, realpathSafe(resolve(repoRoot)))) {
+      return decline(
+        "bad-fixture-setup",
+        `${setupPath} names \`gh\` — the cli: form has no --fake-gh, so use the shell-argv: form for a setup that needs one`,
+      );
+    }
+  }
   // `--fake-gh` is validated BEFORE anything spawns, like the entry: a
   // directory with no `gh` in it would let the real one answer from further
   // down PATH, which is the exact outcome the flag exists to prevent, with
@@ -2032,6 +2050,7 @@ export function runProbeSpec({
           entryPath: resolved.entryPath,
           runtime: cliRuntime,
           template,
+          setupPath,
           sandboxRoot,
           sandboxHome,
           sandboxTmp,
@@ -2398,6 +2417,23 @@ function listDirStamps(dir) {
  * would turn a traversal name into a write outside the fixture, so any
  * separator in it is a decline, not a normalised path.
  */
+const MATERIALISE_NAME_CODE = "input-is-a-file-name";
+
+/**
+ * The decline detail for an input a fixture directory cannot carry. When the
+ * cause is that the sink WRITES the input as a file name, say so and say the way
+ * out: a path-bearing input (`docs/prd`) needs a sink that is not in
+ * MATERIALISED_SINKS. Without that the line reads as a limit of the engine
+ * (task.254). Shared by the shell and cli: arms, so they cannot drift on it.
+ */
+function cannotMaterialiseDetail(input, sinkName, e) {
+  const why =
+    e?.code === MATERIALISE_NAME_CODE
+      ? `; sink "${sinkName}" writes the input as a file name, so an input that is a path needs a sink that is not materialised (one not listed in MATERIALISED_SINKS)`
+      : "";
+  return `fixture: cannot materialise "${input}": ${e.message}${why}`;
+}
+
 function materialiseFixture(workDir, controls, input, { writeInput }) {
   const fixtureDir = mkdtempSync(join(workDir, "fixture-"));
   for (const control of controls) {
@@ -2405,7 +2441,9 @@ function materialiseFixture(workDir, controls, input, { writeInput }) {
   }
   if (writeInput) {
     if (input.includes("/") || input.includes("\0")) {
-      throw new Error("name carries a path separator or NUL");
+      throw Object.assign(new Error("name carries a path separator or NUL"), {
+        code: MATERIALISE_NAME_CODE,
+      });
     }
     writeFileSync(`${fixtureDir}/${input}`, "");
   } else if (input.includes("\0")) {
@@ -2581,7 +2619,7 @@ function runShellCase(
         shell,
         direction: c.direction,
         outcome: "errored",
-        detail: `fixture: cannot materialise "${c.input}": ${e.message}`,
+        detail: cannotMaterialiseDetail(c.input, c.sink ?? sink, e),
       });
       continue;
     }
@@ -2830,6 +2868,7 @@ function runCliCase(
     entryPath,
     runtime = "node",
     template,
+    setupPath = null,
     sandboxRoot,
     sandboxHome,
     sandboxTmp,
@@ -2895,7 +2934,7 @@ function runCliCase(
       writeInput: fixture !== null,
     });
   } catch (e) {
-    decline(`fixture: cannot materialise "${c.input}": ${e.message}`);
+    decline(cannotMaterialiseDetail(c.input, c.sink ?? sink, e));
     return;
   }
   try {
@@ -2903,6 +2942,28 @@ function runCliCase(
   } catch (e) {
     decline(`fixture: ${e.message}`);
     return;
+  }
+  const env = fixtureCaseEnv(c.fixture, {
+    fixtureDir,
+    sandboxHome,
+    sandboxTmp,
+  });
+  // The `--fixture-setup` (task.254): after the case's files are written, before
+  // the CLI runs — the same helper the shell-argv: arm calls. This is how a CLI
+  // that reads committed or staged repository state gets a repository. A
+  // failure is an errored run, never a rejected one.
+  if (setupPath !== null) {
+    const setup = runCaseSetup({
+      setupPath,
+      fixtureDir,
+      env,
+      timeoutMs,
+      watch: { sandboxRoot, workDir, workDirName, escapeId: c.id },
+    });
+    if (!setup.ok) {
+      decline(setup.detail);
+      return;
+    }
   }
 
   // Whole-element substitution only — parseArgvTemplate refused any element
@@ -2919,7 +2980,7 @@ function runCliCase(
       : [entryPath, ...args],
     {
       cwd: fixtureDir,
-      env: fixtureCaseEnv(c.fixture, { fixtureDir, sandboxHome, sandboxTmp }),
+      env,
       timeoutMs,
       extraFds: isPython ? PYTHON_RECORD_FD - 2 : 0,
     },
@@ -3090,7 +3151,10 @@ function caseWatchedSpawn(
   },
 ) {
   const caseName = basename(cwd);
-  const ownWrite = `${basename(harnessDir)}/${GH_TRIPPED}`;
+  // The cli: arm has no harness (no trip-wire `gh`), so nothing is the harness's
+  // own write there (task.254); the shell forms always pass one.
+  const ownWrite =
+    harnessDir === undefined ? null : `${basename(harnessDir)}/${GH_TRIPPED}`;
   const workBefore = workDirStamps(workDir, caseName);
   const child = watchedSpawn(
     command,
@@ -3122,6 +3186,52 @@ function neverRanDetail(child, timeoutMs) {
     return `timed out after ${timeoutMs}ms`;
   if (child.signal) return `killed by ${child.signal}`;
   return `never ran: ${child.error?.message ?? "no exit status"}`;
+}
+
+/**
+ * Run a case's `--fixture-setup` (task.181; the cli: form too since task.254)
+ * as `bash <setup> <case-dir>` in the case directory, and say whether the case
+ * may go on. ONE definition for the shell-argv: and cli: arms, so they cannot
+ * drift on what a setup may write or how it fails (task.254).
+ *
+ * The setup builds its case directory and nothing else. Its writes are watched
+ * into their OWN list, never the entry's: a setup write charged to the entry
+ * read as the entry escaping (TASK-181-002). A write anywhere but the case
+ * directory — the sandbox HOME or TMPDIR, a sibling case, the harness — errors
+ * this run, named: it leaves the entry's escape baseline unknown. A setup that
+ * needs scratch space makes it inside "$1".
+ *
+ * Returns `{ ok: true }`, or `{ ok: false, detail }` for the caller to record
+ * as an `errored` run — never a `rejected` one.
+ */
+function runCaseSetup({ setupPath, fixtureDir, env, timeoutMs, watch }) {
+  const setupWrites = [];
+  const setup = caseWatchedSpawn(
+    "bash",
+    [setupPath, fixtureDir],
+    { cwd: fixtureDir, env, timeoutMs },
+    { ...watch, scriptDir: dirname(setupPath), escapes: setupWrites },
+  );
+  if (neverRan(setup)) {
+    return {
+      ok: false,
+      detail: `fixture setup ${neverRanDetail(setup, timeoutMs)}`,
+    };
+  }
+  if (setupWrites.length > 0) {
+    const paths = [...new Set(setupWrites.map((e) => e.path))];
+    return {
+      ok: false,
+      detail: `fixture setup wrote outside the case directory: ${paths.slice(0, 5).join(", ")}${paths.length > 5 ? ` (+${paths.length - 5} more)` : ""} — a setup builds "$1" and nothing else`,
+    };
+  }
+  if (setup.status !== 0) {
+    return {
+      ok: false,
+      detail: `fixture setup exited ${setup.status}: ${(setup.stderr ?? "").trim().split("\n")[0].slice(0, 160)}`,
+    };
+  }
+  return { ok: true };
 }
 
 // ── The shell-argv entry form (task.181) ─────────────────────────────────────
@@ -3254,37 +3364,15 @@ function runShellArgvCase(
     };
 
     if (setupPath !== null) {
-      // The setup builds its case directory and nothing else. Its writes are
-      // watched into their OWN list, never the entry's: a setup write charged
-      // to the entry read as the entry escaping (TASK-181-002). A write
-      // anywhere but the case directory — the sandbox HOME or TMPDIR, a
-      // sibling case, the harness — errors this run, named: it leaves the
-      // entry's escape baseline unknown. A setup that needs scratch space
-      // makes it inside "$1".
-      const setupWrites = [];
-      const setup = caseWatchedSpawn(
-        "bash",
-        [setupPath, fixtureDir],
-        { cwd: fixtureDir, env, timeoutMs },
-        { ...watch, scriptDir: dirname(setupPath), escapes: setupWrites },
-      );
-      if (neverRan(setup)) {
-        errored(shell, `fixture setup ${neverRanDetail(setup, timeoutMs)}`);
-        continue;
-      }
-      if (setupWrites.length > 0) {
-        const paths = [...new Set(setupWrites.map((e) => e.path))];
-        errored(
-          shell,
-          `fixture setup wrote outside the case directory: ${paths.slice(0, 5).join(", ")}${paths.length > 5 ? ` (+${paths.length - 5} more)` : ""} — a setup builds "$1" and nothing else`,
-        );
-        continue;
-      }
-      if (setup.status !== 0) {
-        errored(
-          shell,
-          `fixture setup exited ${setup.status}: ${(setup.stderr ?? "").trim().split("\n")[0].slice(0, 160)}`,
-        );
+      const setup = runCaseSetup({
+        setupPath,
+        fixtureDir,
+        env,
+        timeoutMs,
+        watch,
+      });
+      if (!setup.ok) {
+        errored(shell, setup.detail);
         continue;
       }
     }
@@ -4488,11 +4576,12 @@ export function main(argv = process.argv.slice(2)) {
     );
     return 2;
   }
-  // `--fixture-setup` is the shell-argv: form's (task.181), as `--slot` is the
-  // fence: form's: given with any other form it is an argument error.
-  if (!isShellArgvEntry && opts.fixtureSetup !== undefined) {
+  // `--fixture-setup` is the shell-argv: form's (task.181) and, since task.254,
+  // the cli: form's, as `--slot` is the fence: form's: given with any other
+  // form it is an argument error.
+  if (!takesArgv && opts.fixtureSetup !== undefined) {
     process.stderr.write(
-      "bad-fixture-setup: --fixture-setup applies to the shell-argv: entry form only\n",
+      "bad-fixture-setup: --fixture-setup applies to the cli: and shell-argv: entry forms only\n",
     );
     return 2;
   }

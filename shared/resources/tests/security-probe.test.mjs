@@ -6031,16 +6031,19 @@ test("shell-argv entry: every malformed flag combination exits 2 by name and wri
         ],
         /^bad-args: /,
       ],
-      "--fixture-setup on a cli: entry": [
-        [
-          "--entry",
-          "cli:x.mjs",
-          "--argv",
-          '["{input}"]',
-          "--fixture-setup",
-          "setup.sh",
-        ],
-        /^bad-fixture-setup: --fixture-setup applies to the shell-argv: entry form only/,
+      // task.254: the cli: form takes --fixture-setup now; the forms that
+      // still refuse it are the ones with no per-case directory to build.
+      "--fixture-setup on a shell: entry": [
+        ["--entry", "shell:two-args.sh", "--fixture-setup", "setup.sh"],
+        /^bad-fixture-setup: --fixture-setup applies to the cli: and shell-argv: entry forms only/,
+      ],
+      "--fixture-setup on a fence: entry": [
+        ["--entry", "fence:doc.md#Heading", "--fixture-setup", "setup.sh"],
+        /^bad-fixture-setup: --fixture-setup applies to the cli: and shell-argv: entry forms only/,
+      ],
+      "--fixture-setup on a shell-fn: entry": [
+        ["--entry", "shell-fn:lib.sh#fn", "--fixture-setup", "setup.sh"],
+        /^bad-fixture-setup: --fixture-setup applies to the cli: and shell-argv: entry forms only/,
       ],
       "an embedded slot": [
         ["--entry", "shell-argv:two-args.sh", "--argv", '["--n={input}"]'],
@@ -8496,4 +8499,328 @@ test("task.250: the scanner flags a REPO_ROOT write and ignores a REPO_ROOT read
     masked.map((m) => m.split(" → ")[0]),
     ["10", "13", "14", "18"],
   );
+});
+
+// ── task.254: a cli: entry can run a fixture setup ───────────────────────────
+//
+// A Node or Python CLI that reads repository state (a commit, a staged index)
+// had no legitimate case that could be accepted: fixture files are text, and
+// `--fixture-setup` was shell-argv:'s alone, so the zero-guard fired and the
+// DoD took a recorded override (task.252). The cli: arm now runs the same
+// `runCaseSetup` helper the shell-argv: arm does. Each row runs under Node and
+// Python.
+
+const NEEDS_REPO = [
+  ["node", `cli:${FIXTURES}/cli-needs-repo.mjs`],
+  ["python", `cli:${FIXTURES}/cli-needs-repo.py`],
+];
+const REPO_ARGV = ["check", "{input}"];
+const REPO_SETUP = `${FIXTURES}/setup-git-repo.sh`;
+const repoCases = () => [
+  { id: "r.legit", input: ".", direction: "legitimate" },
+  // The control: a hostile input the setup never mentions, refused by the CLI's
+  // own guard even though a repository exists. Without it a pass could mean
+  // "the repository makes everything pass".
+  {
+    id: "r.flag",
+    input: "-x",
+    direction: "hostile",
+    expected: { exit: 1 },
+  },
+];
+
+for (const [lang, ENTRY] of NEEDS_REPO) {
+  test(`cli entry (${lang}): --fixture-setup gives the CLI a repository — with it the legitimate case is accepted and the hostile one rejected, without it every input reads as overblocked`, () => {
+    const withSetup = runProbeSpec({
+      sink: "url-authority",
+      entry: ENTRY,
+      cases: repoCases(),
+      argv: REPO_ARGV,
+      fixtureSetup: REPO_SETUP,
+    });
+    assert.deepEqual(withSetup.declined, [], JSON.stringify(withSetup.cases));
+    assert.equal(withSetup.executed, 2, JSON.stringify(withSetup.cases));
+    assert.equal(withSetup.verdict, "engages", JSON.stringify(withSetup.cases));
+    assert.deepEqual(
+      withSetup.cases.map((c) => [c.id, c.outcome]),
+      [
+        ["r.legit", "accepted"],
+        ["r.flag", "rejected"],
+      ],
+    );
+    assert.equal(withSetup.fixtureSetup, join(REPO_ROOT, REPO_SETUP));
+    assert.equal(
+      toRecordEntry(withSetup).fixture_setup,
+      join(REPO_ROOT, REPO_SETUP),
+    );
+    // The same cases with no setup: the repository is what made the difference,
+    // and a run with no setup records none and runs no setup (the performance
+    // criterion — nothing is spawned for a setup that was not given).
+    const without = runProbeSpec({
+      sink: "url-authority",
+      entry: ENTRY,
+      cases: repoCases(),
+      argv: REPO_ARGV,
+    });
+    assert.equal(
+      without.cases[0].outcome,
+      "rejected",
+      JSON.stringify(without.cases),
+    );
+    assert.match(without.cases[0].detail, /not a git repository/);
+    assert.equal(without.fixtureSetup, null);
+    assert.equal(toRecordEntry(without).fixture_setup, null);
+  });
+}
+
+test("cli entry: a setup that fails, or writes outside its case directory, is errored for every case — never rejected (task.254)", () => {
+  const root = fenceRoot(
+    {
+      "setup-fails.sh": "#!/usr/bin/env bash\nexit 3\n",
+      "setup-tmp.sh": "#!/usr/bin/env bash\nmktemp >/dev/null\n",
+      "setup-home.sh": '#!/usr/bin/env bash\ntouch "$HOME/stray"\n',
+      "setup-sibling.sh": '#!/usr/bin/env bash\ntouch "$1/../sibling-write"\n',
+      "setup-inside.sh": '#!/usr/bin/env bash\ntouch "$1/inside"\n',
+    },
+    {
+      copy: [`${FIXTURES}/cli-needs-repo.mjs`, `${FIXTURES}/cli-needs-repo.py`],
+    },
+  );
+  try {
+    for (const [lang, ENTRY] of NEEDS_REPO) {
+      const run = (setup) =>
+        runProbeSpec({
+          sink: "url-authority",
+          entry: ENTRY,
+          cases: repoCases(),
+          argv: REPO_ARGV,
+          fixtureSetup: setup,
+          repoRoot: root,
+        });
+      const failing = run("setup-fails.sh");
+      assert.equal(failing.executed, 0, lang);
+      assert.equal(failing.verdict, "unverifiable", lang);
+      for (const c of failing.cases) {
+        assert.equal(c.outcome, "errored", `${lang}: ${JSON.stringify(c)}`);
+        assert.match(c.detail, /fixture setup exited 3/);
+      }
+      // Each stray write — the sandbox TMPDIR, the sandbox HOME, and a sibling
+      // case directory — errors the run, named, and is charged to nobody.
+      for (const setup of [
+        "setup-tmp.sh",
+        "setup-home.sh",
+        "setup-sibling.sh",
+      ]) {
+        const r = run(setup);
+        assert.equal(r.executed, 0, `${lang} ${setup}`);
+        assert.deepEqual(r.escapes, [], `${lang} ${setup}`);
+        for (const c of r.cases) {
+          assert.equal(c.outcome, "errored", `${lang} ${setup}`);
+          assert.match(
+            c.detail,
+            /fixture setup wrote outside the case directory/,
+          );
+        }
+      }
+      // A write INSIDE "$1" is the setup doing its job; the run goes on.
+      const inside = run("setup-inside.sh");
+      assert.deepEqual(inside.escapes, [], lang);
+      assert.equal(
+        inside.executed,
+        2,
+        `${lang}: ${JSON.stringify(inside.cases)}`,
+      );
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("cli entry: a setup that names gh is declined bad-fixture-setup — this form has no --fake-gh (task.254)", () => {
+  const root = fenceRoot(
+    {
+      "gh-setup.sh": "#!/usr/bin/env bash\nif false; then gh auth status; fi\n",
+    },
+    { copy: [`${FIXTURES}/cli-needs-repo.mjs`] },
+  );
+  try {
+    const r = runProbeSpec({
+      sink: "url-authority",
+      entry: `cli:${FIXTURES}/cli-needs-repo.mjs`,
+      cases: repoCases(),
+      argv: REPO_ARGV,
+      fixtureSetup: "gh-setup.sh",
+      repoRoot: root,
+    });
+    assert.equal(r.reason, "bad-fixture-setup");
+    assert.equal(r.executed, 0);
+    assert.match(r.declined[0].detail, /--fake-gh/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("--fixture-setup is still declined by the forms with no per-case directory to build: shell:, shell-fn: and fence: (task.254)", () => {
+  const root = fenceRoot({
+    "one.sh": "#!/usr/bin/env bash\nexit 0\n",
+    "lib.sh": "fn() { return 0; }\n",
+    "doc.md": "# Heading\n\n```bash\necho @@X@@\n```\n",
+    "setup.sh": "#!/usr/bin/env bash\nexit 0\n",
+  });
+  try {
+    for (const entry of [
+      "shell:one.sh",
+      "shell-fn:lib.sh#fn",
+      "fence:doc.md#Heading",
+    ]) {
+      const r = runProbeSpec({
+        sink: "filename",
+        entry,
+        cases: [
+          {
+            id: "c",
+            input: "a",
+            direction: "legitimate",
+            why: "w",
+            correct: "admitted",
+          },
+        ],
+        ...(entry.startsWith("fence:") ? { slot: "@@X@@" } : {}),
+        fixtureSetup: "setup.sh",
+        repoRoot: root,
+      });
+      assert.equal(r.reason, "bad-fixture-setup", entry);
+      assert.match(
+        r.declined[0].detail,
+        /applies to the cli: and shell-argv: entry forms only/,
+        entry,
+      );
+      assert.equal(r.executed, 0, entry);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the 'cannot materialise' decline names the sink that wrote the input as a file name, and the way out — on the cli: and shell: arms (task.254)", () => {
+  const cliCase = {
+    id: "p.path",
+    input: "docs/prd",
+    direction: "legitimate",
+  };
+  const viaFilename = runProbeSpec({
+    sink: "filename",
+    entry: CLI("accept-all"),
+    cases: [cliCase],
+    argv: HOST_ARGV,
+  });
+  assert.equal(viaFilename.executed, 0);
+  assert.match(
+    viaFilename.cases[0].detail,
+    /cannot materialise "docs\/prd": name carries a path separator or NUL; sink "filename" writes the input as a file name, so an input that is a path needs a sink that is not materialised/,
+  );
+  // The way out the message names works: a sink that is not materialised runs
+  // the same path-bearing input.
+  const viaOther = runProbeSpec({
+    sink: "url-authority",
+    entry: CLI("accept-all"),
+    cases: [cliCase],
+    argv: HOST_ARGV,
+  });
+  assert.equal(viaOther.executed, 1, JSON.stringify(viaOther.cases));
+  const root = fenceRoot({ "one.sh": "#!/usr/bin/env bash\nexit 0\n" });
+  try {
+    const shell = runProbeSpec({
+      sink: "filename",
+      entry: "shell:one.sh",
+      cases: [
+        { ...cliCase, why: "w", correct: "admitted", expected: { exit: 0 } },
+      ],
+      repoRoot: root,
+    });
+    assert.match(
+      shell.cases[0].detail,
+      /sink "filename" writes the input as a file name/,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+  // A NUL is a different cause and is not blamed on the sink.
+  const nul = runProbeSpec({
+    sink: "url-authority",
+    entry: CLI("accept-all"),
+    cases: [{ ...cliCase, input: "a\0b" }],
+    argv: HOST_ARGV,
+  });
+  assert.doesNotMatch(
+    nul.cases[0].detail ?? "",
+    /writes the input as a file name/,
+  );
+});
+
+test("one setup helper: both arms call runCaseSetup and neither spawns its own setup (task.254; the mutation in § 8 holds the behaviour)", () => {
+  const src = readFileSync(
+    join(REPO_ROOT, "shared/resources/security-probe.mjs"),
+    "utf8",
+  );
+  // The setup is `bash <setup> <case-dir>`: exactly one place builds that argv.
+  assert.equal(src.match(/\[setupPath, fixtureDir\]/g)?.length, 1);
+  assert.equal(src.match(/= runCaseSetup\(\{/g)?.length, 2);
+});
+
+test("cli entry: a run with no --fixture-setup spawns no bash for a setup; with one it spawns exactly one per case (task.254 QA-1)", () => {
+  // The performance criterion, observed rather than inferred from the record: a
+  // `bash` shim first on the harness's PATH logs every bash the harness starts by
+  // name. The setup is the only thing the cli: arm runs under bash, so a count
+  // above zero on the no-setup run is an extra process. The with-setup run
+  // proves the shim can see a spawn at all — without it a zero would also read
+  // "the shim never sees anything".
+  const dir = mkdtempSync(join(tmpdir(), "probe-spawn-count-"));
+  try {
+    const real = spawnSync("sh", ["-c", "command -v bash"], {
+      encoding: "utf8",
+    }).stdout.trim();
+    assert.ok(real.startsWith("/"), `no absolute bash path: ${real}`);
+    const shimDir = join(dir, "shim");
+    mkdirSync(shimDir);
+    const log = join(dir, "bash-spawns.log");
+    writeFileSync(
+      join(shimDir, "bash"),
+      `#!/bin/sh\nprintf 'x\\n' >> "${log}"\nexec "${real}" "$@"\n`,
+    );
+    chmodSync(join(shimDir, "bash"), 0o755);
+    const spawns = () =>
+      existsSync(log)
+        ? readFileSync(log, "utf8").split("\n").filter(Boolean).length
+        : 0;
+    const ENTRY = NEEDS_REPO[0][1];
+    // The cli: form refuses a case-level PATH (it would steer the interpreter),
+    // so the shim goes on the harness's own PATH for the two calls, then back.
+    const hostPath = process.env.PATH;
+    process.env.PATH = `${shimDir}:${hostPath}`;
+    try {
+      const without = runProbeSpec({
+        sink: "url-authority",
+        entry: ENTRY,
+        cases: repoCases(),
+        argv: REPO_ARGV,
+      });
+      assert.equal(without.executed, 2, JSON.stringify(without.cases));
+      assert.equal(spawns(), 0, "a run with no setup started a bash");
+
+      const withSetup = runProbeSpec({
+        sink: "url-authority",
+        entry: ENTRY,
+        cases: repoCases(),
+        argv: REPO_ARGV,
+        fixtureSetup: REPO_SETUP,
+      });
+      assert.equal(withSetup.executed, 2, JSON.stringify(withSetup.cases));
+      assert.equal(spawns(), 2, "one setup bash per case");
+    } finally {
+      process.env.PATH = hostPath;
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
