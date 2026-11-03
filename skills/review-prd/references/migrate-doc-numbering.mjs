@@ -2598,7 +2598,7 @@ export function scanTracked(
  *   dirty-tree        any uncommitted or untracked file — a plan made over edits the author may
  *                     still change is a plan over the wrong tree.
  *   behind-upstream   the branch lacks commits its upstream has. Measured AFTER a fetch, because
- *                     `@{u}` is the last-fetched state: without one, the guard sees "level" on
+ *                     the upstream ref is the last-fetched state: without one, the guard sees "level" on
  *                     exactly the checkout it exists for (a branch nobody has pulled).
  *   upstream-unverified   the fetch failed, so the comparison is against the last-fetched state.
  *   no-upstream       no upstream is configured, so the behind check is skipped.
@@ -2616,11 +2616,20 @@ function repoGuard(repoRoot) {
       detail: `${n} uncommitted or untracked path(s) in the working tree — commit or stash them first`,
     });
   }
-  const up = git(
-    ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
-    repoRoot,
-  );
-  if (up.status !== 0) {
+  // for-each-ref, not the `@{...}` shorthand: the upstream is named once and reused below.
+  const branch = git(["branch", "--show-current"], repoRoot).stdout.trim();
+  const up = branch
+    ? git(
+        [
+          "for-each-ref",
+          "--format=%(upstream:short) %(upstream:remotename)",
+          `refs/heads/${branch}`,
+        ],
+        repoRoot,
+      )
+    : { status: 1, stdout: "" };
+  const [upstream, remote] = up.stdout.trim().split(" ");
+  if (up.status !== 0 || !upstream || !remote) {
     warnings.push({
       code: "no-upstream",
       detail:
@@ -2628,8 +2637,6 @@ function repoGuard(repoRoot) {
     });
     return warnings;
   }
-  const upstream = up.stdout.trim();
-  const remote = upstream.split("/")[0];
   const fetched = spawnSync("git", ["fetch", "--quiet", remote], {
     cwd: repoRoot,
     encoding: "utf8",
@@ -2640,7 +2647,7 @@ function repoGuard(repoRoot) {
       code: "upstream-unverified",
       detail: `could not fetch ${remote} — the behind check compares with the last-fetched ${upstream}`,
     });
-  const behind = git(["rev-list", "--count", "HEAD..@{u}"], repoRoot);
+  const behind = git(["rev-list", "--count", `HEAD..${upstream}`], repoRoot);
   const n = behind.status === 0 ? Number(behind.stdout.trim()) : 0;
   if (n > 0)
     warnings.push({

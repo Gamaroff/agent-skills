@@ -5,7 +5,7 @@ type: task
 description: "Close the remaining tinker-city handoff gaps in migrate-doc-numbering.mjs: multi-line links, a post-apply dead-link and old-path scan, frontmatter validation, a link-free registry stub, a dirty/behind guard, generated files, and a legacy-name warning for consumer scripts."
 tags: [migrate-doc-numbering, links, safety-nets]
 category: refactoring
-status: ready-for-development
+status: ready-for-review
 priority: Medium
 created: 2026-11-03
 updated: 2026-11-03
@@ -14,7 +14,7 @@ estimated_effort_hours: 16
 
 # migrate-doc-numbering: link, frontmatter and downstream safety nets
 
-**Status:** Ready for Development
+**Status:** Ready for Review
 
 **Review**: ✅ All review recommendations from `task.253.review.1.migrate-doc-numbering-safety-nets.md` implemented 2026-11-03
 
@@ -112,7 +112,7 @@ None to the CLI's inputs. Outputs gain lines and the tool may refuse a dirty or 
 **Files**: `shared/resources/tests/migrate-doc-numbering.test.mjs`
 
 **Changes**:
-- [ ] One failing test per gap, using the real-git-repo helper. Where a gap does not reproduce, record that in the QA report and drop it from scope, rather than fix a guess.
+- [x] One failing test per gap, using the real-git-repo helper. Where a gap does not reproduce, record that in the QA report and drop it from scope, rather than fix a guess.
 
 **Dependencies**: none.
 
@@ -139,7 +139,7 @@ The `postScan`, `warnings` and `skippedGenerated` result keys the tests read are
 **Files**: `shared/resources/doc-links.js`, `shared/resources/migrate-doc-numbering.mjs`
 
 **Changes**:
-- [ ] Confirm the cause with the Phase 1 failing test: the matcher returns the link, and the per-line apply loop in the migration tool (`byLine` / `replaceTargets`, `:1513-1530`) misses a target that is not on the reported line.
+- [x] Confirm the cause with the Phase 1 failing test: the matcher returns the link, and the per-line apply loop in the migration tool (`byLine` / `replaceTargets`, `:1513-1530`) misses a target that is not on the reported line.
 - [x] Confirmed with the Phase 1 test: the matcher returns the link, and the per-line apply loop misses a target that is not on the reported line.
 - [x] Fixed with an **additive** `targetLine` on `scanLinks` output (present only when the target sits on a later line than the link's opening, so every existing `deepEqual` and every caller reading `line` is unchanged), read by `linkPass`. The fix does not search forward in the text: a search would also rewrite a fenced copy of the same path on the next line, which the control in `253 gap 1` forbids.
 - [x] `doc-links.js` callers re-run: `doc-links.test.mjs` (33 pass) plus the full suite at the end of Phase 5.
@@ -155,9 +155,9 @@ The `postScan`, `warnings` and `skippedGenerated` result keys the tests read are
 **Files**: `shared/resources/migrate-doc-numbering.mjs`
 
 **Changes**:
-- [ ] Dead-link scan over rewritten files; fenced and inline-code links as warnings.
-- [ ] Old-path scan across tracked files using the move map.
-- [ ] Closing line `N repo files still hard-code legacy names: …`.
+- [x] Dead-link scan over rewritten files; fenced and inline-code links as warnings.
+- [x] Old-path scan across tracked files using the move map.
+- [x] Closing line `N repo files still hard-code legacy names: …`.
 
 **Dependencies**: Phase 1.
 
@@ -173,7 +173,7 @@ The `postScan`, `warnings` and `skippedGenerated` result keys the tests read are
 - [x] ~~Validate migrated story frontmatter~~ — **dropped: did not reproduce** (Phase 1 results). The existing post-apply `doc-id.js checkCorpus` already fails `--apply` on a story whose `prd_number`, `epic` or id disagrees with its name.
 - [x] Generate the registry stub without links.
 - [x] Dirty-tree and behind-upstream check. Decision: the tool runs `git fetch --quiet <remote>` in every mode (it updates remote-tracking refs only), because `@{u}` is the last-fetched state and a guard that skips the fetch reads "level" on the very checkout it exists for. A failed fetch is the `upstream-unverified` warning, not a blocker; no upstream is the `no-upstream` warning. `dirty-tree` and `behind-upstream` are warnings in the dry run and `--check`, blockers for `--apply`. Two existing tests that dirtied the tree before `--apply` now dirty it after.
-- [ ] Skip generated files and list them. "Generated" is defined by a short list of directory suffixes (for example `*-out/`), each entry with a stated reason, as the plan sets out; a file's own `AUTO-GENERATED` header is a second signal only if Phase 1 shows a real consumer file needs it.
+- [x] Skip generated files and list them. "Generated" is defined by a short list of directory suffixes (for example `*-out/`), each entry with a stated reason, as the plan sets out; a file's own `AUTO-GENERATED` header is a second signal only if Phase 1 shows a real consumer file needs it.
 
 **Dependencies**: Phase 1.
 
@@ -184,8 +184,8 @@ The `postScan`, `warnings` and `skippedGenerated` result keys the tests read are
 **Risk Level**: Low
 
 **Changes**:
-- [ ] Revert each fix in turn and confirm its test goes red.
-- [ ] Update docs that describe the tool's output; `npm run bundle`; `CHANGELOG.md`.
+- [x] Revert each fix in turn and confirm its test goes red.
+- [x] Update docs that describe the tool's output; `npm run bundle`; `CHANGELOG.md`.
 
 **Dependencies**: Phases 2 to 4.
 
@@ -354,6 +354,7 @@ For the dead-link scan, include a live link and a link to an external URL that m
 | 2026-11-03 | 1.0     | Initial draft | create-task |
 | 2026-11-03 | 1.1     | Review passed (8/10) — re-measured 8 stale line anchors, located gap 1's cause in the migration tool's per-line apply loop (matcher is correct), listed `doc-links` callers, defined "generated" | review-task |
 | 2026-11-03 |         | Status → ready-for-development | review-task |
+| 2026-11-03 | 1.2     | Implemented phases 1–5 (gap 3 did not reproduce and was dropped); mutation proof in `task.253.review.2.mutation-proof.md`; status → ready-for-review | develop-task |
 
 <!-- change-log-end -->
 
@@ -361,9 +362,9 @@ For the dead-link scan, include a live link and a link to an external URL that m
 
 - [x] Phase 1: reproduce, tests first
 - [x] Phase 2: multi-line links
-- [ ] Phase 3: post-apply scans
-- [ ] Phase 4: frontmatter, stub, dirty/behind, generated
-- [ ] Phase 5: mutation proof and docs
+- [x] Phase 3: post-apply scans
+- [x] Phase 4: frontmatter, stub, dirty/behind, generated
+- [x] Phase 5: mutation proof and docs
 
 ## References
 
