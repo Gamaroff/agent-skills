@@ -35,7 +35,7 @@ Move every scratch directory `security-probe.test.mjs` creates inside the reposi
 | 2. review-task             | ✅ Done    | `task.250.review.{N}.{name}.md` exists (or skip logged)                | `task.250.review.1.security-probe-scratch-out-of-tree.md` — READY TO IMPLEMENT 9/10; Planned → Ready for Development | —                    | 2026-11-02T18:07Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan names every hunk); 13 in-tree sites moved to temp roots + guard; suite 276/276; `ci:fast` green | —                    | 2026-11-02T18:23Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #813](https://github.com/Gamaroff/agent-skills/pull/813) → develop; #812 comment `posted` | —                    | 2026-11-02T18:24Z |
-| 5–6. qa-task / qa-fix loop | ⚠️ Escalated (loop limit, 5 gates) | `task.250.qa.{N}.*.md`; `task.250.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | `.summaries/step-5-traceability-mapper.json` |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done (loop limit escalated; residual accepted by the user 2026-11-03; 5c APPROVE) | `task.250.qa.{N}.*.md`; `task.250.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | `.summaries/step-5-traceability-mapper.json` |                 |
 | 7. finalise                | ⏳ Pending | `task.250.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
@@ -163,7 +163,13 @@ Move every scratch directory `security-probe.test.mjs` creates inside the reposi
 
 - **Decision (the user's, not autonomous)**: accept the residual, option (a) of the escalation. TASK-250-CR5-1 and TASK-250-CR5-2 stay open as known limits of the heuristic guard; neither shape is in the file today, and the runtime half (`fenceRoot` refusal, watched run) is unaffected. Closing the class (a parser-backed scan with `acorn`) is follow-up work, not this task.
 - Known limits recorded in `t250CodeOnly`'s doc comment; the tripwire comment reworded to state what was measured (CR5-3). Comment-only, suite 277/277; committed as `6092c804`. No mutation proof: no behaviour changed.
-- Next: Step 5c `/review-pr --effort medium --comment --no-code`, then Step 7 `/finalise`.
+- Step 5c `/review-pr --effort medium --comment --no-code` → **APPROVE**. Report: `task.250.pr-review.1.security-probe-scratch-out-of-tree.md`. Two low findings, both doc-only and carried:
+  - **PC-1:** Phase 5's before/after untracked-file check had never run.
+    - Calibrated first: a planted `tests/fixtures/shell-fn/.t250-calib/x` showed as a one-line diff.
+    - Then `git status --porcelain --untracked-files=all --ignored` was taken before and after `command node --test shared/resources/tests/security-probe.test.mjs` (277/277). The two snapshots were identical, 6,156 lines each.
+    - Box ticked.
+  - **PC-2:** `updated:` bumped, and a Change Log row added.
+- Next: Step 7 `/finalise`.
 
 ---
 
@@ -244,7 +250,7 @@ _Track each QA review/fix cycle._
 **Issues Found**: 2. TASK-250-CR5-1 (medium): a nested template literal re-splits a write call's argument list without failing the guard; reproduced. TASK-250-CR5-2 (low): the regex tripwire ignores a phantom regex that holds a quote; reproduced. Advisory: CR5-3 (a regex with a class or group inside a write call's arguments fails the guard). All cycle-4 fixes were verified.
 **HIGH findings**: 0
 **MEDIUM findings**: 1
-**PR Review**: pending (Step 5c)
+**PR Review**: APPROVE — `task.250.pr-review.1.security-probe-scratch-out-of-tree.md` (2 low findings, carried)
 **Loop exit**: loop limit escalated 2026-11-02; residual (CR5-1, CR5-2) accepted by the user 2026-11-03
 **Action**: Escalating — loop limit reached → residual accepted by the user; Proceeding to 5c
 

@@ -8,7 +8,7 @@ category: testing
 status: ready-for-review
 priority: Low
 created: 2026-11-02
-updated: 2026-11-02
+updated: 2026-11-03
 assignee:
 estimated_effort_hours: 8
 github_issue: 812
@@ -193,7 +193,7 @@ None. This changes only a test file. No shipped skill, engine, configuration key
 
 - [x] Remove the `tests/fixtures/shell-fn/.t140-*/` rule and its comment block from `.gitignore` (see Scope).
 - [x] The guard is green and the suite passes alone and under `npm test`.
-- [ ] Run the before/after untracked-file check (Testing Strategy) and record its output in the QA report.
+- [x] Run the before/after untracked-file check (Testing Strategy) and record its output in the QA report. (Run 2026-11-03 at Step 5c, after the QA budget was spent; recorded in the implementation report.)
 - [x] Add a CHANGELOG `[Unreleased]` → Fixed entry citing task 250.
 
 **Dependencies**: Phases 1-4.
@@ -336,6 +336,7 @@ Cycle 4's fixes hold. The static guard still has two string and template blank p
 | 2026-11-02 |  | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-11-02 |  | QA findings fixed — CR4-1 (plus cleanup CR4-2), 1 iteration | qa-fix |
 | 2026-11-02 |  | QA gate CONCERNS (90/100) — 2 findings | qa-task |
+| 2026-11-03 |  | QA loop limit escalated; residual CR5-1, CR5-2 accepted by the user as known guard limits; PR review APPROVE (2 low findings, carried) | develop-task |
 
 <!-- change-log-end -->
 
