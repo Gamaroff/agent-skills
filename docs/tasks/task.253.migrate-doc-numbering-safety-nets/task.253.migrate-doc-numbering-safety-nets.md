@@ -5,7 +5,7 @@ type: task
 description: "Close the remaining tinker-city handoff gaps in migrate-doc-numbering.mjs: multi-line links, a post-apply dead-link and old-path scan, frontmatter validation, a link-free registry stub, a dirty/behind guard, generated files, and a legacy-name warning for consumer scripts."
 tags: [migrate-doc-numbering, links, safety-nets]
 category: refactoring
-status: planned
+status: ready-for-development
 priority: Medium
 created: 2026-11-03
 updated: 2026-11-03
@@ -14,7 +14,9 @@ estimated_effort_hours: 16
 
 # migrate-doc-numbering: link, frontmatter and downstream safety nets
 
-**Status:** Planned
+**Status:** Ready for Development
+
+**Review**: ✅ All review recommendations from `task.253.review.1.migrate-doc-numbering-safety-nets.md` implemented 2026-11-03
 
 ---
 
@@ -51,12 +53,15 @@ Six smaller gaps from the tinker-city handoff (gaps 2 to 7), each making the mig
 
 ### Current Architecture
 
-- Link extraction goes through `extractRelativeLinks` in `shared/resources/doc-links.js:204`, which calls `scanLinks` (`:175`) over the text with fences and code spans blanked. Reproduced behaviour: a link whose text spans a newline is not matched, so it is neither counted nor re-pointed. (Whether the cause is the inline-link regex or the paragraph handling is for Phase 2 to establish.)
-- The rewrite pass reads those links at `shared/resources/migrate-doc-numbering.mjs:999` and edits through `planEdits` (`:1172`).
-- `prd_number` is written at `:1223`, `:1238` and `:1256`. Which document shapes reach each site is unverified.
-- The registry stub is built near `:1650-1690` (`MIGRATED_EPICS_HEADING`, `status: retired`, `# Epic Registry (retired)`).
-- A `dirty-path` blocker exists (`:95`, `:1516`) for paths the run would change. Nothing checks the whole tree or the upstream. `(unverified)` whether `--check` and the dry run ask at all.
+Line numbers below were re-measured at review (2026-11-03) against `develop` at `05dc71ad`; they drift, so re-find each by the symbol named.
+
+- Link extraction goes through `extractRelativeLinks` in `shared/resources/doc-links.js:204`, which calls `scanLinks` (`:175`) over the text with fences and code spans blanked. **The matcher already accepts a link whose text spans a newline:** `extractRelativeLinks("a\n[multi\nline](../../epic.1.alpha.md)\n")` returns `[{target:"../../epic.1.alpha.md", line:2}]` (`INLINE_LINK_RE` at `:93` uses `[^\[\]]`, which matches `\n`). The reported `line` is the line of the opening `[`, but the target text sits on line 3.
+- The rewrite pass reads those links in `linkPass` (`shared/resources/migrate-doc-numbering.mjs:1133`) and applies each rewrite **per line** in the loop at `:1513-1530` (`byLine.get(r.line)`, then `replaceTargets(lines[ln - 1], from, …)`). A `from` that is not on the reported line is skipped silently (`if (next === s) continue`). That is the likely cause of gap 1; Phase 2 confirms it with the failing test. `planEdits` is at `:1306`.
+- `prd_number` is written at `:1357`, `:1372` and `:1390`. Which document shapes reach each site is unverified.
+- The registry stub is built by the function holding `MIGRATED_EPICS_HEADING` (`:1671`, builder body near `:1771-1816`; `status: retired` at `:1813`, `# Epic Registry (retired)` at `:1816`).
+- A `dirty-path` blocker exists (code list at `:98`, emitted at `:1657`) for paths the run would change. Nothing checks the whole tree or the upstream. `registry-behind` (`:100`) is an unrelated blocker about the epic registry, not the git upstream; a new code must not reuse that name. `(unverified)` whether `--check` and the dry run ask about dirtiness at all.
 - No code excludes generated files, and no code scans for legacy-name consumers. `grep -n "graphify" shared/resources/migrate-doc-numbering.mjs` finds nothing.
+- Callers of `doc-links.js` `extractRelativeLinks` (found with `grep -rln "doc-links" shared skills scripts tests evals`, excluding bundled `references/` copies): `shared/resources/migrate-doc-numbering.mjs`, `jira-sync.js`, `status-history.js`, `qa-read-back.js`, `finalise-fix-and-recheck.mjs`, and the `sync-jira-*` link tests. `tests/lib/markdown-links.js` has its own separate `extractRelativeLinks`; it is not a caller.
 
 ### Target Architecture
 
@@ -120,8 +125,9 @@ None to the CLI's inputs. Outputs gain lines and the tool may refuse a dirty or 
 **Files**: `shared/resources/doc-links.js`, `shared/resources/migrate-doc-numbering.mjs`
 
 **Changes**:
-- [ ] Find the cause. Fix it in `doc-links.js` only if every other caller of `extractRelativeLinks` is correct to gain multi-line matches. List the callers with `grep -rn "extractRelativeLinks" shared skills scripts`.
-- [ ] Otherwise normalise inside the migration tool's own pass.
+- [ ] Confirm the cause with the Phase 1 failing test: the matcher returns the link, and the per-line apply loop in the migration tool (`byLine` / `replaceTargets`, `:1513-1530`) misses a target that is not on the reported line.
+- [ ] Fix it inside the migration tool's own pass (apply the rewrite to the line that holds `from`, or to the span from the link's opening line). Leave `doc-links.js` unchanged: its callers (listed in section 3) rely on its current output, and the matcher is correct.
+- [ ] Change `doc-links.js` only if the test shows the matcher is at fault; then run each caller's tests and compare their output before and after.
 
 **Dependencies**: Phase 1.
 
@@ -152,7 +158,7 @@ None to the CLI's inputs. Outputs gain lines and the tool may refuse a dirty or 
 - [ ] Validate migrated story frontmatter (reproduce first).
 - [ ] Generate the registry stub without links.
 - [ ] Dirty-tree and behind-upstream check.
-- [ ] Skip generated files and list them.
+- [ ] Skip generated files and list them. "Generated" is defined by a short list of directory suffixes (for example `*-out/`), each entry with a stated reason, as the plan sets out; a file's own `AUTO-GENERATED` header is a second signal only if Phase 1 shows a real consumer file needs it.
 
 **Dependencies**: Phase 1.
 
@@ -331,6 +337,8 @@ For the dead-link scan, include a live link and a link to an external URL that m
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-11-03 | 1.0     | Initial draft | create-task |
+| 2026-11-03 | 1.1     | Review passed (8/10) — re-measured 8 stale line anchors, located gap 1's cause in the migration tool's per-line apply loop (matcher is correct), listed `doc-links` callers, defined "generated" | review-task |
+| 2026-11-03 |         | Status → ready-for-development | review-task |
 
 <!-- change-log-end -->
 
