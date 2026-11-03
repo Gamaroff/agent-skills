@@ -2440,10 +2440,15 @@ function materialiseFixture(workDir, controls, input, { writeInput }) {
     writeFileSync(join(fixtureDir, control), "");
   }
   if (writeInput) {
-    if (input.includes("/") || input.includes("\0")) {
-      throw Object.assign(new Error("name carries a path separator or NUL"), {
+    if (input.includes("/")) {
+      throw Object.assign(new Error("name carries a path separator"), {
         code: MATERIALISE_NAME_CODE,
       });
+    }
+    // A NUL is not a path: no other sink fixes it, so it carries no code and
+    // the decline gives no sink advice (task.254 QA advisory CR-1).
+    if (input.includes("\0")) {
+      throw new Error("name carries a NUL");
     }
     writeFileSync(`${fixtureDir}/${input}`, "");
   } else if (input.includes("\0")) {
