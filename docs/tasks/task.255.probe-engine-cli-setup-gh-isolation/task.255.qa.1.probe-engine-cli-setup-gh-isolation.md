@@ -177,7 +177,7 @@ None.
 ## Final Assessment
 
 **Gate Status**: PASS
-**Rationale**: Every criterion has evidence; two guard mutations re-proven; no bug found.
+**Rationale**: Every criterion has evidence; three guard mutations re-proven; no bug found.
 **Quality Score**: 100/100
 
 **Deployment Recommendation**: APPROVED

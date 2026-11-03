@@ -1,0 +1,183 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "ff0eefe991e7c28a5ae5e4fb8206b265e3de0cee",
+  "dirty_paths": [
+    "docs/tasks/task.255.probe-engine-cli-setup-gh-isolation/task.255.gate.1.probe-engine-cli-setup-gh-isolation.yml",
+    "docs/tasks/task.255.probe-engine-cli-setup-gh-isolation/task.255.implementation.1.probe-engine-cli-setup-gh-isolation-initial-run.md",
+    "docs/tasks/task.255.probe-engine-cli-setup-gh-isolation/task.255.pr-review.1.probe-engine-cli-setup-gh-isolation.md",
+    "docs/tasks/task.255.probe-engine-cli-setup-gh-isolation/task.255.qa.1.probe-engine-cli-setup-gh-isolation.md"
+  ],
+  "document": "docs/tasks/task.255.probe-engine-cli-setup-gh-isolation/task.255.probe-engine-cli-setup-gh-isolation.md",
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 12,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "dd5a5ea8626b64403cb40c50816822d42b87f29331ecdb1dd3838081bbc19bfb",
+      "status": "PASS",
+      "description": "cli: setup reaching gh by a scan-missed spelling declines needs-fake-gh; host gh never runs",
+      "code_citation": "shared/resources/security-probe.mjs:2154",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:8872",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Trip-wire is written for cliSetupGuarded (:1991-1992) and read at :2154-2178. The test runs split-name and printf spellings, asserts namesGh false, reason needs-fake-gh, and that the host marker gh never ran. It is in shared/resources/tests/*.test.mjs, which test:suite selects, and test.yml has no paths-ignore."
+    },
+    {
+      "id": "#2",
+      "text_hash": "87cec86b5108a411a3931382a4bbd7e1d2dc271cbe4b899bf82314c836eff4a9",
+      "status": "PASS",
+      "description": "git-only cli: setup still runs and case is scored",
+      "code_citation": "shared/resources/security-probe.mjs:2972",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:8894",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Asserts declined=[], executed=2, verdict engages, and no host gh run."
+    },
+    {
+      "id": "#3",
+      "text_hash": "0b6d2e06aa80f501232ab3c48da847bcb78d99bc43f6d224523072fc392fd484",
+      "status": "PASS",
+      "description": "cli: entry's PATH is unchanged",
+      "code_citation": "shared/resources/security-probe.mjs:2970",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:8910",
+      "members": [],
+      "non_member_fail": null,
+      "note": "setupEnv is a spread copy of env, so the entry spawn keeps the host PATH. The test uses a fixture entry (cli-path-clean.mjs) that exits 1 if its PATH names the harness directory."
+    },
+    {
+      "id": "#4",
+      "text_hash": "9290866987af6b38f50fefbe80e862cd8f33e17358f829996a405d4a3fcaf065",
+      "status": "PASS",
+      "description": "runCaseSetup still called by both arms, held by existing structural test",
+      "code_citation": "shared/resources/security-probe.mjs:2978",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:8774",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Calls at :2978 (runCliCase) and :3390 (shell-argv arm). The structural test asserts exactly 2 runCaseSetup call matches (:8781)."
+    },
+    {
+      "id": "#5",
+      "text_hash": "7cdda9f4530e4d8b45e3c4a30012649950d21ba10a7146630b0f98e9a5028c8b",
+      "status": "PASS",
+      "description": "cli: run without --fixture-setup writes no bin/gh and spawns no extra process",
+      "code_citation": "shared/resources/security-probe.mjs:1991",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:8784",
+      "members": [],
+      "non_member_fail": null,
+      "note": "cliSetupGuarded is isCliForm and setupPath not null, so bin/gh is only written when a setup is present. The task.254 spawn-count test, unchanged, covers the no-setup run. The QA report records it green (qa.1.md:73)."
+    },
+    {
+      "id": "#6",
+      "text_hash": "8595d1acb7226debeeb3aadb206266398482d063b31e1f3d1a64c4d1ba9563eb",
+      "status": "PASS",
+      "description": "ghFreePath called at most once per case in runCliCase, before the setup spawn",
+      "code_citation": "shared/resources/security-probe.mjs:2972",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The criterion names the QA report's Findings table as its record. The report records the single call at :2972, before the setup spawn at :2978, and that :3140 is the shell arm (task.255.qa.1.probe-engine-cli-setup-gh-isolation.md:74). The code agrees. The gate repeats it (gate.1.yml:35)."
+    },
+    {
+      "id": "#7",
+      "text_hash": "e8e027ed3e029e319a8c3caacbaaab38e6b62eec4955d25379f321185eb93b7d",
+      "status": "PASS",
+      "description": "command node --test security-probe.test.mjs passes",
+      "code_citation": "docs/tasks/task.255.probe-engine-cli-setup-gh-isolation/task.255.qa.1.probe-engine-cli-setup-gh-isolation.md:159",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:8872",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The committed QA report records the command and 290 pass, 0 fail (qa.1.md:75, :159). The file is in the test:suite glob that npm test runs per PR (.github/workflows/test.yml:58). The five task.255 tests start at :8872."
+    },
+    {
+      "id": "#8",
+      "text_hash": "c8ec8c26988d92f51cb68d629c392577afe46ffde9a977d0312c8bf7396c2af7",
+      "status": "PASS",
+      "description": "npm test passes",
+      "code_citation": ".github/workflows/test.yml:58",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ ff0eefe991e7c28a5ae5e4fb8206b265e3de0cee — Asks that the PR's CI test lane (npm test) succeeds. That lane is IN_PROGRESS. The only other evidence is the QA dev run (qa.1.md:76), 7174 pass and 1 fail on a local zsh-missing guard. That is not a CI reading. Graded by /finalise Step 6.",
+      "ci_reading": "CI reading 1: SUCCESS @ ff0eefe991e7c28a5ae5e4fb8206b265e3de0cee"
+    },
+    {
+      "id": "#9",
+      "text_hash": "bc6b678967e2eea61887816e5a44b0329c2c9c2c4955c5e3006dae6659610f56",
+      "status": "PASS",
+      "description": "Each of the three guard mutations turns a test red, recorded in QA mutation table",
+      "code_citation": "docs/tasks/task.255.probe-engine-cli-setup-gh-isolation/task.255.qa.1.probe-engine-cli-setup-gh-isolation.md:132",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "M1 drop trip-wire bin/gh",
+          "evidence": "task.255.qa.1.probe-engine-cli-setup-gh-isolation.md:136",
+          "status": "PASS"
+        },
+        {
+          "member": "M2 drop ghFreePath",
+          "evidence": "task.255.qa.1.probe-engine-cli-setup-gh-isolation.md:134",
+          "status": "PASS"
+        },
+        {
+          "member": "M3 drop ghTripped cliSetupGuarded check",
+          "evidence": "task.255.qa.1.probe-engine-cli-setup-gh-isolation.md:135",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Units are the three guards (trip-wire, ghFreePath, ghTripped check), per the task's Mutation Tests section. Each has a row naming the red test and a mutation-proven line. The QA report states that all three were re-run and restored byte-identical (:142)."
+    },
+    {
+      "id": "#10",
+      "text_hash": "cb9f5304368cb1fba08990a5faabfc87dd4602b30bb48c1f523be156bbf9bbec",
+      "status": "PASS",
+      "description": "CHANGELOG.md records the change and cites task 255",
+      "code_citation": "CHANGELOG.md:52",
+      "test_citation": "shared/resources/tests/changelog-cites.test.mjs",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Documentation criterion. The entry at :52-57 states that a cli: setup can no longer reach the host gh, and it cites (task 255). The QA report records changelog-cites.sh exit 0 (qa.1.md:78)."
+    },
+    {
+      "id": "#11",
+      "text_hash": "8bec3083df1cc18e45b590dcaf2e77745033ae18ef2bcdf3dcc845a14e5d3685",
+      "status": "PASS",
+      "description": "probe-boundary-rule.md states the run-time guard and its inherited limits",
+      "code_citation": "shared/resources/probe-boundary-rule.md:559",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Documentation criterion. :559-566 states the setup-only trip-wire and ghFreePath at run time, the needs-fake-gh decline, an unchanged entry PATH, and the three inherited limits (absolute path, PATH prepend, backgrounded call). The skills/qa-story and skills/qa-task copies carry the same text."
+    },
+    {
+      "id": "#12",
+      "text_hash": "445ca15be94ed041136b0735c1a9ed4c34370d985fca5da682eb0310badb0201",
+      "status": "PASS",
+      "description": "npm run bundle:check reports 0 problems",
+      "code_citation": "docs/tasks/task.255.probe-engine-cli-setup-gh-isolation/task.255.qa.1.probe-engine-cli-setup-gh-isolation.md:160",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Bound: 0 problems. Measured: 0 problems across 128 skills, by npm run bundle:check (qa.1.md:80, :160). The diff updates all five bundled copies. validate.yml:128 also runs the check per PR. The measurement is a count; the later commits touch only docs, gate and review artifacts."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#9",
+      "note": "The QA report says M0 (original code) and M4 were dev-only and were not re-run (qa.1.md:142). Neither is among the three criterion-named mutations, so there is no effect on the grade."
+    },
+    {
+      "ac_id": "#8",
+      "note": "The QA report records a local failure from the missing zsh (qa.1.md:76). test.yml installs zsh for CI, so it should not recur there. Confirm from the CI reading."
+    },
+    {
+      "ac_id": "#11",
+      "note": "The QA report flags the added paragraph at probe-boundary-rule.md:565 as over-wide, with an unrelated sentence glued to its end (CR-2, advisory). The content satisfies the criterion."
+    }
+  ]
+}

@@ -2,7 +2,7 @@ schema: 2
 task: 'task.255.probe-engine-cli-setup-gh-isolation'
 task_title: 'security-probe: a cli: fixture setup cannot reach the host gh'
 gate: PASS
-status_reason: 'All four phases verified, 290/290 probe tests pass, two guard mutations re-proven red, bundles clean. Two low-severity advisory cleanups only.'
+status_reason: 'All four phases verified, 290/290 probe tests pass, three guard mutations re-proven red, bundles clean. Two low-severity advisory cleanups only.'
 reviewer: 'QA Engineer'
 head: '22f6b145a7e6bda5a7e4164edebd776407ab4ad7'
 updated: '2026-11-03T17:33:00Z'

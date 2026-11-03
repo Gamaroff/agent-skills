@@ -5,17 +5,19 @@ type: task
 description: "Run the cli: --fixture-setup under the same trip-wire gh and gh-free PATH the shell arm uses, so a setup that reaches gh by an indirect spelling the textual scan misses is caught at run time instead of running the host binary."
 tags: [security-probe, observation, qa-advisory]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-11-03
 updated: 2026-11-03
+completed_date: 2026-11-03
 estimated_effort_hours: 8
 github_issue: 820
+pr_number: 821
 ---
 
 # Technical Task: security-probe: a cli: fixture setup cannot reach the host gh
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **GitHub Issue**: [#820](https://github.com/Gamaroff/agent-skills/issues/820)
 
@@ -197,27 +199,27 @@ The obfuscated spelling the test uses is **not** the one quoted in this task or 
 
 ### Functional
 
-- [ ] A `cli:` setup that reaches `gh` by a PATH-resolved spelling `namesGh` misses declines `needs-fake-gh`; the host marker `gh` is never executed
-- [ ] A `cli:` setup that uses only `git` still runs and the case is scored
-- [ ] The `cli:` entry's PATH is unchanged
-- [ ] `runCaseSetup` is still called by both arms, held by the existing structural test
+- [x] A `cli:` setup that reaches `gh` by a PATH-resolved spelling `namesGh` misses declines `needs-fake-gh`; the host marker `gh` is never executed
+- [x] A `cli:` setup that uses only `git` still runs and the case is scored
+- [x] The `cli:` entry's PATH is unchanged
+- [x] `runCaseSetup` is still called by both arms, held by the existing structural test
 
 ### Performance
 
-- [ ] A `cli:` run with no `--fixture-setup` writes no `bin/gh` and spawns no extra process (the task.254 spawn-count test stays green)
-- [ ] `ghFreePath` is called once per case at most (one call in `runCliCase`, before the setup spawn; the QA report's Findings table records it)
+- [x] A `cli:` run with no `--fixture-setup` writes no `bin/gh` and spawns no extra process (the task.254 spawn-count test stays green)
+- [x] `ghFreePath` is called once per case at most (one call in `runCliCase`, before the setup spawn; the QA report's Findings table records it)
 
 ### Code Quality
 
-- [ ] `command node --test shared/resources/tests/security-probe.test.mjs` passes
-- [ ] `npm test` passes
-- [ ] Each of the three guard mutations turns a test red, recorded in the QA report's mutation table
+- [x] `command node --test shared/resources/tests/security-probe.test.mjs` passes
+- [x] `npm test` passes
+- [x] Each of the three guard mutations turns a test red, recorded in the QA report's mutation table
 
 ### Migration
 
-- [ ] `CHANGELOG.md` records the change and cites task 255
-- [ ] `probe-boundary-rule.md` states the run-time guard and its inherited limits
-- [ ] `npm run bundle:check` reports 0 problems
+- [x] `CHANGELOG.md` records the change and cites task 255
+- [x] `probe-boundary-rule.md` states the run-time guard and its inherited limits
+- [x] `npm run bundle:check` reports 0 problems
 
 ---
 
@@ -282,16 +284,41 @@ None.
 ### Key Findings
 No critical issues. Two low-severity advisory cleanups (CR-1, CR-2).
 
-## Change Log
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report**: `task.255.qa.1.probe-engine-cli-setup-gh-isolation.md`
+**Gate File**: `task.255.gate.1.probe-engine-cli-setup-gh-isolation.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** all 12 met (`npm test` graded from CI reading 1, SUCCESS on `ff0eefe99`)
+✅ **Tests:** 290 pass in `security-probe.test.mjs`; the five task.255 tests start at line 8872
+✅ **Mutation proof:** three guard mutations each turn a test red (QA report mutation table)
+✅ **PR Review (5c):** CONCERNS, 0 open coverage findings; PC-1 cleared by this acceptance, PC-2 fixed
+✅ **Documentation:** CHANGELOG entry citing task 255; `probe-boundary-rule.md` states the guard and its limits; bundled copies match
+✅ **Security Review:** boundary held (1 executed, 0 reproduced, 0 escapes). The plan carried legitimate-direction cases only, so the engine verdict per control is `unverifiable`; the hostile-direction evidence is the mutation-proven behavioural tests
+⚠️ **Compliance:** not applicable (internal developer tooling)
+
+**Advisory, not fixed here:** CR-1 (share the setup-PATH build with `caseShellEnv`) and CR-2 (re-wrap one doc paragraph), recorded in the gate's `recommendations.future`.
+
+**Task marked as ACCEPTED on:** 2026-11-03
+
+**Detailed Verification Log:** See `task.255.dod.1.probe-engine-cli-setup-gh-isolation.md` for complete verification evidence and timestamps.
 
 <!-- change-log-start -->
+## Change Log
 
-| Date       | Version | Description                                                            | Author      |
-| ---------- | ------- | ---------------------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-03 | 1.0     | Initial draft — task.254 QA advisory CR-1; design: reuse the trip-wire | create-task |
 | 2026-11-03 | 1.1     | Review passed (9/10) — runCliCase harnessDir, env copy, errored-vs-decline order, record locations | review-task |
 | 2026-11-03 |         | Status → ready-for-development                                          | review-task |
 | 2026-11-03 |         | QA gate PASS (100/100) — 2 advisory findings                            | qa-task     |
+| 2026-11-03 | 1.2 | DoD passed — accepted (PR #821) | finalise |
 <!-- change-log-end -->
 
 ---

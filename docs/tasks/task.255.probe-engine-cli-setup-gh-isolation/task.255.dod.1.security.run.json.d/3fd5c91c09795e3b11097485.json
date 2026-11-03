@@ -1,0 +1,31 @@
+{
+  "sink": "filename",
+  "entry": "cli:shared/resources/tests/fixtures/security-probe/cli-path-clean.mjs",
+  "name": "cli setup gh isolation - printf-built name",
+  "call_site": null,
+  "verdict": "unverifiable",
+  "reason": "needs-fake-gh",
+  "executed": 0,
+  "passed": 0,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 1,
+  "declined_cases": [
+    {
+      "id": "cli:shared/resources/tests/fixtures/security-probe/cli-path-clean.mjs",
+      "reason": "needs-fake-gh",
+      "detail": "the --fixture-setup /home/gamaroff/Development/agent-skills/shared/resources/tests/fixtures/security-probe/setup-gh-printf.sh invoked `gh` at run time — the trip-wire on PATH answered, so nothing was scored; the cli: form has no --fake-gh, so use the shell-argv: form with --fake-gh <dir>"
+    }
+  ],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": [
+    "{input}"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": "/home/gamaroff/Development/agent-skills/shared/resources/tests/fixtures/security-probe/setup-gh-printf.sh",
+  "ran_at": "2026-11-03T17:38:55.953Z"
+}
