@@ -983,3 +983,25 @@ test("isWithin parity: the ESM and the CJS definitions agree on one case table (
     assert.equal(cjs(p, c), want, `cjs(${p}, ${c})`);
   }
 });
+
+test("task 253: a link whose text spans a newline reports the line its target sits on, as an additive targetLine", () => {
+  const links = extractRelativeLinks(
+    "a\n[multi\nline](../x.md)\n[one](../y.md)\n",
+  );
+  // `line` keeps its meaning (where the link opens); only a multi-line link gains targetLine.
+  assert.deepEqual(
+    [...links],
+    [
+      { target: "../x.md", line: 2, targetLine: 3 },
+      { target: "../y.md", line: 4 },
+    ],
+  );
+});
+
+test("task 253: targetLine tracks a three-line link text and is absent for a link inside a fence", () => {
+  const text = "[a\nb\nc](../x.md)\n```\n[e\nf](../z.md)\n```\n";
+  assert.deepEqual(
+    [...extractRelativeLinks(text)],
+    [{ target: "../x.md", line: 1, targetLine: 3 }],
+  );
+});

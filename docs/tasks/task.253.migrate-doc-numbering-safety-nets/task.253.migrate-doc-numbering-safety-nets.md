@@ -140,8 +140,9 @@ The `postScan`, `warnings` and `skippedGenerated` result keys the tests read are
 
 **Changes**:
 - [ ] Confirm the cause with the Phase 1 failing test: the matcher returns the link, and the per-line apply loop in the migration tool (`byLine` / `replaceTargets`, `:1513-1530`) misses a target that is not on the reported line.
-- [ ] Fix it inside the migration tool's own pass (apply the rewrite to the line that holds `from`, or to the span from the link's opening line). Leave `doc-links.js` unchanged: its callers (listed in section 3) rely on its current output, and the matcher is correct.
-- [ ] Change `doc-links.js` only if the test shows the matcher is at fault; then run each caller's tests and compare their output before and after.
+- [x] Confirmed with the Phase 1 test: the matcher returns the link, and the per-line apply loop misses a target that is not on the reported line.
+- [x] Fixed with an **additive** `targetLine` on `scanLinks` output (present only when the target sits on a later line than the link's opening, so every existing `deepEqual` and every caller reading `line` is unchanged), read by `linkPass`. The fix does not search forward in the text: a search would also rewrite a fenced copy of the same path on the next line, which the control in `253 gap 1` forbids.
+- [x] `doc-links.js` callers re-run: `doc-links.test.mjs` (33 pass) plus the full suite at the end of Phase 5.
 
 **Dependencies**: Phase 1.
 
@@ -359,7 +360,7 @@ For the dead-link scan, include a live link and a link to an external URL that m
 ## Progress Tracking
 
 - [x] Phase 1: reproduce, tests first
-- [ ] Phase 2: multi-line links
+- [x] Phase 2: multi-line links
 - [ ] Phase 3: post-apply scans
 - [ ] Phase 4: frontmatter, stub, dirty/behind, generated
 - [ ] Phase 5: mutation proof and docs

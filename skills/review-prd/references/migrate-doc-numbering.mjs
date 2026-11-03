@@ -1141,7 +1141,10 @@ export function linkPass(file, text, { liveSet, postSet, mapPath }) {
     live: 0,
     dead: 0,
   };
-  for (const { target, line } of links) {
+  for (const { target, line: openLine, targetLine } of links) {
+    // The rewrite is applied per line, so it must name the line the target text sits on: a link
+    // whose text spans a newline opens on an earlier line than its target (task 253, gap 1).
+    const line = targetLine ?? openLine;
     const [rawPath, suffix] = splitTarget(target);
     if (rawPath === "") continue;
     const decoded = decodeSafe(rawPath);
