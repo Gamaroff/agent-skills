@@ -8717,7 +8717,7 @@ test("the 'cannot materialise' decline names the sink that wrote the input as a 
   assert.equal(viaFilename.executed, 0);
   assert.match(
     viaFilename.cases[0].detail,
-    /cannot materialise "docs\/prd": name carries a path separator or NUL; sink "filename" writes the input as a file name, so an input that is a path needs a sink that is not materialised/,
+    /cannot materialise "docs\/prd": name carries a path separator; sink "filename" writes the input as a file name, so an input that is a path needs a sink that is not materialised/,
   );
   // The way out the message names works: a sink that is not materialised runs
   // the same path-bearing input.
@@ -8755,6 +8755,19 @@ test("the 'cannot materialise' decline names the sink that wrote the input as a 
   assert.doesNotMatch(
     nul.cases[0].detail ?? "",
     /writes the input as a file name/,
+  );
+  // ...including on the filename sink, where the NUL reaches the name check:
+  // the path advice would be wrong there, since no other sink fixes a NUL.
+  const nulOnFilename = runProbeSpec({
+    sink: "filename",
+    entry: CLI("accept-all"),
+    cases: [{ ...cliCase, input: "a\0b" }],
+    argv: HOST_ARGV,
+  });
+  assert.match(nulOnFilename.cases[0].detail, /name carries a NUL/);
+  assert.doesNotMatch(
+    nulOnFilename.cases[0].detail,
+    /writes the input as a file name|needs a sink/,
   );
 });
 

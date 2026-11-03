@@ -49,6 +49,10 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **A probe input carrying a NUL no longer gets path advice on the `filename` sink (task 254
+  follow-up).** The "cannot materialise" decline told a NUL input to pick a sink that is not
+  materialised, which cannot help: no sink accepts a NUL. The NUL now declines with
+  `name carries a NUL` and no sink advice; a `/` still names the sink and the way out.
 - **The bundle comment-origin scan no longer races another suite's scratch files (obs #145).**
   `tests/bundle-comment-origin.test.js` §2 walked the directories, so it also listed
   `security-probe.test.mjs`'s `.t131-mutant-*` scratch copies inside `shared/resources/tests/`.
