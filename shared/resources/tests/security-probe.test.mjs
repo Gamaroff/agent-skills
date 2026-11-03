@@ -8099,6 +8099,16 @@ const T250_WRITE_ARG = {
  * the code-only view hides must be one of T250_MASKED's known sites, exactly:
  * a misread that hides a real call adds a site no entry names, whatever the
  * heuristic got wrong (QA cycle 3, CR3-2 — an allow-list, not a cap).
+ *
+ * Known limits, accepted when the QA loop escalated (gate 5). Neither shape is
+ * in this file today; both let a misread re-split a write call's arguments
+ * without hiding its name, so the guard checks the wrong argument and passes:
+ * - A template literal nested inside another (`${b ? `,` : ""}`): a template
+ *   ends at the next backtick, with no `${ … }` depth (TASK-250-CR5-1).
+ * - A phantom regex that holds a quote (after `this.#x`, which the `.` rule
+ *   does not cover): it shifts string boundaries, and the phantom string
+ *   swallows a comma the regex tripwire never sees (TASK-250-CR5-2).
+ * Closing these for good means a real parser (acorn), not another heuristic.
  */
 function t250CodeOnly(src, regexes = []) {
   const out = src.split("");
@@ -8231,9 +8241,10 @@ function t250Args(code, open) {
  * A call is also `unparsed` when a regex literal the view blanked inside its
  * argument list holds a comma or a bracket. Such a blank decides how the list
  * splits, and a misread one (a phantom regex) merges arguments without hiding
- * the call name, so neither `masked` nor an unclosed list would catch it. Real
- * code puts no such regex in a write call's arguments, so the tripwire costs
- * nothing (QA cycle 4, CR4-1: it closes the class, not one tokenizer cause).
+ * the call name, so neither `masked` nor an unclosed list would catch it. No
+ * write call in this file holds such a regex today (`unparsed` is empty); one
+ * that needs it should hoist the regex into a const (QA cycle 4, CR4-1: it
+ * closes the class for regex blanks, not one tokenizer cause; CR5-3).
  */
 function t250InTreeWrites(src) {
   const call = new RegExp(
