@@ -296,8 +296,9 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
      `waived` and `deferred` (with a named owner) are not open. **One exception, and it is what makes
      the `WAIVED` row reachable:** under `gate: WAIVED` with `waiver.active: true`, the entries in
      `top_issues[]` *are* the waived findings — `qa-gate`'s own schema keeps them there with no
-     `status:` field, and no skill stamps `status: waived` — so entries without a `status:` count as
-     waived, not open. Without this clause every waived gate matched the HALT row and the waiver row
+     `status:` field — so entries without a `status:` count as waived, not open. (The one writer that
+     stamps `status: waived`, `accept-qa-residual.sh` at a loop-limit acceptance (task.251), stamps
+     every open entry, `status: open` included — a `status: open` under `WAIVED` is still open.) Without this clause every waived gate matched the HALT row and the waiver row
      could never fire. The two clauses below are about *this commit* and cannot be inferred from
      `accepted` — they stay regardless of the row matched here.
 

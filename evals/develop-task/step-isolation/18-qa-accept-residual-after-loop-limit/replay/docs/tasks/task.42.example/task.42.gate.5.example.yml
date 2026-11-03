@@ -1,0 +1,26 @@
+schema: 1
+gate: WAIVED
+status_reason: "Cycle 5."
+reviewer: "QA Engineer"
+updated: "2026-09-18T14:00:00Z"
+
+top_issues:
+  - id: "EX-501"
+    severity: medium
+    file: "src/example.ts"
+    finding: "MEDIUM of cycle 5."
+    suggested_owner: dev
+    status: waived
+
+waiver:
+  active: true
+  reason: 'residual accepted at the loop-limit escalation'
+  approved_by: 'Example Owner'
+  approved_at: '2026-09-18'
+
+quality_score: 80
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged."

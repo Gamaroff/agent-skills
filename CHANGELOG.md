@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **A loop-limit residual can now be accepted in one step (task 251, obs #115, #150).** The QA
+  loop HALT's option 2 ("accept the current gate status") had no writer, and the hand edits it
+  invited failed twice: the 5c lens refused the cycle's `Escalating — loop limit reached` row
+  (task.238), and `develop-next` refused the gate's still-`open` findings (task.250). Phase 0b of
+  `develop-task` / `develop-story` now offers **"Accept the residual"** after a loop-limit halt
+  (never a not-converging one). It calls `accept-qa-residual.sh`, which records the decision where
+  the readers already look. The highest gate becomes `WAIVED` with the owner as `approved_by` and
+  each open finding `status: waived`. The cycle entry moves to `Proceeding to 5c` with a `Loop exit`
+  row naming the decision. The lock is restored if needed and re-enters at `qa_phase: 5c`. It
+  refuses a `FAIL` gate, a not-converging escalation and a report missing the cycle's entry, and in
+  each case writes nothing. `qa-diminishing-returns.js` now exports `isOpen`, so the writer judges
+  "open" exactly as the loop does.
+
 ### Fixed
 
 - **The bundle comment-origin scan no longer races another suite's scratch files (obs #145).**

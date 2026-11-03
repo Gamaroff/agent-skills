@@ -340,7 +340,10 @@ recorded, not the findings.
 
 Runs after the QA skill writes its gate and **before** the outcome branching below reads it — and only
 when the lock carries a `waiver` (a step was removed by `--skip`, task.201). **The QA skill writes the
-gate; this step only checks it** — dev-side steps never modify a gate file. The waiver directive the QA
+gate; this step only checks it** — dev-side steps never modify a gate file. One exception, stated
+here and nowhere else: `accept-qa-residual.sh` (task.251) records the **owner's** acceptance of a
+loop-limit residual as the gate's `waiver:` — a human decision, not a dev-side verdict — and it never
+waives a `FAIL` (Loop Escalation, option 2). The waiver directive the QA
 skill was given (lite-mode contract, §"Directive Passed to the QA Skill") tells it to record `WAIVED`
 for a review that would otherwise read `PASS` or `CONCERNS`. The engine's rule is a fixed point, so the
 recorded gate is correct exactly when the engine, given it, returns it unchanged:
@@ -404,6 +407,9 @@ CR-1). A loop-limit escalation therefore always leaves the same Action signal th
 leaves, and a resume reads it from the last entry's Action row rather than from which route happened
 to run (task.123 QA cycle 2, CR-4). The row's value set is exactly `{Proceeding to 5c
 (PR conformance review), Running qa-fix (cycle {N} of {QA_MAX_CYCLES}), Escalating — loop not converging, Escalating — loop limit reached}`.
+An owner's acceptance of a loop-limit residual adds no value: `accept-qa-residual.sh` moves the entry
+from `Escalating — loop limit reached` to `Proceeding to 5c (PR conformance review)`, and its
+`**Loop exit**` row names the decision (Loop Escalation, option 2; task.251).
 
 - `PASS` with **no open entry in `top_issues[]`** → **proceed to 5c** (the loop's exit gate), not straight to Step 7
 - `WAIVED` with `waiver.active: true` and a documented reason/approver → **proceed to 5c** (finalise treats `WAIVED` as accept-eligible; re-running qa-fix would churn against an intentionally-waived gate)
@@ -484,7 +490,7 @@ Log the result in the QA Iteration History section:
 **HIGH findings**: {HIGH_N}
 **MEDIUM findings**: {MEDIUM_N}
 **PR Review**: {pending — 5c not yet run / APPROVE / CONCERNS / REQUEST CHANGES / review failed / not reached — gate did not exit the loop}
-**Loop exit**: {n/a — this exit not taken / the `describeLoopRoute()` message verbatim}
+**Loop exit**: {n/a — this exit not taken / the `describeLoopRoute()` message verbatim / residual accepted by {approver} on {date} (accept-qa-residual)}
 **Action**: {Proceeding to 5c (PR conformance review) / Running qa-fix (cycle N of {QA_MAX_CYCLES}) / Escalating — loop not converging / Escalating — loop limit reached}
 ```
 
@@ -2109,8 +2115,9 @@ On a convergence stall the remaining findings are outstanding, not accepted — 
 because it was no longer reducing them, which is a reason to look at them, not past them.
 Options:
 1. Fix remaining issues manually, then re-run /qa-story
-2. Accept the current gate status: run Step 5c first (/review-pr --effort medium --comment
-   --no-code), then /finalise — on a host with no review decision, finalise needs that report
+2. Accept the residual (loop limit only): re-run /develop-story and pick "Accept the residual"
+   in Phase 0b — it records the waiver in the gate and resumes at Step 5c (/review-pr), then
+   /finalise
 3. Update the story requirements if issues reflect unintended scope
 4. Re-run /develop-story to resume with more cycles — Phase 0b offers
    "Resume the QA loop with {k} more cycles"; any /qa-story you run by hand in between is counted
@@ -2133,17 +2140,30 @@ On a convergence stall the remaining findings are outstanding, not accepted — 
 because it was no longer reducing them, which is a reason to look at them, not past them.
 Options:
 1. Fix remaining issues manually, then re-run /qa-task
-2. Accept the current gate status: run Step 5c first (/review-pr --effort medium --comment
-   --no-code), then /finalise — on a host with no review decision, finalise needs that report
+2. Accept the residual (loop limit only): re-run /develop-task and pick "Accept the residual"
+   in Phase 0b — it records the waiver in the gate and resumes at Step 5c (/review-pr), then
+   /finalise
 3. Update the task requirements if issues reflect unintended scope
 4. Re-run /develop-task to resume with more cycles — Phase 0b offers
    "Resume the QA loop with {k} more cycles"; any /qa-task you run by hand in between is counted
    from its gate on disk
 ```
 
-> **Option 2 goes through 5c, not around it.** A loop that escalates never reaches Step 5c, so no
-> `*.pr-review.*.md` exists. `/finalise` satisfies its "PR approved" column with a GitHub review
-> decision or, when the host has none (a single-maintainer repository), with that report — reading
-> APPROVE or CONCERNS. Taking option 2 straight to `/finalise` there produces a DoD gap. The review
-> also reads the trail, and on task.180 it found five bug reports whose fixes later gates had
-> verified but that no step had closed (obs #21).
+> **Option 2 goes through 5c, not around it, and through one writer.** A loop that escalates never
+> reaches Step 5c, so no `*.pr-review.*.md` exists. `/finalise` satisfies its "PR approved" column
+> with a GitHub review decision or, when the host has none (a single-maintainer repository), with
+> that report — reading APPROVE or CONCERNS. Taking option 2 straight to `/finalise` there produces
+> a DoD gap. The review also reads the trail, and on task.180 it found five bug reports whose fixes
+> later gates had verified but that no step had closed (obs #21).
+>
+> **The acceptance is recorded by `accept-qa-residual.sh`, never by hand (task.251).** Before it
+> existed, option 2 could not succeed: the 5c lens refused the last cycle's
+> `Escalating — loop limit reached` (task.238, twice; obs #115), and `develop-next` Step 3 refused
+> the gate's still-`open` findings (task.250; obs #150). The writer records the decision where those
+> readers already look: the highest gate becomes `WAIVED` with the owner as `approved_by` and each
+> open finding `status: waived`; the cycle entry moves onto the accepting route
+> (`**Action**: Proceeding to 5c (PR conformance review)`, `**Loop exit**` naming the decision); the
+> lock re-enters at `qa_phase: 5c`. The run then leaves the loop on the existing `WAIVED` → 5c route.
+> It refuses a `FAIL` gate and a not-converging escalation, whose findings are not accepted. Phase 0b
+> offers it; the call and its reasons are the resume contract's **Re-entry after a QA loop
+> escalation**, step 3b.
