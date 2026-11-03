@@ -1,0 +1,31 @@
+{
+  "sink": "markdown-structure",
+  "entry": "shared/resources/accept-qa-residual.js#planReportEdit",
+  "name": null,
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 6,
+  "passed": 6,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": [
+    5,
+    {
+      "approvedBy": "Owner",
+      "reason": "r",
+      "date": "2026-11-03",
+      "waived": []
+    }
+  ],
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-11-03T06:45:14.613Z"
+}

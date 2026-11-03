@@ -1,0 +1,44 @@
+[
+  {
+    "id": "legit-block-gate",
+    "direction": "legitimate",
+    "input": "schema: 1\ngate: CONCERNS\nhead: 'abc'\nupdated: '2026-11-02T00:00:00Z'\n\ntop_issues:\n  - id: 'X-1'\n    severity: medium\n    file: 'a.js'\n    finding: 'f'\n    status: open\n\nwaiver:\n  active: false\n",
+    "why": "A block-style CONCERNS gate with one open entry is the shape this pipeline writes.",
+    "correct": "Accept and plan the edit."
+  },
+  {
+    "id": "fail-gate",
+    "direction": "hostile",
+    "input": "schema: 1\ngate: FAIL\nhead: 'abc'\nupdated: '2026-11-02T00:00:00Z'\n\ntop_issues:\n  - id: 'X-1'\n    severity: high\n    file: 'a.js'\n    finding: 'f'\n    status: open\n\nwaiver:\n  active: false\n",
+    "why": "A FAIL gate is never waived by this writer.",
+    "correct": "Refuse (fail-gate); write nothing."
+  },
+  {
+    "id": "multi-line-flow-entry",
+    "direction": "hostile",
+    "input": "schema: 1\ngate: CONCERNS\nhead: 'abc'\nupdated: '2026-11-02T00:00:00Z'\n\ntop_issues:\n  - {id: X,\n     status: open}\n\nwaiver:\n  active: false\n",
+    "why": "A flow mapping that closes on a later line cannot be edited line by line.",
+    "correct": "Refuse (unreadable-gate); write nothing."
+  },
+  {
+    "id": "nested-map-multi-line-flow-entry",
+    "direction": "hostile",
+    "input": "schema: 1\ngate: CONCERNS\nhead: 'abc'\nupdated: '2026-11-02T00:00:00Z'\n\ntop_issues:\n  - {id: X, a: {b: 1},\n     status: open}\n\nwaiver:\n  active: false\n",
+    "why": "A nested map closes on the dash line, but the outer flow mapping closes on a later line.",
+    "correct": "Refuse (unreadable-gate); write nothing."
+  },
+  {
+    "id": "comment-brace-multi-line-flow-entry",
+    "direction": "hostile",
+    "input": "schema: 1\ngate: CONCERNS\nhead: 'abc'\nupdated: '2026-11-02T00:00:00Z'\n\ntop_issues:\n  - {id: X, # note }\n     status: open}\n\nwaiver:\n  active: false\n",
+    "why": "A closing brace inside a trailing comment is not a closing brace.",
+    "correct": "Refuse (unreadable-gate); write nothing."
+  },
+  {
+    "id": "empty-gate",
+    "direction": "hostile",
+    "input": "",
+    "why": "An empty gate.",
+    "correct": "Refuse (unreadable-gate); write nothing."
+  }
+]

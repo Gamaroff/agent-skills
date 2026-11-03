@@ -1,0 +1,83 @@
+schema: 2
+task: 'task.251.record-loop-limit-residual-acceptance'
+task_title: 'Record a loop-limit residual acceptance in one writer'
+gate: CONCERNS
+status_reason: 'Writer, wiring and tests are in place and green. Three medium findings: a block-style gate entry containing a brace is waived wrongly while the writer reports accepted, an approver name with a newline forges report lines, and the plan functions return no ok field so the boundary probe scores every refusal as acceptance.'
+reviewer: 'QA Engineer'
+head: '4b8e8d22b25fdbbdb9d498c4996bc22d041581b9'
+updated: '2026-11-03T06:35:56Z'
+
+top_issues:
+  - id: 'T251-QA-1'
+    severity: medium
+    file: 'shared/resources/accept-qa-residual.js'
+    finding: 'waiveEntry treats any "{" on an entry first line as flow style, so a block-style entry such as `- id: "X {y}"` has "status: waived" spliced inside the quoted id, the real `status: open` line stays, and the writer still returns accepted because its read-back uses the same readTopIssues that misparses the brace (reproduced: gate WAIVED, entry id corrupted, status: open kept).'
+    suggested_action: 'Take the flow branch only when the text after the dash starts with "{", and add a control test with a brace inside a block-style value; the read-back check should compare entry ids and statuses, not rely on the one reader alone.'
+    suggested_owner: dev
+    status: open
+  - id: 'T251-CR-2'
+    severity: medium
+    file: 'shared/resources/accept-qa-residual.js'
+    finding: '--approved-by is written raw into the Loop exit row and the Decisions Log bullet with no newline folding (--reason is folded), so an approver containing a newline forges extra report lines (reproduced: an injected "## Completion" heading inside the Decisions Log and the Loop exit row).'
+    suggested_action: 'Fold CR and LF to a space in approvedBy once, in acceptResidual option normalisation, before it reaches the gate or the report, and add a hostile-approver test.'
+    suggested_owner: dev
+    status: open
+  - id: 'T251-QA-2'
+    severity: medium
+    file: 'shared/resources/accept-qa-residual.js'
+    finding: 'planGateEdit and planReportEdit signal refusal by state and carry no ok field, so the probe engine scores all 9 reproduced hostile cases as accepted (verdict absent, 15 executed, 0 escaped) and /finalise would hit the same result on its own probe.'
+    suggested_action: 'Add `ok: false` to every refusal result of planGateEdit and planReportEdit (ok: true for edit and already), keep the existing state field, and re-run the probe so at least one hostile case is rejected.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 29
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 15
+    escaped: 0
+    boundary: true
+    boundary_signals: ['refused', 'refuses']
+    notes: 'Caller-supplied strings reach YAML and Markdown. --reason is quoted and folded; --approved-by is not folded in the report (T251-CR-2). The probe engine ran 15 cases against planReportEdit (markdown-structure), 0 escaped, verdict absent because the result carries no ok field (T251-QA-2).'
+  performance:
+    status: PASS
+    notes: 'Writer ran in 0.047 s on the task.250 gate and report.'
+  reliability:
+    status: PASS
+    notes: 'Atomic temp-and-rename writes; idempotent per artefact; a Stop between the two writes is finished by a re-run. Refusals write nothing (byte-identical checks). T251-QA-1 is the one path that reports success wrongly.'
+  maintainability:
+    status: PASS
+    notes: 'Reuses readGateToken, readTopIssues and isOpen; one lock restore path; bundled copies in sync; one advisory note on insertAt ordering (CR-3, low).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T251-QA-1, T251-CR-2 and T251-QA-2 in accept-qa-residual.js, with a committed test for each.'
+      refs: ['shared/resources/accept-qa-residual.js', 'shared/resources/tests/accept-qa-residual.test.mjs']
+  future:
+    - action: 'resume-contract fenced block at line 492 fails under qa-execute-snippets on the base branch too (develop-bug resume block); not introduced by this change.'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+      provenance: pre-existing
+    - action: 'CR-3 (low/low): the Decisions Log insertion index is computed before the Loop exit row can be spliced in above it; only reachable if a QA Cycle entry precedes ## Decisions Log.'
+      refs: ['shared/resources/accept-qa-residual.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T251-QA-1, T251-CR-2 and T251-QA-2 fixed and re-verified']

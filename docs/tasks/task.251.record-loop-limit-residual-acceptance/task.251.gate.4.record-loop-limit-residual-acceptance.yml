@@ -1,0 +1,78 @@
+schema: 2
+task: 'task.251.record-loop-limit-residual-acceptance'
+task_title: 'Record a loop-limit residual acceptance in one writer'
+gate: CONCERNS
+status_reason: 'The cycle 3 scanner closes every extent shape the previous cycles named. The status-key match it edits through still handles only a plain, single status key: a quoted status key and a duplicated one are edited and reported accepted while the entry stays open.'
+reviewer: 'QA Engineer'
+head: '70abf7ad39f440ac007d664e6ac872cda7bacf35'
+updated: '2026-11-03T06:57:54Z'
+
+top_issues:
+  - id: 'T251-CR4-1'
+    severity: medium
+    file: 'shared/resources/accept-qa-residual.js'
+    finding: 'A flow entry whose status key is quoted (`- {id: X, "status": open}`, also single quotes) is not matched by the top-level segment test, so a second plain `status: waived` is appended and the entry reads as a duplicate-key mapping that still holds the open status; planGateEdit returns edit with ok true (reproduced by the reviewer and by QA; the probe engine scores the case accepted, verdict present-but-inert).'
+    suggested_action: 'Match the key with optional quotes around it in the one segment test.'
+    suggested_owner: dev
+    status: open
+  - id: 'T251-CR4-2'
+    severity: low
+    file: 'shared/resources/accept-qa-residual.js'
+    finding: 'A duplicated top-level status (`- {id: X, status: open, status: open}`) has only its first copy waived, `{id: X, status: waived, status: open}`; a last-wins parser reads open. Reproduced; edit with ok true. Same segment test as T251-CR4-1.'
+    suggested_action: 'Waive every top-level status segment, not the first only.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 92
+
+evidence:
+  tests_reviewed: 34
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 6
+    escaped: 0
+    boundary: true
+    boundary_signals: ['refused', 'refuses']
+    notes: 'Probe engine on planGateEdit with the committed gate cases file (1 legitimate flow gate accepted; FAIL, multi-line flow and empty gates rejected; quoted-status-key and duplicate-status-key gates accepted): verdict present-but-inert, 6 executed, 2 reproduced, 0 escaped. The two accepted hostile gates are T251-CR4-1 and T251-CR4-2.'
+  performance:
+    status: PASS
+    notes: 'One linear scan per open entry.'
+  reliability:
+    status: CONCERNS
+    notes: 'T251-CR4-1 and -2 report success on an entry that still holds the open status. Neither shape is one this pipeline writes (gates are block style). Advisory from earlier cycles still open: no timeout on the qa-cycle.sh spawn; audit text after a re-run.'
+  maintainability:
+    status: PASS
+    notes: 'Cycle 3 consolidated the extent into flowSpan; this cycle''s two findings are in the status-key match beside it, not in the extent.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Match a quoted status key and waive every top-level status segment (T251-CR4-1, T251-CR4-2).'
+      refs: ['shared/resources/accept-qa-residual.js', 'shared/resources/tests/accept-qa-residual.test.mjs']
+  future:
+    - action: 'CR-2 (low): add a timeout to the qa-cycle.sh spawnSync and map a timeout to engine-unavailable.'
+      refs: ['shared/resources/accept-qa-residual.js']
+    - action: 'CR-3 (low/low): on a re-run after a Stop, the Decisions Log line says "none newly waived" instead of listing the ids the first run waived.'
+      refs: ['shared/resources/accept-qa-residual.js']
+    - action: 'readKeysInto stops a quoted value at "}" (pre-existing, outside this change).'
+      refs: ['shared/resources/qa-diminishing-returns.js']
+      provenance: pre-existing
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T251-CR4-1 fixed and re-verified']

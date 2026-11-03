@@ -1,0 +1,6 @@
+[
+  {"skill":"resume-detector","args":null,"status":"started","timestamp":1000},
+  {"skill":"resume-detector","args":null,"status":"completed","timestamp":1500},
+  {"skill":"review-pr","args":"--effort medium --comment --no-code","status":"started","timestamp":2000},
+  {"skill":"review-pr","args":"--effort medium --comment --no-code","status":"completed","timestamp":2500}
+]
