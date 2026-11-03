@@ -2740,3 +2740,24 @@ test("253 gap 6: inRewriteScope refuses a generated file; a sibling directory wi
   assert.equal(m.inRewriteScope("docs/out/readme.md"), true); // "out" alone is not a "-out" directory
   assert.equal(m.inRewriteScope("docs/about/readme.md"), true); // control: ends in "out", not "-out"
 });
+
+test("253 gap 2/7: scanTracked reads each tracked file at most once, and reads nothing it has no use for", () => {
+  const files = l2Tree({
+    "scripts/a.mjs": "// nothing\n",
+    "assets/logo.png": "bin",
+    "notes.txt": "plain\n",
+  });
+  const io = memIo(files);
+  const reads = new Map();
+  const inner = io.readFile;
+  io.readFile = (p) => {
+    reads.set(p, (reads.get(p) || 0) + 1);
+    return inner(p);
+  };
+  const { planned } = dry(memIo(files));
+  m.scanTracked(io, planned, { applied: false, root: R });
+  for (const [p, n] of reads) assert.equal(n, 1, `${p} read ${n} times`);
+  assert.ok(reads.has("scripts/a.mjs"), "the code file was scanned");
+  assert.ok(!reads.has("assets/logo.png"), "a binary file was read");
+  assert.ok(!reads.has("notes.txt"), "a dry run read a file it has no use for");
+});

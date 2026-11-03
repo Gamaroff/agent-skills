@@ -18,5 +18,10 @@ One row per fix: revert the behaviour, run the named test, expect red, restore, 
 | 5. Dirty / behind (Phase 4) | the `dirty-tree` warning dropped | `253 gap 5`, `253 gap 5/6: the text output…` | yes |
 | 6. Generated file (Phase 4) | the skip-and-list branch for generated files removed | `253 gap 6`, `253 gap 5/6: the text output…` | yes |
 | 6. Generated file (Phase 4) | `!isGenerated(rel)` removed from `inRewriteScope` | `253 gap 6: inRewriteScope refuses a generated file…` | yes |
+| 2. Post-apply scan (Phase 3) | `maskedLinks` returns nothing (fenced / code-span links unreported) | `253 gap 2` | yes |
+| 2. Post-apply scan (Phase 3) | old-path scan disabled | `253 gap 2` | yes |
+| 2. Post-apply scan (Phase 3) | dead-link existence check removed (every link reported) | `253 gap 2` | yes |
+| 7. Legacy-name line (Phase 3) | `parseLegacy` result ignored (nothing matches) | `253 gap 7` | yes |
+| 7. Legacy-name line (Phase 3) | "already the new scheme" exclusion removed | **no test went red** — `parseLegacy` already rejects new-scheme names, so the line was dead; deleted rather than kept | n/a |
 
 Gap 3 did not reproduce (Phase 1), so it has no fix and no mutation row.

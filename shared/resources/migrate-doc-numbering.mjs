@@ -2272,6 +2272,7 @@ export function run(argv, ctx = {}) {
         reason: "already",
         exitCode: 0,
         corpus: corpus.summary,
+        postScan: scanTracked(io, planned, { applied: false, root }),
       };
     return {
       ...base,
@@ -2356,9 +2357,23 @@ export function run(argv, ctx = {}) {
     },
     edits: e.edits.size,
   };
-  if (args.check) return { ...report, reason: "needs-migration", exitCode: 1 };
+  // The legacy-name scan is the same before and after a run: it reads code outside the PRD root.
+  const legacyOnly = () => scanTracked(io, planned, { applied: false, root });
+  if (args.check)
+    return {
+      ...report,
+      postScan: legacyOnly(),
+      reason: "needs-migration",
+      exitCode: 1,
+    };
   if (blockers.length) return { ...report, reason: "blocked", exitCode: 1 };
-  if (!args.apply) return { ...report, reason: "dry-run", exitCode: 0 };
+  if (!args.apply)
+    return {
+      ...report,
+      postScan: legacyOnly(),
+      reason: "dry-run",
+      exitCode: 0,
+    };
 
   const progress = { moved: new Set(), written: new Set() };
   let done;
@@ -2388,14 +2403,192 @@ export function run(argv, ctx = {}) {
       findings: corpus.findings,
       revert: revertHint(touch),
     };
+  // What the tree looks like now: moved files at their new paths, the run's own writes included.
+  const moved = new Set(touch.moves.map((m) => m.from));
+  const after = [
+    ...[...tracked].filter((f) => !moved.has(f)),
+    ...touch.moves.map((m) => m.to),
+    ...touch.created,
+  ];
+  const postScan = scanTracked(io, planned, {
+    applied: true,
+    root,
+    files: after,
+    touched: new Set([
+      ...touch.moves.map((m) => m.to),
+      ...touch.inPlace,
+      ...touch.created,
+    ]),
+  });
   return {
     ...report,
     ...done,
+    postScan,
     reason: "ok",
     exitCode: 0,
     corpus: corpus.summary,
     // Nothing is committed by the run: this is how to undo it before you commit.
     revert: revertHint(touch),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// The closing scans (task 253, gaps 2 and 7)
+// ---------------------------------------------------------------------------
+
+const FENCE_LINE = /^[ \t]*(?:`{3,}|~{3,})/;
+// What the legacy-name scan reads: code and configuration, where a tool hard-codes a grammar.
+const CODE_EXTS = Object.freeze([
+  ".js",
+  ".mjs",
+  ".cjs",
+  ".ts",
+  ".sh",
+  ".py",
+  ".yml",
+  ".yaml",
+  ".json",
+]);
+
+/**
+ * Markdown links the link scanner blanks on purpose: the ones inside a fenced block and inside
+ * a single-backtick code span. Each is `{ target, line, kind }`, kind `fenced` or `code-span`.
+ * They are examples as often as references, so the caller reports them as warnings.
+ */
+export function maskedLinks(text) {
+  const out = [];
+  const lines = text.replace(/\r\n?/g, "\n").split("\n");
+  let fence = null; // { start, body[] }
+  lines.forEach((line, i) => {
+    if (FENCE_LINE.test(line)) {
+      if (fence === null) fence = { start: i + 1, body: [] };
+      else {
+        for (const l of extractRelativeLinks(fence.body.join("\n")))
+          out.push({
+            target: l.target,
+            line: fence.start + (l.targetLine ?? l.line),
+            kind: "fenced",
+          });
+        fence = null;
+      }
+      return;
+    }
+    if (fence !== null) {
+      fence.body.push(line);
+      return;
+    }
+    for (const span of line.matchAll(/`([^`\n]+)`/g))
+      for (const l of extractRelativeLinks(span[1]))
+        out.push({ target: l.target, line: i + 1, kind: "code-span" });
+  });
+  return out;
+}
+
+/**
+ * Whether a token reads as a legacy epic or story name — through doc-id, not a pattern of ours.
+ * The token is the text of a script, so regex spellings are first reduced to the name they
+ * stand for: `\d`, `\d+` and `[0-9]` become a digit, `\.` becomes a dot. A bare `kind.1` or
+ * `kind.1.1` (a prefix a script matches on) is completed with a slug so doc-id can read it.
+ */
+function isLegacyName(token) {
+  const t = token.replace(/\.+$/, "");
+  const kind = t.split(".")[0];
+  if (kind !== "epic" && kind !== "story") return false;
+  for (const c of [t, `${t}.x`]) {
+    // parseLegacy refuses a new-scheme name, so no separate "already migrated" check is needed.
+    if (docId.parseLegacy(c).ok) return true;
+  }
+  return false;
+}
+
+/** [{ line, token }] for each legacy epic or story name a code file spells out. Pure. */
+export function legacyNameHits(text) {
+  const hits = [];
+  text.split("\n").forEach((line, i) => {
+    const reduced = line
+      .replace(/\\d\+?|\[0-9\]\+?/g, "1")
+      .replace(/\\\./g, ".");
+    for (const token of reduced.split(/[^A-Za-z0-9._-]+/))
+      if (token.includes(".") && isLegacyName(token))
+        hits.push({ line: i + 1, token });
+  });
+  return hits;
+}
+
+/**
+ * One pass over the tracked tree, each file read once (task 253, gaps 2 and 7):
+ *   deadLinks    after an apply, every relative link in a file the run moved or wrote whose
+ *                target does not exist — fenced and code-span ones as warnings.
+ *   oldPaths     after an apply, every old path of the move map still present in any tracked
+ *                text file (history, fixtures, bundled copies and generated files keep theirs).
+ *   legacyNames  in every mode, the tracked code files outside the PRD root that spell a legacy
+ *                epic or story name — the scripts that stop matching once the tree is migrated.
+ * Pure over `io`. `applied` is false for the dry run and --check: only `legacyNames` is computed.
+ */
+export function scanTracked(
+  io,
+  planned,
+  { applied, touched = new Set(), root, files = null },
+) {
+  const deadLinks = [];
+  const oldPaths = [];
+  const legacy = [];
+  const keys = applied
+    ? [...planned.fileMap.keys(), ...planned.dirMap.keys()]
+    : [];
+  const oldRe = keys.length ? tokenRe(keys, { pathTail: true }) : null;
+  const sortedKeys = [...keys].sort((a, b) => b.length - a.length);
+  for (const file of new Set(files ?? io.tracked())) {
+    const ext = P.extname(file).toLowerCase();
+    if (BINARY_EXTS.includes(ext)) continue;
+    const wantsLinks = applied && file.endsWith(".md") && touched.has(file);
+    const wantsLegacy =
+      CODE_EXTS.includes(ext) &&
+      !isUnder(file, root) &&
+      !isHistory(file) &&
+      !isTestFixture(file) &&
+      !isBundledCopy(file) &&
+      !isGenerated(file) &&
+      !file.startsWith("node_modules/");
+    if (!wantsLinks && !wantsLegacy && !oldRe) continue;
+    const text = io.readFile(file);
+    if (text === null || text.includes("\0")) continue;
+    if (wantsLinks) {
+      const seen = new Set();
+      for (const l of [
+        ...extractRelativeLinks(text).map((x) => ({ ...x, kind: "link" })),
+        ...maskedLinks(text),
+      ]) {
+        const [rawPath] = splitTarget(l.target);
+        if (rawPath === "") continue;
+        const resolved = P.normalize(
+          P.join(P.dirname(file), decodeSafe(rawPath)),
+        ).replace(/\/$/, "");
+        if (io.exists(resolved)) continue;
+        const line = l.targetLine ?? l.line;
+        const id = `${line}\0${l.kind}\0${l.target}`;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        deadLinks.push({ file, line, target: l.target, kind: l.kind });
+      }
+    }
+    if (oldRe)
+      text.split("\n").forEach((lineText, i) => {
+        oldRe.lastIndex = 0;
+        for (const m of lineText.matchAll(oldRe)) {
+          const path = sortedKeys.find((k) => m[0].startsWith(k)) || m[0];
+          oldPaths.push({ file, line: i + 1, path });
+        }
+      });
+    if (wantsLegacy) {
+      const hits = legacyNameHits(text);
+      if (hits.length)
+        legacy.push({ file, line: hits[0].line, token: hits[0].token });
+    }
+  }
+  return {
+    ...(applied ? { deadLinks, oldPaths } : {}),
+    legacyNames: { count: legacy.length, files: legacy },
   };
 }
 
@@ -2520,6 +2713,12 @@ function render(p) {
     out.push(`  would heal: ${h.file}:${h.line} → ${h.target}`);
   for (const b of p.blockers || [])
     out.push(`✖ ${b.code}: ${b.path} — ${b.detail}`);
+  for (const d of p.postScan?.deadLinks || [])
+    out.push(
+      `dead link (${d.kind}): ${d.file}:${d.line} → ${d.target}${d.kind === "link" ? "" : " (an example or a reference — check)"}`,
+    );
+  for (const o of p.postScan?.oldPaths || [])
+    out.push(`old path left: ${o.file}:${o.line} → ${o.path}`);
   for (const w of p.warnings || []) out.push(`⚠ ${w.code}: ${w.detail}`);
   for (const g of p.skippedGenerated || [])
     out.push(
@@ -2534,6 +2733,14 @@ function render(p) {
   if (p.revert) out.push(`revert: ${p.revert}`);
   if (p.moved !== undefined)
     out.push(`moved ${p.moved} file(s), wrote ${p.written}`);
+  const legacy = p.postScan?.legacyNames;
+  if (legacy?.count)
+    out.push(
+      `${legacy.count} repo file${legacy.count === 1 ? "" : "s"} still hard-code${legacy.count === 1 ? "s" : ""} legacy names: ${legacy.files
+        .map((f) => `${f.file}:${f.line}`)
+        .join(", ")
+        .replace(/:\d+(?=,|$)/g, "")}`,
+    );
   return `${out.join("\n")}\n`;
 }
 
