@@ -3,7 +3,7 @@
 **Task**: `task.250.security-probe-scratch-out-of-tree.md`
 **Run Number**: 1
 **Started**: 2026-11-02 18:06
-**Status**: In Progress (resumed 2026-11-03 after the loop-limit escalation; residual accepted by the user)
+**Status**: Completed (accepted 2026-11-03, after the loop-limit escalation; the residual was accepted by the user)
 
 ---
 
@@ -36,8 +36,8 @@ Move every scratch directory `security-probe.test.mjs` creates inside the reposi
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan names every hunk); 13 in-tree sites moved to temp roots + guard; suite 276/276; `ci:fast` green | —                    | 2026-11-02T18:23Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #813](https://github.com/Gamaroff/agent-skills/pull/813) → develop; #812 comment `posted` | —                    | 2026-11-02T18:24Z |
 | 5–6. qa-task / qa-fix loop | ✅ Done (loop limit escalated; residual accepted by the user 2026-11-03; 5c APPROVE) | `task.250.qa.{N}.*.md`; `task.250.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | `.summaries/step-5-traceability-mapper.json` |                 |
-| 7. finalise                | ⏳ Pending | `task.250.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 7. finalise                | ✅ Done    | `task.250.dod.{N}.*.md`; task `status: accepted`                       | `task.250.dod.1` ACCEPTED; acceptance commit `5dbca8e5`; CI readings 1 and 2 SUCCESS | —                    | 2026-11-03 |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | This report, committed last | —                    | 2026-11-03 |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -183,6 +183,20 @@ Move every scratch directory `security-probe.test.mjs` creates inside the reposi
     base run3 31.35 s | load average: 4.22, 3.14, 2.57
     head run3 31.18 s | load average: 3.76, 3.14, 2.59
     ```
+  - The AC agent then asked for the figure to sit in this run's DoD file, the location its template admits. It was copied there (`task.250.dod.1`, Measurement section), and #4 passed.
+- `/finalise` result: **ACCEPTED**.
+  - AC 9/9; #7 was graded from CI reading 1.
+  - Security PASS (`boundary: false`), Docs PASS, Compliance not applicable.
+  - The CHANGELOG cites task 250, and the registry row is ticked.
+  - Acceptance commit: `5dbca8e5`.
+- CI reading 1: SUCCESS @ `38aa837ba0fb`, 6 checks. CI reading 2: SUCCESS @ `5dbca8e5018d`, 6 checks.
+  - The finalise poll first latched "tree-equivalent to `7f24cc0b4b3e`" after 30 s.
+  - The head's own 6 checks then all finished SUCCESS, after 330 s.
+- Outward side-effects, all after the publish boundary:
+  - PR canonical summary posted.
+  - #812 `done` comment `posted`, and the issue `CLOSED`.
+  - Board `done`: `already`.
+  - The Document link was already on `develop`.
 
 ---
 
@@ -271,10 +285,10 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-11-03
+**Final Status**: Completed (accepted). The QA loop first escalated at its limit, and the user then accepted the residual.
 **Branch**: feature/task.250.security-probe-scratch-out-of-tree
 **PR**: https://github.com/Gamaroff/agent-skills/pull/813
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
+**QA Iterations**: 5 gates, 4 fixes. The last gate was CONCERNS 90/100, and its residual was accepted.
+**DoD Summary**: `task.250.dod.1.security-probe-scratch-out-of-tree.md`: ACCEPTED, 9/9 criteria.
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
