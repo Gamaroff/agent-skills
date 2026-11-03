@@ -1,11 +1,11 @@
 schema: 2
 task: 'task.250.security-probe-scratch-out-of-tree'
 task_title: 'Security-probe tests write no scratch files into the repository'
-gate: CONCERNS
-status_reason: 'Cycle 4''s fixes hold: each calibration row goes red when its fix is reverted, and with both postfix handling and the tripwire removed, row 30 passes silently. Two blank kinds still escape the tripwire. A nested template literal re-splits an argument list (CR5-1, reproduced), and a phantom regex that holds a quote opens a phantom string that swallows a comma (CR5-2, reproduced). Neither shape is in the file today. The shipped work, no repository writes, is unaffected; the open issues are in how complete the static guard is.'
+gate: WAIVED
+status_reason: 'Issued CONCERNS; waived on 2026-11-03 when the user accepted CR5-1 and CR5-2 as known limits of the static guard (loop-limit escalation, recorded in the DoD and implementation report). Cycle 4''s fixes hold: each calibration row goes red when its fix is reverted, and with both postfix handling and the tripwire removed, row 30 passes silently. Two blank kinds still escape the tripwire. A nested template literal re-splits an argument list (CR5-1, reproduced), and a phantom regex that holds a quote opens a phantom string that swallows a comma (CR5-2, reproduced). Neither shape is in the file today. The shipped work, no repository writes, is unaffected; the open issues are in how complete the static guard is.'
 reviewer: 'QA Engineer'
 head: '51ca2fdb02822a341bd3bb21a0de8e2a9153bfd6'
-updated: '2026-11-02T19:43:02Z'
+updated: '2026-11-03T04:30:23Z'
 
 top_issues:
   - id: 'TASK-250-CR5-1'
@@ -14,17 +14,20 @@ top_issues:
     finding: 't250CodeOnly (line 8177) ends a template literal at the next backtick and ignores ${ … }. In a nested template, the outer one ends at the inner opening backtick, and the inner text is read as code. A comma there re-splits the argument list, while the call name stays visible and the list still closes, so masked, unparsed and the regex tripwire all miss it. Reproduced: cpSync(`${b ? `,` : ""}`, join(REPO_ROOT, "x")); gives found [], total 1, unparsed [], masked []. There is no nested template in the file today.'
     suggested_action: 'Track ${ } depth when scanning a template, or treat a template that contains ${ inside a write call''s argument list as unparsed. Add a nested-template calibration row.'
     suggested_owner: dev
-    status: open
+    status: waived
   - id: 'TASK-250-CR5-2'
     severity: low
     file: 'shared/resources/tests/security-probe.test.mjs'
     finding: 'The tripwire (line 8258) fires only on a comma or bracket. A phantom regex holding a quote (after this.#of, which the "." rule does not cover) shifts the string boundaries, and a phantom string swallows the comma. Reproduced: cpSync(this.#of / ''/'' + x, join(REPO_ROOT, "x"), opts); followed by a line with a comma and a closing brace gives found [], total 1, unparsed [], masked [].'
     suggested_action: 'Include quotes and backticks in the tripwire''s class, or apply the tripwire to string and template blanks too.'
     suggested_owner: dev
-    status: open
+    status: waived
 
 waiver:
-  active: false
+  active: true
+  reason: 'Loop-limit escalation: CR5-1 and CR5-2 accepted as known limits of the heuristic static guard; neither shape is in the file today. Follow-up: a parser-backed guard (acorn).'
+  approved_by: 'Lorien Gamaroff'
+  approved_at: '2026-11-03'
 
 quality_score: 90
 
