@@ -318,24 +318,24 @@ The fixture is the incident, so a pass could mean the tool recognised it. Add on
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-03
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.252.qa.1.migrate-doc-numbering-name-blockers.md](./task.252.qa.1.migrate-doc-numbering-name-blockers.md)
-- **Gate File**: [task.252.gate.1.migrate-doc-numbering-name-blockers.yml](./task.252.gate.1.migrate-doc-numbering-name-blockers.yml)
+- **Full Report**: [task.252.qa.2.migrate-doc-numbering-name-blockers.md](./task.252.qa.2.migrate-doc-numbering-name-blockers.md)
+- **Gate File**: [task.252.gate.2.migrate-doc-numbering-name-blockers.yml](./task.252.gate.2.migrate-doc-numbering-name-blockers.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 89
+- **Tests Executed**: 90
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-One MEDIUM finding: the loose-file rule blocks the section shards of a sharded PRD, which shard-prd writes into the PRD directory (T252-QA-1). All ten success criteria are met and mutation-proven.
+T252-QA-1 (section shards of a sharded PRD) is fixed and held by a test. One follow-up recorded: a stray file beside an index.md in a PRD directory is not named, by design of the shard exemption.
 
 <!-- change-log-start -->
 ## Change Log
@@ -348,6 +348,7 @@ One MEDIUM finding: the loose-file rule blocks the section shards of a sharded P
 | 2026-11-03 |         | Implemented — 5 files, 7 new tests (89 pass) | develop |
 | 2026-11-03 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-11-03 |         | QA findings fixed — cycle 1, 1 finding | qa-fix |
+| 2026-11-03 |         | QA gate PASS (100/100) — 0 findings | qa-task |
 
 <!-- change-log-end -->
 
