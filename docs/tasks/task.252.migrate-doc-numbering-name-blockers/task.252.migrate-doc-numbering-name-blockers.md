@@ -5,17 +5,18 @@ type: task
 description: "Make migrate-doc-numbering.mjs raise a named blocker, in dry-run and --check, for every document under the PRD root it would otherwise skip silently, and print a classified/skipped count."
 tags: [migrate-doc-numbering, doc-id, blockers]
 category: refactoring
-status: ready-for-review
+status: accepted
 pr_number: 817
 priority: High
 created: 2026-11-03
 updated: 2026-11-03
+completed_date: 2026-11-03
 estimated_effort_hours: 8
 ---
 
 # migrate-doc-numbering: name every document it cannot classify
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 ---
 
@@ -338,6 +339,20 @@ The fixture is the incident, so a pass could mean the tool recognised it. Add on
 ### Key Findings
 The PR-review finding PC-2 (directory allowlist) is fixed and held by a test. No new findings.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+✅ **Acceptance Criteria:** all 10 met (QA gate 3 PASS 100/100)
+✅ **Tests and PR:** PR #817 reviewed APPROVE (`task.252.pr-review.2`); 91 tests; CI green on `ec6be614` (6 checks)
+✅ **Documentation:** `CHANGELOG.md` and `skills/review-prd/SKILL.md` updated
+✅ **Security Review:** static checks pass. The probe engine could not run this CLI (it needs a git repository), so the owner recorded an override accepting the task's own mutation-proven tests as the boundary evidence.
+✅ **Compliance Review:** not applicable
+
+**Detailed Verification Log:** see `task.252.dod.1.migrate-doc-numbering-name-blockers.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-03
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -352,6 +367,7 @@ The PR-review finding PC-2 (directory allowlist) is fixed and held by a test. No
 | 2026-11-03 |         | QA gate PASS (100/100) — 0 findings | qa-task |
 | 2026-11-03 |         | QA findings fixed — cycle 2, 3 findings (PR review) | qa-fix |
 | 2026-11-03 |         | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-11-03 | 1.2     | DoD passed — accepted (PR #817) | finalise |
 
 <!-- change-log-end -->
 

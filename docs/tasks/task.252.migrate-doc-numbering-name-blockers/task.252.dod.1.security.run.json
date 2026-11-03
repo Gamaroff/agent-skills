@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "filename",
+      "entry": "cli:shared/resources/migrate-doc-numbering.mjs",
+      "name": "unclassified-document blocker (--check --root)",
+      "call_site": null,
+      "verdict": "unverifiable",
+      "reason": "entry-not-probeable",
+      "executed": 0,
+      "passed": 0,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 1,
+      "declined_cases": [
+        {
+          "id": "cli:shared/resources/migrate-doc-numbering.mjs",
+          "reason": "entry-not-probeable",
+          "detail": "fixture: cannot materialise \"docs/prd\": name carries a path separator or NUL"
+        }
+      ],
+      "escaped": 0,
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "--check",
+        "--root",
+        "{input}"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-11-03T10:01:16.049Z"
+    }
+  ],
+  "totals": {
+    "executed": 0,
+    "reproduced": 0,
+    "escaped": 0
+  },
+  "updated_at": "2026-11-03T10:01:16.049Z"
+}
