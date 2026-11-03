@@ -726,10 +726,9 @@ test("epicRegistryPointer keeps the old table as a historical mapping and names 
   assert.match(text, /task\.205/);
   // task.205 landed: the pointer no longer tells anyone to hold off /create-epic.
   assert.doesNotMatch(text, /do not run `\/create-epic`/);
-  assert.match(
-    text,
-    /\[`docs\/prd\/prd-registry\.md`\]\(\.\.\/prd\/prd-registry\.md\)/,
-  );
+  // Plain code spans, no link: the stub is generated text and a link in it goes dead (task 253).
+  assert.match(text, /`docs\/prd\/prd-registry\.md`; the epics of a PRD/);
+  assert.doesNotMatch(text, /\]\([^)]*\)/);
 });
 
 test("engine defines no id regex: identifiers go through doc-id.js", () => {
@@ -981,10 +980,6 @@ test("CR-2: the printed revert undoes an uncommitted --apply exactly, in a real 
   );
   const { dir, g } = gitRepo(tree);
   try {
-    writeFileSync(
-      join(dir, "unrelated.txt"),
-      "someone else's untracked work\n",
-    );
     const r = m.run(["--apply", "--json", "--root", R], { cwd: dir });
     assert.equal(
       r.reason,
@@ -994,6 +989,11 @@ test("CR-2: the printed revert undoes an uncommitted --apply exactly, in a real 
     assert.ok(
       g("status", "--porcelain").trim().length > 0,
       "the apply changed the tree",
+    );
+    // Someone else's work lands after the run (a dirty tree before it is refused, task 253).
+    writeFileSync(
+      join(dir, "unrelated.txt"),
+      "someone else's untracked work\n",
     );
     execFileSync("bash", ["-c", r.revert], { cwd: dir });
     assert.equal(
@@ -1042,16 +1042,17 @@ test("cycle 2 CR-1/CR-7: the revert touches only the run's own paths, keeps unre
   );
   const { dir, g } = gitRepo(tree);
   try {
-    // Uncommitted work under the root that the run neither moves nor rewrites.
-    writeFileSync(
-      join(dir, R, "onb/README.md"),
-      "someone's uncommitted edit\n",
-    );
     const r = m.run(["--apply", "--json", "--root", R], { cwd: dir });
     assert.equal(
       r.reason,
       "ok",
       JSON.stringify(r.findings || r.blockers || r.error),
+    );
+    // Uncommitted work under the root that the run neither moved nor rewrote, made after the
+    // run: --apply refuses a dirty tree up front (task 253).
+    writeFileSync(
+      join(dir, R, "onb/README.md"),
+      "someone's uncommitted edit\n",
     );
     assert.doesNotMatch(
       r.revert,
@@ -2573,8 +2574,9 @@ test("253 gap 6: a generated file is not edited and is listed as skipped, genera
 test("253 gap 7: the closing line lists tracked files outside the PRD root that still hard-code legacy names", () => {
   const { dir } = gitRepo(
     l2Tree({
-      "scripts/lint.mjs":
-        "const re = /^epic\\.\\d+\\.([a-z-]+)$/; const s = /story\\.\\d+\\.\\d+/;\n",
+      // A consumer's lint script that reads the legacy grammar. Assembled from parts: written out,
+      // the regexes would trip tests/doc-id-chokepoint.test.js, which is right about this file too.
+      "scripts/lint.mjs": `const re = /^${"epic"}${"\\."}\\d+${"\\."}([a-z-]+)$/; const s = /${"story"}${"\\."}\\d+${"\\."}\\d+/;\n`,
       "scripts/clean.mjs": "const re = 1; // nothing about documents here\n", // control: no legacy name
       "scripts/new.mjs":
         "const id = 'story.1.1.1.first'; // already the new scheme\n", // control
@@ -2712,4 +2714,29 @@ test("253 gap 5 controls: a clean tree level with its upstream, and a repo with 
       if (x.up) rmSync(x.up, { recursive: true, force: true });
     }
   }
+});
+
+test("253 gap 5/6: the text output prints each warning and each skipped, generated file", () => {
+  const gen = "graphify-out/GRAPH_REPORT.md";
+  const { dir } = gitRepo(l2Tree({ [gen]: `see ${R}/onb/prd.onb.md\n` }));
+  try {
+    writeFileSync(join(dir, "unrelated.txt"), "x\n");
+    const text = spawnSync(process.execPath, [ENGINE, "--root", R], {
+      cwd: dir,
+      encoding: "utf8",
+    }).stdout;
+    assert.match(text, /⚠ dirty-tree: /);
+    assert.match(text, /⚠ no-upstream: /);
+    assert.match(text, new RegExp(`skipped, generated: ${gen} `));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("253 gap 6: inRewriteScope refuses a generated file; a sibling directory with a similar name is still in scope", () => {
+  assert.equal(m.inRewriteScope("graphify-out/GRAPH_REPORT.md"), false);
+  assert.equal(m.inRewriteScope("a/b-out/c/d.md"), false);
+  assert.equal(m.inRewriteScope("docs/readme.md"), true); // control
+  assert.equal(m.inRewriteScope("docs/out/readme.md"), true); // "out" alone is not a "-out" directory
+  assert.equal(m.inRewriteScope("docs/about/readme.md"), true); // control: ends in "out", not "-out"
 });

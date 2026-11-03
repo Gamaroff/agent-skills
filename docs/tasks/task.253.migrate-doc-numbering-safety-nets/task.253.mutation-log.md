@@ -12,3 +12,11 @@ One row per fix: revert the behaviour, run the named test, expect red, restore, 
 | --- | --- | --- | --- |
 | 1. Multi-line link (Phase 2) | `linkPass` reads `openLine` instead of `targetLine ?? openLine` | `253 gap 1` (`migrate-doc-numbering.test.mjs`) | yes |
 | 1. Multi-line link (Phase 2) | `scanLinks` never sets `targetLine` | `task 253: a link whose text spans a newline…`, `task 253: targetLine tracks…` (`doc-links.test.mjs`) and `253 gap 1` | yes |
+| 4. Link-free stub (Phase 4) | the stub's registry path written as a link again | `253 gap 4`, `epicRegistryPointer keeps the old table…` | yes |
+| 5. Dirty / behind (Phase 4) | `--apply` no longer turns the warnings into blockers | `253 gap 5` | yes |
+| 5. Dirty / behind (Phase 4) | the `git fetch` replaced by a no-op (the never-fetched case) | `253 gap 5`, `253 gap 5 controls` | yes |
+| 5. Dirty / behind (Phase 4) | the `dirty-tree` warning dropped | `253 gap 5`, `253 gap 5/6: the text output…` | yes |
+| 6. Generated file (Phase 4) | the skip-and-list branch for generated files removed | `253 gap 6`, `253 gap 5/6: the text output…` | yes |
+| 6. Generated file (Phase 4) | `!isGenerated(rel)` removed from `inRewriteScope` | `253 gap 6: inRewriteScope refuses a generated file…` | yes |
+
+Gap 3 did not reproduce (Phase 1), so it has no fix and no mutation row.

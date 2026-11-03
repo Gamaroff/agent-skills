@@ -170,9 +170,9 @@ The `postScan`, `warnings` and `skippedGenerated` result keys the tests read are
 **Files**: `shared/resources/migrate-doc-numbering.mjs`
 
 **Changes**:
-- [ ] Validate migrated story frontmatter (reproduce first).
-- [ ] Generate the registry stub without links.
-- [ ] Dirty-tree and behind-upstream check.
+- [x] ~~Validate migrated story frontmatter~~ — **dropped: did not reproduce** (Phase 1 results). The existing post-apply `doc-id.js checkCorpus` already fails `--apply` on a story whose `prd_number`, `epic` or id disagrees with its name.
+- [x] Generate the registry stub without links.
+- [x] Dirty-tree and behind-upstream check. Decision: the tool runs `git fetch --quiet <remote>` in every mode (it updates remote-tracking refs only), because `@{u}` is the last-fetched state and a guard that skips the fetch reads "level" on the very checkout it exists for. A failed fetch is the `upstream-unverified` warning, not a blocker; no upstream is the `no-upstream` warning. `dirty-tree` and `behind-upstream` are warnings in the dry run and `--check`, blockers for `--apply`. Two existing tests that dirtied the tree before `--apply` now dirty it after.
 - [ ] Skip generated files and list them. "Generated" is defined by a short list of directory suffixes (for example `*-out/`), each entry with a stated reason, as the plan sets out; a file's own `AUTO-GENERATED` header is a second signal only if Phase 1 shows a real consumer file needs it.
 
 **Dependencies**: Phase 1.
