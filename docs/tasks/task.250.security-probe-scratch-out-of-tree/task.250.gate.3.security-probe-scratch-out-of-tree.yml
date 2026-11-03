@@ -1,0 +1,78 @@
+schema: 2
+task: 'task.250.security-probe-scratch-out-of-tree'
+task_title: 'Security-probe tests write no scratch files into the repository'
+gate: CONCERNS
+status_reason: 'Cycle 2''s fixes hold: all five go red when reverted, and the suite passes 277/277. The new regex-literal heuristic misreads a division after a string literal or a // comment as a regex start, which hides a REPO_ROOT write without failing the guard (CR3-1, reproduced). The calibration row meant to cover this cannot catch it (CR3-3).'
+reviewer: 'QA Engineer'
+head: '951f9cbe5e3fdc4ae3c4c1e3d20abe6d1e8e71e4'
+updated: '2026-11-02T19:18:33Z'
+
+top_issues:
+  - id: 'TASK-250-CR3-1'
+    severity: medium
+    file: 'shared/resources/tests/security-probe.test.mjs'
+    finding: 'regexAfter (line 8115) reads the blanked view, with ^ anchored to the start of a 16-character window. A / after a string literal or after a // comment is therefore taken as the start of a regex literal, and it blanks the code that follows up to the next / on the line. Reproduced in memory: `const z = "it''s" / c; mkdirSync(join(REPO_ROOT, "x")); const w = e / f;` gives found [] with masked ["1"]. The masked count stays under the cap of 8, so the guard passes.'
+    suggested_action: 'Decide from the last significant character or word, scanning back past whitespace (a blanked comment is whitespace), and treat a closing literal delimiter as an operand; add both reproductions to the calibration sample.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-250-CR3-3'
+    severity: low
+    file: 'shared/resources/tests/security-probe.test.mjs'
+    finding: 'The calibration row described as "division is not a regex" (line 8348) passes only because nothing on its line closes the phantom regex, so it cannot detect TASK-250-CR3-1.'
+    suggested_action: 'Put a second division and a REPO_ROOT write on the same line, and assert the call is found and not masked.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 277
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary: false
+    boundary_reason: 'Test-only change; no shipped code changed. Predicate-shaped functions: t250InTreeWrites, t250CodeOnly and t250Args (input: this test file''s own source) and fenceRoot''s inside-repo refusal (input: its own mkdtemp result). None is reachable by external input, and no corpus sink models them. CR3-1 was measured in memory, not by the probe engine.'
+    notes: 'The engine (security-probe.mjs) is unchanged.'
+  performance:
+    status: PASS
+    notes: 'Suite alone 31.33 s at gate 2 (base median 31.60 s). The cycle-2 change adds one string scan of the file.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR3-1: the guard can still miss a write without failing. The leak class is closed: CR2-3 is fixed, and the 5 other create-before-try sites are pre-existing on develop.'
+  maintainability:
+    status: PASS
+    notes: 'One view decides match and split. The calibration sample has 27 lines, and allowlist entries carry exact counts.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-250-CR3-1 and TASK-250-CR3-3, with a calibration line that goes red without the fix.'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+  future:
+    - action: 'CR3-2 (advisory, medium/medium): a cap on the masked count lets a hidden call go unnoticed while the count is under the cap; pinning the exact masked set (keyed by trimmed line text) makes any misread fail, whatever the tokenizer gets wrong.'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+    - action: 'Pre-existing (on develop, task.180-era): 5 tests create something between their temp root and try (probe-fence-record-, probe-outside-, probe-host-gh-, probe-sa-fnargv-, driver.mjs) and can leak the root on a throw.'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+      provenance: pre-existing
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'TASK-250-CR3-1 fixed and re-gated'

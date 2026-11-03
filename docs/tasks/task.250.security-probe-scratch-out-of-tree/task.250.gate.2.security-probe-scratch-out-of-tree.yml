@@ -1,0 +1,79 @@
+schema: 2
+task: 'task.250.security-probe-scratch-out-of-tree'
+task_title: 'Security-probe tests write no scratch files into the repository'
+gate: CONCERNS
+status_reason: 'Cycle 1''s fixes hold: each was re-checked and the suite passes 277/277. The refute pass found the in-tree write guard can still be blinded: a comment containing a quote inside an argument list makes the call vanish from the scan (CR2-1, reproduced), and so does a backtick or /* inside a regex literal (CR2-2, reproduced).'
+reviewer: 'QA Engineer'
+head: '7482fc53da4ff2f8a576eff9d8b954617feab933'
+updated: '2026-11-02T19:07:26Z'
+
+top_issues:
+  - id: 'TASK-250-CR2-1'
+    severity: medium
+    file: 'shared/resources/tests/security-probe.test.mjs'
+    finding: 'The guard reads the source with two parsers. Calls are matched on the t250CodeOnly view, but t250Args splits arguments on the raw source and does not know about comments. A comment containing a quote inside an argument list makes t250Args return null, and line 8157 (`if (!args) continue;`) silently skips the call: it is neither counted nor flagged. Reproduced in memory: mkdirSync(join(REPO_ROOT, "x") // it''s ⏎ , {…}) gives total 0, found [].'
+    suggested_action: 'Split arguments on the code-only view, using the same indices to slice the target from the raw source, and fail the guard on any matched call whose arguments cannot be parsed.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-250-CR2-2'
+    severity: low
+    file: 'shared/resources/tests/security-probe.test.mjs'
+    finding: 't250CodeOnly does not recognise regex literals. A backtick, or /*, inside a regex blanks the code after it up to the next backtick or */, hiding real REPO_ROOT writes (both reproduced in memory: total 0). The comment at line 8082 says otherwise. The total >= 150 floor is far below the 244 calls present, so a large silent drop would still pass.'
+    suggested_action: 'Skip regex literals in t250CodeOnly, or pin the floor to the exact call count, so any drop fails the guard; correct the comment either way.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 277
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary: false
+    boundary_reason: 'Test-only change; no shipped code changed. Predicate-shaped functions added: t250InTreeWrites, t250CodeOnly and t250Args (input: this test file''s own source) and fenceRoot''s inside-repo refusal (input: its own mkdtemp result). None is reachable by external input, and no corpus sink models them. Their failure modes (CR2-1, CR2-2) were measured in memory, not by the probe engine.'
+    notes: 'The engine (security-probe.mjs) is unchanged. The BUG-12 row now pins PWNED-self under the temp root, and goes red with repoRoot: REPO_ROOT.'
+  performance:
+    status: PASS
+    notes: 'Suite alone at this head: 31.33 s (cycle 1 interleaved medians: base 31.60 s, head 31.58 s). Limit is +10%.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR2-1 and CR2-2: the guard can miss a write without failing. CR-4 from cycle 1 is fixed, with one residual site of the same class (the namesGh viaLink, advisory CR2-3). The tmp-leak ratchet was ok on ci:fast.'
+  maintainability:
+    status: PASS
+    notes: 'One root builder (fenceRoot, with build callback) and one wrapper (t140Libs). The calibration test pins 17 sample lines.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-250-CR2-1 (one parser for match and argument split; an unparseable matched call fails) and TASK-250-CR2-2 (regex literals or an exact floor), each with a calibration line that goes red without the fix.'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+  future:
+    - action: 'CR2-3 (advisory, low/medium): the namesGh test creates viaLink between its t140Libs root and try (line 2158); move it inside try. No scan enumerates root-then-throwable-before-try sites.'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+    - action: 'CR2-4 (advisory, low/low): a PWNED-self left in the repository by a killed older run fails the BUG-12 assertion with a message that reads as a regression; check for it before the probe.'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+    - action: 'CR2-5 (cleanup): T250_ALLOWED approves any number of identical calls; store an expected count per entry.'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'TASK-250-CR2-1 fixed and re-gated'

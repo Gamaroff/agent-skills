@@ -14,6 +14,15 @@ All notable changes to this project will be documented in this file. Format foll
   v0.63.0 `release.sh --tag`. The scan now lists git-tracked files only (`git ls-files`, so a
   staged file is still scanned) and reads the same 240 sources as before. The new §2a checks this
   against a throwaway repo, so the test never writes into the tree it scans.
+- **The security-probe tests no longer write scratch files into the repository (task 250).**
+  `security-probe.test.mjs` created 12 scratch directories under `shared/resources/tests/` and
+  `tests/fixtures/shell-fn/`, and one test's target wrote `PWNED-self` beside its fixture. Any
+  suite walking those trees in parallel could list one and find it gone, which is the race #145
+  fixed for one reader only. Every scratch target now lives in a temp root built by `fenceRoot()`
+  and passed to the engine as `repoRoot`; `fenceRoot()` refuses a root inside the repository, and
+  a new guard fails on any write call whose path is built from `REPO_ROOT`. The `.t140-*`
+  `.gitignore` rule, which hid leftovers from killed runs, is gone. The `--fake-gh` containment
+  row now also asserts it was refused for being outside the root, not for being missing.
 
 ## [v0.63.0] - 2026-11-02
 
