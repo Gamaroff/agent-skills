@@ -2970,11 +2970,12 @@ function runCliCase(
     // COPY — `env` also goes to the CLI spawn below, whose PATH stays the host's.
     const setupEnv = {
       ...env,
-      PATH: `${join(harnessDir, "bin")}:${ghFreePath(
+      PATH: ghIsolatedPath(
         env.PATH,
-        join(harnessDir, "path"),
+        harnessDir,
         fixtureDir,
-      )}`,
+        join(harnessDir, "bin"),
+      ),
     };
     const setup = runCaseSetup({
       setupPath,
@@ -3138,14 +3139,24 @@ function caseShellEnv(
     sandboxHome,
     sandboxTmp,
   });
-  env.PATH = ghFreePath(env.PATH, join(harnessDir, "path"), caseDir);
-  if (fakeGhDir !== null) {
-    env.PATH = `${fakeGhDir}:${env.PATH}`;
-    env.FAKE_GH = "1";
-  } else {
-    env.PATH = `${join(harnessDir, "bin")}:${env.PATH}`;
-  }
+  env.PATH = ghIsolatedPath(
+    env.PATH,
+    harnessDir,
+    caseDir,
+    fakeGhDir !== null ? fakeGhDir : join(harnessDir, "bin"),
+  );
+  if (fakeGhDir !== null) env.FAKE_GH = "1";
   return env;
+}
+
+/**
+ * The `PATH` every `gh`-guarded spawn gets: `frontDir` (the fake `gh` or the
+ * trip-wire) first, then `path` with every directory holding the host `gh`
+ * shadowed by a copy without it. ONE definition for `caseShellEnv` and the
+ * `cli:` setup spawn (task.255), so the two cannot drift.
+ */
+function ghIsolatedPath(path, harnessDir, cwd, frontDir) {
+  return `${frontDir}:${ghFreePath(path, join(harnessDir, "path"), cwd)}`;
 }
 
 /**
