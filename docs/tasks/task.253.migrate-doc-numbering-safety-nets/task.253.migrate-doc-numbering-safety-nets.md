@@ -346,6 +346,27 @@ For the dead-link scan, include a live link and a link to an external URL that m
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-03
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.253.qa.1.migrate-doc-numbering-safety-nets.md](./task.253.qa.1.migrate-doc-numbering-safety-nets.md)
+- **Gate File**: [task.253.gate.1.migrate-doc-numbering-safety-nets.yml](./task.253.gate.1.migrate-doc-numbering-safety-nets.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 135 in the two touched suites; 7187 in the full run
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0 (1 medium)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+One medium finding: the behind-upstream guard says "not behind" when `git rev-list` fails, for example when the upstream branch is gone from the remote. Gap 3 did not reproduce and was dropped.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -355,6 +376,8 @@ For the dead-link scan, include a live link and a link to an external URL that m
 | 2026-11-03 | 1.1     | Review passed (8/10) — re-measured 8 stale line anchors, located gap 1's cause in the migration tool's per-line apply loop (matcher is correct), listed `doc-links` callers, defined "generated" | review-task |
 | 2026-11-03 |         | Status → ready-for-development | review-task |
 | 2026-11-03 | 1.2     | Implemented phases 1–5 (gap 3 did not reproduce and was dropped); mutation proof in `task.253.review.2.mutation-proof.md`; status → ready-for-review | develop-task |
+| 2026-11-03 |         | QA gate CONCERNS (90/100) — 1 medium finding | qa-task |
+| 2026-11-03 |         | QA findings fixed — 1 iteration (behind guard warns when rev-list fails) | qa-fix |
 
 <!-- change-log-end -->
 

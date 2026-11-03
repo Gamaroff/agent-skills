@@ -2691,6 +2691,7 @@ test("253 gap 5 controls: a clean tree level with its upstream, and a repo with 
   const level = gitRepoWithUpstream(l2Tree());
   const none = gitRepo(l2Tree());
   const gone = gitRepoWithUpstream(l2Tree());
+  const deleted = gitRepoWithUpstream(l2Tree());
   try {
     for (const { dir } of [level, none]) {
       const r = m.run(["--json", "--root", R], { cwd: dir });
@@ -2708,8 +2709,24 @@ test("253 gap 5 controls: a clean tree level with its upstream, and a repo with 
       JSON.stringify(r.warnings ?? null),
     );
     assert.equal(applyJson(gone.dir).reason, "ok"); // not a blocker: an offline run still works
+    // QA bug 1: the branch still names an upstream whose remote branch was deleted. The fetch
+    // succeeds, the count fails, and that must read as "could not look", never as "level".
+    deleted.g("checkout", "-q", "-b", "feat");
+    deleted.g("push", "-q", "-u", "origin", "feat");
+    deleted.g("push", "-q", "origin", "--delete", "feat");
+    const d = m.run(["--json", "--root", R], { cwd: deleted.dir });
+    assert.equal(
+      (d.warnings || []).filter((w) => w.code === "upstream-unverified").length,
+      1,
+      JSON.stringify(d.warnings ?? null),
+    );
+    assert.equal(
+      (d.warnings || []).some((w) => w.code === "behind-upstream"),
+      false,
+    );
+    assert.equal(applyJson(deleted.dir).reason, "ok"); // a warning, not a blocker
   } finally {
-    for (const x of [level, none, gone]) {
+    for (const x of [level, none, gone, deleted]) {
       rmSync(x.dir, { recursive: true, force: true });
       if (x.up) rmSync(x.up, { recursive: true, force: true });
     }

@@ -2647,7 +2647,19 @@ function repoGuard(repoRoot) {
       detail: `could not fetch ${remote} — the behind check compares with the last-fetched ${upstream}`,
     });
   const behind = git(["rev-list", "--count", `HEAD..${upstream}`], repoRoot);
-  const n = behind.status === 0 ? Number(behind.stdout.trim()) : 0;
+  // A failed count is "could not look", not "level": the upstream ref can be gone (its remote
+  // branch deleted) while the branch still names it. One warning, replacing a fetch warning whose
+  // "compares with the last-fetched ref" would be untrue here (task 253 QA bug 1).
+  if (behind.status !== 0) {
+    const kept = warnings.filter((w) => w.code !== "upstream-unverified");
+    warnings.length = 0;
+    warnings.push(...kept, {
+      code: "upstream-unverified",
+      detail: `could not compare with ${upstream} (${(behind.stderr || "git rev-list failed").trim().split("\n")[0]}) — the behind check did not run`,
+    });
+    return warnings;
+  }
+  const n = Number(behind.stdout.trim());
   if (n > 0)
     warnings.push({
       code: "behind-upstream",

@@ -23,5 +23,6 @@ One row per fix: revert the behaviour, run the named test, expect red, restore, 
 | 2. Post-apply scan (Phase 3) | dead-link existence check removed (every link reported) | `253 gap 2` | yes |
 | 7. Legacy-name line (Phase 3) | `parseLegacy` result ignored (nothing matches) | `253 gap 7` | yes |
 | 7. Legacy-name line (Phase 3) | "already the new scheme" exclusion removed | **no test went red** — `parseLegacy` already rejects new-scheme names, so the line was dead; deleted rather than kept | n/a |
+| QA bug 1 (cycle 1) | `if (behind.status !== 0)` branch disabled (a failed `rev-list` read as 0 behind again) | `253 gap 5 controls` (upstream branch deleted on the remote) | yes |
 
 Gap 3 did not reproduce (Phase 1), so it has no fix and no mutation row.
