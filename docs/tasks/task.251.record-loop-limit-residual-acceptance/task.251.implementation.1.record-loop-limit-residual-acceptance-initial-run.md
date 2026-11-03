@@ -35,7 +35,7 @@ First run of task.251: add `accept-qa-residual.js`, the one writer that records 
 | 1. create-branch           | ✅ Done    | Branch `feature/task.251.*` exists in git                             | Branch created at `17f43480` | —                    | 2026-11-03T05:53Z |
 | 2. review-task             | ✅ Done    | `task.251.review.{N}.{name}.md` exists (or skip logged)               | `task.251.review.1.*.md` — READY TO IMPLEMENT 8/10; Planned → Ready for Development | —                    | 2026-11-03T05:57Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline; ci:fast green (7147 tests, 0 fail); other CI stages green; `CI=true` run fails only on missing local `zsh` | —                    | 2026-11-03T06:32Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #815 → develop (commit 4b8e8d22) | —                    | 2026-11-03T06:33Z |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.251.qa.{N}.*.md`; `task.251.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.251.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
@@ -92,6 +92,9 @@ First run of task.251: add `accept-qa-residual.js`, the one writer that records 
 - Mutation proof (engine suite): M1 FAIL refusal removed → 1 red; M2 `waived` stamp skipped → 11 red; M3 report write skipped → 5 red; all reverted, 16/16 green.
 - Timing: the writer ran in 0.047 s on the task.250 gate and report (scratch copy).
 - Tests: engine 16/16, lock `.test.sh` 10/10, parity 9/9, develop-next merge rule + shape 75/75, both replay evals 15/15.
+- QA Cycle 1 — changes-requested: stage-disabled (off by default).
+- QA Cycle 1 fix (qa-fix): ran the findings inline, not through the ingester subagent — the three findings were already in context from the QA pass. Fixed T251-QA-1 (flow branch only when the dash is followed by `{`; read-back also compares entry ids), T251-CR-2 (CR/LF folded in `approvedBy` and `reason` once in `acceptResidual`), T251-QA-2 (`ok` on every plan result via thin wrappers; `state` kept). Engine suite 19/19. Mutation proof: each fix reverted turns its own test red (3 of 3), all restored. Probe re-run on `planReportEdit` with a cases file (one legitimate report, five refusals): `engages`; the same entry read `absent` before. Step 3.5 probe: phrase `accept-qa-residual`, population 7 (the four step docs, the two SKILL.md, develop-next), all `unaffected` — they state the contract (refusals, Loop exit text, 5c re-entry), which did not change. Narrowing residue: not triggered (first fix cycle). CR-3 (low/low) left open by design: unreachable with the documented layout.
+- Pre-existing, noted not fixed: `readKeysInto` in `qa-diminishing-returns.js` stops a quoted value at `}`.
 
 ---
 
@@ -106,6 +109,15 @@ _Problems encountered and how they were resolved or escalated._
 ## QA Iteration History
 
 _Track each QA review/fix cycle._
+
+### QA Cycle 1 — 2026-11-03
+**Gate Result**: CONCERNS
+**Issues Found**: 3 medium — T251-QA-1 (block-style entry with a brace waived wrongly), T251-CR-2 (approver newline not folded), T251-QA-2 (plan functions carry no ok field)
+**HIGH findings**: 0
+**MEDIUM findings**: 3
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
 
 ---
 

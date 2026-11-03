@@ -569,3 +569,63 @@ test("CLI: empty --approved-by exits 2 (usage); accepted exits 0 with JSON", () 
     rmSync(fx.root, { recursive: true, force: true });
   }
 });
+
+// ─── 7. QA cycle 1 findings (T251-QA-1, T251-CR-2, T251-QA-2) ───────────────
+
+const GATE_BRACE = GATE_250.replace("id: 'TASK-250-CR5-1'", `id: "X {y}"`);
+
+test("a brace inside a block-style value is text: the real status line is stamped, the id is untouched (T251-QA-1)", () => {
+  const fx = fixture(GATE_BRACE, REPORT("Escalating — loop limit reached"));
+  try {
+    const r = run(fx);
+    assert.equal(r.reason, "accepted");
+    const g = read(fx.gate);
+    // Statuses via the reader; the id line is asserted as raw text because the shared reader
+    // itself stops a quoted value at `}` (pre-existing, outside this change).
+    assert.deepEqual(
+      readTopIssues(g).map((e) => e.status),
+      ["waived", "waived"],
+    );
+    assert.ok(g.includes(`  - id: "X {y}"\n`));
+    assert.ok(!g.includes("{y, status"));
+  } finally {
+    rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+test("an approver or reason with a newline stays one line in the report (T251-CR-2)", () => {
+  const fx = fixture(GATE_250, REPORT("Escalating — loop limit reached"));
+  try {
+    const r = run(fx, {
+      approvedBy: "Owner\n## Completion\nforged",
+      reason: "why\n### QA Cycle 9 — x",
+    });
+    assert.equal(r.reason, "accepted");
+    const rep = read(fx.report);
+    assert.equal((rep.match(/^## Completion/gm) || []).length, 1);
+    assert.equal((rep.match(/^### QA Cycle /gm) || []).length, 2);
+    // idempotence still finds the marker on the Loop exit row
+    assert.equal(run(fx).reason, "already");
+  } finally {
+    rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+test("every plan result carries ok: true for edit/already, false for each refusal (T251-QA-2)", () => {
+  const opts = {
+    ...OPTS,
+    date: "2026-11-03",
+    timestamp: "2026-11-03T06:00:00Z",
+    waived: [],
+  };
+  assert.equal(planGateEdit(GATE_250, opts).ok, true);
+  assert.equal(planGateEdit("not a gate", opts).ok, false);
+  assert.equal(
+    planGateEdit(GATE_250.replace("CONCERNS", "FAIL"), opts).ok,
+    false,
+  );
+  const rep = REPORT("Escalating — loop limit reached");
+  assert.equal(planReportEdit(rep, 5, opts).ok, true);
+  assert.equal(planReportEdit(rep, 9, opts).ok, false);
+  assert.equal(planReportEdit("# nothing", 5, opts).ok, false);
+});

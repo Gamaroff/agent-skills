@@ -141,7 +141,10 @@ function topIssueSpans(lines) {
 function waiveEntry(entryLines, base) {
   const out = entryLines.slice();
   const dash = out[0];
-  const brace = dash.indexOf("{");
+  // Flow style only when the value after the dash IS a mapping: a `{` inside a quoted block-style
+  // value (`- id: "X {y}"`) is text, not a mapping (T251-QA-1).
+  const flow = /^[ \t]*-[ \t]*\{/.exec(dash);
+  const brace = flow ? flow[0].length - 1 : -1;
   if (brace !== -1 && dash.lastIndexOf("}") > brace) {
     // Flow style: `- { id: X, status: open }`.
     const close = dash.lastIndexOf("}");
@@ -215,6 +218,15 @@ function waiverActive(lines) {
  * `edit` (content is the new gate), `already`, or a refusal reason.
  */
 function planGateEdit(gateContent, opts) {
+  return withOk(planGateEditRaw(gateContent, opts));
+}
+
+/** Every plan result carries `ok`: true for `edit` and `already`, false for each refusal (T251-QA-2). */
+function withOk(plan) {
+  return { ok: plan.state === "edit" || plan.state === "already", ...plan };
+}
+
+function planGateEditRaw(gateContent, opts) {
   const token = readGateToken(gateContent);
   if (token === null)
     return {
@@ -319,6 +331,7 @@ function planGateEdit(gateContent, opts) {
     readGateToken(content) !== "WAIVED" ||
     after === null ||
     after.length !== entries.length ||
+    after.some((e, i) => e.id !== entries[i].id) ||
     stillOpen !== 0
   )
     return {
@@ -368,6 +381,10 @@ function rowValue(lines, entry, label) {
  * or a refusal reason.
  */
 function planReportEdit(reportContent, n, opts) {
+  return withOk(planReportEditRaw(reportContent, n, opts));
+}
+
+function planReportEditRaw(reportContent, n, opts) {
   const eol = reportContent.includes("\r\n") ? "\r\n" : "\n";
   const lines = reportContent.split(/\r?\n/);
   const entries = cycleEntries(lines);
@@ -507,9 +524,12 @@ function acceptResidual(opts) {
   const now = opts.now || new Date();
   const timestamp = now.toISOString().replace(/\.\d{3}Z$/, "Z");
   const date = timestamp.slice(0, 10);
+  // One line wherever it lands: a CR/LF in either would forge report lines (T251-CR-2).
+  const oneLine = (s) =>
+    typeof s === "string" ? s.replace(/[\r\n]+/g, " ").trim() : s;
   const o = {
-    approvedBy: opts.approvedBy,
-    reason: opts.reason,
+    approvedBy: oneLine(opts.approvedBy),
+    reason: oneLine(opts.reason),
     timestamp,
     date,
   };

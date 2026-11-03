@@ -311,6 +311,27 @@ The plan names any other file the doc sweep finds, with the `git grep` that foun
 - Critical: any masked `FAIL`; a corrupted gate.
 - Non-critical: wording, or a missed doc restatement.
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-03
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.251.qa.1.record-loop-limit-residual-acceptance.md](./task.251.qa.1.record-loop-limit-residual-acceptance.md)
+- **Gate File**: [task.251.gate.1.record-loop-limit-residual-acceptance.yml](./task.251.gate.1.record-loop-limit-residual-acceptance.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 7147 (`ci:fast`), 29 of them new
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+Three medium findings in `accept-qa-residual.js`: a block-style entry with a brace is waived wrongly while the writer reports accepted (T251-QA-1), `--approved-by` is not newline-folded (T251-CR-2), and the plan functions carry no `ok` field so the boundary probe cannot score a refusal (T251-QA-2).
+
 ## Change Log
 
 | Date       | Version | Description                                      | Author      |
@@ -320,6 +341,8 @@ The plan names any other file the doc sweep finds, with the `git grep` that foun
 | 2026-11-03 |         | Status → ready-for-development | review-task |
 | 2026-11-03 |         | Implemented — 45 new files (most of them two replay eval fixtures, plus 4 bundled copies), 29 modified; 29 new tests (16 engine, 10 lock, 3 merge rule) and 2 replay evals | develop |
 | 2026-11-03 |         | Status → ready-for-review | develop |
+| 2026-11-03 |         | QA gate CONCERNS (90/100) — 3 medium findings | qa-task |
+| 2026-11-03 |         | QA findings fixed — 3 medium, 1 iteration | qa-fix |
 
 ## Progress Tracking
 
