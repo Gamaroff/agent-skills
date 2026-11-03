@@ -2355,3 +2355,361 @@ test("task.252 QA-1: a sharded PRD directory (index.md beside the PRD) blocks no
 test("task.252: the blocker code is in the closed list", () => {
   assert.ok(m.BLOCKER_CODES.includes("unclassified-document"));
 });
+
+// ---------------------------------------------------------------------------
+// Task 253 — safety nets (Phase 1: one failing test per gap, written first)
+// ---------------------------------------------------------------------------
+
+/** l2Tree with the story body replaced: the frontmatter and heading stay as in l2Tree. */
+function storyWithBody(body, extra = {}) {
+  const base = l2Tree()[`${S11}/story.1.1.first.md`];
+  const head = base.split("\n").slice(0, 9).join("\n"); // frontmatter + heading
+  return l2Tree({
+    [`${S11}/story.1.1.first.md`]: `${head}\n\n${body}\n`,
+    ...extra,
+  });
+}
+
+function applyJson(dir, extraArgs = []) {
+  return m.run(["--apply", "--json", "--root", R, ...extraArgs], { cwd: dir });
+}
+
+test("253 gap 1: a link whose text spans a newline is re-pointed; a fenced copy on the next line is left as written", () => {
+  const body = [
+    "[multi",
+    "line](../../epic.1.alpha.md)",
+    "```",
+    "../../epic.1.alpha.md",
+    "```",
+  ].join("\n");
+  const { dir } = gitRepo(storyWithBody(body));
+  try {
+    const r = applyJson(dir);
+    assert.equal(
+      r.reason,
+      "ok",
+      JSON.stringify(r.findings || r.blockers || r.error || r.reason),
+    );
+    const out = readFileSync(
+      join(dir, `${NEW_S11}/story.1.1.1.first.md`),
+      "utf8",
+    );
+    assert.ok(out.includes("[multi\nline](../../epic.1.1.alpha.md)"), out);
+    assert.ok(out.includes("```\n../../epic.1.alpha.md\n```"), out); // control: fence untouched
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("253 gap 3 (did not reproduce; regression guard): a migrated sub-story carries id, prd_number, epic and prd_source", () => {
+  const sub = (s) => `${E1}/stories/story.1.${s}.sub/story.1.${s}.sub.md`;
+  const subDoc = (s) =>
+    `---\nid: story.1.${s}.sub\ntitle: "Sub ${s}"\nstatus: accepted\nepic: 1\nprd_source: docs/prd/onb/prd.onb.md\n---\n# Sub ${s}\n`;
+  const { dir } = gitRepo(
+    l2Tree({ [sub("1A")]: subDoc("1A"), [sub("1B")]: subDoc("1B") }),
+  );
+  try {
+    const r = applyJson(dir);
+    assert.equal(
+      r.reason,
+      "ok",
+      JSON.stringify(r.findings || r.blockers || r.error || r.reason),
+    );
+    for (const s of ["1A", "1B"]) {
+      const f = `${NEW_E1}/stories/story.1.1.${s}.sub/story.1.1.${s}.sub.md`;
+      assert.ok(existsSync(join(dir, f)), f);
+      const text = readFileSync(join(dir, f), "utf8");
+      for (const key of ["id", "prd_number", "epic", "prd_source"])
+        assert.notEqual(
+          docId.frontmatterField(text, key),
+          null,
+          `${f} lacks ${key}\n${text}`,
+        );
+      assert.equal(docId.frontmatterField(text, "prd_number"), "1", text);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("253 gap 4: the retired epic-registry stub carries no link", () => {
+  const reg = [
+    "---",
+    "name: epic-registry",
+    "---",
+    "# Epic Registry",
+    "",
+    "| # | Epic | PRD | Tracker | Title | Status |",
+    "| --- | --- | --- | --- | --- | --- |",
+    "| 1 | epic.1.alpha | onb | — | Alpha | draft |",
+    "",
+    "See [the alpha epic](../prd/onb/epics/epic.1.alpha/epic.1.alpha.md).",
+    "",
+  ].join("\n");
+  const { dir } = gitRepo(l2Tree({ [EPIC_REG]: reg }));
+  try {
+    const r = applyJson(dir);
+    assert.equal(
+      r.reason,
+      "ok",
+      JSON.stringify(r.findings || r.blockers || r.error || r.reason),
+    );
+    const stub = readFileSync(join(dir, EPIC_REG), "utf8");
+    assert.equal(docId.frontmatterField(stub, "status"), "retired", stub);
+    assert.doesNotMatch(
+      stub,
+      /\]\([^)]*\)/,
+      `a link survived in the stub:\n${stub}`,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("253 gap 2: after --apply, dangling links (fenced and code-span ones as warnings) and old paths left behind are listed with file and line", () => {
+  const body = [
+    "```",
+    "[ex](../../epic.1.alpha.md)", // fenced: not re-pointed, dangling afterwards
+    "```",
+    "`[c](../../epic.1.alpha.md)`", // code span: same
+    "[live](../../epic.1.alpha.md)", // control: re-pointed, must not be reported
+    "[ext](https://example.com/a.md)", // control: external, must not be reported
+    "[gone](../../missing.md)", // dead before the run and after it
+  ].join("\n");
+  const { dir } = gitRepo(
+    storyWithBody(body, {
+      // CHANGELOG.md is history: the run leaves its old path as written, and the scan must say so.
+      "CHANGELOG.md": "- moved `docs/prd/onb/prd.onb.md`\n",
+    }),
+  );
+  try {
+    const r = applyJson(dir);
+    assert.equal(
+      r.reason,
+      "ok",
+      JSON.stringify(r.findings || r.blockers || r.error || r.reason),
+    );
+    const file = `${NEW_S11}/story.1.1.1.first.md`;
+    const at = (kind, target) =>
+      (r.postScan?.deadLinks || []).filter(
+        (d) => d.file === file && d.kind === kind && d.target === target,
+      );
+    assert.equal(
+      at("fenced", "../../epic.1.alpha.md").length,
+      1,
+      JSON.stringify(r.postScan ?? null),
+    );
+    assert.equal(
+      at("code-span", "../../epic.1.alpha.md").length,
+      1,
+      JSON.stringify(r.postScan ?? null),
+    );
+    assert.equal(
+      at("link", "../../missing.md").length,
+      1,
+      JSON.stringify(r.postScan ?? null),
+    );
+    const targets = r.postScan.deadLinks.map((d) => d.target);
+    assert.ok(
+      !targets.some((t) => t.startsWith("https://")),
+      "an external URL was reported",
+    );
+    assert.equal(
+      targets.filter((t) => t === "../../epic.1.1.alpha.md").length,
+      0,
+      "a live link was reported",
+    );
+    assert.ok(
+      r.postScan.oldPaths.some(
+        (o) =>
+          o.file === "CHANGELOG.md" &&
+          o.path === `${R}/onb/prd.onb.md` &&
+          o.line === 1,
+      ),
+      JSON.stringify(r.postScan?.oldPaths ?? null),
+    );
+    // Every deadLinks entry carries a 1-based line that is a line of the file.
+    const lines = readFileSync(join(dir, file), "utf8").split("\n").length;
+    for (const d of r.postScan.deadLinks.filter((x) => x.file === file))
+      assert.ok(d.line >= 1 && d.line <= lines, JSON.stringify(d));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("253 gap 6: a generated file is not edited and is listed as skipped, generated", () => {
+  const gen = "graphify-out/GRAPH_REPORT.md";
+  const { dir, g } = gitRepo(
+    l2Tree({
+      [gen]: `see ${R}/onb/prd.onb.md\n`,
+      "docs/other.md": `see ${R}/onb/prd.onb.md\n`,
+    }),
+  );
+  try {
+    const r = applyJson(dir);
+    assert.equal(
+      r.reason,
+      "ok",
+      JSON.stringify(r.findings || r.blockers || r.error || r.reason),
+    );
+    assert.equal(
+      readFileSync(join(dir, gen), "utf8"),
+      `see ${R}/onb/prd.onb.md\n`,
+    );
+    assert.match(
+      readFileSync(join(dir, "docs/other.md"), "utf8"),
+      /prd\.1\.onb\/prd\.1\.onb\.md/,
+    ); // control: ordinary file still rewritten
+    assert.deepEqual(
+      (r.skippedGenerated || []).map((s) => s.file),
+      [gen],
+    );
+    g("add", "-A");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("253 gap 7: the closing line lists tracked files outside the PRD root that still hard-code legacy names", () => {
+  const { dir } = gitRepo(
+    l2Tree({
+      "scripts/lint.mjs":
+        "const re = /^epic\\.\\d+\\.([a-z-]+)$/; const s = /story\\.\\d+\\.\\d+/;\n",
+      "scripts/clean.mjs": "const re = 1; // nothing about documents here\n", // control: no legacy name
+      "scripts/new.mjs":
+        "const id = 'story.1.1.1.first'; // already the new scheme\n", // control
+    }),
+  );
+  try {
+    const r = applyJson(dir);
+    assert.equal(
+      r.reason,
+      "ok",
+      JSON.stringify(r.findings || r.blockers || r.error || r.reason),
+    );
+    assert.equal(
+      r.postScan?.legacyNames?.count,
+      1,
+      JSON.stringify(r.postScan ?? null),
+    );
+    assert.deepEqual(
+      r.postScan.legacyNames.files.map((f) => f.file),
+      ["scripts/lint.mjs"],
+    );
+    const text = spawnSync(process.execPath, [ENGINE, "--check", "--root", R], {
+      cwd: dir,
+      encoding: "utf8",
+    }).stdout;
+    assert.match(
+      text,
+      /1 repo files? still hard-codes? legacy names?: scripts\/lint\.mjs/,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/** A repo with a bare upstream; `other()` is a second clone that can push ahead. */
+function gitRepoWithUpstream(files) {
+  const { dir, g } = gitRepo(files);
+  const up = mkdtempSync(join(tmpdir(), "migrate-doc-numbering-up-"));
+  const gu = (cwd, ...a) =>
+    execFileSync("git", a, {
+      cwd,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        GIT_CONFIG_GLOBAL: "/dev/null",
+        GIT_CONFIG_NOSYSTEM: "1",
+      },
+    });
+  gu(up, "init", "-q", "--bare");
+  const branch = g("branch", "--show-current").trim();
+  g("remote", "add", "origin", up);
+  g("push", "-q", "-u", "origin", branch);
+  const aheadCommit = () => {
+    const other = mkdtempSync(join(tmpdir(), "migrate-doc-numbering-other-"));
+    gu(other, "clone", "-q", up, ".");
+    gu(other, "config", "user.email", "t@example.com");
+    gu(other, "config", "user.name", "t");
+    gu(other, "config", "commit.gpgsign", "false");
+    writeFileSync(join(other, "upstream-only.txt"), "x\n");
+    gu(other, "add", "-A");
+    gu(other, "commit", "-qm", "ahead", "--no-verify");
+    gu(other, "push", "-q", "origin", branch);
+    rmSync(other, { recursive: true, force: true });
+  };
+  return { dir, g, up, branch, aheadCommit };
+}
+
+test("253 gap 5: a dirty tree (any file) and a branch behind its upstream are warnings in the dry run and --check, and block --apply", () => {
+  for (const state of [
+    "dirty",
+    "behind-never-fetched",
+    "behind-fetched-not-pulled",
+  ]) {
+    const { dir, g, up, aheadCommit } = gitRepoWithUpstream(l2Tree());
+    try {
+      if (state === "dirty")
+        writeFileSync(join(dir, "unrelated.txt"), "dirty\n");
+      else {
+        aheadCommit();
+        if (state === "behind-fetched-not-pulled") g("fetch", "-q");
+      }
+      const code = state === "dirty" ? "dirty-tree" : "behind-upstream";
+      for (const mode of [[], ["--check"]]) {
+        const r = m.run([...mode, "--json", "--root", R], { cwd: dir });
+        assert.ok(
+          (r.warnings || []).some((w) => w.code === code),
+          `${state} ${mode.join(" ") || "dry run"}: no ${code} warning: ${JSON.stringify(r.warnings ?? null)}`,
+        );
+        assert.ok(
+          !(r.blockers || []).some((b) => b.code === code),
+          `${state}: a read-only run blocked`,
+        );
+      }
+      const a = applyJson(dir);
+      assert.equal(a.reason, "blocked", `${state}: --apply ran (${a.reason})`);
+      assert.ok(
+        (a.blockers || []).some((b) => b.code === code),
+        JSON.stringify(a.blockers),
+      );
+      assert.ok(
+        existsSync(join(dir, `${S11}/story.1.1.first.md`)),
+        `${state}: --apply moved files`,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(up, { recursive: true, force: true });
+    }
+  }
+});
+
+test("253 gap 5 controls: a clean tree level with its upstream, and a repo with no upstream, raise neither code; an unreachable upstream warns it could not verify", () => {
+  const level = gitRepoWithUpstream(l2Tree());
+  const none = gitRepo(l2Tree());
+  const gone = gitRepoWithUpstream(l2Tree());
+  try {
+    for (const { dir } of [level, none]) {
+      const r = m.run(["--json", "--root", R], { cwd: dir });
+      assert.deepEqual(
+        (r.warnings || []).filter((w) =>
+          /dirty-tree|behind-upstream/.test(w.code),
+        ),
+        [],
+      );
+    }
+    rmSync(gone.up, { recursive: true, force: true }); // the upstream disappears: fetch fails
+    const r = m.run(["--json", "--root", R], { cwd: gone.dir });
+    assert.ok(
+      (r.warnings || []).some((w) => w.code === "upstream-unverified"),
+      JSON.stringify(r.warnings ?? null),
+    );
+    assert.equal(applyJson(gone.dir).reason, "ok"); // not a blocker: an offline run still works
+  } finally {
+    for (const x of [level, none, gone]) {
+      rmSync(x.dir, { recursive: true, force: true });
+      if (x.up) rmSync(x.up, { recursive: true, force: true });
+    }
+  }
+});

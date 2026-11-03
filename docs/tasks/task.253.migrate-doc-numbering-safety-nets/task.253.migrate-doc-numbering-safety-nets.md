@@ -116,6 +116,20 @@ None to the CLI's inputs. Outputs gain lines and the tool may refuse a dirty or 
 
 **Dependencies**: none.
 
+**Phase 1 results (2026-11-03)** — one test per gap in `shared/resources/tests/migrate-doc-numbering.test.mjs`, run with `command node --test --test-name-pattern='253' …`:
+
+| Gap | Test | Reproduced? | Evidence |
+| --- | --- | --- | --- |
+| 1. Multi-line link not re-pointed | `253 gap 1` | **Yes** | `[multi\nline](../../epic.1.alpha.md)` is left as written after `--apply`; the fenced control on the next line is also asserted untouched |
+| 2. No dead-link / old-path scan | `253 gap 2` | **Yes** (nothing reports them: no `postScan` in the result) | fenced and code-span dangling links, a history file keeping an old path, with live-link and external-URL controls |
+| 3. `prd_number` missing on sub-stories | `253 gap 3 (did not reproduce; regression guard)` | **No** | sub-stories `1A` and `1B` come out of `--apply` with `id`, `prd_number`, `epic` and `prd_source`; `planEdits` inserts `prd_number` for every moved story and `postCheck` runs `doc-id.js checkCorpus`. **Dropped from scope**: no fix; the test stays as a guard |
+| 4. Stub carries a link | `253 gap 4` | **Yes** | the retired stub keeps `[docs/prd/prd-registry.md](../prd/prd-registry.md)`, dead when the registry lives elsewhere |
+| 5. Dirty tree / behind upstream | `253 gap 5`, `253 gap 5 controls` | **Yes** | `--apply` succeeds with an unrelated uncommitted file (probe: exit `ok`, file left dirty), and no warning exists for any mode |
+| 6. Generated file edited | `253 gap 6` | **Yes** | `graphify-out/GRAPH_REPORT.md` is rewritten to the new path (probe: ` M graphify-out/GRAPH_REPORT.md`) |
+| 7. Legacy-name consumers unreported | `253 gap 7` | **Yes** (no closing line exists) | `scripts/lint.mjs` with `epic.\d+` / `story.\d+` patterns, with a clean script and a new-scheme script as controls |
+
+The `postScan`, `warnings` and `skippedGenerated` result keys the tests read are the new interface; their names are fixed by these tests.
+
 ---
 
 ### Phase 2: Multi-line links
@@ -344,7 +358,7 @@ For the dead-link scan, include a live link and a link to an external URL that m
 
 ## Progress Tracking
 
-- [ ] Phase 1: reproduce, tests first
+- [x] Phase 1: reproduce, tests first
 - [ ] Phase 2: multi-line links
 - [ ] Phase 3: post-apply scans
 - [ ] Phase 4: frontmatter, stub, dirty/behind, generated
