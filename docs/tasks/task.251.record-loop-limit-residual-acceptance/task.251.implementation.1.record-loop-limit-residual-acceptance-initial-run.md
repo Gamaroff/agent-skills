@@ -36,9 +36,9 @@ First run of task.251: add `accept-qa-residual.js`, the one writer that records 
 | 2. review-task             | ✅ Done    | `task.251.review.{N}.{name}.md` exists (or skip logged)               | `task.251.review.1.*.md` — READY TO IMPLEMENT 8/10; Planned → Ready for Development | —                    | 2026-11-03T05:57Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline; ci:fast green (7147 tests, 0 fail); other CI stages green; `CI=true` run fails only on missing local `zsh` | —                    | 2026-11-03T06:32Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #815 → develop (commit 4b8e8d22) | —                    | 2026-11-03T06:33Z |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.251.qa.{N}.*.md`; `task.251.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.251.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.251.qa.{N}.*.md`; `task.251.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 5 gates, 4 fixes; gate 5 WAIVED by the owner (accept-qa-residual); PR review CONCERNS, 3 doc-only findings fixed | — | 2026-11-03T07:11Z |
+| 7. finalise                | ✅ Done    | `task.251.dod.{N}.*.md`; task `status: accepted`                      | DoD run 2 ACCEPTED (run 1: gaps, evidence-only); CI reading 1 SUCCESS @ 2c4d30113771; CI reading 2 SUCCESS (tree-equivalent to 2c4d30113771) @ 1a0e8085680f over 6 checks; PR comment, issue #814 closed, board done | — | 2026-11-03T08:00Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | acceptance commit `1a0e8085`; this report committed last | — | 2026-11-03T08:00Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -104,6 +104,13 @@ First run of task.251: add `accept-qa-residual.js`, the one writer that records 
 - QA residual accepted at the loop-limit escalation (cycle 5): gate.5 recorded as WAIVED (T251-CR5-1); approved by Lorien Gamaroff on 2026-11-03 — Loop limit reached after 5 gates; the one open finding (T251-CR5-1, low) is an empty-value flow-style status, a shape the pipeline never writes; the pipeline's own reader handles it.. Recorded by accept-qa-residual; the run resumes at Step 5c.
 
 ---
+
+### Finalise — 2026-11-03
+
+- DoD run 1 ended GAPS: four criteria (lens trail-rule dry run, writer timing, `npm run ci` wall time, doc-sweep record) had no recorded evidence. Owner chose to close them. Evidence went into an addendum on QA report 5; DoD run 2 accepted.
+- `npm run ci` timing: a first PR-head pair taken in the main checkout (220 s, 229 s) was discarded as not like for like. A matching detached worktree gave PR head 198 s and 199 s against develop 196 s and 196 s, +1.3%. A first develop pair ran under `/tmp` and failed on the suite's ephemeral-path guard; it was discarded and re-run beside the repository.
+- Security, compliance and docs sections were carried from run 1 (only documentation files changed in between); the deviation is stated in the DoD file.
+- CI reading 1: SUCCESS @ 2c4d30113771. CI reading 2: SUCCESS (tree-equivalent to 2c4d30113771) @ 1a0e8085680f.
 
 ## Issues Log
 
@@ -182,7 +189,7 @@ _Track each QA review/fix cycle._
 **Issues Found**: 1 low — T251-CR5-1 (an empty status value in a flow entry is edited to `status:waived`, which a strict YAML parser reads as one key). Cycle 4's two findings are fixed.
 **HIGH findings**: 0
 **MEDIUM findings**: 0
-**PR Review**: not reached — gate did not exit the loop
+**PR Review**: CONCERNS — task.251.pr-review.1.record-loop-limit-residual-acceptance.md (3 consistency findings, all documentation, fixed and staged for the acceptance commit; no coverage finding)
 **Loop exit**: residual accepted by Lorien Gamaroff on 2026-11-03 (accept-qa-residual)
 **Action**: Proceeding to 5c (PR conformance review)
 
@@ -190,10 +197,10 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-11-03
+**Final Status**: Completed
 **Branch**: feature/task.251.record-loop-limit-residual-acceptance
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**PR**: [#815](https://github.com/Gamaroff/agent-skills/pull/815)
+**QA Iterations**: 5 gates, 4 fix cycles; gate 5 WAIVED by the owner (loop-limit residual accepted)
+**DoD Summary**: `task.251.dod.2.record-loop-limit-residual-acceptance.md` (run 1 ended in gaps on four unevidenced criteria; the evidence was added to QA report 5 and run 2 accepted)
+**Tracker debt**: none
