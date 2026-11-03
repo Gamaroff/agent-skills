@@ -2316,6 +2316,25 @@ test("task.252: allowlisted names and dot-directories are not documents and bloc
   assert.deepEqual(disc.unclassified, []);
 });
 
+test("task.252 PC-2: assets/ and underscore directories under epics/ and stories/ block nothing; an ordinary odd directory is still named", () => {
+  const ok = l2Tree({
+    [`${R}/onb/epics/assets/a.md`]: "a\n",
+    [`${R}/onb/epics/_archive/b.md`]: "b\n",
+    [`${STORIES1}/assets/c.md`]: "c\n",
+    [`${STORIES1}/_old/d.md`]: "d\n",
+  });
+  assert.deepEqual(
+    m.discover(R, memIo(ok), { names: new Map() }).unclassified,
+    [],
+  );
+  // Control: a directory that is none of those is still a blocker.
+  const bad = l2Tree({ [`${R}/onb/epics/notes/e.md`]: "e\n" });
+  assert.equal(
+    m.discover(R, memIo(bad), { names: new Map() }).unclassified.length,
+    1,
+  );
+});
+
 test("task.252 QA-1: a sharded PRD directory (index.md beside the PRD) blocks nothing; the same section file without that index.md is named", () => {
   const section = `${R}/onb/goals-and-background-context.md`;
   const sharded = l2Tree({

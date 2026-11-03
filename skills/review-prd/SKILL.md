@@ -469,8 +469,8 @@ the `reason` alone:
   `-N` sub-story suffix, a stray note). The tool used to skip it silently and then carry it half-way
   into the renamed tree. The detail gives the path, the rule it broke and, for a lowercase or dash
   suffix, the spelling that would read. Report each as Critical; the fix is by hand (rename it, or move
-  it out of the PRD tree), then plan again. README.md, index.md, `prd-registry.md` and dot-directories
-  are not documents and are never named. A PRD directory that holds an `index.md` is a sharded PRD
+  it out of the PRD tree), then plan again. README.md, index.md, `prd-registry.md`, dot-directories,
+  underscore-prefixed directories and `assets/` are not documents and are never named. A PRD directory that holds an `index.md` is a sharded PRD
   (`/shard-prd` writes its section files there), so its loose `.md` files are shards and are not named
   either. The text output also prints `N documents classified, M skipped`;
   `M` must be 0 before `--apply`.

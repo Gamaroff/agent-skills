@@ -237,8 +237,12 @@ const NON_DOCUMENT_FILES = Object.freeze([
 ]);
 const isNonDocumentFile = (base) =>
   NON_DOCUMENT_FILES.some(([n]) => n === base);
-// A directory whose name starts with a dot is tooling or editor state, never a document.
-const isNonDocumentDir = (base) => base.startsWith(".");
+// A directory is not a document when its name starts with a dot (tooling or editor state), starts
+// with an underscore (the "kept aside" convention, for example _archive), or is `assets`
+// (images and attachments beside the documents). The task promised directories in the allowlist
+// (PR review PC-2, gate CR-3).
+const isNonDocumentDir = (base) =>
+  base.startsWith(".") || base.startsWith("_") || base === "assets";
 
 const allDigits = (s) => s !== "" && [...s].every((c) => c >= "0" && c <= "9");
 

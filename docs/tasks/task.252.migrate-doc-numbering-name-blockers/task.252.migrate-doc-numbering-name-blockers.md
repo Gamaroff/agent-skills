@@ -6,6 +6,7 @@ description: "Make migrate-doc-numbering.mjs raise a named blocker, in dry-run a
 tags: [migrate-doc-numbering, doc-id, blockers]
 category: refactoring
 status: ready-for-review
+pr_number: 817
 priority: High
 created: 2026-11-03
 updated: 2026-11-03
@@ -65,7 +66,7 @@ Reproduced 2026-11-03 on a throwaway git repo built by `make-fixture.sh` (cases 
 
 ### Important Clarifications
 
-- Whether a stray file is a blocker was left to the maintainer by the handoff. **Decision recorded here:** a directory in an epic or story position is always a blocker, because its position says it is a document. A loose file is a blocker unless the allowlist names it. Phase 1 measures this on the repository's own `docs/prd` tree and on the fixture, and the allowlist is whatever makes the real tree read `M = 0`.
+- Whether a stray file is a blocker was left to the maintainer by the handoff. **Decision recorded here:** a directory in an epic or story position is always a blocker, because its position says it is a document. A loose file is a blocker unless the allowlist names it. Phase 1 measures this on the repository's own `docs/prd` tree and on the fixture, and the allowlist is whatever makes the real tree read `M = 0`. **Exceptions found in QA and the PR review (recorded 2026-11-03):** a PRD directory that holds an `index.md` is a sharded PRD (`/shard-prd` writes its section files there), and so is an L3 PRD, so loose files in them are not checked. The trade-off is that a stray file beside an `index.md` is silent. Directories named `assets`, or starting with a dot or an underscore, are not documents.
 - Renaming the offending documents stays the author's job. This task does not rewrite names.
 
 ---
@@ -349,6 +350,7 @@ T252-QA-1 (section shards of a sharded PRD) is fixed and held by a test. One fol
 | 2026-11-03 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-11-03 |         | QA findings fixed — cycle 1, 1 finding | qa-fix |
 | 2026-11-03 |         | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-11-03 |         | QA findings fixed — cycle 2, 3 findings (PR review) | qa-fix |
 
 <!-- change-log-end -->
 
