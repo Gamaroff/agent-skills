@@ -316,6 +316,27 @@ The fixture is the incident, so a pass could mean the tool recognised it. Add on
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-03
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.252.qa.1.migrate-doc-numbering-name-blockers.md](./task.252.qa.1.migrate-doc-numbering-name-blockers.md)
+- **Gate File**: [task.252.gate.1.migrate-doc-numbering-name-blockers.yml](./task.252.gate.1.migrate-doc-numbering-name-blockers.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 89
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+One MEDIUM finding: the loose-file rule blocks the section shards of a sharded PRD, which shard-prd writes into the PRD directory (T252-QA-1). All ten success criteria are met and mutation-proven.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -325,6 +346,8 @@ The fixture is the incident, so a pass could mean the tool recognised it. Add on
 | 2026-11-03 | 1.1     | Review passed (8/10) — blocker moved from verify() to plan() so the early `already` branch cannot bypass it; Phase 1 measurement reordered; Phase 4 doc list corrected; allowlist covers directories; walk-count criterion names its test | review-task |
 | 2026-11-03 |         | Status → ready-for-development | review-task |
 | 2026-11-03 |         | Implemented — 5 files, 7 new tests (89 pass) | develop |
+| 2026-11-03 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-11-03 |         | QA findings fixed — cycle 1, 1 finding | qa-fix |
 
 <!-- change-log-end -->
 

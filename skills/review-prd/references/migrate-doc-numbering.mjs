@@ -578,9 +578,11 @@ export function discover(root, io, opts = {}) {
   }
   // A loose .md file in a PRD directory that neither grammar reads and no allowlist entry excuses.
   // L3 (a monolith or root index.md) is left alone: its directory holds the shards of a sharded
-  // PRD, and a shard's name is not an id.
+  // PRD, and a shard's name is not an id. So is any L1/L2 PRD directory that holds an index.md:
+  // shard-prd writes the section files and that index.md beside the PRD (QA T252-QA-1).
   for (const p of prds) {
     if (p.shape === "L3") continue;
+    if (fileSet.has(P.join(p.dir, "index.md"))) continue;
     for (const f of files) {
       if (P.dirname(f) !== p.dir || f === p.doc || !f.endsWith(".md")) continue;
       const base = P.basename(f);

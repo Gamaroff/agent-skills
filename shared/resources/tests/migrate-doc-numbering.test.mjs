@@ -2316,6 +2316,23 @@ test("task.252: allowlisted names and dot-directories are not documents and bloc
   assert.deepEqual(disc.unclassified, []);
 });
 
+test("task.252 QA-1: a sharded PRD directory (index.md beside the PRD) blocks nothing; the same section file without that index.md is named", () => {
+  const section = `${R}/onb/goals-and-background-context.md`;
+  const sharded = l2Tree({
+    [section]: "# Goals\n",
+    [`${R}/onb/index.md`]: "# Index\n",
+  });
+  const withIndex = m.discover(R, memIo(sharded), { names: new Map() });
+  assert.deepEqual(withIndex.unclassified, []);
+  // Control: the identical section file with no index.md is a stray and must still be named.
+  const stray = l2Tree({ [section]: "# Goals\n" });
+  const without = m.discover(R, memIo(stray), { names: new Map() });
+  assert.deepEqual(
+    without.unclassified.map((u) => u.path),
+    [section],
+  );
+});
+
 test("task.252: the blocker code is in the closed list", () => {
   assert.ok(m.BLOCKER_CODES.includes("unclassified-document"));
 });

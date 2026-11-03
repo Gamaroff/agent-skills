@@ -470,7 +470,9 @@ the `reason` alone:
   into the renamed tree. The detail gives the path, the rule it broke and, for a lowercase or dash
   suffix, the spelling that would read. Report each as Critical; the fix is by hand (rename it, or move
   it out of the PRD tree), then plan again. README.md, index.md, `prd-registry.md` and dot-directories
-  are not documents and are never named. The text output also prints `N documents classified, M skipped`;
+  are not documents and are never named. A PRD directory that holds an `index.md` is a sharded PRD
+  (`/shard-prd` writes its section files there), so its loose `.md` files are shards and are not named
+  either. The text output also prints `N documents classified, M skipped`;
   `M` must be 0 before `--apply`.
 - **`stale-reference`** — a file names a moved outside PRD (such as `docs/prd.md`) by a path neither pass rewrites:
   a relative path outside a link, such as `"../docs/prd.md"` in a script, or any path in a file type the

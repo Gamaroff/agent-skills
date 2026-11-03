@@ -17,8 +17,8 @@ All notable changes to this project will be documented in this file. Format foll
   the names are fixed. The blocker is raised while planning, so a fully migrated tree whose only
   defect is a bad name no longer answers `already`. The plan output prints `N documents classified,
   M skipped`, and `--json` carries `classified`, `skipped` and `unclassified`. README.md, index.md,
-  `prd-registry.md` and dot-directories are not documents; a sharded PRD (a monolith or root
-  `index.md`) is not checked for loose files.
+  `prd-registry.md` and dot-directories are not documents; a sharded PRD (a monolith, a root
+  `index.md`, or a PRD directory that holds an `index.md`) is not checked for loose files.
 - **A loop-limit residual can now be accepted in one step (task 251, obs #115, #150).** The QA
   loop HALT's option 2 ("accept the current gate status") had no writer, and the hand edits it
   invited failed twice: the 5c lens refused the cycle's `Escalating — loop limit reached` row
