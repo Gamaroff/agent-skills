@@ -29,8 +29,9 @@ All notable changes to this project will be documented in this file. Format foll
   named in tracked text, such as history files). (3) The retired epic-registry stub names its
   neighbours as code spans, not links, so it cannot go dead. (4) Dirty tree and behind-upstream: a
   `dirty-tree` or `behind-upstream` **warning** in every mode and a **blocker** for `--apply`; the
-  behind check runs `git fetch` for the upstream remote first (remote-tracking refs only), a failed
-  fetch or a missing upstream is a warning (`upstream-unverified`, `no-upstream`). (5) Files under a
+  behind check runs `git fetch --prune` for the upstream remote first (remote-tracking refs only), a
+  failed fetch, a missing upstream, or an upstream branch deleted on the remote is a warning
+  (`upstream-unverified`, `no-upstream`). (5) Files under a
   `*-out/` directory (generated output such as `graphify-out/`) are never rewritten and are listed as
   `skipped, generated` when they name a moved path. (6) Every mode ends with `N repo files still
   hard-code legacy names: …` for tracked code outside the PRD root that spells a legacy epic or story

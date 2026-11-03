@@ -2420,13 +2420,21 @@ test("253 gap 3 (did not reproduce; regression guard): a migrated sub-story carr
       const f = `${NEW_E1}/stories/story.1.1.${s}.sub/story.1.1.${s}.sub.md`;
       assert.ok(existsSync(join(dir, f)), f);
       const text = readFileSync(join(dir, f), "utf8");
-      for (const key of ["id", "prd_number", "epic", "prd_source"])
-        assert.notEqual(
+      // frontmatterField returns "" for a missing key, never null, so each key is checked
+      // against its expected VALUE: a not-null assertion here passed with the key absent
+      // (task 253 QA bug 2).
+      const expected = {
+        id: `story.1.1.${s}.sub`,
+        prd_number: "1",
+        epic: "epic.1.1.alpha",
+        prd_source: "docs/prd/onb/prd.1.onb/prd.1.onb.md",
+      };
+      for (const [key, want] of Object.entries(expected))
+        assert.equal(
           docId.frontmatterField(text, key),
-          null,
-          `${f} lacks ${key}\n${text}`,
+          want,
+          `${f}: ${key}\n${text}`,
         );
-      assert.equal(docId.frontmatterField(text, "prd_number"), "1", text);
     }
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -2692,6 +2700,7 @@ test("253 gap 5 controls: a clean tree level with its upstream, and a repo with 
   const none = gitRepo(l2Tree());
   const gone = gitRepoWithUpstream(l2Tree());
   const deleted = gitRepoWithUpstream(l2Tree());
+  const stale = gitRepoWithUpstream(l2Tree());
   try {
     for (const { dir } of [level, none]) {
       const r = m.run(["--json", "--root", R], { cwd: dir });
@@ -2725,12 +2734,55 @@ test("253 gap 5 controls: a clean tree level with its upstream, and a repo with 
       false,
     );
     assert.equal(applyJson(deleted.dir).reason, "ok"); // a warning, not a blocker
+    // QA CR-3: the branch is deleted on the remote by SOMEONE ELSE, so this clone keeps a stale
+    // remote-tracking ref. Without --prune the fetch leaves it, rev-list succeeds, and the
+    // guard reads "level".
+    stale.g("checkout", "-q", "-b", "feat2");
+    stale.g("push", "-q", "-u", "origin", "feat2");
+    execFileSync("git", [
+      "--git-dir",
+      stale.up,
+      "update-ref",
+      "-d",
+      "refs/heads/feat2",
+    ]);
+    const s = m.run(["--json", "--root", R], { cwd: stale.dir });
+    assert.equal(
+      (s.warnings || []).filter((w) => w.code === "upstream-unverified").length,
+      1,
+      JSON.stringify(s.warnings ?? null),
+    );
   } finally {
-    for (const x of [level, none, gone, deleted]) {
+    for (const x of [level, none, gone, deleted, stale]) {
       rmSync(x.dir, { recursive: true, force: true });
       if (x.up) rmSync(x.up, { recursive: true, force: true });
     }
   }
+});
+
+test("253 gap 2: maskedLinks closes a fence only on the opening character at least as long (agrees with doc-links blankFences)", () => {
+  // A backtick line inside a tilde fence does not close it, so both links before the closing
+  // tilde fence are masked, and the link after it is not (QA bug 3).
+  assert.deepEqual(
+    m.maskedLinks(
+      "~~~\n[a](./before.md)\n```\n[b](./inner.md)\n~~~\n[c](./after.md)\n",
+    ),
+    [
+      { target: "./before.md", line: 2, kind: "fenced" },
+      { target: "./inner.md", line: 4, kind: "fenced" },
+    ],
+  );
+  // Controls: a plain fence still masks its link; a shorter fence line does not close a longer one.
+  assert.deepEqual(m.maskedLinks("```\n[a](./x.md)\n```\n"), [
+    { target: "./x.md", line: 2, kind: "fenced" },
+  ]);
+  assert.deepEqual(
+    m.maskedLinks("````\n[a](./x.md)\n```\n[b](./y.md)\n````\n"),
+    [
+      { target: "./x.md", line: 2, kind: "fenced" },
+      { target: "./y.md", line: 4, kind: "fenced" },
+    ],
+  );
 });
 
 test("253 gap 5/6: the text output prints each warning and each skipped, generated file", () => {

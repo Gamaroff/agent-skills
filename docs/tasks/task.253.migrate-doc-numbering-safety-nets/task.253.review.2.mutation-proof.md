@@ -24,5 +24,9 @@ One row per fix: revert the behaviour, run the named test, expect red, restore, 
 | 7. Legacy-name line (Phase 3) | `parseLegacy` result ignored (nothing matches) | `253 gap 7` | yes |
 | 7. Legacy-name line (Phase 3) | "already the new scheme" exclusion removed | **no test went red** — `parseLegacy` already rejects new-scheme names, so the line was dead; deleted rather than kept | n/a |
 | QA bug 1 (cycle 1) | `if (behind.status !== 0)` branch disabled (a failed `rev-list` read as 0 behind again) | `253 gap 5 controls` (upstream branch deleted on the remote) | yes |
+| QA bug 2 (cycle 2) | the story `prd_source` entry written as a constant | `253 gap 3` (asserts each key's value; the old not-null assertion would have stayed green) | yes |
+| QA bug 3 (cycle 2) | `maskedLinks` ignores the opening fence character (`true &&`) | `253 gap 2: maskedLinks closes a fence only on…` | yes |
+| QA bug 3 (cycle 2) | `maskedLinks` ignores the opening fence length | same test (the four-backtick control) | yes |
+| QA CR-3 (cycle 2) | `--prune` removed from the fetch | `253 gap 5 controls` (branch deleted on the remote by another party) | yes |
 
 Gap 3 did not reproduce (Phase 1), so it has no fix and no mutation row.

@@ -172,7 +172,7 @@ The `postScan`, `warnings` and `skippedGenerated` result keys the tests read are
 **Changes**:
 - [x] ~~Validate migrated story frontmatter~~ — **dropped: did not reproduce** (Phase 1 results). The existing post-apply `doc-id.js checkCorpus` already fails `--apply` on a story whose `prd_number`, `epic` or id disagrees with its name.
 - [x] Generate the registry stub without links.
-- [x] Dirty-tree and behind-upstream check. Decision: the tool runs `git fetch --quiet <remote>` in every mode (it updates remote-tracking refs only), because `@{u}` is the last-fetched state and a guard that skips the fetch reads "level" on the very checkout it exists for. A failed fetch is the `upstream-unverified` warning, not a blocker; no upstream is the `no-upstream` warning. `dirty-tree` and `behind-upstream` are warnings in the dry run and `--check`, blockers for `--apply`. Two existing tests that dirtied the tree before `--apply` now dirty it after.
+- [x] Dirty-tree and behind-upstream check. Decision: the tool runs `git fetch --quiet --prune <remote>` in every mode (it updates remote-tracking refs only; `--prune` so a branch deleted on the remote is not read as level), because `@{u}` is the last-fetched state and a guard that skips the fetch reads "level" on the very checkout it exists for. A failed fetch is the `upstream-unverified` warning, not a blocker; no upstream is the `no-upstream` warning. `dirty-tree` and `behind-upstream` are warnings in the dry run and `--check`, blockers for `--apply`. Two existing tests that dirtied the tree before `--apply` now dirty it after.
 - [x] Skip generated files and list them. "Generated" is defined by a short list of directory suffixes (for example `*-out/`), each entry with a stated reason, as the plan sets out; a file's own `AUTO-GENERATED` header is a second signal only if Phase 1 shows a real consumer file needs it.
 
 **Dependencies**: Phase 1.
@@ -355,17 +355,17 @@ For the dead-link scan, include a live link and a link to an external URL that m
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.253.qa.1.migrate-doc-numbering-safety-nets.md](./task.253.qa.1.migrate-doc-numbering-safety-nets.md)
-- **Gate File**: [task.253.gate.1.migrate-doc-numbering-safety-nets.yml](./task.253.gate.1.migrate-doc-numbering-safety-nets.yml)
+- **Full Report**: [task.253.qa.2.migrate-doc-numbering-safety-nets.md](./task.253.qa.2.migrate-doc-numbering-safety-nets.md)
+- **Gate File**: [task.253.gate.2.migrate-doc-numbering-safety-nets.yml](./task.253.gate.2.migrate-doc-numbering-safety-nets.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 135 in the two touched suites; 7187 in the full run
 - **Phases Verified**: 5/5
-- **Critical Issues**: 0 (1 medium)
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0 (1 medium, 1 low)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-One medium finding: the behind-upstream guard says "not behind" when `git rev-list` fails, for example when the upstream branch is gone from the remote. Gap 3 did not reproduce and was dropped.
+Cycle 1's fix (the behind-upstream guard on a failed `git rev-list`) is verified. The refute pass found a gap 3 regression guard that cannot fail for three of its four keys (T253-QA-2) and a fence-tracking bug in the closing warning list (T253-QA-3).
 
 <!-- change-log-start -->
 ## Change Log
@@ -378,6 +378,8 @@ One medium finding: the behind-upstream guard says "not behind" when `git rev-li
 | 2026-11-03 | 1.2     | Implemented phases 1–5 (gap 3 did not reproduce and was dropped); mutation proof in `task.253.review.2.mutation-proof.md`; status → ready-for-review | develop-task |
 | 2026-11-03 |         | QA gate CONCERNS (90/100) — 1 medium finding | qa-task |
 | 2026-11-03 |         | QA findings fixed — 1 iteration (behind guard warns when rev-list fails) | qa-fix |
+| 2026-11-03 |         | QA gate CONCERNS (90/100) — 2 findings (1 medium, 1 low) | qa-task |
+| 2026-11-03 |         | QA findings fixed — 1 iteration (gap 3 guard asserts values; maskedLinks fence tracking; fetch --prune) | qa-fix |
 
 <!-- change-log-end -->
 

@@ -2,7 +2,7 @@
 type: bug
 title: "task.253 bug 1: the behind-upstream guard fails open when the upstream ref is gone"
 description: "repoGuard reads a failed git rev-list as 'not behind', so --apply is not blocked and no warning is raised."
-status: ready-for-qa
+status: closed
 severity: medium
 priority: P2
 updated: 2026-11-03
@@ -14,7 +14,7 @@ updated: 2026-11-03
 **Bug ID**: TASK-253-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (diff code review CR-1, reproduced)
 **Date Found**: 2026-11-03
 
@@ -58,6 +58,7 @@ When `rev-list` exits non-zero, push an `upstream-unverified` warning whose deta
 | --- | --- | --- | --- |
 | 2026-11-03 | new | qa-task | Found in QA cycle 1 |
 | 2026-11-03 | ready-for-qa | qa-fix | Fixed: a failed `rev-list` now raises `upstream-unverified` (one warning, replacing the fetch warning). Control test: upstream branch deleted on the remote. Mutation-proven. |
+| 2026-11-03 | Closed | qa-task | Verified by task.253.qa.2.migrate-doc-numbering-safety-nets.md |
 
 ## Developer Fix Cycle
 

@@ -2436,7 +2436,8 @@ export function run(argv, ctx = {}) {
 // The closing scans (task 253, gaps 2 and 7)
 // ---------------------------------------------------------------------------
 
-const FENCE_LINE = /^[ \t]*(?:`{3,}|~{3,})/;
+const FENCE_OPEN = /^[ \t]*(`{3,}|~{3,})(.*)$/;
+const FENCE_CLOSE = /^[ \t]*(`{3,}|~{3,})[ \t]*$/;
 // What the legacy-name scan reads: code and configuration, where a tool hard-codes a grammar.
 const CODE_EXTS = Object.freeze([
   ".js",
@@ -2458,11 +2459,24 @@ const CODE_EXTS = Object.freeze([
 export function maskedLinks(text) {
   const out = [];
   const lines = text.replace(/\r\n?/g, "\n").split("\n");
-  let fence = null; // { start, body[] }
+  let fence = null; // { start, marker, body[] }
   lines.forEach((line, i) => {
-    if (FENCE_LINE.test(line)) {
-      if (fence === null) fence = { start: i + 1, body: [] };
-      else {
+    // The same rule doc-links.js blankFences applies, so the two agree on what is inside a
+    // fence: a fence closes only on the opening character at least as long, and a backtick
+    // opener whose info string holds a backtick is not a fence (task 253 QA bug 3).
+    if (fence === null) {
+      const open = FENCE_OPEN.exec(line);
+      if (open && !(open[1][0] === "`" && open[2].includes("`"))) {
+        fence = { start: i + 1, marker: open[1], body: [] };
+        return;
+      }
+    } else {
+      const close = FENCE_CLOSE.exec(line);
+      if (
+        close &&
+        close[1][0] === fence.marker[0] &&
+        close[1].length >= fence.marker.length
+      ) {
         for (const l of extractRelativeLinks(fence.body.join("\n")))
           out.push({
             target: l.target,
@@ -2470,11 +2484,13 @@ export function maskedLinks(text) {
             kind: "fenced",
           });
         fence = null;
+        return;
       }
-      return;
     }
     if (fence !== null) {
-      fence.body.push(line);
+      // A fence-looking line inside this fence is text. extractRelativeLinks would read it as a
+      // fence of its own and blank what follows, so it is blanked here, keeping the line count.
+      fence.body.push(FENCE_OPEN.test(line) ? "" : line);
       return;
     }
     for (const span of line.matchAll(/`([^`\n]+)`/g))
@@ -2636,7 +2652,7 @@ function repoGuard(repoRoot) {
     });
     return warnings;
   }
-  const fetched = spawnSync("git", ["fetch", "--quiet", remote], {
+  const fetched = spawnSync("git", ["fetch", "--quiet", "--prune", remote], {
     cwd: repoRoot,
     encoding: "utf8",
     timeout: 20000,
