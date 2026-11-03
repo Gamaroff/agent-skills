@@ -5,7 +5,7 @@ type: task
 description: "Make migrate-doc-numbering.mjs raise a named blocker, in dry-run and --check, for every document under the PRD root it would otherwise skip silently, and print a classified/skipped count."
 tags: [migrate-doc-numbering, doc-id, blockers]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: High
 created: 2026-11-03
 updated: 2026-11-03
@@ -14,7 +14,7 @@ estimated_effort_hours: 8
 
 # migrate-doc-numbering: name every document it cannot classify
 
-**Status:** Planned
+**Status:** Ready for Review
 
 ---
 
@@ -59,9 +59,9 @@ Reproduced 2026-11-03 on a throwaway git repo built by `make-fixture.sh` (cases 
 ### Target Architecture
 
 - `discover()` records, in a new `unclassified` list, every directory directly under an `epics/` or `stories/` directory, and every file in a PRD directory, that is neither classified nor a recognised non-document. Each entry carries `path` and `reason`.
-- `verify()` turns each entry into a blocker `unclassified-document` (path plus reason, and the nearest valid spelling when one is obvious, such as `4.1.1A` for `4.1.1a`).
-- The plan output prints `N documents classified, M skipped`.
-- A name that is genuinely not a document (README, index, sprint-review summary, artifacts) is recognised by a short allowlist, so a clean corpus produces `M = 0`.
+- Each entry becomes a blocker `unclassified-document` (path plus reason, and the nearest valid spelling when one is obvious, such as `4.1.1A` for `4.1.1a`). **It is raised from `plan()`'s `planned.blockers`, not from `verify()`**: the run function (`migrate-doc-numbering.mjs`, the `planned.fileMap.size === 0 && !planned.blockers.length` branch, about `:2085`) returns `already` or `post-check-failed` *before* `verify()` is called, so a blocker raised only in `verify()` would never fire on a tree whose only defect is a bad name. That is the tree this task most needs to catch.
+- The plan output prints `N documents classified, M skipped`, where `N` = `counts.prds + counts.epics + counts.stories` (the existing `counts` object) and `M` = `unclassified.length`. Both are added to `--json` beside `counts`.
+- A name that is genuinely not a document (README, index, sprint-review summary, artifacts) is recognised by a short allowlist, so a clean corpus produces `M = 0`. **The allowlist covers directories as well as files** (for example an `assets/` directory or a dot-directory under `epics/`), because the directory-position rule would otherwise flag them.
 
 ### Important Clarifications
 
@@ -114,7 +114,9 @@ Reproduced 2026-11-03 on a throwaway git repo built by `make-fixture.sh` (cases 
 
 **Changes**:
 - [ ] Add a real-git-repo test with the fixture's four bad documents. It asserts the dry run, `--check` and `--apply` each name all four, and that `--apply` writes nothing.
-- [ ] Run the new tool over this repository's `docs/prd` and record, in the plan file, the command and the count of documents that would be flagged. The expected count is 0.
+- [ ] Add a control for the branch that matters most: a tree migrated in every other respect (nothing left to move) with one bad name must answer `blocked`, not `already` or `post-check-failed`.
+- [ ] Measure the false-positive risk before code lands, without the new blocker (it does not exist yet): walk this repository's `docs/prd` with a throwaway read-only script that applies `docId.parse` / `parseLegacy` to every directory under an `epics/` or `stories/` directory and every loose file in a PRD directory, and record the command and the list of unclassified names in the plan file. The allowlist is built from that list. After Phase 3, re-run the real tool for the `0 skipped` criterion.
+- [ ] Record the baseline for the walk-count criterion now: the length of `calls.readDir` on the clean fixture (`memIo`), as a number in the plan file.
 
 **Dependencies**: none.
 
@@ -129,7 +131,8 @@ Reproduced 2026-11-03 on a throwaway git repo built by `make-fixture.sh` (cases 
 
 **Changes**:
 - [ ] Add `unclassified` to the `discover()` result, filled at the two `continue` sites and for loose files in PRD directories.
-- [ ] Add the allowlist of recognised non-documents, with a reason beside each entry.
+- [ ] Add the allowlist of recognised non-documents (files and directories), with a reason beside each entry.
+- [ ] Sweep the existing test file for fixtures that hold a loose file or an odd directory the new rule would flag (`git grep -n` the fixture names in `shared/resources/tests/migrate-doc-numbering.test.mjs`, for example the `README.md`, `index.md` and `goals.md` entries) and list each as a test to update or an allowlist entry. A fixture that flips from exit 0 to `blocked` fails with a message about the exit code, not about the new rule.
 
 **Dependencies**: Phase 1.
 
@@ -144,9 +147,9 @@ Reproduced 2026-11-03 on a throwaway git repo built by `make-fixture.sh` (cases 
 
 **Changes**:
 - [ ] Add `unclassified-document` to the blocker-code list and the header comment.
-- [ ] `verify()` emits one blocker per entry. Include the suggested spelling where the name is a lowercase or dashed sub-story suffix.
-- [ ] Print `N documents classified, M skipped` in the text and `--json` output.
-- [ ] Confirm `--check` cannot answer `already` while `M > 0`.
+- [ ] Emit one blocker per entry into `planned.blockers` (in `plan()`), so it is present on the early `already` / `post-check-failed` branch as well as on the `verify()` path. Include the suggested spelling where the name is a lowercase or dashed sub-story suffix.
+- [ ] Print `N documents classified, M skipped` in the text and `--json` output (definitions in section 3).
+- [ ] Held by the Phase 1 control test: a tree with nothing left to move and one bad name answers `blocked`, never `already`.
 
 **Dependencies**: Phase 2.
 
@@ -157,12 +160,12 @@ Reproduced 2026-11-03 on a throwaway git repo built by `make-fixture.sh` (cases 
 **Risk Level**: Low
 
 **Files**:
-- `docs/standards/file-naming.md`, `docs/contributing/traps.md` (only where they list the blocker codes)
+- `skills/review-prd/SKILL.md` (lists the blocker codes at about line 464; the generated copy `skills/review-prd/references/migrate-doc-numbering.mjs` changes through `npm run bundle`)
 - `CHANGELOG.md`
 
 **Changes**:
-- [ ] Revert the `verify()` emission and confirm the Phase 1 test goes red. Revert the `discover()` recording and confirm it goes red again. Restore both.
-- [ ] Update the docs that list blocker codes. Find them with `grep -rn "displaced-frontmatter" docs shared skills` and add the new code beside each.
+- [ ] Revert the `plan()` blocker emission and confirm the Phase 1 test goes red. Revert the `discover()` recording and confirm it goes red again. Restore both.
+- [ ] Update the docs that list blocker codes. Find them with `grep -rln "displaced-frontmatter" docs shared skills CHANGELOG.md`, ignoring `docs/tasks/` history and the roadmap's history rows; as measured on 2026-11-03 that leaves `skills/review-prd/SKILL.md`, `CHANGELOG.md` and the script header. `docs/standards/file-naming.md` and `docs/contributing/traps.md` do not list the codes and are not edited.
 - [ ] Run `npm run bundle` and `npm test`.
 
 **Dependencies**: Phase 3.
@@ -181,7 +184,7 @@ Reproduced 2026-11-03 on a throwaway git repo built by `make-fixture.sh` (cases 
 
 ### Files to Modify (Documentation)
 
-3. ✅ Docs that list the blocker codes (command in Phase 4).
+3. ✅ `skills/review-prd/SKILL.md` (blocker-code list) and the script header comment (command in Phase 4).
 4. ✅ `CHANGELOG.md`.
 
 Generated copies of the script under `skills/*/references/` change through `npm run bundle`, not by hand. Find them with `git ls-files | grep migrate-doc-numbering`.
@@ -225,7 +228,7 @@ The fixture is the incident, so a pass could mean the tool recognised it. Add on
 
 ### Performance
 
-- [ ] The discovery walk is not repeated: the test's walk counter (`calls.readDir`) is unchanged from before this task on the clean fixture.
+- [ ] The discovery walk is not repeated: a planned unit test asserts `calls.readDir.length` on the clean `memIo` fixture equals the baseline recorded in Phase 1 (the array holds one path per directory read, so compare its length).
 
 ### Code Quality
 
@@ -319,15 +322,18 @@ The fixture is the incident, so a pass could mean the tool recognised it. Add on
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-11-03 | 1.0     | Initial draft | create-task |
+| 2026-11-03 | 1.1     | Review passed (8/10) — blocker moved from verify() to plan() so the early `already` branch cannot bypass it; Phase 1 measurement reordered; Phase 4 doc list corrected; allowlist covers directories; walk-count criterion names its test | review-task |
+| 2026-11-03 |         | Status → ready-for-development | review-task |
+| 2026-11-03 |         | Implemented — 5 files, 7 new tests (89 pass) | develop |
 
 <!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 1: fixture test and measurement
-- [ ] Phase 2: discovery records the unclassified set
-- [ ] Phase 3: blocker and count
-- [ ] Phase 4: mutation proof and docs
+- [x] Phase 1: fixture test and measurement
+- [x] Phase 2: discovery records the unclassified set
+- [x] Phase 3: blocker and count
+- [x] Phase 4: mutation proof and docs (mutation results go in the QA report)
 
 QA artifacts will land beside this file: `task.252.qa.[n].…md`, `task.252.bug.[n].…md`, `task.252.gate.[n].…yml`.
 

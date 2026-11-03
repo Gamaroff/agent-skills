@@ -73,7 +73,10 @@
  * (a registry with no usable counter), registry-unwritable (appendPrdRow refused a
  * row: no PRD table header it recognises, a duplicate, a malformed cell) and bad-slug
  * (a legacy slug that no hierarchical name can carry, such as one starting with a
- * digit, or a --name domain that is not a lowercase kebab-case segment). Every one of them is raised by the dry run and by --check, before --apply
+ * digit, or a --name domain that is not a lowercase kebab-case segment) — and
+ * unclassified-document (an epic or story directory, or a loose .md file in a PRD
+ * directory, whose name neither grammar reads and that no allowlist entry excuses: it
+ * is named with its path and the rule it broke instead of being skipped silently). Every one of them is raised by the dry run and by --check, before --apply
  * writes anything.
  */
 import { createRequire } from "node:module";
@@ -105,6 +108,7 @@ export const BLOCKER_CODES = Object.freeze([
   "displaced-frontmatter",
   "needs-domain",
   "stale-reference",
+  "unclassified-document",
 ]);
 
 const TERMINAL_STATUSES = Object.freeze(["accepted", "cancelled"]);
@@ -215,6 +219,91 @@ function classify(base) {
   const l = docId.parseLegacy(base);
   if (l.ok) return { scheme: "legacy", ...l };
   return null;
+}
+
+// Files that sit in a PRD directory and are not documents. Each entry carries the reason it is
+// excused, so a reader can tell a deliberate exemption from a forgotten one (task 252). The list
+// is closed on purpose: a name that is not here and that neither grammar reads is a blocker.
+const NON_DOCUMENT_FILES = Object.freeze([
+  [
+    "README.md",
+    "a directory readme, written for people, not a numbered document",
+  ],
+  ["index.md", "a directory index, not a numbered document"],
+  [
+    "prd-registry.md",
+    "the PRD registry, which owns numbering and is read by name",
+  ],
+]);
+const isNonDocumentFile = (base) =>
+  NON_DOCUMENT_FILES.some(([n]) => n === base);
+// A directory whose name starts with a dot is tooling or editor state, never a document.
+const isNonDocumentDir = (base) => base.startsWith(".");
+
+const allDigits = (s) => s !== "" && [...s].every((c) => c >= "0" && c <= "9");
+
+/**
+ * The spelling that would read, for the two sub-story suffix mistakes a person makes: a lowercase
+ * letter (`3a`) and a dash number (`2-1`). Built from the dotted segments by string operations —
+ * an id regex outside doc-id is refused by the chokepoint test — and returned only when doc-id
+ * reads the result as a `kind`, so a suggestion is never a guess. Null when neither applies.
+ */
+function suggestSpelling(base, kind) {
+  const segs = base.split(".");
+  let changed = false;
+  const out = segs.map((seg) => {
+    const dash = seg.indexOf("-");
+    if (
+      dash > 0 &&
+      allDigits(seg.slice(0, dash)) &&
+      allDigits(seg.slice(dash + 1)) &&
+      Number(seg.slice(dash + 1)) >= 1 &&
+      Number(seg.slice(dash + 1)) <= 26
+    ) {
+      changed = true;
+      return (
+        seg.slice(0, dash) +
+        String.fromCharCode(64 + Number(seg.slice(dash + 1)))
+      );
+    }
+    const last = seg.slice(-1);
+    if (
+      seg.length >= 2 &&
+      last >= "a" &&
+      last <= "z" &&
+      allDigits(seg.slice(0, -1))
+    ) {
+      changed = true;
+      return seg.slice(0, -1) + last.toUpperCase();
+    }
+    return seg;
+  });
+  if (!changed) return null;
+  const candidate = out.join(".");
+  const c = classify(candidate);
+  return c && c.kind === kind && !c.artifact ? candidate : null;
+}
+
+/**
+ * Why `base` is not a `kind` document, in a sentence that says how to fix it. `kind` is `epic`,
+ * `story` or `document` (a loose file in a PRD directory).
+ */
+function unclassifiedReason(base, kind) {
+  const c = classify(base);
+  const want = kind === "document" ? "a document" : `an ${kind}`;
+  if (c) {
+    const what = c.artifact
+      ? `the ${c.artifact} artifact of a ${c.kind}`
+      : `a ${c.kind}`;
+    return `${base} reads as ${what}, but this position holds ${want}`;
+  }
+  const a = docId.parse(base);
+  const l = docId.parseLegacy(base);
+  const tried = `doc-id rejects it under the hierarchical grammar (${a.reason}) and the legacy one (${l.reason})`;
+  const fix = kind === "document" ? null : suggestSpelling(base, kind);
+  return fix
+    ? `${tried}; try "${fix}"`
+    : `${tried}; rename it to a valid ${kind === "document" ? "document" : kind} name or move it out of the PRD tree`;
 }
 
 /** The short id of a legacy document (`story.1.2`, `epic.3`), built from its parts. */
@@ -436,10 +525,22 @@ export function discover(root, io, opts = {}) {
   // Epics and stories -------------------------------------------------------
   const epics = [];
   const stories = [];
+  // Everything a document position holds that no grammar reads (task 252): recorded here, raised
+  // as a blocker by plan(), so a rejected name is named instead of skipped.
+  const unclassified = [];
+  const skip = (p, kind) =>
+    unclassified.push({
+      path: p,
+      kind,
+      reason: unclassifiedReason(P.basename(p), kind),
+    });
   for (const d of dirs) {
     if (P.basename(P.dirname(d)) !== "epics") continue;
     const c = classify(P.basename(d));
-    if (!c || c.kind !== "epic" || c.artifact) continue;
+    if (!c || c.kind !== "epic" || c.artifact) {
+      if (!isNonDocumentDir(P.basename(d))) skip(d, "epic");
+      continue;
+    }
     const epicsDir = P.dirname(d);
     const doc = P.join(d, `${P.basename(d)}.md`);
     const epic = {
@@ -457,7 +558,10 @@ export function discover(root, io, opts = {}) {
     for (const sd of dirs) {
       if (P.dirname(sd) !== P.join(d, "stories")) continue;
       const s = classify(P.basename(sd));
-      if (!s || s.kind !== "story" || s.artifact) continue;
+      if (!s || s.kind !== "story" || s.artifact) {
+        if (!isNonDocumentDir(P.basename(sd))) skip(sd, "story");
+        continue;
+      }
       const sdoc = P.join(sd, `${P.basename(sd)}.md`);
       stories.push({
         dir: sd,
@@ -472,7 +576,20 @@ export function discover(root, io, opts = {}) {
       });
     }
   }
-  return { root, files, dirs, prds, epics, stories, unreadable };
+  // A loose .md file in a PRD directory that neither grammar reads and no allowlist entry excuses.
+  // L3 (a monolith or root index.md) is left alone: its directory holds the shards of a sharded
+  // PRD, and a shard's name is not an id.
+  for (const p of prds) {
+    if (p.shape === "L3") continue;
+    for (const f of files) {
+      if (P.dirname(f) !== p.dir || f === p.doc || !f.endsWith(".md")) continue;
+      const base = P.basename(f);
+      if (classify(base) || isNonDocumentFile(base)) continue;
+      if (!unclassified.some((u) => u.path === f)) skip(f, "document");
+    }
+  }
+  unclassified.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+  return { root, files, dirs, prds, epics, stories, unreadable, unclassified };
 }
 
 // ---------------------------------------------------------------------------
@@ -494,6 +611,16 @@ export function plan(disc, registryText, io, opts = {}) {
   // numbered PRD still feeds the P counter, so a scoped run never reuses a number.
   const scope = opts.scope || null;
   const inScope = (p) => !scope || scope.has(p.doc);
+  // A document no grammar reads is a blocker raised HERE, in planned.blockers, and not in
+  // verify(): run() returns `already` / `post-check-failed` on an empty plan before verify()
+  // is called, so a blocker raised only there never fires on a tree whose one defect is a
+  // bad name (task 252). A scoped run is told only about names under the PRDs it was asked to move.
+  const unclassified = (disc.unclassified || []).filter(
+    (u) =>
+      !scope || disc.prds.some((p) => inScope(p) && isUnder(u.path, p.dir)),
+  );
+  for (const u of unclassified)
+    blockers.push(blocker("unclassified-document", u.path, u.reason));
 
   // PRD numbers: a numbered PRD keeps P; the rest take the counter in path order.
   const numbered = disc.prds.filter((p) => !p.legacy);
@@ -860,6 +987,7 @@ export function plan(disc, registryText, io, opts = {}) {
     mapPath,
     mapping,
     blockers,
+    unclassified,
     registryText,
   };
 }
@@ -2084,6 +2212,12 @@ export function run(argv, ctx = {}) {
       stories: planned.mapping.filter((m) => m.kind === "story").length,
       files: planned.fileMap.size,
     },
+    // The count an author can compare with the tree on disk: documents read, documents named
+    // as blockers instead (task 252).
+    classified:
+      planned.prds.length + planned.epics.length + planned.stories.length,
+    skipped: planned.unclassified.length,
+    unclassified: planned.unclassified,
   };
 
   if (planned.fileMap.size === 0 && !planned.blockers.length) {
@@ -2263,6 +2397,8 @@ function render(p) {
       `${p.reason}: ${p.counts.prds} PRD, ${p.counts.epics} epic(s), ${p.counts.stories} story(ies), ${p.counts.files} file(s) under ${p.root}`,
     );
   }
+  if (p.classified !== undefined)
+    out.push(`${p.classified} documents classified, ${p.skipped} skipped`);
   for (const m of p.mapping || [])
     out.push(
       `  ${m.kind.padEnd(5)} ${m.oldId} → ${m.newId}   ${m.old} → ${m.new}`,

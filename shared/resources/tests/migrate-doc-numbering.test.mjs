@@ -16,10 +16,11 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
@@ -1033,14 +1034,19 @@ test("cycle 2 CR-1/CR-7: the revert touches only the run's own paths, keeps unre
     Array.from({ length: 40 }, (_, i) => `# unchanged line ${i}`).join("\n") +
     "\n";
   const tree = Object.fromEntries(
-    Object.entries(l2Tree({ [`${R}/onb/notes.md`]: "notes\n" })).map(
+    // README.md, not notes.md: a loose .md file the grammar cannot read is a blocker since task.252,
+    // and this test needs a tracked file the run neither moves nor rewrites.
+    Object.entries(l2Tree({ [`${R}/onb/README.md`]: "notes\n" })).map(
       ([k, v]) => [k, v + PAD],
     ),
   );
   const { dir, g } = gitRepo(tree);
   try {
     // Uncommitted work under the root that the run neither moves nor rewrites.
-    writeFileSync(join(dir, R, "onb/notes.md"), "someone's uncommitted edit\n");
+    writeFileSync(
+      join(dir, R, "onb/README.md"),
+      "someone's uncommitted edit\n",
+    );
     const r = m.run(["--apply", "--json", "--root", R], { cwd: dir });
     assert.equal(
       r.reason,
@@ -1055,11 +1061,11 @@ test("cycle 2 CR-1/CR-7: the revert touches only the run's own paths, keeps unre
     execFileSync("bash", ["-c", r.revert], { cwd: join(dir, "docs") });
     assert.equal(
       g("status", "--porcelain").trim(),
-      `M ${R}/onb/notes.md`,
+      `M ${R}/onb/README.md`,
       "only the unrelated edit is left",
     );
     assert.equal(
-      readFileSync(join(dir, R, "onb/notes.md"), "utf8"),
+      readFileSync(join(dir, R, "onb/README.md"), "utf8"),
       "someone's uncommitted edit\n",
     );
   } finally {
@@ -2124,4 +2130,192 @@ test("--prd A in a real git repository: ok, B's tree untouched on disk, and the 
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// ---------------------------------------------------------------------------
+// task.252 — a document the id grammar rejects is a named blocker, never a silent skip
+// ---------------------------------------------------------------------------
+
+/** `calls.readDir.length` for the clean l2Tree, measured on the engine before task.252. */
+const READDIR_BASELINE_252 = 6;
+
+/** A short, accepted document: nothing in it blocks a move. `fm` adds frontmatter lines. */
+const DOC252 = (title, ...fm) =>
+  `---\nstatus: accepted\n${fm.map((l) => `${l}\n`).join("")}---\n# ${title}\n`;
+const BAD_DOT = `${R}/onb/epics/epic.2.discovery-2.0-thing`;
+const STORIES1 = `${E1}/stories`;
+const BAD_DASH = `${STORIES1}/story.1.2-1.dash`;
+const BAD_LOWER = `${STORIES1}/story.1.3a.lower`;
+const BAD_CONTROL = `${STORIES1}/story.1.4Ab.control`; // a defect the incident never names
+const GOOD_CONTROL = `${STORIES1}/story.1.5A.fine`; // valid: must not be flagged
+const BAD_STRAY = `${R}/onb/feature-exploration-2026-07-11.md`;
+const BAD252 = [BAD_DOT, BAD_DASH, BAD_LOWER, BAD_CONTROL, BAD_STRAY];
+
+/** l2Tree plus the incident's bad names and the two controls. */
+function badNameTree() {
+  const stem = (d) => d.slice(d.lastIndexOf("/") + 1);
+  return l2Tree({
+    [`${BAD_DOT}/${stem(BAD_DOT)}.md`]: DOC252(
+      "dot in the slug",
+      "epic_number: 2",
+    ),
+    [`${BAD_DASH}/${stem(BAD_DASH)}.md`]: DOC252("dash suffix", "epic: 1"),
+    [`${BAD_LOWER}/${stem(BAD_LOWER)}.md`]: DOC252(
+      "lowercase suffix",
+      "epic: 1",
+    ),
+    [`${BAD_CONTROL}/${stem(BAD_CONTROL)}.md`]: DOC252(
+      "two-letter suffix",
+      "epic: 1",
+    ),
+    [`${GOOD_CONTROL}/${stem(GOOD_CONTROL)}.md`]: DOC252(
+      "valid suffix",
+      "epic: 1",
+    ),
+    [BAD_STRAY]: "# stray\n",
+  });
+}
+
+const unclassifiedPaths = (blockers) =>
+  blockers
+    .filter((b) => b.code === "unclassified-document")
+    .map((b) => b.path)
+    .sort();
+
+test("task.252: discovery records every rejected name, each with a reason, and leaves the valid control alone", () => {
+  const disc = m.discover(R, memIo(badNameTree()), { names: new Map() });
+  assert.deepEqual(
+    disc.unclassified.map((u) => u.path).sort(),
+    [...BAD252].sort(),
+  );
+  for (const u of disc.unclassified) assert.ok(u.reason.length > 10, u.path);
+  assert.ok(!disc.unclassified.some((u) => u.path === GOOD_CONTROL));
+  const byPath = Object.fromEntries(
+    disc.unclassified.map((u) => [u.path, u.reason]),
+  );
+  // The two suffix cases name the spelling that would read; the control's defect names none.
+  assert.match(byPath[BAD_LOWER], /story\.1\.3A\.lower/);
+  assert.match(byPath[BAD_DASH], /story\.1\.2A\.dash/);
+  assert.doesNotMatch(byPath[BAD_CONTROL], /try "/);
+});
+
+test("task.252: a clean tree records nothing, skips 0, and walks each directory once", () => {
+  const io = memIo(l2Tree());
+  const disc = m.discover(R, io, { names: new Map() });
+  assert.deepEqual(disc.unclassified, []);
+  const r = m.run(["--root", R], { io: memIo(l2Tree()) });
+  assert.equal(r.skipped, 0);
+  assert.deepEqual(r.unclassified, []);
+  assert.equal(r.classified, 3, "one PRD, one epic, one story");
+  // The walk is not repeated: one readDir per directory, a count measured before this task.
+  assert.equal(new Set(io.calls.readDir).size, io.calls.readDir.length);
+  assert.equal(io.calls.readDir.length, READDIR_BASELINE_252);
+});
+
+test("task.252: dry run, --check and --apply each name all five, and --apply writes nothing", () => {
+  const { dir, g } = gitRepo(badNameTree());
+  try {
+    const dry = m.run(["--json", "--root", R], { cwd: dir });
+    assert.deepEqual([dry.reason, dry.exitCode], ["blocked", 1]);
+    assert.deepEqual(unclassifiedPaths(dry.blockers), [...BAD252].sort());
+    assert.equal(dry.skipped, 5);
+    assert.equal(
+      dry.classified,
+      dry.counts.prds + dry.counts.epics + dry.counts.stories,
+    );
+    const check = m.run(["--check", "--json", "--root", R], { cwd: dir });
+    assert.deepEqual([check.reason, check.exitCode], ["needs-migration", 1]);
+    assert.deepEqual(unclassifiedPaths(check.blockers), [...BAD252].sort());
+    const apply = m.run(["--apply", "--json", "--root", R], { cwd: dir });
+    assert.deepEqual([apply.reason, apply.exitCode], ["blocked", 1]);
+    assert.deepEqual(unclassifiedPaths(apply.blockers), [...BAD252].sort());
+    assert.equal(
+      g("status", "--porcelain").trim(),
+      "",
+      "--apply wrote nothing",
+    );
+    assert.ok(
+      existsSync(join(dir, `${R}/onb/prd.onb.md`)),
+      "the PRD did not move",
+    );
+    // The text form names them too, so a human reading the dry run sees each path.
+    const cli = spawnSync(process.execPath, [ENGINE, "--root", R], {
+      cwd: dir,
+      encoding: "utf8",
+    });
+    assert.equal(cli.status, 1, cli.stderr);
+    for (const p of BAD252)
+      assert.ok(cli.stdout.includes(p), `text output names ${p}`);
+    assert.match(cli.stdout, /\d+ documents classified, 5 skipped/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("task.252: with the five names fixed the same repo migrates, and a second run answers already", () => {
+  const { dir, g } = gitRepo(badNameTree());
+  try {
+    const mv = (from, to) => {
+      renameSync(join(dir, from), join(dir, to));
+    };
+    const fix = (badDir, goodName) => {
+      const badStem = badDir.slice(badDir.lastIndexOf("/") + 1);
+      const parent = badDir.slice(0, badDir.lastIndexOf("/"));
+      mv(`${badDir}/${badStem}.md`, `${badDir}/${goodName}.md`);
+      mv(badDir, `${parent}/${goodName}`);
+    };
+    fix(BAD_DOT, "epic.2.discovery-2-0-thing");
+    fix(BAD_DASH, "story.1.2A.dash");
+    fix(BAD_LOWER, "story.1.3A.lower");
+    fix(BAD_CONTROL, "story.1.4B.control");
+    rmSync(join(dir, BAD_STRAY));
+    g("add", "-A");
+    g("commit", "-qm", "fix names", "--no-verify");
+    const pre = m.run(["--check", "--json", "--root", R], { cwd: dir });
+    assert.deepEqual(unclassifiedPaths(pre.blockers || []), []);
+    const apply = m.run(["--apply", "--json", "--root", R], { cwd: dir });
+    assert.deepEqual(
+      [apply.reason, apply.exitCode],
+      ["ok", 0],
+      JSON.stringify(apply.findings || apply.blockers),
+    );
+    g("add", "-A");
+    g("commit", "-qm", "migrated", "--no-verify");
+    const again = m.run(["--check", "--json", "--root", R], { cwd: dir });
+    assert.deepEqual([again.reason, again.skipped], ["already", 0]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("task.252: a fully migrated tree with one bad name is blocked, never already", () => {
+  // The branch that matters most: nothing left to move, so the early `already` return is the
+  // route a blocker raised only in verify() would never reach.
+  const io = memIo(l2Tree());
+  assert.equal(m.run(["--apply", "--root", R], { io }).reason, "ok");
+  assert.equal(m.run(["--check", "--root", R], { io }).reason, "already");
+  const bad = `${NEW_E1}/stories/story.1.3a.lower`;
+  io.files.set(`${bad}/story.1.3a.lower.md`, DOC252("lowercase suffix"));
+  const check = m.run(["--check", "--root", R], { io });
+  assert.notEqual(check.reason, "already");
+  assert.equal(check.exitCode, 1);
+  assert.deepEqual(unclassifiedPaths(check.blockers), [bad]);
+  const dry = m.run(["--root", R], { io });
+  assert.deepEqual([dry.reason, dry.exitCode], ["blocked", 1]);
+  assert.deepEqual(unclassifiedPaths(dry.blockers), [bad]);
+});
+
+test("task.252: allowlisted names and dot-directories are not documents and block nothing", () => {
+  const files = l2Tree({
+    [`${R}/onb/README.md`]: "# readme\n",
+    [`${E1}/.tooling/notes.md`]: "notes\n",
+    [`${STORIES1}/.cache/x.md`]: "x\n",
+    [`${R}/onb/diagram.png`]: "not markdown\n",
+  });
+  const disc = m.discover(R, memIo(files), { names: new Map() });
+  assert.deepEqual(disc.unclassified, []);
+});
+
+test("task.252: the blocker code is in the closed list", () => {
+  assert.ok(m.BLOCKER_CODES.includes("unclassified-document"));
 });

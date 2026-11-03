@@ -464,6 +464,14 @@ the `reason` alone:
   number. **`displaced-frontmatter`** — a BOM or blank lines come before a `---` block of YAML keys,
   so no reader sees the block. Report either as Critical; the fix is by hand (close the block, or
   delete what precedes it), then plan again.
+- **`unclassified-document`** — an epic or story directory, or a loose `.md` file in a PRD directory,
+  whose name neither the hierarchical nor the legacy grammar reads (a dot in a slug, a lowercase or
+  `-N` sub-story suffix, a stray note). The tool used to skip it silently and then carry it half-way
+  into the renamed tree. The detail gives the path, the rule it broke and, for a lowercase or dash
+  suffix, the spelling that would read. Report each as Critical; the fix is by hand (rename it, or move
+  it out of the PRD tree), then plan again. README.md, index.md, `prd-registry.md` and dot-directories
+  are not documents and are never named. The text output also prints `N documents classified, M skipped`;
+  `M` must be 0 before `--apply`.
 - **`stale-reference`** — a file names a moved outside PRD (such as `docs/prd.md`) by a path neither pass rewrites:
   a relative path outside a link, such as `"../docs/prd.md"` in a script, or any path in a file type the
   passes do not rewrite, such as `package.json` or a `.sh` (under `${PRD_ROOT}` too), including a path
