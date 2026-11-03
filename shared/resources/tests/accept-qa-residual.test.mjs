@@ -36,6 +36,7 @@ import {
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { spawnSync } from "node:child_process";
+import { spawnBudget } from "../spawn-budget.mjs";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 
@@ -801,3 +802,70 @@ for (const [name, entry] of [
     }
   });
 }
+
+// ─── 7. advisories closed after task.251 ────────────────────────────────────
+
+test("a re-run that finds the gate already WAIVED says so in the audit line, not 'none newly waived'", () => {
+  const fx = fixture(GATE_250, REPORT("Escalating — loop limit reached"));
+  try {
+    const plan = planGateEdit(GATE_250, {
+      ...OPTS,
+      timestamp: "2026-11-03T06:00:00Z",
+      date: "2026-11-03",
+    });
+    writeFileSync(fx.gate, plan.content);
+    assert.equal(run(fx).reason, "accepted");
+    const rep = read(fx.report);
+    assert.match(rep, /the gate was already WAIVED by an earlier run/);
+    assert.doesNotMatch(rep, /none newly waived/);
+  } finally {
+    rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+test("a hung qa-cycle.sh is cut off by the timeout and the writer refuses with nothing written", () => {
+  const fx = fixture(GATE_250, REPORT("Escalating — loop limit reached"));
+  const bin = mkdtempSync(join(tmpdir(), "t251-bin-"));
+  try {
+    // A copy of the engine beside a qa-cycle.sh that never returns.
+    const src = join(__dirname, "..");
+    for (const f of [
+      "accept-qa-residual.js",
+      "qa-diminishing-returns.js",
+      "glob-match.js",
+    ])
+      writeFileSync(join(bin, f), read(join(src, f)));
+    writeFileSync(join(bin, "qa-cycle.sh"), "#!/bin/bash\nsleep 30\n");
+    const gate = read(fx.gate);
+    const rep = read(fx.report);
+    const r = spawnSync(
+      process.execPath,
+      [
+        join(bin, "accept-qa-residual.js"),
+        "--doc-dir",
+        fx.doc,
+        "--report",
+        fx.report,
+        "--approved-by",
+        "Test Owner",
+        "--reason",
+        "timeout probe",
+        "--json",
+      ],
+      {
+        encoding: "utf8",
+        env: { ...process.env, ACCEPT_QA_CYCLE_TIMEOUT_MS: "400" },
+        // If the engine's own timeout did not fire, this outer one kills the run and stdout is
+        // empty, so the match below fails — no wall-clock assertion is needed.
+        timeout: spawnBudget("ACCEPT_RESIDUAL").timeoutMs,
+      },
+    );
+    assert.notEqual(r.status, 0);
+    assert.match(r.stdout, /engine-unavailable/);
+    assert.equal(read(fx.gate), gate);
+    assert.equal(read(fx.report), rep);
+  } finally {
+    rmSync(fx.root, { recursive: true, force: true });
+    rmSync(bin, { recursive: true, force: true });
+  }
+});
