@@ -3,7 +3,7 @@
 **Task**: `task.250.security-probe-scratch-out-of-tree.md`
 **Run Number**: 1
 **Started**: 2026-11-02 18:06
-**Status**: Escalated
+**Status**: In Progress (resumed 2026-11-03 after the loop-limit escalation; residual accepted by the user)
 
 ---
 
@@ -159,6 +159,12 @@ Move every scratch directory `security-probe.test.mjs` creates inside the reposi
 - QA cycle 5: re-review scoped to changes since gate 4's head `ad5bd436`. One Explore reviewer, 4.2 min; 3 anchors `ok`. Gate 5 CONCERNS (90/100): TASK-250-CR5-1 (medium/high) and TASK-250-CR5-2 (low/high) promoted, both reproduced; CR5-3 advisory. CI on `51ca2fdb` read `pending`; the earlier heads `951f9cbe` and `ad5bd436` have all six workflows `success`. PR comment and #812 `qa-gate-5` posted.
 - Cycle 5 routing: HIGH `0, 0, 0, 0, 0` → Convergence check does not trip. Route classifier → `continue` (`not-a-pass-gate`). **Budget test: N = 5 = QA_MAX_CYCLES → Loop Escalation, Loop limit trigger**, with gate 5's findings open. Escalation entry in the Issues Log; gate 5 and QA report 5 committed with this report.
 
+### Escalation resolved — 2026-11-03
+
+- **Decision (the user's, not autonomous)**: accept the residual, option (a) of the escalation. TASK-250-CR5-1 and TASK-250-CR5-2 stay open as known limits of the heuristic guard; neither shape is in the file today, and the runtime half (`fenceRoot` refusal, watched run) is unaffected. Closing the class (a parser-backed scan with `acorn`) is follow-up work, not this task.
+- Known limits recorded in `t250CodeOnly`'s doc comment; the tripwire comment reworded to state what was measured (CR5-3). Comment-only, suite 277/277; committed as `6092c804`. No mutation proof: no behaviour changed.
+- Next: Step 5c `/review-pr --effort medium --comment --no-code`, then Step 7 `/finalise`.
+
 ---
 
 ## Issues Log
@@ -238,9 +244,9 @@ _Track each QA review/fix cycle._
 **Issues Found**: 2. TASK-250-CR5-1 (medium): a nested template literal re-splits a write call's argument list without failing the guard; reproduced. TASK-250-CR5-2 (low): the regex tripwire ignores a phantom regex that holds a quote; reproduced. Advisory: CR5-3 (a regex with a class or group inside a write call's arguments fails the guard). All cycle-4 fixes were verified.
 **HIGH findings**: 0
 **MEDIUM findings**: 1
-**PR Review**: not reached — gate did not exit the loop
-**Loop exit**: n/a — this exit not taken
-**Action**: Escalating — loop limit reached
+**PR Review**: pending (Step 5c)
+**Loop exit**: loop limit escalated 2026-11-02; residual (CR5-1, CR5-2) accepted by the user 2026-11-03
+**Action**: Escalating — loop limit reached → residual accepted by the user; Proceeding to 5c
 
 ---
 
