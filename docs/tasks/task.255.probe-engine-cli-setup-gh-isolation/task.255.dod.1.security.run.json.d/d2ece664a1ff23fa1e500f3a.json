@@ -1,0 +1,25 @@
+{
+  "sink": "filename",
+  "entry": "cli:shared/resources/tests/fixtures/security-probe/cli-path-clean.mjs",
+  "name": "cli setup gh isolation - PATH-stripping setup",
+  "call_site": null,
+  "verdict": "unverifiable",
+  "reason": "no-hostile-evidence",
+  "executed": 1,
+  "passed": 1,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": [
+    "{input}"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": "/home/gamaroff/Development/agent-skills/shared/resources/tests/fixtures/security-probe/setup-gh-unshadowed.sh",
+  "ran_at": "2026-11-03T17:38:55.864Z"
+}

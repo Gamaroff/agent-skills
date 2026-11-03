@@ -555,8 +555,14 @@ takes it.
   committed script run as `bash <setup> <case-dir>` after the case's files and
   before the CLI, contained, watched and failing exactly as the `shell-argv:`
   form's setup does (one helper, `runCaseSetup`). On `cli:` a setup that names
-  `gh` is declined `bad-fixture-setup`, since this form has no `--fake-gh`. A
-  directory too large to inline is the one thing still not reachable on `cli:`.
+  `gh` is declined `bad-fixture-setup`, since this form has no `--fake-gh`. That
+  text check is the fast path; the guarantee is at run time (task.255): the
+  setup, and only the setup, runs under the same trip-wire `gh` first on `PATH`
+  and the same `PATH` filtering (`ghFreePath`) as the shell forms, so a spelling the scan
+  misses (`a=g; b=h; "$a$b"`) is declined `needs-fake-gh`, naming the setup, with
+  nothing scored. The CLI entry's own `PATH` is unchanged. The trip-wire's stated
+  limits carry over unchanged: an absolute path to a real `gh`, a `PATH` the
+  script itself prepends, and a call backgrounded past the spawn. A directory too large to inline is the one thing still not reachable on `cli:`.
 
   **`shell-argv:path --argv '<JSON array>'` runs a bash script that takes
   several arguments or flags** (task.181) — `verify-push-state.sh --base …

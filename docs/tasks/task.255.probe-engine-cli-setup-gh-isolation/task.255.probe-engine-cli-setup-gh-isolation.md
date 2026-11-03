@@ -5,17 +5,19 @@ type: task
 description: "Run the cli: --fixture-setup under the same trip-wire gh and gh-free PATH the shell arm uses, so a setup that reaches gh by an indirect spelling the textual scan misses is caught at run time instead of running the host binary."
 tags: [security-probe, observation, qa-advisory]
 category: infrastructure
-status: planned
+status: accepted
 priority: Medium
 created: 2026-11-03
 updated: 2026-11-03
+completed_date: 2026-11-03
 estimated_effort_hours: 8
 github_issue: 820
+pr_number: 821
 ---
 
 # Technical Task: security-probe: a cli: fixture setup cannot reach the host gh
 
-**Status:** Planned
+**Status:** Accepted
 
 **GitHub Issue**: [#820](https://github.com/Gamaroff/agent-skills/issues/820)
 
@@ -70,6 +72,8 @@ Names found with `grep -n` on `shared/resources/security-probe.mjs`:
 - `runCliCase` builds a **setup-only** env: the case env, with `env.PATH = ghFreePath(...)` then the trip-wire first. The CLI entry's own env is unchanged.
 - The `ghTripped` check includes the `cli:` form when a setup ran, and the decline reuses the `needs-fake-gh` reason with wording that names the setup.
 - `runCaseSetup` stays the one helper; the PATH policy is passed in through `env`, not duplicated inside it.
+- `runCliCase` (`:2868`) does not receive `harnessDir` today; the call at `:2047` must pass it. The setup env is a **copy** of the case env (`{ ...env, PATH }`), because `env` is also handed to the entry spawn and must stay unchanged.
+- The trip-wire exits 127, so a setup that hits it fails and the case is recorded `errored` (as at `:3378` in the shell-argv arm). `ghTripped` is read once after the case loop (`:2150`), so the decline still wins over the `errored` record. A test pins this order.
 
 ### Clarifications
 
@@ -111,18 +115,18 @@ None. A `cli:` setup that never reaches `gh` runs exactly as before. A setup tha
 
 Files: none modified; scratch fixtures.
 
-- [ ] Write a setup whose `gh` call the textual scan misses (a variable-built name) and run it through the `cli:` form; confirm the host `gh` is reached (observe with a marker `gh` placed on the host PATH, not the real one)
-- [ ] Confirm `namesGh` returns false for the chosen spelling
-- [ ] Confirm a `git`-using setup still runs under `ghFreePath` in the shell arm
+- [x] Write a setup whose `gh` call the textual scan misses (a variable-built name) and run it through the `cli:` form; confirm the host `gh` is reached (observe with a marker `gh` placed on the host PATH, not the real one)
+- [x] Confirm `namesGh` returns false for the chosen spelling
+- [x] Confirm a `git`-using setup still runs under `ghFreePath` in the shell arm
 
 ### Phase 2: Give the cli: setup the trip-wire and gh-free PATH (Risk: Medium)
 
 Files: `shared/resources/security-probe.mjs`
 
-- [ ] Create `harnessDir/bin/gh` for the `cli:` form when a setup is present
-- [ ] Build the setup-only env with `ghFreePath` and the trip-wire first; leave the entry's env alone
-- [ ] Include the `cli:` form in the `ghTripped` check and the `needs-fake-gh` decline
-- [ ] Keep `runCaseSetup` the single helper
+- [x] Create `harnessDir/bin/gh` for the `cli:` form when a setup is present
+- [x] Build the setup-only env with `ghFreePath` and the trip-wire first; leave the entry's env alone
+- [x] Include the `cli:` form in the `ghTripped` check and the `needs-fake-gh` decline
+- [x] Keep `runCaseSetup` the single helper
 
 Depends on Phase 1.
 
@@ -130,18 +134,19 @@ Depends on Phase 1.
 
 Files: `shared/resources/tests/security-probe.test.mjs`
 
-- [ ] A test: an obfuscated `gh` call in a `cli:` setup declines `needs-fake-gh`, and the host marker `gh` is never run
-- [ ] A test: a `git`-using setup still runs
-- [ ] A test: the `cli:` entry's PATH is unchanged
-- [ ] Mutation per guard: drop the trip-wire, drop `ghFreePath`, drop the `ghTripped` check; each turns a test red
+- [x] A test: an obfuscated `gh` call in a `cli:` setup declines `needs-fake-gh`, and the host marker `gh` is never run
+- [x] A test: a `git`-using setup still runs
+- [x] A test: the `cli:` entry's PATH is unchanged
+- [x] A test: a setup that hits the trip-wire (exit 127, case `errored`) still yields the `needs-fake-gh` decline, not an errored run
+- [x] Mutation per guard: drop the trip-wire, drop `ghFreePath`, drop the `ghTripped` check; each turns a test red
 
 ### Phase 4: Documentation, bundles and proof (Risk: Low)
 
 Files: `shared/resources/probe-boundary-rule.md`, `CHANGELOG.md`, bundled copies
 
-- [ ] State that the `cli:` setup is now guarded at run time, with the inherited limits
-- [ ] `npm run bundle`; `npm run bundle:check`
-- [ ] CHANGELOG entry citing task 255
+- [x] State that the `cli:` setup is now guarded at run time, with the inherited limits
+- [x] `npm run bundle`; `npm run bundle:check`
+- [x] CHANGELOG entry citing task 255
 
 ---
 
@@ -194,27 +199,27 @@ The obfuscated spelling the test uses is **not** the one quoted in this task or 
 
 ### Functional
 
-- [ ] A `cli:` setup that reaches `gh` by a PATH-resolved spelling `namesGh` misses declines `needs-fake-gh`; the host marker `gh` is never executed
-- [ ] A `cli:` setup that uses only `git` still runs and the case is scored
-- [ ] The `cli:` entry's PATH is unchanged
-- [ ] `runCaseSetup` is still called by both arms, held by the existing structural test
+- [x] A `cli:` setup that reaches `gh` by a PATH-resolved spelling `namesGh` misses declines `needs-fake-gh`; the host marker `gh` is never executed
+- [x] A `cli:` setup that uses only `git` still runs and the case is scored
+- [x] The `cli:` entry's PATH is unchanged
+- [x] `runCaseSetup` is still called by both arms, held by the existing structural test
 
 ### Performance
 
-- [ ] A `cli:` run with no `--fixture-setup` writes no `bin/gh` and spawns no extra process (the task.254 spawn-count test stays green)
-- [ ] `ghFreePath` is called once per case at most (test or QA report records the count)
+- [x] A `cli:` run with no `--fixture-setup` writes no `bin/gh` and spawns no extra process (the task.254 spawn-count test stays green)
+- [x] `ghFreePath` is called once per case at most (one call in `runCliCase`, before the setup spawn; the QA report's Findings table records it)
 
 ### Code Quality
 
-- [ ] `command node --test shared/resources/tests/security-probe.test.mjs` passes
-- [ ] `npm test` passes
-- [ ] Each of the three guard mutations turns a test red, recorded in the QA report
+- [x] `command node --test shared/resources/tests/security-probe.test.mjs` passes
+- [x] `npm test` passes
+- [x] Each of the three guard mutations turns a test red, recorded in the QA report's mutation table
 
 ### Migration
 
-- [ ] `CHANGELOG.md` records the change and cites task 255
-- [ ] `probe-boundary-rule.md` states the run-time guard and its inherited limits
-- [ ] `npm run bundle:check` reports 0 problems
+- [x] `CHANGELOG.md` records the change and cites task 255
+- [x] `probe-boundary-rule.md` states the run-time guard and its inherited limits
+- [x] `npm run bundle:check` reports 0 problems
 
 ---
 
@@ -258,13 +263,62 @@ None.
 
 ---
 
-## Change Log
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-03
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.255.qa.1.probe-engine-cli-setup-gh-isolation.md](./task.255.qa.1.probe-engine-cli-setup-gh-isolation.md)
+- **Gate File**: [task.255.gate.1.probe-engine-cli-setup-gh-isolation.yml](./task.255.gate.1.probe-engine-cli-setup-gh-isolation.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 290
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues. Two low-severity advisory cleanups (CR-1, CR-2).
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report**: `task.255.qa.1.probe-engine-cli-setup-gh-isolation.md`
+**Gate File**: `task.255.gate.1.probe-engine-cli-setup-gh-isolation.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** all 12 met (`npm test` graded from CI reading 1, SUCCESS on `ff0eefe99`)
+✅ **Tests:** 290 pass in `security-probe.test.mjs`; the five task.255 tests start at line 8872
+✅ **Mutation proof:** three guard mutations each turn a test red (QA report mutation table)
+✅ **PR Review (5c):** CONCERNS, 0 open coverage findings; PC-1 cleared by this acceptance, PC-2 fixed
+✅ **Documentation:** CHANGELOG entry citing task 255; `probe-boundary-rule.md` states the guard and its limits; bundled copies match
+✅ **Security Review:** boundary held (1 executed, 0 reproduced, 0 escapes). The plan carried legitimate-direction cases only, so the engine verdict per control is `unverifiable`; the hostile-direction evidence is the mutation-proven behavioural tests
+⚠️ **Compliance:** not applicable (internal developer tooling)
+
+**Advisory, not fixed here:** CR-1 (share the setup-PATH build with `caseShellEnv`) and CR-2 (re-wrap one doc paragraph), recorded in the gate's `recommendations.future`.
+
+**Task marked as ACCEPTED on:** 2026-11-03
+
+**Detailed Verification Log:** See `task.255.dod.1.probe-engine-cli-setup-gh-isolation.md` for complete verification evidence and timestamps.
 
 <!-- change-log-start -->
+## Change Log
 
-| Date       | Version | Description                                                            | Author      |
-| ---------- | ------- | ---------------------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-03 | 1.0     | Initial draft — task.254 QA advisory CR-1; design: reuse the trip-wire | create-task |
+| 2026-11-03 | 1.1     | Review passed (9/10) — runCliCase harnessDir, env copy, errored-vs-decline order, record locations | review-task |
+| 2026-11-03 |         | Status → ready-for-development                                          | review-task |
+| 2026-11-03 |         | QA gate PASS (100/100) — 2 advisory findings                            | qa-task     |
+| 2026-11-03 | 1.2 | DoD passed — accepted (PR #821) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -272,22 +326,22 @@ None.
 ## Progress Tracking
 
 ### Phase 1: Reproduce the gap
-- [ ] Obfuscated spelling reaches the host marker `gh`
-- [ ] `namesGh` misses it
-- [ ] `git` setup runs under `ghFreePath`
+- [x] Obfuscated spelling reaches the host marker `gh`
+- [x] `namesGh` misses it
+- [x] `git` setup runs under `ghFreePath`
 
 ### Phase 2: Guard the cli: setup
-- [ ] Trip-wire created
-- [ ] Setup-only env
-- [ ] `ghTripped` includes `cli:`
+- [x] Trip-wire created
+- [x] Setup-only env
+- [x] `ghTripped` includes `cli:`
 
 ### Phase 3: Tests and mutations
-- [ ] Tests
-- [ ] Three mutations red
+- [x] Tests
+- [x] Three mutations red
 
 ### Phase 4: Documentation, bundles and proof
-- [ ] Docs and CHANGELOG
-- [ ] Bundle and `bundle:check`
+- [x] Docs and CHANGELOG
+- [x] Bundle and `bundle:check`
 
 ---
 

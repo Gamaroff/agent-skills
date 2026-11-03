@@ -1986,7 +1986,10 @@ export function runProbeSpec({
   // The harness's own files — source-completed markers and the trip-wire gh —
   // live under the WORK dir, which the escape sentinel deliberately skips.
   const harnessDir = join(workDir, ".probe-harness");
-  if (isShellForm || isFenceForm || isShellArgvForm) {
+  // The cli: form gets the same run-time guard for its --fixture-setup only
+  // (task.255): the trip-wire is what catches a `gh` spelling namesGh missed.
+  const cliSetupGuarded = isCliForm && setupPath !== null;
+  if (isShellForm || isFenceForm || isShellArgvForm || cliSetupGuarded) {
     mkdirSync(join(harnessDir, "bin"), { recursive: true });
     if (fakeGhDir === null) {
       writeFileSync(
@@ -2050,6 +2053,7 @@ export function runProbeSpec({
           runtime: cliRuntime,
           template,
           setupPath,
+          harnessDir,
           sandboxRoot,
           sandboxHome,
           sandboxTmp,
@@ -2148,7 +2152,7 @@ export function runProbeSpec({
       });
     }
     ghTripped =
-      (isShellForm || isFenceForm || isShellArgvForm) &&
+      (isShellForm || isFenceForm || isShellArgvForm || cliSetupGuarded) &&
       existsSync(join(harnessDir, GH_TRIPPED));
   } finally {
     removeSandbox(sandboxRoot);
@@ -2171,7 +2175,9 @@ export function runProbeSpec({
     return {
       ...decline(
         "needs-fake-gh",
-        `${resolved.entryPath} invoked \`gh\` at run time with no --fake-gh — the trip-wire on PATH answered, so nothing was scored; pass --fake-gh <dir>`,
+        cliSetupGuarded
+          ? `the --fixture-setup ${setupPath} invoked \`gh\` at run time — the trip-wire on PATH answered, so nothing was scored; the cli: form has no --fake-gh, so use the shell-argv: form with --fake-gh <dir>`
+          : `${resolved.entryPath} invoked \`gh\` at run time with no --fake-gh — the trip-wire on PATH answered, so nothing was scored; pass --fake-gh <dir>`,
       ),
       cases: caseResults,
       escapes,
@@ -2873,6 +2879,7 @@ function runCliCase(
     runtime = "node",
     template,
     setupPath = null,
+    harnessDir,
     sandboxRoot,
     sandboxHome,
     sandboxTmp,
@@ -2957,12 +2964,23 @@ function runCliCase(
   // that reads committed or staged repository state gets a repository. A
   // failure is an errored run, never a rejected one.
   if (setupPath !== null) {
+    // Setup-only env (task.255): the shell arm's isolation, so a `gh` spelling
+    // the textual scan missed reaches the trip-wire, not the host binary. A
+    // COPY — `env` also goes to the CLI spawn below, whose PATH stays the host's.
+    const setupEnv = {
+      ...env,
+      PATH: `${join(harnessDir, "bin")}:${ghFreePath(
+        env.PATH,
+        join(harnessDir, "path"),
+        fixtureDir,
+      )}`,
+    };
     const setup = runCaseSetup({
       setupPath,
       fixtureDir,
-      env,
+      env: setupEnv,
       timeoutMs,
-      watch: { sandboxRoot, workDir, workDirName, escapeId: c.id },
+      watch: { sandboxRoot, workDir, workDirName, harnessDir, escapeId: c.id },
     });
     if (!setup.ok) {
       decline(setup.detail);
@@ -3155,8 +3173,9 @@ function caseWatchedSpawn(
   },
 ) {
   const caseName = basename(cwd);
-  // The cli: arm has no harness (no trip-wire `gh`), so nothing is the harness's
-  // own write there (task.254); the shell forms always pass one.
+  // The cli: entry spawn passes no harness; only its --fixture-setup does
+  // (task.255), so the trip-wire marker is the harness's own write there. The
+  // shell forms always pass one.
   const ownWrite =
     harnessDir === undefined ? null : `${basename(harnessDir)}/${GH_TRIPPED}`;
   const workBefore = workDirStamps(workDir, caseName);

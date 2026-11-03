@@ -8837,3 +8837,105 @@ test("cli entry: a run with no --fixture-setup spawns no bash for a setup; with 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ── task.255: a cli: fixture setup cannot reach the host gh ──────────────────
+//
+// The only earlier guard was the textual scan (namesGh). A setup that builds the
+// command name from parts has no `gh` token for it to find, and ran the host
+// binary. The cli: setup now runs under the shell arm's trip-wire `gh` and
+// gh-free PATH. A stand-in `gh` in a scratch directory, first on the harness's
+// PATH, plays the host binary: the real one is never called, and the marker file
+// it writes is the proof it was reached.
+
+/** Run `fn` with a marker `gh` first on PATH; return the marker's path. */
+function withHostMarkerGh(fn) {
+  const dir = mkdtempSync(join(tmpdir(), "probe-host-gh-"));
+  const marker = join(dir, "host-gh-ran");
+  writeFileSync(join(dir, "gh"), `#!/bin/sh\n: > "${marker}"\nexit 0\n`);
+  chmodSync(join(dir, "gh"), 0o755);
+  const hostPath = process.env.PATH;
+  process.env.PATH = `${dir}:${hostPath}`;
+  try {
+    fn(marker);
+  } finally {
+    process.env.PATH = hostPath;
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+const GH_SETUPS = {
+  "split name": `${FIXTURES}/setup-gh-split.sh`,
+  "command substitution (control)": `${FIXTURES}/setup-gh-printf.sh`,
+};
+
+for (const [label, setup] of Object.entries(GH_SETUPS)) {
+  test(`cli entry: a setup that reaches gh by a spelling namesGh misses (${label}) declines needs-fake-gh, and the host gh never runs (task.255)`, () => {
+    assert.equal(
+      namesGh(join(REPO_ROOT, setup), realpathSync(REPO_ROOT)),
+      false,
+      "the premise: the textual scan cannot see this spelling",
+    );
+    withHostMarkerGh((marker) => {
+      const r = runProbeSpec({
+        sink: "url-authority",
+        entry: NEEDS_REPO[0][1],
+        cases: repoCases(),
+        argv: REPO_ARGV,
+        fixtureSetup: setup,
+      });
+      assert.equal(r.reason, "needs-fake-gh", JSON.stringify(r.declined));
+      assert.match(r.declined[0].detail, /--fixture-setup/);
+      assert.match(r.declined[0].detail, /shell-argv:/);
+      assert.equal(existsSync(marker), false, "the host gh ran");
+    });
+  });
+}
+
+test("cli entry: a git-only setup still runs and the case is scored under the gh-free PATH (task.255)", () => {
+  withHostMarkerGh((marker) => {
+    const r = runProbeSpec({
+      sink: "url-authority",
+      entry: NEEDS_REPO[0][1],
+      cases: repoCases(),
+      argv: REPO_ARGV,
+      fixtureSetup: REPO_SETUP,
+    });
+    assert.deepEqual(r.declined, [], JSON.stringify(r.cases));
+    assert.equal(r.executed, 2, JSON.stringify(r.cases));
+    assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+    assert.equal(existsSync(marker), false, "the host gh ran");
+  });
+});
+
+test("cli entry: the entry's own PATH is not the setup's — it carries no harness directory (task.255)", () => {
+  // cli-path-clean.mjs exits 1 when its PATH names the harness directory, so an
+  // accepted legitimate case is the proof that the guard stayed on the setup.
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: `cli:${FIXTURES}/cli-path-clean.mjs`,
+    cases: [{ id: "p.legit", input: ".", direction: "legitimate" }],
+    argv: ["{input}"],
+    fixtureSetup: REPO_SETUP,
+  });
+  assert.deepEqual(r.declined, [], JSON.stringify(r.cases));
+  assert.deepEqual(
+    r.cases.map((c) => [c.id, c.outcome]),
+    [["p.legit", "accepted"]],
+  );
+});
+
+test("cli entry: with the trip-wire stepped around, the gh-free PATH still keeps the host gh out of the setup's reach (task.255)", () => {
+  withHostMarkerGh((marker) => {
+    const r = runProbeSpec({
+      sink: "url-authority",
+      entry: NEEDS_REPO[0][1],
+      cases: repoCases(),
+      argv: REPO_ARGV,
+      fixtureSetup: `${FIXTURES}/setup-gh-unshadowed.sh`,
+    });
+    // The setup tolerates the failed call, so the run is scored; what matters
+    // is that the host binary was never reached.
+    assert.equal(r.executed, 2, JSON.stringify(r));
+    assert.equal(existsSync(marker), false, "the host gh ran");
+  });
+});

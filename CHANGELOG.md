@@ -49,6 +49,12 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **A `cli:` fixture setup can no longer reach the host `gh` (task 255).** Task 254's only guard
+  was a textual scan, so a setup that built the command name from parts (`a=g; b=h; "$a$b"`) ran
+  the host binary. The setup now runs under the shell forms' trip-wire `gh` and gh-free `PATH`,
+  and a hit declines the run `needs-fake-gh` (the message names the setup and points at
+  `shell-argv:` with `--fake-gh`). The CLI entry's own `PATH` is unchanged. The trip-wire's stated
+  limits are unchanged too: an absolute path, a `PATH` the script prepends, a backgrounded call.
 - **A probe input carrying a NUL no longer gets path advice on the `filename` sink (task 254
   follow-up).** The "cannot materialise" decline told a NUL input to pick a sink that is not
   materialised, which cannot help: no sink accepts a NUL. The NUL now declines with
