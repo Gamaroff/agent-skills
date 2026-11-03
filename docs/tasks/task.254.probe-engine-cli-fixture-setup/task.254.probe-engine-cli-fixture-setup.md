@@ -350,6 +350,27 @@ The set of bundled copies is defined as: files named `security-probe.mjs`, `fina
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-03
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.254.qa.1.probe-engine-cli-fixture-setup.md](./task.254.qa.1.probe-engine-cli-fixture-setup.md)
+- **Gate File**: [task.254.gate.1.probe-engine-cli-fixture-setup.yml](./task.254.gate.1.probe-engine-cli-fixture-setup.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 284
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+One MEDIUM finding: the "no extra process without a setup" criterion is held only by a record field, not a test that observes spawns (T254-QA-1). All three mutations turn a committed test red.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -359,6 +380,8 @@ The set of bundled copies is defined as: files named `security-probe.mjs`, `fina
 | 2026-11-03 | 1.1     | Review passed (8/10) — added the `harnessDir` constraint on the shared helper, the full doc-site list (4 files, search recorded), corrected bundled-copy counts, and a sibling-case escape test and mutation | review-task |
 | 2026-11-03 |         | Status → ready-for-development | review-task |
 | 2026-11-03 |         | Implemented — 4 source files + 3 fixtures, 8 new tests (284 pass), 3 mutations red | develop |
+| 2026-11-03 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-11-03 |         | QA findings fixed — 1 finding, 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

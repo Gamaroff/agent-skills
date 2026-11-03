@@ -1579,8 +1579,9 @@ export function runProbeSpec({
     args: null,
     // The fence: form's placeholder token, or null (task.180).
     slot: null,
-    // The shell-argv: form's per-run setup script (its real path), or null
-    // (task.181). Stated so the record says what built each case directory.
+    // The per-run setup script (its real path) of the shell-argv: and cli:
+    // forms, or null (task.181; the cli: form since task.254). Stated so the
+    // record says what built each case directory.
     fixtureSetup: null,
   };
 

@@ -8767,3 +8767,60 @@ test("one setup helper: both arms call runCaseSetup and neither spawns its own s
   assert.equal(src.match(/\[setupPath, fixtureDir\]/g)?.length, 1);
   assert.equal(src.match(/= runCaseSetup\(\{/g)?.length, 2);
 });
+
+test("cli entry: a run with no --fixture-setup spawns no bash for a setup; with one it spawns exactly one per case (task.254 QA-1)", () => {
+  // The performance criterion, observed rather than inferred from the record: a
+  // `bash` shim first on the harness's PATH logs every bash the harness starts by
+  // name. The setup is the only thing the cli: arm runs under bash, so a count
+  // above zero on the no-setup run is an extra process. The with-setup run
+  // proves the shim can see a spawn at all — without it a zero would also read
+  // "the shim never sees anything".
+  const dir = mkdtempSync(join(tmpdir(), "probe-spawn-count-"));
+  try {
+    const real = spawnSync("sh", ["-c", "command -v bash"], {
+      encoding: "utf8",
+    }).stdout.trim();
+    assert.ok(real.startsWith("/"), `no absolute bash path: ${real}`);
+    const shimDir = join(dir, "shim");
+    mkdirSync(shimDir);
+    const log = join(dir, "bash-spawns.log");
+    writeFileSync(
+      join(shimDir, "bash"),
+      `#!/bin/sh\nprintf 'x\\n' >> "${log}"\nexec "${real}" "$@"\n`,
+    );
+    chmodSync(join(shimDir, "bash"), 0o755);
+    const spawns = () =>
+      existsSync(log)
+        ? readFileSync(log, "utf8").split("\n").filter(Boolean).length
+        : 0;
+    const ENTRY = NEEDS_REPO[0][1];
+    // The cli: form refuses a case-level PATH (it would steer the interpreter),
+    // so the shim goes on the harness's own PATH for the two calls, then back.
+    const hostPath = process.env.PATH;
+    process.env.PATH = `${shimDir}:${hostPath}`;
+    try {
+      const without = runProbeSpec({
+        sink: "url-authority",
+        entry: ENTRY,
+        cases: repoCases(),
+        argv: REPO_ARGV,
+      });
+      assert.equal(without.executed, 2, JSON.stringify(without.cases));
+      assert.equal(spawns(), 0, "a run with no setup started a bash");
+
+      const withSetup = runProbeSpec({
+        sink: "url-authority",
+        entry: ENTRY,
+        cases: repoCases(),
+        argv: REPO_ARGV,
+        fixtureSetup: REPO_SETUP,
+      });
+      assert.equal(withSetup.executed, 2, JSON.stringify(withSetup.cases));
+      assert.equal(spawns(), 2, "one setup bash per case");
+    } finally {
+      process.env.PATH = hostPath;
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
