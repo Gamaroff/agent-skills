@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-11-03
-**Next Available Task Number:** **252**
+**Next Available Task Number:** **254**
 
 ## How to use
 
@@ -293,6 +293,8 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 249 | [/finalise grades every kind of criterion fairly](task.249.finalise-grades-every-criterion-kind/task.249.finalise-grades-every-criterion-kind.md) | accepted | refactoring | Medium | 2026-11-01 | [#802](https://github.com/Gamaroff/agent-skills/issues/802) | — cut from observations #77, #81, #82, #105, #110 (2026-11-01 review, cluster 1B: process, CI-state, record location, spec-tied probes) · PR #805 merged |
 | 250 | [Security-probe tests write no scratch files into the repository](task.250.security-probe-scratch-out-of-tree/task.250.security-probe-scratch-out-of-tree.md) | accepted | testing | Low | 2026-11-02 | [#812](https://github.com/Gamaroff/agent-skills/issues/812) | — follow-up to obs #145 (PR #811 fixed one reader; this removes the in-tree scratch directories that reader raced) · PR #813 merged |
 | 251 | [Record loop-limit residual acceptance](task.251.record-loop-limit-residual-acceptance/task.251.record-loop-limit-residual-acceptance.md) | accepted | refactoring | Medium | 2026-11-03 | [#814](https://github.com/Gamaroff/agent-skills/issues/814) | — cut from observations #115, #150 (option 2 of the loop-limit HALT refused by the lens on task.238; hand-recorded on task.250) · PR #815 merged |
+| 252 | [migrate-doc-numbering: name every document it cannot classify](task.252.migrate-doc-numbering-name-blockers/task.252.migrate-doc-numbering-name-blockers.md) | planned | refactoring | High | 2026-11-03 | — | — cut from the tinker-city handoff gap 1 (reproduced 2026-11-03) |
+| 253 | [migrate-doc-numbering: link, frontmatter and downstream safety nets](task.253.migrate-doc-numbering-safety-nets/task.253.migrate-doc-numbering-safety-nets.md) | planned | refactoring | Medium | 2026-11-03 | — | — cut from the tinker-city handoff gaps 2–7 (only gap 2 reproduced; Phase 1 reproduces the rest) |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
@@ -309,6 +311,8 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 ---
 
 ## Notes
+
+- **Tasks 252–253 split the tinker-city `migrate-doc-numbering.mjs` handoff (2026-11-03)** — one shippable unit each, independent of each other. 252 makes the tool name every document it would skip (the root problem: a green `--check` hid unmigrated documents). 253 adds the smaller safety nets (multi-line links, post-apply dead-link scan, frontmatter, registry stub, dirty/behind guard, generated files, legacy-name warning). Both edit the same script and test file, so land one and rebase the other.
 
 - **Tasks 248–249 split the QA–finalise criteria cluster (2026-11-01)** — one shippable unit each, independent of each other: 248 makes QA run the four DoD rules it currently skips or judges by eye (boundary classification, quantifier rule, unapproved criterion amendments, CHANGELOG citation), so those failures surface in the QA loop; 249 gives `/finalise` a defined grading path for the criterion kinds it mis-grades (process, CI-state, implementation-report records, stricter-than-spec probe cases). Land 248 first: it moves failures earlier, and 249's new kinds then reach QA through 248's citation of the AC prompt with no extra edit.
 - **Tasks 213–214 are the loop-supervisor multi-engine handoff (2026-10-18)** — one shippable unit each, independent of one another: 213 ships the engine registry, `--engine`/`--model`/`--effort` and the normalised result envelope together, because an engine whose result line is never parsed is classified without its error signal and is not mergeable alone; 214 fixes the `probeScript` default and touches `adapters.js` and one `resolveAdapter` call, so it may land in either order (213 edits `run-loop.mjs` near that call; rebase whichever lands second).
