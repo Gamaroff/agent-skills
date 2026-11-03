@@ -755,3 +755,49 @@ for (const [name, entry, want] of [
     }
   });
 }
+
+// ─── 10. QA cycle 4 findings (T251-CR4-1, T251-CR4-2): the status key may be quoted or repeated ──
+
+test("every copy of a repeated top-level status key is waived (T251-CR4-2)", () => {
+  const fx = fixture(
+    withFlow("  - {id: X, status: open, status: open}"),
+    REPORT("Escalating — loop limit reached"),
+  );
+  try {
+    assert.equal(run(fx).reason, "accepted");
+    const gate = read(fx.gate);
+    assert.ok(
+      gate.includes("  - {id: X, status: waived, status: waived}\n"),
+      gate,
+    );
+    assert.ok(
+      !/open/.test(gate.split("top_issues:")[1].split("waiver:")[0]),
+      "no open status remains",
+    );
+  } finally {
+    rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+// A quoted key is the entry's status, but the shared reader (readKeysInto) does not read it as
+// one, so the writer's own read-back cannot confirm the edit and refuses. Refusing with nothing
+// written is the safe outcome; what must never happen is `accepted` over an entry that still
+// reads open, or a second `status` key appended beside the quoted one (T251-CR4-1).
+for (const [name, entry] of [
+  ["double-quoted", `  - {id: X, "status": open}`],
+  ["single-quoted", `  - {id: X, 'status': open}`],
+]) {
+  test(`a ${name} status key in a flow entry is refused with nothing written (T251-CR4-1)`, () => {
+    const fx = fixture(
+      withFlow(entry),
+      REPORT("Escalating — loop limit reached"),
+    );
+    try {
+      const before = [read(fx.gate), read(fx.report)];
+      assert.notEqual(run(fx).reason, "accepted");
+      assert.deepEqual([read(fx.gate), read(fx.report)], before);
+    } finally {
+      rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+}

@@ -98,6 +98,8 @@ First run of task.251: add `accept-qa-residual.js`, the one writer that records 
 - QA Cycle 2 fix (qa-fix, inline): T251-CR2-1 — `planGateEditRaw` now refuses (`unreadable-gate`, nothing written) an open entry whose dash line opens a flow mapping that does not close on that line. Engine suite 20/20. Mutation proof: refusal disabled → the new test red, restored. Step 3.5 probe: phrase `unreadable-gate`, population 1 (`develop-pipeline-resume-contract.md`, lists it as a refusal that returns to the halt) — unaffected. Not fixed, advisory (gate `recommendations.future`): CR-2 (timeout on the `qa-cycle.sh` spawn), CR-3 (audit text after a re-run).
 - QA Cycle 3 — changes-requested: stage-disabled. Convergence check: HIGH sequence 0,0,0, no trip (needs HIGH > 0). Route classifier: `continue` (not-a-pass-gate; route 2 declined: product-defect-signal). Reviewer rated its single finding low/low; QA ran the candidate, which the reviewer had not, and it reproduced.
 - QA Cycle 3 fix (qa-fix, inline). Narrowing residue: the flow-entry detection (trigger: pipeline offer, gates 2 and 3 both name `accept-qa-residual.js` at HIGH 0). Move: **consolidate** — this was the third correction of one brace heuristic (cycles 1, 2, 3). New `flowSpan` is the one definition of the extent (depth, quotes, comment, trailing junk, top-level separators); the planner refusal and `waiveEntry` both use it, and `waiveEntry` edits only a top-level `status:` segment. Engine suite 28/28. Mutation proof: comment handling off → 2 red; top-level split off → 3 red; restored. Probe on `planGateEdit` with the cycle 3 cases file: `engages` (was `present-but-inert`). Step 3.5 probe: phrases `does not close on its first line` (population 0), `flow mapping` (4 documents about unrelated YAML, none restates this). Two of my own new tests were wrong first (an off-by-two column, and a nested-only status that the shared reader would still read as open); fixed the expectations, not the scanner. A nested-only `status:` is refused by the read-back, nothing written.
+- QA Cycle 4 — changes-requested: stage-disabled. Convergence check: HIGH sequence 0,0,0,0, no trip. Route classifier: `continue` (not-a-pass-gate). Reviewer executed 28 variants; QA reproduced both findings and the probe engine scored them (`present-but-inert`).
+- QA Cycle 4 fix (qa-fix, inline). T251-CR4-1 (medium) and T251-CR4-2 (low) are the same segment test in `waiveEntry`, so one change fixes both: it accepts a quoted key and waives every matching top-level segment. Engine suite 31/31. Mutation proof: waive-first-only → the repeated-key test red; quoted-key match dropped → both quoted-key tests red; restored. **A quoted `status` key ends in a refusal, not an edit:** the segment test now matches it, but the shared reader does not read a quoted key as a status, so the writer's own read-back refuses the plan and nothing is written. I wrote the test to that outcome rather than widen the shared reader, which other callers use. The probe engine cannot tell a correct acceptance from a wrong one, so the repeated-key case, now correctly accepted, scores `accepted` against a case file that listed it hostile; I re-scored it as legitimate in a scratchpad copy and left the committed cycle 4 cases file as the gate recorded it. Step 3.5 probe: no phrase changed. Narrowing residue: none, this cycle's two findings were not in a file both of the last two gates named at HIGH. Note: four consecutive cycles have found a flow-style shape the pipeline never writes; the next cycle is the last the budget allows.
 - Pre-existing, noted not fixed: `readKeysInto` in `qa-diminishing-returns.js` stops a quoted value at `}`.
 
 ---
@@ -140,6 +142,15 @@ _Track each QA review/fix cycle._
 **PR Review**: not reached — gate did not exit the loop
 **Loop exit**: n/a — this exit not taken
 **Action**: Running qa-fix (cycle 3 of 5)
+
+### QA Cycle 4 — 2026-11-03
+**Gate Result**: CONCERNS
+**Issues Found**: 1 medium, 1 low — T251-CR4-1 (a quoted `status` key in a flow entry is not matched, so a second plain key is appended) and T251-CR4-2 (a duplicated `status` has only its first copy waived). Cycle 3's extent finding is fixed.
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 4 of 5)
 
 ---
 

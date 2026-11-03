@@ -4,7 +4,7 @@
 **Bug ID**: TASK-251-BUG-5
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 3 code review CR-1, reproduced)
 **Date Found**: 2026-11-03
 
@@ -72,3 +72,4 @@ turns three red.
 | ---------- | ------------ | ---------- | ----------------------------- |
 | 2026-11-03 | New          | QA         | Found in QA cycle 3           |
 | 2026-11-03 | Ready for QA | qa-fix     | Fixed with mutation-proven tests |
+| 2026-11-03 | Closed | qa-task | Verified by task.251.qa.4.record-loop-limit-residual-acceptance.md |

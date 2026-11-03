@@ -200,8 +200,11 @@ function waiveEntry(entryLines, base) {
     let inner = "";
     for (let k = 0; k < cuts.length - 1; k++) {
       let seg = dash.slice(cuts[k] + 1, cuts[k + 1]);
-      if (!done && /^\s*status\s*:/.test(seg)) {
-        seg = seg.replace(/^(\s*status\s*:\s*)[^]*?(\s*)$/, "$1waived$2");
+      // The key may be quoted, and every top-level copy is waived: a last-wins parser reads the
+      // final one, a first-wins parser the first (T251-CR4-1, T251-CR4-2).
+      const keyed = /^(\s*(?:status|"status"|'status')\s*:\s*)[^]*?(\s*)$/;
+      if (keyed.test(seg)) {
+        seg = seg.replace(keyed, "$1waived$2");
         done = true;
       }
       inner += (k ? "," : "") + seg;

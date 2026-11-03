@@ -1,0 +1,44 @@
+[
+  {
+    "id": "legit-flow-gate",
+    "direction": "legitimate",
+    "input": "schema: 1\ngate: CONCERNS\nhead: 'abc'\nupdated: '2026-11-02T00:00:00Z'\n\ntop_issues:\n  - {id: X, status: open}\n\nwaiver:\n  active: false\n",
+    "why": "A single-line flow entry with one plain status key.",
+    "correct": "Accept and plan the edit."
+  },
+  {
+    "id": "fail-gate",
+    "direction": "hostile",
+    "input": "schema: 1\ngate: FAIL\nhead: 'abc'\nupdated: '2026-11-02T00:00:00Z'\n\ntop_issues:\n  - {id: X, status: open}\n\nwaiver:\n  active: false\n",
+    "why": "A FAIL gate is never waived by this writer.",
+    "correct": "Refuse (fail-gate); write nothing."
+  },
+  {
+    "id": "quoted-status-key",
+    "direction": "hostile",
+    "input": "schema: 1\ngate: CONCERNS\nhead: 'abc'\nupdated: '2026-11-02T00:00:00Z'\n\ntop_issues:\n  - {id: X, \"status\": open}\n\nwaiver:\n  active: false\n",
+    "why": "A quoted status key is the entry's status; a second plain status key leaves a duplicate-key mapping that still reads open.",
+    "correct": "Waive the quoted key or refuse; never append a second status."
+  },
+  {
+    "id": "duplicate-status-key",
+    "direction": "hostile",
+    "input": "schema: 1\ngate: CONCERNS\nhead: 'abc'\nupdated: '2026-11-02T00:00:00Z'\n\ntop_issues:\n  - {id: X, status: open, status: open}\n\nwaiver:\n  active: false\n",
+    "why": "A last-wins parser reads the second copy, which stays open.",
+    "correct": "Waive every status key or refuse."
+  },
+  {
+    "id": "multi-line-flow-entry",
+    "direction": "hostile",
+    "input": "schema: 1\ngate: CONCERNS\nhead: 'abc'\nupdated: '2026-11-02T00:00:00Z'\n\ntop_issues:\n  - {id: X,\n     status: open}\n\nwaiver:\n  active: false\n",
+    "why": "Closes on a later line.",
+    "correct": "Refuse (unreadable-gate); write nothing."
+  },
+  {
+    "id": "empty-gate",
+    "direction": "hostile",
+    "input": "",
+    "why": "An empty gate.",
+    "correct": "Refuse (unreadable-gate); write nothing."
+  }
+]
