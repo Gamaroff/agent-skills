@@ -1,0 +1,67 @@
+schema: 2
+task: 'task.252.migrate-doc-numbering-name-blockers'
+task_title: 'migrate-doc-numbering: name every document it cannot classify'
+gate: PASS
+status_reason: 'The PR-review fix (assets/ and underscore directories excused) is held by a test that goes red without it; the scoped code review found nothing; the real tree still reads 22 classified, 0 skipped.'
+reviewer: 'QA Engineer'
+head: '61754ddd4b45648161c7b91ef825b24a12f6372c'
+updated: '2026-11-03T09:55:59Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 91
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    notes: 'boundary: false, unchanged. The widened directory predicate only narrows which names are reported; its input is the repository own directory listing.'
+  performance:
+    status: PASS
+    notes: 'Two extra string comparisons per odd directory; the readDir baseline test passes.'
+  reliability:
+    status: PASS
+    notes: 'The task promise that the allowlist covers directories such as assets/ now holds; an ordinary odd directory is still named (control in the test).'
+  maintainability:
+    status: PASS
+    notes: 'The rule is stated in review-prd SKILL.md, CHANGELOG.md and the task decision text.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-11-03'
+  total_iterations: 2
+  verification_method: 'Mutation: reverting the predicate to dot-only turns the PC-2 test red (90 pass, 1 fail); restored, 91 pass.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Trade-off (gate 2): a stray .md beside an index.md in a PRD directory is silent. Narrow the exemption to files the index links, or keep the recorded exception.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs']
+    - action: 'CR-2 (gate 1): under a scope, an unclassified entry beneath an epics directory with no owning PRD is dropped, while an unscoped run blocks on it; decide and test.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs']
+    - action: 'CR-4 (gate 1, cleanup): group files by directory once instead of rescanning per PRD; use a Set for the duplicate check.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

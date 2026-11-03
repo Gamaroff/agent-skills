@@ -326,17 +326,17 @@ The fixture is the incident, so a pass could mean the tool recognised it. Add on
 **Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.252.qa.2.migrate-doc-numbering-name-blockers.md](./task.252.qa.2.migrate-doc-numbering-name-blockers.md)
-- **Gate File**: [task.252.gate.2.migrate-doc-numbering-name-blockers.yml](./task.252.gate.2.migrate-doc-numbering-name-blockers.yml)
+- **Full Report**: [task.252.qa.3.migrate-doc-numbering-name-blockers.md](./task.252.qa.3.migrate-doc-numbering-name-blockers.md)
+- **Gate File**: [task.252.gate.3.migrate-doc-numbering-name-blockers.yml](./task.252.gate.3.migrate-doc-numbering-name-blockers.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 90
+- **Tests Executed**: 91
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-T252-QA-1 (section shards of a sharded PRD) is fixed and held by a test. One follow-up recorded: a stray file beside an index.md in a PRD directory is not named, by design of the shard exemption.
+The PR-review finding PC-2 (directory allowlist) is fixed and held by a test. No new findings.
 
 <!-- change-log-start -->
 ## Change Log
@@ -351,6 +351,7 @@ T252-QA-1 (section shards of a sharded PRD) is fixed and held by a test. One fol
 | 2026-11-03 |         | QA findings fixed — cycle 1, 1 finding | qa-fix |
 | 2026-11-03 |         | QA gate PASS (100/100) — 0 findings | qa-task |
 | 2026-11-03 |         | QA findings fixed — cycle 2, 3 findings (PR review) | qa-fix |
+| 2026-11-03 |         | QA gate PASS (100/100) — 0 findings | qa-task |
 
 <!-- change-log-end -->
 
