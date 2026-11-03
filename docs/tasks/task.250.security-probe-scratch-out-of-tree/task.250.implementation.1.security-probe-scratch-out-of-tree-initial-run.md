@@ -169,7 +169,20 @@ Move every scratch directory `security-probe.test.mjs` creates inside the reposi
     - Then `git status --porcelain --untracked-files=all --ignored` was taken before and after `command node --test shared/resources/tests/security-probe.test.mjs` (277/277). The two snapshots were identical, 6,156 lines each.
     - Box ticked.
   - **PC-2:** `updated:` bumped, and a Change Log row added.
-- Next: Step 7 `/finalise`.
+- Step 7 `/finalise`, DoD run 1. The AC agent failed criterion #4 (runtime ≤ +10%) because QA report 1's median was measured on `1a4750a2`, and the test file has changed five times since. It was re-measured on the PR head, the same way as QA report 1. Both sides ran `uptime; command node --test shared/resources/tests/security-probe.test.mjs`, interleaved base/head ×3, base in a detached worktree. All six runs rc=0:
+  - Base `77c32356` (the merge-base with develop): 31.39 / 31.20 / 31.35 s, median **31.35 s**.
+  - Head `7f24cc0b`: 31.21 / 31.14 / 31.18 s, median **31.18 s**.
+  - Change: **−0.5%**.
+  - Load averages 2.86–4.22, taken before each run:
+
+    ```
+    base run1 31.39 s | load average: 2.86, 2.70, 2.37
+    head run1 31.21 s | load average: 2.98, 2.75, 2.40
+    base run2 31.20 s | load average: 3.09, 2.81, 2.43
+    head run2 31.14 s | load average: 3.18, 2.86, 2.46
+    base run3 31.35 s | load average: 4.22, 3.14, 2.57
+    head run3 31.18 s | load average: 3.76, 3.14, 2.59
+    ```
 
 ---
 
