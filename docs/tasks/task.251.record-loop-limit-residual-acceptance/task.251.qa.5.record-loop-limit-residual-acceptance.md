@@ -176,3 +176,52 @@ command node .agents/skills/qa-task/references/security-probe.mjs --sink markdow
 **QA Report**: co-located at `task.251.qa.5.record-loop-limit-residual-acceptance.md`
 **Gate File**: co-located at `task.251.gate.5.record-loop-limit-residual-acceptance.yml`
 **Next Steps**: Loop Escalation (loop limit): the owner fixes the residual, accepts it, or grants more cycles.
+
+---
+
+## Evidence addendum — 2026-11-03 (added at `/finalise` DoD run 1; closes the criteria carried as UNVERIFIED in QA reports 1 and 2)
+
+Measured on the PR head `2c4d3011`. This adds evidence only; gate 5 and the verdict above are unchanged.
+
+### Lens trail rule C (AC "The lens does not raise the trail finding on a processed report")
+
+A dry run of `pr-conformance-prompt.md` trail rule C over two copies of this task's directory.
+
+| Fixture | Last `### QA Cycle` Action | Gate 5 | Result |
+| --- | --- | --- | --- |
+| Processed (the real directory after `accept-qa-residual`) | `Proceeding to 5c (PR conformance review)` | `WAIVED`, `waiver.active: true`, entry `waived` | `trail_rule_C_finding: not-raised` |
+| Control (same copy, left unprocessed) | `Escalating — loop limit reached` | `CONCERNS`, `waiver.active: false`, entry `open` | `trail_rule_C_finding: raised` |
+
+### Writer timing (AC "under 1 s on the task.250 gate and report")
+
+The task.250 gate 5 and implementation report, reverted to their pre-acceptance shape (gate `CONCERNS`, two entries `open`, no waiver, last Action `Escalating — loop limit reached`), run against a scratch lock.
+
+```
+uptime  → 09:43:58 up 8 days, 19:45, load average: 3.98, 4.40, 4.00
+time    → real 0m0.057s  user 0m0.036s  sys 0m0.021s   (reason=accepted, both entries waived)
+uptime  → 09:43:58 up 8 days, 19:45, load average: 3.98, 4.40, 4.00
+```
+
+### `npm run ci` wall time (AC "within 5% of the develop baseline")
+
+Both commits in a detached worktree beside the repository, `node_modules` linked, two runs each, all exit 0, the machine otherwise quiet. `uptime` was taken before each run.
+
+| Commit | Run 1 | Run 2 | Mean | Load before run 1 / run 2 |
+| --- | --- | --- | --- | --- |
+| `develop` `17f43480` | 196 s | 196 s | 196 s | 4.03 / 7.20 |
+| PR head `2c4d3011` | 198 s | 199 s | 198.5 s | 6.19 / 7.65 |
+
+Rise: +2.5 s, **+1.3%**, inside the 5% bound. A first PR-head pair taken in the main checkout read 220 s and 229 s, but that checkout is not like the develop one (a different tree, plus a concurrent agent run), so it is not the comparison.
+
+### Doc sweep (AC "every restatement of option 2 updated or cites the HALT; greps recorded")
+
+```
+git grep -n "Accept the current gate status" -- . ':(exclude)docs/tasks' ':(glob,exclude)skills/*/references/**'
+→ 0 hits (7 hits in all, every one under docs/tasks)
+
+git grep -n "option 2" -- docs shared skills ':!docs/tasks'
+→ shared/resources/accept-qa-residual.{js,sh}, develop-pipeline-resume-contract.md:691,
+  develop-pipeline-step-5-6-qa-loop.md:346, :412, :2155, :2160, skills/develop-{story,task}/SKILL.md:355/342,
+  and the bundled references/ copies of those. Every hit states the accept path (task.251) or cites the HALT.
+  docs/bugs/bug.2.* hits use "option 2" for an unrelated choice.
+```

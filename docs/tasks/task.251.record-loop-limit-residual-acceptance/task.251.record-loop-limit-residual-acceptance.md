@@ -5,7 +5,8 @@ type: task
 description: "When the owner accepts the residual after a QA loop-limit escalation, one writer records that decision as a gate waiver and returns the run to Step 5c, so the conformance lens, /finalise, develop-next and develop-batch all read the same fact."
 tags: [develop-task, develop-story, qa-loop, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
+completed_date: 2026-11-03
 priority: Medium
 risk_level: medium
 created: 2026-11-03
@@ -13,11 +14,12 @@ updated: 2026-11-03
 assignee:
 estimated_effort_hours: 16
 github_issue: 814
+pr_number: 815
 ---
 
 # Record loop-limit residual acceptance
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.251.review.1.record-loop-limit-residual-acceptance.md` implemented 2026-11-03
 
@@ -317,7 +319,7 @@ The plan names any other file the doc sweep finds, with the `git grep` that foun
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-03
 **Quality Score**: 92/100
-**Gate Decision**: CONCERNS
+**Gate Decision**: WAIVED (QA wrote CONCERNS; the owner then accepted the loop-limit residual, so gate 5 reads WAIVED with bug 7 as the accepted residual)
 
 ### QA Report
 - **Full Report**: [task.251.qa.5.record-loop-limit-residual-acceptance.md](./task.251.qa.5.record-loop-limit-residual-acceptance.md)
@@ -330,12 +332,30 @@ The plan names any other file the doc sweep finds, with the `git grep` that foun
 - **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Cycle 4 fixes hold. One low residual: an empty status value in a flow entry is edited to `status:waived` (T251-CR5-1), a shape the pipeline never writes. The loop budget is spent; the residual goes to Loop Escalation.
+Cycle 4 fixes hold. One low residual: an empty status value in a flow entry is edited to `status:waived` (T251-CR5-1), a shape the pipeline never writes. The loop budget was spent; the owner accepted the residual (bug 7), recorded by `accept-qa-residual` on 2026-11-03, and the run left the loop on the WAIVED route to Step 5c.
+## Definition of Done - PASSED ✅
 
+**Status:** ACCEPTED
+
+**QA Report**: `task.251.qa.5.record-loop-limit-residual-acceptance.md`
+**Gate File**: `task.251.gate.5.record-loop-limit-residual-acceptance.yml`
+**Gate Status**: WAIVED (92/100). **Waiver**: loop limit reached after 5 gates; residual T251-CR5-1 (low) accepted by the owner — approved by Lorien Gamaroff.
+
+✅ **Acceptance Criteria:** 16 of 16 met. The four carried as unverified (lens trail rule, writer timing, `npm run ci` wall time, doc-sweep record) are now evidenced in the QA 5 addendum.
+✅ **Tests:** the new suite runs under `npm test`; PR #815 CI is green on 6 of 6 checks.
+✅ **Documentation:** CHANGELOG entry and the skill and pipeline docs updated.
+✅ **Security Review:** boundary held, 9 probes, 0 reproduced.
+✅ **Compliance Review:** not applicable.
+
+**Detailed Verification Log:** see `task.251.dod.2.record-loop-limit-residual-acceptance.md` (run 1, `task.251.dod.1…`, ended in gaps and is kept as history).
+
+**Task marked as ACCEPTED on:** 2026-11-03
+
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                      | Author      |
-| ---------- | ------- | ------------------------------------------------ | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-03 | 1.0     | Initial draft — cut from observations #115, #150 | create-task |
 | 2026-11-03 | 1.1     | Review passed (8/10) — added the writer's reconstruction states, `unreadable-gate` and `no-report-entry` refusals, named the test holding each behaviour criterion, aligned the `gateFor` wording with the plan | review-task |
 | 2026-11-03 |         | Status → ready-for-development | review-task |
@@ -349,7 +369,10 @@ Cycle 4 fixes hold. One low residual: an empty status value in a flow entry is e
 | 2026-11-03 |         | QA findings fixed — 1 medium, 3 iterations | qa-fix |
 | 2026-11-03 |         | QA gate CONCERNS (92/100) — 1 medium, 1 low finding | qa-task |
 | 2026-11-03 |         | QA findings fixed — 1 medium, 1 low, 4 iterations | qa-fix |
-| 2026-11-03 |         | QA gate CONCERNS (92/100) — 1 low finding | qa-task |
+| 2026-11-03 |         | QA gate WAIVED (92/100) — 1 low finding; QA wrote CONCERNS, owner accepted the loop-limit residual | qa-task |
+| 2026-11-03 |         | Loop-limit residual accepted by the owner — bug 7 waived, run resumes at 5c | accept-qa-residual |
+| 2026-11-03 | 1.2 | DoD passed — accepted (PR #815) | finalise |
+<!-- change-log-end -->
 
 ## Progress Tracking
 
