@@ -523,10 +523,14 @@ function planReportEditRaw(reportContent, n, opts) {
   if (le !== -1) out[le] = loopExitLine;
   else out.splice(rowIndex(out, entry, "Action"), 0, loopExitLine);
 
+  // A re-run that finds the gate already WAIVED waives nothing itself; "none newly waived" read as
+  // though nothing had been waived at all, so that case says what happened.
   const waived =
     opts.waived && opts.waived.length
       ? opts.waived.join(", ")
-      : "none newly waived";
+      : opts.gateAlready
+        ? "the gate was already WAIVED by an earlier run"
+        : "none newly waived";
   const logLine =
     `- QA residual accepted at the loop-limit escalation (cycle ${n}): gate.${n} recorded as WAIVED ` +
     `(${waived}); approved by ${opts.approvedBy} on ${opts.date} — ${opts.reason.replace(/\r?\n/g, " ")}. ` +
@@ -539,18 +543,29 @@ function planReportEditRaw(reportContent, n, opts) {
 
 // ─── orchestration ──────────────────────────────────────────────────────────
 
+// The env override exists so a test can prove the timeout without waiting 30 s.
+const QA_CYCLE_TIMEOUT_MS =
+  Number(process.env.ACCEPT_QA_CYCLE_TIMEOUT_MS) > 0
+    ? Number(process.env.ACCEPT_QA_CYCLE_TIMEOUT_MS)
+    : 30000;
+
 function highestGate(docDir) {
   const r = spawnSync(
     "bash",
     [path.join(__dirname, "qa-cycle.sh"), docDir, "--path", "gate"],
     {
       encoding: "utf8",
+      timeout: QA_CYCLE_TIMEOUT_MS,
+      // A hung helper must not hang the writer: on a timeout spawnSync sets `r.error` (ETIMEDOUT)
+      // and the branch below refuses with nothing written.
     },
   );
   if (r.error || (r.status !== 0 && r.status !== 1))
     return {
       error: "engine-unavailable",
-      detail: `qa-cycle.sh not runnable (rc ${r.status})`,
+      detail: r.error
+        ? `qa-cycle.sh not runnable (${r.error.code || r.error.message})`
+        : `qa-cycle.sh not runnable (rc ${r.status})`,
     };
   if (r.status === 1)
     return {
@@ -625,7 +640,10 @@ function acceptResidual(opts) {
   const reportPlan = planReportEdit(
     reportContent,
     g.n,
-    Object.assign({ waived: gatePlan.waived }, o),
+    Object.assign(
+      { waived: gatePlan.waived, gateAlready: gatePlan.state === "already" },
+      o,
+    ),
   );
   if (reportPlan.state !== "edit" && reportPlan.state !== "already")
     return result(reportPlan.state, {
