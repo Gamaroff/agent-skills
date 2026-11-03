@@ -1,0 +1,71 @@
+schema: 2
+task: 'task.251.record-loop-limit-residual-acceptance'
+task_title: 'Record a loop-limit residual acceptance in one writer'
+gate: CONCERNS
+status_reason: 'The cycle 4 status-key fix holds: the reviewer ran 14 flow-entry shapes and found no input where the writer reports success over an entry that still reads open. One low residual remains: an empty status value in a flow entry is edited to `status:waived`, which a strict YAML parser reads as a single key.'
+reviewer: 'QA Engineer'
+head: '2bd177d6bd2dbf14eda59975aa9d2a0c4ee9108d'
+updated: '2026-11-03T07:03:57Z'
+
+top_issues:
+  - id: 'T251-CR5-1'
+    severity: low
+    file: 'shared/resources/accept-qa-residual.js'
+    finding: 'A flow entry with an empty status value (`- {id: X, status:}`) is edited to `- {id: X, status:waived}` (no space after the colon); planGateEdit returns edit with ok true, and a strict YAML parser (PyYAML in the reviewer''s run) reads `status:waived` as one key with a null value, so the entry has no status. Reproduced by the reviewer and by QA; the probe engine scores the case accepted, verdict present-but-inert. The pipeline writes block style, never this shape.'
+    suggested_action: 'Emit `: waived` when the matched key text ends in a colon with no whitespace, or refuse an empty-value status; add the shape to the flow-entry tests.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 92
+
+evidence:
+  tests_reviewed: 35
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 7
+    escaped: 0
+    boundary: true
+    boundary_signals: ['refused', 'refuses']
+    notes: 'Probe engine on planGateEdit with the committed cycle 5 gate cases file (2 legitimate flow gates accepted; FAIL, multi-line flow, empty and quoted-key gates rejected; empty-status-value gate accepted): verdict present-but-inert, 7 executed, 1 reproduced, 0 escaped. The accepted hostile gate is T251-CR5-1.'
+  performance:
+    status: PASS
+    notes: 'One linear scan per open entry.'
+  reliability:
+    status: CONCERNS
+    notes: 'T251-CR5-1 reports success on an entry a strict parser reads with no status. Advisory from earlier cycles still open: no timeout on the qa-cycle.sh spawn; audit text after a re-run. The reviewer also noted that a repeated status whose first copy reads resolved is left byte-identical (the shared reader is first-wins); that is the reader''s existing behaviour, not this change''s.'
+  maintainability:
+    status: PASS
+    notes: 'The extent (flowSpan) and the status-key match are each defined once.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Emit `: waived` (or refuse) for an empty-value flow status (T251-CR5-1).'
+      refs: ['shared/resources/accept-qa-residual.js', 'shared/resources/tests/accept-qa-residual.test.mjs']
+  future:
+    - action: 'CR-2 (low): add a timeout to the qa-cycle.sh spawnSync and map a timeout to engine-unavailable.'
+      refs: ['shared/resources/accept-qa-residual.js']
+    - action: 'CR-3 (low/low): on a re-run after a Stop, the Decisions Log line says "none newly waived" instead of listing the ids the first run waived.'
+      refs: ['shared/resources/accept-qa-residual.js']
+    - action: 'readKeysInto stops a quoted value at "}" and does not read a quoted key (pre-existing, outside this change).'
+      refs: ['shared/resources/qa-diminishing-returns.js']
+      provenance: pre-existing
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T251-CR5-1 fixed, or accepted by the owner as a residual']

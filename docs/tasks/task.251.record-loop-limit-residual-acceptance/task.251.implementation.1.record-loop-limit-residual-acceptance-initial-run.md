@@ -110,6 +110,30 @@ _Problems encountered and how they were resolved or escalated._
 
 - Step 3: `npm run ci:fast` first run failed on `prettier --check` (3 new files). Fixed with `prettier --write`, re-bundled.
 
+### QA Loop Limit Reached — 2026-11-03
+
+The pipeline ran 5 qa-task gates and 4 qa-fix cycles without a clean PASS; the last gate's finding is unfixed.
+
+**Final gate status**: CONCERNS
+**HIGH findings per cycle**: 0, 0, 0, 0, 0 — none at any cycle
+**Remaining issues** (from final gate file):
+- T251-CR5-1 (low) — `shared/resources/accept-qa-residual.js`: an empty status value in a flow-style entry (`- {id: X, status:}`) is edited to `- {id: X, status:waived}`, which a strict YAML parser reads as one key. The pipeline's own reader reads it as waived. The pipeline writes block style, never this shape.
+
+**What was attempted per cycle**:
+- Cycle 1: block-style entry with a brace waived wrongly; approver newline folded; plan results carry `ok`.
+- Cycle 2: a flow entry that closes on a later line is refused.
+- Cycle 3: the flow extent defined once (`flowSpan`), used by the refusal and the edit; edits only a top-level `status` segment.
+- Cycle 4: a quoted status key is matched and every top-level copy of a repeated status is waived; a quoted key alone is refused by the read-back.
+
+**Likely root cause**: not a flaw in the approach. The writer's block-style path, which is the only shape the pipeline writes, was fixed in cycle 1 and has had no finding since. Cycles 2 to 5 each found a flow-style input (`- {…}`) that nothing in this repository produces, and each fix exposed the next one in a parser that was never needed. Four cycles of the same narrowing kind is the signal that supporting flow style is the cost, not any one input.
+
+**Third-strike files**: none. Every cycle's HIGH count was 0, so the third-strike rule (which reads HIGH entries) never struck `accept-qa-residual.js`.
+
+**Recommended next steps**:
+1. Accept the residual (the one low finding): re-run `/develop-task` and pick "Accept the residual" in Phase 0b. This is the case the task's own writer exists for. The finding is low, outside the shapes the pipeline writes, and the pipeline's reader handles it.
+2. Or fix T251-CR5-1 in one line (emit `: waived` when the matched key ends in a colon with no space) and resume with one more cycle ("Resume the QA loop with 1 more cycle").
+3. Consider the structural option the history points to: refuse every flow-style entry (`unreadable-gate`) and delete the flow edit path. It ends this class of finding for good, at the price of the writer refusing a gate shape it never meets. That is a scope change for the owner, not something this run decides.
+
 ---
 
 ## QA Iteration History
@@ -151,6 +175,15 @@ _Track each QA review/fix cycle._
 **PR Review**: not reached — gate did not exit the loop
 **Loop exit**: n/a — this exit not taken
 **Action**: Running qa-fix (cycle 4 of 5)
+
+### QA Cycle 5 — 2026-11-03
+**Gate Result**: CONCERNS
+**Issues Found**: 1 low — T251-CR5-1 (an empty status value in a flow entry is edited to `status:waived`, which a strict YAML parser reads as one key). Cycle 4's two findings are fixed.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop limit reached
 
 ---
 

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-251-BUG-6
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 4 code review CR-1 and CR-2, reproduced)
 **Date Found**: 2026-11-03
 
@@ -54,3 +54,4 @@ A quoted key is recognised by the segment test, but the shared reader (`readKeys
 | ---------- | ------------ | ---------- | ----------------------------------- |
 | 2026-11-03 | New          | QA         | Found in QA cycle 4                 |
 | 2026-11-03 | Ready for QA | qa-fix     | Fixed with mutation-proven tests    |
+| 2026-11-03 | Closed | qa-task | Verified by task.251.qa.5.record-loop-limit-residual-acceptance.md |

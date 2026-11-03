@@ -320,17 +320,17 @@ The plan names any other file the doc sweep finds, with the `git grep` that foun
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.251.qa.4.record-loop-limit-residual-acceptance.md](./task.251.qa.4.record-loop-limit-residual-acceptance.md)
-- **Gate File**: [task.251.gate.4.record-loop-limit-residual-acceptance.yml](./task.251.gate.4.record-loop-limit-residual-acceptance.yml)
+- **Full Report**: [task.251.qa.5.record-loop-limit-residual-acceptance.md](./task.251.qa.5.record-loop-limit-residual-acceptance.md)
+- **Gate File**: [task.251.gate.5.record-loop-limit-residual-acceptance.yml](./task.251.gate.5.record-loop-limit-residual-acceptance.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 7147 (`ci:fast`), 34 new
+- **Tests Executed**: 7147 (`ci:fast`), 35 new
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-The cycle 3 scanner closes every named extent shape. A quoted status key and a duplicated one are still edited and reported accepted (T251-CR4-1, -2). Neither is a shape the pipeline writes.
+Cycle 4 fixes hold. One low residual: an empty status value in a flow entry is edited to `status:waived` (T251-CR5-1), a shape the pipeline never writes. The loop budget is spent; the residual goes to Loop Escalation.
 
 ## Change Log
 
@@ -349,6 +349,7 @@ The cycle 3 scanner closes every named extent shape. A quoted status key and a d
 | 2026-11-03 |         | QA findings fixed — 1 medium, 3 iterations | qa-fix |
 | 2026-11-03 |         | QA gate CONCERNS (92/100) — 1 medium, 1 low finding | qa-task |
 | 2026-11-03 |         | QA findings fixed — 1 medium, 1 low, 4 iterations | qa-fix |
+| 2026-11-03 |         | QA gate CONCERNS (92/100) — 1 low finding | qa-task |
 
 ## Progress Tracking
 

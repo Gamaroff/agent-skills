@@ -1,0 +1,51 @@
+[
+  {
+    "id": "legit-flow-gate",
+    "direction": "legitimate",
+    "input": "schema: 1\ngate: CONCERNS\nhead: 'abc'\nupdated: '2026-11-02T00:00:00Z'\n\ntop_issues:\n  - {id: X, status: open}\n\nwaiver:\n  active: false\n",
+    "why": "A single-line flow entry with one plain status key.",
+    "correct": "Accept and plan the edit."
+  },
+  {
+    "id": "fail-gate",
+    "direction": "hostile",
+    "input": "schema: 1\ngate: FAIL\nhead: 'abc'\nupdated: '2026-11-02T00:00:00Z'\n\ntop_issues:\n  - {id: X, status: open}\n\nwaiver:\n  active: false\n",
+    "why": "A FAIL gate is never waived by this writer.",
+    "correct": "Refuse (fail-gate); write nothing."
+  },
+  {
+    "id": "multi-line-flow-entry",
+    "direction": "hostile",
+    "input": "schema: 1\ngate: CONCERNS\nhead: 'abc'\nupdated: '2026-11-02T00:00:00Z'\n\ntop_issues:\n  - {id: X,\n     status: open}\n\nwaiver:\n  active: false\n",
+    "why": "Closes on a later line.",
+    "correct": "Refuse (unreadable-gate); write nothing."
+  },
+  {
+    "id": "empty-gate",
+    "direction": "hostile",
+    "input": "",
+    "why": "An empty gate.",
+    "correct": "Refuse (unreadable-gate); write nothing."
+  },
+  {
+    "id": "duplicate-status-key",
+    "direction": "legitimate",
+    "input": "schema: 1\ngate: CONCERNS\nhead: 'abc'\nupdated: '2026-11-02T00:00:00Z'\n\ntop_issues:\n  - {id: X, status: open, status: open}\n\nwaiver:\n  active: false\n",
+    "why": "Every copy is waived.",
+    "correct": "Accept and plan the edit."
+  },
+  {
+    "id": "quoted-status-key",
+    "direction": "hostile",
+    "input": "schema: 1\ngate: CONCERNS\nhead: 'abc'\nupdated: '2026-11-02T00:00:00Z'\n\ntop_issues:\n  - {id: X, \"status\": open}\n\nwaiver:\n  active: false\n",
+    "why": "A quoted key is not read by the shared reader.",
+    "correct": "Refuse; write nothing."
+  },
+  {
+    "id": "empty-status-value",
+    "direction": "hostile",
+    "input": "schema: 1\ngate: CONCERNS\nhead: 'abc'\nupdated: '2026-11-02T00:00:00Z'\n\ntop_issues:\n  - {id: X, status:}\n\nwaiver:\n  active: false\n",
+    "why": "An empty value edited to `status:waived` is one key to a strict YAML parser.",
+    "correct": "Emit `status: waived` or refuse."
+  }
+]
