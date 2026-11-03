@@ -659,3 +659,99 @@ test("a flow entry that closes on a later line is refused with nothing written; 
     rmSync(fy.root, { recursive: true, force: true });
   }
 });
+
+// ─── 9. QA cycle 3 finding (T251-CR3-1): one flow extent, used by refusal and edit ──
+
+const FLOW_ENTRY =
+  /  - id: 'TASK-250-CR5-1'\n    severity: medium\n    finding: '[^']*'\n    suggested_action: '[^']*'\n    status: open\n/;
+const withFlow = (entry) => {
+  const g = GATE_250.replace(FLOW_ENTRY, entry + "\n");
+  assert.ok(g.includes(entry.split("\n")[0]), "fixture substitution applied");
+  return g;
+};
+
+test("flowSpan: one definition of the extent (balanced, nested, quoted, comment, junk, block style)", () => {
+  const { flowSpan } = require(ENGINE);
+  assert.equal(flowSpan("  - id: 'X {y}'"), null);
+  assert.equal(flowSpan("  - id: X"), null);
+  const one = flowSpan("  - {id: X, status: open}");
+  assert.deepEqual([one.open, one.close, one.commas.length], [4, 24, 1]);
+  assert.equal(
+    flowSpan("  - {id: X, a: {b: 1}, status: open}").commas.length,
+    2,
+  );
+  assert.equal(flowSpan('  - {id: "a, }b", status: open}').commas.length, 1);
+  assert.equal(flowSpan("  - {id: X, status: open} # done }").close, 24);
+  for (const bad of [
+    "  - {id: X,",
+    "  - {id: X, a: {b: 1},",
+    "  - {id: X, # note }",
+    "  - {id: X} trailing",
+    '  - {id: "unclosed',
+  ])
+    assert.equal(flowSpan(bad).unbalanced, true, bad);
+});
+
+for (const [name, entry] of [
+  [
+    "nested map, outer closes later",
+    "  - {id: X, a: {b: 1},\n     status: open}",
+  ],
+  [
+    "closing brace in a trailing comment",
+    "  - {id: X, # note }\n     status: open}",
+  ],
+  ["junk after the close", "  - {id: X, status: open} trailing"],
+  // The edit itself is right (a top-level status is appended), but the shared reader would still
+  // read the nested `status: open` as the entry's status, so the writer's own read-back refuses
+  // and nothing is written. Safe direction.
+  [
+    "a status only inside a nested map (the shared reader would still read it as open)",
+    "  - {id: X, a: {status: open}}",
+  ],
+]) {
+  test(`refuses a flow entry the extent scanner cannot read: ${name}`, () => {
+    const fx = fixture(
+      withFlow(entry),
+      REPORT("Escalating — loop limit reached"),
+    );
+    try {
+      const before = [read(fx.gate), read(fx.report)];
+      assert.equal(run(fx).reason, "unreadable-gate");
+      assert.deepEqual([read(fx.gate), read(fx.report)], before);
+    } finally {
+      rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+}
+
+for (const [name, entry, want] of [
+  [
+    "nested map on one line: only the top-level status is edited",
+    "  - {id: X, a: {b: 1}, status: open}",
+    "  - {id: X, a: {b: 1}, status: waived}\n",
+  ],
+  [
+    "a status inside a quoted string is left alone",
+    `  - {id: "status: open, x", status: open}`,
+    `  - {id: "status: open, x", status: waived}\n`,
+  ],
+  [
+    "a trailing comment is kept",
+    "  - {id: X, status: open} # keep",
+    "  - {id: X, status: waived} # keep\n",
+  ],
+]) {
+  test(`edits a flow entry the scanner reads: ${name}`, () => {
+    const fx = fixture(
+      withFlow(entry),
+      REPORT("Escalating — loop limit reached"),
+    );
+    try {
+      assert.equal(run(fx).reason, "accepted");
+      assert.ok(read(fx.gate).includes(want), read(fx.gate));
+    } finally {
+      rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+}

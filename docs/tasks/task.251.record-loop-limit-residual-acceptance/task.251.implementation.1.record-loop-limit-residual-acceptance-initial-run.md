@@ -96,6 +96,8 @@ First run of task.251: add `accept-qa-residual.js`, the one writer that records 
 - QA Cycle 1 fix (qa-fix): ran the findings inline, not through the ingester subagent — the three findings were already in context from the QA pass. Fixed T251-QA-1 (flow branch only when the dash is followed by `{`; read-back also compares entry ids), T251-CR-2 (CR/LF folded in `approvedBy` and `reason` once in `acceptResidual`), T251-QA-2 (`ok` on every plan result via thin wrappers; `state` kept). Engine suite 19/19. Mutation proof: each fix reverted turns its own test red (3 of 3), all restored. Probe re-run on `planReportEdit` with a cases file (one legitimate report, five refusals): `engages`; the same entry read `absent` before. Step 3.5 probe: phrase `accept-qa-residual`, population 7 (the four step docs, the two SKILL.md, develop-next), all `unaffected` — they state the contract (refusals, Loop exit text, 5c re-entry), which did not change. Narrowing residue: not triggered (first fix cycle). CR-3 (low/low) left open by design: unreachable with the documented layout.
 - QA Cycle 2 — changes-requested: stage-disabled. Cycle 2 was the refute pass over the whole branch (reviewer returned 3 findings; QA reproduced the medium one and found it worse than reported). Convergence check and route classifier did not apply (cycle 2: fewer than three readings; the classifier runs from cycle 3).
 - QA Cycle 2 fix (qa-fix, inline): T251-CR2-1 — `planGateEditRaw` now refuses (`unreadable-gate`, nothing written) an open entry whose dash line opens a flow mapping that does not close on that line. Engine suite 20/20. Mutation proof: refusal disabled → the new test red, restored. Step 3.5 probe: phrase `unreadable-gate`, population 1 (`develop-pipeline-resume-contract.md`, lists it as a refusal that returns to the halt) — unaffected. Not fixed, advisory (gate `recommendations.future`): CR-2 (timeout on the `qa-cycle.sh` spawn), CR-3 (audit text after a re-run).
+- QA Cycle 3 — changes-requested: stage-disabled. Convergence check: HIGH sequence 0,0,0, no trip (needs HIGH > 0). Route classifier: `continue` (not-a-pass-gate; route 2 declined: product-defect-signal). Reviewer rated its single finding low/low; QA ran the candidate, which the reviewer had not, and it reproduced.
+- QA Cycle 3 fix (qa-fix, inline). Narrowing residue: the flow-entry detection (trigger: pipeline offer, gates 2 and 3 both name `accept-qa-residual.js` at HIGH 0). Move: **consolidate** — this was the third correction of one brace heuristic (cycles 1, 2, 3). New `flowSpan` is the one definition of the extent (depth, quotes, comment, trailing junk, top-level separators); the planner refusal and `waiveEntry` both use it, and `waiveEntry` edits only a top-level `status:` segment. Engine suite 28/28. Mutation proof: comment handling off → 2 red; top-level split off → 3 red; restored. Probe on `planGateEdit` with the cycle 3 cases file: `engages` (was `present-but-inert`). Step 3.5 probe: phrases `does not close on its first line` (population 0), `flow mapping` (4 documents about unrelated YAML, none restates this). Two of my own new tests were wrong first (an off-by-two column, and a nested-only status that the shared reader would still read as open); fixed the expectations, not the scanner. A nested-only `status:` is refused by the read-back, nothing written.
 - Pre-existing, noted not fixed: `readKeysInto` in `qa-diminishing-returns.js` stops a quoted value at `}`.
 
 ---
@@ -129,6 +131,15 @@ _Track each QA review/fix cycle._
 **PR Review**: not reached — gate did not exit the loop
 **Loop exit**: n/a — this exit not taken
 **Action**: Running qa-fix (cycle 2 of 5)
+
+### QA Cycle 3 — 2026-11-03
+**Gate Result**: CONCERNS
+**Issues Found**: 1 medium — T251-CR3-1 (the flow-entry refusal added in cycle 2 guesses the mapping's extent from brace characters; a nested map and a closing brace inside a comment still pass and are edited into the wrong span). Cycle 2's finding is partly fixed (the plain multi-line case is refused).
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 3 of 5)
 
 ---
 

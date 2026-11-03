@@ -320,17 +320,17 @@ The plan names any other file the doc sweep finds, with the `git grep` that foun
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.251.qa.2.record-loop-limit-residual-acceptance.md](./task.251.qa.2.record-loop-limit-residual-acceptance.md)
-- **Gate File**: [task.251.gate.2.record-loop-limit-residual-acceptance.yml](./task.251.gate.2.record-loop-limit-residual-acceptance.yml)
+- **Full Report**: [task.251.qa.3.record-loop-limit-residual-acceptance.md](./task.251.qa.3.record-loop-limit-residual-acceptance.md)
+- **Gate File**: [task.251.gate.3.record-loop-limit-residual-acceptance.yml](./task.251.gate.3.record-loop-limit-residual-acceptance.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 7147 (`ci:fast`), 32 new
+- **Tests Executed**: 7147 (`ci:fast`), 33 new
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Key Findings
-Cycle 1's three findings are fixed and verified. The refute pass found one more medium defect: a flow-style gate entry whose mapping closes on a later line is edited into invalid YAML and reported as accepted (T251-CR2-1).
+The cycle 2 refusal works for the shape it named. A nested map and a closing brace inside a comment still pass the same brace heuristic and are edited into the wrong span (T251-CR3-1). Third cycle on one check: the recommendation is to define the flow extent once.
 
 ## Change Log
 
@@ -345,6 +345,8 @@ Cycle 1's three findings are fixed and verified. The refute pass found one more 
 | 2026-11-03 |         | QA findings fixed — 3 medium, 1 iteration | qa-fix |
 | 2026-11-03 |         | QA gate CONCERNS (92/100) — 1 medium finding | qa-task |
 | 2026-11-03 |         | QA findings fixed — 1 medium, 2 iterations | qa-fix |
+| 2026-11-03 |         | QA gate CONCERNS (92/100) — 1 medium finding | qa-task |
+| 2026-11-03 |         | QA findings fixed — 1 medium, 3 iterations | qa-fix |
 
 ## Progress Tracking
 

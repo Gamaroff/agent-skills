@@ -136,31 +136,81 @@ function topIssueSpans(lines) {
   return spans;
 }
 
+/**
+ * The ONE definition of where a flow-style entry's mapping sits on its dash line (T251-QA-1,
+ * T251-CR2-1, T251-CR3-1: three cycles corrected a brace heuristic that guessed this).
+ *
+ * Returns `null` when the dash line does not open a mapping (block style), `{ open, close, commas }`
+ * when it opens one that closes on the same line (`commas` = the top-level separators), and
+ * `{ unbalanced: true }` when it opens one that does not: the extent is not on this line, a brace
+ * sits in a comment or is unmatched, or something other than a comment follows the close. Quoted
+ * strings are skipped, and a `#` after whitespace starts a comment. The caller refuses an
+ * unbalanced entry: refusing is the safe direction for every shape this cannot read.
+ */
+function flowSpan(dash) {
+  const m = /^[ \t]*-[ \t]*\{/.exec(dash);
+  if (!m) return null;
+  const open = m[0].length - 1;
+  let depth = 0;
+  let quote = null;
+  const commas = [];
+  for (let i = open; i < dash.length; i++) {
+    const c = dash[i];
+    if (quote) {
+      if (quote === '"' && c === "\\") i++;
+      else if (c === quote) {
+        if (quote === "'" && dash[i + 1] === "'") i++;
+        else quote = null;
+      }
+      continue;
+    }
+    if (c === '"' || c === "'") quote = c;
+    else if (c === "#" && /\s/.test(dash[i - 1])) break;
+    else if (c === "{" || c === "[") depth++;
+    else if (c === "}" || c === "]") {
+      depth--;
+      if (depth === 0) {
+        return /^[ \t]*(#.*)?$/.test(dash.slice(i + 1))
+          ? { open, close: i, commas }
+          : { unbalanced: true };
+      }
+    } else if (c === "," && depth === 1) commas.push(i);
+  }
+  return { unbalanced: true };
+}
+
 /** Rewrite one entry's lines so that it reads `status: waived`. Returns the new lines. */
 function waiveEntry(entryLines, base) {
   const out = entryLines.slice();
   const dash = out[0];
-  // Flow style only when the value after the dash IS a mapping: a `{` inside a quoted block-style
-  // value (`- id: "X {y}"`) is text, not a mapping (T251-QA-1).
-  const flow = /^[ \t]*-[ \t]*\{/.exec(dash);
-  const brace = flow ? flow[0].length - 1 : -1;
-  if (brace !== -1 && dash.lastIndexOf("}") > brace) {
-    // Flow style: `- { id: X, status: open }`.
-    const close = dash.lastIndexOf("}");
-    const inner = dash.slice(brace + 1, close);
-    const statusRe = /((?:^|[,\s])status[ \t]*:[ \t]*)([^,}]*)/;
-    let next;
-    if (statusRe.test(inner)) {
-      next = inner.replace(statusRe, (m, key, val) => {
-        const trail = val.match(/[ \t]*$/)[0];
-        return `${key}waived${trail}`;
-      });
-    } else {
+  // Flow style only when the value after the dash IS a mapping (flowSpan), so a `{` inside a quoted
+  // block-style value (`- id: "X {y}"`) is text (T251-QA-1).
+  const span = flowSpan(dash);
+  if (span && span.unbalanced)
+    throw new Error(
+      "waiveEntry: a flow entry whose mapping is not on its dash line",
+    );
+  if (span) {
+    // Flow style: `- { id: X, status: open }`. Edit a TOP-LEVEL `status:` segment only: a
+    // `status:` inside a nested map or a string is not the entry's status.
+    const { open, close, commas } = span;
+    const cuts = [open, ...commas, close];
+    let done = false;
+    let inner = "";
+    for (let k = 0; k < cuts.length - 1; k++) {
+      let seg = dash.slice(cuts[k] + 1, cuts[k + 1]);
+      if (!done && /^\s*status\s*:/.test(seg)) {
+        seg = seg.replace(/^(\s*status\s*:\s*)[^]*?(\s*)$/, "$1waived$2");
+        done = true;
+      }
+      inner += (k ? "," : "") + seg;
+    }
+    if (!done) {
       const trimmed = inner.replace(/[ \t]*$/, "");
       const pad = inner.slice(trimmed.length);
-      next = `${trimmed}, status: waived${pad || " "}`;
+      inner = `${trimmed}, status: waived${pad || " "}`;
     }
-    out[0] = dash.slice(0, brace + 1) + next + dash.slice(close);
+    out[0] = dash.slice(0, open + 1) + inner + dash.slice(close);
     return out;
   }
   // Block style: a `status:` key on the dash line, or on a line at the key indent.
@@ -271,12 +321,11 @@ function planGateEditRaw(gateContent, opts) {
   // line-by-line: the block branch would leave its `status:` alone and add a stray key after it.
   // Refuse rather than write invalid YAML (T251-CR2-1).
   for (const i of openIdx) {
-    const dash = lines[spans[i].first];
-    const m = /^[ \t]*-[ \t]*\{/.exec(dash);
-    if (m && dash.lastIndexOf("}") <= m[0].length - 1)
+    const fs_ = flowSpan(lines[spans[i].first]);
+    if (fs_ && fs_.unbalanced)
       return {
         state: "unreadable-gate",
-        detail: `top_issues entry ${i + 1} opens a flow mapping that does not close on its first line — refusing to edit it line by line`,
+        detail: `top_issues entry ${i + 1} opens a flow mapping whose extent cannot be read from its first line (closes later, unmatched, or a brace in a comment) — refusing to edit it line by line`,
       };
   }
 
@@ -672,6 +721,7 @@ module.exports = {
   planReportEdit,
   topIssueSpans,
   waiveEntry,
+  flowSpan,
   parseArgs,
   main,
   MARKER,

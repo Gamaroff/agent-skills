@@ -4,7 +4,7 @@
 **Bug ID**: TASK-251-BUG-4
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 2 refute review, reproduced)
 **Date Found**: 2026-11-03
 
@@ -61,3 +61,4 @@ flow control is edited" (red when the refusal is disabled: proven).
 | ---------- | ------------ | ---------- | ----------------------------- |
 | 2026-11-03 | New          | QA         | Found in QA cycle 2           |
 | 2026-11-03 | Ready for QA | qa-fix     | Fixed with a mutation-proven test |
+| 2026-11-03 | Closed | qa-task | Verified by task.251.qa.3.record-loop-limit-residual-acceptance.md; the remaining variants are TASK-251-BUG-5 |
