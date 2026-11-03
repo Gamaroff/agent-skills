@@ -629,3 +629,33 @@ test("every plan result carries ok: true for edit/already, false for each refusa
   assert.equal(planReportEdit(rep, 9, opts).ok, false);
   assert.equal(planReportEdit("# nothing", 5, opts).ok, false);
 });
+
+// ─── 8. QA cycle 2 finding (T251-CR2-1) ─────────────────────────────────────
+
+test("a flow entry that closes on a later line is refused with nothing written; the single-line flow control is edited (T251-CR2-1)", () => {
+  const multi = GATE_250.replace(
+    /  - id: 'TASK-250-CR5-1'\n    severity: medium\n    finding: '[^']*'\n    suggested_action: '[^']*'\n    status: open\n/,
+    "  - {id: X,\n     status: open}\n",
+  );
+  assert.ok(multi.includes("{id: X,"), "fixture substitution applied");
+  const fx = fixture(multi, REPORT("Escalating — loop limit reached"));
+  try {
+    const before = [read(fx.gate), read(fx.report)];
+    const r = run(fx);
+    assert.equal(r.reason, "unreadable-gate");
+    assert.deepEqual([read(fx.gate), read(fx.report)], before);
+  } finally {
+    rmSync(fx.root, { recursive: true, force: true });
+  }
+  const single = GATE_250.replace(
+    /  - id: 'TASK-250-CR5-1'\n    severity: medium\n    finding: '[^']*'\n    suggested_action: '[^']*'\n    status: open\n/,
+    "  - {id: X, status: open}\n",
+  );
+  const fy = fixture(single, REPORT("Escalating — loop limit reached"));
+  try {
+    assert.equal(run(fy).reason, "accepted");
+    assert.ok(read(fy.gate).includes("  - {id: X, status: waived}\n"));
+  } finally {
+    rmSync(fy.root, { recursive: true, force: true });
+  }
+});

@@ -267,6 +267,19 @@ function planGateEditRaw(gateContent, opts) {
       detail: `the gate reads ${token} with no open entry — it already exits the loop`,
     };
 
+  // A flow mapping that opens on the dash line and closes on a later line cannot be edited
+  // line-by-line: the block branch would leave its `status:` alone and add a stray key after it.
+  // Refuse rather than write invalid YAML (T251-CR2-1).
+  for (const i of openIdx) {
+    const dash = lines[spans[i].first];
+    const m = /^[ \t]*-[ \t]*\{/.exec(dash);
+    if (m && dash.lastIndexOf("}") <= m[0].length - 1)
+      return {
+        state: "unreadable-gate",
+        detail: `top_issues entry ${i + 1} opens a flow mapping that does not close on its first line — refusing to edit it line by line`,
+      };
+  }
+
   // Edit bottom-up so earlier line numbers stay valid.
   const edits = [];
   for (const i of openIdx) edits.push({ kind: "entry", span: spans[i] });

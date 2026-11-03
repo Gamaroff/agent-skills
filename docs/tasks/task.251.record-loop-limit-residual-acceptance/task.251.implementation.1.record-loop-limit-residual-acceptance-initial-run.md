@@ -94,6 +94,8 @@ First run of task.251: add `accept-qa-residual.js`, the one writer that records 
 - Tests: engine 16/16, lock `.test.sh` 10/10, parity 9/9, develop-next merge rule + shape 75/75, both replay evals 15/15.
 - QA Cycle 1 — changes-requested: stage-disabled (off by default).
 - QA Cycle 1 fix (qa-fix): ran the findings inline, not through the ingester subagent — the three findings were already in context from the QA pass. Fixed T251-QA-1 (flow branch only when the dash is followed by `{`; read-back also compares entry ids), T251-CR-2 (CR/LF folded in `approvedBy` and `reason` once in `acceptResidual`), T251-QA-2 (`ok` on every plan result via thin wrappers; `state` kept). Engine suite 19/19. Mutation proof: each fix reverted turns its own test red (3 of 3), all restored. Probe re-run on `planReportEdit` with a cases file (one legitimate report, five refusals): `engages`; the same entry read `absent` before. Step 3.5 probe: phrase `accept-qa-residual`, population 7 (the four step docs, the two SKILL.md, develop-next), all `unaffected` — they state the contract (refusals, Loop exit text, 5c re-entry), which did not change. Narrowing residue: not triggered (first fix cycle). CR-3 (low/low) left open by design: unreachable with the documented layout.
+- QA Cycle 2 — changes-requested: stage-disabled. Cycle 2 was the refute pass over the whole branch (reviewer returned 3 findings; QA reproduced the medium one and found it worse than reported). Convergence check and route classifier did not apply (cycle 2: fewer than three readings; the classifier runs from cycle 3).
+- QA Cycle 2 fix (qa-fix, inline): T251-CR2-1 — `planGateEditRaw` now refuses (`unreadable-gate`, nothing written) an open entry whose dash line opens a flow mapping that does not close on that line. Engine suite 20/20. Mutation proof: refusal disabled → the new test red, restored. Step 3.5 probe: phrase `unreadable-gate`, population 1 (`develop-pipeline-resume-contract.md`, lists it as a refusal that returns to the halt) — unaffected. Not fixed, advisory (gate `recommendations.future`): CR-2 (timeout on the `qa-cycle.sh` spawn), CR-3 (audit text after a re-run).
 - Pre-existing, noted not fixed: `readKeysInto` in `qa-diminishing-returns.js` stops a quoted value at `}`.
 
 ---
@@ -118,6 +120,15 @@ _Track each QA review/fix cycle._
 **PR Review**: not reached — gate did not exit the loop
 **Loop exit**: n/a — this exit not taken
 **Action**: Running qa-fix (cycle 1 of 5)
+
+### QA Cycle 2 — 2026-11-03
+**Gate Result**: CONCERNS
+**Issues Found**: 1 medium — T251-CR2-1 (a flow-style gate entry whose mapping closes on a later line is edited into invalid YAML and reported accepted). Cycle 1's three findings verified fixed.
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
 
 ---
 

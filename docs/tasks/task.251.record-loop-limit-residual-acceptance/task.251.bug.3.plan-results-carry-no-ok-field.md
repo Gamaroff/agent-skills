@@ -4,7 +4,7 @@
 **Bug ID**: TASK-251-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-11-03
 
@@ -68,3 +68,4 @@ Before the fix the same entry read `absent`.
 | ---------- | ------------ | ---------- | ----------------------------- |
 | 2026-11-03 | New          | QA         | Found in QA cycle 1           |
 | 2026-11-03 | Ready for QA | qa-fix     | Fixed with a mutation-proven test |
+| 2026-11-03 | Closed | qa-task | Verified by task.251.qa.2.record-loop-limit-residual-acceptance.md |

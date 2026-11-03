@@ -316,21 +316,21 @@ The plan names any other file the doc sweep finds, with the `git grep` that foun
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-03
-**Quality Score**: 90/100
+**Quality Score**: 92/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.251.qa.1.record-loop-limit-residual-acceptance.md](./task.251.qa.1.record-loop-limit-residual-acceptance.md)
-- **Gate File**: [task.251.gate.1.record-loop-limit-residual-acceptance.yml](./task.251.gate.1.record-loop-limit-residual-acceptance.yml)
+- **Full Report**: [task.251.qa.2.record-loop-limit-residual-acceptance.md](./task.251.qa.2.record-loop-limit-residual-acceptance.md)
+- **Gate File**: [task.251.gate.2.record-loop-limit-residual-acceptance.yml](./task.251.gate.2.record-loop-limit-residual-acceptance.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 7147 (`ci:fast`), 29 of them new
+- **Tests Executed**: 7147 (`ci:fast`), 32 new
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Three medium findings in `accept-qa-residual.js`: a block-style entry with a brace is waived wrongly while the writer reports accepted (T251-QA-1), `--approved-by` is not newline-folded (T251-CR-2), and the plan functions carry no `ok` field so the boundary probe cannot score a refusal (T251-QA-2).
+Cycle 1's three findings are fixed and verified. The refute pass found one more medium defect: a flow-style gate entry whose mapping closes on a later line is edited into invalid YAML and reported as accepted (T251-CR2-1).
 
 ## Change Log
 
@@ -343,6 +343,8 @@ Three medium findings in `accept-qa-residual.js`: a block-style entry with a bra
 | 2026-11-03 |         | Status → ready-for-review | develop |
 | 2026-11-03 |         | QA gate CONCERNS (90/100) — 3 medium findings | qa-task |
 | 2026-11-03 |         | QA findings fixed — 3 medium, 1 iteration | qa-fix |
+| 2026-11-03 |         | QA gate CONCERNS (92/100) — 1 medium finding | qa-task |
+| 2026-11-03 |         | QA findings fixed — 1 medium, 2 iterations | qa-fix |
 
 ## Progress Tracking
 
