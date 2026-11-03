@@ -1,0 +1,240 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "7f24cc0b4b3e888b7840f942da413c93ff525a13",
+  "dirty_paths": [],
+  "document": "docs/tasks/task.250.security-probe-scratch-out-of-tree/task.250.security-probe-scratch-out-of-tree.md",
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 9,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "4deeb7cd0d7e0744cf27306d3de1f7ca5ff5e96b372306f966b4fe7fcc40a7b2",
+      "status": "PASS",
+      "description": "No security-probe test creates a file, directory or symlink under REPO_ROOT",
+      "code_citation": "shared/resources/tests/security-probe.test.mjs:4545",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:8338",
+      "members": [
+        {
+          "member": ".t128-launch- (BUG-7 own 126/127)",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:741",
+          "status": "PASS"
+        },
+        {
+          "member": ".t128-errall- (CR-3 errored-all)",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:863",
+          "status": "PASS"
+        },
+        {
+          "member": ".obs73- (totals.escaped)",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:898",
+          "status": "PASS"
+        },
+        {
+          "member": "BUG-12 PWNED-self beside fixture (13th site found in QA)",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:1022",
+          "status": "PASS"
+        },
+        {
+          "member": ".t136-source-",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:1412",
+          "status": "PASS"
+        },
+        {
+          "member": ".t136-collide-",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:1620",
+          "status": "PASS"
+        },
+        {
+          "member": ".t136-toplevel-exit-",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:1736",
+          "status": "PASS"
+        },
+        {
+          "member": ".t136-errexit-",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:1762",
+          "status": "PASS"
+        },
+        {
+          "member": "t140Libs helper (15 callers)",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:1848",
+          "status": "PASS"
+        },
+        {
+          "member": ".t140-symlink- containment (incl. in-tree symlinkSync at old 1972)",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:2017",
+          "status": "PASS"
+        },
+        {
+          "member": ".t140-fakegh- containment (incl. in-tree symlinkSync at old 2053)",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:2111",
+          "status": "PASS"
+        },
+        {
+          "member": ".t140-missing- containment",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:2450",
+          "status": "PASS"
+        },
+        {
+          "member": ".t131-mutant-",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:4474",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "All sites now build roots via fenceRoot under tmpdir(); fenceRoot refuses a root inside the repo (4548-4551); guard test (8338) fails on any REPO_ROOT-built write call; runs per-PR (test:suite, test.yml:58). Watched run 0 create events after vs 61 before (QA report 1:61). Static guard's two known blank paths (CR5-1, CR5-2) accepted by the user 2026-11-03; neither shape in the file."
+    },
+    {
+      "id": "#2",
+      "text_hash": "6a5ff1ece0b7fc4dd4206fcbd1547be8b4822a7d785356f6b5699c51a7002ad3",
+      "status": "PASS",
+      "description": "Every pre-existing test keeps its name and makes the same assertions against its root",
+      "code_citation": "docs/tasks/task.250.security-probe-scratch-out-of-tree/task.250.qa.1.security-probe-scratch-out-of-tree.md:75",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:2034",
+      "members": [
+        {
+          "member": "BUG-7 / CR-3 / obs73 shell: tests",
+          "evidence": "docs/tasks/task.250.security-probe-scratch-out-of-tree/task.250.qa.1.security-probe-scratch-out-of-tree.md:77",
+          "status": "PASS"
+        },
+        {
+          "member": "BUG-12 writes-home-tmp-self",
+          "evidence": "docs/tasks/task.250.security-probe-scratch-out-of-tree/task.250.qa.1.security-probe-scratch-out-of-tree.md:80",
+          "status": "PASS"
+        },
+        {
+          "member": "task.131 mutant",
+          "evidence": "docs/tasks/task.250.security-probe-scratch-out-of-tree/task.250.qa.1.security-probe-scratch-out-of-tree.md:81",
+          "status": "PASS"
+        },
+        {
+          "member": "task.136 x4",
+          "evidence": "docs/tasks/task.250.security-probe-scratch-out-of-tree/task.250.qa.1.security-probe-scratch-out-of-tree.md:82",
+          "status": "PASS"
+        },
+        {
+          "member": "t140Libs callers",
+          "evidence": "docs/tasks/task.250.security-probe-scratch-out-of-tree/task.250.qa.1.security-probe-scratch-out-of-tree.md:83",
+          "status": "PASS"
+        },
+        {
+          "member": "three containment tests",
+          "evidence": "docs/tasks/task.250.security-probe-scratch-out-of-tree/task.250.qa.1.security-probe-scratch-out-of-tree.md:84",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "No test( line removed in the diff; 3 assertion lines removed, each re-added re-rooted (REPO_ROOT -> root); one assertion strengthened (`is outside`, 2135). Runs per-PR via npm test (test.yml:58)."
+    },
+    {
+      "id": "#3",
+      "text_hash": "971e5a684b416565f712abe7cc0bb2b48f6672acbff69d91f2bdce2f1d6a52f9",
+      "status": "PASS",
+      "description": "Three containment tests fail when their root is wrong (premise control)",
+      "code_citation": "docs/tasks/task.250.security-probe-scratch-out-of-tree/task.250.qa.1.security-probe-scratch-out-of-tree.md:88",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "symlink containment (test at 2011)",
+          "evidence": "docs/tasks/task.250.security-probe-scratch-out-of-tree/task.250.qa.1.security-probe-scratch-out-of-tree.md:92",
+          "status": "PASS"
+        },
+        {
+          "member": "--fake-gh containment (test at 2106)",
+          "evidence": "docs/tasks/task.250.security-probe-scratch-out-of-tree/task.250.qa.1.security-probe-scratch-out-of-tree.md:93",
+          "status": "PASS"
+        },
+        {
+          "member": "missing-path containment (test at 2447)",
+          "evidence": "docs/tasks/task.250.security-probe-scratch-out-of-tree/task.250.qa.1.security-probe-scratch-out-of-tree.md:94",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Each mutated to REPO_ROOT went red; fake-gh needed the /is outside/ assertion (present at head 2135). Mutation proofs at QA report 1 lines 168-170."
+    },
+    {
+      "id": "#4",
+      "text_hash": "7c4d12c9d8203674a0de9ba81b3e4048645b9553a210131908ab6ec094857be6",
+      "status": "PASS",
+      "description": "Suite runtime grows at most 10%: median of 3 runs, base vs PR head, with uptime",
+      "code_citation": "docs/tasks/task.250.security-probe-scratch-out-of-tree/task.250.dod.1.security-probe-scratch-out-of-tree.md:53",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Bound +10%; measured -0.5% (base 77c32356 median 31.35 s, head median 31.18 s; DoD lines 50-55), command `uptime; command node --test shared/resources/tests/security-probe.test.mjs` interleaved base/head x3, load line per run (2.86-4.22). Measured on 7f24cc0b; head 38aa837b changes only the implementation report. Record is this run's DoD file, committed by 6a."
+    },
+    {
+      "id": "#5",
+      "text_hash": "9f5de56046dd95d44261148fcc3fccff4fdb9c46620a9f0f1d2056a8624336b1",
+      "status": "PASS",
+      "description": "No temp roots left behind; test-tmpdir ratchet reports no new or over-count prefix",
+      "code_citation": "shared/resources/tests/security-probe.test.mjs:4565",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:8386",
+      "members": [],
+      "non_member_fail": null,
+      "note": "fenceRoot removes root on a throwing build (4564-4567); callers remove in finally; CR-4 test (8386) proves no leak on throw. Ratchet wraps npm test (package.json:26), run per PR (test.yml:58). QA reports 1 and 3 record `ratchet ok`."
+    },
+    {
+      "id": "#6",
+      "text_hash": "057ffde4b4837e1e76374188f8305e40b9eac82f24f32830481d53e41a6ba1ac",
+      "status": "PASS",
+      "description": "One root builder: fenceRoot generalised or wrapped, no third builder",
+      "code_citation": "shared/resources/tests/security-probe.test.mjs:4541",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:8386",
+      "members": [],
+      "non_member_fail": null,
+      "note": "fenceRoot (4541) generalised; t140Libs (1848) and saRoot (5977) are thin wrappers. New mkdtempSync calls only create separate 'outside' dirs, not roots."
+    },
+    {
+      "id": "#7",
+      "text_hash": "db718878cce1cd4c32c453bb88c86abbdfffa18f178967204ffb76c61d9997b4",
+      "status": "PASS",
+      "description": "format:check and npm test pass; lint:shell if a .sh touched",
+      "code_citation": ".github/workflows/test.yml:55",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 38aa837ba0fbe293076f5b28018afebf5688ac94 — CI-state criterion: Formatting (format:check, test.yml:55) and npm test (test.yml:58) on the PR head. lint:shell not applicable (no .sh touched). Graded at Step 6 from CI reading 1.",
+      "ci_reading": "CI reading 1: SUCCESS @ 38aa837ba0fbe293076f5b28018afebf5688ac94"
+    },
+    {
+      "id": "#8",
+      "text_hash": "ef50b46013799cdae56cb726aadddb3a49ec679097f7109ebb557d98794ef146",
+      "status": "PASS",
+      "description": "Guard red on pre-change file and red on a one-site mutation",
+      "code_citation": "docs/tasks/task.250.security-probe-scratch-out-of-tree/task.250.qa.1.security-probe-scratch-out-of-tree.md:68",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "red on pre-change file",
+          "evidence": "docs/tasks/task.250.security-probe-scratch-out-of-tree/task.250.qa.1.security-probe-scratch-out-of-tree.md:68",
+          "status": "PASS"
+        },
+        {
+          "member": "red on one-site mutation",
+          "evidence": "docs/tasks/task.250.security-probe-scratch-out-of-tree/task.250.qa.1.security-probe-scratch-out-of-tree.md:166",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Pre-change run listed all 12 sites plus BUG-12 cleanup and __pycache__; one re-added REPO_ROOT mkdtempSync turned it red. Re-proved in QA reports 2-5; calibration test (8419) checks per-PR."
+    },
+    {
+      "id": "#9",
+      "text_hash": "bbfe53a34bde354f365803cafe020b013c580f843150d7d4572b96d169cc733e",
+      "status": "PASS",
+      "description": "CHANGELOG [Unreleased] cites task 250",
+      "code_citation": "CHANGELOG.md:17",
+      "test_citation": "evals/shared/tests/changelog-entry-drift.test.mjs:1",
+      "members": [],
+      "non_member_fail": null,
+      "note": "CHANGELOG.md:17 under [Unreleased] cites (task 250). criteria-drift.js clean (exit 0) vs review-commit 1a4750a2."
+    }
+  ],
+  "advisories": []
+}

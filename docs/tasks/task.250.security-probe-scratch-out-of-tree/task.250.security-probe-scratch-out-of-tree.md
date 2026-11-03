@@ -5,10 +5,12 @@ type: task
 description: "Move every scratch directory security-probe.test.mjs creates inside the live repository into a disposable temp root passed to the engine as repoRoot, so no parallel suite that walks the tree can see a half-deleted file."
 tags: [tests, security-probe, flake, parallel-tests]
 category: testing
-status: ready-for-review
+status: accepted
 priority: Low
 created: 2026-11-02
 updated: 2026-11-03
+completed_date: 2026-11-03
+pr_number: 813
 assignee:
 estimated_effort_hours: 8
 github_issue: 812
@@ -16,7 +18,7 @@ github_issue: 812
 
 # Security-probe tests write no scratch files into the repository
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.250.review.1.security-probe-scratch-out-of-tree.md` implemented 2026-11-02
 
 **GitHub Issue**: [#812](https://github.com/Gamaroff/agent-skills/issues/812)
@@ -317,12 +319,38 @@ No other file changes. `shared/resources/security-probe.mjs` is read, not edited
 
 Cycle 4's fixes hold. The static guard still has two string and template blank paths that re-split an argument list without failing: a nested template literal (TASK-250-CR5-1, medium) and a phantom string (TASK-250-CR5-2, low). Both are reproduced, and neither shape is in the file today. The QA budget is spent, so the loop escalated to a person.
 
-## Change Log
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.250.qa.5.security-probe-scratch-out-of-tree.md`
+**Gate File**: `task.250.gate.5.security-probe-scratch-out-of-tree.yml`
+**Gate Status**: ⚠️ CONCERNS (90/100)
+- The QA loop escalated at its 5-gate limit.
+- On 2026-11-03 the user accepted the residual. TASK-250-CR5-1 and TASK-250-CR5-2 are recorded as known limits of the static guard.
+- Neither shape is in the file. The runtime half (the `fenceRoot` refusal) is unaffected.
+
+**PR Review (Step 5c)**: ✅ APPROVE, `task.250.pr-review.1.security-probe-scratch-out-of-tree.md` (2 low findings, both carried)
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** All 9 met. #4 was re-measured on the PR head (−0.5%), and #7 was graded from CI reading 1.
+✅ **Tests & PR:** PR #813, 277 tests in `security-probe.test.mjs`. CI is green on `38aa837b` across 6 checks. No reviewers are required; the 5c review is APPROVE.
+✅ **Documentation:** The CHANGELOG `[Unreleased]` entry cites task 250. Nothing else applies (test-only change).
+✅ **Security Review:** PASS. Not a boundary; no secrets, unsafe exec/eval or dependency change.
+⚠️ **Compliance Review:** NOT_APPLICABLE. No personal, payment, UI or health data.
+
+**Task marked as ACCEPTED on:** 2026-11-03
+
+**Detailed Verification Log:** See `task.250.dod.1.security-probe-scratch-out-of-tree.md` for the full verification evidence.
 
 <!-- change-log-start -->
+## Change Log
 
 | Date | Version | Description | Author |
-| ---- | ------- | ----------- | ------ |
+|------|---------|-------------|--------|
 | 2026-11-02 | 1.0 | Initial draft | create-task |
 | 2026-11-02 | 1.1 | Review passed (9/10): added removal of the dead `.t140-*` `.gitignore` rule; Performance criteria now name the timing command and the `scripts/test-tmpdir.mjs` ratchet | review-task |
 | 2026-11-02 |  | Status → ready-for-development | review-task |
@@ -337,7 +365,7 @@ Cycle 4's fixes hold. The static guard still has two string and template blank p
 | 2026-11-02 |  | QA findings fixed — CR4-1 (plus cleanup CR4-2), 1 iteration | qa-fix |
 | 2026-11-02 |  | QA gate CONCERNS (90/100) — 2 findings | qa-task |
 | 2026-11-03 |  | QA loop limit escalated; residual CR5-1, CR5-2 accepted by the user as known guard limits; PR review APPROVE (2 low findings, carried) | develop-task |
-
+| 2026-11-03 | 1.2 | DoD passed — accepted (PR #813) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
