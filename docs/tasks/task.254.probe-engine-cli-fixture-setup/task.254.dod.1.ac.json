@@ -1,0 +1,207 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "989951549a52b6934a73424bacfc24330baaa191",
+  "dirty_paths": [
+    "docs/tasks/task.254.probe-engine-cli-fixture-setup/task.254.gate.2.probe-engine-cli-fixture-setup.yml",
+    "docs/tasks/task.254.probe-engine-cli-fixture-setup/task.254.implementation.1.probe-engine-cli-fixture-setup-initial-run.md",
+    "docs/tasks/task.254.probe-engine-cli-fixture-setup/task.254.pr-review.1.probe-engine-cli-fixture-setup.md",
+    "docs/tasks/task.254.probe-engine-cli-fixture-setup/task.254.probe-engine-cli-fixture-setup.md",
+    "docs/tasks/task.254.probe-engine-cli-fixture-setup/task.254.qa.2.probe-engine-cli-fixture-setup.md"
+  ],
+  "document": "docs/tasks/task.254.probe-engine-cli-fixture-setup/task.254.probe-engine-cli-fixture-setup.md",
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 12,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "1824f613e4bbd3a986d09cae56bdb9d9644efe34141bfd9596b1eabab800117b",
+      "status": "PASS",
+      "description": "cli: entry with --fixture-setup runs the setup in each case dir before the CLI (Node, Python)",
+      "code_citation": "shared/resources/security-probe.mjs:2955",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:8533",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#2",
+      "text_hash": "1c967f53f32fda70a0653bb936d93f6f1fe44f1b62b03bdfbe48649f57ebf41e",
+      "status": "PASS",
+      "description": "Failing, timed-out or escaping setup is errored, never rejected",
+      "code_citation": "shared/resources/security-probe.mjs:2955-2966",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:8575",
+      "members": [
+        {
+          "member": "setup exits non-zero",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:8601",
+          "status": "PASS"
+        },
+        {
+          "member": "setup writes to sandbox TMPDIR",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:8612",
+          "status": "PASS"
+        },
+        {
+          "member": "setup writes to sandbox HOME",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:8612",
+          "status": "PASS"
+        },
+        {
+          "member": "setup writes to a sibling case directory",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:8612",
+          "status": "PASS"
+        },
+        {
+          "member": "setup times out",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:6582",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#3",
+      "text_hash": "1249a54b4a76da1948af079eee484b42aa01b4b0b7cf4dabe92c9df8c898e69a",
+      "status": "PASS",
+      "description": "--fixture-setup still refused with shell:, shell-fn:, fence:",
+      "code_citation": "shared/resources/security-probe.mjs:4581",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:8663",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#4",
+      "text_hash": "4d487f20e71d3eba59bd55a867f33d8a753324f5fdcf9c650b1eea6026f5657d",
+      "status": "PASS",
+      "description": "T252 plan re-run on cli: with git-init setup executes a probe; recorded in QA report",
+      "code_citation": "shared/resources/security-probe.mjs:2950",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:8533",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#5",
+      "text_hash": "08ddccbdfcb47a5d934492425c54756ab3ed75f0e967e84192ddc59563525ca6",
+      "status": "PASS",
+      "description": "cannot materialise decline names the sink",
+      "code_citation": "shared/resources/security-probe.mjs:2428",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:8705",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#6",
+      "text_hash": "16f8e29f9b3618ccf136930be038082304d2839bc8820b709ae5f91f680878a5",
+      "status": "PASS",
+      "description": "cli: run without --fixture-setup spawns no extra process (asserted by a test)",
+      "code_citation": "shared/resources/security-probe.mjs:2954",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:8771",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#7",
+      "text_hash": "de3d6bdfd81cfe919fdbc26dd1a6aa7ede07ed98d17fde08b763bfb850101b76",
+      "status": "PASS",
+      "description": "One setup helper called by both arms (asserted by a test)",
+      "code_citation": "shared/resources/security-probe.mjs:3206",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:8761",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#8",
+      "text_hash": "cd4dd12c7a6a0438050eb958f8ad14b73e9a05d355d6d9e69c01e885aaeaa297",
+      "status": "PASS",
+      "description": "node --test security-probe.test.mjs passes",
+      "code_citation": ".github/workflows/test.yml:58",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 989951549a52b6934a73424bacfc24330baaa191",
+      "ci_reading": "CI reading 1: SUCCESS @ 989951549a52b6934a73424bacfc24330baaa191"
+    },
+    {
+      "id": "#9",
+      "text_hash": "08ab509a9bf03c5cad2279539489a69c71228ecdfa3acf635c8b8bd2ebf2d225",
+      "status": "PASS",
+      "description": "npm test and npm run bundle:check pass",
+      "code_citation": ".github/workflows/test.yml:58",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 989951549a52b6934a73424bacfc24330baaa191",
+      "ci_reading": "CI reading 1: SUCCESS @ 989951549a52b6934a73424bacfc24330baaa191"
+    },
+    {
+      "id": "#10",
+      "text_hash": "6a49abcf2adb491de23076accd93089355997e9df23d368ad51f3e1567085980",
+      "status": "PASS",
+      "description": "Every mutation in section 8 turns a test red",
+      "code_citation": "docs/tasks/task.254.probe-engine-cli-fixture-setup/task.254.qa.1.probe-engine-cli-fixture-setup.md:124",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "remove the cli: call to the helper",
+          "evidence": "task.254.qa.1.probe-engine-cli-fixture-setup.md:124",
+          "status": "PASS"
+        },
+        {
+          "member": "re-add the cli: refusal",
+          "evidence": "task.254.qa.1.probe-engine-cli-fixture-setup.md:125",
+          "status": "PASS"
+        },
+        {
+          "member": "inline a private setup spawn in the cli: arm",
+          "evidence": "task.254.qa.1.probe-engine-cli-fixture-setup.md:126",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#11",
+      "text_hash": "0c291a7263460690f865ba2648d3ff632f257f6004b195dc58d8ca47ac83608c",
+      "status": "PASS",
+      "description": "CHANGELOG.md records capability and changed refusal, citing task 254",
+      "code_citation": "CHANGELOG.md:9",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#12",
+      "text_hash": "0b27564b618a00531535b336d8409756640e9bd2aeee78c8f264d88e373bd310",
+      "status": "PASS",
+      "description": "Prompt and boundary rule no longer say repository state is unreachable on cli:",
+      "code_citation": "shared/resources/finalise-dod-security-prompt.md:62-65",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#2",
+      "note": "No cli:-specific test of a setup timing out; the timeout rests on the shared helper and the shell-argv test at security-probe.test.mjs:6582."
+    },
+    {
+      "ac_id": "#5",
+      "note": "Known low advisory from qa.2: the NUL branch of materialiseFixture gives path advice on the filename sink."
+    }
+  ]
+}

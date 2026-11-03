@@ -1,0 +1,67 @@
+schema: 2
+task: 'task.254.probe-engine-cli-fixture-setup'
+task_title: 'security-probe: a cli: entry can run a fixture setup'
+gate: PASS
+status_reason: 'T254-QA-1 is closed by a spawn-counting test that goes red under an extra bash spawn. The cycle-2 refute pass over the whole branch diff found no gate-level defect; two low advisory items remain.'
+reviewer: 'QA Engineer'
+head: '989951549a52b6934a73424bacfc24330baaa191'
+updated: '2026-11-03T13:08:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 285
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: ['never']
+    boundary: false
+    boundary_reason: 'The criteria word "never" is "errored, never rejected": outcome classification of a harness run, not an input gate. The one predicate-shaped function the refute pass looked at, materialiseFixture, throws on a "/" or NUL name; it existed before this change and only gained an error code. runCaseSetup returns a setup result and cannotMaterialiseDetail builds a message. The setup-escape detection reuses the watched-spawn machinery, exercised by committed tests.'
+    notes: 'A cli: setup runs with the host PATH and the gh scan is textual (carried advisory item). No sandbox escape found; the refute pass checked the setup timeout and process-group kill, and the PATH-shim test restores PATH in a finally.'
+  performance:
+    status: PASS
+    notes: 'Setup spawns only when a setup path is given; the new test observes zero bash spawns without a setup.'
+  reliability:
+    status: PASS
+    notes: 'A failing, timed-out or escaping setup is errored with a named detail. 285 tests pass; CI green on this head.'
+  maintainability:
+    status: PASS
+    notes: 'One helper, runCaseSetup, called by both arms; the stale record-field comment is fixed.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (cycle 2, low): materialiseFixture attaches MATERIALISE_NAME_CODE to the NUL branch too, so a filename-sink input with a NUL gets the "input is a path" advice. Attach the code only for "/", or add a NUL code, and test the filename sink with a NUL input.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'Carried from cycle 1: run the cli: setup with a gh-free PATH, or document the gh scan as best-effort.'
+      refs: ['shared/resources/security-probe.mjs']
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-11-03'
+  total_iterations: 1
+  verification_method: 'Committed spawn-counting test, mutation-proven by an extra bash spawn on the no-setup path'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

@@ -5,16 +5,18 @@ type: task
 description: "Let the cli: entry form take --fixture-setup (today shell-argv: only) so a Node or Python CLI that needs a git repository is probed instead of declined, and make the path-input decline say why."
 tags: [finalise, observation, security-probe]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-11-03
 updated: 2026-11-03
+completed_date: 2026-11-03
 estimated_effort_hours: 8
+pr_number: 818
 ---
 
 # Technical Task: security-probe: a cli: entry can run a fixture setup
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 > Cut from observation #152. **The observation's own remedy was wrong and is corrected here.** It asked for "a shell-argv entry form with a committed fixture-setup script". That form already exists (task.181) and takes a bash script. The gap is the Node and Python `cli:` form, which cannot take the setup. See Technical Background.
 
@@ -218,12 +220,12 @@ The set of bundled copies is defined as: files named `security-probe.mjs`, `fina
 **Scope**: the `cli:` arm with a setup; argument validation; the decline wording.
 
 **Actions**:
-- [ ] A `cli:` Node entry that exits 0 only inside a git work tree is `accepted` with a setup that runs `git init`, and `errored` (not `rejected`) when the setup exits non-zero.
-- [ ] The same for a Python entry.
-- [ ] A setup that writes outside the case directory (the sandbox HOME, and a sibling case directory) makes the run `errored`, named.
-- [ ] `--fixture-setup` is refused (exit 2, `bad-fixture-setup`) with `shell:`, `shell-fn:` and `fence:`.
-- [ ] The existing shell-argv setup tests pass unchanged.
-- [ ] **Control case**: a hostile case the setup never mentions, and a legitimate case the guard must accept, so a pass does not mean the example was recognised.
+- [x] A `cli:` Node entry that exits 0 only inside a git work tree is `accepted` with a setup that runs `git init`, and `errored` (not `rejected`) when the setup exits non-zero.
+- [x] The same for a Python entry.
+- [x] A setup that writes outside the case directory (the sandbox HOME, and a sibling case directory) makes the run `errored`, named.
+- [x] `--fixture-setup` is refused (exit 2, `bad-fixture-setup`) with `shell:`, `shell-fn:` and `fence:`.
+- [x] The existing shell-argv setup tests pass unchanged.
+- [x] **Control case**: a hostile case the setup never mentions, and a legitimate case the guard must accept, so a pass does not mean the example was recognised.
 
 **Command**: `command node --test shared/resources/tests/security-probe.test.mjs`
 
@@ -231,9 +233,9 @@ The set of bundled copies is defined as: files named `security-probe.mjs`, `fina
 
 ### Mutation
 
-- [ ] Remove the `cli:` call to the helper: the new setup test goes red. Restore.
-- [ ] Re-add the `cli:` refusal: the new acceptance test goes red. Restore.
-- [ ] Inline a private setup spawn in the `cli:` arm in place of the helper call: the escape test (a `cli:` setup writing to a sibling case directory is `errored`) goes red. This is what holds "one helper", with the structural assertion in § 9 as a second line.
+- [x] Remove the `cli:` call to the helper: the new setup test goes red. Restore.
+- [x] Re-add the `cli:` refusal: the new acceptance test goes red. Restore.
+- [x] Inline a private setup spawn in the `cli:` arm in place of the helper call: the escape test (a `cli:` setup writing to a sibling case directory is `errored`) goes red. This is what holds "one helper", with the structural assertion in § 9 as a second line.
 
 ### Consumer Tests
 
@@ -247,27 +249,27 @@ The set of bundled copies is defined as: files named `security-probe.mjs`, `fina
 
 ### Functional
 
-- [ ] `--entry cli:<node or python script> --fixture-setup <script>` runs the setup in each case directory before the CLI.
-- [ ] A setup that fails, times out, or writes outside the case directory makes the run `errored`, never `rejected` (Phase 2 states the branch).
-- [ ] `--fixture-setup` is still refused with `shell:`, `shell-fn:` and `fence:`.
-- [ ] The T252 probe plan, re-run on `cli:` with a committed setup that runs `git init`, executes at least one probe and is no longer declined `entry-not-probeable`. Command and result are recorded in the QA report. (Whether its clean control is accepted is decided in Phase 1, not promised here.)
-- [ ] The `cannot materialise` decline names the sink.
+- [x] `--entry cli:<node or python script> --fixture-setup <script>` runs the setup in each case directory before the CLI.
+- [x] A setup that fails, times out, or writes outside the case directory makes the run `errored`, never `rejected` (Phase 2 states the branch).
+- [x] `--fixture-setup` is still refused with `shell:`, `shell-fn:` and `fence:`.
+- [x] The T252 probe plan, re-run on `cli:` with a committed setup that runs `git init`, executes at least one probe and is no longer declined `entry-not-probeable`. Command and result are recorded in the QA report. (Whether its clean control is accepted is decided in Phase 1, not promised here.)
+- [x] The `cannot materialise` decline names the sink.
 
 ### Performance
 
-- [ ] A `cli:` run without `--fixture-setup` spawns no extra process (asserted by a test).
+- [x] A `cli:` run without `--fixture-setup` spawns no extra process (asserted by a test).
 
 ### Code Quality
 
-- [ ] One setup helper, called by both arms (asserted by a test that fails if either arm inlines its own).
-- [ ] `command node --test shared/resources/tests/security-probe.test.mjs` passes.
-- [ ] `npm test` and `npm run bundle:check` pass.
-- [ ] Every mutation in § 8 turns a test red.
+- [x] One setup helper, called by both arms (asserted by a test that fails if either arm inlines its own).
+- [x] `command node --test shared/resources/tests/security-probe.test.mjs` passes.
+- [x] `npm test` and `npm run bundle:check` pass.
+- [x] Every mutation in § 8 turns a test red.
 
 ### Migration
 
-- [ ] `CHANGELOG.md` records the capability and the changed refusal, citing task 254.
-- [ ] The prompt and the boundary rule no longer say repository state is unreachable on `cli:`.
+- [x] `CHANGELOG.md` records the capability and the changed refusal, citing task 254.
+- [x] The prompt and the boundary rule no longer say repository state is unreachable on `cli:`.
 
 ---
 
@@ -352,24 +354,43 @@ The set of bundled copies is defined as: files named `security-probe.mjs`, `fina
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-03
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 95/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.254.qa.1.probe-engine-cli-fixture-setup.md](./task.254.qa.1.probe-engine-cli-fixture-setup.md)
-- **Gate File**: [task.254.gate.1.probe-engine-cli-fixture-setup.yml](./task.254.gate.1.probe-engine-cli-fixture-setup.yml)
+- **Full Report**: [task.254.qa.2.probe-engine-cli-fixture-setup.md](./task.254.qa.2.probe-engine-cli-fixture-setup.md)
+- **Gate File**: [task.254.gate.2.probe-engine-cli-fixture-setup.yml](./task.254.gate.2.probe-engine-cli-fixture-setup.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 284
+- **Tests Executed**: 285
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-One MEDIUM finding: the "no extra process without a setup" criterion is held only by a record field, not a test that observes spawns (T254-QA-1). All three mutations turn a committed test red.
+No gate-level issues. The cycle-1 finding (T254-QA-1) is closed by a spawn-counting test, mutation-proven. One low advisory item: the NUL branch of `materialiseFixture` gives path advice on the `filename` sink.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report**: `task.254.qa.2.probe-engine-cli-fixture-setup.md`
+**Gate File**: `task.254.gate.2.probe-engine-cli-fixture-setup.yml` — PASS, 95/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** all 12 met, each with code and a per-PR test (CI-state criteria graded from CI reading 1)
+✅ **Tests / PR:** PR #818, CI green; Step 5c review CONCERNS with no coverage finding
+✅ **Documentation:** CHANGELOG entry citing task 254; prompt, boundary rule and security-review prompt updated, bundles regenerated
+✅ **Security Review:** PASS. The `--fixture-setup` path check is not probeable by the engine; a human override for that is recorded in the DoD file
+⚠️ **Compliance:** not applicable
+
+**Detailed Verification Log:** See `task.254.dod.1.probe-engine-cli-fixture-setup.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-03
 
 <!-- change-log-start -->
 ## Change Log
@@ -382,6 +403,8 @@ One MEDIUM finding: the "no extra process without a setup" criterion is held onl
 | 2026-11-03 |         | Implemented — 4 source files + 3 fixtures, 8 new tests (284 pass), 3 mutations red | develop |
 | 2026-11-03 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-11-03 |         | QA findings fixed — 1 finding, 1 iteration | qa-fix |
+| 2026-11-03 |         | QA gate PASS (95/100) — 0 findings | qa-task |
+| 2026-11-03 | 1.2     | DoD passed — accepted (PR #818) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -405,7 +428,7 @@ One MEDIUM finding: the "no extra process without a setup" criterion is held onl
 ### Phase 4: Documentation, bundles and proof
 - [x] Docs and CHANGELOG
 - [x] Bundle and bundle:check
-- [ ] T252 plan re-run recorded in the QA report (run done in Step 3; the QA report records it)
+- [x] T252 plan re-run recorded in the QA report (run done in Step 3; the QA report records it)
 
 ---
 
