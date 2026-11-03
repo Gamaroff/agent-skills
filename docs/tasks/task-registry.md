@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-11-03
-**Next Available Task Number:** **254**
+**Next Available Task Number:** **255**
 
 ## How to use
 
@@ -295,6 +295,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 251 | [Record loop-limit residual acceptance](task.251.record-loop-limit-residual-acceptance/task.251.record-loop-limit-residual-acceptance.md) | accepted | refactoring | Medium | 2026-11-03 | [#814](https://github.com/Gamaroff/agent-skills/issues/814) | — cut from observations #115, #150 (option 2 of the loop-limit HALT refused by the lens on task.238; hand-recorded on task.250) · PR #815 merged |
 | 252 | [migrate-doc-numbering: name every document it cannot classify](task.252.migrate-doc-numbering-name-blockers/task.252.migrate-doc-numbering-name-blockers.md) | accepted | refactoring | High | 2026-11-03 | — | — cut from the tinker-city handoff gap 1 (reproduced 2026-11-03) · PR #817 merged |
 | 253 | [migrate-doc-numbering: link, frontmatter and downstream safety nets](task.253.migrate-doc-numbering-safety-nets/task.253.migrate-doc-numbering-safety-nets.md) | planned | refactoring | Medium | 2026-11-03 | — | — cut from the tinker-city handoff gaps 2–7 (only gap 2 reproduced; Phase 1 reproduces the rest) |
+| 254 | [security-probe: a cli: entry can run a fixture setup](task.254.probe-engine-cli-fixture-setup/task.254.probe-engine-cli-fixture-setup.md) | planned | infrastructure | Medium | 2026-11-03 | — | — cut from obs #152 (which asked for a shell-argv form; that exists since task.181, the gap is `cli:`) |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
