@@ -6,6 +6,17 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **A probe that never reached the control now declines instead of reporting `absent` (task 256,
+  obs #12).** When every case, hostile and legitimate alike, fails with the same non-zero exit and
+  the same stderr, the input never reached the control: the usual cause is a multi-flag script
+  probed under `shell:`, which exits on its usage line. That run used to score `absent`, with a
+  full `executed` count, and `/finalise` published it as a missing control. **Changed verdict:** it
+  now answers `unverifiable` / `entry-not-probeable` with `executed: 0`, under every shell and CLI
+  entry form, and the decline's detail quotes the shared line. A decline is a zero-guard failure,
+  so it still stops the run. An accept-all control, a silent failure, exit 126 or 127, a usage
+  error quoting its input and a hostile-only corpus are all scored as before. No run record on disk
+  changes.
+
 - **A `cli:` probe can run a fixture setup (task 254, obs #152).** A Node or Python CLI that reads
   committed or staged repository state could not be probed: fixture files are text, `--fixture-setup`
   belonged to `shell-argv:` alone, so the engine ran zero probes, the zero-guard failed, and
