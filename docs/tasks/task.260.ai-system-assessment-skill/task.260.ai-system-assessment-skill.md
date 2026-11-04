@@ -5,17 +5,19 @@ type: task
 description: "Build a read-only skill that assesses a system, repo or project against eight AI-system best practices and produces an evidence-cited report plus a prioritised roadmap."
 tags: [skill, assessment, ai-systems, guardrails, evals, observability]
 category: other
-status: ready-for-review
+status: accepted
 priority: High
 created: 2026-11-04
 updated: 2026-11-04
+completed_date: 2026-11-04
 estimated_effort_hours: 8
 github_issue: 834
+pr_number: 837
 ---
 
 # Technical Task: ai-system-assessment skill
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **GitHub Issue**: [#834](https://github.com/Gamaroff/agent-skills/issues/834)
 
@@ -316,29 +318,29 @@ None.
 
 ### Functional
 
-- [ ] The skill produces a report with a rating, evidence and gaps for each of the eight principles.
-- [ ] Every `Strong`, `Partial` and `Gap` rating cites a `path:line` or a command; a rating with neither is `Unverified`.
-- [ ] A `Gap` lists the locations searched.
-- [ ] The skill makes no write to the target and runs none of its code. Held by the fixture-tree-unchanged test and by the Consumer Test run: the QA report records `git status --porcelain` of this repository before and after the run, differing only by the report file.
-- [ ] The roadmap orders gaps by value per effort and names a closing artefact for each. Held by the roadmap template's required `Closing artefact` and `Value` and `Effort` columns, asserted by the template-slot test.
+- [x] The skill produces a report with a rating, evidence and gaps for each of the eight principles.
+- [x] Every `Strong`, `Partial` and `Gap` rating cites a `path:line` or a command; a rating with neither is `Unverified`.
+- [x] A `Gap` lists the locations searched.
+- [x] The skill makes no write to the target and runs none of its code. Held by the fixture-tree-unchanged test and by the Consumer Test run: the QA report records `git status --porcelain` of this repository before and after the run, differing only by the report file.
+- [x] The roadmap orders gaps by value per effort and names a closing artefact for each. Held by the roadmap template's required `Closing artefact` and `Value` and `Effort` columns, asserted by the template-slot test.
 
 ### Performance
 
-- [ ] Progressive disclosure: `SKILL.md` names each checklist by path and does not inline it, and stays at most 300 lines (the repository defines no skill-size limit; 300 is this task's bound, measured with `wc -l skills/ai-system-assessment/SKILL.md` and asserted by the Phase 4 test).
-- [ ] The report is written to a single file in one run; the Consumer Test run records the file's path in the QA report.
+- [x] Progressive disclosure: `SKILL.md` names each checklist by path and does not inline it, and stays at most 300 lines (the repository defines no skill-size limit; 300 is this task's bound, measured with `wc -l skills/ai-system-assessment/SKILL.md` and asserted by the Phase 4 test).
+- [x] The report is written to a single file in one run; the Consumer Test run records the file's path in the QA report.
 
 ### Code Quality
 
-- [ ] `CI=true npm test` passes, including the new suite, which is present in the `test:suite` glob list.
-- [ ] `npm run validate -- skills/ai-system-assessment/` passes.
-- [ ] Mutation proving recorded in the QA report: removing a seeded control turns its test red.
-- [ ] Tests assert behaviour on the fixture, not strings in `SKILL.md`.
+- [x] `CI=true npm test` passes, including the new suite, which is present in the `test:suite` glob list.
+- [x] `npm run validate -- skills/ai-system-assessment/` passes.
+- [x] Mutation proving recorded in the QA report: removing a seeded control turns its test red.
+- [x] Tests assert behaviour on the fixture, not strings in `SKILL.md`.
 
 ### Migration
 
-- [ ] The skill is named in `docs/reference/commands.md` and `docs/reference/activation-phrases.md`, and `tests/skill-doc-coverage.test.js` passes without a new allowlist entry.
-- [ ] `npm run bundle:check` and `npm run check:generated` are clean.
-- [ ] The run against this repository is recorded in the QA report (not the implementation report, which is committed after `/finalise`).
+- [x] The skill is named in `docs/reference/commands.md` and `docs/reference/activation-phrases.md`, and `tests/skill-doc-coverage.test.js` passes without a new allowlist entry.
+- [x] `npm run bundle:check` and `npm run check:generated` are clean.
+- [x] The run against this repository is recorded in the QA report (not the implementation report, which is committed after `/finalise`).
 
 ---
 
@@ -468,11 +470,30 @@ Not enabled for this repository (`sign-off.enabled` is not set); no section is e
 ### Key Findings
 No open findings. The Consumer Test report path and the before and after `git status` are recorded in the QA report.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report**: `task.260.qa.3.ai-system-assessment-skill.md`
+**Gate File**: `task.260.gate.3.ai-system-assessment-skill.yml`
+**Gate Status**: ✅ PASS, 97/100
+
+✅ **Success criteria:** all 14 met, each with code, test or QA-report evidence
+✅ **PR review:** `task.260.pr-review.2…` APPROVE (PR #837)
+✅ **CI:** reading 1 SUCCESS across 6 checks on `63a591f6adae`
+✅ **Documentation:** CHANGELOG cites (task 260); both reference pages name the skill
+✅ **Security and compliance:** no boundary deliverable; compliance not applicable
+
+The four DoD checks ran inline, not by independent subagents.
+
+**Detailed Verification Log:** See `task.260.dod.1.ai-system-assessment-skill.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-04
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-04 | 1.0     | Initial draft | create-task |
 | 2026-11-04 | 1.1     | Review passed (8/10) — fixed size-limit claim, report location, signal-table test mechanism, stale registry edit, two unheld criteria | review-task |
 | 2026-11-04 |         | Status → ready-for-development | review-task |
@@ -482,6 +503,7 @@ No open findings. The Consumer Test report path and the before and after `git st
 | 2026-11-04 |         | QA gate PASS (96/100) — 0 findings | qa-task |
 | 2026-11-04 |         | QA findings fixed — cycle 2 (PR review), 1 finding | qa-fix |
 | 2026-11-04 |         | QA gate PASS (97/100) — 0 findings | qa-task |
+| 2026-11-04 | 1.2 | DoD passed — accepted (PR #837) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -535,7 +557,7 @@ No open findings. The Consumer Test report path and the before and after `git st
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 1. Implement according to implementation plan
