@@ -1,0 +1,44 @@
+[
+  {
+    "id": "apply-dirty-tree-refused",
+    "sink": "path",
+    "input": "--allow-in-flight",
+    "direction": "hostile",
+    "why": "--apply on a tree with an unrelated untracked file must not move files",
+    "correct": "--apply exits non-zero with a dirty-tree blocker (task.253 line 100)",
+    "spec_ref": "docs/tasks/task.253.migrate-doc-numbering-safety-nets/task.253.migrate-doc-numbering-safety-nets.md:100",
+    "fixture": {
+      "files": {
+        "make-dirty.flag": "1\n"
+      }
+    }
+  },
+  {
+    "id": "apply-clean-tree-accepted",
+    "sink": "path",
+    "input": "--allow-in-flight",
+    "direction": "legitimate",
+    "why": "--apply on a clean tree with no upstream proceeds (the behind check is skipped with a warning)",
+    "correct": "--apply exits 0 (task.253 line 175)",
+    "spec_ref": "docs/tasks/task.253.migrate-doc-numbering-safety-nets/task.253.migrate-doc-numbering-safety-nets.md:175",
+    "fixture": {
+      "files": {
+        "keep.flag": "1\n"
+      }
+    }
+  },
+  {
+    "id": "apply-behind-upstream-refused",
+    "sink": "path",
+    "input": "--allow-in-flight",
+    "direction": "hostile",
+    "why": "--apply on a branch behind its upstream must not move files",
+    "correct": "--apply exits non-zero with a behind-upstream blocker (task.253 line 100)",
+    "spec_ref": "docs/tasks/task.253.migrate-doc-numbering-safety-nets/task.253.migrate-doc-numbering-safety-nets.md:100",
+    "fixture": {
+      "files": {
+        "make-behind.flag": "1\n"
+      }
+    }
+  }
+]

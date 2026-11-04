@@ -1,0 +1,32 @@
+{
+  "sink": "path",
+  "entry": "cli:shared/resources/migrate-doc-numbering.mjs",
+  "name": "migrate-doc-numbering --root (checkPrdRoot containment)",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 10,
+  "passed": 10,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 1,
+  "declined_cases": [
+    {
+      "id": "path.null-byte",
+      "reason": "case-errored",
+      "detail": "fixture: cannot materialise \"safe.txt\u0000.png\": input carries a NUL"
+    }
+  ],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": [
+    "--root",
+    "{input}"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": "/home/gamaroff/Development/agent-skills/shared/resources/tests/fixtures/security-probe/migrate-doc-numbering-guard-setup.sh",
+  "ran_at": "2026-11-04T04:46:49.444Z"
+}

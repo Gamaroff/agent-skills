@@ -1,0 +1,128 @@
+[
+  {
+    "id": "name-slug",
+    "sink": "path",
+    "input": "docs/prd/onb/prd.onb.md=my-slug",
+    "direction": "legitimate",
+    "why": "one segment",
+    "correct": "--name accepts <path>=<slug> and <path>=<domain>/<slug>",
+    "spec_ref": "shared/resources/migrate-doc-numbering.mjs:363",
+    "fixture": {
+      "files": {
+        "keep.flag": "1\n"
+      }
+    }
+  },
+  {
+    "id": "name-domain-slug",
+    "sink": "path",
+    "input": "docs/prd/onb/prd.onb.md=dom/my-slug",
+    "direction": "legitimate",
+    "why": "two segments",
+    "correct": "--name accepts <path>=<slug> and <path>=<domain>/<slug>",
+    "spec_ref": "shared/resources/migrate-doc-numbering.mjs:363",
+    "fixture": {
+      "files": {
+        "keep.flag": "1\n"
+      }
+    }
+  },
+  {
+    "id": "name-three-segments",
+    "sink": "path",
+    "input": "docs/prd/onb/prd.onb.md=a/b/c",
+    "direction": "hostile",
+    "why": "more than two segments",
+    "correct": "--name refuses a value that is not <path>=<slug> or <path>=<domain>/<slug>, each lowercase kebab",
+    "spec_ref": "shared/resources/migrate-doc-numbering.mjs:363",
+    "fixture": {
+      "files": {
+        "keep.flag": "1\n"
+      }
+    }
+  },
+  {
+    "id": "name-dotdot",
+    "sink": "path",
+    "input": "docs/prd/onb/prd.onb.md=../../etc",
+    "direction": "hostile",
+    "why": "path traversal in the value",
+    "correct": "--name refuses a value that is not <path>=<slug> or <path>=<domain>/<slug>, each lowercase kebab",
+    "spec_ref": "shared/resources/migrate-doc-numbering.mjs:363",
+    "fixture": {
+      "files": {
+        "keep.flag": "1\n"
+      }
+    }
+  },
+  {
+    "id": "name-cmd-subst",
+    "sink": "path",
+    "input": "docs/prd/onb/prd.onb.md=$(touch PWNED)",
+    "direction": "hostile",
+    "why": "shell text in the value",
+    "correct": "--name refuses a value that is not <path>=<slug> or <path>=<domain>/<slug>, each lowercase kebab",
+    "spec_ref": "shared/resources/migrate-doc-numbering.mjs:363",
+    "fixture": {
+      "files": {
+        "keep.flag": "1\n"
+      }
+    }
+  },
+  {
+    "id": "name-space",
+    "sink": "path",
+    "input": "docs/prd/onb/prd.onb.md=Bad Slug",
+    "direction": "hostile",
+    "why": "not kebab",
+    "correct": "--name refuses a value that is not <path>=<slug> or <path>=<domain>/<slug>, each lowercase kebab",
+    "spec_ref": "shared/resources/migrate-doc-numbering.mjs:363",
+    "fixture": {
+      "files": {
+        "keep.flag": "1\n"
+      }
+    }
+  },
+  {
+    "id": "name-empty",
+    "sink": "path",
+    "input": "docs/prd/onb/prd.onb.md=",
+    "direction": "hostile",
+    "why": "empty slug",
+    "correct": "--name refuses a value that is not <path>=<slug> or <path>=<domain>/<slug>, each lowercase kebab",
+    "spec_ref": "shared/resources/migrate-doc-numbering.mjs:363",
+    "fixture": {
+      "files": {
+        "keep.flag": "1\n"
+      }
+    }
+  },
+  {
+    "id": "name-leading-dash",
+    "sink": "path",
+    "input": "docs/prd/onb/prd.onb.md=-x",
+    "direction": "hostile",
+    "why": "leading dash",
+    "correct": "--name refuses a value that is not <path>=<slug> or <path>=<domain>/<slug>, each lowercase kebab",
+    "spec_ref": "shared/resources/migrate-doc-numbering.mjs:363",
+    "fixture": {
+      "files": {
+        "keep.flag": "1\n"
+      }
+    }
+  },
+  {
+    "id": "name-semicolon",
+    "sink": "path",
+    "input": "docs/prd/onb/prd.onb.md=a;b",
+    "direction": "hostile",
+    "why": "shell metacharacter",
+    "correct": "--name refuses a value that is not <path>=<slug> or <path>=<domain>/<slug>, each lowercase kebab",
+    "spec_ref": "shared/resources/migrate-doc-numbering.mjs:363",
+    "fixture": {
+      "files": {
+        "keep.flag": "1\n"
+      }
+    }
+  }
+]

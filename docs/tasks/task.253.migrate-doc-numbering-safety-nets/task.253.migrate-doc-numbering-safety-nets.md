@@ -5,16 +5,18 @@ type: task
 description: "Close the remaining tinker-city handoff gaps in migrate-doc-numbering.mjs: multi-line links, a post-apply dead-link and old-path scan, frontmatter validation, a link-free registry stub, a dirty/behind guard, generated files, and a legacy-name warning for consumer scripts."
 tags: [migrate-doc-numbering, links, safety-nets]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-11-03
-updated: 2026-11-03
+updated: 2026-11-04
+completed_date: 2026-11-04
+pr_number: 823
 estimated_effort_hours: 16
 ---
 
 # migrate-doc-numbering: link, frontmatter and downstream safety nets
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.253.review.1.migrate-doc-numbering-safety-nets.md` implemented 2026-11-03
 
@@ -218,9 +220,9 @@ Generated copies under `skills/*/references/` change through `npm run bundle`.
 **Scope**: link extraction and each new report, over `memIo`.
 
 **Actions**:
-- [ ] Multi-line link matched and re-pointed.
-- [ ] Dead link in a fence reported as a warning, not rewritten.
-- [ ] Legacy-name file reported; a file with no legacy name not reported.
+- [x] Multi-line link matched and re-pointed.
+- [x] Dead link in a fence reported as a warning, not rewritten.
+- [x] Legacy-name file reported; a file with no legacy name not reported.
 
 **Command**: `command node --test shared/resources/tests/migrate-doc-numbering.test.mjs`
 
@@ -229,9 +231,9 @@ Generated copies under `skills/*/references/` change through `npm run bundle`.
 **Scope**: a real temporary git repo.
 
 **Actions**:
-- [ ] Dirty tree: dry run warns, `--apply` refuses.
-- [ ] Behind upstream: same, using a second clone as the upstream.
-- [ ] Generated file untouched and listed.
+- [x] Dirty tree: dry run warns, `--apply` refuses.
+- [x] Behind upstream: same, using a second clone as the upstream.
+- [x] Generated file untouched and listed.
 
 ### Control case
 
@@ -243,26 +245,26 @@ For the dead-link scan, include a live link and a link to an external URL that m
 
 ### Functional
 
-- [ ] On the fixture, the multi-line link resolves after `--apply`.
-- [ ] A dangling link left by the tool is printed with file and line.
-- [ ] The stub contains no link.
-- [ ] `--apply` refuses a dirty tree and a branch behind upstream.
-- [ ] A generated file is not edited.
-- [ ] A tracked script containing a legacy pattern is listed in the closing line.
+- [x] On the fixture, the multi-line link resolves after `--apply`.
+- [x] A dangling link left by the tool is printed with file and line.
+- [x] The stub contains no link.
+- [x] `--apply` refuses a dirty tree and a branch behind upstream.
+- [x] A generated file is not edited.
+- [x] A tracked script containing a legacy pattern is listed in the closing line.
 
 ### Performance
 
-- [ ] The post-apply scans read each tracked file once; the test's read counter is asserted.
+- [x] The post-apply scans read each tracked file once; the test's read counter is asserted.
 
 ### Code Quality
 
-- [ ] Tests, `npm test`, `npm run bundle:check` pass.
-- [ ] Each fix's test goes red when the fix is reverted (QA report).
+- [x] Tests, `npm test`, `npm run bundle:check` pass.
+- [x] Each fix's test goes red when the fix is reverted (QA report).
 
 ### Migration
 
-- [ ] `CHANGELOG.md` updated.
-- [ ] Gaps that did not reproduce are recorded as such in the QA report.
+- [x] `CHANGELOG.md` updated.
+- [x] Gaps that did not reproduce are recorded as such in the QA report.
 
 ---
 
@@ -366,12 +368,37 @@ For the dead-link scan, include a live link and a link to an external URL that m
 
 ### Key Findings
 No blocking findings. Both cycle 2 fixes are verified and each is held by a test that goes red when the fix is reverted. Advisory items (an unclosed fence dropping its links silently, and the gate 2 list) are recorded in the gate.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.253.qa.3.migrate-doc-numbering-safety-nets.md`
+**Gate File**: `task.253.gate.3.migrate-doc-numbering-safety-nets.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** all 11 met. Each of the six changes has a test, and each fix is mutation-proven (`task.253.review.2.mutation-proof.md`).
+✅ **Tests and CI:** PR #823, all six checks green on `afc91b30`.
+✅ **PR Review:** `task.253.pr-review.1.migrate-doc-numbering-safety-nets.md`, CONCERNS with no coverage finding.
+✅ **Documentation:** `CHANGELOG.md` entry cites task 253; the script header documents the new warning codes.
+✅ **Security Review:** PASS. The tool was probed as a boundary: 22 candidates across `--root`, `--name` and the `--apply` guard, none reproduced; the guard is mutation-proven.
+⚠️ **Compliance Review:** not applicable (internal developer CLI).
+
+Gap 3 (frontmatter validation) did not reproduce and was dropped with a regression guard.
+
+**Task marked as ACCEPTED on:** 2026-11-04
+
+**Detailed Verification Log:** See `task.253.dod.1.migrate-doc-numbering-safety-nets.md` for the complete verification evidence.
 
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-03 | 1.0     | Initial draft | create-task |
 | 2026-11-03 | 1.1     | Review passed (8/10) — re-measured 8 stale line anchors, located gap 1's cause in the migration tool's per-line apply loop (matcher is correct), listed `doc-links` callers, defined "generated" | review-task |
 | 2026-11-03 |         | Status → ready-for-development | review-task |
@@ -381,7 +408,7 @@ No blocking findings. Both cycle 2 fixes are verified and each is held by a test
 | 2026-11-03 |         | QA gate CONCERNS (90/100) — 2 findings (1 medium, 1 low) | qa-task |
 | 2026-11-03 |         | QA findings fixed — 1 iteration (gap 3 guard asserts values; maskedLinks fence tracking; fetch --prune) | qa-fix |
 | 2026-11-03 |         | QA gate PASS (100/100) — 0 findings | qa-task |
-
+| 2026-11-04 | 1.3 | DoD verified — accepted (PR #823) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
