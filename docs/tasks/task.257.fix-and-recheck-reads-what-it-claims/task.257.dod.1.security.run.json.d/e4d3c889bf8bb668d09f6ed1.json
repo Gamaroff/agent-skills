@@ -1,0 +1,31 @@
+{
+  "sink": "filename",
+  "entry": "shared/resources/finalise-fix-and-recheck.mjs#pathInScope",
+  "name": null,
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 14,
+  "passed": 14,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": [
+    [
+      "task.121.gate.20.name.yml",
+      "story.2.1.gate.020.name.yml",
+      "tâche.121.gate.21.résumé.yml",
+      "task.121.gate.22.my-long-name.yml",
+      "task 121.gate.23.name with spaces.yml"
+    ]
+  ],
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-11-04T13:23:58.384Z"
+}

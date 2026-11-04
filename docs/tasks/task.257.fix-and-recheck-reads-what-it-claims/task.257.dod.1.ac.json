@@ -1,0 +1,244 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "d5979a90c45441578da7e106c9749a20a4ec9518",
+  "dirty_paths": [
+    "docs/tasks/task.257.fix-and-recheck-reads-what-it-claims/task.257.fix-and-recheck-reads-what-it-claims.md",
+    "docs/tasks/task.257.fix-and-recheck-reads-what-it-claims/task.257.implementation.1.fix-and-recheck-reads-what-it-claims-initial-run.md",
+    "docs/tasks/task.257.fix-and-recheck-reads-what-it-claims/task.257.pr-review.1.fix-and-recheck-reads-what-it-claims.md"
+  ],
+  "document": "docs/tasks/task.257.fix-and-recheck-reads-what-it-claims/task.257.fix-and-recheck-reads-what-it-claims.md",
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 16,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "adcfd3c37584d7181cbe26f015471e6741de30660ec852e40aa19d5374366abb",
+      "status": "PASS",
+      "description": "Green named test beside failing neighbour exits 1 on mutation-proved",
+      "code_citation": "shared/resources/finalise-fix-and-recheck.mjs:290",
+      "test_citation": "shared/resources/tests/finalise-fix-and-recheck.test.mjs:923",
+      "members": [],
+      "non_member_fail": null,
+      "note": "package.json test:suite globs shared/resources/tests/*.test.mjs; .github/workflows/test.yml:58 runs npm test on every PR."
+    },
+    {
+      "id": "#2",
+      "text_hash": "c4b547abde73ab78a82e601e96327ffe6a71caa617e0fcb554bd4a00bb81ee90",
+      "status": "PASS",
+      "description": "Test-file-shaped mutationProof.test exits 1, naming the rule",
+      "code_citation": "shared/resources/finalise-fix-and-recheck.mjs:389",
+      "test_citation": "shared/resources/tests/finalise-fix-and-recheck.test.mjs:1063",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#3",
+      "text_hash": "2c48630b882fbc03cc971966e506a9b3662997f8e7f9d4d5d114b3f0e3d088ff",
+      "status": "PASS",
+      "description": "Test with its own red line proves; other failures appear in otherRed",
+      "code_citation": "shared/resources/finalise-fix-and-recheck.mjs:301",
+      "test_citation": "shared/resources/tests/finalise-fix-and-recheck.test.mjs:1093",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#4",
+      "text_hash": "6c39b3add63edd10697371ce8986dcefe2c01295846e679a5c1a0011ddb6f132",
+      "status": "PASS",
+      "description": "Docs-link clause's .md proof still exits 0",
+      "code_citation": "shared/resources/finalise-fix-and-recheck.mjs:259",
+      "test_citation": "shared/resources/tests/finalise-fix-and-recheck.test.mjs:1080",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#5",
+      "text_hash": "e5cfdb2737c31a4940e021f5c7cceab2ffeca870cae4f352cd8454ed88d9e9d4",
+      "status": "PASS",
+      "description": "skills/*/references/ and {a,b} entries in scope; outside path exits 1",
+      "code_citation": "shared/resources/finalise-fix-and-recheck.mjs:130",
+      "test_citation": "shared/resources/tests/finalise-fix-and-recheck.test.mjs:1127",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#6",
+      "text_hash": "4c5d84883d9eea5874a3c3986dd53b8e8c4c0ff8458f915021fff93ec8026f5d",
+      "status": "PASS",
+      "description": "*, ** and **/* admit nothing",
+      "code_citation": "shared/resources/finalise-fix-and-recheck.mjs:140",
+      "test_citation": "shared/resources/tests/finalise-fix-and-recheck.test.mjs:1167",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#7",
+      "text_hash": "908f54bc962f25d3add3d76e39066d0d1be2a76343585ac223df74bb8322d029",
+      "status": "PASS",
+      "description": "Low AC, docs or compliance FAIL reaches evaluator as low, on every merge path",
+      "code_citation": "shared/resources/finalise-rerun-scope.js:645",
+      "test_citation": "shared/resources/tests/finalise-rerun-scope.test.mjs:2003",
+      "members": [
+        {
+          "member": "full-run merge path",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:1924",
+          "status": "PASS"
+        },
+        {
+          "member": "scoped reported-gap merge path",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:1949",
+          "status": "PASS"
+        },
+        {
+          "member": "reported-gap overturned (PASS carries no severity)",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:1968",
+          "status": "PASS"
+        },
+        {
+          "member": "no agent verdict (carried FAIL stays ungraded)",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:1987",
+          "status": "PASS"
+        },
+        {
+          "member": "AC prompt emits severity",
+          "evidence": "shared/resources/finalise-dod-ac-prompt.md:111",
+          "status": "PASS"
+        },
+        {
+          "member": "docs prompt emits severity",
+          "evidence": "shared/resources/finalise-dod-docs-prompt.md:83",
+          "status": "PASS"
+        },
+        {
+          "member": "compliance prompt emits severity",
+          "evidence": "shared/resources/finalise-dod-compliance-prompt.md:70",
+          "status": "PASS"
+        },
+        {
+          "member": "fix-evidence prompt emits severity",
+          "evidence": "shared/resources/finalise-dod-fix-evidence-prompt.md:107",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#8",
+      "text_hash": "9d8531237ba8265430ef74a756c61b3184b3ff068bf2b659456899cdd2a11f46",
+      "status": "PASS",
+      "description": "A FAIL with no severity is still refused",
+      "code_citation": "shared/resources/finalise-rerun-scope.js:645",
+      "test_citation": "shared/resources/tests/finalise-rerun-scope.test.mjs:2003",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#9",
+      "text_hash": "2f4fdb39cb3940f23234a6b179ddc31bc961a7eab5671c560bba1a05ae0f10c1",
+      "status": "PASS",
+      "description": "Oversized brace list refused within default timeout, not expanded",
+      "code_citation": "shared/resources/finalise-fix-and-recheck.mjs:77",
+      "test_citation": "shared/resources/tests/finalise-fix-and-recheck.test.mjs:1228",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#10",
+      "text_hash": "57f749a648fdf70974981f3597063ad11da3ba42de6b4290386b1eeb68306354",
+      "status": "PASS",
+      "description": "Matching linear per entry by reusing glob-match.js, no new matcher",
+      "code_citation": "shared/resources/finalise-fix-and-recheck.mjs:59",
+      "test_citation": "shared/resources/tests/finalise-fix-and-recheck.test.mjs:1127",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#11",
+      "text_hash": "385314b35ffe628c8e17a419022c0e5075122c39cb339a46d1416ed2a07989c2",
+      "status": "PASS",
+      "description": "No second glob matcher is added",
+      "code_citation": "shared/resources/finalise-fix-and-recheck.mjs:59",
+      "test_citation": "NOT_APPLICABLE: no dedicated test; the diff adds no matcher module",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Absence criterion, resting on the diff file list."
+    },
+    {
+      "id": "#12",
+      "text_hash": "956d2de0982d24cd91872b8277919fde916284ab68fa8ea8c6fb52aee933cfcb",
+      "status": "PASS",
+      "description": "npm test, CI=true npm test and bundle:check pass",
+      "code_citation": ".github/workflows/test.yml:58",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 2e02d40bfe547c4d06f2698988eac0ba1e9600ff — Asks CI to pass npm test and bundle:check.",
+      "ci_reading": "CI reading 1: SUCCESS @ 2e02d40bfe547c4d06f2698988eac0ba1e9600ff"
+    },
+    {
+      "id": "#13",
+      "text_hash": "1985880866c1d043a4a30d452a0a1e4623f31875bf016df3a809e13f29b6f93f",
+      "status": "PASS",
+      "description": "npm run validate -- skills/finalise/ passes",
+      "code_citation": ".github/workflows/validate.yml:73",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 2e02d40bfe547c4d06f2698988eac0ba1e9600ff — Run by the validate.yml CI job.",
+      "ci_reading": "CI reading 1: SUCCESS @ 2e02d40bfe547c4d06f2698988eac0ba1e9600ff"
+    },
+    {
+      "id": "#14",
+      "text_hash": "3595aa7dd5fd13abd515e6f517d125fc4d30b63dee1939fc2609613529d059b9",
+      "status": "PASS",
+      "description": "Every mutation in section 8 turns a test red, recorded in the QA report",
+      "code_citation": "docs/tasks/task.257.fix-and-recheck-reads-what-it-claims/task.257.qa.2.fix-and-recheck-reads-what-it-claims.md:74",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "First pass FAILed (record only in the implementation report); the six mutations were re-run during this finalise, recorded in the QA report (commit 2e02d40b) and re-judged by a second agent: all six members PASS."
+    },
+    {
+      "id": "#15",
+      "text_hash": "ecc4bc56d7fb27efb87e42fec598b923ae3da003de176158fbcc18d56ecc9f26",
+      "status": "PASS",
+      "description": "Step 8a template and preconditions file state the new test rule",
+      "code_citation": "shared/resources/finalise-fix-and-recheck-preconditions.json:25",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Documentation criterion; skills/finalise/SKILL.md Step 8a states the same rule."
+    },
+    {
+      "id": "#16",
+      "text_hash": "2b5bfe852bf6a246e9f59eb7d94c4f97eb52d4248b0303ea756fd52d03d4b1ef",
+      "status": "PASS",
+      "description": "CHANGELOG records the changed proof rule and scope notation, citing task 257",
+      "code_citation": "CHANGELOG.md:9",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#12",
+      "note": "QA 1 and QA 2 report a pre-existing local ci-tool-skips failure (zsh absent locally). CI installs zsh, so CI reading 1 decides."
+    }
+  ]
+}
