@@ -239,3 +239,18 @@ never uses (`MISSING … has a shared source but no bundled copy`). It has cost 
 and `yaml-subset.js`. Assemble such paths from parts in the test, as `handoff-verify.test.js` does
 (`const REFS = "refer" + "ences"`, `const SHARED = "shared/" + "resources"`). The real fix, a `tests/`
 exclusion in `bundle_skill.py`, is not filed.
+
+### `/finalise` must read the QA report for process criteria BEFORE the DoD run
+
+A success criterion that asks for a **record** ("the six mutations are recorded", "the measurement is
+logged") is graded by the DoD agent against **committed** artifacts. The implementation report is
+committed only after `/finalise` finishes (Step 8), so a record that lives only there fails as
+missing. On task 257 (2026-11-04) criterion 14 asked for the task's six §8 mutations to be recorded;
+they were in the implementation report alone, so the first DoD pass failed it. The fix cost a full
+re-run of all six mutations, a table in the QA report, a commit and a second agent to re-judge.
+
+Before dispatching the DoD agents, read the newest `{stem}.qa.{N}.*.md` and list every criterion that
+asks for a record. For each one, confirm the evidence is in a **committed** QA report, gate file or DoD
+file; if it is not, write it there first. The task-authoring side already names a location for such a
+criterion (`create-task` §3.5, obs #105, #77, task 249; `review-task` Step 3 check 22). This is the
+finalise side of the same rule, and it is a procedure step to carry out, not a check that exists yet.
