@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-11-04
-**Next Available Task Number:** **260**
+**Next Available Task Number:** **261**
 
 ## How to use
 
@@ -301,6 +301,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 257 | [finalise fix-and-recheck reads severity, scope and the named test](task.257.fix-and-recheck-reads-what-it-claims/task.257.fix-and-recheck-reads-what-it-claims.md) | accepted | refactoring | Medium | 2026-11-04 | [#826](https://github.com/Gamaroff/agent-skills/issues/826) | — cut from obs #61, #131, #132 (proof rule tightened as the gate widens) · PR #829 merged |
 | 258 | [finalise fix-and-recheck reads test names, scope entries and run logs as written](task.258.fix-and-recheck-reads-inputs-as-written/task.258.fix-and-recheck-reads-inputs-as-written.md) | accepted | refactoring | Medium | 2026-11-04 | [#830](https://github.com/Gamaroff/agent-skills/issues/830) | — cut from task 257's QA gate 2 advisories CR2-1 to CR2-4 (CR-4 and CR-6 stay out) · PR #832 merged |
 | 259 | [finalise checks record criteria before the DoD run](task.259.finalise-checks-record-criteria-before-dod/task.259.finalise-checks-record-criteria-before-dod.md) | accepted | refactoring | Medium | 2026-11-04 | [#831](https://github.com/Gamaroff/agent-skills/issues/831) | — turns the `traps.md` record-criteria trap into a check; independent of task 258 · PR #833 merged |
+| 260 | [ai-system-assessment skill](task.260.ai-system-assessment-skill/task.260.ai-system-assessment-skill.md) | planned | other | High | 2026-11-04 | [#834](https://github.com/Gamaroff/agent-skills/issues/834) | — read-only skill that rates a target against eight AI-system practices; the collector script is a possible follow-up |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
