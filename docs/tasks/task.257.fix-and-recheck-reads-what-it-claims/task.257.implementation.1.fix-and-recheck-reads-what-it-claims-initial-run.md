@@ -36,8 +36,8 @@ Run task 257 through the full develop-task pipeline: tighten the Step 8a mutatio
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Phases 1–4 done inline; 6 mutations proven red then restored; 178 tests green in the four touched files | —                    | 2026-11-04T13:02Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #829; #826 commented; PR body written by hand (summariser subagent not dispatched) | —                    | 2026-11-04T13:12Z |
 | 5–6. qa-task / qa-fix loop | ✅ Done | `task.257.qa.{N}.*.md`; `task.257.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 2 cycles: CONCERNS 70 → PASS 90; 5c CONCERNS, 0 open coverage | —                    | 2026-11-04T13:18Z |
-| 7. finalise                | ⏳ Pending | `task.257.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 7. finalise                | ✅ Done | `task.257.dod.{N}.*.md`; task `status: accepted`                       | DoD 16/16; accepted; CI reading 1 SUCCESS @ `2e02d40bfe54`; reading 2 SUCCESS (tree-equivalent to d5979a90c454) @ `b68de43a7288`; #826 closed | —                    | 2026-11-04T13:36Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Report committed and pushed | —                    | 2026-11-04T13:38Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -97,10 +97,10 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-11-04T13:38Z
+**Final Status**: Completed
 **Branch**: feature/task.257.fix-and-recheck-reads-what-it-claims
 **PR**: https://github.com/Gamaroff/agent-skills/pull/829
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 2
+**DoD Summary**: `task.257.dod.1.fix-and-recheck-reads-what-it-claims.md` — accepted. Deviation: AC #14 (the six §8 mutations) failed on the first pass, was fixed by re-running them and recording them in the QA report, then re-judged by a second agent.
+**Tracker debt**: none
