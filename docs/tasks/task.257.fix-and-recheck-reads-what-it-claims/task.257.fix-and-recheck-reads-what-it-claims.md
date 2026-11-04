@@ -5,7 +5,7 @@ type: task
 description: "Make /finalise Step 8a reachable for a low acceptance-criteria, docs or compliance finding, read a Files Summary in the notation authors use, and stop accepting a mutation proof for a test that did not go red."
 tags: [finalise, observation]
 category: refactoring
-status: ready-for-development
+status: ready-for-review
 priority: Medium
 created: 2026-11-04
 updated: 2026-11-04
@@ -15,7 +15,7 @@ github_issue: 826
 
 # Technical Task: finalise fix-and-recheck reads severity, scope and the named test
 
-**Status:** Ready for Development
+**Status:** Ready for Review
 
 **Review**: ✅ All review recommendations from `task.257.review.1.fix-and-recheck-reads-what-it-claims.md` implemented 2026-11-04
 
@@ -389,6 +389,27 @@ The set is defined as: copies of items 1 to 7 under `skills/`. Command: `find sk
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-04
+**Quality Score**: 70/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.257.qa.1.fix-and-recheck-reads-what-it-claims.md](./task.257.qa.1.fix-and-recheck-reads-what-it-claims.md)
+- **Gate File**: [task.257.gate.1.fix-and-recheck-reads-what-it-claims.yml](./task.257.gate.1.fix-and-recheck-reads-what-it-claims.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 178
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+Two reproduced medium bugs in the new readers (path-guard normalisation bypass, TODO/SKIP read as red) and an unprobeable scope predicate.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -397,6 +418,8 @@ The set is defined as: copies of items 1 to 7 under `skills/`. Command: `find sk
 | 2026-11-04 | 1.0     | Initial draft — cut from observations #61, #131, #132 | create-task |
 | 2026-11-04 | 1.1     | Review passed (8/10) — added the pinned-message assertions to Phase 1 | review-task |
 | 2026-11-04 |         | Status → ready-for-development                        | review-task |
+| 2026-11-04 |         | QA gate CONCERNS (70/100) — 3 findings                | qa-task     |
+| 2026-11-04 |         | QA findings fixed — 3 of 3, 1 iteration               | qa-fix      |
 <!-- change-log-end -->
 
 ---
@@ -447,7 +470,7 @@ The set is defined as: copies of items 1 to 7 under `skills/`. Command: `find sk
 
 ---
 
-**Status:** Ready for Development
+**Status:** Ready for Review
 
 **Next Steps**:
 1. Implement according to the plan with `/develop-task`.

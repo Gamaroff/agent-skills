@@ -114,9 +114,27 @@ function expandBraces(entry) {
  */
 const isPlainRelativePath = (p) =>
   typeof p === "string" &&
+  p === p.trim() &&
+  !p.includes("\\") &&
+  !/[\0-\x1f]/.test(p) &&
   !p.startsWith("/") &&
-  !/[\0\r\n]/.test(p) &&
-  !p.split("/").includes("..");
+  // Judged in the form the matcher sees: no `..`, `.` or empty segment.
+  p.split("/").every((s) => s !== "" && s !== "." && s !== "..");
+
+/**
+ * Is `p` inside the Files Summary? (task 257; QA cycle 1, T257-BOUNDARY-1.)
+ * A pure predicate so the probe engine can reach it: the exact string admits
+ * itself, and a canonical relative path is matched against the entries read as
+ * pathspecs. A scope that is not a list admits nothing.
+ */
+export function pathInScope(p, filesSummary) {
+  if (!isList(filesSummary)) return false;
+  if (filesSummary.includes(p)) return true;
+  return (
+    isPlainRelativePath(p) &&
+    matchesAnyGlob(p, filesSummary.flatMap(entryPatterns))
+  );
+}
 
 /** A path with at least one segment that is neither empty nor a wildcard. */
 const hasLiteralSegment = (p) =>
@@ -250,7 +268,15 @@ const TEST_FILE_SHAPE = /\.(?:test|spec)\.(?!md$)[A-Za-z0-9]+$/;
 function subjectNames(subject, test) {
   if (!subject.startsWith(test)) return false;
   const rest = subject.slice(test.length);
-  return /^(?:\s*$|\s\(\d+(?:\.\d+)?\s?m?s\)\s*$|\s#\s|:\d)/.test(rest);
+  // A TAP `# TODO` / `# SKIP` directive marks an expected failure or a skipped
+  // test: neither is a red (QA cycle 1, T257-CR-2).
+  if (/^\s#\s*(?:todo|skip)/i.test(rest)) return false;
+  // `:<line>` ends the name only for a path (the docs-link clause's
+  // `✖ <file>:<line>`); after a plain title it is another test's name (CR-3).
+  const pathy = test.includes("/") || /\.md$/.test(test);
+  return new RegExp(
+    `^(?:\\s*$|\\s\\(\\d+(?:\\.\\d+)?\\s?m?s\\)\\s*$|\\s#\\s${pathy ? "|:\\d" : ""})`,
+  ).test(rest);
 }
 
 /**
@@ -342,10 +368,8 @@ const CHECKS = Object.freeze({
     // (task.152, obs #155).
     // An entry is read as a pathspec (task 257, obs #132): the exact string
     // still admits itself, and the notation authors write admits the rest.
-    const patterns = f.filesSummary.flatMap(entryPatterns);
     const inScope = (p) =>
-      f.filesSummary.includes(p) ||
-      (isPlainRelativePath(p) && matchesAnyGlob(p, patterns)) ||
+      pathInScope(p, f.filesSummary) ||
       (isWorkItemDocument(f.documentPath) && p === f.documentPath) ||
       (isList(f.artifactPaths) &&
         f.artifactPaths.includes(p) &&

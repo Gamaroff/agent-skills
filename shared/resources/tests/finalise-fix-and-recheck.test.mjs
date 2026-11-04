@@ -33,6 +33,7 @@ import {
   isWorkItemDocument,
   isCoLocatedArtifact,
   parseWorkItemName,
+  pathInScope,
 } from "../finalise-fix-and-recheck.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -980,6 +981,50 @@ test("control: other titles the task never mentions, red test last and first (ta
   }
 });
 
+function textRun(name, text) {
+  const p = join(RUN_DIR, `${name}.log`);
+  writeFileSync(p, text);
+  return p;
+}
+
+test("a TODO or SKIP directive is not a red proof (QA cycle 1, T257-CR-2)", () => {
+  for (const directive of ["# TODO known", "# SKIP nope", "# todo later"]) {
+    const run = textRun("dir", `not ok 1 - foo ${directive}\n`);
+    assert.equal(
+      evaluateFixAndRecheck(proofFor("foo", run)).proceed,
+      false,
+      directive,
+    );
+  }
+  // Control: the same line without a directive proves; so does a duration.
+  assert.equal(
+    evaluateFixAndRecheck(proofFor("foo", textRun("ok1", "not ok 1 - foo\n")))
+      .proceed,
+    true,
+  );
+  assert.equal(
+    evaluateFixAndRecheck(proofFor("foo", textRun("ok2", "✖ foo (3.2ms)\n")))
+      .proceed,
+    true,
+  );
+});
+
+test("the `:<line>` boundary belongs to a file-shaped name only (QA cycle 1, T257-CR-3)", () => {
+  // A plain title followed by `:12` is another test's name, not the title.
+  const run = textRun("colon", "✔ foo (1ms)\n✖ foo:12 something else (1ms)\n");
+  assert.equal(evaluateFixAndRecheck(proofFor("foo", run)).proceed, false);
+  // The docs-link clause names a repo-relative .md path and keeps its proof.
+  const docs = textRun(
+    "docs",
+    "✖ docs/tasks/task.9/task.9.md:12 → dead link\nFAIL doc-links: 1\n",
+  );
+  assert.equal(
+    evaluateFixAndRecheck(proofFor("docs/tasks/task.9/task.9.md", docs))
+      .proceed,
+    true,
+  );
+});
+
 test("a title that is a prefix of a failing title does not prove (task 257)", () => {
   const run = realRun("prefix", [
     ["alpha gate", true],
@@ -1146,6 +1191,37 @@ test("scope: a pattern never admits a traversal, an absolute path or a path with
     admitted(dir, "skills/a/references/x..y.js"),
     true,
     "`..` inside a name is not traversal",
+  );
+});
+
+test("scope: a path the matcher would normalise is judged in its normalised form (QA cycle 1, T257-CR-1)", () => {
+  const dir = ["skills/**", "etc/", "src/*/x.js", "src/"];
+  for (const bad of [
+    "skills\\a\\..\\..\\..\\etc\\passwd",
+    "\\etc\\passwd",
+    " /etc/passwd",
+    "src/a.js ",
+    "src/a.js\t",
+    "src/./x.js",
+    "src//x.js",
+    "./src/a.js/../../b.js",
+  ]) {
+    assert.equal(admitted(dir, bad), false, JSON.stringify(bad));
+  }
+  // Controls: canonical paths still match.
+  assert.equal(admitted(dir, "src/a/x.js"), true);
+  assert.equal(admitted(dir, "skills/a/b.md"), true);
+});
+
+test("pathInScope: the exported scope predicate agrees with the gate (QA cycle 1, T257-BOUNDARY-1)", () => {
+  assert.equal(pathInScope("a/b.js", ["a/"]), true);
+  assert.equal(pathInScope("c/b.js", ["a/"]), false);
+  assert.equal(pathInScope("a/../c.js", ["a/"]), false);
+  assert.equal(pathInScope("a/b.js", []), false);
+  assert.equal(
+    pathInScope("a/b.js", "a/"),
+    false,
+    "a non-list scope admits nothing",
   );
 });
 
