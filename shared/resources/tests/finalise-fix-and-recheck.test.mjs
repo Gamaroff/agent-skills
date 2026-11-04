@@ -1272,3 +1272,105 @@ test("--json prints otherRed (task 257)", () => {
   assert.equal(out.status, 0, out.stdout + out.stderr);
   assert.deepEqual(JSON.parse(out.stdout).otherRed, ["bystander red"]);
 });
+
+// ---------------------------------------------------------------------------
+// task 258 — the evaluator reads its input the way people and runners write it
+// (CR2-1 to CR2-4 from task 257's QA gate 2). Each test was run red on the
+// unchanged tree before its fix.
+
+test("a test file is refused by name in every common spelling and any letter case (task 258, CR2-1)", () => {
+  for (const file of [
+    "tests/x.TEST.js",
+    "tests/x_test.go",
+    "tests/x.sh",
+    "test_foo.py",
+    "lib/Y.Spec.TS",
+    "pkg/parse_test.py",
+    "src/__tests__/a.js",
+  ]) {
+    const r = evaluateFixAndRecheck(proofFor(file, RED_RUN));
+    assert.equal(r.proceed, false, file);
+    assert.equal(r.failed[0].id, "mutation-proved", file);
+    assert.match(
+      r.failed[0].detail,
+      /a test file — name the test by its title/,
+      file,
+    );
+  }
+});
+
+test("controls: a real title that mentions test, a dir or a slash is not refused as a file (task 258, CR2-1)", () => {
+  for (const title of [
+    "test_parse_title",
+    "tests dir is skipped",
+    "GET /v1 tests the route",
+    "docs/tests/x.md",
+  ]) {
+    const run = textRun("ctl-title", `✖ ${title} (1ms)\n`);
+    const r = evaluateFixAndRecheck(proofFor(title, run));
+    assert.equal(r.proceed, true, `${title}: ${JSON.stringify(r.failed)}`);
+  }
+});
+
+test("scope: a Files Summary entry written ./x, /x or in backticks means x (task 258, CR2-2)", () => {
+  for (const entry of [
+    "./src/a.js",
+    "/src/a.js",
+    "`src/a.js`",
+    "./`src/a.js`",
+  ]) {
+    assert.equal(
+      pathInScope("src/a.js", [entry]),
+      entry !== "./`src/a.js`",
+      entry,
+    );
+  }
+  // A directory prefix, however it is spelled.
+  assert.equal(pathInScope("src/a.js", ["./src/"]), true);
+  assert.equal(pathInScope("srcx/a.js", ["./src/"]), false);
+  assert.equal(pathInScope("src/a.js", ["`./src/`"]), true);
+  // Controls: normalising an entry never widens the candidate or the scope.
+  assert.equal(pathInScope("/etc/passwd", ["/src/a.js"]), false);
+  assert.equal(pathInScope("etc/passwd", ["/src/a.js"]), false);
+  assert.equal(pathInScope("src/b.js", ["./src/a.js"]), false);
+  assert.equal(pathInScope("src/a.js", ["./**"]), false, "no literal segment");
+  assert.equal(pathInScope("src/a.js", ["/"]), false);
+  // An exact entry that was admitted before still is.
+  assert.equal(pathInScope("src/a.js", ["src/a.js"]), true);
+});
+
+test("a CRLF run log is read like an LF one (task 258, CR2-3)", () => {
+  const lf = realRun("crlf-source", [
+    ["crlf title", false],
+    ["other crlf green", true],
+  ]);
+  const crlf = textRun("crlf", readFileSync(lf, "utf8").replace(/\n/g, "\r\n"));
+  assert.equal(
+    evaluateFixAndRecheck(proofFor("crlf title", crlf)).proceed,
+    true,
+  );
+  assert.equal(evaluateFixAndRecheck(proofFor("crlf title", lf)).proceed, true);
+  // Control: a CR inside a title (not at the line end) is still part of it.
+  const inner = textRun("cr-inner", "✖ foo\rbar (1ms)\n");
+  assert.equal(evaluateFixAndRecheck(proofFor("foo", inner)).proceed, false);
+});
+
+test("the `:<digit>` boundary belongs to a .md proof path, not to any title with a slash (task 258, CR2-4)", () => {
+  const colon = textRun(
+    "slash-colon",
+    "✔ GET /v1 (1ms)\n✖ GET /v1:5 stuff (1ms)\n",
+  );
+  assert.equal(
+    evaluateFixAndRecheck(proofFor("GET /v1", colon)).proceed,
+    false,
+  );
+  // Controls: the same title proves on its own red line, and a .md path with
+  // `:12` still proves (the docs-link clause).
+  const own = textRun("slash-own", "✖ GET /v1 (1ms)\n");
+  assert.equal(evaluateFixAndRecheck(proofFor("GET /v1", own)).proceed, true);
+  const docs = textRun("slash-docs", "✖ docs/a/b.md:12 → dead link\n");
+  assert.equal(
+    evaluateFixAndRecheck(proofFor("docs/a/b.md", docs)).proceed,
+    true,
+  );
+});

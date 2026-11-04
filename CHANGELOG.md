@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`/finalise` Step 8a fix-and-recheck reads its input the way people and runners write it
+  (task 258, CR2-1 to CR2-4).** Four edges of the evaluator closed. (CR2-1) A `mutationProof.test`
+  that names a test file is refused in every common spelling and any letter case (`x.TEST.js`,
+  `x_test.go`, `test_foo.py`, `tests/x.sh`); a name with whitespace is still a title. (CR2-2) A Files
+  Summary entry written `./src/a.js`, `/src/a.js` or in backticks is read as `src/a.js`; the
+  candidate path guard is unchanged. (CR2-3) A CRLF run log is read like an LF one. (CR2-4) The
+  `:<digit>` boundary applies to a `.md` proof path only, not to any title with a slash.
+  **Changed refusal:** a record naming a file such as `tests/x.sh` or `test_foo.py` now halts on
+  `mutation-proved`.
+
 - **`/finalise` Step 8a fix-and-recheck reads what it claims (task 257, obs #131, #132, #133).**
   Three evaluator gaps closed. (1) **Severity:** the AC, docs, compliance and fix-evidence prompts
   now grade every FAIL (`low | medium | high`, with the security prompt's fail-closed wording), and

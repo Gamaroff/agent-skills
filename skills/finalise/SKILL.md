@@ -3117,7 +3117,8 @@ line `Fix-and-recheck refused: {ids}` in the gap report's Blocking Issues Summar
   file's rule 2). On task.207 a revert deleted one line of a guard prettier had split across two,
   every call then returned null, and two unrelated tests went red, which proves nothing about the
   guard (obs #61). `mutationProof.test` is the **test's title** as the runner prints it (the text
-  after `not ok N -` / `✖`), never a test file path: the evaluator refuses a file-shaped value, and it
+  after `not ok N -` / `✖`), never a test file path: the evaluator refuses a file-shaped value (`*.test.*`, `*.spec.*`,
+  `*_test.*`, `test_*.*`, or a file under `test/`, `tests/` or `__tests__/`, in any case), and it
   accepts the proof only when a `not ok` / `✖` / `FAIL` line **starts with that title** and ends at the
   line end, a duration, a `# ` directive or `:<line>`. A neighbouring test's red line, a title that is
   only a prefix of the red one, and a bare `ℹ fail N` count do not pass it (obs #133). Other red lines
