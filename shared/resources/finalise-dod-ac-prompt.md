@@ -108,6 +108,7 @@ ac_traceability:
     - ac_id: "AC1"
       description: "brief AC description (≤15 words)"
       status: PASS | FAIL | DEFERRED-CI      # DEFERRED-CI only for a CI-state criterion (Step 3)
+      severity: low | medium | high         # REQUIRED on a FAIL (Severity rule below); omit on PASS / DEFERRED-CI
       code_citation: "path/to/file.ts:NN"   # null if not found
       test_citation: "path/to/file.spec.ts:NN"  # null if not found, or "NOT_APPLICABLE: reason"
       test_runs_per_pr: true | false | null     # false → status must be FAIL; name the lane in note. null only when test_citation is NOT_APPLICABLE
@@ -120,6 +121,7 @@ ac_traceability:
   docs:
     - item: "description of doc item"
       status: PASS | FAIL | NOT_APPLICABLE
+      severity: low | medium | high    # REQUIRED on a FAIL (Severity rule below); omit otherwise
       citation: "path/to/file.md:NN"   # null if not found
       note: "optional, required if NOT_APPLICABLE"
   advisories:                                   # findings outside the Step 0 scope; [] when none
@@ -132,3 +134,5 @@ ac_traceability:
 **Citation rule**: `status: PASS` requires a non-null citation. Null citation → `status: FAIL`. `NOT_APPLICABLE` must have a `note`.
 
 **Execution rule**: for acceptance criteria with a test citation, `status: PASS` additionally requires `test_runs_per_pr: true`. A cited test in a lane the PR does not run is a citation, not evidence → `status: FAIL` with the lane named in `note`. The `NOT_APPLICABLE` kinds in Step 3 carry `null` here and are judged by their own rules.
+
+**Severity rule**: every FAIL carries `severity`. It is what lets `/finalise` take the bounded fix-and-recheck path (Step 8a) on a low finding instead of halting a hands-free run. `low`: one member or one check, where the code's behaviour is right or it fails closed, such as a missing test for a correct branch or one wrong doc line. `medium`: behaviour is wrong for a member. `high`: the criterion is undelivered, or it fails open. More than one failed member is not low. A FAIL with no `severity` is read as not low and halts, so leaving it off is never the lenient choice.

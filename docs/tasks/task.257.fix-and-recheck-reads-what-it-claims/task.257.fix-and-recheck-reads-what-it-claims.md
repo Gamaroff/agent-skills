@@ -5,7 +5,7 @@ type: task
 description: "Make /finalise Step 8a reachable for a low acceptance-criteria, docs or compliance finding, read a Files Summary in the notation authors use, and stop accepting a mutation proof for a test that did not go red."
 tags: [finalise, observation]
 category: refactoring
-status: planned
+status: ready-for-development
 priority: Medium
 created: 2026-11-04
 updated: 2026-11-04
@@ -15,7 +15,9 @@ github_issue: 826
 
 # Technical Task: finalise fix-and-recheck reads severity, scope and the named test
 
-**Status:** Planned
+**Status:** Ready for Development
+
+**Review**: ✅ All review recommendations from `task.257.review.1.fix-and-recheck-reads-what-it-claims.md` implemented 2026-11-04
 
 **GitHub Issue**: [#826](https://github.com/Gamaroff/agent-skills/issues/826)
 
@@ -148,6 +150,7 @@ Every line below was found with `grep -n` on `shared/resources/finalise-fix-and-
 - [ ] Return `otherRed` in the JSON output, de-duplicated across node:test's failing-tests summary.
 - [ ] Update the preconditions statement and the fixtures that pin the old convention.
 - [ ] Confirm the docs-link clause's `✖ <file>:<line>` shape still proves.
+- [ ] Update the two assertions that pin the refusal message text (`finalise-fix-and-recheck.test.mjs:437` and `:479`, `shows no failing test`), found by `git grep -n 'shows no failing test'`.
 
 **Dependencies**: none.
 
@@ -392,6 +395,8 @@ The set is defined as: copies of items 1 to 7 under `skills/`. Command: `find sk
 | Date       | Version | Description                                           | Author      |
 | ---------- | ------- | ----------------------------------------------------- | ----------- |
 | 2026-11-04 | 1.0     | Initial draft — cut from observations #61, #131, #132 | create-task |
+| 2026-11-04 | 1.1     | Review passed (8/10) — added the pinned-message assertions to Phase 1 | review-task |
+| 2026-11-04 |         | Status → ready-for-development                        | review-task |
 <!-- change-log-end -->
 
 ---
@@ -442,7 +447,7 @@ The set is defined as: copies of items 1 to 7 under `skills/`. Command: `find sk
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Development
 
 **Next Steps**:
 1. Implement according to the plan with `/develop-task`.

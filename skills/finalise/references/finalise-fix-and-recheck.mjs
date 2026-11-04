@@ -55,6 +55,9 @@ import { fileURLToPath } from "node:url";
 // doc-id parse — this file declares no id grammar of its own (task 206).
 const require = createRequire(import.meta.url);
 const docId = require("./doc-id.js");
+// The one glob matcher (task 257): a Files Summary entry is read as a pathspec
+// through it, never through a second matcher written here.
+const { matchesAnyGlob } = require("./glob-match.js");
 
 // bundle-dependency: shared/resources/finalise-fix-and-recheck-preconditions.json
 const TABLE_URL = new URL(
@@ -70,6 +73,71 @@ export const PRECONDITIONS = Object.freeze(
 );
 
 const isList = (v) => Array.isArray(v);
+
+/** The most patterns one Files Summary entry may expand to (task 257). */
+const MAX_BRACE_EXPANSIONS = 256;
+
+/**
+ * `a/{b,c}/d` → ["a/b/d", "a/c/d"]. Innermost group first, one group per pass,
+ * so nesting works; an unbalanced brace stays literal. Returns null when the
+ * expansion would exceed MAX_BRACE_EXPANSIONS — a long list of groups is
+ * 2^N patterns, and refusing it is the safe direction (the entry admits
+ * nothing, which takes the existing Step 8 halt).
+ */
+function expandBraces(entry) {
+  let results = [entry];
+  for (;;) {
+    const next = [];
+    let expanded = false;
+    for (const s of results) {
+      const m = /\{([^{}]*)\}/.exec(s);
+      if (!m) {
+        next.push(s);
+        continue;
+      }
+      expanded = true;
+      for (const alt of m[1].split(",")) {
+        next.push(s.slice(0, m.index) + alt + s.slice(m.index + m[0].length));
+      }
+      if (next.length > MAX_BRACE_EXPANSIONS) return null;
+    }
+    results = next;
+    if (!expanded) return results;
+  }
+}
+
+/**
+ * A repo-relative path a PATTERN may admit. glob-match.js does not resolve `..`
+ * (and `**` crosses `/`), strips a trailing line break, and reads a leading `/`
+ * as relative — so without this guard `skills/*\/references/` would admit
+ * `skills/a/references/../../../etc/passwd`, an absolute path or `x.js\n`. An
+ * exact Files Summary entry is not subject to it: the author wrote that path.
+ */
+const isPlainRelativePath = (p) =>
+  typeof p === "string" &&
+  !p.startsWith("/") &&
+  !/[\0\r\n]/.test(p) &&
+  !p.split("/").includes("..");
+
+/** A path with at least one segment that is neither empty nor a wildcard. */
+const hasLiteralSegment = (p) =>
+  p.split("/").some((s) => s !== "" && !/[*?]/.test(s));
+
+/**
+ * The glob patterns one Files Summary entry stands for (task 257, obs #132).
+ * The notation authors use: an exact path; a trailing `/` for a directory
+ * prefix; `*` and `**` as glob-match.js reads them; `{a,b}` alternatives. An
+ * entry whose wildcards leave no literal path segment (`*`, `**`, `**\/*`) is
+ * not a scope — it would admit every path — and stands for nothing.
+ */
+function entryPatterns(entry) {
+  if (typeof entry !== "string") return [];
+  const expanded = expandBraces(entry.trim());
+  if (expanded === null) return [];
+  return expanded
+    .map((p) => (p.endsWith("/") ? `${p}**` : p))
+    .filter(hasLiteralSegment);
+}
 
 /** The kinds a pipeline work item can be. A PRD is a document, not a work item. */
 const WORK_ITEM_KINDS = Object.freeze(["task", "story", "epic", "bug"]);
@@ -150,33 +218,72 @@ export const isCoLocatedArtifact = (documentPath, p) => {
   return WORK_ITEM_ARTIFACT_RE.test(base) && !/\.bug\./.test(base);
 };
 
-/** What a recorded red run looks like from node:test, bash test harnesses, or a
- *  hand-run assertion: a TAP `not ok`, the runner's ✖, or a `fail` count > 0. */
-const RED_MARKER = /^\s*(not ok\b|✖|ℹ fail [1-9]|FAIL\b)/;
+/**
+ * A red line of a recorded run, split into its marker and its SUBJECT: a TAP
+ * `not ok 2 - <title>`, the runner's `✖ <title> (3ms)`, or a harness's
+ * `FAIL <name>`. `ℹ fail N` is deliberately NOT here — a count names no test,
+ * so it cannot prove one (task 257).
+ */
+const RED_SUBJECT = /^\s*(?:not ok\b(?:\s+\d+)?(?:\s+-)?|✖|FAIL\b)\s*(.*)$/;
 
-/** How far a red line may sit from a line naming the test and still count. */
-const RED_WINDOW = 3;
+/** node:test prints this heading on a ✖ line of its own, before the failures. */
+const RUNNER_HEADINGS = new Set(["failing tests:"]);
+
+/** A trailing duration or TAP directive, which is not part of the test's name. */
+const DURATION_TAIL = /\s\(\d+(?:\.\d+)?\s?m?s\)\s*$/;
 
 /**
- * A red marker TIED to the named test (cycle 2, CR-4). Checking "the log
- * mentions the test" and "the log has a red line" independently let a
- * whole-suite log pass on an unrelated failure while the named test was
- * green. node:test prints a failing test as `✖ <name>` followed within a
- * few lines by `test at <file>:<line>`, so a red line within RED_WINDOW of
- * a line naming the test is the shape of a real red run; a green test's name
- * appears only on a `✔` line with no red neighbour.
+ * A mutationProof.test shaped like a test FILE (`x.test.js`, `y.spec.ts`,
+ * `z.test.sh`). A file appears on a `test at <file>` line beside ANY failure in
+ * it, so it cannot show that one particular test went red; on task.207 a broken
+ * revert reddened two unrelated tests and was accepted as `mutation-proved`
+ * (obs #61). A `.md` path is the docs-link clause's proof and is not a test file.
  */
-function redNamesTest(text, test) {
-  const lines = text.split("\n");
-  for (let i = 0; i < lines.length; i += 1) {
-    if (!lines[i].includes(test)) continue;
-    const lo = Math.max(0, i - RED_WINDOW);
-    const hi = Math.min(lines.length - 1, i + RED_WINDOW);
-    for (let j = lo; j <= hi; j += 1) {
-      if (RED_MARKER.test(lines[j])) return true;
-    }
+const TEST_FILE_SHAPE = /\.(?:test|spec)\.(?!md$)[A-Za-z0-9]+$/;
+
+/**
+ * Does a red line's subject name `test`? It must START the subject and end at a
+ * boundary: the end of the line, a duration `(3ms)`, a TAP directive `# SKIP`,
+ * or `:<digits>` — the docs-link clause's `✖ <file>:<line> → …`. So a title
+ * that is a prefix of a failing title does not match, and neither does one that
+ * only ends it (task 257).
+ */
+function subjectNames(subject, test) {
+  if (!subject.startsWith(test)) return false;
+  const rest = subject.slice(test.length);
+  return /^(?:\s*$|\s\(\d+(?:\.\d+)?\s?m?s\)\s*$|\s#\s|:\d)/.test(rest);
+}
+
+/**
+ * Read a recorded run against the test it is meant to prove. `named` is true
+ * only when ONE red line carries that test's name (CR-4, tightened by task 257:
+ * the old rule accepted any red line within three lines of a line that merely
+ * mentioned the name, so a green test sitting beside a failing neighbour was
+ * "proved"). `otherRed` is every other failing subject, once each — node:test
+ * prints each failure twice, inline and again in its failing-tests summary.
+ */
+function analyseRun(text, test) {
+  let named = false;
+  const other = new Set();
+  for (const line of text.split("\n")) {
+    const m = RED_SUBJECT.exec(line);
+    if (!m) continue;
+    const subject = m[1].trimEnd();
+    if (subject === "" || RUNNER_HEADINGS.has(subject)) continue;
+    if (subjectNames(subject, test)) named = true;
+    else other.add(subject.replace(DURATION_TAIL, ""));
   }
-  return false;
+  return { named, otherRed: [...other] };
+}
+
+/** The recorded run's text, or null when it cannot be read. */
+function readProofRun(m) {
+  if (!m || typeof m !== "object" || typeof m.run !== "string") return null;
+  try {
+    return readFileSync(m.run, "utf8");
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -234,8 +341,12 @@ const CHECKS = Object.freeze({
     // pipeline artifacts — a path listed there is admitted only when
     // isCoLocatedArtifact holds for it, so listing a file is never enough
     // (task.152, obs #155).
+    // An entry is read as a pathspec (task 257, obs #132): the exact string
+    // still admits itself, and the notation authors write admits the rest.
+    const patterns = f.filesSummary.flatMap(entryPatterns);
     const inScope = (p) =>
       f.filesSummary.includes(p) ||
+      (isPlainRelativePath(p) && matchesAnyGlob(p, patterns)) ||
       (isWorkItemDocument(f.documentPath) && p === f.documentPath) ||
       (isList(f.artifactPaths) &&
         f.artifactPaths.includes(p) &&
@@ -250,6 +361,10 @@ const CHECKS = Object.freeze({
     if (!m || typeof m !== "object") return "no `mutationProof` recorded";
     if (typeof m.test !== "string" || m.test.trim() === "") {
       return "mutationProof names no test";
+    }
+    // A test FILE is not a test (task 257): see TEST_FILE_SHAPE.
+    if (TEST_FILE_SHAPE.test(m.test.trim())) {
+      return `mutationProof.test is ${m.test}, a test file — name the test by its title`;
     }
     if (m.redOnRevert !== true) {
       return `${m.test} did not go red on revert (redOnRevert: ${m.redOnRevert})`;
@@ -271,8 +386,8 @@ const CHECKS = Object.freeze({
     if (!text.includes(m.test)) {
       return `mutationProof.run ${m.run} does not mention ${m.test}`;
     }
-    if (!redNamesTest(text, m.test)) {
-      return `mutationProof.run ${m.run} shows no failing test for ${m.test} (no "not ok" / ✖ / fail line within ${RED_WINDOW} lines of the test's name)`;
+    if (!analyseRun(text, m.test.trim()).named) {
+      return `mutationProof.run ${m.run} shows no failing test for ${m.test} (no "not ok" / ✖ / FAIL line that starts with the test's name)`;
     }
     return null;
   },
@@ -355,7 +470,16 @@ export function evaluateFixAndRecheck(finding, { git } = {}) {
   // the same id are the same precondition failing, reported once (first wins).
   const seen = new Set();
   const uniq = failed.filter((f) => !seen.has(f.id) && seen.add(f.id));
-  return { proceed: uniq.length === 0, checked, failed: uniq };
+  // The other failing tests in the recorded run (task 257). More than one red
+  // can be legitimate; the rule is that the NAMED test is among them. Reported,
+  // never a precondition: Step 8a records it in the DoD for a reader to weigh.
+  const proofMeta = finding.mutationProof;
+  const proofText = readProofRun(proofMeta);
+  const otherRed =
+    proofText !== null && typeof proofMeta.test === "string"
+      ? analyseRun(proofText, proofMeta.test.trim()).otherRed
+      : [];
+  return { proceed: uniq.length === 0, checked, failed: uniq, otherRed };
 }
 
 export function main(argv = process.argv.slice(2)) {
@@ -420,6 +544,11 @@ export function main(argv = process.argv.slice(2)) {
     process.stdout.write(
       `halt — ${result.failed.length} precondition(s) fail:\n` +
         result.failed.map((f) => `  ${f.id}: ${f.detail}\n`).join(""),
+    );
+  }
+  if (!json && result.otherRed.length > 0) {
+    process.stdout.write(
+      `other red in the recorded run (record in the DoD): ${result.otherRed.join("; ")}\n`,
     );
   }
   return result.proceed ? 0 : 1;

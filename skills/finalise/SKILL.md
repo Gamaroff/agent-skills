@@ -3065,9 +3065,10 @@ It qualifies **only** when all of these hold, each verified rather than assumed:
   it is the anchor every `artifactPaths` entry is checked against.
 - The mutation proof is the engine itself: the **pre-fix** run of `doc-links.js` on **every**
   reproduced file, appended to `mutationProof.run` in turn before the edit, is the red (each prints
-  `✖ <file>:<line> → …` and `FAIL doc-links: …`, which are the markers the evaluator reads, on lines
-  naming the file — so `mutationProof.test` is the **first** reproduced file, whose name already
-  sits beside a red marker); the **post-fix** run on each exits 0. Reverting the
+  `✖ <file>:<line> → …` and `FAIL doc-links: …`, which are the markers the evaluator reads — so for
+  this clause only, `mutationProof.test` is the **first** reproduced file: its `✖ <file>:<line>` line
+  starts with the name and ends at `:<digit>`, which the title rule accepts); the **post-fix** run on
+  each exits 0. Reverting the
   edit and re-running is the same proof a second time, and is what `redOnRevert: true` asserts.
 
 Then Steps 8a.1–8a.5 run unchanged, with the Docs section as the failed section and the engine run
@@ -3084,10 +3085,10 @@ with `--git-base` so both are re-read from git before anything is pushed (step 2
 mkdir -p .claude/state
 cat > .claude/state/finalise-fix-finding.json <<'JSON'
 {
-  "severity": "{the finding's severity, from the agent YAML — copy it; leave the key out if the agent gave none}",
+  "severity": "{the finding's severity, from the agent YAML — copy it; leave the key out if the agent gave none. Every DoD agent grades its FAILs (AC, docs, security, compliance, fix-evidence), so an absent grade means an ungraded finding and halts}",
   "commits": 1,
   "touched": ["{every path the fix will change, repo-relative}"],
-  "filesSummary": [{every path in the work item's Files Summary (task §7) / File List (story), as strings}],
+  "filesSummary": [{every entry in the work item's Files Summary (task §7) / File List (story), as strings — copy them as written: an exact path, a directory prefix ending in `/`, `*` / `**` globs and `{a,b}` alternatives are all read as pathspecs; an entry with no literal path segment (`*`, `**`) admits nothing}],
   "documentPath": "{repo-root-relative path of the work item document — only for the docs-link clause; omit otherwise}",
   "artifactPaths": [{co-located artifacts the docs-link red is on, repo-root-relative — only for the docs-link clause; omit otherwise}],
   "mutationProof": { "test": "{the test that must go red on revert}", "redOnRevert": false, "run": ".claude/state/finalise-mutation-proof.log" },
@@ -3115,11 +3116,15 @@ line `Fix-and-recheck refused: {ids}` in the gap report's Blocking Issues Summar
   hunk, and read which tests went red: a red in a different test is a finding, not a proof** (that
   file's rule 2). On task.207 a revert deleted one line of a guard prettier had split across two,
   every call then returned null, and two unrelated tests went red, which proves nothing about the
-  guard (obs #61). **The evaluator does not check this for you:** it looks for a red line near the
-  name, so a neighbouring failure passes it even when the named test is green. Set
+  guard (obs #61). `mutationProof.test` is the **test's title** as the runner prints it (the text
+  after `not ok N -` / `✖`), never a test file path: the evaluator refuses a file-shaped value, and it
+  accepts the proof only when a `not ok` / `✖` / `FAIL` line **starts with that title** and ends at the
+  line end, a duration, a `# ` directive or `:<line>`. A neighbouring test's red line, a title that is
+  only a prefix of the red one, and a bare `ℹ fail N` count do not pass it (obs #133). Other red lines
+  in the same run are printed as `other red in the recorded run` — record them in the DoD. Set
   `mutationProof.redOnRevert`
   to `true` in the finding record and re-run the evaluator — it opens the run file and requires
-  it to be non-empty, to name the test, and to carry a red marker (`not ok` / `✖` / `ℹ fail N`);
+  it to be non-empty and to carry a red line for the named title;
   a flipped boolean with no recorded run halts on `mutation-proved`. **Exit 0 is the licence for
   the commit; exit 1 is Step 8.**
 - Commit — one commit, message `fix(<stem>): finalise DoD <section> — <finding, one line>`,

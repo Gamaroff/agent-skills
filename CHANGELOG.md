@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **`/finalise` Step 8a fix-and-recheck reads what it claims (task 257, obs #131, #132, #133).**
+  Three evaluator gaps closed. (1) **Severity:** the AC, docs, compliance and fix-evidence prompts
+  now grade every FAIL (`low | medium | high`, with the security prompt's fail-closed wording), and
+  the AC merge keeps the agent's grade; before, only a security FAIL could ever be `low`, so no
+  other finding could take the bounded path. A FAIL with no grade still halts. (2) **Scope:** a
+  Files Summary entry is read as a pathspec (exact path, trailing-`/` directory prefix, `*`/`**`,
+  `{a,b}`); an entry with no literal segment admits nothing, a brace list over 256 expansions is
+  refused, and a `..`, absolute or line-break path is never admitted by a pattern. (3) **Proof:**
+  `mutationProof.test` is a test **title** and the recorded run must carry a `not ok` / `✖` /
+  `FAIL` line that starts with it; a neighbouring red line, a prefix title, a test-file path and a
+  bare `ℹ fail N` no longer pass. **Changed refusal:** a record that names a test file now halts on
+  `mutation-proved`. Other red lines in the run are printed for the DoD.
+
 ### Added
 
 - **A probe that never reached the control now declines instead of reporting `absent` (task 256,

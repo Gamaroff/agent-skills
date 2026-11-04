@@ -179,6 +179,7 @@ The marker is built by `loadSensitive()` in the shared `spawn-budget.mjs` (task 
 - `shared/resources/tests/access-config-parity.test.mjs`
 - `shared/resources/tests/call-sites.test.mjs`
 - `shared/resources/tests/doc-id.test.mjs`
+- `shared/resources/tests/finalise-fix-and-recheck.test.mjs`
 - `shared/resources/tests/ci-tree-equivalence.test.mjs`
 - `shared/resources/tests/migrate-doc-numbering.test.mjs`
 - `shared/resources/tests/qa-diminishing-returns.test.mjs`
