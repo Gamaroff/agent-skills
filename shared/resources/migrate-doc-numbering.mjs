@@ -2656,6 +2656,9 @@ function repoGuard(repoRoot) {
     cwd: repoRoot,
     encoding: "utf8",
     timeout: 20000,
+    // A remote that wants credentials must fail the fetch (upstream-unverified), never stop on a
+    // prompt the run cannot answer. The timeout alone would cost 20 s per run to find that out.
+    env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
   });
   if (fetched.status !== 0)
     warnings.push({

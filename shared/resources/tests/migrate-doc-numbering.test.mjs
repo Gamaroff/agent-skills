@@ -2830,3 +2830,78 @@ test("253 gap 2/7: scanTracked reads each tracked file at most once, and reads n
   assert.ok(!reads.has("assets/logo.png"), "a binary file was read");
   assert.ok(!reads.has("notes.txt"), "a dry run read a file it has no use for");
 });
+
+test("253 advisory: the applied scan reads each file once while its link, old-path and legacy-name passes all run", () => {
+  const touchedDoc = `${S11}/story.1.1.first.md`;
+  const files = l2Tree({
+    "scripts/a.mjs": "const n = 'story.1.1.first.md';\n",
+    "notes.txt": `see ${touchedDoc}\n`,
+  });
+  const io = memIo(files);
+  const reads = new Map();
+  const inner = io.readFile;
+  io.readFile = (p) => {
+    reads.set(p, (reads.get(p) || 0) + 1);
+    return inner(p);
+  };
+  const { planned } = dry(memIo(files));
+  const out = m.scanTracked(io, planned, {
+    applied: true,
+    touched: new Set([touchedDoc]),
+    root: R,
+  });
+  // Controls: each pass produced output, so the counter below covers all three on one file set.
+  assert.ok(
+    out.deadLinks.some(
+      (d) => d.file === touchedDoc && d.target.includes("missing.md"),
+    ),
+    `the link pass did not run: ${JSON.stringify(out.deadLinks)}`,
+  );
+  assert.ok(out.oldPaths.length > 0, "the old-path pass did not run");
+  assert.ok(
+    out.legacyNames.files.some((f) => f.file === "scripts/a.mjs"),
+    "the legacy-name pass did not run",
+  );
+  for (const [p, n] of reads) assert.equal(n, 1, `${p} read ${n} times`);
+  assert.equal(reads.get(touchedDoc), 1, "the touched document was not read");
+});
+
+test("253 advisory: the upstream fetch runs with GIT_TERMINAL_PROMPT=0, so a remote that wants credentials fails instead of waiting", () => {
+  const { dir, up } = gitRepoWithUpstream(l2Tree());
+  const shimDir = mkdtempSync(join(tmpdir(), "migrate-doc-numbering-shim-"));
+  const log = join(shimDir, "fetch-env.log");
+  const realGit = execFileSync("sh", ["-c", "command -v git"], {
+    encoding: "utf8",
+  }).trim();
+  writeFileSync(
+    join(shimDir, "git"),
+    [
+      "#!/bin/sh",
+      `case " $* " in *" fetch "*) printf '%s\\n' "\${GIT_TERMINAL_PROMPT-unset}" >> '${log}' ;; esac`,
+      `exec '${realGit}' "$@"`,
+      "",
+    ].join("\n"),
+    { mode: 0o755 },
+  );
+  const oldPath = process.env.PATH;
+  try {
+    process.env.PATH = `${shimDir}:${oldPath}`;
+    m.run(["--check", "--json", "--root", R], { cwd: dir });
+  } finally {
+    process.env.PATH = oldPath;
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(up, { recursive: true, force: true });
+  }
+  try {
+    const seen = existsSync(log)
+      ? readFileSync(log, "utf8").trim().split("\n")
+      : [];
+    assert.ok(
+      seen.length > 0,
+      "the shim saw no fetch, so the control proves nothing",
+    );
+    assert.deepEqual([...new Set(seen)], ["0"]);
+  } finally {
+    rmSync(shimDir, { recursive: true, force: true });
+  }
+});
