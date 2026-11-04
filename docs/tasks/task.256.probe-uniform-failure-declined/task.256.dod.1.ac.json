@@ -1,0 +1,268 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "73b0df2444cf40877b9ba0efd16f62b6bb99edf1",
+  "dirty_paths": [
+    "docs/tasks/task.256.probe-uniform-failure-declined/task.256.implementation.1.probe-uniform-failure-declined-initial-run.md",
+    "docs/tasks/task.256.probe-uniform-failure-declined/task.256.pr-review.1.probe-uniform-failure-declined.md",
+    "docs/tasks/task.256.probe-uniform-failure-declined/task.256.probe-uniform-failure-declined.md"
+  ],
+  "document": "docs/tasks/task.256.probe-uniform-failure-declined/task.256.probe-uniform-failure-declined.md",
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 16,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "ff44602b472c5221d94b109d86c156f9915e054d7afd959b43d016c908b8a548",
+      "status": "PASS",
+      "description": "resolve-pr-number.sh under --sink filename declines entry-not-probeable, executed 0, exit 1",
+      "code_citation": "shared/resources/security-probe.mjs:2227",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:9003",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Regression test on the real script; QA report line 72 records the re-run result."
+    },
+    {
+      "id": "#2",
+      "text_hash": "310fabaf7ee28cae798cddf0f83f72f797e6e8cdc66cae238f8cd6efba045703",
+      "status": "PASS",
+      "description": "Decline detail names the exit and the shared stderr line",
+      "code_citation": "shared/resources/security-probe.mjs:2227",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:9025",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Held by 'every form declines'; QA report line 73 quotes the detail."
+    },
+    {
+      "id": "#3",
+      "text_hash": "ef7a702871f32b32d074a5c27f7228f507e9bfca5a7efb01e3b9fba138f3b0a7",
+      "status": "PASS",
+      "description": "Shape declined under shell:, shell-fn:, shell-argv:, cli:, fence:",
+      "code_citation": "shared/resources/security-probe.mjs:1527",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:9025",
+      "members": [
+        {
+          "member": "shell:",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:9029",
+          "status": "PASS"
+        },
+        {
+          "member": "shell-fn:",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:9052",
+          "status": "PASS"
+        },
+        {
+          "member": "shell-argv:",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:9127",
+          "status": "PASS"
+        },
+        {
+          "member": "cli:",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:9025",
+          "status": "PASS"
+        },
+        {
+          "member": "fence:",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:9082",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#4",
+      "text_hash": "dd4936169c6749cbbf76f59983d0924f63a621f7bc462d93a4e410c7ff7d6b81",
+      "status": "PASS",
+      "description": "Accept-all still absent; stay-scored rows unchanged",
+      "code_citation": "shared/resources/security-probe.mjs:1527",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:9229",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Stay-scored table test (7 rows)."
+    },
+    {
+      "id": "#5",
+      "text_hash": "560ae80d1b023c60a3b70e461988533aa6cefb39a8afed2d12e9898e10e8e9a9",
+      "status": "PASS",
+      "description": "A run that reaches gh under the trip-wire stays needs-fake-gh",
+      "code_citation": "shared/resources/security-probe.mjs:2227",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:9296",
+      "members": [],
+      "non_member_fail": null,
+      "note": "QA line 76 records mutation M7 going red."
+    },
+    {
+      "id": "#6",
+      "text_hash": "e392a5c40766b41c3a380e0ecac08070a92e2be5e68ca41b2805fa7b779fb522",
+      "status": "PASS",
+      "description": "Through security-probe-plan.mjs: probes [] and probes_executed 0",
+      "code_citation": "shared/resources/security-probe.mjs:2271",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:9343",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Plan-level test."
+    },
+    {
+      "id": "#7",
+      "text_hash": "298dcd721ca556ba7f66adbb71875ea382144601288348ea4821f4c3ac9b540b",
+      "status": "PASS",
+      "description": "No private key or raw stderr in a case from the three returns, or a run record",
+      "code_citation": "shared/resources/security-probe.mjs:2228",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:9307",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Covers the trip-wire return, the fold and the scored return; the record is asserted clean at line 9343."
+    },
+    {
+      "id": "#8",
+      "text_hash": "6597da794d2f32b59d47b87c9f1397dffe5d399e9f3a0d8302fb47f12426e77c",
+      "status": "PASS",
+      "description": "No extra process per case: a declined cli: run starts no bash",
+      "code_citation": "shared/resources/security-probe.mjs:1527",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:8814",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Extended spawn test asserts spawns() === 0."
+    },
+    {
+      "id": "#9",
+      "text_hash": "3166220864cabed9b5f3883b3fada6dec3d8734be8257749d7f43f766bb5e09a",
+      "status": "PASS",
+      "description": "Case-record size does not grow: private key removed before every return",
+      "code_citation": "shared/resources/security-probe.mjs:2228",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:9307",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#10",
+      "text_hash": "5c79bf6a542fb32203eb620bcd3a62455090973a98ec0a38322de95a6b5952ed",
+      "status": "PASS",
+      "description": "One decline path: one declined entry, every case errored",
+      "code_citation": "shared/resources/security-probe.mjs:2271",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:9025",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#11",
+      "text_hash": "f59358f114c67014c0c5b5f5bc80f3170a20033956020fa2729e3af3eab35180",
+      "status": "PASS",
+      "description": "Probe test file passes on a real checkout",
+      "code_citation": "docs/tasks/task.256.probe-uniform-failure-declined/task.256.qa.1.probe-uniform-failure-declined.md:92",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:9003",
+      "members": [],
+      "non_member_fail": null,
+      "note": "301/301 in this checkout (bash)."
+    },
+    {
+      "id": "#12",
+      "text_hash": "16c15cdc1528d4b7a0c050b85474772e66288ea2f7248a59f9ec2b13f6c268d7",
+      "status": "PASS",
+      "description": "npm test, CI=true npm test, lint:shell, bundle:check pass",
+      "code_citation": ".github/workflows/test.yml:58",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 73b0df2444cf40877b9ba0efd16f62b6bb99edf1 — Decided by CI on the PR head. Locally lint:shell and bundle:check are clean; CI=true ci:fast fails only the zsh-on-PATH guard because zsh is not installed here.",
+      "ci_reading": "CI reading 1: SUCCESS @ 73b0df2444cf40877b9ba0efd16f62b6bb99edf1"
+    },
+    {
+      "id": "#13",
+      "text_hash": "972a497f0294e8f016f910662d816412c59378a5df7dedd7bdd6df54c0db5c24",
+      "status": "PASS",
+      "description": "Every mutation in section 8 turns a test red (18 run, 18 red)",
+      "code_citation": "docs/tasks/task.256.probe-uniform-failure-declined/task.256.qa.1.probe-uniform-failure-declined.md:161",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "remove the reclassification",
+          "evidence": "docs/tasks/task.256.probe-uniform-failure-declined/task.256.qa.1.probe-uniform-failure-declined.md:161",
+          "status": "PASS"
+        },
+        {
+          "member": "remove the path normaliser",
+          "evidence": "docs/tasks/task.256.probe-uniform-failure-declined/task.256.qa.1.probe-uniform-failure-declined.md:162",
+          "status": "PASS"
+        },
+        {
+          "member": "remove the 126/127 exclusion",
+          "evidence": "docs/tasks/task.256.probe-uniform-failure-declined/task.256.qa.1.probe-uniform-failure-declined.md:165",
+          "status": "PASS"
+        },
+        {
+          "member": "remove the both-directions condition",
+          "evidence": "docs/tasks/task.256.probe-uniform-failure-declined/task.256.qa.1.probe-uniform-failure-declined.md:166",
+          "status": "PASS"
+        },
+        {
+          "member": "add input replacement to the normaliser",
+          "evidence": "docs/tasks/task.256.probe-uniform-failure-declined/task.256.qa.1.probe-uniform-failure-declined.md:167",
+          "status": "PASS"
+        },
+        {
+          "member": "delete the private key only after the needs-fake-gh return",
+          "evidence": "docs/tasks/task.256.probe-uniform-failure-declined/task.256.qa.1.probe-uniform-failure-declined.md:168",
+          "status": "PASS"
+        },
+        {
+          "member": "apply the reclassification before the needs-fake-gh return",
+          "evidence": "docs/tasks/task.256.probe-uniform-failure-declined/task.256.qa.1.probe-uniform-failure-declined.md:169",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#14",
+      "text_hash": "3adacd83726eee0fde4a205711f84b57ac6648b0167b84b7d72f8384b47c8cf4",
+      "status": "PASS",
+      "description": "CHANGELOG.md records the changed verdict, citing task 256",
+      "code_citation": "CHANGELOG.md:9",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Entry reads 'task 256, obs #12' and states the changed verdict."
+    },
+    {
+      "id": "#15",
+      "text_hash": "5af4552dffea0345d6eca8eec5e1eed66dc8329d995dca0355cf4833f86e5df3",
+      "status": "PASS",
+      "description": "probe-boundary-rule.md states the rule and its four known limits",
+      "code_citation": "shared/resources/probe-boundary-rule.md:163",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#16",
+      "text_hash": "2731cdc6dc0bfbfcf4a366307175599d9fd418166747759e35365ac3f3acaa0e",
+      "status": "PASS",
+      "description": "No committed run record rewritten",
+      "code_citation": "docs/tasks/task.256.probe-uniform-failure-declined/task.256.qa.1.probe-uniform-failure-declined.md:102",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#13",
+      "note": "The criterion and QA line 172 say 18 mutations; the itemised mutation-proven lines sum to 17 unless a grouped line counts one more."
+    },
+    {
+      "ac_id": "#12",
+      "note": "QA CR-1 is advisory: when one case genuinely errored, the fold overwrites its own detail."
+    }
+  ]
+}

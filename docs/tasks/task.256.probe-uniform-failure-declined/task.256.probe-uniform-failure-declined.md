@@ -5,17 +5,19 @@ type: task
 description: "security-probe.mjs declines rather than scores an entry when every case, hostile and legitimate, fails with the same non-zero exit and the same stderr."
 tags: [finalise, observation, security-probe]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-11-04
 updated: 2026-11-04
+completed_date: 2026-11-04
+pr_number: 827
 estimated_effort_hours: 8
 github_issue: 825
 ---
 
 # Technical Task: security-probe: a uniform failure is declined, not scored
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.256.review.1.probe-uniform-failure-declined.md` implemented 2026-11-04
 
@@ -223,7 +225,7 @@ The decline's detail names the exit, tells the reader to check the entry form an
 - [x] Update the engine header and the `entry-not-probeable` row, and state the four known limits.
 - [x] `npm run bundle`, then `npm run bundle:check`.
 - [x] Add the `CHANGELOG.md` entry citing task 256.
-- [ ] Re-run the resolve-pr-number command and record its result in the QA report. (The regression test runs it; QA records it.)
+- [x] Re-run the resolve-pr-number command and record its result in the QA report. (The regression test runs it; QA records it.)
 
 **Dependencies**: Phase 2.
 
@@ -416,16 +418,40 @@ The decline's detail names the exit, tells the reader to check the entry form an
 ### Key Findings
 No blocking findings. One advisory code-review note (a genuinely errored case loses its own detail in the fold). PR CI was pending and nothing has run under zsh yet, so the CI result is worth reading before merge.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.256.qa.1.probe-uniform-failure-declined.md`
+**Gate File**: `task.256.gate.1.probe-uniform-failure-declined.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** all 16 met (15 on committed tests or records, #12 graded from CI)
+✅ **Tests:** probe suite 301/301; 10 new tests and 12 fixtures; 18 of 18 mutations of the engine red
+✅ **PR Review:** PR #827, `/review-pr` APPROVE (`task.256.pr-review.1.probe-uniform-failure-declined.md`)
+✅ **CI:** all 6 checks SUCCESS on `73b0df2444cf`, including the zsh lane
+✅ **Documentation:** CHANGELOG entry citing task 256; the rule and its four limits in `probe-boundary-rule.md`
+⚠️ **Security / Compliance:** not applicable (not a boundary; no PII, payment, UI or PHI scope)
+
+**Detailed Verification Log:** See `task.256.dod.1.probe-uniform-failure-declined.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-04
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                               | Author      |
-| ---------- | ------- | ----------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-04 | 1.0     | Initial draft — cut from observation #12  | create-task |
 | 2026-11-04 | 1.1     | Review passed (9/10) after 8 fixes: private key removed before the `needs-fake-gh` return; three forms run and tabled; criteria name their tests | review-task |
 | 2026-11-04 |         | Status → ready-for-development | review-task |
 | 2026-11-04 |         | Implemented — 12 files (engine, tests, 12 fixtures, rule doc, CHANGELOG, bundles), 10 new tests, 18 mutations red | develop |
 | 2026-11-04 |         | QA gate PASS (95/100) — 1 advisory finding | qa-task |
+| 2026-11-04 | 1.2 | DoD passed — accepted (PR #827) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -446,7 +472,7 @@ No blocking findings. One advisory code-review note (a genuinely errored case lo
 - [x] Plan-level test
 - [x] Docs and CHANGELOG
 - [x] Bundle and bundle:check
-- [ ] Reproduction re-run recorded in the QA report
+- [x] Reproduction re-run recorded in the QA report
 
 ---
 
@@ -474,7 +500,7 @@ No blocking findings. One advisory code-review note (a genuinely errored case lo
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 1. Implement according to the plan with `/develop-task`.
