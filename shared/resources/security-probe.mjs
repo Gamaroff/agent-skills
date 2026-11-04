@@ -147,6 +147,11 @@
  * must print is NOT the sink corpus's `expected` (that describes a script
  * printing a gate number): the caller names a cases file with `--cases-file`.
  *
+ * A UNIFORM FAILURE IS DECLINED, NOT SCORED (task 256). When hostile and
+ * legitimate cases all fail with the same non-zero exit and the same stderr, no
+ * input reached the control, so the run answers `entry-not-probeable` rather
+ * than `absent`. See `uniformFailure` for the rule and its limits.
+ *
  * THE CLI ENTRY FORM (task.144). A boundary delivered as a MULTI-FLAG NODE CLI
  * matched none of the three forms — the JS runner calls an export with ONE
  * argument, and `uat-status.mjs`'s `--env` guard lives behind a three-argument
@@ -1496,6 +1501,65 @@ export function computeVerdict(caseResults) {
   return { verdict: "engages", reason: "hostile-rejected-legitimate-accepted" };
 }
 
+/**
+ * A run where every case failed the same way before any input reached the
+ * control (task 256, obs #12). Compared with `expected`, a usage error differs
+ * on every case, so it reads as hostile `accepted` and legitimate `rejected`:
+ * `computeVerdict` calls that `absent`, with a full `executed` count. The two
+ * directions failing identically is the evidence that the run measured the
+ * harness, because a control that sees its input answers the two differently.
+ *
+ * Both directions must be present and in those outcomes, so `rejects-every-input`
+ * and an accept-all control never reach the comparison. Within each shell, the
+ * exit and the stderr must match; shells may differ from each other, since one
+ * entry can fail differently under each. Exit 126 and 127 stay scored: those are
+ * the target's own answer (task.128 QA cycle 2, BUG-7 and BUG-9). Empty stderr
+ * stays scored, because there is then no shared line to say what failed.
+ *
+ * Only the harness's own per-case tokens are normalised. A case's input is not:
+ * replacing it would decline a real refusal that quotes what it refused, so a
+ * usage error quoting its input stays scored, and that is a stated limit.
+ *
+ * @param {Array} caseResults the arms' results, each with its private `_failure`
+ * @param {string} sandboxRoot this run's sandbox, printed in per-case paths
+ * @returns {string|null} the decline's detail, or null when this is a measurement
+ */
+export function uniformFailure(caseResults, sandboxRoot) {
+  const ran = caseResults.filter((c) => c.outcome !== "errored");
+  const hostile = ran.filter((c) => c.direction === "hostile");
+  const legitimate = ran.filter((c) => c.direction === "legitimate");
+  if (hostile.length === 0 || legitimate.length === 0) return null;
+  if (!hostile.every((c) => c.outcome === "accepted")) return null;
+  if (!legitimate.every((c) => c.outcome === "rejected")) return null;
+  // The JS form has no child process, so it has nothing to compare.
+  if (!ran.every((c) => c._failure)) return null;
+
+  const normalised = (c) =>
+    c._failure.stderr
+      .split(sandboxRoot)
+      .join("<sandbox>")
+      .replace(/fixture-[A-Za-z0-9]{6}/g, "fixture-X")
+      .replace(/fence-[0-9]+\.sh/g, "fence-N.sh")
+      .trim();
+
+  const firstByShell = new Map();
+  for (const c of ran) {
+    const shell = c.shell ?? "";
+    if (!firstByShell.has(shell)) firstByShell.set(shell, c);
+    const first = firstByShell.get(shell);
+    const { status } = c._failure;
+    if (!Number.isInteger(status) || status === 0) return null;
+    if (status === 126 || status === 127) return null;
+    if (status !== first._failure.status) return null;
+    const stderr = normalised(c);
+    if (stderr === "" || stderr !== normalised(first)) return null;
+  }
+
+  const [first] = ran;
+  const line = normalised(first).split("\n")[0].slice(0, 160);
+  return `every case exited ${first._failure.status} with the same stderr, hostile and legitimate alike, so no input reached the control. Check the entry form and its argv: ${line}`;
+}
+
 // ── The runner ───────────────────────────────────────────────────────────────
 
 /**
@@ -2158,6 +2222,11 @@ export function runProbeSpec({
     removeSandbox(sandboxRoot);
   }
 
+  // Read the failures while they exist, and remove them here, ahead of every
+  // return: a case record never carries raw stderr (task 256).
+  const uniform = uniformFailure(caseResults, sandboxRoot);
+  for (const c of caseResults) delete c._failure;
+
   // The run reached `gh` with no fixture: the trip-wire answered instead of the
   // host binary, and whatever the cases then did was shaped by a stub, so
   // nothing is scored. This is the GUARANTEE the pre-spawn detector above only
@@ -2190,7 +2259,15 @@ export function runProbeSpec({
 
   // An import or export failure is a property of the ENTRY, not of one case, so
   // it presents identically for every case. Reporting N identical declines
-  // would read as N problems; report it once, against the entry.
+  // would read as N problems; report it once, against the entry. A uniform
+  // failure is the same property, so it joins this fold (task 256). It comes
+  // after the `gh` return, which is the more specific answer.
+  if (uniform !== null) {
+    for (const c of caseResults) {
+      c.outcome = "errored";
+      c.detail = uniform;
+    }
+  }
   const allErrored = caseResults.every((c) => c.outcome === "errored");
   if (allErrored && caseResults.length > 0) {
     const first = caseResults[0].detail ?? "unknown";
@@ -2750,6 +2827,8 @@ function runShellCase(
         fnName === null
           ? [...fixture.controls, c.input]
           : [...fixture.controls],
+      // Read and removed by runProbeSpec, before any return (task 256).
+      _failure: { status: child.status, stderr: child.stderr ?? "" },
     });
   }
 }
@@ -3082,6 +3161,8 @@ function runCliCase(
     outcome,
     detail,
     exit: child.status,
+    // Read and removed by runProbeSpec, before any return (task 256).
+    _failure: { status: child.status, stderr: child.stderr ?? "" },
   });
 }
 
@@ -3456,6 +3537,8 @@ function runShellArgvCase(
       outcome,
       detail,
       exit: child.status,
+      // Read and removed by runProbeSpec, before any return (task 256).
+      _failure: { status: child.status, stderr: child.stderr ?? "" },
     });
   }
 }
@@ -3951,6 +4034,8 @@ function runFenceCase(
       outcome,
       detail,
       exit: child.status,
+      // Read and removed by runProbeSpec, before any return (task 256).
+      _failure: { status: child.status, stderr: child.stderr ?? "" },
     });
   }
 }

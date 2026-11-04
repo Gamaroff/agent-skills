@@ -72,6 +72,7 @@ import {
   SHELL_ARGV_PREFIX,
   shellArgvSpawnArgs,
   toRecordEntry,
+  uniformFailure,
   validateCases,
 } from "../security-probe.mjs";
 import { corpusFor, DIRECTIONS, SINKS } from "../security-input-corpus.mjs";
@@ -8781,6 +8782,35 @@ test("one setup helper: both arms call runCaseSetup and neither spawns its own s
   assert.equal(src.match(/= runCaseSetup\(\{/g)?.length, 2);
 });
 
+// A corpus whose every case states what a working control answers, so a failure
+// before the control differs from `expected` on all of them (task 256).
+const UNIFORM_CASES = [
+  {
+    id: "u.ok",
+    direction: "legitimate",
+    input: "good",
+    expected: { stdout: "ok\n", exit: 0 },
+  },
+  {
+    id: "u.ok2",
+    direction: "legitimate",
+    input: "fine",
+    expected: { stdout: "ok\n", exit: 0 },
+  },
+  {
+    id: "u.bad",
+    direction: "hostile",
+    input: "../evil",
+    expected: { stdout: "REFUSED\n", exit: 1 },
+  },
+  {
+    id: "u.bad2",
+    direction: "hostile",
+    input: "$(id)",
+    expected: { stdout: "REFUSED\n", exit: 1 },
+  },
+];
+
 test("cli entry: a run with no --fixture-setup spawns no bash for a setup; with one it spawns exactly one per case (task.254 QA-1)", () => {
   // The performance criterion, observed rather than inferred from the record: a
   // `bash` shim first on the harness's PATH logs every bash the harness starts by
@@ -8820,6 +8850,16 @@ test("cli entry: a run with no --fixture-setup spawns no bash for a setup; with 
       });
       assert.equal(without.executed, 2, JSON.stringify(without.cases));
       assert.equal(spawns(), 0, "a run with no setup started a bash");
+
+      // Declining a uniform failure only reads what the arm already has
+      // (task 256): the decline starts no process of its own.
+      const declinedRun = runProbeSpec({
+        entry: `cli:${FIXTURES}/cli-uniform-usage.mjs`,
+        cases: UNIFORM_CASES,
+        argv: ["{input}"],
+      });
+      assert.equal(declinedRun.reason, "entry-not-probeable");
+      assert.equal(spawns(), 0, "a declined run started a bash");
 
       const withSetup = runProbeSpec({
         sink: "url-authority",
@@ -8938,4 +8978,409 @@ test("cli entry: with the trip-wire stepped around, the gh-free PATH still keeps
     assert.equal(r.executed, 2, JSON.stringify(r));
     assert.equal(existsSync(marker), false, "the host gh ran");
   });
+});
+
+// ── A uniform failure is declined, not scored (task 256, obs #12) ────────────
+//
+// When every case fails the same way before reaching the control, the run
+// measured the harness. Scored, a usage error reads as a missing control with a
+// full `executed` count, and /finalise publishes it. A decline here is
+// `unverifiable` and the zero-guard still counts it, so nothing passes.
+
+const assertUniformDecline = (r, label, exit, line) => {
+  assert.equal(r.verdict, "unverifiable", `${label}: ${JSON.stringify(r)}`);
+  assert.equal(r.reason, "entry-not-probeable", label);
+  assert.equal(r.executed, 0, label);
+  assert.deepEqual(r.reproduced, [], label);
+  assert.deepEqual(r.overblocked, [], label);
+  assert.equal(r.declined.length, 1, label);
+  const { detail } = r.declined[0];
+  assert.match(detail, new RegExp(`exited ${exit}\\b`), label);
+  assert.ok(detail.includes(line), `${label}: ${detail}`);
+  for (const c of r.cases) assert.equal(c.outcome, "errored", label);
+};
+
+test("uniform failure: the script that caused the false findings is declined, exit 1 (obs #12)", () => {
+  const child = spawnSync(
+    process.execPath,
+    [
+      join(REPO_ROOT, "shared/resources/security-probe.mjs"),
+      "--sink",
+      "filename",
+      "--entry",
+      "shell:shared/resources/resolve-pr-number.sh",
+      "--json",
+    ],
+    { cwd: REPO_ROOT, encoding: "utf8" },
+  );
+  assert.equal(child.status, 1, child.stderr);
+  assertUniformDecline(
+    JSON.parse(child.stdout),
+    "resolve-pr-number",
+    2,
+    "usage: resolve-pr-number.sh --doc",
+  );
+});
+
+test("uniform failure: every form declines, in any wording and with any non-zero exit", () => {
+  for (const [label, spec, exit, line] of [
+    [
+      "shell: usage",
+      { sink: "filename", entry: `shell:${FIXTURES}/uniform-usage.sh` },
+      2,
+      "usage: x --doc",
+    ],
+    [
+      "shell: usage quoting its fixture path",
+      {
+        sink: "filename",
+        entry: `shell:${FIXTURES}/uniform-usage-echoes-arg.sh`,
+      },
+      2,
+      "unknown argument",
+    ],
+    [
+      "shell: control case, other words, other exit",
+      { sink: "filename", entry: `shell:${FIXTURES}/uniform-no-config.sh` },
+      1,
+      "cannot find config",
+    ],
+    [
+      "shell-fn:",
+      {
+        sink: "filename",
+        entry: `shell-fn:${FIXTURES}/uniform-fn.sh#uniform_fn`,
+      },
+      2,
+      "usage: uniform_fn --doc",
+    ],
+    [
+      "shell-argv:",
+      {
+        entry: `shell-argv:${FIXTURES}/uniform-usage.sh`,
+        argv: ["{input}"],
+        cases: UNIFORM_CASES,
+      },
+      2,
+      "usage: x --doc",
+    ],
+    [
+      "cli:",
+      {
+        entry: `cli:${FIXTURES}/cli-uniform-usage.mjs`,
+        argv: ["{input}"],
+        cases: UNIFORM_CASES,
+      },
+      2,
+      "usage: tool --doc",
+    ],
+  ]) {
+    assertUniformDecline(runProbeSpec(spec), label, exit, line);
+  }
+});
+
+test("uniform failure: fence: declines, with the generated script's own path normalised", () => {
+  const block = (body) => ["```bash", "x=<slot>", body, "exit 2", "```"];
+  const root = fenceRoot({
+    "doc.md": [
+      "# D",
+      "",
+      "## Usage",
+      "",
+      ...block('echo "usage: guard --doc <p>" >&2'),
+      "",
+      "## Path",
+      "",
+      ...block('echo "failed at $0" >&2'),
+      "",
+    ].join("\n"),
+  });
+  const cases = [
+    fenceCase("uf.ok", "legitimate", "ok"),
+    fenceCase("uf.ok2", "legitimate", "fine"),
+    fenceCase("uf.bad", "hostile", "bad", {
+      expected: { exit: 1, stdout: "REFUSED\n" },
+    }),
+  ];
+  try {
+    for (const [heading, line] of [
+      ["Usage", "usage: guard --doc"],
+      ["Path", "failed at <sandbox>"],
+    ]) {
+      assertUniformDecline(
+        runProbeSpec({
+          entry: `fence:doc.md#${heading}`,
+          slot: "<slot>",
+          cases,
+          repoRoot: root,
+        }),
+        `fence ${heading}`,
+        2,
+        line,
+      );
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("uniform failure: shell-argv: normalises a printed {fixture} path, per case", () => {
+  const root = fenceRoot({
+    "prints-path.sh": {
+      text: '#!/usr/bin/env bash\necho "cannot read $2" >&2\nexit 2\n',
+      mode: 0o755,
+    },
+  });
+  try {
+    assertUniformDecline(
+      runProbeSpec({
+        entry: "shell-argv:prints-path.sh",
+        argv: ["{input}", "{fixture}"],
+        cases: UNIFORM_CASES,
+        repoRoot: root,
+      }),
+      "shell-argv path",
+      2,
+      "cannot read <sandbox>",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("uniformFailure: each shell is compared with itself, whatever is installed", () => {
+  // Hand-built, because zsh may be absent where this suite runs.
+  const result = (id, direction, shell, status, stderr) => ({
+    id,
+    direction,
+    shell,
+    outcome: direction === "hostile" ? "accepted" : "rejected",
+    _failure: { status, stderr },
+  });
+  const pair = (shell, status, stderr) => [
+    result(`h.${shell}`, "hostile", shell, status, stderr),
+    result(`l.${shell}`, "legitimate", shell, status, stderr),
+  ];
+
+  const twoShells = uniformFailure(
+    [...pair("bash", 2, "bash said\n"), ...pair("zsh", 1, "zsh said\n")],
+    "/sandbox",
+  );
+  assert.match(twoShells, /every case exited 2\b/);
+  assert.ok(twoShells.includes("bash said"), twoShells);
+
+  for (const [label, cases] of [
+    [
+      "exit differs inside a shell",
+      [
+        result("h", "hostile", "bash", 2, "x"),
+        result("l", "legitimate", "bash", 3, "x"),
+      ],
+    ],
+    [
+      "stderr differs inside a shell",
+      [
+        result("h", "hostile", "bash", 2, "x"),
+        result("l", "legitimate", "bash", 2, "y"),
+      ],
+    ],
+    [
+      "a signal has no status",
+      [
+        result("h", "hostile", "bash", null, "x"),
+        result("l", "legitimate", "bash", null, "x"),
+      ],
+    ],
+    [
+      "exit 0 is not a failure",
+      [
+        result("h", "hostile", "bash", 0, "x"),
+        result("l", "legitimate", "bash", 0, "x"),
+      ],
+    ],
+    [
+      "a hostile case was rejected",
+      [
+        { ...result("h", "hostile", "bash", 2, "x"), outcome: "rejected" },
+        result("l", "legitimate", "bash", 2, "x"),
+      ],
+    ],
+    [
+      "a legitimate case was accepted",
+      [
+        result("h", "hostile", "bash", 2, "x"),
+        { ...result("l", "legitimate", "bash", 2, "x"), outcome: "accepted" },
+      ],
+    ],
+    ["hostile only", [result("h", "hostile", "bash", 2, "x")]],
+    ["legitimate only", [result("l", "legitimate", "bash", 2, "x")]],
+    [
+      "a case the JS form produced, with no child",
+      [
+        { id: "h", direction: "hostile", outcome: "accepted" },
+        { id: "l", direction: "legitimate", outcome: "rejected" },
+      ],
+    ],
+  ]) {
+    assert.equal(uniformFailure(cases, "/sandbox"), null, label);
+  }
+});
+
+test("uniform failure: every shape that is a measurement stays scored", () => {
+  const hostileOnly = UNIFORM_CASES.filter((c) => c.direction === "hostile");
+  const shellSpec = (name) => ({
+    sink: "filename",
+    entry: `shell:${FIXTURES}/${name}.sh`,
+  });
+  for (const [label, spec] of [
+    ["accept-all: a real finding", shellSpec("uniform-accept-all")],
+    ["silent: no shared line", shellSpec("uniform-silent")],
+    ["exit 127: the target's answer", shellSpec("uniform-exit-127")],
+    ["exit 126: the target's answer", shellSpec("uniform-exit-126")],
+    ["stderr differs: inputs arrived", shellSpec("uniform-lists-fixture")],
+    [
+      "hostile only: no legitimate case fails alike",
+      {
+        entry: `cli:${FIXTURES}/cli-uniform-usage.mjs`,
+        argv: ["{input}"],
+        cases: hostileOnly,
+      },
+    ],
+    [
+      "usage echoing the input: a stated limit",
+      {
+        entry: `cli:${FIXTURES}/cli-uniform-echoes.mjs`,
+        argv: ["{input}"],
+        cases: UNIFORM_CASES,
+      },
+    ],
+  ]) {
+    const r = runProbeSpec(spec);
+    assert.equal(
+      r.verdict,
+      "absent",
+      `${label}: ${JSON.stringify(r.declined)}`,
+    );
+    assert.ok(r.executed > 0, label);
+    assert.ok(r.reproduced.length > 0, label);
+    assert.deepEqual(r.declined, [], label);
+  }
+});
+
+test("uniform failure: a case that matches its `expected` is a measurement, not a uniform failure", () => {
+  const cases = UNIFORM_CASES.map((c) =>
+    c.id === "u.bad"
+      ? { ...c, expected: { stderr: "usage: tool --doc <p>\n", exit: 2 } }
+      : c,
+  );
+  const r = runProbeSpec({
+    entry: `cli:${FIXTURES}/cli-uniform-usage.mjs`,
+    argv: ["{input}"],
+    cases,
+  });
+  assert.notEqual(r.reason, "entry-not-probeable", JSON.stringify(r.declined));
+  assert.ok(r.executed > 0);
+});
+
+test("uniform failure: with no `expected` the existing rejects-every-input answer is unchanged", () => {
+  const r = runProbeSpec({
+    entry: `cli:${FIXTURES}/cli-uniform-usage.mjs`,
+    argv: ["{input}"],
+    cases: UNIFORM_CASES.map(({ expected: _unused, ...c }) => c),
+  });
+  assert.equal(r.verdict, "unverifiable");
+  assert.equal(r.reason, "rejects-every-input");
+  assert.ok(r.executed > 0);
+});
+
+test("uniform failure: a run that reached `gh` stays needs-fake-gh", () => {
+  const r = runProbeSpec({
+    entry: `shell-argv:${FIXTURES}/uniform-calls-gh.sh`,
+    argv: ["{input}"],
+    cases: UNIFORM_CASES,
+  });
+  assert.equal(r.reason, "needs-fake-gh", JSON.stringify(r.declined));
+  assert.ok(r.cases.length > 0, "the trip-wire return carries the cases");
+  for (const c of r.cases) assert.notEqual(c.outcome, "errored", c.id);
+});
+
+test("uniform failure: no case from any of the three returns carries the private key or raw stderr", () => {
+  for (const [label, spec, holds] of [
+    [
+      "the trip-wire return",
+      {
+        entry: `shell-argv:${FIXTURES}/uniform-calls-gh.sh`,
+        argv: ["{input}"],
+        cases: UNIFORM_CASES,
+      },
+      (r) => r.reason === "needs-fake-gh",
+    ],
+    [
+      "the fold",
+      {
+        entry: `shell-argv:${FIXTURES}/uniform-usage.sh`,
+        argv: ["{input}"],
+        cases: UNIFORM_CASES,
+      },
+      (r) => r.reason === "entry-not-probeable",
+    ],
+    [
+      "the scored return",
+      { sink: "filename", entry: `shell:${FIXTURES}/uniform-exit-127.sh` },
+      (r) => r.verdict === "absent",
+    ],
+  ]) {
+    const r = runProbeSpec(spec);
+    assert.ok(holds(r), `${label}: ${r.verdict}/${r.reason}`);
+    assert.ok(r.cases.length > 0, label);
+    for (const c of r.cases) {
+      assert.equal("_failure" in c, false, `${label}: ${JSON.stringify(c)}`);
+      assert.equal("stderr" in c, false, label);
+    }
+  }
+});
+
+test("uniform failure: through security-probe-plan.mjs there are no probes and none executed, and the record is clean", () => {
+  const dir = mkdtempSync(join(tmpdir(), "probe-uniform-plan-"));
+  try {
+    const plan = join(dir, "plan.json");
+    const record = join(dir, "x.dod.1.security.run.json");
+    writeFileSync(
+      plan,
+      JSON.stringify([
+        {
+          argv: [
+            "--sink",
+            "filename",
+            "--entry",
+            `shell:${FIXTURES}/uniform-usage.sh`,
+          ],
+        },
+      ]),
+    );
+    const child = spawnSync(
+      process.execPath,
+      [
+        join(REPO_ROOT, "shared/resources/security-probe-plan.mjs"),
+        "--plan",
+        plan,
+        "--record",
+        record,
+        "--cases-base",
+        join(dir, "x.dod.1.security.cases"),
+        "--repo-root",
+        REPO_ROOT,
+        "--json",
+      ],
+      { cwd: REPO_ROOT, encoding: "utf8" },
+    );
+    const out = JSON.parse(child.stdout);
+    assert.deepEqual(out.probes, [], child.stdout);
+    assert.equal(out.probes_executed, 0, child.stdout);
+    assert.equal(out.runs[0].verdict, "unverifiable", child.stdout);
+    const text = readFileSync(record, "utf8");
+    assert.equal(text.includes("_failure"), false, text);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

@@ -2,20 +2,24 @@
 id: task.256
 title: "security-probe: a uniform failure is declined, not scored"
 type: task
-description: "security-probe.mjs should decline rather than score when every case for one entry exits with the same non-zero status and the same stderr."
+description: "security-probe.mjs declines rather than scores an entry when every case, hostile and legitimate, fails with the same non-zero exit and the same stderr."
 tags: [finalise, observation, security-probe]
 category: infrastructure
-status: planned
+status: accepted
 priority: Medium
 created: 2026-11-04
 updated: 2026-11-04
+completed_date: 2026-11-04
+pr_number: 827
 estimated_effort_hours: 8
 github_issue: 825
 ---
 
 # Technical Task: security-probe: a uniform failure is declined, not scored
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.256.review.1.probe-uniform-failure-declined.md` implemented 2026-11-04
 
 **GitHub Issue**: [#825](https://github.com/Gamaroff/agent-skills/issues/825)
 
@@ -55,9 +59,10 @@ When every probe case fails the same way before reaching the control, the engine
 Every line below was found with `grep -n` on `shared/resources/security-probe.mjs` unless stated.
 
 - `computeVerdict` (`:1462`) scores `absent` when a hostile case reproduced and none was rejected. It reads only `outcome` and `direction`.
-- A case's outcome comes from `compareExpected` in each arm: `runShellCase` (`:2542`), `runCliCase` (`:2874`), `runShellArgvCase` (`:3303`) and `runFenceCase` (`:3804`). With an `expected`, a hostile case that differs is `accepted` and a legitimate case that differs is `rejected`. A uniform failure differs on all of them.
-- `caseResults` carries no raw stderr. Only `detail` holds a truncated comparison string, so the fold cannot see the shared line today.
+- A case's outcome comes from `compareExpected`. Search: `grep -n "compareExpected(" shared/resources/security-probe.mjs` gives the definition (`:1365`) and four callers: `runShellCase` (`:2542`, which runs both `shell:` and `shell-fn:`), `runCliCase` (`:2874`), `runShellArgvCase` (`:3303`), and `scoreFenceRun` (`:3658`), called from `runFenceCase` (`:3804`). With an `expected`, a hostile case that differs is `accepted` and a legitimate case that differs is `rejected`. A fence legitimate case with no `expected` is `rejected` on any non-zero exit. A uniform failure differs on all of them.
+- `caseResults` carries no raw stderr. Only `detail` holds a truncated comparison string, so the fold cannot see the shared line today. `exit` is on the cli, shell-argv and fence pushes but not on the `shell:` one.
 - `runProbeSpec` already folds identical errored cases into one decline (`const allErrored`, `:2194`). `sandboxRoot` (`:1971`) is still in scope there; only the directory is removed, at `:2158`.
+- **Three returns carry `cases: caseResults`**, found with `grep -n "cases: caseResults"`: the run-time `needs-fake-gh` trip-wire (`:2182`), the fold (`:2201`) and the scored return (`:2252`). The trip-wire return comes first, so the private key must be gone before it.
 - Bundled copies: `find skills \( -name security-probe.mjs -o -name probe-boundary-rule.md \)`. Measured 6 on 2026-11-04 (engine in `finalise`, `qa-story`, `qa-task`, `review-security`; rule in `qa-story`, `qa-task`). `npm run bundle:check` holds them, not this count.
 
 **A second mechanism for a job the file already does.** The `allErrored` fold is the job. This task must not add a second decline return. The new check reclassifies the cases as `errored` and lets the existing fold produce the decline, so `executed: 0`, the once-only `declined` entry and the carried `escapes` all stay in one place.
@@ -91,7 +96,22 @@ Calibration on the prototype, `runProbeSpec` per row:
 | `cli:` usage echoing the input | `absent` | 3 | **Known limit**, see below |
 | `cli:` usage, no `expected` | `unverifiable` / `rejects-every-input` | 3 | Already not a finding; unchanged |
 
-`shell-fn:`, `shell-argv:` and `fence:` were not in that table, and are **(unverified)** until Phase 1 tests them.
+The other three forms ran through the same prototype at review, on 2026-11-04:
+
+| Entry behaviour | Verdict | Executed | Why |
+|---|---|---|---|
+| `shell-fn:` with `sink: "filename"`, usage line, return 2 | `unverifiable` / `entry-not-probeable` | 0 | Target shape. This form needs `sink`: with `cases` alone it declines for a different reason |
+| `shell-argv:` usage line, exit 2 | `unverifiable` / `entry-not-probeable` | 0 | Target shape |
+| `shell-argv:` prints the `{fixture}` path, exit 2 | `unverifiable` / `entry-not-probeable` | 0 | The normaliser handles it |
+| `shell-argv:` echoes the input | `absent` | 4 | Known limit |
+| `shell-argv:` hostile only | `absent` | 2 | Needs both directions |
+| `shell-argv:` accept-all | `absent` | 4 | A real finding |
+| `fence:` usage line, exit 2 | `unverifiable` / `entry-not-probeable` | 0 | Target shape |
+| `fence:` prints `$0`, the `fence-N.sh` path, exit 2 | `unverifiable` / `entry-not-probeable` | 0 | The normaliser handles it |
+| `fence:` a command not found, exit 127 | `absent` | 3 | Exit 127 stays scored |
+| `fence:` accept-all | `absent` | 3 | A real finding |
+
+**All of this ran under bash only**: zsh is not installed on the machine that ran it (`shells: ["bash"]`). CI installs zsh (`.github/workflows/test.yml`), so CI is the first run of these tests under both shells.
 
 ### Target Architecture
 
@@ -101,7 +121,9 @@ Calibration on the prototype, `runProbeSpec` per row:
 2. Within each shell, every case has the same non-zero exit, and that exit is neither 126 nor 127.
 3. Within each shell, every case has the same non-empty stderr, once `sandboxRoot`, `fixture-XXXXXX` and `fence-N.sh` are normalised.
 
-The decline's detail names the exit and the first stderr line.
+The decline's detail names the exit, tells the reader to check the entry form and its argv, and quotes the first stderr line.
+
+**The check runs before the `needs-fake-gh` return, and its result applies after it.** A run that reached `gh` stays `needs-fake-gh`, because the trip-wire answered and that is the more specific reason. The private key is removed before that return as well.
 
 ### Important Clarifications
 
@@ -158,10 +180,13 @@ The decline's detail names the exit and the first stderr line.
 - `shared/resources/tests/fixtures/security-probe/` (new fixtures)
 
 **Changes**:
-- [ ] Add the regression on the real script: `shell:shared/resources/resolve-pr-number.sh` is declined with `executed: 0` and no `reproduced`. Confirm it is red on the unmodified engine.
-- [ ] Add one declined case per form: `shell:`, `shell-fn:`, `shell-argv:`, `cli:`, `fence:`.
-- [ ] Add the stay-scored table from § 3: accept-all, silent exit, exit 126/127, stderr that differs per case, hostile-only, echoed input, a corpus where one case matches its `expected`.
-- [ ] Add a case where two shells each fail uniformly with different lines, which is still declined.
+- [x] Add the regression on the real script: `shell:shared/resources/resolve-pr-number.sh` is declined with `executed: 0` and no `reproduced`. Confirm it is red on the unmodified engine.
+- [x] Add one declined case per form: `shell:`, `shell-fn:`, `shell-argv:`, `cli:`, `fence:`. Each asserts `executed: 0`, exactly one `declined` entry whose `id` is the entry, and a detail holding the exit and the shared stderr line.
+- [x] Add the stay-scored table from § 3: accept-all, silent exit, exit 126/127, stderr that differs per case, hostile-only, echoed input, a corpus where one case matches its `expected`.
+- [x] Test `uniformFailure` directly with hand-built results: two shells that each fail uniformly with different lines are still declined, and a shell whose cases differ in exit is not. A hand-built result is what lets this run where zsh is absent.
+- [x] Add a run that reaches `gh` under the trip-wire and also fails uniformly. It stays `needs-fake-gh`, and its cases carry no private key.
+- [x] Extend the bash-shim spawn test (`security-probe.test.mjs`, "a run with no --fixture-setup spawns no bash") with a declined `cli:` run, which also starts no bash.
+- [x] Give each new `.sh` fixture a bash shebang, because `git ls-files '*.sh'` puts it in the ShellCheck lane.
 
 **Dependencies**: none.
 
@@ -175,11 +200,11 @@ The decline's detail names the exit and the first stderr line.
 - `shared/resources/security-probe.mjs`
 
 **Changes**:
-- [ ] Each spawning arm records exit and stderr on its case result, under a private key.
-- [ ] Add and export the pure `uniformFailure(caseResults, sandboxRoot)`, stating the three conditions of § 3.
-- [ ] In `runProbeSpec`, before `const allErrored`: run it, delete the private key from every case, and on a hit set every case to `errored` with the shared detail. Add no second decline return.
-- [ ] Assert a returned case and a run record carry no private key or raw stderr.
-- [ ] Run the suite on a real checkout, not only an overlay.
+- [x] Each spawning arm records exit and stderr on its case result, under a private key.
+- [x] Add and export the pure `uniformFailure(caseResults, sandboxRoot)`, stating the three conditions of § 3.
+- [x] In `runProbeSpec`, straight after the `try`/`finally` and before `if (ghTripped)`: run it and delete the private key from every case. Immediately before `const allErrored`: on a hit, set every case to `errored` with the shared detail. Add no second decline return.
+- [x] Assert that a case from each of the three returns, and a run record, carry no private key or raw stderr.
+- [x] Run the suite on a real checkout, not only an overlay.
 
 **Dependencies**: Phase 1.
 
@@ -196,11 +221,11 @@ The decline's detail names the exit and the first stderr line.
 - generated copies under `skills/*/references/`
 
 **Changes**:
-- [ ] Test through `security-probe-plan.mjs` that the shape yields `probes: []` and `probes_executed: 0`.
-- [ ] Update the engine header and the `entry-not-probeable` row, and state the four known limits.
-- [ ] `npm run bundle`, then `npm run bundle:check`.
-- [ ] Add the `CHANGELOG.md` entry citing task 256.
-- [ ] Re-run the resolve-pr-number command and record its result in the QA report.
+- [x] Test through `security-probe-plan.mjs` that the shape yields `probes: []` and `probes_executed: 0`.
+- [x] Update the engine header and the `entry-not-probeable` row, and state the four known limits.
+- [x] `npm run bundle`, then `npm run bundle:check`.
+- [x] Add the `CHANGELOG.md` entry citing task 256.
+- [x] Re-run the resolve-pr-number command and record its result in the QA report. (The regression test runs it; QA records it.)
 
 **Dependencies**: Phase 2.
 
@@ -236,8 +261,8 @@ The decline's detail names the exit and the first stderr line.
 **Scope**: `uniformFailure` as a pure function and `runProbeSpec` per form.
 
 **Actions**:
-- [ ] Every row of § 3's calibration table is a test.
-- [ ] **Control case**: besides `resolve-pr-number.sh`, a fixture this task's text never names, failing with a different message and exit 1, is declined; and an accept-all fixture stays `absent`. So a pass does not mean the example was recognised.
+- [x] Every row of § 3's calibration table is a test.
+- [x] **Control case**: besides `resolve-pr-number.sh`, a fixture this task's text never names, failing with a different message and exit 1, is declined; and an accept-all fixture stays `absent`. So a pass does not mean the example was recognised.
 
 **Command**: `command node --test shared/resources/tests/security-probe.test.mjs`
 
@@ -245,11 +270,13 @@ The decline's detail names the exit and the first stderr line.
 
 ### Mutation
 
-- [ ] Remove the reclassification: the resolve-pr-number regression goes red. Restore.
-- [ ] Remove the path normaliser: the regression goes red. Restore.
-- [ ] Remove the 126/127 exclusion: `BUG-9` goes red. Restore.
-- [ ] Remove the both-directions condition: the hostile-only row goes red. Restore.
-- [ ] Add input replacement to the normaliser: `BUG-9` or the echoed-input row goes red. Restore.
+- [x] Remove the reclassification: the resolve-pr-number regression goes red. Restore.
+- [x] Remove the path normaliser: the regression goes red. Restore.
+- [x] Remove the 126/127 exclusion: `BUG-9` goes red. Restore.
+- [x] Remove the both-directions condition: the hostile-only row goes red. Restore.
+- [x] Add input replacement to the normaliser: `BUG-9` or the echoed-input row goes red. Restore.
+- [x] Delete the private key only after the `needs-fake-gh` return: the trip-wire test goes red. Restore.
+- [x] Apply the reclassification before the `needs-fake-gh` return: the trip-wire test goes red. Restore.
 
 ### Consumer Tests
 
@@ -263,30 +290,31 @@ The decline's detail names the exit and the first stderr line.
 
 ### Functional
 
-- [ ] `shell:shared/resources/resolve-pr-number.sh` under `--sink filename` returns `verdict: unverifiable`, `reason: entry-not-probeable`, `executed: 0`, empty `reproduced` and `overblocked`, exit 1 (Phase 2 states the branch). The command and result are recorded in the QA report.
-- [ ] The decline's detail names the exit and the shared stderr line.
-- [ ] The shape is declined under `shell:`, `shell-fn:`, `shell-argv:`, `cli:` and `fence:`.
-- [ ] An accept-all control still scores `absent`, and every stay-scored row in § 3 is unchanged.
-- [ ] Through `security-probe-plan.mjs`, the shape yields `probes: []` and `probes_executed: 0`.
-- [ ] No private key or raw stderr appears in a returned case or a run record.
+- [x] `shell:shared/resources/resolve-pr-number.sh` under `--sink filename` returns `verdict: unverifiable`, `reason: entry-not-probeable`, `executed: 0`, empty `reproduced` and `overblocked`, exit 1 (Phase 2 states the branch). The command and result are recorded in the QA report.
+- [x] The decline's detail names the exit and the shared stderr line (held by the per-form tests, Phase 1).
+- [x] The shape is declined under `shell:`, `shell-fn:`, `shell-argv:`, `cli:` and `fence:` (held by the per-form tests, Phase 1).
+- [x] An accept-all control still scores `absent`, and every stay-scored row in § 3 is unchanged (held by the stay-scored tests, Phase 1).
+- [x] A run that reaches `gh` under the trip-wire stays `needs-fake-gh` (held by the trip-wire test, Phase 1).
+- [x] Through `security-probe-plan.mjs`, the shape yields `probes: []` and `probes_executed: 0` (held by the plan-level test, Phase 3).
+- [x] No private key or raw stderr appears in a case from any of the three returns, or in a run record (held by the private-key test, Phase 2).
 
 ### Performance
 
-- [ ] No extra process per case: the check only reads results the arms already have (asserted by the existing spawn-counting test staying green).
-- [ ] A run's case-record size does not grow: the private key is removed before return (asserted by the private-key test).
+- [x] No extra process per case: a declined `cli:` run starts no bash (held by the extended bash-shim spawn test, Phase 1).
+- [x] A run's case-record size does not grow: the private key is removed before every return (held by the private-key test, Phase 2).
 
 ### Code Quality
 
-- [ ] One decline path: no second `entry-not-probeable` return is added for this shape.
-- [ ] `command node --test shared/resources/tests/security-probe.test.mjs` passes on a real checkout.
-- [ ] `npm test`, `CI=true npm test` and `npm run bundle:check` pass.
-- [ ] Every mutation in § 8 turns a test red, recorded in the QA report.
+- [x] One decline path: a declined run returns exactly one `declined` entry, whose `id` is the entry, with every case `errored` (held by the per-form tests, Phase 1).
+- [x] `command node --test shared/resources/tests/security-probe.test.mjs` passes on a real checkout.
+- [ ] `npm test`, `CI=true npm test`, `npm run lint:shell` and `npm run bundle:check` pass. (Not met locally: `CI=true` fails one test, "under CI, every tool a suite skips without is on PATH", because zsh is not installed on this machine. 7201 of 7215 pass; `lint:shell` and `bundle:check` pass. CI installs zsh.)
+- [x] Every mutation in § 8 turns a test red (18 mutations run, 18 red as predicted; recorded in the implementation report, QA re-checks).
 
 ### Migration
 
-- [ ] `CHANGELOG.md` records the changed verdict, citing task 256.
-- [ ] `probe-boundary-rule.md` states the rule and its four known limits.
-- [ ] No committed run record is rewritten.
+- [x] `CHANGELOG.md` records the changed verdict, citing task 256.
+- [x] `probe-boundary-rule.md` states the rule and its four known limits.
+- [x] No committed run record is rewritten: `git diff --name-only origin/develop... -- '*.run.json'` prints nothing, and the QA report records the command and its result.
 
 ---
 
@@ -298,7 +326,7 @@ The decline's detail names the exit and the first stderr line.
 - **Risk**: an entry that is genuinely unguarded fails uniformly and loses its reproduction.
 - **Probability**: Low
 - **Impact**: Critical
-- **Mitigation**: the rule needs a non-zero exit and a legitimate case failing identically, so a control letting input through cannot meet it. The decline is a zero-guard FAIL, so it still stops the run. The stay-scored table holds the boundary.
+- **Mitigation**: the rule needs a non-zero exit and a legitimate case failing identically, so a control letting input through cannot meet it. The decline is a zero-guard FAIL, so it still stops the run. The stay-scored table is the differential oracle: each row must read the same on `develop` and on this branch.
 - **Rollback**: revert the merge; verdicts return to today's.
 
 ### Medium Risk Areas
@@ -369,12 +397,61 @@ The decline's detail names the exit and the first stderr line.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-04
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.256.qa.1.probe-uniform-failure-declined.md](./task.256.qa.1.probe-uniform-failure-declined.md)
+- **Gate File**: [task.256.gate.1.probe-uniform-failure-declined.yml](./task.256.gate.1.probe-uniform-failure-declined.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 301
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No blocking findings. One advisory code-review note (a genuinely errored case loses its own detail in the fold). PR CI was pending and nothing has run under zsh yet, so the CI result is worth reading before merge.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.256.qa.1.probe-uniform-failure-declined.md`
+**Gate File**: `task.256.gate.1.probe-uniform-failure-declined.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** all 16 met (15 on committed tests or records, #12 graded from CI)
+✅ **Tests:** probe suite 301/301; 10 new tests and 12 fixtures; 18 of 18 mutations of the engine red
+✅ **PR Review:** PR #827, `/review-pr` APPROVE (`task.256.pr-review.1.probe-uniform-failure-declined.md`)
+✅ **CI:** all 6 checks SUCCESS on `73b0df2444cf`, including the zsh lane
+✅ **Documentation:** CHANGELOG entry citing task 256; the rule and its four limits in `probe-boundary-rule.md`
+⚠️ **Security / Compliance:** not applicable (not a boundary; no PII, payment, UI or PHI scope)
+
+**Detailed Verification Log:** See `task.256.dod.1.probe-uniform-failure-declined.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-04
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                               | Author      |
-| ---------- | ------- | ----------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-04 | 1.0     | Initial draft — cut from observation #12  | create-task |
+| 2026-11-04 | 1.1     | Review passed (9/10) after 8 fixes: private key removed before the `needs-fake-gh` return; three forms run and tabled; criteria name their tests | review-task |
+| 2026-11-04 |         | Status → ready-for-development | review-task |
+| 2026-11-04 |         | Implemented — 12 files (engine, tests, 12 fixtures, rule doc, CHANGELOG, bundles), 10 new tests, 18 mutations red | develop |
+| 2026-11-04 |         | QA gate PASS (95/100) — 1 advisory finding | qa-task |
+| 2026-11-04 | 1.2 | DoD passed — accepted (PR #827) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -382,20 +459,20 @@ The decline's detail names the exit and the first stderr line.
 ## Progress Tracking
 
 ### Phase 1: Tests first
-- [ ] Regression red on the unmodified engine
-- [ ] One declined case per form
-- [ ] Stay-scored table
+- [x] Regression red on the unmodified engine
+- [x] One declined case per form
+- [x] Stay-scored table
 
 ### Phase 2: The check and the fold
-- [ ] Private exit and stderr recorded by each arm
-- [ ] `uniformFailure` and the reclassification
-- [ ] Suite green on a real checkout
+- [x] Private exit and stderr recorded by each arm
+- [x] `uniformFailure` and the reclassification
+- [x] Suite green on a real checkout
 
 ### Phase 3: Downstream, docs, bundles and proof
-- [ ] Plan-level test
-- [ ] Docs and CHANGELOG
-- [ ] Bundle and bundle:check
-- [ ] Reproduction re-run recorded in the QA report
+- [x] Plan-level test
+- [x] Docs and CHANGELOG
+- [x] Bundle and bundle:check
+- [x] Reproduction re-run recorded in the QA report
 
 ---
 
@@ -415,6 +492,7 @@ The decline's detail names the exit and the first stderr line.
 - Edit `shared/resources/` sources only; `npm run bundle` regenerates the copies.
 - Mutation-prove every fix.
 - Use `command node`, and never under `timeout` (obs #146).
+- In the engine header and in `probe-boundary-rule.md`, cite a sibling by its bare filename. A `shared/resources/` literal inside a shared source is a bundling instruction.
 
 ### Future Improvements
 
@@ -422,7 +500,7 @@ The decline's detail names the exit and the first stderr line.
 
 ---
 
-**Status:** Planned
+**Status:** Accepted
 
 **Next Steps**:
 1. Implement according to the plan with `/develop-task`.

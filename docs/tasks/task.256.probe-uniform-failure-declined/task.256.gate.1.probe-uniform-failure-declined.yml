@@ -1,0 +1,60 @@
+schema: 2
+task: 'task.256.probe-uniform-failure-declined'
+task_title: 'security-probe: a uniform failure is declined, not scored'
+gate: PASS
+status_reason: 'All success criteria are held by committed tests or measured commands, 18 of 18 mutations of the engine went red, and the one code-review finding is low confidence and advisory. Two things are not decided here: PR CI is still pending, and nothing has run these tests under zsh (not installed on this machine).'
+reviewer: 'QA Engineer'
+head: '4dc52774bbd151d3d666ba00f48feee8cb727dba'
+updated: '2026-11-04T10:37:45Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95 # formula gives 100; 5 held back for the undecided CI run and the never-run zsh lane
+
+evidence:
+  tests_reviewed: 301
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary: internal
+    internal_reason: 'uniformFailure decides decline versus score from the engine''s own per-case result objects, not from a caller-supplied string, so no corpus sink models its input. It is tested directly with hand-built hostile and legitimate results (security-probe.test.mjs, "uniformFailure: each shell is compared with itself") and end to end through every entry form.'
+    notes: 'The change reduces a false finding; a decline is a zero-guard failure, so it cannot turn a missing control into a pass. The private _failure key (raw stderr) is removed ahead of all three returns and a test asserts it for each. The decline cannot hide an escape: escapes are carried on the fold exactly as before.'
+  performance:
+    status: PASS
+    notes: 'No extra process per case: the check reads results the arms already hold. The extended spawn test shows a declined cli: run starts no bash.'
+  reliability:
+    status: PASS
+    notes: 'Fails toward scoring: any state uniformFailure cannot vouch for (signal exit, missing status, JS form, one shell differing) returns null and is scored as before.'
+  maintainability:
+    status: PASS
+    notes: 'One new pure exported function, one reused fold, no second decline path; the rule and its four limits are in probe-boundary-rule.md.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'When one case errored for its own reason and the others fail uniformly, the fold overwrites that case''s detail with the uniform message (code review CR-1, low confidence). Consider overwriting only the cases that ran.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'Read the PR CI result on this head before merge: it is the first run of the new tests under zsh and of the CI-only tool guard.'
+      refs: ['.github/workflows/test.yml']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

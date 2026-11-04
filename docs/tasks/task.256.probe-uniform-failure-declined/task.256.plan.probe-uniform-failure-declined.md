@@ -35,7 +35,15 @@ Each spawning arm records its case's exit and raw stderr under a private key. On
 
 Use `runProbeSpec` with `sink: "filename"` and `entry: "shell:…"` for those. For `cli:`, pass `cases` with `expected: { stdout: "ok\n", exit: 0 }` and `argv: ["{input}"]`: a usage CLI with both directions is declined; the same CLI with hostile cases only, and a CLI echoing `process.argv[2]`, stay `absent`; with no `expected` it stays `rejects-every-input`.
 
-Also add `shell-fn:`, `shell-argv:` and `fence:` declined cases. Those three were not run in the prototype, so a failure here is news about the design, not a test bug: check which per-case token the form prints before changing the normaliser.
+Also add `shell-fn:`, `shell-argv:` and `fence:` declined cases. All three ran through the prototype under bash at review (the task's § 3 table). Shapes that worked:
+
+- `shell-fn:` needs `sink: "filename"`. With `cases` and no `sink` it declines with "sink is not materialised", which is `entry-not-probeable` for the wrong reason, so the test must assert the detail too.
+- `shell-argv:` takes `cases` with `expected` and `argv: ["{input}"]`. Use `["{input}", "{fixture}"]` for the row that prints the fixture path.
+- `fence:` takes `slot: "<slot>"`. A legitimate case needs no `expected`, and a hostile one needs a refusal output, such as `{ exit: 1, stdout: "REFUSED\n" }`.
+
+A failure under zsh in CI is news about the design, not a test bug: check which per-case token that shell prints before changing the normaliser.
+
+**Tests that do not depend on zsh.** Two shells failing differently is a `uniformFailure` unit test on hand-built results, because zsh may be absent where the suite runs. Do not assert a literal `shells` value in the per-form tests.
 
 ### Phase 2: The check and the fold
 
@@ -81,15 +89,20 @@ export function uniformFailure(caseResults, sandboxRoot) {
     if (line === "" || line !== norm(first)) return null;
   }
   const first = ran[0];
-  return `every case exited ${first._failure.status} with the same stderr, hostile and legitimate alike, so no input reached the control: ${norm(first).split("\n")[0].slice(0, 160)}`;
+  return `every case exited ${first._failure.status} with the same stderr, hostile and legitimate alike, so no input reached the control. Check the entry form and its argv: ${norm(first).split("\n")[0].slice(0, 160)}`;
 }
 ```
 
-**In `runProbeSpec`, immediately before `const allErrored`:**
+**In `runProbeSpec`, straight after the `try`/`finally` (`:2159`), before `if (ghTripped)`:**
 
 ```js
 const uniform = uniformFailure(caseResults, sandboxRoot);
 for (const c of caseResults) delete c._failure;
+```
+
+**Immediately before `const allErrored`:**
+
+```js
 if (uniform !== null) {
   for (const c of caseResults) {
     c.outcome = "errored";
@@ -97,6 +110,8 @@ if (uniform !== null) {
   }
 }
 ```
+
+**Why two places.** Three returns carry `cases: caseResults` (`:2182`, `:2201`, `:2252`), and the `needs-fake-gh` return at `:2182` comes first. The review ran the first prototype, which deleted the key just before `const allErrored`, on a script that reaches `gh`: the trip-wire return's cases carried `_failure`, raw stderr included. A run that reached `gh` must also stay `needs-fake-gh`, so the reclassification has to come after that return.
 
 `sandboxRoot` is declared at `:1971`, outside the `try` whose `finally` removes the directory at `:2158`, so the string is still in scope here.
 
@@ -114,7 +129,7 @@ if (uniform !== null) {
 ## Key Patterns and References
 
 - The `allErrored` fold (`:2194`) is the only decline return this shape may use.
-- The comment at `:2190` states the reason: a property of the entry is reported once.
+- The comment at `:2191` states the reason: a property of the entry is reported once.
 - `computeVerdict`'s doc comment (above `:1462`) already calls a reject-everything function indistinguishable from a stub. This extends that to a run that fails before reaching the code.
 
 ## Testing Approach
@@ -122,4 +137,5 @@ if (uniform !== null) {
 - **Red first**: confirm the resolve-pr-number regression fails on the unmodified engine before writing Phase 2.
 - **Reproduction command**: `command node shared/resources/security-probe.mjs --sink filename --entry 'shell:shared/resources/resolve-pr-number.sh' --json`. Do not wrap `command node` in `timeout`: it exits 127 (obs #146).
 - **Run on a real checkout.** The `task.227 regression` test reads from `docs/`, so an overlay without it shows that one failure on both sides.
-- **Mutations**: the five in the task's § 8, each restored from a `cp` snapshot per `mutation-proving.md`.
+- **Mutations**: the seven in the task's § 8, each restored from a `cp` snapshot per `mutation-proving.md`.
+- **ShellCheck**: `npm run lint:shell` covers new `.sh` fixtures, because it lints every tracked `*.sh` outside `skills/*/references/`.
