@@ -1,0 +1,57 @@
+schema: 2
+task: 'task.259.finalise-checks-record-criteria-before-dod'
+task_title: 'finalise checks record criteria before the DoD run'
+gate: PASS
+status_reason: 'No open HIGH or MEDIUM finding. 17/17 tests pass and all three section 8 mutations turn the named test red. Two LOW edge cases are advisory.'
+reviewer: 'QA Engineer'
+head: 'c319643799d22d2a99c0bf378159a21551446745'
+updated: '2026-11-04T17:25:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 17
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: false
+    boundary_signals: []
+    notes: 'Reads a repository document and git listings and prints text. git is called with an argument vector. isRecordCriterion and classify are predicate-shaped but feed an advisory listing that exits 0, so they are not a boundary.'
+  performance:
+    status: PASS
+    notes: 'One git ls-files and one git status per run.'
+  reliability:
+    status: PASS
+    notes: 'Unreadable document, failed git listing, document absent from both listings and missing criteria section each report scan-broken. Empty and scan-broken are separate reasons.'
+  maintainability:
+    status: PASS
+    notes: 'Trigger words held to review-task check 22 by a parity test; bundled copy held by the freshness test.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Resolve ls-files and status paths against the repository root in readListings, so a non-root --cwd cannot mix path bases.'
+      refs: ['shared/resources/finalise-record-preflight.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

@@ -280,6 +280,27 @@ A trigger word that over-matches: narrow it and add the criterion as a control.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-04
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.259.qa.1.finalise-checks-record-criteria-before-dod.md](./task.259.qa.1.finalise-checks-record-criteria-before-dod.md)
+- **Gate File**: [task.259.gate.1.finalise-checks-record-criteria-before-dod.yml](./task.259.gate.1.finalise-checks-record-criteria-before-dod.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 17
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues. Two LOW edge cases are advisory. All three section 8 mutations turn the named test red.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -289,6 +310,7 @@ A trigger word that over-matches: narrow it and add the criterion as a control.
 | 2026-11-04 | 1.1 | Review passed (8/10) — Critical fixed: task 257's own incident reads `ok` from the engine, so the catch moves to a Step 3a confirm step and the first criterion is re-scoped; Step 3a test and Performance criterion made testable | review-task |
 | 2026-11-04 |  | Status → ready-for-development | review-task |
 | 2026-11-04 |  | Implemented: finalise-record-preflight.js and its tests, Step 3a check, trap reworded, CHANGELOG; the `record-preflight` key added to the bug-mode skip table and its test. Status → ready-for-review | develop |
+| 2026-11-04 |  | QA gate PASS (95/100) — 0 findings | qa-task |
 <!-- change-log-end -->
 
 ---
