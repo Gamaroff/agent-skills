@@ -137,6 +137,23 @@ export function pathInScope(p, filesSummary) {
   );
 }
 
+/**
+ * A Files Summary entry as an author writes it, brought to the canonical
+ * repo-relative form (task 258): trimmed, one surrounding backtick pair dropped
+ * (the file is Markdown), leading `./` segments dropped, and one leading `/`
+ * dropped — Files Summary paths are repo-relative by contract. Only entries are
+ * normalised; the candidate is still judged by isPlainRelativePath, so a
+ * leading-`/` candidate stays refused whatever an entry says.
+ */
+function normaliseEntry(entry) {
+  let e = entry.trim();
+  const tick = /^`([^`]*)`$/.exec(e);
+  if (tick) e = tick[1].trim();
+  while (e.startsWith("./")) e = e.slice(2);
+  if (e.startsWith("/")) e = e.slice(1);
+  return e;
+}
+
 /** A path with at least one segment that is neither empty nor a wildcard. */
 const hasLiteralSegment = (p) =>
   p.split("/").some((s) => s !== "" && !/[*?]/.test(s));
@@ -150,7 +167,7 @@ const hasLiteralSegment = (p) =>
  */
 function entryPatterns(entry) {
   if (typeof entry !== "string") return [];
-  const expanded = expandBraces(entry.trim());
+  const expanded = expandBraces(normaliseEntry(entry));
   if (expanded === null) return [];
   return expanded
     .map((p) => (p.endsWith("/") ? `${p}**` : p))
@@ -250,14 +267,32 @@ const RUNNER_HEADINGS = new Set(["failing tests:"]);
 /** A trailing duration or TAP directive, which is not part of the test's name. */
 const DURATION_TAIL = /\s\(\d+(?:\.\d+)?\s?m?s\)\s*$/;
 
+const TEST_DIRS = new Set(["test", "tests", "__tests__"]);
+
 /**
- * A mutationProof.test shaped like a test FILE (`x.test.js`, `y.spec.ts`,
- * `z.test.sh`). A file appears on a `test at <file>` line beside ANY failure in
- * it, so it cannot show that one particular test went red; on task.207 a broken
- * revert reddened two unrelated tests and was accepted as `mutation-proved`
- * (obs #61). A `.md` path is the docs-link clause's proof and is not a test file.
+ * A mutationProof.test that names a test FILE (`x.test.js`, `y.spec.ts`,
+ * `z_test.go`, `test_a.py`, or any file under a `test`/`tests`/`__tests__`
+ * directory), in any letter case (task 258). A file appears on a
+ * `test at <file>` line beside ANY failure in it, so it cannot show that one
+ * particular test went red; on task.207 a broken revert reddened two unrelated
+ * tests and was accepted as `mutation-proved` (obs #61).
+ *
+ * A name with whitespace is a title, never a file, and a `.md` path is the
+ * docs-link clause's proof — both are left alone, so a real title that merely
+ * mentions a test is not refused.
  */
-const TEST_FILE_SHAPE = /\.(?:test|spec)\.(?!md$)[A-Za-z0-9]+$/;
+function isTestFileName(name) {
+  if (/\s/.test(name) || /\.md$/i.test(name)) return false;
+  const segs = name.split("/");
+  const base = segs[segs.length - 1].toLowerCase();
+  if (/\.(?:test|spec)\.[a-z0-9]+$/.test(base)) return true;
+  if (/_test\.[a-z0-9]+$/.test(base)) return true;
+  if (/^test_.+\.[a-z0-9]+$/.test(base)) return true;
+  return (
+    /\.[a-z0-9]+$/.test(base) &&
+    segs.slice(0, -1).some((s) => TEST_DIRS.has(s.toLowerCase()))
+  );
+}
 
 /**
  * Does a red line's subject name `test`? It must START the subject and end at a
@@ -274,7 +309,7 @@ function subjectNames(subject, test) {
   if (/^\s#\s*(?:todo|skip)/i.test(rest)) return false;
   // `:<line>` ends the name only for a path (the docs-link clause's
   // `✖ <file>:<line>`); after a plain title it is another test's name (CR-3).
-  const pathy = test.includes("/") || /\.md$/.test(test);
+  const pathy = /\.md$/.test(test);
   return new RegExp(
     `^(?:\\s*$|\\s\\(\\d+(?:\\.\\d+)?\\s?m?s\\)\\s*$|\\s#\\s${pathy ? "|:\\d" : ""})`,
   ).test(rest);
@@ -291,7 +326,9 @@ function subjectNames(subject, test) {
 function analyseRun(text, test) {
   let named = false;
   const other = new Set();
-  for (const line of text.split("\n")) {
+  // `\r?\n`: a log recorded on Windows, or through a CRLF-converting tool, ends
+  // its lines in `\r\n`, and a stray `\r` would sit inside the subject (task 258).
+  for (const line of text.split(/\r?\n/)) {
     const m = RED_SUBJECT.exec(line);
     if (!m) continue;
     const subject = m[1].trimEnd();
@@ -386,8 +423,8 @@ const CHECKS = Object.freeze({
     if (typeof m.test !== "string" || m.test.trim() === "") {
       return "mutationProof names no test";
     }
-    // A test FILE is not a test (task 257): see TEST_FILE_SHAPE.
-    if (TEST_FILE_SHAPE.test(m.test.trim())) {
+    // A test FILE is not a test (task 257): see isTestFileName.
+    if (isTestFileName(m.test.trim())) {
       return `mutationProof.test is ${m.test}, a test file — name the test by its title`;
     }
     if (m.redOnRevert !== true) {

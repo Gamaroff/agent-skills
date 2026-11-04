@@ -5,7 +5,7 @@ type: task
 description: "Close four edge cases the task 257 cycle 2 reviewer reproduced in the Step 8a evaluator: test-file shapes beyond .test.X, Files Summary entries written ./x or in backticks, CRLF run logs, and the :digit boundary on a title that contains a slash."
 tags: [finalise, observation, advisory]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-11-04
 updated: 2026-11-04
@@ -15,7 +15,7 @@ github_issue: 830
 
 # Technical Task: finalise fix-and-recheck reads test names, scope entries and run logs as written
 
-**Status:** Planned
+**Status:** Ready for Review
 
 **GitHub Issue**: [#830](https://github.com/Gamaroff/agent-skills/issues/830)
 
@@ -120,9 +120,9 @@ None. Two behaviours get stricter and two get more accepting, all on inputs that
 - `shared/resources/tests/finalise-fix-and-recheck.test.mjs`
 
 **Changes**:
-- [ ] Write the failing tests first, using the four reproduced names (`tests/x.TEST.js`, `tests/x_test.go`, `tests/x.sh`, `test_foo.py`) and confirm each is red against the current code.
-- [ ] Replace `TEST_FILE_SHAPE` with `isTestFileName` as described in § 3, and use it at the `"mutation-proved"` check.
-- [ ] Add the controls: a title with spaces that contains `test` and `/` is not refused; a `.md` proof path is not refused; `tests/x.test.js` is still refused.
+- [x] Write the failing tests first, using the four reproduced names (`tests/x.TEST.js`, `tests/x_test.go`, `tests/x.sh`, `test_foo.py`) and confirm each is red against the current code.
+- [x] Replace `TEST_FILE_SHAPE` with `isTestFileName` as described in § 3, and use it at the `"mutation-proved"` check. Update the comment above that check (`see TEST_FILE_SHAPE`, `:388`) to name `isTestFileName`. The literal `TEST_FILE_SHAPE` is held by no test (`git grep -n TEST_FILE_SHAPE -- '*.test.*'` finds nothing, 2026-11-04); its other hits are the evaluator, its bundled copy, and task 257/258 documents.
+- [x] Add the controls: a title with spaces that contains `test` and `/` is not refused; a `.md` proof path is not refused; `tests/x.test.js` is still refused.
 
 **Dependencies**: none.
 
@@ -135,9 +135,9 @@ None. Two behaviours get stricter and two get more accepting, all on inputs that
 **Files**: the same two.
 
 **Changes**:
-- [ ] Failing tests first: `./src/a.js`, `/src/a.js`, `` `src/a.js` ``, and `./src/` as a directory prefix.
-- [ ] Add `normaliseEntry`; use it in `pathInScope` and `entryPatterns`.
-- [ ] Controls: `pathInScope("/etc/passwd", ["/etc/passwd"])` stays false because the candidate guard still refuses it; `pathInScope("src/b.js", ["./src/a.js"])` is false; an entry with no literal segment (`./**`) still stands for nothing.
+- [x] Failing tests first: `./src/a.js`, `/src/a.js`, `` `src/a.js` ``, and `./src/` as a directory prefix.
+- [x] Add `normaliseEntry`; use it in `pathInScope` and `entryPatterns`.
+- [x] Controls: `pathInScope("/etc/passwd", ["/src/a.js"])` stays false because the candidate guard still refuses it (develop correction: with the *entry* `/etc/passwd` the raw exact-match comparison admits it today, and that unchanged behaviour is kept, since an exact entry is the author's own path); `pathInScope("src/b.js", ["./src/a.js"])` is false; an entry with no literal segment (`./**`) still stands for nothing.
 
 **Dependencies**: none (independent of Phase 1).
 
@@ -150,9 +150,9 @@ None. Two behaviours get stricter and two get more accepting, all on inputs that
 **Files**: the same two.
 
 **Changes**:
-- [ ] Failing tests first: a real-shaped log with `\r\n` line ends proves its test; `✖ GET /v1:5 stuff` does not prove `GET /v1`.
-- [ ] `text.split(/\r?\n/)` in `analyseRun`; `pathy` becomes `/\.md$/.test(test)`.
-- [ ] Control: the docs-link `.md` proof on its `✖ <file>:<line>` line still proves.
+- [x] Failing tests first: a real-shaped log with `\r\n` line ends proves its test; `✖ GET /v1:5 stuff` does not prove `GET /v1`.
+- [x] `text.split(/\r?\n/)` in `analyseRun`; `pathy` becomes `/\.md$/.test(test)`. The file's other `.split("\n")` (`gitFacts`, `:327`) splits `git diff --name-only` output and trims every line, so it is deliberately left as it is (search: `git grep -n 'split("\\n")' shared/resources/finalise-fix-and-recheck.mjs`, two hits on 2026-11-04).
+- [x] Control: the docs-link `.md` proof on its `✖ <file>:<line>` line still proves.
 
 **Dependencies**: none.
 
@@ -165,10 +165,10 @@ None. Two behaviours get stricter and two get more accepting, all on inputs that
 **Files**: `skills/finalise/references/finalise-fix-and-recheck.mjs` (generated), `CHANGELOG.md`, `skills/finalise/SKILL.md`.
 
 **Changes**:
-- [ ] Run `npm run bundle`, then `npm run bundle:check`.
-- [ ] One CHANGELOG entry under `[Unreleased]` → `### Fixed` that cites `task 258` and the four ids.
-- [ ] Update the Step 8a sentence "the evaluator refuses a file-shaped value" so it names the shapes (`*.test.*`, `*.spec.*`, `*_test.*`, `test_*.*`, a file under `tests/`), in any case.
-- [ ] Run the mutation record (§ 8) and write it into the QA report.
+- [x] Run `npm run bundle`, then `npm run bundle:check`.
+- [x] One CHANGELOG entry under `[Unreleased]` → `### Fixed` that cites `task 258` and the four ids.
+- [x] Update the Step 8a sentence "the evaluator refuses a file-shaped value" so it names the shapes (`*.test.*`, `*.spec.*`, `*_test.*`, `test_*.*`, a file under `tests/`), in any case.
+- [x] Run the mutation record (§ 8) and write it into the QA report.
 
 **Dependencies**: Phases 1 to 3.
 
@@ -233,26 +233,26 @@ Revert each fix and name the test that goes red. Record the table in the QA repo
 
 ### Functional
 
-- [ ] `tests/x.TEST.js`, `tests/x_test.go`, `tests/x.sh` and `test_foo.py` as `mutationProof.test` are each refused with "a test file — name the test by its title".
-- [ ] `pathInScope("src/a.js", [e])` is true for `e` of `./src/a.js`, `/src/a.js` and `` `src/a.js` ``, and false for `/etc/passwd` as a candidate.
-- [ ] A CRLF red line proves its test.
-- [ ] `✖ GET /v1:5 stuff` does not prove `GET /v1`; the docs-link `.md` proof still proves.
+- [x] `tests/x.TEST.js`, `tests/x_test.go`, `tests/x.sh` and `test_foo.py` as `mutationProof.test` are each refused with "a test file — name the test by its title".
+- [x] `pathInScope("src/a.js", [e])` is true for `e` of `./src/a.js`, `/src/a.js` and `` `src/a.js` ``, and false for `/etc/passwd` as a candidate.
+- [x] A CRLF red line proves its test.
+- [x] `✖ GET /v1:5 stuff` does not prove `GET /v1`; the docs-link `.md` proof still proves.
 - [ ] Each of the four mutations in § 8 turns the named test red, recorded in the QA report.
 
 ### Performance
 
-- [ ] No measurable change: the evaluator reads one small file and a short list. No baseline is needed.
+- [x] Not applicable: the evaluator reads one small file and a short list, and no change here adds a loop or a process call. No bound is stated and no baseline is needed.
 
 ### Code Quality
 
-- [ ] `CI=true` over `shared/resources/tests/finalise-fix-and-recheck.test.mjs` and the consumer suites passes.
-- [ ] `npm run bundle:check` is clean and `./node_modules/.bin/prettier --check` passes on the changed files.
-- [ ] `npm run validate -- skills/finalise/` passes (the `SKILL.md` changes).
+- [x] `CI=true` over `shared/resources/tests/finalise-fix-and-recheck.test.mjs` and the consumer suites passes.
+- [x] `npm run bundle:check` is clean and `./node_modules/.bin/prettier --check` passes on the changed files.
+- [x] `npm run validate -- skills/finalise/` passes (the `SKILL.md` changes).
 
 ### Migration
 
-- [ ] `CHANGELOG.md` has the entry, and `changelog-cites.sh task.258` reports it.
-- [ ] The Step 8a sentence matches the evaluator's shapes.
+- [x] `CHANGELOG.md` has the entry, and `changelog-cites.sh task.258` reports it.
+- [x] The Step 8a sentence matches the evaluator's shapes.
 
 ---
 
@@ -302,16 +302,16 @@ None.
 ## Progress Tracking
 
 ### Phase 1: Test-file recognition (CR2-1)
-- [ ] Failing tests, then `isTestFileName`, then controls
+- [x] Failing tests, then `isTestFileName`, then controls
 
 ### Phase 2: Scope entries (CR2-2)
-- [ ] Failing tests, then `normaliseEntry`, then controls
+- [x] Failing tests, then `normaliseEntry`, then controls
 
 ### Phase 3: CRLF and the `:<digit>` boundary (CR2-3, CR2-4)
-- [ ] Failing tests, then both fixes, then the control
+- [x] Failing tests, then both fixes, then the control
 
 ### Phase 4: Bundle, CHANGELOG and prose
-- [ ] Bundle, CHANGELOG, Step 8a sentence, mutation record in the QA report
+- [x] Bundle, CHANGELOG, Step 8a sentence (mutation record goes in the QA report)
 
 ---
 
@@ -321,6 +321,9 @@ None.
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-11-04 | 1.0 | Initial draft — cut from the CR2-1 to CR2-4 advisories of task 257 QA gate 2 | create-task |
+| 2026-11-04 | 1.1 | Review passed (9/10) — three clarifications applied: stale comment reference, second `split("\n")` named as out of scope, performance criterion reworded | review-task |
+| 2026-11-04 |  | Status → ready-for-development | review-task |
+| 2026-11-04 |  | Status → ready-for-review — implementation complete (4 fixes, tests, bundle, CHANGELOG) | develop |
 <!-- change-log-end -->
 
 ---
