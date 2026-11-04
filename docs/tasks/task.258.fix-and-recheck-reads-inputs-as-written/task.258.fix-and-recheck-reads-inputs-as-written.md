@@ -10,11 +10,14 @@ priority: Medium
 created: 2026-11-04
 updated: 2026-11-04
 estimated_effort_hours: 4
+github_issue: 830
 ---
 
 # Technical Task: finalise fix-and-recheck reads test names, scope entries and run logs as written
 
 **Status:** Planned
+
+**GitHub Issue**: [#830](https://github.com/Gamaroff/agent-skills/issues/830)
 
 > Cut from the four advisories task 257's QA gate 2 left open (`recommendations.future`, CR2-1 to CR2-4 in `task.257.gate.2.fix-and-recheck-reads-what-it-claims.yml`; detail in `task.257.qa.2.fix-and-recheck-reads-what-it-claims.md` § New Findings This Cycle). One document because all four are in one file and are the same kind of defect: the evaluator reads its input more narrowly than the way people and runners write it. CR-4 and CR-6 from cycle 1 are not part of this task.
 

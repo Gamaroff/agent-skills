@@ -10,11 +10,14 @@ priority: Medium
 created: 2026-11-04
 updated: 2026-11-04
 estimated_effort_hours: 8
+github_issue: 831
 ---
 
 # Technical Task: finalise checks record criteria before the DoD run
 
 **Status:** Planned
+
+**GitHub Issue**: [#831](https://github.com/Gamaroff/agent-skills/issues/831)
 
 > Turns the trap "`/finalise` must read the QA report for record criteria BEFORE the DoD run" (`docs/contributing/traps.md`, added 2026-11-04) from a procedure step into a check. Origin: task 257, criterion 14.
 
