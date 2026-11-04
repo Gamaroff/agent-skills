@@ -1884,6 +1884,153 @@ test("newest_numbered finds the newest AC record and never a security run record
   }
 });
 
+// ── task 257: severity survives the merge, on every path ──────────────────
+//
+// /finalise Step 8a reads the severity of an AC FAIL from the MERGED result
+// (Step 3c). The fix-and-recheck path is reachable only for a FAIL graded
+// `low`; an AC finding whose grade the merge dropped could never take it
+// (obs #131).
+
+const acEntry = (id, status, extra = []) =>
+  [
+    `    - ac_id: "${id}"`,
+    `      description: "${id} description"`,
+    `      status: ${status}`,
+    `      code_citation: "src/a.js:1"`,
+    `      test_citation: ${status === "PASS" ? '"tests/a.test.mjs:1"' : "null"}`,
+    ...(status === "PASS" ? ["      test_runs_per_pr: true"] : []),
+    ...extra.map((l) => `      ${l}`),
+  ].join("\n");
+
+const agentDoc = (entries) =>
+  [
+    "ac_traceability:",
+    `  story_file: "${DOC}"`,
+    "  pr_number: 1",
+    "  pr_status: OPEN",
+    "  pr_review_decision: null",
+    "  acs:",
+    ...entries,
+    "  docs: []",
+    "  advisories: []",
+    "  overall: FAIL",
+    '  summary: "x"',
+    "",
+  ].join("\n");
+
+const acOf = (merged, id) =>
+  merged.ac_result.ac_traceability.acs.find((x) => x.ac_id === id);
+
+test("severity (full run): a low AC FAIL keeps its grade; a FAIL with none stays ungraded (task 257)", () => {
+  const dir = mkRepo();
+  try {
+    const s = scopeAt(dir, null);
+    const yaml = agentDoc([
+      acEntry("SC-1", "PASS"),
+      acEntry("SC-2", "PASS"),
+      acEntry("SC-3", "FAIL", [
+        "severity: low",
+        'note: "one branch has no test"',
+      ]),
+      acEntry("SC-4", "FAIL", ['note: "the agent did not grade this"']),
+    ]);
+    const m = eng.merge(s, yaml, {}, eng.gitIo(dir));
+    assert.equal(acOf(m, "SC-3").severity, "low");
+    assert.equal(
+      acOf(m, "SC-4").severity,
+      undefined,
+      "a FAIL with no severity must stay ungraded — not low",
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("severity (scoped reported-gap): the agent's grade survives the member merge (task 257)", () => {
+  const { dir, prior } = replayRepo();
+  try {
+    const yaml = RUN5_NO_FAILING_MEMBER.replace(
+      /(ac_id: "SC-11"[\s\S]*?status: FAIL\n)/,
+      '$1      severity: low\n      non_member_fail: "the cited test does not cover the criterion"\n',
+    );
+    assert.notEqual(yaml, RUN5_NO_FAILING_MEMBER);
+    const sc11 = acOf(
+      eng.merge(scopeAt(dir, prior), yaml, {}, eng.gitIo(dir)),
+      "SC-11",
+    );
+    assert.equal(sc11.status, "FAIL");
+    assert.equal(sc11.severity, "low");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("severity (reported-gap overturned): a criterion the members pass carries no severity (task 257)", () => {
+  const { dir, prior } = replayRepo();
+  try {
+    // The agent FAILs SC-11 only because of members the merge carries or
+    // advisories; the merged status is PASS, and a PASS is not graded.
+    const yaml = AGENT_RUN5.replace(
+      /(ac_id: "SC-11"[\s\S]*?status: FAIL\n)/,
+      "$1      severity: low\n",
+    );
+    const merged = eng.merge(scopeAt(dir, prior), yaml, {}, eng.gitIo(dir));
+    const sc11 = acOf(merged, "SC-11");
+    if (sc11.status === "PASS") {
+      assert.equal(sc11.severity, undefined, "a PASS must not carry a grade");
+    }
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("severity (no agent verdict for a gap): the prior FAIL stands ungraded — a carried FAIL is not low (task 257)", () => {
+  const { dir, prior } = replayRepo();
+  try {
+    // Drop SC-11 from the agent's answer entirely.
+    const yaml = agentDoc([acEntry("SC-1", "PASS"), acEntry("SC-2", "PASS")]);
+    const sc11 = acOf(
+      eng.merge(scopeAt(dir, prior), yaml, {}, eng.gitIo(dir)),
+      "SC-11",
+    );
+    assert.equal(sc11.status, "FAIL");
+    assert.equal(sc11.severity, undefined);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("severity (end to end): a merged low AC FAIL is read by the evaluator as low, an ungraded one is refused (task 257)", async () => {
+  const { evaluateFixAndRecheck } =
+    await import("../finalise-fix-and-recheck.mjs");
+  const dir = mkRepo();
+  try {
+    const yaml = agentDoc([
+      acEntry("SC-1", "PASS"),
+      acEntry("SC-2", "PASS"),
+      acEntry("SC-3", "FAIL", ["severity: low"]),
+      acEntry("SC-4", "FAIL"),
+    ]);
+    const m = eng.merge(scopeAt(dir, null), yaml, {}, eng.gitIo(dir));
+    const finding = (severity) => ({
+      severity,
+      commits: 1,
+      touched: ["src/a.js"],
+      filesSummary: ["src/a.js"],
+      otherFindingsOpen: [],
+      // The proof is not under test here: leave it unproved and read only the
+      // severity precondition.
+      mutationProof: { test: "x", redOnRevert: false },
+    });
+    const idsFailed = (sev) =>
+      evaluateFixAndRecheck(finding(sev)).failed.map((f) => f.id);
+    assert.ok(!idsFailed(acOf(m, "SC-3").severity).includes("severity-low"));
+    assert.ok(idsFailed(acOf(m, "SC-4").severity).includes("severity-low"));
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test("every documented reason is reached by a case above", () => {
   for (const r of [...eng.FULL_REASONS, ...eng.CRITERION_REASONS]) {
     assert.ok(SEEN.has(r), `reason ${r} is documented but no case produced it`);

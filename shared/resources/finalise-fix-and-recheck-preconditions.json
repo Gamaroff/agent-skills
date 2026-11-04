@@ -22,9 +22,9 @@
     },
     {
       "id": "mutation-proved",
-      "statement": "a named test goes red when the fix is reverted, and the run that showed it is recorded to a file the evaluator opens (mutationProof.run: non-empty, names the test, carries a red marker)",
+      "statement": "a named test goes red when the fix is reverted, and the run that showed it is recorded to a file the evaluator opens (mutationProof.run: non-empty, and one red line — `not ok`, `✖` or `FAIL` — that starts with the test's own title, ending at a boundary; mutationProof.test is that title, or for the docs-link clause the document's path, never a test file)",
       "input": "mutationProof (test, redOnRevert, run)",
-      "why": "A fix with no red-on-revert test is a change nothing holds; the next edit can undo it silently."
+      "why": "A fix with no red-on-revert test is a change nothing holds; the next edit can undo it silently. A test FILE or a red neighbour proves nothing about the named test: a broken revert reddened two unrelated tests on task.207 and was accepted as mutation-proved."
     },
     {
       "id": "no-other-finding-open",

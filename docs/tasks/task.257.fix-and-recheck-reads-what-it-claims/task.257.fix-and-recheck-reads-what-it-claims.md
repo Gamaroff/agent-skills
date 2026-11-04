@@ -5,17 +5,21 @@ type: task
 description: "Make /finalise Step 8a reachable for a low acceptance-criteria, docs or compliance finding, read a Files Summary in the notation authors use, and stop accepting a mutation proof for a test that did not go red."
 tags: [finalise, observation]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 created: 2026-11-04
 updated: 2026-11-04
 estimated_effort_hours: 8
 github_issue: 826
+pr_number: 829
+completed_date: 2026-11-04
 ---
 
 # Technical Task: finalise fix-and-recheck reads severity, scope and the named test
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.257.review.1.fix-and-recheck-reads-what-it-claims.md` implemented 2026-11-04
 
 **GitHub Issue**: [#826](https://github.com/Gamaroff/agent-skills/issues/826)
 
@@ -148,6 +152,7 @@ Every line below was found with `grep -n` on `shared/resources/finalise-fix-and-
 - [ ] Return `otherRed` in the JSON output, de-duplicated across node:test's failing-tests summary.
 - [ ] Update the preconditions statement and the fixtures that pin the old convention.
 - [ ] Confirm the docs-link clause's `✖ <file>:<line>` shape still proves.
+- [ ] Update the two assertions that pin the refusal message text (`finalise-fix-and-recheck.test.mjs:437` and `:479`, `shows no failing test`), found by `git grep -n 'shows no failing test'`.
 
 **Dependencies**: none.
 
@@ -386,12 +391,54 @@ The set is defined as: copies of items 1 to 7 under `skills/`. Command: `find sk
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-04
+**Quality Score**: 90/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.257.qa.2.fix-and-recheck-reads-what-it-claims.md](./task.257.qa.2.fix-and-recheck-reads-what-it-claims.md)
+- **Gate File**: [task.257.gate.2.fix-and-recheck-reads-what-it-claims.yml](./task.257.gate.2.fix-and-recheck-reads-what-it-claims.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 187
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No blocking findings. Four advisory items are recorded in the gate's future recommendations.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report:** `task.257.qa.2.fix-and-recheck-reads-what-it-claims.md` — gate PASS, 90/100.
+
+✅ **Acceptance criteria:** 16/16 (criterion 14, the six §8 mutations, was recorded in the QA report during finalise)
+✅ **Tests and CI:** green on PR #829 (6 checks); 187 tests across the five touched suites
+✅ **Documentation:** `CHANGELOG.md`, `skills/finalise/SKILL.md` Step 8a, preconditions JSON, four DoD prompts
+✅ **Security:** 25 probes against `pathInScope`, 0 reproduced
+⚠️ **Compliance:** not applicable (internal tooling)
+
+**Detailed Verification Log:** see `task.257.dod.1.fix-and-recheck-reads-what-it-claims.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-04
+
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                           | Author      |
-| ---------- | ------- | ----------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-04 | 1.0     | Initial draft — cut from observations #61, #131, #132 | create-task |
+| 2026-11-04 | 1.1     | Review passed (8/10) — added the pinned-message assertions to Phase 1 | review-task |
+| 2026-11-04 |         | Status → ready-for-development                        | review-task |
+| 2026-11-04 |         | QA gate CONCERNS (70/100) — 3 findings                | qa-task     |
+| 2026-11-04 |         | QA findings fixed — 3 of 3, 1 iteration               | qa-fix      |
+| 2026-11-04 |         | QA gate PASS (90/100) — 0 findings                    | qa-task     |
+| 2026-11-04 | 1.2 | DoD passed — accepted (PR #829) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -442,7 +489,7 @@ The set is defined as: copies of items 1 to 7 under `skills/`. Command: `find sk
 
 ---
 
-**Status:** Planned
+**Status:** Accepted
 
 **Next Steps**:
 1. Implement according to the plan with `/develop-task`.

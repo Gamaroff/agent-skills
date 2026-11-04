@@ -67,6 +67,7 @@ compliance_review:
     - area: "GDPR | PCI-DSS | WCAG | HIPAA"
       check: "check name"
       status: PASS | FAIL | NOT_APPLICABLE
+      severity: low | medium | high    # REQUIRED on a FAIL (Severity rule below); omit otherwise
       citation: "path/to/file.ts:NN"   # null if not found
       note: "optional, required if NOT_APPLICABLE"
   overall: PASS | FAIL | NOT_APPLICABLE
@@ -74,3 +75,5 @@ compliance_review:
 ```
 
 **Citation rule**: `status: PASS` requires a non-null citation. Null → `FAIL`. `NOT_APPLICABLE` must include `note`. If no compliance areas apply, set `overall: NOT_APPLICABLE` and explain in `summary`.
+
+**Severity rule**: every FAIL carries `severity`. It is what lets `/finalise` take the bounded fix-and-recheck path (Step 8a) on a low finding instead of halting a hands-free run. `low`: one check, where the code's behaviour is right or it fails closed, such as one missing citation for a control that is in place. `medium`: the control is wrong for a data subject or a user. `high`: the control is absent, or it fails open. More than one failed check is not low. A FAIL with no `severity` is read as not low and halts, so leaving it off is never the lenient choice.

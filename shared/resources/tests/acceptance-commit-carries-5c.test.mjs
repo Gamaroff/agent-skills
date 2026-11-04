@@ -924,7 +924,7 @@ for (const shell of SHELLS) {
         touched: ["a.sh"],
         filesSummary: ["a.sh", "b.js"],
         mutationProof: {
-          test: "b.js",
+          test: "reverted fix goes red",
           redOnRevert: true,
           run: ".claude/state/mutation-proof.log",
         },

@@ -1271,3 +1271,79 @@ test("/finalise: the DoD Step 2 block carries the re-run scope line and the advi
     `the engine's scope line changed shape: ${line}`,
   );
 });
+
+// --- task 257: every DoD agent grades a FAIL --------------------------------------------------
+//
+// /finalise Step 8a's fix-and-recheck path is reachable only for a FAIL graded `low`, and a FAIL
+// with no `severity` is read as not low and halts. The security prompt always carried the field;
+// the AC, docs, compliance and fix-evidence prompts did not, so an acceptance-criteria finding
+// could never take the path (obs #131). The grading rule is stated once per prompt, and this test
+// holds that each of the four still emits the field, defines all three grades and says what an
+// ungraded FAIL means.
+
+const GRADED_PROMPTS = [
+  "finalise-dod-ac-prompt.md",
+  "finalise-dod-docs-prompt.md",
+  "finalise-dod-compliance-prompt.md",
+  "finalise-dod-fix-evidence-prompt.md",
+];
+
+for (const name of GRADED_PROMPTS) {
+  test(`${name}: every FAIL entry is graded — the field, the three grades, and the fail-closed clause`, () => {
+    const text = readFileSync(
+      join(repoRoot, "shared", "resources", name),
+      "utf-8",
+    );
+    assert.match(
+      text,
+      /severity: low \| medium \| high/,
+      `${name}: the output YAML no longer carries a severity field`,
+    );
+    const rule = text.match(/\*\*Severity rule\*\*:[^\n]*(?:\n(?!\n)[^\n]*)*/);
+    assert.ok(rule, `${name}: the Severity rule paragraph is gone`);
+    for (const grade of ["`low`", "`medium`", "`high`"]) {
+      assert.ok(
+        rule[0].includes(grade),
+        `${name}: the Severity rule no longer defines ${grade}`,
+      );
+    }
+    assert.ok(
+      has(rule[0], "More than one failed"),
+      `${name}: the rule no longer says that several failures are not low`,
+    );
+    assert.ok(
+      has(rule[0], "A FAIL with no `severity` is read as not low and halts"),
+      `${name}: the rule no longer says an ungraded FAIL halts — leaving it off would read as lenient`,
+    );
+  });
+}
+
+test("every entry shape in the four graded prompts names severity beside its status (task 257)", () => {
+  // Count entries that carry a PASS|FAIL status line against severity lines: a new check added
+  // without a grade would otherwise be the one FAIL that can never take the bounded path.
+  for (const name of GRADED_PROMPTS) {
+    const text = readFileSync(
+      join(repoRoot, "shared", "resources", name),
+      "utf-8",
+    );
+    const yaml = text.match(/```yaml\n([\s\S]*?)```/);
+    assert.ok(yaml, `${name}: no yaml block`);
+    const lines = yaml[1].split("\n");
+    for (let i = 0; i < lines.length; i += 1) {
+      if (
+        !/^\s+status: (PASS \| FAIL|PASS \| FAIL \| (NOT_APPLICABLE|DEFERRED-CI))\b/.test(
+          lines[i],
+        )
+      )
+        continue;
+      // acs[].members carry a PASS | FAIL status of their own: a member is graded through its
+      // criterion, so it is the one entry shape that carries no severity line.
+      if (/^\s{10,}status:/.test(lines[i])) continue;
+      assert.match(
+        lines[i + 1] ?? "",
+        /severity: low \| medium \| high/,
+        `${name}: the entry at yaml line ${i + 1} has a status but no severity line after it`,
+      );
+    }
+  }
+});

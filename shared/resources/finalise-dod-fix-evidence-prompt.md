@@ -104,38 +104,47 @@ fix_evidence:
   checks:
     - check: "expected behaviour implemented"
       status: PASS | FAIL
+      severity: low | medium | high              # REQUIRED on a FAIL (Severity rule below); omit otherwise
       code_citation: "path/to/file.js:NN"        # null if not found
       note: "optional"
     - check: "regression test asserts it and runs per PR"
       status: PASS | FAIL
+      severity: low | medium | high              # REQUIRED on a FAIL
       test_citation: "path/to/file.test.js:NN"   # null if not found
       test_runs_per_pr: true | false             # false → status must be FAIL; name the lane in note
       note: "optional"
     - check: "test fails without the fix"
       status: PASS | FAIL
+      severity: low | medium | high              # REQUIRED on a FAIL
       citation: "bug file / implementation report / commit that records the red run"   # null if none
       note: "optional"
     - check: "guard scope stated"
       status: PASS | FAIL | NOT_APPLICABLE
+      severity: low | medium | high              # REQUIRED on a FAIL
       citation: "path:NN"                        # null if N/A
       note: "required if NOT_APPLICABLE"
     - check: "bundled copies match source"
       status: PASS | FAIL | NOT_APPLICABLE
+      severity: low | medium | high              # REQUIRED on a FAIL
       citation: "path:NN or the bundle:check result"
       note: "required if NOT_APPLICABLE"
   docs:
     - item: "bug report fix record"
       status: PASS | FAIL
+      severity: low | medium | high              # REQUIRED on a FAIL
       citation: "path:NN"
       note: "optional"
     - item: "status history"
       status: PASS | FAIL
+      severity: low | medium | high              # REQUIRED on a FAIL
       citation: "path:NN"
     - item: "change log absent"
       status: PASS | FAIL
+      severity: low | medium | high              # REQUIRED on a FAIL
       citation: "count of '## Change Log' headings"
     - item: "behaviour docs"
       status: PASS | FAIL | NOT_APPLICABLE
+      severity: low | medium | high              # REQUIRED on a FAIL
       citation: "path:NN"
       note: "required if NOT_APPLICABLE"
   overall: PASS | FAIL | PARTIAL
@@ -148,3 +157,10 @@ fix_evidence:
 **Execution rule**: the regression-test check additionally requires `test_runs_per_pr: true`. A
 cited test in a lane the PR does not run is a citation, not evidence → `status: FAIL` with the lane
 named in `note`.
+
+**Severity rule**: every FAIL carries `severity`. It is what lets `/finalise` take the bounded
+fix-and-recheck path (Step 8a) on a low finding instead of halting a hands-free run. `low`: one check,
+where the code's behaviour is right or it fails closed, such as a missing test for a correct branch or
+one wrong doc line. `medium`: behaviour is wrong for a caller. `high`: the fix is undelivered, or it
+fails open. More than one failed check is not low. A FAIL with no `severity` is read as not low and
+halts, so leaving it off is never the lenient choice.

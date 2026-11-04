@@ -81,14 +81,17 @@ docs_review:
   checks:
     - item: "CHANGELOG.md updated"
       status: PASS | FAIL | NOT_APPLICABLE
+      severity: low | medium | high    # REQUIRED on a FAIL (Severity rule below); omit otherwise
       citation: "CHANGELOG.md:NN"   # null if not found
       note: "optional, required if NOT_APPLICABLE"
     - item: "API/type-specific docs updated"
       status: PASS | FAIL | NOT_APPLICABLE
+      severity: low | medium | high    # REQUIRED on a FAIL
       citation: "path/to/file.md:NN"   # null if not found
       note: "optional"
     - item: "README / architecture docs updated"
       status: PASS | FAIL | NOT_APPLICABLE
+      severity: low | medium | high    # REQUIRED on a FAIL
       citation: "README.md:NN or docs/architecture/file.md:NN"   # null if not found
       note: "optional"
   overall: PASS | FAIL | NOT_APPLICABLE
@@ -96,3 +99,5 @@ docs_review:
 ```
 
 **Citation rule**: `status: PASS` requires a non-null citation. Null → `FAIL`. `NOT_APPLICABLE` must include `note` explaining why the check does not apply.
+
+**Severity rule**: every FAIL carries `severity`. It is what lets `/finalise` take the bounded fix-and-recheck path (Step 8a) on a low finding instead of halting a hands-free run. `low`: one check, where the code's behaviour is right or it fails closed, such as one wrong doc line or a missing CHANGELOG entry for a correct change. `medium`: the docs state behaviour that is wrong for a reader. `high`: the documentation the work promised is undelivered. More than one failed check is not low. A FAIL with no `severity` is read as not low and halts, so leaving it off is never the lenient choice.
