@@ -1,0 +1,64 @@
+schema: 2
+task: 'task.260.ai-system-assessment-skill'
+task_title: 'ai-system-assessment skill'
+gate: PASS
+status_reason: 'Cycle 1 MEDIUM (missing CHANGELOG entry) is fixed and verified. The refute pass over the whole diff found nothing new.'
+reviewer: 'QA Engineer'
+head: 'c1ac2387ba05f5deb0350707462c33619010d2f8'
+updated: '2026-11-04T21:40:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 96
+
+evidence:
+  tests_reviewed: 12
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-11-04'
+  total_iterations: 1
+  verification_method: 'changelog-cites.sh task.260 prints "cites (task 260)"'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    escaped: 0
+    boundary_signals: []
+    notes: 'Read-only skill; harness lists and reads only. No boundary function.'
+  performance:
+    status: PASS
+    notes: 'Test file about 90 ms.'
+  reliability:
+    status: PASS
+    notes: '12 tests pass; validate:all and prettier clean.'
+  maintainability:
+    status: PASS
+    notes: 'EXPECT table forces a stated fixture result for each new signal.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Widen p2-drift-test and p3-tool-fakes globs, which assume a root tests/ directory (missed evals/shared/tests/*parity* and shared/resources/fake-jira.js on this repository).'
+      refs: ['skills/ai-system-assessment/references/p2-grounding.md', 'skills/ai-system-assessment/references/p3-tools.md']
+    - action: 'Tighten noisy p4-permission-modes and p7-decision-log patterns (hundreds of hits on a large repository).'
+      refs: ['skills/ai-system-assessment/references/p4-access-control.md', 'skills/ai-system-assessment/references/p7-observability.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
