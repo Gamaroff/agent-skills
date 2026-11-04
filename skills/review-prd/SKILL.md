@@ -605,6 +605,9 @@ stay for later runs — with options **Apply** and **Skip**. Apply only on an ex
 # review-prd — apply the numbering migration (task 204)
 # Run ONLY after the user chose Apply. INPUT: MIG_NAME and MIG_PRD, as the plan used them.
 # --apply re-plans and refuses on any blocker (reason blocked) before it moves anything.
+# A checkout with uncommitted or untracked files (dirty-tree) or behind its upstream
+# (behind-upstream) is a blocker too: commit or stash, or pull, and run it again. The plan above
+# reports the same two states as warnings, so they are visible before Apply is chosen.
 MIGRATE=.agents/skills/review-prd/references/migrate-doc-numbering.mjs
 source .agents/skills/review-prd/references/resolve-paths.sh || exit 1
 NAME_ARGS=()

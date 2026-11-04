@@ -20,6 +20,13 @@ All notable changes to this project will be documented in this file. Format foll
   `cannot materialise "<input>"` decline now names the sink that wrote the input as a file name and
   says a path-bearing input needs a sink that is not materialised.
 
+- **`migrate-doc-numbering`: three task 253 advisories closed.** The upstream `git fetch` now runs
+  with `GIT_TERMINAL_PROMPT=0`, so a remote that wants credentials fails the fetch
+  (`upstream-unverified`) rather than waiting on a prompt the run cannot answer. A new test holds
+  the read-once rule on the applied path, where the link pass runs; the earlier test covered the
+  dry run only. `skills/review-prd/SKILL.md` now says `--apply` also refuses a dirty or behind
+  checkout. Each test is mutation-proven.
+
 - **`migrate-doc-numbering` gets the safety nets the tinker-city migration asked for (task 253).**
   Six changes, all in `shared/resources/migrate-doc-numbering.mjs`. (1) A link whose text wraps
   across lines (`[text\nmore](target)`) is now re-pointed; the target on a later line was missed
