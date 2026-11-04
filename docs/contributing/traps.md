@@ -249,8 +249,13 @@ missing. On task 257 (2026-11-04) criterion 14 asked for the task's six §8 muta
 they were in the implementation report alone, so the first DoD pass failed it. The fix cost a full
 re-run of all six mutations, a table in the QA report, a commit and a second agent to re-judge.
 
-Before dispatching the DoD agents, read the newest `{stem}.qa.{N}.*.md` and list every criterion that
-asks for a record. For each one, confirm the evidence is in a **committed** QA report, gate file or DoD
-file; if it is not, write it there first. The task-authoring side already names a location for such a
-criterion (`create-task` §3.5, obs #105, #77, task 249; `review-task` Step 3 check 22). This is the
-finalise side of the same rule, and it is a procedure step to carry out, not a check that exists yet.
+`/finalise` Step 3a now runs this as a check (task 259): `finalise-record-preflight.js` lists every
+criterion that asks for a record, with the committed artifact its named location resolves to, and
+Step 3a's table says what to do for each state. The task-authoring side already names a location for
+such a criterion (`create-task` §3.5, obs #105, #77, task 249; `review-task` Step 3 check 22); the two
+share one list of trigger words, held by a test.
+
+**The check lists; it does not read.** `ok` means a committed place exists, not that the record is in
+it. Task 257's criterion named the QA report, one was committed, and the record was missing from it.
+So Step 3a's confirm step still means opening each listed artifact and looking, before dispatching.
+If you skip it, the DoD pass is where you find out.

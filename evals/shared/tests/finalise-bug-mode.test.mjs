@@ -137,6 +137,7 @@ const EXPECTED_VERBS = {
   "read-document": "run",
   "qa-reports": "run",
   "rerun-scope": "skip", // task 242 — a bug has no criteria list to scope
+  "record-preflight": "skip", // task 259 — a bug has no criteria list to check
   "ac-agent": "skip",
   "fix-evidence": "run",
   "frontmatter-accepted": "skip",

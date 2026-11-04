@@ -1083,6 +1083,9 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 22. **A criterion that demands a record names where it lives** (obs #77, #105; task 249):
     - Trigger: a success criterion demands a record or a measurement — it says "recorded", "logged",
       "listed in", "documented", or it states a numeric bound graded by a measurement
+      (`/finalise` Step 3a applies the same trigger to a finished task, through
+      `finalise-record-preflight.js`; a test holds the two word lists together, so reword one only
+      with the other)
     - Require the criterion to name the record's location: the QA report, the QA gate file or the
       DoD. Each is committed by the time the work is accepted. The implementation report does not
       count, because the pipeline commits it after `/finalise` grades the criterion

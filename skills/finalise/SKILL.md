@@ -100,6 +100,7 @@ apply to a bug?" a lookup instead of a judgement.
 | `read-document` | Step 1 — read the document | run | run — the bug report, frontmatter or header block (`references/bug-doc.js`) |
 | `qa-reports` | Step 2 — QA reports and gate | run | run — globs scoped to `${STEM}` (a co-located bug must not read its parent's); none expected; the verify loop's `#### QA Verification` and the implementation report are the QA record |
 | `rerun-scope` | Step 3a — re-run scope and Step 3c — AC record | run | **skip** — fix-evidence has no criteria list to scope; no AC record is read or written |
+| `record-preflight` | Step 3a — record-criteria check | run | **skip** — a bug report has no criteria list |
 | `ac-agent` | Step 3b — AC traceability agent | run | **skip** — a bug has no ACs; the `fix-evidence` agent takes its slot |
 | `fix-evidence` | Step 3b — fix-evidence agent | — | run — `references/finalise-dod-fix-evidence-prompt.md` |
 | `frontmatter-accepted` | Step 7.2 — `status: accepted` | run | **skip** — `accepted` is not a bug status; develop-bug Part B writes `closed` |
@@ -527,6 +528,42 @@ hand-set stop rule (obs #121). **To force a full re-judge**, move the newest `${
 aside; the next run reports `no-prior-record`.
 
 **Bug mode (`rerun-scope`):** skip — a bug report has no criteria list to scope; the fix-evidence agent's five checks run in full every time, and no AC record is read or written.
+
+**Then check that every record criterion has a committed place** — before any agent runs (task 259).
+A criterion that asks for a record ("recorded", "logged", "listed in", "documented", or a numeric
+bound graded by a measurement) is graded against **committed** artifacts, and the implementation
+report is committed only at Step 8. On task 257 (2026-11-04) criterion 14's record lived there alone
+and the first DoD pass failed it. Engine source: `references/finalise-record-preflight.js`; the
+trigger words are `review-task` Step 3 check 22's, held together by a test.
+
+```bash
+# INPUT, substituted into THIS block: {document-path}, the work item document.
+DOC_PATH="{document-path}"
+case "$DOC_PATH" in *'{'*) echo "HALT: DOC_PATH must be substituted into this block (an unsubstituted placeholder found)"; exit 1 ;; esac
+mkdir -p .claude/state
+command node .agents/skills/finalise/references/finalise-record-preflight.js check \
+  --doc "$DOC_PATH" --json > .claude/state/finalise-record-preflight.json
+case $? in
+  0) jq -r '"record criteria: \(.reason) — \(.message)", (.listed[] | "  #\(.index) [\(.state)] \(.criterion)")' .claude/state/finalise-record-preflight.json ;;
+  *) echo "HALT: finalise-record-preflight.js failed — see .claude/state/finalise-record-preflight.json"; exit 1 ;;
+esac
+```
+
+Read `reason` and act per state, in the main context — it holds the evidence the engine cannot see:
+
+| State | Action before Step 3b |
+| :-- | :-- |
+| `ok` | **Confirm.** Open each file in `artifacts` and check the record is in it. `ok` means a committed place exists, not that the record is in it (task 257's criterion named the QA report, one was committed, and the record was missing from it). A record that is missing is written there and committed first. |
+| `implementation-report-only` | Write the record into the newest committed QA report (or the gate), commit it, then continue. The criterion is also an authoring defect: note it in the DoD. |
+| `location-uncommitted` | Commit the named artifact. |
+| `location-absent` | Write the record into the named artifact once it exists, and commit. If the artifact cannot exist yet, say so in the DoD. |
+| `no-location` | Report it in the DoD. `/finalise` cannot invent a location, and nothing blocks: the AC agent still runs. |
+
+`empty` and `ok` with nothing listed need no action. `scan-broken` is a **HALT**: the instrument could
+not read the directory or the criteria, which is not the same as there being nothing to check. The
+check reports and the main context fixes; it never writes a record.
+
+**Bug mode (`record-preflight`):** skip — a bug report has no criteria list.
 
 #### Step 3b: Dispatch 4 Explore Subagents in Parallel
 
