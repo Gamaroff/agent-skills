@@ -391,24 +391,24 @@ The set is defined as: copies of items 1 to 7 under `skills/`. Command: `find sk
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-04
-**Quality Score**: 70/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 90/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.257.qa.1.fix-and-recheck-reads-what-it-claims.md](./task.257.qa.1.fix-and-recheck-reads-what-it-claims.md)
-- **Gate File**: [task.257.gate.1.fix-and-recheck-reads-what-it-claims.yml](./task.257.gate.1.fix-and-recheck-reads-what-it-claims.yml)
+- **Full Report**: [task.257.qa.2.fix-and-recheck-reads-what-it-claims.md](./task.257.qa.2.fix-and-recheck-reads-what-it-claims.md)
+- **Gate File**: [task.257.gate.2.fix-and-recheck-reads-what-it-claims.yml](./task.257.gate.2.fix-and-recheck-reads-what-it-claims.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 178
+- **Tests Executed**: 187
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Two reproduced medium bugs in the new readers (path-guard normalisation bypass, TODO/SKIP read as red) and an unprobeable scope predicate.
+No blocking findings. Four advisory items are recorded in the gate's future recommendations.
 
 <!-- change-log-start -->
 ## Change Log
@@ -420,6 +420,7 @@ Two reproduced medium bugs in the new readers (path-guard normalisation bypass, 
 | 2026-11-04 |         | Status → ready-for-development                        | review-task |
 | 2026-11-04 |         | QA gate CONCERNS (70/100) — 3 findings                | qa-task     |
 | 2026-11-04 |         | QA findings fixed — 3 of 3, 1 iteration               | qa-fix      |
+| 2026-11-04 |         | QA gate PASS (90/100) — 0 findings                    | qa-task     |
 <!-- change-log-end -->
 
 ---
