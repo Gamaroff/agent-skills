@@ -34,10 +34,10 @@ Add a pure `finalise-record-preflight.js` engine, wire it into `/finalise` Step 
 | 1. create-branch           | ✅ Done | Branch `feature/task.259.*` exists in git                              | Branch created at `f5210476`; work-started signalled | —                    | 2026-11-04T16:46Z |
 | 2. review-task             | ✅ Done | `task.259.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT 8/10; 1 Critical + 3 Important fixed in the document; status → ready-for-development | —                    | 2026-11-04T16:49Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (iteration 1); `ci:fast` green (rc=0); 17 new tests | —                    | 2026-11-04T17:05Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.259.qa.{N}.*.md`; `task.259.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.259.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #833 https://github.com/Gamaroff/agent-skills/pull/833; commit c3196437 | —                    | 2026-11-04T17:15Z |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.259.qa.{N}.*.md`; `task.259.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 1 cycle: gate PASS 95; 5c APPROVE (conformance only); 3 mutations covered | —                    | 2026-11-04T17:10Z |
+| 7. finalise                | ✅ Done | `task.259.dod.{N}.*.md`; task `status: accepted`                       | DoD 1 ACCEPTED; acceptance commit `6e47dadf`; CI reading 1 SUCCESS @ `0a28e849eca8`; CI reading 2 SUCCESS (tree-equivalent to `c319643799d2`) @ `6e47dadf7cc0`; issue #831 closed | —                    | 2026-11-04T18:28Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Report committed and pushed | —                    | 2026-11-04T18:30Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -78,14 +78,25 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-11-04
+**Gate Result**: PASS
+**Issues Found**: 2 LOW edge cases, advisory (mixed committed and untracked QA reports; non-root `--cwd` path bases)
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
-**Branch**: {populated after Step 1}
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**Finished**: 2026-11-04T18:30Z
+**Final Status**: Completed
+**Branch**: feature/task.259.finalise-checks-record-criteria-before-dod
+**PR**: #833
+**QA Iterations**: 1
+**DoD Summary**: task.259.dod.1.finalise-checks-record-criteria-before-dod.md (ACCEPTED)
+**Tracker debt**: none
+
+**Completion Summary**: Implemented a pure `finalise-record-preflight.js` engine and wired it into `/finalise` Step 3a ahead of the DoD dispatch, with trigger words held equal to `review-task` check 22. One QA cycle (gate PASS 95, 5c APPROVE). CI reading 2 on the acceptance head was satisfied by the docs-only tree-equivalence rule, so the head's own `test` lane had not finished when it was read.
