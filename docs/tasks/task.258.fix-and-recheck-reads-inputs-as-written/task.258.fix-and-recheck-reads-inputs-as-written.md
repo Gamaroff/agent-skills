@@ -315,6 +315,27 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-04
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.258.qa.1.fix-and-recheck-reads-inputs-as-written.md](./task.258.qa.1.fix-and-recheck-reads-inputs-as-written.md)
+- **Gate File**: [task.258.gate.1.fix-and-recheck-reads-inputs-as-written.yml](./task.258.gate.1.fix-and-recheck-reads-inputs-as-written.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 146
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No blocking findings. All four fixes were reverted in turn and each named test went red (4 of 4). One low-confidence cleanup is routed to future work.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -324,6 +345,7 @@ None.
 | 2026-11-04 | 1.1 | Review passed (9/10) — three clarifications applied: stale comment reference, second `split("\n")` named as out of scope, performance criterion reworded | review-task |
 | 2026-11-04 |  | Status → ready-for-development | review-task |
 | 2026-11-04 |  | Status → ready-for-review — implementation complete (4 fixes, tests, bundle, CHANGELOG) | develop |
+| 2026-11-04 |  | QA gate PASS (95/100) — 0 blocking findings, 4 of 4 mutations red | qa-task |
 <!-- change-log-end -->
 
 ---

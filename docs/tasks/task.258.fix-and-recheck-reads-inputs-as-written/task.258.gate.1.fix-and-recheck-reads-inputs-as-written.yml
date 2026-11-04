@@ -1,0 +1,58 @@
+schema: 2
+task: 'task.258.fix-and-recheck-reads-inputs-as-written'
+task_title: 'finalise fix-and-recheck reads test names, scope entries and run logs as written'
+gate: PASS
+status_reason: 'All four edge cases (CR2-1 to CR2-4) are fixed and each is held by a committed test that goes red when its fix is reverted (4 of 4 mutations, run by QA). The diff review found one low-confidence cleanup. No blocking finding.'
+reviewer: 'QA Engineer'
+head: 'c6e1d753e7472e59ae62848b0c1fcc62f4ee3be5'
+updated: '2026-11-04T15:30:17Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 146
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 11
+    escaped: 0
+    boundary: true
+    boundary_signals: ['refused']
+    boundary_reason: ''
+    notes: 'pathInScope probed with security-probe.mjs, path sink, scope entries written ./reports/, backticked, /.gitkeep, ./src/ and / (verdict engages, 11 executed, 11 passed, 0 escaped, 0 reproduced). Normalising an entry never widens the candidate: the candidate guard is unchanged. isTestFileName is module-private and takes a name rather than an untrusted path, so it is held by committed unit tests only.'
+  performance:
+    status: PASS
+    notes: 'No loop or process call added; one small file and a short list.'
+  reliability:
+    status: PASS
+    notes: 'A CRLF log is now read like an LF one. A named test file is refused (fails closed).'
+  maintainability:
+    status: PASS
+    notes: 'One test-file predicate and one entry normaliser, each with a named test; the Step 8a sentence matches the shapes.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (low confidence, cleanup): isTestFileName tests .md case-insensitively while subjectNames tests it case-sensitively, so a proof path ending .MD is exempt from the test-file refusal yet gets no :<line> boundary. Share one .md predicate.'
+      refs: ['shared/resources/finalise-fix-and-recheck.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
