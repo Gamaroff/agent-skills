@@ -20,6 +20,23 @@ All notable changes to this project will be documented in this file. Format foll
   `cannot materialise "<input>"` decline now names the sink that wrote the input as a file name and
   says a path-bearing input needs a sink that is not materialised.
 
+- **`migrate-doc-numbering` gets the safety nets the tinker-city migration asked for (task 253).**
+  Six changes, all in `shared/resources/migrate-doc-numbering.mjs`. (1) A link whose text wraps
+  across lines (`[text\nmore](target)`) is now re-pointed; the target on a later line was missed
+  (`doc-links.js` `scanLinks` adds an additive `targetLine`). (2) After `--apply`, the result carries
+  `postScan.deadLinks` (relative links in moved or written files that point nowhere; fenced and
+  code-span ones are listed with their kind, as warnings) and `postScan.oldPaths` (old paths still
+  named in tracked text, such as history files). (3) The retired epic-registry stub names its
+  neighbours as code spans, not links, so it cannot go dead. (4) Dirty tree and behind-upstream: a
+  `dirty-tree` or `behind-upstream` **warning** in every mode and a **blocker** for `--apply`; the
+  behind check runs `git fetch --prune` for the upstream remote first (remote-tracking refs only), a
+  failed fetch, a missing upstream, or an upstream branch deleted on the remote is a warning
+  (`upstream-unverified`, `no-upstream`). (5) Files under a
+  `*-out/` directory (generated output such as `graphify-out/`) are never rewritten and are listed as
+  `skipped, generated` when they name a moved path. (6) Every mode ends with `N repo files still
+  hard-code legacy names: …` for tracked code outside the PRD root that spells a legacy epic or story
+  name. **Behaviour change:** `--apply` now refuses a dirty or behind checkout. A reported gap 3
+  (sub-story frontmatter not rewritten) did not reproduce; a regression test holds it.
 - **`migrate-doc-numbering` names every document it cannot classify (task 252).** An epic or story
   directory, or a loose `.md` file in a PRD directory, whose name neither grammar reads (a dot in a
   slug, a lowercase or `-N` sub-story suffix, a stray note) was skipped without a word, and `--apply`
