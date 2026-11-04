@@ -5,17 +5,19 @@ type: task
 description: "Before /finalise dispatches the DoD agents, find every success criterion that demands a record and confirm the record is in a committed artifact, so a missing record is fixed in minutes instead of costing a failed DoD pass."
 tags: [finalise, trap]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 created: 2026-11-04
 updated: 2026-11-04
+completed_date: 2026-11-04
 estimated_effort_hours: 8
 github_issue: 831
+pr_number: 833
 ---
 
 # Technical Task: finalise checks record criteria before the DoD run
 
-**Status:** Planned
+**Status:** Ready for Review
 
 **GitHub Issue**: [#831](https://github.com/Gamaroff/agent-skills/issues/831)
 
@@ -64,7 +66,8 @@ A pure engine `shared/resources/finalise-record-preflight.js` with one command, 
 
 - **Input**: the work item's success-criteria text, and the list of paths in the work item's directory that git tracks (`git ls-files`), plus the list of paths in the working tree that are staged or modified.
 - **Output** (`--json`, `reason` contract): for each criterion that matches the record trigger, `{ criterion, location, state }` where `location` is the artifact the criterion names (`qa-report`, `gate`, `dod`, `implementation-report`, or `none`) and `state` is one of `ok`, `no-location`, `implementation-report-only`, `location-uncommitted`, `location-absent`. `location-absent` means the named artifact does not exist yet (a QA report not written).
-- **It does not judge content.** Whether the named file holds the evidence stays with the AC agent. The engine answers only "is there a committed place the agent can read".
+- **It does not judge content.** Whether the named file holds the evidence stays with the AC agent. The engine answers only "is there a committed place the agent can read". Each listed criterion also carries `artifacts`, the committed files its named location resolves to (for `qa-report`, every tracked `{stem}.qa.{N}.*.md` beside the work item).
+- **`ok` means a committed place exists, not that the record is in it.** Task 257's criterion 14 read "Every mutation in § 8 turns a test red, recorded in the QA report" and a committed QA report existed, so the engine reads that incident as `ok`. The record was missing from the named file, which only a reader of the file can see. That reader is Step 3a's confirm step (Phase 2), run by the main context, which holds the evidence. The engine turns the trap's "find every record criterion and its place" into a deterministic list; it does not replace the reading.
 - **The trigger is defined once**, exported by the engine, and a test asserts that the words in `review-task` check 22 are the same set.
 
 ### Important Clarifications
@@ -110,9 +113,10 @@ None. The check adds a step before dispatch and a section in the DoD file's Step
 - `shared/resources/tests/finalise-record-preflight.test.mjs` (new)
 
 **Changes**:
-- [ ] Reproduce task 257's case as the first test: a criterion "the six mutations are recorded" with the only record in the implementation report reads `implementation-report-only`. Red before the engine exists.
-- [ ] Implement `check` with the five states and the `reason` contract (`ok`, `findings`, `usage`, `scan-broken`).
-- [ ] Controls: a criterion naming "the QA report" with a committed QA report reads `ok`; a criterion with no trigger word is not listed; an empty criteria list answers `empty`, distinct from `scan-broken` (an empty result is a claim about the instrument).
+- [x] Reproduce task 257's criterion 14 verbatim as the first test, from the committed document (`git show 95f58307^:docs/tasks/task.257.fix-and-recheck-reads-what-it-claims/task.257.fix-and-recheck-reads-what-it-claims.md`), with the real file listing: it reads `ok` with `artifacts` holding the committed QA report. The test's comment states the limit above. Red before the engine exists.
+- [x] A criterion reworded to name only the implementation report ("recorded in the implementation report") reads `implementation-report-only`: the shape the review-task check 22 rejects at authoring.
+- [x] Implement `check` with the five states and the `reason` contract (`ok`, `findings`, `usage`, `scan-broken`).
+- [x] Controls: a criterion naming "the QA report" with a committed QA report reads `ok`; a criterion with no trigger word is not listed; an empty criteria list answers `empty`, distinct from `scan-broken` (an empty result is a claim about the instrument).
 
 **Dependencies**: none.
 
@@ -123,9 +127,12 @@ None. The check adds a step before dispatch and a section in the DoD file's Step
 **Files**: `skills/finalise/SKILL.md`.
 
 **Changes**:
-- [ ] Add a Step 3a sub-step that runs the engine and prints its findings before dispatch.
-- [ ] State the rule once: fix `implementation-report-only` and `location-uncommitted` and `location-absent` by writing and committing the record; report `no-location`.
-- [ ] Run `npm run validate -- skills/finalise/`.
+- [x] Add a Step 3a sub-step that runs the engine and prints its findings before dispatch.
+- [x] State the rule once: fix `implementation-report-only` and `location-uncommitted` and `location-absent` by writing and committing the record; report `no-location`.
+- [x] Add the confirm step for every `ok` criterion: the main context opens each file in `artifacts` and confirms the record is in it before dispatch; a record missing from a committed artifact is written there and committed first. This is the step that catches task 257's incident.
+- [x] Put the engine call in a fenced `bash` block in Step 3a (not a table cell or a sentence), so a test can extract and run it.
+- [x] Add a test that extracts that block and asserts it calls the engine and sits before the `#### Step 3b` heading.
+- [x] Run `npm run validate -- skills/finalise/`.
 
 **Dependencies**: Phase 1.
 
@@ -136,9 +143,9 @@ None. The check adds a step before dispatch and a section in the DoD file's Step
 **Files**: `skills/review-task/SKILL.md` (a citation of the engine's trigger), `docs/contributing/traps.md`, `CHANGELOG.md`, generated `references/` copies.
 
 **Changes**:
-- [ ] The parity test between the engine's trigger and check 22.
-- [ ] Reword the trap to point at the check.
-- [ ] `npm run bundle`, `npm run bundle:check`, CHANGELOG entry.
+- [x] The parity test between the engine's trigger and check 22.
+- [x] Reword the trap to point at the check.
+- [x] `npm run bundle`, `npm run bundle:check`, CHANGELOG entry.
 - [ ] Mutation record written into the QA report.
 
 **Dependencies**: Phases 1 and 2.
@@ -186,7 +193,7 @@ None. The check adds a step before dispatch and a section in the DoD file's Step
 
 | # | Mutation | Test expected red |
 | - | -------- | ----------------- |
-| 1 | treat the implementation report as committed | the task 257 case |
+| 1 | treat the implementation report as a committed location | the `implementation-report-only` test |
 | 2 | ignore untracked state | the `location-uncommitted` test |
 | 3 | drop one trigger word | the parity test |
 
@@ -198,24 +205,24 @@ The table is recorded in the QA report (`task.259.qa.{N}.*.md`), committed befor
 
 ### Functional
 
-- [ ] The task 257 case reads `implementation-report-only`.
-- [ ] A record in a committed QA report, gate or DoD reads `ok`.
-- [ ] Step 3a runs the check before the dispatch, and the SKILL.md says what to do for each state.
-- [ ] The three mutations in § 8 each turn the named test red, recorded in the QA report.
+- [x] Task 257's criterion 14, read verbatim, lists with `artifacts` holding the committed QA report (test: the first Phase 1 test), and a criterion naming only the implementation report reads `implementation-report-only`.
+- [x] A record criterion naming a committed QA report, gate or DoD reads `ok`.
+- [x] Step 3a runs the check before the dispatch (the Phase 2 extraction test: the fenced block calls the engine and precedes `#### Step 3b`), and the SKILL.md says what to do for each state and states the confirm step.
+- [x] The three mutations in § 8 each turn the named test red, recorded in the QA report's mutation table.
 
 ### Performance
 
-- [ ] The check reads one document and one directory listing; no baseline is needed.
+- [x] The engine is pure: `check()` takes the criteria and the file lists as arguments and spawns nothing. A test passes it lists and asserts the answer with `child_process` stubbed to throw; the CLI gathers `git ls-files` once.
 
 ### Code Quality
 
-- [ ] `CI=true` over the new test file passes; `npm run bundle:check` is clean.
-- [ ] `npm run validate -- skills/finalise/` and `npm run validate -- skills/review-task/` pass.
+- [x] `CI=true` over the new test file passes; `npm run bundle:check` is clean.
+- [x] `npm run validate -- skills/finalise/` and `npm run validate -- skills/review-task/` pass.
 
 ### Migration
 
-- [ ] CHANGELOG entry present; `changelog-cites.sh task.259` reports it.
-- [ ] The trap in `traps.md` points at the check.
+- [x] CHANGELOG entry present; `changelog-cites.sh task.259` reports it.
+- [x] The trap in `traps.md` points at the check.
 
 ---
 
@@ -275,12 +282,55 @@ A trigger word that over-matches: narrow it and add the criterion as a control.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-04
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.259.qa.1.finalise-checks-record-criteria-before-dod.md](./task.259.qa.1.finalise-checks-record-criteria-before-dod.md)
+- **Gate File**: [task.259.gate.1.finalise-checks-record-criteria-before-dod.yml](./task.259.gate.1.finalise-checks-record-criteria-before-dod.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 17
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues. Two LOW edge cases are advisory. All three section 8 mutations turn the named test red.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 9 of 9 met, each with a code and test citation
+✅ **QA Gate:** PASS (95/100), `task.259.gate.1.finalise-checks-record-criteria-before-dod.yml`
+✅ **PR Review:** PR #833, review `task.259.pr-review.1.finalise-checks-record-criteria-before-dod.md` verdict APPROVE
+✅ **CI:** SUCCESS across 6 of 6 checks on `0a28e849eca8`
+✅ **Documentation:** `skills/finalise/SKILL.md`, `skills/review-task/SKILL.md`, `docs/contributing/traps.md`, `CHANGELOG.md`
+✅ **Security Review:** PASS, `boundary: false` (read-only engine)
+✅ **Compliance Review:** not applicable (internal tooling)
+
+**Task marked as ACCEPTED on:** 2026-11-04
+
+**Detailed Verification Log:** See `task.259.dod.1.finalise-checks-record-criteria-before-dod.md` for the complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-11-04 | 1.0 | Initial draft — turns the finalise record-criteria trap into a check | create-task |
+| 2026-11-04 | 1.1 | Review passed (8/10) — Critical fixed: task 257's own incident reads `ok` from the engine, so the catch moves to a Step 3a confirm step and the first criterion is re-scoped; Step 3a test and Performance criterion made testable | review-task |
+| 2026-11-04 |  | Status → ready-for-development | review-task |
+| 2026-11-04 |  | Implemented: finalise-record-preflight.js and its tests, Step 3a check, trap reworded, CHANGELOG; the `record-preflight` key added to the bug-mode skip table and its test. Status → ready-for-review | develop |
+| 2026-11-04 |  | QA gate PASS (95/100) — 0 findings | qa-task |
+| 2026-11-04 | 1.2 | DoD passed — accepted (PR #833) | finalise |
 <!-- change-log-end -->
 
 ---

@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **`/finalise` checks record criteria before the DoD run (task 259, `traps.md` "must read the QA
+  report for process criteria").** New `finalise-record-preflight.js` (`check --doc`) lists every
+  success criterion that demands a record ("recorded", "logged", "listed in", "documented", or a
+  numeric bound) with a state: `ok`, `no-location`, `implementation-report-only`,
+  `location-uncommitted`, `location-absent`. Step 3a runs it before dispatching the agents and says
+  what to do for each state. `ok` means a committed place exists, not that the record is in it, so
+  Step 3a also tells the main context to open each listed artifact first. The trigger words are
+  `review-task` check 22's, held together by a test.
+
 ### Fixed
 
 - **`/finalise` Step 8a fix-and-recheck reads its input the way people and runners write it
