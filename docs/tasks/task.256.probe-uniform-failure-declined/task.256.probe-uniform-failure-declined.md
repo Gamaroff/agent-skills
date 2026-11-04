@@ -395,6 +395,27 @@ The decline's detail names the exit, tells the reader to check the entry form an
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-04
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.256.qa.1.probe-uniform-failure-declined.md](./task.256.qa.1.probe-uniform-failure-declined.md)
+- **Gate File**: [task.256.gate.1.probe-uniform-failure-declined.yml](./task.256.gate.1.probe-uniform-failure-declined.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 301
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No blocking findings. One advisory code-review note (a genuinely errored case loses its own detail in the fold). PR CI was pending and nothing has run under zsh yet, so the CI result is worth reading before merge.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -404,6 +425,7 @@ The decline's detail names the exit, tells the reader to check the entry form an
 | 2026-11-04 | 1.1     | Review passed (9/10) after 8 fixes: private key removed before the `needs-fake-gh` return; three forms run and tabled; criteria name their tests | review-task |
 | 2026-11-04 |         | Status → ready-for-development | review-task |
 | 2026-11-04 |         | Implemented — 12 files (engine, tests, 12 fixtures, rule doc, CHANGELOG, bundles), 10 new tests, 18 mutations red | develop |
+| 2026-11-04 |         | QA gate PASS (95/100) — 1 advisory finding | qa-task |
 <!-- change-log-end -->
 
 ---
