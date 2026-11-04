@@ -2,7 +2,7 @@
 type: bug
 title: "task.253 bug 2: the gap 3 regression guard cannot fail for three of its four keys"
 description: "The guard asserts frontmatterField is not null, but frontmatterField returns an empty string for a missing key, so id, epic and prd_source are never really checked."
-status: ready-for-qa
+status: closed
 severity: medium
 priority: P2
 updated: 2026-11-03
@@ -14,7 +14,7 @@ updated: 2026-11-03
 **Bug ID**: TASK-253-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (diff code review CR-1, cycle 2, reproduced)
 **Date Found**: 2026-11-03
 
@@ -57,6 +57,7 @@ Assert a non-empty value and the expected value for each key. Mutation-prove it:
 | --- | --- | --- | --- |
 | 2026-11-03 | new | qa-task | Found in QA cycle 2 |
 | 2026-11-03 | ready-for-qa | qa-fix | Fixed: the guard asserts each key's expected value. Mutation-proven. |
+| 2026-11-03 | Closed | qa-task | Verified by task.253.qa.3.migrate-doc-numbering-safety-nets.md |
 
 ## Developer Fix Cycle
 

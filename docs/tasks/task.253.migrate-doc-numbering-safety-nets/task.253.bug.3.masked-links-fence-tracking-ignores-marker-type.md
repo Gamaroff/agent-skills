@@ -2,7 +2,7 @@
 type: bug
 title: "task.253 bug 3: maskedLinks closes a code fence on any fence line"
 description: "maskedLinks ignores the opening marker's character and length, so a tilde fence holding a backtick fence line loses its tracking and later links go unreported."
-status: ready-for-qa
+status: closed
 severity: low
 priority: P3
 updated: 2026-11-03
@@ -14,7 +14,7 @@ updated: 2026-11-03
 **Bug ID**: TASK-253-BUG-3
 **Severity**: LOW
 **Priority**: P3
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (diff code review CR-5, cycle 2, reproduced)
 **Date Found**: 2026-11-03
 
@@ -52,6 +52,7 @@ Track the opening marker's character and length and close only on a match. Expor
 | --- | --- | --- | --- |
 | 2026-11-03 | new | qa-task | Found in QA cycle 2 |
 | 2026-11-03 | ready-for-qa | qa-fix | Fixed: fence closes only on the same character and at least the same length. Mutation-proven. |
+| 2026-11-03 | Closed | qa-task | Verified by task.253.qa.3.migrate-doc-numbering-safety-nets.md |
 
 ## Developer Fix Cycle
 

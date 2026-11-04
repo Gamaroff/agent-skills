@@ -348,24 +348,24 @@ For the dead-link scan, include a live link and a link to an external URL that m
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-03
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.253.qa.2.migrate-doc-numbering-safety-nets.md](./task.253.qa.2.migrate-doc-numbering-safety-nets.md)
-- **Gate File**: [task.253.gate.2.migrate-doc-numbering-safety-nets.yml](./task.253.gate.2.migrate-doc-numbering-safety-nets.yml)
+- **Full Report**: [task.253.qa.3.migrate-doc-numbering-safety-nets.md](./task.253.qa.3.migrate-doc-numbering-safety-nets.md)
+- **Gate File**: [task.253.gate.3.migrate-doc-numbering-safety-nets.yml](./task.253.gate.3.migrate-doc-numbering-safety-nets.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 135 in the two touched suites; 7187 in the full run
+- **Tests Executed**: 136 in the two touched suites; 7188 in the full run
 - **Phases Verified**: 5/5
-- **Critical Issues**: 0 (1 medium, 1 low)
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle 1's fix (the behind-upstream guard on a failed `git rev-list`) is verified. The refute pass found a gap 3 regression guard that cannot fail for three of its four keys (T253-QA-2) and a fence-tracking bug in the closing warning list (T253-QA-3).
+No blocking findings. Both cycle 2 fixes are verified and each is held by a test that goes red when the fix is reverted. Advisory items (an unclosed fence dropping its links silently, and the gate 2 list) are recorded in the gate.
 
 <!-- change-log-start -->
 ## Change Log
@@ -380,6 +380,7 @@ Cycle 1's fix (the behind-upstream guard on a failed `git rev-list`) is verified
 | 2026-11-03 |         | QA findings fixed — 1 iteration (behind guard warns when rev-list fails) | qa-fix |
 | 2026-11-03 |         | QA gate CONCERNS (90/100) — 2 findings (1 medium, 1 low) | qa-task |
 | 2026-11-03 |         | QA findings fixed — 1 iteration (gap 3 guard asserts values; maskedLinks fence tracking; fetch --prune) | qa-fix |
+| 2026-11-03 |         | QA gate PASS (100/100) — 0 findings | qa-task |
 
 <!-- change-log-end -->
 

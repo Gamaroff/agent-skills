@@ -1,0 +1,63 @@
+schema: 2
+task: 'task.253.migrate-doc-numbering-safety-nets'
+task_title: 'migrate-doc-numbering safety nets'
+gate: PASS
+status_reason: 'T253-QA-2 and T253-QA-3 are fixed and verified; the scoped diff review found nothing, and five mutations of the cycle 2 fixes each turn a named test red. Remaining items are advisory.'
+reviewer: 'QA Engineer'
+head: '46c2815d8b2045761f39d972fa3ac4617876f68b'
+updated: '2026-11-03T21:06:12Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 136
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: ['refuses']
+    boundary_reason: 'The criterion that matched ("--apply refuses a dirty tree and a branch behind upstream") describes a repository-state guard, not a validator of caller-supplied input. Predicate-shaped functions in the diff: repoGuard, isGenerated / generatedReason, isLegacyName, maskedLinks. Each is exercised by committed tests with must-pass controls and was mutation-proven. No corpus sink models them, so the probe engine was not run.'
+    notes: 'git is spawned with an argument array. The fetch has a 20 s timeout but no GIT_TERMINAL_PROMPT=0 (advisory).'
+  performance:
+    status: PASS
+    notes: 'Each tracked file is read once (asserted). Applied mode runs a regex per line with no whole-text prefilter (advisory).'
+  reliability:
+    status: PASS
+    notes: 'The behind guard now reports a failed rev-list and a branch deleted on the remote (including by someone else, via fetch --prune) as upstream-unverified. A failed git status reading as clean is advisory.'
+  maintainability:
+    status: PASS
+    notes: 'The gap 3 guard asserts exact values; maskedLinks agrees with doc-links blankFences on fence closing.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'maskedLinks drops the links of a fence that never closes without a warning (blankFences reports unterminatedFence); report them or warn about the fence.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs']
+    - action: 'Carried from gate 2, still open and advisory: a failed git status reads as clean (CR-2); fetch has no GIT_TERMINAL_PROMPT=0, stdin ignore or SIGKILL (CR-4); the blocked return carries no postScan, so the CHANGELOG "every mode" wording is not true for blocked runs (CR-6).'
+      refs: ['shared/resources/migrate-doc-numbering.mjs', 'CHANGELOG.md']
+    - action: 'Carried from gate 2, still open and advisory: the read-count test covers only applied=false (CR-7); no whole-text prefilter in applied mode (CR-8).'
+      refs: ['shared/resources/tests/migrate-doc-numbering.test.mjs', 'shared/resources/migrate-doc-numbering.mjs']
+    - action: 'CI was green (6/6) on the pushed head 2c366a49; the fix commit 46c2815d is not pushed, so CI has not run on it. /finalise reads CI on the final commit.'
+      refs: ['.github/workflows/test.yml']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
