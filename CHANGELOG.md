@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`ai-system-assessment` skill (task 260).** A user-invoked, read-only skill that rates a system,
+  repository or project against eight AI-system practices (prompt and change control, grounding,
+  tools, access control, guardrails, cost control, observability, evals before change) and writes one
+  report with a roadmap ordered by value per effort. Every rating cites a `path:line` or a command;
+  absence of evidence is `Unverified`, not a Gap. Each checklist declares its evidence signals as a
+  table that a plain-Node harness runs over a seeded fixture, so a test holds the signal layer.
 - **`/finalise` checks record criteria before the DoD run (task 259, `traps.md` "must read the QA
   report for process criteria").** New `finalise-record-preflight.js` (`check --doc`) lists every
   success criterion that demands a record ("recorded", "logged", "listed in", "documented", or a

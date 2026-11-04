@@ -70,7 +70,7 @@ Each checklist uses the same headings: **Failure it prevents**, **Evidence signa
 
 ### Phase 4: Fixture and tests
 
-Fixture target: a few files shaped like a minimal prompt library, with controls present for some principles and absent for others, and one control under a nonstandard name (the misleading signal). Tests apply the rubric rules to the fixture and assert the expected rating per principle. Do not grep `SKILL.md` for sentences; test that a checklist's declared signals match the fixture where they should and do not where the control is absent.
+Fixture target: a few files shaped like a minimal prompt library, with controls present for some principles and absent for others, and one control under a nonstandard name (the misleading signal). No script applies the rubric (the collector is out of scope), so the tests hold the signal layer, not the final rating. Each checklist declares its signals as a table (`Signal`, `Pattern` as an extended regex, `Paths` as a glob). The test extracts those rows, runs them over the fixture tree in plain Node (no shell-out to the target), and asserts which signals hit and which miss per principle. Do not grep `SKILL.md` for sentences. Also assert `SKILL.md` is at most 300 lines and that the fixture tree hashes identically before and after the run. The report goes to a user-named path, default `AI_SYSTEM_ASSESSMENT.md` in the working directory, never inside an assessed target that is another repository.
 
 ### Phase 5: Integration
 
