@@ -181,7 +181,7 @@ Before starting any verification, also create a co-located running summary file 
    # Definition of Done Verification
 
    **Story/Task:** {story-name}
-   **Verification Started:** {current-date-time}
+   **Verification Started:** {the output of `date -u +%Y-%m-%dT%H:%MZ`, run now}
 
    ---
 
@@ -1489,14 +1489,20 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    fi
    ```
 
+   **Both figures are measured, never composed (obs #26, #100).** Run `date -u +%Y-%m-%dT%H:%MZ` now
+   and paste its output as `Completion Time`. `Total Duration` is the whole minutes from the header's
+   `Verification Started` to that value, computed from those two values. On task.182 a typed `07:40Z`
+   and `~25 minutes` stood where the measured values were `07:20Z` and about 5 minutes, and they were
+   already committed when Step 8 showed it.
+
    **Example final append:**
 
    ```markdown
    ## Verification Complete
 
    **Final Status:** ✅ ACCEPTED
-   **Completion Time:** {current-date-time}
-   **Total Duration:** {duration}
+   **Completion Time:** {the output of `date -u +%Y-%m-%dT%H:%MZ`, run now}
+   **Total Duration:** {whole minutes from Verification Started to Completion Time}
    **CI reading 1:** {CI_ROLLUP}{ (tree-equivalent to `CI_TREE_EQ`) — only when the docs-only rule resolved it} @ `{CI_HEAD_1}` (the acceptance decision — Step 6)
    **CI reading 2:** taken on the acceptance commit after this file is committed and pushed; recorded on the PR canonical summary comment and in the implementation report (Step 7 publish boundary)
 
@@ -2737,8 +2743,8 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
 
    **Final Status:** ❌ GAPS IDENTIFIED - NOT ACCEPTED
 
-   **Completion Time:** {current-date-time}
-   **Total Duration:** {duration}
+   **Completion Time:** {the output of `date -u +%Y-%m-%dT%H:%MZ`, run now}
+   **Total Duration:** {whole minutes from Verification Started to Completion Time}
 
    **Blocking Issues Summary:**
 
@@ -3105,7 +3111,13 @@ line `Fix-and-recheck refused: {ids}` in the gap report's Blocking Issues Summar
 - Run the mutation proof per `references/mutation-proving.md`: snapshot the fixed file with `cp`,
   revert the behaviour, run the named test **with its output captured to the file named in
   `mutationProof.run`** (`node --test <test> > .claude/state/finalise-mutation-proof.log 2>&1`),
-  confirm it is **red**, restore from the snapshot, confirm green. Set `mutationProof.redOnRevert`
+  confirm it is **red**, restore from the snapshot, confirm green. **Revert every line of the fix's
+  hunk, and read which tests went red: a red in a different test is a finding, not a proof** (that
+  file's rule 2). On task.207 a revert deleted one line of a guard prettier had split across two,
+  every call then returned null, and two unrelated tests went red, which proves nothing about the
+  guard (obs #61). **The evaluator does not check this for you:** it looks for a red line near the
+  name, so a neighbouring failure passes it even when the named test is green. Set
+  `mutationProof.redOnRevert`
   to `true` in the finding record and re-run the evaluator — it opens the run file and requires
   it to be non-empty, to name the test, and to carry a red marker (`not ok` / `✖` / `ℹ fail N`);
   a flipped boolean with no recorded run halts on `mutation-proved`. **Exit 0 is the licence for
