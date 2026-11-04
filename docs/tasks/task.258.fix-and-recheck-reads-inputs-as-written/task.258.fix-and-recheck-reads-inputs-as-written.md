@@ -5,17 +5,19 @@ type: task
 description: "Close four edge cases the task 257 cycle 2 reviewer reproduced in the Step 8a evaluator: test-file shapes beyond .test.X, Files Summary entries written ./x or in backticks, CRLF run logs, and the :digit boundary on a title that contains a slash."
 tags: [finalise, observation, advisory]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-11-04
 updated: 2026-11-04
+completed_date: 2026-11-04
+pr_number: 832
 estimated_effort_hours: 4
 github_issue: 830
 ---
 
 # Technical Task: finalise fix-and-recheck reads test names, scope entries and run logs as written
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **GitHub Issue**: [#830](https://github.com/Gamaroff/agent-skills/issues/830)
 
@@ -237,7 +239,7 @@ Revert each fix and name the test that goes red. Record the table in the QA repo
 - [x] `pathInScope("src/a.js", [e])` is true for `e` of `./src/a.js`, `/src/a.js` and `` `src/a.js` ``, and false for `/etc/passwd` as a candidate.
 - [x] A CRLF red line proves its test.
 - [x] `✖ GET /v1:5 stuff` does not prove `GET /v1`; the docs-link `.md` proof still proves.
-- [ ] Each of the four mutations in § 8 turns the named test red, recorded in the QA report.
+- [x] Each of the four mutations in § 8 turns the named test red, recorded in the QA report.
 
 ### Performance
 
@@ -336,6 +338,24 @@ None.
 ### Key Findings
 No blocking findings. All four fixes were reverted in turn and each named test went red (4 of 4). One low-confidence cleanup is routed to future work.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+All Definition of Done criteria have been verified:
+
+✅ **QA Report:** `task.258.qa.1.fix-and-recheck-reads-inputs-as-written.md`, gate PASS, 95/100
+✅ **Acceptance Criteria:** all 11 success criteria met, each with code and a per-PR test, a committed measurement, or (for the mutation criterion) four recorded QA rows
+✅ **PR Review:** PR #832; Step 5c `/review-pr` verdict APPROVE (`task.258.pr-review.1.fix-and-recheck-reads-inputs-as-written.md`)
+✅ **CI:** SUCCESS on `d2a315f` across 6 checks
+✅ **Documentation:** CHANGELOG entry (task 258) and the Step 8a sentence
+✅ **Security Review:** `pathInScope` probed, 11 executed, 0 reproduced, 0 escaped
+⚠️ **Compliance Review:** not applicable (internal evaluator change)
+
+**Task marked as ACCEPTED on:** 2026-11-04
+
+**Detailed Verification Log:** See `task.258.dod.1.fix-and-recheck-reads-inputs-as-written.md` for complete verification evidence and timestamps.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -346,6 +366,7 @@ No blocking findings. All four fixes were reverted in turn and each named test w
 | 2026-11-04 |  | Status → ready-for-development | review-task |
 | 2026-11-04 |  | Status → ready-for-review — implementation complete (4 fixes, tests, bundle, CHANGELOG) | develop |
 | 2026-11-04 |  | QA gate PASS (95/100) — 0 blocking findings, 4 of 4 mutations red | qa-task |
+| 2026-11-04 | 1.2 | DoD passed — accepted (PR #832) | finalise |
 <!-- change-log-end -->
 
 ---
