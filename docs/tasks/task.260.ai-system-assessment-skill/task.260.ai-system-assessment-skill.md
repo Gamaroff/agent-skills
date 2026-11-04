@@ -480,6 +480,7 @@ No open findings. Cycle 1's CHANGELOG finding is fixed.
 | 2026-11-04 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-11-04 |         | QA findings fixed — cycle 1, 1 finding | qa-fix |
 | 2026-11-04 |         | QA gate PASS (96/100) — 0 findings | qa-task |
+| 2026-11-04 |         | QA findings fixed — cycle 2 (PR review), 1 finding | qa-fix |
 <!-- change-log-end -->
 
 ---
