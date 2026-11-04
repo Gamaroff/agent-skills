@@ -31,6 +31,7 @@ For slash-command form, see [commands](./commands.md). For the three invocation 
 | "Review my changes" / "Review this diff" / "Review PR 123" | `review-code` |
 | "Review this PR" / "Does this PR match the task?" / "Is the evidence there for this PR?" / "Review the PR for RAPP-702" | `review-pr` (a work item — Jira key, Jira URL or GitHub issue — resolves to its PR) (also runs automatically as Step 5c of `/develop-story` and `/develop-task`) |
 | "Does this control actually work?" / "Prove the TLS is really on" / "Probe this validator" | `review-security` (the repo skill — distinct from the built-in `/security-review`, which reads the diff rather than executing the control) |
+| "Assess this AI system" / "Audit this assistant against best practice" / "What is missing before this agent goes to production?" | `ai-system-assessment` (user-invoked; rates a target against eight AI-system practices, read-only — distinct from `review-security`, which executes a control, and `tech-debt-audit`, which audits code health) |
 | "Double check that" / "Verify your work" / "Are you sure?" / "Did you actually do that?" | `double-check` |
 
 ## Development

@@ -5,7 +5,7 @@ type: task
 description: "Build a read-only skill that assesses a system, repo or project against eight AI-system best practices and produces an evidence-cited report plus a prioritised roadmap."
 tags: [skill, assessment, ai-systems, guardrails, evals, observability]
 category: other
-status: planned
+status: ready-for-review
 priority: High
 created: 2026-11-04
 updated: 2026-11-04
@@ -15,7 +15,7 @@ github_issue: 834
 
 # Technical Task: ai-system-assessment skill
 
-**Status:** Planned
+**Status:** Ready for Review
 
 **GitHub Issue**: [#834](https://github.com/Gamaroff/agent-skills/issues/834)
 
@@ -116,7 +116,8 @@ Each principle checklist holds: what the practice protects against (the video's 
 
 - **The target is often a prompt library, not a deployed assistant.** This repository is one. Principle 2 (grounding) then means how the prompts get ground-truth context, and principle 4 means what the agent is permitted to do, not end-user identity. `target-types.md` must state the mapping per type; without it the skill marks a library down for things it cannot have.
 - **Absence of evidence is not a Gap.** A grep that finds nothing may mean the control does not exist or that it lives under a name the checklist did not anticipate. The rubric therefore separates `Gap` (a search was run, covered the plausible locations, and found nothing; the report lists the searches) from `Unverified` (no search was possible or the target was too large to cover).
-- **Read-only.** The skill must not edit, install, run the target's code or call its network services. Every check is a read or a grep. Running the target's test suite is out of scope and is offered to the user, not done.
+- **Read-only.** The skill must not edit, install, run the target's code or call its network services. Every check is a read or a grep. Running the target's test suite is out of scope and is offered to the user, not done. The one write the skill makes is its own report file. It goes to a user-named path, defaulting to `AI_SYSTEM_ASSESSMENT.md` in the working directory, and never inside the assessed target when the target is another repository. No other write is permitted.
+- **Ratings are made by the model; signals are checked by tests.** No script applies the rubric, because the collector is out of scope. What a test can hold is the signal layer: each checklist declares its signals as a table with an extended-regex `Pattern` column and a `Paths` glob column, and the fixture test extracts those rows and runs them over the fixture tree. It asserts which signals hit and which do not, per principle. The rubric-to-rating step is held by the checklist's `Thresholds` text and the Consumer Test, not by a test.
 - **The plan file holds the worked example.** The hand assessment of this repository is copied into the plan as the expected-output fixture. This task does not reference where it was first drafted.
 
 ---
@@ -128,7 +129,7 @@ Each principle checklist holds: what the practice protects against (the video's 
 ✅ **Skill content**: `SKILL.md`, eight principle checklists, rubric, target-type mapping, report and roadmap templates.
 ✅ **Workflow**: target discovery, applicability decision, evidence gathering per principle, rating, roadmap, report.
 ✅ **Fixture and tests**: a small fixture repository with known seeded gaps and controls, and tests asserting the skill's rating rules against it.
-✅ **Integration**: bundling, catalog regeneration, `package.json` test glob, the two reference pages, a registry row.
+✅ **Integration**: bundling, catalog regeneration, `package.json` test glob, the two reference pages. (The registry row already exists.)
 
 ### Out of Scope
 
@@ -159,9 +160,9 @@ None. This adds a new skill. Existing skills, scripts and documents are unchange
 - `skills/ai-system-assessment/references/target-types.md`
 
 **Changes**:
-- [ ] Define the five ratings and the evidence bar for each, including the `Gap` vs `Unverified` rule.
-- [ ] Define the four target types and, per type, which principles apply and what each means.
-- [ ] State the search-coverage rule: a `Gap` lists the locations searched.
+- [x] Define the five ratings and the evidence bar for each, including the `Gap` vs `Unverified` rule.
+- [x] Define the four target types and, per type, which principles apply and what each means.
+- [x] State the search-coverage rule: a `Gap` lists the locations searched.
 
 **Dependencies**: none.
 
@@ -175,9 +176,10 @@ None. This adds a new skill. Existing skills, scripts and documents are unchange
 - `skills/ai-system-assessment/references/p1-prompt-and-change-control.md` through `p8-evals-before-change.md`
 
 **Changes**:
-- [ ] For each principle: the failure it prevents, evidence signals with the grep or command, rating thresholds, common false positive, and closing artefact.
-- [ ] Principle 5 points to `review-security` for execution-level depth and states that it does not duplicate it.
-- [ ] Principle 8 distinguishes hermetic checks from behavioural evals and states that replayed fixtures do not detect a behaviour regression from a prompt edit.
+- [x] For each principle: the failure it prevents, evidence signals with the grep or command, rating thresholds, common false positive, and closing artefact.
+- [x] Declare each principle's evidence signals as a table with columns `Signal`, `Pattern` (extended regex) and `Paths` (glob), so the Phase 4 test can run them. A signal that needs a non-grep command (`ls CODEOWNERS`) is a `Command` row the test skips and the checklist's thresholds still use.
+- [x] Principle 5 points to `review-security` for execution-level depth and states that it does not duplicate it.
+- [x] Principle 8 distinguishes hermetic checks from behavioural evals and states that replayed fixtures do not detect a behaviour regression from a prompt edit.
 
 **Dependencies**: Phase 1.
 
@@ -193,11 +195,12 @@ None. This adds a new skill. Existing skills, scripts and documents are unchange
 - `skills/ai-system-assessment/assets/roadmap.template.md`
 
 **Changes**:
-- [ ] Frontmatter with a trigger-rich `description` and `disable-model-invocation: true` (user-invoked, like `tech-debt-audit`), after confirming the choice in review.
-- [ ] Workflow: discover the target, decide target type, load only the checklists that apply, gather evidence, rate, build the roadmap, write the report.
-- [ ] State the read-only rule and the "no evidence is not a Gap" rule in the body.
-- [ ] Roadmap ordering rule: value per effort, with the closing artefact named per item.
-- [ ] Output location: a co-located report in the target repo's `docs/` or the working directory, never inside `skills/`.
+- [x] Frontmatter with a trigger-rich `description` and `disable-model-invocation: true` (user-invoked, like `tech-debt-audit`), after confirming the choice in review.
+- [x] Workflow: discover the target, decide target type, load only the checklists that apply, gather evidence, rate, build the roadmap, write the report.
+- [x] State the read-only rule and the "no evidence is not a Gap" rule in the body.
+- [x] Roadmap ordering rule: value per effort, with the closing artefact named per item.
+- [x] Output location: one report file at a user-named path, default `AI_SYSTEM_ASSESSMENT.md` in the working directory; never inside `skills/`, and never inside an assessed target that is another repository.
+- [x] Frontmatter `allowed-tools`, if the repository's frontmatter schema accepts it (check `skills/create-skill/scripts/skill_frontmatter.py`), lists read tools plus the one report write; if it does not, say so in the Decisions Log and rely on the body's read-only rule.
 
 **Dependencies**: Phases 1 and 2.
 
@@ -212,10 +215,11 @@ None. This adds a new skill. Existing skills, scripts and documents are unchange
 - `skills/ai-system-assessment/tests/*.test.js`
 
 **Changes**:
-- [ ] Fixture with at least one control present and one absent per principle, and one deliberately misleading signal (a control named differently from the checklist).
-- [ ] Tests assert behaviour, not source text: the structural contract of the skill (every checklist exists, every principle carries the required headings, every roadmap template slot is filled by the report template) and the rubric rules applied to the fixture.
-- [ ] Mutation-prove: remove a seeded control and confirm the matching test goes red; restore it.
-- [ ] Add `skills/ai-system-assessment/tests/*.test.js` to the `test:suite` glob list in `package.json`.
+- [x] Fixture with at least one control present and one absent per principle, and one deliberately misleading signal (a control named differently from the checklist).
+- [x] Tests assert behaviour, not source text: the structural contract of the skill (every checklist exists, every principle carries the required headings and a signals table, every roadmap template slot is filled by the report template) and the checklists' signal patterns run over the fixture (which signals hit, which do not, per principle).
+- [x] A test asserts `SKILL.md` stays within 300 lines (`wc -l` bound) and that running the signal harness leaves the fixture tree byte-identical (hash before and after).
+- [x] Mutation-prove: remove a seeded control and confirm the matching test goes red; restore it.
+- [x] Add `skills/ai-system-assessment/tests/*.test.js` to the `test:suite` glob list in `package.json`.
 
 **Dependencies**: Phase 3.
 
@@ -231,9 +235,10 @@ None. This adds a new skill. Existing skills, scripts and documents are unchange
 - `docs/tasks/task-registry.md`
 
 **Changes**:
-- [ ] Name the skill in both reference pages.
-- [ ] `npm run bundle`, `npm run generate-catalog`, `npm run validate -- skills/ai-system-assessment/`.
-- [ ] Run the skill once against this repository and compare with the expected-output fixture in the plan.
+- [x] Name the skill in both reference pages.
+- [x] Do not touch `docs/tasks/task-registry.md`: `/create-task` already appended the row and advanced the counter, and `/finalise` ticks the Status cell.
+- [x] `npm run bundle`, `npm run generate-catalog`, `npm run validate -- skills/ai-system-assessment/`.
+- [x] Run the skill once against this repository and compare with the expected-output fixture in the plan.
 
 **Dependencies**: Phase 4.
 
@@ -258,7 +263,7 @@ None. This adds a new skill. Existing skills, scripts and documents are unchange
 
 8. ✅ `docs/reference/commands.md`, `docs/reference/activation-phrases.md` - name the skill
 9. ✅ `docs/reference/skill-catalog.md` - regenerated
-10. ✅ `docs/tasks/task-registry.md` - row and counter
+10. `docs/tasks/task-registry.md` - not modified by this task (row exists; `/finalise` ticks it)
 
 ### Files to Delete
 
@@ -275,8 +280,9 @@ None.
 **Actions**:
 - [ ] Every principle checklist exists and carries the required headings (failure prevented, signals, thresholds, false positive, closing artefact).
 - [ ] The report template has a slot for every principle and every rating.
-- [ ] Applying the rubric to the fixture yields the seeded rating per principle.
-- [ ] The misleading-signal case is rated from evidence, not from the name the checklist expected.
+- [ ] Running each principle's declared signal patterns over the fixture hits the seeded controls and misses the seeded gaps.
+- [ ] The misleading-signal case (a control under a nonstandard name) is hit by a pattern written to the control's behaviour, and a name-only pattern misses it; the test asserts both.
+- [ ] `SKILL.md` is at most 300 lines, and the signal harness leaves the fixture tree byte-identical.
 
 **Command**: `node --test skills/ai-system-assessment/tests/*.test.js`
 
@@ -302,7 +308,7 @@ None.
 **Scope**: run against this repository.
 
 **Actions**:
-- [ ] Run `/ai-system-assessment` here; the report must reproduce the gaps listed in the plan's expected output (untrusted-content rule, change control, behavioural evals, routing and caching).
+- [ ] Run `/ai-system-assessment` here; the report must reproduce the gaps listed in the plan's expected output (untrusted-content rule, change control, behavioural evals, routing and caching), except any a task merged since 2026-11-04 has closed (task 261 closes the untrusted-content gap). A difference is judged gap by gap and recorded in the QA report; it is not a failure by itself.
 
 ---
 
@@ -313,13 +319,13 @@ None.
 - [ ] The skill produces a report with a rating, evidence and gaps for each of the eight principles.
 - [ ] Every `Strong`, `Partial` and `Gap` rating cites a `path:line` or a command; a rating with neither is `Unverified`.
 - [ ] A `Gap` lists the locations searched.
-- [ ] The skill makes no write to the target and runs none of its code.
-- [ ] The roadmap orders gaps by value per effort and names a closing artefact for each.
+- [ ] The skill makes no write to the target and runs none of its code. Held by the fixture-tree-unchanged test and by the Consumer Test run: the QA report records `git status --porcelain` of this repository before and after the run, differing only by the report file.
+- [ ] The roadmap orders gaps by value per effort and names a closing artefact for each. Held by the roadmap template's required `Closing artefact` and `Value` and `Effort` columns, asserted by the template-slot test.
 
 ### Performance
 
-- [ ] Only the checklists for applicable principles are loaded (progressive disclosure); the `SKILL.md` body stays under the repository's skill-size limit.
-- [ ] The report is written to a single file in one run.
+- [ ] Progressive disclosure: `SKILL.md` names each checklist by path and does not inline it, and stays at most 300 lines (the repository defines no skill-size limit; 300 is this task's bound, measured with `wc -l skills/ai-system-assessment/SKILL.md` and asserted by the Phase 4 test).
+- [ ] The report is written to a single file in one run; the Consumer Test run records the file's path in the QA report.
 
 ### Code Quality
 
@@ -447,6 +453,9 @@ Not enabled for this repository (`sign-off.enabled` is not set); no section is e
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-11-04 | 1.0     | Initial draft | create-task |
+| 2026-11-04 | 1.1     | Review passed (8/10) — fixed size-limit claim, report location, signal-table test mechanism, stale registry edit, two unheld criteria | review-task |
+| 2026-11-04 |         | Status → ready-for-development | review-task |
+| 2026-11-04 |         | Implementation complete — status → ready-for-review | develop |
 <!-- change-log-end -->
 
 ---
@@ -454,25 +463,25 @@ Not enabled for this repository (`sign-off.enabled` is not set); no section is e
 ## Progress Tracking
 
 ### Phase 1: Rubric and target types
-- [ ] Ratings and evidence bar
-- [ ] Target-type mapping
+- [x] Ratings and evidence bar
+- [x] Target-type mapping
 
 ### Phase 2: Eight principle checklists
-- [ ] p1 to p8 written
-- [ ] Principle 5 defers to `review-security`
+- [x] p1 to p8 written
+- [x] Principle 5 defers to `review-security`
 
 ### Phase 3: SKILL.md workflow and templates
-- [ ] SKILL.md
-- [ ] Report and roadmap templates
+- [x] SKILL.md
+- [x] Report and roadmap templates
 
 ### Phase 4: Fixture and tests
-- [ ] Fixture with seeded gaps
-- [ ] Tests, mutation proved
-- [ ] Glob added to `package.json`
+- [x] Fixture with seeded gaps
+- [x] Tests, mutation proved
+- [x] Glob added to `package.json`
 
 ### Phase 5: Integration
-- [ ] Reference pages, bundle, catalog, validate
-- [ ] Run against this repository
+- [x] Reference pages, bundle, catalog, validate
+- [x] Run against this repository
 
 ---
 
@@ -500,7 +509,7 @@ Not enabled for this repository (`sign-off.enabled` is not set); no section is e
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review
 
 **Next Steps**:
 1. Implement according to implementation plan
