@@ -11,6 +11,7 @@ created: 2026-11-04
 updated: 2026-11-04
 estimated_effort_hours: 8
 github_issue: 826
+pr_number: 829
 ---
 
 # Technical Task: finalise fix-and-recheck reads severity, scope and the named test

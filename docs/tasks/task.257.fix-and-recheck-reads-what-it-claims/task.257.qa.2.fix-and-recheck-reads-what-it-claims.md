@@ -71,6 +71,19 @@ mutation-proven: backslash guard reverted → "a path the matcher would normalis
 
 See New Findings This Cycle for the advisory bugs.
 
+### Task §8 mutation record
+
+Re-run on 2026-11-04 during `/finalise` (head `d5979a90`), each as: revert the behaviour, run the suite, read which tests went red, restore from a snapshot, confirm green (112 pass, 0 fail across `finalise-fix-and-recheck.test.mjs` and `finalise-rerun-scope.test.mjs`).
+
+| # | §8 mutation | Test that went red |
+| - | ----------- | ------------------ |
+| 1 | any red line counts as naming the test (the old 3-line window) | "a green named test directly above a failing neighbour is NOT proved" |
+| 2 | no boundary after the name | "a title that is a prefix of a failing title does not prove" |
+| 3 | no test-file refusal | "a test-file-shaped mutationProof.test is refused by name" |
+| 4 | no-literal-segment rule removed | "scope: an entry with no literal path segment is not a scope and matches nothing" |
+| 5 | exact `includes` only | "scope: a trailing-slash entry is a directory prefix, and `*` is one path segment" (and five more scope tests) |
+| 6 | `severity` dropped from the merge | "severity (scoped reported-gap): the agent's grade survives the member merge" |
+
 ## Final Assessment
 
 **Gate Status**: PASS

@@ -35,7 +35,7 @@ Run task 257 through the full develop-task pipeline: tighten the Step 8a mutatio
 | 2. review-task             | ✅ Done | `task.257.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT 8/10; 0 Critical, 0 Important, 2 Optional; Planned → Ready for Development | —                    | 2026-11-04T12:50Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Phases 1–4 done inline; 6 mutations proven red then restored; 178 tests green in the four touched files | —                    | 2026-11-04T13:02Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #829; #826 commented; PR body written by hand (summariser subagent not dispatched) | —                    | 2026-11-04T13:12Z |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.257.qa.{N}.*.md`; `task.257.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.257.qa.{N}.*.md`; `task.257.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 2 cycles: CONCERNS 70 → PASS 90; 5c CONCERNS, 0 open coverage | —                    | 2026-11-04T13:18Z |
 | 7. finalise                | ⏳ Pending | `task.257.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
@@ -79,6 +79,19 @@ _Problems encountered and how they were resolved or escalated._
 ## QA Iteration History
 
 _Track each QA review/fix cycle._
+
+### QA Cycle 1
+
+- **Gate**: CONCERNS 70/100 (`task.257.gate.1.fix-and-recheck-reads-what-it-claims.yml`); report `task.257.qa.1.fix-and-recheck-reads-what-it-claims.md`
+- **Findings**: T257-CR-1, T257-CR-2, T257-BOUNDARY-1 (medium); CR-3, CR-5 folded in
+- **Action**: Running qa-fix — all three fixed in `2048bd6c`, each mutation-proven
+
+### QA Cycle 2
+
+- **Gate**: PASS 90/100 (`task.257.gate.2.fix-and-recheck-reads-what-it-claims.yml`); report `task.257.qa.2.fix-and-recheck-reads-what-it-claims.md`
+- **Findings**: none blocking; four advisories (CR2-1..4) in `recommendations.future`
+- **Action**: Proceeding to 5c
+- **PR Review**: CONCERNS — one trail finding (this section was empty), fixed here; no open coverage finding. Report: `task.257.pr-review.1.fix-and-recheck-reads-what-it-claims.md`
 
 ---
 
