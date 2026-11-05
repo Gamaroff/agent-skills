@@ -370,21 +370,21 @@ None.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-05
-**Quality Score**: 90/100
+**Quality Score**: 80/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.261.qa.1.untrusted-content-rule.md](./task.261.qa.1.untrusted-content-rule.md)
-- **Gate File**: [task.261.gate.1.untrusted-content-rule.yml](./task.261.gate.1.untrusted-content-rule.yml)
+- **Full Report**: [task.261.qa.2.untrusted-content-rule.md](./task.261.qa.2.untrusted-content-rule.md)
+- **Gate File**: [task.261.gate.2.untrusted-content-rule.yml](./task.261.gate.2.untrusted-content-rule.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 20
+- **Tests Executed**: 22
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-One medium finding (T261-QA-1): the lint test's forbidding-sentence filter drops a real read line that contains the word "no".
+Gate 1's finding is fixed. Two new medium findings: the fence tracking in the lint test can desynchronise (T261-QA-2), and the CHANGELOG entry citing task 261 is missing (T261-QA-3).
 
 <!-- change-log-start -->
 ## Change Log
@@ -396,6 +396,7 @@ One medium finding (T261-QA-1): the lint test's forbidding-sentence filter drops
 | 2026-11-05 |         | Status → ready-for-development | review-task |
 | 2026-11-05 |         | QA gate CONCERNS (90/100) — 1 medium finding (lint filter drops a read line containing "no") | qa-task |
 | 2026-11-05 |         | QA findings fixed — T261-QA-1 (lint filter), 1 iteration | qa-fix |
+| 2026-11-05 |         | QA gate CONCERNS (80/100) — 2 medium findings (fence tracking can desynchronise; CHANGELOG entry missing) | qa-task |
 <!-- change-log-end -->
 
 ---
