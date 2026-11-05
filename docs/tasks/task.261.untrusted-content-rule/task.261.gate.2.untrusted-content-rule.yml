@@ -1,0 +1,73 @@
+schema: 2
+task: 'task.261.untrusted-content-rule'
+task_title: 'Untrusted-content rule'
+gate: CONCERNS
+status_reason: 'T261-QA-1 is fixed. The refute pass found the fix itself is fragile: the fence toggle desynchronises on an unclosed or nested fence and then flags forbidding prose as a read. The CHANGELOG [Unreleased] entry citing task 261 is also missing, which /finalise 6d halts on.'
+reviewer: 'QA Engineer'
+head: 'e0d5e0191bdcf97f06f6197fb5f7ae9863256041'
+updated: '2026-11-05T07:25:00Z'
+
+top_issues:
+  - id: 'T261-QA-2'
+    severity: medium
+    file: 'tests/untrusted-content-rule.test.js'
+    finding: 'markerLines() toggles a single boolean on any fence line, ignoring fence character and length (reviewer CR-1, reproduced: an unclosed ```, a ``` inside ~~~, or an odd number of fence lines leaves inFence wrong, so a later prose "Never call WebFetch" line is flagged as a read). skills/create-parallel-stories/SKILL.md already has 55 fence lines (odd), so the tree is green only because no forbidding prose follows the desync. Introduced by the cycle 1 fix. Reviewer anchor was line 107; the real line is 95 (anchor text-mismatch, corrected here).'
+    suggested_action: 'Track the opening fence character and length, close only on a matching fence of at least that length, reset at end of file, and add controls for ~~~ containing ```, a four-backtick fence and an unclosed fence.'
+    suggested_owner: dev
+    status: open
+  - id: 'T261-QA-3'
+    severity: medium
+    file: 'CHANGELOG.md'
+    finding: 'changelog-cites.sh reports "missing (task 261)": [Unreleased] has no entry citing task 261. /finalise step 6d halts without it. Missed in cycle 1.'
+    suggested_action: 'Add an [Unreleased] entry for the untrusted-content rule citing (task 261).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 22
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary_reason: 'The path bound is a boundary, but its block sits under a bold label, not a heading, so the fence entry form cannot reach it. It is executed by committed behaviour tests instead (3 sites x accepted, rejected and empty paths). The reviewer traced docs/.., docs/a/../../x, a trailing /.. and docs/a..b.md by hand and found the shell logic correct; those cases are not yet asserted (advisory CR-3).'
+    notes: 'Path bound rejects paths outside docs/ and any .. segment. Not covered: symlinks inside docs/, and a PRD root other than docs/.'
+  performance:
+    status: PASS
+    notes: 'Lint test runs well under 2 seconds.'
+  reliability:
+    status: PASS
+    notes: 'Empty derived path still falls through to the key lookup.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The same path-bound block is copied into three files with no test that they stay identical (advisory CR-3).'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-2 (low): the rule doc says a path must resolve under docs/ "or the configured PRD or task root", but all three bound blocks hard-code docs/. Reword the rule to docs/ only, or derive the root from resolve-paths.sh. Reviewer anchor was rule doc line 40; the real line is 34.'
+      refs: ['shared/resources/untrusted-content-rule.md']
+    - action: 'CR-3 (cleanup): add the missing bound cases (docs/.., docs/a/../../x, trailing /.., accepted docs/a..b.md) and a test that the three bound blocks are byte-identical.'
+      refs: ['tests/untrusted-content-rule.test.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions: ['Fix T261-QA-2 (fence tracking) and T261-QA-3 (CHANGELOG entry) before merge']

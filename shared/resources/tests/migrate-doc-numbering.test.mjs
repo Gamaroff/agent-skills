@@ -16,10 +16,11 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
@@ -725,10 +726,9 @@ test("epicRegistryPointer keeps the old table as a historical mapping and names 
   assert.match(text, /task\.205/);
   // task.205 landed: the pointer no longer tells anyone to hold off /create-epic.
   assert.doesNotMatch(text, /do not run `\/create-epic`/);
-  assert.match(
-    text,
-    /\[`docs\/prd\/prd-registry\.md`\]\(\.\.\/prd\/prd-registry\.md\)/,
-  );
+  // Plain code spans, no link: the stub is generated text and a link in it goes dead (task 253).
+  assert.match(text, /`docs\/prd\/prd-registry\.md`; the epics of a PRD/);
+  assert.doesNotMatch(text, /\]\([^)]*\)/);
 });
 
 test("engine defines no id regex: identifiers go through doc-id.js", () => {
@@ -980,10 +980,6 @@ test("CR-2: the printed revert undoes an uncommitted --apply exactly, in a real 
   );
   const { dir, g } = gitRepo(tree);
   try {
-    writeFileSync(
-      join(dir, "unrelated.txt"),
-      "someone else's untracked work\n",
-    );
     const r = m.run(["--apply", "--json", "--root", R], { cwd: dir });
     assert.equal(
       r.reason,
@@ -993,6 +989,11 @@ test("CR-2: the printed revert undoes an uncommitted --apply exactly, in a real 
     assert.ok(
       g("status", "--porcelain").trim().length > 0,
       "the apply changed the tree",
+    );
+    // Someone else's work lands after the run (a dirty tree before it is refused, task 253).
+    writeFileSync(
+      join(dir, "unrelated.txt"),
+      "someone else's untracked work\n",
     );
     execFileSync("bash", ["-c", r.revert], { cwd: dir });
     assert.equal(
@@ -1033,19 +1034,25 @@ test("cycle 2 CR-1/CR-7: the revert touches only the run's own paths, keeps unre
     Array.from({ length: 40 }, (_, i) => `# unchanged line ${i}`).join("\n") +
     "\n";
   const tree = Object.fromEntries(
-    Object.entries(l2Tree({ [`${R}/onb/notes.md`]: "notes\n" })).map(
+    // README.md, not notes.md: a loose .md file the grammar cannot read is a blocker since task.252,
+    // and this test needs a tracked file the run neither moves nor rewrites.
+    Object.entries(l2Tree({ [`${R}/onb/README.md`]: "notes\n" })).map(
       ([k, v]) => [k, v + PAD],
     ),
   );
   const { dir, g } = gitRepo(tree);
   try {
-    // Uncommitted work under the root that the run neither moves nor rewrites.
-    writeFileSync(join(dir, R, "onb/notes.md"), "someone's uncommitted edit\n");
     const r = m.run(["--apply", "--json", "--root", R], { cwd: dir });
     assert.equal(
       r.reason,
       "ok",
       JSON.stringify(r.findings || r.blockers || r.error),
+    );
+    // Uncommitted work under the root that the run neither moved nor rewrote, made after the
+    // run: --apply refuses a dirty tree up front (task 253).
+    writeFileSync(
+      join(dir, R, "onb/README.md"),
+      "someone's uncommitted edit\n",
     );
     assert.doesNotMatch(
       r.revert,
@@ -1055,11 +1062,11 @@ test("cycle 2 CR-1/CR-7: the revert touches only the run's own paths, keeps unre
     execFileSync("bash", ["-c", r.revert], { cwd: join(dir, "docs") });
     assert.equal(
       g("status", "--porcelain").trim(),
-      `M ${R}/onb/notes.md`,
+      `M ${R}/onb/README.md`,
       "only the unrelated edit is left",
     );
     assert.equal(
-      readFileSync(join(dir, R, "onb/notes.md"), "utf8"),
+      readFileSync(join(dir, R, "onb/README.md"), "utf8"),
       "someone's uncommitted edit\n",
     );
   } finally {
@@ -2123,5 +2130,778 @@ test("--prd A in a real git repository: ok, B's tree untouched on disk, and the 
     assert.ok(existsSync(join(dir, NEW_A_DOC)));
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// task.252 — a document the id grammar rejects is a named blocker, never a silent skip
+// ---------------------------------------------------------------------------
+
+/** `calls.readDir.length` for the clean l2Tree, measured on the engine before task.252. */
+const READDIR_BASELINE_252 = 6;
+
+/** A short, accepted document: nothing in it blocks a move. `fm` adds frontmatter lines. */
+const DOC252 = (title, ...fm) =>
+  `---\nstatus: accepted\n${fm.map((l) => `${l}\n`).join("")}---\n# ${title}\n`;
+const BAD_DOT = `${R}/onb/epics/epic.2.discovery-2.0-thing`;
+const STORIES1 = `${E1}/stories`;
+const BAD_DASH = `${STORIES1}/story.1.2-1.dash`;
+const BAD_LOWER = `${STORIES1}/story.1.3a.lower`;
+const BAD_CONTROL = `${STORIES1}/story.1.4Ab.control`; // a defect the incident never names
+const GOOD_CONTROL = `${STORIES1}/story.1.5A.fine`; // valid: must not be flagged
+const BAD_STRAY = `${R}/onb/feature-exploration-2026-07-11.md`;
+const BAD252 = [BAD_DOT, BAD_DASH, BAD_LOWER, BAD_CONTROL, BAD_STRAY];
+
+/** l2Tree plus the incident's bad names and the two controls. */
+function badNameTree() {
+  const stem = (d) => d.slice(d.lastIndexOf("/") + 1);
+  return l2Tree({
+    [`${BAD_DOT}/${stem(BAD_DOT)}.md`]: DOC252(
+      "dot in the slug",
+      "epic_number: 2",
+    ),
+    [`${BAD_DASH}/${stem(BAD_DASH)}.md`]: DOC252("dash suffix", "epic: 1"),
+    [`${BAD_LOWER}/${stem(BAD_LOWER)}.md`]: DOC252(
+      "lowercase suffix",
+      "epic: 1",
+    ),
+    [`${BAD_CONTROL}/${stem(BAD_CONTROL)}.md`]: DOC252(
+      "two-letter suffix",
+      "epic: 1",
+    ),
+    [`${GOOD_CONTROL}/${stem(GOOD_CONTROL)}.md`]: DOC252(
+      "valid suffix",
+      "epic: 1",
+    ),
+    [BAD_STRAY]: "# stray\n",
+  });
+}
+
+const unclassifiedPaths = (blockers) =>
+  blockers
+    .filter((b) => b.code === "unclassified-document")
+    .map((b) => b.path)
+    .sort();
+
+test("task.252: discovery records every rejected name, each with a reason, and leaves the valid control alone", () => {
+  const disc = m.discover(R, memIo(badNameTree()), { names: new Map() });
+  assert.deepEqual(
+    disc.unclassified.map((u) => u.path).sort(),
+    [...BAD252].sort(),
+  );
+  for (const u of disc.unclassified) assert.ok(u.reason.length > 10, u.path);
+  assert.ok(!disc.unclassified.some((u) => u.path === GOOD_CONTROL));
+  const byPath = Object.fromEntries(
+    disc.unclassified.map((u) => [u.path, u.reason]),
+  );
+  // The two suffix cases name the spelling that would read; the control's defect names none.
+  assert.match(byPath[BAD_LOWER], /story\.1\.3A\.lower/);
+  assert.match(byPath[BAD_DASH], /story\.1\.2A\.dash/);
+  assert.doesNotMatch(byPath[BAD_CONTROL], /try "/);
+});
+
+test("task.252: a clean tree records nothing, skips 0, and walks each directory once", () => {
+  const io = memIo(l2Tree());
+  const disc = m.discover(R, io, { names: new Map() });
+  assert.deepEqual(disc.unclassified, []);
+  const r = m.run(["--root", R], { io: memIo(l2Tree()) });
+  assert.equal(r.skipped, 0);
+  assert.deepEqual(r.unclassified, []);
+  assert.equal(r.classified, 3, "one PRD, one epic, one story");
+  // The walk is not repeated: one readDir per directory, a count measured before this task.
+  assert.equal(new Set(io.calls.readDir).size, io.calls.readDir.length);
+  assert.equal(io.calls.readDir.length, READDIR_BASELINE_252);
+});
+
+test("task.252: dry run, --check and --apply each name all five, and --apply writes nothing", () => {
+  const { dir, g } = gitRepo(badNameTree());
+  try {
+    const dry = m.run(["--json", "--root", R], { cwd: dir });
+    assert.deepEqual([dry.reason, dry.exitCode], ["blocked", 1]);
+    assert.deepEqual(unclassifiedPaths(dry.blockers), [...BAD252].sort());
+    assert.equal(dry.skipped, 5);
+    assert.equal(
+      dry.classified,
+      dry.counts.prds + dry.counts.epics + dry.counts.stories,
+    );
+    const check = m.run(["--check", "--json", "--root", R], { cwd: dir });
+    assert.deepEqual([check.reason, check.exitCode], ["needs-migration", 1]);
+    assert.deepEqual(unclassifiedPaths(check.blockers), [...BAD252].sort());
+    const apply = m.run(["--apply", "--json", "--root", R], { cwd: dir });
+    assert.deepEqual([apply.reason, apply.exitCode], ["blocked", 1]);
+    assert.deepEqual(unclassifiedPaths(apply.blockers), [...BAD252].sort());
+    assert.equal(
+      g("status", "--porcelain").trim(),
+      "",
+      "--apply wrote nothing",
+    );
+    assert.ok(
+      existsSync(join(dir, `${R}/onb/prd.onb.md`)),
+      "the PRD did not move",
+    );
+    // The text form names them too, so a human reading the dry run sees each path.
+    const cli = spawnSync(process.execPath, [ENGINE, "--root", R], {
+      cwd: dir,
+      encoding: "utf8",
+    });
+    assert.equal(cli.status, 1, cli.stderr);
+    for (const p of BAD252)
+      assert.ok(cli.stdout.includes(p), `text output names ${p}`);
+    assert.match(cli.stdout, /\d+ documents classified, 5 skipped/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("task.252: with the five names fixed the same repo migrates, and a second run answers already", () => {
+  const { dir, g } = gitRepo(badNameTree());
+  try {
+    const mv = (from, to) => {
+      renameSync(join(dir, from), join(dir, to));
+    };
+    const fix = (badDir, goodName) => {
+      const badStem = badDir.slice(badDir.lastIndexOf("/") + 1);
+      const parent = badDir.slice(0, badDir.lastIndexOf("/"));
+      mv(`${badDir}/${badStem}.md`, `${badDir}/${goodName}.md`);
+      mv(badDir, `${parent}/${goodName}`);
+    };
+    fix(BAD_DOT, "epic.2.discovery-2-0-thing");
+    fix(BAD_DASH, "story.1.2A.dash");
+    fix(BAD_LOWER, "story.1.3A.lower");
+    fix(BAD_CONTROL, "story.1.4B.control");
+    rmSync(join(dir, BAD_STRAY));
+    g("add", "-A");
+    g("commit", "-qm", "fix names", "--no-verify");
+    const pre = m.run(["--check", "--json", "--root", R], { cwd: dir });
+    assert.deepEqual(unclassifiedPaths(pre.blockers || []), []);
+    const apply = m.run(["--apply", "--json", "--root", R], { cwd: dir });
+    assert.deepEqual(
+      [apply.reason, apply.exitCode],
+      ["ok", 0],
+      JSON.stringify(apply.findings || apply.blockers),
+    );
+    g("add", "-A");
+    g("commit", "-qm", "migrated", "--no-verify");
+    const again = m.run(["--check", "--json", "--root", R], { cwd: dir });
+    assert.deepEqual([again.reason, again.skipped], ["already", 0]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("task.252: a fully migrated tree with one bad name is blocked, never already", () => {
+  // The branch that matters most: nothing left to move, so the early `already` return is the
+  // route a blocker raised only in verify() would never reach.
+  const io = memIo(l2Tree());
+  assert.equal(m.run(["--apply", "--root", R], { io }).reason, "ok");
+  assert.equal(m.run(["--check", "--root", R], { io }).reason, "already");
+  const bad = `${NEW_E1}/stories/story.1.3a.lower`;
+  io.files.set(`${bad}/story.1.3a.lower.md`, DOC252("lowercase suffix"));
+  const check = m.run(["--check", "--root", R], { io });
+  assert.notEqual(check.reason, "already");
+  assert.equal(check.exitCode, 1);
+  assert.deepEqual(unclassifiedPaths(check.blockers), [bad]);
+  const dry = m.run(["--root", R], { io });
+  assert.deepEqual([dry.reason, dry.exitCode], ["blocked", 1]);
+  assert.deepEqual(unclassifiedPaths(dry.blockers), [bad]);
+});
+
+test("task.252: allowlisted names and dot-directories are not documents and block nothing", () => {
+  const files = l2Tree({
+    [`${R}/onb/README.md`]: "# readme\n",
+    [`${E1}/.tooling/notes.md`]: "notes\n",
+    [`${STORIES1}/.cache/x.md`]: "x\n",
+    [`${R}/onb/diagram.png`]: "not markdown\n",
+  });
+  const disc = m.discover(R, memIo(files), { names: new Map() });
+  assert.deepEqual(disc.unclassified, []);
+});
+
+test("task.252 PC-2: assets/ and underscore directories under epics/ and stories/ block nothing; an ordinary odd directory is still named", () => {
+  const ok = l2Tree({
+    [`${R}/onb/epics/assets/a.md`]: "a\n",
+    [`${R}/onb/epics/_archive/b.md`]: "b\n",
+    [`${STORIES1}/assets/c.md`]: "c\n",
+    [`${STORIES1}/_old/d.md`]: "d\n",
+  });
+  assert.deepEqual(
+    m.discover(R, memIo(ok), { names: new Map() }).unclassified,
+    [],
+  );
+  // Control: a directory that is none of those is still a blocker.
+  const bad = l2Tree({ [`${R}/onb/epics/notes/e.md`]: "e\n" });
+  assert.equal(
+    m.discover(R, memIo(bad), { names: new Map() }).unclassified.length,
+    1,
+  );
+});
+
+test("task.252 QA-1: a sharded PRD directory (index.md beside the PRD) blocks nothing; the same section file without that index.md is named", () => {
+  const section = `${R}/onb/goals-and-background-context.md`;
+  const sharded = l2Tree({
+    [section]: "# Goals\n",
+    [`${R}/onb/index.md`]: "# Index\n",
+  });
+  const withIndex = m.discover(R, memIo(sharded), { names: new Map() });
+  assert.deepEqual(withIndex.unclassified, []);
+  // Control: the identical section file with no index.md is a stray and must still be named.
+  const stray = l2Tree({ [section]: "# Goals\n" });
+  const without = m.discover(R, memIo(stray), { names: new Map() });
+  assert.deepEqual(
+    without.unclassified.map((u) => u.path),
+    [section],
+  );
+});
+
+test("task.252: the blocker code is in the closed list", () => {
+  assert.ok(m.BLOCKER_CODES.includes("unclassified-document"));
+});
+
+// ---------------------------------------------------------------------------
+// Task 253 — safety nets (Phase 1: one failing test per gap, written first)
+// ---------------------------------------------------------------------------
+
+/** l2Tree with the story body replaced: the frontmatter and heading stay as in l2Tree. */
+function storyWithBody(body, extra = {}) {
+  const base = l2Tree()[`${S11}/story.1.1.first.md`];
+  const head = base.split("\n").slice(0, 9).join("\n"); // frontmatter + heading
+  return l2Tree({
+    [`${S11}/story.1.1.first.md`]: `${head}\n\n${body}\n`,
+    ...extra,
+  });
+}
+
+function applyJson(dir, extraArgs = []) {
+  return m.run(["--apply", "--json", "--root", R, ...extraArgs], { cwd: dir });
+}
+
+test("253 gap 1: a link whose text spans a newline is re-pointed; a fenced copy on the next line is left as written", () => {
+  const body = [
+    "[multi",
+    "line](../../epic.1.alpha.md)",
+    "```",
+    "../../epic.1.alpha.md",
+    "```",
+  ].join("\n");
+  const { dir } = gitRepo(storyWithBody(body));
+  try {
+    const r = applyJson(dir);
+    assert.equal(
+      r.reason,
+      "ok",
+      JSON.stringify(r.findings || r.blockers || r.error || r.reason),
+    );
+    const out = readFileSync(
+      join(dir, `${NEW_S11}/story.1.1.1.first.md`),
+      "utf8",
+    );
+    assert.ok(out.includes("[multi\nline](../../epic.1.1.alpha.md)"), out);
+    assert.ok(out.includes("```\n../../epic.1.alpha.md\n```"), out); // control: fence untouched
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("253 gap 3 (did not reproduce; regression guard): a migrated sub-story carries id, prd_number, epic and prd_source", () => {
+  const sub = (s) => `${E1}/stories/story.1.${s}.sub/story.1.${s}.sub.md`;
+  const subDoc = (s) =>
+    `---\nid: story.1.${s}.sub\ntitle: "Sub ${s}"\nstatus: accepted\nepic: 1\nprd_source: docs/prd/onb/prd.onb.md\n---\n# Sub ${s}\n`;
+  const { dir } = gitRepo(
+    l2Tree({ [sub("1A")]: subDoc("1A"), [sub("1B")]: subDoc("1B") }),
+  );
+  try {
+    const r = applyJson(dir);
+    assert.equal(
+      r.reason,
+      "ok",
+      JSON.stringify(r.findings || r.blockers || r.error || r.reason),
+    );
+    for (const s of ["1A", "1B"]) {
+      const f = `${NEW_E1}/stories/story.1.1.${s}.sub/story.1.1.${s}.sub.md`;
+      assert.ok(existsSync(join(dir, f)), f);
+      const text = readFileSync(join(dir, f), "utf8");
+      // frontmatterField returns "" for a missing key, never null, so each key is checked
+      // against its expected VALUE: a not-null assertion here passed with the key absent
+      // (task 253 QA bug 2).
+      const expected = {
+        id: `story.1.1.${s}.sub`,
+        prd_number: "1",
+        epic: "epic.1.1.alpha",
+        prd_source: "docs/prd/onb/prd.1.onb/prd.1.onb.md",
+      };
+      for (const [key, want] of Object.entries(expected))
+        assert.equal(
+          docId.frontmatterField(text, key),
+          want,
+          `${f}: ${key}\n${text}`,
+        );
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("253 gap 4: the retired epic-registry stub carries no link", () => {
+  const reg = [
+    "---",
+    "name: epic-registry",
+    "---",
+    "# Epic Registry",
+    "",
+    "| # | Epic | PRD | Tracker | Title | Status |",
+    "| --- | --- | --- | --- | --- | --- |",
+    "| 1 | epic.1.alpha | onb | — | Alpha | draft |",
+    "",
+    "See [the alpha epic](../prd/onb/epics/epic.1.alpha/epic.1.alpha.md).",
+    "",
+  ].join("\n");
+  const { dir } = gitRepo(l2Tree({ [EPIC_REG]: reg }));
+  try {
+    const r = applyJson(dir);
+    assert.equal(
+      r.reason,
+      "ok",
+      JSON.stringify(r.findings || r.blockers || r.error || r.reason),
+    );
+    const stub = readFileSync(join(dir, EPIC_REG), "utf8");
+    assert.equal(docId.frontmatterField(stub, "status"), "retired", stub);
+    assert.doesNotMatch(
+      stub,
+      /\]\([^)]*\)/,
+      `a link survived in the stub:\n${stub}`,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("253 gap 2: after --apply, dangling links (fenced and code-span ones as warnings) and old paths left behind are listed with file and line", () => {
+  const body = [
+    "```",
+    "[ex](../../epic.1.alpha.md)", // fenced: not re-pointed, dangling afterwards
+    "```",
+    "`[c](../../epic.1.alpha.md)`", // code span: same
+    "[live](../../epic.1.alpha.md)", // control: re-pointed, must not be reported
+    "[ext](https://example.com/a.md)", // control: external, must not be reported
+    "[gone](../../missing.md)", // dead before the run and after it
+  ].join("\n");
+  const { dir } = gitRepo(
+    storyWithBody(body, {
+      // CHANGELOG.md is history: the run leaves its old path as written, and the scan must say so.
+      "CHANGELOG.md": "- moved `docs/prd/onb/prd.onb.md`\n",
+    }),
+  );
+  try {
+    const r = applyJson(dir);
+    assert.equal(
+      r.reason,
+      "ok",
+      JSON.stringify(r.findings || r.blockers || r.error || r.reason),
+    );
+    const file = `${NEW_S11}/story.1.1.1.first.md`;
+    const at = (kind, target) =>
+      (r.postScan?.deadLinks || []).filter(
+        (d) => d.file === file && d.kind === kind && d.target === target,
+      );
+    assert.equal(
+      at("fenced", "../../epic.1.alpha.md").length,
+      1,
+      JSON.stringify(r.postScan ?? null),
+    );
+    assert.equal(
+      at("code-span", "../../epic.1.alpha.md").length,
+      1,
+      JSON.stringify(r.postScan ?? null),
+    );
+    assert.equal(
+      at("link", "../../missing.md").length,
+      1,
+      JSON.stringify(r.postScan ?? null),
+    );
+    const targets = r.postScan.deadLinks.map((d) => d.target);
+    assert.ok(
+      !targets.some((t) => t.startsWith("https://")),
+      "an external URL was reported",
+    );
+    assert.equal(
+      targets.filter((t) => t === "../../epic.1.1.alpha.md").length,
+      0,
+      "a live link was reported",
+    );
+    assert.ok(
+      r.postScan.oldPaths.some(
+        (o) =>
+          o.file === "CHANGELOG.md" &&
+          o.path === `${R}/onb/prd.onb.md` &&
+          o.line === 1,
+      ),
+      JSON.stringify(r.postScan?.oldPaths ?? null),
+    );
+    // Every deadLinks entry carries a 1-based line that is a line of the file.
+    const lines = readFileSync(join(dir, file), "utf8").split("\n").length;
+    for (const d of r.postScan.deadLinks.filter((x) => x.file === file))
+      assert.ok(d.line >= 1 && d.line <= lines, JSON.stringify(d));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("253 gap 6: a generated file is not edited and is listed as skipped, generated", () => {
+  const gen = "graphify-out/GRAPH_REPORT.md";
+  const { dir, g } = gitRepo(
+    l2Tree({
+      [gen]: `see ${R}/onb/prd.onb.md\n`,
+      "docs/other.md": `see ${R}/onb/prd.onb.md\n`,
+    }),
+  );
+  try {
+    const r = applyJson(dir);
+    assert.equal(
+      r.reason,
+      "ok",
+      JSON.stringify(r.findings || r.blockers || r.error || r.reason),
+    );
+    assert.equal(
+      readFileSync(join(dir, gen), "utf8"),
+      `see ${R}/onb/prd.onb.md\n`,
+    );
+    assert.match(
+      readFileSync(join(dir, "docs/other.md"), "utf8"),
+      /prd\.1\.onb\/prd\.1\.onb\.md/,
+    ); // control: ordinary file still rewritten
+    assert.deepEqual(
+      (r.skippedGenerated || []).map((s) => s.file),
+      [gen],
+    );
+    g("add", "-A");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("253 gap 7: the closing line lists tracked files outside the PRD root that still hard-code legacy names", () => {
+  const { dir } = gitRepo(
+    l2Tree({
+      // A consumer's lint script that reads the legacy grammar. Assembled from parts: written out,
+      // the regexes would trip tests/doc-id-chokepoint.test.js, which is right about this file too.
+      "scripts/lint.mjs": `const re = /^${"epic"}${"\\."}\\d+${"\\."}([a-z-]+)$/; const s = /${"story"}${"\\."}\\d+${"\\."}\\d+/;\n`,
+      "scripts/clean.mjs": "const re = 1; // nothing about documents here\n", // control: no legacy name
+      "scripts/new.mjs":
+        "const id = 'story.1.1.1.first'; // already the new scheme\n", // control
+    }),
+  );
+  try {
+    const r = applyJson(dir);
+    assert.equal(
+      r.reason,
+      "ok",
+      JSON.stringify(r.findings || r.blockers || r.error || r.reason),
+    );
+    assert.equal(
+      r.postScan?.legacyNames?.count,
+      1,
+      JSON.stringify(r.postScan ?? null),
+    );
+    assert.deepEqual(
+      r.postScan.legacyNames.files.map((f) => f.file),
+      ["scripts/lint.mjs"],
+    );
+    const text = spawnSync(process.execPath, [ENGINE, "--check", "--root", R], {
+      cwd: dir,
+      encoding: "utf8",
+    }).stdout;
+    assert.match(
+      text,
+      /1 repo files? still hard-codes? legacy names?: scripts\/lint\.mjs/,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/** A repo with a bare upstream; `other()` is a second clone that can push ahead. */
+function gitRepoWithUpstream(files) {
+  const { dir, g } = gitRepo(files);
+  const up = mkdtempSync(join(tmpdir(), "migrate-doc-numbering-up-"));
+  const gu = (cwd, ...a) =>
+    execFileSync("git", a, {
+      cwd,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        GIT_CONFIG_GLOBAL: "/dev/null",
+        GIT_CONFIG_NOSYSTEM: "1",
+      },
+    });
+  gu(up, "init", "-q", "--bare");
+  const branch = g("branch", "--show-current").trim();
+  g("remote", "add", "origin", up);
+  g("push", "-q", "-u", "origin", branch);
+  const aheadCommit = () => {
+    const other = mkdtempSync(join(tmpdir(), "migrate-doc-numbering-other-"));
+    gu(other, "clone", "-q", up, ".");
+    gu(other, "config", "user.email", "t@example.com");
+    gu(other, "config", "user.name", "t");
+    gu(other, "config", "commit.gpgsign", "false");
+    writeFileSync(join(other, "upstream-only.txt"), "x\n");
+    gu(other, "add", "-A");
+    gu(other, "commit", "-qm", "ahead", "--no-verify");
+    gu(other, "push", "-q", "origin", branch);
+    rmSync(other, { recursive: true, force: true });
+  };
+  return { dir, g, up, branch, aheadCommit };
+}
+
+test("253 gap 5: a dirty tree (any file) and a branch behind its upstream are warnings in the dry run and --check, and block --apply", () => {
+  for (const state of [
+    "dirty",
+    "behind-never-fetched",
+    "behind-fetched-not-pulled",
+  ]) {
+    const { dir, g, up, aheadCommit } = gitRepoWithUpstream(l2Tree());
+    try {
+      if (state === "dirty")
+        writeFileSync(join(dir, "unrelated.txt"), "dirty\n");
+      else {
+        aheadCommit();
+        if (state === "behind-fetched-not-pulled") g("fetch", "-q");
+      }
+      const code = state === "dirty" ? "dirty-tree" : "behind-upstream";
+      for (const mode of [[], ["--check"]]) {
+        const r = m.run([...mode, "--json", "--root", R], { cwd: dir });
+        assert.ok(
+          (r.warnings || []).some((w) => w.code === code),
+          `${state} ${mode.join(" ") || "dry run"}: no ${code} warning: ${JSON.stringify(r.warnings ?? null)}`,
+        );
+        assert.ok(
+          !(r.blockers || []).some((b) => b.code === code),
+          `${state}: a read-only run blocked`,
+        );
+      }
+      const a = applyJson(dir);
+      assert.equal(a.reason, "blocked", `${state}: --apply ran (${a.reason})`);
+      assert.ok(
+        (a.blockers || []).some((b) => b.code === code),
+        JSON.stringify(a.blockers),
+      );
+      assert.ok(
+        existsSync(join(dir, `${S11}/story.1.1.first.md`)),
+        `${state}: --apply moved files`,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(up, { recursive: true, force: true });
+    }
+  }
+});
+
+test("253 gap 5 controls: a clean tree level with its upstream, and a repo with no upstream, raise neither code; an unreachable upstream warns it could not verify", () => {
+  const level = gitRepoWithUpstream(l2Tree());
+  const none = gitRepo(l2Tree());
+  const gone = gitRepoWithUpstream(l2Tree());
+  const deleted = gitRepoWithUpstream(l2Tree());
+  const stale = gitRepoWithUpstream(l2Tree());
+  try {
+    for (const { dir } of [level, none]) {
+      const r = m.run(["--json", "--root", R], { cwd: dir });
+      assert.deepEqual(
+        (r.warnings || []).filter((w) =>
+          /dirty-tree|behind-upstream/.test(w.code),
+        ),
+        [],
+      );
+    }
+    rmSync(gone.up, { recursive: true, force: true }); // the upstream disappears: fetch fails
+    const r = m.run(["--json", "--root", R], { cwd: gone.dir });
+    assert.ok(
+      (r.warnings || []).some((w) => w.code === "upstream-unverified"),
+      JSON.stringify(r.warnings ?? null),
+    );
+    assert.equal(applyJson(gone.dir).reason, "ok"); // not a blocker: an offline run still works
+    // QA bug 1: the branch still names an upstream whose remote branch was deleted. The fetch
+    // succeeds, the count fails, and that must read as "could not look", never as "level".
+    deleted.g("checkout", "-q", "-b", "feat");
+    deleted.g("push", "-q", "-u", "origin", "feat");
+    deleted.g("push", "-q", "origin", "--delete", "feat");
+    const d = m.run(["--json", "--root", R], { cwd: deleted.dir });
+    assert.equal(
+      (d.warnings || []).filter((w) => w.code === "upstream-unverified").length,
+      1,
+      JSON.stringify(d.warnings ?? null),
+    );
+    assert.equal(
+      (d.warnings || []).some((w) => w.code === "behind-upstream"),
+      false,
+    );
+    assert.equal(applyJson(deleted.dir).reason, "ok"); // a warning, not a blocker
+    // QA CR-3: the branch is deleted on the remote by SOMEONE ELSE, so this clone keeps a stale
+    // remote-tracking ref. Without --prune the fetch leaves it, rev-list succeeds, and the
+    // guard reads "level".
+    stale.g("checkout", "-q", "-b", "feat2");
+    stale.g("push", "-q", "-u", "origin", "feat2");
+    execFileSync("git", [
+      "--git-dir",
+      stale.up,
+      "update-ref",
+      "-d",
+      "refs/heads/feat2",
+    ]);
+    const s = m.run(["--json", "--root", R], { cwd: stale.dir });
+    assert.equal(
+      (s.warnings || []).filter((w) => w.code === "upstream-unverified").length,
+      1,
+      JSON.stringify(s.warnings ?? null),
+    );
+  } finally {
+    for (const x of [level, none, gone, deleted, stale]) {
+      rmSync(x.dir, { recursive: true, force: true });
+      if (x.up) rmSync(x.up, { recursive: true, force: true });
+    }
+  }
+});
+
+test("253 gap 2: maskedLinks closes a fence only on the opening character at least as long (agrees with doc-links blankFences)", () => {
+  // A backtick line inside a tilde fence does not close it, so both links before the closing
+  // tilde fence are masked, and the link after it is not (QA bug 3).
+  assert.deepEqual(
+    m.maskedLinks(
+      "~~~\n[a](./before.md)\n```\n[b](./inner.md)\n~~~\n[c](./after.md)\n",
+    ),
+    [
+      { target: "./before.md", line: 2, kind: "fenced" },
+      { target: "./inner.md", line: 4, kind: "fenced" },
+    ],
+  );
+  // Controls: a plain fence still masks its link; a shorter fence line does not close a longer one.
+  assert.deepEqual(m.maskedLinks("```\n[a](./x.md)\n```\n"), [
+    { target: "./x.md", line: 2, kind: "fenced" },
+  ]);
+  assert.deepEqual(
+    m.maskedLinks("````\n[a](./x.md)\n```\n[b](./y.md)\n````\n"),
+    [
+      { target: "./x.md", line: 2, kind: "fenced" },
+      { target: "./y.md", line: 4, kind: "fenced" },
+    ],
+  );
+});
+
+test("253 gap 5/6: the text output prints each warning and each skipped, generated file", () => {
+  const gen = "graphify-out/GRAPH_REPORT.md";
+  const { dir } = gitRepo(l2Tree({ [gen]: `see ${R}/onb/prd.onb.md\n` }));
+  try {
+    writeFileSync(join(dir, "unrelated.txt"), "x\n");
+    const text = spawnSync(process.execPath, [ENGINE, "--root", R], {
+      cwd: dir,
+      encoding: "utf8",
+    }).stdout;
+    assert.match(text, /⚠ dirty-tree: /);
+    assert.match(text, /⚠ no-upstream: /);
+    assert.match(text, new RegExp(`skipped, generated: ${gen} `));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("253 gap 6: inRewriteScope refuses a generated file; a sibling directory with a similar name is still in scope", () => {
+  assert.equal(m.inRewriteScope("graphify-out/GRAPH_REPORT.md"), false);
+  assert.equal(m.inRewriteScope("a/b-out/c/d.md"), false);
+  assert.equal(m.inRewriteScope("docs/readme.md"), true); // control
+  assert.equal(m.inRewriteScope("docs/out/readme.md"), true); // "out" alone is not a "-out" directory
+  assert.equal(m.inRewriteScope("docs/about/readme.md"), true); // control: ends in "out", not "-out"
+});
+
+test("253 gap 2/7: scanTracked reads each tracked file at most once, and reads nothing it has no use for", () => {
+  const files = l2Tree({
+    "scripts/a.mjs": "// nothing\n",
+    "assets/logo.png": "bin",
+    "notes.txt": "plain\n",
+  });
+  const io = memIo(files);
+  const reads = new Map();
+  const inner = io.readFile;
+  io.readFile = (p) => {
+    reads.set(p, (reads.get(p) || 0) + 1);
+    return inner(p);
+  };
+  const { planned } = dry(memIo(files));
+  m.scanTracked(io, planned, { applied: false, root: R });
+  for (const [p, n] of reads) assert.equal(n, 1, `${p} read ${n} times`);
+  assert.ok(reads.has("scripts/a.mjs"), "the code file was scanned");
+  assert.ok(!reads.has("assets/logo.png"), "a binary file was read");
+  assert.ok(!reads.has("notes.txt"), "a dry run read a file it has no use for");
+});
+
+test("253 advisory: the applied scan reads each file once while its link, old-path and legacy-name passes all run", () => {
+  const touchedDoc = `${S11}/story.1.1.first.md`;
+  const files = l2Tree({
+    "scripts/a.mjs": "const n = 'story.1.1.first.md';\n",
+    "notes.txt": `see ${touchedDoc}\n`,
+  });
+  const io = memIo(files);
+  const reads = new Map();
+  const inner = io.readFile;
+  io.readFile = (p) => {
+    reads.set(p, (reads.get(p) || 0) + 1);
+    return inner(p);
+  };
+  const { planned } = dry(memIo(files));
+  const out = m.scanTracked(io, planned, {
+    applied: true,
+    touched: new Set([touchedDoc]),
+    root: R,
+  });
+  // Controls: each pass produced output, so the counter below covers all three on one file set.
+  assert.ok(
+    out.deadLinks.some(
+      (d) => d.file === touchedDoc && d.target.includes("missing.md"),
+    ),
+    `the link pass did not run: ${JSON.stringify(out.deadLinks)}`,
+  );
+  assert.ok(out.oldPaths.length > 0, "the old-path pass did not run");
+  assert.ok(
+    out.legacyNames.files.some((f) => f.file === "scripts/a.mjs"),
+    "the legacy-name pass did not run",
+  );
+  for (const [p, n] of reads) assert.equal(n, 1, `${p} read ${n} times`);
+  assert.equal(reads.get(touchedDoc), 1, "the touched document was not read");
+});
+
+test("253 advisory: the upstream fetch runs with GIT_TERMINAL_PROMPT=0, so a remote that wants credentials fails instead of waiting", () => {
+  const { dir, up } = gitRepoWithUpstream(l2Tree());
+  const shimDir = mkdtempSync(join(tmpdir(), "migrate-doc-numbering-shim-"));
+  const log = join(shimDir, "fetch-env.log");
+  const realGit = execFileSync("sh", ["-c", "command -v git"], {
+    encoding: "utf8",
+  }).trim();
+  writeFileSync(
+    join(shimDir, "git"),
+    [
+      "#!/bin/sh",
+      `case " $* " in *" fetch "*) printf '%s\\n' "\${GIT_TERMINAL_PROMPT-unset}" >> '${log}' ;; esac`,
+      `exec '${realGit}' "$@"`,
+      "",
+    ].join("\n"),
+    { mode: 0o755 },
+  );
+  const oldPath = process.env.PATH;
+  try {
+    process.env.PATH = `${shimDir}:${oldPath}`;
+    m.run(["--check", "--json", "--root", R], { cwd: dir });
+  } finally {
+    process.env.PATH = oldPath;
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(up, { recursive: true, force: true });
+  }
+  try {
+    const seen = existsSync(log)
+      ? readFileSync(log, "utf8").trim().split("\n")
+      : [];
+    assert.ok(
+      seen.length > 0,
+      "the shim saw no fetch, so the control proves nothing",
+    );
+    assert.deepEqual([...new Set(seen)], ["0"]);
+  } finally {
+    rmSync(shimDir, { recursive: true, force: true });
   }
 });

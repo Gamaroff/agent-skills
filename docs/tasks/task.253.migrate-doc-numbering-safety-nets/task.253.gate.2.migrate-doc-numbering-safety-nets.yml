@@ -1,0 +1,83 @@
+schema: 2
+task: 'task.253.migrate-doc-numbering-safety-nets'
+task_title: 'migrate-doc-numbering safety nets'
+gate: CONCERNS
+status_reason: 'T253-QA-1 is fixed and verified. The refute pass found one medium: the gap 3 regression guard asserts not-null on a function that returns an empty string, so three of its four keys are unchecked. One low-severity fence-tracking bug is also promoted.'
+reviewer: 'QA Engineer'
+head: '2c366a494b64adc4a541cf959bdf7e64471d56f0'
+updated: '2026-11-03T20:32:50Z'
+
+top_issues:
+  - id: 'T253-QA-2'
+    severity: medium
+    file: 'shared/resources/tests/migrate-doc-numbering.test.mjs'
+    finding: 'The gap 3 regression guard asserts frontmatterField(text, key) is not null, but doc-id.js frontmatterField returns an empty string for a missing key and never null. The id, epic and prd_source checks cannot fail; only prd_number is really checked. Reproduced: frontmatterField on a document without epic returns "". Code review CR-1 (high confidence).'
+    suggested_action: 'Assert a non-empty value and the expected value for each key; mutation-prove it by blanking one key and confirming the test goes red.'
+    suggested_owner: dev
+    bug_ref: 'task.253.bug.2.gap-3-guard-asserts-not-null-on-an-empty-string.md'
+    status: open
+  - id: 'T253-QA-3'
+    severity: low
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'maskedLinks closes a fence on any fence line, ignoring the opening marker character and length, so it disagrees with doc-links.js blankFences. Reproduced: a tilde fence holding a backtick fence line drops a later link from the warning list. Code review CR-5 (high confidence, low severity).'
+    suggested_action: 'Track the opening marker character and length and close only on a match; add a test with the reproduction string.'
+    suggested_owner: dev
+    bug_ref: 'task.253.bug.3.masked-links-fence-tracking-ignores-marker-type.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 135
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: ['refuses']
+    boundary_reason: 'The criterion that matched ("--apply refuses a dirty tree and a branch behind upstream") describes a repository-state guard, not a validator of caller-supplied input. Predicate-shaped functions in the diff: repoGuard, isGenerated / generatedReason, isLegacyName, maskedLinks. Each is exercised by committed tests with must-pass controls and was mutation-proven. No corpus sink models them, so the probe engine was not run.'
+    notes: 'git is spawned with an argument array. The fetch has a 20 s timeout but no GIT_TERMINAL_PROMPT=0 (advisory, CR-4).'
+  performance:
+    status: PASS
+    notes: 'Each tracked file is read once (asserted). Applied mode runs a regex per line with no whole-text prefilter (advisory, CR-8).'
+  reliability:
+    status: PASS
+    notes: 'T253-QA-1 closed. Remaining guard gaps are advisory: a stale remote-tracking ref after a third-party branch delete reads as level (CR-3), and a failed git status reads as clean (CR-2).'
+  maintainability:
+    status: CONCERNS
+    notes: 'T253-QA-2 (a regression guard that cannot fail for three keys) and T253-QA-3.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T253-QA-2 and T253-QA-3'
+      refs: ['shared/resources/tests/migrate-doc-numbering.test.mjs', 'shared/resources/migrate-doc-numbering.mjs']
+  future:
+    - action: 'CR-3: fetch with --prune (or read upstream:track for [gone]) so a branch deleted by someone else is not reported as level; test from a second clone.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs']
+    - action: 'CR-2 and CR-4: warn when git status fails (dirty-tree-unverified); set GIT_TERMINAL_PROMPT=0, ignore stdin and use SIGKILL on the fetch.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs']
+    - action: 'CR-6: attach postScan to the blocked return or narrow the CHANGELOG wording ("every mode").'
+      refs: ['shared/resources/migrate-doc-numbering.mjs', 'CHANGELOG.md']
+    - action: 'CR-7 and CR-8: cover the applied=true path of scanTracked in the read-count test; prefilter whole text before splitting lines.'
+      refs: ['shared/resources/tests/migrate-doc-numbering.test.mjs', 'shared/resources/migrate-doc-numbering.mjs']
+    - action: 'CI for the PR was pending when read; /finalise reads it on the final commit.'
+      refs: ['.github/workflows/test.yml']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T253-QA-2 and T253-QA-3 fixed and re-reviewed']

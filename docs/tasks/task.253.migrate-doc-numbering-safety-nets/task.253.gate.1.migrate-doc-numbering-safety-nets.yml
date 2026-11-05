@@ -1,0 +1,67 @@
+schema: 2
+task: 'task.253.migrate-doc-numbering-safety-nets'
+task_title: 'migrate-doc-numbering safety nets'
+gate: CONCERNS
+status_reason: 'All six fixes are held by tests that go red when the fix is reverted. One reproduced fail-open remains: the behind-upstream guard reports "not behind" when git rev-list fails.'
+reviewer: 'QA Engineer'
+head: '1676e0f47a81a31643de47f01fcacea836c379e5'
+updated: '2026-11-03T20:23:19Z'
+
+top_issues:
+  - id: 'T253-QA-1'
+    severity: medium
+    file: 'shared/resources/migrate-doc-numbering.mjs'
+    finding: 'repoGuard reads a failed `git rev-list --count HEAD..<upstream>` as 0 behind (line 2650), so a configured upstream whose remote branch is gone raises no warning. Reproduced: rev-list exits 128 and the tool prints nothing. Code review CR-1 (medium confidence); promoted by QA on the strength of the reproduction.'
+    suggested_action: 'On a non-zero rev-list exit push an upstream-unverified warning; add a control test with the remote branch deleted; mutation-prove it.'
+    suggested_owner: dev
+    bug_ref: 'task.253.bug.1.behind-guard-fails-open-on-missing-upstream-ref.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 135
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: ['refuses']
+    boundary_reason: 'The criterion that matched ("--apply refuses a dirty tree and a branch behind upstream") describes a repository-state guard, not a validator of caller-supplied input. Predicate-shaped functions in the diff: repoGuard, isGenerated / generatedReason, isLegacyName. Each is exercised by committed tests against real git repositories or direct calls, with must-pass controls, and each was mutation-proven in a scratch worktree this cycle. No corpus sink models them, so the probe engine was not run.'
+    notes: 'No new input reaches a shell: git is spawned with an argument array, the remote name comes from git itself. Files under -out directories are skipped, not read.'
+  performance:
+    status: PASS
+    notes: 'The scans read each tracked file at most once (asserted by a read-counter test). repoGuard adds one git fetch with a 20 s timeout in every mode.'
+  reliability:
+    status: CONCERNS
+    notes: 'The fail-open above. A failed fetch and a missing upstream both warn, as designed.'
+  maintainability:
+    status: PASS
+    notes: 'One predicate for generated paths, folded into inRewriteScope. Legacy names are read through doc-id.js; the chokepoint test passes.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T253-QA-1 (upstream-unverified on a failed rev-list)'
+      refs: ['shared/resources/migrate-doc-numbering.mjs']
+  future:
+    - action: 'CI check for the PR was still pending when this gate was written; /finalise reads it on the final commit.'
+      refs: ['.github/workflows/test.yml']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T253-QA-1 fixed and re-reviewed']

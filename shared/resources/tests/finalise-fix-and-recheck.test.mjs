@@ -23,6 +23,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { loadSensitive } from "../spawn-budget.mjs";
 
 import {
   CHECK_IDS,
@@ -32,6 +33,7 @@ import {
   isWorkItemDocument,
   isCoLocatedArtifact,
   parseWorkItemName,
+  pathInScope,
 } from "../finalise-fix-and-recheck.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -49,6 +51,9 @@ const PINNED = Object.freeze([
   "no-other-finding-open",
 ]);
 
+/** The title of the test the fixtures' recorded run shows red (task 257: a proof names a TEST, never its file). */
+const TITLE = "a filename with an embedded newline is un-numbered";
+
 /** A recorded red run, as node:test prints one — written once for the suite. */
 const RUN_DIR = mkdtempSync(join(tmpdir(), "fix-recheck-run-"));
 const RED_RUN = join(RUN_DIR, "mutation-proof.log");
@@ -57,10 +62,7 @@ writeFileSync(
   "test at tests/qa-cycle.test.js:142\n✖ a filename with an embedded newline is un-numbered (3ms)\nℹ fail 1\n",
 );
 const GREEN_RUN = join(RUN_DIR, "green.log");
-writeFileSync(
-  GREEN_RUN,
-  "test at tests/qa-cycle.test.js:142\n✔ all good\nℹ pass 12\nℹ fail 0\n",
-);
+writeFileSync(GREEN_RUN, `✔ ${TITLE} (1ms)\nℹ pass 12\nℹ fail 0\n`);
 process.on("exit", () => rmSync(RUN_DIR, { recursive: true, force: true }));
 
 const GOOD = Object.freeze({
@@ -73,7 +75,7 @@ const GOOD = Object.freeze({
     "skills/qa-task/SKILL.md",
   ],
   mutationProof: {
-    test: "tests/qa-cycle.test.js",
+    test: TITLE,
     redOnRevert: true,
     run: RED_RUN,
   },
@@ -332,7 +334,7 @@ const FALSIFY = Object.freeze({
   },
   "mutation-proved": {
     mutationProof: {
-      test: "tests/qa-cycle.test.js",
+      test: TITLE,
       redOnRevert: false,
       run: RED_RUN,
     },
@@ -407,7 +409,7 @@ test("the first evaluation of a real run halts on mutation-proved alone — the 
   // says the first evaluation must name mutation-proved and nothing else.
   const r = evaluateFixAndRecheck({
     ...GOOD,
-    mutationProof: { test: "tests/qa-cycle.test.js", redOnRevert: false },
+    mutationProof: { test: TITLE, redOnRevert: false },
   });
   assert.deepEqual(
     r.failed.map((f) => f.id),
@@ -419,7 +421,7 @@ test("mutation-proved reads the RECORDED run, not the boolean (BUG-4)", () => {
   const proof = (extra) => ({
     ...GOOD,
     mutationProof: {
-      test: "tests/qa-cycle.test.js",
+      test: TITLE,
       redOnRevert: true,
       run: RED_RUN,
       ...extra,
@@ -436,8 +438,11 @@ test("mutation-proved reads the RECORDED run, not the boolean (BUG-4)", () => {
   r = evaluateFixAndRecheck(proof({ run: GREEN_RUN }));
   assert.match(r.failed[0].detail, /shows no failing test/);
   // A red run about a DIFFERENT test.
-  r = evaluateFixAndRecheck(proof({ test: "tests/other.test.js" }));
-  assert.match(r.failed[0].detail, /does not mention tests\/other\.test\.js/);
+  r = evaluateFixAndRecheck(proof({ test: "a title the run never prints" }));
+  assert.match(
+    r.failed[0].detail,
+    /does not mention a title the run never prints/,
+  );
   // An empty file.
   const empty = join(RUN_DIR, "empty.log");
   writeFileSync(empty, "   \n");
@@ -453,14 +458,14 @@ test("mutation-proved: the red marker must be TIED to the named test, not anywhe
   writeFileSync(
     suite,
     [
-      "✔ tests/qa-cycle.test.js passes everything (2ms)",
+      `✔ ${TITLE} (2ms)`,
       "✔ another green one (1ms)",
       "",
       "",
       "",
       "",
       "",
-      "✖ tests/other.test.js: something else is broken (3ms)",
+      "✖ something unrelated is broken (3ms)",
       "ℹ fail 1",
       "",
     ].join("\n"),
@@ -468,7 +473,7 @@ test("mutation-proved: the red marker must be TIED to the named test, not anywhe
   const r = evaluateFixAndRecheck({
     ...GOOD,
     mutationProof: {
-      test: "tests/qa-cycle.test.js",
+      test: TITLE,
       redOnRevert: true,
       run: suite,
     },
@@ -476,9 +481,9 @@ test("mutation-proved: the red marker must be TIED to the named test, not anywhe
   assert.equal(r.proceed, false);
   assert.match(
     r.failed[0].detail,
-    /shows no failing test for tests\/qa-cycle\.test\.js/,
+    /shows no failing test for a filename with an embedded newline is un-numbered/,
   );
-  // The real shape — ✖ within a few lines of the test's name — still proves.
+  // The real shape — a ✖ line that carries the test's own name — still proves.
   assert.equal(evaluateFixAndRecheck(GOOD).proceed, true);
 });
 
@@ -873,5 +878,499 @@ test("a legacy story.{E}.{S} name is not a work-item document — it is migrated
       "docs/prd/p/epics/epic.5.e/stories/story.5.1.s/story.5.1.qa.1.s.md",
     ),
     false,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// task 257 — the proof is tied to the TEST IT NAMES (obs #61).
+//
+// Every log below comes from a real `node --test` run in a scratch directory,
+// never a hand-written one: a hand-written log is what let a 3-line window pass
+// in the first place, because nobody had run the rule against an adjacent
+// failure.
+
+/** Run a scratch node:test file and return the path of its recorded output. */
+function realRun(name, titles, reporter = "spec") {
+  const dir = mkdtempSync(join(RUN_DIR, "real-"));
+  const body = [
+    'import test from "node:test";',
+    'import assert from "node:assert/strict";',
+    ...titles.map(
+      ([title, green]) =>
+        `test(${JSON.stringify(title)}, () => { assert.equal(1, ${green ? 1 : 2}); });`,
+    ),
+  ].join("\n");
+  writeFileSync(join(dir, "scratch.test.mjs"), body);
+  // The parent test runner marks its children with NODE_TEST_CONTEXT; leaving it
+  // set makes this run speak the runner's internal protocol instead of text.
+  const env = { ...process.env };
+  delete env.NODE_TEST_CONTEXT;
+  const out = spawnSync(
+    process.execPath,
+    ["--test", `--test-reporter=${reporter}`, "scratch.test.mjs"],
+    { cwd: dir, encoding: "utf8", env },
+  );
+  const log = join(RUN_DIR, `${name}.log`);
+  writeFileSync(log, out.stdout + out.stderr);
+  return log;
+}
+
+const proofFor = (test, run) => ({
+  ...GOOD,
+  mutationProof: { test, redOnRevert: true, run },
+});
+
+test("a green named test directly above a failing neighbour is NOT proved (task 257, the §2 reproduction)", () => {
+  // `✔ new guard refuses` sits on the line above `✖ findRelatedDocs a`: the
+  // old window read that red neighbour as proof of the green test.
+  const run = realRun("adjacent-spec", [
+    ["new guard refuses", true],
+    ["findRelatedDocs a", false],
+  ]);
+  const r = evaluateFixAndRecheck(proofFor("new guard refuses", run));
+  assert.equal(r.proceed, false);
+  assert.equal(r.failed[0].id, "mutation-proved");
+  assert.match(
+    r.failed[0].detail,
+    /shows no failing test for new guard refuses/,
+  );
+  // The red test itself proves.
+  assert.equal(
+    evaluateFixAndRecheck(proofFor("findRelatedDocs a", run)).proceed,
+    true,
+  );
+});
+
+test("the same holds for TAP output (task 257)", () => {
+  const run = realRun(
+    "adjacent-tap",
+    [
+      ["new guard refuses", true],
+      ["findRelatedDocs a", false],
+    ],
+    "tap",
+  );
+  assert.equal(
+    evaluateFixAndRecheck(proofFor("new guard refuses", run)).proceed,
+    false,
+  );
+  assert.equal(
+    evaluateFixAndRecheck(proofFor("findRelatedDocs a", run)).proceed,
+    true,
+  );
+});
+
+test("control: other titles the task never mentions, red test last and first (task 257)", () => {
+  // Not the document's own example: a rule that only recognised the quoted
+  // incident would pass the two tests above and fail this one.
+  const run = realRun("control", [
+    ["quokka routes the parcel", false],
+    ["marmot keeps the ledger", true],
+    ["lynx seals the door", true],
+  ]);
+  assert.equal(
+    evaluateFixAndRecheck(proofFor("quokka routes the parcel", run)).proceed,
+    true,
+  );
+  for (const green of ["marmot keeps the ledger", "lynx seals the door"]) {
+    assert.equal(
+      evaluateFixAndRecheck(proofFor(green, run)).proceed,
+      false,
+      green,
+    );
+  }
+});
+
+function textRun(name, text) {
+  const p = join(RUN_DIR, `${name}.log`);
+  writeFileSync(p, text);
+  return p;
+}
+
+test("a TODO or SKIP directive is not a red proof (QA cycle 1, T257-CR-2)", () => {
+  for (const directive of ["# TODO known", "# SKIP nope", "# todo later"]) {
+    const run = textRun("dir", `not ok 1 - foo ${directive}\n`);
+    assert.equal(
+      evaluateFixAndRecheck(proofFor("foo", run)).proceed,
+      false,
+      directive,
+    );
+  }
+  // Control: the same line without a directive proves; so does a duration.
+  assert.equal(
+    evaluateFixAndRecheck(proofFor("foo", textRun("ok1", "not ok 1 - foo\n")))
+      .proceed,
+    true,
+  );
+  assert.equal(
+    evaluateFixAndRecheck(proofFor("foo", textRun("ok2", "✖ foo (3.2ms)\n")))
+      .proceed,
+    true,
+  );
+});
+
+test("the `:<line>` boundary belongs to a file-shaped name only (QA cycle 1, T257-CR-3)", () => {
+  // A plain title followed by `:12` is another test's name, not the title.
+  const run = textRun("colon", "✔ foo (1ms)\n✖ foo:12 something else (1ms)\n");
+  assert.equal(evaluateFixAndRecheck(proofFor("foo", run)).proceed, false);
+  // The docs-link clause names a repo-relative .md path and keeps its proof.
+  const docs = textRun(
+    "docs",
+    "✖ docs/tasks/task.9/task.9.md:12 → dead link\nFAIL doc-links: 1\n",
+  );
+  assert.equal(
+    evaluateFixAndRecheck(proofFor("docs/tasks/task.9/task.9.md", docs))
+      .proceed,
+    true,
+  );
+});
+
+test("a title that is a prefix of a failing title does not prove (task 257)", () => {
+  const run = realRun("prefix", [
+    ["alpha gate", true],
+    ["alpha gate extended", false],
+  ]);
+  assert.equal(
+    evaluateFixAndRecheck(proofFor("alpha gate", run)).proceed,
+    false,
+  );
+  assert.equal(
+    evaluateFixAndRecheck(proofFor("alpha gate extended", run)).proceed,
+    true,
+  );
+});
+
+test("a title that only ENDS a failing title does not prove (task 257)", () => {
+  // The name must start the red line's subject, not sit anywhere inside it.
+  const run = realRun("suffix", [
+    ["the guard refuses", true],
+    ["new guard refuses", false],
+  ]);
+  assert.equal(
+    evaluateFixAndRecheck(proofFor("guard refuses", run)).proceed,
+    false,
+  );
+});
+
+test("`ℹ fail N` alone proves nothing: it names no test (task 257)", () => {
+  const only = join(RUN_DIR, "count-only.log");
+  writeFileSync(only, "✔ some green title (1ms)\nℹ pass 1\nℹ fail 1\n");
+  const r = evaluateFixAndRecheck(proofFor("some green title", only));
+  assert.equal(r.proceed, false);
+  assert.equal(r.failed[0].id, "mutation-proved");
+});
+
+test("a test-file-shaped mutationProof.test is refused by name (task 257)", () => {
+  for (const file of [
+    "tests/qa-cycle.test.js",
+    "lib/x.spec.ts",
+    "skills/a/tests/parse.test.sh",
+  ]) {
+    const r = evaluateFixAndRecheck(proofFor(file, RED_RUN));
+    assert.equal(r.proceed, false, file);
+    assert.equal(r.failed[0].id, "mutation-proved", file);
+    assert.match(
+      r.failed[0].detail,
+      /a test file — name the test by its title/,
+      file,
+    );
+  }
+});
+
+test("the docs-link clause's `.md` proof still proves, on its `✖ <file>:<line>` line (task 257)", () => {
+  const doc = "docs/tasks/task.1.x/task.1.x.md";
+  const run = join(RUN_DIR, "doclinks.log");
+  writeFileSync(run, `✖ ${doc}:12 → ./missing.md\nFAIL doc-links: 1 broken\n`);
+  assert.equal(evaluateFixAndRecheck(proofFor(doc, run)).proceed, true);
+  // A document whose path merely starts with the name does not prove it.
+  assert.equal(
+    evaluateFixAndRecheck(proofFor("docs/tasks/task.1.x/task.1.x", run))
+      .proceed,
+    false,
+  );
+});
+
+test("otherRed lists the other failing tests once each, without the runner's headings (task 257)", () => {
+  const run = realRun("other-red", [
+    ["first red one", false],
+    ["green one", true],
+    ["second red one", false],
+  ]);
+  const r = evaluateFixAndRecheck(proofFor("first red one", run));
+  assert.equal(r.proceed, true, JSON.stringify(r.failed));
+  // spec prints each failure twice (inline and in the failing-tests summary),
+  // and a `failing tests:` heading on a ✖ line of its own.
+  assert.deepEqual(r.otherRed, ["second red one"]);
+  // A refused proof still reports what else was red.
+  const refused = evaluateFixAndRecheck(proofFor("green one", run));
+  assert.equal(refused.proceed, false);
+  assert.deepEqual([...refused.otherRed].sort(), [
+    "first red one",
+    "second red one",
+  ]);
+});
+
+// ---------------------------------------------------------------------------
+// task 257 — a Files Summary entry is read as a pathspec (obs #132).
+
+/** `inside-files-summary`'s verdict for one touched path against one Files Summary. */
+function scopeVerdict(filesSummary, touched) {
+  const r = evaluateFixAndRecheck({
+    ...GOOD,
+    touched: Array.isArray(touched) ? touched : [touched],
+    filesSummary,
+  });
+  return r.failed.find((f) => f.id === "inside-files-summary") ?? null;
+}
+const admitted = (summary, path) => scopeVerdict(summary, path) === null;
+
+test("scope: a trailing-slash entry is a directory prefix, and `*` is one path segment (task 257)", () => {
+  const dir = ["skills/*/references/"];
+  assert.equal(
+    admitted(dir, "skills/finalise/references/wireframe-map.js"),
+    true,
+  );
+  assert.equal(
+    admitted(dir, "skills/finalise/references/nested/deep.js"),
+    true,
+  );
+  // The directory itself is not a file inside it, and a sibling tree is not inside it.
+  assert.equal(admitted(dir, "shared/resources/wireframe-map.js"), false);
+  assert.equal(admitted(dir, "skills/finalise/SKILL.md"), false);
+  assert.equal(
+    admitted(["shared/resources/"], "shared/resources2/a.js"),
+    false,
+  );
+  assert.equal(admitted(["shared/resources/"], "shared/resources/a.js"), true);
+});
+
+test("scope: {a,b} alternatives expand, in the middle of a segment too (task 257)", () => {
+  const braces = ["skills/{create-story,create-task}/SKILL.md"];
+  assert.equal(admitted(braces, "skills/create-story/SKILL.md"), true);
+  assert.equal(admitted(braces, "skills/create-task/SKILL.md"), true);
+  assert.equal(admitted(braces, "skills/create-epic/SKILL.md"), false);
+  const mid = ["skills/create-{story,task}/SKILL.md"];
+  assert.equal(admitted(mid, "skills/create-task/SKILL.md"), true);
+  assert.equal(admitted(mid, "skills/create-bug/SKILL.md"), false);
+  // Control: a pattern and paths this task never mentions.
+  const other = ["lib/{alpha,beta}/gamma/*.cfg"];
+  assert.equal(admitted(other, "lib/beta/gamma/app.cfg"), true);
+  assert.equal(admitted(other, "lib/delta/gamma/app.cfg"), false);
+  assert.equal(admitted(other, "lib/beta/gamma/sub/app.cfg"), false);
+});
+
+test("scope: `*` never crosses a `/` (task 257)", () => {
+  assert.equal(admitted(["skills/*/SKILL.md"], "skills/a/SKILL.md"), true);
+  assert.equal(admitted(["skills/*/SKILL.md"], "skills/a/b/SKILL.md"), false);
+});
+
+test("scope: an entry with no literal path segment is not a scope and matches nothing (task 257)", () => {
+  for (const entry of ["*", "**", "**/*", "*/", "**/", "{*,**}"]) {
+    assert.equal(admitted([entry], "docs/anything/at/all.md"), false, entry);
+    assert.equal(admitted([entry], "a.js"), false, entry);
+  }
+});
+
+test("scope: a pattern never admits a traversal, an absolute path or a path with a line break (task 257)", () => {
+  // glob-match.js does not resolve `..`, and `**` crosses `/`: without a guard
+  // `skills/*/references/` would admit a path that climbs out of it.
+  const dir = ["skills/*/references/", "shared/resources/"];
+  for (const bad of [
+    "skills/a/references/../../../etc/passwd",
+    "shared/resources/../../outside.js",
+    "/skills/a/references/x.js",
+    "skills/a/references/x.js\n",
+    "skills/a/references/x.js\r",
+    "skills/a/references/x.js\0.md",
+  ]) {
+    assert.equal(admitted(dir, bad), false, JSON.stringify(bad));
+  }
+  // The same paths are admitted when listed EXACTLY only if the author wrote
+  // them: a pattern is what must not widen.
+  assert.equal(
+    admitted(dir, "skills/a/references/x..y.js"),
+    true,
+    "`..` inside a name is not traversal",
+  );
+});
+
+test("scope: a path the matcher would normalise is judged in its normalised form (QA cycle 1, T257-CR-1)", () => {
+  const dir = ["skills/**", "etc/", "src/*/x.js", "src/"];
+  for (const bad of [
+    "skills\\a\\..\\..\\..\\etc\\passwd",
+    "\\etc\\passwd",
+    " /etc/passwd",
+    "src/a.js ",
+    "src/a.js\t",
+    "src/./x.js",
+    "src//x.js",
+    "./src/a.js/../../b.js",
+  ]) {
+    assert.equal(admitted(dir, bad), false, JSON.stringify(bad));
+  }
+  // Controls: canonical paths still match.
+  assert.equal(admitted(dir, "src/a/x.js"), true);
+  assert.equal(admitted(dir, "skills/a/b.md"), true);
+});
+
+test("pathInScope: the exported scope predicate agrees with the gate (QA cycle 1, T257-BOUNDARY-1)", () => {
+  assert.equal(pathInScope("a/b.js", ["a/"]), true);
+  assert.equal(pathInScope("c/b.js", ["a/"]), false);
+  assert.equal(pathInScope("a/../c.js", ["a/"]), false);
+  assert.equal(pathInScope("a/b.js", []), false);
+  assert.equal(
+    pathInScope("a/b.js", "a/"),
+    false,
+    "a non-list scope admits nothing",
+  );
+});
+
+test("scope: an oversized brace list is refused, not expanded without bound (task 257)", () => {
+  const groups = Array.from({ length: 24 }, () => "{a,b}").join("/");
+  const started = Date.now();
+  assert.equal(
+    admitted(
+      [`${groups}/x.js`],
+      "a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/x.js",
+    ),
+    false,
+  );
+  assert.ok(
+    Date.now() - started < 2000,
+    loadSensitive("the 24-group brace entry must be refused, not expanded"),
+  );
+  // A list inside the bound still works.
+  assert.equal(admitted(["x/{a,b}/{c,d}.js"], "x/b/c.js"), true);
+});
+
+test("scope: an exact entry is still admitted, and a path outside every entry is still refused (task 257)", () => {
+  assert.equal(
+    admitted(["shared/resources/qa-cycle.sh"], "shared/resources/qa-cycle.sh"),
+    true,
+  );
+  const v = scopeVerdict(
+    ["shared/resources/qa-cycle.sh"],
+    ["shared/resources/qa-cycle.sh", "docs/README.md"],
+  );
+  assert.match(v.detail, /outside the Files Summary: docs\/README\.md/);
+});
+
+test("--json prints otherRed (task 257)", () => {
+  const run = realRun("other-red-cli", [
+    ["named red", false],
+    ["bystander red", false],
+  ]);
+  const finding = join(RUN_DIR, "finding-other-red.json");
+  writeFileSync(finding, JSON.stringify(proofFor("named red", run)));
+  const out = spawnSync(
+    process.execPath,
+    [CLI, "--finding", finding, "--json"],
+    {
+      encoding: "utf8",
+    },
+  );
+  assert.equal(out.status, 0, out.stdout + out.stderr);
+  assert.deepEqual(JSON.parse(out.stdout).otherRed, ["bystander red"]);
+});
+
+// ---------------------------------------------------------------------------
+// task 258 — the evaluator reads its input the way people and runners write it
+// (CR2-1 to CR2-4 from task 257's QA gate 2). Each test was run red on the
+// unchanged tree before its fix.
+
+test("a test file is refused by name in every common spelling and any letter case (task 258, CR2-1)", () => {
+  for (const file of [
+    "tests/x.TEST.js",
+    "tests/x_test.go",
+    "tests/x.sh",
+    "test_foo.py",
+    "lib/Y.Spec.TS",
+    "pkg/parse_test.py",
+    "src/__tests__/a.js",
+  ]) {
+    const r = evaluateFixAndRecheck(proofFor(file, RED_RUN));
+    assert.equal(r.proceed, false, file);
+    assert.equal(r.failed[0].id, "mutation-proved", file);
+    assert.match(
+      r.failed[0].detail,
+      /a test file — name the test by its title/,
+      file,
+    );
+  }
+});
+
+test("controls: a real title that mentions test, a dir or a slash is not refused as a file (task 258, CR2-1)", () => {
+  for (const title of [
+    "test_parse_title",
+    "tests dir is skipped",
+    "GET /v1 tests the route",
+    "docs/tests/x.md",
+  ]) {
+    const run = textRun("ctl-title", `✖ ${title} (1ms)\n`);
+    const r = evaluateFixAndRecheck(proofFor(title, run));
+    assert.equal(r.proceed, true, `${title}: ${JSON.stringify(r.failed)}`);
+  }
+});
+
+test("scope: a Files Summary entry written ./x, /x or in backticks means x (task 258, CR2-2)", () => {
+  for (const entry of [
+    "./src/a.js",
+    "/src/a.js",
+    "`src/a.js`",
+    "./`src/a.js`",
+  ]) {
+    assert.equal(
+      pathInScope("src/a.js", [entry]),
+      entry !== "./`src/a.js`",
+      entry,
+    );
+  }
+  // A directory prefix, however it is spelled.
+  assert.equal(pathInScope("src/a.js", ["./src/"]), true);
+  assert.equal(pathInScope("srcx/a.js", ["./src/"]), false);
+  assert.equal(pathInScope("src/a.js", ["`./src/`"]), true);
+  // Controls: normalising an entry never widens the candidate or the scope.
+  assert.equal(pathInScope("/etc/passwd", ["/src/a.js"]), false);
+  assert.equal(pathInScope("etc/passwd", ["/src/a.js"]), false);
+  assert.equal(pathInScope("src/b.js", ["./src/a.js"]), false);
+  assert.equal(pathInScope("src/a.js", ["./**"]), false, "no literal segment");
+  assert.equal(pathInScope("src/a.js", ["/"]), false);
+  // An exact entry that was admitted before still is.
+  assert.equal(pathInScope("src/a.js", ["src/a.js"]), true);
+});
+
+test("a CRLF run log is read like an LF one (task 258, CR2-3)", () => {
+  const lf = realRun("crlf-source", [
+    ["crlf title", false],
+    ["other crlf green", true],
+  ]);
+  const crlf = textRun("crlf", readFileSync(lf, "utf8").replace(/\n/g, "\r\n"));
+  assert.equal(
+    evaluateFixAndRecheck(proofFor("crlf title", crlf)).proceed,
+    true,
+  );
+  assert.equal(evaluateFixAndRecheck(proofFor("crlf title", lf)).proceed, true);
+  // Control: a CR inside a title (not at the line end) is still part of it.
+  const inner = textRun("cr-inner", "✖ foo\rbar (1ms)\n");
+  assert.equal(evaluateFixAndRecheck(proofFor("foo", inner)).proceed, false);
+});
+
+test("the `:<digit>` boundary belongs to a .md proof path, not to any title with a slash (task 258, CR2-4)", () => {
+  const colon = textRun(
+    "slash-colon",
+    "✔ GET /v1 (1ms)\n✖ GET /v1:5 stuff (1ms)\n",
+  );
+  assert.equal(
+    evaluateFixAndRecheck(proofFor("GET /v1", colon)).proceed,
+    false,
+  );
+  // Controls: the same title proves on its own red line, and a .md path with
+  // `:12` still proves (the docs-link clause).
+  const own = textRun("slash-own", "✖ GET /v1 (1ms)\n");
+  assert.equal(evaluateFixAndRecheck(proofFor("GET /v1", own)).proceed, true);
+  const docs = textRun("slash-docs", "✖ docs/a/b.md:12 → dead link\n");
+  assert.equal(
+    evaluateFixAndRecheck(proofFor("docs/a/b.md", docs)).proceed,
+    true,
   );
 });

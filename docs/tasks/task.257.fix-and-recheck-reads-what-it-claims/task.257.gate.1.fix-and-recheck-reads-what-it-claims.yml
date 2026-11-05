@@ -1,0 +1,83 @@
+schema: 2
+task: 'task.257.fix-and-recheck-reads-what-it-claims'
+task_title: 'finalise fix-and-recheck reads severity, scope and the named test'
+gate: CONCERNS
+status_reason: 'Implementation matches the plan and all touched suites are green, but the independent diff review reproduced two high-confidence bugs in the new scope and proof readers, and the new scope boundary has no probe-reachable entry.'
+reviewer: 'QA Engineer'
+head: 'e9269126d2c8cf9348762ad5c05d5ec286400374'
+updated: '2026-11-04T13:08:39Z'
+
+top_issues:
+  - id: 'T257-CR-1'
+    severity: medium
+    file: 'shared/resources/finalise-fix-and-recheck.mjs'
+    finding: 'isPlainRelativePath checks the raw string but matchesAnyGlob normalises it (trim, backslash to slash, leading ./ and /), so the traversal and leading-slash guard is bypassed: touched skills\a\..\..\..\etc\passwd against skills/** is admitted, as are a leading-space or trailing-tab path (reproduced by the reviewer).'
+    suggested_action: 'Run the guard on the string the matcher sees (normalisePath), or reject backslashes, leading or trailing whitespace and any non-canonical form; add `.` and empty segments to the rejected set (CR-5).'
+    suggested_owner: dev
+    status: open
+  - id: 'T257-CR-2'
+    severity: medium
+    file: 'shared/resources/finalise-fix-and-recheck.mjs'
+    finding: 'The `\s#\s` boundary in subjectNames admits TAP directives, so `not ok 1 - foo # TODO known` and `# SKIP` (an expected failure and a skipped test, neither a real red) satisfy mutation-proved for test foo (reproduced). The `:\d` boundary also applies to every test, not only the docs-link clause (CR-3, medium confidence).'
+    suggested_action: 'Reject a red line whose directive is TODO or SKIP; allow the `:<digits>` boundary only for the docs-link `.md` proof.'
+    suggested_owner: dev
+    status: open
+  - id: 'T257-BOUNDARY-1'
+    severity: medium
+    file: 'shared/resources/finalise-fix-and-recheck.mjs'
+    finding: 'The change set delivers a boundary (the Files Summary scope predicate: path in, admit or refuse out; the criteria say "refused"), but the predicate is a closure inside evaluateFixAndRecheck, so the probe engine cannot reach it and probes_executed is 0. CR-1 is the kind of defect a probe finds.'
+    suggested_action: 'Export a pure `pathInScope(path, filesSummary)` that evaluateFixAndRecheck calls, then probe it with security-probe.mjs (JS form, --args-json for filesSummary) and record the run.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 178
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: true
+    boundary_signals: ['refused', 'is refused']
+    boundary_reason: ''
+    notes: 'boundary: true. The scope predicate is not probe-reachable (T257-BOUNDARY-1). The path guard has a normalisation bypass (T257-CR-1).'
+  performance:
+    status: PASS
+    notes: 'Brace expansion is capped at 256; the unbounded form took 73 s in the mutation run, the capped form returns at once.'
+  reliability:
+    status: CONCERNS
+    notes: 'The proof reader accepts a TODO or SKIP red line (T257-CR-2). A merged severity can keep a low grade over two failing members (CR-4, advisory).'
+  maintainability:
+    status: PASS
+    notes: 'One glob matcher reused; prompts state one severity rule each; contract tests cover all four prompts.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T257-CR-1, T257-CR-2 and export pathInScope for the probe (T257-BOUNDARY-1).'
+      refs: ['shared/resources/finalise-fix-and-recheck.mjs']
+  future:
+    - action: 'CR-4: derive the merged severity from the merged result (drop it when more than one counted member fails, or the value is not low/medium/high). Medium confidence, advisory.'
+      refs: ['shared/resources/finalise-rerun-scope.js']
+    - action: 'CR-6: add a fixture per runner output form (node:test, TAP, bash harness, doc-links) asserting each real red form is accepted. Low severity.'
+      refs: ['shared/resources/tests/finalise-fix-and-recheck.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T257-CR-1', 'T257-CR-2', 'T257-BOUNDARY-1 closed']

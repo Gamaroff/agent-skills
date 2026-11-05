@@ -1,0 +1,71 @@
+schema: 2
+task: 'task.251.record-loop-limit-residual-acceptance'
+task_title: 'Record a loop-limit residual acceptance in one writer'
+gate: CONCERNS
+status_reason: 'The cycle 2 refusal works for the case it named. The same mechanism still guesses a flow mapping''s extent from brace characters, so a nested map or a closing brace inside a comment passes it and is edited into the wrong span while the writer returns edit.'
+reviewer: 'QA Engineer'
+head: '07aa92808854a6a7b50cd72c04e91fd595f7730b'
+updated: '2026-11-03T06:51:09Z'
+
+top_issues:
+  - id: 'T251-CR3-1'
+    severity: medium
+    file: 'shared/resources/accept-qa-residual.js'
+    finding: 'The refusal added in cycle 2 asks only whether any "}" follows the opening brace on the dash line, so `- {id: X, a: {b: 1},` (nested map closes, outer mapping closes on a later line) and `- {id: X, # note }` (brace inside a comment) pass it and waiveEntry splices `status: waived` into the nested map or the comment while `status: open` stays; planGateEdit returns edit with ok true (reproduced; the probe engine scores both hostile gates accepted, verdict present-but-inert). Reviewer rated it low/low; QA reproduced it and keeps the cycle 1 and 2 rating for the same defect class.'
+    suggested_action: 'Do not patch the check again: define the flow extent once. One scanner (brace depth, skipping quoted strings, stopping at a comment) returns the open and close columns of the dash line''s flow mapping or reports it unbalanced; waiveEntry edits only inside the span it returns and the planner refuses an unbalanced one. Add the nested-map and comment-brace gates to the tests as refusals and keep the single-line nested control as an edit.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 92
+
+evidence:
+  tests_reviewed: 33
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 6
+    escaped: 0
+    boundary: true
+    boundary_signals: ['refused', 'refuses']
+    notes: 'Probe engine on planGateEdit with the committed gate cases file (1 legitimate gate accepted; FAIL, multi-line flow and empty gates rejected; nested-map and comment-brace flow gates accepted): verdict present-but-inert, 6 executed, 2 reproduced, 0 escaped. The two accepted hostile gates are T251-CR3-1.'
+  performance:
+    status: PASS
+    notes: 'No new loops; the added check is one regex per open entry.'
+  reliability:
+    status: CONCERNS
+    notes: 'T251-CR3-1 reports success on a gate edited into the wrong span. Advisory from cycle 2 still open: no timeout on the qa-cycle.sh spawn; audit text after a re-run.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Three consecutive cycles have corrected the same line-based flow-mapping detection (cycles 1, 2 and 3). The fix is to define the span once, not to correct the check a fourth time.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Replace the brace heuristics with one flow-extent scanner used by both the planner refusal and waiveEntry (T251-CR3-1).'
+      refs: ['shared/resources/accept-qa-residual.js', 'shared/resources/tests/accept-qa-residual.test.mjs']
+  future:
+    - action: 'CR-2 (low): add a timeout to the qa-cycle.sh spawnSync and map a timeout to engine-unavailable.'
+      refs: ['shared/resources/accept-qa-residual.js']
+    - action: 'CR-3 (low/low): on a re-run after a Stop, the Decisions Log line says "none newly waived" instead of listing the ids the first run waived.'
+      refs: ['shared/resources/accept-qa-residual.js']
+    - action: 'readKeysInto stops a quoted value at "}" (pre-existing, outside this change).'
+      refs: ['shared/resources/qa-diminishing-returns.js']
+      provenance: pre-existing
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T251-CR3-1 fixed and re-verified']

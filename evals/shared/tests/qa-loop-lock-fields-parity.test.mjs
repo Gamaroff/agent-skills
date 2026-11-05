@@ -102,6 +102,7 @@ const FILES = {
   taskReadme: "skills/develop-task/README.md",
   storyReadme: "skills/develop-story/README.md",
   reenterScript: "shared/resources/reenter-qa-after-finalise.sh",
+  acceptScript: "shared/resources/accept-qa-residual.sh",
 };
 const text = Object.fromEntries(
   Object.entries(FILES).map(([k, p]) => [k, read(p)]),
@@ -309,8 +310,29 @@ test("qa_reentry: the writer and every reader and describer name it (task.182)",
   // patched again, and this test holds the one-statement shape (TASK-182-001, TASK-182-003).
   assert.match(
     text.pauseDoc,
-    /`grant-qa-cycles\.sh` \(task\.123\) writes `5b` when no code moved since the latest gate[^|]*`5a` when code moved or the helper cannot answer[^|]*`reenter-qa-after-finalise\.sh` \(task\.170\) always writes `5a`/,
+    /`grant-qa-cycles\.sh` \(task\.123\) writes `5b` when no code moved since the latest gate[^|]*`5a` when code moved or the helper cannot answer[^|]*`reenter-qa-after-finalise\.sh` \(task\.170\) always writes `5a`[^|]*`accept-qa-residual\.sh` \(task\.251\) always writes `5c`/,
     "the pause reference's qa_phase row must state which value each re-entry writer writes",
+  );
+  // The third re-entry writer (task.251): the owner's acceptance of a loop-limit residual. It
+  // writes qa_phase 5c and nothing else on the lock — the budget is spent, and current_step stays
+  // 5 — so a fourth writer that moved current_step or the budget is a different design, not drift.
+  assert.match(
+    text.acceptScript,
+    /jq '\.qa_phase = "5c"' "\$LOCK"/,
+    "accept-qa-residual.sh must write qa_phase 5c through jq — re-check the pause reference's qa_phase row",
+  );
+  const acceptCode = text.acceptScript
+    .split(/\r?\n/)
+    .filter((l) => !/^\s*#/.test(l))
+    .join("\n");
+  assert.doesNotMatch(
+    acceptCode,
+    /\.current_step\s*=|\.qa_max_cycles\s*=|\.extra_cycles_granted\s*=/,
+    "accept-qa-residual.sh writes qa_phase only — never current_step or the budget",
+  );
+  assert.ok(
+    text.hooksDoc.includes("accept-qa-residual.sh"),
+    "the hooks doc must name accept-qa-residual.sh as a writer of qa_phase",
   );
   // The writer the statement describes (task.244): 5b only when code-moved-since-gate.sh prints 0,
   // 5a for everything else, and the halt reason is never read.

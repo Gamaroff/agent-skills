@@ -1,0 +1,69 @@
+schema: 2
+task: 'task.252.migrate-doc-numbering-name-blockers'
+task_title: 'migrate-doc-numbering: name every document it cannot classify'
+gate: PASS
+status_reason: 'T252-QA-1 is fixed and held by a test that fails without the guard; the refute-pass review found only a documented trade-off (a stray file beside an index.md is not named), recorded as a follow-up.'
+reviewer: 'QA Engineer'
+head: '22464943e4d07bcbdb847040675cf034b7f7dcc3'
+updated: '2026-11-03T09:47:14Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 90
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    notes: 'boundary: false, unchanged from gate 1. The new guard (a Set lookup of index.md beside a PRD document) only narrows which names are reported; its input is the repository own directory listing.'
+  performance:
+    status: PASS
+    notes: 'readDir baseline test still passes; the guard is one Set lookup per PRD.'
+  reliability:
+    status: PASS
+    notes: 'A sharded PRD directory no longer raises unclassified-document (reproduced fixed on the gate-1 fixture). Trade-off, not a defect: a stray file beside an index.md in a PRD directory is not named.'
+  maintainability:
+    status: PASS
+    notes: 'The exemption is stated in review-prd SKILL.md and CHANGELOG.md and pinned by a two-sided test.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-11-03'
+  total_iterations: 1
+  verification_method: 'Reproduction re-run on the sharded fixture (0 unclassified-document); mutation removing the guard turns the new test red (89 pass, 1 fail); 90 pass restored.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Trade-off: a stray .md beside an index.md in a PRD directory is now silent (reproduced: feature-exploration-2026-07-11.md next to index.md, 0 skipped). Narrow the exemption to files the index links, or record the exception in the task decision (line 68 of the task document) and pin it with a test.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs']
+    - action: 'CR-3 (gate 1, low confidence): directories such as _archive or assets under epics/ or stories/ block where the old code skipped them silently; decide on an underscore or reasoned directory allowlist.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs']
+    - action: 'CR-2 (gate 1): under a scope, an unclassified entry beneath an epics directory with no owning PRD is dropped, while an unscoped run blocks on it; decide and test.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs']
+    - action: 'CR-4 (gate 1, cleanup): group files by directory once instead of rescanning per PRD; use a Set for the duplicate check.'
+      refs: ['shared/resources/migrate-doc-numbering.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

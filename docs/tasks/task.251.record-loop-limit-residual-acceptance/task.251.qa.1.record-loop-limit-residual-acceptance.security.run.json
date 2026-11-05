@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "markdown-structure",
+      "entry": "shared/resources/accept-qa-residual.js#planReportEdit",
+      "name": null,
+      "call_site": null,
+      "verdict": "absent",
+      "reason": "no-hostile-case-was-rejected",
+      "executed": 15,
+      "passed": 6,
+      "reproduced": 9,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": [
+        5,
+        {
+          "approvedBy": "Owner",
+          "reason": "r",
+          "date": "2026-11-03",
+          "waived": []
+        }
+      ],
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-11-03T06:35:37.473Z"
+    }
+  ],
+  "totals": {
+    "executed": 15,
+    "reproduced": 9,
+    "escaped": 0
+  },
+  "updated_at": "2026-11-03T06:35:37.473Z"
+}

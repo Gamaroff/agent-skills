@@ -1,0 +1,195 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "afc91b30fb384a60eb32bc82871fd6e4fa62db80",
+  "dirty_paths": [
+    "docs/tasks/task.253.migrate-doc-numbering-safety-nets/task.253.implementation.1.migrate-doc-numbering-safety-nets-initial-run.md"
+  ],
+  "document": "docs/tasks/task.253.migrate-doc-numbering-safety-nets/task.253.migrate-doc-numbering-safety-nets.md",
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 11,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "79a97cd61a24c1a9f44db8c29f6dced50ef5442b27a8de0f4f410e4d26d8e09d",
+      "status": "PASS",
+      "description": "Multi-line link resolves after --apply on the fixture",
+      "code_citation": "shared/resources/migrate-doc-numbering.mjs:1171",
+      "test_citation": "shared/resources/tests/migrate-doc-numbering.test.mjs:2378",
+      "members": [],
+      "non_member_fail": null,
+      "note": "linkPass edits at targetLine ?? openLine. scanLinks adds targetLine at doc-links.js:187-189, tested at doc-links.test.mjs:987. Both test files are in the 'shared/resources/tests/*.test.mjs' glob of test:suite, which test.yml runs on every pull_request."
+    },
+    {
+      "id": "#2",
+      "text_hash": "88509a72c9590203c09d6a63b89b4ce862412f5126f75c2b7a3c46a737a36b21",
+      "status": "PASS",
+      "description": "Dangling link left by the tool printed with file and line",
+      "code_citation": "shared/resources/migrate-doc-numbering.mjs:2584",
+      "test_citation": "shared/resources/tests/migrate-doc-numbering.test.mjs:2478",
+      "members": [],
+      "non_member_fail": null,
+      "note": "deadLinks entries carry file and line (targetLine ?? line). The text output printing is pinned by the test at 2788, which covers warnings and skipped files."
+    },
+    {
+      "id": "#3",
+      "text_hash": "27030348fab5066c4f4955bcd49c8cf2840bb759b1db9baa3c286db6316a8836",
+      "status": "PASS",
+      "description": "Retired epic-registry stub contains no link",
+      "code_citation": "shared/resources/migrate-doc-numbering.mjs:1843",
+      "test_citation": "shared/resources/tests/migrate-doc-numbering.test.mjs:2444",
+      "members": [],
+      "non_member_fail": null,
+      "note": "epicRegistryPointer writes code spans, not links."
+    },
+    {
+      "id": "#4",
+      "text_hash": "fdb20a5df155609e7dc15c33972654906b400f8c344339beb526e24f3b3f47d6",
+      "status": "PASS",
+      "description": "--apply refuses dirty tree and branch behind upstream",
+      "code_citation": "shared/resources/migrate-doc-numbering.mjs:2345",
+      "test_citation": "shared/resources/tests/migrate-doc-numbering.test.mjs:2655",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The dirty-tree and behind-upstream warnings are turned into blockers under --apply. Guards are at 2630 and 2681. The controls test at 2698 covers no upstream, an upstream deleted on the remote, and an unreachable upstream."
+    },
+    {
+      "id": "#5",
+      "text_hash": "655645ee951165fbe814447a75ade72e4dadbe299a6b7d9f71eb787c9db26561",
+      "status": "PASS",
+      "description": "Generated file is not edited",
+      "code_citation": "shared/resources/migrate-doc-numbering.mjs:1486",
+      "test_citation": "shared/resources/tests/migrate-doc-numbering.test.mjs:2549",
+      "members": [],
+      "non_member_fail": null,
+      "note": "A generated file is skipped and listed. inRewriteScope also refuses it (test at 2805)."
+    },
+    {
+      "id": "#6",
+      "text_hash": "2fd3d9d868cb3e75e5c5b180ff51444e88d72dca02142b955f6eaf1389c999c1",
+      "status": "PASS",
+      "description": "Tracked script with legacy pattern listed in closing line",
+      "code_citation": "shared/resources/migrate-doc-numbering.mjs:2774",
+      "test_citation": "shared/resources/tests/migrate-doc-numbering.test.mjs:2582",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The closing line reads 'N repo files still hard-code legacy names: ...'."
+    },
+    {
+      "id": "#7",
+      "text_hash": "4e76b5aa4420946b1a5a2875aeae7370700153ed508552607d6412586913fdad",
+      "status": "PASS",
+      "description": "Post-apply scans read each tracked file once; read counter asserted",
+      "code_citation": "shared/resources/migrate-doc-numbering.mjs:2569",
+      "test_citation": "shared/resources/tests/migrate-doc-numbering.test.mjs:2813",
+      "members": [],
+      "non_member_fail": null,
+      "note": "scanTracked has one io.readFile per file, shared by the link, old-path and legacy-name scans. The test wraps readFile with a counter and asserts n === 1 per path. See the advisory: the test calls scanTracked with applied:false."
+    },
+    {
+      "id": "#8",
+      "text_hash": "f7177e53b73f70ac7d95b68e886478cf9d98a22913f377eee87cb45a77f8ce46",
+      "status": "DEFERRED-CI",
+      "description": "Tests, npm test, npm run bundle:check pass",
+      "code_citation": ".github/workflows/test.yml:58",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The only evidence is that the test suite and bundle:check run clean. validate.yml:128 runs bundle:check. QA 1-3 record 'npm run bundle:check # 128 skills, 0 problems' as an extra reading, but the grade comes from CI reading 1."
+    },
+    {
+      "id": "#9",
+      "text_hash": "2c9b03a97e041566225e2512a4c9114639f4a74955ed34081639ff061b9e449c",
+      "status": "PASS",
+      "description": "Each fix's test goes red when the fix is reverted (QA report)",
+      "code_citation": "docs/tasks/task.253.migrate-doc-numbering-safety-nets/task.253.review.2.mutation-proof.md:11",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "Gap 1 multi-line link",
+          "evidence": "task.253.review.2.mutation-proof.md:11-12",
+          "status": "PASS"
+        },
+        {
+          "member": "Gap 4 link-free stub",
+          "evidence": "task.253.review.2.mutation-proof.md:13",
+          "status": "PASS"
+        },
+        {
+          "member": "Gap 5 dirty/behind",
+          "evidence": "task.253.review.2.mutation-proof.md:14-16",
+          "status": "PASS"
+        },
+        {
+          "member": "Gap 6 generated file",
+          "evidence": "task.253.review.2.mutation-proof.md:17-18",
+          "status": "PASS"
+        },
+        {
+          "member": "Gap 2 post-apply scan",
+          "evidence": "task.253.review.2.mutation-proof.md:19-21",
+          "status": "PASS"
+        },
+        {
+          "member": "Gap 7 legacy-name line",
+          "evidence": "task.253.review.2.mutation-proof.md:22",
+          "status": "PASS"
+        },
+        {
+          "member": "QA bug 1 behind guard fails open",
+          "evidence": "task.253.review.2.mutation-proof.md:24",
+          "status": "PASS"
+        },
+        {
+          "member": "QA bug 2 gap-3 guard",
+          "evidence": "task.253.review.2.mutation-proof.md:25",
+          "status": "PASS"
+        },
+        {
+          "member": "QA bug 3 fence tracking",
+          "evidence": "task.253.review.2.mutation-proof.md:26-27",
+          "status": "PASS"
+        },
+        {
+          "member": "QA CR-3 --prune",
+          "evidence": "task.253.review.2.mutation-proof.md:28",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Process criterion. The committed mutation-proof table (rows at lines 11-28) gives a revert and the red test for each unit. QA gate 3 reports PASS 100 and qa.3:93 re-confirms the bug 2 mutation. One row (the new-scheme exclusion in gap 7, line 20) records 'no test went red', and the code was deleted, not kept. That leaves no fix needing a test, so it does not count as an uncovered unit. Gap 3 has no fix."
+    },
+    {
+      "id": "#10",
+      "text_hash": "d46ba14816789db9148d7a545e1f67ab553dba482ee66e054e99360368b5d65f",
+      "status": "PASS",
+      "description": "CHANGELOG.md updated",
+      "code_citation": "CHANGELOG.md:23",
+      "test_citation": "shared/resources/tests/changelog-cites.test.mjs:1",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Documentation criterion. CHANGELOG.md:23 is the entry '(task 253)' and describes all six changes, the behaviour change and the gap 3 non-reproduction. changelog-cites.sh reported 'cites (task 253)' in QA 2 and 3. Its test is in the shared/resources/tests glob and runs per PR."
+    },
+    {
+      "id": "#11",
+      "text_hash": "160dd3da6c04229e30a4756bc5b08a5c02aea8813a4f0c4a8ec89ed1ede57b59",
+      "status": "PASS",
+      "description": "Gaps that did not reproduce are recorded as such in the QA report",
+      "code_citation": "docs/tasks/task.253.migrate-doc-numbering-safety-nets/task.253.qa.1.migrate-doc-numbering-safety-nets.md:60",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Documentation criterion. qa.1:60 says '**Gap 3 (frontmatter validation) did not reproduce.**' and gives the evidence and the dropped fix. qa.1:54 and qa.3:31 repeat it, and the mutation-proof file notes it at its end. Gap 3 is the only gap that did not reproduce."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#7",
+      "note": "The read-once test calls scanTracked with applied:false. The link scan (wantsLinks) runs only when applied is true, so the post-apply link path is not exercised by the counter. The code is still one readFile per file (migrate-doc-numbering.mjs:2569), so the criterion holds structurally. A test with applied:true and a touched .md file would assert the post-apply path directly."
+    }
+  ]
+}

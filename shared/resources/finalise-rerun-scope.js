@@ -641,8 +641,13 @@ function mergeReportedGap(r, agentAc, io, advisories) {
       note: `agent's FAIL overturned by the merged members: ${agentAc.note}`,
     });
   }
+  // The agent's grade belongs to its FAIL. When the members overturn that FAIL
+  // the merged criterion is a PASS, and a PASS carries no severity — a stale
+  // `low` on it would read as a graded finding that is no longer there (task 257).
+  const { severity: agentSeverity, ...agentRest } = agentAc;
   return {
-    ...agentAc,
+    ...agentRest,
+    ...(pass || agentSeverity === undefined ? {} : { severity: agentSeverity }),
     ac_id: r.id,
     description: agentAc.description ?? prior.description ?? null,
     status: pass ? "PASS" : "FAIL",

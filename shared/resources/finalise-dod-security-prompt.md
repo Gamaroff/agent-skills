@@ -61,9 +61,10 @@ make it `false`. Probe it through the `shell-argv:` form (task.181): each case's
 carries the state, a `--fixture-setup` stages it (a commit, a `git add`) before the run, and the
 template's one `{input}` element reaches a script that may ignore it. A Node or Python CLI that
 refuses on a data directory's contents takes the `cli:` form with the same per-case `fixture.files`
-(task.216); one that reads committed or staged repository state is not reachable on `cli:` yet,
-because fixture files are text and `--fixture-setup` is `shell-argv:`'s. Record `boundary: true`; where
-no form reaches the guard, the zero-guard fires and closing it takes a recorded override (obs #221).
+(task.216); one that reads committed or staged repository state takes `cli:` too, plus a committed
+`--fixture-setup` that builds the scratch repository (fixture files are text and make no commit;
+task.254). Record `boundary: true`; where no form reaches the guard, the zero-guard fires and closing
+it takes a recorded override (obs #221).
 
 **Test code is not exempt by location.** A test double whose refusal backs an assertion — a fake
 `gh` that refuses writes so an eval can assert "never posts" — is a boundary: the agent under test
@@ -253,8 +254,12 @@ cases: [ … ]
 # effect or a cleanup is asserted with `absent` / `removed`, as in the shell-argv block below. PATH,
 # NODE_OPTIONS and the LD_*/DYLD_* loader variables are refused in a cli: case's env. Use a sink
 # that is not materialised: --sink filename writes each input as an empty file of that name, so
-# input "." is declined (EISDIR). Repository state (a commit, a staged index) is not reachable on
-# cli: — fixture files are text and there is no --fixture-setup here.
+# an input that is a path ("docs/prd") is declined, the decline naming the sink. A CLI that reads
+# REPOSITORY STATE (a commit, a staged index) adds `--fixture-setup <setup-script-from-repo-root>`
+# (task.254): a committed bash script run as `bash <setup> <case-dir>` after the case's files are
+# written and before the CLI, in the same sandbox. It builds "$1" and nothing else (a write anywhere
+# else, or a non-zero exit, makes the run errored, never a refusal), states its own git identity
+# (the sandbox HOME has none), and may not name `gh` (this form has no --fake-gh).
 argv: ["--sink", "<sink>", "--entry", "cli:<path-from-repo-root>",
        "--argv", "[\"--flag-before\",\"value\",\"--guarded-flag\",\"{input}\"]",
        "--name", "<control name>"]

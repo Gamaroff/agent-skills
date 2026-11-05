@@ -1,0 +1,9 @@
+[
+  {
+    "id": "legit-clean-input",
+    "input": "ok",
+    "direction": "legitimate",
+    "correct": "Accepted: cli-path-clean.mjs exits 0 when its own PATH does not name the harness directory. The setup's gh call is not what the case tests, so the run must decline needs-fake-gh rather than score it.",
+    "spec_ref": "docs/tasks/task.255.probe-engine-cli-setup-gh-isolation/task.255.probe-engine-cli-setup-gh-isolation.md:200"
+  }
+]

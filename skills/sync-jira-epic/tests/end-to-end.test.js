@@ -97,13 +97,12 @@ test("an epic synced twice reports no field changes and issues no second PUT", a
   const key = first.result.issueKey;
   assert.match(key, /^PROJ-\d+$/);
 
-  const syncLabel = (state.issues[key].fields.labels || []).find((l) =>
-    l.startsWith("synced-from-"),
-  );
-  assert.ok(
-    syncLabel,
-    "the create payload should carry a synced-from-* label — " +
-      "without it there is no divergence to test",
+  assert.deepEqual(
+    (state.issues[key].fields.labels || []).filter((l) =>
+      l.startsWith("synced-from-"),
+    ),
+    [],
+    "the create payload must not carry a synced-from-* label",
   );
 
   const putsAfterCreate = putCount(state, key);
@@ -419,4 +418,89 @@ test("task 205: an epic.1.2 file creates a [Epic 1.2] card that links Story 1.2.
   const card = state.issues[res.result.issueKey].fields;
   assert.equal(card.summary, "[Epic 1.2] Checkout flow hardening");
   assert.match(JSON.stringify(card.description), /Story 1\.2\.1 — Tap targets/);
+});
+
+// ===========================================================================
+// Idempotent create — the guard that replaced the synced-from-* label
+// ===========================================================================
+
+// The guard is the summary's [Epic P.E] id, which exists only when the document
+// carries its prd_number/epic_number pair; an epic without the pair gets a bare
+// title and no guard (the script warns).
+function repoWithNumberedEpic() {
+  const root = gitRepo("epic-e2e-", {
+    "docs/prd/epic.7.checkout.md": EPIC_MD.replace(
+      "type: epic\n",
+      "type: epic\nprd_number: 1\nepic_number: 7\n",
+    ),
+  });
+  return { root, epic: path.join(root, "docs/prd/epic.7.checkout.md") };
+}
+
+test("epic: a create whose jira_key write-back was lost adopts the card, not a duplicate", async (t) => {
+  const { root, epic } = repoWithNumberedEpic();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const { state, fetchImpl } = fakeJira();
+
+  const first = await runSync(root, epic, fetchImpl, ["--quiet"]);
+  assert.equal(Object.keys(state.issues).length, 1);
+
+  // The crash: Jira accepted the POST, the local write-back never happened.
+  fs.writeFileSync(
+    epic,
+    fs.readFileSync(epic, "utf-8").replace(/^jira_key:.*\n/m, ""),
+    "utf-8",
+  );
+  const posts = () =>
+    state.requests.filter(
+      (r) => r.method === "POST" && r.url.endsWith("/rest/api/3/issue"),
+    ).length;
+  assert.equal(posts(), 1);
+
+  const again = await runSync(root, epic, fetchImpl, ["--quiet"]);
+  assert.equal(posts(), 1, "a second POST was made — the guard did not hold");
+  assert.equal(Object.keys(state.issues).length, 1);
+  // The epic's no-change fast path returns before building a `result`, so read
+  // the adopted key from the document the rerun wrote back.
+  assert.match(
+    fs.readFileSync(epic, "utf-8"),
+    new RegExp(`^jira_key:\\s*['"]?${first.result.issueKey}`, "m"),
+  );
+  void again;
+});
+
+test("epic: a legacy synced-from-* card is adopted by label and the label is stripped on the next PUT", async (t) => {
+  const { root, epic } = repoWithNumberedEpic();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const { state, fetchImpl } = fakeJira();
+
+  const first = await runSync(root, epic, fetchImpl, ["--quiet"]);
+  const key = first.result.issueKey;
+  // Make it a pre-change card: legacy label present, summary no longer matches
+  // (so only the label can find it), local jira_key lost.
+  state.issues[key].fields.labels = ["synced-from-legacy-stem"];
+  state.issues[key].fields.summary = "Renamed in Jira, no bracket id";
+  fs.writeFileSync(
+    epic,
+    fs.readFileSync(epic, "utf-8").replace(/^jira_key:.*\n/m, ""),
+    "utf-8",
+  );
+  // The legacy label is derived from the document's own directory/stem.
+  const lib = require("../references/jira-sync.js");
+  assert.ok(typeof lib.findExistingByIdentity === "function");
+  const label = require("../scripts/sync-jira-epic.js").legacySyncLabelFor(
+    epic,
+  );
+  state.issues[key].fields.labels = [label];
+
+  const again = await runSync(root, epic, fetchImpl, ["--quiet"]);
+  assert.equal(again.result.issueKey, key, "the legacy card was not adopted");
+  assert.equal(Object.keys(state.issues).length, 1);
+  assert.deepEqual(
+    (state.issues[key].fields.labels || []).filter((l) =>
+      l.startsWith("synced-from-"),
+    ),
+    [],
+    "the PUT replaces labels, so the legacy label must be gone",
+  );
 });

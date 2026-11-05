@@ -1,0 +1,59 @@
+schema: 2
+task: 'task.255.probe-engine-cli-setup-gh-isolation'
+task_title: 'security-probe: a cli: fixture setup cannot reach the host gh'
+gate: PASS
+status_reason: 'All four phases verified, 290/290 probe tests pass, three guard mutations re-proven red, bundles clean. Two low-severity advisory cleanups only.'
+reviewer: 'QA Engineer'
+head: '22f6b145a7e6bda5a7e4164edebd776407ab4ad7'
+updated: '2026-11-03T17:33:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 290
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: ["never"]
+    boundary_reason: 'The criterion word "never" states the engine''s own run-time isolation (the host gh is not executed), not an input classifier. It is held by committed behavioural tests that run a real setup under the real harness, and by guard mutations M2 and M3 re-proven red this cycle. No predicate accepts or rejects a caller-supplied value.'
+    notes: 'The change narrows what a cli: fixture setup can reach. Inherited limits (absolute path, script-prepended PATH, backgrounded call) are documented in probe-boundary-rule.md.'
+  performance:
+    status: PASS
+    notes: 'No extra spawn without a --fixture-setup (task.254 spawn-count test green); one ghFreePath call in runCliCase before the setup spawn.'
+  reliability:
+    status: PASS
+    notes: 'A tripped setup declines needs-fake-gh; a git-only setup still scores; the harness marker is counted as the harness''s own write, not an escape.'
+  maintainability:
+    status: PASS
+    notes: 'Setup PATH isolation is restated inline in runCliCase rather than shared with caseShellEnv (advisory CR-1).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1: share the trip-wire-first, ghFreePath PATH build between caseShellEnv and runCliCase so the two cannot drift'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'CR-2: re-wrap the added paragraph in probe-boundary-rule.md and put the "directory too large to inline" sentence back on its own line'
+      refs: ['shared/resources/probe-boundary-rule.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

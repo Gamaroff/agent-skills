@@ -395,8 +395,8 @@ const SEED_ORDER = [
  * Why this exists: `upsertFrontmatterKeys` returns its input UNCHANGED, and
  * silently, for a file that does not start with `---`. On such a file the sync
  * used to create the issue, write the link line, and then never persist
- * `jira_key` — so the next run created a duplicate unless the `synced-from-*`
- * label search happened to rescue it. Roughly half the bug documents in a
+ * `jira_key` — so the next run created a duplicate unless the summary-id
+ * search happened to rescue it. Roughly half the bug documents in a
  * consuming repo are that shape.
  *
  * Additive by construction: the body is concatenated verbatim, so the operation

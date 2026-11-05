@@ -125,15 +125,13 @@ test("a task synced twice reports no field changes on the second run", async () 
   const key = first.result.issueKey;
   assert.match(key, /^PROJ-\d+$/);
 
-  // The payload that was actually sent carries the idempotency label.
+  // The create payload carries no `synced-from-*` label: it buried the real
+  // labels in every picker. The summary's [Task N] id is the guard now.
   const created = state.issues[key];
-  const syncLabel = (created.fields.labels || []).find((l) =>
-    l.startsWith("synced-from-"),
-  );
-  assert.ok(
-    syncLabel,
-    "the create payload should carry a synced-from-* label — " +
-      "without it there is no divergence to test",
+  assert.deepEqual(
+    (created.fields.labels || []).filter((l) => l.startsWith("synced-from-")),
+    [],
+    "the create payload must not carry a synced-from-* label",
   );
 
   const before = fs.readFileSync(task, "utf-8");
@@ -189,8 +187,8 @@ test("the diff is fed the label set that is actually sent, not a frontmatter reb
     .sort();
 
   assert.ok(
-    held.some((l) => l.startsWith("synced-from-")),
-    "the card carries no synced-from-* label — there is no divergence to test",
+    !held.some((l) => l.startsWith("synced-from-")),
+    "the card must carry no synced-from-* label",
   );
   assert.deepEqual(
     sentLabels,
@@ -313,5 +311,71 @@ test("a genuine remote edit still trips the concurrent-edit guard", async () => 
     () => runSync(root, task, fetchImpl, ["--quiet"]),
     /updated since last local sync/i,
     "the guard did not fire on a genuine remote edit — the fix disabled it",
+  );
+});
+
+// ===========================================================================
+// Idempotent create — the guard that replaced the synced-from-* label
+// ===========================================================================
+
+test("task: a create whose jira_key write-back was lost adopts the card, not a duplicate", async (t) => {
+  const { root, task } = repoWithTask();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const { state, fetchImpl } = fakeJira();
+
+  const first = await runSync(root, task, fetchImpl, ["--quiet"]);
+  assert.equal(Object.keys(state.issues).length, 1);
+
+  // The crash: Jira accepted the POST, the local write-back never happened.
+  fs.writeFileSync(
+    task,
+    fs.readFileSync(task, "utf-8").replace(/^jira_key:.*\n/m, ""),
+    "utf-8",
+  );
+  const posts = () =>
+    state.requests.filter(
+      (r) => r.method === "POST" && r.url.endsWith("/rest/api/3/issue"),
+    ).length;
+  assert.equal(posts(), 1);
+
+  const again = await runSync(root, task, fetchImpl, ["--quiet"]);
+  assert.equal(posts(), 1, "a second POST was made — the guard did not hold");
+  assert.equal(Object.keys(state.issues).length, 1);
+  assert.equal(again.result.issueKey, first.result.issueKey);
+});
+
+test("task: a legacy synced-from-* card is adopted by label and the label is stripped on the next PUT", async (t) => {
+  const { root, task } = repoWithTask();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const { state, fetchImpl } = fakeJira();
+
+  const first = await runSync(root, task, fetchImpl, ["--quiet"]);
+  const key = first.result.issueKey;
+  // Make it a pre-change card: legacy label present, summary no longer matches
+  // (so only the label can find it), local jira_key lost.
+  state.issues[key].fields.labels = ["synced-from-legacy-stem"];
+  state.issues[key].fields.summary = "Renamed in Jira, no bracket id";
+  fs.writeFileSync(
+    task,
+    fs.readFileSync(task, "utf-8").replace(/^jira_key:.*\n/m, ""),
+    "utf-8",
+  );
+  // The legacy label is derived from the document's own directory/stem.
+  const lib = require("../references/jira-sync.js");
+  assert.ok(typeof lib.findExistingByIdentity === "function");
+  const label = require("../scripts/sync-jira-task.js").legacySyncLabelFor(
+    task,
+  );
+  state.issues[key].fields.labels = [label];
+
+  const again = await runSync(root, task, fetchImpl, ["--quiet"]);
+  assert.equal(again.result.issueKey, key, "the legacy card was not adopted");
+  assert.equal(Object.keys(state.issues).length, 1);
+  assert.deepEqual(
+    (state.issues[key].fields.labels || []).filter((l) =>
+      l.startsWith("synced-from-"),
+    ),
+    [],
+    "the PUT replaces labels, so the legacy label must be gone",
   );
 });

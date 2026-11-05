@@ -464,6 +464,16 @@ the `reason` alone:
   number. **`displaced-frontmatter`** — a BOM or blank lines come before a `---` block of YAML keys,
   so no reader sees the block. Report either as Critical; the fix is by hand (close the block, or
   delete what precedes it), then plan again.
+- **`unclassified-document`** — an epic or story directory, or a loose `.md` file in a PRD directory,
+  whose name neither the hierarchical nor the legacy grammar reads (a dot in a slug, a lowercase or
+  `-N` sub-story suffix, a stray note). The tool used to skip it silently and then carry it half-way
+  into the renamed tree. The detail gives the path, the rule it broke and, for a lowercase or dash
+  suffix, the spelling that would read. Report each as Critical; the fix is by hand (rename it, or move
+  it out of the PRD tree), then plan again. README.md, index.md, `prd-registry.md`, dot-directories,
+  underscore-prefixed directories and `assets/` are not documents and are never named. A PRD directory that holds an `index.md` is a sharded PRD
+  (`/shard-prd` writes its section files there), so its loose `.md` files are shards and are not named
+  either. The text output also prints `N documents classified, M skipped`;
+  `M` must be 0 before `--apply`.
 - **`stale-reference`** — a file names a moved outside PRD (such as `docs/prd.md`) by a path neither pass rewrites:
   a relative path outside a link, such as `"../docs/prd.md"` in a script, or any path in a file type the
   passes do not rewrite, such as `package.json` or a `.sh` (under `${PRD_ROOT}` too), including a path
@@ -595,6 +605,9 @@ stay for later runs — with options **Apply** and **Skip**. Apply only on an ex
 # review-prd — apply the numbering migration (task 204)
 # Run ONLY after the user chose Apply. INPUT: MIG_NAME and MIG_PRD, as the plan used them.
 # --apply re-plans and refuses on any blocker (reason blocked) before it moves anything.
+# A checkout with uncommitted or untracked files (dirty-tree) or behind its upstream
+# (behind-upstream) is a blocker too: commit or stash, or pull, and run it again. The plan above
+# reports the same two states as warnings, so they are visible before Apply is chosen.
 MIGRATE=.agents/skills/review-prd/references/migrate-doc-numbering.mjs
 source .agents/skills/review-prd/references/resolve-paths.sh || exit 1
 NAME_ARGS=()

@@ -1,6 +1,6 @@
 ---
 name: sync-jira-task
-description: Sync a local technical task markdown file to Jira — creates the task if it has no jira_key, updates it if jira_key is already set. Standalone task — NOT linked to a Jira epic. Adds the task to the project backlog (Scrum boards only). Idempotent create via "synced-from-*" label search. Embeds Bitbucket links rendered via ADF (current-branch refs, fall back to default branch). Writes a Change Log row on issue creation and on status transition only (not on body updates). Concurrent-edit guard via stored Jira `updated` timestamp. Drives Jira status from frontmatter `status` via Jira transitions. Use when the user says "create this task in Jira", "update this task in Jira", "sync task to Jira", "push task changes to Jira", or "publish task to Jira".
+description: Sync a local technical task markdown file to Jira — creates the task if it has no jira_key, updates it if jira_key is already set. Standalone task — NOT linked to a Jira epic. Adds the task to the project backlog (Scrum boards only). Idempotent create via a search on the summary's [Task N] id. Embeds Bitbucket links rendered via ADF (current-branch refs, fall back to default branch). Writes a Change Log row on issue creation and on status transition only (not on body updates). Concurrent-edit guard via stored Jira `updated` timestamp. Drives Jira status from frontmatter `status` via Jira transitions. Use when the user says "create this task in Jira", "update this task in Jira", "sync task to Jira", "push task changes to Jira", or "publish task to Jira".
 ---
 
 # sync-jira-task
@@ -11,14 +11,14 @@ One-way sync of a local technical task markdown file to Jira. Auto-detects creat
 
 | `jira_key` present? | Action                                                                                                     |
 | ------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Absent              | **Pre-flight search by sync label**, then **Create** if no match. Writes `jira_key` back to file.          |
+| Absent              | **Pre-flight search by summary id**, then **Create** if no match. Writes `jira_key` back to file.          |
 | Present             | **Update** existing Jira task via atomic PUT. A Change Log row is written only if the status transitioned. |
 
 **Difference from `sync-jira-story`:** tasks are **standalone** — not associated with any Jira epic. No `jira_epic` field, no parent/Epic Link wiring, no epic Bitbucket URL. Issue type sent as `Task`.
 
 ## Key features
 
-- **Idempotent create** — pre-flight JQL search by `synced-from-<task-dir>` label prevents duplicates if a previous POST left no `jira_key` in the file.
+- **Idempotent create** — pre-flight JQL search by the summary's `[Task N]` id prevents duplicates if a previous POST left no `jira_key` in the file.
 - **Atomic PUT** — uses `?returnIssue=true` so the fresh `updated` timestamp comes back in one round-trip.
 - **Concurrent-edit guard** — stores Jira `fields.updated` in frontmatter as `jira_last_synced_at`. Aborts on next sync if Jira advanced (use `--force` to override).
 - **Field-level diff** — Change Log entries say `Updated: summary, description, metadata` etc. Body and metadata hashes are stored separately (`jira_last_body_hash`, `jira_last_meta_hash`) so frontmatter changes (status/effort/category) don't masquerade as description changes.
@@ -103,7 +103,7 @@ priority: "High" # mapped to live Jira priorities
 category: "refactoring"
 estimated_effort_hours: 24 # → timetracking.originalEstimate (+ jira.devEstimateField if configured)
 status: "🚧 In Progress" # emoji stripped, mapped to Jira transition
-labels: ["cache", "refactor"] # synced-from-* label appended automatically
+labels: ["cache", "refactor"] # sent exactly as written; no label is added
 assignee: "5b10a2844c20165700ede21g" # Jira accountId (optional)
 components: ["Cache"] # optional
 fix_versions: ["1.0.0"] # optional
@@ -152,7 +152,7 @@ Flow:
 
 1. Parse the task file (frontmatter + body) — safe against `---` horizontal rules in the body.
 2. Resolve auth, Bitbucket repo URL + branch (current branch's upstream, falling back to the default branch), and load live Jira priorities.
-3. If `jira_key` absent: search for an issue carrying the file's `synced-from-*` label. If found, switch to update.
+3. If `jira_key` absent: search for an issue whose summary opens with the document's `[Task N]` id (or that carries the legacy `synced-from-*` label). If found, switch to update.
 4. Detect create vs update; on update fetch current state and run concurrent-edit guard.
 5. Diff `summary`, body hash, meta hash, priority, labels.
 6. Build a Jira ADF description: Summary → Success Criteria (capped) → Breaking Changes (if any) → Metadata → Source link.
@@ -225,10 +225,15 @@ mapping passes through verbatim as a single candidate.
 When creating, the script first runs:
 
 ```
-GET /rest/api/3/search?jql=project="RB" AND labels="synced-from-task.1.cache-lib"&maxResults=2
+POST /rest/api/3/search/jql
+{ "jql": "project = \"RB\" AND (summary ~ \"\\\"Task 1\\\"\" OR labels = \"synced-from-task.1.cache-lib\")", "maxResults": 20 }
 ```
 
-If a matching issue exists (because a prior POST succeeded but the local file did not get its `jira_key` written), the script switches to update mode against that key. Every create automatically appends the `synced-from-<dir>` label to enable this lookup on subsequent runs.
+If a matching issue exists (because a prior POST succeeded but the local file did not get its `jira_key` written), the script switches to update mode against that key.
+
+**The guard is the summary's leading `[Task N]` id.** The text search only produces candidates (`summary ~` is tokenised and may over-match); the script then requires an exact, case-insensitive match on the leading bracket id of each returned summary, so a near-miss is never adopted. The create no longer adds any label. The legacy `synced-from-<dir>` label is still searched, read-only, so a card created by an older version is adopted rather than duplicated.
+
+**Known limits.** A summary with no leading `[id]` (the id could not be derived) has no guard; the script warns. A card whose summary was edited in Jira to drop the bracket id is not found, so a rerun after a crash would create a second card. Jira's text index is eventually consistent, so a rerun within seconds of a crash may miss the card.
 
 ## Change Log
 

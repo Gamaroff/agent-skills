@@ -35,7 +35,7 @@
  *
  * The alternative — emitting a placeholder — was rejected. Writing
  * `github_issue: 0` into frontmatter would defeat the idempotent
- * `synced-from-*` label search that stops the NEXT run creating a duplicate
+ * summary-id search that stops the NEXT run creating a duplicate
  * issue. A wrong key is worse than no key: no key converges on the second run,
  * a wrong key never converges and leaves a duplicate behind.
  *

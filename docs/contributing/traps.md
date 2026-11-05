@@ -179,6 +179,7 @@ The marker is built by `loadSensitive()` in the shared `spawn-budget.mjs` (task 
 - `shared/resources/tests/access-config-parity.test.mjs`
 - `shared/resources/tests/call-sites.test.mjs`
 - `shared/resources/tests/doc-id.test.mjs`
+- `shared/resources/tests/finalise-fix-and-recheck.test.mjs`
 - `shared/resources/tests/ci-tree-equivalence.test.mjs`
 - `shared/resources/tests/migrate-doc-numbering.test.mjs`
 - `shared/resources/tests/qa-diminishing-returns.test.mjs`
@@ -238,3 +239,23 @@ never uses (`MISSING … has a shared source but no bundled copy`). It has cost 
 and `yaml-subset.js`. Assemble such paths from parts in the test, as `handoff-verify.test.js` does
 (`const REFS = "refer" + "ences"`, `const SHARED = "shared/" + "resources"`). The real fix, a `tests/`
 exclusion in `bundle_skill.py`, is not filed.
+
+### `/finalise` must read the QA report for process criteria BEFORE the DoD run
+
+A success criterion that asks for a **record** ("the six mutations are recorded", "the measurement is
+logged") is graded by the DoD agent against **committed** artifacts. The implementation report is
+committed only after `/finalise` finishes (Step 8), so a record that lives only there fails as
+missing. On task 257 (2026-11-04) criterion 14 asked for the task's six §8 mutations to be recorded;
+they were in the implementation report alone, so the first DoD pass failed it. The fix cost a full
+re-run of all six mutations, a table in the QA report, a commit and a second agent to re-judge.
+
+`/finalise` Step 3a now runs this as a check (task 259): `finalise-record-preflight.js` lists every
+criterion that asks for a record, with the committed artifact its named location resolves to, and
+Step 3a's table says what to do for each state. The task-authoring side already names a location for
+such a criterion (`create-task` §3.5, obs #105, #77, task 249; `review-task` Step 3 check 22); the two
+share one list of trigger words, held by a test.
+
+**The check lists; it does not read.** `ok` means a committed place exists, not that the record is in
+it. Task 257's criterion named the QA report, one was committed, and the record was missing from it.
+So Step 3a's confirm step still means opening each listed artifact and looking, before dispatching.
+If you skip it, the DoD pass is where you find out.

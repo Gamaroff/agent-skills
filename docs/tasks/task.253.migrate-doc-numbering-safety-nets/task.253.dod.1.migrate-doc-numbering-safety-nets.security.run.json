@@ -1,0 +1,99 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "path",
+      "entry": "cli:shared/resources/migrate-doc-numbering.mjs",
+      "name": "migrate-doc-numbering --root (checkPrdRoot containment)",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 10,
+      "passed": 10,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 1,
+      "declined_cases": [
+        {
+          "id": "path.null-byte",
+          "reason": "case-errored",
+          "detail": "fixture: cannot materialise \"safe.txt\u0000.png\": input carries a NUL"
+        }
+      ],
+      "escaped": 0,
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "--root",
+        "{input}"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": "/home/gamaroff/Development/agent-skills/shared/resources/tests/fixtures/security-probe/migrate-doc-numbering-guard-setup.sh",
+      "ran_at": "2026-11-04T04:46:49.444Z"
+    },
+    {
+      "sink": "path",
+      "entry": "cli:shared/resources/migrate-doc-numbering.mjs",
+      "name": "migrate-doc-numbering --name (parseNameValue segments)",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 9,
+      "passed": 9,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "--root",
+        "docs/prd",
+        "--name",
+        "{input}"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": "/home/gamaroff/Development/agent-skills/shared/resources/tests/fixtures/security-probe/migrate-doc-numbering-guard-setup.sh",
+      "ran_at": "2026-11-04T04:46:50.080Z"
+    },
+    {
+      "sink": "path",
+      "entry": "cli:shared/resources/migrate-doc-numbering.mjs",
+      "name": "migrate-doc-numbering --apply repository-state guard (dirty-tree, behind-upstream)",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 3,
+      "passed": 3,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "--apply",
+        "--root",
+        "docs/prd",
+        "{input}"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": "/home/gamaroff/Development/agent-skills/shared/resources/tests/fixtures/security-probe/migrate-doc-numbering-guard-setup.sh",
+      "ran_at": "2026-11-04T04:46:50.439Z"
+    }
+  ],
+  "totals": {
+    "executed": 22,
+    "reproduced": 0,
+    "escaped": 0
+  },
+  "updated_at": "2026-11-04T04:46:50.439Z"
+}

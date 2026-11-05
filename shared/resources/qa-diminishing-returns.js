@@ -879,6 +879,9 @@ module.exports = {
   readTopIssues,
   readNfrStatuses,
   readGateToken,
+  // The open-entry rule, exported for accept-qa-residual.js (task.251): the writer that stamps
+  // entries `status: waived` must judge "open" exactly as this reader does (obs #134).
+  isOpen,
   countRaised,
   matchesAnyGlob,
   // classify

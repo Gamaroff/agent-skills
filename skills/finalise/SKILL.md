@@ -100,6 +100,7 @@ apply to a bug?" a lookup instead of a judgement.
 | `read-document` | Step 1 — read the document | run | run — the bug report, frontmatter or header block (`references/bug-doc.js`) |
 | `qa-reports` | Step 2 — QA reports and gate | run | run — globs scoped to `${STEM}` (a co-located bug must not read its parent's); none expected; the verify loop's `#### QA Verification` and the implementation report are the QA record |
 | `rerun-scope` | Step 3a — re-run scope and Step 3c — AC record | run | **skip** — fix-evidence has no criteria list to scope; no AC record is read or written |
+| `record-preflight` | Step 3a — record-criteria check | run | **skip** — a bug report has no criteria list |
 | `ac-agent` | Step 3b — AC traceability agent | run | **skip** — a bug has no ACs; the `fix-evidence` agent takes its slot |
 | `fix-evidence` | Step 3b — fix-evidence agent | — | run — `references/finalise-dod-fix-evidence-prompt.md` |
 | `frontmatter-accepted` | Step 7.2 — `status: accepted` | run | **skip** — `accepted` is not a bug status; develop-bug Part B writes `closed` |
@@ -181,7 +182,7 @@ Before starting any verification, also create a co-located running summary file 
    # Definition of Done Verification
 
    **Story/Task:** {story-name}
-   **Verification Started:** {current-date-time}
+   **Verification Started:** {the output of `date -u +%Y-%m-%dT%H:%MZ`, run now}
 
    ---
 
@@ -527,6 +528,42 @@ hand-set stop rule (obs #121). **To force a full re-judge**, move the newest `${
 aside; the next run reports `no-prior-record`.
 
 **Bug mode (`rerun-scope`):** skip — a bug report has no criteria list to scope; the fix-evidence agent's five checks run in full every time, and no AC record is read or written.
+
+**Then check that every record criterion has a committed place** — before any agent runs (task 259).
+A criterion that asks for a record ("recorded", "logged", "listed in", "documented", or a numeric
+bound graded by a measurement) is graded against **committed** artifacts, and the implementation
+report is committed only at Step 8. On task 257 (2026-11-04) criterion 14's record lived there alone
+and the first DoD pass failed it. Engine source: `references/finalise-record-preflight.js`; the
+trigger words are `review-task` Step 3 check 22's, held together by a test.
+
+```bash
+# INPUT, substituted into THIS block: {document-path}, the work item document.
+DOC_PATH="{document-path}"
+case "$DOC_PATH" in *'{'*) echo "HALT: DOC_PATH must be substituted into this block (an unsubstituted placeholder found)"; exit 1 ;; esac
+mkdir -p .claude/state
+command node .agents/skills/finalise/references/finalise-record-preflight.js check \
+  --doc "$DOC_PATH" --json > .claude/state/finalise-record-preflight.json
+case $? in
+  0) jq -r '"record criteria: \(.reason) — \(.message)", (.listed[] | "  #\(.index) [\(.state)] \(.criterion)")' .claude/state/finalise-record-preflight.json ;;
+  *) echo "HALT: finalise-record-preflight.js failed — see .claude/state/finalise-record-preflight.json"; exit 1 ;;
+esac
+```
+
+Read `reason` and act per state, in the main context — it holds the evidence the engine cannot see:
+
+| State | Action before Step 3b |
+| :-- | :-- |
+| `ok` | **Confirm.** Open each file in `artifacts` and check the record is in it. `ok` means a committed place exists, not that the record is in it (task 257's criterion named the QA report, one was committed, and the record was missing from it). A record that is missing is written there and committed first. |
+| `implementation-report-only` | Write the record into the newest committed QA report (or the gate), commit it, then continue. The criterion is also an authoring defect: note it in the DoD. |
+| `location-uncommitted` | Commit the named artifact. |
+| `location-absent` | Write the record into the named artifact once it exists, and commit. If the artifact cannot exist yet, say so in the DoD. |
+| `no-location` | Report it in the DoD. `/finalise` cannot invent a location, and nothing blocks: the AC agent still runs. |
+
+`empty` and `ok` with nothing listed need no action. `scan-broken` is a **HALT**: the instrument could
+not read the directory or the criteria, which is not the same as there being nothing to check. The
+check reports and the main context fixes; it never writes a record.
+
+**Bug mode (`record-preflight`):** skip — a bug report has no criteria list.
 
 #### Step 3b: Dispatch 4 Explore Subagents in Parallel
 
@@ -1489,14 +1526,20 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    fi
    ```
 
+   **Both figures are measured, never composed (obs #26, #100).** Run `date -u +%Y-%m-%dT%H:%MZ` now
+   and paste its output as `Completion Time`. `Total Duration` is the whole minutes from the header's
+   `Verification Started` to that value, computed from those two values. On task.182 a typed `07:40Z`
+   and `~25 minutes` stood where the measured values were `07:20Z` and about 5 minutes, and they were
+   already committed when Step 8 showed it.
+
    **Example final append:**
 
    ```markdown
    ## Verification Complete
 
    **Final Status:** ✅ ACCEPTED
-   **Completion Time:** {current-date-time}
-   **Total Duration:** {duration}
+   **Completion Time:** {the output of `date -u +%Y-%m-%dT%H:%MZ`, run now}
+   **Total Duration:** {whole minutes from Verification Started to Completion Time}
    **CI reading 1:** {CI_ROLLUP}{ (tree-equivalent to `CI_TREE_EQ`) — only when the docs-only rule resolved it} @ `{CI_HEAD_1}` (the acceptance decision — Step 6)
    **CI reading 2:** taken on the acceptance commit after this file is committed and pushed; recorded on the PR canonical summary comment and in the implementation report (Step 7 publish boundary)
 
@@ -2737,8 +2780,8 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
 
    **Final Status:** ❌ GAPS IDENTIFIED - NOT ACCEPTED
 
-   **Completion Time:** {current-date-time}
-   **Total Duration:** {duration}
+   **Completion Time:** {the output of `date -u +%Y-%m-%dT%H:%MZ`, run now}
+   **Total Duration:** {whole minutes from Verification Started to Completion Time}
 
    **Blocking Issues Summary:**
 
@@ -3059,9 +3102,10 @@ It qualifies **only** when all of these hold, each verified rather than assumed:
   it is the anchor every `artifactPaths` entry is checked against.
 - The mutation proof is the engine itself: the **pre-fix** run of `doc-links.js` on **every**
   reproduced file, appended to `mutationProof.run` in turn before the edit, is the red (each prints
-  `✖ <file>:<line> → …` and `FAIL doc-links: …`, which are the markers the evaluator reads, on lines
-  naming the file — so `mutationProof.test` is the **first** reproduced file, whose name already
-  sits beside a red marker); the **post-fix** run on each exits 0. Reverting the
+  `✖ <file>:<line> → …` and `FAIL doc-links: …`, which are the markers the evaluator reads — so for
+  this clause only, `mutationProof.test` is the **first** reproduced file: its `✖ <file>:<line>` line
+  starts with the name and ends at `:<digit>`, which the title rule accepts); the **post-fix** run on
+  each exits 0. Reverting the
   edit and re-running is the same proof a second time, and is what `redOnRevert: true` asserts.
 
 Then Steps 8a.1–8a.5 run unchanged, with the Docs section as the failed section and the engine run
@@ -3078,10 +3122,10 @@ with `--git-base` so both are re-read from git before anything is pushed (step 2
 mkdir -p .claude/state
 cat > .claude/state/finalise-fix-finding.json <<'JSON'
 {
-  "severity": "{the finding's severity, from the agent YAML — copy it; leave the key out if the agent gave none}",
+  "severity": "{the finding's severity, from the agent YAML — copy it; leave the key out if the agent gave none. Every DoD agent grades its FAILs (AC, docs, security, compliance, fix-evidence), so an absent grade means an ungraded finding and halts}",
   "commits": 1,
   "touched": ["{every path the fix will change, repo-relative}"],
-  "filesSummary": [{every path in the work item's Files Summary (task §7) / File List (story), as strings}],
+  "filesSummary": [{every entry in the work item's Files Summary (task §7) / File List (story), as strings — copy them as written: an exact path, a directory prefix ending in `/`, `*` / `**` globs and `{a,b}` alternatives are all read as pathspecs; an entry with no literal path segment (`*`, `**`) admits nothing}],
   "documentPath": "{repo-root-relative path of the work item document — only for the docs-link clause; omit otherwise}",
   "artifactPaths": [{co-located artifacts the docs-link red is on, repo-root-relative — only for the docs-link clause; omit otherwise}],
   "mutationProof": { "test": "{the test that must go red on revert}", "redOnRevert": false, "run": ".claude/state/finalise-mutation-proof.log" },
@@ -3105,9 +3149,20 @@ line `Fix-and-recheck refused: {ids}` in the gap report's Blocking Issues Summar
 - Run the mutation proof per `references/mutation-proving.md`: snapshot the fixed file with `cp`,
   revert the behaviour, run the named test **with its output captured to the file named in
   `mutationProof.run`** (`node --test <test> > .claude/state/finalise-mutation-proof.log 2>&1`),
-  confirm it is **red**, restore from the snapshot, confirm green. Set `mutationProof.redOnRevert`
+  confirm it is **red**, restore from the snapshot, confirm green. **Revert every line of the fix's
+  hunk, and read which tests went red: a red in a different test is a finding, not a proof** (that
+  file's rule 2). On task.207 a revert deleted one line of a guard prettier had split across two,
+  every call then returned null, and two unrelated tests went red, which proves nothing about the
+  guard (obs #61). `mutationProof.test` is the **test's title** as the runner prints it (the text
+  after `not ok N -` / `✖`), never a test file path: the evaluator refuses a file-shaped value (`*.test.*`, `*.spec.*`,
+  `*_test.*`, `test_*.*`, or a file under `test/`, `tests/` or `__tests__/`, in any case), and it
+  accepts the proof only when a `not ok` / `✖` / `FAIL` line **starts with that title** and ends at the
+  line end, a duration, a `# ` directive or `:<line>`. A neighbouring test's red line, a title that is
+  only a prefix of the red one, and a bare `ℹ fail N` count do not pass it (obs #133). Other red lines
+  in the same run are printed as `other red in the recorded run` — record them in the DoD. Set
+  `mutationProof.redOnRevert`
   to `true` in the finding record and re-run the evaluator — it opens the run file and requires
-  it to be non-empty, to name the test, and to carry a red marker (`not ok` / `✖` / `ℹ fail N`);
+  it to be non-empty and to carry a red line for the named title;
   a flipped boolean with no recorded run halts on `mutation-proved`. **Exit 0 is the licence for
   the commit; exit 1 is Step 8.**
 - Commit — one commit, message `fix(<stem>): finalise DoD <section> — <finding, one line>`,

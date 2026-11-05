@@ -1,0 +1,171 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "d2a315f36334e58eefd59d9928f3afa1121c1e9f",
+  "dirty_paths": [
+    "docs/tasks/task.258.fix-and-recheck-reads-inputs-as-written/task.258.fix-and-recheck-reads-inputs-as-written.md",
+    "docs/tasks/task.258.fix-and-recheck-reads-inputs-as-written/task.258.implementation.1.fix-and-recheck-reads-inputs-as-written-initial-run.md",
+    "docs/tasks/task.258.fix-and-recheck-reads-inputs-as-written/task.258.pr-review.1.fix-and-recheck-reads-inputs-as-written.md"
+  ],
+  "document": "docs/tasks/task.258.fix-and-recheck-reads-inputs-as-written/task.258.fix-and-recheck-reads-inputs-as-written.md",
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 11,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "a9319f8d7e73da6535fbaadd771eda2176554dc907c896a2b0291327b6244bf7",
+      "status": "PASS",
+      "description": "Four test-file names refused as mutationProof.test",
+      "code_citation": "shared/resources/finalise-fix-and-recheck.mjs:283",
+      "test_citation": "shared/resources/tests/finalise-fix-and-recheck.test.mjs:1281",
+      "members": [],
+      "non_member_fail": null,
+      "note": "isTestFileName covers .TEST.js, _test.go, test_*.py and files under tests/ (so tests/x.sh). The test loops over all four plus three more and asserts the refusal detail. shared/resources/tests/*.test.mjs is in test:suite, run per PR."
+    },
+    {
+      "id": "#2",
+      "text_hash": "f5638043ca30cd4b62717292ec1f5cbbf5082b2d8ad8db7a247f29879f2d96ab",
+      "status": "PASS",
+      "description": "pathInScope accepts ./, / and backtick entries; refuses /etc/passwd candidate",
+      "code_citation": "shared/resources/finalise-fix-and-recheck.mjs:147",
+      "test_citation": "shared/resources/tests/finalise-fix-and-recheck.test.mjs:1315",
+      "members": [],
+      "non_member_fail": null,
+      "note": "normaliseEntry is applied at line 169. The test asserts the three entry spellings are true and that /etc/passwd as candidate is false."
+    },
+    {
+      "id": "#3",
+      "text_hash": "a2c8fb34e66eba23348b3db0d4f101b163f600a141f6daa07c10757704cd4e72",
+      "status": "PASS",
+      "description": "A CRLF red line proves its test",
+      "code_citation": "shared/resources/finalise-fix-and-recheck.mjs:330",
+      "test_citation": "shared/resources/tests/finalise-fix-and-recheck.test.mjs:1342",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Line 330 reads text.split(/\\\\r?\\\\n/). The test converts a real run log to CRLF and asserts proceed is true."
+    },
+    {
+      "id": "#4",
+      "text_hash": "19580ac89301b978935ef2a2ba1f777f6fb67b0462d7a9963d41bbe3d79c97c8",
+      "status": "PASS",
+      "description": "GET /v1:5 does not prove GET /v1; docs-link .md proof still proves",
+      "code_citation": "shared/resources/finalise-fix-and-recheck.mjs:311",
+      "test_citation": "shared/resources/tests/finalise-fix-and-recheck.test.mjs:1358",
+      "members": [],
+      "non_member_fail": null,
+      "note": "pathy is now /\\\\.md$/.test(test). The test asserts proceed is false for the GET /v1:5 line and true for the .md control."
+    },
+    {
+      "id": "#5",
+      "text_hash": "3ce2bfed442bd7a839f625587e84c2d08c1f2606880b7a42dc91b6773d3ac3d4",
+      "status": "PASS",
+      "description": "Each of four mutations turns the named test red, recorded in QA report",
+      "code_citation": "docs/tasks/task.258.fix-and-recheck-reads-inputs-as-written/task.258.qa.1.fix-and-recheck-reads-inputs-as-written.md:83",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "Mutation 1: isTestFileName replaced by the old regex",
+          "evidence": "task.258.qa.1.fix-and-recheck-reads-inputs-as-written.md:83",
+          "status": "PASS"
+        },
+        {
+          "member": "Mutation 2: normaliseEntry replaced by entry.trim()",
+          "evidence": "task.258.qa.1.fix-and-recheck-reads-inputs-as-written.md:84",
+          "status": "PASS"
+        },
+        {
+          "member": "Mutation 3: split on a bare newline",
+          "evidence": "task.258.qa.1.fix-and-recheck-reads-inputs-as-written.md:85",
+          "status": "PASS"
+        },
+        {
+          "member": "Mutation 4: pathy includes a slash again",
+          "evidence": "task.258.qa.1.fix-and-recheck-reads-inputs-as-written.md:86",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "All 4 rows are in the QA report Mutation record, each naming the revert and the test that went red."
+    },
+    {
+      "id": "#6",
+      "text_hash": "d6c24021ccaddd46599a974a023deda29de19975f784d6c480fa036b93ac5461",
+      "status": "PASS",
+      "description": "Performance: not applicable, no loop or process call added",
+      "code_citation": "docs/tasks/task.258.fix-and-recheck-reads-inputs-as-written/task.258.fix-and-recheck-reads-inputs-as-written.md:243",
+      "test_citation": "NOT_APPLICABLE: criterion states no performance bound; it is itself marked Not applicable",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The criterion text says Not applicable and states no bound. The QA report NFR section agrees."
+    },
+    {
+      "id": "#7",
+      "text_hash": "ed9a5240696558885bb4b3d8e0550b14065614d2d6a1d4deeb5b6789c78b162e",
+      "status": "PASS",
+      "description": "CI=true evaluator tests and consumer suites pass",
+      "code_citation": "docs/tasks/task.258.fix-and-recheck-reads-inputs-as-written/task.258.qa.1.fix-and-recheck-reads-inputs-as-written.md:168",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "QA Test Commands lines 168-169; line 71 records 59 evaluator tests plus 87 consumer tests, 0 fail. Gate file gate: PASS. Measured on c6e1d753; later commits are docs and QA records only."
+    },
+    {
+      "id": "#8",
+      "text_hash": "70743b9507e3650284ac82f4d618ce9d06810b1b8f1fe7e1ded41fadbb6d2610",
+      "status": "PASS",
+      "description": "bundle:check clean and prettier --check passes on changed files",
+      "code_citation": "docs/tasks/task.258.fix-and-recheck-reads-inputs-as-written/task.258.qa.1.fix-and-recheck-reads-inputs-as-written.md:171",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Commands at QA lines 171-172, result at line 72. Measured on c6e1d753; later commits are docs only."
+    },
+    {
+      "id": "#9",
+      "text_hash": "f0d00dcef927f134d3a502ba5a9767e2ec2911d456ba1d431b7771e672d3ff1b",
+      "status": "PASS",
+      "description": "npm run validate -- skills/finalise/ passes",
+      "code_citation": "docs/tasks/task.258.fix-and-recheck-reads-inputs-as-written/task.258.qa.1.fix-and-recheck-reads-inputs-as-written.md:170",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "QA line 170 gives the command and line 176 states it passed."
+    },
+    {
+      "id": "#10",
+      "text_hash": "beb15abfeb908b7cf36d2dde9949ad496e13f0ed31c5e52c08e66f2f08b351bb",
+      "status": "PASS",
+      "description": "CHANGELOG entry present; changelog-cites.sh task.258 reports it",
+      "code_citation": "CHANGELOG.md:8",
+      "test_citation": "shared/resources/tests/changelog-cites.test.mjs",
+      "members": [],
+      "non_member_fail": null,
+      "note": "CHANGELOG.md:8-16 is headed with task 258 and CR2-1 to CR2-4. QA line 73 records changelog-cites.sh task.258 reports it."
+    },
+    {
+      "id": "#11",
+      "text_hash": "14727c44854061f203e8ab3bc79a783375462dec92c48af7fddf9e55ffd2b8d2",
+      "status": "PASS",
+      "description": "Step 8a sentence matches the evaluator's shapes",
+      "code_citation": "skills/finalise/SKILL.md:3120",
+      "test_citation": "shared/resources/tests/finalise-fix-and-recheck.test.mjs:1281",
+      "members": [],
+      "non_member_fail": null,
+      "note": "SKILL.md:3120 lists the same shapes as isTestFileName; the test at line 1281 covers each shape."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#7",
+      "note": "Gate and QA report record head c6e1d753; the PR head is d2a315f. The five intervening files are docs and QA records only, so no code drift. QA recorded CI on c6e1d753 as pending; CI state is for finalise Step 6."
+    },
+    {
+      "ac_id": "#5",
+      "note": "QA cleanup CR-1 (low): isTestFileName tests .md case-insensitively while subjectNames tests it case-sensitively. Routed to recommendations.future in the gate; not a criterion failure."
+    }
+  ]
+}

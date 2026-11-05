@@ -1,0 +1,23 @@
+{
+  "name": "develop-task-step-05-accept-residual-after-loop-limit",
+  "skill": "develop-task",
+  "description": "Phase 0b re-entry after a loop-limit halt, taking HALT option 2 (task.251 / obs #115, #150): the halt snapshot records halt_reason loop-limit at 5 cycles, and gate.5 reads CONCERNS with one open MEDIUM. The operator picks \"Accept the residual\"; accept-qa-residual.sh records gate.5 as WAIVED (the finding stamped status: waived, the owner as approved_by), moves QA Cycle 5 onto the accepting route (Action: Proceeding to 5c, Loop exit naming the decision), restores the lock from the snapshot and writes qa_phase 5c — no qa_max_cycles, no extra_cycles_granted, no cycle runs. The fixture's post-state was produced by running the real writer on the pre-state. Fixture records the resume detector, then review-pr only.",
+  "prompt": "Re-invoke /develop-task for task.42.example after a QA loop-limit halt. Accept the residual.",
+  "assertions": [
+    { "fn": "fileMatches", "args": ["$SANDBOX/docs/tasks/task.42.example/task.42.gate.5.example.yml", "\\ngate: WAIVED\\n"] },
+    { "fn": "fileMatches", "args": ["$SANDBOX/docs/tasks/task.42.example/task.42.gate.5.example.yml", "status: waived"] },
+    { "fn": "fileDoesNotMatch", "args": ["$SANDBOX/docs/tasks/task.42.example/task.42.gate.5.example.yml", "status: open"] },
+    { "fn": "fileMatches", "args": ["$SANDBOX/docs/tasks/task.42.example/task.42.gate.5.example.yml", "waiver:\\n  active: true\\n  reason: '[^']+'\\n  approved_by: '[^']+'\\n  approved_at: '\\d{4}-\\d{2}-\\d{2}'"] },
+    { "fn": "fileAbsent", "args": ["$SANDBOX/docs/tasks/task.42.example/task.42.gate.6.example.yml"] },
+    { "fn": "fileExists", "args": ["$SANDBOX/.claude/state/develop-pipeline.lock"] },
+    { "fn": "fileAbsent", "args": ["$SANDBOX/.claude/state/develop-pipeline.last-halt.json"] },
+    { "fn": "fileMatches", "args": ["$SANDBOX/.claude/state/develop-pipeline.lock", "\"qa_phase\":\\s*\"5c\""] },
+    { "fn": "fileMatches", "args": ["$SANDBOX/.claude/state/develop-pipeline.lock", "\"current_step\":\\s*5"] },
+    { "fn": "fileDoesNotMatch", "args": ["$SANDBOX/.claude/state/develop-pipeline.lock", "qa_max_cycles|extra_cycles_granted|halt_reason"] },
+    { "fn": "fileMatches", "args": ["$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md", "### QA Cycle 5[^#]*\\*\\*Loop exit\\*\\*: residual accepted by [^\\n]+ \\(accept-qa-residual\\)\\n\\*\\*Action\\*\\*: Proceeding to 5c \\(PR conformance review\\)"] },
+    { "fn": "fileDoesNotMatch", "args": ["$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md", "### QA Cycle 6"] },
+    { "fn": "fileMatches", "args": ["$SANDBOX/docs/tasks/task.42.example/task.42.implementation.1.example.md", "- QA residual accepted at the loop-limit escalation \\(cycle 5\\): gate\\.5 recorded as WAIVED"] },
+    { "fn": "pipelineStepsRan", "args": ["$SANDBOX/.eval/pipeline-events.json", ["resume-detector", "review-pr"]] },
+    { "fn": "loopBoundedAt", "args": ["$SANDBOX/.eval/pipeline-events.json", "qa-task", 0] }
+  ]
+}

@@ -11,14 +11,14 @@ One-way sync of a local story markdown file to Jira. Auto-detects create vs upda
 
 | `jira_key` present? | Action |
 |---|---|
-| Absent | **Pre-flight search by sync label**, then **Create** as child of `jira_epic` if no match. Writes `jira_key` back to file. |
+| Absent | **Pre-flight search by summary id**, then **Create** as child of `jira_epic` if no match. Writes `jira_key` back to file. |
 | Present | **Update** existing Jira story via atomic PUT. A Change Log row is written only if the status transitioned. |
 
 **Difference from `sync-jira-task`:** stories are **linked to a parent Jira epic** (required `jira_epic` frontmatter). Issue type sent as `Story`. Project style is auto-detected (team-managed `parent` field vs classic Epic Link customfield), with retry on the opposite linkage if Jira rejects the first attempt.
 
 ## Key features
 
-- **Idempotent create** — pre-flight JQL search by `synced-from-<story-dir>` label prevents duplicates if a previous POST left no `jira_key` in the file.
+- **Idempotent create** — pre-flight JQL search by the summary's `[Story N.N.N]` id prevents duplicates if a previous POST left no `jira_key` in the file.
 - **Atomic PUT** — uses `?returnIssue=true` so the fresh `updated` timestamp comes back in one round-trip.
 - **Parent linkage detection + retry** — detects team-managed (`parent`) vs classic (`customfield_10014` Epic Link) project style on create. If the first attempt is rejected with a 400 mentioning `parent`/`epic_link`/`customfield_10014`, retries with the opposite field.
 - **No-change fast path** — if no fields changed, the Jira PUT is skipped entirely. Pass `--force` to push the update anyway; a forced sync re-publishes the description, which is what makes it a repair for a card someone edited in the Jira UI.
@@ -101,7 +101,7 @@ story_type: 'feature_enhancement'
 priority: 'high'
 estimated_effort_hours: 4          # → timetracking.originalEstimate (+ jira.devEstimateField if configured)
 status: '📋 Planned'                # emoji stripped, mapped to Jira transition
-labels: ['auth']                   # synced-from-* label appended automatically
+labels: ['auth']                   # sent exactly as written; no label is added
 assignee: '5b10a2844c20165700ede21g'
 components: ['Auth']
 fix_versions: ['1.0.0']
@@ -153,7 +153,7 @@ Flow:
 2. Verify `jira_epic` is present — exit with error if not.
 3. Resolve auth, Bitbucket repo URL + branch (current branch's upstream, falling back to the default branch), and load live Jira priorities.
 4. Resolve `epic_source` to a Bitbucket URL for the parent epic file.
-5. If `jira_key` absent: search for an issue carrying the file's `synced-from-*` label. If found, switch to update.
+5. If `jira_key` absent: search for an issue whose summary opens with the document's `[Story N.N.N]` id (or that carries the legacy `synced-from-*` label). If found, switch to update.
 6. Detect create vs update; on update fetch current state and run concurrent-edit guard.
 7. Diff `summary`, body hash, meta hash, priority, labels.
 8. **If diff empty (update path only):** skip the PUT, the file write-back, and the changelog entry. Status transition still runs, unless `--no-transition` is passed. Exit clean.
@@ -228,14 +228,16 @@ When creating, the script first runs:
 
 ```
 POST /rest/api/3/search/jql
-Body: { "jql": "project = \"RB\" AND labels = \"synced-from-story.1.1.2.slug\"", "fields": ["summary","updated"], "maxResults": 5 }
+Body: { "jql": "project = \"RB\" AND (summary ~ \"\\\"Story 1.1.2\\\"\" OR labels = \"synced-from-story.1.1.2.slug\")", "fields": ["summary","labels","updated"], "maxResults": 20 }
 ```
 
 > **Note**: this is the modern POST `/search/jql` endpoint. Atlassian deprecated the legacy GET `/rest/api/3/search` form on 1 May 2025 (returns `410 Gone` on migrated Jira Cloud tenants).
 
-If a matching issue exists (because a prior POST succeeded but the local file did not get its `jira_key` written), the script switches to update mode against that key. Every create automatically appends the `synced-from-<dir>` label to enable this lookup on subsequent runs.
+If a matching issue exists (because a prior POST succeeded but the local file did not get its `jira_key` written), the script switches to update mode against that key.
 
-If multiple issues carry the same sync label (duplicates from prior failed runs), the first match is adopted and a warning is emitted listing all keys — clean up the duplicates manually in Jira.
+**The guard is the summary's leading `[Story N.N.N]` id.** The text search only produces candidates (`summary ~` is tokenised and may over-match); the script then requires an exact, case-insensitive match on each returned summary's leading bracket id, so a near-miss is never adopted. The create adds no label. The legacy `synced-from-<dir>` label is still searched, read-only, so a card made by an older version is adopted rather than duplicated. Limits: a summary with no leading `[id]` has no guard (the script warns); a card whose summary was edited in Jira to drop the id is not found; Jira's text index is eventually consistent, so an immediate rerun may miss the card.
+
+If multiple issues match (duplicates from prior failed runs), the first match is adopted and a warning is emitted listing all keys — clean up the duplicates manually in Jira.
 
 ## Parent Linkage
 

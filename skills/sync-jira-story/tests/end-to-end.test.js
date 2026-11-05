@@ -103,13 +103,12 @@ test("a story synced twice reports no field changes and issues no second PUT", a
   const key = first.result.issueKey;
   assert.match(key, /^PROJ-\d+$/);
 
-  const syncLabel = (state.issues[key].fields.labels || []).find((l) =>
-    l.startsWith("synced-from-"),
-  );
-  assert.ok(
-    syncLabel,
-    "the create payload should carry a synced-from-* label — " +
-      "without it there is no divergence to test",
+  assert.deepEqual(
+    (state.issues[key].fields.labels || []).filter((l) =>
+      l.startsWith("synced-from-"),
+    ),
+    [],
+    "the create payload must not carry a synced-from-* label",
   );
 
   const before = fs.readFileSync(story, "utf-8");
@@ -368,5 +367,71 @@ test("a genuine remote edit still trips the concurrent-edit guard", async () => 
     () => runSync(root, story, fetchImpl, ["--quiet"]),
     /updated since last local sync/i,
     "the guard did not fire on a genuine remote edit — the fix disabled it",
+  );
+});
+
+// ===========================================================================
+// Idempotent create — the guard that replaced the synced-from-* label
+// ===========================================================================
+
+test("story: a create whose jira_key write-back was lost adopts the card, not a duplicate", async (t) => {
+  const { root, story } = repoWithStory();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const { state, fetchImpl } = fakeJira();
+
+  const first = await runSync(root, story, fetchImpl, ["--quiet"]);
+  assert.equal(Object.keys(state.issues).length, 1);
+
+  // The crash: Jira accepted the POST, the local write-back never happened.
+  fs.writeFileSync(
+    story,
+    fs.readFileSync(story, "utf-8").replace(/^jira_key:.*\n/m, ""),
+    "utf-8",
+  );
+  const posts = () =>
+    state.requests.filter(
+      (r) => r.method === "POST" && r.url.endsWith("/rest/api/3/issue"),
+    ).length;
+  assert.equal(posts(), 1);
+
+  const again = await runSync(root, story, fetchImpl, ["--quiet"]);
+  assert.equal(posts(), 1, "a second POST was made — the guard did not hold");
+  assert.equal(Object.keys(state.issues).length, 1);
+  assert.equal(again.result.issueKey, first.result.issueKey);
+});
+
+test("story: a legacy synced-from-* card is adopted by label and the label is stripped on the next PUT", async (t) => {
+  const { root, story } = repoWithStory();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const { state, fetchImpl } = fakeJira();
+
+  const first = await runSync(root, story, fetchImpl, ["--quiet"]);
+  const key = first.result.issueKey;
+  // Make it a pre-change card: legacy label present, summary no longer matches
+  // (so only the label can find it), local jira_key lost.
+  state.issues[key].fields.labels = ["synced-from-legacy-stem"];
+  state.issues[key].fields.summary = "Renamed in Jira, no bracket id";
+  fs.writeFileSync(
+    story,
+    fs.readFileSync(story, "utf-8").replace(/^jira_key:.*\n/m, ""),
+    "utf-8",
+  );
+  // The legacy label is derived from the document's own directory/stem.
+  const lib = require("../references/jira-sync.js");
+  assert.ok(typeof lib.findExistingByIdentity === "function");
+  const label = require("../scripts/sync-jira-story.js").legacySyncLabelFor(
+    story,
+  );
+  state.issues[key].fields.labels = [label];
+
+  const again = await runSync(root, story, fetchImpl, ["--quiet"]);
+  assert.equal(again.result.issueKey, key, "the legacy card was not adopted");
+  assert.equal(Object.keys(state.issues).length, 1);
+  assert.deepEqual(
+    (state.issues[key].fields.labels || []).filter((l) =>
+      l.startsWith("synced-from-"),
+    ),
+    [],
+    "the PUT replaces labels, so the legacy label must be gone",
   );
 });

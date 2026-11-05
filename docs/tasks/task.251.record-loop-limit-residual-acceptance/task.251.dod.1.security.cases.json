@@ -1,0 +1,74 @@
+[
+  {
+    "id": "legit-block-gate",
+    "direction": "legitimate",
+    "input": "schema: 1\ngate: CONCERNS\nhead: 'abc'\nupdated: '2026-11-02T00:00:00Z'\n\ntop_issues:\n  - id: 'X-1'\n    severity: medium\n    file: 'a.js'\n    finding: 'f'\n    status: open\n\nwaiver:\n  active: false\n",
+    "why": "Block-style CONCERNS gate with one open entry.",
+    "correct": "Accept and plan the edit.",
+    "spec_ref": "docs/tasks/task.251.record-loop-limit-residual-acceptance/task.251.record-loop-limit-residual-acceptance.md:148"
+  },
+  {
+    "id": "legit-flow-gate",
+    "direction": "legitimate",
+    "input": "schema: 1\ngate: CONCERNS\nhead: 'abc'\nupdated: '2026-11-02T00:00:00Z'\n\ntop_issues:\n  - {id: X, status: open}\n\nwaiver:\n  active: false\n",
+    "why": "Single-line flow entry with one plain status key.",
+    "correct": "Accept and plan the edit.",
+    "spec_ref": "docs/tasks/task.251.record-loop-limit-residual-acceptance/task.251.record-loop-limit-residual-acceptance.md:148"
+  },
+  {
+    "id": "duplicate-status-key",
+    "direction": "legitimate",
+    "input": "schema: 1\ngate: CONCERNS\nhead: 'abc'\nupdated: '2026-11-02T00:00:00Z'\n\ntop_issues:\n  - {id: X, status: open, status: open}\n\nwaiver:\n  active: false\n",
+    "why": "Repeated status key; every copy is waived.",
+    "correct": "Accept and plan the edit waiving every copy.",
+    "spec_ref": "docs/tasks/task.251.record-loop-limit-residual-acceptance/task.251.bug.6.flow-status-key-quoted-or-duplicated.md:43"
+  },
+  {
+    "id": "fail-gate",
+    "direction": "hostile",
+    "input": "schema: 1\ngate: FAIL\nhead: 'abc'\nupdated: '2026-11-02T00:00:00Z'\n\ntop_issues:\n  - {id: X, status: open}\n\nwaiver:\n  active: false\n",
+    "why": "A FAIL gate is never waived.",
+    "correct": "Refuse (fail-gate); write nothing.",
+    "spec_ref": "docs/tasks/task.251.record-loop-limit-residual-acceptance/task.251.record-loop-limit-residual-acceptance.md:145"
+  },
+  {
+    "id": "multi-line-flow-entry",
+    "direction": "hostile",
+    "input": "schema: 1\ngate: CONCERNS\nhead: 'abc'\nupdated: '2026-11-02T00:00:00Z'\n\ntop_issues:\n  - {id: X,\n     status: open}\n\nwaiver:\n  active: false\n",
+    "why": "Flow mapping closes on a later line.",
+    "correct": "Refuse (unreadable-gate); write nothing.",
+    "spec_ref": "docs/tasks/task.251.record-loop-limit-residual-acceptance/task.251.bug.5.flow-extent-guessed-from-brace-characters.md:56"
+  },
+  {
+    "id": "nested-map-multi-line-flow-entry",
+    "direction": "hostile",
+    "input": "schema: 1\ngate: CONCERNS\nhead: 'abc'\nupdated: '2026-11-02T00:00:00Z'\n\ntop_issues:\n  - {id: X, a: {b: 1},\n     status: open}\n\nwaiver:\n  active: false\n",
+    "why": "Nested map closes on the dash line, outer mapping closes later.",
+    "correct": "Refuse (unreadable-gate); write nothing.",
+    "spec_ref": "docs/tasks/task.251.record-loop-limit-residual-acceptance/task.251.bug.5.flow-extent-guessed-from-brace-characters.md:56"
+  },
+  {
+    "id": "comment-brace-multi-line-flow-entry",
+    "direction": "hostile",
+    "input": "schema: 1\ngate: CONCERNS\nhead: 'abc'\nupdated: '2026-11-02T00:00:00Z'\n\ntop_issues:\n  - {id: X, # note }\n     status: open}\n\nwaiver:\n  active: false\n",
+    "why": "A brace inside a comment is not a closing brace.",
+    "correct": "Refuse (unreadable-gate); write nothing.",
+    "spec_ref": "docs/tasks/task.251.record-loop-limit-residual-acceptance/task.251.bug.5.flow-extent-guessed-from-brace-characters.md:56"
+  },
+  {
+    "id": "quoted-status-key",
+    "direction": "hostile",
+    "input": "schema: 1\ngate: CONCERNS\nhead: 'abc'\nupdated: '2026-11-02T00:00:00Z'\n\ntop_issues:\n  - {id: X, \"status\": open}\n\nwaiver:\n  active: false\n",
+    "why": "A quoted key is not read by the shared reader, so the edit cannot be confirmed.",
+    "correct": "Refuse (unreadable-gate); write nothing.",
+    "spec_ref": "docs/tasks/task.251.record-loop-limit-residual-acceptance/task.251.bug.6.flow-status-key-quoted-or-duplicated.md:45"
+  },
+  {
+    "id": "empty-gate",
+    "direction": "hostile",
+    "input": "",
+    "why": "An empty gate has no readable verdict.",
+    "correct": "Refuse (unreadable-gate); write nothing.",
+    "spec_ref": "docs/tasks/task.251.record-loop-limit-residual-acceptance/task.251.record-loop-limit-residual-acceptance.md:145"
+  }
+]

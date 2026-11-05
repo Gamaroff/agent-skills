@@ -161,10 +161,11 @@ Declining conditions, each reported with its reason:
 | `unknown-sink` | No corpus for that sink. `corpusFor` throws rather than returning `[]`, deliberately. |
 | `bad-cases` | A supplied case is not an object, its `direction` is not `hostile` or `legitimate`, or its `sink` is set and is not a known sink. A `null` sink counts as absent. The CLI refuses the same input with exit 2. |
 | `entry-not-probeable` | The module would not import, the export is absent, or it is not a function. An **absent** export is a module-private predicate: export it and re-run — never a reason for `boundary: false` (obs #156). For `fence:`: the heading is not in the doc, appears twice, or has no ```` ```bash ```` block under it. |
+| `entry-not-probeable`, the uniform-failure shape | Every case failed before reaching the control (task 256). At least one hostile and one legitimate case ran, every hostile case read `accepted`, every legitimate case read `rejected`, and within each shell they share one non-zero exit (not 126 or 127) and one non-empty stderr, after removing the sandbox path, `fixture-XXXXXX` and `fence-N.sh`. The usual cause is a wrong entry form: a multi-flag script under `shell:`, which passes the fixture as one positional argument. Use `shell-argv:` with an `--argv` template. A run that reached `gh` stays `needs-fake-gh`. **Four shapes stay scored, and these are limits, not guarantees:** a usage error quoting the input, a corpus with hostile cases only, exit 126 or 127, and a failure with no stderr. |
 | `case-errored` | One case timed out or its child never ran. |
 | `bad-args` | `--args-json` is not a JSON array, or was given with a `shell:` / `shell-fn:` / `cli:` / `shell-argv:` / `fence:` entry, which cannot append an argument to a call. |
 | `bad-slot` | A `fence:` entry with no `--slot`, a `--slot` the block does not contain (a slot that substitutes nothing tests nothing), or a `--slot` given with any other form. |
-| `bad-fixture-setup` | A `--fixture-setup` given with any form but `shell-argv:`, or one outside the containment root, under `node_modules`, or not a readable regular file. |
+| `bad-fixture-setup` | A `--fixture-setup` given with any form but `cli:` and `shell-argv:`, or one outside the containment root, under `node_modules`, not a readable regular file, or (on `cli:`) naming `gh`. |
 
 ### `boundary: internal` is a decision, not a verdict
 
@@ -550,11 +551,22 @@ takes it.
   files create, each declined by name — plus the form's own: **`PATH`,
   `NODE_OPTIONS` and any `LD_*` or `DYLD_*` variable** (the dynamic loader's,
   matched by prefix and case-sensitively), which steer the interpreter the form runs (`PATH` selects the `python3` binary; the others
-  load code before the entry) rather than the CLI under probe. `--fixture-setup`
-  stays `shell-argv:`'s, so two things are not yet reachable on `cli:`: a
-  directory too large to inline, and **repository state** — `fixture.files`
-  writes text files, which make no commit and no staged index, so a CLI that
-  reads committed or staged state still refuses every case.
+  load code before the entry) rather than the CLI under probe. **Repository
+  state** — a commit, a staged index — is reached with `--fixture-setup <path>`
+  (task.254), because `fixture.files` writes text files, which make no commit: a
+  committed script run as `bash <setup> <case-dir>` after the case's files and
+  before the CLI, contained, watched and failing exactly as the `shell-argv:`
+  form's setup does (one helper, `runCaseSetup`). On `cli:` a setup that names
+  `gh` is declined `bad-fixture-setup`, since this form has no `--fake-gh`. That
+  text check is the fast path; the guarantee is at run time (task.255): the
+  setup, and only the setup, runs under the same trip-wire `gh` first on `PATH`
+  and the same `PATH` filtering (`ghFreePath`) as the shell forms, so a spelling
+  the scan misses (`a=g; b=h; "$a$b"`) is declined `needs-fake-gh`, naming the
+  setup, with nothing scored. The CLI entry's own `PATH` is unchanged. The
+  trip-wire's stated limits carry over unchanged: an absolute path to a real
+  `gh`, a `PATH` the script itself prepends, and a call backgrounded past the
+  spawn.
+  A directory too large to inline is the one thing still not reachable on `cli:`.
 
   **`shell-argv:path --argv '<JSON array>'` runs a bash script that takes
   several arguments or flags** (task.181) — `verify-push-state.sh --base …
@@ -584,8 +596,10 @@ takes it.
     needs scratch space makes it inside `"$1"`. The entry's own runs are watched
     beside the case directory as `fence:`'s are, so a write to a sibling case or
     a deletion in the harness is an escape.
-    `--fixture-setup` with any other form is exit 2, `bad-fixture-setup`; the
-    record carries it as `fixture_setup`.
+    `--fixture-setup` is also valid with the Node and Python CLI form (task.254), with the same
+    containment, write watch and failure rule; with `shell:`, `shell-fn:`,
+    `fence:` or the JS form it is exit 2, `bad-fixture-setup`; the record carries
+    it as `fixture_setup`.
   - **A case's `fixture`** (`env`, `files`) is honoured exactly as `fence:`
     honours it, and is written **before** the setup runs, so the setup may rely
     on it.
@@ -682,7 +696,8 @@ entry form reaches) is not exempt from being tested; it is exempt from the
 *engine*. **Reach for this only after the entry forms have been tried** — a
 one-argument script is `shell:`'s job, a shell script taking several arguments
 or flags is `shell-argv:`'s (with `--fixture-setup` when it needs a
-repository), a Node or Python CLI driven by its argv is `cli:`'s and a fenced bash block
+repository), a Node or Python CLI driven by its argv is `cli:`'s (with `--fixture-setup` when it
+reads repository state) and a fenced bash block
 in a step doc is `fence:`'s, and a by-hand probe of any of them is the self-report the engine
 exists to remove. A `cli:` probe exercises **one arm**
 — the CLI's own argv; the other arms below (a wrapper, an env-var path) still

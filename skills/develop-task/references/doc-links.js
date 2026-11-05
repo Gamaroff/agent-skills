@@ -179,13 +179,26 @@ function scanLinks(text, keep) {
   const fenced = blankFences(text.replace(/\r\n?/g, "\n"));
   const clean = blankCodeSpans(fenced.text);
   const out = [];
-  const push = (target, index) => {
+  // `line` is where the link opens. `targetLine` is where its target text sits, and is present
+  // only when that is a later line (a link whose text spans a newline): every existing caller
+  // reads `line` and sees no change, and a caller that edits the target reads `targetLine`.
+  const push = (target, index, targetIndex = index) => {
     if (target === undefined || target === "" || !keep(target)) return;
-    out.push({ target, line: lineOf(clean, index) });
+    const line = lineOf(clean, index);
+    const targetLine = lineOf(clean, targetIndex);
+    out.push(
+      targetLine === line ? { target, line } : { target, line, targetLine },
+    );
   };
   let m;
   INLINE_LINK_RE.lastIndex = 0;
-  while ((m = INLINE_LINK_RE.exec(clean)) !== null) push(m[1] ?? m[2], m.index);
+  while ((m = INLINE_LINK_RE.exec(clean)) !== null) {
+    const target = m[1] ?? m[2];
+    // The target follows the last `](` of the match; search from there, not from the `[`.
+    const open = m[0].lastIndexOf("](");
+    const at = target ? m[0].indexOf(target, open < 0 ? 0 : open) : -1;
+    push(target, m.index, at < 0 ? m.index : m.index + at);
+  }
   HTML_ATTR_RE.lastIndex = 0;
   while ((m = HTML_ATTR_RE.exec(clean)) !== null) push(m[1] ?? m[2], m.index);
   let offset = 0;

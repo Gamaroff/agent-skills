@@ -6,7 +6,7 @@
  * Standalone (no parent epic). Uses Jira REST API v3 with ADF.
  *
  * Features:
- *   - Idempotent create via "synced-from-*" label pre-flight search
+ *   - Idempotent create via a pre-flight search on the summary's [Task N] id
  *   - Atomic PUT via ?returnIssue=true
  *   - Concurrent-edit guard (--force override)
  *   - Field-level diff with split body/meta hashes
@@ -181,7 +181,10 @@ function findRelatedDocs(filePath) {
 // ---------------------------------------------------------------------------
 // Sync label
 // ---------------------------------------------------------------------------
-function syncLabelFor(filePath) {
+// LEGACY, lookup only: nothing writes this label any more. It is still searched
+// so a card created before the label was dropped is adopted rather than
+// duplicated when its document lost its `jira_key`.
+function legacySyncLabelFor(filePath) {
   const dir = path.basename(path.dirname(filePath));
   return SYNC_LABEL_PREFIX + dir.replace(/\s+/g, "-");
 }
@@ -219,7 +222,6 @@ function collectIssueFields({
   projectKey,
   livePriorities,
   output,
-  syncLabel,
 }) {
   const priority = lib.normalisePriority(
     args.priority || frontmatter.priority,
@@ -228,7 +230,6 @@ function collectIssueFields({
   );
   const labelInput = args.labels || frontmatter.labels;
   const cleanLabels = lib.sanitiseLabels(labelInput) || [];
-  if (!cleanLabels.includes(syncLabel)) cleanLabels.push(syncLabel);
 
   const fields = {
     summary,
@@ -598,7 +599,7 @@ async function run({
         })
       : null;
 
-  const syncLabel = syncLabelFor(filePath);
+  const legacyLabel = legacySyncLabelFor(filePath);
   const newBodyHash = hashBody({
     body,
     taskBbUrl,
@@ -611,17 +612,19 @@ async function run({
 
   // Pre-flight idempotency check (only if creating)
   if (!existingJiraKey && auth.ok && !args.dryRun) {
-    const found = await lib.findExistingByLabel({
+    const found = await lib.findExistingByIdentity({
       http,
       baseUrl: auth.baseUrl,
       email: auth.email,
       token: auth.token,
       projectKey: auth.project,
-      label: syncLabel,
+      summary,
+      legacyLabel,
+      output,
     });
     if (found) {
       output.warn(
-        `ℹ️  Found existing issue ${found.key} with label "${syncLabel}" — switching to update.`,
+        `ℹ️  Found existing issue ${found.key} for "${lib.leadingBracketId(summary)}" — switching to update.`,
       );
       existingJiraKey = found.key;
     }
@@ -668,11 +671,11 @@ async function run({
 
     // Build the payload FIRST, then diff against the set actually being sent.
     //
-    // The diff used to rebuild `labels` from frontmatter here, which can never
-    // match: `collectIssueFields` appends the `synced-from-*` idempotency label
-    // to the set it sends, so the comparison was always a set-without-the-label
-    // against a Jira issue that has it. `labels` was reported changed on every
-    // run.
+    // The diff used to rebuild `labels` from frontmatter here, which could
+    // never match while `collectIssueFields` appended a `synced-from-*` label
+    // to the set it sent. That label is gone, but the rule stands: diff the
+    // payload actually sent. A legacy card still holding the label shows one
+    // label change, and the PUT (which REPLACES labels) strips it.
     const descAdf = buildDescriptionAdf({
       body,
       frontmatter,
@@ -690,7 +693,6 @@ async function run({
       projectKey: null,
       livePriorities,
       output,
-      syncLabel,
     });
 
     const changedFields = lib.diffAgainstPayload({
@@ -809,7 +811,6 @@ async function run({
       output.info(`\n=== DRY RUN — Would CREATE Jira task ===`);
       output.info(`  Project:  ${auth.project || "(unset)"}`);
       output.info(`  Summary:  ${summary}`);
-      output.info(`  Label:    ${syncLabel}`);
       result = { issueKey: null, issueUrl: null, updated: null };
     } else {
       const taskTypeId = await lib.getIssueTypeId({
@@ -830,7 +831,6 @@ async function run({
         projectKey: auth.project,
         livePriorities,
         output,
-        syncLabel,
       });
 
       const postHeaders = {
@@ -861,8 +861,8 @@ async function run({
       let resp = await postCreate(fields);
       if (resp.deferred) {
         // The create null shape — identical to --dry-run. NEVER a placeholder
-        // key: one would break the idempotent synced-from-* label search and
-        // the next run would create a duplicate.
+        // key: one would break the idempotent summary-id search and the next
+        // run would create a duplicate.
         deferred = true;
         deferredRecord = resp.deferredRecord;
         result = { issueKey: null, issueUrl: null, updated: null };
@@ -1060,7 +1060,7 @@ if (require.main === module) {
     buildDescriptionAdf,
     hashBody,
     hashMeta,
-    syncLabelFor,
+    legacySyncLabelFor,
     normaliseTaskSummary,
     mapStatus: lib.mapStatus,
     loadStatusMap: lib.loadStatusMap,

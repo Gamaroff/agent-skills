@@ -1,0 +1,77 @@
+schema: 2
+task: 'task.250.security-probe-scratch-out-of-tree'
+task_title: 'Security-probe tests write no scratch files into the repository'
+gate: CONCERNS
+status_reason: 'Every in-tree scratch site is converted and a watched run sees 0 in-tree creates, but the new guard''s stale-allowlist check is vacuous (CR-1, reproduced), and some temp roots can leak on a throw before try (CR-4).'
+reviewer: 'QA Engineer'
+head: '1a4750a2c7a5e9aafeb65b0bce017a3f9764ffcb'
+updated: '2026-11-02T18:30:56Z'
+
+top_issues:
+  - id: 'TASK-250-CR-1'
+    severity: medium
+    file: 'shared/resources/tests/security-probe.test.mjs'
+    finding: 'The T250_ALLOWED stale-entry check can never fail. The scanner also matches the write call written inside the allowlist key''s own string literal (line 8102), so every key satisfies itself. Reproduced: with the real __pycache__ rmSync (line 2992) changed to a tmpdir() path, the guard test still passes.'
+    suggested_action: 'Skip matches inside string and template literals when scanning (or build the key at run time), and add a calibration row with a write call inside a string literal that must not be counted.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-250-CR-4'
+    severity: low
+    file: 'shared/resources/tests/security-probe.test.mjs'
+    finding: 'Temp roots can leak when a call throws before a test''s try: t140Libs writes into its root after fenceRoot() with no cleanup of its own; fenceRoot''s cpSync can throw after mkdtempSync; several containment rows create outside dirs and scratch dirs before try.'
+    suggested_action: 'Clean up the root on a throw inside fenceRoot and t140Libs (try/rethrow), and move pre-try mkdtemp/mkdir calls inside try with null-guarded removals.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 276
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary: false
+    boundary_reason: 'Test-only change; no shipped code changed. Predicate-shaped functions added: t250InTreeWrites (input: this test file''s own source) and fenceRoot''s inside-repo refusal (input: its own mkdtemp result). Neither is reachable by external input, and no corpus sink models them.'
+    notes: 'The engine (security-probe.mjs) is unchanged. Containment tests now run against temp roots, and each was shown to fail under the wrong root.'
+  performance:
+    status: PASS
+    notes: 'Suite alone, interleaved base/head x3 under similar load (1.6-2.0): base median 31.60 s, head median 31.58 s, 0% change. Limit is +10%.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-4: a throw before try can leak a temp root. The tmp-leak ratchet was ok on ci:fast, so no leak occurs on the passing path.'
+  maintainability:
+    status: PASS
+    notes: 'One root builder (fenceRoot) and one wrapper (t140Libs). The .t140-* .gitignore rule that hid leftovers is removed.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-250-CR-1 so the stale-allowlist check can fail, and prove it with a mutation.'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+  future:
+    - action: 'CR-2 (advisory): widen the guard to any write argument that mentions REPO_ROOT (resolve(, path.join(, template literals), and add appendFileSync, copyFileSync, linkSync, openSync to T250_WRITE_ARG.'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+    - action: 'CR-3 (advisory): in the BUG-12 row, assert the PWNED-self escape path is under root and that the in-tree PWNED-self does not exist after the run.'
+      refs: ['shared/resources/tests/security-probe.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'TASK-250-CR-1 fixed and re-gated'

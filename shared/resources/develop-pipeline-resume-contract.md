@@ -686,6 +686,45 @@ This convention ensures the cycle budget is respected across resumes.
    `evals/shared/tests/qa-loop-lock-fields-parity.test.mjs` fails when any file disagrees. **Do not
    reuse `MAX_ITER`**: that is the Step 3 develop-loop bound (below), a different budget over a
    different loop.
+3b. **Offer the acceptance — loop limit only (task.251).** When `halt_reason` matches `loop-limit`
+   (never `not-converging`, whose findings the halt says are **not** accepted), the same Phase 0b
+   prompt also offers **"Accept the residual"** — HALT option 2. It is the grant's sibling for the
+   opposite decision: the owner accepts the open findings instead of paying for more cycles. On
+   accept, record it with **one call** to the bundled writer, after step 2's back-fill:
+
+   ```bash
+   bash .agents/skills/{develop-story|develop-task}/references/accept-qa-residual.sh \
+     {doc-directory} {implementation-report-path} \
+     "$(git config user.name)" "{the owner's reason, or: residual accepted at the loop-limit escalation}"
+   ```
+
+   Source: `accept-qa-residual.sh` (the lock) and `accept-qa-residual.js` (the gate and the report);
+   suites: `accept-qa-residual.test.sh` and `tests/accept-qa-residual.test.mjs`. It records the
+   decision in one place, the place the readers already read — the reason the grant has one writer:
+
+   - **The gate.** The highest gate becomes `WAIVED` with an active `waiver:` (`reason`,
+     `approved_by`, `approved_at`), each open finding is stamped `status: waived`, and `updated:` is
+     set from the clock; `head:` and every other line are unchanged. `develop-next` / `develop-batch`
+     Step 3 then read no open entry, and `/finalise` writes the `**Waiver**` line from the block.
+   - **The report.** The highest gate's `### QA Cycle {N}` entry moves to
+     `**Action**: Proceeding to 5c (PR conformance review)` with a `**Loop exit**` row naming the
+     decision, plus one Decisions Log line. The 5c lens's trail rule reads that Action.
+   - **The lock.** Restored through `advance-pipeline-lock.sh --restore` when the HALT removed it,
+     then `qa_phase: 5c` in one atomic write — no other field.
+
+   Read the JSON `reason` it prints first: `accepted` or `already` → the run resumes at **5c**, then
+   leaves the loop on the existing `WAIVED` → 5c route. Any other `reason` exits non-zero with
+   nothing written and no lock restored — `fail-gate` (a waiver never masks a failure),
+   `no-loop-limit` (the cycle did not escalate at the limit), `no-report-entry` (step 2's back-fill
+   did not run), `unreadable-gate`, `nothing-to-accept`, `no-gate` — and the run returns to the halt
+   message's options, exactly as a declined grant does. Log in the Decisions Log: "QA residual
+   accepted at the loop-limit escalation: {reason}; re-entering at 5c."
+
+   The states it holds in are the task's (task.251 Phase 1): a fresh re-invocation (no lock) and an
+   in-place continuation (lock present); a cycle the operator ran by hand after the HALT (its
+   back-filled entry is accepted when the escalation before it was the loop limit); a Stop between
+   its gate and report writes (the re-run finishes the report); and a Step 5c REQUEST CHANGES after
+   an acceptance, which re-escalates on the spent budget and may be accepted again (report only).
 4. **Re-enter at the phase the grant printed (`reenter_at`), and report it from that line.**
    `reenter_at=5b` → tell the operator "re-entering at 5b: fix first"; `reenter_at=5a` → "re-entering
    at 5a: review first". Report what the script printed; do not restate the rule that picks it.

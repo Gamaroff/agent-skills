@@ -1,0 +1,67 @@
+schema: 2
+task: 'task.260.ai-system-assessment-skill'
+task_title: 'ai-system-assessment skill'
+gate: CONCERNS
+status_reason: 'The skill, signal harness and 12 tests are sound and mutation-proved. One MEDIUM finding: CHANGELOG.md [Unreleased] has no entry citing task 260, which /finalise 6d halts on.'
+reviewer: 'QA Engineer'
+head: '3c1838b41ce3d2fe26fa6feed2d0020a23773d17'
+updated: '2026-11-04T21:15:30Z'
+
+top_issues:
+  - id: 'T260-QA-1'
+    severity: medium
+    file: 'CHANGELOG.md'
+    finding: 'No [Unreleased] entry cites (task 260). changelog-cites.sh task.260 reports "missing (task 260)", and /finalise step 6d halts without it.'
+    suggested_action: 'Add an Added entry under [Unreleased] describing the ai-system-assessment skill and citing (task 260).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 12
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [5]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    escaped: 0
+    boundary_signals: []
+    notes: 'The skill is read-only by rule and the harness only lists and reads files under the root it is given. No boundary function: parseSignals and runSignal report a result, they do not accept or reject an action. Tree-hash test holds the no-write property.'
+  performance:
+    status: PASS
+    notes: 'Test file runs in about 90 ms. The harness walks the whole target once per signal, which is fine for a test fixture.'
+  reliability:
+    status: PASS
+    notes: 'Tests pass under CI=true and under TMPDIR=/tmp. Prettier, validate and quick_validate are clean.'
+  maintainability:
+    status: PASS
+    notes: 'SKILL.md is under 300 lines, loads one checklist at a time, and an EXPECT table forces every new signal to state its fixture result.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Add the CHANGELOG [Unreleased] entry citing (task 260).'
+      refs: ['CHANGELOG.md']
+  future:
+    - action: 'Widen p2-drift-test (tests/**/*drift*) and p3-tool-fakes (tests/**/fake*): on this repository they miss evals/shared/tests/*parity*.test.mjs and shared/resources/fake-jira.js. The rubric already requires a behaviour search before a Gap, so this is a false-lead cost, not a wrong rating.'
+      refs: ['skills/ai-system-assessment/references/p2-grounding.md', 'skills/ai-system-assessment/references/p3-tools.md']
+    - action: 'Tighten noisy p4 and p7 signals (p4-permission-modes returned 477 files, p7-decision-log 240 on this repository). Leads only; the rubric tells the reader to discard changelog and plan hits.'
+      refs: ['skills/ai-system-assessment/references/p4-access-control.md', 'skills/ai-system-assessment/references/p7-observability.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CHANGELOG entry citing task 260'

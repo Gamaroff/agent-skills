@@ -1,0 +1,9 @@
+[
+  {
+    "id": "legit-entry-path-clean",
+    "input": "ok",
+    "direction": "legitimate",
+    "correct": "Accepted: the guard belongs to the --fixture-setup alone, never to the entry, so the entry's PATH must not name .probe-harness.",
+    "spec_ref": "docs/tasks/task.255.probe-engine-cli-setup-gh-isolation/task.255.probe-engine-cli-setup-gh-isolation.md:200"
+  }
+]

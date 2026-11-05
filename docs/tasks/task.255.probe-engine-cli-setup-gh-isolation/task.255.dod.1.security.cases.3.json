@@ -1,0 +1,9 @@
+[
+  {
+    "id": "legit-clean-input-printf",
+    "input": "ok",
+    "direction": "legitimate",
+    "correct": "Same as control 1, for the printf-built spelling.",
+    "spec_ref": "docs/tasks/task.255.probe-engine-cli-setup-gh-isolation/task.255.probe-engine-cli-setup-gh-isolation.md:200"
+  }
+]

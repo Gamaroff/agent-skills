@@ -1,0 +1,71 @@
+schema: 2
+task: 'task.251.record-loop-limit-residual-acceptance'
+task_title: 'Record a loop-limit residual acceptance in one writer'
+gate: CONCERNS
+status_reason: 'Cycle 1 findings are fixed and verified. The refute pass found one more medium defect in the same line-preserving YAML edit: an entry whose dash line opens a flow mapping that closes on a later line is edited into invalid YAML and reported as accepted.'
+reviewer: 'QA Engineer'
+head: '41f31595060ad1b5f7e02a15928218a908a69e4e'
+updated: '2026-11-03T06:45:17Z'
+
+top_issues:
+  - id: 'T251-CR2-1'
+    severity: medium
+    file: 'shared/resources/accept-qa-residual.js'
+    finding: 'waiveEntry takes the flow branch only when the dash line also holds the closing "}", so a multi-line flow entry (`- {id: X,` then `status: open}`) falls into the block branch: the real status line is left as-is, a stray `status: waived` line is inserted after the entry, and planGateEdit returns edit with ok true because the loose reader still reads the result as waived (reproduced; the single-line flow control is correct).'
+    suggested_action: 'Refuse (unreadable-gate, nothing written) any entry whose dash line opens "{" without closing it on the same line; add a refusal test for it and keep the single-line flow control.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 92
+
+evidence:
+  tests_reviewed: 32
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 6
+    escaped: 0
+    boundary: true
+    boundary_signals: ['refused', 'refuses']
+    notes: 'Probe engine on planReportEdit with the committed cases file (1 legitimate report accepted, 5 refusals rejected): verdict engages, 6 executed, 0 escaped. Cycle 1 hostile-string findings are fixed (approver and reason folded to one line). Open: T251-CR2-1, the multi-line flow gate entry.'
+  performance:
+    status: PASS
+    notes: 'Writer 0.047 s on the task.250 gate and report; no new loops.'
+  reliability:
+    status: CONCERNS
+    notes: 'T251-CR2-1 is a path that reports success on a corrupted gate. Low: no timeout on the qa-cycle.sh spawn (CR-2); the re-run after a Stop between the two writes loses the waived ids in the log line (CR-3).'
+  maintainability:
+    status: PASS
+    notes: 'Thin ok wrappers over unchanged planners; bundled copies in sync.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T251-CR2-1 with a refusal test (multi-line flow entry) and keep the single-line flow control green.'
+      refs: ['shared/resources/accept-qa-residual.js', 'shared/resources/tests/accept-qa-residual.test.mjs']
+  future:
+    - action: 'CR-2 (low): add a timeout to the qa-cycle.sh spawnSync and map a timeout to engine-unavailable.'
+      refs: ['shared/resources/accept-qa-residual.js']
+    - action: 'CR-3 (low/low): on a re-run after a Stop, the Decisions Log line says "none newly waived" instead of listing the ids the first run waived.'
+      refs: ['shared/resources/accept-qa-residual.js']
+    - action: 'readKeysInto stops a quoted value at "}" (pre-existing, outside this change).'
+      refs: ['shared/resources/qa-diminishing-returns.js']
+      provenance: pre-existing
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T251-CR2-1 fixed and re-verified']

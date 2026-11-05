@@ -1,0 +1,44 @@
+[
+  {
+    "id": "legit-loop-limit-report",
+    "direction": "legitimate",
+    "input": "# R\n\n## Decisions Log\n\n- startup\n\n---\n\n## QA Iteration History\n\n### QA Cycle 5 — 2026-11-02\n**Gate Result**: CONCERNS\n**Loop exit**: n/a — this exit not taken\n**Action**: Escalating — loop limit reached\n\n---\n\n## Completion\n",
+    "why": "A report whose cycle 5 entry escalated at the loop limit is the one input the planner may edit.",
+    "correct": "Accept and plan the edit."
+  },
+  {
+    "id": "no-cycle-entry",
+    "direction": "hostile",
+    "input": "# R\n\n## Decisions Log\n\n- startup\n\n---\n\n## QA Iteration History\n\n---\n\n## Completion\n",
+    "why": "No QA Cycle entry: nothing records that the loop limit was reached.",
+    "correct": "Refuse (no-report-entry); write nothing."
+  },
+  {
+    "id": "not-escalated",
+    "direction": "hostile",
+    "input": "# R\n\n## Decisions Log\n\n- startup\n\n---\n\n## QA Iteration History\n\n### QA Cycle 5 — 2026-11-02\n**Gate Result**: CONCERNS\n**Loop exit**: n/a — this exit not taken\n**Action**: Running qa-fix (cycle 5 of 5)\n\n---\n\n## Completion\n",
+    "why": "The loop never escalated: an acceptance here would waive a gate that is still being fixed.",
+    "correct": "Refuse (no-loop-limit); write nothing."
+  },
+  {
+    "id": "no-decisions-log",
+    "direction": "hostile",
+    "input": "# R\n\n## QA Iteration History\n\n### QA Cycle 5 — 2026-11-02\n**Gate Result**: CONCERNS\n**Loop exit**: n/a — this exit not taken\n**Action**: Escalating — loop limit reached\n\n---\n\n## Completion\n",
+    "why": "No Decisions Log to append the acceptance to: the edit would be half-recorded.",
+    "correct": "Refuse (report-malformed); write nothing."
+  },
+  {
+    "id": "wrong-cycle-only",
+    "direction": "hostile",
+    "input": "# R\n\n## Decisions Log\n\n- startup\n\n---\n\n## QA Iteration History\n\n### QA Cycle 4 — 2026-11-02\n**Gate Result**: CONCERNS\n**Loop exit**: n/a — this exit not taken\n**Action**: Escalating — loop limit reached\n\n---\n\n## Completion\n",
+    "why": "The escalation sits on cycle 4 but the gate being accepted is cycle 5.",
+    "correct": "Refuse (no-report-entry); write nothing."
+  },
+  {
+    "id": "empty-report",
+    "direction": "hostile",
+    "input": "",
+    "why": "An empty report.",
+    "correct": "Refuse; write nothing."
+  }
+]
