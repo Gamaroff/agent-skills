@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`sync-jira-*` no longer strips a card's Source Documents links when the Bitbucket remote is
+  spelled differently** (task 264). `getBitbucketRepoBase` rewrote only `git@bitbucket.org:`; the
+  other six shapes Bitbucket Cloud serves (`git@ssh.bitbucket.org:`, `https://user@bitbucket.org/`,
+  `ssh://git@bitbucket.org/`, `ssh://git@ssh.bitbucket.org/`, `ssh://git@altssh.bitbucket.org:443/`)
+  returned null, and an update with a null base wrote the description without its links. A pure
+  `parseBitbucketRemote` now reads all of them with an exact host match, dropping any userinfo. And
+  when the base still cannot be derived, an **update** of an existing card now exits non-zero before
+  any write (`--dry-run` included) with the exact `BITBUCKET_REPO_URL=` line to set; a **create** keeps
+  its warning. Bitbucket Server / Data Center hosts still need `BITBUCKET_REPO_URL`.
+
 - **The "Bound the derived path" block refuses a parent it cannot resolve** (task 263). When the
   parent directory of a path read from an issue body did not resolve, the block skipped its real-path
   check and relied on the later read failing. It now judges the nearest ancestor that exists: a link

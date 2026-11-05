@@ -631,6 +631,13 @@ async function run({
   }
 
   const isUpdate = !!existingJiraKey;
+  // Task 264: an update with no Bitbucket base rewrites the card without its Source
+  // Documents links. Stop before any write — --dry-run included, so a plan is never clean.
+  // After `isUpdate`, because the pre-flight above can turn a create into an update.
+  if (isUpdate && !bbBase) {
+    output.err(lib.missingBitbucketBaseMessage(existingJiraKey));
+    return { exitCode: 1 };
+  }
   output.info(
     `\n${isUpdate ? "🔄 Updating" : "➕ Creating"} Jira task${isUpdate ? ` ${existingJiraKey}` : ""}…`,
   );

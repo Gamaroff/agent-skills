@@ -76,7 +76,7 @@ The script auto-loads `<repo-root>/.env`. Shell exports take precedence.
 
 | Variable | Description |
 |---|---|
-| `BITBUCKET_REPO_URL` | Override Bitbucket base URL (auto-detected from git remote) |
+| `BITBUCKET_REPO_URL` | Override Bitbucket base URL. Auto-detected from `git remote` for `bitbucket.org`, `ssh.bitbucket.org` and `altssh.bitbucket.org` (scp-style, `ssh://`, `https://`); any other host needs this variable |
 | `JIRA_EPIC_LINK_FIELD` | Custom field id for the classic "Epic Link" field. Defaults to `customfield_10014`. Only used on classic projects. |
 | `JIRA_DEV_ESTIMATE_FIELD` | Custom field id to mirror `estimated_effort_hours` into (e.g. `customfield_10594`). Takes precedence over `jira.devEstimateField` in `skills-config.yaml`. Unset → not written. |
 
@@ -372,7 +372,7 @@ On error: `{ "error": "<message>" }` and a non-zero exit code.
 | Missing env vars (live) | Add to `.env` and retry |
 | Missing env vars (dry-run) | Warning only — preview proceeds |
 | `epic_source` not resolvable | If the existing frontmatter already has an `epic_bitbucket_url`, that value is reused for the **Jira** link (so it is preserved across moves of the parent epic file). The relative `**Epic File**` body line is omitted, since there is no path to compute it from. Sync continues. |
-| Bitbucket URL not detected | Set `BITBUCKET_REPO_URL`; links omitted but sync continues |
+| Bitbucket URL not detected | Set `BITBUCKET_REPO_URL`. An **update stops with an error** before writing (it would drop the card's Source Documents links); a **create warns** and omits the links |
 | File not found | Verify story file path |
 | `401 Unauthorized` | Verify `JIRA_USER_EMAIL` and `JIRA_API_TOKEN` |
 | `403 Forbidden` | Token lacks permission for issue/project |

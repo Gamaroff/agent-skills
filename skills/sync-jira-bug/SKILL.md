@@ -65,7 +65,7 @@ docs/bugs/bug.{N}.{name}/bug.{N}.{name}.md                # general bug
 | --- | --- |
 | `JIRA_SEVERITY_FIELD` | Custom field id to receive the bug's severity as a select option. Also readable as `jira.severityField` in `skills-config.yaml`. Unset → severity travels in the description's Metadata line only. |
 | `JIRA_DEFAULT_ASSIGNEE` | Fallback assignee accountId. Frontmatter `assignee` overrides it. |
-| `BITBUCKET_REPO_URL` | Repo base for document links, when it cannot be derived from `git remote`. |
+| `BITBUCKET_REPO_URL` | Repo base for document links, when it cannot be derived from `git remote`. The remote is read for the hosts `bitbucket.org`, `ssh.bitbucket.org` and `altssh.bitbucket.org` (scp-style, `ssh://` and `https://`); anything else needs this variable. With no base, an **update stops with an error before writing** (it would drop the card's Source Documents links); a **create warns** and omits links. |
 | `JIRA_DOC_BRANCH` | Pins the branch document links point at. Also `jira.docBranch` / `developNext.baseBranch`. |
 
 ### Bug file format
@@ -317,6 +317,7 @@ The three violation headings are one spec with an alias array, which is what kee
 | Parent document not found | Warns; the card links to the bug report only. |
 | Parent has no `jira_key` | Informational; document linked, card link deferred to a later re-sync. |
 | No usable issue link type | `no-link-type`; description links only. |
+| Bitbucket URL not derivable | An **update stops with an error** before any write, naming `BITBUCKET_REPO_URL` and the remote it read; set the variable and re-run. A **create warns** and omits the links. |
 | Jira rejects `JIRA_SEVERITY_FIELD` | Retries once without it, then proceeds. |
 | Jira issue updated since last sync | Aborts; re-run with `--force` to overwrite. |
 | `access.tracker` restricts the run | Create/update/link/transition recorded, not performed. No placeholder key is ever written. |
