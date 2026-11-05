@@ -34,8 +34,8 @@ Close the four advisory gaps left by task 261: CRLF in the fence regex, hostile-
 | 1. create-branch           | ✅ Done    | Branch `feature/task.262.*` exists in git                              | Branch created at `d3bdc536` | — | 2026-11-05T09:20Z |
 | 2. review-task             | ✅ Done    | `task.262.review.{N}.{name}.md` exists (or skip logged)               | READY TO IMPLEMENT 8/10; 3 fixes applied; status → ready-for-development | — | 2026-11-05T09:40Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (no /develop); 33 tests pass; ci:fast: only a load-sensitive file failed, green alone | — | 2026-11-05T10:10Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.262.qa.{N}.*.md`; `task.262.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | https://github.com/Gamaroff/agent-skills/pull/840 (no issue linked, so no comment) | — | 2026-11-05T10:12Z |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.262.qa.{N}.*.md`; `task.262.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 1 QA cycle, gate PASS 95; 5c APPROVE (1 low consistency note) | —                    | 2026-11-05T10:30Z |
 | 7. finalise                | ⏳ Pending | `task.262.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
@@ -91,6 +91,15 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-11-05
+**Gate Result**: PASS
+**Issues Found**: none gating; 2 advisory code-review notes (one refuted, one measured as not exploitable)
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
@@ -98,7 +107,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: feature/task.262.untrusted-content-path-bound-hardening
-**PR**: {populated after Step 4}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/840
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
