@@ -151,6 +151,7 @@ github_issue: 845
 | 2026-11-05 | In Progress | develop-bug | Reproduced; investigation started |
 | 2026-11-05 | Ready for QA | develop-bug | Fix implemented + regression tests L1–L3 |
 | 2026-11-05 | Ready for QA | develop-bug | Fix verified — bug scenario gone |
+| 2026-11-05 | Ready for QA | finalise | DoD verified — bug.20.dod.1.change-log-blank-date-row.md |
 
 ---
 
