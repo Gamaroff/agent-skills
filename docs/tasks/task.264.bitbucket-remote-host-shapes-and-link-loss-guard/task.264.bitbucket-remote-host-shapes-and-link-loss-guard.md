@@ -247,6 +247,27 @@ Sign-off is not enabled in this repository's `skills-config.yaml`; no rows are r
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-05
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.264.qa.1.bitbucket-remote-host-shapes-and-link-loss-guard.md](./task.264.qa.1.bitbucket-remote-host-shapes-and-link-loss-guard.md)
+- **Gate File**: [task.264.gate.1.bitbucket-remote-host-shapes-and-link-loss-guard.yml](./task.264.gate.1.bitbucket-remote-host-shapes-and-link-loss-guard.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 41
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues identified. Two LOW advisory notes are recorded in the gate's future recommendations.
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -257,6 +278,7 @@ Sign-off is not enabled in this repository's `skills-config.yaml`; no rows are r
 | 2026-11-05 | 1.1 | Review passed (8/10) — guard test must force a null base past fake-jira's pinned `BITBUCKET_REPO_URL`; latency criterion given its measuring command; `pr-read.sh` anchor corrected to line 100 | review-task |
 | 2026-11-05 |  | Status → ready-for-development | review-task |
 | 2026-11-05 |  | Implemented — 4 scripts, 1 engine file, 5 test files (36 new tests), 4 SKILL.md, CHANGELOG | develop |
+| 2026-11-05 |  | QA gate PASS (95/100) — 0 findings | qa-task |
 
 <!-- change-log-end -->
 
