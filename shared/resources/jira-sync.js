@@ -499,15 +499,22 @@ const BITBUCKET_HOSTS = new Set([
   "altssh.bitbucket.org",
 ]);
 
+// A remote split into [whole, host, path] across the URL and scp-style forms, or null. The one
+// place the two shapes are told apart, shared by the parser and the refusal message.
+function splitRemote(url) {
+  const s = String(url == null ? "" : url).trim();
+  return (
+    /^[a-z][a-z0-9+.-]*:\/\/(?:[^@/]+@)?([^/:@]+)(?::\d+)?\/(.+)$/i.exec(s) ||
+    /^(?:[^@/:]+@)?([^/:@]+):(?!\/\/)(.+)$/.exec(s)
+  );
+}
+
 // `https://bitbucket.org/<workspace>/<repo>` for any remote Bitbucket Cloud serves, else
 // null. Pure — no subprocess, no environment. Accepts scp-style (`git@host:ws/repo`),
 // `ssh://[user@]host[:port]/ws/repo` and `https://[userinfo@]host/ws/repo`; drops userinfo
 // and port, because a base must never carry a credential into a card.
 function parseBitbucketRemote(url) {
-  const s = String(url == null ? "" : url).trim();
-  const m =
-    /^[a-z][a-z0-9+.-]*:\/\/(?:[^@/]+@)?([^/:@]+)(?::\d+)?\/(.+)$/i.exec(s) ||
-    /^(?:[^@/:]+@)?([^/:@]+):(?!\/\/)(.+)$/.exec(s);
+  const m = splitRemote(url);
   if (!m || !BITBUCKET_HOSTS.has(m[1].toLowerCase())) return null;
   const segs = m[2]
     .replace(/\/+$/, "")
@@ -530,9 +537,22 @@ function missingBitbucketBaseMessage(existingJiraKey) {
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
   } catch (_) {}
-  const tail = /([^/:@\s]+)\/([^/:@\s]+?)(?:\.git)?\/*$/.exec(remote);
+  // The exact line is offered only for a Bitbucket Cloud host. For any other host (Server,
+  // Data Center, another forge) the last two path segments say nothing about a workspace and
+  // repo, so a derived line would look authoritative and be wrong: print the template instead.
+  const parts = splitRemote(remote);
+  const cloudHost = !!parts && BITBUCKET_HOSTS.has(parts[1].toLowerCase());
+  // A Cloud host that still failed to parse carries extra or missing path segments; its first
+  // two are the workspace and repo (`/ws/repo/src/main` → ws/repo).
+  const segs = cloudHost
+    ? parts[2]
+        .replace(/\/+$/, "")
+        .replace(/\.git$/, "")
+        .split("/")
+    : [];
+  const tail = segs.length >= 2 && segs[0] && segs[1] ? segs : null;
   const line = tail
-    ? `BITBUCKET_REPO_URL=https://bitbucket.org/${tail[1]}/${tail[2]}`
+    ? `BITBUCKET_REPO_URL=https://bitbucket.org/${tail[0]}/${tail[1]}`
     : "BITBUCKET_REPO_URL=https://bitbucket.org/<workspace>/<repo>";
   return (
     `Error: cannot update ${existingJiraKey}: the Bitbucket repo URL could not be derived ` +

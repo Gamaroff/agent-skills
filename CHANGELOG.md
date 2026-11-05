@@ -14,7 +14,12 @@ All notable changes to this project will be documented in this file. Format foll
   `parseBitbucketRemote` now reads all of them with an exact host match, dropping any userinfo. And
   when the base still cannot be derived, an **update** of an existing card now exits non-zero before
   any write (`--dry-run` included) with the exact `BITBUCKET_REPO_URL=` line to set; a **create** keeps
-  its warning. Bitbucket Server / Data Center hosts still need `BITBUCKET_REPO_URL`.
+  its warning. Bitbucket Server / Data Center hosts still need `BITBUCKET_REPO_URL`. Follow-up
+  (task 264): the refusal now prints a derived `BITBUCKET_REPO_URL=` line only for a Bitbucket Cloud
+  host and the template for any other, so a Server or other-forge remote is never given a plausible
+  but wrong workspace/repo; and `qa-task`'s probe rule documents how to probe an exact-host
+  allow-list predicate, with a committed worked cases file
+  (`tests/fixtures/probe/bitbucket-remote.cases.json`) and a test that runs it.
 
 - **The "Bound the derived path" block refuses a parent it cannot resolve** (task 263). When the
   parent directory of a path read from an issue body did not resolve, the block skipped its real-path
