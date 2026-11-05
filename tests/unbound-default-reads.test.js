@@ -41,6 +41,21 @@ const REPO_ROOT = path.resolve(__dirname, "..");
 
 // Declared inputs — `file#NAME`: why the document may read it unbound.
 const INPUTS = new Map([
+  // task.262: the issue-body path bound runs as its own shell. PRD_ROOT is the project's PRD root,
+  // exported by the agent from the project's config (resolve-paths.sh) before the block runs; unset,
+  // the default is the shipped default root (`docs/prd`), which lies under `docs/` anyway.
+  [
+    "skills/review-task/SKILL.md#PRD_ROOT",
+    "input of the path-bound block (the project's PRD root, exported by the caller); the default is the shipped default root",
+  ],
+  [
+    "skills/review-story/SKILL.md#PRD_ROOT",
+    "input of the path-bound block (the project's PRD root, exported by the caller); the default is the shipped default root",
+  ],
+  [
+    "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md#PRD_ROOT",
+    "input of the path-bound block (the project's PRD root, exported by the caller); the default is the shipped default root",
+  ],
   // task.206: the story-id blocks of the two story tracker skills run as their own shell; the
   // story document is bound by the agent from the skill's input.
   [

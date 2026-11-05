@@ -23,8 +23,10 @@ Fix the four advisory gaps from task 261 in test-first order: tests that prove e
 **Exact changes:**
 - Before: `const f = l.match(/^\s*(`{3,}|~{3,})(.*)$/);`
 - After: `const f = l.replace(/\r$/, "").match(/^\s*(`{3,}|~{3,})([^\n]*)$/);`
-- Control: build a text with `\r\n` line endings, an opened and closed bash fence, then a read marker line outside it. Assert `markerLines(text)` returns the marker. Before the fix the closing fence reads as a fence with trailing text and the marker is swallowed.
-- Mutation: restore the old line, expect the control red.
+- Why it fails today (measured): the old regex does not match `"```\r"` or `"```bash\r"` at all (`.` excludes `\r`; `$` has no `m` flag), so a CRLF document never opens a fence. The effect is on the forbidding filter, which applies only outside a fence.
+- Control (CRLF): a text with `\r\n` endings holding a bash fence whose body line contains a read marker **and** a forbidding sentence (for example `# do not read the issue body`). Inside a fence that line counts as a read, so assert `markerLines(text)` returns it. On the old regex the fence never opens, the line is judged as prose, the forbidding filter drops it, and the control is red. A control with the marker merely after a closed fence would pass on the old regex too and prove nothing.
+- Control (LF): the same text with `\n` endings must return the same hit; it is green before and after.
+- Mutation: restore the old line, expect the CRLF control red and the LF control green.
 
 ### Phase 2: Name the guard in each hostile case
 
@@ -64,12 +66,15 @@ LOCAL_PATH="<derived-path>"
 if [ -n "$LOCAL_PATH" ]; then
   case "$LOCAL_PATH" in docs/*) ;; *) echo "HALT: derived path $LOCAL_PATH is outside docs/"; exit 1 ;; esac
   case "/$LOCAL_PATH/" in */../*) echo "HALT: derived path $LOCAL_PATH climbs out with .."; exit 1 ;; esac
+  REAL_ROOT=$(cd docs 2>/dev/null && pwd -P) || { echo "HALT: docs/ not found in $(pwd)"; exit 1; }
   REAL_DIR=$(cd "$(dirname "$LOCAL_PATH")" 2>/dev/null && pwd -P) || REAL_DIR=""
-  REAL_ROOT=$(cd docs 2>/dev/null && pwd -P)
-  case "$REAL_DIR/" in "$REAL_ROOT"/*) ;; "") ;; *) echo "HALT: derived path $LOCAL_PATH resolves outside docs/"; exit 1 ;; esac
+  if [ -n "$REAL_DIR" ]; then
+    case "$REAL_DIR/" in "$REAL_ROOT"/*) ;; *) echo "HALT: derived path $LOCAL_PATH resolves outside docs/"; exit 1 ;; esac
+  fi
 fi
 ```
-A missing parent directory leaves `REAL_DIR` empty and is left to the existing "file exists" check after the block.
+Two empty values are handled before the `case`, because the `case` cannot: `"$REAL_DIR/"` is never the empty string (it is `/`), so a `""` arm never fires and an empty `REAL_DIR` would fall to the HALT arm; and an empty `REAL_ROOT` turns the pattern into `/*`, which admits every absolute path (both measured). An empty `REAL_ROOT` is a HALT. A missing parent directory leaves `REAL_DIR` empty, is not a HALT here, and is left to the existing "file exists" check after the block.
+Keep the final `fi` as the block's last line: `boundBlock` lifts the block by it.
 
 **Configured root:** where a story is resolved (review-story, Step 0 with a story document), use `${PRD_ROOT:-docs/prd}` in place of `docs` for the first guard. Task paths stay under `docs/tasks`. Decide in the phase whether one root list (`docs` plus `$PRD_ROOT`) is simpler than two blocks, and record the choice in the QA report. Keep the three blocks identical.
 
