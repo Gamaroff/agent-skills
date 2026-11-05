@@ -46,7 +46,7 @@
 | 17 | [Under zsh, `choose_candidate()` accepts a candidate directory with an embedded NUL](bug.17.zsh-nul-truncates-candidate-directory/bug.17.zsh-nul-truncates-candidate-directory.md) | closed | Minor | Low | 2026-09-30 | pipeline lock (`advance-pipeline-lock.sh`) |
 | 18 | [`develop-next` and `develop-batch` hardcode the Phase 0d base branch, overriding `epic-integration`](bug.18.autonomous-runs-hardcode-base-branch/bug.18.autonomous-runs-hardcode-base-branch.md) | closed | Major | High | 2026-10-09 | autonomous orchestrators (`develop-next`, `develop-batch`) |
 | 19 | [`registry-tick` reports `no-row` when `parseRegistry` rejects every row of a plain-title registry](bug.19.registry-tick-malformed-row-reported-as-no-row/bug.19.registry-tick-malformed-row-reported-as-no-row.md) | closed | Major | Medium | 2026-10-14 | registry tick + parser (`registry-tick`, `select-next`) |
-| 20 | [`upsertChangeLog` moves a blank-date continuation row above every dated row on the next write](bug.20.change-log-blank-date-row-floats-to-top/bug.20.change-log-blank-date-row-floats-to-top.md) | new | Minor | Low | 2026-11-05 | change log engine (`change-log.js`) |
+| 20 | [`upsertChangeLog` moves a blank-date continuation row above every dated row on the next write](bug.20.change-log-blank-date-row-floats-to-top/bug.20.change-log-blank-date-row-floats-to-top.md) | ready-for-qa | Minor | Low | 2026-11-05 | change log engine (`change-log.js`) |
 
 ---
 

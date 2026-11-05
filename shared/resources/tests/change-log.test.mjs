@@ -3192,3 +3192,70 @@ test("K27 an own-section dated log beats a log-shaped foreign table, with or wit
     assert.ok(!kBlock(content).includes("| 2026-02-01 | 2.0 | ios |"));
   }
 });
+
+// ---------------------------------------------------------------------------
+// L — blank-date continuation rows (bug.20)
+// ---------------------------------------------------------------------------
+
+const lDoc = (rows) =>
+  [
+    "# T",
+    "",
+    "<!-- change-log-start -->",
+    "## Change Log",
+    "",
+    "| Date | Version | Description | Author |",
+    "| ---------- | ------- | ----------- | ------ |",
+    ...rows,
+    "<!-- change-log-end -->",
+    "",
+  ].join("\n");
+const lRows = (doc) =>
+  doc
+    .split("\n")
+    .filter((l) => l.startsWith("|"))
+    .slice(2);
+const L_NEW = {
+  date: "2026-11-05",
+  version: "1.2",
+  description: "DoD passed",
+  author: "finalise",
+};
+
+test("L1 a blank-date continuation row stays under the row it continues", () => {
+  const input = [
+    "| 2026-11-05 | 1.0     | Initial draft | create-task |",
+    "| 2026-11-05 | 1.1     | Review passed | review-task |",
+    "|            |         | Status → ready-for-development | review-task |",
+    "| 2026-11-05 |         | Implemented | develop-task |",
+  ];
+  const rows = lRows(CL.upsertChangeLog(lDoc(input), L_NEW));
+  assert.deepEqual(rows.slice(0, 4), input);
+  assert.match(rows[4], /DoD passed/);
+  assert.equal(rows.length, 5);
+});
+
+test("L2 a continuation row travels with its entry row when a second block forces a sort", () => {
+  const doc =
+    lDoc([
+      "| 2026-02-01 | 1.0 | Later | a |",
+      "|            |     | continues Later | a |",
+    ]) +
+    [
+      "<!-- github-sync-changelog-start -->",
+      "| 2026-01-01 | Earlier |",
+      "<!-- github-sync-changelog-end -->",
+      "",
+    ].join("\n");
+  const rows = lRows(CL.upsertChangeLog(doc, L_NEW));
+  const later = rows.findIndex((r) => r.includes("Later |"));
+  assert.match(rows[later + 1], /continues Later/);
+  assert.ok(rows.findIndex((r) => r.includes("Earlier")) < later);
+});
+
+test("L3 a blank-date row with no entry row above it stays leading, and a Version-first row is untouched", () => {
+  const lead = "|            |         | orphan note | x |";
+  const vf = "| 1.0 | 2026-01-01 | Version-first row | a |";
+  const rows = lRows(CL.upsertChangeLog(lDoc([lead, vf]), L_NEW));
+  assert.deepEqual(rows.slice(0, 2), [lead, vf]);
+});

@@ -100,6 +100,21 @@ const isUnparsedRow = (line) =>
   !/^\s*\|[\s\-:|]+\|\s*$/.test(line) &&
   !/^\s*\|\s*(Date|Version|Description|Author|Change)\b/i.test(line);
 
+// A canonical-layout row with a blank Date cell and a non-blank Description:
+// `|            |         | Status → ready-for-development | review-task |`. The pipeline writes
+// these on purpose, directly under the row they continue (bug.20), so the writer keeps them in
+// place rather than treating them as unreadable history. A `| Version | Date | … |` row has a
+// non-blank first cell and is not matched; a blank-date row with no entry row above it stays
+// unparsed (see `rebuildChangeLog`).
+const isContinuationRow = (line) => {
+  const cells = line
+    .trim()
+    .replace(/^\||\|$/g, "")
+    .split("|")
+    .map((c) => c.trim());
+  return cells.length >= 4 && cells[0] === "" && cells[2] !== "";
+};
+
 // ---------------------------------------------------------------------------
 // Scope guards — frontmatter and fenced code
 // ---------------------------------------------------------------------------
@@ -785,7 +800,23 @@ function rebuildChangeLog(content, found, newRow, docType) {
   // cannot be carried as prose AND absorbed as history (bug.13, cycle 1).
   const { before, after, tableLines, beforeForeign, afterForeign } =
     splitCarriedLines(content, found);
-  const existing = tableLines.filter(isEntryRow);
+  // Walk the table once so a continuation row (bug.20) is attached to the entry row it
+  // continues instead of being classed with the unparsed rows that lead the table.
+  const existing = [];
+  const continuations = []; // continuations[i] — rows carried directly under existing[i]
+  const unparsed = [];
+  for (const line of tableLines) {
+    if (isEntryRow(line)) {
+      existing.push(line);
+      continuations.push([]);
+    } else if (isUnparsedRow(line)) {
+      if (isContinuationRow(line) && existing.length) {
+        continuations[existing.length - 1].push(line);
+      } else {
+        unparsed.push(line);
+      }
+    }
+  }
 
   // Rows the parser does not recognise are PRESERVED, not dropped.
   //
@@ -799,7 +830,6 @@ function rebuildChangeLog(content, found, newRow, docType) {
   //
   // Header and separator lines are excluded because the regenerated block
   // supplies its own.
-  const unparsed = tableLines.filter(isUnparsedRow);
   const migrated = found.legacyAuthor
     ? migrateLegacyEntries(existing, {
         legacyAuthor: found.legacyAuthor,
@@ -849,9 +879,13 @@ function rebuildChangeLog(content, found, newRow, docType) {
   // rows get sorted — otherwise the two blocks' histories would interleave
   // wrongly. In the ordinary single-block case the existing order is preserved
   // untouched, because the log is append-only and its order is its history.
-  const history = merged.length
-    ? [...migrated, ...merged].sort(byDate)
-    : migrated;
+  // A continuation row travels with its entry row through the sort (bug.20).
+  const history = [
+    ...migrated.map((row, i) => ({ row, tail: continuations[i] })),
+    ...merged.map((row) => ({ row, tail: [] })),
+  ]
+    .sort(merged.length ? (a, b) => byDate(a.row, b.row) : () => 0)
+    .flatMap(({ row, tail }) => [row, ...tail]);
 
   // Unparsed rows lead: they are older history the parser could not read, and
   // the log is append-only, so nothing may be emitted above them that would
