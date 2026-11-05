@@ -1,0 +1,55 @@
+schema: 2
+task: 'task.263.untrusted-content-bound-parent-and-test-headroom'
+task_title: 'Untrusted-content bound: unresolvable parent and lint test headroom'
+gate: PASS
+status_reason: 'All 12 success criteria met and held by committed tests. Both new guards mutation-proven (5 named tests red each way). Probe plan re-run: 66 executed, 0 escaped, engages at all three sites. Diff review returned no findings.'
+reviewer: 'QA Engineer'
+head: 'd320ad441e0606c9ba63c3b85acc84d0b261d494'
+updated: '2026-11-05T17:45:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 39
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 66
+    escaped: 0
+    boundary_signals: []
+    boundary_reason: ''
+    notes: 'Boundary: true (the Bound the derived path fence at three sites). Probe plan 22 cases x 3 sites (task 262 plan plus a file-as-directory case) engages, no escapes. Symlink and mode-000 cases are held by the unit tests, not the probe (the fence form has no symlink fixture). Block also run by hand under bash and zsh on six paths: identical results.'
+  performance:
+    status: PASS
+    notes: 'Lint test 397, 392 and 395 ms on three consecutive runs, against the 1500 ms bound.'
+  reliability:
+    status: PASS
+    notes: 'A parent that cannot be resolved is now a HALT instead of a skipped check. A missing directory under docs/ is still kept (control test).'
+  maintainability:
+    status: PASS
+    notes: 'The three blocks stay identical (equality test red under a one-site mutation); bundle:check clean (129 skills).'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate: []
+  future: []
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
