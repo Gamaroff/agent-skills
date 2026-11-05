@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **The "Bound the derived path" block refuses a parent it cannot resolve** (task 263). When the
+  parent directory of a path read from an issue body did not resolve, the block skipped its real-path
+  check and relied on the later read failing. It now judges the nearest ancestor that exists: a link
+  that does not resolve, or a directory that cannot be entered, is a HALT (`has a parent that cannot be
+  resolved`); an ancestor that leaves `docs/` and the PRD root is a HALT as before; a missing
+  directory under `docs/` is still kept. A regular file used as a directory now HALTs too. The lint
+  test reads its tree once instead of three times.
+
 ## [v0.64.0] - 2026-11-05
 
 ### Changed

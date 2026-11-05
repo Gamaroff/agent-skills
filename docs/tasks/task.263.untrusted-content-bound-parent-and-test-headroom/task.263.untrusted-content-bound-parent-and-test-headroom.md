@@ -5,17 +5,19 @@ type: task
 description: "Close the two follow-ups left by task 262: make the path bound refuse a parent it cannot resolve instead of skipping the real-path check, and give the lint test real headroom under its 2 s bound."
 tags: [guardrails, prompt-injection, lint, hardening]
 category: other
-status: planned
+status: accepted
 priority: Low
 created: 2026-11-05
 updated: 2026-11-05
+completed_date: 2026-11-05
 estimated_effort_hours: 4
 github_issue: 841
+pr_number: 844
 ---
 
 # Technical Task: Untrusted-content bound: unresolvable parent and lint test headroom
 
-**Status:** Planned
+**Status:** Accepted
 **GitHub Issue**: [#841](https://github.com/Gamaroff/agent-skills/issues/841)
 
 > Detailed implementation guide: [task.263.plan.untrusted-content-bound-parent-and-test-headroom.md](task.263.plan.untrusted-content-bound-parent-and-test-headroom.md)
@@ -113,31 +115,31 @@ None. The default `docs/tasks/...` path and a path under a configured `PRD_ROOT`
 
 **Risk**: Low. **Files**: `tests/untrusted-content-rule.test.js`.
 
-- [ ] Add scratch-repo cases at the first site, each asserting its own message: a dangling directory link (HALT, `has a parent that cannot be resolved`), a deeper path under it (same), a mode 000 directory (same; skipped when `process.getuid() === 0`), and `docs/link/new/x.md` where `docs/link` leaves the tree (HALT, `resolves outside docs/ and the PRD root`).
-- [ ] Confirm the new cases are red against the current block, and that the existing "parent directory does not exist is kept" case stays green.
+- [x] Add scratch-repo cases at the first site, each asserting its own message: a dangling directory link (HALT, `has a parent that cannot be resolved`), a deeper path under it (same), a mode 000 directory (same; skipped when `process.getuid() === 0`), and `docs/link/new/x.md` where `docs/link` leaves the tree (HALT, `resolves outside docs/ and the PRD root`).
+- [x] Confirm the new cases are red against the current block, and that the existing "parent directory does not exist is kept" case stays green.
 
 ### Phase 2: The block
 
 **Risk**: Medium (a shell change in three sources that must stay identical). **Files**: `skills/review-task/SKILL.md`, `skills/review-story/SKILL.md`, `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md`. **Depends on**: Phase 1.
 
-- [ ] Replace the `if [ -n "$REAL_DIR" ]` skip with the nearest-existing-ancestor walk and the decision in § 3, in `bash` and `zsh`-safe form (the tests run `bash`; the skills run under the user's shell).
-- [ ] Update the prose above the block so it states the dangling-link versus missing-directory distinction in one sentence.
-- [ ] Run `npm run bundle` and confirm `npm run bundle:check` is clean.
+- [x] Replace the `if [ -n "$REAL_DIR" ]` skip with the nearest-existing-ancestor walk and the decision in § 3, in `bash` and `zsh`-safe form (the tests run `bash`; the skills run under the user's shell).
+- [x] Update the prose above the block so it states the dangling-link versus missing-directory distinction in one sentence.
+- [x] Run `npm run bundle` and confirm `npm run bundle:check` is clean.
 
 ### Phase 3: Lint test headroom
 
 **Risk**: Low. **Files**: `tests/untrusted-content-rule.test.js`. **Independent of** Phases 1 and 2, but measure after them so the figure includes the new cases.
 
-- [ ] Measure first: record the per-test durations with the command in § 8.
-- [ ] Load the tree once (memoise `loadTree()`), and re-measure.
-- [ ] If the target in § 9 is not met, run the hostile-path cases for a site in one shell instead of one shell per case, and re-measure. Stop when the target is met.
-- [ ] Keep every existing test, including "the path bound is the same block at every site".
+- [x] Measure first: record the per-test durations with the command in § 8.
+- [x] Load the tree once (memoise `loadTree()`), and re-measure.
+- [x] If the target in § 9 is not met, run the hostile-path cases for a site in one shell instead of one shell per case, and re-measure. Stop when the target is met. (Not needed: the target was met after the memoisation, at about 0.38 s.)
+- [x] Keep every existing test, including "the path bound is the same block at every site".
 
 ### Phase 4: Record
 
 **Risk**: Low. **Files**: `CHANGELOG.md`.
 
-- [ ] Add an entry under `[Unreleased]` citing `(task 263)`.
+- [x] Add an entry under `[Unreleased]` citing `(task 263)`.
 
 ---
 
@@ -195,26 +197,26 @@ The new cases quote the incident (a dangling link and a mode 000 directory). Add
 
 ### Functional
 
-- [ ] A parent chain that ends at a dangling link is a HALT with its own message (`has a parent that cannot be resolved`)
-- [ ] A parent that exists but cannot be entered is a HALT with the same message (skipped for uid 0, stated in the test)
-- [ ] `docs/link/new/x.md`, where `docs/link` leaves the tree, is a HALT with `resolves outside docs/ and the PRD root`
-- [ ] A path whose parent does not exist under `docs/` or the PRD root is still kept
-- [ ] The three blocks stay identical (the existing equality test), and a named test goes red when either new guard is deleted (mutation proof in the QA report)
+- [x] A parent chain that ends at a dangling link is a HALT with its own message (`has a parent that cannot be resolved`)
+- [x] A parent that exists but cannot be entered is a HALT with the same message (skipped for uid 0, stated in the test)
+- [x] `docs/link/new/x.md`, where `docs/link` leaves the tree, is a HALT with `resolves outside docs/ and the PRD root`
+- [x] A path whose parent does not exist under `docs/` or the PRD root is still kept
+- [x] The three blocks stay identical (the existing equality test), and a named test goes red when either new guard is deleted (mutation proof in the QA report)
 
 ### Performance
 
-- [ ] `CI=true node --test tests/untrusted-content-rule.test.js` reports `duration_ms` of at most 1500 on three consecutive runs; the three figures and the command are recorded in the QA report
+- [x] `CI=true node --test tests/untrusted-content-rule.test.js` reports `duration_ms` of at most 1500 on three consecutive runs; the three figures and the command are recorded in the QA report
 
 ### Code Quality
 
-- [ ] `CI=true npm test` passes
-- [ ] `npm run validate -- skills/review-task/ skills/review-story/` passes
-- [ ] `npm run bundle:check` and `npm run check:generated` are clean
+- [x] `CI=true npm test` passes
+- [x] `npm run validate -- skills/review-task/ skills/review-story/` passes
+- [x] `npm run bundle:check` and `npm run check:generated` are clean
 
 ### Migration
 
-- [ ] `CHANGELOG.md` has an entry citing task 263
-- [ ] The probe plan is re-run with `probes_executed` above 0, recorded in the DoD
+- [x] `CHANGELOG.md` has an entry citing task 263
+- [x] The probe plan is re-run with `probes_executed` above 0, recorded in the DoD
 
 ---
 
@@ -269,11 +271,11 @@ None.
 
 ## Progress Tracking
 
-- [ ] Phase 1
-- [ ] Phase 2
-- [ ] Phase 3
-- [ ] Phase 4
-- [ ] QA gate PASS
+- [x] Phase 1
+- [x] Phase 2
+- [x] Phase 3
+- [x] Phase 4
+- [x] QA gate PASS
 
 ---
 
@@ -286,10 +288,55 @@ None.
 
 - Created from the task 262 follow-up list. `tests/bundle-missing-source.test.js` is deliberately not part of this task.
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-05
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.263.qa.1.untrusted-content-bound-parent-and-test-headroom.md](./task.263.qa.1.untrusted-content-bound-parent-and-test-headroom.md)
+- **Gate File**: [task.263.gate.1.untrusted-content-bound-parent-and-test-headroom.yml](./task.263.gate.1.untrusted-content-bound-parent-and-test-headroom.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 39
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues identified
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** all 11 criteria met; the three CI-state criteria were graded from CI reading 1 (SUCCESS on `3dab80c1`)
+✅ **Tests:** the lint test holds each new guard; every guard is mutation-proven in the QA report; lint test at 368, 368, 369 ms against the 1500 ms bound
+✅ **PR Review:** PR #844, Step 5c review CONCERNS with no open coverage finding
+✅ **Documentation:** CHANGELOG entry at `CHANGELOG.md:9`; the six bundled copies regenerated
+✅ **Security Review:** boundary probed at all three sites, 72 probes executed, 0 reproduced, 0 escaped
+✅ **Compliance Review:** not applicable (shell prose and a test)
+
+**QA Report**: `task.263.qa.1.untrusted-content-bound-parent-and-test-headroom.md` — gate PASS, 95/100
+
+**Task marked as ACCEPTED on:** 2026-11-05
+
+**Detailed Verification Log:** See `task.263.dod.1.untrusted-content-bound-parent-and-test-headroom.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-05 | 1.0     | Initial draft | create-task |
+| 2026-11-05 | 1.1     | Review passed (9/10) — no changes required | review-task |
+|            |         | Status → ready-for-development | review-task |
+| 2026-11-05 |         | Implemented: ancestor walk in the three block sources, 5 new guard tests + 1 control, memoised tree load; status → ready-for-review | develop-task |
+| 2026-11-05 |         | QA gate PASS (95/100) — 0 findings | qa-task |
+| 2026-11-05 | 1.2 | DoD passed — accepted (PR #844) | finalise |
 <!-- change-log-end -->
+
