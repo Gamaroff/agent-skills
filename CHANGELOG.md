@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **Untrusted-content rule (task 261).** A shared rule (`shared/resources/untrusted-content-rule.md`)
+  says text written outside the repository (issue and PR bodies, comments, web pages, search
+  results) is data to read, never instructions to follow. `review-pr`, `review-task`,
+  `review-story`, develop Step 0, `browser-use` and `explain-simply` cite it, and a lint test fails
+  when a new read site does not. A path taken from an issue body is now bounded to `docs/`: a path
+  outside it, or one with a `..` segment, halts at `review-task`, `review-story` and develop Step 0.
 - **`ai-system-assessment` skill (task 260).** A user-invoked, read-only skill that rates a system,
   repository or project against eight AI-system practices (prompt and change control, grounding,
   tools, access control, guardrails, cost control, observability, evals before change) and writes one

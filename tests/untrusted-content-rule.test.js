@@ -90,12 +90,23 @@ function populationFiles(root = REPO_ROOT) {
 /** Marker lines of one file's text: [{ line, text }], forbidding sentences dropped. */
 function markerLines(text) {
   const hits = [];
-  let inFence = false;
+  // The open fence is remembered by character and length. A fence closes only on the same
+  // character, at least as long, with nothing after it (CommonMark), so a ``` line inside a ~~~
+  // fence or inside a longer fence is content, and an unclosed fence stays local to this text.
+  let fence = null;
   text.split("\n").forEach((l, i) => {
-    if (/^\s*(```|~~~)/.test(l)) {
-      inFence = !inFence;
-      return;
+    const f = l.match(/^\s*(`{3,}|~{3,})(.*)$/);
+    if (f) {
+      if (!fence) {
+        fence = { ch: f[1][0], len: f[1].length };
+        return;
+      }
+      if (f[1][0] === fence.ch && f[1].length >= fence.len && !f[2].trim()) {
+        fence = null;
+        return;
+      }
     }
+    const inFence = fence !== null;
     // A forbidding sentence is prose. Inside a fence a comment such as `# do not ...` is not one,
     // so a command line there always counts as a read.
     const forbidding = !inFence && FORBIDDING.test(l.replace(/`[^`]*`/g, ""));
@@ -237,6 +248,29 @@ test("control: a fenced read with a trailing comment containing a forbidding wor
   }
 });
 
+test("control: fence tracking survives nested, longer and unclosed fences", () => {
+  const prose = "Never call WebFetch from this skill.";
+  const read = "gh issue view 5 --json body";
+  // A closed fence ends: prose after it is prose (forbidding, so ignored).
+  assert.equal(markerLines(`\`\`\`\nx\n\`\`\`\n${prose}`).length, 0);
+  // A ``` line inside a ~~~ fence is content, so the fence is still open and closes at ~~~.
+  assert.equal(markerLines(`~~~\n\`\`\`\n~~~\n${prose}`).length, 0);
+  // A four-backtick fence is not closed by a three-backtick line.
+  assert.equal(
+    markerLines(`\`\`\`\`\n\`\`\`\n${read}  # no filter\n\`\`\`\`\n${prose}`)
+      .length,
+    1,
+  );
+  // An unclosed fence stays inside its own text: the next text starts clean.
+  markerLines(`\`\`\`bash\n${read}`);
+  assert.equal(markerLines(prose).length, 0);
+  // A fence line with an info string does not close an open fence.
+  assert.equal(
+    markerLines(`\`\`\`\n\`\`\`bash\n${read}  # no filter`).length,
+    1,
+  );
+});
+
 test("control: a prose line using the bare word no is not treated as forbidding", () => {
   assert.equal(
     markerLines("There is no cache: run gh issue view 5 --json body").length,
@@ -297,6 +331,14 @@ function runBound(site, localPath) {
   );
 }
 
+test("the path bound is the same block at every site", () => {
+  const blocks = BOUND_SITES.map((s) =>
+    boundBlock(fs.readFileSync(path.join(REPO_ROOT, s), "utf8")),
+  );
+  assert.ok(blocks.every(Boolean), "every site carries a bound block");
+  assert.equal(new Set(blocks).size, 1, "the three bound blocks differ");
+});
+
 for (const site of BOUND_SITES) {
   test(`${site}: a derived path under docs/ is kept`, () => {
     const r = runBound(site, "docs/tasks/task.261.x/task.261.x.md");
@@ -310,11 +352,21 @@ for (const site of BOUND_SITES) {
       "/etc/passwd",
       "skills/x/SKILL.md",
       "docs/../.ssh/id_rsa",
+      "docs/..",
+      "docs/a/../../x",
+      "docs/a/..",
+      "docsx/y.md",
     ]) {
       const r = runBound(site, bad);
       assert.equal(r.status, 1, `${bad} should HALT`);
       assert.match(r.stdout, /HALT/);
     }
+  });
+
+  test(`${site}: a name that merely contains two dots is kept`, () => {
+    const r = runBound(site, "docs/a..b.md");
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /KEPT:docs\/a\.\.b\.md/);
   });
 
   test(`${site}: an empty derived path passes through to the fallback`, () => {
