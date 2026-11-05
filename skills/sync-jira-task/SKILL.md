@@ -70,7 +70,7 @@ The script auto-loads `<repo-root>/.env`. Shell exports take precedence.
 
 | Variable                  | Description                                                                                                                                                                     |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `BITBUCKET_REPO_URL`      | Override Bitbucket base URL (auto-detected from git remote)                                                                                                                     |
+| `BITBUCKET_REPO_URL`      | Override Bitbucket base URL. Auto-detected from `git remote` for `bitbucket.org`, `ssh.bitbucket.org` and `altssh.bitbucket.org` (scp-style, `ssh://`, `https://`); any other host needs this variable                                                                                                                     |
 | `JIRA_DEV_ESTIMATE_FIELD` | Custom field id to mirror `estimated_effort_hours` into (e.g. `customfield_10594`). Takes precedence over `jira.devEstimateField` in `skills-config.yaml`. Unset → not written. |
 
 ### Finding Your Board ID
@@ -399,7 +399,7 @@ On error: `{ "error": "<message>" }` and a non-zero exit code.
 | ----------------------------- | -------------------------------------------------------------- |
 | Missing env vars (live)       | Add to `.env` and retry                                        |
 | Missing env vars (dry-run)    | Warning only — preview proceeds                                |
-| Bitbucket URL not detected    | Set `BITBUCKET_REPO_URL`; link omitted but sync continues      |
+| Bitbucket URL not detected    | Set `BITBUCKET_REPO_URL`. An **update stops with an error** before writing (it would drop the card's Source Documents links); a **create warns** and omits the link. |
 | File not found                | Verify task file path                                          |
 | `401 Unauthorized`            | Verify `JIRA_USER_EMAIL` and `JIRA_API_TOKEN`                  |
 | `403 Forbidden`               | Token lacks permission for issue/project                       |

@@ -489,17 +489,72 @@ function getCurrentBranchUpstream() {
   return dlb.currentUpstream(); // null on a detached HEAD, no upstream, or no git
 }
 
+// The three hosts Bitbucket Cloud serves a repository from. Matched EXACTLY, never by
+// substring or `.endsWith`: a plausible-but-wrong base is worse than null, because a null
+// stops an update (see the guard in the sync-jira-* scripts) while a wrong base quietly
+// publishes dead links. Bitbucket Server / Data Center hosts are deliberately absent —
+// they are left to BITBUCKET_REPO_URL.
+const BITBUCKET_HOSTS = new Set([
+  "bitbucket.org",
+  "ssh.bitbucket.org",
+  "altssh.bitbucket.org",
+]);
+
+// `https://bitbucket.org/<workspace>/<repo>` for any remote Bitbucket Cloud serves, else
+// null. Pure — no subprocess, no environment. Accepts scp-style (`git@host:ws/repo`),
+// `ssh://[user@]host[:port]/ws/repo` and `https://[userinfo@]host/ws/repo`; drops userinfo
+// and port, because a base must never carry a credential into a card.
+function parseBitbucketRemote(url) {
+  const s = String(url == null ? "" : url).trim();
+  const m =
+    /^[a-z][a-z0-9+.-]*:\/\/(?:[^@/]+@)?([^/:@]+)(?::\d+)?\/(.+)$/i.exec(s) ||
+    /^(?:[^@/:]+@)?([^/:@]+):(?!\/\/)(.+)$/.exec(s);
+  if (!m || !BITBUCKET_HOSTS.has(m[1].toLowerCase())) return null;
+  const segs = m[2]
+    .replace(/\/+$/, "")
+    .replace(/\.git$/, "")
+    .split("/");
+  if (segs.length !== 2 || !segs[0] || !segs[1]) return null;
+  return `https://bitbucket.org/${segs[0]}/${segs[1]}`;
+}
+
+// The refusal message for an UPDATE whose Bitbucket base is null. Rewriting an existing
+// card without a base drops its "Source Documents" links, so the sync scripts stop before
+// any write and print this instead (task.264). Names the env var and the remote it read;
+// when the remote's last two path segments read as workspace/repo, prints the exact line to
+// set. Runs `git remote get-url` only on this error path, so a normal run pays nothing.
+function missingBitbucketBaseMessage(existingJiraKey) {
+  let remote = "";
+  try {
+    remote = execSync("git remote get-url origin", {
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch (_) {}
+  const tail = /([^/:@\s]+)\/([^/:@\s]+?)(?:\.git)?\/*$/.exec(remote);
+  const line = tail
+    ? `BITBUCKET_REPO_URL=https://bitbucket.org/${tail[1]}/${tail[2]}`
+    : "BITBUCKET_REPO_URL=https://bitbucket.org/<workspace>/<repo>";
+  return (
+    `Error: cannot update ${existingJiraKey}: the Bitbucket repo URL could not be derived ` +
+    `(origin: ${remote ? redactRemoteUserinfo(remote) : "none"}), and writing the card now ` +
+    `would remove its Source Documents links. Set ${line} in the environment and re-run.`
+  );
+}
+
+// `https://user:token@host/…` → `https://host/…`: a credential in a remote must not reach
+// a terminal, a CI log or a card through an error message.
+function redactRemoteUserinfo(remote) {
+  return String(remote).replace(/^([a-z][a-z0-9+.-]*:\/\/)[^@/]+@/i, "$1");
+}
+
 function getBitbucketRepoBase() {
   const env = process.env.BITBUCKET_REPO_URL;
   if (env) return env.replace(/\/$/, "");
   try {
-    const remote = execSync("git remote get-url origin", {
-      encoding: "utf-8",
-    }).trim();
-    const base = remote
-      .replace(/^git@bitbucket\.org:/, "https://bitbucket.org/")
-      .replace(/\.git$/, "");
-    if (base.startsWith("https://bitbucket.org/")) return base;
+    return parseBitbucketRemote(
+      execSync("git remote get-url origin", { encoding: "utf-8" }),
+    );
   } catch (_) {}
   return null;
 }
@@ -6004,6 +6059,8 @@ module.exports = {
   getCurrentBranchUpstream,
   stripRemotePrefix,
   getBitbucketRepoBase,
+  parseBitbucketRemote,
+  missingBitbucketBaseMessage,
   buildBitbucketUrl,
   resolveRelativeLink,
   makeRelativeLinkResolver,

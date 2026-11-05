@@ -5,7 +5,7 @@ type: task
 description: "Derive the Bitbucket repo base from every SSH and HTTPS remote shape Bitbucket serves, and stop sync-jira-* from rewriting an existing card without its Source Documents links when the base cannot be derived."
 tags: [sync-jira, bitbucket, data-loss]
 category: other
-status: planned
+status: ready-for-review
 priority: High
 created: 2026-11-05
 updated: 2026-11-05
@@ -15,7 +15,7 @@ estimated_effort_hours: 8
 
 # Bitbucket remote host shapes and link-loss guard
 
-**Status:** Planned
+**Status:** Ready for Review
 
 > Detailed implementation guide: [task.264.plan.bitbucket-remote-host-shapes-and-link-loss-guard.md](task.264.plan.bitbucket-remote-host-shapes-and-link-loss-guard.md)
 
@@ -75,7 +75,7 @@ Measured against the current rewrite (`command node -e` over `f = r => r.replace
 | `ssh://git@ssh.bitbucket.org/w/r.git` | **null** |
 | `ssh://git@altssh.bitbucket.org:443/w/r.git` | **null** |
 
-The first four `null` rows are the handoff's list; the `altssh` row is added because `shared/resources/pr-read.sh:96` already names that spelling.
+The first four `null` rows are the handoff's list; the `altssh` row is added because `shared/resources/pr-read.sh:100` already names that spelling.
 
 ### Callers
 
@@ -85,7 +85,7 @@ The first four `null` rows are the handoff's list; the `altssh` row is added bec
 
 Two other parsers read remotes, and neither does this job:
 
-- `shared/resources/pr-read.sh:96` (`bb_path=$(… sed -E …)`) extracts `workspace/repo` from the last two path segments, for the PR API. It is shell, takes the *configured* URL, and returns a slug rather than a browse base.
+- `shared/resources/pr-read.sh:100` (`bb_path=$(… sed -E …)`) extracts `workspace/repo` from the last two path segments, for the PR API. It is shell, takes the *configured* URL, and returns a slug rather than a browse base.
 - `shared/resources/tracker-issue.js:~415-445` parses a *GitHub* slug and deliberately rejects other hosts.
 
 The new parser **sits beside** both: it is the JS entry the sync scripts already import, it returns a browse base for `buildBitbucketUrl`, and folding it into the shell parser would put a subprocess in a pure function. It follows `tracker-issue.js`'s rule that the host match is **exact**, never a substring or a `.endsWith` guess, because a plausible-but-wrong base is worse than `null`.
@@ -136,26 +136,26 @@ The new parser **sits beside** both: it is the JS entry the sync scripts already
 
 Files: `shared/resources/jira-sync.js`, its test file.
 
-- [ ] Add `parseBitbucketRemote(url)` (pure, exported) accepting the shapes in § 3 and dropping userinfo.
-- [ ] Make `getBitbucketRepoBase` call it on the `origin` URL.
-- [ ] One failing-first test per shape, plus: unknown host, look-alike host (`bitbucket.org.evil.example`), empty string.
+- [x] Add `parseBitbucketRemote(url)` (pure, exported) accepting the shapes in § 3 and dropping userinfo.
+- [x] Make `getBitbucketRepoBase` call it on the `origin` URL.
+- [x] One failing-first test per shape, plus: unknown host, look-alike host (`bitbucket.org.evil.example`), empty string.
 
 ### Phase 2: Update guard — Risk: Medium
 
 Depends on Phase 1. Files: the four `sync-jira-*` scripts, their tests.
 
-- [ ] After `isUpdate` is computed, exit non-zero before any write when `isUpdate && !bbBase`; the message names `BITBUCKET_REPO_URL` and the remote.
-- [ ] Keep the create-path warning unchanged.
-- [ ] Honour `--dry-run`: report the same error rather than a clean plan.
-- [ ] One test per script: update with a null base exits non-zero and issues no PUT.
+- [x] After `isUpdate` is computed, exit non-zero before any write when `isUpdate && !bbBase`; the message names `BITBUCKET_REPO_URL` and the remote.
+- [x] Keep the create-path warning unchanged.
+- [x] Honour `--dry-run`: report the same error rather than a clean plan.
+- [x] One test per script: update with a null base exits non-zero and issues no PUT.
 
 ### Phase 3: Docs and release — Risk: Low
 
 Depends on Phases 1-2.
 
-- [ ] Four `SKILL.md` files: env-var row says what is accepted; the troubleshooting row says an update stops and a create warns.
-- [ ] `CHANGELOG.md` entry citing task 264.
-- [ ] `npm run bundle`; commit the regenerated `references/` copies.
+- [x] Four `SKILL.md` files: env-var row says what is accepted; the troubleshooting row says an update stops and a create warns.
+- [x] `CHANGELOG.md` entry citing task 264.
+- [x] `npm run bundle`; commit the regenerated `references/` copies.
 
 ---
 
@@ -180,7 +180,7 @@ Depends on Phases 1-2.
 
 **Unit (parser)**: one case per shape in § 3 (7), plus unknown host, look-alike host, empty, trailing slash, credential in userinfo (must not appear in the result). Run: `CI=true ./node_modules/.bin/node --test` on the new file, or the repo's `npm test` entry for `shared/resources/tests`.
 
-**Guard (per script)**: stub the HTTP layer already used by that script's tests, set `BITBUCKET_REPO_URL` empty and a remote that does not parse; assert non-zero exit and **no PUT recorded**. Assert behaviour, not source text.
+**Guard (per script)**: stub the HTTP layer already used by that script's tests and force a null base. `makeRunner` in `shared/resources/fake-jira.js` pins `BITBUCKET_REPO_URL` to a valid base in its default `ENV` (`fake-jira.js:42`), and `gitRepo()` creates a repo with no remote. So the guard test passes `env: { BITBUCKET_REPO_URL: "" }` to `makeRunner` (an empty value is falsy in `getBitbucketRepoBase`, so it falls through to the remote-less repo and returns `null`). Without that override the guard never fires and the test passes vacuously. Seed the card with a `jira_key` so `isUpdate` is true. Assert non-zero exit and **no PUT recorded**. Assert behaviour, not source text.
 
 **Regression**: with a parseable remote an update still writes the "Source Documents" block (existing tests); a create with a null base still warns and exits 0.
 
@@ -197,7 +197,7 @@ Depends on Phases 1-2.
 
 **Performance**
 - [ ] No added subprocess or network call per sync run (the parser is pure).
-- [ ] Added suite time under 2 s, recorded in the QA report.
+- [ ] Added suite time under 2 s, measured with `uptime; time node --test shared/resources/tests/jira-sync-bitbucket-remote.test.mjs` on the PR head commit and recorded in the QA report.
 
 **Code quality**
 - [ ] `CI=true npm test` passes.
@@ -254,6 +254,9 @@ Sign-off is not enabled in this repository's `skills-config.yaml`; no rows are r
 | Date | Version | Description | Author |
 | --- | --- | --- | --- |
 | 2026-11-05 | 1.0 | Initial draft | create-task |
+| 2026-11-05 | 1.1 | Review passed (8/10) — guard test must force a null base past fake-jira's pinned `BITBUCKET_REPO_URL`; latency criterion given its measuring command; `pr-read.sh` anchor corrected to line 100 | review-task |
+| 2026-11-05 |  | Status → ready-for-development | review-task |
+| 2026-11-05 |  | Implemented — 4 scripts, 1 engine file, 5 test files (36 new tests), 4 SKILL.md, CHANGELOG | develop |
 
 <!-- change-log-end -->
 
@@ -261,9 +264,9 @@ Sign-off is not enabled in this repository's `skills-config.yaml`; no rows are r
 
 ## Progress Tracking
 
-- [ ] Phase 1: Remote parser
-- [ ] Phase 2: Update guard
-- [ ] Phase 3: Docs and release
+- [x] Phase 1: Remote parser
+- [x] Phase 2: Update guard
+- [x] Phase 3: Docs and release
 
 QA artifacts land beside this file: `task.264.qa.[n].…md`, `task.264.gate.[n].…yml`, bugs as `task.264.bug.[N].…md`.
 
@@ -272,5 +275,5 @@ QA artifacts land beside this file: `task.264.qa.[n].…md`, `task.264.gate.[n].
 ## References
 
 - Source report: handoff note from a consumer repo, 2026-11-05, against v0.64.0.
-- `shared/resources/pr-read.sh:96`: altssh slug parsing (sits beside, see § 3).
+- `shared/resources/pr-read.sh:100`: altssh slug parsing (sits beside, see § 3).
 - `shared/resources/tracker-issue.js`: exact-host rule for GitHub remotes.
