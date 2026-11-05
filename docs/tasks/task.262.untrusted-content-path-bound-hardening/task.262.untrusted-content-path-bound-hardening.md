@@ -5,16 +5,18 @@ type: task
 description: "Close the four advisory gaps left by task 261: CRLF in the fence regex, hostile-path assertions that do not name the guard, duplicated block extraction, and a path bound that hard-codes docs/ and ignores symlinks."
 tags: [guardrails, prompt-injection, lint, hardening]
 category: other
-status: ready-for-review
+status: accepted
 priority: Low
 created: 2026-11-05
 updated: 2026-11-05
+completed_date: 2026-11-05
+pr_number: 840
 estimated_effort_hours: 4
 ---
 
 # Technical Task: Untrusted-content path bound hardening
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 ---
 
@@ -194,7 +196,7 @@ Security probe: the bound is a rejecting predicate. Re-run the `fence:<doc>#Boun
 ### Migration
 
 - [x] `CHANGELOG.md` has an entry citing task 262
-- [ ] The probe plan is re-run with `probes_executed` above 0, recorded in the DoD
+- [x] The probe plan is re-run with `probes_executed` above 0, recorded in the DoD
 
 ---
 
@@ -297,14 +299,39 @@ Rollback triggers:
 ### Key Findings
 No critical issues. One advisory code-review note (an unresolvable parent skips the real-path check; not exploitable, measured).
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.262.qa.1.untrusted-content-path-bound-hardening.md`
+**Gate File**: `task.262.gate.1.untrusted-content-path-bound-hardening.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100
+**PR Review (5c)**: ✅ APPROVE
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 11/11 met (CRLF control, named-guard hostile table, mutation proofs, symlink HALT, `PRD_ROOT` kept, lint test under 2 s, `CI=true npm test`, validate, bundle checks, CHANGELOG, probe re-run)
+✅ **CI:** all 6 checks SUCCESS on the head `2ece97238222` (reading 1)
+✅ **Security Review:** ✅ PASS — 60 probes executed, 0 reproduced, 0 escaped
+✅ **Documentation:** CHANGELOG entry cites task 262; three bound-block sources and nine bundled copies updated
+✅ **Compliance Review:** not applicable (no personal data, payment, UI or health data)
+
+**Task marked as ACCEPTED on:** 2026-11-05
+
+**Detailed Verification Log:** See `task.262.dod.1.untrusted-content-path-bound-hardening.md` for the complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-05 | 1.0     | Initial draft | create-task |
 | 2026-11-05 | 1.1     | Review passed (8/10) after 3 fixes: CRLF mechanism corrected (old regex never matches a CRLF fence), CRLF control redesigned so it can go red, Phase 4 empty-path handling specified | review-task |
 | 2026-11-05 |         | Status → ready-for-development | review-task |
 | 2026-11-05 |         | Implemented — 13 files, 15 new tests | develop |
 | 2026-11-05 |         | QA gate PASS (95/100) — 0 findings | qa-task |
+| 2026-11-05 | 1.2 | DoD passed — accepted (PR #840) | finalise |
 <!-- change-log-end -->
+
