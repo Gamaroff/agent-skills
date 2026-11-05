@@ -5,10 +5,12 @@ type: task
 description: "Derive the Bitbucket repo base from every SSH and HTTPS remote shape Bitbucket serves, and stop sync-jira-* from rewriting an existing card without its Source Documents links when the base cannot be derived."
 tags: [sync-jira, bitbucket, data-loss]
 category: other
-status: ready-for-review
+status: accepted
 priority: High
 created: 2026-11-05
 updated: 2026-11-05
+completed_date: 2026-11-05
+pr_number: 847
 assignee:
 estimated_effort_hours: 8
 ---
@@ -162,7 +164,7 @@ Depends on Phases 1-2.
 ## 7. Files Summary
 
 **Core**
-1. ✅ `shared/resources/jira-sync.js`: parser and `getBitbucketRepoBase`
+1. ✅ `shared/resources/jira-sync.js`: parser, `getBitbucketRepoBase`, and the shared `missingBitbucketBaseMessage` helper (with userinfo redaction) that the four guards call
 2. ✅ `skills/sync-jira-task/scripts/sync-jira-task.js`: guard
 3. ✅ `skills/sync-jira-story/scripts/sync-jira-story.js`: guard
 4. ✅ `skills/sync-jira-epic/scripts/sync-jira-epic.js`: guard
@@ -191,23 +193,23 @@ Depends on Phases 1-2.
 ## 9. Success Criteria
 
 **Functional**
-- [ ] Each of the seven shapes in § 3 derives `https://bitbucket.org/<ws>/<repo>`; unknown and look-alike hosts return `null`.
-- [ ] An update with a null base exits non-zero and issues no write, in all four scripts.
-- [ ] A create with a null base still warns and exits 0.
+- [x] Each of the seven shapes in § 3 derives `https://bitbucket.org/<ws>/<repo>`; unknown and look-alike hosts return `null`.
+- [x] An update with a null base exits non-zero and issues no write, in all four scripts.
+- [x] A create with a null base still warns and exits 0.
 
 **Performance**
-- [ ] No added subprocess or network call per sync run (the parser is pure).
-- [ ] Added suite time under 2 s, measured with `uptime; time node --test shared/resources/tests/jira-sync-bitbucket-remote.test.mjs` on the PR head commit and recorded in the QA report.
+- [x] No added subprocess or network call per sync run (the parser is pure).
+- [x] Added suite time under 2 s, measured with `uptime; time node --test shared/resources/tests/jira-sync-bitbucket-remote.test.mjs` on the PR head commit and recorded in the QA report.
 
 **Code quality**
-- [ ] `CI=true npm test` passes.
-- [ ] `npm run validate` passes.
-- [ ] Mutation proof recorded in the QA report: parser revert and guard removal each turn a named test red.
+- [x] `CI=true npm test` passes.
+- [x] `npm run validate` passes.
+- [x] Mutation proof recorded in the QA report: parser revert and guard removal each turn a named test red.
 
 **Migration**
-- [ ] `CHANGELOG.md` cites task 264.
-- [ ] `npm run bundle:check` and `check:generated` are clean.
-- [ ] Each of the four `SKILL.md` files states the update-stops / create-warns behaviour.
+- [x] `CHANGELOG.md` cites task 264.
+- [x] `npm run bundle:check` and `check:generated` are clean.
+- [x] Each of the four `SKILL.md` files states the update-stops / create-warns behaviour.
 
 ---
 
@@ -268,18 +270,30 @@ Sign-off is not enabled in this repository's `skills-config.yaml`; no rows are r
 ### Key Findings
 No critical issues identified. Two LOW advisory notes are recorded in the gate's future recommendations.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+✅ **Acceptance Criteria:** all 11 Success Criteria met (QA gate PASS 95/100)
+✅ **Tests & PR:** 71 tests across the parser suite and four end-to-end suites pass; PR #847 review report APPROVE; PR CI green on `0443b8cba095`
+✅ **Documentation:** four `SKILL.md` files and `CHANGELOG.md` (task 264) updated; bundled copies in sync
+✅ **Security Review:** exact-host parser probed, 9 executed, 0 reproduced, 0 escaped
+⚠️ **Compliance:** not applicable
+
+**Detailed Verification Log:** see `task.264.dod.1.bitbucket-remote-host-shapes-and-link-loss-guard.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-05
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
-
 | Date | Version | Description | Author |
-| --- | --- | --- | --- |
+|------|---------|-------------|--------|
 | 2026-11-05 | 1.0 | Initial draft | create-task |
 | 2026-11-05 | 1.1 | Review passed (8/10) — guard test must force a null base past fake-jira's pinned `BITBUCKET_REPO_URL`; latency criterion given its measuring command; `pr-read.sh` anchor corrected to line 100 | review-task |
 | 2026-11-05 |  | Status → ready-for-development | review-task |
 | 2026-11-05 |  | Implemented — 4 scripts, 1 engine file, 5 test files (36 new tests), 4 SKILL.md, CHANGELOG | develop |
 | 2026-11-05 |  | QA gate PASS (95/100) — 0 findings | qa-task |
-
+| 2026-11-05 | 1.2 | DoD passed — accepted (PR #847) | finalise |
 <!-- change-log-end -->
 
 ---
