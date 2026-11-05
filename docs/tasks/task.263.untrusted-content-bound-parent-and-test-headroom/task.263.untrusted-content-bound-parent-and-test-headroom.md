@@ -5,7 +5,7 @@ type: task
 description: "Close the two follow-ups left by task 262: make the path bound refuse a parent it cannot resolve instead of skipping the real-path check, and give the lint test real headroom under its 2 s bound."
 tags: [guardrails, prompt-injection, lint, hardening]
 category: other
-status: planned
+status: ready-for-review
 priority: Low
 created: 2026-11-05
 updated: 2026-11-05
@@ -15,7 +15,7 @@ github_issue: 841
 
 # Technical Task: Untrusted-content bound: unresolvable parent and lint test headroom
 
-**Status:** Planned
+**Status:** Ready for Review
 **GitHub Issue**: [#841](https://github.com/Gamaroff/agent-skills/issues/841)
 
 > Detailed implementation guide: [task.263.plan.untrusted-content-bound-parent-and-test-headroom.md](task.263.plan.untrusted-content-bound-parent-and-test-headroom.md)
@@ -113,31 +113,31 @@ None. The default `docs/tasks/...` path and a path under a configured `PRD_ROOT`
 
 **Risk**: Low. **Files**: `tests/untrusted-content-rule.test.js`.
 
-- [ ] Add scratch-repo cases at the first site, each asserting its own message: a dangling directory link (HALT, `has a parent that cannot be resolved`), a deeper path under it (same), a mode 000 directory (same; skipped when `process.getuid() === 0`), and `docs/link/new/x.md` where `docs/link` leaves the tree (HALT, `resolves outside docs/ and the PRD root`).
-- [ ] Confirm the new cases are red against the current block, and that the existing "parent directory does not exist is kept" case stays green.
+- [x] Add scratch-repo cases at the first site, each asserting its own message: a dangling directory link (HALT, `has a parent that cannot be resolved`), a deeper path under it (same), a mode 000 directory (same; skipped when `process.getuid() === 0`), and `docs/link/new/x.md` where `docs/link` leaves the tree (HALT, `resolves outside docs/ and the PRD root`).
+- [x] Confirm the new cases are red against the current block, and that the existing "parent directory does not exist is kept" case stays green.
 
 ### Phase 2: The block
 
 **Risk**: Medium (a shell change in three sources that must stay identical). **Files**: `skills/review-task/SKILL.md`, `skills/review-story/SKILL.md`, `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md`. **Depends on**: Phase 1.
 
-- [ ] Replace the `if [ -n "$REAL_DIR" ]` skip with the nearest-existing-ancestor walk and the decision in § 3, in `bash` and `zsh`-safe form (the tests run `bash`; the skills run under the user's shell).
-- [ ] Update the prose above the block so it states the dangling-link versus missing-directory distinction in one sentence.
-- [ ] Run `npm run bundle` and confirm `npm run bundle:check` is clean.
+- [x] Replace the `if [ -n "$REAL_DIR" ]` skip with the nearest-existing-ancestor walk and the decision in § 3, in `bash` and `zsh`-safe form (the tests run `bash`; the skills run under the user's shell).
+- [x] Update the prose above the block so it states the dangling-link versus missing-directory distinction in one sentence.
+- [x] Run `npm run bundle` and confirm `npm run bundle:check` is clean.
 
 ### Phase 3: Lint test headroom
 
 **Risk**: Low. **Files**: `tests/untrusted-content-rule.test.js`. **Independent of** Phases 1 and 2, but measure after them so the figure includes the new cases.
 
-- [ ] Measure first: record the per-test durations with the command in § 8.
-- [ ] Load the tree once (memoise `loadTree()`), and re-measure.
-- [ ] If the target in § 9 is not met, run the hostile-path cases for a site in one shell instead of one shell per case, and re-measure. Stop when the target is met.
-- [ ] Keep every existing test, including "the path bound is the same block at every site".
+- [x] Measure first: record the per-test durations with the command in § 8.
+- [x] Load the tree once (memoise `loadTree()`), and re-measure.
+- [x] If the target in § 9 is not met, run the hostile-path cases for a site in one shell instead of one shell per case, and re-measure. Stop when the target is met. (Not needed: the target was met after the memoisation, at about 0.38 s.)
+- [x] Keep every existing test, including "the path bound is the same block at every site".
 
 ### Phase 4: Record
 
 **Risk**: Low. **Files**: `CHANGELOG.md`.
 
-- [ ] Add an entry under `[Unreleased]` citing `(task 263)`.
+- [x] Add an entry under `[Unreleased]` citing `(task 263)`.
 
 ---
 
@@ -269,10 +269,10 @@ None.
 
 ## Progress Tracking
 
-- [ ] Phase 1
-- [ ] Phase 2
-- [ ] Phase 3
-- [ ] Phase 4
+- [x] Phase 1
+- [x] Phase 2
+- [x] Phase 3
+- [x] Phase 4
 - [ ] QA gate PASS
 
 ---
@@ -292,4 +292,7 @@ None.
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-11-05 | 1.0     | Initial draft | create-task |
+| 2026-11-05 | 1.1     | Review passed (9/10) — no changes required | review-task |
+|            |         | Status → ready-for-development | review-task |
+| 2026-11-05 |         | Implemented: ancestor walk in the three block sources, 5 new guard tests + 1 control, memoised tree load; status → ready-for-review | develop-task |
 <!-- change-log-end -->

@@ -138,13 +138,18 @@ function check(files, allowlist) {
   return { uncited, staleAllow: [...staleAllow] };
 }
 
+// Read once: three tests share it, and none writes to it. The repeated tree read, not the
+// scratch-repo cases, was the cost of this file (task 263).
+let TREE = null;
 function loadTree() {
+  if (TREE) return TREE;
   const files = {};
   for (const f of populationFiles()) {
     files[path.relative(REPO_ROOT, f).split(path.sep).join("/")] =
       fs.readFileSync(f, "utf8");
   }
-  return files;
+  TREE = files;
+  return TREE;
 }
 
 test("the rule document exists and carries the six headings a citation can point at", () => {
@@ -427,8 +432,79 @@ for (const site of BOUND_SITES) {
       path.join(t, "outside", "secret.md"),
       path.join(t, "docs", "a", "evil.md"),
     );
+    // task 263: parents the bound cannot resolve. A link to nothing, and a regular file used as a
+    // directory. (The mode-000 directory is made only in its own test: it needs a special cleanup.)
+    fs.symlinkSync(
+      path.join(t, "nonexistent"),
+      path.join(t, "docs", "dangling"),
+    );
+    fs.mkdirSync(path.join(t, "docs", "sub"));
+    fs.writeFileSync(path.join(t, "docs", "file.md"), "x");
     return t;
   }
+
+  // task 263: each row names the guard that must fire, so deleting one guard turns its own row red.
+  const UNRESOLVABLE =
+    /HALT: derived path .* has a parent that cannot be resolved/;
+  const LEAVES =
+    /HALT: derived path .* resolves outside docs\/ and the PRD root/;
+  for (const [label, bad, expected] of [
+    ["a dangling directory link", "docs/dangling/x.md", UNRESOLVABLE],
+    [
+      "a path deeper under a dangling directory link",
+      "docs/dangling/sub/x.md",
+      UNRESOLVABLE,
+    ],
+    ["a regular file used as a directory", "docs/file.md/x.md", UNRESOLVABLE],
+    [
+      "a missing child under a link that leaves the tree",
+      "docs/link/new/x.md",
+      LEAVES,
+    ],
+  ]) {
+    test(`${site}: ${label} is a HALT`, () => {
+      const t = scratchRepo();
+      try {
+        const r = runBound(site, bad, { cwd: t });
+        assert.equal(r.status, 1, r.stdout);
+        assert.match(r.stdout, expected);
+      } finally {
+        fs.rmSync(t, { recursive: true, force: true });
+      }
+    });
+  }
+
+  test(
+    `${site}: a directory that cannot be entered (mode 000) is a HALT`,
+    // Root enters a mode 000 directory, so the state cannot be built; skipped for uid 0.
+    { skip: process.getuid?.() === 0 },
+    () => {
+      const t = scratchRepo();
+      const locked = path.join(t, "docs", "locked");
+      try {
+        fs.mkdirSync(locked, { mode: 0o000 });
+        const r = runBound(site, "docs/locked/x.md", { cwd: t });
+        assert.equal(r.status, 1, r.stdout);
+        assert.match(r.stdout, UNRESOLVABLE);
+      } finally {
+        fs.chmodSync(locked, 0o755);
+        fs.rmSync(t, { recursive: true, force: true });
+      }
+    },
+  );
+
+  test(`${site}: a missing parent under a real subdirectory of docs/ is kept (control)`, () => {
+    const t = scratchRepo();
+    try {
+      for (const kept of ["docs/sub/new/x.md", "docs/sub/new/deeper/x.md"]) {
+        const r = runBound(site, kept, { cwd: t });
+        assert.equal(r.status, 0, `${kept}: ${r.stdout}`);
+        assert.ok(r.stdout.includes(`KEPT:${kept}`));
+      }
+    } finally {
+      fs.rmSync(t, { recursive: true, force: true });
+    }
+  });
 
   test(`${site}: a directory symlink inside docs/ that leaves the tree is a HALT`, () => {
     const t = scratchRepo();
