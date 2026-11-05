@@ -1,0 +1,58 @@
+schema: 2
+task: 'task.262.untrusted-content-path-bound-hardening'
+task_title: 'Untrusted-content path bound hardening'
+gate: PASS
+status_reason: 'All four gaps closed and held by committed tests (33 pass, mutation-proven). Probe plan re-run: 60 executed, 0 escaped, engages at all three sites. Two code-review findings examined; neither gates.'
+reviewer: 'QA Engineer'
+head: '9d93048cd21cb991dc34367d3b1e55b306ad96e7'
+updated: '2026-11-05T10:17:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 35
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 60
+    escaped: 0
+    boundary_signals: []
+    notes: 'Boundary: true (the Bound the derived path fence at three sites). Probe plan (10 cases x 3 sites x 2 shells) engages, no escapes, no refusals. Symlink cases are held by unit tests, not the probe.'
+  performance:
+    status: PASS
+    notes: 'Lint test 2.0 s over 35 tests including unbound-default-reads, within its bound.'
+  reliability:
+    status: PASS
+    notes: 'tests/bundle-missing-source.test.js exceeds its wall-clock budget only under full ci:fast load and passes alone; not caused by this change.'
+  maintainability:
+    status: PASS
+    notes: 'One boundBlockFor extraction path; the same-block-at-every-site test holds the three copies identical; bundle:check clean (129 skills).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (medium/medium, advisory): an unresolvable parent directory yields an empty REAL_DIR and the real-path check is skipped. Measured: a dangling symlinked directory and a 000-mode directory both make the read itself fail, so nothing escapes. Consider HALTing when the parent exists but cannot be resolved.'
+      refs: ['skills/review-task/SKILL.md']
+    - action: 'CR-2 (refuted): the reviewer said the six bundled copies were stale. All nine files carrying the heading hold the new block; bundle:check is clean.'
+      refs: ['shared/resources/develop-pipeline-step-0-resolve-and-prepare.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

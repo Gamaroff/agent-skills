@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Changed
+
+- **The issue-body path bound follows the PRD root and symlinks (task 262).** The check that keeps a
+  path taken from an issue body inside `docs/` (`review-task`, `review-story`, develop Step 0) now
+  accepts the configured `PRD_ROOT` as well, refuses a symlinked file, and refuses a path whose
+  parent directory resolves, through a symlink, outside both roots. The lint test for the rule now
+  tracks fences under CRLF line endings, and each hostile path case names the guard that must fire.
+
 ### Added
 
 - **Untrusted-content rule (task 261).** A shared rule (`shared/resources/untrusted-content-rule.md`)

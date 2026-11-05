@@ -1,0 +1,149 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "e24e28da5e41b578d6a17c9dd6e65bfb0a02de6e",
+  "dirty_paths": [],
+  "document": "docs/tasks/task.262.untrusted-content-path-bound-hardening/task.262.untrusted-content-path-bound-hardening.md",
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 11,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "28eb4a45abe160bb76d8926041e3a77333adb294d77fbbcd1f698a9785f5fcb1",
+      "status": "PASS",
+      "description": "CRLF document with closing fence is tracked correctly (control case)",
+      "code_citation": "tests/untrusted-content-rule.test.js:99",
+      "test_citation": "tests/untrusted-content-rule.test.js:278",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Regex uses [^\\\\n]* with trim; the control compares CRLF and LF texts."
+    },
+    {
+      "id": "#2",
+      "text_hash": "0d40998c8fd61e9995d07ba146ec25cf49963b2d16f4b44b3f055545e0cc8fb1",
+      "status": "PASS",
+      "description": "Each hostile path case asserts its own HALT message",
+      "code_citation": "tests/untrusted-content-rule.test.js:385",
+      "test_citation": "tests/untrusted-content-rule.test.js:382",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Every row pairs the path with OUTSIDE or CLIMBS and the loop asserts the match, at all three sites."
+    },
+    {
+      "id": "#3",
+      "text_hash": "240158415d51edd50c5e0fd1a0acc5a4c5c08fed646bb6566544c6a1c46bea7e",
+      "status": "PASS",
+      "description": "Deleting either guard turns a named test red (mutation proof in QA report)",
+      "code_citation": "docs/tasks/task.262.untrusted-content-path-bound-hardening/task.262.qa.1.untrusted-content-path-bound-hardening.md:93",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "QA report lines 93-94 record both guard deletions and the tests that went red; committed at 2ece9723."
+    },
+    {
+      "id": "#4",
+      "text_hash": "abdbce4d066a80c4b3211398e809957d5d06251aec0f2ef60c149b4819fdd89d",
+      "status": "PASS",
+      "description": "Symlink inside docs/ pointing outside the tree is a HALT",
+      "code_citation": "skills/review-task/SKILL.md:178",
+      "test_citation": "tests/untrusted-content-rule.test.js:433",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Real directory symlink in a scratch repo; file-symlink case at line 444."
+    },
+    {
+      "id": "#5",
+      "text_hash": "4b82dd672c00ba914eac5ebdea2592e476256cafc76f3c82202ad9f77f5460f1",
+      "status": "PASS",
+      "description": "Configured PRD_ROOT path kept; default docs/tasks path kept",
+      "code_citation": "skills/review-task/SKILL.md:168",
+      "test_citation": "tests/untrusted-content-rule.test.js:466",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Default path covered at line 376."
+    },
+    {
+      "id": "#6",
+      "text_hash": "647ea2df26c7fd7ecea000b13097a89caa71602f0d9096c9757583d978deb891",
+      "status": "PASS",
+      "description": "Lint test runs in under 2 seconds; figure and command in QA report",
+      "code_citation": "docs/tasks/task.262.untrusted-content-path-bound-hardening/task.262.qa.1.untrusted-content-path-bound-hardening.md:100",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Three runs 1981, 1989, 1951 ms at load average about 6. Thin margin."
+    },
+    {
+      "id": "#7",
+      "text_hash": "42c527517fa0e9104c447ce1048f8d3123e53163a5b447f912d9b17b4b303db0",
+      "status": "PASS",
+      "description": "CI=true npm test passes",
+      "code_citation": ".github/workflows/test.yml:58",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 2ece97238222d3c5af2dc7c21e9912af3efb1f01 — Graded from CI reading 1. Local ci:fast had one load-sensitive failure (bundle-missing-source), green alone.",
+      "ci_reading": "CI reading 1: SUCCESS @ 2ece97238222d3c5af2dc7c21e9912af3efb1f01"
+    },
+    {
+      "id": "#8",
+      "text_hash": "3743ef394bf75e43ac4feaf8db86abc2e5d13e427b6948552d478d12108c1849",
+      "status": "PASS",
+      "description": "npm run validate on review-task and review-story passes",
+      "code_citation": ".github/workflows/validate.yml:1",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 2ece97238222d3c5af2dc7c21e9912af3efb1f01 — Graded from CI reading 1; quick_validate passed locally for both skills.",
+      "ci_reading": "CI reading 1: SUCCESS @ 2ece97238222d3c5af2dc7c21e9912af3efb1f01"
+    },
+    {
+      "id": "#9",
+      "text_hash": "c9e8b69ad48a4393f02caad40966252d6e7e75bbc75b718eaff50f28c78a01a1",
+      "status": "PASS",
+      "description": "bundle:check and check:generated are clean",
+      "code_citation": ".github/workflows/validate.yml:128",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 2ece97238222d3c5af2dc7c21e9912af3efb1f01 — Graded from CI reading 1; bundle:check clean locally (129 skills).",
+      "ci_reading": "CI reading 1: SUCCESS @ 2ece97238222d3c5af2dc7c21e9912af3efb1f01"
+    },
+    {
+      "id": "#10",
+      "text_hash": "2d969654061d712feb8702add6e3c0a29d3700c882530f2cadd141d500445a67",
+      "status": "PASS",
+      "description": "CHANGELOG.md has an entry citing task 262",
+      "code_citation": "CHANGELOG.md:9",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Entry under [Unreleased] cites task 262."
+    },
+    {
+      "id": "#11",
+      "text_hash": "4eea1ad89286dc867ff8b7289036cb3a93838096a583064f22262f23445ece6a",
+      "status": "PASS",
+      "description": "Probe plan re-run with probes_executed above 0, recorded in the DoD",
+      "code_citation": "docs/tasks/task.262.untrusted-content-path-bound-hardening/task.262.dod.1.security.run.json",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Lead regrade: the AC agent graded this FAIL only because the record did not yet exist. Step 3b.1 then wrote the run record beside the task, 60 executed, 0 reproduced, 0 escaped."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#6",
+      "note": "Margin is thin: 1951-1989 ms against 2000 ms. May fail under heavier load."
+    },
+    {
+      "ac_id": "#4",
+      "note": "QA advisory CR-1: an unresolvable parent skips the real-path check; measured not exploitable."
+    }
+  ]
+}

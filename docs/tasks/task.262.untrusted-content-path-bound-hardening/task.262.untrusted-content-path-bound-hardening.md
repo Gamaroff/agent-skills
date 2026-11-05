@@ -5,16 +5,18 @@ type: task
 description: "Close the four advisory gaps left by task 261: CRLF in the fence regex, hostile-path assertions that do not name the guard, duplicated block extraction, and a path bound that hard-codes docs/ and ignores symlinks."
 tags: [guardrails, prompt-injection, lint, hardening]
 category: other
-status: planned
+status: accepted
 priority: Low
 created: 2026-11-05
 updated: 2026-11-05
+completed_date: 2026-11-05
+pr_number: 840
 estimated_effort_hours: 4
 ---
 
 # Technical Task: Untrusted-content path bound hardening
 
-**Status:** Planned
+**Status:** Accepted
 
 ---
 
@@ -30,7 +32,7 @@ Task 261 added a shared untrusted-content rule, a `docs/`-bounded check on a pat
 
 ### Current Problems
 
-1. **CRLF is a latent miss.** The fence regex in `markerLines` (`tests/untrusted-content-rule.test.js`, the `l.match(/^\s*(`{3,}|~{3,})(.*)$/)` line) ends in `(.*)$`. `.` does not match `\r`, but `$` without the `m` flag only matches at the end of the string, and each line is split on `\n`, so a line ending `\r` leaves the capture holding the `\r`. A closing fence written ```` ```\r ```` is then read as a fence with trailing text, not as a close. A CRLF checkout would desynchronise fence tracking.
+1. **CRLF is a latent miss.** The fence regex in `markerLines` (`tests/untrusted-content-rule.test.js`, the `l.match(/^\s*(`{3,}|~{3,})(.*)$/)` line) ends in `(.*)$`. Each line is split on `\n`, so a CRLF line keeps its `\r`. In JavaScript `.` does not match `\r` and `$` (no `m` flag) only matches at the end of the string, so the regex **does not match a CRLF fence line at all** (measured: `"```\r".match(...)` is `null`, and so is `"```bash\r"`). A CRLF document therefore never opens a fence. A fenced line that holds a read marker is then judged as prose, and the forbidding-sentence filter (which applies only outside a fence) can drop it. The marker is silently lost, which is the miss.
 2. **The hostile path cases cannot tell the two guards apart.** The bound has two guards: outside `docs/`, and climbs out with `..`. The hostile test asserts only `assert.match(r.stdout, /HALT/)`, so deleting either guard while the other still fires for that input leaves the test green for many inputs.
 3. **The block is extracted twice.** `boundBlock` is called from `runBound` and again from the `BOUND_SITES.map(...)` in the "same block at every site" test.
 4. **The bound is a string check on `docs/`.** A custom `PRD_ROOT` outside `docs/` would make `review-story` HALT on a legitimate story path, and a symlink inside `docs/` that points outside the tree passes the string check.
@@ -99,35 +101,36 @@ None - API stable. Phase 4 narrows what the bound accepts only for a symlink tha
 
 **Risk**: Low. **Files**: `tests/untrusted-content-rule.test.js`. **Dependencies**: none.
 
-- [ ] Change the fence regex to capture `([^\n]*)` and strip a trailing `\r` before the close test
-- [ ] Add a control: a CRLF document whose closing fence is ```` ```\r ``` ` still closes, and a read marker after it is found
-- [ ] Mutation-prove: revert the regex, confirm the control goes red
+- [x] Change the fence regex to capture `([^\n]*)` and strip a trailing `\r` before the close test
+- [x] Add a control: a CRLF document with a fenced block whose body line holds both a read marker and a forbidding sentence (e.g. `# do not ...`). With the fence tracked the line counts as a read, so `markerLines` must return it. A control that only puts a marker *after* a closed fence passes on the old regex too (the fence never opens), so it cannot go red
+- [x] Add a second control with LF endings (same text) that must give the same result, so the CRLF case is compared with a known-good case
+- [x] Mutation-prove: revert the regex, confirm the CRLF control goes red and the LF control stays green
 
 ### Phase 2: Name the guard in each hostile case
 
 **Risk**: Low. **Files**: `tests/untrusted-content-rule.test.js`. **Dependencies**: none.
 
-- [ ] Replace the single `/HALT/` assertion with a table of `[path, expected message]` pairs
-- [ ] Mutation-prove each guard separately: delete the `docs/*` guard and confirm the outside-`docs/` rows go red; delete the `..` guard and confirm the climb rows go red
+- [x] Replace the single `/HALT/` assertion with a table of `[path, expected message]` pairs
+- [x] Mutation-prove each guard separately: delete the `docs/*` guard and confirm the outside-`docs/` rows go red; delete the `..` guard and confirm the climb rows go red
 
 ### Phase 3: One extraction helper
 
 **Risk**: Low. **Files**: `tests/untrusted-content-rule.test.js`. **Dependencies**: Phase 2 (same hunk).
 
-- [ ] Add `boundBlockFor(site)` and use it in `runBound` and the "same block at every site" test
-- [ ] Confirm the test count is unchanged and nothing else reads the block another way
+- [x] Add `boundBlockFor(site)` and use it in `runBound` and the "same block at every site" test
+- [x] Confirm the test count is unchanged and nothing else reads the block another way
 
 ### Phase 4: Configured root and symlinks
 
 **Risk**: Medium. **Files**: the three bound blocks and their bundled copies; `tests/untrusted-content-rule.test.js`; `CHANGELOG.md`. **Dependencies**: Phases 2 and 3.
 
-- [ ] Run the symlink-resolution property on a temp symlink (Section 3)
-- [ ] Decide and record the root: `docs` for tasks, `${PRD_ROOT:-docs/prd}` for stories (review-story and Step 0 when the document is a story)
-- [ ] Resolve the real path of the parent directory with `cd … && pwd -P` and compare with the real path of the root
-- [ ] Add behaviour tests: a symlink inside `docs/` pointing outside is a HALT; a configured `PRD_ROOT` path is kept; the default path is kept
-- [ ] Re-run the `fence:` probe plan for the three sites; update the cases (`probes_executed` must be above 0)
-- [ ] `npm run bundle`, then `npm run bundle:check`
-- [ ] Add a `CHANGELOG.md` entry citing task 262
+- [x] Run the symlink-resolution property on a temp symlink (Section 3)
+- [x] Decide and record the root: `docs` for tasks, `${PRD_ROOT:-docs/prd}` for stories (review-story and Step 0 when the document is a story)
+- [x] Resolve the real path of the parent directory with `cd … && pwd -P` and compare with the real path of the root. Handle both empty cases explicitly, before the `case`: an empty `REAL_ROOT` (no `docs/` in the cwd) makes the pattern `"$REAL_ROOT"/*` equal `/*`, which admits every absolute path, so it must HALT; an empty `REAL_DIR` (the parent does not exist) must not HALT here and is left to the caller's existing file-exists check. Note `"$REAL_DIR/"` is never the empty string, so a `""` case arm cannot catch it (measured)
+- [x] Add behaviour tests: a symlink inside `docs/` pointing outside is a HALT; a configured `PRD_ROOT` path is kept; the default path is kept; a path whose parent directory does not exist is kept (not a HALT); a cwd with no `docs/` is a HALT
+- [x] Re-run the `fence:` probe plan for the three sites; update the cases (`probes_executed` must be above 0)
+- [x] `npm run bundle`, then `npm run bundle:check`
+- [x] Add a `CHANGELOG.md` entry citing task 262
 
 ---
 
@@ -146,6 +149,7 @@ Generated (via `npm run bundle`, never hand-edited):
 Tests:
 
 5. ✅ `tests/untrusted-content-rule.test.js` - Phases 1 to 4
+5a. ✅ `tests/unbound-default-reads.test.js` - declares `PRD_ROOT` as an input of the three bound blocks (its guard flagged the new `${PRD_ROOT:-docs/prd}` read; found by `ci:fast`, not by the review)
 
 Documentation:
 
@@ -173,26 +177,26 @@ Security probe: the bound is a rejecting predicate. Re-run the `fence:<doc>#Boun
 
 ### Functional
 
-- [ ] A CRLF document with a closing ```` ```\r ``` ` fence is tracked correctly (control case in the lint test)
-- [ ] Each hostile path case asserts its own HALT message
-- [ ] Deleting either guard turns a named test red (mutation proof recorded in the QA report)
-- [ ] A symlink inside `docs/` that points outside the tree is a HALT
-- [ ] A path under a configured `PRD_ROOT` is kept, and the default `docs/tasks/...` path is kept
+- [x] A CRLF document with a closing ```` ```\r ``` ` fence is tracked correctly (control case in the lint test)
+- [x] Each hostile path case asserts its own HALT message
+- [x] Deleting either guard turns a named test red (mutation proof recorded in the QA report)
+- [x] A symlink inside `docs/` that points outside the tree is a HALT
+- [x] A path under a configured `PRD_ROOT` is kept, and the default `docs/tasks/...` path is kept
 
 ### Performance
 
-- [ ] The lint test runs in under 2 seconds; the figure and command are recorded in the QA report
+- [x] The lint test runs in under 2 seconds; the figure and command are recorded in the QA report
 
 ### Code Quality
 
-- [ ] `CI=true npm test` passes
-- [ ] `npm run validate -- skills/review-task/ skills/review-story/` passes
-- [ ] `npm run bundle:check` and `npm run check:generated` are clean
+- [x] `CI=true npm test` passes
+- [x] `npm run validate -- skills/review-task/ skills/review-story/` passes
+- [x] `npm run bundle:check` and `npm run check:generated` are clean
 
 ### Migration
 
-- [ ] `CHANGELOG.md` has an entry citing task 262
-- [ ] The probe plan is re-run with `probes_executed` above 0, recorded in the DoD
+- [x] `CHANGELOG.md` has an entry citing task 262
+- [x] The probe plan is re-run with `probes_executed` above 0, recorded in the DoD
 
 ---
 
@@ -240,10 +244,10 @@ Rollback triggers:
 
 ## Progress Tracking
 
-- [ ] Phase 1
-- [ ] Phase 2
-- [ ] Phase 3
-- [ ] Phase 4
+- [x] Phase 1
+- [x] Phase 2
+- [x] Phase 3
+- [x] Phase 4
 - [ ] QA gate PASS
 
 ---
@@ -259,10 +263,75 @@ Rollback triggers:
 - Cut from the task 261 follow-ups; independent of every open task. One shippable unit: the four items share one test file and one block.
 - QA artifacts will land beside this file: `task.262.qa.[N].*.md`, `task.262.gate.[N].*.yml`, `task.262.bug.[N].*.md`.
 
+## Implementation Summary
+
+**Completed**: 2026-11-05
+
+**Approach**: Test-first, one phase at a time. Phases 1 to 3 changed only `tests/untrusted-content-rule.test.js`; Phase 4 rewrote the "Bound the derived path" block at the three sites and `npm run bundle` regenerated the six bundled copies of the step-0 document.
+
+- **Phase 1**: the fence regex is `([^\n]*)`. The review found that the old regex did not mis-read a CRLF fence line, it never matched one. The control puts a fenced read marker with a forbidding word in a CRLF text and asserts the hit survives; an LF twin must give the same result.
+- **Phase 2**: the hostile table is `[path, expected message]`; the outside-`docs/` and `..` rows name their own guard.
+- **Phase 3**: `boundBlockFor(site)` is the only caller of `boundBlock`.
+- **Phase 4**: the block accepts `docs/` or `${PRD_ROOT:-docs/prd}`, refuses a symlinked file, and compares the real path of the parent directory with the real path of each root (`cd … && pwd -P`, no `realpath -m`). A missing parent directory is not a HALT. Behaviour tests run in a scratch repo with real symlinks.
+
+**Testing Results**: `CI=true node --test tests/untrusted-content-rule.test.js`: 33 tests pass, 1.6 to 1.9 s over three runs at load average about 5. Every fix was mutation-proved (see the implementation report's Decisions Log). Probe plan re-run: 60 probes executed, verdict `engages`, no escapes.
+
+**Deferred Work**: none. Two things were decided in-session: the bound also refuses a symlinked file (the plan compared only the parent directory), and the Phase 4 behaviour tests run at one site because the three blocks are asserted equal.
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-05
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.262.qa.1.untrusted-content-path-bound-hardening.md](./task.262.qa.1.untrusted-content-path-bound-hardening.md)
+- **Gate File**: [task.262.gate.1.untrusted-content-path-bound-hardening.yml](./task.262.gate.1.untrusted-content-path-bound-hardening.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 35
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues. One advisory code-review note (an unresolvable parent skips the real-path check; not exploitable, measured).
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.262.qa.1.untrusted-content-path-bound-hardening.md`
+**Gate File**: `task.262.gate.1.untrusted-content-path-bound-hardening.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100
+**PR Review (5c)**: ✅ APPROVE
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 11/11 met (CRLF control, named-guard hostile table, mutation proofs, symlink HALT, `PRD_ROOT` kept, lint test under 2 s, `CI=true npm test`, validate, bundle checks, CHANGELOG, probe re-run)
+✅ **CI:** all 6 checks SUCCESS on the head `2ece97238222` (reading 1)
+✅ **Security Review:** ✅ PASS — 60 probes executed, 0 reproduced, 0 escaped
+✅ **Documentation:** CHANGELOG entry cites task 262; three bound-block sources and nine bundled copies updated
+✅ **Compliance Review:** not applicable (no personal data, payment, UI or health data)
+
+**Task marked as ACCEPTED on:** 2026-11-05
+
+**Detailed Verification Log:** See `task.262.dod.1.untrusted-content-path-bound-hardening.md` for the complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-05 | 1.0     | Initial draft | create-task |
+| 2026-11-05 | 1.1     | Review passed (8/10) after 3 fixes: CRLF mechanism corrected (old regex never matches a CRLF fence), CRLF control redesigned so it can go red, Phase 4 empty-path handling specified | review-task |
+| 2026-11-05 |         | Status → ready-for-development | review-task |
+| 2026-11-05 |         | Implemented — 13 files, 15 new tests | develop |
+| 2026-11-05 |         | QA gate PASS (95/100) — 0 findings | qa-task |
+| 2026-11-05 | 1.2 | DoD passed — accepted (PR #840) | finalise |
 <!-- change-log-end -->
+

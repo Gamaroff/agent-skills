@@ -31,6 +31,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const os = require("node:os");
 
 const REPO_ROOT = path.join(__dirname, "..");
 const SHARED = path.join(REPO_ROOT, "shared", "resources");
@@ -95,7 +96,10 @@ function markerLines(text) {
   // fence or inside a longer fence is content, and an unclosed fence stays local to this text.
   let fence = null;
   text.split("\n").forEach((l, i) => {
-    const f = l.match(/^\s*(`{3,}|~{3,})(.*)$/);
+    // `[^\n]*`, not `.*`: a CRLF line keeps its `\r` after the split on `\n`, `.` does not match `\r`
+    // and `$` has no `m` flag, so `.*$` never matched a CRLF fence line and the fence never opened
+    // (task 262). `.trim()` below drops the `\r` from the info string.
+    const f = l.match(/^\s*(`{3,}|~{3,})([^\n]*)$/);
     if (f) {
       if (!fence) {
         fence = { ch: f[1][0], len: f[1].length };
@@ -271,6 +275,19 @@ test("control: fence tracking survives nested, longer and unclosed fences", () =
   );
 });
 
+test("control: fence tracking is the same under CRLF and LF line endings (task 262)", () => {
+  // A fenced read whose comment holds a forbidding word. Inside a tracked fence it counts as a read;
+  // if the fence never opens, the line is judged as prose and the forbidding word drops it. The old
+  // `(.*)$` regex never matched a CRLF fence line, so the CRLF text lost the hit.
+  const lf = "```bash\ngh issue view 5 --json body  # never cached\n```\n";
+  const crlf = lf.replace(/\n/g, "\r\n");
+  assert.equal(markerLines(lf).length, 1, "LF control");
+  assert.equal(markerLines(crlf).length, 1, "CRLF text must give the same hit");
+  // And the fence still closes under CRLF: prose after it is prose again.
+  const after = crlf + "Never call WebFetch from this skill.\r\n";
+  assert.equal(markerLines(after).length, 1, "the CRLF fence closes");
+});
+
 test("control: a prose line using the bare word no is not treated as forbidding", () => {
   assert.equal(
     markerLines("There is no cache: run gh issue view 5 --json body").length,
@@ -317,8 +334,20 @@ function boundBlock(text) {
 }
 const BOUND_SLOT = "<derived-path>";
 
-function runBound(site, localPath) {
-  const block = boundBlock(fs.readFileSync(path.join(REPO_ROOT, site), "utf8"));
+/** The one way a site's bound block is read; every test goes through it (task 262). */
+function boundBlockFor(site) {
+  return boundBlock(fs.readFileSync(path.join(REPO_ROOT, site), "utf8"));
+}
+
+/**
+ * Runs a site's bound block on `localPath`. `cwd` defaults to the repository root (a real `docs/`);
+ * `prdRoot` sets PRD_ROOT, and is otherwise removed from the environment so the default applies.
+ */
+function runBound(site, localPath, { cwd = REPO_ROOT, prdRoot } = {}) {
+  const env = { ...process.env };
+  delete env.PRD_ROOT;
+  if (prdRoot) env.PRD_ROOT = prdRoot;
+  const block = boundBlockFor(site);
   assert.ok(block, `${site}: no path bound block found`);
   assert.ok(block.includes(BOUND_SLOT), `${site}: bound block has no slot`);
   return spawnSync(
@@ -331,14 +360,14 @@ function runBound(site, localPath) {
     ],
     {
       encoding: "utf8",
+      cwd,
+      env,
     },
   );
 }
 
 test("the path bound is the same block at every site", () => {
-  const blocks = BOUND_SITES.map((s) =>
-    boundBlock(fs.readFileSync(path.join(REPO_ROOT, s), "utf8")),
-  );
+  const blocks = BOUND_SITES.map(boundBlockFor);
   assert.ok(blocks.every(Boolean), "every site carries a bound block");
   assert.equal(new Set(blocks).size, 1, "the three bound blocks differ");
 });
@@ -351,19 +380,23 @@ for (const site of BOUND_SITES) {
   });
 
   test(`${site}: a derived path outside docs/, or climbing out of it, is a HALT`, () => {
-    for (const bad of [
-      "../../etc/passwd",
-      "/etc/passwd",
-      "skills/x/SKILL.md",
-      "docs/../.ssh/id_rsa",
-      "docs/..",
-      "docs/a/../../x",
-      "docs/a/..",
-      "docsx/y.md",
+    // Each row names the guard that must fire, so deleting one guard turns its own rows red
+    // instead of being covered by the other (task 262).
+    const OUTSIDE = /HALT: derived path .* is outside docs\//;
+    const CLIMBS = /HALT: derived path .* climbs out with \.\./;
+    for (const [bad, expected] of [
+      ["../../etc/passwd", OUTSIDE],
+      ["/etc/passwd", OUTSIDE],
+      ["skills/x/SKILL.md", OUTSIDE],
+      ["docsx/y.md", OUTSIDE],
+      ["docs/../.ssh/id_rsa", CLIMBS],
+      ["docs/..", CLIMBS],
+      ["docs/a/../../x", CLIMBS],
+      ["docs/a/..", CLIMBS],
     ]) {
       const r = runBound(site, bad);
       assert.equal(r.status, 1, `${bad} should HALT`);
-      assert.match(r.stdout, /HALT/);
+      assert.match(r.stdout, expected, `${bad} should name its own guard`);
     }
   });
 
@@ -376,5 +409,85 @@ for (const site of BOUND_SITES) {
   test(`${site}: an empty derived path passes through to the fallback`, () => {
     const r = runBound(site, "");
     assert.equal(r.status, 0);
+  });
+  // ---- task 262: the bound follows symlinks and the configured PRD root ----
+  // Run at the first site only: "the path bound is the same block at every site" holds the three
+  // blocks equal, so the behaviour is proved once. It also keeps this file under its 2 s bound.
+  if (site !== BOUND_SITES[0]) continue;
+
+  /** A scratch repo: docs/a (real), docs/link -> ../outside (leaves the tree), specs/prd (a PRD root). */
+  function scratchRepo() {
+    const t = fs.mkdtempSync(path.join(os.tmpdir(), "bound-"));
+    fs.mkdirSync(path.join(t, "docs", "a"), { recursive: true });
+    fs.mkdirSync(path.join(t, "outside"));
+    fs.mkdirSync(path.join(t, "specs", "prd", "p"), { recursive: true });
+    fs.symlinkSync(path.join(t, "outside"), path.join(t, "docs", "link"));
+    fs.writeFileSync(path.join(t, "outside", "secret.md"), "x");
+    fs.symlinkSync(
+      path.join(t, "outside", "secret.md"),
+      path.join(t, "docs", "a", "evil.md"),
+    );
+    return t;
+  }
+
+  test(`${site}: a directory symlink inside docs/ that leaves the tree is a HALT`, () => {
+    const t = scratchRepo();
+    try {
+      const r = runBound(site, "docs/link/secret.md", { cwd: t });
+      assert.equal(r.status, 1, r.stdout);
+      assert.match(r.stdout, /HALT: derived path .* resolves outside docs\//);
+    } finally {
+      fs.rmSync(t, { recursive: true, force: true });
+    }
+  });
+
+  test(`${site}: a file symlink inside docs/ is a HALT`, () => {
+    const t = scratchRepo();
+    try {
+      const r = runBound(site, "docs/a/evil.md", { cwd: t });
+      assert.equal(r.status, 1, r.stdout);
+      assert.match(r.stdout, /HALT: derived path .* is a symlink/);
+    } finally {
+      fs.rmSync(t, { recursive: true, force: true });
+    }
+  });
+
+  test(`${site}: a real path under docs/ is kept in a repo that has symlinks`, () => {
+    const t = scratchRepo();
+    try {
+      const r = runBound(site, "docs/a/real.md", { cwd: t });
+      assert.equal(r.status, 0, r.stdout);
+      assert.match(r.stdout, /KEPT:docs\/a\/real\.md/);
+    } finally {
+      fs.rmSync(t, { recursive: true, force: true });
+    }
+  });
+
+  test(`${site}: a path under a configured PRD_ROOT outside docs/ is kept; without it, it is a HALT`, () => {
+    const t = scratchRepo();
+    try {
+      const kept = runBound(site, "specs/prd/p/story.md", {
+        cwd: t,
+        prdRoot: "specs/prd",
+      });
+      assert.equal(kept.status, 0, kept.stdout);
+      assert.match(kept.stdout, /KEPT:specs\/prd\/p\/story\.md/);
+      const refused = runBound(site, "specs/prd/p/story.md", { cwd: t });
+      assert.equal(refused.status, 1, refused.stdout);
+      assert.match(refused.stdout, /HALT: derived path .* is outside docs\//);
+    } finally {
+      fs.rmSync(t, { recursive: true, force: true });
+    }
+  });
+
+  test(`${site}: a path whose parent directory does not exist is kept, not a HALT`, () => {
+    const t = scratchRepo();
+    try {
+      const r = runBound(site, "docs/missing/dir/x.md", { cwd: t });
+      assert.equal(r.status, 0, r.stdout);
+      assert.match(r.stdout, /KEPT:docs\/missing\/dir\/x\.md/);
+    } finally {
+      fs.rmSync(t, { recursive: true, force: true });
+    }
   });
 }
