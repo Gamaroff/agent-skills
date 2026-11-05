@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Minor'
 priority: 'Low'
 created: '2026-11-05'
@@ -12,7 +12,7 @@ github_issue: 845
 **Bug ID**: bug.20.change-log-blank-date-row-floats-to-top
 **Related**: None — cross-cutting bug (no single owner)
 **GitHub**: [#845](https://github.com/Gamaroff/agent-skills/issues/845)
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Priority**: Low
 **Severity**: Minor
 **Created**: 2026-11-05
@@ -152,15 +152,14 @@ github_issue: 845
 | 2026-11-05 | Ready for QA | develop-bug | Fix implemented + regression tests L1–L3 |
 | 2026-11-05 | Ready for QA | develop-bug | Fix verified — bug scenario gone |
 | 2026-11-05 | Ready for QA | finalise | DoD verified — bug.20.dod.1.change-log-blank-date-row.md |
+| 2026-11-05 | Closed | develop-bug | Fix verified and accepted |
 
 ---
 
 ## Resolution Summary
 
-[Will be completed when bug is closed]
-
-**Final Status**: [Closed status]
-**Total Iterations**: [Number]
-**Time to Resolution**: [Duration]
-**Final Fix Details**: [Summary]
-**Lessons Learned**: [Key takeaways]
+**Final Status**: Closed — Fixed
+**Total Iterations**: 1
+**Time to Resolution**: same day (2026-11-05)
+**Final Fix Details**: `rebuildChangeLog` classed a blank-date continuation row with the unparsed rows, which are emitted ahead of all history. It now attaches such a row to the entry row above it, and the two travel together, including through the second-block date sort. Orphan blank-date rows and `| Version | Date | … |` rows behave as before.
+**Lessons Learned**: a predicate written to protect unreadable history (`isUnparsedRow`) also caught rows the pipeline writes on purpose. Tests for an order-preserving writer should assert row order, not just row presence. A task document that already carries a blank-date row (task 235) will no longer be reordered on its next write.
