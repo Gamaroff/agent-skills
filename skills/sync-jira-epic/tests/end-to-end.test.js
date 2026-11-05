@@ -428,7 +428,7 @@ test("task 205: an epic.1.2 file creates a [Epic 1.2] card that links Story 1.2.
 // carries its prd_number/epic_number pair; an epic without the pair gets a bare
 // title and no guard (the script warns).
 function repoWithNumberedEpic() {
-  const root = gitRepo("epic-e2e-guard-", {
+  const root = gitRepo("epic-e2e-", {
     "docs/prd/epic.7.checkout.md": EPIC_MD.replace(
       "type: epic\n",
       "type: epic\nprd_number: 1\nepic_number: 7\n",
@@ -437,8 +437,9 @@ function repoWithNumberedEpic() {
   return { root, epic: path.join(root, "docs/prd/epic.7.checkout.md") };
 }
 
-test("epic: a create whose jira_key write-back was lost adopts the card, not a duplicate", async () => {
+test("epic: a create whose jira_key write-back was lost adopts the card, not a duplicate", async (t) => {
   const { root, epic } = repoWithNumberedEpic();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const { state, fetchImpl } = fakeJira();
 
   const first = await runSync(root, epic, fetchImpl, ["--quiet"]);
@@ -468,8 +469,9 @@ test("epic: a create whose jira_key write-back was lost adopts the card, not a d
   void again;
 });
 
-test("epic: a legacy synced-from-* card is adopted by label and the label is stripped on the next PUT", async () => {
+test("epic: a legacy synced-from-* card is adopted by label and the label is stripped on the next PUT", async (t) => {
   const { root, epic } = repoWithNumberedEpic();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const { state, fetchImpl } = fakeJira();
 
   const first = await runSync(root, epic, fetchImpl, ["--quiet"]);

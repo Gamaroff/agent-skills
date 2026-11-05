@@ -318,8 +318,9 @@ test("a genuine remote edit still trips the concurrent-edit guard", async () => 
 // Idempotent create — the guard that replaced the synced-from-* label
 // ===========================================================================
 
-test("task: a create whose jira_key write-back was lost adopts the card, not a duplicate", async () => {
+test("task: a create whose jira_key write-back was lost adopts the card, not a duplicate", async (t) => {
   const { root, task } = repoWithTask();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const { state, fetchImpl } = fakeJira();
 
   const first = await runSync(root, task, fetchImpl, ["--quiet"]);
@@ -343,8 +344,9 @@ test("task: a create whose jira_key write-back was lost adopts the card, not a d
   assert.equal(again.result.issueKey, first.result.issueKey);
 });
 
-test("task: a legacy synced-from-* card is adopted by label and the label is stripped on the next PUT", async () => {
+test("task: a legacy synced-from-* card is adopted by label and the label is stripped on the next PUT", async (t) => {
   const { root, task } = repoWithTask();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const { state, fetchImpl } = fakeJira();
 
   const first = await runSync(root, task, fetchImpl, ["--quiet"]);
