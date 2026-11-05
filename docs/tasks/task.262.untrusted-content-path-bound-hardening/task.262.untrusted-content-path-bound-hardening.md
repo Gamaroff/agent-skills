@@ -276,6 +276,27 @@ Rollback triggers:
 
 **Deferred Work**: none. Two things were decided in-session: the bound also refuses a symlinked file (the plan compared only the parent directory), and the Phase 4 behaviour tests run at one site because the three blocks are asserted equal.
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-05
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.262.qa.1.untrusted-content-path-bound-hardening.md](./task.262.qa.1.untrusted-content-path-bound-hardening.md)
+- **Gate File**: [task.262.gate.1.untrusted-content-path-bound-hardening.yml](./task.262.gate.1.untrusted-content-path-bound-hardening.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 35
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues. One advisory code-review note (an unresolvable parent skips the real-path check; not exploitable, measured).
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -285,4 +306,5 @@ Rollback triggers:
 | 2026-11-05 | 1.1     | Review passed (8/10) after 3 fixes: CRLF mechanism corrected (old regex never matches a CRLF fence), CRLF control redesigned so it can go red, Phase 4 empty-path handling specified | review-task |
 | 2026-11-05 |         | Status → ready-for-development | review-task |
 | 2026-11-05 |         | Implemented — 13 files, 15 new tests | develop |
+| 2026-11-05 |         | QA gate PASS (95/100) — 0 findings | qa-task |
 <!-- change-log-end -->
