@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.64.0] - 2026-11-05
+
 ### Changed
 
 - **`sync-jira-*` no longer adds a `synced-from-*` label to the cards it creates.** The label buried
