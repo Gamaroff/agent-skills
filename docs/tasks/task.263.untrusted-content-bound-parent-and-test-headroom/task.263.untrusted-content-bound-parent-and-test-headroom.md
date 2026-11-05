@@ -5,17 +5,19 @@ type: task
 description: "Close the two follow-ups left by task 262: make the path bound refuse a parent it cannot resolve instead of skipping the real-path check, and give the lint test real headroom under its 2 s bound."
 tags: [guardrails, prompt-injection, lint, hardening]
 category: other
-status: ready-for-review
+status: accepted
 priority: Low
 created: 2026-11-05
 updated: 2026-11-05
+completed_date: 2026-11-05
 estimated_effort_hours: 4
 github_issue: 841
+pr_number: 844
 ---
 
 # Technical Task: Untrusted-content bound: unresolvable parent and lint test headroom
 
-**Status:** Ready for Review
+**Status:** Accepted
 **GitHub Issue**: [#841](https://github.com/Gamaroff/agent-skills/issues/841)
 
 > Detailed implementation guide: [task.263.plan.untrusted-content-bound-parent-and-test-headroom.md](task.263.plan.untrusted-content-bound-parent-and-test-headroom.md)
@@ -195,26 +197,26 @@ The new cases quote the incident (a dangling link and a mode 000 directory). Add
 
 ### Functional
 
-- [ ] A parent chain that ends at a dangling link is a HALT with its own message (`has a parent that cannot be resolved`)
-- [ ] A parent that exists but cannot be entered is a HALT with the same message (skipped for uid 0, stated in the test)
-- [ ] `docs/link/new/x.md`, where `docs/link` leaves the tree, is a HALT with `resolves outside docs/ and the PRD root`
-- [ ] A path whose parent does not exist under `docs/` or the PRD root is still kept
-- [ ] The three blocks stay identical (the existing equality test), and a named test goes red when either new guard is deleted (mutation proof in the QA report)
+- [x] A parent chain that ends at a dangling link is a HALT with its own message (`has a parent that cannot be resolved`)
+- [x] A parent that exists but cannot be entered is a HALT with the same message (skipped for uid 0, stated in the test)
+- [x] `docs/link/new/x.md`, where `docs/link` leaves the tree, is a HALT with `resolves outside docs/ and the PRD root`
+- [x] A path whose parent does not exist under `docs/` or the PRD root is still kept
+- [x] The three blocks stay identical (the existing equality test), and a named test goes red when either new guard is deleted (mutation proof in the QA report)
 
 ### Performance
 
-- [ ] `CI=true node --test tests/untrusted-content-rule.test.js` reports `duration_ms` of at most 1500 on three consecutive runs; the three figures and the command are recorded in the QA report
+- [x] `CI=true node --test tests/untrusted-content-rule.test.js` reports `duration_ms` of at most 1500 on three consecutive runs; the three figures and the command are recorded in the QA report
 
 ### Code Quality
 
-- [ ] `CI=true npm test` passes
-- [ ] `npm run validate -- skills/review-task/ skills/review-story/` passes
-- [ ] `npm run bundle:check` and `npm run check:generated` are clean
+- [x] `CI=true npm test` passes
+- [x] `npm run validate -- skills/review-task/ skills/review-story/` passes
+- [x] `npm run bundle:check` and `npm run check:generated` are clean
 
 ### Migration
 
-- [ ] `CHANGELOG.md` has an entry citing task 263
-- [ ] The probe plan is re-run with `probes_executed` above 0, recorded in the DoD
+- [x] `CHANGELOG.md` has an entry citing task 263
+- [x] The probe plan is re-run with `probes_executed` above 0, recorded in the DoD
 
 ---
 
@@ -273,7 +275,7 @@ None.
 - [x] Phase 2
 - [x] Phase 3
 - [x] Phase 4
-- [ ] QA gate PASS
+- [x] QA gate PASS
 
 ---
 
@@ -307,14 +309,34 @@ None.
 ### Key Findings
 No critical issues identified
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** all 11 criteria met; the three CI-state criteria were graded from CI reading 1 (SUCCESS on `3dab80c1`)
+✅ **Tests:** the lint test holds each new guard; every guard is mutation-proven in the QA report; lint test at 368, 368, 369 ms against the 1500 ms bound
+✅ **PR Review:** PR #844, Step 5c review CONCERNS with no open coverage finding
+✅ **Documentation:** CHANGELOG entry at `CHANGELOG.md:9`; the six bundled copies regenerated
+✅ **Security Review:** boundary probed at all three sites, 72 probes executed, 0 reproduced, 0 escaped
+✅ **Compliance Review:** not applicable (shell prose and a test)
+
+**QA Report**: `task.263.qa.1.untrusted-content-bound-parent-and-test-headroom.md` — gate PASS, 95/100
+
+**Task marked as ACCEPTED on:** 2026-11-05
+
+**Detailed Verification Log:** See `task.263.dod.1.untrusted-content-bound-parent-and-test-headroom.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-05 | 1.0     | Initial draft | create-task |
 | 2026-11-05 | 1.1     | Review passed (9/10) — no changes required | review-task |
 |            |         | Status → ready-for-development | review-task |
 | 2026-11-05 |         | Implemented: ancestor walk in the three block sources, 5 new guard tests + 1 control, memoised tree load; status → ready-for-review | develop-task |
 | 2026-11-05 |         | QA gate PASS (95/100) — 0 findings | qa-task |
+| 2026-11-05 | 1.2 | DoD passed — accepted (PR #844) | finalise |
 <!-- change-log-end -->
+

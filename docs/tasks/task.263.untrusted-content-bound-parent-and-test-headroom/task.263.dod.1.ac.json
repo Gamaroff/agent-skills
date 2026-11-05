@@ -1,0 +1,154 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "3dab80c13fdd244fce7dc374b5e523eb3b757a3f",
+  "dirty_paths": [
+    "docs/tasks/task.263.untrusted-content-bound-parent-and-test-headroom/task.263.implementation.1.untrusted-content-bound-parent-and-test-headroom-initial-run.md",
+    "docs/tasks/task.263.untrusted-content-bound-parent-and-test-headroom/task.263.pr-review.1.untrusted-content-bound-parent-and-test-headroom.md"
+  ],
+  "document": "docs/tasks/task.263.untrusted-content-bound-parent-and-test-headroom/task.263.untrusted-content-bound-parent-and-test-headroom.md",
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 11,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "e6486b5d5f69ad953c281a45fab4f84aa790b641347cf9eb5a68e79a5c2d120e",
+      "status": "PASS",
+      "description": "Dangling-link parent chain is a HALT with its own message",
+      "code_citation": "skills/review-task/SKILL.md:174-178",
+      "test_citation": "tests/untrusted-content-rule.test.js:465",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#2",
+      "text_hash": "2bd1d9353adfadfc16cf0baeed28fed3c5b9d485c6efbcae2e64d5d35d0ac665",
+      "status": "PASS",
+      "description": "Unenterable (mode 000) parent is a HALT with same message",
+      "code_citation": "skills/review-task/SKILL.md:178",
+      "test_citation": "tests/untrusted-content-rule.test.js:478",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#3",
+      "text_hash": "b81e0f233d6df0662a097eb837f7bf259377c518f277960e1273e1392853383e",
+      "status": "PASS",
+      "description": "docs/link/new/x.md, where docs/link leaves the tree, HALTs with 'resolves outside'",
+      "code_citation": "skills/review-task/SKILL.md:174-178",
+      "test_citation": "tests/untrusted-content-rule.test.js:465",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#4",
+      "text_hash": "95beb7df347552f3ab0117d5795359d4cb247436b5f5f277408aea1acb094891",
+      "status": "PASS",
+      "description": "Path whose parent does not exist under docs/ is still kept",
+      "code_citation": "skills/review-task/SKILL.md:176",
+      "test_citation": "tests/untrusted-content-rule.test.js:496",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#5",
+      "text_hash": "3e8bdb9a30fd870e8cb508bc2fa46b230f596e78084e40cb2936722831dd4733",
+      "status": "PASS",
+      "description": "Three blocks identical; named test red when either new guard deleted",
+      "code_citation": "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md:144",
+      "test_citation": "tests/untrusted-content-rule.test.js:374",
+      "members": [
+        "{member: \"skills/review-task/SKILL.md\", evidence: \"tests/untrusted-content-rule.test.js:374\", status: PASS}",
+        "{member: \"skills/review-story/SKILL.md\", evidence: \"tests/untrusted-content-rule.test.js:374\", status: PASS}",
+        "{member: \"shared/resources/develop-pipeline-step-0-resolve-and-prepare.md\", evidence: \"tests/untrusted-content-rule.test.js:374\", status: PASS}",
+        "{member: \"guard: unresolvable-ancestor HALT\", evidence: \"task.263.qa.1 report:119\", status: PASS}",
+        "{member: \"guard: ancestor walk / in-root comparison\", evidence: \"task.263.qa.1 report:120\", status: PASS}"
+      ],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#6",
+      "text_hash": "ae09ce09d637dc802d605e333d12a0e69baee610de5796bfa48bed99f127e688",
+      "status": "PASS",
+      "description": "Lint test duration_ms at most 1500 on three consecutive runs, recorded",
+      "code_citation": "docs/tasks/task.263.untrusted-content-bound-parent-and-test-headroom/task.263.dod.1.untrusted-content-bound-parent-and-test-headroom.md (Measured criterion record)",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Re-measured by the caller after the agent's re-measure finding: 368, 368, 369 ms against 1500 ms, command CI=true node --test tests/untrusted-content-rule.test.js, head 3dab80c13fdd, load average 0.19 to 0.25 (uptime), recorded in the DoD. Earlier QA figures were 397, 392, 395 ms."
+    },
+    {
+      "id": "#7",
+      "text_hash": "42c527517fa0e9104c447ce1048f8d3123e53163a5b447f912d9b17b4b303db0",
+      "status": "PASS",
+      "description": "CI=true npm test passes",
+      "code_citation": ".github/workflows/test.yml:58",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 3dab80c13fdd244fce7dc374b5e523eb3b757a3f",
+      "ci_reading": "CI reading 1: SUCCESS @ 3dab80c13fdd244fce7dc374b5e523eb3b757a3f"
+    },
+    {
+      "id": "#8",
+      "text_hash": "3743ef394bf75e43ac4feaf8db86abc2e5d13e427b6948552d478d12108c1849",
+      "status": "PASS",
+      "description": "npm run validate on review-task and review-story passes",
+      "code_citation": ".github/workflows/validate.yml:1",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 3dab80c13fdd244fce7dc374b5e523eb3b757a3f",
+      "ci_reading": "CI reading 1: SUCCESS @ 3dab80c13fdd244fce7dc374b5e523eb3b757a3f"
+    },
+    {
+      "id": "#9",
+      "text_hash": "c9e8b69ad48a4393f02caad40966252d6e7e75bbc75b718eaff50f28c78a01a1",
+      "status": "PASS",
+      "description": "bundle:check and check:generated are clean",
+      "code_citation": ".github/workflows/validate.yml:128",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 3dab80c13fdd244fce7dc374b5e523eb3b757a3f",
+      "ci_reading": "CI reading 1: SUCCESS @ 3dab80c13fdd244fce7dc374b5e523eb3b757a3f"
+    },
+    {
+      "id": "#10",
+      "text_hash": "fdd1f948d326df595eb29135f302ec4d60ab380ca8591606a0dc3ca4b3efeaf0",
+      "status": "PASS",
+      "description": "CHANGELOG.md has an entry citing task 263",
+      "code_citation": "CHANGELOG.md:9",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#11",
+      "text_hash": "4eea1ad89286dc867ff8b7289036cb3a93838096a583064f22262f23445ece6a",
+      "status": "PASS",
+      "description": "Probe plan re-run with probes_executed above 0, recorded in the DoD",
+      "code_citation": "docs/tasks/task.263.untrusted-content-bound-parent-and-test-headroom/task.263.dod.1.security.run.json",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Step 3b.1 run by the caller: 72 probes executed (12 cases x 3 sites), 0 reproduced, 0 escaped; recorded in the DoD."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#1",
+      "note": "Task section 9 checkboxes unticked; finalise ticks them."
+    }
+  ]
+}
