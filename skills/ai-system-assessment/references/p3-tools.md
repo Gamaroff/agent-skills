@@ -12,7 +12,7 @@ Run every row. Patterns are case-insensitive extended regular expressions; a `|`
 |---|---|---|---|---|
 | p3-tool-wrappers | Tools the model calls are wrapped scripts, CLIs or typed schemas | file | — | `{tools,scripts,bin,mcp}/**/*` |
 | p3-idempotency | Writes carry an idempotency key or marker so a retry is safe | grep | `idempoten\|dedup[e]?[-_ ]?(key\|marker)` | `{tools,scripts,bin,src,lib}/**/*` |
-| p3-tool-fakes | Tests use a fake of the tool or service instead of the real one | file | — | `tests/**/fake*` |
+| p3-tool-fakes | Tests use a fake of the tool or service instead of the real one | file | — | `**/{tests,test,__tests__,spec}/**/{fake,stub}*` |
 | p3-exit-codes | Tool wrappers report failure through documented exit codes or error fields | grep | `exit code\|exit [0-9]\|reason` | `{tools,scripts,bin}/**/*` |
 
 ## Thresholds

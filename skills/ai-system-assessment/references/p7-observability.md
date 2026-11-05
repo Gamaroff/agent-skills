@@ -11,7 +11,7 @@ Run every row. Patterns are case-insensitive extended regular expressions; a `|`
 | ID | Signal | Kind | Pattern | Paths |
 |---|---|---|---|---|
 | p7-run-log | Each run leaves a log or state file (JSON lines, a report) | file | — | `{logs,.state,.claude/state}/**/*.{jsonl,json,log}` |
-| p7-decision-log | Decisions the agent made are recorded in a document | grep | `decisions log\|decision log\|rationale` | `**/*.md` |
+| p7-decision-log | Decisions the agent made are recorded in a document | grep | `decisions? log\|decision records?` | `**/*.md` |
 | p7-tool-records | Tool calls and their results are recorded | grep | `journal\|audit log\|tool call log\|actions\.jsonl` | `**/*.{md,js,ts,py,sh}` |
 | p7-trace-export | Traces or metrics are exported somewhere queryable | grep | `opentelemetry\|otel\|trace[-_ ]export\|langfuse\|datadog` | `**/*.{md,js,ts,py,json,yaml,yml}` |
 
