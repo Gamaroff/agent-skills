@@ -308,20 +308,24 @@ const BOUND_SITES = [
 
 /** The `if [ -n "$LOCAL_PATH" ] … fi` bound, lifted from the fenced block that carries it. */
 function boundBlock(text) {
+  // The first bash fence under its own heading, so the probe engine's
+  // `fence:<doc>#Bound the derived path` entry form reaches it the same way.
   const m = text.match(
-    /# Bound the derived path[^\n]*\n(if \[ -n "\$LOCAL_PATH" \]; then\n[\s\S]*?\nfi)\n/,
+    /\n#### Bound the derived path\n[\s\S]*?\n```bash\n([\s\S]*?\nfi)\n```\n/,
   );
   return m ? m[1] : null;
 }
+const BOUND_SLOT = "<derived-path>";
 
 function runBound(site, localPath) {
   const block = boundBlock(fs.readFileSync(path.join(REPO_ROOT, site), "utf8"));
   assert.ok(block, `${site}: no path bound block found`);
+  assert.ok(block.includes(BOUND_SLOT), `${site}: bound block has no slot`);
   return spawnSync(
     "bash",
     [
       "-c",
-      `LOCAL_PATH="$1"\n${block}\necho "KEPT:$LOCAL_PATH"`,
+      `${block.split(BOUND_SLOT).join("$1")}\necho "KEPT:$LOCAL_PATH"`,
       "x",
       localPath,
     ],

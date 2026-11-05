@@ -5,7 +5,7 @@ gate: PASS
 status_reason: 'Both gate 2 findings are fixed (fence tracking by character and length, CHANGELOG entry). The scoped review found two low-severity test-hardening items and one cleanup, all advisory. Tests 34 of 34 pass; CI on the new head was still pending when this gate was written.'
 reviewer: 'QA Engineer'
 head: 'ab45a4b0c16c38cd0c307d48b59e60083b33f128'
-updated: '2026-11-05T07:40:00Z'
+updated: '2026-11-05T07:26:00Z'
 
 top_issues: []
 

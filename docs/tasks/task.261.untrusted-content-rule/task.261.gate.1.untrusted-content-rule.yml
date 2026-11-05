@@ -5,7 +5,7 @@ gate: CONCERNS
 status_reason: 'Implementation matches the plan and every success criterion holds. One medium finding: the lint test silently ignores a real read-marker line that contains the word "no" or "don''t", so a read site can ship uncited.'
 reviewer: 'QA Engineer'
 head: '76f90d6d1aabdc63f50364e7c9a5516394fc5123'
-updated: '2026-11-05T12:00:00Z'
+updated: '2026-11-05T07:02:00Z'
 
 top_issues:
   - id: 'T261-QA-1'

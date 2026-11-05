@@ -154,8 +154,15 @@ DOC_URL=$(echo "$ISSUE_BODY" | grep -o 'https://github\.com/[^)]*\.md' | head -1
 
 # Strip the URL prefix to get the repo-relative path
 LOCAL_PATH=$(echo "$DOC_URL" | sed 's|https://github\.com/[^/]*/[^/]*/blob/[^/]*/||')
+```
 
-# Bound the derived path: the issue body is written by someone else (untrusted-content-rule.md).
+#### Bound the derived path
+
+Run this block next, with the value the block above derived in place of `<derived-path>`. It is its own block because each fenced block is its own shell. Left unsubstituted, the placeholder fails the check.
+
+```bash
+# The issue body is written by someone else (untrusted-content-rule.md).
+LOCAL_PATH="<derived-path>"
 if [ -n "$LOCAL_PATH" ]; then
   case "$LOCAL_PATH" in docs/*) ;; *) echo "HALT: derived path $LOCAL_PATH is outside docs/"; exit 1 ;; esac
   case "/$LOCAL_PATH/" in */../*) echo "HALT: derived path $LOCAL_PATH climbs out with .."; exit 1 ;; esac
