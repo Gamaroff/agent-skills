@@ -365,6 +365,27 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-05
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.261.qa.1.untrusted-content-rule.md](./task.261.qa.1.untrusted-content-rule.md)
+- **Gate File**: [task.261.gate.1.untrusted-content-rule.yml](./task.261.gate.1.untrusted-content-rule.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 20
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+One medium finding (T261-QA-1): the lint test's forbidding-sentence filter drops a real read line that contains the word "no".
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -373,6 +394,8 @@ None.
 | 2026-11-04 | 1.0     | Initial draft | create-task |
 | 2026-11-05 | 1.1     | Review passed (8/10) — Phase 1 now records LOCAL_PATH is unbounded and the read-site population is wider than the table | review-task |
 | 2026-11-05 |         | Status → ready-for-development | review-task |
+| 2026-11-05 |         | QA gate CONCERNS (90/100) — 1 medium finding (lint filter drops a read line containing "no") | qa-task |
+| 2026-11-05 |         | QA findings fixed — T261-QA-1 (lint filter), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

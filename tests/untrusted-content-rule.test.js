@@ -41,8 +41,7 @@ const MARKERS = [
   /\bgh (?:pr|issue) view\b[^\n]*--json[^\n]*\b(?:body|comments)\b/,
   /\bWebSearch\b|\bWebFetch\b|\bbrowser-use get text\b|\bget_page_text\b/,
 ];
-const FORBIDDING =
-  /\b(?:never|do not|don't|must not|not allowed|forbidden|no)\b/i;
+const FORBIDDING = /\b(?:never|do not|don't|must not|not allowed|forbidden)\b/i;
 
 // file (repo-relative) → why its marker is not a read of third-party prose.
 const ALLOWLIST = {
@@ -91,11 +90,16 @@ function populationFiles(root = REPO_ROOT) {
 /** Marker lines of one file's text: [{ line, text }], forbidding sentences dropped. */
 function markerLines(text) {
   const hits = [];
+  let inFence = false;
   text.split("\n").forEach((l, i) => {
-    if (
-      MARKERS.some((m) => m.test(l)) &&
-      !FORBIDDING.test(l.replace(/`[^`]*`/g, ""))
-    ) {
+    if (/^\s*(```|~~~)/.test(l)) {
+      inFence = !inFence;
+      return;
+    }
+    // A forbidding sentence is prose. Inside a fence a comment such as `# do not ...` is not one,
+    // so a command line there always counts as a read.
+    const forbidding = !inFence && FORBIDDING.test(l.replace(/`[^`]*`/g, ""));
+    if (MARKERS.some((m) => m.test(l)) && !forbidding) {
       hits.push({ line: i + 1, text: l.trim() });
     }
   });
@@ -219,6 +223,25 @@ test("control: a metadata-only gh read does not fire", () => {
 
 test("control: a marker inside a forbidding sentence is ignored", () => {
   assert.equal(markerLines("Never call WebFetch from this skill.").length, 0);
+});
+
+test("control: a fenced read with a trailing comment containing a forbidding word still fires", () => {
+  for (const comment of ["no filter applied", "don't trim", "never cached"]) {
+    const text = `\`\`\`bash\ngh issue view 5 --json body  # ${comment}\n\`\`\`\n`;
+    assert.equal(markerLines(text).length, 1, comment);
+    assert.equal(
+      check({ "skills/x/SKILL.md": text }, {}).uncited.length,
+      1,
+      comment,
+    );
+  }
+});
+
+test("control: a prose line using the bare word no is not treated as forbidding", () => {
+  assert.equal(
+    markerLines("There is no cache: run gh issue view 5 --json body").length,
+    1,
+  );
 });
 
 test("control: an allowlist entry that matches no marker is reported stale", () => {
