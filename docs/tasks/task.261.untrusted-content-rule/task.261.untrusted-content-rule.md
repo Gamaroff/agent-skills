@@ -5,7 +5,9 @@ type: task
 description: "Add a shared rule that tracker, PR and web text is data and never instructions, cite it from every skill that reads such text, and hold it with a lint test."
 tags: [guardrails, prompt-injection, shared-resources, lint]
 category: other
-status: ready-for-review
+status: accepted
+pr_number: 839
+completed_date: 2026-11-05
 priority: High
 created: 2026-11-04
 updated: 2026-11-05
@@ -14,7 +16,7 @@ estimated_effort_hours: 4
 
 # Technical Task: Untrusted-content rule
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 ---
 
@@ -386,11 +388,26 @@ None.
 ### Key Findings
 Both gate 2 findings are fixed. The scoped review found two low-severity test-hardening items (CRLF in the fence regex, hostile path cases that do not show which guard fired) and one cleanup. All are advisory.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report**: `task.261.qa.3.untrusted-content-rule.md`
+**Gate File**: `task.261.gate.3.untrusted-content-rule.yml` — PASS 95/100
+**DoD Summary**: `task.261.dod.1.untrusted-content-rule.md`
+
+✅ **Success criteria:** all 11 met (#1-#6, #9, #11 by agent and measurement; #7, #8, #10 by CI on `53f60e6d`)
+✅ **Tests:** 27 lint tests in `tests/untrusted-content-rule.test.js` (0.375 s); full CI green
+✅ **PR Review:** PR #839, `/review-pr` APPROVE
+✅ **Security:** PASS. The `docs/` path bound was made reachable by the probe engine, then probed: 60 cases, no defect
+✅ **Compliance:** not applicable
+✅ **Documentation:** `CHANGELOG.md` entry; rule doc and six skill citations
+
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-04 | 1.0     | Initial draft | create-task |
 | 2026-11-05 | 1.1     | Review passed (8/10) — Phase 1 now records LOCAL_PATH is unbounded and the read-site population is wider than the table | review-task |
 | 2026-11-05 |         | Status → ready-for-development | review-task |
@@ -399,6 +416,8 @@ Both gate 2 findings are fixed. The scoped review found two low-severity test-ha
 | 2026-11-05 |         | QA gate CONCERNS (80/100) — 2 medium findings (fence tracking can desynchronise; CHANGELOG entry missing) | qa-task |
 | 2026-11-05 |         | QA findings fixed — T261-QA-2 (fence tracking), T261-QA-3 (CHANGELOG), advisory CR-2 and CR-3, 2 iterations | qa-fix |
 | 2026-11-05 |         | QA gate PASS (95/100) — 0 blocking findings; 2 low and 1 cleanup advisory | qa-task |
+| 2026-11-05 |         | PR review APPROVE — 3 low advisory conformance findings (trail and consistency), doc-only, addressed | review-pr |
+| 2026-11-05 | 1.2 | DoD passed — accepted (PR #839) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -447,7 +466,7 @@ Both gate 2 findings are fixed. The scoped review found two low-severity test-ha
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 1. Implement according to implementation plan
