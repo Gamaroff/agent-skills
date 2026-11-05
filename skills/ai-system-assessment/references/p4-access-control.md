@@ -10,7 +10,7 @@ Run every row. Patterns are case-insensitive extended regular expressions; a `|`
 
 | ID | Signal | Kind | Pattern | Paths |
 |---|---|---|---|---|
-| p4-permission-modes | Documented access modes (read-only, restricted, full) the tooling reads | grep | `read[-_ ]only\|access[.:_ ](tracker\|vcs\|mode)\|permission mode` | `**/*.{md,yaml,yml,json,sh}` |
+| p4-permission-modes | Documented access modes (read-only, restricted, full) the tooling reads | grep | `access[.:_ ](tracker\|vcs\|mode)\|permission[ _-]modes?\|read[-_ ]only (mode\|access)` | `**/*.{md,yaml,yml,json,sh}` |
 | p4-user-identity | The end user's identity is passed into each tool call | grep | `on[-_ ]behalf[-_ ]of\|user[-_ ]?id\|acting user\|impersonat` | `{src,lib,app,tools}/**/*` |
 | p4-tool-allowlist | A per-tool or per-skill allowlist limits what the agent can call | grep | `allowed-tools\|allowlist\|allow[-_ ]list` | `**/*.{md,json,yaml,yml}` |
 | p4-credential-redaction | Credentials are redacted from logs and prompts | grep | `redact\|mask(ed)? secret\|never print` | `**/*.{md,js,ts,py,sh}` |

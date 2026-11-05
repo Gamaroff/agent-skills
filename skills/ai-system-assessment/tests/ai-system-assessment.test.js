@@ -191,6 +191,64 @@ test("mutation: removing the files behind a hit turns that signal into a miss", 
   }
 });
 
+function signalById(id) {
+  return runnable(checklists()).find((s) => s.id === id);
+}
+
+function withTree(files, fn) {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "asa-tree-"));
+  try {
+    for (const [rel, body] of Object.entries(files)) {
+      fs.mkdirSync(path.dirname(path.join(tmp, rel)), { recursive: true });
+      fs.writeFileSync(path.join(tmp, rel), body);
+    }
+    return fn(tmp);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+test("test-file signals find tests in a nested package, not only a root tests/ directory", () => {
+  const cases = [
+    ["p2-drift-test", "packages/core/tests/copies-drift.test.js"],
+    ["p2-drift-test", "services/api/__tests__/drift.spec.ts"],
+    ["p3-tool-fakes", "packages/core/test/fake-tracker.js"],
+    ["p3-tool-fakes", "tests/unit/stub-client.js"],
+  ];
+  for (const [id, rel] of cases) {
+    withTree({ [rel]: "x" }, (root) =>
+      assert.equal(runSignal(signalById(id), root).hit, true, `${id}: ${rel}`),
+    );
+  }
+  // A drift or fake file outside any test directory is not a test of the target.
+  withTree({ "src/drift-notes.md": "x", "src/fake-data.js": "x" }, (root) => {
+    assert.equal(runSignal(signalById("p2-drift-test"), root).hit, false);
+    assert.equal(runSignal(signalById("p3-tool-fakes"), root).hit, false);
+  });
+});
+
+test("p4-permission-modes and p7-decision-log ignore everyday words and keep their real phrases", () => {
+  const prose =
+    "The file is read-only. The rationale for this layout is simple.\n";
+  withTree({ "docs/a.md": prose }, (root) => {
+    assert.equal(runSignal(signalById("p4-permission-modes"), root).hit, false);
+    assert.equal(runSignal(signalById("p7-decision-log"), root).hit, false);
+  });
+  withTree(
+    {
+      "docs/b.md": "Set the permission mode before a run.\n",
+      "docs/c.md": "## Decisions Log\n",
+    },
+    (root) => {
+      assert.equal(
+        runSignal(signalById("p4-permission-modes"), root).hit,
+        true,
+      );
+      assert.equal(runSignal(signalById("p7-decision-log"), root).hit, true);
+    },
+  );
+});
+
 test("running every signal leaves the fixture tree byte-identical", () => {
   const before = treeHash(FIXTURE);
   for (const s of runnable(checklists())) runSignal(s, FIXTURE);

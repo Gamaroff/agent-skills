@@ -12,7 +12,7 @@ Run every row. Patterns are case-insensitive extended regular expressions; a `|`
 |---|---|---|---|---|
 | p2-source-of-truth | Docs name a single source of truth the model must use | grep | `single source of truth\|source of truth\|canonical` | `docs/**/*.md` |
 | p2-retrieval | Retrieval, embeddings or a document index feed the model | grep | `retriev\|embedding\|vector\|rag\b` | `{src,lib,app}/**/*.{js,ts,py}` |
-| p2-drift-test | A test or CI step fails when copies of a source drift apart | file | — | `tests/**/*drift*` |
+| p2-drift-test | A test or CI step fails when copies of a source drift apart | file | — | `**/{tests,test,__tests__,spec}/**/*drift*` |
 | p2-context-budget | A size limit or budget on always-loaded context | grep | `token budget\|context budget\|max[-_ ]?tokens\|size budget` | `**/*.{md,json,yaml,yml}` |
 
 ## Thresholds
