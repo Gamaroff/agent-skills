@@ -11,7 +11,7 @@ One-way sync of a local bug report to Jira. Auto-detects create vs update from `
 
 | `jira_key` present? | Action |
 | --- | --- |
-| Absent / null | **Pre-flight dedup search by `synced-from-*` label**, then **Create** if no match. Writes `jira_key` + `jira_url` back to the file. |
+| Absent / null | **Pre-flight dedup search by the summary's `[bug id]`**, then **Create** if no match. Writes `jira_key` + `jira_url` back to the file. |
 | Present | **Update** the existing issue (summary, description, priority, labels), reconcile status from the bug's lifecycle. A Status History row is written only if the status transitioned. |
 
 **Difference from `sync-jira-task`:** a bug is not standalone — it hangs off a story, a task, or the bug registry — but it is not a *child* either. See [Parent linkage](#parent-linkage). It also carries `## Status History` in place of `## Change Log`, and it must read files that have no frontmatter at all.
@@ -128,7 +128,7 @@ The script:
 2. Infers the mode from the path and warns — without obeying — when `related:` disagrees.
 3. Resolves auth, the Bitbucket repo base and the document branch.
 4. Resolves the parent document, its `jira_key`, and (story mode) the epic document.
-5. If `jira_key` is absent, searches for an issue carrying this bug's `synced-from-*` label; on a hit, switches to update.
+5. If `jira_key` is absent, searches for an issue whose summary opens with this bug's `[bug id]` (or that carries the legacy `synced-from-*` label); on a hit, switches to update.
 6. On update: fetches current state and runs the concurrent-edit guard; diffs summary, body hash, meta hash, priority, labels.
 7. Builds the ADF description: Summary → Reproduction → Impact → Metadata → Source Documents.
 8. Creates (POST) or updates (atomic PUT with `returnIssue=true`).
@@ -214,12 +214,12 @@ Diagnose a board with `--probe-workflow`, which is read-only.
 
 ```
 POST /rest/api/3/search/jql
-{"jql": "project = \"RB\" AND labels = \"synced-from-story.1.7.4.bug.4.tap-target\"", "maxResults": 2}
+{"jql": "project = \"RB\" AND (summary ~ \"\\\"story.1.7.4.bug.4\\\"\" OR labels = \"synced-from-story.1.7.4.bug.4.tap-target\")", "fields": ["summary", "labels", "updated"], "maxResults": 20}
 ```
 
-If a matching issue exists — because a prior POST succeeded but the write-back did not — the script switches to update mode against that key. Every create appends the `synced-from-<bug stem>` label to enable this on subsequent runs.
+If a matching issue exists — because a prior POST succeeded but the write-back did not — the script switches to update mode against that key.
 
-**The label is derived from the bug file's own stem, not from its directory.** `sync-jira-task` labels by directory basename, which is unique because a task owns its directory. A bug does not: a story bug shares a directory with its story, that story's QA reports and every sibling bug. Labelling by directory would give all of them the same label, and this search would then adopt the first card it found — so bug 2 would silently update bug 1's card. This label is the sole guarantor of idempotent create when the write-back fails, so it must be unique per bug.
+**The guard is the summary's leading `[bug id]`** (for example `[story.1.7.4.bug.4]`). The text search only produces candidates (`summary ~` is tokenised and may over-match); the script then requires an exact, case-insensitive match on each returned summary's leading bracket id. The id is the bug's fully qualified id, not a bare number, so it is unique per bug: a story bug shares a directory with its story and every sibling bug, and a bare `[Bug 4]` would match across stories. The create adds no `synced-from-*` label; the legacy label is still searched, read-only, so a card made by an older version is adopted rather than duplicated. Limits: a summary with no leading `[id]` has no guard (the script warns); a card whose summary was edited in Jira to drop the id is not found; Jira's text index is eventually consistent, so an immediate rerun may miss the card.
 
 ## Status History
 
@@ -276,7 +276,7 @@ The three violation headings are one spec with an alias array, which is what kee
 | `--file` / `-f` | Bug markdown path (required) |
 | `--summary` / `-s` | Override the summary |
 | `--priority` / `-p` | Override the priority |
-| `--labels` / `-l` | Comma-separated extra labels (the sync label is always appended) |
+| `--labels` / `-l` | Comma-separated extra labels (sent as written, plus the mode label) |
 | `--doc-branch <name>` | Pin the branch document links point at |
 | `--check-card` | Offline preflight; exit 1 on findings |
 | `--dry-run` | No Jira calls, no writes |

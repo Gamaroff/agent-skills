@@ -195,8 +195,9 @@ test("a story bug synced twice produces ONE card, fully linked, and the second r
 });
 
 test("deleting jira_key adopts the existing card instead of creating a second", async () => {
-  // The synced-from-* label search is the sole guarantor of idempotent create
-  // when the write-back does not happen.
+  // The summary-id search (findExistingByIdentity) is the sole guarantor of
+  // idempotent create when the write-back does not happen. The fake Jira
+  // evaluates the JQL text, so this goes red if the search is removed.
   const { root, bug } = repoWithStoryBug();
   const { state, fetchImpl } = fakeJira();
 

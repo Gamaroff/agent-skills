@@ -2245,7 +2245,7 @@ function authHeader(email, token) {
 //
 // The one exception is a read wearing a POST — see READ_VIA_POST.
 
-// Jira takes a JQL query in a request body, so `findExistingByLabel` searches
+// Jira takes a JQL query in a request body, so `findExistingByIdentity` searches
 // with POST. Refusing it would make every sync skill see "no existing issue"
 // and create a duplicate on the next run — the opposite of safe. Matched by
 // URL, never by "it looked like a read".
@@ -2608,8 +2608,8 @@ function diffFields({
  *
  * This exists because all four `sync-jira-*` scripts got the same thing wrong
  * in the same place: they rebuilt `labels` from frontmatter to feed the diff,
- * while the payload they sent had the `synced-from-*` idempotency label
- * appended by `collectIssueFields`. The two sets could never match, so `labels`
+ * while the payload they sent had a `synced-from-*` label appended by
+ * `collectIssueFields` (no longer; the rule stands). The two sets could never match, so `labels`
  * was reported changed on every run — a PUT every time on the scripts that gate
  * on the diff, and a permanently wrong change summary on the ones that do not.
  *
@@ -5531,6 +5531,86 @@ async function findExistingByLabel({
 }
 
 // ---------------------------------------------------------------------------
+// Idempotent create — search by the document id in the summary
+//
+// The create no longer adds a `synced-from-*` label (it buried the real labels
+// in every picker), so the guard that stops a duplicate when a POST succeeds
+// but `jira_key` is never written back is the card's own summary. Every
+// summary opens with the document id in brackets — `[Task 12]`, `[Story 3.1.2]`,
+// `[Epic 3.1]`, `[story.7.4.bug.4]` — and ids are unique per project.
+//
+// `summary ~` is a tokenised, eventually-consistent text search; it will not
+// reliably honour brackets or dots. So the search only produces CANDIDATES and
+// the real test is the exact, case-insensitive leading-bracket comparison done
+// here on each returned summary. A card whose summary was edited to drop the
+// bracket id is not found (fail open: a duplicate, never a wrong adoption).
+//
+// The legacy `synced-from-*` label is still searched in the same query so a
+// card created before this change, whose document lost its `jira_key`, is
+// still adopted. Nothing writes that label any more.
+// ---------------------------------------------------------------------------
+
+/** The text inside a summary's leading `[...]`, or null when there is none. */
+function leadingBracketId(summary) {
+  const m = String(summary || "").match(/^\s*\[([^\]]+)\]/);
+  return m ? m[1].trim() : null;
+}
+
+async function findExistingByIdentity({
+  http,
+  baseUrl,
+  email,
+  token,
+  projectKey,
+  summary,
+  legacyLabel = null,
+  output,
+} = {}) {
+  const id = leadingBracketId(summary);
+  if (!id) {
+    if (output)
+      output.warn(
+        "⚠️  Summary has no leading [id]; a crash between the Jira create and the jira_key write-back cannot be detected for this document, and a rerun would create a duplicate.",
+      );
+    return null;
+  }
+  const esc = (s) => String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  const clauses = [`summary ~ "\\"${esc(id)}\\""`];
+  if (legacyLabel) clauses.push(`labels = "${esc(legacyLabel)}"`);
+  const jql = `project = "${esc(projectKey)}" AND (${clauses.join(" OR ")})`;
+  const resp = await http(`${baseUrl}/rest/api/3/search/jql`, {
+    method: "POST",
+    headers: {
+      Authorization: authHeader(email, token),
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({
+      jql,
+      fields: ["summary", "labels", "updated"],
+      maxResults: 20,
+    }),
+  });
+  if (!resp.ok) return null;
+  const data = await resp.json();
+  const want = id.toLowerCase();
+  const hits = (data.issues || []).filter((i) => {
+    const f = i.fields || {};
+    if (legacyLabel && (f.labels || []).includes(legacyLabel)) return true;
+    const got = leadingBracketId(f.summary);
+    return got !== null && got.toLowerCase() === want;
+  });
+  if (hits.length === 0) return null;
+  if (hits.length > 1 && output) {
+    const keys = hits.map((i) => i.key).join(", ");
+    output.warn(
+      `⚠️  Multiple Jira issues match [${id}]: ${keys}. Adopting first (${hits[0].key}). The others are duplicates from prior failed runs — review and delete in Jira.`,
+    );
+  }
+  return { key: hits[0].key, updated: hits[0].fields?.updated || null };
+}
+
+// ---------------------------------------------------------------------------
 // Atomic PUT with returnIssue
 // ---------------------------------------------------------------------------
 async function putIssueAtomic({
@@ -6022,6 +6102,8 @@ module.exports = {
   moveToBacklog,
   putIssueAtomic,
   findExistingByLabel,
+  findExistingByIdentity,
+  leadingBracketId,
   transitionToStatus,
   walkLadder,
   planHops,

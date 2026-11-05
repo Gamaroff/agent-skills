@@ -98,7 +98,7 @@ node .agents/skills/sync-jira-bug/scripts/sync-jira-bug.js \
 `sync-jira-bug` will:
 
 - Infer the bug **mode** — story / task / general — from the file's own path.
-- Create the Jira bug if it does not exist (idempotent — searches by the `synced-from-{bug stem}` label first).
+- Create the Jira bug if it does not exist (idempotent — searches by the summary's `[bug id]` first).
 - Render a `Source Documents` section carrying link-marked entries to the bug report, its parent document, its parent's card and (story mode) the epic.
 - **Link the card to its parent's card** as a Jira issue link, with the link type resolved by runtime introspection.
 - Add the bug to the project backlog (Scrum boards only).
@@ -117,7 +117,7 @@ node .agents/skills/sync-jira-bug/scripts/sync-jira-bug.js \
 - Set `BUG_JIRA_KEY=""`.
 - Return.
 
-**If the run was deferred** (`reason: "deferred"` in `--json` output, because `access.tracker` restricts this run): no key exists yet and none was invented. Set `BUG_JIRA_KEY=""` and report the deferral. A placeholder key would defeat the `synced-from-*` dedup search that stops the *next* run creating a duplicate — turning a recoverable state into a permanent one.
+**If the run was deferred** (`reason: "deferred"` in `--json` output, because `access.tracker` restricts this run): no key exists yet and none was invented. Set `BUG_JIRA_KEY=""` and report the deferral. A placeholder key would defeat the summary-id dedup search that stops the *next* run creating a duplicate — turning a recoverable state into a permanent one.
 
 After delegation completes: re-read the bug file to capture the freshly-written `jira_key`. Continue to Step BJ5.
 

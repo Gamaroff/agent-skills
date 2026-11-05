@@ -790,8 +790,8 @@ test("loadStatusMap — merges jira.statusMap over defaults", () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test("syncLabelFor — derives stable label from task dir name", () => {
-  const label = task.syncLabelFor(
+test("legacySyncLabelFor — derives stable label from task dir name", () => {
+  const label = task.legacySyncLabelFor(
     "/repo/docs/tasks/task.1.cache-lib/task.1.cache-lib.md",
   );
   assert.equal(label, "synced-from-task.1.cache-lib");

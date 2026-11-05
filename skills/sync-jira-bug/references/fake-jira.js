@@ -128,9 +128,27 @@ function fakeJira(opts = {}) {
     if (url.includes("/rest/api/3/priority")) return ok(priorities);
 
     if (url.includes("/rest/api/3/search/jql")) {
-      const m = /labels = "([^"]+)"/.exec(body.jql || "");
-      const key = m && state.labels[m[1]];
-      return ok({ issues: key ? [{ key, fields: {} }] : [] });
+      // Evaluate the JQL TEXT. A fake that answers a hit for any query makes a
+      // guard test pass with the guard removed. Two clauses are understood —
+      // `summary ~ "\"<phrase>\""` (loose, case-insensitive substring: real Jira
+      // tokenises, so it over-matches, which is why the caller re-checks the
+      // exact id) and `labels = "<label>"` (exact).
+      const jql = body.jql || "";
+      const phrase = /summary ~ "\\"(.+?)\\""/.exec(jql);
+      const label = /labels = "([^"]+)"/.exec(jql);
+      const issues = Object.entries(state.issues)
+        .filter(([, issue]) => {
+          const f = issue.fields || {};
+          if (label && (f.labels || []).includes(label[1])) return true;
+          return (
+            !!phrase &&
+            String(f.summary || "")
+              .toLowerCase()
+              .includes(phrase[1].toLowerCase())
+          );
+        })
+        .map(([key, issue]) => ({ key, fields: issue.fields }));
+      return ok({ issues });
     }
 
     if (url.includes("/issuetypes") || url.includes("createmeta"))

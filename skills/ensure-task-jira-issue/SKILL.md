@@ -86,7 +86,7 @@ node .agents/skills/sync-jira-task/scripts/sync-jira-task.js \
 > **Path note**: the script is bundled with the skill at `.agents/skills/sync-jira-task/scripts/sync-jira-task.js` (installed by `setup-consumer.sh`). Do **NOT** look for `.scripts/jira-sync*.js` in the consumer repo root — that path does not exist.
 
 `sync-jira-task` will:
-- Create the Jira task if it does not exist (idempotent — searches by `synced-from-*` label first)
+- Create the Jira task if it does not exist (idempotent — searches by the summary's `[Task N]` id first)
 - Add the task to the project backlog (Scrum boards only)
 - Embed Bitbucket links rendered via ADF (default-branch refs)
 - Write `jira_key` (and `jira_url` of shape `{JIRA_URL}/browse/{KEY}`) back to the task frontmatter

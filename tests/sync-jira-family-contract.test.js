@@ -40,7 +40,7 @@ test("every member exists and is readable", () => {
 test("no member builds its diff label set from frontmatter", () => {
   // THE DEFECT, asserted over the family. Each script used to feed the diff
   // `lib.sanitiseLabels(args.labels || frontmatter.labels)` while the payload
-  // appended the `synced-from-*` label, so the two could never converge.
+  // appended a `synced-from-*` label (since removed), so the two could never converge.
   //
   // Scan BOTH diff entry points. An earlier version matched only `diffFields({`
   // — which no script contains any more, since all four now route through

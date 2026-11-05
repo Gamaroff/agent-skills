@@ -263,13 +263,13 @@ test("mapStatus — strips emoji and maps to Jira canonical status", () => {
 });
 
 // ---------------------------------------------------------------------------
-// syncLabelFor
+// legacySyncLabelFor (lookup only — nothing writes this label any more)
 // ---------------------------------------------------------------------------
-test("syncLabelFor — derives label from epic dir name", () => {
+test("legacySyncLabelFor — derives label from epic dir name", () => {
   const fp = path.resolve(
     "/x/docs/prd/foo/epics/epic.1.foundation/epic.1.foundation.md",
   );
-  assert.equal(lib.syncLabelFor(fp), "synced-from-epic.1.foundation");
+  assert.equal(lib.legacySyncLabelFor(fp), "synced-from-epic.1.foundation");
 });
 
 // ---------------------------------------------------------------------------
@@ -644,7 +644,6 @@ test("collectCreateFields — includes project + issuetype on create", () => {
     descAdf: { type: "doc", content: [] },
     livePriorities: null,
     output: { warn: () => {} },
-    syncLabel: "synced-from-epic.1.x",
     summary: "S",
     epicTypeId: "10001",
     projectKey: "RB",
@@ -652,7 +651,7 @@ test("collectCreateFields — includes project + issuetype on create", () => {
   assert.equal(fields.project.key, "RB");
   assert.equal(fields.issuetype.id, "10001");
   assert.equal(fields.summary, "S");
-  assert.ok(fields.labels.includes("synced-from-epic.1.x"));
+  assert.ok(!fields.labels.some((l) => l.startsWith("synced-from-")));
 });
 
 test("collectUpdateFields — omits project + issuetype (Jira refuses on PUT)", () => {
@@ -662,43 +661,23 @@ test("collectUpdateFields — omits project + issuetype (Jira refuses on PUT)", 
     descAdf: { type: "doc", content: [] },
     livePriorities: null,
     output: { warn: () => {} },
-    syncLabel: "synced-from-epic.1.x",
     summary: "S",
   });
   assert.equal(fields.project, undefined);
   assert.equal(fields.issuetype, undefined);
-  assert.ok(fields.labels.includes("synced-from-epic.1.x"));
+  assert.ok(!fields.labels.some((l) => l.startsWith("synced-from-")));
 });
 
-test("collectCommonFields — preserves user-supplied labels and adds sync label", () => {
+test("collectCommonFields — sends exactly the user-supplied labels, adds no sync label", () => {
   const fields = lib.collectCommonFields({
     args: { labels: "alpha,beta" },
     frontmatter: {},
     descAdf: { type: "doc", content: [] },
     livePriorities: null,
     output: { warn: () => {} },
-    syncLabel: "synced-from-epic.1.x",
     summary: "S",
   });
-  assert.ok(fields.labels.includes("alpha"));
-  assert.ok(fields.labels.includes("beta"));
-  assert.ok(fields.labels.includes("synced-from-epic.1.x"));
-});
-
-test("collectCommonFields — does not duplicate sync label if already present", () => {
-  const fields = lib.collectCommonFields({
-    args: { labels: "synced-from-epic.1.x,other" },
-    frontmatter: {},
-    descAdf: { type: "doc", content: [] },
-    livePriorities: null,
-    output: { warn: () => {} },
-    syncLabel: "synced-from-epic.1.x",
-    summary: "S",
-  });
-  const count = fields.labels.filter(
-    (l) => l === "synced-from-epic.1.x",
-  ).length;
-  assert.equal(count, 1);
+  assert.deepEqual(fields.labels, ["alpha", "beta"]);
 });
 
 // ---------------------------------------------------------------------------

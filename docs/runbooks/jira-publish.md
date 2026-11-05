@@ -68,7 +68,7 @@ The parent epic **must already exist in Jira** with `jira_key` set — Phase 1 f
 
 - Creates the Jira task if `jira_key` is absent; updates it otherwise.
 - **Not linked** to any Jira epic — tasks are standalone.
-- Idempotent create via `synced-from-*` label search.
+- Idempotent create via a search on the summary's `[Task N]` id.
 - Adds the task to the project backlog (Scrum boards only).
 
 ## Phase 4 — Sync bugs
@@ -85,8 +85,8 @@ The parent epic **must already exist in Jira** with `jira_key` set — Phase 1 f
   resolved by runtime introspection) plus link-marked entries in a `Source Documents` section.
 - Sync the **parent first**. A parent with no `jira_key` yet gets its document linked but not its
   card; re-run the bug sync afterwards and the card link lands — `linkIssues` is idempotent.
-- Idempotent create via a `synced-from-{bug stem}` label — derived from the bug's own filename, not
-  its directory, because a bug shares its directory with its parent and every sibling bug.
+- Idempotent create via a search on the summary's `[bug id]` — the fully qualified id, not a bare
+  number, because a bug shares its directory with its parent and every sibling bug.
 - Writes `## Status History` rows, never a Change Log. Bug reports are barred from carrying one.
 - Embeds Bitbucket links rendered via ADF.
 

@@ -142,7 +142,7 @@ is irreversible and not blocking; a milestone create is reversible and blocking 
 needs its number.
 
 **Never fabricate the produced value to clear a block.** Writing `github_issue: 0` or
-`jira_key: <pending>` would defeat the idempotent `synced-from-*` label search that stops the next run
+`jira_key: <pending>` would defeat the idempotent summary-id search that stops the next run
 creating a duplicate. A wrong key is worse than no key, and the empty capture is the honest answer.
 
 Renderers must surface blocking records **at the top**, not in document order — `md` and `summary`

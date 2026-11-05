@@ -345,7 +345,7 @@ Contract: [`tracker-issue-cli.md`](../../shared/resources/tracker-issue-cli.md) 
 *The two-run convergence*.
 
 **Not this:** a deferred create never writes a placeholder key to frontmatter. That is
-deliberate — a placeholder would break the idempotent `synced-from-*` label search and the next
+deliberate — a placeholder would break the idempotent summary-id search and the next
 unrestricted run would create a duplicate. `jira_key` stays absent until the issue really exists.
 
 Full schema and the roster of mutation kinds:
