@@ -367,24 +367,24 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-05
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 95/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.261.qa.2.untrusted-content-rule.md](./task.261.qa.2.untrusted-content-rule.md)
-- **Gate File**: [task.261.gate.2.untrusted-content-rule.yml](./task.261.gate.2.untrusted-content-rule.yml)
+- **Full Report**: [task.261.qa.3.untrusted-content-rule.md](./task.261.qa.3.untrusted-content-rule.md)
+- **Gate File**: [task.261.gate.3.untrusted-content-rule.yml](./task.261.gate.3.untrusted-content-rule.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 22
+- **Tests Executed**: 34
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Gate 1's finding is fixed. Two new medium findings: the fence tracking in the lint test can desynchronise (T261-QA-2), and the CHANGELOG entry citing task 261 is missing (T261-QA-3).
+Both gate 2 findings are fixed. The scoped review found two low-severity test-hardening items (CRLF in the fence regex, hostile path cases that do not show which guard fired) and one cleanup. All are advisory.
 
 <!-- change-log-start -->
 ## Change Log
@@ -397,6 +397,8 @@ Gate 1's finding is fixed. Two new medium findings: the fence tracking in the li
 | 2026-11-05 |         | QA gate CONCERNS (90/100) — 1 medium finding (lint filter drops a read line containing "no") | qa-task |
 | 2026-11-05 |         | QA findings fixed — T261-QA-1 (lint filter), 1 iteration | qa-fix |
 | 2026-11-05 |         | QA gate CONCERNS (80/100) — 2 medium findings (fence tracking can desynchronise; CHANGELOG entry missing) | qa-task |
+| 2026-11-05 |         | QA findings fixed — T261-QA-2 (fence tracking), T261-QA-3 (CHANGELOG), advisory CR-2 and CR-3, 2 iterations | qa-fix |
+| 2026-11-05 |         | QA gate PASS (95/100) — 0 blocking findings; 2 low and 1 cleanup advisory | qa-task |
 <!-- change-log-end -->
 
 ---

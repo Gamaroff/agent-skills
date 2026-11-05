@@ -1,0 +1,61 @@
+schema: 2
+task: 'task.261.untrusted-content-rule'
+task_title: 'Untrusted-content rule'
+gate: PASS
+status_reason: 'Both gate 2 findings are fixed (fence tracking by character and length, CHANGELOG entry). The scoped review found two low-severity test-hardening items and one cleanup, all advisory. Tests 34 of 34 pass; CI on the new head was still pending when this gate was written.'
+reviewer: 'QA Engineer'
+head: 'ab45a4b0c16c38cd0c307d48b59e60083b33f128'
+updated: '2026-11-05T07:40:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 34
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary_reason: 'The path bound is a boundary, but its block sits under a bold label, not a heading, so the fence entry form cannot reach it. Committed behaviour tests execute it at all three sites with accepted, rejected (now including docs/.., docs/a/../../x, docs/a/.., docsx/y.md), dotted-name and empty paths. Not covered: symlinks inside docs/, and a PRD root other than docs/.'
+    notes: 'Path bound rejects paths outside docs/ and any .. segment. The rule doc now says docs/ only, matching the code.'
+  performance:
+    status: PASS
+    notes: 'Lint test runs in under half a second.'
+  reliability:
+    status: PASS
+    notes: 'Empty derived path still falls through to the key lookup.'
+  maintainability:
+    status: PASS
+    notes: 'A test now asserts the three path-bound blocks are byte-identical.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (low): the fence regex ends in (.*)$, and . does not match a carriage return, so on CRLF text every fence line is missed and fenced reads count as prose. No file in the repository has CRLF today. Use ([^\n]*)$ so a trailing CR does not defeat the match.'
+      refs: ['tests/untrusted-content-rule.test.js']
+    - action: 'CR-2 (low): the hostile path cases assert only status 1 and /HALT/, so they do not show which guard fired (docsx/y.md must hit the prefix guard, docs/.. the .. guard). Pair each bad path with its expected message. Reviewer anchor was line 360; the real line is 362.'
+      refs: ['tests/untrusted-content-rule.test.js']
+    - action: 'CR-3 (cleanup): block extraction is duplicated between the identity test and runBound. Add a boundBlockAt(site) helper.'
+      refs: ['tests/untrusted-content-rule.test.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
