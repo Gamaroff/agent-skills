@@ -131,14 +131,14 @@ github_issue: 845
 
 #### QA Verification (Ready for QA → Closed/Reopened)
 
-**Date**: [Date]
-**QA Engineer**: [Name]
+**Date**: 2026-11-05
+**Verified by**: develop-bug
 
-**Verification Result**: ✅ Fixed | ⚠️ Still Failing
+**Verification Result**: ✅ Fixed
 
-**Notes**: [Testing notes]
+**Notes**: Regression tests L1 and L2 pass (both failed with the fix disabled); `change-log.test.mjs` 116 of 116; `CI=true npm run ci:fast` 7894 pass, 0 fail; prettier clean. Lite mode: signals 1 and 2 only, no diff code review. The reported failure no longer reproduces.
 
-**Decision**: Closed | Reopened
+**Decision**: Closed (finalised in Step 7)
 
 ---
 
@@ -150,6 +150,7 @@ github_issue: 845
 | 2026-11-05 | New | ensure-bug-github-issue | GitHub issue created (#845) |
 | 2026-11-05 | In Progress | develop-bug | Reproduced; investigation started |
 | 2026-11-05 | Ready for QA | develop-bug | Fix implemented + regression tests L1–L3 |
+| 2026-11-05 | Ready for QA | develop-bug | Fix verified — bug scenario gone |
 
 ---
 
