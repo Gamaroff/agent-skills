@@ -781,20 +781,20 @@ test("collectIssueFields — omits the dev-estimate custom field when unconfigur
 });
 
 // ---------------------------------------------------------------------------
-// syncLabelFor
+// legacySyncLabelFor (lookup only — nothing writes this label any more)
 // ---------------------------------------------------------------------------
-test("syncLabelFor — derives label from parent dir name", () => {
+test("legacySyncLabelFor — derives label from parent dir name", () => {
   assert.equal(
-    lib.syncLabelFor(
+    lib.legacySyncLabelFor(
       "/abs/docs/prd/x/epics/epic.1.foo/stories/story.1.2.bar/story.1.2.bar.md",
     ),
     "synced-from-story.1.2.bar",
   );
 });
 
-test("syncLabelFor — replaces whitespace with dashes (no Jira labels with spaces)", () => {
+test("legacySyncLabelFor — replaces whitespace with dashes (no Jira labels with spaces)", () => {
   assert.equal(
-    lib.syncLabelFor("/abs/docs/some dir with spaces/file.md"),
+    lib.legacySyncLabelFor("/abs/docs/some dir with spaces/file.md"),
     "synced-from-some-dir-with-spaces",
   );
 });
@@ -819,7 +819,7 @@ test("collectIssueFields — team-managed sets parent.key, NOT customfield_10014
   assert.equal(fields.customfield_10014, undefined);
   assert.equal(fields.summary, "S");
   assert.equal(fields.priority.name, "High");
-  assert.ok(fields.labels.includes("synced-from-foo"));
+  assert.ok(!(fields.labels || []).some((l) => l.startsWith("synced-from-")));
 });
 
 test("collectIssueFields — classic sets customfield_10014, NOT parent", () => {
@@ -857,7 +857,7 @@ test("collectIssueFields — includeDescription:false omits description (used on
   assert.equal(fields.summary, "S");
 });
 
-test("collectIssueFields — sync label always injected when missing, not duplicated", () => {
+test("collectIssueFields — sends exactly the frontmatter labels, never adds a sync label", () => {
   const f1 = lib.collectIssueFields({
     args: { labels: "alpha,beta" },
     frontmatter: { title: "S" },
@@ -866,25 +866,10 @@ test("collectIssueFields — sync label always injected when missing, not duplic
     projectKey: null,
     livePriorities: null,
     output: { warn() {}, info() {} },
-    syncLabel: "synced-from-x",
     epicKey: null,
     useEpicLink: false,
   });
-  assert.deepEqual(f1.labels, ["alpha", "beta", "synced-from-x"]);
-
-  const f2 = lib.collectIssueFields({
-    args: { labels: "alpha,synced-from-x" },
-    frontmatter: { title: "S" },
-    descAdf: { type: "doc", content: [] },
-    storyTypeId: null,
-    projectKey: null,
-    livePriorities: null,
-    output: { warn() {}, info() {} },
-    syncLabel: "synced-from-x",
-    epicKey: null,
-    useEpicLink: false,
-  });
-  assert.deepEqual(f2.labels, ["alpha", "synced-from-x"]);
+  assert.deepEqual(f1.labels, ["alpha", "beta"]);
 });
 
 // ---------------------------------------------------------------------------

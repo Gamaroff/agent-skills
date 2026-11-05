@@ -192,7 +192,10 @@ function hashMeta(fields) {
 //
 // This label is the only guarantor of idempotent create when the write-back
 // fails, so it must be unique per bug.
-function syncLabelFor(filePath) {
+// LEGACY, lookup only: nothing writes this label any more. It is still searched
+// so a card created before the label was dropped is adopted rather than
+// duplicated when its document lost its `jira_key`.
+function legacySyncLabelFor(filePath) {
   const stem = path.basename(filePath).replace(/\.md$/i, "");
   return SYNC_LABEL_PREFIX + stem.replace(/\s+/g, "-");
 }
@@ -226,7 +229,6 @@ function collectIssueFields({
   projectKey,
   livePriorities,
   output,
-  syncLabel,
   modeLabels,
 }) {
   const priority = lib.normalisePriority(
@@ -236,7 +238,7 @@ function collectIssueFields({
   );
   const labelInput = args.labels || frontmatter.labels;
   const cleanLabels = lib.sanitiseLabels(labelInput) || [];
-  for (const l of [syncLabel, ...(modeLabels || [])]) {
+  for (const l of modeLabels || []) {
     if (l && !cleanLabels.includes(l)) cleanLabels.push(l);
   }
 
@@ -302,7 +304,7 @@ function updateBugFile({
   // A file with no frontmatter gets one. `upsertFrontmatterKeys` returns its
   // input unchanged — and silently — for such a file, so without this the issue
   // is created and `jira_key` is never persisted, and the next run creates a
-  // duplicate unless the synced-from-* label search rescues it.
+  // duplicate unless the summary-id search rescues it.
   if (adopted) {
     content = BD.ensureFrontmatter(content, bugFields, {
       dir: path.dirname(filePath),
@@ -695,9 +697,9 @@ async function run({
         })
       : null;
 
-  const syncLabel = syncLabelFor(filePath);
-  // A second, COARSER label so a board can filter every bug of one parent at a
-  // glance. Not used for idempotency — that is syncLabel's job alone.
+  const legacyLabel = legacySyncLabelFor(filePath);
+  // A COARSER label so a board can filter every bug of one parent at a glance.
+  // Not used for idempotency — the summary's [bug id] is (findExistingByIdentity).
   const modeLabels =
     mode.mode === "general"
       ? ["bug"]
@@ -719,17 +721,19 @@ async function run({
 
   // Pre-flight idempotency check (only if creating)
   if (!existingJiraKey && auth.ok && !args.dryRun) {
-    const found = await lib.findExistingByLabel({
+    const found = await lib.findExistingByIdentity({
       http,
       baseUrl: auth.baseUrl,
       email: auth.email,
       token: auth.token,
       projectKey: auth.project,
-      label: syncLabel,
+      summary,
+      legacyLabel,
+      output,
     });
     if (found) {
       output.warn(
-        `ℹ️  Found existing issue ${found.key} with label "${syncLabel}" — switching to update.`,
+        `ℹ️  Found existing issue ${found.key} for "${lib.leadingBracketId(summary)}" — switching to update.`,
       );
       existingJiraKey = found.key;
     }
@@ -788,9 +792,9 @@ async function run({
     // Build the outgoing payload BEFORE diffing, and diff against it.
     //
     // Diffing against a separately-computed label list is a trap: the payload
-    // carries the `synced-from-*` idempotency label and the mode labels that
-    // `collectIssueFields` appends, so a diff built from frontmatter alone
-    // compares a set that is missing them against a Jira issue that has them.
+    // carries the mode labels that `collectIssueFields` appends, so a diff built
+    // from frontmatter alone compares a set that is missing them against a Jira
+    // issue that has them.
     // They never converge, `labels` is reported as changed on every single run,
     // and "the second sync changes nothing" is never true — which also fires a
     // pointless PUT and defeats the skip-when-no-diff path.
@@ -805,7 +809,6 @@ async function run({
       projectKey: null,
       livePriorities,
       output,
-      syncLabel,
       modeLabels,
     });
 
@@ -909,7 +912,6 @@ async function run({
       output.info(`\n=== DRY RUN — Would CREATE Jira bug ===`);
       output.info(`  Project:  ${auth.project || "(unset)"}`);
       output.info(`  Summary:  ${summary}`);
-      output.info(`  Label:    ${syncLabel}`);
       output.info(`  Link:     ${parentKey || "(no parent card)"}`);
       result = { issueKey: null, issueUrl: null, updated: null };
     } else {
@@ -932,7 +934,6 @@ async function run({
         projectKey: auth.project,
         livePriorities,
         output,
-        syncLabel,
         modeLabels,
       });
 
@@ -961,8 +962,8 @@ async function run({
       let resp = await postCreate(fields);
       if (resp.deferred) {
         // The create null shape — identical to --dry-run. NEVER a placeholder
-        // key: one would break the idempotent synced-from-* label search and
-        // the next run would create a duplicate.
+        // key: one would break the idempotent summary-id search and the next
+        // run would create a duplicate.
         deferred = true;
         deferredRecord = resp.deferredRecord;
         result = { issueKey: null, issueUrl: null, updated: null };
@@ -1188,7 +1189,7 @@ if (require.main === module) {
     buildStatusHistoryEntries,
     hashBody,
     hashMeta,
-    syncLabelFor,
+    legacySyncLabelFor,
     normaliseBugSummary,
     collectIssueFields,
     updateBugFile,

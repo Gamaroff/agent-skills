@@ -495,9 +495,9 @@ test("every Source Documents entry carries a real ADF link mark", () => {
 // Sync label — unique per bug, not per directory
 // ===========================================================================
 
-test("the sync label is derived from the bug's own stem", () => {
+test("the legacy sync label (lookup only) is derived from the bug's own stem", () => {
   assert.equal(
-    bug.syncLabelFor("/x/docs/prd/a/story.1.7.4.bug.4.tap-target.md"),
+    bug.legacySyncLabelFor("/x/docs/prd/a/story.1.7.4.bug.4.tap-target.md"),
     "synced-from-story.1.7.4.bug.4.tap-target",
   );
 });
@@ -508,13 +508,15 @@ test("sibling bugs in one directory get DIFFERENT sync labels", () => {
   // would make the idempotency search adopt the first card it found, so bug 2
   // would silently update bug 1's card.
   const dir = "/x/docs/prd/epic-7/";
-  const a = bug.syncLabelFor(`${dir}story.1.7.4.bug.1.first.md`);
-  const b = bug.syncLabelFor(`${dir}story.1.7.4.bug.2.second.md`);
+  const a = bug.legacySyncLabelFor(`${dir}story.1.7.4.bug.1.first.md`);
+  const b = bug.legacySyncLabelFor(`${dir}story.1.7.4.bug.2.second.md`);
   assert.notEqual(a, b);
 });
 
 test("a bug's sync label differs from its parent story's directory name", () => {
-  const label = bug.syncLabelFor("/x/docs/prd/epic-7/story.1.7.4.bug.1.a.md");
+  const label = bug.legacySyncLabelFor(
+    "/x/docs/prd/epic-7/story.1.7.4.bug.1.a.md",
+  );
   assert.ok(!label.endsWith("epic-7"));
 });
 

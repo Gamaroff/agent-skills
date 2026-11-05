@@ -11,14 +11,14 @@ One-way sync of a local epic markdown file to Jira. Auto-detects create vs updat
 
 | `jira_key` present? | Action |
 |---|---|
-| Absent | **Pre-flight search by sync label**, then **Create** if no match. Writes `jira_key` back to file. |
+| Absent | **Pre-flight search by summary id**, then **Create** if no match. Writes `jira_key` back to file. |
 | Present | **Update** existing Jira epic via atomic PUT. A Change Log row is written only if the status transitioned. |
 
 **Difference from `sync-jira-story`:** epics are **top-level** — no parent issue. Issue type sent as `Epic`. Sets the Epic Name customfield (`customfield_10011` by default) on create, with auto-retry that drops the field if the project rejects it (typical of team-managed projects).
 
 ## Key features
 
-- **Idempotent create** — pre-flight JQL search by `synced-from-<epic-dir>` label prevents duplicates if a previous POST left no `jira_key` in the file. Uses Jira's new `POST /rest/api/3/search/jql` endpoint (the legacy `GET /search` was retired May 2025).
+- **Idempotent create** — pre-flight JQL search by the summary's `[Epic P.E]` id prevents duplicates if a previous POST left no `jira_key` in the file. Uses Jira's new `POST /rest/api/3/search/jql` endpoint (the legacy `GET /search` was retired May 2025).
 - **Atomic PUT** — uses `?returnIssue=true` so the fresh `updated` timestamp comes back in one round-trip.
 - **No-change fast path** — if no fields changed, the Jira PUT is skipped entirely **and** the Change Log is left alone (no noise rows for no-op syncs). Pass `--force` to push a no-op update anyway.
 - **Concurrent-edit guard** — stores Jira `fields.updated` in frontmatter as `jira_last_synced_at`. Aborts on next sync if Jira advanced (use `--force` to override).
@@ -96,7 +96,7 @@ epic_type: 'foundation'
 priority: 'high'
 estimated_sprints: 2
 status: '📋 Planned'                # emoji stripped, mapped to Jira transition
-labels: ['foundation']              # synced-from-* label appended automatically
+labels: ['foundation']              # sent exactly as written; no label is added
 assignee: '5b10a2844c20165700ede21g'
 components: ['Build']
 fix_versions: ['1.0.0']
@@ -139,7 +139,7 @@ Flow:
 1. Parse the epic file (frontmatter + body) — safe against `---` horizontal rules in the body.
 2. Resolve auth, Bitbucket repo URL + branch (current branch's upstream, falling back to the default branch), and load live Jira priorities.
 3. Resolve `prd_source` to a Bitbucket URL via the multi-variant lookup; fall back to `prd_bitbucket_url` frontmatter if present.
-4. If `jira_key` absent: search for an issue carrying the file's `synced-from-*` label. If found, switch to update.
+4. If `jira_key` absent: search for an issue whose summary opens with the document's `[Epic P.E]` id (or that carries the legacy `synced-from-*` label). If found, switch to update.
 5. Detect create vs update; on update fetch current state and run concurrent-edit guard.
 6. Normalise the summary to `[Epic P.E] {title}` from frontmatter `prd_number` + `epic_number` with `epicSummary` from `references/doc-id.js` (the one rule, shared with `jira-epic-creator`; a missing pair leaves the bare title), then diff `summary`, body hash, meta hash, priority, labels.
 7. Build a Jira ADF description: Summary → Metadata → Stories Breakdown overview table → Source links.
@@ -230,11 +230,13 @@ When creating, the script first runs:
 
 ```
 POST /rest/api/3/search/jql
-{ "jql": "project = \"RB\" AND labels = \"synced-from-epic.1.1.foundation\"",
-  "fields": ["summary", "updated"], "maxResults": 2 }
+{ "jql": "project = \"RB\" AND (summary ~ \"\\\"Epic 1.1\\\"\" OR labels = \"synced-from-epic.1.1.foundation\")",
+  "fields": ["summary", "labels", "updated"], "maxResults": 20 }
 ```
 
-If a matching issue exists (because a prior POST succeeded but the local file did not get its `jira_key` written), the script switches to update mode against that key. Every create automatically appends the `synced-from-<dir>` label to enable this lookup on subsequent runs.
+If a matching issue exists (because a prior POST succeeded but the local file did not get its `jira_key` written), the script switches to update mode against that key.
+
+**The guard is the summary's leading `[Epic P.E]` id.** The text search only produces candidates (`summary ~` is tokenised and may over-match); the script then requires an exact, case-insensitive match on each returned summary's leading bracket id. The create adds no label. The legacy `synced-from-<dir>` label is still searched, read-only, so a card made by an older version is adopted rather than duplicated. Limits: a summary with no leading `[id]` has no guard (the script warns); a card whose summary was edited in Jira to drop the id is not found; Jira's text index is eventually consistent, so an immediate rerun may miss the card.
 
 > **Endpoint migration:** Atlassian retired `GET /rest/api/3/search` in May 2025. This script uses the replacement `POST /rest/api/3/search/jql`. Older clones of the script that still hit the legacy `GET` will see `410 Gone` on migrated tenants — re-run the latest version.
 

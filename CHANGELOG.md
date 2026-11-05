@@ -6,6 +6,24 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **`sync-jira-*` no longer adds a `synced-from-*` label to the cards it creates.** The label buried
+  the real labels in every label picker (one site held hundreds). It was also the only guard against
+  a duplicate card when a create succeeds in Jira but the document never gets its `jira_key`, so the
+  guard moves rather than disappears: a new shared `findExistingByIdentity` searches the project for
+  a summary that opens with the document's bracket id (`[Task N]`, `[Story P.E.S]`, `[Epic P.E]`,
+  `[story.P.E.S.bug.N]`) and accepts a hit only on an exact, case-insensitive match of that leading
+  id. The text search is tokenised and over-matches, so the exact match, not the query, is the guard.
+  The legacy label is still searched (read only), so a card made by an older version is adopted, not
+  duplicated. **Accepted limits:** a summary with no leading `[id]` has no guard (the script warns);
+  a card whose summary was edited in Jira to drop its id is not found; Jira's text index is eventually
+  consistent, so an immediate rerun after a crash can miss the card. The `summary ~` behaviour on a
+  live tenant is not verified by the hermetic tests.
+  **Existing cards:** a `PUT` replaces `labels` rather than merging, so the first sync of a card that
+  still carries `synced-from-*` reports one label change and strips it. That sync also writes
+  `jira_last_synced_at`, so the concurrent-edit guard does not trip on the change the sync itself
+  made. Stripping the labels in bulk first still works but bumps each card's Jira `updated`, which
+  trips that guard until `--force` is used on the next sync of each card. Run
+  `setup-consumer.sh --update` to pick this up; strip bulk labels only after it.
 - **The issue-body path bound follows the PRD root and symlinks (task 262).** The check that keeps a
   path taken from an issue body inside `docs/` (`review-task`, `review-story`, develop Step 0) now
   accepts the configured `PRD_ROOT` as well, refuses a symlinked file, and refuses a path whose

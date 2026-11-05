@@ -361,7 +361,10 @@ function labelForChildStory(file, num) {
 // ---------------------------------------------------------------------------
 // Sync label
 // ---------------------------------------------------------------------------
-function syncLabelFor(filePath) {
+// LEGACY, lookup only: nothing writes this label any more. It is still searched
+// so a card created before the label was dropped is adopted rather than
+// duplicated when its document lost its `jira_key`.
+function legacySyncLabelFor(filePath) {
   const dir = path.basename(path.dirname(filePath));
   return SYNC_LABEL_PREFIX + dir.replace(/\s+/g, "-");
 }
@@ -386,7 +389,6 @@ function collectCommonFields({
   descAdf,
   livePriorities,
   output,
-  syncLabel,
   summary,
 }) {
   const priority = lib.normalisePriority(
@@ -396,7 +398,6 @@ function collectCommonFields({
   );
   const labelInput = args.labels || frontmatter.labels;
   const cleanLabels = lib.sanitiseLabels(labelInput) || [];
-  if (!cleanLabels.includes(syncLabel)) cleanLabels.push(syncLabel);
 
   const fields = {
     summary,
@@ -861,7 +862,7 @@ async function run({
         })
       : null;
 
-  const syncLabel = syncLabelFor(filePath);
+  const legacyLabel = legacySyncLabelFor(filePath);
   const newBodyHash = hashBody({
     body,
     prdBbUrl,
@@ -875,17 +876,19 @@ async function run({
 
   // Pre-flight idempotency
   if (!existingJiraKey && auth.ok && !args.dryRun) {
-    const found = await lib.findExistingByLabel({
+    const found = await lib.findExistingByIdentity({
       http,
       baseUrl: auth.baseUrl,
       email: auth.email,
       token: auth.token,
       projectKey: auth.project,
-      label: syncLabel,
+      summary,
+      legacyLabel,
+      output,
     });
     if (found) {
       output.warn(
-        `ℹ️  Found existing issue ${found.key} with label "${syncLabel}" — switching to update.`,
+        `ℹ️  Found existing issue ${found.key} for "${lib.leadingBracketId(summary)}" — switching to update.`,
       );
       existingJiraKey = found.key;
     }
@@ -932,10 +935,10 @@ async function run({
     // Build the payload FIRST, then diff against the set actually being sent.
     //
     // The diff used to rebuild `labels` from frontmatter here, which can never
-    // match: `collectCommonFields` appends the `synced-from-*` idempotency
-    // label to the set it sends, so the comparison was always a
-    // set-without-the-label against a Jira issue that has it. `labels` was
-    // reported changed on every run — which meant the no-change fast path at
+    // match while `collectCommonFields` appended a `synced-from-*` label to the
+    // set it sent (that label is gone; diff the payload actually sent, and a
+    // legacy card still holding it is stripped by the PUT, which replaces
+    // labels). `labels` was reported changed on every run — which meant the no-change fast path at
     // the gate below was NEVER entered, and the post-transition re-read behind
     // that gate was dead code. Fixing the diff is what makes that path
     // reachable at all.
@@ -962,7 +965,6 @@ async function run({
       descAdf,
       livePriorities,
       output,
-      syncLabel,
       summary,
     });
 
@@ -1178,7 +1180,6 @@ async function run({
       output.info(`\n=== DRY RUN — Would CREATE Jira epic ===`);
       output.info(`  Project: ${auth.project || "(unset)"}`);
       output.info(`  Summary: ${summary}`);
-      output.info(`  Label:   ${syncLabel}`);
       result = { issueKey: null, issueUrl: null, updated: null };
     } else {
       const epicTypeId = await lib.getIssueTypeId({
@@ -1198,7 +1199,6 @@ async function run({
         projectKey: auth.project,
         livePriorities,
         output,
-        syncLabel,
         summary,
       });
 
@@ -1244,7 +1244,7 @@ async function run({
       });
       if (resp.deferred) {
         // The create null shape — identical to --dry-run. NEVER a placeholder
-        // key: one would break the idempotent synced-from-* label search.
+        // key: one would break the idempotent summary-id search.
         deferred = true;
         deferredRecord = resp.deferredRecord;
         result = { issueKey: null, issueUrl: null, updated: null };
@@ -1576,7 +1576,7 @@ if (require.main === module) {
     labelForChildStory,
     hashBody,
     hashMeta,
-    syncLabelFor,
+    legacySyncLabelFor,
     normaliseEpicSummary,
     mapStatus: lib.mapStatus,
     loadStatusMap: lib.loadStatusMap,
@@ -1615,6 +1615,7 @@ if (require.main === module) {
     parseJiraError: lib.parseJiraError,
     hashStable: lib.hashStable,
     findExistingByLabel: lib.findExistingByLabel,
+    findExistingByIdentity: lib.findExistingByIdentity,
     fetchUpdatedTimestamp: lib.fetchUpdatedTimestamp,
     escapeRe: lib.escapeRe,
     stripRemotePrefix: lib.stripRemotePrefix,

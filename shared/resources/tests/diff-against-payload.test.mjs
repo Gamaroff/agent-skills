@@ -7,11 +7,12 @@
  * mechanism, and because §8 of task.96 promises three things the e2e tests
  * cannot provide:
  *
- *   1. the corrected diff input reports no `labels` change when Jira already
- *      carries the `synced-from-*` label;
- *   2. a STANDING counter-example — the same comparison fed the frontmatter
- *      rebuild DOES report a change. Without this the defect is only ever
- *      demonstrated by a transient mutation that leaves nothing behind;
+ *   1. the diff input reports no `labels` change when Jira holds exactly the
+ *      labels the payload sends (the builder no longer appends a
+ *      `synced-from-*` label, so frontmatter labels ARE the sent set);
+ *   2. a legacy card still carrying `synced-from-*` is reported as a label
+ *      change ONCE (the PUT replaces `labels`, stripping it) and then
+ *      converges;
  *   3. negative cases isolating each guard condition.
  *
  * Run: node --test shared/resources/tests/diff-against-payload.test.mjs
@@ -28,31 +29,32 @@ const taskSync = require("../../../skills/sync-jira-task/scripts/sync-jira-task.
 
 const SILENT = { info() {}, warn() {}, err() {}, emit() {} };
 
-const SYNC_LABEL = "synced-from-task-42";
+// A label the PREVIOUS version of the skills appended to every card.
+const LEGACY_LABEL = "synced-from-task-42";
 
-// What Jira holds: the labels the payload sent, sync label included.
+// What Jira holds: the labels the payload sent.
 const current = {
   summary: "Cache lib simplification",
   priority: "High",
-  labels: ["backend", SYNC_LABEL],
+  labels: ["backend"],
   updated: "2026-09-07T10:00:00.000Z",
 };
 
-// What `collectIssueFields` builds and PUTs — note the appended sync label.
+// What `collectIssueFields` builds and PUTs.
 const fields = {
   summary: "Cache lib simplification",
   priority: { name: "High" },
-  labels: ["backend", SYNC_LABEL],
+  labels: ["backend"],
 };
 
 const frontmatter = {
   jira_last_body_hash: "b1",
   jira_last_meta_hash: "m1",
-  labels: ["backend"], // the frontmatter set — WITHOUT the sync label
+  labels: ["backend"],
   priority: "High",
 };
 
-test("diffing the payload reports no label change when Jira already carries the sync label", () => {
+test("diffing the payload reports no label change when Jira holds exactly the sent labels", () => {
   const changed = lib.diffAgainstPayload({
     current,
     fields,
@@ -63,16 +65,11 @@ test("diffing the payload reports no label change when Jira already carries the 
   assert.deepEqual(changed, [], `expected no changes, got: ${changed}`);
 });
 
-test("THE COUNTER-EXAMPLE: the real builder's labels differ from the frontmatter rebuild", () => {
-  // The defect, asserted permanently rather than proven by a mutation that is
-  // reverted a moment later.
-  //
-  // This drives the REAL builder — `sync-jira-task`'s `collectIssueFields` —
-  // rather than a hand-built object, because the defect was never in
-  // `diffFields`: it was in the disagreement between what the builder SENDS and
-  // what the old code DIFFED. A test that hand-builds both sides pins
-  // `diffFields` and would stay green if a caller reverted to the frontmatter
-  // rebuild, which is precisely the vacuity this task exists to eliminate.
+test("the real builder sends exactly the frontmatter labels — no sync label", () => {
+  // Drives the REAL builder, not a hand-built object: the divergence this
+  // suite once pinned (a builder appending `synced-from-*` that the diff did
+  // not see) cannot recur while the builder's output equals the frontmatter
+  // set. A builder that re-appended the label would fail here.
   const built = taskSync.collectIssueFields({
     summary: "Cache lib simplification",
     args: {},
@@ -82,42 +79,45 @@ test("THE COUNTER-EXAMPLE: the real builder's labels differ from the frontmatter
     projectKey: null,
     livePriorities: null,
     output: SILENT,
-    syncLabel: SYNC_LABEL,
   });
 
-  const rebuilt = lib.sanitiseLabels(["backend"]) || [];
+  assert.deepEqual(built.labels, ["backend"]);
+  assert.deepEqual(built.labels, lib.sanitiseLabels(["backend"]));
 
-  assert.ok(
-    built.labels.includes(SYNC_LABEL),
-    "the builder no longer appends the sync label — the defect's precondition " +
-      "is gone and this counter-example no longer means anything",
-  );
-  assert.ok(
-    !rebuilt.includes(SYNC_LABEL),
-    "the frontmatter rebuild now contains the sync label — the two sets no " +
-      "longer diverge, so the defect cannot be demonstrated",
-  );
-
-  // Feeding the rebuild to the diff reports the spurious change. Feeding the
-  // built payload does not. That gap IS the bug.
-  const withRebuild = lib.diffFields({
-    prev: { ...current, labels: built.labels },
-    next: { summary: built.summary, priority: "High", labels: rebuilt },
-    prevBodyHash: "b1",
-    newBodyHash: "b1",
-    prevMetaHash: "m1",
-    newMetaHash: "m1",
-  });
-  assert.deepEqual(withRebuild, ["labels"], "the defect no longer reproduces");
-
-  const withPayload = lib.diffAgainstPayload({
+  const changed = lib.diffAgainstPayload({
     current: { ...current, labels: built.labels },
     fields: built,
     frontmatter,
     newBodyHash: "b1",
     newMetaHash: "m1",
   });
-  assert.deepEqual(withPayload, [], "the fix no longer converges");
+  assert.deepEqual(changed, [], "a no-op rerun must report no label change");
+});
+
+test("a legacy card still carrying synced-from-* is reported once, then converges", () => {
+  // `putIssueAtomic` sends `{ fields }`, and Jira REPLACES `labels` on a PUT
+  // (it does not merge). So the first sync after the label was dropped sees a
+  // label change on a legacy card, sends `labels` without it, and strips it.
+  const legacy = { ...current, labels: ["backend", LEGACY_LABEL] };
+
+  const first = lib.diffAgainstPayload({
+    current: legacy,
+    fields,
+    frontmatter,
+    newBodyHash: "b1",
+    newMetaHash: "m1",
+  });
+  assert.deepEqual(first, ["labels"]);
+
+  // After the PUT Jira holds exactly what was sent.
+  const second = lib.diffAgainstPayload({
+    current: { ...legacy, labels: fields.labels },
+    fields,
+    frontmatter,
+    newBodyHash: "b1",
+    newMetaHash: "m1",
+  });
+  assert.deepEqual(second, [], "the second run must change nothing");
 });
 
 test("a real summary change is still reported", () => {
@@ -145,7 +145,7 @@ test("a real priority change is still reported", () => {
 test("a real label change is still reported", () => {
   const changed = lib.diffAgainstPayload({
     current,
-    fields: { ...fields, labels: ["backend", "urgent", SYNC_LABEL] },
+    fields: { ...fields, labels: ["backend", "urgent"] },
     frontmatter,
     newBodyHash: "b1",
     newMetaHash: "m1",

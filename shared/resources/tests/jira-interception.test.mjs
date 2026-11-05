@@ -542,7 +542,7 @@ test("§7 a deferred response invents no issue key — that is what keeps the cr
       body,
       {},
       "a fabricated key would be written to frontmatter, break the idempotent " +
-        "synced-from-* label search, and make the next run create a duplicate",
+        "summary-id search, and make the next run create a duplicate",
     );
     assert.equal(body.key, undefined);
     assert.equal(await resp.text(), "");
