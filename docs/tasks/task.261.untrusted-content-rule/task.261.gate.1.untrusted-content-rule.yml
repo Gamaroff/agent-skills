@@ -1,0 +1,64 @@
+schema: 2
+task: 'task.261.untrusted-content-rule'
+task_title: 'Untrusted-content rule'
+gate: CONCERNS
+status_reason: 'Implementation matches the plan and every success criterion holds. One medium finding: the lint test silently ignores a real read-marker line that contains the word "no" or "don''t", so a read site can ship uncited.'
+reviewer: 'QA Engineer'
+head: '76f90d6d1aabdc63f50364e7c9a5516394fc5123'
+updated: '2026-11-05T07:02:00Z'
+
+top_issues:
+  - id: 'T261-QA-1'
+    severity: medium
+    file: 'tests/untrusted-content-rule.test.js'
+    finding: 'FORBIDDING matches the bare word "no" (and "don''t", "not allowed") anywhere on the line outside backticks, so markerLines() drops a genuine read such as `gh issue view 5 --json body  # no filter applied`. Probed: FORBIDDING.test(that line) is true. The filter is also applied inside fenced code, where a trailing comment is not a forbidding sentence. A read site with such a comment passes the test uncited. Today it drops 2 lines, both in an already-allowlisted file, so no current false pass.'
+    suggested_action: 'Drop the bare "no" from FORBIDDING, apply the forbidding filter to prose lines only (outside fenced code blocks), and add a control case for a fenced read line carrying a comment that contains "no".'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 20
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary_reason: 'The path bound is a boundary, but its block sits under a bold label, not a heading, so the fence entry form cannot reach it. It is executed by committed tests instead: 3 sites x (accepted path, 4 rejected paths, empty path), mutation-proven by neutering the bound in review-task.'
+    notes: 'Path bound rejects paths outside docs/ and paths containing .. segments. Not covered: symlinks inside docs/, and a configured PRD root other than docs/.'
+  performance:
+    status: PASS
+    notes: 'Lint test runs in well under 2 seconds (tree scan).'
+  reliability:
+    status: PASS
+    notes: 'Empty derived path still falls through to the key lookup as before.'
+  maintainability:
+    status: PASS
+    notes: 'Rule doc is 52 lines. Citations are one line each. Allowlist entries each carry a reason and must still match a marker.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'The path bound hard-codes docs/. A consumer with a different PRD root would HALT on a legitimate document; derive the root from resolve-paths.sh if one reports it.'
+      refs: ['skills/review-task/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions: ['Fix T261-QA-1 (lint test filter) before merge']

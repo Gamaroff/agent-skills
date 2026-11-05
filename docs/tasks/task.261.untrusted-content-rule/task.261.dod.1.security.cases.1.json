@@ -1,0 +1,100 @@
+[
+  {
+    "id": "outside-absolute",
+    "input": "/etc/passwd",
+    "direction": "hostile",
+    "correct": "The block prints its HALT line and exits 1.",
+    "spec_ref": "docs/tasks/task.261.untrusted-content-rule/task.261.untrusted-content-rule.md:259",
+    "expected": {
+      "stdout": "HALT: derived path /etc/passwd is outside docs/\n",
+      "exit": 1
+    }
+  },
+  {
+    "id": "outside-relative",
+    "input": "skills/review-task/SKILL.md",
+    "direction": "hostile",
+    "correct": "The block prints its HALT line and exits 1.",
+    "spec_ref": "docs/tasks/task.261.untrusted-content-rule/task.261.untrusted-content-rule.md:259",
+    "expected": {
+      "stdout": "HALT: derived path skills/review-task/SKILL.md is outside docs/\n",
+      "exit": 1
+    }
+  },
+  {
+    "id": "prefix-lookalike",
+    "input": "docsx/y.md",
+    "direction": "hostile",
+    "correct": "The block prints its HALT line and exits 1.",
+    "spec_ref": "docs/tasks/task.261.untrusted-content-rule/task.261.untrusted-content-rule.md:259",
+    "expected": {
+      "stdout": "HALT: derived path docsx/y.md is outside docs/\n",
+      "exit": 1
+    }
+  },
+  {
+    "id": "dotdot-climb",
+    "input": "docs/../.ssh/id_rsa",
+    "direction": "hostile",
+    "correct": "The block prints its HALT line and exits 1.",
+    "spec_ref": "docs/tasks/task.261.untrusted-content-rule/task.261.untrusted-content-rule.md:259",
+    "expected": {
+      "stdout": "HALT: derived path docs/../.ssh/id_rsa climbs out with ..\n",
+      "exit": 1
+    }
+  },
+  {
+    "id": "dotdot-deep",
+    "input": "docs/a/../../x",
+    "direction": "hostile",
+    "correct": "The block prints its HALT line and exits 1.",
+    "spec_ref": "docs/tasks/task.261.untrusted-content-rule/task.261.untrusted-content-rule.md:259",
+    "expected": {
+      "stdout": "HALT: derived path docs/a/../../x climbs out with ..\n",
+      "exit": 1
+    }
+  },
+  {
+    "id": "dotdot-trailing",
+    "input": "docs/a/..",
+    "direction": "hostile",
+    "correct": "The block prints its HALT line and exits 1.",
+    "spec_ref": "docs/tasks/task.261.untrusted-content-rule/task.261.untrusted-content-rule.md:259",
+    "expected": {
+      "stdout": "HALT: derived path docs/a/.. climbs out with ..\n",
+      "exit": 1
+    }
+  },
+  {
+    "id": "dotdot-bare",
+    "input": "docs/..",
+    "direction": "hostile",
+    "correct": "The block prints its HALT line and exits 1.",
+    "spec_ref": "docs/tasks/task.261.untrusted-content-rule/task.261.untrusted-content-rule.md:259",
+    "expected": {
+      "stdout": "HALT: derived path docs/.. climbs out with ..\n",
+      "exit": 1
+    }
+  },
+  {
+    "id": "legit-task-doc",
+    "input": "docs/tasks/task.261.x/task.261.x.md",
+    "direction": "legitimate",
+    "correct": "Accepted, exit 0.",
+    "spec_ref": "docs/tasks/task.261.untrusted-content-rule/task.261.untrusted-content-rule.md:259"
+  },
+  {
+    "id": "legit-dotted-name",
+    "input": "docs/a..b.md",
+    "direction": "legitimate",
+    "correct": "Accepted: a name containing two dots is not a climb.",
+    "spec_ref": "docs/tasks/task.261.untrusted-content-rule/task.261.untrusted-content-rule.md:259"
+  },
+  {
+    "id": "legit-empty",
+    "input": "",
+    "direction": "legitimate",
+    "correct": "Empty passes through to the key lookup, exit 0.",
+    "spec_ref": "docs/tasks/task.261.untrusted-content-rule/task.261.untrusted-content-rule.md:126"
+  }
+]

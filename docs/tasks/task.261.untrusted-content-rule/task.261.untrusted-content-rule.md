@@ -5,16 +5,18 @@ type: task
 description: "Add a shared rule that tracker, PR and web text is data and never instructions, cite it from every skill that reads such text, and hold it with a lint test."
 tags: [guardrails, prompt-injection, shared-resources, lint]
 category: other
-status: planned
+status: accepted
+pr_number: 839
+completed_date: 2026-11-05
 priority: High
 created: 2026-11-04
-updated: 2026-11-04
+updated: 2026-11-05
 estimated_effort_hours: 4
 ---
 
 # Technical Task: Untrusted-content rule
 
-**Status:** Planned
+**Status:** Accepted
 
 ---
 
@@ -138,8 +140,9 @@ None. The rule adds a sentence to skills and a test. The one behavioural change,
 - `skills/review-task/SKILL.md`, `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` (read only)
 
 **Changes**:
-- [ ] Re-run the population command and reconcile with the table in Technical Background; add or remove sites with a witness each.
-- [ ] Read how `LOCAL_PATH` is used after `sed` and record whether it is bounded to `docs/`.
+- [x] Re-run the population command and reconcile with the table in Technical Background; add or remove sites with a witness each.
+- [x] Read how `LOCAL_PATH` is used after `sed` and record whether it is bounded to `docs/`. Review (2026-11-05) read both sites (`skills/review-task/SKILL.md:156-159`, step-0 doc `:128`): `LOCAL_PATH` is the `sed` output with no check, and the file is then opened. It is unbounded, so the Phase 3 bound is required, not conditional.
+- [x] The population is wider than the five-row table. A review-time grep for the read markers (`gh … view … body`, `getJiraIssue`, `WebSearch`, `WebFetch`, `browser-use get text`, `get_page_text`) over `skills/*/SKILL.md` and `shared/resources/*.md` also hit `create-issue`, `finalise`, `review-story`, the `ensure-*-jira-issue` and `sync-github-*` skills, `jira-transition-protocol.md`, `tracker-state-poller-subagent.md` and `develop-pipeline-pause.md`. Classify each hit as in scope (reads prose written by a third party), a metadata-only read, or own content, with a witness line, and record the result. `getJiraIssue` and a bare `body` are shared tokens (obs #135): expect the matcher to need the compound form, and every exclusion to carry a reason in the test allowlist.
 
 **Dependencies**: none.
 
@@ -153,9 +156,9 @@ None. The rule adds a sentence to skills and a test. The one behavioural change,
 - `shared/resources/untrusted-content-rule.md`
 
 **Changes**:
-- [ ] Write the six parts above, each under its own heading so a fragment can cite it.
-- [ ] Cite `probe-boundary-rule.md` for the execution case.
-- [ ] State that the rule is advice and name the mechanical parts.
+- [x] Write the six parts above, each under its own heading so a fragment can cite it.
+- [x] Cite `probe-boundary-rule.md` for the execution case.
+- [x] State that the rule is advice and name the mechanical parts.
 
 **Dependencies**: Phase 1.
 
@@ -169,9 +172,9 @@ None. The rule adds a sentence to skills and a test. The one behavioural change,
 - `skills/review-pr/SKILL.md`, `skills/review-task/SKILL.md`, `skills/browser-use/SKILL.md`, `skills/explain-simply/SKILL.md`, `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md`
 
 **Changes**:
-- [ ] Add one cited line at each read site, by fragment reference.
-- [ ] Add the path bound at `review-task` and Step 0 if Phase 1 found it missing.
-- [ ] `npm run bundle`; commit the regenerated `references/` copies.
+- [x] Add one cited line at each read site, by fragment reference.
+- [x] Add the path bound at `review-task` and Step 0 if Phase 1 found it missing.
+- [x] `npm run bundle`; commit the regenerated `references/` copies.
 
 **Dependencies**: Phase 2.
 
@@ -185,10 +188,10 @@ None. The rule adds a sentence to skills and a test. The one behavioural change,
 - `tests/untrusted-content-rule.test.js`
 
 **Changes**:
-- [ ] Derive the population from `skills/*/SKILL.md` and `shared/resources/*.md` (bundled copies excluded); require each file with a read marker to cite the rule.
-- [ ] Non-vacuity floor: fail if the population is empty or below the Phase 1 measured floor.
-- [ ] Controls: a read marker without a citation fails; a cited one passes; a marker inside a "never do this" sentence is ignored; a read the test does not know (`curl` of a URL) is named as a known blind spot, not silently passed.
-- [ ] Mutation-prove: delete one citation and confirm red; restore.
+- [x] Derive the population from `skills/*/SKILL.md` and `shared/resources/*.md` (bundled copies excluded); require each file with a read marker to cite the rule.
+- [x] Non-vacuity floor: fail if the population is empty or below the Phase 1 measured floor.
+- [x] Controls: a read marker without a citation fails; a cited one passes; a marker inside a "never do this" sentence is ignored; a read the test does not know (`curl` of a URL) is named as a known blind spot, not silently passed.
+- [x] Mutation-prove: delete one citation and confirm red; restore.
 
 **Dependencies**: Phase 3.
 
@@ -226,25 +229,25 @@ None.
 **Scope**: the lint test's matcher and population.
 
 **Actions**:
-- [ ] Control: marker without citation fails.
-- [ ] Control: marker with citation passes.
-- [ ] Control: marker in a forbidding sentence is ignored.
-- [ ] Control: a restatement the key does not match (a `curl` read) is documented as a blind spot (obs #135).
-- [ ] Non-vacuity: population is at least the measured floor.
+- [x] Control: marker without citation fails.
+- [x] Control: marker with citation passes.
+- [x] Control: marker in a forbidding sentence is ignored.
+- [x] Control: a restatement the key does not match (a `curl` read) is documented as a blind spot (obs #135).
+- [x] Non-vacuity: population is at least the measured floor.
 
 **Command**: `node --test tests/untrusted-content-rule.test.js`
 
 ### Mutation Proving
 
 **Actions**:
-- [ ] Remove one citation; confirm the test goes red; restore.
-- [ ] Remove the rule doc; confirm the citations' target check goes red; restore.
+- [x] Remove one citation; confirm the test goes red; restore.
+- [x] Remove the rule doc; confirm the citations' target check goes red; restore.
 
 ### Integration Tests
 
 **Actions**:
-- [ ] `CI=true npm test` passes, including `bundled-parity`, `bundled-links`, `skill-protocol`.
-- [ ] `npm run bundle:check` clean.
+- [x] `CI=true npm test` passes, including `bundled-parity`, `bundled-links`, `skill-protocol`.
+- [x] `npm run bundle:check` clean.
 
 ---
 
@@ -252,26 +255,26 @@ None.
 
 ### Functional
 
-- [ ] `shared/resources/untrusted-content-rule.md` exists and states the six parts, each under its own heading.
-- [ ] Every skill or shared step doc with a read marker cites the rule by fragment.
-- [ ] If Phase 1 finds the derived path unbounded, a path outside `docs/` HALTs at `review-task` and Step 0, with a test.
-- [ ] Removing any one citation turns `tests/untrusted-content-rule.test.js` red.
+- [x] `shared/resources/untrusted-content-rule.md` exists and states the six parts, each under its own heading.
+- [x] Every skill or shared step doc with a read marker cites the rule by fragment.
+- [x] If Phase 1 finds the derived path unbounded, a path outside `docs/` HALTs at `review-task` and Step 0, with a test.
+- [x] Removing any one citation turns `tests/untrusted-content-rule.test.js` red.
 
 ### Performance
 
-- [ ] The rule doc is under one page, and each citation adds one line, so skill bodies grow by at most a few lines.
-- [ ] The lint test runs in under 2 seconds (a tree scan, no processes).
+- [x] The rule doc is under one page, and each citation adds one line, so skill bodies grow by at most a few lines.
+- [x] The lint test runs in under 2 seconds (a tree scan, no processes).
 
 ### Code Quality
 
-- [ ] `CI=true npm test` passes.
-- [ ] `npm run validate -- skills/review-pr/` (and the other edited skills) pass.
-- [ ] The test asserts citations and population, with a non-vacuity floor and controls; the mutation proof is recorded in the QA report.
+- [x] `CI=true npm test` passes.
+- [x] `npm run validate -- skills/review-pr/` (and the other edited skills) pass.
+- [x] The test asserts citations and population, with a non-vacuity floor and controls; the mutation proof is recorded in the QA report.
 
 ### Migration
 
-- [ ] `npm run bundle:check` and `npm run check:generated` are clean.
-- [ ] The Phase 1 re-measured read-site table is recorded in the QA report (not the implementation report, which is committed after `/finalise`).
+- [x] `npm run bundle:check` and `npm run check:generated` are clean.
+- [x] The Phase 1 re-measured read-site table is recorded in the QA report (not the implementation report, which is committed after `/finalise`).
 
 ---
 
@@ -364,12 +367,57 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-05
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.261.qa.3.untrusted-content-rule.md](./task.261.qa.3.untrusted-content-rule.md)
+- **Gate File**: [task.261.gate.3.untrusted-content-rule.yml](./task.261.gate.3.untrusted-content-rule.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 34
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+Both gate 2 findings are fixed. The scoped review found two low-severity test-hardening items (CRLF in the fence regex, hostile path cases that do not show which guard fired) and one cleanup. All are advisory.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report**: `task.261.qa.3.untrusted-content-rule.md`
+**Gate File**: `task.261.gate.3.untrusted-content-rule.yml` — PASS 95/100
+**DoD Summary**: `task.261.dod.1.untrusted-content-rule.md`
+
+✅ **Success criteria:** all 11 met (#1-#6, #9, #11 by agent and measurement; #7, #8, #10 by CI on `53f60e6d`)
+✅ **Tests:** 27 lint tests in `tests/untrusted-content-rule.test.js` (0.375 s); full CI green
+✅ **PR Review:** PR #839, `/review-pr` APPROVE
+✅ **Security:** PASS. The `docs/` path bound was made reachable by the probe engine, then probed: 60 cases, no defect
+✅ **Compliance:** not applicable
+✅ **Documentation:** `CHANGELOG.md` entry; rule doc and six skill citations
+
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-04 | 1.0     | Initial draft | create-task |
+| 2026-11-05 | 1.1     | Review passed (8/10) — Phase 1 now records LOCAL_PATH is unbounded and the read-site population is wider than the table | review-task |
+| 2026-11-05 |         | Status → ready-for-development | review-task |
+| 2026-11-05 |         | QA gate CONCERNS (90/100) — 1 medium finding (lint filter drops a read line containing "no") | qa-task |
+| 2026-11-05 |         | QA findings fixed — T261-QA-1 (lint filter), 1 iteration | qa-fix |
+| 2026-11-05 |         | QA gate CONCERNS (80/100) — 2 medium findings (fence tracking can desynchronise; CHANGELOG entry missing) | qa-task |
+| 2026-11-05 |         | QA findings fixed — T261-QA-2 (fence tracking), T261-QA-3 (CHANGELOG), advisory CR-2 and CR-3, 2 iterations | qa-fix |
+| 2026-11-05 |         | QA gate PASS (95/100) — 0 blocking findings; 2 low and 1 cleanup advisory | qa-task |
+| 2026-11-05 |         | PR review APPROVE — 3 low advisory conformance findings (trail and consistency), doc-only, addressed | review-pr |
+| 2026-11-05 | 1.2 | DoD passed — accepted (PR #839) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -377,19 +425,19 @@ None.
 ## Progress Tracking
 
 ### Phase 1: Re-measure and confirm
-- [ ] Population re-run and reconciled
-- [ ] Path bound confirmed or not
+- [x] Population re-run and reconciled
+- [x] Path bound confirmed or not
 
 ### Phase 2: The rule doc
-- [ ] Six parts written
+- [x] Six parts written
 
 ### Phase 3: Citations and extraction bound
-- [ ] Citations at each read site
-- [ ] Bundle regenerated
+- [x] Citations at each read site
+- [x] Bundle regenerated
 
 ### Phase 4: Lint test
-- [ ] Test with controls and floor
-- [ ] Mutation proved
+- [x] Test with controls and floor
+- [x] Mutation proved
 
 ---
 
@@ -418,7 +466,7 @@ None.
 
 ---
 
-**Status:** Planned
+**Status:** Accepted
 
 **Next Steps**:
 1. Implement according to implementation plan
