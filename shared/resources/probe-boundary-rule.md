@@ -102,6 +102,15 @@ appended after every case's input. The engine never guesses an argument; without
 the flag such an export throws on every case, which scores `rejects-every-input`,
 not a verdict.
 
+**An exact-host allow-list predicate does not fit the stock `url-authority` corpus.** That corpus
+models a free host *component* (a `/` or `@` smuggled into a field), so a function that accepts only
+a fixed set of hosts refuses every case in it, including the legitimate ones, and scores
+`rejects-every-input` (task.264). It is a corpus mismatch, not a defect. Keep `--sink url-authority`
+and name a cases file whose inputs are whole remotes, with look-alike, userinfo-confusion, extra-path
+and other-forge hostiles and one legitimate case per accepted shape.
+`tests/fixtures/probe/bitbucket-remote.cases.json` is the worked one, for
+`jira-sync.js#parseBitbucketRemote`; copy its shape and change the hosts.
+
 The verdict branches, in the order they are checked:
 
 | Condition | Verdict | Why |

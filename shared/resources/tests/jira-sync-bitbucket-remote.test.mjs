@@ -144,11 +144,35 @@ function messageForRemote(remote) {
   }
 }
 
-test("the refusal names the env var, the card and the exact line to set", () => {
-  const msg = messageForRemote("https://git.example.com/team/proj.git");
+test("a Bitbucket Cloud remote that did not parse gets the exact line to set", () => {
+  const msg = messageForRemote("https://bitbucket.org/team/proj/src/main");
   assert.match(msg, /PROJ-9/);
-  assert.match(msg, /BITBUCKET_REPO_URL=https:\/\/bitbucket\.org\/team\/proj/);
-  assert.match(msg, /git\.example\.com/, "it must name the remote it read");
+  assert.match(
+    msg,
+    /BITBUCKET_REPO_URL=https:\/\/bitbucket\.org\/team\/proj(?!\/)/,
+    "the first two path segments are the workspace and repo",
+  );
+  assert.match(msg, /bitbucket\.org/, "it must name the remote it read");
+});
+
+test("a non-Bitbucket-Cloud remote gets the template, never a derived line", () => {
+  for (const remote of [
+    "https://git.example.com/team/proj.git",
+    "git@bitbucket.example.com:team/proj.git",
+    "https://github.com/team/proj.git",
+  ]) {
+    const msg = messageForRemote(remote);
+    assert.match(
+      msg,
+      /BITBUCKET_REPO_URL=https:\/\/bitbucket\.org\/<workspace>\/<repo>/,
+      remote,
+    );
+    assert.ok(
+      !/bitbucket\.org\/team\/proj/.test(msg),
+      `derived line for ${remote}`,
+    );
+    assert.match(msg, /PROJ-9/);
+  }
 });
 
 test("the refusal never prints a credential from the remote", () => {
