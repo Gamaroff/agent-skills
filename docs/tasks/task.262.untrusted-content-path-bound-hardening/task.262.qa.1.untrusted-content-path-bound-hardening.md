@@ -90,7 +90,14 @@ boundary: true (the Bound the derived path fence).
 
 mutation-proven: drop the `[ -L "$LOCAL_PATH" ]` guard in review-task → "the path bound is the same block at every site" and "a file symlink inside docs/ is a HALT" went red → covered
 
-Develop-time proofs (recorded in the implementation report) cover the other guards; they are `dev-only` in this cycle's terms.
+mutation-proven: delete the `docs/*|"$PRD_DIR"/*` outside-root guard in review-task → "a derived path outside docs/, or climbing out of it, is a HALT" (plus the same-block equality test and the PRD_ROOT test) went red → covered
+mutation-proven: delete the `*/../*` climb guard in review-task → "a derived path outside docs/, or climbing out of it, is a HALT" and the same-block equality test went red → covered
+
+Each mutation was applied to a `cp` snapshot of the file, shown red, then restored and shown green (`git status` clean afterwards).
+
+Develop-time proofs for the remaining guards (real-path loop, PRD root, missing parent, CRLF regex) are recorded in the implementation report; they are `dev-only` in this cycle's terms.
+
+**Lint test runtime (success criterion: under 2 seconds).** Command: `CI=true node --test tests/untrusted-content-rule.test.js`. Three runs at load average about 6: `duration_ms` 1981, 1989, 1951 (33 tests). Under 2 s, with little margin on a loaded machine.
 
 ---
 
