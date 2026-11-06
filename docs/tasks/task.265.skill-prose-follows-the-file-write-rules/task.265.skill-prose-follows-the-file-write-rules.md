@@ -330,6 +330,27 @@ None identified.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-06
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.265.qa.1.skill-prose-follows-the-file-write-rules.md](./task.265.qa.1.skill-prose-follows-the-file-write-rules.md)
+- **Gate File**: [task.265.gate.1.skill-prose-follows-the-file-write-rules.yml](./task.265.gate.1.skill-prose-follows-the-file-write-rules.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 5
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+Five medium findings: follow-up migration task not filed, rule not cited at the other `--body-file` sites, four bundled `mutation-proving.md` copies cite a file their skill lacks, wall-time criterion unmeasured, no CHANGELOG entry.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -339,6 +360,7 @@ None identified.
 | 2026-11-06 | 1.1     | Review passed (9/10) — no changes required; claims re-measured (32 heredocs, 16 anchors, 31 body-file files) | review-task |
 | 2026-11-06 |         | Status → ready-for-development                           | review-task |
 | 2026-11-06 |         | Implemented phases 1-5 inline; status → ready-for-review (ci:fast 7944 tests, 0 fail; ratchet mutation-proved) | develop-task |
+| 2026-11-06 |         | QA gate CONCERNS (80/100) — 5 findings                   | qa-task     |
 <!-- change-log-end -->
 
 ---
