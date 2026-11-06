@@ -1,0 +1,87 @@
+schema: 2
+task: 'task.268.qa-fix-finds-the-whole-defect-the-first-time'
+task_title: 'qa-fix finds the whole defect the first time'
+gate: FAIL
+status_reason: 'Cycle 1 closed the CHANGELOG and Step 7 findings, but its fix for the Step 4 guard introduced a HIGH bug: once the slot is filled, the unsubstituted-slot check matches its own substituted value and the block always halts.'
+reviewer: 'QA Engineer'
+head: 'b88d057e9078d994e02c3c462f4b2e367e017757'
+updated: '2026-11-06T20:46:14Z'
+
+top_issues:
+  - id: 'T268-QA-4'
+    severity: high
+    file: 'skills/qa-fix/SKILL.md'
+    finding: 'The Step 4 guard block tests for an unsubstituted slot with the literal slot text in its case pattern. Substitution replaces that text too, so a filled slot always matches and the block prints HALT and exits 1. Reproduced: with the slot replaced by skills/qa-fix the block exits 1 with "skills/qa-fix was not substituted". Absent on the PR base (introduced by b88d057e). (CR-1.)'
+    suggested_action: 'Detect the unsubstituted state without repeating the slot literal in the pattern (split the literal, or keep only the empty-string check), then probe the block with the fence form: a filled slot with a clean path passes, an untracked file refuses, an empty slot refuses.'
+    suggested_owner: dev
+    status: open
+  - id: 'T268-QA-5'
+    severity: medium
+    file: 'skills/qa-fix/SKILL.md'
+    finding: 'The Step 4 prose offers "run git add -N" or "refuse", but the block only refuses and never stages; $CHANGED_PATHS is word-split, so a path with a space breaks into two arguments. (CR-2.)'
+    suggested_action: 'State that the block is the refuse branch only (staging is the prose step above it), and say paths containing spaces are unsupported or pass them as an array.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 13
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: ["refused", "is refused"]
+    boundary: true
+    notes: 'The Step 4 guard is a repository-state refusal (boundary true). It now has an engine-reachable form (a {changed-paths} slot) but a defect makes it refuse every filled slot (T268-QA-4); it was reproduced by hand, which does not count toward probes_executed. After the fix the fence form must be run so probes_executed is above zero.'
+  performance:
+    status: PASS
+    notes: 'Unchanged from gate 1: prose plus one edited test file.'
+  reliability:
+    status: FAIL
+    notes: 'A guard that always refuses blocks the Step 4 gate for every qa-fix cycle that follows it literally.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Step 7 restates the Step 2.6 triggers in paraphrase and omits the Struck mechanism block (CR-3); the test header still says four moves (CR-4). Both advisory.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix the Step 4 guard so a filled slot passes, then probe it with the fence form.'
+      refs: ['skills/qa-fix/SKILL.md']
+  future:
+    - action: 'Cite Step 2.6 instead of restating its triggers in Step 7, and decide whether the Struck mechanism block is owed (CR-3).'
+      refs: ['skills/qa-fix/SKILL.md']
+    - action: 'Update the header comment in the structural-move test to six moves (CR-4).'
+      refs: ['tests/qa-fix-structural-move.test.js']
+
+bug_resolution:
+  cycle_1_findings:
+    - id: 'T268-QA-1'
+      status: closed
+      note: 'changelog-cites.sh: cites (task 268)'
+    - id: 'T268-QA-2'
+      status: closed
+      note: 'Step 7 now says what happens when a block cannot be added; both triggers named'
+    - id: 'T268-QA-3'
+      status: not-fixed
+      note: 'slot added, but the new refusal check is itself broken (T268-QA-4)'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T268-QA-4 fixed and re-reviewed']

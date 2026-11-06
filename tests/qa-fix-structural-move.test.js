@@ -5,8 +5,8 @@
  *
  * Two changes to qa-fix, each held here:
  *
- *   - Step 2.6 (obs #167, #172) — a four-move menu (consolidate the contract,
- *     scope the claim, waive, patch) offered on two triggers (the pipeline's
+ *   - Step 2.6 (obs #167, #172) — a six-move menu (consolidate the contract,
+ *     scope the claim, narrow the contract, extract to a script, waive, patch) offered on two triggers (the pipeline's
  *     narrowing-residue offer; a repeat subject), with a fixed fix-summary shape.
  *   - Step 3.5, documentation row 1 (obs #174, #177) — the probe's population
  *     is every executed document that restates the subject, found by a named

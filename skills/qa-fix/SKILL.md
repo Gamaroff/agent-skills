@@ -834,16 +834,20 @@ count reflects what actually happened.
 **Make new files visible to the gate before running it (obs #56).** Guards that read
 `git ls-files` cannot see an untracked file, so a fast gate can pass and CI go red on the same
 tree. Before the commands below, run `git add -N -- {changed-paths}` for new files, or refuse to
-go on while any are untracked. `{changed-paths}` is a slot: substitute the space-separated paths
-this fix touched (the block refuses to run with the slot left in):
+go on while any are untracked. The block below is the refusal branch only; the `git add -N` is a
+separate command you run first. `{changed-paths}` is a slot: substitute the space-separated paths
+this fix touched. A path holding a space or a brace is not supported, and the block refuses a
+value that is empty or still holds a brace, which is what an unfilled slot looks like. The check
+does not repeat the slot text, because substitution would rewrite that copy too:
 
 ```bash
 CHANGED_PATHS="{changed-paths}"
 case "$CHANGED_PATHS" in
-  ""|*"{changed-paths}"*) echo "HALT: {changed-paths} was not substituted with the paths this fix touched"; exit 1 ;;
+  ""|*"{"*|*"}"*) echo "HALT: CHANGED_PATHS is empty or still holds a brace — substitute the paths this fix touched"; exit 1 ;;
 esac
 # shellcheck disable=SC2086  # the slot is a space-separated path list by contract
-UNTRACKED=$(git ls-files --others --exclude-standard -- $CHANGED_PATHS)
+UNTRACKED=$(git ls-files --others --exclude-standard -- $CHANGED_PATHS) \
+  || { echo "HALT: git ls-files could not look (not a repository, or a bad path) — not treating that as clean"; exit 1; }
 [ -z "$UNTRACKED" ] \
   || { echo "untracked files under the changed paths — stage them first:"; printf '%s\n' "$UNTRACKED"; exit 1; }
 ```
@@ -958,10 +962,10 @@ criterion #5 to fit what it could deliver. Five QA gates and 5c passed it, and o
 the summary carried no `Narrowing residue:` block and the post went out. Before composing the
 comment, check two conditions on this cycle's bug set:
 
-- **Step 2.6 applied this cycle** — trigger (a) (the pipeline's `Narrowing residue — …` offer) or
-  trigger (b) (a repeat subject, as Step 2.6 defines it: your judgement, with the usual signs a bug
-  that names an earlier bug of the same work item, or a `file:` on a previous gate). The summary must
-  carry the `Narrowing residue:` / `Move:` block.
+- **Step 2.6 applied this cycle** — either of its two triggers, (a) or (b), as Step 2.6 defines
+  them (trigger (b) is your judgement there). The summary must carry the `Narrowing residue:` /
+  `Move:` block. The Step 2.5 `Struck mechanism:` block is owed whenever a third strike was passed
+  in, and is checked the same way.
 - **A bug is a documentation fix** — the summary must carry the Step 3.5 `Probe:` block.
 
 When a block is owed and the summary lacks it, print the missing block's name and the reason, add the

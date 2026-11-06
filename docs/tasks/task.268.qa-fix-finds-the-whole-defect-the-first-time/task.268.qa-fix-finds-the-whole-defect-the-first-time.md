@@ -308,24 +308,24 @@ None identified.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-06
-**Quality Score**: 85/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.268.qa.1.qa-fix-finds-the-whole-defect-the-first-time.md](./task.268.qa.1.qa-fix-finds-the-whole-defect-the-first-time.md)
-- **Gate File**: [task.268.gate.1.qa-fix-finds-the-whole-defect-the-first-time.yml](./task.268.gate.1.qa-fix-finds-the-whole-defect-the-first-time.yml)
+- **Full Report**: [task.268.qa.2.qa-fix-finds-the-whole-defect-the-first-time.md](./task.268.qa.2.qa-fix-finds-the-whole-defect-the-first-time.md)
+- **Gate File**: [task.268.gate.2.qa-fix-finds-the-whole-defect-the-first-time.yml](./task.268.gate.2.qa-fix-finds-the-whole-defect-the-first-time.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 13 (pinned suite); full suite 7914 pass, 2 worktree-sensitive failures on both trees
+- **Tests Executed**: 13 (pinned suite); `ci:fast` green on this tree
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **Critical Issues**: 1
+- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
 
 ### Key Findings
-Three medium findings: no CHANGELOG entry citing task 268, a self-contradicting Step 7 sentence, and a Step 4 guard block that cannot run as written.
+The Step 4 guard added in cycle 1 always refuses once its slot is filled (HIGH), and its prose and block disagree (MEDIUM). Gate 1's CHANGELOG and Step 7 findings are closed.
 
 <!-- change-log-start -->
 ## Change Log
@@ -337,6 +337,8 @@ Three medium findings: no CHANGELOG entry citing task 268, a self-contradicting 
 | 2026-11-06 |         | Status → ready-for-development                                               | review-task |
 | 2026-11-06 |         | QA gate CONCERNS (85/100) — 3 medium findings                                | qa-task     |
 | 2026-11-06 |         | QA findings fixed — CHANGELOG entry, Step 7 wording, Step 4 guard slot, 1 iteration | qa-fix      |
+| 2026-11-06 |         | QA gate FAIL (70/100) — 1 high, 1 medium finding                             | qa-task     |
+| 2026-11-06 |         | QA findings fixed — Step 4 guard repaired and held by `tests/qa-fix-step4-guard.test.js`, 2 iterations | qa-fix      |
 <!-- change-log-end -->
 
 ---
