@@ -3,7 +3,7 @@
 **Task**: `task.267.review-task-catches-the-plan-defects-it-lets-through.md`
 **Run Number**: 1
 **Started**: 2026-11-06 00:00
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -34,9 +34,9 @@ Add the thirteen missing plan-defect checks to review-task (and the review-story
 | 1. create-branch           | ✅ Done | Branch `feature/task.{id}.*` exists in git                             | Branch created at `fd81159a`; no tracker issue linked, work-started signal skipped | —                    | 2026-11-06T15:00Z |
 | 2. review-task             | ✅ Done | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               | 9/10 READY; 4 Important fixed (pinning tests named, review-story mirror resolved, 266 dep, check count); task now ready-for-development | —                    | 2026-11-06T15:10Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (plan file + surface map recorded); 1 iteration; ci:fast found 3 guard failures from my own worked examples, fixed, targeted guards re-run green | —                    | 2026-11-06T16:00Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
+| 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #853; no tracker issue linked, comment skipped | —                    | 2026-11-06T16:20Z |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 2 gates (CONCERNS 80, PASS 95); 5c APPROVE; wall-time criterion amended with owner approval | —                    | 2026-11-06T18:30Z |
+| 7. finalise                | ✅ Done | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      | DoD 1: 9/9 criteria, security PASS, compliance N/A, docs PASS; criterion 2's record moved into QA report 2 at preflight; registry row ticked | —                    | 2026-11-06T18:25Z |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -80,14 +80,42 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-11-06
+**Gate Result**: CONCERNS
+**Issues Found**: 2 MEDIUM: no CHANGELOG entry citing task 267 (T267-QA-1); wall-time criterion unmeasured (T267-QA-2)
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**Action**: Running qa-fix (cycle 1 of 5)
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+
+### QA Fix Cycle 1 — 2026-11-06
+- T267-QA-1 fixed: CHANGELOG `[Unreleased]` entry citing (task 267).
+- T267-QA-2: five alternating runs were attempted on the shared LAN server and abandoned (load 17 to 20 on 8 cores; runs 9 min quiet, 15 min loaded). One quiet pair: develop 537 s, branch 464 s. Criterion amended in the task document, approved by the owner (Lorien Gamaroff) in session. The same test (`fence entry: task.167's 13 cases`) fails on the server on develop and branch alike (environment).
+- Probe: step 3.5 population — the fix touched no executed document except CHANGELOG.md and the task document; nothing restates the amended rule.
+- Combination re-read: two edits, no interaction.
+
+### QA Cycle 2 — 2026-11-06
+**Gate Result**: PASS
+**Issues Found**: none
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**Action**: Proceeding to 5c (PR conformance review)
+**PR Review**: APPROVE
+**Loop exit**: n/a — this exit not taken
+
+- Step 7: CI reading 1: SUCCESS @ eac769d4a0d9; CI reading 2: SUCCESS (tree-equivalent to 7e3a2bbb45ca) @ 4674361e794c. The acceptance head's own CI had not finished; the docs-only rule satisfied the reading.
+- Step 7: canonical PR comment posted. No tracker issue is linked, so no tracker comment or board move.
+- Step 7: DoD agents ran as independent Explore subagents; the 5c conformance lens also ran as one (no findings).
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
-**Branch**: {populated after Step 1}
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**Finished**: 2026-11-06T18:30Z
+**Final Status**: Completed
+**Branch**: feature/task.267.review-task-catches-the-plan-defects-it-lets-through
+**PR**: #853
+**QA Iterations**: 2 gates (CONCERNS 80, PASS 95), 1 fix cycle
+**DoD Summary**: task.267.dod.1.review-task-catches-the-plan-defects-it-lets-through.md — ACCEPTED
+**Tracker debt**: none
