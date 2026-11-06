@@ -1,0 +1,63 @@
+schema: 2
+task: 'task.266.create-task-asks-the-questions-its-checks-miss'
+task_title: 'create-task asks the questions its checks miss'
+gate: CONCERNS
+status_reason: 'Prose-only change is correct and tested (7944 pass, 0 fail; 11-draft behavioural evidence). One MEDIUM: no CHANGELOG [Unreleased] entry citing task 266, which /finalise 6d HALTs on. The wall-time criterion could not be measured as written (see performance NFR).'
+reviewer: 'QA Engineer'
+head: 'd93ca1035f6d3c704270883227ea3dec39fc4c5f'
+updated: '2026-11-06T11:05:01Z'
+
+top_issues:
+  - id: 'T266-QA-1'
+    severity: medium
+    file: 'CHANGELOG.md'
+    finding: 'No [Unreleased] entry cites (task 266); changelog-cites.sh answers missing (task 266). /finalise 6d HALTs without it.'
+    suggested_action: 'Add an [Unreleased] entry for the five create-task § 3.5 items and the finalise run-count clause, citing (task 266).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 50
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    boundary_signals: []
+    notes: 'Prose only; no code path, no input boundary. boundary: false, no candidates (no predicate-shaped function added).'
+  performance:
+    status: CONCERNS
+    notes: 'Criterion asks median of five alternating npm test runs within 10% of develop. One full run took 491 s at load average ~12 (uptime 13:04), which is not a valid timing, and ten such runs are not feasible here. Not measured as written. The change adds about 3 KB of prose to two files read by 50 contract tests that run in 2.7 s.'
+  reliability:
+    status: PASS
+    notes: 'Bundled copies match source (bundle --check: 0 problems).'
+  maintainability:
+    status: PASS
+    notes: 'CARD_SECTIONS_BY_KIND untouched; one definition stands.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Add the CHANGELOG [Unreleased] entry citing (task 266).'
+      refs: ['CHANGELOG.md']
+  future:
+    - action: 'Measure the wall-time criterion on a quiet host (the LAN server) with five alternating runs, or reword the criterion to name the two reading tests.'
+      refs: ['docs/tasks/task.266.create-task-asks-the-questions-its-checks-miss/task.266.create-task-asks-the-questions-its-checks-miss.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CHANGELOG entry added']

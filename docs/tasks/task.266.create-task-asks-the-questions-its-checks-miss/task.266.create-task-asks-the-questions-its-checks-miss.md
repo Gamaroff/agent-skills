@@ -5,22 +5,24 @@ type: task
 description: "Add five Critical items to create-task's adversarial review (timing statistic, measured population, classifier/writer parity, second-layer defence test, seeded remedy vs existing tests) so a plan fails where it is written, not in review-task."
 tags: [create-task, finalise, observation]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-06
+completed_date: 2026-11-06
+pr_number: 851
 estimated_effort_hours: 4
 ---
 
 # Task 266: create-task asks the questions its checks miss
 
-**Status:** Planned
+**Status:** Accepted
 
 ---
 
 ## 1. Overview
 
-`create-task` § 3.5 (Adversarial Quality Review) lets five plan shapes through that `review-task` or `finalise` later catch, one round-trip late. Each is a question the author is best placed to answer while writing (obs #31, #122, #134, #154, #156). This task adds the five as Critical items.
+`create-task` § 3.5 (Adversarial Quality Review) lets five plan shapes through that `review-task` or `finalise` later catch, one round-trip late. Each is a question the author is best placed to answer while writing (obs #31, #122, #134, #154, #156). This task adds the five as four Critical items and one Should Add item (the timing bound, beside the baseline item).
 
 **Scope**: prose in `skills/create-task/SKILL.md` § 3.5, one clause in `shared/resources/finalise-dod-ac-prompt.md`, and behavioural evidence. Observation #34 (a multi-task path and an issue-body renderer) is **not** here; see § 4.
 
@@ -59,7 +61,7 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 
 ### Target Architecture
 
-Five Critical items, each stating the check, the command or walk that performs it, and the author's remedy. `review-task` already has checks that catch three of the five late (`review-task` check 10 for obs #134 and check 21 for obs #122); this task adds the authoring-side twin and does not edit `review-task`.
+Four Critical items and one Should Add item, each stating the check, the command or walk that performs it, and the author's remedy. `review-task` has no twin of any of the five today: `grep -n -E "obs #(134|122|31|156)" skills/review-task/SKILL.md` returns nothing, and its check 10 (outcome reachability, obs #168) and check 21 (field names from another skill, obs #296) are different checks. The review-side twins are task 267; this task does not edit `review-task`.
 
 ### Important Clarifications
 
@@ -72,7 +74,7 @@ Five Critical items, each stating the check, the command or walk that performs i
 
 ### In Scope
 
-✅ **Five Critical items** in § 3.5.
+✅ **Five items** in § 3.5: four Critical and one Should Add.
 ✅ **One clause** in `finalise-dod-ac-prompt.md:72` for run count and statistic (obs #31 names finalise's AC check).
 ✅ **Behavioural evidence** with controls for each item.
 
@@ -102,11 +104,11 @@ None - prose only.
 - `skills/create-task/SKILL.md`
 
 **Changes**:
-- [ ] A wall-clock or throughput criterion names N ≥ 5 runs, the statistic (median) against the bound, the load ceiling and that outliers are reported (obs #31). Placed in Should Add beside the baseline item.
-- [ ] A rule that parses or keys on a field of existing documents or agent output states the population and the command that measured how much of it carries the field (obs #122).
-- [ ] A plan pairing a read-only classifier with a writer that can refuse maps every refusal reason to a classifier state and states a recovery that leaves that state (obs #134).
-- [ ] A defence layered behind another that blocks the same input names the test that defeats the first layer and the mutation it alone turns red (obs #154).
-- [ ] `--from-observation`: when the seeded remedy changes an engine's verdict or refusal, grep the engine's tests for the decision it overrides and, where a suite exists, try the rule in a scratch copy against an unmodified baseline; say where the remedy was narrowed (obs #156).
+- [x] A wall-clock or throughput criterion names N ≥ 5 runs, the statistic (median) against the bound, the load ceiling and that outliers are reported (obs #31). Placed in Should Add beside the baseline item.
+- [x] A rule that parses or keys on a field of existing documents or agent output states the population and the command that measured how much of it carries the field (obs #122).
+- [x] A plan pairing a read-only classifier with a writer that can refuse maps every refusal reason to a classifier state and states a recovery that leaves that state (obs #134).
+- [x] A defence layered behind another that blocks the same input names the test that defeats the first layer and the mutation it alone turns red (obs #154).
+- [x] `--from-observation`: when the seeded remedy changes an engine's verdict or refusal, grep the engine's tests for the decision it overrides and, where a suite exists, try the rule in a scratch copy against an unmodified baseline; say where the remedy was narrowed (obs #156).
 
 **Dependencies**: none.
 
@@ -119,9 +121,10 @@ None - prose only.
 **Files**:
 - `shared/resources/finalise-dod-ac-prompt.md`
 - `evals/shared/tests/finalise-dod-prompt-contract.test.mjs` (read only; run it)
+- `tests/review-task-measured-criterion.test.js` and `tests/lib/count-of-kinds.js` (read only; both read this prompt, so run the test)
 
 **Changes**:
-- [ ] Extend the wall-clock sentence at `:72` with: a bound is graded on the median of at least five runs, each with load recorded; one run is `FAIL` with `note: "re-measure"`.
+- [x] Extend the wall-clock sentence at `:72` with: a bound is graded on the median of at least five runs, each with load recorded; one run is `FAIL` with `note: "re-measure"`. The clause adds no new criterion kind, so the kind count that `count-of-kinds.js` derives stays as it is.
 
 **Dependencies**: none.
 
@@ -132,9 +135,9 @@ None - prose only.
 **Risk Level**: Low
 
 **Changes**:
-- [ ] Run each item against its motivating example and against a control (§ 8).
-- [ ] `command npm run bundle`, then `command npm run bundle -- --check`.
-- [ ] Grep consumer docs for restatements of § 3.5's list.
+- [x] Run each item against its motivating example and against a control (§ 8). Eleven drafts (five motivating, one extra different-dimension case for item 3, five controls) ran in a fresh agent against the new § 3.5, and the same eleven against the unchanged `develop` copy as a baseline; the QA report cites both.
+- [x] `command npm run bundle`, then `command npm run bundle -- --check`.
+- [x] Grep consumer docs for restatements of § 3.5's list.
 
 **Dependencies**: Phases 1 and 2.
 
@@ -167,10 +170,10 @@ None authored. `evals/shared/tests/finalise-dod-prompt-contract.test.mjs` is run
 - [ ] Item 1: a draft with a single-run `time` criterion is flagged; a draft naming median of 5 under a load ceiling is not.
 - [ ] Item 2: a draft keying on "leading id" without a measured population is flagged; one citing the measuring command is not.
 - [ ] Item 3: a plan with `detect` classifying on parsed config and `configure` refusing on raw text is flagged. **Control (obs #176)**: a pair that disagrees on a different dimension than the motivating example (e.g. encoding, not key presence) is also flagged; a pair reading one parse is not.
-- [ ] Item 4: two layers on one spawn with tests only through the first are flagged.
-- [ ] Item 5: a seeded remedy adding a decline rule that an existing test pins is flagged.
+- [ ] Item 4: two layers on one spawn with tests only through the first are flagged. **Control**: the same two layers with a planned test that bypasses the first layer, and the mutation only it turns red, are not flagged.
+- [ ] Item 5: a seeded remedy adding a decline rule that an existing test pins is flagged. **Control**: a seeded remedy that changes no verdict or refusal, or whose overridden decision was grepped and narrowed in Technical Background, is not flagged.
 
-**Command**: a fresh session running `create-task` § 3.5 on each draft; results go in the QA report.
+**Command**: a fresh session running `create-task` § 3.5 on each draft; results go in the QA report as one row per item, with the flagged draft and the control draft each shown.
 
 ### Regression
 
@@ -182,23 +185,23 @@ None authored. `evals/shared/tests/finalise-dod-prompt-contract.test.mjs` is run
 
 ### Functional
 
-- [ ] Each of the five items is present in `skills/create-task/SKILL.md` § 3.5 and fires on its motivating shape; the five-draft results are listed in the QA report.
-- [ ] Each item leaves its control draft unflagged; recorded in the QA report.
-- [ ] `finalise-dod-ac-prompt.md` names run count and statistic for a wall-clock bound.
+- [x] Each of the five items is present in `skills/create-task/SKILL.md` § 3.5 and fires on its motivating shape; the five-draft results are listed in the QA report.
+- [x] Each item leaves its control draft unflagged; recorded in the QA report.
+- [x] `finalise-dod-ac-prompt.md` names run count and statistic for a wall-clock bound.
 
 ### Performance
 
-- [ ] `CI=true command npm test` wall time is within 10% of `develop`, as the median of five alternating runs with `uptime` beside each, recorded in the QA report.
+- [x] `CI=true command npm test` wall time is within 10% of `develop`, as the median of five alternating runs with `uptime` beside each, recorded in the QA report.
 
 ### Code Quality
 
-- [ ] `CI=true command node --test evals/shared/tests/finalise-dod-prompt-contract.test.mjs` passes.
-- [ ] `command npm run bundle -- --check` reports 0 problems.
-- [ ] `python skills/create-skill/scripts/quick_validate.py skills/create-task` passes.
+- [x] `CI=true command node --test evals/shared/tests/finalise-dod-prompt-contract.test.mjs tests/review-task-measured-criterion.test.js` passes.
+- [x] `command npm run bundle -- --check` reports 0 problems.
+- [x] `python skills/create-skill/scripts/quick_validate.py skills/create-task` passes.
 
 ### Migration
 
-- [ ] No new item restates a section list (`CARD_SECTIONS_BY_KIND` stays the single definition).
+- [x] No new item restates a section list (`CARD_SECTIONS_BY_KIND` stays the single definition).
 
 ---
 
@@ -270,12 +273,63 @@ None identified.
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report**: `task.266.qa.3.create-task-asks-the-questions-its-checks-miss.md`
+**Gate File**: `task.266.gate.3.create-task-asks-the-questions-its-checks-miss.yml` — ✅ PASS, 97/100
+**PR Review**: `task.266.pr-review.2.create-task-asks-the-questions-its-checks-miss.md` — APPROVE
+
+✅ **Acceptance Criteria:** 8 of 8 met. The five § 3.5 items and the finalise clause are in place; the wall-time bound is measured (median 733.2 s vs 737.1 s, -0.5%).
+✅ **Tests:** the contract tests pass (50 of 50), re-run in this verification.
+✅ **Documentation:** CHANGELOG cites task 266; `bundle --check` reports 0 problems.
+⚠️ **Security / Compliance:** not applicable — prose only.
+✅ **CI:** all six checks green on `bb5be9016572`.
+
+The DoD checks ran inline, not in independent subagents. The behavioural evidence is one run per arm.
+
+**Detailed Verification Log:** see `task.266.dod.1.create-task-asks-the-questions-its-checks-miss.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-06
+
+---
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-06
+**Quality Score**: 97/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.266.qa.3.create-task-asks-the-questions-its-checks-miss.md](./task.266.qa.3.create-task-asks-the-questions-its-checks-miss.md)
+- **Gate File**: [task.266.gate.3.create-task-asks-the-questions-its-checks-miss.yml](./task.266.gate.3.create-task-asks-the-questions-its-checks-miss.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 7944 (full suite, five runs on the head)
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No findings. The wall-time criterion is measured: median 733.2 s on the head against 737.1 s on develop (-0.5%).
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                                            | Author      |
-| ---------- | ------- | ---------------------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #31, #122, #134, #154, #156      | create-task |
+| 2026-11-06 | 1.1     | Review passed (8/10) — corrected the false review-task twin claim, four-plus-one item count, controls for items 4 and 5, two more tests that read the finalise prompt | review-task |
+|            |         | Status → ready-for-development                                         | review-task |
+| 2026-11-06 |         | Implemented — 2 source files + 3 bundled copies; 50 prompt-contract tests pass; 11 drafts run against new and baseline § 3.5 | develop |
+| 2026-11-06 |         | QA gate CONCERNS (90/100) — 1 finding                                  | qa-task     |
+| 2026-11-06 |         | QA findings fixed — cycle 1, 1 finding (CHANGELOG entry)               | qa-fix      |
+| 2026-11-06 |         | QA gate PASS (95/100) — 0 findings                                     | qa-task     |
+| 2026-11-06 |         | QA findings fixed — cycle 2, 1 finding (wall-time measurement)         | qa-fix      |
+| 2026-11-06 |         | QA gate PASS (97/100) — 0 findings                                     | qa-task     |
+| 2026-11-06 | 1.2 | DoD passed — accepted (PR #851) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -283,13 +337,13 @@ None identified.
 ## Progress Tracking
 
 ### Phase 1: The five items
-- [ ] Five § 3.5 items written
+- [x] Five § 3.5 items written
 
 ### Phase 2: The finalise clause
-- [ ] Clause added, contract test green
+- [x] Clause added, contract test green
 
 ### Phase 3: Evidence, bundle and sweep
-- [ ] Ten drafts run, bundle clean, sweep done
+- [x] Eleven drafts run, bundle clean, sweep done
 
 ---
 
@@ -315,4 +369,4 @@ Task 267 (review-task) holds the review-side twins of these checks.
 
 ---
 
-**Status:** Planned
+**Status:** Accepted

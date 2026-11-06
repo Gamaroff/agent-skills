@@ -1,0 +1,107 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "bb5be901657260f45ef09678b778e0b86e8ac964",
+  "dirty_paths": [
+    "docs/tasks/task.266.create-task-asks-the-questions-its-checks-miss/task.266.implementation.1.create-task-asks-the-questions-its-checks-miss-initial-run.md",
+    "docs/tasks/task.266.create-task-asks-the-questions-its-checks-miss/task.266.pr-review.2.create-task-asks-the-questions-its-checks-miss.md"
+  ],
+  "document": "docs/tasks/task.266.create-task-asks-the-questions-its-checks-miss/task.266.create-task-asks-the-questions-its-checks-miss.md",
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 8,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "45c6a0f1c0327a14959eb50f430e31ca6df57b37c069b9f4ff0d5d24dc41f46d",
+      "status": "PASS",
+      "description": "Five items present in create-task section 3.5 and firing on motivating shape",
+      "code_citation": "skills/create-task/SKILL.md:561",
+      "test_citation": "NOT_APPLICABLE: prose rule; evidence is behavioural, eleven drafts in the QA report (task.266.qa.1 evidence table, D1 D3 D5 D6 D8 D10)",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Items at SKILL.md:561 (obs 122), :562 (obs 134), :563 (obs 154), :564 (obs 156, from-observation only), :569 (obs 31, Should Add). Drafts were run in fresh agents by the implementer; one run per arm, so firing is demonstrated, not statistically established."
+    },
+    {
+      "id": "#2",
+      "text_hash": "d7c7d98794e8baa1ed145ea136e0183e46a25ebe902c8385f93eda724ac28f18",
+      "status": "PASS",
+      "description": "Each item leaves its control draft unflagged, recorded in QA report",
+      "code_citation": "skills/create-task/SKILL.md:561",
+      "test_citation": "NOT_APPLICABLE: behavioural evidence, task.266.qa.1 lines 56-79 (D2 D4 D7 D9 D11 unflagged)",
+      "members": [],
+      "non_member_fail": null,
+      "note": "D4 and D7 were flagged at baseline by unrelated items and unflagged after the change; recorded in the table."
+    },
+    {
+      "id": "#3",
+      "text_hash": "12e9d96fdf7c8e3fedcbbf4b29339479cf77564f8123f9e374ed0cb9c568bd40",
+      "status": "PASS",
+      "description": "finalise-dod-ac-prompt names run count and statistic for wall-clock bound",
+      "code_citation": "shared/resources/finalise-dod-ac-prompt.md:72",
+      "test_citation": "evals/shared/tests/finalise-dod-prompt-contract.test.mjs:1",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Clause: graded on the median of at least five runs, each with load recorded; single run is FAIL re-measure. Contract tests (50) pass, run in this DoD."
+    },
+    {
+      "id": "#4",
+      "text_hash": "546f8d2e546317c6fe9a55fd0f609c8fefcc1c0cc809d62ee9ee5cda06496d54",
+      "status": "PASS",
+      "description": "npm test wall time within 10% of develop, median of five alternating runs",
+      "code_citation": "docs/tasks/task.266.create-task-asks-the-questions-its-checks-miss/task.266.qa.3.create-task-asks-the-questions-its-checks-miss.md:46",
+      "test_citation": "NOT_APPLICABLE: measurement criterion; the record is the QA report 3 table (head median 733.2 s vs develop 737.1 s, -0.5%, uptime beside each run)",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Measured on aacfcc23; later commits are task documents only. One develop run exited 1 on a load-sensitive test and is kept and reported."
+    },
+    {
+      "id": "#5",
+      "text_hash": "7192f07e6a4b21d72a1439305cd540c4aa7f3d406debba40c31765595100aa5f",
+      "status": "PASS",
+      "description": "Contract tests and measured-criterion test pass",
+      "code_citation": "shared/resources/finalise-dod-ac-prompt.md:72",
+      "test_citation": "tests/review-task-measured-criterion.test.js:1",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Re-run in this DoD: 50 tests, 50 pass, 0 fail."
+    },
+    {
+      "id": "#6",
+      "text_hash": "6df02d7ffdb1df8127b4563d1180bfbb8afd0e4af247ecba99ef7a2a14aa951b",
+      "status": "PASS",
+      "description": "bundle --check reports 0 problems",
+      "code_citation": "skills/finalise/references/finalise-dod-ac-prompt.md:72",
+      "test_citation": "NOT_APPLICABLE: command criterion; re-run in this DoD printed 'bundle freshness: 129 skill(s) checked, 0 problems'",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#7",
+      "text_hash": "0e53139bd0802603603d96d6ae83d1391c11b5f7aedcb78f4a47106bde211d6d",
+      "status": "PASS",
+      "description": "quick_validate on create-task passes",
+      "code_citation": "skills/create-task/SKILL.md:1",
+      "test_citation": "NOT_APPLICABLE: command criterion; re-run in this DoD printed 'create-task' valid",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#8",
+      "text_hash": "3e841645fb23eae633a45224d76c42bcd355a646f360a0bf0f25ca75e364a743",
+      "status": "PASS",
+      "description": "No new item restates a section list",
+      "code_citation": "skills/create-task/SKILL.md:766",
+      "test_citation": "NOT_APPLICABLE: absence criterion; diff touches no jira-sync.js or CARD_SECTIONS_BY_KIND",
+      "members": [],
+      "non_member_fail": null,
+      "note": "CARD_SECTIONS_BY_KIND is still cited once at SKILL.md:766, pre-existing."
+    }
+  ],
+  "advisories": []
+}
