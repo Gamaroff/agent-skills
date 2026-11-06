@@ -93,10 +93,12 @@ test("Step 2.6 exists, between Step 2.5 and Step 3", () => {
   assert.ok(at < text.indexOf("\n### Step 3: Apply Changes"));
 });
 
-test("Step 2.6 carries the four moves, as table rows", () => {
+test("Step 2.6 carries the six moves, as table rows", () => {
   for (const move of [
     "Consolidate the contract",
     "Scope the claim",
+    "Narrow the contract",
+    "Extract to a script",
     "Waive",
     "Patch",
   ]) {
@@ -122,7 +124,7 @@ test("Step 2.6 carries the fixed fix-summary shape", () => {
   );
   assert.match(
     step26,
-    /^Move: consolidate \| scope the claim \| waive \| patch — \{one sentence why\}$/m,
+    /^Move: consolidate \| scope the claim \| narrow the contract \| extract to a script \| waive \| patch — \{one sentence why\}$/m,
   );
 });
 

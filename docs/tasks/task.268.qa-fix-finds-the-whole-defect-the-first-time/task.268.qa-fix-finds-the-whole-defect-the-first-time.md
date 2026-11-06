@@ -5,7 +5,7 @@ type: task
 description: "Add the probes, structural moves and gates qa-fix lacks (classifier direction, weakest value, earlier refusal, restatement population, undecidable boundary, extract-to-script, mechanical trigger b, untracked-file fast gate) so repeat-finding loops end sooner."
 tags: [qa-fix, develop-task, observation]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-06
@@ -14,7 +14,8 @@ estimated_effort_hours: 8
 
 # Task 268: qa-fix finds the whole defect the first time
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.268.review.1.qa-fix-finds-the-whole-defect-the-first-time.md` implemented 2026-11-06
 
 ---
 
@@ -53,6 +54,7 @@ Eight recurring ways a QA fix loop circles the same subject are not covered by `
 
 Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 
+- Line numbers below were re-measured on 2026-11-06 at `develop` `5363f369`: Step 3.5 is at `:687`, Step 4 at `:811`, Step 7 at `:907`, the optional summary blocks near `:972`; the anchors in the plan file are offset by up to 5 lines, so find each by its heading.
 - `skills/qa-fix/SKILL.md:623` `### Step 2.6: Offer the structural move before another patch` has **two triggers** ((a) pipeline offer, (b) repeat subject, a judgement) and a four-row move table: Consolidate the contract, Scope the claim, Waive, Patch. The summary shape `Narrowing residue:` / `Move:` is at `:655`.
 - `:683` `### Step 3.5: Adversarial pass over the fixes themselves` has the lifecycle table, the documentation table at `:719` (`What did this edit make false elsewhere?` with a population command), the identity-rule both-directions table at `:770`, and the writer/refusal/input-class table that follows (`Is the writer idempotent?`, `Does the fix hold across the input class?`, `Which documented shapes does the new refusal reject?`). None asks for the classifier direction, the weakest value, or re-running later mutation proofs.
 - `:807` `### Step 4: Validate` runs lint and test commands with no staging step; `grep -n "git add -N" skills/qa-fix/SKILL.md` returns nothing.
@@ -127,7 +129,7 @@ None - prose only. The `Narrowing residue:` / `Move:` shape is unchanged; the `M
 **Changes**:
 - [ ] Move 5, narrow the contract (obs #42): when successive fixes to one function each open a new edge at one boundary and the task says the boundary cannot be decided from the function's input, refuse every ambiguous shape and leave the decision to the caller.
 - [ ] Move 6, extract to a script (obs #63): when the repeat subject is operational shell in a fenced block and has drawn MEDIUMs on two consecutive gates, move it to a script with a test per edge and leave a one-line call.
-- [ ] Update the "four moves" wording and the `Move:` allowed values.
+- [ ] Update the "four moves" wording (one site, `skills/qa-fix/SKILL.md:642`) and the `Move:` allowed values, and update `tests/qa-fix-structural-move.test.js` (`:96`, `:125`) in the same change.
 - [ ] Step 7 (obs #113): before posting, check whether any bug in this cycle's set names an earlier bug of the same work item (`bug.N` text or the same `file:` as a previous gate's entry); when one does, the summary must carry the `Narrowing residue:` block or the post is refused. Same for a documentation fix and the `Probe:` block.
 
 **Dependencies**: Phase 1.
@@ -175,7 +177,9 @@ None - prose only. The `Narrowing residue:` / `Move:` shape is unchanged; the `M
 
 ### Files to Modify (Tests)
 
-None authored. `shared/resources/tests/qa-narrowing-residue.test.mjs` and `evals/shared/tests/qa-narrowing-offer-wiring.test.mjs` are run, not edited.
+4. ✅ `tests/qa-fix-structural-move.test.js` - it pins the old shape by pattern, found by `git grep -ln "qa-fix/SKILL\|four moves\|Narrowing residue" -- '*.test.*' 'tests/**' 'evals/**'`: the `Move: consolidate | scope the claim | waive | patch — {one sentence why}` line (`:125`, an exact-line match) and the four-row move list (`:96`). Widen the `Move:` pin to the six values and add the two new rows to the list, in the same change as the `SKILL.md` edit.
+
+`shared/resources/tests/qa-narrowing-residue.test.mjs` and `evals/shared/tests/qa-narrowing-offer-wiring.test.mjs` are run, not edited. Run `CI=true command node --test tests/qa-fix-structural-move.test.js tests/identity-rule-probe.test.js` too.
 
 ---
 
@@ -216,7 +220,7 @@ None authored. `shared/resources/tests/qa-narrowing-residue.test.mjs` and `evals
 
 ### Code Quality
 
-- [ ] `CI=true command node --test shared/resources/tests/qa-narrowing-residue.test.mjs evals/shared/tests/qa-narrowing-offer-wiring.test.mjs` passes.
+- [ ] `CI=true command node --test shared/resources/tests/qa-narrowing-residue.test.mjs evals/shared/tests/qa-narrowing-offer-wiring.test.mjs tests/qa-fix-structural-move.test.js tests/identity-rule-probe.test.js` passes.
 - [ ] `command npm run bundle -- --check` reports 0 problems.
 - [ ] `python skills/create-skill/scripts/quick_validate.py skills/qa-fix` passes.
 
@@ -308,6 +312,8 @@ None identified.
 | Date       | Version | Description                                                                  | Author      |
 | ---------- | ------- | ---------------------------------------------------------------------------- | ----------- |
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #16, #18, #20, #27, #42, #56, #63, #113 | create-task |
+| 2026-11-06 | 1.1     | Review passed (9/10) — added `tests/qa-fix-structural-move.test.js` to the files to modify, refreshed line anchors | review-task |
+| 2026-11-06 |         | Status → ready-for-development                                               | review-task |
 <!-- change-log-end -->
 
 ---

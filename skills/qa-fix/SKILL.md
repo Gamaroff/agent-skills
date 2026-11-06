@@ -639,21 +639,23 @@ it — before the third patch, not after it.
   rule. This is your judgement, and it is allowed here because this step only *offers*; it exits
   nothing and forbids nothing.
 
-**The four moves.** Choose one, and record it in the fix plan:
+**The six moves.** Choose one, and record it in the fix plan:
 
 | Move | When it is right |
 | ---- | ---------------- |
 | **Consolidate the contract** | The subject is a record the skill passes between its own steps (a state file, run-state JSON, a handoff record), or a rule stated at several sites. Define it once: a field / writer / readers table; ownership moved into the skill's script so a test holds it; or one statement plus citations plus a single-statement test (task.130). When the subject is a deny-list over a parser's input, consolidating means an allow-list of the accepted shapes that refuses everything else; copying more of the parser is still a patch (obs #276). |
 | **Scope the claim** | The subject is a best-effort derivation (compatibility, migration, inference) that lacks the fact it needs. Flag the value `unverifiable`, document the limitation, or drop the precision. Do not add another rule (task.143 cycles 3 and 6). |
+| **Narrow the contract** | Successive fixes to one function each open a new edge at one boundary, and the task itself says the function's input cannot decide that boundary (task.202 ran five cycles on a parser the task called undecidable from its input, obs #42). Refuse every ambiguous shape and leave the decision to the caller; do not add another rule that guesses. |
+| **Extract to a script** | The subject is operational shell inside a fenced block of a skill document, and it has drawn a MEDIUM on two consecutive gates (task.189 drew one per cycle from one block; consolidating inside the block did not reduce its edges, obs #63). Move the shell to a script with one test per edge and leave a one-line call in the document. |
 | **Waive** | As in Step 2.5, with the reason stated. |
-| **Patch** | Allowed. Say why neither structural move applies — for example, the findings are distinct defects in the deliverable itself (task.117 gates 1→2, where the offer fires and patch is the right answer). |
+| **Patch** | Allowed. Say why no structural move applies — for example, the findings are distinct defects in the deliverable itself (task.117 gates 1→2, where the offer fires and patch is the right answer). |
 
 The fix summary carries the choice in a fixed shape, so the next cycle can see a change of shape
 without re-reading the diff:
 
 ```
 Narrowing residue: {subject} ({trigger: pipeline offer | repeat subject})
-Move: consolidate | scope the claim | waive | patch — {one sentence why}
+Move: consolidate | scope the claim | narrow the contract | extract to a script | waive | patch — {one sentence why}
 ```
 
 **How this differs from Step 2.5.** A third strike *forbids* the patch; this step only *asks why*.
@@ -718,6 +720,12 @@ three consecutive QA cycles each found a defect introduced by the previous cycle
 every one was one grep away; on task.124 four consecutive cycles each found the previous fix had
 made a sibling false in **another** file (obs #174):
 
+**Before fixing a finding that says a document states a value or rule wrongly, run the population
+command below first (obs #27).** Fixing the one restatement the finding cited leaves the rest, and
+the next cycle finds the same defect at a new site (task.182 cycles 1–3). Fix or consolidate the
+whole population in this cycle, and derive any guard's file set by the same search, never from a
+hand-kept list.
+
 | Probe | Ask |
 | ----- | --- |
 | **What did this edit make false elsewhere?** | Find every executed document that restates the subject — run the population command below, not a grep of the edited file — and check each hit against the new text. Record the population size. A population above 1 means the rule is restated at several sites, which is the shape Step 2.6's **consolidate** move exists for: say in the `Probe:` block which move you chose for it and why (obs #174). The fix summary carries a `Probe:` block: the command as run, then one line per hit, `updated` or `unaffected — {why}`. A documentation fix whose summary has no `Probe:` block has not run the probe (obs #177) |
@@ -761,7 +769,7 @@ Probe: {the population command, as run, with its phrase}
   {path} — updated
   {path} — unaffected — {why: e.g. cites the rule, restates nothing}
 Population: {N}
-Move: {when N > 1 — consolidate | scope the claim | waive | patch — one sentence why}
+Move: {when N > 1 — consolidate | scope the claim | narrow the contract | extract to a script | waive | patch — one sentence why}
 ```
 
 On task.145 the fix summary said the pass had run and recorded no phrase and no hits; the same rule
@@ -787,6 +795,17 @@ sites** rather than synthetic strings — each counter-example above was a real 
 | **Should not merge** | Two inputs a real call site treats as two — does the new rule still give them two? |
 | **Which direction did the last fix move?** | A fix for a split pushes toward merging, and vice versa — the test must carry the pair for the direction the finding did **not** name |
 
+**For a fix that widens or narrows a classifier, probe both sides of it (obs #16).** A classifier
+is any error/refusal split, allow/deny boundary or "could not look" class. Each fix pushes it one
+way, and a loop that only tests the named direction swings to the opposite false result (task.180
+ran HIGH 1, 1, 1 over one error/refusal split):
+
+| Probe | Ask |
+| ----- | --- |
+| **Must now catch** | One case the rule must now catch, that it did not before |
+| **Must still leave alone** | One case it must still leave alone, including a failure that happens after the decision was already made |
+| **Which direction did the last fix move?** | Name it, and test the other direction |
+
 **For a fix to a writer, a refusal or an input class, test the property, not the repro.** A repro
 is one point in its input class, and a test that counts the token the finding named passes on a
 residue of the same class:
@@ -796,6 +815,8 @@ residue of the same class:
 | **Is the writer idempotent?** | For a stacking, upsert, replace-in-place or normaliser fix, assert that write N and write N+1 are byte-identical, with only the payload varied — not a count of the token the finding named (obs #237) |
 | **Does the fix hold across the input class?** | Vary what precedes and follows the trigger, and where else the same token appears. A destructive-write post-condition compares the bytes outside the edited span; a count of what must exist cannot see a deletion (obs #238) |
 | **Which documented shapes does the new refusal reject?** | For a new refusal or completeness check over a shared input, run it against every documented shape of that input — its reference doc's examples — not only this repository's instance (obs #248) |
+| **What is the weakest value that satisfies the new requirement, and does it carry the ambiguity the requirement was added to remove?** | Required-field, non-empty and present-at-all checks are the usual shape: `{exit: 1}` satisfies a mandatory `expected` and keeps the ambiguity. Add a test with that value (obs #18) |
+| **Did this fix add or widen an earlier check on a path?** | Re-run the mutation proofs of the later-stage guards whose tests send input through that path: an earlier refusal can leave a later guard's test passing with the guard deleted (task.180 cycle 7 widened a pre-spawn check and cycle 6's guard test went vacuous). Record the re-runs in the fix summary (obs #20) |
 
 **Review the combination, not only each fix.** At least one real lifecycle defect was caused by
 two earlier fixes that were each correct alone. After the last fix in a cycle, re-read the full diff
@@ -809,6 +830,16 @@ Record anything found as a new finding in this cycle rather than fixing it silen
 count reflects what actually happened.
 
 ### Step 4: Validate
+
+**Make new files visible to the gate before running it (obs #56).** Guards that read
+`git ls-files` cannot see an untracked file, so a fast gate can pass and CI go red on the same
+tree. Before the commands below, run `git add -N -- <changed paths>` for new files, or refuse to
+go on while any are untracked:
+
+```bash
+[ -z "$(git ls-files --others --exclude-standard -- <changed paths>)" ] \
+  || { echo "untracked files under the changed paths — stage them first"; exit 1; }
+```
 
 ```bash
 # For your project:
@@ -915,6 +946,19 @@ criterion #5 to fit what it could deliver. Five QA gates and 5c passed it, and o
 | `finalise` | Canonical summary — PR + final gate + QA cycle count + DoD path + accepted status (idempotent via marker) |
 
 **This step is best-effort.** If the comment cannot be posted (network error, auth issue), log the failure and continue — do not halt. The final canonical summary is posted by `/finalise` at pipeline end.
+
+**Check the summary for the blocks this cycle owes before posting (obs #113).** On task.238 cycle 5
+the summary carried no `Narrowing residue:` block and the post went out. Before composing the
+comment, check two conditions on this cycle's bug set:
+
+- **Trigger (b) of Step 2.6 holds** — a bug in the set names an earlier bug of the same work item
+  (`bug.N` text), or its `file:` matches an entry on a previous gate. The summary must carry the
+  `Narrowing residue:` / `Move:` block.
+- **A bug is a documentation fix** — the summary must carry the Step 3.5 `Probe:` block.
+
+When a block is owed and the summary lacks it, print the missing block's name and the reason, and do
+not post until it is added. This stays best-effort: a `Move: waive — {reason}` line satisfies the
+check, and a refusal here never halts the cycle.
 
 Use the PR metadata stored in Step 0 (Prerequisites). Compose the comment body then post it via the active platform.
 
