@@ -271,6 +271,27 @@ None identified.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-06
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.266.qa.1.create-task-asks-the-questions-its-checks-miss.md](./task.266.qa.1.create-task-asks-the-questions-its-checks-miss.md)
+- **Gate File**: [task.266.gate.1.create-task-asks-the-questions-its-checks-miss.yml](./task.266.gate.1.create-task-asks-the-questions-its-checks-miss.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 7944 (full suite), 50 contract tests
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+One MEDIUM: no CHANGELOG entry citing task 266. The wall-time criterion could not be measured as written on a loaded host.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -280,6 +301,8 @@ None identified.
 | 2026-11-06 | 1.1     | Review passed (8/10) — corrected the false review-task twin claim, four-plus-one item count, controls for items 4 and 5, two more tests that read the finalise prompt | review-task |
 |            |         | Status → ready-for-development                                         | review-task |
 | 2026-11-06 |         | Implemented — 2 source files + 3 bundled copies; 50 prompt-contract tests pass; 11 drafts run against new and baseline § 3.5 | develop |
+| 2026-11-06 |         | QA gate CONCERNS (90/100) — 1 finding                                  | qa-task     |
+| 2026-11-06 |         | QA findings fixed — cycle 1, 1 finding (CHANGELOG entry)               | qa-fix      |
 <!-- change-log-end -->
 
 ---

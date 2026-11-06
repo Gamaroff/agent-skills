@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **`create-task` asks five more questions before a task is written** (task 266). Section 3.5 gains
+  four Critical items (a rule specified from one example, a classifier and a writer that read the
+  input differently, a second layer of defence with no test of its own, and a seeded remedy that
+  overrides a decision the tests hold) and one Should Add item (a timing bound that names one run).
+  `finalise-dod-ac-prompt.md` now grades a wall-clock bound on the median of at least five runs;
+  a single run is `FAIL` with `note: "re-measure"`.
+
 ## [v0.65.0] - 2026-11-06
 
 ### Added
