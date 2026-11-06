@@ -841,7 +841,9 @@ value that is empty, blank or still holds a brace, which is what an unfilled slo
 check does not repeat the slot text, because substitution would rewrite that copy too. The list is
 split with `tr` and handed to `xargs`, never by expanding the variable: zsh does not word-split an
 unquoted variable, so a two-path value reached `git ls-files` as one pathspec that matched nothing
-and the guard reported clean:
+and the guard reported clean. Each path is matched literally (`--literal-pathspecs`), so a glob or
+pathspec magic is not interpreted, and a path that is neither on disk nor tracked is refused,
+because `git ls-files` lists nothing for it and "found nothing" would read as "clean":
 
 ```bash
 CHANGED_PATHS="{changed-paths}"
@@ -850,7 +852,11 @@ case "$CHANGED_PATHS" in
 esac
 [ -n "$(printf '%s' "$CHANGED_PATHS" | tr -d ' \t\n')" ] \
   || { echo "HALT: CHANGED_PATHS is empty or still holds a brace — substitute the paths this fix touched"; exit 1; }
-UNTRACKED=$(printf '%s\n' "$CHANGED_PATHS" | tr -s ' \t' '\n\n' | grep -v '^$' | xargs git ls-files --others --exclude-standard --) \
+MISSING=$(printf '%s\n' "$CHANGED_PATHS" | tr -s ' \t' '\n\n' | grep -v '^$' \
+  | while IFS= read -r p; do [ -e "$p" ] || git --literal-pathspecs ls-files --error-unmatch -- "$p" >/dev/null 2>&1 || printf '%s\n' "$p"; done)
+[ -z "$MISSING" ] \
+  || { echo "HALT: these changed paths are neither on disk nor tracked — a mistyped path lists nothing and would read as clean:"; printf '%s\n' "$MISSING"; exit 1; }
+UNTRACKED=$(printf '%s\n' "$CHANGED_PATHS" | tr -s ' \t' '\n\n' | grep -v '^$' | xargs git --literal-pathspecs ls-files --others --exclude-standard --) \
   || { echo "HALT: git ls-files could not look (not a repository, or a bad path) — not treating that as clean"; exit 1; }
 [ -z "$UNTRACKED" ] \
   || { echo "untracked files under the changed paths — stage them first:"; printf '%s\n' "$UNTRACKED"; exit 1; }

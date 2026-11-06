@@ -98,6 +98,34 @@ const CASES = [
     },
   },
   {
+    id: "missing-path",
+    input: "nosuchdir",
+    why: "a mistyped path lists nothing and would read as clean",
+    correct: "refused",
+    direction: "hostile",
+    fixture: { files: { ...GIT, "other/x": "x\n" } },
+    expected: {
+      stdout:
+        "HALT: these changed paths are neither on disk nor tracked — a mistyped path lists nothing and would read as clean:\nnosuchdir\n",
+      exit: 1,
+    },
+  },
+  {
+    id: "magic-pathspec-dir",
+    input: ":(exclude)newdir newdir",
+    why: "a path named like an exclude pathspec must be matched literally, not hide newdir",
+    correct: "refused",
+    direction: "hostile",
+    fixture: {
+      files: { ...GIT, ":(exclude)newdir/g": "x\n", "newdir/new.txt": "x\n" },
+    },
+    expected: {
+      stdout:
+        "untracked files under the changed paths — stage them first:\n:(exclude)newdir/g\nnewdir/new.txt\n",
+      exit: 1,
+    },
+  },
+  {
     id: "multi-clean",
     input: "ignored ignored2",
     why: "two filled paths with nothing untracked are admitted",
@@ -175,8 +203,18 @@ const MUTANTS = [
   },
   {
     name: "the cycle-3 bug: an unquoted expansion, which zsh does not word-split",
-    from: "printf '%s\\n' \"$CHANGED_PATHS\" | tr -s ' \\t' '\\n\\n' | grep -v '^$' | xargs git ls-files --others --exclude-standard --",
-    to: "git ls-files --others --exclude-standard -- $CHANGED_PATHS",
+    from: "printf '%s\\n' \"$CHANGED_PATHS\" | tr -s ' \\t' '\\n\\n' | grep -v '^$' | xargs git --literal-pathspecs ls-files --others --exclude-standard --",
+    to: "git --literal-pathspecs ls-files --others --exclude-standard -- $CHANGED_PATHS",
+  },
+  {
+    name: "the cycle-4 bug: pathspec magic is interpreted, not matched literally",
+    from: "xargs git --literal-pathspecs ls-files",
+    to: "xargs git ls-files",
+  },
+  {
+    name: "the cycle-4 bug: a nonexistent path reads as clean",
+    from: '[ -z "$MISSING" ]',
+    to: '[ -z "" ]',
   },
 ];
 

@@ -342,6 +342,7 @@ The Step 4 guard can still read clean on a pathspec-magic path (T268-QA-8) and o
 | 2026-11-06 |         | QA gate FAIL (70/100) — 1 high, 1 medium finding | qa-task     |
 | 2026-11-06 |         | QA findings fixed — Step 4 guard splits its slot in bash and zsh; multi-path cases and a second mutant added, 1 iteration | qa-fix      |
 | 2026-11-06 |         | QA gate CONCERNS (80/100) — 2 findings | qa-task     |
+| 2026-11-06 |         | QA findings fixed — Step 4 guard matches paths literally and refuses a nonexistent path; two more mutants proven, 1 iteration | qa-fix      |
 <!-- change-log-end -->
 
 ---
