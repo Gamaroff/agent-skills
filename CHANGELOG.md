@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **The file-write rules are stated once, with a recipe for each job they block** (task 265).
+  `shared/resources/file-write-rules.md` says to change files with the file-edit tool and pass
+  bodies by path, and gives sanctioned recipes for a mutation revert, a gate write and a
+  fresh-body post. The develop-loop and QA-loop step docs, `develop-task`, `qa-task`, `qa-story`,
+  `qa-fix` and `review-pr` cite it; `mutation-proving.md` no longer tells an agent to edit through
+  a Python `assert`. A new `payload-heredoc-ratchet.test.mjs` fails when shipped prose gains a
+  payload heredoc (32 are allow-listed today). Moving those 32 sites off is a follow-up task.
+
 ### Fixed
 
 - **`sync-jira-*` no longer strips a card's Source Documents links when the Bitbucket remote is

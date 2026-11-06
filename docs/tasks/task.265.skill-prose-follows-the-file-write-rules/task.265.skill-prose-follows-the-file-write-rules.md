@@ -139,7 +139,7 @@ None - prose and one new test. No script, flag or exit code changes.
 
 **Changes**:
 - [x] State the gate write shape at Step 10 in both QA skills (obs #15).
-- [ ] Add the freshness assertion and the two-call rule at `qa-fix` Step 7, and cite it from the other `--body-file` posting sites the plan lists (obs #85).
+- [x] Add the freshness assertion and the two-call rule at `qa-fix` Step 7, and cite it from the other `--body-file` posting sites the plan lists (obs #85). Cited at `qa-fix`, `qa-task`, `qa-story` and `review-pr`; the remaining posting sites (`create-pr`, `finalise`, `ensure-*`, `sync-github-*`, `review-bug/story/task`, `create-issue`, `observe-work`) are excluded here and swept in task 284, where each is also a heredoc migration.
 
 **Dependencies**: Phase 1.
 
@@ -361,6 +361,7 @@ Five medium findings: follow-up migration task not filed, rule not cited at the 
 | 2026-11-06 |         | Status → ready-for-development                           | review-task |
 | 2026-11-06 |         | Implemented phases 1-5 inline; status → ready-for-review (ci:fast 7944 tests, 0 fail; ratchet mutation-proved) | develop-task |
 | 2026-11-06 |         | QA gate CONCERNS (80/100) — 5 findings                   | qa-task     |
+| 2026-11-06 |         | QA findings fixed — 5 of 5 addressed, 1 iteration; follow-up filed as task 284 | qa-fix      |
 <!-- change-log-end -->
 
 ---
@@ -406,7 +407,7 @@ A prohibition without its replacement gets broken at the moment the replacement 
 
 ### Future Improvements
 
-The migration task: move the 32 sites to the file tool plus `--body-file`, deleting one allowlist entry each, per-axis (`qa-*`, `finalise`, `ensure-*-github-issue`, `review-*`, pipeline steps).
+The migration task (task 284): move the 32 sites to the file tool plus `--body-file`, deleting one allowlist entry each, per-axis (`qa-*`, `finalise`, `ensure-*-github-issue`, `review-*`, pipeline steps).
 
 ---
 

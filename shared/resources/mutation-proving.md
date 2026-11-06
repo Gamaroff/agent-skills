@@ -54,7 +54,7 @@ For each invariant a test claims to hold:
    above: it fails loudly when the edit changed nothing. Add a `grep -c` before and
    after, or a line count that must change. To revert, edit the line back and
    confirm `git diff --stat -- <file>` prints nothing
-   (`file-write-rules.md#mutation-revert`).
+   (`shared/resources/file-write-rules.md`, recipe "Mutation revert").
    Never a silent fallback on the edit — `|| true`, `2>/dev/null ||` — because a
    fallback that swallows "pattern not found" turns a no-op into a green.
 5. **Re-run the suite** — the exact command the matrix uses, from the same

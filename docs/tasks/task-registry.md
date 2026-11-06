@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-11-06
-**Next Available Task Number:** **284**
+**Next Available Task Number:** **285**
 
 ## How to use
 
@@ -325,6 +325,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 281 | [The observation log names what it cannot read](task.281.observation-log-names-what-it-cannot-read/task.281.observation-log-names-what-it-cannot-read.md) | planned | refactoring | Medium | 2026-11-06 | — | — invalidStatus list, set-status repair and parked-to-open, propose-a-task decision (obs #93, #155) · independent |
 | 282 | [review-task resolves the right task and reports every review](task.282.review-task-resolves-the-right-task-and-reports-every-review/task.282.review-task-resolves-the-right-task-and-reports-every-review.md) | planned | refactoring | Medium | 2026-11-06 | — | — task-id-first bare-number resolution and a numbered review comment stage (obs #128, #129) · independent, shares tracker-comment.js with 275 |
 | 283 | [Authoring and fix steps state the rules they keep missing](task.283.authoring-and-fix-steps-state-the-rules-they-keep-missing/task.283.authoring-and-fix-steps-state-the-rules-they-keep-missing.md) | planned | refactoring | Medium | 2026-11-06 | 266, 267 | — CHANGELOG placement check, multi-task create path with issue-body renderer, parser-widening importer audit, `command node` wrapper trap (obs #30, #34, #36, #146) · four independent phases |
+| 284 | [Migrate shipped payload heredocs to the file tool](task.284.migrate-payload-heredocs-to-file-tool/task.284.migrate-payload-heredocs-to-file-tool.md) | planned | refactoring | Medium | 2026-11-06 | 265 | — migration half of the task 265 split: 32 allow-listed heredoc sites to the file tool, plus the fresh-body-post citation sweep (obs #15, #85, #88, #106, #123, #158) · five phases, one per axis |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
@@ -385,7 +386,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 
 - **Task 247 gathers two carried advisory findings from task.246 (PR #793)** — one shippable unit: CR5-1 (widen the "no develop pipeline step calls detect or configure" test in `evals/shared/tests/wireframe-mapping-hooks.test.mjs` to skill-local step docs and amend task.246 § 9) and CR4-1 (preserve blank lines in `shared/resources/wireframe-map.js` `configure` list-removal under blank keys on unterminated files). A third carried finding, map-path containment, is pre-existing and out of scope.
 
-- **Task 265 is the primitive half of a split (obs #15, #85, #88, #106, #123, #158)**: the rule, the recipes and a ratchet over today's 32 payload heredocs. The migration of those sites is a second task, not yet filed, and depends on 265; it ships after the ratchet so each removal is a visible allowlist deletion.
+- **Task 265 is the primitive half of a split (obs #15, #85, #88, #106, #123, #158)**: the rule, the recipes and a ratchet over today's 32 payload heredocs. The migration of those sites is task 284, which depends on 265; it ships after the ratchet so each removal is a visible allowlist deletion.
 
 - **Tasks 265–267 were cut from the 2026-11-06 observation review (clusters 1–3)**. 265 is the file-write rule, recipes and ratchet; 266 adds create-task's authoring-time checks; 267 adds review-task's missing checks. They are independent in outcome. 267's Phase 3 edits create-task § 3.5 after 266's items, so land 266 first or merge `develop` into 267's branch.
 

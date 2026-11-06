@@ -1868,7 +1868,7 @@ if [ "$VCS" = "bitbucket" ]; then
 fi
 ```
 
-**Write the body to a file, then post it.** Always `--body-file`, never an inline `--body`: the body below carries backticks, `$(…)` and newlines, and an inline string invites the shell to evaluate them before `gh` ever sees them. The file is also what the Bitbucket arm reads.
+**Write the body to a file, then post it.** Always `--body-file`, never an inline `--body`: the body below carries backticks, `$(…)` and newlines, and an inline string invites the shell to evaluate them before `gh` ever sees them. The file is also what the Bitbucket arm reads. Write it with the file tool in one call and post it in a later one (`references/file-write-rules.md#fresh-body-post`).
 
 ```bash
 # Step 12b's rule, re-checked here: every block runs as its own shell, and a run that
