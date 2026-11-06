@@ -306,6 +306,27 @@ None identified.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-06
+**Quality Score**: 85/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.268.qa.1.qa-fix-finds-the-whole-defect-the-first-time.md](./task.268.qa.1.qa-fix-finds-the-whole-defect-the-first-time.md)
+- **Gate File**: [task.268.gate.1.qa-fix-finds-the-whole-defect-the-first-time.yml](./task.268.gate.1.qa-fix-finds-the-whole-defect-the-first-time.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 13 (pinned suite); full suite 7914 pass, 2 worktree-sensitive failures on both trees
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+Three medium findings: no CHANGELOG entry citing task 268, a self-contradicting Step 7 sentence, and a Step 4 guard block that cannot run as written.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -314,6 +335,8 @@ None identified.
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #16, #18, #20, #27, #42, #56, #63, #113 | create-task |
 | 2026-11-06 | 1.1     | Review passed (9/10) — added `tests/qa-fix-structural-move.test.js` to the files to modify, refreshed line anchors | review-task |
 | 2026-11-06 |         | Status → ready-for-development                                               | review-task |
+| 2026-11-06 |         | QA gate CONCERNS (85/100) — 3 medium findings                                | qa-task     |
+| 2026-11-06 |         | QA findings fixed — CHANGELOG entry, Step 7 wording, Step 4 guard slot, 1 iteration | qa-fix      |
 <!-- change-log-end -->
 
 ---

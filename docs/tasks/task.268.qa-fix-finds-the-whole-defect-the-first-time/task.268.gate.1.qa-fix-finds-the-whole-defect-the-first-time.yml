@@ -1,0 +1,82 @@
+schema: 2
+task: 'task.268.qa-fix-finds-the-whole-defect-the-first-time'
+task_title: 'qa-fix finds the whole defect the first time'
+gate: CONCERNS
+status_reason: 'All 8 rules land and the pinned test is mutation-proven, but three medium findings are open: no CHANGELOG [Unreleased] entry citing task 268, a Step 7 sentence that contradicts itself, and a Step 4 guard block that cannot run as written.'
+reviewer: 'QA Engineer'
+head: '91e2da1d39b5ec7e261379a6d53cd0fb05431941'
+updated: '2026-11-06T20:18:06Z'
+
+top_issues:
+  - id: 'T268-QA-1'
+    severity: medium
+    file: 'CHANGELOG.md'
+    finding: 'No [Unreleased] entry cites task 268 (changelog-cites.sh: missing (task 268)); /finalise 6d halts without it.'
+    suggested_action: 'Add an [Unreleased] entry for the qa-fix changes that ends with (task 268).'
+    suggested_owner: dev
+    status: open
+  - id: 'T268-QA-2'
+    severity: medium
+    file: 'skills/qa-fix/SKILL.md'
+    finding: 'Step 7 check says "do not post until it is added" and "never halts the cycle" in the same paragraph, and defines trigger (b) mechanically where Step 2.6 defines it as a judgement call; trigger (a) is not named. (CR-1, reviewer confidence medium, so not auto-promoted.)'
+    suggested_action: 'State the outcome when the block cannot be added (post anyway with a logged warning), and cite Step 2.6 for trigger (b) and name both (a) and (b).'
+    suggested_owner: dev
+    status: open
+  - id: 'T268-QA-3'
+    severity: medium
+    file: 'skills/qa-fix/SKILL.md'
+    finding: 'The Step 4 untracked-files guard is a fenced block that refuses on repository state but holds an unbound <changed paths> placeholder, so no engine entry form can run it and it is a syntax error if run as written. Boundary recorded true with probes_executed 0. (CR-2.)'
+    suggested_action: 'Bind CHANGED in the block (for example from git diff --name-only against the base) so the fence form can probe it, then run it with a hostile fixture.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 85
+
+evidence:
+  tests_reviewed: 13
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: ["refused", "is refused"]
+    boundary: true
+    notes: 'The Step 4 guard is a repository-state refusal and could not be probed: its placeholder is unbound (T268-QA-3).'
+  performance:
+    status: PASS
+    notes: 'The change edits one existing test file (13 tests, about 0.14-0.6 s). The five alternating full-suite pairs were contaminated by rising machine load (0.7 to 7.5): the first two pairs read 162/172 s and 168/167 s (base/head); later pairs diverged only with load. Both trees fail the same two worktree-sensitive tests (clean-checkout, from-observation), 7914 pass on each.'
+  reliability:
+    status: PASS
+    notes: 'Prose-only change plus a test regex; no runtime path added.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Duplicate direction-of-fix row (CR-3) and the obs #56 rule restated in two places (CR-4); both advisory cleanups.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Add the CHANGELOG [Unreleased] entry citing (task 268).'
+      refs: ['CHANGELOG.md']
+    - action: 'Resolve the Step 7 contradiction and make the Step 4 guard runnable.'
+      refs: ['skills/qa-fix/SKILL.md']
+  future:
+    - action: 'Drop the repeated "Which direction did the last fix move?" row and cite the identity-rule table (CR-3); keep one statement of the obs #56 rule (CR-4).'
+      refs: ['skills/qa-fix/SKILL.md', 'shared/resources/develop-pipeline-step-3-develop-loop.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T268-QA-1 to T268-QA-3 fixed and re-reviewed']

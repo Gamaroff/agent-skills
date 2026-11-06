@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`qa-fix` finds the whole defect the first time** (task 268). Step 3.5 gains a both-sides probe
+  for a classifier fix, a weakest-value probe, an earlier-refusal mutation re-run and a pre-fix
+  population search for a restated rule. Step 2.6 grows from four moves to six ("narrow the contract"
+  and "extract to a script"). Step 4 stages new files before the fast gate and Step 7 checks the fix
+  summary for the blocks the cycle owes. The develop-loop doc carries the same staging rule.
 - **`review-task` catches twelve more plan-defect shapes at review** (task 267). Checks 23 to 29 are
   new (parity guards enumerated, a refusal in a self-rewriting writer applied to its output, an
   enumerated-class test named, fixture literals run through the banned-name guard, an async read's

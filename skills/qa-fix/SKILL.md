@@ -833,12 +833,19 @@ count reflects what actually happened.
 
 **Make new files visible to the gate before running it (obs #56).** Guards that read
 `git ls-files` cannot see an untracked file, so a fast gate can pass and CI go red on the same
-tree. Before the commands below, run `git add -N -- <changed paths>` for new files, or refuse to
-go on while any are untracked:
+tree. Before the commands below, run `git add -N -- {changed-paths}` for new files, or refuse to
+go on while any are untracked. `{changed-paths}` is a slot: substitute the space-separated paths
+this fix touched (the block refuses to run with the slot left in):
 
 ```bash
-[ -z "$(git ls-files --others --exclude-standard -- <changed paths>)" ] \
-  || { echo "untracked files under the changed paths — stage them first"; exit 1; }
+CHANGED_PATHS="{changed-paths}"
+case "$CHANGED_PATHS" in
+  ""|*"{changed-paths}"*) echo "HALT: {changed-paths} was not substituted with the paths this fix touched"; exit 1 ;;
+esac
+# shellcheck disable=SC2086  # the slot is a space-separated path list by contract
+UNTRACKED=$(git ls-files --others --exclude-standard -- $CHANGED_PATHS)
+[ -z "$UNTRACKED" ] \
+  || { echo "untracked files under the changed paths — stage them first:"; printf '%s\n' "$UNTRACKED"; exit 1; }
 ```
 
 ```bash
@@ -951,14 +958,16 @@ criterion #5 to fit what it could deliver. Five QA gates and 5c passed it, and o
 the summary carried no `Narrowing residue:` block and the post went out. Before composing the
 comment, check two conditions on this cycle's bug set:
 
-- **Trigger (b) of Step 2.6 holds** — a bug in the set names an earlier bug of the same work item
-  (`bug.N` text), or its `file:` matches an entry on a previous gate. The summary must carry the
-  `Narrowing residue:` / `Move:` block.
+- **Step 2.6 applied this cycle** — trigger (a) (the pipeline's `Narrowing residue — …` offer) or
+  trigger (b) (a repeat subject, as Step 2.6 defines it: your judgement, with the usual signs a bug
+  that names an earlier bug of the same work item, or a `file:` on a previous gate). The summary must
+  carry the `Narrowing residue:` / `Move:` block.
 - **A bug is a documentation fix** — the summary must carry the Step 3.5 `Probe:` block.
 
-When a block is owed and the summary lacks it, print the missing block's name and the reason, and do
-not post until it is added. This stays best-effort: a `Move: waive — {reason}` line satisfies the
-check, and a refusal here never halts the cycle.
+When a block is owed and the summary lacks it, print the missing block's name and the reason, add the
+block, then post. If it cannot be added (the Move was never chosen), post anyway and log
+`⚠️ {block} owed and missing — posted without it`: this step is best-effort, so the check never halts
+the cycle. A `Move: waive — {reason}` line satisfies the check.
 
 Use the PR metadata stored in Step 0 (Prerequisites). Compose the comment body then post it via the active platform.
 
