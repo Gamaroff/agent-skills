@@ -70,7 +70,18 @@ Success criterion 4 asks that `CI=true command npm test` stay within 10% of `dev
 | Cycle 2, `aea4fed6` | 167 s | 0.4 | `develop` 163 s at load 4.2 (+2.5%) |
 | DoD run 1, `e76822a1` | 191 s wall (suite `duration_ms` 134,713) | 2.6 | `develop` not re-run: a clean worktree has no `.agents/skills` symlink and exits 1, so the run is not comparable |
 
-The 191 s figure is higher than 167 s, and the load was 6.6 by the end of the run, so it is not a clean comparison with `develop`. What the 10% bound protects is the cost the branch added to the suite. The only test file the branch adds is `shared/resources/tests/payload-heredoc-ratchet.test.mjs`, run alone three times: 168 ms, 162 ms, 168 ms of a 134,713 ms suite (0.12%). The branch adds no other test file and no runtime code.
+The 191 s figure is higher than 167 s, but it was one reading at a load that rose to 6.6, with no `develop` run beside it, so it says nothing about the ratio. The DoD AC check asked for the ratio itself, at the head. It was measured as an ABBA series on the same host, `develop` (`b4d53375`) and the branch (`480df06f`) alternating, each with `.agents/skills` present:
+
+| Run | Tree | Wall time | Load average (1 min) at start |
+| --- | --- | --- | --- |
+| 1 | `develop` | 451 s | 5.9 |
+| 2 | branch | 439 s | 9.2 |
+| 3 | branch | 483 s | 13.7 |
+| 4 | `develop` | 461 s | 12.0 |
+
+`develop` averages 456 s and the branch 461 s: **+1.1%**, inside the 10% bound. The load average rose from 5.9 to 13.7 over the series (the suite's own parallel workers account for much of it, and the host was not otherwise idle), so every figure is far above the quiet-machine 163 s and 167 s, and the spread between two runs of the same tree (439 s and 483 s) is about 10%. The ratio is therefore a coarse reading; what it can rule out is a cost of 10% or more. The series is consistent with the independent evidence: the only test file the branch adds, `shared/resources/tests/payload-heredoc-ratchet.test.mjs`, runs alone in about 165 ms, which is 0.12% of the 134,713 ms suite.
+
+Two tests fail on `develop` in the scratch worktree both times (`skills/create-task/tests/from-observation.test.js` and `tests/test-clean-checkout.test.js`, which need the real checkout), so those `develop` runs ended with `rc=1`. The failures are in the harness, not the measurement: they run for milliseconds. The branch runs passed: 7946 tests, 0 failed.
 
 ## Final Assessment
 
