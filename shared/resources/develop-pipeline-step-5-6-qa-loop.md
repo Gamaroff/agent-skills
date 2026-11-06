@@ -898,6 +898,8 @@ was expensive, and the expense bought nothing 5c would not have seen anyway.
 
 ### 5b. Run QA Fix (shared)
 
+**File changes in the QA loop** (including edits to the implementation report) use the file-edit tool, one hunk per call; never an interpreter script, `sed -i`, or a heredoc carrying file content (`shared/resources/file-write-rules.md#the-rule`; the third slip was a `sed -i` on the report here, obs #123).
+
 **Lock**: `bash .agents/skills/{develop-story|develop-task}/references/set-qa-phase.sh 5b` before anything else in this sub-step. `current_step` stays `5`.
 
 #### Signal the `changes-requested` stage (when `TRACKER_ISSUE` is set)

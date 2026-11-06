@@ -51,8 +51,12 @@ For each invariant a test claims to hold:
    `case $?` died there — found by executing *that* block); and the diff is printed,
    not `-q`, because the row-10 re-read needs to see the edit.
 
-   Make the edit itself fail loudly: a Python `assert new != old` after
-   `str.replace`, a `grep -c` before and after, a line count that must change.
+   Make the edit with the file-edit tool (one line, one call), then run the block
+   above: it fails loudly when the edit changed nothing. Add a `grep -c` before and
+   after, or a line count that must change. To revert, edit the line back and
+   confirm `cmp <snapshot> <file>` prints nothing (not `git diff --stat`, which differs
+   from `HEAD` when the file carries an uncommitted fix)
+   (`references/file-write-rules.md`, recipe "Mutation revert").
    Never a silent fallback on the edit — `|| true`, `2>/dev/null ||` — because a
    fallback that swallows "pattern not found" turns a no-op into a green.
 5. **Re-run the suite** — the exact command the matrix uses, from the same

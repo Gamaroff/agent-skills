@@ -936,7 +936,7 @@ printf 'BODY_FILE=%s\n' "$BODY_FILE"
 > the GitHub PATCH path, the GitHub POST path and both Bitbucket paths, so the lead reaches the
 > **update** path as well as the create path. That is the half that is easy to miss.
 
-Always `--body-file` / a file-sourced payload, never an inline body: bodies carry backticks, `$(…)` and newlines.
+Always `--body-file` / a file-sourced payload, never an inline body: bodies carry backticks, `$(…)` and newlines. Write the file with the file tool in one call and post it in a later one (`references/file-write-rules.md#fresh-body-post`).
 
 The GitHub path goes through `tracker_call_with_retry`, inheriting 3× exponential backoff **and** the `ACCESS_TRACKER` deferral gate for free. The Bitbucket path is single-shot — the missing Bitbucket retry helper is a known gap `qa-fix` already documents.
 

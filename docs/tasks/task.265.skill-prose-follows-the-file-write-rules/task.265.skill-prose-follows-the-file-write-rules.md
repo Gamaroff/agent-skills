@@ -5,16 +5,18 @@ type: task
 description: "State once that repository files and body payloads are written with the file tool, add the sanctioned recipes the prose lacks (edit, mutation revert, gate write, fresh-body post), and ratchet the payload heredocs the shipped prose still carries."
 tags: [qa-task, qa-fix, finalise, ensure-task-github-issue, develop-task, observation]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-06
+completed_date: 2026-11-06
+pr_number: 849
 estimated_effort_hours: 8
 ---
 
 # Task 265: Skill prose follows the file-write rules
 
-**Status:** Planned
+**Status:** Accepted
 
 ---
 
@@ -106,8 +108,8 @@ None - prose and one new test. No script, flag or exit code changes.
 - `shared/resources/develop-pipeline-step-5-6-qa-loop.md`
 
 **Changes**:
-- [ ] Write the rule statement (obs #88 decision: the library does not show payload heredocs; an agent without a file tool is the only exception).
-- [ ] Cite it by fragment from the inline-implementation section (obs #123) and from the QA loop, which the third slip happened in.
+- [x] Write the rule statement (obs #88 decision: the library does not show payload heredocs; an agent without a file tool is the only exception).
+- [x] Cite it by fragment from the inline-implementation section (obs #123) and from the QA loop, which the third slip happened in.
 
 **Dependencies**: none.
 
@@ -122,8 +124,8 @@ None - prose and one new test. No script, flag or exit code changes.
 - `skills/qa-fix/SKILL.md`, `skills/qa-task/SKILL.md`, `skills/develop-task/SKILL.md` (a citation each)
 
 **Changes**:
-- [ ] Replace the Python `assert` wording at `mutation-proving.md:53` with the Edit-based recipe; keep the applied-check block unchanged.
-- [ ] Add the one-line citation at each site (obs #158).
+- [x] Replace the Python `assert` wording at `mutation-proving.md:53` with the Edit-based recipe; keep the applied-check block unchanged.
+- [x] Add the one-line citation at each site (obs #158).
 
 **Dependencies**: Phase 1 (the citation target).
 
@@ -138,8 +140,8 @@ None - prose and one new test. No script, flag or exit code changes.
 - `skills/qa-fix/SKILL.md` (Step 7)
 
 **Changes**:
-- [ ] State the gate write shape at Step 10 in both QA skills (obs #15).
-- [ ] Add the freshness assertion and the two-call rule at `qa-fix` Step 7, and cite it from the other `--body-file` posting sites the plan lists (obs #85).
+- [x] State the gate write shape at Step 10 in both QA skills (obs #15).
+- [x] Add the freshness assertion and the two-call rule at `qa-fix` Step 7, and cite it from the other `--body-file` posting sites the plan lists (obs #85). Cited at `qa-fix`, `qa-task`, `qa-story` and `review-pr`; the remaining posting sites (`create-pr`, `finalise`, `ensure-*`, `sync-github-*`, `review-bug/story/task`, `create-issue`, `observe-work`) are excluded here and swept in task 284, where each is also a heredoc migration.
 
 **Dependencies**: Phase 1.
 
@@ -154,8 +156,8 @@ None - prose and one new test. No script, flag or exit code changes.
 - `package.json` (test glob, only if the new file is outside an existing glob)
 
 **Changes**:
-- [ ] Count payload heredocs with the § 2 definition; hold today's 32 in an allowlist; fail on a new site and on a stale entry.
-- [ ] Control cases: a fixture with one quoted and one unquoted payload heredoc must be counted (calibration), and a prose line that only mentions `<<'EOF'` must not be.
+- [x] Count payload heredocs with the § 2 definition; hold today's 32 in an allowlist; fail on a new site and on a stale entry.
+- [x] Control cases: a fixture with one quoted and one unquoted payload heredoc must be counted (calibration), and a prose line that only mentions `<<'EOF'` must not be.
 
 **Dependencies**: Phases 1 to 3 (the ratchet's message cites the rule).
 
@@ -166,8 +168,8 @@ None - prose and one new test. No script, flag or exit code changes.
 **Risk Level**: Low
 
 **Changes**:
-- [ ] `npm run bundle`, then `npm run bundle -- --check`.
-- [ ] Doc sweep: grep the consumer docs for any restatement of the heredoc advice (behaviour-change doc sweep).
+- [x] `npm run bundle`, then `npm run bundle -- --check`.
+- [x] Doc sweep: grep the consumer docs for any restatement of the heredoc advice (behaviour-change doc sweep).
 
 **Dependencies**: Phases 1 to 4.
 
@@ -233,24 +235,24 @@ The recipes are prose. Evidence is a fresh session following the Step 10 and Ste
 
 ### Functional
 
-- [ ] The rule is stated in exactly one shared source and cited by fragment from the inline-implementation section, the QA loop and the mutation recipe; `grep` of each site returns the citation (command in the QA report).
-- [ ] `mutation-proving.md` no longer names an interpreter edit (`grep -n "Python" shared/resources/mutation-proving.md` returns nothing for step 4).
-- [ ] `qa-task` Step 10 and `qa-story`'s gate step state the write method; `qa-fix` Step 7 holds a freshness assertion and the two-call rule.
+- [x] The rule is stated in exactly one shared source and cited by fragment from the inline-implementation section, the QA loop and the mutation recipe; `grep` of each site returns the citation (command in the QA report).
+- [x] `mutation-proving.md` no longer names an interpreter edit (`grep -n "Python" shared/resources/mutation-proving.md` returns nothing for step 4).
+- [x] `qa-task` Step 10 and `qa-story`'s gate step state the write method; `qa-fix` Step 7 holds a freshness assertion and the two-call rule.
 
 ### Performance
 
-- [ ] `CI=true command npm test` wall time is within 10% of `develop`, measured once and recorded in the QA report.
+- [x] `CI=true command npm test` wall time is within 10% of `develop`, measured once and recorded in the QA report.
 
 ### Code Quality
 
-- [ ] The ratchet fails when a payload heredoc is added to a shipped prose file and passes at the committed count (mutation proof recorded in the QA report).
-- [ ] `command npm run bundle -- --check` reports 0 problems; `CI=true command npm test` passes.
-- [ ] `python skills/create-skill/scripts/quick_validate.py skills/<skill>` passes for each skill edited.
+- [x] The ratchet fails when a payload heredoc is added to a shipped prose file and passes at the committed count (mutation proof recorded in the QA report).
+- [x] `command npm run bundle -- --check` reports 0 problems; `CI=true command npm test` passes.
+- [x] `python skills/create-skill/scripts/quick_validate.py skills/<skill>` passes for each skill edited.
 
 ### Migration
 
-- [ ] The follow-up task for the 32 sites is filed and named in the QA report.
-- [ ] A one-line note on the split is in `docs/tasks/task-registry.md` § Notes.
+- [x] The follow-up task for the 32 sites is filed and named in the QA report.
+- [x] A one-line note on the split is in `docs/tasks/task-registry.md` § Notes.
 
 ---
 
@@ -330,12 +332,67 @@ None identified.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-06
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.265.qa.3.skill-prose-follows-the-file-write-rules.md](./task.265.qa.3.skill-prose-follows-the-file-write-rules.md)
+- **Gate File**: [task.265.gate.3.skill-prose-follows-the-file-write-rules.yml](./task.265.gate.3.skill-prose-follows-the-file-write-rules.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 7
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+Both cycle 2 findings are fixed. One low advisory remains: the widened ratchet pattern counts a here-string; it fails loudly and hits no tracked file.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.265.qa.3.skill-prose-follows-the-file-write-rules.md`
+**Gate File**: `task.265.gate.3.skill-prose-follows-the-file-write-rules.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100 after 3 QA cycles (80, 90, 95); one low advisory open (T265-QA-8)
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** All 9 met (the wall-time criterion on an ABBA series, +1.1%; the CI criterion from the green PR rollup)
+✅ **Tests:** 7 ratchet tests, mutation-proved; full suite 7946 tests, 0 failed
+✅ **PR Review:** PR #849, `/review-pr` conformance lens CONCERNS with no open coverage finding
+✅ **Documentation:** CHANGELOG cites task 265; rule doc, five skills and the step docs updated
+✅ **Security Review:** ✅ PASS - no secrets or unsafe patterns; the qa-fix stale-body guard probed, 6 runs, 0 reproduced
+⚠️ **Compliance Review:** not applicable (internal skill prose and test tooling)
+
+**CI reading 1:** SUCCESS @ `d3f43cdfc411bbf4824b1702d2944c7fb00a7185`
+
+**Detailed Verification Log:** See `task.265.dod.1.skill-prose-follows-the-file-write-rules.md` for the complete verification evidence.
+
+**Task marked as ACCEPTED on:** 2026-11-06
+
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                              | Author      |
-| ---------- | ------- | -------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #15, #85, #88, #106, #123, #158 | create-task |
+| 2026-11-06 | 1.1     | Review passed (9/10) — no changes required; claims re-measured (32 heredocs, 16 anchors, 31 body-file files) | review-task |
+| 2026-11-06 |         | Status → ready-for-development                           | review-task |
+| 2026-11-06 |         | Implemented phases 1-5 inline; status → ready-for-review (ci:fast 7944 tests, 0 fail; ratchet mutation-proved) | develop-task |
+| 2026-11-06 |         | QA gate CONCERNS (80/100) — 5 findings                   | qa-task     |
+| 2026-11-06 |         | QA findings fixed — 5 of 5 addressed, 1 iteration; follow-up filed as task 284 | qa-fix      |
+| 2026-11-06 |         | QA gate CONCERNS (90/100) — 2 findings                   | qa-task     |
+| 2026-11-06 |         | QA findings fixed — 2 of 2 addressed, 1 iteration (revert recipe compares with the snapshot; ratchet regex widened and bounded) | qa-fix      |
+| 2026-11-06 |         | QA gate PASS (95/100) — 1 low advisory                   | qa-task     |
+| 2026-11-06 | 1.2 | DoD passed — accepted (PR #849) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -343,22 +400,22 @@ None identified.
 ## Progress Tracking
 
 ### Phase 1: State the rule once
-- [ ] Rule statement written
-- [ ] Cited from the inline section and the QA loop
+- [x] Rule statement written
+- [x] Cited from the inline section and the QA loop
 
 ### Phase 2: Mutation revert recipe
-- [ ] Recipe replaces the interpreter wording
-- [ ] Citations added
+- [x] Recipe replaces the interpreter wording
+- [x] Citations added
 
 ### Phase 3: Gate write and fresh-body post
-- [ ] Gate write shape stated
-- [ ] Freshness assertion added
+- [x] Gate write shape stated
+- [x] Freshness assertion added
 
 ### Phase 4: Ratchet
-- [ ] Test and controls written
+- [x] Test and controls written
 
 ### Phase 5: Bundle and sweep
-- [ ] Bundle clean, doc sweep done
+- [x] Bundle clean, doc sweep done
 
 ---
 
@@ -381,8 +438,8 @@ A prohibition without its replacement gets broken at the moment the replacement 
 
 ### Future Improvements
 
-The migration task: move the 32 sites to the file tool plus `--body-file`, deleting one allowlist entry each, per-axis (`qa-*`, `finalise`, `ensure-*-github-issue`, `review-*`, pipeline steps).
+The migration task (task 284): move the 32 sites to the file tool plus `--body-file`, deleting one allowlist entry each, per-axis (`qa-*`, `finalise`, `ensure-*-github-issue`, `review-*`, pipeline steps).
 
 ---
 
-**Status:** Planned
+**Status:** Accepted

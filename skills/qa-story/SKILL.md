@@ -1978,6 +1978,11 @@ gate once it is written.
 > was never the problem. The history belongs in `bug_resolution`, in the QA report's Re-Review
 > Context table, and in the bug reports.
 
+**Write the gate with the file tool, never a shell heredoc.** Bind the head and the clock first
+(`git rev-parse HEAD`, `date -u +%Y-%m-%dT%H:%M:%SZ`), put the two printed values in `head:` and
+`updated:`, and type the finding text once, in the file: an unquoted heredoc executes the backtick
+spans a finding quotes (obs #15). Recipe: `references/file-write-rules.md#gate-write`.
+
 **CRITICAL: Gate files MUST be co-located with story/task files (Updated 2025-12-09)**
 
 **Gate File Location and Naming:**
@@ -2405,7 +2410,7 @@ if [ "$VCS" = "bitbucket" ]; then
 fi
 ```
 
-   **Write the body to a file, then post it.** Always `--body-file`, never an inline `--body`: the body below carries backticks, `$(…)` and newlines, and an inline string invites the shell to evaluate them before `gh` ever sees them. The file is also what the Bitbucket arm reads.
+   **Write the body to a file, then post it.** Always `--body-file`, never an inline `--body`: the body below carries backticks, `$(…)` and newlines, and an inline string invites the shell to evaluate them before `gh` ever sees them. The file is also what the Bitbucket arm reads. Write it with the file tool in one call and post it in a later one (`references/file-write-rules.md#fresh-body-post`).
 
 ```bash
 # Item 3e's rule, re-checked here: every block runs as its own shell, and a run that

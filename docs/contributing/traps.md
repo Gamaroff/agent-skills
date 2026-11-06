@@ -182,6 +182,7 @@ The marker is built by `loadSensitive()` in the shared `spawn-budget.mjs` (task 
 - `shared/resources/tests/finalise-fix-and-recheck.test.mjs`
 - `shared/resources/tests/ci-tree-equivalence.test.mjs`
 - `shared/resources/tests/migrate-doc-numbering.test.mjs`
+- `shared/resources/tests/payload-heredoc-ratchet.test.mjs`
 - `shared/resources/tests/qa-diminishing-returns.test.mjs`
 - `shared/resources/tests/qa-execute-snippets.test.mjs`
 - `skills/session-handoff/tests/handoff-verify.test.js`

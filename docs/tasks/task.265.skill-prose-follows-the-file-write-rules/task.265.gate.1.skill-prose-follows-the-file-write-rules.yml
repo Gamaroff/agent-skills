@@ -1,0 +1,93 @@
+schema: 2
+task: 'task.265.skill-prose-follows-the-file-write-rules'
+task_title: 'Skill prose follows the file-write rules'
+gate: CONCERNS
+status_reason: 'Implementation matches the plan and ci:fast is green (7944 tests, 0 failed), but five medium findings are open: the follow-up migration task is not filed, the rule is not cited at the other --body-file sites, four bundled mutation-proving copies cite a file their skill does not carry, the performance criterion is unmeasured, and the CHANGELOG has no task 265 entry.'
+reviewer: 'QA Engineer'
+head: '3af53deace35353800d4bb39da64a7c1c3ab3c1a'
+updated: '2026-11-06T05:26:43Z'
+
+top_issues:
+  - id: 'T265-QA-1'
+    severity: medium
+    file: 'docs/tasks/task-registry.md'
+    finding: 'Success criterion "The follow-up task for the 32 sites is filed and named in the QA report" is unmet: the registry note at line 388 says the migration task is "not yet filed".'
+    suggested_action: 'File the migration task with /create-task (the 32 sites, one allowlist deletion each, depends on 265) and name it in the next QA report.'
+    suggested_owner: dev
+    status: open
+  - id: 'T265-QA-2'
+    severity: medium
+    file: 'skills/qa-fix/SKILL.md'
+    finding: 'Plan Phase 3 and the task Phase 3 checkbox say to cite the freshness rule from the other --body-file posting sites; none was cited and none was named as in scope or excluded (31 files carry --body-file).'
+    suggested_action: 'Measure the site list with the plan git grep, cite the rule at the in-scope posting sites, and list each site as in scope or excluded in the QA report.'
+    suggested_owner: dev
+    status: open
+  - id: 'T265-QA-3'
+    severity: medium
+    file: 'shared/resources/mutation-proving.md'
+    finding: 'The new citation file-write-rules.md#mutation-revert is a fragment citation, so the bundler did not copy file-write-rules.md into develop, double-check, finalise and review-security, whose references/mutation-proving.md now cite a file their skill does not carry.'
+    suggested_action: 'Cite it without a fragment (a bundling dependency) or via a cite comment so every skill that bundles mutation-proving.md also gets file-write-rules.md; re-run npm run bundle.'
+    suggested_owner: dev
+    status: open
+  - id: 'T265-QA-4'
+    severity: medium
+    file: 'docs/tasks/task.265.skill-prose-follows-the-file-write-rules/task.265.skill-prose-follows-the-file-write-rules.md'
+    finding: 'Success criterion "CI=true npm test wall time is within 10% of develop, measured once and recorded in the QA report" has no committed measurement.'
+    suggested_action: 'Time CI=true npm test on develop and on the branch (uptime beside time), and record both in the QA report.'
+    suggested_owner: dev
+    status: open
+  - id: 'T265-QA-5'
+    severity: medium
+    file: 'CHANGELOG.md'
+    finding: 'changelog-cites.sh task.265 answers "missing (task 265)"; finalise 6d halts on a work item with no [Unreleased] entry citing it.'
+    suggested_action: 'Add an [Unreleased] entry citing (task 265).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 5
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary_reason: ''
+    notes: 'Prose plus one test that reads tracked files. boundary: false (no accept/reject function; the ratchet counts lines).'
+  performance:
+    status: CONCERNS
+    notes: 'The wall-time criterion is unmeasured (T265-QA-4).'
+  reliability:
+    status: PASS
+    notes: 'Ratchet reads git ls-files, so a gitignored symlink cannot change it; mutation-proved red then green.'
+  maintainability:
+    status: PASS
+    notes: 'Rule stated once in file-write-rules.md; allowlist is keyed on file and line text.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T265-QA-1 to T265-QA-5 in qa-fix.'
+      refs: ['docs/tasks/task-registry.md', 'CHANGELOG.md']
+  future: []
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'Five medium findings closed.'
