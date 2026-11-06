@@ -5,16 +5,18 @@ type: task
 description: "Add five Critical items to create-task's adversarial review (timing statistic, measured population, classifier/writer parity, second-layer defence test, seeded remedy vs existing tests) so a plan fails where it is written, not in review-task."
 tags: [create-task, finalise, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-06
+completed_date: 2026-11-06
+pr_number: 851
 estimated_effort_hours: 4
 ---
 
 # Task 266: create-task asks the questions its checks miss
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 ---
 
@@ -183,23 +185,23 @@ None authored. `evals/shared/tests/finalise-dod-prompt-contract.test.mjs` is run
 
 ### Functional
 
-- [ ] Each of the five items is present in `skills/create-task/SKILL.md` § 3.5 and fires on its motivating shape; the five-draft results are listed in the QA report.
-- [ ] Each item leaves its control draft unflagged; recorded in the QA report.
-- [ ] `finalise-dod-ac-prompt.md` names run count and statistic for a wall-clock bound.
+- [x] Each of the five items is present in `skills/create-task/SKILL.md` § 3.5 and fires on its motivating shape; the five-draft results are listed in the QA report.
+- [x] Each item leaves its control draft unflagged; recorded in the QA report.
+- [x] `finalise-dod-ac-prompt.md` names run count and statistic for a wall-clock bound.
 
 ### Performance
 
-- [ ] `CI=true command npm test` wall time is within 10% of `develop`, as the median of five alternating runs with `uptime` beside each, recorded in the QA report.
+- [x] `CI=true command npm test` wall time is within 10% of `develop`, as the median of five alternating runs with `uptime` beside each, recorded in the QA report.
 
 ### Code Quality
 
-- [ ] `CI=true command node --test evals/shared/tests/finalise-dod-prompt-contract.test.mjs tests/review-task-measured-criterion.test.js` passes.
-- [ ] `command npm run bundle -- --check` reports 0 problems.
-- [ ] `python skills/create-skill/scripts/quick_validate.py skills/create-task` passes.
+- [x] `CI=true command node --test evals/shared/tests/finalise-dod-prompt-contract.test.mjs tests/review-task-measured-criterion.test.js` passes.
+- [x] `command npm run bundle -- --check` reports 0 problems.
+- [x] `python skills/create-skill/scripts/quick_validate.py skills/create-task` passes.
 
 ### Migration
 
-- [ ] No new item restates a section list (`CARD_SECTIONS_BY_KIND` stays the single definition).
+- [x] No new item restates a section list (`CARD_SECTIONS_BY_KIND` stays the single definition).
 
 ---
 
@@ -271,6 +273,28 @@ None identified.
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report**: `task.266.qa.3.create-task-asks-the-questions-its-checks-miss.md`
+**Gate File**: `task.266.gate.3.create-task-asks-the-questions-its-checks-miss.yml` — ✅ PASS, 97/100
+**PR Review**: `task.266.pr-review.2.create-task-asks-the-questions-its-checks-miss.md` — APPROVE
+
+✅ **Acceptance Criteria:** 8 of 8 met. The five § 3.5 items and the finalise clause are in place; the wall-time bound is measured (median 733.2 s vs 737.1 s, -0.5%).
+✅ **Tests:** the contract tests pass (50 of 50), re-run in this verification.
+✅ **Documentation:** CHANGELOG cites task 266; `bundle --check` reports 0 problems.
+⚠️ **Security / Compliance:** not applicable — prose only.
+✅ **CI:** all six checks green on `bb5be9016572`.
+
+The DoD checks ran inline, not in independent subagents. The behavioural evidence is one run per arm.
+
+**Detailed Verification Log:** see `task.266.dod.1.create-task-asks-the-questions-its-checks-miss.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-06
+
+---
+
 ## QA Testing Results
 
 **QA Status**: PASS
@@ -291,12 +315,11 @@ None identified.
 
 ### Key Findings
 No findings. The wall-time criterion is measured: median 733.2 s on the head against 737.1 s on develop (-0.5%).
-
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                                            | Author      |
-| ---------- | ------- | ---------------------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #31, #122, #134, #154, #156      | create-task |
 | 2026-11-06 | 1.1     | Review passed (8/10) — corrected the false review-task twin claim, four-plus-one item count, controls for items 4 and 5, two more tests that read the finalise prompt | review-task |
 |            |         | Status → ready-for-development                                         | review-task |
@@ -306,6 +329,7 @@ No findings. The wall-time criterion is measured: median 733.2 s on the head aga
 | 2026-11-06 |         | QA gate PASS (95/100) — 0 findings                                     | qa-task     |
 | 2026-11-06 |         | QA findings fixed — cycle 2, 1 finding (wall-time measurement)         | qa-fix      |
 | 2026-11-06 |         | QA gate PASS (97/100) — 0 findings                                     | qa-task     |
+| 2026-11-06 | 1.2 | DoD passed — accepted (PR #851) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -345,4 +369,4 @@ Task 267 (review-task) holds the review-side twins of these checks.
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
