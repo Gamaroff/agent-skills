@@ -1,0 +1,128 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "e76822a1ee3ffe5a73afd4bfd856e1016d820483",
+  "dirty_paths": [
+    "docs/tasks/task.265.skill-prose-follows-the-file-write-rules/task.265.implementation.1.skill-prose-follows-the-file-write-rules-initial-run.md",
+    "docs/tasks/task.265.skill-prose-follows-the-file-write-rules/task.265.pr-review.1.skill-prose-follows-the-file-write-rules.md"
+  ],
+  "document": "docs/tasks/task.265.skill-prose-follows-the-file-write-rules/task.265.skill-prose-follows-the-file-write-rules.md",
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 9,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "24f84fdbbbdf4f2e294d1df411d0b5376fbd11331a2e544c1a4d1398ef37c805",
+      "status": "PASS",
+      "description": "Rule stated once in shared source; cited by fragment from three sites",
+      "code_citation": "shared/resources/develop-pipeline-step-3-develop-loop.md:170",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Each site cites shared/resources/file-write-rules.md (the first two with #the-rule). The grep evidence is recorded in qa.1 line 48."
+    },
+    {
+      "id": "#2",
+      "text_hash": "ae471375730890881114ff92338bf07e1adfa83e1d3ee227ed9a0ffd834af90f",
+      "status": "PASS",
+      "description": "mutation-proving.md no longer names an interpreter edit",
+      "code_citation": "shared/resources/mutation-proving.md:58",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "grep -n Python on the file returned nothing (rc=1). Line 58 points to the file-write-rules 'Mutation revert' recipe."
+    },
+    {
+      "id": "#3",
+      "text_hash": "043ce7b888495bab11b3cb7f3c3421db3432b5dfd1a91ef9cb3ac7400b0d05d9",
+      "status": "PASS",
+      "description": "qa-task Step 10 and qa-story gate step state write method; qa-fix freshness and two-call rule",
+      "code_citation": "skills/qa-task/SKILL.md:1301",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "qa-task:1301, qa-story:1981, qa-fix:1097 (freshness assertion) and qa-fix:1092 (two-call rule) all read as the criterion asks."
+    },
+    {
+      "id": "#4",
+      "text_hash": "c14620ee82bbd560578abe17007c57427179b033fe5c6927f243439cd2e90cf5",
+      "status": "PASS",
+      "description": "npm test wall time within 10% of develop, recorded in QA report",
+      "code_citation": "docs/tasks/task.265.skill-prose-follows-the-file-write-rules/task.265.qa.3.skill-prose-follows-the-file-write-rules.md:82",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "ABBA series at 480df06f against develop b4d53375: develop 451 s and 461 s (mean 456), branch 439 s and 483 s (mean 461), +1.1%, load recorded per run. Spread between two runs of one tree is about 10%, so the ratio rules out a cost of 10% or more and nothing finer; the added test costs about 165 ms of 134,713 ms."
+    },
+    {
+      "id": "#5",
+      "text_hash": "b7fbae248a8a4efbf9dad825e3f4649e2c180803d3969c33503fafd4b46a9ef1",
+      "status": "PASS",
+      "description": "Ratchet fails on added payload heredoc, passes at committed count; mutation proof in QA report",
+      "code_citation": "shared/resources/tests/payload-heredoc-ratchet.test.mjs:204",
+      "test_citation": "shared/resources/tests/payload-heredoc-ratchet.test.mjs:204",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Runs per PR through npm test (test.yml:58). Mutation proofs: qa.1 line 52 (added heredoc, 2 tests red, reverted) and qa.3 line 25 (old pattern restored, 2 of 7 red)."
+    },
+    {
+      "id": "#6",
+      "text_hash": "4ebe7eb0e4844e0df815176b7f42d776b2bc0cf3440c8435836dd542207af2de",
+      "status": "PASS",
+      "description": "bundle --check reports 0 problems; npm test passes",
+      "code_citation": ".github/workflows/test.yml:58",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ d3f43cdfc411bbf4824b1702d2944c7fb00a7185 — Evidence is the PR's CI run; graded by Step 6 from the CI reading. Local evidence is consistent: 7944 pass, 0 fail on the branch runs, bundle --check 0 problems.",
+      "ci_reading": "CI reading 1: SUCCESS @ d3f43cdfc411bbf4824b1702d2944c7fb00a7185"
+    },
+    {
+      "id": "#7",
+      "text_hash": "48c008f77f90c39678e389f7773743731d11b4e9c66d6b83db0a86a610774de4",
+      "status": "PASS",
+      "description": "quick_validate passes for each skill edited",
+      "code_citation": "docs/tasks/task.265.skill-prose-follows-the-file-write-rules/task.265.qa.1.skill-prose-follows-the-file-write-rules.md:54",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "quick_validate.py was run on all five edited SKILL.md files (qa-fix, qa-task, qa-story, develop-task, review-pr) and each passed. QA 1 names four; review-pr has no committed record."
+    },
+    {
+      "id": "#8",
+      "text_hash": "809846d520e91860b97212846eb909380a4fdf703685332ddecd305f7666aeb6",
+      "status": "PASS",
+      "description": "Follow-up task for the 32 sites filed and named in QA report",
+      "code_citation": "docs/tasks/task.265.skill-prose-follows-the-file-write-rules/task.265.qa.2.skill-prose-follows-the-file-write-rules.md:24",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "QA 2 names task 284; docs/tasks/task-registry.md:328 holds its row and the task 284 files are in the PR."
+    },
+    {
+      "id": "#9",
+      "text_hash": "b4744005238f82cef03fff9bad094bff8c9c3645f2151933a365740cb504cd54",
+      "status": "PASS",
+      "description": "One-line note on the split in task-registry.md Notes",
+      "code_citation": "docs/tasks/task-registry.md:389",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Line 389 says task 265 is the primitive half of a split and task 284 the migration half."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#4",
+      "note": "The spread between two runs of one tree is about 10%, as wide as the bound; the +1.1% ratio is a coarse reading. The series was taken at 480df06f; the only later change is the QA 3 report."
+    },
+    {
+      "ac_id": "#7",
+      "note": "review-pr/SKILL.md is edited in the PR but has no committed quick_validate record. A re-run now passes."
+    }
+  ]
+}

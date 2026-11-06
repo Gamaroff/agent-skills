@@ -73,7 +73,7 @@ The script auto-loads `<repo-root>/.env`. Shell exports take precedence.
 | Variable | Description |
 |---|---|
 | `JIRA_BOARD_ID` | Board ID for backlog placement (Scrum boards only — skipped on Kanban) |
-| `BITBUCKET_REPO_URL` | Override Bitbucket base URL (auto-detected from git remote) |
+| `BITBUCKET_REPO_URL` | Override Bitbucket base URL. Auto-detected from `git remote` for `bitbucket.org`, `ssh.bitbucket.org` and `altssh.bitbucket.org` (scp-style, `ssh://`, `https://`); any other host needs this variable |
 | `JIRA_EPIC_NAME_FIELD` | Custom field id for the Epic Name (classic projects only). Defaults to `customfield_10011`. Set to `none` to skip entirely (recommended for team-managed projects, though the script auto-retries without the field on rejection). |
 
 ### Frontmatter constraints (non-full-YAML parser)
@@ -375,7 +375,7 @@ The two look identical and are not, which is how they were once wrongly deleted 
 | Missing env vars (live) | Add to `.env` and retry |
 | Missing env vars (dry-run) | Warning only — preview proceeds |
 | `prd_source` not resolvable | PRD link omitted; sync continues |
-| Bitbucket URL not detected | Set `BITBUCKET_REPO_URL`; links omitted but sync continues |
+| Bitbucket URL not detected | Set `BITBUCKET_REPO_URL`. An **update stops with an error** before writing (it would drop the card's Source Documents links); a **create warns** and omits the links |
 | File not found | Verify epic file path |
 | `401 Unauthorized` | Verify `JIRA_USER_EMAIL` and `JIRA_API_TOKEN` |
 | `403 Forbidden` | Token lacks permission for issue/project |

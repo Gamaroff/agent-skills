@@ -1520,6 +1520,48 @@ test("shell-fn entry: the fake gh refuses to answer outside the probe (FAKE_GH u
   assert.match(other.stderr, /unsupported subcommand: repo view/);
 });
 
+test("an exact-host allow-list predicate engages under its own cases file, and the stock url-authority corpus cannot score it", () => {
+  const dir = mkdtempSync(join(tmpdir(), "probe-allowlist-"));
+  try {
+    const run = (extra) => {
+      const out = [];
+      const write = process.stdout.write.bind(process.stdout);
+      process.stdout.write = (chunk) => (out.push(String(chunk)), true);
+      let rc;
+      try {
+        rc = main([
+          "--sink",
+          "url-authority",
+          "--entry",
+          "shared/resources/jira-sync.js#parseBitbucketRemote",
+          "--record",
+          join(dir, `run-${extra.length}.json`),
+          "--name",
+          "parseBitbucketRemote",
+          "--repo-root",
+          REPO_ROOT,
+          ...extra,
+        ]);
+      } finally {
+        process.stdout.write = write;
+      }
+      return { rc, text: out.join("") };
+    };
+    const own = run([
+      "--cases-file",
+      join(REPO_ROOT, "tests/fixtures/probe/bitbucket-remote.cases.json"),
+    ]);
+    assert.equal(own.rc, 0, own.text);
+    assert.match(own.text, /^engages .*executed 9, passed 9, reproduced 0/);
+    // The premise the cases file exists for: the stock corpus refuses everything.
+    const stock = run([]);
+    assert.notEqual(stock.rc, 0, stock.text);
+    assert.match(stock.text, /rejects-every-input|unverifiable/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("shell-fn entry: the CLI form runs with --cases-file and --fake-gh and records fake_gh on the entry", () => {
   const dir = mkdtempSync(join(tmpdir(), "probe-shell-fn-cli-"));
   try {

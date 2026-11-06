@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "path",
+      "entry": "fence:shared/resources/develop-pipeline-step-0-resolve-and-prepare.md#Bound the derived path",
+      "name": "docs bound (shared/resources/develop-pipeline-step-0-resolve-and-prepare.md)",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 24,
+      "passed": 24,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": [
+        "bash",
+        "zsh"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": "<derived-path>",
+      "fixture_setup": null,
+      "ran_at": "2026-11-05T18:24:21.036Z"
+    },
+    {
+      "sink": "path",
+      "entry": "fence:skills/review-story/SKILL.md#Bound the derived path",
+      "name": "docs bound (skills/review-story/SKILL.md)",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 24,
+      "passed": 24,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": [
+        "bash",
+        "zsh"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": "<derived-path>",
+      "fixture_setup": null,
+      "ran_at": "2026-11-05T18:24:20.792Z"
+    },
+    {
+      "sink": "path",
+      "entry": "fence:skills/review-task/SKILL.md#Bound the derived path",
+      "name": "docs bound (skills/review-task/SKILL.md)",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 24,
+      "passed": 24,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": [
+        "bash",
+        "zsh"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": "<derived-path>",
+      "fixture_setup": null,
+      "ran_at": "2026-11-05T18:24:20.567Z"
+    }
+  ],
+  "totals": {
+    "executed": 72,
+    "reproduced": 0,
+    "escaped": 0
+  },
+  "updated_at": "2026-11-05T18:24:21.036Z"
+}

@@ -1,0 +1,48 @@
+[
+  {
+    "id": "stale-body-lacks-sha",
+    "input": "abc1234def",
+    "direction": "hostile",
+    "correct": "Refuses with the 'body stale' line and exit 1, because the body file does not carry this cycle's fix commit.",
+    "spec_ref": "docs/tasks/task.265.skill-prose-follows-the-file-write-rules/task.265.skill-prose-follows-the-file-write-rules.md:43",
+    "fixture": {
+      "files": {
+        ".claude/state/comment-body.md": "Fix summary for last cycle, commit 0000000aaa\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "body stale: .claude/state/comment-body.md does not carry abc1234def — not posting\n"
+    }
+  },
+  {
+    "id": "body-missing",
+    "input": "abc1234def",
+    "direction": "hostile",
+    "correct": "Refuses with the 'body stale' line and exit 1 when the body file is absent, because the write may have failed.",
+    "spec_ref": "docs/tasks/task.265.skill-prose-follows-the-file-write-rules/task.265.skill-prose-follows-the-file-write-rules.md:36",
+    "fixture": {
+      "files": {}
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "body stale: .claude/state/comment-body.md does not carry abc1234def — not posting\n"
+    }
+  },
+  {
+    "id": "fresh-body-carries-sha",
+    "input": "abc1234def",
+    "direction": "legitimate",
+    "correct": "Accepts with exit 0 and no output when the body carries this cycle's sha.",
+    "spec_ref": "docs/tasks/task.265.skill-prose-follows-the-file-write-rules/task.265.skill-prose-follows-the-file-write-rules.md:43",
+    "fixture": {
+      "files": {
+        ".claude/state/comment-body.md": "Fix summary, commit abc1234def\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": ""
+    }
+  }
+]

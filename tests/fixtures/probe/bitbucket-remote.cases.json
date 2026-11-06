@@ -1,0 +1,74 @@
+[
+  {
+    "id": "host.suffix-lookalike",
+    "sink": "url-authority",
+    "input": "git@bitbucket.org.evil.example:ws/repo.git",
+    "direction": "hostile",
+    "why": "A substring or suffix match on the host accepts a name the attacker owns, and the base published into a card then points at their server.",
+    "correct": "Refused: the host is compared for exact equality with the allow-list."
+  },
+  {
+    "id": "host.prefix-lookalike",
+    "sink": "url-authority",
+    "input": "https://evilbitbucket.org/ws/repo",
+    "direction": "hostile",
+    "why": "A `contains` or `endsWith` check passes a host that merely ends in the allowed name.",
+    "correct": "Refused: exact host match only."
+  },
+  {
+    "id": "host.userinfo-confusion",
+    "sink": "url-authority",
+    "input": "https://bitbucket.org@evil.example/ws/repo",
+    "direction": "hostile",
+    "why": "The allowed name sits in the userinfo, so a parser that scans the whole authority for it accepts a URL whose real host is evil.example.",
+    "correct": "Refused: the host is what follows the last `@`, and it is not on the list."
+  },
+  {
+    "id": "path.extra-segments",
+    "sink": "url-authority",
+    "input": "https://bitbucket.org/ws/repo/extra",
+    "direction": "hostile",
+    "why": "Taking the last two segments, or the first two, of a longer path publishes a plausible but wrong repo base.",
+    "correct": "Refused: the path must be exactly workspace/repo."
+  },
+  {
+    "id": "path.empty-repo",
+    "sink": "url-authority",
+    "input": "https://bitbucket.org/ws/",
+    "direction": "hostile",
+    "why": "A missing repo segment yields a base ending in a bare workspace.",
+    "correct": "Refused: both segments must be non-empty."
+  },
+  {
+    "id": "host.other-forge",
+    "sink": "url-authority",
+    "input": "git@github.com:ws/repo.git",
+    "direction": "hostile",
+    "why": "A remote on another forge parses as workspace/repo, so a shape-only parser would publish a bitbucket.org link to a repository that is not there.",
+    "correct": "Refused: the host is not on the allow-list."
+  },
+  {
+    "id": "legit.scp-style",
+    "sink": "url-authority",
+    "input": "git@bitbucket.org:ws/repo.git",
+    "direction": "legitimate",
+    "why": "The remote Bitbucket's own clone dialog hands out; refusing it stops every sync.",
+    "correct": "Accepted: base https://bitbucket.org/ws/repo."
+  },
+  {
+    "id": "legit.altssh-with-port",
+    "sink": "url-authority",
+    "input": "ssh://git@altssh.bitbucket.org:443/ws/repo.git",
+    "direction": "legitimate",
+    "why": "The port-443 SSH host is the same platform; an over-strict list that omits it refuses working remotes.",
+    "correct": "Accepted: port dropped, base https://bitbucket.org/ws/repo."
+  },
+  {
+    "id": "legit.https-with-userinfo",
+    "sink": "url-authority",
+    "input": "https://user@bitbucket.org/ws/repo",
+    "direction": "legitimate",
+    "why": "Clone URLs often carry a username; refusing them stops syncs for HTTPS users.",
+    "correct": "Accepted: userinfo dropped, base https://bitbucket.org/ws/repo."
+  }
+]

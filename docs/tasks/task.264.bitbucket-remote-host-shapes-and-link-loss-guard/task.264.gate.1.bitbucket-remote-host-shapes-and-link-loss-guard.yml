@@ -1,0 +1,59 @@
+schema: 2
+task: 'task.264.bitbucket-remote-host-shapes-and-link-loss-guard'
+task_title: 'Bitbucket remote host shapes and link-loss guard'
+gate: PASS
+status_reason: 'All 9 success criteria verified from evidence; 29 new tests plus 12 end-to-end guard tests pass, mutation proofs reproduce, exact-host parser held against 9 executed probes (0 escaped). Two LOW advisory notes only.'
+reviewer: 'QA Engineer'
+head: '8b075544e9099c83e6258b285537adca38782c24'
+updated: '2026-11-05T21:00:29Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 41
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 9
+    escaped: 0
+    boundary_signals: []
+    boundary: true
+    notes: 'parseBitbucketRemote is an allow-list predicate. The stock url-authority corpus models a different function (it rejects every input), so a purpose-built 9-case file (6 hostile, 3 legitimate) was run through security-probe.mjs: verdict engages, hostile rejected, legitimate accepted, 0 reproduced, 0 escaped. Look-alike suffix and prefix hosts, userinfo host confusion, extra path segments, empty repo and another forge are all rejected. The refusal message redacts remote userinfo (tested).'
+  performance:
+    status: PASS
+    notes: 'Parser is pure; the only subprocess is the pre-existing git remote get-url, and the error path adds one. New suite runs in 0.19 s (budget 2 s).'
+  reliability:
+    status: PASS
+    notes: 'An update that cannot derive a base stops before any write, dry-run included; a create keeps its warning. Covered per script (3 tests each).'
+  maintainability:
+    status: PASS
+    notes: 'One parser and one message helper in jira-sync.js shared by four scripts; bundled copies are in sync (bundle:check clean).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'missingBitbucketBaseMessage builds its suggested BITBUCKET_REPO_URL line from the last two path segments of any remote, so a non-Bitbucket or Server remote gets a plausible but possibly wrong workspace/repo suggestion. Consider suggesting the line only when the host reads as Bitbucket, else print the template.'
+      refs: ['shared/resources/jira-sync.js']
+    - action: 'The shared url-authority probe sink has no allow-list form, so an exact-host predicate needs a bespoke cases file. A stock allow-list sink would make this repeatable.'
+      refs: ['skills/qa-task/references/security-input-corpus.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

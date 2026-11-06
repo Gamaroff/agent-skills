@@ -187,7 +187,7 @@ LOCAL_PATH=$(echo "$DOC_URL" | sed 's|https://github\.com/[^/]*/[^/]*/blob/[^/]*
 
 #### Bound the derived path
 
-Run this block next, with the value the block above derived in place of `<derived-path>`. It is its own block because each fenced block is its own shell. Left unsubstituted, the placeholder fails the check. The two roots are `docs/` and the project's PRD root (`PRD_ROOT`, default `docs/prd`); export `PRD_ROOT` first when the project sets one outside `docs/`.
+Run this block next, with the value the block above derived in place of `<derived-path>`. It is its own block because each fenced block is its own shell. Left unsubstituted, the placeholder fails the check. The two roots are `docs/` and the project's PRD root (`PRD_ROOT`, default `docs/prd`); export `PRD_ROOT` first when the project sets one outside `docs/`. A directory that does not exist yet is not an error, but a link that does not resolve, or a directory that cannot be entered, is.
 
 ```bash
 # The issue body is written by someone else (untrusted-content-rule.md).
@@ -198,6 +198,15 @@ if [ -n "$LOCAL_PATH" ]; then
   case "/$LOCAL_PATH/" in */../*) echo "HALT: derived path $LOCAL_PATH climbs out with .."; exit 1 ;; esac
   [ -L "$LOCAL_PATH" ] && { echo "HALT: derived path $LOCAL_PATH is a symlink"; exit 1; }
   REAL_DIR=$(cd "$(dirname "$LOCAL_PATH")" 2>/dev/null && pwd -P) || REAL_DIR=""
+  if [ -z "$REAL_DIR" ]; then
+    # The parent did not resolve. Judge the nearest ancestor that exists as a name.
+    ANC=$(dirname "$LOCAL_PATH")
+    while [ "$ANC" != "." ] && [ "$ANC" != "/" ] && [ ! -e "$ANC" ] && [ ! -L "$ANC" ]; do ANC=$(dirname "$ANC"); done
+    case "$ANC" in
+      .|/) ;;   # nothing on the chain exists: the read fails with its own error
+      *) REAL_DIR=$(cd "$ANC" 2>/dev/null && pwd -P) || { echo "HALT: derived path $LOCAL_PATH has a parent that cannot be resolved"; exit 1; } ;;
+    esac
+  fi
   if [ -n "$REAL_DIR" ]; then
     IN_ROOT=""
     for ROOT in docs "$PRD_DIR"; do

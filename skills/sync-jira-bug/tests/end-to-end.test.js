@@ -384,3 +384,61 @@ test("a parent with no card links the document only, and the link lands on a lat
     "the card link was made but the description was not refreshed",
   );
 });
+
+// ===========================================================================
+// Task 264 — an update with no derivable Bitbucket base must stop, not strip links
+//
+// fake-jira's default ENV pins BITBUCKET_REPO_URL, and gitRepo() has no remote, so the
+// guard is reached only by overriding the pin with "" (falsy in getBitbucketRepoBase).
+// Without the override these tests would pass vacuously.
+// ===========================================================================
+
+const runNoBase = makeRunner({
+  module: bugSync,
+  cliName: "sync-jira-bug",
+  env: { BITBUCKET_REPO_URL: "" },
+});
+const mutations = (state) =>
+  state.requests.filter((r) => r.method !== "GET").length;
+
+test("bug: an update with no derivable Bitbucket base exits 1 and writes nothing", async (t) => {
+  const { root, bug } = repoWithStoryBug();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const { state, fetchImpl } = fakeJira();
+
+  const first = await runSync(root, bug, fetchImpl, ["--quiet"]);
+  const key = first.result.issueKey;
+  const before = mutations(state);
+  const linksBefore = hrefsIn(descriptionOf(state, key));
+  assert.ok(linksBefore.length > 0, "premise: the created card carries links");
+
+  const again = await runNoBase(root, bug, fetchImpl, ["--quiet"]);
+  assert.equal(again.exitCode, 1);
+  assert.equal(
+    mutations(state),
+    before,
+    "a write was issued despite the guard",
+  );
+  assert.deepEqual(hrefsIn(descriptionOf(state, key)), linksBefore);
+});
+
+test("bug: --dry-run on an update with no base reports the error, not a clean plan", async (t) => {
+  const { root, bug } = repoWithStoryBug();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const { fetchImpl } = fakeJira();
+  await runSync(root, bug, fetchImpl, ["--quiet"]);
+
+  const dry = await runNoBase(root, bug, fetchImpl, ["--quiet", "--dry-run"]);
+  assert.equal(dry.exitCode, 1);
+});
+
+test("bug: a CREATE with no derivable base still warns and succeeds", async (t) => {
+  const { root, bug } = repoWithStoryBug();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const { state, fetchImpl } = fakeJira();
+
+  const created = await runNoBase(root, bug, fetchImpl, ["--quiet"]);
+  assert.equal(created.exitCode, 0);
+  assert.match(created.result.issueKey, /^PROJ-\d+$/);
+  assert.equal(Object.keys(state.issues).length, 1);
+});

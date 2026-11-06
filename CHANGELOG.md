@@ -4,6 +4,43 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.65.0] - 2026-11-06
+
+### Added
+
+- **The file-write rules are stated once, with a recipe for each job they block** (task 265).
+  `shared/resources/file-write-rules.md` says to change files with the file-edit tool and pass
+  bodies by path, and gives sanctioned recipes for a mutation revert, a gate write and a
+  fresh-body post. The develop-loop and QA-loop step docs, `develop-task`, `qa-task`, `qa-story`,
+  `qa-fix` and `review-pr` cite it; `mutation-proving.md` no longer tells an agent to edit through
+  a Python `assert`. A new `payload-heredoc-ratchet.test.mjs` fails when shipped prose gains a
+  payload heredoc (32 are allow-listed today). Moving those 32 sites off is a follow-up task.
+
+### Fixed
+
+- **`sync-jira-*` no longer strips a card's Source Documents links when the Bitbucket remote is
+  spelled differently** (task 264). `getBitbucketRepoBase` rewrote only `git@bitbucket.org:`; the
+  other six shapes Bitbucket Cloud serves (`git@ssh.bitbucket.org:`, `https://user@bitbucket.org/`,
+  `ssh://git@bitbucket.org/`, `ssh://git@ssh.bitbucket.org/`, `ssh://git@altssh.bitbucket.org:443/`)
+  returned null, and an update with a null base wrote the description without its links. A pure
+  `parseBitbucketRemote` now reads all of them with an exact host match, dropping any userinfo. And
+  when the base still cannot be derived, an **update** of an existing card now exits non-zero before
+  any write (`--dry-run` included) with the exact `BITBUCKET_REPO_URL=` line to set; a **create** keeps
+  its warning. Bitbucket Server / Data Center hosts still need `BITBUCKET_REPO_URL`. Follow-up
+  (task 264): the refusal now prints a derived `BITBUCKET_REPO_URL=` line only for a Bitbucket Cloud
+  host and the template for any other, so a Server or other-forge remote is never given a plausible
+  but wrong workspace/repo; and `qa-task`'s probe rule documents how to probe an exact-host
+  allow-list predicate, with a committed worked cases file
+  (`tests/fixtures/probe/bitbucket-remote.cases.json`) and a test that runs it.
+
+- **The "Bound the derived path" block refuses a parent it cannot resolve** (task 263). When the
+  parent directory of a path read from an issue body did not resolve, the block skipped its real-path
+  check and relied on the later read failing. It now judges the nearest ancestor that exists: a link
+  that does not resolve, or a directory that cannot be entered, is a HALT (`has a parent that cannot be
+  resolved`); an ancestor that leaves `docs/` and the PRD root is a HALT as before; a missing
+  directory under `docs/` is still kept. A regular file used as a directory now HALTs too. The lint
+  test reads its tree once instead of three times.
+
 ## [v0.64.0] - 2026-11-05
 
 ### Changed
