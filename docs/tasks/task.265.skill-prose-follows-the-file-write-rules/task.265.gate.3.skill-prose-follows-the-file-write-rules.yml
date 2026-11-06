@@ -1,0 +1,66 @@
+schema: 2
+task: 'task.265.skill-prose-follows-the-file-write-rules'
+task_title: 'Skill prose follows the file-write rules'
+gate: PASS
+status_reason: 'Both cycle 2 findings are fixed and verified. The scoped review found one low, advisory false positive in the widened ratchet pattern; no medium or high finding is open.'
+reviewer: 'QA Engineer'
+head: 'b77b1f51ef35c41afca9dd12c7288c467847e3ab'
+updated: '2026-11-06T06:43:27Z'
+
+top_issues:
+  - id: 'T265-QA-8'
+    severity: low
+    file: 'shared/resources/tests/payload-heredoc-ratchet.test.mjs'
+    finding: 'The widened PAYLOAD_HEREDOC lets a here-string (cat <<< "x") match, because the gap before the operator absorbs the first angle bracket. QA ran it: true for the new pattern, false with (?<!<)<<(?!<). A shift expression after the word cat (see cat and 1 << n) also matches and cannot be separated without dropping the spaced form the fix needs. No tracked file hits either today: the 32 counts are unchanged. The failure direction is loud (an unlisted site fails the test), not silent.'
+    suggested_action: 'Add lookarounds (?<!<)<<(?!<) and calibration cases for the here-string; accept the shift-expression case as a known false positive.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 7
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary_reason: ''
+    notes: 'boundary: false. The ratchet counts lines and accepts or rejects no input.'
+  performance:
+    status: PASS
+    notes: 'The long-line scan is bounded: the quadratic case that took 1.7 s now runs inside the test under the 500 ms threshold, behind the load-sensitive marker.'
+  reliability:
+    status: PASS
+    notes: 'CI on b77b1f51: validate, link-check, secret-scan, shellcheck and test all pass.'
+  maintainability:
+    status: PASS
+    notes: 'The revert recipe and its three restatements now agree.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'T265-QA-8: add the here-string lookarounds to the ratchet pattern.'
+      refs: ['shared/resources/tests/payload-heredoc-ratchet.test.mjs']
+    - action: 'No committed test holds the bundling fix (carried from gate 2): add a test that every bundled copy citing file-write-rules.md has it beside it.'
+      refs: ['shared/resources/mutation-proving.md']
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []
