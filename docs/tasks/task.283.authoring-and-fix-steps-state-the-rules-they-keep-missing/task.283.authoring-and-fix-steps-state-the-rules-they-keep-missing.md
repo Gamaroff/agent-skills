@@ -102,9 +102,9 @@ None - each phase adds a rule or a script.
 
 **Changes**:
 - [ ] Placement check in review-task check 2.
-- [ ] The fix point the owner chooses.
+- [ ] Fix point (decided 2026-11-06): Step 3 checks that a new CHANGELOG entry lands under `[Unreleased]`. No 5c CHANGELOG exception: it would widen the docs-only gate.
 
-**Dependencies**: owner decision on the fix point.
+**Dependencies**: none (fix point decided).
 
 ---
 
@@ -236,11 +236,11 @@ None identified.
 
 ### Medium Risk Areas
 
-**1. Phase 1 blocks on the owner decision**
-- **Risk**: the fix point is unsettled.
-- **Probability**: Medium
+**1. The Step 3 check false-positives**
+- **Risk**: a legitimate edit to a released entry is blocked.
+- **Probability**: Low
 - **Impact**: Minor
-- **Mitigation**: Phases 2 to 4 are independent; Phase 1 proceeds when decided.
+- **Mitigation**: the check applies only to new entries; Phases 2 to 4 are independent.
 - **Rollback**: drop Phase 1.
 
 **2. Overlap with 266 and 267**
