@@ -1,0 +1,82 @@
+schema: 2
+task: 'task.268.qa-fix-finds-the-whole-defect-the-first-time'
+task_title: 'qa-fix finds the whole defect the first time'
+gate: CONCERNS
+status_reason: 'Cycle 3 closed T268-QA-6 and T268-QA-7: the guard now splits a multi-path slot the same way in bash and zsh, and the probe engages with 14 cases. The independent reviewer found two medium holes in the same block: pathspec magic is not matched literally, and a nonexistent path reads as clean. Both reproduced.'
+reviewer: 'QA Engineer'
+head: '7f24069b1cf588e2233bf473204e81a3e6e7d29a'
+updated: '2026-11-06T21:00:33Z'
+
+top_issues:
+  - id: 'T268-QA-8'
+    severity: medium
+    file: 'skills/qa-fix/SKILL.md'
+    finding: 'The Step 4 guard hands each path to git ls-files as a pathspec, so magic is interpreted: a path written as an exclude pathspec for d, followed by d, prints nothing while d/a is untracked, and a glob character is read as a pattern. Reproduced under zsh. Absent on the PR base. (CR-1.)'
+    suggested_action: 'Run the listing with --literal-pathspecs so every changed path is matched as written, and add a magic-pathspec case to the fence probe and the committed test.'
+    suggested_owner: dev
+    status: open
+  - id: 'T268-QA-9'
+    severity: medium
+    file: 'skills/qa-fix/SKILL.md'
+    finding: 'A path that does not exist makes git ls-files exit 0 with no output, so a mistyped path reads as clean, although the HALT text promises a bad path is caught. "Found nothing" and "path does not exist" give the same result. Reproduced. (CR-2.)'
+    suggested_action: 'HALT on any listed path that does not exist before the listing, and add a nonexistent-path case to the probe and the test.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 20
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 14
+    escaped: 0
+    boundary_signals: ["refused", "is refused"]
+    boundary: true
+    notes: 'Fence probe engages (14 executed, 0 escaped): empty, unfilled, blank, brace-free untracked, two-path untracked, two clean cases. Run record: task.268.qa.4.security.run.json. It has no magic-pathspec or nonexistent-path case, which is why it cannot see T268-QA-8 and T268-QA-9.'
+  performance:
+    status: PASS
+    notes: 'Prose plus test files.'
+  reliability:
+    status: CONCERNS
+    notes: 'The guard can still read clean on a magic pathspec or a mistyped path.'
+  maintainability:
+    status: PASS
+    notes: 'CR-3 to CR-5 are advisory: xargs quote handling, the zsh-only mutant, a duplicated HALT string.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Match paths literally and refuse a nonexistent path in the Step 4 guard; add both cases to the probe and the test.'
+      refs: ['skills/qa-fix/SKILL.md', 'tests/qa-fix-step4-guard.test.js']
+  future:
+    - action: 'Use xargs -0 with NUL-separated input and document quote and backslash paths as unsupported (CR-3); skip the zsh-only mutant explicitly when zsh is absent (CR-4); give each HALT its own message (CR-5).'
+      refs: ['skills/qa-fix/SKILL.md', 'tests/qa-fix-step4-guard.test.js']
+
+bug_resolution:
+  cycle_3_findings:
+    - id: 'T268-QA-6'
+      status: closed
+      note: 'a two-path slot is split in bash and zsh; mutation-proven by the unquoted-expansion mutant'
+    - id: 'T268-QA-7'
+      status: closed
+      note: 'blank, two-path refused and two-path clean cases added'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T268-QA-8 and T268-QA-9 fixed and re-reviewed']

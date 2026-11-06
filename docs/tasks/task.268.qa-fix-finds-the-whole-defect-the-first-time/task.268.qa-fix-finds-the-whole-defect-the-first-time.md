@@ -308,24 +308,24 @@ None identified.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-06
-**Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.268.qa.3.qa-fix-finds-the-whole-defect-the-first-time.md](./task.268.qa.3.qa-fix-finds-the-whole-defect-the-first-time.md)
-- **Gate File**: [task.268.gate.3.qa-fix-finds-the-whole-defect-the-first-time.yml](./task.268.gate.3.qa-fix-finds-the-whole-defect-the-first-time.yml)
+- **Full Report**: [task.268.qa.4.qa-fix-finds-the-whole-defect-the-first-time.md](./task.268.qa.4.qa-fix-finds-the-whole-defect-the-first-time.md)
+- **Gate File**: [task.268.gate.4.qa-fix-finds-the-whole-defect-the-first-time.yml](./task.268.gate.4.qa-fix-finds-the-whole-defect-the-first-time.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 16
+- **Tests Executed**: 20
 - **Phases Verified**: 4/4
-- **Critical Issues**: 1
-- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: FAIL, Maintainability: PASS
+- **Critical Issues**: 0
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-The repaired Step 4 guard does not split a multi-path slot under zsh, so it admits untracked files (T268-QA-6, high). The suite has only single-path cases (T268-QA-7, medium).
+The Step 4 guard can still read clean on a pathspec-magic path (T268-QA-8) and on a nonexistent path (T268-QA-9). Both medium.
 
 <!-- change-log-start -->
 ## Change Log
@@ -341,6 +341,7 @@ The repaired Step 4 guard does not split a multi-path slot under zsh, so it admi
 | 2026-11-06 |         | QA findings fixed — Step 4 guard repaired and held by `tests/qa-fix-step4-guard.test.js`, 2 iterations | qa-fix      |
 | 2026-11-06 |         | QA gate FAIL (70/100) — 1 high, 1 medium finding | qa-task     |
 | 2026-11-06 |         | QA findings fixed — Step 4 guard splits its slot in bash and zsh; multi-path cases and a second mutant added, 1 iteration | qa-fix      |
+| 2026-11-06 |         | QA gate CONCERNS (80/100) — 2 findings | qa-task     |
 <!-- change-log-end -->
 
 ---
