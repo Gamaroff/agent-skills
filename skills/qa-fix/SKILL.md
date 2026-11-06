@@ -662,6 +662,10 @@ requires HIGH on three — but trigger (b) can meet a strike. When both apply, S
 
 ### Step 3: Apply Changes
 
+**Change files with the file-edit tool, one hunk per call** — never an interpreter script, `sed -i`
+or a heredoc carrying file content. A mutation proof edits the one line and edits it back
+(`references/file-write-rules.md#mutation-revert`).
+
 **Pre-fix codebase mapping (do this before any code changes):**
 
 Use the Agent tool with subagent_type="Explore" to map the codebase around the files being fixed:
@@ -1085,6 +1089,18 @@ TRACKER_COMMENT_BODY="${FIX_SUMMARY}"
 mkdir -p .claude/state
 printf '%s' "$TRACKER_COMMENT_BODY" > .claude/state/comment-body.md
 ```
+
+**Write the body in one call and post it in a later one — never both in one parallel batch** (obs #85:
+a failed write and two posts ran together and republished last cycle's body). Before any post, assert
+a line only this cycle's body carries, and stop without posting when it is absent:
+
+```bash
+# INPUT: {sha}, this cycle's fix commit. The body file was written by the call above.
+grep -q "{sha}" .claude/state/comment-body.md \
+  || { echo "body stale: .claude/state/comment-body.md does not carry {sha} — not posting"; exit 1; }
+```
+
+Recipe and rationale: `references/file-write-rules.md#fresh-body-post`.
 
 **Post the comment (dual-path):**
 

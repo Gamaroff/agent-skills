@@ -166,6 +166,10 @@ Item 2 of the loop body (the loop audit) runs **unchanged**. An incomplete inlin
 reads `In Progress` and re-enters the loop, and from iteration 2 onward the loop always invokes
 `/develop`. On any other input (no plan file, or no surface map), invoke `/develop`.
 
+**How files change on this path.** Change repository files with the file-edit tool, one hunk per
+call; never an interpreter script, `sed -i`, or a heredoc carrying file content. A multi-hunk
+change is several edit calls (`references/file-write-rules.md#the-rule`; obs #123).
+
 #### develop-story loop body
 
 1. Invoke `/develop` with the story file path (or, on iteration 1 only, implement inline per §"Inline implementation instead of `/develop`" above when its two-fact precondition holds). On iteration 1, pass the always-load file contents (from `ALWAYS_LOAD_FILES`), the Explore surface map, and the plan file (or note that all were reused per Decisions Log on resume). On iteration ≥2, pass only: "Resuming from partial completion — see story checkboxes for completed tasks."

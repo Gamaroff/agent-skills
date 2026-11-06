@@ -1978,6 +1978,11 @@ gate once it is written.
 > was never the problem. The history belongs in `bug_resolution`, in the QA report's Re-Review
 > Context table, and in the bug reports.
 
+**Write the gate with the file tool, never a shell heredoc.** Bind the head and the clock first
+(`git rev-parse HEAD`, `date -u +%Y-%m-%dT%H:%M:%SZ`), put the two printed values in `head:` and
+`updated:`, and type the finding text once, in the file: an unquoted heredoc executes the backtick
+spans a finding quotes (obs #15). Recipe: `references/file-write-rules.md#gate-write`.
+
 **CRITICAL: Gate files MUST be co-located with story/task files (Updated 2025-12-09)**
 
 **Gate File Location and Naming:**

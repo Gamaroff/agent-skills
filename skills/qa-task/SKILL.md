@@ -847,7 +847,9 @@ JSON
    no longer exists while the commit that will be reviewed still carries it. On task.111 the QA
    step applied three fixes it had just verified and then wrote the gate (obs #106). The
    `cp`-snapshot-and-restore rule in `references/mutation-proving.md` is the mechanism; `git status
-   --porcelain` must be as it was when this step began, before Step 10 writes the gate.
+   --porcelain` must be as it was when this step began, before Step 10 writes the gate. Edit the
+   mutated line with the file tool and edit it back; `git diff --stat` must then print nothing
+   (`references/file-write-rules.md#mutation-revert`).
 
 6. **Gate mapping — resolve blocking, then map:** apply the **canonical resolution** from the **Opt-in to blocking** section of `references/code-review-prompt.md`. It combines a run-level override (from Skill `args`) with the task frontmatter flag; an explicit per-doc `false` is the escape hatch:
 
@@ -1295,6 +1297,11 @@ later commit. The repository's gate-head freshness test fails a `schema: 2` gate
 `head:` is not a full SHA, whose `updated:` is not a `date -u` timestamp, or whose `updated:`
 precedes the head's author time when the head resolves. Existence and ancestry are checked by the
 Step 3b scope block at the next cycle and by the 5c conformance lens, while the branch is intact.
+
+**Write the gate with the file tool, never a shell heredoc.** Put the two printed values in `head:`
+and `updated:`; type the finding text once, in the file. An unquoted heredoc executes the backtick
+spans a finding quotes and truncates them silently (obs #15); the freshness test above is the
+backstop for a mistyped value. Recipe: `references/file-write-rules.md#gate-write`.
 
 **Read the PR's CI once, then compose the gate** (task.238, obs #45). A red CI lane on the PR used
 to go unread until `/finalise`, which found it after a PASS gate and a 5c APPROVE (task.203,
