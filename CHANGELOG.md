@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`review-task` catches twelve more plan-defect shapes at review** (task 267). Checks 23 to 29 are
+  new (parity guards enumerated, a refusal in a self-rewriting writer applied to its output, an
+  enumerated-class test named, fixture literals run through the banned-name guard, an async read's
+  timing, temp-dir removal, directory readers named), and checks 11, 13, 15, 20 and Step 6 item 4 are
+  sharpened. `review-story` gains check 19 (fixture literals) and `create-task` section 3.5 gains four
+  matching authoring items. Each shape was previously caught only at 5c, QA or finalise.
 - **`create-task` asks five more questions before a task is written** (task 266). Section 3.5 gains
   four Critical items (a rule specified from one example, a classifier and a writer that read the
   input differently, a second layer of defence with no test of its own, and a seeded remedy that

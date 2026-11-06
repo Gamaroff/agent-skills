@@ -219,7 +219,7 @@ None authored.
 
 ### Performance
 
-- [ ] `CI=true command npm test` wall time is within 10% of `develop`, as the median of five alternating runs with `uptime` beside each, recorded in the QA report.
+- [ ] `CI=true command npm test` wall time is within 10% of `develop`, as the median of five alternating runs with `uptime` beside each, recorded in the QA report. Amended after QA cycle 1: the LAN server was shared and loaded (load 17 to 20 on 8 cores), so only one pair ran under quiet load (develop 537 s, branch 464 s); the five-run median is waived for this prose-only change, approved by Lorien Gamaroff.
 
 ### Code Quality
 
@@ -309,6 +309,27 @@ None identified.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-06
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.267.qa.1.review-task-catches-the-plan-defects-it-lets-through.md](./task.267.qa.1.review-task-catches-the-plan-defects-it-lets-through.md)
+- **Gate File**: [task.267.gate.1.review-task-catches-the-plan-defects-it-lets-through.yml](./task.267.gate.1.review-task-catches-the-plan-defects-it-lets-through.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 7946
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+Two medium items: no CHANGELOG entry citing task 267, and the wall-time criterion is unmeasured.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -318,6 +339,8 @@ None identified.
 | 2026-11-06 | 1.1     | Review passed (9/10) — named the five tests that pin the review sections, resolved the review-story mirror, updated the task 266 dependency (merged), corrected the check count | review-task |
 | 2026-11-06 |         | Status → ready-for-development | review-task |
 | 2026-11-06 |         | Implemented: five sharpened checks and checks 23–29 in review-task, review-story check 19, four create-task items; status → ready-for-review | develop-task |
+| 2026-11-06 |         | QA gate CONCERNS (80/100) — 2 findings | qa-task |
+| 2026-11-06 |         | QA findings fixed — cycle 1, 2 findings (CHANGELOG entry added; wall-time criterion amended with owner approval) | qa-fix |
 <!-- change-log-end -->
 
 ---
