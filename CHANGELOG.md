@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.65.0] - 2026-11-06
+
 ### Added
 
 - **The file-write rules are stated once, with a recipe for each job they block** (task 265).
