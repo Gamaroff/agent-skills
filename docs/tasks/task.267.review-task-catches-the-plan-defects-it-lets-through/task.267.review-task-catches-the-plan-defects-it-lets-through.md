@@ -5,16 +5,18 @@ type: task
 description: "Add the missing plan-defect checks to review-task Steps 3 and 6 (thirteen observed shapes, each caught only later at 5c, QA or finalise), with a create-task twin where the observation names one."
 tags: [review-task, review-story, create-task, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-06
+completed_date: 2026-11-06
+pr_number: 853
 estimated_effort_hours: 8
 ---
 
 # Task 267: review-task catches the plan defects it lets through
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.267.review.1.review-task-catches-the-plan-defects-it-lets-through.md` implemented 2026-11-06
 
 ---
@@ -330,11 +332,27 @@ None identified.
 ### Key Findings
 No open findings. Cycle 1's two medium items are closed.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+All Definition of Done criteria verified (PR #853, gate 2 PASS 95/100, 5c review APPROVE):
+
+✅ **Success criteria:** 9 of 9 met; criterion 5 (wall time) carries an owner-approved amendment
+✅ **Pinning tests and CI:** all checks green on `eac769d4a0d9`, including `test`
+✅ **Documentation:** CHANGELOG entry cites (task 267)
+✅ **Security review:** PASS, no boundary deliverable
+✅ **Compliance review:** not applicable
+
+**Detailed Verification Log:** See `task.267.dod.1.review-task-catches-the-plan-defects-it-lets-through.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-06
+
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                                                         | Author      |
-| ---------- | ------- | ----------------------------------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #7, #13, #22, #25, #28, #29, #60, #90, #108, #111, #137, #144, #153 | create-task |
 | 2026-11-06 | 1.1     | Review passed (9/10) — named the five tests that pin the review sections, resolved the review-story mirror, updated the task 266 dependency (merged), corrected the check count | review-task |
 | 2026-11-06 |         | Status → ready-for-development | review-task |
@@ -342,6 +360,7 @@ No open findings. Cycle 1's two medium items are closed.
 | 2026-11-06 |         | QA gate CONCERNS (80/100) — 2 findings | qa-task |
 | 2026-11-06 |         | QA findings fixed — cycle 1, 2 findings (CHANGELOG entry added; wall-time criterion amended with owner approval) | qa-fix |
 | 2026-11-06 |         | QA gate PASS (95/100) — 0 findings | qa-task |
+| 2026-11-06 | 1.2 | DoD passed — accepted (PR #853) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -392,4 +411,4 @@ If the check list keeps growing, group checks by plan shape in a table; not part
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted

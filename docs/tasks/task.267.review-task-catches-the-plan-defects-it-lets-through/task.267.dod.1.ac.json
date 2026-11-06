@@ -1,0 +1,145 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "7e3a2bbb45caa1c6c1404d49c0cb4bd4975e213e",
+  "dirty_paths": [
+    "docs/tasks/task.267.review-task-catches-the-plan-defects-it-lets-through/task.267.implementation.1.review-task-catches-the-plan-defects-it-lets-through-initial-run.md",
+    "docs/tasks/task.267.review-task-catches-the-plan-defects-it-lets-through/task.267.pr-review.1.review-task-catches-the-plan-defects-it-lets-through.md"
+  ],
+  "document": "docs/tasks/task.267.review-task-catches-the-plan-defects-it-lets-through/task.267.review-task-catches-the-plan-defects-it-lets-through.md",
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 9,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "feb0ebc5bacfe2eca2dcdd926f1760708b2ef3511d4e03a5cc9736a177643a08",
+      "status": "PASS",
+      "description": "Twelve checks (five sharpened, seven new) present in review-task, each citing obs ids",
+      "code_citation": "skills/review-task/SKILL.md:1175",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [
+        "{ member: \"Step 6 item 4 negative-content criterion (obs #7)\", evidence: \"skills/review-task/SKILL.md:1470\", status: PASS }",
+        "{ member: \"check 13 bounded lexical guard (obs #13)\", evidence: \"skills/review-task/SKILL.md:1003\", status: PASS }",
+        "{ member: \"check 15 every removed sentence + file-name search (obs #25, #144)\", evidence: \"skills/review-task/SKILL.md:1062\", status: PASS }",
+        "{ member: \"check 11 new boolean term (obs #28)\", evidence: \"skills/review-task/SKILL.md:961\", status: PASS }",
+        "{ member: \"check 20 sweep population from the concept's own names (obs #60)\", evidence: \"skills/review-task/SKILL.md:1142\", status: PASS }",
+        "{ member: \"check 23 parity claim (obs #22)\", evidence: \"skills/review-task/SKILL.md:1175\", status: PASS }",
+        "{ member: \"check 24 self-rewriting writer (obs #29)\", evidence: \"skills/review-task/SKILL.md:1188\", status: PASS }",
+        "{ member: \"check 25 enumerated class (obs #90)\", evidence: \"skills/review-task/SKILL.md:1200\", status: PASS }",
+        "{ member: \"check 26 banned-name fixtures (obs #108)\", evidence: \"skills/review-task/SKILL.md:1214\", status: PASS }",
+        "{ member: \"check 27 async read (obs #111)\", evidence: \"skills/review-task/SKILL.md:1225\", status: PASS }",
+        "{ member: \"check 28 temp dirs (obs #137)\", evidence: \"skills/review-task/SKILL.md:1237\", status: PASS }",
+        "{ member: \"check 29 directory readers (obs #153)\", evidence: \"skills/review-task/SKILL.md:1247\", status: PASS }"
+      ],
+      "non_member_fail": null,
+      "note": "I read each cited heading or bullet. Each states its rule and carries its (obs #N) id."
+    },
+    {
+      "id": "#2",
+      "text_hash": "78cf4c39dccb8ba880745204011979242de966427c07ab6eb234880cd029bccd",
+      "status": "PASS",
+      "description": "Each of the twelve fires on its defective fixture and not on its controls, per check in QA Findings table",
+      "code_citation": "docs/tasks/task.267.review-task-catches-the-plan-defects-it-lets-through/task.267.qa.2.review-task-catches-the-plan-defects-it-lets-through.md:63",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        "{ member: \"Step 6 item 4\", evidence: \"qa.2.md:65 (F01 fires, F02 clean)\", status: PASS }",
+        "{ member: \"check 13\", evidence: \"qa.2.md:66 (F03/F04)\", status: PASS }",
+        "{ member: \"check 15\", evidence: \"qa.2.md:67 (F07/F08)\", status: PASS }",
+        "{ member: \"check 11\", evidence: \"qa.2.md:68 (F09/F10)\", status: PASS }",
+        "{ member: \"check 20\", evidence: \"qa.2.md:69 (F23/F24)\", status: PASS }",
+        "{ member: \"check 23\", evidence: \"qa.2.md:70 (F05/F06)\", status: PASS }",
+        "{ member: \"check 24\", evidence: \"qa.2.md:71 (F11/F12)\", status: PASS }",
+        "{ member: \"check 25\", evidence: \"qa.2.md:72 (F13/F14)\", status: PASS }",
+        "{ member: \"check 26\", evidence: \"qa.2.md:73 (F15/F16)\", status: PASS }",
+        "{ member: \"check 27\", evidence: \"qa.2.md:74 (F17/F18)\", status: PASS }",
+        "{ member: \"check 28\", evidence: \"qa.2.md:75 (F19/F20)\", status: PASS }",
+        "{ member: \"check 29\", evidence: \"qa.2.md:76 (F21/F22)\", status: PASS }"
+      ],
+      "non_member_fail": null,
+      "note": "Each row records a defective fixture, a control, and yes/yes. The fixtures are kept at qa.2.md:82-105. The F03 attribution caveat is stated at qa.2.md:61."
+    },
+    {
+      "id": "#3",
+      "text_hash": "3d04f0b00e70604cdad1d30fd8ff317db53facd4bc406c213a9a9955c56b1c13",
+      "status": "PASS",
+      "description": "Five pinning tests pass after every phase",
+      "code_citation": "skills/review-task/SKILL.md:1175",
+      "test_citation": "tests/review-plan-shape-checks.test.js:90",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The other four tests are tests/review-property-checks.test.js:170, tests/review-call-site-population-check.test.js:129, tests/outcome-reachability-check.test.js:232 and tests/review-task-measured-criterion.test.js:97. All five run under npm test (test:suite), which .github/workflows/test.yml:58 runs per PR with no paths filter. qa.2.md:38 and :57 record them green inside ci:fast (7946 tests, 0 fail). I did not re-run them."
+    },
+    {
+      "id": "#4",
+      "text_hash": "503c53989584ef4b7612c7c21cad8914428c44806a8cb7e39e443e636244befc",
+      "status": "PASS",
+      "description": "Existing check numbers 1 to 22 unchanged; heading diff shows additions only",
+      "code_citation": "skills/review-task/SKILL.md:1161",
+      "test_citation": "tests/review-plan-shape-checks.test.js:90",
+      "members": [],
+      "non_member_fail": null,
+      "note": "I scanned the PR diff for removed lines in the three skill files and found none (additions only). Checks 1-22 are contiguous, with 23-29 following (SKILL.md:840-1247). The test reads checks 15-20 by number and name. The pin covers only part of 1-22; the diff scan is the main evidence."
+    },
+    {
+      "id": "#5",
+      "text_hash": "2e0b9dd0af1399f3736bd2af0a6b216c009daf8d8dfd035ce50474ff6f9d9ae8",
+      "status": "PASS",
+      "description": "npm test wall time within 10% of develop (median of five); amended with owner approval",
+      "code_citation": "docs/tasks/task.267.review-task-catches-the-plan-defects-it-lets-through/task.267.qa.2.review-task-catches-the-plan-defects-it-lets-through.md:40",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The criterion was amended after QA cycle 1 and records the owner approval (Lorien Gamaroff). criteria-drift.js reports the #5 change as reworded and approved=true (exit 0), so this is not an unapproved amendment. The cited quiet pair is develop 537 s versus branch 464 s, which meets the bound. The five-run median is waived by the approval."
+    },
+    {
+      "id": "#6",
+      "text_hash": "6df02d7ffdb1df8127b4563d1180bfbb8afd0e4af247ecba99ef7a2a14aa951b",
+      "status": "PASS",
+      "description": "npm run bundle -- --check reports 0 problems",
+      "code_citation": "docs/tasks/task.267.review-task-catches-the-plan-defects-it-lets-through/task.267.qa.2.review-task-catches-the-plan-defects-it-lets-through.md:39",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Bound: 0 problems. QA records 0 problems (qa.2.md:39; also qa.1.md:51). My re-run of bundle_skill.py --check printed '129 skill(s) checked, 0 problems'."
+    },
+    {
+      "id": "#7",
+      "text_hash": "209a186457f2700a7035b8fea41eb091f43ee00e2dbe99f10b1183d3deedf049",
+      "status": "PASS",
+      "description": "quick_validate.py passes for review-task, review-story and create-task",
+      "code_citation": "docs/tasks/task.267.review-task-catches-the-plan-defects-it-lets-through/task.267.qa.1.review-task-catches-the-plan-defects-it-lets-through.md:82",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "qa.1.md:82 records that quick_validate.py passes for the three skills, with the command at :89. My re-run of quick_validate.py printed a check mark for all three skills."
+    },
+    {
+      "id": "#8",
+      "text_hash": "a42df8d2f12818e41eef7243cbd6bc2374acfff9ae646694d139ae5185968639",
+      "status": "PASS",
+      "description": "CI=true npm test passes",
+      "code_citation": ".github/workflows/test.yml:58",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ eac769d4a0d9 — The criterion asks the PR CI run to report a green test suite. The local result (ci:fast, 7944 pass, 0 fail, 2 skipped; qa.2.md:57) is context only. CI on the head was 'pending' at QA (qa.2.md:20).",
+      "ci_reading": "CI reading 1: SUCCESS @ eac769d4a0d9"
+    },
+    {
+      "id": "#9",
+      "text_hash": "d97f8673480c980bf73021a76be760723c605735d39edd01ec638522a0ffa3ed",
+      "status": "PASS",
+      "description": "review-task stays under the skill-size limit if one is enforced",
+      "code_citation": "docs/tasks/task.267.review-task-catches-the-plan-defects-it-lets-through/task.267.qa.1.review-task-catches-the-plan-defects-it-lets-through.md:82",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The criterion says quick_validate.py reports the limit. quick_validate.py passes for review-task (qa.1.md:82, and my re-run), so any enforced limit is met."
+    }
+  ],
+  "advisories": []
+}
