@@ -31,7 +31,9 @@ A mutation proof edits one line, runs the test, and puts the line back:
 2. `Edit` the one line. Run the applied-check block in `mutation-proving.md` step 4: it fails when
    the edit changed nothing.
 3. Run the test and read which test went red.
-4. `Edit` the line back. `git diff --stat -- <file>` must print nothing.
+4. `Edit` the line back, then `cmp <snapshot> <file>` must print nothing. Compare with the
+   snapshot, not `git diff --stat`: a file that carries an uncommitted fix differs from `HEAD`
+   after a correct restore.
 
 ### Gate write
 

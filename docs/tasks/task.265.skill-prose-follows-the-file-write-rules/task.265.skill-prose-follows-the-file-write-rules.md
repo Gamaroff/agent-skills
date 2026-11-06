@@ -363,6 +363,7 @@ Cycle 1's five findings are fixed. The refute pass found two medium defects: the
 | 2026-11-06 |         | QA gate CONCERNS (80/100) — 5 findings                   | qa-task     |
 | 2026-11-06 |         | QA findings fixed — 5 of 5 addressed, 1 iteration; follow-up filed as task 284 | qa-fix      |
 | 2026-11-06 |         | QA gate CONCERNS (90/100) — 2 findings                   | qa-task     |
+| 2026-11-06 |         | QA findings fixed — 2 of 2 addressed, 1 iteration (revert recipe compares with the snapshot; ratchet regex widened and bounded) | qa-fix      |
 <!-- change-log-end -->
 
 ---

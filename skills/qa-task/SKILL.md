@@ -848,7 +848,7 @@ JSON
    step applied three fixes it had just verified and then wrote the gate (obs #106). The
    `cp`-snapshot-and-restore rule in `references/mutation-proving.md` is the mechanism; `git status
    --porcelain` must be as it was when this step began, before Step 10 writes the gate. Edit the
-   mutated line with the file tool and edit it back; `git diff --stat` must then print nothing
+   mutated line with the file tool and edit it back; `cmp <snapshot> <file>` must then print nothing
    (`references/file-write-rules.md#mutation-revert`).
 
 6. **Gate mapping — resolve blocking, then map:** apply the **canonical resolution** from the **Opt-in to blocking** section of `references/code-review-prompt.md`. It combines a run-level override (from Skill `args`) with the task frontmatter flag; an explicit per-doc `false` is the escape hatch:

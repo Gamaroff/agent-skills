@@ -22,11 +22,15 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadSensitive } from "../spawn-budget.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "..", "..", "..");
 
-const PAYLOAD_HEREDOC = /(cat|tee)[^|\n]*<<-?['"]?[A-Za-z_]+['"]?/;
+// `cat`/`tee`, then (within 200 characters, no pipe) `<<` or `<<-`, optional spaces, an optional
+// quote or backslash, and a delimiter word. The bound keeps a long line of repeated `cat` linear.
+const PAYLOAD_HEREDOC =
+  /\b(?:cat|tee)\b[^|\n]{0,200}<<-?[ \t]*[\\'"]?[A-Za-z_]+/;
 const EXCLUDED = new Set(["shared/resources/security-input-corpus.md"]);
 
 /** Payload-heredoc lines in `text`, trimmed. */
@@ -138,6 +142,29 @@ test("calibration: a quoted and an unquoted payload heredoc are both counted", (
     "tee out.txt <<-X",
   ].join("\n");
   assert.equal(payloadHeredocLines(text).length, 3);
+});
+
+test("calibration: a heredoc with a space after the operator, or a backslash delimiter, is counted", () => {
+  const text = [
+    "cat > a.md << EOF",
+    "cat > b.md << 'EOF'",
+    'cat > c.md << "EOF"',
+    "cat > d.md <<\\EOF",
+    "tee e.txt <<- EOF",
+  ].join("\n");
+  assert.equal(payloadHeredocLines(text).length, 5);
+});
+
+test("a long line of repeated cat is scanned in bounded time", () => {
+  const started = Date.now();
+  assert.equal(payloadHeredocLines("cat ".repeat(20000)).length, 0);
+  const elapsed = Date.now() - started;
+  assert.ok(
+    elapsed < 500,
+    loadSensitive(
+      `long-line scan took ${elapsed}ms — the scan is quadratic again`,
+    ),
+  );
 });
 
 test("control: prose that mentions a heredoc, and a read loop, are not counted", () => {
