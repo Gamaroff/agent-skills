@@ -339,6 +339,17 @@ test("the file budget defaults to 20 s and honours the precedence ladder", async
     withEnv(clean, () => fileBudgetMs()),
     20000,
   );
+  // A file's own default replaces the shared one, and the env ladder still wins over it.
+  assert.equal(
+    withEnv(clean, () => fileBudgetMs("P", 40000)),
+    40000,
+  );
+  assert.equal(
+    withEnv({ ...clean, P_FILE_BUDGET_MS: "50000" }, () =>
+      fileBudgetMs("P", 40000),
+    ),
+    50000,
+  );
   // Global applies when the specific var is unset, empty or malformed.
   assert.equal(
     withEnv({ ...clean, TEST_FILE_BUDGET_MS: "45000" }, () =>
