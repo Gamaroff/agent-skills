@@ -1,0 +1,74 @@
+schema: 2
+task: 'task.265.skill-prose-follows-the-file-write-rules'
+task_title: 'Skill prose follows the file-write rules'
+gate: CONCERNS
+status_reason: 'All five cycle 1 findings are fixed and verified. The independent refute pass found two real defects that QA reproduced: the mutation-revert recipe asserts an empty git diff --stat that is false when the file carries an uncommitted fix, and the ratchet regex misses a heredoc written with a space after the operator.'
+reviewer: 'QA Engineer'
+head: 'aea4fed6b3a0ef1bc8a9b0c513298f01aafeb3b6'
+updated: '2026-11-06T06:05:34Z'
+
+top_issues:
+  - id: 'T265-QA-6'
+    severity: medium
+    file: 'shared/resources/file-write-rules.md'
+    finding: 'Recipe step 4 says git diff --stat -- <file> must print nothing after the line is edited back. That is false when the file holds an uncommitted fix (the normal case in qa-fix and after a fix cycle) and contradicts mutation-proving.md rule 1 (restore from the cp snapshot, version control only knows committed state). Following it fails a correct restore or invites git checkout, which deletes the fix. The same assertion is restated at mutation-proving.md:56 and skills/qa-task/SKILL.md:851. Reviewer CR-1 (medium confidence); QA verified the contradiction by reading both texts.'
+    suggested_action: 'Verify the restore by comparing the file with the step-1 snapshot (cmp or diff prints nothing), keep git diff --stat only for a file with no uncommitted change, and make file-write-rules.md, mutation-proving.md and qa-task SKILL.md say the same.'
+    suggested_owner: dev
+    status: open
+  - id: 'T265-QA-7'
+    severity: medium
+    file: 'shared/resources/tests/payload-heredoc-ratchet.test.mjs'
+    finding: 'PAYLOAD_HEREDOC needs the delimiter directly after the operator. QA ran it: cat > f << EOF, cat > f << "EOF" and cat > f <<\EOF all return false, so a payload heredoc written with a space is not counted and the ratchet passes it. The unbounded scan after cat/tee is quadratic: 80,000 characters of repeated cat took 1.7 s. Reviewer CR-2 (low severity, medium confidence); QA reproduced both.'
+    suggested_action: 'Allow optional whitespace and a backslash after the operator, bound the scan to a fixed width, add calibration cases for the spaced and backslash forms, and re-check the allowlist count.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 5
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary_reason: ''
+    notes: 'boundary: false. The ratchet counts lines and accepts or rejects no input; a miss in its pattern is a coverage gap (T265-QA-7), not an input boundary.'
+  performance:
+    status: PASS
+    notes: 'CI=true npm test: branch 167 s, develop 163 s (+2.5%), measured in cycle 1 fix and recorded in the QA report.'
+  reliability:
+    status: PASS
+    notes: 'The qa-fix freshness block was executed under bash and zsh: a present sha runs clean, a stale sha exits non-zero.'
+  maintainability:
+    status: CONCERNS
+    notes: 'A recipe that contradicts the mutation rule it cites (T265-QA-6).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T265-QA-6 and T265-QA-7 in qa-fix.'
+      refs: ['shared/resources/file-write-rules.md', 'shared/resources/tests/payload-heredoc-ratchet.test.mjs']
+  future:
+    - action: 'No committed test holds the bundling fix (T265-QA-3): bundle --check reported 0 problems while four skills cited a file they did not carry. Add a test that every bundled copy citing file-write-rules.md has it beside it.'
+      refs: ['shared/resources/mutation-proving.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'T265-QA-6 and T265-QA-7 closed.'

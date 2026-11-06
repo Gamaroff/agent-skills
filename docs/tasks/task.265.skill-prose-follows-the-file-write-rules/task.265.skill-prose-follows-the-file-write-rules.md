@@ -335,21 +335,21 @@ None identified.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-06
-**Quality Score**: 80/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.265.qa.1.skill-prose-follows-the-file-write-rules.md](./task.265.qa.1.skill-prose-follows-the-file-write-rules.md)
-- **Gate File**: [task.265.gate.1.skill-prose-follows-the-file-write-rules.yml](./task.265.gate.1.skill-prose-follows-the-file-write-rules.yml)
+- **Full Report**: [task.265.qa.2.skill-prose-follows-the-file-write-rules.md](./task.265.qa.2.skill-prose-follows-the-file-write-rules.md)
+- **Gate File**: [task.265.gate.2.skill-prose-follows-the-file-write-rules.yml](./task.265.gate.2.skill-prose-follows-the-file-write-rules.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 5
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Five medium findings: follow-up migration task not filed, rule not cited at the other `--body-file` sites, four bundled `mutation-proving.md` copies cite a file their skill lacks, wall-time criterion unmeasured, no CHANGELOG entry.
+Cycle 1's five findings are fixed. The refute pass found two medium defects: the mutation-revert recipe asserts an empty `git diff --stat` that is false for a file with an uncommitted fix, and the ratchet regex misses a heredoc with a space after the operator.
 
 <!-- change-log-start -->
 ## Change Log
@@ -362,6 +362,7 @@ Five medium findings: follow-up migration task not filed, rule not cited at the 
 | 2026-11-06 |         | Implemented phases 1-5 inline; status → ready-for-review (ci:fast 7944 tests, 0 fail; ratchet mutation-proved) | develop-task |
 | 2026-11-06 |         | QA gate CONCERNS (80/100) — 5 findings                   | qa-task     |
 | 2026-11-06 |         | QA findings fixed — 5 of 5 addressed, 1 iteration; follow-up filed as task 284 | qa-fix      |
+| 2026-11-06 |         | QA gate CONCERNS (90/100) — 2 findings                   | qa-task     |
 <!-- change-log-end -->
 
 ---
