@@ -315,17 +315,22 @@ None identified.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.268.qa.4.qa-fix-finds-the-whole-defect-the-first-time.md](./task.268.qa.4.qa-fix-finds-the-whole-defect-the-first-time.md)
-- **Gate File**: [task.268.gate.4.qa-fix-finds-the-whole-defect-the-first-time.yml](./task.268.gate.4.qa-fix-finds-the-whole-defect-the-first-time.yml)
+- **Full Report**: [task.268.qa.5.qa-fix-finds-the-whole-defect-the-first-time.md](./task.268.qa.5.qa-fix-finds-the-whole-defect-the-first-time.md)
+- **Gate File**: [task.268.gate.5.qa-fix-finds-the-whole-defect-the-first-time.yml](./task.268.gate.5.qa-fix-finds-the-whole-defect-the-first-time.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 20
+- **Tests Executed**: 22
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-The Step 4 guard can still read clean on a pathspec-magic path (T268-QA-8) and on a nonexistent path (T268-QA-9). Both medium.
+Two medium edge cases remain in the Step 4 guard: shell metacharacters in a path (T268-QA-10) and a nested-repo or symlinked path (T268-QA-11). The QA budget is spent, so both are deferred.
+
+## Deferred Work
+
+- **T268-QA-10** (MEDIUM) — carried to gate 5 `recommendations.future` (QA budget spent, cycle 5): shell metacharacters in a changed path are expanded by the double-quoted slot assignment in qa-fix Step 4; substitute through a single-quoted heredoc or refuse them, with a hostile probe case.
+- **T268-QA-11** (MEDIUM) — carried to gate 5 `recommendations.future` (QA budget spent, cycle 5): a path in a nested repository or behind a symlinked directory reads clean in the Step 4 guard; refuse or document it.
 
 <!-- change-log-start -->
 ## Change Log
@@ -343,6 +348,7 @@ The Step 4 guard can still read clean on a pathspec-magic path (T268-QA-8) and o
 | 2026-11-06 |         | QA findings fixed — Step 4 guard splits its slot in bash and zsh; multi-path cases and a second mutant added, 1 iteration | qa-fix      |
 | 2026-11-06 |         | QA gate CONCERNS (80/100) — 2 findings | qa-task     |
 | 2026-11-06 |         | QA findings fixed — Step 4 guard matches paths literally and refuses a nonexistent path; two more mutants proven, 1 iteration | qa-fix      |
+| 2026-11-06 |         | QA gate CONCERNS (80/100) — 2 findings, both deferred (budget spent) | qa-task     |
 <!-- change-log-end -->
 
 ---

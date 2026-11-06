@@ -1,0 +1,86 @@
+schema: 2
+task: 'task.268.qa-fix-finds-the-whole-defect-the-first-time'
+task_title: 'qa-fix finds the whole defect the first time'
+gate: CONCERNS
+status_reason: 'Cycle 4 closed T268-QA-8 and T268-QA-9 (literal pathspecs, nonexistent path refused; both mutation-proven). The independent reviewer found two further medium edge cases in the Step 4 guard: shell metacharacters in a path are expanded by the double-quoted slot assignment, and a path inside a nested repo or behind a symlinked directory reads clean. This is the last gate in the budget, so both go to Deferred Work.'
+reviewer: 'QA Engineer'
+head: 'e16103d83db82a51d0567c4c99d762b7ee3bbd0a'
+updated: '2026-11-06T21:23:52Z'
+
+top_issues:
+  - id: 'T268-QA-10'
+    severity: medium
+    file: 'skills/qa-fix/SKILL.md'
+    finding: 'The slot is substituted into a double-quoted assignment, so a path holding a command substitution, a backtick or a variable reference is executed or expanded by the shell. Reproduced: an assignment whose value contains a command substitution ran it and created a file. A bare double quote is a syntax error (fails closed). The prose excludes only spaces and braces. (CR-1.)'
+    suggested_action: 'Substitute the slot into a single-quoted heredoc or extend the case guard and the prose to refuse dollar, backtick, double quote and backslash, with a hostile case in the probe and the test.'
+    suggested_owner: dev
+    status: open
+  - id: 'T268-QA-11'
+    severity: medium
+    file: 'skills/qa-fix/SKILL.md'
+    finding: 'A path inside a nested repository, or behind a symlinked directory, exists on disk so the existence check passes, and the outer git ls-files lists nothing for it, so the guard exits 0: "found nothing" and "could not look" give the same result. Run by the reviewer; not re-run by me. (CR-2.)'
+    suggested_action: 'Refuse a path whose parent leaves this repository tree (a .git boundary or a symlink), or document the limitation and add a probe case.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 22
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 18
+    escaped: 0
+    boundary_signals: ["refused", "is refused"]
+    boundary: true
+    notes: 'Fence probe engages (18 executed, 0 escaped) over empty, unfilled, blank, untracked, two-path untracked, missing path, magic pathspec and two clean cases. Run record: task.268.qa.5.security.run.json. It has no shell-metacharacter or nested-repo case, which is why it cannot see T268-QA-10 or T268-QA-11.'
+  performance:
+    status: PASS
+    notes: 'Prose plus test files.'
+  reliability:
+    status: CONCERNS
+    notes: 'The guard is correct for ordinary repository-relative paths; the two remaining holes are unusual path shapes.'
+  maintainability:
+    status: PASS
+    notes: 'CR-3 (no tracked-file legitimate case) and CR-4 (the develop-loop doc gives the bare unguarded listing) are advisory.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Substitute the slot safely (single-quoted heredoc) or refuse shell metacharacters in a path; add a hostile case (T268-QA-10).'
+      refs: ['skills/qa-fix/SKILL.md', 'tests/qa-fix-step4-guard.test.js']
+    - action: 'Refuse a path that crosses a nested repository or a symlinked directory, or document it (T268-QA-11).'
+      refs: ['skills/qa-fix/SKILL.md']
+    - action: 'Add legitimate cases for a tracked, a deleted-tracked and an intent-to-add path, plus a mutant dropping the error-unmatch clause; assert the HALT text in the no-repo test (CR-3).'
+      refs: ['tests/qa-fix-step4-guard.test.js']
+    - action: 'Point the develop-loop step doc at the qa-fix Step 4 guard instead of the bare listing, then regenerate the three copies (CR-4).'
+      refs: ['shared/resources/develop-pipeline-step-3-develop-loop.md']
+
+bug_resolution:
+  cycle_4_findings:
+    - id: 'T268-QA-8'
+      status: closed
+      note: 'paths matched literally; mutation-proven by the magic-pathspec mutant'
+    - id: 'T268-QA-9'
+      status: closed
+      note: 'a path neither on disk nor tracked is refused; mutation-proven'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T268-QA-10 and T268-QA-11 recorded as deferred work']
