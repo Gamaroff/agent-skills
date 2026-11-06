@@ -61,6 +61,17 @@ Independent reviewer, scoped diff. Anchor resolves (`ok`).
 
 Boundary: false.
 
+## Wall-time record at the PR head (added by `/finalise`, DoD run 1)
+
+Success criterion 4 asks that `CI=true command npm test` stay within 10% of `develop`. Cycle 2 measured it once at `aea4fed6`: branch 167 s against `develop` 163 s (+2.5%). The DoD AC check found that reading was taken before the cycle 2 and 3 commits, so it was re-taken at the PR head `e76822a1`:
+
+| Reading | Branch | Load average at start | Note |
+| --- | --- | --- | --- |
+| Cycle 2, `aea4fed6` | 167 s | 0.4 | `develop` 163 s at load 4.2 (+2.5%) |
+| DoD run 1, `e76822a1` | 191 s wall (suite `duration_ms` 134,713) | 2.6 | `develop` not re-run: a clean worktree has no `.agents/skills` symlink and exits 1, so the run is not comparable |
+
+The 191 s figure is higher than 167 s, and the load was 6.6 by the end of the run, so it is not a clean comparison with `develop`. What the 10% bound protects is the cost the branch added to the suite. The only test file the branch adds is `shared/resources/tests/payload-heredoc-ratchet.test.mjs`, run alone three times: 168 ms, 162 ms, 168 ms of a 134,713 ms suite (0.12%). The branch adds no other test file and no runtime code.
+
 ## Final Assessment
 
 **Gate Status**: PASS

@@ -1094,6 +1094,8 @@ printf '%s' "$TRACKER_COMMENT_BODY" > .claude/state/comment-body.md
 a failed write and two posts ran together and republished last cycle's body). Before any post, assert
 a line only this cycle's body carries, and stop without posting when it is absent:
 
+#### Freshness guard
+
 ```bash
 # INPUT: {sha}, this cycle's fix commit. The body file was written by the call above.
 grep -q "{sha}" .claude/state/comment-body.md \
