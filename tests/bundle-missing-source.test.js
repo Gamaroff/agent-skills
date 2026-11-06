@@ -48,7 +48,12 @@ test.after(async () => {
       path.join(__dirname, "..", "shared", "resources", "spawn-budget.mjs"),
     ).href
   );
-  const FILE_BUDGET_MS = fileBudgetMs("BUNDLE_MISSING_SOURCE");
+  const FILE_BUDGET_MS = fileBudgetMs(
+    "BUNDLE_MISSING_SOURCE",
+    // 18.5 s alone on an idle laptop and 20.2 s inside a loaded full run (task 266 QA 3), so the
+    // shared 20 s default left no headroom. 40 s still catches a file that genuinely doubles.
+    40_000,
+  );
   assert.ok(
     ms < FILE_BUDGET_MS,
     loadSensitive(

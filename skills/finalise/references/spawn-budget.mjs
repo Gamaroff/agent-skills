@@ -119,17 +119,21 @@ export function spawnBudget(prefix) {
  *
  * Pair the assertion with `loadSensitive()`: the budget is a load-sensitive check by nature.
  *
+ * A file that is slow by construction (it spawns the bundler many times) passes its own default
+ * as `defaultMs`; the env ladder above still wins.
+ *
  * @param {string} [prefix] Suite-specific env prefix, e.g. "CLEAN_CHECKOUT".
+ * @param {number} [defaultMs] This file's own default, used when no env var is set.
  * @returns {number}
  */
-export function fileBudgetMs(prefix) {
+export function fileBudgetMs(prefix, defaultMs = DEFAULT_FILE_BUDGET_MS) {
   const env = process.env;
   return resolve(
     [
       prefix ? env[`${prefix}_FILE_BUDGET_MS`] : undefined,
       env.TEST_FILE_BUDGET_MS,
     ],
-    DEFAULT_FILE_BUDGET_MS,
+    defaultMs,
     1,
   );
 }
