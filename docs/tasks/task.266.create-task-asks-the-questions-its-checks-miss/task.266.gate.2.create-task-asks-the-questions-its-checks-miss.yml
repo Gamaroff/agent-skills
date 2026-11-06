@@ -1,0 +1,61 @@
+schema: 2
+task: 'task.266.create-task-asks-the-questions-its-checks-miss'
+task_title: 'create-task asks the questions its checks miss'
+gate: PASS
+status_reason: 'Cycle 1 MEDIUM closed: CHANGELOG [Unreleased] cites (task 266). Refute pass over the whole branch diff found no false claim; the cited tasks and engines exist. The wall-time criterion remains unmeasured on a loaded host, recorded as a future action.'
+reviewer: 'QA Engineer'
+head: '79d4076c5863c34d13a6c8fc86e62d20b92e4abd'
+updated: '2026-11-06T11:06:53Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 50
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    boundary_signals: []
+    notes: 'Prose only; no input boundary, no predicate-shaped function added.'
+  performance:
+    status: PASS
+    notes: 'Prose-only change (about 3 KB across two source files); the 50 contract tests that read them run in 2.7 s and the full suite passed (7944 pass, 0 fail). The five-run alternating timing was not taken on a loaded host; a future action records it.'
+  reliability:
+    status: PASS
+    notes: 'bundle --check: 0 problems.'
+  maintainability:
+    status: PASS
+    notes: 'CARD_SECTIONS_BY_KIND untouched.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-11-06'
+  total_iterations: 1
+  verification_method: 'changelog-cites.sh answers cites (task 266)'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Measure the wall-time criterion on a quiet host (the LAN server) with five alternating runs, or reword the criterion to name the two reading tests.'
+      refs: ['docs/tasks/task.266.create-task-asks-the-questions-its-checks-miss/task.266.create-task-asks-the-questions-its-checks-miss.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
