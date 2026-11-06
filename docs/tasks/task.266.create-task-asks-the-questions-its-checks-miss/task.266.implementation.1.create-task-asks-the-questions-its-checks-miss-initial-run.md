@@ -3,7 +3,7 @@
 **Task**: `task.266.create-task-asks-the-questions-its-checks-miss.md`
 **Run Number**: 1
 **Started**: 2026-11-06 00:00
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -34,10 +34,10 @@ Add five authoring-time checks to create-task § 3.5 and a run-count clause to t
 | 1. create-branch           | ✅ Done | Branch `feature/task.266.*` exists in git                              | Branch created at `1f014f1c` |  —                    | 2026-11-06T10:44Z |
 | 2. review-task             | ✅ Done | `task.266.review.{N}.{name}.md` exists (or skip logged)                | Review 1: 8/10 READY; 5 Important fixed; status → ready-for-development; pre-pass inline (no subagent independence) | — | 2026-11-06T10:58Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (/develop not invoked); loop audit inline, 1 iteration; evidence: `.claude/state/t266-evidence.md` | — | 2026-11-06T11:20Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.266.qa.{N}.*.md`; `task.266.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.266.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #851 (no issue linked; no comment) | — | 2026-11-06T11:40Z |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.266.qa.{N}.*.md`; `task.266.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 3 cycles, gate PASS 97, PR review APPROVE; wall-time criterion measured (733.2 s vs 737.1 s) | — | 2026-11-06T13:40Z |
+| 7. finalise                | ✅ Done | `task.266.dod.{N}.*.md`; task `status: accepted`                       | DoD 8/8; accepted; CI readings 1 and 2 SUCCESS; checks inline, no subagents | — | 2026-11-06T13:31Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Report committed and pushed | — | 2026-11-06T13:33Z |
 
 ---
 
@@ -71,14 +71,41 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-11-06
+**Gate Result**: CONCERNS
+**Issues Found**: 1 MEDIUM (no CHANGELOG entry citing task 266); wall-time criterion not measurable as written (performance NFR CONCERNS)
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+
+### QA Cycle 2 — 2026-11-06
+**Gate Result**: PASS
+**Issues Found**: none (cycle 1 MEDIUM closed: CHANGELOG entry added in 79d4076c)
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: CONCERNS — one open coverage finding (PC-1: wall-time criterion unmeasured); conformance lens run inline, no independent subagent
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review); 5c returned to 5b on the open coverage finding
+
+### QA Cycle 3 — 2026-11-06
+**Gate Result**: PASS
+**Issues Found**: none (5c finding PC-1 closed: five alternating runs, median 733.2 s head vs 737.1 s develop, -0.5%)
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE — no findings; conformance lens run inline, no independent subagent
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
-**Branch**: {populated after Step 1}
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**Finished**: 2026-11-06T13:33Z
+**Final Status**: Completed
+**Branch**: `feature/task.266.create-task-asks-the-questions-its-checks-miss`
+**PR**: #851
+**QA Iterations**: 3 cycles (gate PASS 97/100); PR review APPROVE
+**DoD Summary**: 8 of 8 criteria PASS; security and compliance not applicable; `task.266.dod.1.*.md`. CI reading 1: SUCCESS @ `bb5be9016572`; CI reading 2: SUCCESS @ `d9254bac38ed`. The DoD checks ran inline, not in independent subagents.
+**Tracker debt**: none (no linked tracker issue)
