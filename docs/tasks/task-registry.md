@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-11-06
-**Next Available Task Number:** **283**
+**Next Available Task Number:** **284**
 
 ## How to use
 
@@ -324,6 +324,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 280 | [Skill and test tooling see what ships](task.280.skill-and-test-tooling-see-what-ships/task.280.skill-and-test-tooling-see-what-ships.md) | planned | refactoring | Medium | 2026-11-06 | — | — `:?` quote lint, one fence reader plus fence-balance check, bundle discovery of skill-owned reference docs, probe scratch under tmpdir (obs #47, #48, #102, #112) · independent |
 | 281 | [The observation log names what it cannot read](task.281.observation-log-names-what-it-cannot-read/task.281.observation-log-names-what-it-cannot-read.md) | planned | refactoring | Medium | 2026-11-06 | — | — invalidStatus list, set-status repair and parked-to-open, propose-a-task decision (obs #93, #155) · independent |
 | 282 | [review-task resolves the right task and reports every review](task.282.review-task-resolves-the-right-task-and-reports-every-review/task.282.review-task-resolves-the-right-task-and-reports-every-review.md) | planned | refactoring | Medium | 2026-11-06 | — | — task-id-first bare-number resolution and a numbered review comment stage (obs #128, #129) · independent, shares tracker-comment.js with 275 |
+| 283 | [Authoring and fix steps state the rules they keep missing](task.283.authoring-and-fix-steps-state-the-rules-they-keep-missing/task.283.authoring-and-fix-steps-state-the-rules-they-keep-missing.md) | planned | refactoring | Medium | 2026-11-06 | 266, 267 | — CHANGELOG placement check, multi-task create path with issue-body renderer, parser-widening importer audit, `command node` wrapper trap (obs #30, #34, #36, #146) · four independent phases; Phase 1 needs one owner decision |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
