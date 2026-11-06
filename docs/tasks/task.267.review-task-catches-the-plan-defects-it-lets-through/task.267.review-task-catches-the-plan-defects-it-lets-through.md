@@ -5,7 +5,7 @@ type: task
 description: "Add the missing plan-defect checks to review-task Steps 3 and 6 (thirteen observed shapes, each caught only later at 5c, QA or finalise), with a create-task twin where the observation names one."
 tags: [review-task, review-story, create-task, observation]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-06
@@ -14,7 +14,8 @@ estimated_effort_hours: 8
 
 # Task 267: review-task catches the plan defects it lets through
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.267.review.1.review-task-catches-the-plan-defects-it-lets-through.md` implemented 2026-11-06
 
 ---
 
@@ -59,8 +60,14 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 - `skills/review-task/SKILL.md:826` `### Step 3: Technical Accuracy and Anti-Hallucination Review` holds checks 1–22: check 11 at `:942` (invariant verification), 13 at `:980` (single-statement test discriminator), 15 at `:1028` (removed-literal test sweep), 18 at `:1074` (test file reached by the runner), 20 at `:1100` (a site list carries its grep), 22 at `:1118` (a criterion that demands a record names where it lives).
 - `:1250` `### Step 6: Consistency and Completeness Review`; its item 4 at `:1288` is `Success Criteria Measurability`, the home for obs #7.
 - Check 18 asks whether a new test is reached by the runner; obs #90 asks the converse (which existing tests reach the new file). Check 20 covers a site list; obs #60 covers how the population is derived.
-- No existing check mentions `mkdtemp`, `banned-name`, `disjunct` or `second reader`: `grep -n -iE "mkdtemp|banned|disjunct|second reader|self-rewrit" skills/review-task/SKILL.md` returns nothing for those shapes. `(unverified)` for `review-story`: the plan greps its equivalent of Step 6 item 4 first.
-- Tests: `review-task` is exercised by the shared evals (`evals/shared/tests/*`). No test asserts the list of checks, so evidence is behavioural (§ 8).
+- No existing check mentions `mkdtemp`, `banned-name`, `disjunct` or `second reader`: `grep -n -iE "mkdtemp|banned|disjunct|second reader|self-rewrit" skills/review-task/SKILL.md` returns nothing for those shapes. For `review-story`, `grep -nE 'Measurab' skills/review-story/SKILL.md` returns nothing, so it has no Step 6 item 4 equivalent and obs #7 has no mirror there. Its Step 4 (`### Step 4: Technical Accuracy and Anti-Hallucination Review`) numbers its checks 1 to 18 (the criterion-record check is 18), so the obs #108 mirror lands as its check 19.
+- Tests that pin these sections by pattern (found by `git grep -l 'skills/review-task' -- tests evals shared`; the plan edits sentences inside the pinned items, so each is a removed-literal hazard, check 15 / obs #144):
+  - `tests/review-plan-shape-checks.test.js` reads checks 15 to 20 of review-task Step 3 (11 to 16 in review-story Step 4) by number and name, and requires an `(obs #N)` id, a `- Trigger: ` line, a `- Worked example: ` line and an `**Important**` severity in each.
+  - `tests/review-property-checks.test.js` pins check 11 (`11. **Invariant verification** (obs #161):`), check 12, and the hallucination-list lines that cite `(check 11)`.
+  - `tests/review-call-site-population-check.test.js` pins check 14 and its hallucination-list line.
+  - `tests/outcome-reachability-check.test.js` pins check 10 in all three skills.
+  - `tests/review-task-measured-criterion.test.js` slices Step 6 check 4 up to check 5 and pins the measured-bound rules inside it.
+  Sharpening must therefore add text to an item and leave the pinned wording intact, and new checks 23 to 29 must carry the same `(obs #N)`, `Trigger:`, `Worked example:` and `Important` shape.
 
 ### Target Architecture
 
@@ -109,11 +116,11 @@ None - prose only. Check numbers 23 and up are new; existing numbers are unchang
 - `skills/review-task/SKILL.md`
 
 **Changes**:
-- [ ] Step 6 item 4: name the negative-content shape; Important (obs #7).
-- [ ] Check 13: a lexical guard states its claim as a bounded set with known unseen shapes named (obs #13).
-- [ ] Check 15: enumerate every removed or rewritten sentence first, one search each, with hit counts recorded (obs #25); search the test tree for each rewritten document's file name and read hits for structural pins (obs #144).
-- [ ] Check 11: run the plan's named mutation against the planned inputs for each new boolean term (obs #28).
-- [ ] Check 20: derive a sweep population from the retired concept's own names, then diff-pass changed lines mentioning legacy/old/previous/retired (obs #60).
+- [x] Step 6 item 4: name the negative-content shape; Important (obs #7).
+- [x] Check 13: a lexical guard states its claim as a bounded set with known unseen shapes named (obs #13).
+- [x] Check 15: enumerate every removed or rewritten sentence first, one search each, with hit counts recorded (obs #25); search the test tree for each rewritten document's file name and read hits for structural pins (obs #144).
+- [x] Check 11: run the plan's named mutation against the planned inputs for each new boolean term (obs #28).
+- [x] Check 20: derive a sweep population from the retired concept's own names, then diff-pass changed lines mentioning legacy/old/previous/retired (obs #60).
 
 **Dependencies**: none.
 
@@ -127,13 +134,13 @@ None - prose only. Check numbers 23 and up are new; existing numbers are unchang
 - `skills/review-task/SKILL.md`
 
 **Changes**:
-- [ ] 23: parity claim → enumerate the sibling's guards read off its code, a disposition per guard (obs #22).
-- [ ] 24: refusal added to a self-rewriting writer → self-consistency criterion plus a property test over a generated family (obs #29).
-- [ ] 25: new member of an enumerated class → the existing tests that list the class's directory or table (obs #90).
-- [ ] 26: prescribed fixture literals → run the banned-name guard's pattern over the plan (obs #108).
-- [ ] 27: async external read → latency measured against the point where the read fires, commands cited (obs #111).
-- [ ] 28: planned `mkdtemp` → removal named (obs #137).
-- [ ] 29: new file, marker or side effect in a directory → every reader of that directory named (obs #153).
+- [x] 23: parity claim → enumerate the sibling's guards read off its code, a disposition per guard (obs #22).
+- [x] 24: refusal added to a self-rewriting writer → self-consistency criterion plus a property test over a generated family (obs #29).
+- [x] 25: new member of an enumerated class → the existing tests that list the class's directory or table (obs #90).
+- [x] 26: prescribed fixture literals → run the banned-name guard's pattern over the plan (obs #108).
+- [x] 27: async external read → latency measured against the point where the read fires, commands cited (obs #111).
+- [x] 28: planned `mkdtemp` → removal named (obs #137).
+- [x] 29: new file, marker or side effect in a directory → every reader of that directory named (obs #153).
 
 **Dependencies**: Phase 1 (numbers 23+ follow the sharpened block).
 
@@ -147,7 +154,7 @@ None - prose only. Check numbers 23 and up are new; existing numbers are unchang
 - `skills/create-task/SKILL.md` (one line each for #29, #108, #111, #137, in § 3.5 after task 266's items)
 - `skills/review-story/SKILL.md` (obs #7 and #108 equivalents, if present)
 
-**Dependencies**: task 266 merged, or a merge of `develop` into the branch (both edit § 3.5).
+**Dependencies**: task 266 is merged (PR #851 is in `develop` at `fd81159a`, the base of this branch), so § 3.5 already holds its five items and the four twins append after them. `review-story` gets only the obs #108 mirror, as its check 19; obs #7 has no mirror there (§ 3, Current Architecture).
 
 ---
 
@@ -156,9 +163,10 @@ None - prose only. Check numbers 23 and up are new; existing numbers are unchang
 **Risk Level**: Low
 
 **Changes**:
-- [ ] Run each new or sharpened check on its motivating plan shape and on a control (§ 8).
-- [ ] `command npm run bundle`, then `command npm run bundle -- --check`.
-- [ ] Grep consumer docs for restatements of the review-task check list.
+- [x] Run the five pinning tests named in § 3 (`CI=true command node --test tests/review-plan-shape-checks.test.js tests/review-property-checks.test.js tests/review-call-site-population-check.test.js tests/outcome-reachability-check.test.js tests/review-task-measured-criterion.test.js`) after Phase 1, after Phase 2 and after Phase 3, not only in the final `npm test`.
+- [x] Run each new or sharpened check on its motivating plan shape and on a control (§ 8).
+- [x] `command npm run bundle`, then `command npm run bundle -- --check`.
+- [x] Grep consumer docs for restatements of the review-task check list.
 
 **Dependencies**: Phases 1 to 3.
 
@@ -204,8 +212,9 @@ None authored.
 
 ### Functional
 
-- [ ] Each of the thirteen checks is present in `skills/review-task/SKILL.md`, each citing its observation; the list is in the QA report.
-- [ ] Each fires on its defective fixture and not on its controls, recorded per check in the QA report.
+- [ ] The twelve checks (five sharpened, seven new) covering the thirteen observations (#25 and #144 share check 15) are present in `skills/review-task/SKILL.md`, each citing its observation ids; the list is in the QA report's Findings table.
+- [ ] Each of the twelve fires on its defective fixture and not on its controls, recorded per check in the QA report's Findings table. The fixtures are kept in the QA report, not committed.
+- [ ] The five pinning tests named in § 3 pass after every phase (`CI=true command node --test <the five files>`), shown by the planned test run in Phase 4.
 - [ ] Existing check numbers 1 to 22 are unchanged (`git diff` of the headings shows additions only).
 
 ### Performance
@@ -233,7 +242,7 @@ None identified.
 ### Medium Risk Areas
 
 **1. review-task grows slower and noisier**
-- **Risk**: twelve more checks add wall time and false positives.
+- **Risk**: seven new checks and five sharpened ones add wall time and false positives, and a sharpened sentence can break a test that pins its neighbour (§ 3).
 - **Probability**: Medium
 - **Impact**: Minor
 - **Mitigation**: each check carries a trigger condition, so it runs only on the plan shape it names.
@@ -306,6 +315,9 @@ None identified.
 | Date       | Version | Description                                                                         | Author      |
 | ---------- | ------- | ----------------------------------------------------------------------------------- | ----------- |
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #7, #13, #22, #25, #28, #29, #60, #90, #108, #111, #137, #144, #153 | create-task |
+| 2026-11-06 | 1.1     | Review passed (9/10) — named the five tests that pin the review sections, resolved the review-story mirror, updated the task 266 dependency (merged), corrected the check count | review-task |
+| 2026-11-06 |         | Status → ready-for-development | review-task |
+| 2026-11-06 |         | Implemented: five sharpened checks and checks 23–29 in review-task, review-story check 19, four create-task items; status → ready-for-review | develop-task |
 <!-- change-log-end -->
 
 ---
@@ -313,16 +325,16 @@ None identified.
 ## Progress Tracking
 
 ### Phase 1: Sharpen five existing checks
-- [ ] #7, #13, #25 and #144, #28, #60 done
+- [x] #7, #13, #25 and #144, #28, #60 done
 
 ### Phase 2: Seven new checks
-- [ ] Checks 23 to 29 written
+- [x] Checks 23 to 29 written
 
 ### Phase 3: Twins and mirror
-- [ ] create-task and review-story lines
+- [x] create-task and review-story lines
 
 ### Phase 4: Evidence, bundle and sweep
-- [ ] Fixtures run, bundle clean, sweep done
+- [x] Fixtures run (12 of 12 defective fire, 12 of 12 controls clean; evidence in the QA report), bundle clean, sweep done
 
 ---
 
@@ -356,4 +368,4 @@ If the check list keeps growing, group checks by plan shape in a table; not part
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review

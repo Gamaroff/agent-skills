@@ -1174,6 +1174,17 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
       the QA report's Findings table" names one
     - Flag as **Important** a criterion that names no location, or names only the implementation
       report. The fix costs one clause now and a failed DoD later
+19. **Fixture literals are run through the banned-name guard** (obs #108):
+    - Trigger: the story's Dev Notes or tasks prescribe literal values for a test fixture — keys,
+      hosts, names — that will land in shipped files
+    - Run the pattern of the repository's banned-name guard over those literals. In this repository
+      that is `tests/no-consumer-names.test.js`: read its pattern, then grep the story and its plan
+      file for it. A guard whose pattern cannot be read is recorded as such
+    - Worked example: task.179's plan told the developer to test against a Jira browse URL whose
+      key was a real consumer's project key. The guard bans that key from every shipped line (this
+      very example cannot quote it). Review passed the plan at 9/10 and `ci:fast` failed on
+      `no shipped line names the consumer` (2 hits), a full gate round trip after the code was done
+    - Flag as **Important** a prescribed literal the guard matches
 
 **Common Hallucination Patterns to Detect**:
 
