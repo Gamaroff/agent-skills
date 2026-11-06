@@ -5,7 +5,7 @@ type: task
 description: "Add the probes, structural moves and gates qa-fix lacks (classifier direction, weakest value, earlier refusal, restatement population, undecidable boundary, extract-to-script, mechanical trigger b, untracked-file fast gate) so repeat-finding loops end sooner."
 tags: [qa-fix, develop-task, observation]
 category: refactoring
-status: ready-for-review
+status: in-progress
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-06
@@ -14,7 +14,7 @@ estimated_effort_hours: 8
 
 # Task 268: qa-fix finds the whole defect the first time
 
-**Status:** Ready for Review
+**Status:** In Progress
 **Review**: ✅ All review recommendations from `task.268.review.1.qa-fix-finds-the-whole-defect-the-first-time.md` implemented 2026-11-06
 
 ---
@@ -315,17 +315,17 @@ None identified.
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.268.qa.2.qa-fix-finds-the-whole-defect-the-first-time.md](./task.268.qa.2.qa-fix-finds-the-whole-defect-the-first-time.md)
-- **Gate File**: [task.268.gate.2.qa-fix-finds-the-whole-defect-the-first-time.yml](./task.268.gate.2.qa-fix-finds-the-whole-defect-the-first-time.yml)
+- **Full Report**: [task.268.qa.3.qa-fix-finds-the-whole-defect-the-first-time.md](./task.268.qa.3.qa-fix-finds-the-whole-defect-the-first-time.md)
+- **Gate File**: [task.268.gate.3.qa-fix-finds-the-whole-defect-the-first-time.yml](./task.268.gate.3.qa-fix-finds-the-whole-defect-the-first-time.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 13 (pinned suite); `ci:fast` green on this tree
+- **Tests Executed**: 16
 - **Phases Verified**: 4/4
 - **Critical Issues**: 1
-- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
+- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: FAIL, Maintainability: PASS
 
 ### Key Findings
-The Step 4 guard added in cycle 1 always refuses once its slot is filled (HIGH), and its prose and block disagree (MEDIUM). Gate 1's CHANGELOG and Step 7 findings are closed.
+The repaired Step 4 guard does not split a multi-path slot under zsh, so it admits untracked files (T268-QA-6, high). The suite has only single-path cases (T268-QA-7, medium).
 
 <!-- change-log-start -->
 ## Change Log
@@ -339,6 +339,7 @@ The Step 4 guard added in cycle 1 always refuses once its slot is filled (HIGH),
 | 2026-11-06 |         | QA findings fixed — CHANGELOG entry, Step 7 wording, Step 4 guard slot, 1 iteration | qa-fix      |
 | 2026-11-06 |         | QA gate FAIL (70/100) — 1 high, 1 medium finding                             | qa-task     |
 | 2026-11-06 |         | QA findings fixed — Step 4 guard repaired and held by `tests/qa-fix-step4-guard.test.js`, 2 iterations | qa-fix      |
+| 2026-11-06 |         | QA gate FAIL (70/100) — 1 high, 1 medium finding | qa-task     |
 <!-- change-log-end -->
 
 ---
