@@ -837,16 +837,20 @@ tree. Before the commands below, run `git add -N -- {changed-paths}` for new fil
 go on while any are untracked. The block below is the refusal branch only; the `git add -N` is a
 separate command you run first. `{changed-paths}` is a slot: substitute the space-separated paths
 this fix touched. A path holding a space or a brace is not supported, and the block refuses a
-value that is empty or still holds a brace, which is what an unfilled slot looks like. The check
-does not repeat the slot text, because substitution would rewrite that copy too:
+value that is empty, blank or still holds a brace, which is what an unfilled slot looks like. The
+check does not repeat the slot text, because substitution would rewrite that copy too. The list is
+split with `tr` and handed to `xargs`, never by expanding the variable: zsh does not word-split an
+unquoted variable, so a two-path value reached `git ls-files` as one pathspec that matched nothing
+and the guard reported clean:
 
 ```bash
 CHANGED_PATHS="{changed-paths}"
 case "$CHANGED_PATHS" in
-  ""|*"{"*|*"}"*) echo "HALT: CHANGED_PATHS is empty or still holds a brace — substitute the paths this fix touched"; exit 1 ;;
+  *"{"*|*"}"*) echo "HALT: CHANGED_PATHS is empty or still holds a brace — substitute the paths this fix touched"; exit 1 ;;
 esac
-# shellcheck disable=SC2086  # the slot is a space-separated path list by contract
-UNTRACKED=$(git ls-files --others --exclude-standard -- $CHANGED_PATHS) \
+[ -n "$(printf '%s' "$CHANGED_PATHS" | tr -d ' \t\n')" ] \
+  || { echo "HALT: CHANGED_PATHS is empty or still holds a brace — substitute the paths this fix touched"; exit 1; }
+UNTRACKED=$(printf '%s\n' "$CHANGED_PATHS" | tr -s ' \t' '\n\n' | grep -v '^$' | xargs git ls-files --others --exclude-standard --) \
   || { echo "HALT: git ls-files could not look (not a repository, or a bad path) — not treating that as clean"; exit 1; }
 [ -z "$UNTRACKED" ] \
   || { echo "untracked files under the changed paths — stage them first:"; printf '%s\n' "$UNTRACKED"; exit 1; }

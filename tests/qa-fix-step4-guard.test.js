@@ -70,6 +70,49 @@ const CASES = [
     },
   },
   {
+    id: "blank",
+    input: "   ",
+    why: "whitespace-only slot",
+    correct: "refused",
+    direction: "hostile",
+    expected: { stdout: BRACE_REFUSAL, exit: 1 },
+  },
+  {
+    id: "multi-second-untracked",
+    input: "ignored newdir",
+    why: "two paths, the untracked file under the second (zsh does not word-split a bare variable)",
+    correct: "refused",
+    direction: "hostile",
+    fixture: {
+      files: {
+        ...GIT,
+        ".gitignore": "ignored/\n",
+        "ignored/x": "x\n",
+        "newdir/new.txt": "x\n",
+      },
+    },
+    expected: {
+      stdout:
+        "untracked files under the changed paths — stage them first:\nnewdir/new.txt\n",
+      exit: 1,
+    },
+  },
+  {
+    id: "multi-clean",
+    input: "ignored ignored2",
+    why: "two filled paths with nothing untracked are admitted",
+    correct: "admitted",
+    direction: "legitimate",
+    fixture: {
+      files: {
+        ...GIT,
+        ".gitignore": "ignored/\nignored2/\n",
+        "ignored/x": "x\n",
+        "ignored2/x": "x\n",
+      },
+    },
+  },
+  {
     id: "filled-clean",
     input: "ignored",
     why: "a filled slot with nothing untracked is admitted",
@@ -117,46 +160,52 @@ test("Step 4 guard: hostile slots are refused, a filled clean slot is admitted (
   assert.ok(out.cases.length >= CASES.length, "every case ran");
 });
 
-test("Step 4 guard: a block that tests for the unfilled slot with the slot text is caught (the cycle-1 bug)", () => {
-  const src = fs.readFileSync(
-    path.join(ROOT, "skills", "qa-fix", "SKILL.md"),
-    "utf8",
-  );
-  const fixed = '""|*"{"*|*"}"*)';
-  assert.ok(
-    src.includes(fixed),
-    "the guard uses the brace check (fixture for the mutation below)",
-  );
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "qa-fix-step4-mut-"));
-  try {
-    // The mutant lives under the repo root so the engine's --repo-root containment accepts it.
-    const rel = path.join("tests", ".qa-fix-step4-mutant.md");
+// Each mutant reverts one fix to the shape that shipped broken. The probe must stop reading
+// "engages" for it. The mutant lives under the repo root so the engine's --repo-root containment
+// accepts it, and is removed in a finally.
+const SKILL_SRC = fs.readFileSync(
+  path.join(ROOT, "skills", "qa-fix", "SKILL.md"),
+  "utf8",
+);
+const MUTANTS = [
+  {
+    name: "the cycle-1 bug: the unfilled-slot test repeats the slot text",
+    from: '*"{"*|*"}"*)',
+    to: '*"{changed-paths}"*)',
+  },
+  {
+    name: "the cycle-3 bug: an unquoted expansion, which zsh does not word-split",
+    from: "printf '%s\\n' \"$CHANGED_PATHS\" | tr -s ' \\t' '\\n\\n' | grep -v '^$' | xargs git ls-files --others --exclude-standard --",
+    to: "git ls-files --others --exclude-standard -- $CHANGED_PATHS",
+  },
+];
+
+for (const m of MUTANTS) {
+  test(`Step 4 guard: caught when reverted to ${m.name}`, () => {
+    assert.ok(SKILL_SRC.includes(m.from), "the line under mutation is present");
+    const src = SKILL_SRC.replace(m.from, m.to);
+    assert.notEqual(src, SKILL_SRC, "the mutation applied");
+    const rel = path.join("tests", `.qa-fix-step4-mutant-${process.pid}.md`);
     const mutantPath = path.join(ROOT, rel);
-    fs.writeFileSync(mutantPath, src.replace(fixed, '""|*"{changed-paths}"*)'));
+    fs.writeFileSync(mutantPath, src);
     try {
       const out = probe(rel);
       assert.notEqual(
         out.reason,
         "hostile-rejected-legitimate-accepted",
-        "the cycle-1 guard must not read as engaging",
+        "the mutant must not read as engaging",
       );
-      const legit = out.cases.filter((c) => c.id === "filled-clean");
-      assert.ok(
-        legit.length > 0 && legit.every((c) => c.outcome === "rejected"),
-        "the mutant refuses a filled slot: " + JSON.stringify(legit),
-      );
+      assert.ok(out.cases.length > 0, "the mutant was probed: " + out.reason);
     } finally {
       fs.rmSync(mutantPath, { force: true });
     }
-  } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
-  }
-});
+  });
+}
 
 test("Step 4 guard: fails closed when git cannot look (not a repository)", () => {
   const noRepo = [
     {
-      ...CASES[4],
+      ...CASES.find((c) => c.id === "filled-clean"),
       id: "no-repo",
       direction: "hostile",
       correct: "refused",
@@ -172,7 +221,7 @@ test("Step 4 guard: fails closed when git cannot look (not a repository)", () =>
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "qa-fix-step4-nr-"));
   try {
     const casesFile = path.join(dir, "cases.json");
-    fs.writeFileSync(casesFile, JSON.stringify([...noRepo, CASES[4]]));
+    fs.writeFileSync(casesFile, JSON.stringify([...noRepo]));
     const r = spawnSync(
       process.execPath,
       [

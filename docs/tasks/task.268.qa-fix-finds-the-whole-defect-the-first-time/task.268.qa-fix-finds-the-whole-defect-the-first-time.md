@@ -5,7 +5,7 @@ type: task
 description: "Add the probes, structural moves and gates qa-fix lacks (classifier direction, weakest value, earlier refusal, restatement population, undecidable boundary, extract-to-script, mechanical trigger b, untracked-file fast gate) so repeat-finding loops end sooner."
 tags: [qa-fix, develop-task, observation]
 category: refactoring
-status: in-progress
+status: ready-for-review
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-06
@@ -14,7 +14,7 @@ estimated_effort_hours: 8
 
 # Task 268: qa-fix finds the whole defect the first time
 
-**Status:** In Progress
+**Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.268.review.1.qa-fix-finds-the-whole-defect-the-first-time.md` implemented 2026-11-06
 
 ---
@@ -340,6 +340,7 @@ The repaired Step 4 guard does not split a multi-path slot under zsh, so it admi
 | 2026-11-06 |         | QA gate FAIL (70/100) — 1 high, 1 medium finding                             | qa-task     |
 | 2026-11-06 |         | QA findings fixed — Step 4 guard repaired and held by `tests/qa-fix-step4-guard.test.js`, 2 iterations | qa-fix      |
 | 2026-11-06 |         | QA gate FAIL (70/100) — 1 high, 1 medium finding | qa-task     |
+| 2026-11-06 |         | QA findings fixed — Step 4 guard splits its slot in bash and zsh; multi-path cases and a second mutant added, 1 iteration | qa-fix      |
 <!-- change-log-end -->
 
 ---
