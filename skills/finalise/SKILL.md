@@ -837,9 +837,10 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
    `no-approver-configured`, `unverifiable` — and name the `reason` and `detail` beside the probe so
    the owner sees why it was not deferred. The records read are the gate's `recommendations.future[]`
    entry (`deferred_to: task.N`, `approved_by`, `approved_on`) and the work item's `## Deferred Work`
-   bullet (the one form `` `{case-id}`: deferred to task.N, approved by {name} on {YYYY-MM-DD}. ``, with the
-   case id in backticks, the clause contiguous and closing the bullet, and no negation word); a bullet in
-   any other wording, or inside an HTML comment, is not read. The matcher's header states both.
+   bullet (the one form `` [**{finding-id}**,] [reproduced by] `{case-id}`: deferred to task.N, approved by {name} on {YYYY-MM-DD}. ``:
+   nothing but those optional pieces before the backticked case id, the clause contiguous and closing the
+   bullet, and no negation word); a bullet in any other wording, or inside an HTML comment, is not read.
+   The matcher's header states both.
 6. **The zero-guard still applies — now to this run.** `boundary: true` with `probes_executed: 0`
    (an empty plan, every entry refused or declined) adds the `probe mode executed no candidates`
    FAIL check; a zero from this run **still takes the zero-guard**, because then the engine declined

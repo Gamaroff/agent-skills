@@ -158,7 +158,7 @@ function repoRoot(exec, cwd) {
  * same name as `a/b`; a path that leaves the root, an unsubstituted `{placeholder}`, a glob and a
  * NUL are refused, because each would otherwise be "a file the PR did not change" by being no file.
  */
-function canonicalFile(p, root) {
+function canonicalFile(p, root, top = root) {
   const raw = String(p);
   if (raw.trim() === "" || /[{}*?\0]/.test(raw)) return null;
   let abs = path.isAbsolute(raw) ? path.resolve(raw) : path.resolve(root, raw);
@@ -170,9 +170,11 @@ function canonicalFile(p, root) {
   } catch {
     /* the directory may not exist at this checkout: judge the spelling as written */
   }
-  let realRoot = root;
+  // Names are reduced against the git TOPLEVEL, which is what `git diff --name-only` prints, even when
+  // the caller's workspace root is a subdirectory (T271-QA-8).
+  let realRoot = top;
   try {
-    realRoot = fs.realpathSync(root);
+    realRoot = fs.realpathSync(top);
   } catch {
     /* keep the root as given */
   }
@@ -221,13 +223,16 @@ function decide(args, exec, cwd) {
   // Every failed file must reduce to a repo-relative name before the arm can say anything about it.
   let failed = [];
   if (args.command === "rerun-eligible") {
-    const bad = args.failedFiles.filter((f) => canonicalFile(f, root) === null);
+    const top = repoRoot(exec, root);
+    const bad = args.failedFiles.filter(
+      (f) => canonicalFile(f, root, top) === null,
+    );
     if (bad.length > 0) {
       return result(REASONS.BAD_FAILED_FILE, {
         detail: `cannot reduce to a path inside the repository (an unsubstituted placeholder, a glob, or a path outside it): ${bad.join(", ")}`,
       });
     }
-    failed = args.failedFiles.map((f) => canonicalFile(f, root));
+    failed = args.failedFiles.map((f) => canonicalFile(f, root, top));
   }
 
   let base;
@@ -239,6 +244,31 @@ function decide(args, exec, cwd) {
     return result(REASONS.UNVERIFIABLE, {
       detail: `a revision could not be resolved: ${firstLine(e)}`,
     });
+  }
+
+  // A failed file is a file (a blob) at the head commit. A directory, a submodule or a path that is
+  // not there is no test file: its name is never "in the diff", so it must not read as outside it
+  // (T271-QA-8).
+  if (args.command === "rerun-eligible") {
+    const notFiles = failed.filter((f) => {
+      try {
+        return (
+          String(
+            exec("git", ["cat-file", "-t", `${head}:${f}`], {
+              ...EXEC_OPTS,
+              cwd: root,
+            }),
+          ).trim() !== "blob"
+        );
+      } catch {
+        return true;
+      }
+    });
+    if (notFiles.length > 0) {
+      return result(REASONS.BAD_FAILED_FILE, {
+        detail: `not a file at ${head}: ${notFiles.join(", ")}`,
+      });
+    }
   }
 
   const cfg = readConfigAtCommit(exec, root, head);

@@ -379,6 +379,45 @@ test("rerun-eligible control: a symlink the PR changed is in-diff, not its targe
   }
 });
 
+test("rerun-eligible control: a directory or a missing path is not a failed file; a subdirectory workspace root still compares toplevel names (T271-QA-8)", () => {
+  const { dir, green } = prRepo();
+  try {
+    const head = commit(dir, { "docs/n.md": "n\n" });
+    for (const f of ["src", "src/", "docs", "src/missing.test.js"]) {
+      const r = rerun(dir, green, head, [
+        "--attempts",
+        "0",
+        "--failed-file",
+        f,
+      ]);
+      assert.equal(r.json.reason, "bad-failed-file", `value ${f}`);
+      assert.equal(r.status, 1, `value ${f}`);
+    }
+    // The workspace root is a subdirectory: git prints toplevel-relative names, so a file the PR
+    // changed (src/a.js) named relative to that subdirectory is still in-diff, not eligible.
+    const sub = rerun(dir, green, head, [
+      "--attempts",
+      "0",
+      "--workspace-root",
+      join(dir, "src"),
+      "--failed-file",
+      "a.js",
+    ]);
+    assert.equal(sub.json.reason, "in-diff");
+    const subOk = rerun(dir, green, head, [
+      "--attempts",
+      "0",
+      "--workspace-root",
+      join(dir, "src"),
+      "--failed-file",
+      "other.test.js",
+    ]);
+    assert.equal(subOk.json.reason, "eligible");
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test("rerun-eligible control: a failed file that is not a path inside the repository is bad-failed-file (T271-QA-2)", () => {
   const { dir, green } = prRepo();
   try {

@@ -126,6 +126,7 @@ for (const shell of SHELLS) {
       mkdirSync(join(dir, "src"));
       writeFileSync(join(dir, "src", "a.js"), "a\n");
       writeFileSync(join(dir, "src", "other.test.js"), "t\n");
+      writeFileSync(join(dir, "src", "with space.test.js"), "t\n");
       git(dir, "add", "-A");
       git(dir, "commit", "-q", "-m", "base");
       git(dir, "checkout", "-q", "-b", "feature/x");

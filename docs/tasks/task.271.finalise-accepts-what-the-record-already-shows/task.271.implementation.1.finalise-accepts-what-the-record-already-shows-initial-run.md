@@ -119,6 +119,27 @@ Fix summary:
 - Population: 4 executed documents. Move: patch.
 - Advisory, not fixed: `--base` ancestry is not checked; approver names fold non-ASCII lookalikes (Kelvin sign) to ASCII. Both are in the gate's `recommendations.future`.
 
+### QA Cycle 3 — 2026-11-07
+
+| Item | Result |
+| ---- | ------ |
+| `/qa-task` gate | FAIL, 70/100, unscoped safety re-probe: T271-QA-9 (HIGH), T271-QA-8 (MEDIUM) |
+| Probe engine | 21 probes, 0 escapes; the matcher reproduced 1 of 10 (a conditional lead accepted); the delta engine 0 of 11 |
+| `/qa-fix` | Both fixed; `ci:fast` 8058 tests, 0 failed |
+| Mutation proofs | Lead allow-list, blob check and toplevel reduction each turn a named test red; files restored (`cmp`) |
+| Cause of the repeat | Cycle 2 fixed the negated bullet with a closed list of negation words, which is a deny-list; the next phrasing nobody listed passed. The lead is now an allow-list |
+| Test broken by the fix | The bash and zsh re-run block test named a path with a space that did not exist; it now exists in the fixture, because a failed file must be a file |
+| Ungated fix | The cycle-3 fix was written in the working tree before gate 3 was written, then gated as findings against the committed head `31ee1c69` and committed with it; the gate record says so |
+| Gate score | Gate 2 recorded 60/100; its rule gives 70, corrected from gate 3 on |
+
+Fix summary:
+
+- Struck mechanism: the negation word list (replaced, not extended).
+- Narrowing residue: none.
+- Probe: `git grep -l -F -e 'failed-file' -e 'Deferred Work'` over SKILL.md, shared resources, docs/reference and CHANGELOG: `skills/finalise/SKILL.md` — updated (bullet form and failed-file wording); `shared/resources/finalise-deferral-match.js` and `finalise-delta.js` — updated; generated copies bundled; other hits are the pipeline's own loop-exit section or unaffected prose.
+- Population: 3 executed documents. Move: replace (deny-list to allow-list).
+- Advisory, not fixed: gate-entry `action` text and duplicate keys; exact-case comparison (macOS, task 210); `--base` ancestry; Kelvin-sign folding.
+
 ---
 
 ## Completion

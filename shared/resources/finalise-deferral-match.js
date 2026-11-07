@@ -22,10 +22,11 @@
  *   - the QA gate's `recommendations.future[]`: an entry whose `action` names the case id and which
  *     carries `deferred_to: task.N`, `approved_by: <name>`, `approved_on: YYYY-MM-DD`;
  *   - the work item's `## Deferred Work` section (an H2): a list item in the ONE form
- *     `<lead naming the case id in backticks> deferred to task.N, approved by <name> on YYYY-MM-DD.`
- *     The lead holds that single backticked id (a bullet naming two cases matches neither), the clause
- *     is contiguous and ends the bullet, the bullet holds no negation word, and a bullet inside an
- *     HTML comment is not read. Anything else is a candidate with no facts: `unapproved`.
+ *     `[**finding-id**,] [reproduced by] `case-id`: deferred to task.N, approved by <name> on YYYY-MM-DD.`
+ *     The lead is an allow-list: only those optional pieces and the one backticked case id (a bullet
+ *     naming two cases matches neither), so no other word can qualify the approval. The clause is
+ *     contiguous and ends the bullet, the bullet holds no negation word, and a bullet inside an HTML
+ *     comment is not read. Anything else is a candidate with no facts: `unapproved`.
  *
  * FAILS CLOSED. Exit 0 means exactly one thing: `matched`. Every other answer exits 1 (a usage error
  * exits 2), so a shell `if` cannot round a "no" up to a deferral.
@@ -255,8 +256,15 @@ function parseBullet(item, id) {
   if (NEGATION_RE.test(item)) return null;
   const m = BULLET_RE.exec(item.trim());
   if (!m) return null;
-  const ticks = m[1].match(/`[^`]*`/g) || [];
-  if (ticks.length !== 1 || ticks[0] !== `\`${id}\``) return null;
+  // The lead is an ALLOW-LIST, not a word filter (T271-QA-9): at most a bold finding id and
+  // "reproduced by", then the backticked case id and an optional colon. Any other word in the lead
+  // ("withheld", "if accepted", "is to be", "only if Sam agrees") is a bullet in another form, and
+  // a closed list of bad words would pass the next phrasing nobody listed.
+  const lead = m[1].trim();
+  const leadRe =
+    /^(?:\*\*[^*`]+\*\*,?\s*)?(?:reproduced by\s+)?(`[^`]+`)\s*:?$/i;
+  const lm = leadRe.exec(lead);
+  if (!lm || lm[1] !== `\`${id}\``) return null;
   return { task: m[2], owner: m[3], date: m[4] };
 }
 

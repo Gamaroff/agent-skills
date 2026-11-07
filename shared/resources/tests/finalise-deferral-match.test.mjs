@@ -344,6 +344,10 @@ test("control: a bullet that is not the one accepted form never matches (T271-QA
     "quoted approval": `- \`${CASE}\`: deferred to task.901; the approval by ${OWNER} on 2026-10-28 was a quote from Sam.`,
     "second clause": `- \`${CASE}\`: deferred to task.901, ${ok} Later: deferred to task.902, ${ok}`,
     "two case ids": `- \`${CASE}\` and \`other-case\`: deferred to task.901, ${ok}`,
+    "withheld lead": `- \`${CASE}\` withheld; deferred to task.901, ${ok}`,
+    "conditional lead": `- If accepted, \`${CASE}\` deferred to task.901, ${ok}`,
+    "future lead": `- \`${CASE}\` is to be deferred to task.901, ${ok}`,
+    "only-if lead": `- \`${CASE}\`: only if Sam agrees, deferred to task.901, ${ok}`,
     "bare id, no backticks": `- ${CASE}: deferred to task.901, ${ok}`,
     "text after the date": `- \`${CASE}\`: deferred to task.901, approved by ${OWNER} on 2026-10-28 unless Sam objects.`,
   };
