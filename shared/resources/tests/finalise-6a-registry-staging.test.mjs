@@ -227,4 +227,87 @@ for (const shell of SHELLS) {
       /git add[^\n]*task-registry\.md/,
     );
   });
+
+  // obs #59, task.270: the DoD security probe writes a record, a `.run.json.d/` sidecar and cases
+  // files beside the DoD. Prose said 6a carried them; no block staged them.
+  const SEC = (taskDir) => {
+    writeFileSync(path.join(taskDir, "task.9.dod.1.security.run.json"), "{}\n");
+    mkdirSync(path.join(taskDir, "task.9.dod.1.security.run.json.d"));
+    writeFileSync(
+      path.join(taskDir, "task.9.dod.1.security.run.json.d", "case-1.txt"),
+      "probe\n",
+    );
+    writeFileSync(
+      path.join(taskDir, "task.9.dod.1.security.cases.json"),
+      "[]\n",
+    );
+    // Another run's artefact: not this run's to commit.
+    writeFileSync(path.join(taskDir, "task.9.dod.2.security.run.json"), "{}\n");
+  };
+
+  test(`[${shell}] 6a stages this run's security record, its .d/ sidecar and cases file (obs #59)`, () => {
+    const s = scratch();
+    try {
+      SEC(s.taskDir);
+      tick(s);
+      const r = runBlock(shell, s, sixABlock());
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      const committed = s.g("show", "--name-only", "--format=", "HEAD");
+      for (const f of [
+        "task.9.dod.1.security.run.json",
+        "task.9.dod.1.security.run.json.d/case-1.txt",
+        "task.9.dod.1.security.cases.json",
+      ]) {
+        assert.ok(committed.includes(f), `${f} is in the acceptance commit`);
+      }
+      const status = s.g(
+        "status",
+        "--porcelain",
+        "--",
+        "docs/tasks/task.9.demo",
+      );
+      assert.doesNotMatch(
+        status,
+        /dod\.1\.security/,
+        "none of this run's artefacts is left untracked",
+      );
+      assert.match(
+        status,
+        /dod\.2\.security\.run\.json/,
+        "another run's artefact is left alone",
+      );
+    } finally {
+      rmSync(s.dir, { recursive: true, force: true });
+    }
+  });
+
+  // Control: with the staging loop removed the same artefacts stay untracked, so the test above
+  // can see the defect. A directory with NO security artefacts must still pass the block (zsh
+  // aborts on an unmatched glob; `find` does not).
+  test(`[${shell}] control — without the staging loop the artefacts stay untracked; with none present the block still passes`, () => {
+    const loop = /while IFS= read -r SEC_PATH; do[\s\S]*?done < <\([^\n]*\)\n/;
+    assert.match(sixABlock(), loop, "the staging loop is present to remove");
+    const s = scratch();
+    try {
+      SEC(s.taskDir);
+      tick(s);
+      const r = runBlock(shell, s, sixABlock().replace(loop, ""));
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      assert.match(
+        s.g("status", "--porcelain", "--", "docs/tasks/task.9.demo"),
+        /dod\.1\.security/,
+        "the old behaviour leaves them untracked",
+      );
+    } finally {
+      rmSync(s.dir, { recursive: true, force: true });
+    }
+    const none = scratch();
+    try {
+      tick(none);
+      const r = runBlock(shell, none, sixABlock());
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+    } finally {
+      rmSync(none.dir, { recursive: true, force: true });
+    }
+  });
 }

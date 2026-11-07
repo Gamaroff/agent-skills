@@ -240,3 +240,46 @@ for (const [skill, site] of Object.entries(SITES)) {
     });
   }
 }
+
+// ── finalise's DOD_N counts the whole dod namespace (obs #96, task.270) ──────
+
+// A foreign writer's file in the `{stem}.dod.{N}.` namespace (a review-pr probe corpus) must not
+// share a number with the DoD about to be written. The call line is run as written in SKILL.md.
+for (const shell of SHELLS) {
+  test(`[${shell}] finalise's DOD_N skips a foreign dod.N.* file (obs #96); the old .md-only pattern would not`, () => {
+    const files = ["task.9.dod.1.x.md", "task.9.dod.2.security.cases.1.json"];
+    const blocks = callBlocks("finalise");
+    assert.equal(blocks.length, 1);
+    const base = blocks[0]
+      .replace(`.agents/skills/finalise/references/newest-numbered.sh`, HELPER)
+      .replace("{document-directory}", "$DIR")
+      .replace(
+        "{story.{P}.{E}.{S} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}",
+        "task.9",
+      );
+    const dirs = [];
+    const go = (script) => {
+      const dir = dirWith(files);
+      dirs.push(dir);
+      return run(shell, `DIR='${dir}'\n${script}\necho "DOD_N=$DOD_N"`);
+    };
+    try {
+      const now = go(base);
+      assert.equal(now.status, 0, now.stderr);
+      assert.match(now.stdout, /^DOD_N=3$/m);
+      checkNarrow(go);
+    } finally {
+      for (const d of dirs) fs.rmSync(d, { recursive: true, force: true });
+    }
+    function checkNarrow(go) {
+      // Control: put the narrow pattern back; the same layout now answers 2, a collision.
+      const narrow = base.replace(
+        '-name "${STEM}.dod.*"',
+        '-name "${STEM}.dod.*.md"',
+      );
+      assert.notEqual(narrow, base, "the pattern to revert is present");
+      const old = go(narrow);
+      assert.match(old.stdout, /^DOD_N=2$/m);
+    }
+  });
+}

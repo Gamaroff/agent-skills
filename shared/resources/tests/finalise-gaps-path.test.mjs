@@ -770,3 +770,77 @@ test("each develop-* Step Transition Protocol reads Step 7's outcome before adva
     /DoD gaps found → do \*\*not\*\* advance the lock \(it stays at 7/,
   );
 });
+
+// obs #37, task.270: a GAPS bug DoD must not read as an accepted one, and a placeholder that
+// survives the fill is a HALT. Each case runs the real helper on a copy of the real template.
+const ACCEPTED_ONLY = [
+  /committed and pushed at 6a/,
+  /Status History row `DoD verified/,
+  /develop-bug Step 7 Part B: Resolution Summary/,
+  /\{CI_ROLLUP\}/,
+];
+const withGap = (t) =>
+  t.replace(/^\*\*Outcome:\*\* \{[^\n]*\}$/m, "**Outcome:**\n\n- [ ] a gap");
+const block = (t) => t.slice(t.indexOf("## Verification Complete"));
+
+for (const shell of SHELLS) {
+  const fill = (text, verdict) => {
+    const dir = tmp("fvc-");
+    const dod = path.join(dir, "bug.14.dod.1.x.md");
+    fs.writeFileSync(dod, text);
+    const r = run(shell, `bash "${FILL_HELPER}" "${dod}" ${verdict}`, {
+      cwd: dir,
+    });
+    return { r, dir, out: fs.readFileSync(dod, "utf8") };
+  };
+  const template = () => readDoc("skills/finalise/assets/bug-dod-template.md");
+
+  test(`[${shell}] a gaps fill leaves no accepted-path text in the block; an accepted fill keeps it`, () => {
+    const g = fill(withGap(template()), "gaps");
+    const a = fill(template(), "accepted");
+    try {
+      assert.equal(g.r.status, 0, g.r.stdout + g.r.stderr);
+      assert.equal(a.r.status, 0, a.r.stdout + a.r.stderr);
+      for (const re of ACCEPTED_ONLY) {
+        assert.doesNotMatch(block(g.out), re, `gaps file: ${re}`);
+        assert.match(
+          block(a.out),
+          re.source.includes("CI_ROLLUP") ? /CI reading 1/ : re,
+          `accepted file: ${re}`,
+        );
+      }
+      assert.match(block(g.out), /GAPS: no acceptance decision/);
+    } finally {
+      fs.rmSync(g.dir, { recursive: true, force: true });
+      fs.rmSync(a.dir, { recursive: true, force: true });
+    }
+  });
+
+  for (const verdict of ["accepted", "gaps"]) {
+    test(`[${shell}] a surviving placeholder in the block halts a ${verdict} fill; one in a code span does not`, () => {
+      const base = verdict === "gaps" ? withGap(template()) : template();
+      const bad = base.replace(
+        "**Next Steps:**",
+        "**Reviewer:** {REVIEWER_NAME}\n\n**Next Steps:**",
+      );
+      const ok = base.replace(
+        "**Next Steps:**",
+        "**Reviewer:** see `{REVIEWER_NAME}`\n\n**Next Steps:**",
+      );
+      const h = fill(bad, verdict);
+      const c = fill(ok, verdict);
+      try {
+        assert.equal(h.r.status, 1, h.r.stdout + h.r.stderr);
+        assert.match(h.r.stderr, /placeholder survives[\s\S]*REVIEWER_NAME/);
+        assert.equal(
+          c.r.status,
+          0,
+          "control: a code span is text, not a gap: " + c.r.stderr,
+        );
+      } finally {
+        fs.rmSync(h.dir, { recursive: true, force: true });
+        fs.rmSync(c.dir, { recursive: true, force: true });
+      }
+    });
+  }
+}
