@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-11-06
-**Next Available Task Number:** **287**
+**Next Available Task Number:** **288**
 
 ## How to use
 
@@ -401,3 +401,4 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 
 - Filenames follow `task.[N].[kebab-case-name].md` per [AGENTS.md](../../AGENTS.md#file-naming).
 | 286 | [qa-fix Step 4 guard looks beneath gitlinks](task.286.qa-fix-step4-guard-looks-beneath-gitlinks/task.286.qa-fix-step4-guard-looks-beneath-gitlinks.md) | planned | refactoring | Medium | 2026-11-07 | 285 | — task 285 QA gate 5 residual: a directory above a gitlink with an untracked file reads clean (CR-1), plus two advisories (CR-2, CR-3) · four phases |
+| 287 | [cases_file accepts only engine-shaped names](task.287.cases-file-accepts-only-engine-shaped-names/task.287.cases-file-accepts-only-engine-shaped-names.md) | planned | refactoring | Low | 2026-11-07 | — | — task 269 gate.4 recommendation: refuse a `cases_file` not named `*.security.cases[.n].json`; no committed plan affected · three phases |
