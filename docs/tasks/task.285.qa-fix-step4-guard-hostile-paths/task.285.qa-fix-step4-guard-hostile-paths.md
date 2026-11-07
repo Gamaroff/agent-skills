@@ -5,7 +5,7 @@ type: task
 description: "Close the two deferred task 268 findings in the qa-fix Step 4 untracked-files guard (shell metacharacters in a path, nested-repo or symlinked paths) and the advisory gaps beside them."
 tags: [qa-fix, develop-task, security, deferred-work]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-11-07
 updated: 2026-11-07
@@ -15,7 +15,7 @@ github_issue: 855
 
 # Task 285: qa-fix Step 4 guard survives hostile paths
 
-**Status:** Planned
+**Status:** Ready for Review
 **GitHub Issue**: [#855](https://github.com/Gamaroff/agent-skills/issues/855)
 
 ---
@@ -52,15 +52,15 @@ Task 268 shipped a Step 4 guard in `skills/qa-fix/SKILL.md` that refuses to run 
 
 The Step 4 block (`skills/qa-fix/SKILL.md:832`, heading `### Step 4: Validate`) takes the space-separated changed paths through the `{changed-paths}` slot and does, in order:
 
-1. refuses an empty, blank or brace-holding value (`SKILL.md:850-853`);
-2. splits with `tr` and refuses any path that is neither on disk nor tracked (`SKILL.md:854-858`, uses `git --literal-pathspecs ls-files --error-unmatch`);
+1. refuses an empty, blank or brace-holding value (`SKILL.md:850-854`);
+2. splits with `tr` and refuses any path that is neither on disk nor tracked (`SKILL.md:855-858`, uses `git --literal-pathspecs ls-files --error-unmatch`);
 3. lists untracked files under the paths with `git --literal-pathspecs ls-files --others --exclude-standard` through `xargs` (`SKILL.md:859`) and refuses on any.
 
 `tests/qa-fix-step4-guard.test.js` drives the block through `shared/resources/security-probe.mjs` (`fence:` entry) under bash and zsh. It holds ten cases, four mutants (`MUTANTS`) and a no-repo fail-closed test.
 
 ### Target Architecture
 
-- The slot reaches the shell as data, never as shell syntax. Either the value is substituted through a single-quoted heredoc written by the Write tool path (no shell quoting involved), or the block refuses any value holding `$`, a backtick, `"`, `'` or a backslash before the value is expanded anywhere. Phase 1 chooses by running both against the hostile cases; prefer the refusal if the heredoc cannot hold a value that itself contains the heredoc delimiter (the CLAUDE.md shell-safety rule).
+- The slot reaches the shell as data, never as shell syntax: the value is substituted into a **single-quoted heredoc** (a distinctive delimiter, e.g. `QA_FIX_CHANGED_PATHS_END`), so `$`, backticks and `"` stay inert. A refusal on its own cannot do this job, because the slot is substituted into the assignment text before any line of the block runs; the two mechanisms are therefore **layered, not alternatives**. The block then also refuses a value holding `\`, `'` or `"`, and a value equal to the delimiter. Why the refusal stays even with the heredoc: `xargs` (no `-0`) treats quotes and backslashes as syntax. Measured in this review: `printf '%s\n' "a'b" | xargs echo` exits with `unmatched single quote` (loud), but `printf '%s\n' 'a\' | xargs echo` prints `a`: the backslash is silently consumed, so the guard would judge path `a` while the file on disk is `a\`, and read clean where it should refuse. The alternative that removes the cause (`tr '\n' '\0' | xargs -0`) is portable to GNU and BSD `xargs`; Phase 2 may use it instead of the refusal for `\`, `'` and `"`, but must then hold the same hostile case with a test.
 - The block refuses a path it cannot judge: a path whose resolved parent leaves this repository's tree (a `.git` boundary below the root, or a symlink along the way). Refusing is the chosen remedy; documenting the limit alone would keep "found nothing" and "could not look" indistinguishable.
 - The loop doc line points at the Step 4 block instead of restating the bare command.
 
@@ -106,9 +106,11 @@ None - API stable. A path that used to pass and now is refused (a metacharacter,
 - `tests/qa-fix-step4-guard.test.js`
 
 **Changes**:
-- [ ] Add a hostile case whose path holds a command substitution that would create a marker file, and assert the marker is absent (expect red on today's block).
-- [ ] Add a nested-repository case and a symlinked-directory case (expect red: today's block exits 0).
-- [ ] Record the red output in the QA report.
+- [x] Add a hostile case whose path holds a command substitution that would create a marker file, and assert the marker is absent (expect red on today's block).
+- [x] Add a nested-repository case (`inner/f` under a directory holding `.git`) and a symlinked-directory case (`link/f`, `link -> real`) (expect red: today's block exits 0 on both; reproduced in this review with the block's own commands: `--error-unmatch` exits 1, `[ -e ]` passes, the untracked listing prints nothing). The nested-repo directory itself and the symlink itself are already listed as untracked (`inner/`, `link`) and refused today; only paths *below* them read clean.
+- [x] Add a `backslash-mutation` case: a file `a\` exists beside a tracked clean file `a`, input `a\`; hostile, refused (expect red: `xargs` turns `a\` into `a`).
+- [x] Any symlink or directory a case creates outside the engine's own fixture directory is removed in a `finally` or `t.after`.
+- [x] Record the red output in the QA report (captured now in the implementation report's Decisions Log; QA copies it).
 
 **Dependencies**: none.
 
@@ -122,8 +124,8 @@ None - API stable. A path that used to pass and now is refused (a metacharacter,
 - `skills/qa-fix/SKILL.md`
 
 **Changes**:
-- [ ] Choose the mechanism (refusal or single-quoted heredoc) by running both against the Phase 1 case; record the choice and the reason in Technical Background.
-- [ ] Implement it in the Step 4 block and state the refused characters in the prose beside it.
+- [x] Substitute the slot through a single-quoted heredoc, then refuse a value holding `\`, `'` or `"` and a value equal to the delimiter (or feed `xargs -0`; see Target Architecture). Run the Phase 1 `meta-substitution` and `backslash-mutation` cases under bash and zsh.
+- [x] State the refused characters in the prose beside the block, and remove the now-false sentence that says only spaces and braces are unsupported.
 
 **Dependencies**: Phase 1.
 
@@ -137,8 +139,8 @@ None - API stable. A path that used to pass and now is refused (a metacharacter,
 - `skills/qa-fix/SKILL.md`
 
 **Changes**:
-- [ ] Refuse a path with a `.git` boundary below the repository root, or a symlink anywhere along its parents, naming the path.
-- [ ] State the refusal in the prose beside the block.
+- [x] Refuse a path with a `.git` boundary below the repository root, or a symlink anywhere along its parents, naming the path.
+- [x] State the refusal in the prose beside the block.
 
 **Dependencies**: Phase 1.
 
@@ -152,9 +154,9 @@ None - API stable. A path that used to pass and now is refused (a metacharacter,
 - `tests/qa-fix-step4-guard.test.js`
 
 **Changes**:
-- [ ] Add admitted cases: a tracked path, a deleted tracked path, an intent-to-add path.
-- [ ] Add a mutant that removes the `--error-unmatch` branch and one per new refusal; each must turn a named test red.
-- [ ] Make the no-repo test assert the refusal reason, not only the outcome.
+- [x] Add admitted cases: a tracked path, a deleted tracked path, an intent-to-add path.
+- [x] Add a mutant that removes the `--error-unmatch` branch and one per new refusal; each must turn a named test red.
+- [x] Make the no-repo test assert the refusal reason, not only the outcome.
 
 **Dependencies**: Phases 2 and 3.
 
@@ -169,8 +171,9 @@ None - API stable. A path that used to pass and now is refused (a metacharacter,
 - generated copies under `skills/*/references/`
 
 **Changes**:
-- [ ] Replace the bare command at line 233 with a pointer to the qa-fix Step 4 block.
-- [ ] Run `npm run bundle`.
+- [x] Replace the bare command at line 233 with a pointer to the qa-fix Step 4 block.
+- [x] Run `npm run bundle`.
+- [x] Run the tests that pin this document by pattern (found by file name: `git grep -l develop-pipeline-step-3-develop-loop -- '*.test.*' 'tests/**' 'evals/**'`): `evals/shared/tests/fast-gate-precondition.test.mjs`, `qa-loop-fast-gate-outcomes.test.mjs`, `optional-file-lookups.test.mjs`, `transition-protocol-parity.test.mjs`, `qa-gate-preconditions-parity.test.mjs`, `ci-gate-parity.test.mjs` and the two `pipeline-shape` / `step-contract` protocol suites. No test pins the literal `stop while` (searched: 0 hits outside the doc and its bundled copies).
 
 **Dependencies**: none.
 
@@ -190,6 +193,7 @@ Documentation:
 3. ✅ `shared/resources/develop-pipeline-step-3-develop-loop.md` - line 233
 4. ✅ `skills/*/references/develop-pipeline-step-3-develop-loop.md` - regenerated by `npm run bundle`
 5. ✅ `CHANGELOG.md` - entry for task 285
+6. ✅ `docs/tasks/task.268.qa-fix-finds-the-whole-defect-the-first-time/task.268.qa-fix-finds-the-whole-defect-the-first-time.md` - `## Deferred Work` entries marked closed by task 285
 
 ---
 
@@ -227,7 +231,8 @@ Documentation:
 ### Performance
 
 - [ ] Suite median within 10% of `develop` (five alternating pairs, load recorded), figure recorded in the QA report.
-- [ ] No new test takes longer than one second on its own.
+- [ ] No new test takes longer than one second on its own. Measured with `CI=true command node --test --test-reporter=spec tests/qa-fix-step4-guard.test.js`, reading each new case's reported `(…ms)` (bound 1000 ms), with `uptime` recorded beside the run; the figure goes in the QA report.
+- [ ] A path holding a backslash, single quote or double quote is refused (a named test per character class, bash and zsh), and a path `a\` beside a clean `a` is not judged as `a`.
 
 ### Code Quality
 
@@ -297,17 +302,20 @@ None.
 | ---------- | ------- | ------------------------------------------------------------------------------------ | ----------- |
 | 2026-11-07 | 1.0     | Initial draft — cut from task 268 gate 5 T268-QA-10, T268-QA-11 and two advisories | create-task |
 | 2026-11-07 |         | GitHub issue created (#855)                                                          | sync-github-task |
+| 2026-11-07 | 1.1     | Review passed (8/10) — mechanisms layered (heredoc + refusal of `\ ' "` because `xargs` reads them as syntax), anchors fixed, bound command and Phase 5 pinned suites named | review-task |
+| 2026-11-07 |         | Status → ready-for-development                                                        | review-task |
+| 2026-11-07 |         | Implemented — 8 files, 15 new tests (17 in the file) | develop |
 <!-- change-log-end -->
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1: Reproduce both findings
-- [ ] Phase 2: Close T268-QA-10
-- [ ] Phase 3: Close T268-QA-11
-- [ ] Phase 4: Hold every branch with a test
-- [ ] Phase 5: One description of the check
+- [x] Phase 1: Reproduce both findings
+- [x] Phase 2: Close T268-QA-10
+- [x] Phase 3: Close T268-QA-11
+- [x] Phase 4: Hold every branch with a test
+- [x] Phase 5: One description of the check
 
 ---
 

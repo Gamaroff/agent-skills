@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **`qa-fix` Step 4 guard survives hostile paths** (task 285). The changed-paths slot now goes into a
+  single-quoted heredoc, so a command substitution, a backtick or a `$VAR` in a path stays inert
+  (T268-QA-10). A path below a symlinked directory or a nested repository is refused, naming it,
+  where the untracked listing used to print nothing and read as clean (T268-QA-11). A backslash,
+  single quote or double quote in a path is refused: `xargs` read a trailing backslash as syntax and
+  judged a different path. The develop-loop doc now points at the Step 4 block instead of restating
+  the bare `git ls-files --others` command.
+
 ### Added
 
 - **`qa-fix` finds the whole defect the first time** (task 268). Step 3.5 gains a both-sides probe

@@ -331,8 +331,8 @@ Two medium edge cases remain in the Step 4 guard: shell metacharacters in a path
 
 ## Deferred Work
 
-- **T268-QA-10** (MEDIUM) — carded as task 285 (2026-11-07) — carried to gate 5 `recommendations.future` (QA budget spent, cycle 5): shell metacharacters in a changed path are expanded by the double-quoted slot assignment in qa-fix Step 4; substitute through a single-quoted heredoc or refuse them, with a hostile probe case.
-- **T268-QA-11** (MEDIUM) — carded as task 285 (2026-11-07) — carried to gate 5 `recommendations.future` (QA budget spent, cycle 5): a path in a nested repository or behind a symlinked directory reads clean in the Step 4 guard; refuse or document it.
+- **T268-QA-10** (MEDIUM) — closed by task 285 (2026-11-07), carded as task 285 (2026-11-07) — carried to gate 5 `recommendations.future` (QA budget spent, cycle 5): shell metacharacters in a changed path are expanded by the double-quoted slot assignment in qa-fix Step 4; substitute through a single-quoted heredoc or refuse them, with a hostile probe case.
+- **T268-QA-11** (MEDIUM) — closed by task 285 (2026-11-07), carded as task 285 (2026-11-07) — carried to gate 5 `recommendations.future` (QA budget spent, cycle 5): a path in a nested repository or behind a symlinked directory reads clean in the Step 4 guard; refuse or document it.
 
 ## Definition of Done - Gaps Identified, run 1 (historical, superseded by run 2)
 

@@ -31,14 +31,14 @@ Prove both findings red in the existing probe harness, fix the block, then hold 
 - `skills/qa-fix/SKILL.md` — the assignment at line 849 and the prose above it.
 
 **Exact changes:**
-- Option A (refuse): before the assignment is evaluated nothing can inspect the value, because the slot is substituted into the assignment itself. So the refusal must be on the substitution path: write the value through a single-quoted heredoc into a variable, then run the existing `case` plus a new `case` on `*'$'*|*'`'*|*'"'*|*'\\'*`.
-- Option B (heredoc only): `CHANGED_PATHS=$(cat <<'EOF' … EOF)`. The delimiter line must not appear in a path; refuse a value equal to the delimiter.
-- Pick by running both on `meta-substitution` under bash and zsh.
+- Layered, not a choice (decided at review): nothing can inspect the value before the assignment evaluates it, because the slot is substituted into the assignment text itself. So the value goes through a single-quoted heredoc with a distinctive delimiter (`CHANGED_PATHS=$(cat <<'QA_FIX_CHANGED_PATHS_END' … QA_FIX_CHANGED_PATHS_END)`), which makes `$`, backticks and `"` inert.
+- Then a new `case` refuses a value holding `\`, `'` or `"` (`*'\\'*|*"'"*|*'"'*`) and a value equal to the delimiter. The heredoc does not make these safe: `xargs` without `-0` reads them as syntax (`'a\'` silently becomes `a`; reproduced in review). The alternative is `tr '\n' '\0' | xargs -0`, portable to GNU and BSD; if chosen, hold `backslash-mutation` with a test.
+- Run `meta-substitution` and `backslash-mutation` under bash and zsh before and after.
 
 ### Phase 3: T268-QA-11
 
 **Exact changes:**
-- After the existence check, for each path walk its parents up to the repository root: refuse when a parent is a symlink (`[ -L ]`) or holds a `.git` entry other than the root's.
+- After the existence check, for each path walk its parents up to the repository root: refuse when a parent is a symlink (`[ -L ]`) or holds a `.git` entry (directory or file) other than the root's. Only parents need walking: the path itself, when it is a nested repo or a symlink, is already listed as untracked (`inner/`, `link`) by the existing listing (reproduced in review).
 
 ### Phase 4: Tests
 
@@ -48,7 +48,7 @@ Prove both findings red in the existing probe harness, fix the block, then hold 
 
 ### Phase 5: Loop doc
 
-- `shared/resources/develop-pipeline-step-3-develop-loop.md:233` — rewrite the sentence to point at the qa-fix Step 4 block, then `npm run bundle`.
+- `shared/resources/develop-pipeline-step-3-develop-loop.md:233` — rewrite the sentence to point at the qa-fix Step 4 block, then `npm run bundle`, then run the pattern-pinning suites the task document lists under Phase 5.
 
 ## Key Patterns and References
 

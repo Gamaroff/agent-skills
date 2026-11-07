@@ -836,26 +836,52 @@ count reflects what actually happened.
 tree. Before the commands below, run `git add -N -- {changed-paths}` for new files, or refuse to
 go on while any are untracked. The block below is the refusal branch only; the `git add -N` is a
 separate command you run first. `{changed-paths}` is a slot: substitute the space-separated paths
-this fix touched. A path holding a space or a brace is not supported, and the block refuses a
-value that is empty, blank or still holds a brace, which is what an unfilled slot looks like. The
-check does not repeat the slot text, because substitution would rewrite that copy too. The list is
-split with `tr` and handed to `xargs`, never by expanding the variable: zsh does not word-split an
-unquoted variable, so a two-path value reached `git ls-files` as one pathspec that matched nothing
-and the guard reported clean. Each path is matched literally (`--literal-pathspecs`), so a glob or
-pathspec magic is not interpreted, and a path that is neither on disk nor tracked is refused,
-because `git ls-files` lists nothing for it and "found nothing" would read as "clean":
+this fix touched. A path holding a space, a brace or a newline is not supported, and the block
+refuses a value that is empty, blank or still holds a brace, which is what an unfilled slot looks
+like. The slot is substituted as text before any line of the block runs, so it goes into a
+**single-quoted heredoc**, where `$`, backticks and a command substitution stay inert; a
+double-quoted assignment would have run them (T268-QA-10). One limit remains, and the block
+cannot see it before the text is in place: a path holding a **newline** could carry a line equal
+to the delimiter `QA_FIX_CHANGED_PATHS_END`, which ends the heredoc early and leaves the rest to
+run as commands. Do not substitute a path with a newline. A value holding a backslash, a single quote or a double quote is refused,
+because `xargs` (no `-0`) reads those as syntax: a quote fails loudly, but a trailing backslash is
+consumed silently and the guard would judge a different path from the one on disk. The check does
+not repeat the slot text, because substitution would rewrite that copy too. The list is split with
+`tr` and handed to `xargs`, never by expanding the variable: zsh does not word-split an unquoted
+variable, so a two-path value reached `git ls-files` as one pathspec that matched nothing and the
+guard reported clean. Each path is matched literally (`--literal-pathspecs`), so a glob or pathspec
+magic is not interpreted, and a path that is neither on disk nor tracked is refused, because
+`git ls-files` lists nothing for it and "found nothing" would read as "clean". A path below a
+symlinked directory or a nested repository is refused too, naming it: the untracked listing cannot
+look through either, so it prints nothing for them, which is "could not look" and not "clean"
+(T268-QA-11). The walk over a path's parents stops at the repository root:
 
 ```bash
-CHANGED_PATHS="{changed-paths}"
+IFS= read -r -d '' CHANGED_PATHS <<'QA_FIX_CHANGED_PATHS_END' || true
+{changed-paths}
+QA_FIX_CHANGED_PATHS_END
 case "$CHANGED_PATHS" in
   *"{"*|*"}"*) echo "HALT: CHANGED_PATHS is empty or still holds a brace — substitute the paths this fix touched"; exit 1 ;;
 esac
 [ -n "$(printf '%s' "$CHANGED_PATHS" | tr -d ' \t\n')" ] \
   || { echo "HALT: CHANGED_PATHS is empty or still holds a brace — substitute the paths this fix touched"; exit 1; }
+case "$CHANGED_PATHS" in
+  *\\*|*\'*|*\"*) echo "HALT: a changed path holds a backslash, single quote or double quote — xargs reads those as syntax and would judge a different path"; exit 1 ;;
+esac
 MISSING=$(printf '%s\n' "$CHANGED_PATHS" | tr -s ' \t' '\n\n' | grep -v '^$' \
   | while IFS= read -r p; do [ -e "$p" ] || git --literal-pathspecs ls-files --error-unmatch -- "$p" >/dev/null 2>&1 || printf '%s\n' "$p"; done)
 [ -z "$MISSING" ] \
   || { echo "HALT: these changed paths are neither on disk nor tracked — a mistyped path lists nothing and would read as clean:"; printf '%s\n' "$MISSING"; exit 1; }
+TOP=$(git rev-parse --show-toplevel 2>/dev/null) || TOP=""
+BOUNDARY=$(printf '%s\n' "$CHANGED_PATHS" | tr -s ' \t' '\n\n' | grep -v '^$' \
+  | while IFS= read -r p; do
+      d=$p
+      while d=$(dirname -- "$d"); [ "$d" != "." ] && [ "$d" != "/" ] && [ "$d" != "$TOP" ]; do
+        if [ -L "$d" ] || [ -e "$d/.git" ]; then printf '%s\n' "$p"; break; fi
+      done
+    done)
+[ -z "$BOUNDARY" ] \
+  || { echo "HALT: these changed paths sit below a symlink or a nested repository — the untracked listing cannot look through either, so \"nothing listed\" would read as clean:"; printf '%s\n' "$BOUNDARY"; exit 1; }
 UNTRACKED=$(printf '%s\n' "$CHANGED_PATHS" | tr -s ' \t' '\n\n' | grep -v '^$' | xargs git --literal-pathspecs ls-files --others --exclude-standard --) \
   || { echo "HALT: git ls-files could not look (not a repository, or a bad path) — not treating that as clean"; exit 1; }
 [ -z "$UNTRACKED" ] \
