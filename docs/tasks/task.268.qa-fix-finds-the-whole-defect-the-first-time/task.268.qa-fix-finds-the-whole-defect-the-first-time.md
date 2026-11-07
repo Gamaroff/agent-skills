@@ -5,16 +5,18 @@ type: task
 description: "Add the probes, structural moves and gates qa-fix lacks (classifier direction, weakest value, earlier refusal, restatement population, undecidable boundary, extract-to-script, mechanical trigger b, untracked-file fast gate) so repeat-finding loops end sooner."
 tags: [qa-fix, develop-task, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-07
+completed_date: 2026-11-07
+pr_number: 854
 estimated_effort_hours: 8
 ---
 
 # Task 268: qa-fix finds the whole defect the first time
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.268.review.1.qa-fix-finds-the-whole-defect-the-first-time.md` implemented 2026-11-06
 
 ---
@@ -210,23 +212,23 @@ None - prose only. The `Narrowing residue:` / `Move:` shape is unchanged; the `M
 
 ### Functional
 
-- [ ] Each of the eight rules is present in `skills/qa-fix/SKILL.md`, citing its observation; the list is in the QA report.
-- [ ] Each rule fires on its fixture and not on its control, recorded per rule in the QA report.
-- [ ] A Step 7 post is warned about (the block is added, then the post goes ahead; the check never halts the cycle) when trigger (b) holds and the block is absent, shown by running the check on a fixture set recorded in the QA report. (Reworded from "refused" after review; approved by Lorien Gamaroff, 2026-11-07.)
+- [x] Each of the eight rules is present in `skills/qa-fix/SKILL.md`, citing its observation; the list is in the QA report.
+- [x] Each rule fires on its fixture and not on its control, recorded per rule in the QA report.
+- [x] A Step 7 post is warned about (the block is added, then the post goes ahead; the check never halts the cycle) when trigger (b) holds and the block is absent, shown by running the check on a fixture set recorded in the QA report. (Reworded from "refused" after review; approved by Lorien Gamaroff, 2026-11-07.)
 
 ### Performance
 
-- [ ] `CI=true command npm test` wall time is within 10% of `develop`, as the median of five alternating runs with `uptime` beside each, recorded in the QA report.
+- [x] `CI=true command npm test` wall time is within 10% of `develop`, as the median of five alternating runs with `uptime` beside each, recorded in the QA report.
 
 ### Code Quality
 
-- [ ] `CI=true command node --test shared/resources/tests/qa-narrowing-residue.test.mjs evals/shared/tests/qa-narrowing-offer-wiring.test.mjs tests/qa-fix-structural-move.test.js tests/identity-rule-probe.test.js` passes.
-- [ ] `command npm run bundle -- --check` reports 0 problems.
-- [ ] `python skills/create-skill/scripts/quick_validate.py skills/qa-fix` passes.
+- [x] `CI=true command node --test shared/resources/tests/qa-narrowing-residue.test.mjs evals/shared/tests/qa-narrowing-offer-wiring.test.mjs tests/qa-fix-structural-move.test.js tests/identity-rule-probe.test.js` passes.
+- [x] `command npm run bundle -- --check` reports 0 problems.
+- [x] `python skills/create-skill/scripts/quick_validate.py skills/qa-fix` passes.
 
 ### Migration
 
-- [ ] No remaining prose says "four moves" (`git grep -n "four moves" -- skills shared` returns nothing outside generated copies).
+- [x] No remaining prose says "four moves" (`git grep -n "four moves" -- skills shared` returns nothing outside generated copies).
 
 ---
 
@@ -332,9 +334,9 @@ Two medium edge cases remain in the Step 4 guard: shell metacharacters in a path
 - **T268-QA-10** (MEDIUM) — carried to gate 5 `recommendations.future` (QA budget spent, cycle 5): shell metacharacters in a changed path are expanded by the double-quoted slot assignment in qa-fix Step 4; substitute through a single-quoted heredoc or refuse them, with a hostile probe case.
 - **T268-QA-11** (MEDIUM) — carried to gate 5 `recommendations.future` (QA budget spent, cycle 5): a path in a nested repository or behind a symlinked directory reads clean in the Step 4 guard; refuse or document it.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified, run 1 (historical, superseded by run 2)
 
-**Status:** IN PROGRESS (stays `ready-for-review`)
+**Status:** SUPERSEDED — all four gaps closed in run 2 (see the section below)
 
 Security (18 probes, 0 reproduced), compliance (not applicable) and docs/changelog pass. Four acceptance criteria are not met as written.
 
@@ -355,6 +357,25 @@ Security (18 probes, 0 reproduced), compliance (not applicable) and docs/changel
 
 **Detailed Verification Log:** See `task.268.dod.1.qa-fix-finds-the-whole-defect-the-first-time.md`.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report**: `task.268.qa.5.qa-fix-finds-the-whole-defect-the-first-time.md` (with the criteria evidence added at run 2)
+**Gate File**: `task.268.gate.5.qa-fix-finds-the-whole-defect-the-first-time.yml`
+**Gate Status**: CONCERNS (80/100), accepted with two deferred MEDIUMs
+
+✅ **Acceptance Criteria:** all 8 met (run 2); the reword of Functional criterion 3 is approved by Lorien Gamaroff
+✅ **Tests:** the four named test files pass (53/53); `bundle --check` 0 problems; `quick_validate` passes
+✅ **Performance:** suite median 160 s on `develop` and on the branch
+✅ **Security Review:** 18 probes executed, 0 reproduced, 0 escapes
+✅ **Compliance / Docs:** not applicable / `CHANGELOG.md` cites task 268
+⚠️ **Deferred:** T268-QA-10 and T268-QA-11 (see Deferred Work)
+
+**Detailed Verification Log:** See `task.268.dod.2.qa-fix-finds-the-whole-defect-the-first-time.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-07
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -374,6 +395,7 @@ Security (18 probes, 0 reproduced), compliance (not applicable) and docs/changel
 | 2026-11-06 |         | QA gate CONCERNS (80/100) — 2 findings, both deferred (budget spent) | qa-task     |
 | 2026-11-07 |         | DoD incomplete — 4 gaps identified | finalise    |
 | 2026-11-07 |         | Functional criterion 3 reworded from "refused" to "warned" to match the Step 7 design settled at gate 1 (T268-QA-2); criteria evidence recorded in QA report 5 | develop-next |
+| 2026-11-07 | 1.2     | DoD passed — accepted (PR #854) | finalise    |
 <!-- change-log-end -->
 
 ---
@@ -419,4 +441,4 @@ Task 269 candidates (qa-task step gaps) sit in the same QA loop; none depends on
 
 ---
 
-**Status:** Planned
+**Status:** Accepted
