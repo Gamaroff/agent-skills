@@ -26,7 +26,7 @@ Insert after the identity-rule table (`:770` block) in the same row style:
 
 ### Phase 2: Step 2.6 moves and Step 7 gate
 
-- In the move table (`:623` block) add rows 5 and 6 (obs #42, #63) in the existing column shape, update "The four moves" and the `Move:` allowed values at `:655` to `consolidate | scope the claim | narrow the contract | extract to a script | waive | patch`.
+- In the move table (`:623` block) add rows 5 and 6 (obs #42, #63) in the existing column shape, update "The four moves" (the one site, `:642`) and the `Move:` allowed values at `:655` to `consolidate | scope the claim | narrow the contract | extract to a script | waive | patch`. `tests/qa-fix-structural-move.test.js` pins both (`:96` the row list, `:125` the exact `Move:` line): update it in the same change. Find each Step by heading; `:` anchors in this file are up to 5 lines early.
 - Step 7 (`:903`), before the post block: check the cycle's bug set for a bug naming an earlier bug of the same work item (`bug.N` text) or the same `file:` as a previous gate's entry; if one does and the summary lacks `Narrowing residue:`, print the missing block and stop the post. Same for a documentation fix and `Probe:`. Keep Step 7's best-effort framing: a refusal prints a reason and the waiver line is allowed.
 - Verify the tests keyed on the shape still pass: `CI=true command node --test shared/resources/tests/qa-narrowing-residue.test.mjs evals/shared/tests/qa-narrowing-offer-wiring.test.mjs`.
 

@@ -1,0 +1,82 @@
+schema: 2
+task: 'task.268.qa-fix-finds-the-whole-defect-the-first-time'
+task_title: 'qa-fix finds the whole defect the first time'
+gate: FAIL
+status_reason: 'Cycle 2 closed T268-QA-4 and T268-QA-5, but the repaired Step 4 guard does not word-split its multi-path slot under zsh, so it reports clean on an untracked file in the second path. Reproduced; the suite has no multi-path case, so it passed.'
+reviewer: 'QA Engineer'
+head: 'da08a54caf47c7c9508f98ad389168e12e7a4af7'
+updated: '2026-11-06T20:53:37Z'
+
+top_issues:
+  - id: 'T268-QA-6'
+    severity: high
+    file: 'skills/qa-fix/SKILL.md'
+    finding: 'The Step 4 guard expands $CHANGED_PATHS unquoted into git ls-files. Bash splits it into pathspecs; zsh does not, so "d e" stays one pathspec that matches nothing. Reproduced: with an untracked file in e/, bash prints e/x and zsh prints nothing, so under zsh the guard admits exactly the untracked files it exists to catch. A whitespace-only value also passes the empty check. Absent on the PR base. (CR-1.)'
+    suggested_action: 'Split the slot explicitly in both shells (an array built with read -r -a, or ${=VAR} under zsh), refuse a value that is blank after trimming, and add a multi-path case and a whitespace-only case to the fence probe and the committed test.'
+    suggested_owner: dev
+    status: open
+  - id: 'T268-QA-7'
+    severity: medium
+    file: 'tests/qa-fix-step4-guard.test.js'
+    finding: 'Every case passes a single-token path, so the suite never exercises the documented multi-path slot, which is the input that breaks under zsh; the legitimate case uses a gitignored path and would also pass a guard whose pathspec matched nothing. (CR-2, CR-3.)'
+    suggested_action: 'Add a two-path case whose second path holds the untracked file (refused), a whitespace-only case, and make the clean case a real tracked file.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 16
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 10
+    escaped: 0
+    boundary_signals: ["refused", "is refused"]
+    boundary: true
+    notes: 'The fence probe engages (10 executed, 0 escaped) but every case is a single path, so it cannot see the zsh word-splitting hole (T268-QA-6). Run record: task.268.qa.3.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'Prose plus test files; the added cost is under 0.6 s of a full suite run.'
+  reliability:
+    status: FAIL
+    notes: 'Under zsh the guard fails open on a multi-path slot.'
+  maintainability:
+    status: PASS
+    notes: 'CR-3 and CR-4 from cycle 2 are closed: Step 7 cites Step 2.6 and the test header says six moves.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Make the Step 4 guard split its slot in both shells, then probe a multi-path and a whitespace-only value.'
+      refs: ['skills/qa-fix/SKILL.md', 'tests/qa-fix-step4-guard.test.js']
+  future:
+    - action: 'Remove the unused mkdtemp in the mutation test and keep the mutant file out of version control (CR-4).'
+      refs: ['tests/qa-fix-step4-guard.test.js']
+
+bug_resolution:
+  cycle_2_findings:
+    - id: 'T268-QA-4'
+      status: closed
+      note: 'a filled single-path slot is admitted; fence probe engages; mutation-proven'
+    - id: 'T268-QA-5'
+      status: closed
+      note: 'prose says refuse branch only; git failure fails closed'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T268-QA-6 fixed and re-reviewed']

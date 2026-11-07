@@ -228,6 +228,10 @@ Two halves of that value, and both are load-bearing:
   paying it on every iteration is what makes the correct fix feel expensive enough to be reverted.
   It runs once, at `develop-next`'s merge gate, via `<qualityGateCommand>`.
 
+**Stage new files before the gate runs (obs #56).** Guards that read `git ls-files` cannot see an
+untracked file, so the gate can pass on a tree CI then fails. Before each run, `git add -N` the new
+files under the changed paths, or stop while `git ls-files --others --exclude-standard` lists any.
+
 ### Precondition — the gate must resolve before the first iteration
 
 Run this **once, before the loop's first iteration**. It does not belong in the Output Capture

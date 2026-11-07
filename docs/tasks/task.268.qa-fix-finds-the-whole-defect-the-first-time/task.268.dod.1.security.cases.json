@@ -1,0 +1,165 @@
+[
+  {
+    "id": "empty",
+    "sink": "filename",
+    "input": "",
+    "why": "empty slot",
+    "correct": "refused",
+    "direction": "hostile",
+    "expected": {
+      "stdout": "HALT: CHANGED_PATHS is empty or still holds a brace — substitute the paths this fix touched\n",
+      "exit": 1
+    },
+    "spec_ref": "skills/qa-fix/SKILL.md:839-846"
+  },
+  {
+    "id": "unfilled",
+    "sink": "filename",
+    "input": "{changed-paths}",
+    "why": "slot left in",
+    "correct": "refused",
+    "direction": "hostile",
+    "expected": {
+      "stdout": "HALT: CHANGED_PATHS is empty or still holds a brace — substitute the paths this fix touched\n",
+      "exit": 1
+    },
+    "spec_ref": "skills/qa-fix/SKILL.md:839-846"
+  },
+  {
+    "id": "blank",
+    "sink": "filename",
+    "input": "   ",
+    "why": "whitespace-only slot",
+    "correct": "refused",
+    "direction": "hostile",
+    "expected": {
+      "stdout": "HALT: CHANGED_PATHS is empty or still holds a brace — substitute the paths this fix touched\n",
+      "exit": 1
+    },
+    "spec_ref": "skills/qa-fix/SKILL.md:839-846"
+  },
+  {
+    "id": "untracked",
+    "sink": "filename",
+    "input": "newdir",
+    "why": "untracked file",
+    "correct": "refused",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/objects/.keep": "",
+        ".git/refs/.keep": "",
+        "newdir/new.txt": "x\n"
+      }
+    },
+    "expected": {
+      "stdout": "untracked files under the changed paths — stage them first:\nnewdir/new.txt\n",
+      "exit": 1
+    },
+    "spec_ref": "skills/qa-fix/SKILL.md:839-846"
+  },
+  {
+    "id": "multi-second-untracked",
+    "sink": "filename",
+    "input": "ignored newdir",
+    "why": "two paths, second untracked",
+    "correct": "refused",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/objects/.keep": "",
+        ".git/refs/.keep": "",
+        ".gitignore": "ignored/\n",
+        "ignored/x": "x\n",
+        "newdir/new.txt": "x\n"
+      }
+    },
+    "expected": {
+      "stdout": "untracked files under the changed paths — stage them first:\nnewdir/new.txt\n",
+      "exit": 1
+    },
+    "spec_ref": "skills/qa-fix/SKILL.md:839-846"
+  },
+  {
+    "id": "missing-path",
+    "sink": "filename",
+    "input": "nosuchdir",
+    "why": "mistyped path",
+    "correct": "refused",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/objects/.keep": "",
+        ".git/refs/.keep": "",
+        "other/x": "x\n"
+      }
+    },
+    "expected": {
+      "stdout": "HALT: these changed paths are neither on disk nor tracked — a mistyped path lists nothing and would read as clean:\nnosuchdir\n",
+      "exit": 1
+    },
+    "spec_ref": "skills/qa-fix/SKILL.md:839-846"
+  },
+  {
+    "id": "magic-pathspec-dir",
+    "sink": "filename",
+    "input": ":(exclude)newdir newdir",
+    "why": "path named like an exclude pathspec is matched literally",
+    "correct": "refused",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/objects/.keep": "",
+        ".git/refs/.keep": "",
+        ":(exclude)newdir/g": "x\n",
+        "newdir/new.txt": "x\n"
+      }
+    },
+    "expected": {
+      "stdout": "untracked files under the changed paths — stage them first:\n:(exclude)newdir/g\nnewdir/new.txt\n",
+      "exit": 1
+    },
+    "spec_ref": "skills/qa-fix/SKILL.md:839-846"
+  },
+  {
+    "id": "multi-clean",
+    "sink": "filename",
+    "input": "ignored ignored2",
+    "why": "two filled paths, clean",
+    "correct": "admitted",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/objects/.keep": "",
+        ".git/refs/.keep": "",
+        ".gitignore": "ignored/\nignored2/\n",
+        "ignored/x": "x\n",
+        "ignored2/x": "x\n"
+      }
+    },
+    "spec_ref": "skills/qa-fix/SKILL.md:839-846"
+  },
+  {
+    "id": "filled-clean",
+    "sink": "filename",
+    "input": "ignored",
+    "why": "filled, clean",
+    "correct": "admitted",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/objects/.keep": "",
+        ".git/refs/.keep": "",
+        ".gitignore": "ignored/\n",
+        "ignored/x": "x\n"
+      }
+    },
+    "spec_ref": "skills/qa-fix/SKILL.md:839-846"
+  }
+]
