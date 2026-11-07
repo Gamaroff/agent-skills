@@ -202,7 +202,7 @@ None for consumers once Phase 1 pins the order: the halt must not fire on a plac
 
 ### Performance
 
-- [ ] `CI=true command npm test` wall time is within 10% of `develop`, as the median of five alternating runs with `uptime` beside each, recorded in the QA report.
+- [x] `CI=true command npm test` wall time is within 10% of `develop`, as the median of five alternating runs with `uptime` beside each, recorded in the QA report.
 
 ### Code Quality
 

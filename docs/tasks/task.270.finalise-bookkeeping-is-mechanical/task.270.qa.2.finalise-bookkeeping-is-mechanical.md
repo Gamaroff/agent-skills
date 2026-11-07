@@ -65,6 +65,20 @@ The criterion asks for the median of five alternating runs of the full suite on 
 
 Median develop 1024 ms, branch 1303 ms, so +279 ms. Against 189 s that is +0.15%. This measures the whole of the added wall time (nothing else in the suite changed), and is not the five-run full-suite median the criterion names.
 
+#### Full-suite measurement, as the criterion is written (taken at finalise, 2026-11-07)
+
+`CI=true npm test`, five alternating runs, each side in its own detached worktree (develop `7e73adaf`; branch head `576d5669`), all ten exit 0. Load average (first field of `/proc/loadavg`, the `uptime` figure) read just before each run:
+
+| Run | develop (ms) | load | branch (ms) | load |
+| --- | --- | --- | --- | --- |
+| 1 | 181525 | 1.64 | 262568 | 6.85 |
+| 2 | 274550 | 11.95 | 209850 | 10.10 |
+| 3 | 170224 | 6.69 | 165249 | 8.61 |
+| 4 | 165913 | 6.30 | 164747 | 6.46 |
+| 5 | 168659 | 4.50 | 165366 | 4.66 |
+
+Median develop 170224 ms, branch 165366 ms: the branch is 2.9% **faster**, so within 10%. Load was uneven (1.6 to 12.0) and the slowest runs on both sides sit at the highest loads (develop run 2, branch run 1); the median is the figure the criterion asks for and sits in the quiet runs 3 to 5, where the two sides differ by under 3%. Criterion met.
+
 ### Template-literal tests: disposition
 
 `git grep -n 'committed and pushed at 6a\|CI reading' -- '*.test.*'` finds the literals in `ci-once-at-finalise`, `finalise-publish-boundary`, `ci-tree-equivalence`, `finalise-deferred-ci`, `finalise-fix-and-recheck`, `finalise-rerun-scope` and `finalise-gaps-path`. Disposition: **confirmed, no change needed**. The first six read `finalise/SKILL.md` or the CI echo lines, which this PR does not touch; `finalise-gaps-path` is the file this PR extends, and its `committed and pushed at 6a` pattern is the one the new gaps test asserts is absent from a gaps fill. All pass in the full run (8011 pass, 0 fail).
