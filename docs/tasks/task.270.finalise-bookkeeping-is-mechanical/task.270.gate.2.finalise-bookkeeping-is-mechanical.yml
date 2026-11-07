@@ -1,0 +1,58 @@
+schema: 2
+task: 'task.270.finalise-bookkeeping-is-mechanical'
+task_title: 'finalise bookkeeping is mechanical'
+gate: PASS
+status_reason: 'Cycle 1 finding T270-QA-1 (CHANGELOG entry) is fixed and verified. A full-diff refute pass found one low-confidence advisory item, already held by a committed test. Wall-time criterion now measured.'
+reviewer: 'QA Engineer'
+head: '25791684e71c1a1d470047e45bbd2cce9a722975'
+updated: '2026-11-07T18:30:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 97
+
+evidence:
+  tests_reviewed: 6
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: internal
+    internal_reason: 'The placeholder halt reads only the bug DoD this pipeline writes from its own template; no corpus sink models it. Covered by committed tests with controls. The cycle 2 reviewer also executed the fills and the 6a find by hand, which does not count as probes.'
+    boundary_signals: []
+    notes: 'No new input crosses a trust boundary.'
+  performance:
+    status: PASS
+    notes: 'Five alternating runs of the three changed suites, develop vs branch, load 3.4-3.8: develop median 1024 ms, branch median 1303 ms, so +279 ms. Against the 189 s full CI=true npm test on the branch that is +0.15%, far inside 10%.'
+  reliability:
+    status: PASS
+    notes: 'Unchanged from cycle 1.'
+  maintainability:
+    status: PASS
+    notes: 'Unchanged from cycle 1.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Optionally make fill-verification-complete.sh halt when an accepted-only phrase survives a gaps rewrite, so template drift fails in the script and not only in the test (cycle 2 CR-1, low/medium). The committed test already reads the real template and goes red on drift.'
+      refs: ['shared/resources/fill-verification-complete.sh', 'shared/resources/tests/finalise-gaps-path.test.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

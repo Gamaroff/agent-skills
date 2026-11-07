@@ -286,24 +286,24 @@ None identified.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-07
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 97/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.270.qa.1.finalise-bookkeeping-is-mechanical.md](./task.270.qa.1.finalise-bookkeeping-is-mechanical.md)
-- **Gate File**: [task.270.gate.1.finalise-bookkeeping-is-mechanical.yml](./task.270.gate.1.finalise-bookkeeping-is-mechanical.yml)
+- **Full Report**: [task.270.qa.2.finalise-bookkeeping-is-mechanical.md](./task.270.qa.2.finalise-bookkeeping-is-mechanical.md)
+- **Gate File**: [task.270.gate.2.finalise-bookkeeping-is-mechanical.yml](./task.270.gate.2.finalise-bookkeeping-is-mechanical.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 8013 (8011 pass, 0 fail, 2 skipped)
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-One MEDIUM: no CHANGELOG `[Unreleased]` entry cites task 270 (T270-QA-1). The 10% wall-time criterion was bounded, not measured as five alternating runs.
+Cycle 1's CHANGELOG finding is fixed. One low-confidence advisory item (template drift in the gaps rewrite) is already held by a committed test.
 
 <!-- change-log-start -->
 ## Change Log
@@ -314,6 +314,7 @@ One MEDIUM: no CHANGELOG `[Unreleased]` entry cites task 270 (T270-QA-1). The 10
 | 2026-11-07 | 1.1     | Review passed (8/10) — fixed drifted ADD_PATHS anchors, zsh-unsafe glob and unbound DOD_N in the 6a plan, and the accepted-path halt ordering; added tests for both | review-task |
 | 2026-11-07 |         | Status → ready-for-development | review-task |
 | 2026-11-07 |         | QA gate CONCERNS (90/100) — 1 finding (no CHANGELOG entry) | qa-task |
+| 2026-11-07 |         | QA gate PASS (97/100) — 0 findings | qa-task |
 <!-- change-log-end -->
 
 ---
