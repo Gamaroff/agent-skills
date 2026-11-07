@@ -322,17 +322,17 @@ Not modified, against the plan: `finalise-dod-security-prompt.md` (Arm 3 is wire
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.271.qa.1.finalise-accepts-what-the-record-already-shows.md](./task.271.qa.1.finalise-accepts-what-the-record-already-shows.md)
-- **Gate File**: [task.271.gate.1.finalise-accepts-what-the-record-already-shows.yml](./task.271.gate.1.finalise-accepts-what-the-record-already-shows.yml)
+- **Full Report**: [task.271.qa.2.finalise-accepts-what-the-record-already-shows.md](./task.271.qa.2.finalise-accepts-what-the-record-already-shows.md)
+- **Gate File**: [task.271.gate.2.finalise-accepts-what-the-record-already-shows.yml](./task.271.gate.2.finalise-accepts-what-the-record-already-shows.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 8043
+- **Tests Executed**: 8055
 - **Phases Verified**: 5/5
 - **Critical Issues**: 2
-- **NFR Status**: Security: FAIL, Performance: CONCERNS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: FAIL, Performance: CONCERNS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-`rerun-eligible` returns eligible for a failed file the PR changed when the path is absolute, `../`-relative, `a/./b`, or an unsubstituted placeholder. The deferral matcher accepts an impossible approval date. The Step 3b.1 item 5a block does not run under zsh.
+Cycle 1's four findings are closed. The refute pass and the probe engine (17 probes) found that the Arm 3 work-item matcher accepts a negated bullet, a bullet inside an HTML comment, and one approval for several case ids, and that `rerun-eligible` follows a symlinked failing test file to its target name.
 
 <!-- change-log-start -->
 ## Change Log
@@ -346,6 +346,8 @@ Not modified, against the plan: `finalise-dod-security-prompt.md` (Arm 3 is wire
 | 2026-11-07 | 1.3     | Developed: `finalise-delta.js` (Arms 1 and 2), `finalise-deferral-match.js` (Arm 3), AC prompt and SKILL.md wiring, `finalise.deferralApprover`, fixture background-git fix; `ci:fast` green | develop |
 | 2026-11-07 |         | QA gate FAIL (60/100) — 4 findings | qa-task |
 | 2026-11-07 |         | QA findings fixed — 4 of 4 (failed-file canonicalisation, placeholder refusal, real-date check, zsh-portable owner read), 1 iteration | qa-fix |
+| 2026-11-07 |         | QA gate FAIL (60/100) — 3 findings | qa-task |
+| 2026-11-07 |         | QA findings fixed — 3 of 3 (anchored single-form deferral bullet, comments ignored, symlink final component kept), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

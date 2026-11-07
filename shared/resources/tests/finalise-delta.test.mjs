@@ -11,7 +11,13 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  rmSync,
+  symlinkSync,
+} from "node:fs";
 import { execFileSync, spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -338,6 +344,36 @@ test("rerun-eligible control: every spelling of an in-diff file is in-diff (T271
       join(dir, "src", "other.test.js"),
     ]);
     assert.equal(ok.json.reason, "eligible");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("rerun-eligible control: a symlink the PR changed is in-diff, not its target (T271-QA-7)", () => {
+  const { dir, green } = prRepo();
+  try {
+    // src/other.test.js exists on the base and the PR never touched it; the link to it is what the PR added.
+    symlinkSync("other.test.js", join(dir, "src", "link.test.js"));
+    git(dir, "add", "-A");
+    git(dir, "commit", "-q", "-m", "pr adds a link");
+    const prHead = git(dir, "rev-parse", "HEAD").trim();
+    const head = commit(dir, { "docs/n.md": "n\n" });
+    const r = rerun(dir, prHead, head, [
+      "--attempts",
+      "0",
+      "--failed-file",
+      "src/link.test.js",
+    ]);
+    assert.equal(r.json.reason, "in-diff");
+    // Control: the target itself, which the PR did not change, stays eligible.
+    const t = rerun(dir, prHead, head, [
+      "--attempts",
+      "0",
+      "--failed-file",
+      "src/other.test.js",
+    ]);
+    assert.equal(t.json.reason, "eligible");
+    assert.ok(green, "the PR's first commit exists");
   } finally {
     cleanup(dir);
   }

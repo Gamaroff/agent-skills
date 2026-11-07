@@ -336,6 +336,77 @@ test("control: a follow-up task must be a positive integer without leading zeros
   }
 });
 
+test("control: a bullet that is not the one accepted form never matches (T271-QA-5, T271-QA-6)", () => {
+  const ok = "approved by " + OWNER + " on 2026-10-28.";
+  const bullets = {
+    negated: `- \`${CASE}\`: NOT deferred to task.901; was not approved by ${OWNER} on 2026-10-28.`,
+    "negated, contiguous": `- \`${CASE}\`: NOT deferred to task.901, ${ok}`,
+    "quoted approval": `- \`${CASE}\`: deferred to task.901; the approval by ${OWNER} on 2026-10-28 was a quote from Sam.`,
+    "second clause": `- \`${CASE}\`: deferred to task.901, ${ok} Later: deferred to task.902, ${ok}`,
+    "two case ids": `- \`${CASE}\` and \`other-case\`: deferred to task.901, ${ok}`,
+    "bare id, no backticks": `- ${CASE}: deferred to task.901, ${ok}`,
+    "text after the date": `- \`${CASE}\`: deferred to task.901, approved by ${OWNER} on 2026-10-28 unless Sam objects.`,
+  };
+  const files = {};
+  Object.entries(bullets).forEach(([k, b], i) => {
+    files[`b${i}.md`] = workItem(b);
+  });
+  files["comment.md"] =
+    `# T\n\n## Deferred Work\n\n<!--\n${GOOD_BULLET}\n-->\n`;
+  files["unterminated.md"] = `# T\n\n## Deferred Work\n\n<!-- ${GOOD_BULLET}\n`;
+  files["good.md"] = workItem(GOOD_BULLET);
+  // A closed comment hides only itself: the honest bullet after it still counts.
+  files["after-comment.md"] =
+    `# T\n\n## Deferred Work\n\n<!-- a note -->\n${GOOD_BULLET}\n`;
+  const { dir, paths } = fixture(files);
+  try {
+    Object.keys(bullets).forEach((k, i) => {
+      const r = run([
+        "--case",
+        CASE,
+        "--work-item",
+        paths[`b${i}.md`],
+        "--approver",
+        OWNER,
+      ]);
+      assert.notEqual(r.json.reason, "matched", k);
+      assert.equal(r.status, 1, k);
+    });
+    for (const f of ["comment.md", "unterminated.md"]) {
+      const r = run([
+        "--case",
+        CASE,
+        "--work-item",
+        paths[f],
+        "--approver",
+        OWNER,
+      ]);
+      assert.equal(r.json.reason, "no-match", f);
+    }
+    const after = run([
+      "--case",
+      CASE,
+      "--work-item",
+      paths["after-comment.md"],
+      "--approver",
+      OWNER,
+    ]);
+    assert.equal(after.json.reason, "matched");
+    // The unmatched control: the one accepted form still matches.
+    const ok2 = run([
+      "--case",
+      CASE,
+      "--work-item",
+      paths["good.md"],
+      "--approver",
+      OWNER,
+    ]);
+    assert.equal(ok2.json.reason, "matched");
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test("control: a work-item bullet outside the Deferred Work H2 is not read", () => {
   const doc = `# T\n\n## Notes\n\n${GOOD_BULLET}\n\n## Deferred Work\n\n- nothing here\n`;
   const { dir, paths } = fixture({ "w.md": doc });

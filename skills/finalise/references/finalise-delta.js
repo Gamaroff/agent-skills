@@ -161,12 +161,14 @@ function repoRoot(exec, cwd) {
 function canonicalFile(p, root) {
   const raw = String(p);
   if (raw.trim() === "" || /[{}*?\0]/.test(raw)) return null;
-  let abs = path.isAbsolute(raw) ? raw : path.resolve(root, raw);
-  // A symlinked directory in the spelling (macOS /var → /private/var) must not read as outside the root.
+  let abs = path.isAbsolute(raw) ? path.resolve(raw) : path.resolve(root, raw);
+  // A symlinked DIRECTORY in the spelling (macOS /var → /private/var) must not read as outside the
+  // root, but the final component stays as written: git names a symlink by the link's own path, and
+  // following it would turn a changed link into its unchanged target (T271-QA-7).
   try {
-    abs = fs.realpathSync(abs);
+    abs = path.join(fs.realpathSync(path.dirname(abs)), path.basename(abs));
   } catch {
-    /* the file may not exist at this checkout: judge the spelling as written */
+    /* the directory may not exist at this checkout: judge the spelling as written */
   }
   let realRoot = root;
   try {

@@ -21,8 +21,11 @@
  * Two record shapes are read, and only these:
  *   - the QA gate's `recommendations.future[]`: an entry whose `action` names the case id and which
  *     carries `deferred_to: task.N`, `approved_by: <name>`, `approved_on: YYYY-MM-DD`;
- *   - the work item's `## Deferred Work` section (an H2): a list item that names the case id and
- *     contains `deferred to task.N` and `approved by <name> on YYYY-MM-DD`.
+ *   - the work item's `## Deferred Work` section (an H2): a list item in the ONE form
+ *     `<lead naming the case id in backticks> deferred to task.N, approved by <name> on YYYY-MM-DD.`
+ *     The lead holds that single backticked id (a bullet naming two cases matches neither), the clause
+ *     is contiguous and ends the bullet, the bullet holds no negation word, and a bullet inside an
+ *     HTML comment is not read. Anything else is a candidate with no facts: `unapproved`.
  *
  * FAILS CLOSED. Exit 0 means exactly one thing: `matched`. Every other answer exits 1 (a usage error
  * exits 2), so a shell `if` cannot round a "no" up to a deferral.
@@ -235,17 +238,42 @@ function deferredWorkItems(text) {
   return items;
 }
 
+// One bullet, one clause (T271-QA-5, T271-QA-6): `<lead> deferred to task.N, approved by NAME on DATE.`
+// The lead holds the case id as its single backticked token; the clause is contiguous and closes the
+// bullet. Free prose that merely contains the three facts ("NOT deferred to task.5; was not approved
+// by ...") is not that form, and a bullet that is not that form yields a candidate with no facts,
+// which judge() answers `unapproved`, never `matched`.
+const BULLET_RE =
+  /^(.*?)\bdeferred to (task\.\d+)\s*,\s*approved by (.+?) on (\d{4}-\d{2}-\d{2})\.?\s*$/i;
+const NEGATION_RE =
+  /\b(not|never|no|none|without|cannot|denied|declined|rejected|refused|revoked|withdrawn|pending|unapproved)\b|n't\b/i;
+
+/** The facts of a bullet in the one accepted form, or null. */
+function parseBullet(item, id) {
+  const count = (re) => (item.match(re) || []).length;
+  if (count(/deferred to/gi) !== 1 || count(/approved by/gi) !== 1) return null;
+  if (NEGATION_RE.test(item)) return null;
+  const m = BULLET_RE.exec(item.trim());
+  if (!m) return null;
+  const ticks = m[1].match(/`[^`]*`/g) || [];
+  if (ticks.length !== 1 || ticks[0] !== `\`${id}\``) return null;
+  return { task: m[2], owner: m[3], date: m[4] };
+}
+
 function workItemCandidates(text, id) {
   const out = [];
-  deferredWorkItems(text).forEach((item, i) => {
+  // An HTML comment is not rendered, so a bullet inside one is not on the record (T271-QA-6).
+  const visible = String(text)
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<!--[\s\S]*$/, "");
+  deferredWorkItems(visible).forEach((item, i) => {
     if (!namesCase(item, id)) return;
-    const task = /deferred to (task\.\d+)(?![\w.-]*\w)/i.exec(item);
-    const appr = /approved by (.+?) on (\d{4}-\d{2}-\d{2})/i.exec(item);
+    const f = parseBullet(item, id);
     out.push({
       source: `work item Deferred Work item ${i + 1}`,
-      task: task ? task[1] : "",
-      owner: appr ? appr[1] : "",
-      date: appr ? appr[2] : "",
+      task: f ? f.task : "",
+      owner: f ? f.owner : "",
+      date: f ? f.date : "",
     });
   });
   return out;

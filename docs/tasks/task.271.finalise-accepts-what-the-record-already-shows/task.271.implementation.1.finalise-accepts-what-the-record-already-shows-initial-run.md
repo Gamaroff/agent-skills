@@ -98,6 +98,27 @@ Fix summary:
   `docs/reference/configuration.md` — unaffected (names the owner key, not the failed-file input). `CHANGELOG.md` — unaffected (states the arms, not path handling).
 - Population: 3 executed documents. Move: patch — the four findings are distinct defects in the deliverable, not one subject re-narrowed.
 
+### QA Cycle 2 — 2026-11-07
+
+| Item | Result |
+| ---- | ------ |
+| `/qa-task` gate | FAIL, 60/100, full refute pass plus safety re-probe: T271-QA-5, QA-6 (HIGH), QA-7 (MEDIUM) |
+| Probe engine | 17 probes, 0 escapes; the deferral matcher reproduced 3 of 7 (negated, commented-out, second-id bullets accepted) |
+| `/qa-fix` | All three fixed; `ci:fast` 8057 tests, 0 failed (run while the timing job was loading the machine) |
+| Mutation proofs | Negation guard, single-backtick guard, symlink-parent guard and the closed-comment strip each turn a named test red; files restored (`cmp`) |
+| Gap found by mutation | Removing the closed-comment strip reddened nothing, because the unterminated-comment rule masked it; a control with an honest bullet after a closed comment now holds it |
+| Timing comparison | Runs 1 and 2 recorded (166 s branch, 165 s develop, then 224 s branch under load from `ci:fast`); the median is taken from the full five when the job finishes |
+| Process slip | A mutation restore edit did not match and left the mutant in the tree for a moment; restored from the byte snapshot and verified with `cmp` and `git diff` |
+
+Fix summary:
+
+- Struck mechanism: none (the three findings are distinct defects, none a re-narrowing of an earlier fix).
+- Narrowing residue: none.
+- Probe: `git grep -l -F -e 'Deferred Work'` over SKILL.md, shared resources, docs/reference and CHANGELOG.
+  `skills/finalise/SKILL.md` — updated (the bullet form is stated); `shared/resources/finalise-deferral-match.js` — updated (header and engine); other hits (`develop`, `qa-*`, `review-*`, the QA loop doc) use the pipeline's own loop-exit section, a different list, unaffected; `CHANGELOG.md` — states the arm, not the bullet grammar, unaffected.
+- Population: 4 executed documents. Move: patch.
+- Advisory, not fixed: `--base` ancestry is not checked; approver names fold non-ASCII lookalikes (Kelvin sign) to ASCII. Both are in the gate's `recommendations.future`.
+
 ---
 
 ## Completion
