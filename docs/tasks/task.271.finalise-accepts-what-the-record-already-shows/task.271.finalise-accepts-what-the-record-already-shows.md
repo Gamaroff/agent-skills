@@ -5,7 +5,7 @@ type: task
 description: "Give finalise three recorded arms it lacks, so work that the evidence already clears is no longer halted: a measurement on a code-identical earlier commit, one bounded re-run of a red outside the diff, and a probe reproduction the owner deferred."
 tags: [finalise, observation]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-07
@@ -14,7 +14,7 @@ estimated_effort_hours: 16
 
 # Task 271: finalise accepts what the record already shows
 
-**Status:** Planned
+**Status:** Ready for Review
 
 ---
 
@@ -48,16 +48,16 @@ estimated_effort_hours: 16
 Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 
 - `shared/resources/finalise-dod-ac-prompt.md:72`: "A wall-clock bound decays with every later commit and every change in machine load. Its cited measurement must record the load it ran under … and be taken on the PR's head commit. A figure from an earlier commit, or with no load recorded, is `FAIL` with `note: "re-measure"`." (Task 266 appends a run-count clause to this line.)
-- `shared/resources/ci-tree-equivalence.js:1127` `module.exports`: the docs-only tree-equivalence engine. `skills/finalise/SKILL.md:1261` already uses it for a `PENDING`/`NONE` rollup after the re-sample loop; it exits 0 only for `tree-equivalent`.
-- `skills/finalise/SKILL.md:1162` buckets `FAILURE | TIMED_OUT | ERROR | STARTUP_FAILURE | ACTION_REQUIRED` as FAILURE with no re-run arm.
-- Security Step 3b.1 item 6 (`:758`, `:742`) "Recompute `overall`: FAIL if any check or general … reproduced"; Step 6 then decides IN PROGRESS unless Step 8a's fix-and-recheck applies. A `WAIVED` gate already has `approved_by` and a reason (`:345`–`:353`, `**Waiver**: {waiver.reason} — approved by {waiver.approved_by}`).
+- `shared/resources/ci-tree-equivalence.js:1127` `module.exports`: the docs-only tree-equivalence engine. `skills/finalise/SKILL.md:1368` (anchors re-measured 2026-11-07 on `feature/task.271…`; find them again with `grep -n "ci-tree-equivalence" skills/finalise/SKILL.md`) already uses it for a `PENDING`/`NONE` rollup after the re-sample loop; it exits 0 only for `tree-equivalent`.
+- `skills/finalise/SKILL.md:1238` (the rollup `jq`; `grep -n "TIMED_OUT" skills/finalise/SKILL.md`) buckets `FAILURE | TIMED_OUT | ERROR | STARTUP_FAILURE | ACTION_REQUIRED` as FAILURE with no re-run arm.
+- Security Step 3b.1 item 6 (`:811`, `:795`; `grep -n "Recompute .overall" skills/finalise/SKILL.md`) "Recompute `overall`: FAIL if any check or general … reproduced"; Step 6 then decides IN PROGRESS unless Step 8a's fix-and-recheck applies. A `WAIVED` gate already has `approved_by` and a reason (`:345`–`:353`, `**Waiver**: {waiver.reason} — approved by {waiver.approved_by}`).
 - `recommendations.future[]` is read from the gate at `:322`.
 
 ### Target Architecture
 
 - **Arm 1 (obs #32)**: a measured figure counts when taken on a commit whose code tree equals the head's, by `ci-tree-equivalence.js`; the AC agent cites the equivalence result, not the literal head.
-- **Arm 2 (obs #50)**: when the only red is a test file outside the PR diff and the delta from the last green head is entirely docs (tree-equivalence answers that), re-run the failed job once, record both attempts, and accept only on a green attempt. Separately, find why the fixture template vanishes mid-copy (`fixtureRepo` in `shared/resources/tests/lib/executed-prose.mjs`).
-- **Arm 3 (obs #117)**: a reproduced probe whose case id matches an entry in the gate's `recommendations.future` (or the work item's Deferred Work) that names a follow-up task and an approver is rendered "deferred (owner, date, task)" and not as FAIL, in the shape a `WAIVED` gate uses. No approver or no match stays FAIL.
+- **Arm 2 (obs #50)**: when the only red is a test file outside the PR diff and the delta from the last green head is entirely docs (tree-equivalence answers that), re-run the failed job **exactly once** (owner decision, Phase 1), record both attempts, and accept only on a green second attempt. Separately, find why the fixture template vanishes mid-copy (`fixtureRepo` in `shared/resources/tests/lib/executed-prose.mjs`).
+- **Arm 3 (obs #117)**: a reproduced probe whose case id matches an entry in the gate's `recommendations.future` (or the work item's Deferred Work) that names a follow-up task and an approver, **where the approver is the repository owner** (owner decision, Phase 1; the matcher compares the approver to an owner identity read from a named source, chosen in Phase 4, with a reader and a test, and with no source configured no deferral is accepted), is rendered "deferred (owner, date, task)" and not as FAIL, in the shape a `WAIVED` gate uses. No approver or no match stays FAIL.
 
 ### Important Clarifications
 
@@ -111,9 +111,11 @@ None - each arm only turns a halt into an acceptance when a recorded basis exist
 - `shared/resources/finalise-dod-prompt-contract` test (read/update pin)
 
 **Changes**:
-- [ ] Rewrite the head-commit clause around tree-equivalence and require the agent to cite the equivalence result.
+- [x] Rewrite the head-commit clause around tree-equivalence and require the agent to cite the equivalence result.
 
-**Dependencies**: Phase 1; task 266 if merged (same line).
+**Dependencies**: Phase 1; task 266 is merged (PR #851), so its run-count clause is already on the line and is kept.
+
+The tests that read the AC prompt, to run before and after (found with `git grep -l "finalise-dod-ac-prompt" -- '*.test.*'`): `evals/shared/tests/finalise-dod-prompt-contract.test.mjs`, `shared/resources/tests/finalise-dod-ac-kinds.test.mjs`, `shared/resources/tests/qa-finalise-rules-wiring.test.mjs`. No test pins the removed phrase "taken on the PR's head commit" by literal (`git grep -n "on the PR's head commit" -- '*.test.*'` returns nothing).
 
 ---
 
@@ -122,13 +124,13 @@ None - each arm only turns a halt into an acceptance when a recorded basis exist
 **Risk Level**: High
 
 **Files**:
-- `skills/finalise/SKILL.md` (CI gate near `:1162`, `:1261`)
+- `skills/finalise/SKILL.md` (CI gate: the rollup `jq` near `:1238` and the tree-equivalence block near `:1368`)
 - `skills/finalise/references/finalise-ci-poll.sh` or a sibling script
 - `shared/resources/tests/lib/executed-prose.mjs` (the vanish)
 
 **Changes**:
-- [ ] One recorded re-run when the red test file is outside the diff and the delta is docs-only.
-- [ ] Root-cause the vanishing fixture template.
+- [x] One recorded re-run when the red test file is outside the diff and the delta is docs-only.
+- [x] Root-cause the vanishing fixture template (suspected cause removed, not reproduced; see the implementation report).
 
 **Dependencies**: Phase 1.
 
@@ -144,7 +146,8 @@ None - each arm only turns a halt into an acceptance when a recorded basis exist
 - a matcher script with tests
 
 **Changes**:
-- [ ] Match on case id against `recommendations.future[]` or Deferred Work with a named task and approver; render as deferred with owner, date, task.
+- [x] Match on case id against `recommendations.future[]` or Deferred Work with a named task and an owner approver; render as deferred with owner, date, task.
+- [x] Before adding the matcher script under `shared/resources/`, find the tests that enumerate that directory (`git grep -nE "readdirSync|git ls-files" -- 'tests/*.test.js' 'shared/resources/tests/*.test.mjs'`) and name each in the QA report with what it required of the new file. Run the banned-name pattern from `tests/no-consumer-names.test.js` over any fixture literals.
 
 **Dependencies**: Phase 1.
 
@@ -155,7 +158,7 @@ None - each arm only turns a halt into an acceptance when a recorded basis exist
 **Risk Level**: Low
 
 **Changes**:
-- [ ] `command npm run bundle`, `command npm run bundle -- --check`, tests with mutation proofs.
+- [x] `command npm run bundle`, `command npm run bundle -- --check`, tests with mutation proofs.
 
 **Dependencies**: Phases 2 to 4.
 
@@ -167,15 +170,17 @@ None - each arm only turns a halt into an acceptance when a recorded basis exist
 
 1. ✅ `shared/resources/finalise-dod-ac-prompt.md` - arm 1
 2. ✅ `skills/finalise/SKILL.md` - arms 2 and 3
-3. ✅ `shared/resources/finalise-dod-security-prompt.md` - arm 3
-4. ✅ `skills/finalise/references/finalise-ci-poll.sh` (or sibling) - arm 2
-5. ✅ a deferral matcher script - arm 3, new
-6. ✅ `shared/resources/tests/lib/executed-prose.mjs` - the vanishing template
+3. ✅ `shared/resources/finalise-delta.js` - arms 1 and 2, new (the sibling script the plan allowed for)
+4. ✅ `shared/resources/finalise-deferral-match.js` - arm 3, new
+5. ✅ `shared/resources/tests/lib/executed-prose.mjs` - the vanishing template
+6. ✅ `docs/reference/configuration.md` and `CHANGELOG.md` - the `finalise.deferralApprover` key and the entry
+
+Not modified, against the plan: `finalise-dod-security-prompt.md` (Arm 3 is wired in `SKILL.md` Step 3b.1, where `overall` is recomputed, so the prompt needs no change) and `finalise-ci-poll.sh` (Arm 2 decides in the new engine and reuses the existing poll as it is).
 
 ### Files to Modify (Tests)
 
-7. ✅ `evals/shared/tests/finalise-dod-prompt-contract.test.mjs` - pin update
-8. ✅ new tests per arm beside `shared/resources/tests/finalise-deferred-ci.test.mjs`
+7. ✅ `evals/shared/tests/finalise-dod-prompt-contract.test.mjs` - ran green unchanged (no pin moved)
+8. ✅ new: `shared/resources/tests/finalise-delta.test.mjs`, `finalise-deferral-match.test.mjs`, `executed-prose-no-background-git.test.mjs`
 
 ### Files to Modify (Generated)
 
@@ -190,10 +195,10 @@ None - each arm only turns a halt into an acceptance when a recorded basis exist
 **Scope**: each arm and its refusal.
 
 **Actions**:
-- [ ] Arm 1: a figure on a code-identical earlier commit passes with the equivalence cited; a figure on a commit with a code change fails `re-measure`. **Control**: a docs-only delta that touches a file the measured suite reads is not equivalent.
-- [ ] Arm 2: a red test outside the diff with a docs-only delta triggers one re-run recorded twice and accepts only on green; a red test inside the diff, or a non-docs delta, does not re-run.
-- [ ] Arm 3: a matching case id with task and approver renders deferred; no approver, no match, or a different case id stays FAIL.
-- [ ] Mutation proofs: drop the equivalence check, the in-diff exclusion and the approver requirement; each turns one named test red.
+- [x] Arm 1: a figure on a code-identical earlier commit passes with the equivalence cited; a figure on a commit with a code change fails `re-measure`. **Control**: a docs-only delta that touches a file the measured suite reads is not equivalent.
+- [x] Arm 2: a red test outside the diff with a docs-only delta triggers one re-run recorded twice and accepts only on green; a red test inside the diff, or a non-docs delta, does not re-run.
+- [x] Arm 3: a matching case id with task and approver renders deferred; no approver, no match, or a different case id stays FAIL.
+- [x] Mutation proofs: drop the equivalence check, the in-diff exclusion and the approver requirement; each turns one named test red.
 
 **Command**: `CI=true command node --test` on the named files.
 
@@ -315,6 +320,9 @@ None - each arm only turns a halt into an acceptance when a recorded basis exist
 | ---------- | ------- | ---------------------------------------------------- | ----------- |
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #32, #50, #117 | create-task |
 | 2026-11-07 | 1.1     | Phase 1 owner decisions recorded in the plan; all three arms approved (Arm 3 owner-only approval) | Claude      |
+| 2026-11-07 | 1.2     | Review passed (9/10): anchors re-measured, owner-only approver and exactly-once re-run stated, test-enumeration step added | review-task |
+| 2026-11-07 |         | Status → ready-for-development | review-task |
+| 2026-11-07 | 1.3     | Developed: `finalise-delta.js` (Arms 1 and 2), `finalise-deferral-match.js` (Arm 3), AC prompt and SKILL.md wiring, `finalise.deferralApprover`, fixture background-git fix; `ci:fast` green | develop |
 <!-- change-log-end -->
 
 ---
@@ -325,16 +333,16 @@ None - each arm only turns a halt into an acceptance when a recorded basis exist
 - [x] Three answers recorded
 
 ### Phase 2: Arm 1
-- [ ] Equivalent-commit measurement
+- [x] Equivalent-commit measurement
 
 ### Phase 3: Arm 2
-- [ ] Bounded re-run, vanishing template
+- [x] Bounded re-run, vanishing template
 
 ### Phase 4: Arm 3
-- [ ] Deferred reproduction
+- [x] Deferred reproduction
 
 ### Phase 5: Bundle and sweep
-- [ ] Mutation proofs, bundle clean
+- [x] Mutation proofs, bundle clean
 
 ---
 
@@ -358,4 +366,4 @@ The measured-criteria card (finalise takes the measurement itself).
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review
