@@ -8,7 +8,7 @@ category: refactoring
 status: ready-for-review
 priority: Medium
 created: 2026-11-06
-updated: 2026-11-06
+updated: 2026-11-07
 estimated_effort_hours: 8
 ---
 
@@ -332,6 +332,29 @@ Two medium edge cases remain in the Step 4 guard: shell metacharacters in a path
 - **T268-QA-10** (MEDIUM) — carried to gate 5 `recommendations.future` (QA budget spent, cycle 5): shell metacharacters in a changed path are expanded by the double-quoted slot assignment in qa-fix Step 4; substitute through a single-quoted heredoc or refuse them, with a hostile probe case.
 - **T268-QA-11** (MEDIUM) — carried to gate 5 `recommendations.future` (QA budget spent, cycle 5): a path in a nested repository or behind a symlinked directory reads clean in the Step 4 guard; refuse or document it.
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS (stays `ready-for-review`)
+
+Security (18 probes, 0 reproduced), compliance (not applicable) and docs/changelog pass. Four acceptance criteria are not met as written.
+
+### Missing Criteria:
+
+- [ ] Functional #3: Step 7 warns and posts instead of refusing when trigger (b) holds and the block is absent, and no fixture run of the check is recorded in a QA report.
+- [ ] Functional #1: no QA report lists the eight rules with their observations.
+- [ ] Functional #2: no per-rule fixture and control record against the final `SKILL.md`.
+- [ ] Performance #4: the recorded median is about +29% (192 s vs 247 s), taken under load at an earlier commit.
+
+### Next Steps:
+
+- Decide #3 (make the check refuse, or amend the criterion), then record the fixture run.
+- Write the eight-rule list and per-rule results into a QA report; re-measure the suite time on a quiet machine or amend #4.
+- Re-run `/finalise`.
+
+**Estimated Effort:** Small to Medium.
+
+**Detailed Verification Log:** See `task.268.dod.1.qa-fix-finds-the-whole-defect-the-first-time.md`.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -349,6 +372,7 @@ Two medium edge cases remain in the Step 4 guard: shell metacharacters in a path
 | 2026-11-06 |         | QA gate CONCERNS (80/100) — 2 findings | qa-task     |
 | 2026-11-06 |         | QA findings fixed — Step 4 guard matches paths literally and refuses a nonexistent path; two more mutants proven, 1 iteration | qa-fix      |
 | 2026-11-06 |         | QA gate CONCERNS (80/100) — 2 findings, both deferred (budget spent) | qa-task     |
+| 2026-11-07 |         | DoD incomplete — 4 gaps identified | finalise    |
 <!-- change-log-end -->
 
 ---
