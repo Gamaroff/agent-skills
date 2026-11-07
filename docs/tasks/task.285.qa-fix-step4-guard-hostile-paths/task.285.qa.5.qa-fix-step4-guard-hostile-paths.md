@@ -108,7 +108,7 @@ None promoted. CR-1 is high severity at medium confidence and so stays advisory 
 ## NFR Assessment
 
 ### Performance — PASS
-Measured at Step 5c (head `03de471a`, load 0.85 to 1.33): whole suite `CI=true npm test` took 171 s once, exit 0, `uptime` load average 1.13 beside the run. Slowest new case 564 ms (bound 1000 ms). The qa-fix test files alone went from a 1356 ms median on `develop` to 5018 ms on the branch over five alternating pairs (+270%); the first Performance criterion was amended at 5c, with approval, to the one whole-suite measurement above.
+Measured at Step 5c (head `03de471a`, load 0.85 to 1.33): whole suite `CI=true npm test` took 171 s once, exit 0, `uptime` load average 1.13 beside the run. Slowest new case, re-measured at /finalise on PR head `89583494` with `CI=true command node --test --test-reporter=spec tests/qa-fix-step4-guard.test.js`, five runs, each exit 0 with 37 of 37 passing and the load average read from `/proc/loadavg` just before it (about 2.04 to 2.14, one other process busy): slowest case per run 569, 572, 584, 564 and 633 ms, median 572 ms, worst 633 ms (bound 1000 ms). The earlier single figure, 564 ms at `03de471a` under load 0.85 to 1.33, agrees. The qa-fix test files alone went from a 1356 ms median on `develop` to 5018 ms on the branch over five alternating pairs (+270%); the first Performance criterion was amended at 5c, with approval, to the one whole-suite measurement above.
 
 ### Reliability — PASS
 37 of 37 tests pass with `CI=true`.
