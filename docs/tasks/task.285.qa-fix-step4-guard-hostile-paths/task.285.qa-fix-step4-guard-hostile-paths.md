@@ -10,11 +10,13 @@ priority: Medium
 created: 2026-11-07
 updated: 2026-11-07
 estimated_effort_hours: 4
+github_issue: 855
 ---
 
 # Task 285: qa-fix Step 4 guard survives hostile paths
 
 **Status:** Planned
+**GitHub Issue**: [#855](https://github.com/Gamaroff/agent-skills/issues/855)
 
 ---
 
@@ -294,6 +296,7 @@ None.
 | Date       | Version | Description                                                                          | Author      |
 | ---------- | ------- | ------------------------------------------------------------------------------------ | ----------- |
 | 2026-11-07 | 1.0     | Initial draft — cut from task 268 gate 5 T268-QA-10, T268-QA-11 and two advisories | create-task |
+| 2026-11-07 |         | GitHub issue created (#855)                                                          | sync-github-task |
 <!-- change-log-end -->
 
 ---
