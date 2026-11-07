@@ -34,7 +34,7 @@ Close three finalise bookkeeping gaps: a GAPS bug DoD that reads as accepted, se
 | 1. create-branch           | ✅ Done | Branch `feature/task.270.*` exists in git                              | Branch created at `7e73adaf` | —                    | 2026-11-07T00:00Z |
 | 2. review-task             | ✅ Done | `task.270.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT 8/10; 4 Important fixed in task + plan; run inline, no pre-pass subagents | —                    | 2026-11-07T17:14Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Implemented inline (plan + surface map); ci:fast 8011 pass / 0 fail | —                    | 2026-11-07T17:26Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
+| 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #858 (no issue linked, so no comment) | —                    | 2026-11-07T17:27Z |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.270.qa.{N}.*.md`; `task.270.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.270.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
@@ -85,7 +85,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: {populated after Step 1}
-**PR**: {populated after Step 4}
+**PR**: #858 https://github.com/Gamaroff/agent-skills/pull/858
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
