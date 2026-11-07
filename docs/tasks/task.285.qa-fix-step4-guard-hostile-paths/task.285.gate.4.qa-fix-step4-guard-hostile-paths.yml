@@ -1,0 +1,71 @@
+schema: 2
+task: 'task.285.qa-fix-step4-guard-hostile-paths'
+task_title: 'qa-fix Step 4 guard survives hostile paths'
+gate: FAIL
+status_reason: 'T285-QA-3 and T285-QA-4 are fixed, but the safety re-probe found the same class again: the parent walk never tests the changed path itself, so a nested repository root (a gitlink) with an untracked file inside reads clean.'
+reviewer: 'QA Engineer'
+head: '1d543eedc884f1d56150ecfccd286c1a9ede4684'
+updated: '2026-11-07T05:50:28Z'
+
+top_issues:
+  - id: 'T285-QA-6'
+    severity: high
+    file: 'skills/qa-fix/SKILL.md'
+    finding: 'The boundary walk starts at dirname of each changed path and never tests the path itself. Reproduced by the reviewer and again by QA in bash and zsh: a changed path that is a nested repository root (smod, a tracked gitlink) holding an untracked file (smod/untrackedInSub) exits 0 with no output, as do smod/ and ../smod. git ls-files --others lists nothing for it, and neither the symlink test nor the .git test ever looks at smod. The longer spelling smod/x is refused, so the same state is refused or passed depending only on whether the path stops at the root of the nested repository.'
+    suggested_action: 'Run the symlink test and the .git-strictly-below-TOP test on the path itself as well as on its parents (start the loop at the path, or test it before the dirname loop). Add gitlink and tracked-symlink scenarios with a mutant each, and a regression case for an absolute path through an external symlink that points back into the repository (CR-3).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 30
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    boundary: true
+    probes_executed: 34
+    escaped: 0
+    boundary_signals: ['refused', 'is refused']
+    notes: 'The 17 probe cases (34 runs, bash and zsh) pass with 0 escaped against this commit. The corpus has no gitlink or tracked-symlink case, so T285-QA-6 passed it; the reviewer and QA reproduced it by running the block directly in a scratch repository. Record: task.285.qa.4.qa-fix-step4-guard-hostile-paths.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'T285-QA-6: a nested repository root or a tracked symlink passed as the path itself reads as clean.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Four cycles in a row found a false clean in the same text-based walk; each fix closed the shape named and left the neighbouring shape. The unexamined inputs are now the path itself and external-symlink parents.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 1
+  note: 'T285-QA-3, T285-QA-4 and T285-QA-5 verified fixed: out-and-back, dotdot-after-symlink and trailing-slash scenarios are refused in bash and zsh, each held by a scenario and a mutant.'
+
+recommendations:
+  immediate:
+    - action: 'Fix T285-QA-6 (test the path itself). Fold in CR-2 (a tracked symlink to a directory with untracked files beneath it reads clean for tl, tl/ and tl2 while tl/new is refused) and CR-3 (external-symlink parent: add the regression case, correct the prose).'
+      refs: ['skills/qa-fix/SKILL.md', 'tests/qa-fix-step4-guard.test.js']
+  future:
+    - action: 'Memoise the physical-path check per distinct parent directory if the changed-path list ever grows large.'
+      refs: ['skills/qa-fix/SKILL.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T285-QA-6 fixed']

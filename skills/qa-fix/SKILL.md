@@ -854,16 +854,25 @@ magic is not interpreted, and a path that is neither on disk nor tracked is refu
 `git ls-files` lists nothing for it and "found nothing" would read as "clean". A path below a
 symlinked directory or a nested repository is refused too, naming it: the untracked listing cannot
 look through either, so it prints nothing for them, which is "could not look" and not "clean"
-(T268-QA-11). Trailing slashes are stripped first, because `git ls-files -- link/` lists nothing
-for a symlink `link` that `link` alone reports (T285-QA-3). The walk then visits **every** parent of
-a path up to the filesystem root and never stops early, because a stop at the repository root lets
-an earlier symlink in the same path (`sub/out/repo/sub/new`, `sub/self/../real/new`) read as clean
-(T285-QA-3). A parent that is a symlink is refused when the directory holding the link resolves
-inside the repository (`cd -P`, `pwd -P`), and refused when that cannot be resolved; a link outside
-the repository, such as a symlinked prefix of an absolute path, is admitted. A parent holding a
-`.git` is refused only when it lies strictly below the repository root, found by comparing
-**physical** paths and not the path text: the root's own `.git`, reached through `..`, is not a
-nested repository (T285-QA-1, T285-QA-2):
+(T268-QA-11). The check decides on **physical identity**, one path at a time, and does not walk the
+path's parents (a text walk was patched four times and left a neighbour each time: T285-QA-1 to
+T285-QA-6). For each path on disk it computes two spellings of the same place: the **lexical** one,
+the working directory's physical path joined to the path with `.` and `..` folded away in text,
+which is how git reads it; and the **physical** one, where every symlink in the directory part and
+a directory named as the path is followed (`cd -P`, `pwd -P`). A path whose lexical spelling
+is inside the repository and differs from its physical one passes through a symlink, so the
+untracked listing cannot look through it and the path is refused. That covers a link to the root, a
+link that leaves and returns, a `..` after a link, a trailing slash on a link, and a tracked link
+to a directory standing as the path itself. A symlink to a file standing as the path is a plain
+file to git, with nothing beneath it, and is not refused. A path whose lexical spelling is outside the repository, such as a
+symlinked prefix of an absolute path, is not judged here: git maps it itself, and a link outside the
+repository that points back inside is stopped by `git ls-files`, which cannot map the path and
+reports "could not look" (T285-CR-3). The second question is asked of git: the path's own
+directory (the path itself when it is a directory) must report the repository's top level, and
+another top level means a nested repository, which covers a submodule or nested root named as the
+path itself and anything below it (T285-QA-6). A directory git cannot report on, such as `.git`,
+is not refused. A path that is not on disk is skipped here, because the
+check above already accepted it as tracked and there is nothing on disk to look through:
 
 ```bash
 IFS= read -r -d '' CHANGED_PATHS <<'QA_FIX_CHANGED_PATHS_END' || true
@@ -877,26 +886,33 @@ esac
 case "$CHANGED_PATHS" in
   *\\*|*\'*|*\"*) echo "HALT: a changed path holds a backslash, single quote or double quote — xargs reads those as syntax and would judge a different path"; exit 1 ;;
 esac
-CHANGED_PATHS=$(printf '%s\n' "$CHANGED_PATHS" | tr -s ' \t' '\n\n' | grep -v '^$' | sed -e 's#\(.\)/*$#\1#')
 MISSING=$(printf '%s\n' "$CHANGED_PATHS" | tr -s ' \t' '\n\n' | grep -v '^$' \
   | while IFS= read -r p; do [ -e "$p" ] || git --literal-pathspecs ls-files --error-unmatch -- "$p" >/dev/null 2>&1 || printf '%s\n' "$p"; done)
 [ -z "$MISSING" ] \
   || { echo "HALT: these changed paths are neither on disk nor tracked — a mistyped path lists nothing and would read as clean:"; printf '%s\n' "$MISSING"; exit 1; }
 TOP=$(git rev-parse --show-toplevel 2>/dev/null) || TOP=""
-BOUNDARY=$(printf '%s\n' "$CHANGED_PATHS" | tr -s ' \t' '\n\n' | grep -v '^$' \
-  | while IFS= read -r p; do
-      d=$p
-      while d=$(dirname -- "$d"); [ "$d" != "." ] && [ "$d" != "/" ]; do
-        if [ -L "$d" ]; then
-          PP=$(cd -P -- "$(dirname -- "$d")" 2>/dev/null && pwd -P) || PP=""
-          case "$PP/" in "$TOP"/*|/) printf '%s\n' "$p"; break ;; esac
+[ -z "$TOP" ] || TOP=$(cd -P -- "$TOP" 2>/dev/null && pwd -P) || TOP=""
+norm() { awk -F/ '{ n = 0; for (i = 1; i <= NF; i++) { if ($i == "" || $i == ".") continue; if ($i == "..") { if (n > 0) n--; continue }; s[++n] = $i }; out = ""; for (i = 1; i <= n; i++) out = out "/" s[i]; print (out == "" ? "/" : out) }'; }
+CWD_PHYS=$(pwd -P)
+BOUNDARY=""
+if [ -n "$TOP" ]; then
+  BOUNDARY=$(printf '%s\n' "$CHANGED_PATHS" | tr -s ' \t' '\n\n' | grep -v '^$' \
+    | while IFS= read -r p; do
+        [ -e "$p" ] || continue
+        case "$p" in /*) LEX=$(printf '%s\n' "$p" | norm) ;; *) LEX=$(printf '%s\n' "$CWD_PHYS/$p" | norm) ;; esac
+        case "$LEX/" in "$TOP"/*) INSIDE=1 ;; *) INSIDE="" ;; esac
+        if [ -d "$p" ]; then
+          DIR=$p; PHYS=$(cd -P -- "$p" 2>/dev/null && pwd -P) || PHYS=""
+        else
+          DIR=$(dirname -- "$p"); PHYS=$(cd -P -- "$DIR" 2>/dev/null && pwd -P) || PHYS=""
+          if [ -z "$PHYS" ]; then PHYS=""; else PHYS="$PHYS/$(basename -- "$p")"; fi
         fi
-        PHYS=$(cd -P -- "$d" 2>/dev/null && pwd -P) || PHYS=""
-        if [ -e "$d/.git" ] && [ "$PHYS" != "$TOP" ]; then
-          case "$PHYS/" in "$TOP"/*) printf '%s\n' "$p"; break ;; esac
-        fi
-      done
-    done)
+        if [ -n "$INSIDE" ] && [ "$PHYS" != "$LEX" ]; then printf '%s\n' "$p"; continue; fi
+        NEST=$(git -C "$DIR" rev-parse --show-toplevel 2>/dev/null) || NEST=""
+        [ -z "$NEST" ] || NEST=$(cd -P -- "$NEST" 2>/dev/null && pwd -P) || NEST=""
+        if [ -n "$INSIDE" ] && [ -n "$NEST" ] && [ "$NEST" != "$TOP" ]; then printf '%s\n' "$p"; fi
+      done)
+fi
 [ -z "$BOUNDARY" ] \
   || { echo "HALT: these changed paths sit below a symlink or a nested repository — the untracked listing cannot look through either, so \"nothing listed\" would read as clean:"; printf '%s\n' "$BOUNDARY"; exit 1; }
 UNTRACKED=$(printf '%s\n' "$CHANGED_PATHS" | tr -s ' \t' '\n\n' | grep -v '^$' | xargs git --literal-pathspecs ls-files --others --exclude-standard --) \
