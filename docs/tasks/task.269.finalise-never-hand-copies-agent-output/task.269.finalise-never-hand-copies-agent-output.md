@@ -5,7 +5,8 @@ type: task
 description: "Give finalise Steps 3b.1 and 3c a transcription-free route for the security probe plan and the AC agent's YAML, and a byte check, so a model reply is never retyped into a file that decides acceptance."
 tags: [finalise, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
+completed_date: 2026-11-07
 pr_number: 857
 priority: Medium
 created: 2026-11-06
@@ -15,7 +16,7 @@ estimated_effort_hours: 16
 
 # Task 269: finalise never hand-copies agent output
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 ---
 
@@ -316,21 +317,28 @@ None - `cases_file:` is an optional field; inline `cases` keeps working.
 ### Key Findings
 No open finding. Cycle 4 reviewed the one test assertion added while closing DoD criterion 7; removing the guard it holds turns it red.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded)
 
-**Status:** IN PROGRESS (run 1)
+Run 1 found two record gaps (criteria 6 and 7). They were closed with evidence in the `qa.3` addendum and graded again in run 2. See `task.269.dod.1.finalise-never-hand-copies-agent-output.md`.
 
-### Missing Criteria:
+## Definition of Done - PASSED ✅
 
-- [ ] Criterion 6: five timed runs with `/proc/loadavg` beside each, on the PR head (evidence now in the `qa.3` addendum; awaiting a graded re-run)
-- [ ] Criterion 7: a mutation proof for each new refusal (13 new proofs in the `qa.3` addendum; awaiting a graded re-run)
+**Status:** ACCEPTED
 
-### Next Steps:
+All Definition of Done criteria were verified in run 2 (a scoped re-run of run 1):
 
-- QA cycle 4 on the test assertion added while closing criterion 7, then 5c
-- Re-run `/finalise` (scoped: only criteria 6 and 7 are re-judged)
+✅ **Acceptance Criteria:** 10 of 10 met (7 re-judged, 3 carried); criteria 6 and 7 now rest on the `qa.3` addendum
+✅ **QA Gate:** PASS (100/100), gate 4; the 5c PR review 2 is APPROVE
+✅ **Security Review:** PASS; 10 probes executed against `casesFileAccepted`, 0 reproduced
+✅ **Compliance Review:** not applicable (internal tooling)
+✅ **Documentation:** `CHANGELOG.md` cites task 269; `skills/finalise/SKILL.md` updated
+✅ **CI:** SUCCESS on the decision head `e8a9f4d6`
 
-**Detailed Verification Log:** See `task.269.dod.1.finalise-never-hand-copies-agent-output.md`.
+**Recommendation for the owner:** consider requiring the `*.security.cases.json` name pattern for `cases_file` (recorded in `gate.4`).
+
+**Task marked as ACCEPTED on:** 2026-11-07
+
+**Detailed Verification Log:** See `task.269.dod.2.finalise-never-hand-copies-agent-output.md`.
 
 <!-- change-log-start -->
 ## Change Log
@@ -348,6 +356,7 @@ No open finding. Cycle 4 reviewed the one test assertion added while closing DoD
 | 2026-11-07 |         | QA gate PASS (100/100) — 0 findings                      | qa-task     |
 | 2026-11-07 |         | DoD incomplete — 2 gaps identified (criteria 6, 7: records)    | finalise    |
 | 2026-11-07 |         | QA gate PASS (100/100) — 0 findings (cycle 4)            | qa-task     |
+| 2026-11-07 | 1.2     | DoD passed — accepted (PR #857)                          | finalise    |
 <!-- change-log-end -->
 
 ---
@@ -388,4 +397,4 @@ If Phase 1 finds no file route, file the AC half as its own task.
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
