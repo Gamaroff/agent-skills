@@ -212,7 +212,7 @@ None - prose only. The `Narrowing residue:` / `Move:` shape is unchanged; the `M
 
 - [ ] Each of the eight rules is present in `skills/qa-fix/SKILL.md`, citing its observation; the list is in the QA report.
 - [ ] Each rule fires on its fixture and not on its control, recorded per rule in the QA report.
-- [ ] A Step 7 post is warned about (the block is added, then the post goes ahead; the check never halts the cycle) when trigger (b) holds and the block is absent, shown by running the check on a fixture set recorded in the QA report.
+- [ ] A Step 7 post is warned about (the block is added, then the post goes ahead; the check never halts the cycle) when trigger (b) holds and the block is absent, shown by running the check on a fixture set recorded in the QA report. (Reworded from "refused" after review; approved by Lorien Gamaroff, 2026-11-07.)
 
 ### Performance
 
