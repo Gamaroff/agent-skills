@@ -31,6 +31,13 @@ const GIT = {
 const BRACE_REFUSAL =
   "HALT: CHANGED_PATHS is empty or still holds a brace — substitute the paths this fix touched\n";
 
+const MISSING_HEAD =
+  "HALT: these changed paths are neither on disk nor tracked — a mistyped path lists nothing and would read as clean:\n";
+const QUOTE_REFUSAL =
+  "HALT: a changed path holds a backslash, single quote or double quote — xargs reads those as syntax and would judge a different path\n";
+const BOUNDARY_REFUSAL =
+  'HALT: these changed paths sit below a symlink or a nested repository — the untracked listing cannot look through either, so "nothing listed" would read as clean:\n';
+
 const CASES = [
   {
     id: "empty",
@@ -125,6 +132,93 @@ const CASES = [
       exit: 1,
     },
   },
+  // T268-QA-10: the slot is substituted as TEXT, so a path holding shell syntax must reach the block
+  // as data. Each case asserts the marker file it would create stays absent AND that the guard
+  // refuses for the named reason (a path that merely does not exist), not because the shell ran it.
+  {
+    id: "meta-substitution",
+    input: "$(touch pwned)",
+    why: "a command substitution in a path must not run",
+    correct: "refused",
+    direction: "hostile",
+    fixture: { files: { ...GIT, "other/x": "x\n" } },
+    expected: {
+      stdout: MISSING_HEAD + "$(touch\npwned)\n",
+      exit: 1,
+      absent: ["pwned"],
+    },
+  },
+  {
+    id: "meta-backtick",
+    input: "`touch pwned2`",
+    why: "a backtick substitution in a path must not run",
+    correct: "refused",
+    direction: "hostile",
+    fixture: { files: { ...GIT, "other/x": "x\n" } },
+    expected: {
+      stdout: MISSING_HEAD + "`touch\npwned2`\n",
+      exit: 1,
+      absent: ["pwned2"],
+    },
+  },
+  {
+    id: "meta-variable",
+    input: "$HOME/x",
+    why: "a variable reference in a path must reach the guard literally, not expanded",
+    correct: "refused",
+    direction: "hostile",
+    fixture: { files: { ...GIT, "other/x": "x\n" } },
+    expected: { stdout: MISSING_HEAD + "$HOME/x\n", exit: 1 },
+  },
+  // xargs (no -0) reads quotes and backslashes as syntax: an unmatched quote fails loudly, but a
+  // trailing backslash is silently consumed, so `a\` is judged as `a` and an untracked `a\` reads clean.
+  {
+    id: "backslash-mutation",
+    input: "a\\",
+    why: "a path ending in a backslash is judged as a different path by xargs",
+    correct: "refused",
+    direction: "hostile",
+    fixture: { files: { ...GIT, ".gitignore": "a\n", a: "x\n", "a\\": "x\n" } },
+    expected: { stdout: QUOTE_REFUSAL, exit: 1 },
+  },
+  {
+    id: "single-quote",
+    input: "a'b",
+    why: "a single quote in a path is syntax to xargs",
+    correct: "refused",
+    direction: "hostile",
+    fixture: { files: { ...GIT, "other/x": "x\n" } },
+    expected: { stdout: QUOTE_REFUSAL, exit: 1 },
+  },
+  {
+    id: "double-quote",
+    input: 'a"b',
+    why: "a double quote in a path is syntax to xargs",
+    correct: "refused",
+    direction: "hostile",
+    fixture: { files: { ...GIT, "other/x": "x\n" } },
+    expected: { stdout: QUOTE_REFUSAL, exit: 1 },
+  },
+  // T268-QA-11: the untracked listing cannot look below a nested repository, so "nothing listed" is
+  // "could not look", not "clean". (A symlinked directory needs a real symlink, which a fixture file
+  // cannot be: it is held by the direct-runner tests below.)
+  {
+    id: "nested-repo",
+    input: "inner/f",
+    why: "a path below a nested repository lists nothing and would read as clean",
+    correct: "refused",
+    direction: "hostile",
+    fixture: {
+      files: {
+        ...GIT,
+        "inner/.git/HEAD": "ref: refs/heads/main\n",
+        "inner/.git/objects/.keep": "",
+        "inner/.git/refs/.keep": "",
+        "inner/f": "x\n",
+      },
+    },
+    expected: { stdout: BOUNDARY_REFUSAL + "inner/f\n", exit: 1 },
+  },
   {
     id: "multi-clean",
     input: "ignored ignored2",
@@ -216,6 +310,21 @@ const MUTANTS = [
     from: '[ -z "$MISSING" ]',
     to: '[ -z "" ]',
   },
+  {
+    name: "T268-QA-10: the slot is substituted into a double-quoted assignment, so the shell runs it",
+    from: "IFS= read -r -d '' CHANGED_PATHS <<'QA_FIX_CHANGED_PATHS_END' || true\n{changed-paths}\nQA_FIX_CHANGED_PATHS_END",
+    to: 'CHANGED_PATHS="{changed-paths}"',
+  },
+  {
+    name: "task 285: backslashes and quotes reach xargs, which reads them as syntax",
+    from: String.raw`*\\*|*\'*|*\"*)`,
+    to: '*"@never-matches@"*)',
+  },
+  {
+    name: "T268-QA-11: a nested repository is not refused, so nothing listed reads as clean",
+    from: 'if [ -n "$INSIDE" ] && [ -n "$NEST" ] && [ "$NEST" != "$TOP" ]; then',
+    to: "if false; then",
+  },
 ];
 
 for (const m of MUTANTS) {
@@ -284,7 +393,440 @@ test("Step 4 guard: fails closed when git cannot look (not a repository)", () =>
       refused.length > 0 && refused.every((c) => c.outcome === "rejected"),
       JSON.stringify(out.cases),
     );
+    // `rejected` with an `expected` means the stdout matched it exactly (a mismatch scores
+    // `accepted` with a detail), so these pin the REASON: the "could not look" refusal, exit 1.
+    assert.ok(
+      refused.every((c) => c.detail === null && c.exit === 1),
+      JSON.stringify(refused),
+    );
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ---------------------------------------------------------------------------------------------
+// Direct runs: cases a fence: fixture cannot express. `fixture.files` writes regular files only,
+// so a symlink, a real index (tracked, deleted-tracked, intent-to-add) and an absolute path cannot
+// be fixtures. The block is run under each shell in a throwaway real repository instead.
+
+const SHELLS = [
+  "bash",
+  ...(spawnSync("zsh", ["-c", "true"]).status === 0 ? ["zsh"] : []),
+];
+const NO_RC = { bash: ["--noprofile", "--norc"], zsh: ["-f"] };
+
+async function stepBlock(src) {
+  const { extractFencedBlock } = await import(
+    require("node:url").pathToFileURL(ENGINE).href
+  );
+  const r = extractFencedBlock(src, "Step 4: Validate");
+  assert.ok(r.ok, r.detail);
+  return r.code;
+}
+
+function git(cwd, ...args) {
+  const r = spawnSync("git", args, {
+    cwd,
+    encoding: "utf8",
+    env: {
+      PATH: process.env.PATH,
+      HOME: cwd,
+      GIT_CONFIG_GLOBAL: "/dev/null",
+      GIT_CONFIG_NOSYSTEM: "1",
+    },
+  });
+  assert.equal(r.status, 0, `git ${args.join(" ")}: ${r.stderr}`);
+}
+
+// `setup(dir)` builds the repository; `input(dir)` is the slot text. Returns one result per shell.
+function runDirect(block, setup, input, cwdOf = (d) => d) {
+  const dir = fs.realpathSync(
+    fs.mkdtempSync(path.join(os.tmpdir(), "qa-fix-step4-d-")),
+  );
+  try {
+    git(dir, "init", "-q");
+    setup(dir);
+    const script = block.replaceAll("{changed-paths}", () => input(dir));
+    return SHELLS.map((shell) => {
+      const r = spawnSync(shell, [...NO_RC[shell], "-c", script], {
+        cwd: cwdOf(dir),
+        encoding: "utf8",
+        env: {
+          PATH: process.env.PATH,
+          HOME: dir,
+          GIT_CONFIG_GLOBAL: "/dev/null",
+          GIT_CONFIG_NOSYSTEM: "1",
+          LC_ALL: "C",
+        },
+      });
+      return { shell, status: r.status, stdout: r.stdout };
+    });
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(dir + "-link", { force: true }); // the symlinked-prefix scenario's link, outside dir
+    fs.rmSync(dir + "-ext", { recursive: true, force: true }); // the external-symlink scenario's directory
+  }
+}
+
+const write = (dir, rel, content = "x\n") => {
+  fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
+  fs.writeFileSync(path.join(dir, rel), content);
+};
+
+const ADMITTED = [
+  {
+    id: "tracked",
+    setup: (d) => {
+      write(d, "t.txt");
+      git(d, "add", "t.txt");
+    },
+    input: () => "t.txt",
+  },
+  {
+    // On disk: no. In the index: yes. Only `--error-unmatch` tells this from a mistyped path.
+    id: "deleted-tracked",
+    setup: (d) => {
+      write(d, "t.txt");
+      git(d, "add", "t.txt");
+      fs.rmSync(path.join(d, "t.txt"));
+    },
+    input: () => "t.txt",
+  },
+  {
+    id: "intent-to-add",
+    setup: (d) => {
+      write(d, "n.txt");
+      git(d, "add", "-N", "n.txt");
+    },
+    input: () => "n.txt",
+  },
+  {
+    // An absolute path sits under the root's own `.git`, which is not a nested repository: the
+    // path's directory must report the repository's own top level.
+    id: "absolute-inside-repo",
+    setup: (d) => {
+      write(d, "sub/f");
+      git(d, "add", "sub/f");
+    },
+    input: (d) => path.join(d, "sub", "f"),
+  },
+  {
+    // A tracked symlink to a FILE is a plain file to git with nothing beneath it: it is not a
+    // boundary, and refusing it would block every change to such a link.
+    id: "tracked-file-symlink-as-path",
+    setup: (d) => {
+      write(d, "t.txt");
+      fs.symlinkSync("t.txt", path.join(d, "fl"));
+      git(d, "add", "t.txt", "fl");
+    },
+    input: () => "fl",
+  },
+  {
+    // A deleted tracked file in a deleted directory has nothing on disk to look through: it is
+    // skipped by the boundary check, not refused because its parent cannot be resolved.
+    id: "deleted-tracked-in-deleted-dir",
+    setup: (d) => {
+      write(d, "gone/t.txt");
+      git(d, "add", "gone/t.txt");
+      fs.rmSync(path.join(d, "gone"), { recursive: true });
+    },
+    input: () => "gone/t.txt",
+  },
+  {
+    // T285-QA-1: run from a subdirectory, a path that climbs out with `..` reaches the root through
+    // text that never equals the root's path. The lexical spelling must fold `..` before the compare.
+    id: "dotdot-from-subdirectory",
+    setup: (d) => {
+      write(d, "real/g");
+      write(d, "a/b");
+      git(d, "add", "real/g", "a/b");
+    },
+    cwd: (d) => path.join(d, "a"),
+    input: () => "../real/g",
+  },
+  {
+    // T285-QA-1: an absolute path that reaches the repository through a symlinked prefix.
+    id: "symlinked-prefix",
+    setup: (d) => {
+      write(d, "sub/f");
+      git(d, "add", "sub/f");
+      fs.symlinkSync(d, d + "-link");
+    },
+    input: (d) => path.join(d + "-link", "sub", "f"),
+  },
+];
+
+for (const c of ADMITTED) {
+  test(`Step 4 guard: admits ${c.id}`, async () => {
+    const block = await stepBlock(SKILL_SRC);
+    for (const r of runDirect(block, c.setup, c.input, c.cwd)) {
+      assert.deepEqual(
+        [r.status, r.stdout],
+        [0, ""],
+        `${r.shell}: ${r.stdout}`,
+      );
+    }
+  });
+}
+
+test("Step 4 guard: refuses a path below a symlinked directory, naming it", async () => {
+  const block = await stepBlock(SKILL_SRC);
+  const results = runDirect(
+    block,
+    (d) => {
+      write(d, "real/f");
+      fs.symlinkSync("real", path.join(d, "link"));
+    },
+    () => "link/f",
+  );
+  for (const r of results) {
+    assert.deepEqual(
+      [r.status, r.stdout],
+      [1, BOUNDARY_REFUSAL + "link/f\n"],
+      r.shell,
+    );
+  }
+});
+
+// Paths the guard must not read as clean. Each reaches an untracked file through a symlink that
+// `git ls-files --others` cannot look through, so "nothing listed" would be a false clean:
+// T285-QA-2 (a link back to the root), T285-QA-3 (a link that leaves the repo and returns, a link
+// followed by `..`, a trailing slash on a link).
+const REFUSED = [
+  {
+    id: "rootlink",
+    setup: (d) => {
+      write(d, "real/tracked");
+      git(d, "add", "real/tracked");
+      write(d, "real/new");
+      fs.symlinkSync(".", path.join(d, "rootlink"));
+    },
+    input: () => "rootlink/real/new",
+    expect: (r, input) =>
+      r.status === 1 && r.stdout === BOUNDARY_REFUSAL + input + "\n",
+  },
+  {
+    id: "out-and-back",
+    setup: (d) => {
+      write(d, "sub/new");
+      fs.symlinkSync("../..", path.join(d, "sub", "out"));
+    },
+    input: (d) => "sub/out/" + path.basename(d) + "/sub/new",
+    expect: (r, input) =>
+      r.status === 1 && r.stdout === BOUNDARY_REFUSAL + input + "\n",
+  },
+  {
+    id: "dotdot-after-symlink",
+    setup: (d) => {
+      write(d, "real/new");
+      write(d, "sub/x");
+      fs.symlinkSync("../sub", path.join(d, "sub", "self"));
+    },
+    input: () => "sub/self/../real/new",
+    expect: (r, input) =>
+      r.status === 1 && r.stdout === BOUNDARY_REFUSAL + input + "\n",
+  },
+  {
+    // `link/` lists nothing where `link` lists the symlink. The lexical spelling drops the slash, so
+    // the path is a symlink whichever way it is written, and the path printed is the one given.
+    id: "trailing-slash-link",
+    setup: (d) => {
+      write(d, "real/new");
+      fs.symlinkSync("real", path.join(d, "link"));
+    },
+    input: () => "link/",
+    expect: (r) => r.status === 1 && r.stdout === BOUNDARY_REFUSAL + "link/\n",
+  },
+  {
+    // T285-QA-6: a nested repository named as the path itself, with an untracked file inside. The
+    // path's own directory reports another top level; its parents are never the question.
+    id: "gitlink-as-path",
+    setup: (d) => {
+      git(d, "init", "-q", "inner");
+      git(
+        path.join(d, "inner"),
+        "-c",
+        "user.name=t",
+        "-c",
+        "user.email=t@t",
+        "commit",
+        "-q",
+        "--allow-empty",
+        "-m",
+        "i",
+      );
+      git(d, "add", "inner");
+      write(d, "inner/untrackedInSub");
+    },
+    input: () => "inner",
+    expect: (r, input) =>
+      r.status === 1 && r.stdout === BOUNDARY_REFUSAL + input + "\n",
+  },
+  {
+    // CR-2: a tracked symlink to a directory holding an untracked file. Git lists the link as a
+    // blob and nothing beneath it, so "nothing listed" would read as clean.
+    id: "tracked-symlink-as-path",
+    setup: (d) => {
+      write(d, "other/tracked");
+      git(d, "add", "other/tracked");
+      write(d, "other/new");
+      fs.symlinkSync("other", path.join(d, "tl"));
+      git(d, "add", "tl");
+    },
+    input: () => "tl",
+    expect: (r, input) =>
+      r.status === 1 && r.stdout === BOUNDARY_REFUSAL + input + "\n",
+  },
+  {
+    id: "tracked-symlink-as-path-trailing-slash",
+    setup: (d) => {
+      write(d, "other/tracked");
+      git(d, "add", "other/tracked");
+      write(d, "other/new");
+      fs.symlinkSync("other", path.join(d, "tl"));
+      git(d, "add", "tl");
+    },
+    input: () => "tl/",
+    expect: (r, input) =>
+      r.status === 1 && r.stdout === BOUNDARY_REFUSAL + input + "\n",
+  },
+];
+
+test("Step 4 guard: an external symlink that points back into the repository is stopped by git, not admitted (CR-3)", async () => {
+  const block = await stepBlock(SKILL_SRC);
+  const results = runDirect(
+    block,
+    (d) => {
+      write(d, "real/new");
+      fs.mkdirSync(d + "-ext");
+      fs.symlinkSync(path.join(d, "real"), path.join(d + "-ext", "inrepo"));
+    },
+    (d) => path.join(d + "-ext", "inrepo", "new"),
+  );
+  for (const r of results) {
+    assert.ok(
+      r.status === 1 && /could not look/.test(r.stdout),
+      `${r.shell}: ${JSON.stringify(r)}`,
+    );
+  }
+});
+
+for (const c of REFUSED) {
+  test(`Step 4 guard: does not read ${c.id} as clean`, async () => {
+    const block = await stepBlock(SKILL_SRC);
+    let input;
+    const results = runDirect(block, c.setup, (d) => (input = c.input(d)));
+    for (const r of results) {
+      assert.ok(c.expect(r, input), `${r.shell}: ${JSON.stringify(r)}`);
+    }
+  });
+}
+
+// Mutants for what a fence: fixture cannot reach. Each reverts one clause; the named scenario must
+// stop reading as it did, or the clause is held by nothing.
+const REFUSED_BY = (id) => REFUSED.find((c) => c.id === id);
+const COMPARE_CLAUSE =
+  'if [ -n "$INSIDE" ] && [ "$PHYS" != "$LEX" ]; then printf \'%s\\n\' "$p"; continue; fi';
+const INSIDE_LINE =
+  'case "$LEX/" in "$TOP"/*) INSIDE=1 ;; *) INSIDE="" ;; esac';
+const NEST_CLAUSE =
+  'if [ -n "$INSIDE" ] && [ -n "$NEST" ] && [ "$NEST" != "$TOP" ]; then printf \'%s\\n\' "$p"; fi';
+const DIRECT_MUTANTS = [
+  {
+    name: "the --error-unmatch branch (a deleted tracked path reads as mistyped)",
+    from: 'git --literal-pathspecs ls-files --error-unmatch -- "$p" >/dev/null 2>&1',
+    to: "false",
+    scenario: ADMITTED.find((c) => c.id === "deleted-tracked"),
+    broken: (r) => r.status !== 0,
+  },
+  {
+    name: "the lexical-vs-physical compare (a link to the root, an out-and-back path and a `..` after a link read as clean)",
+    from: COMPARE_CLAUSE,
+    to: ":",
+    scenario: REFUSED_BY("rootlink"),
+    broken: (r) => r.status === 0,
+  },
+  {
+    name: "the lexical-vs-physical compare (a link that leaves the repository and returns reads as clean)",
+    from: COMPARE_CLAUSE,
+    to: ":",
+    scenario: REFUSED_BY("out-and-back"),
+    broken: (r) => r.status === 0,
+  },
+  {
+    name: "the lexical-vs-physical compare (a `..` after a link reads as clean)",
+    from: COMPARE_CLAUSE,
+    to: ":",
+    scenario: REFUSED_BY("dotdot-after-symlink"),
+    broken: (r) => r.status === 0,
+  },
+  {
+    name: "the lexical-vs-physical compare (a trailing slash on a link reads as clean)",
+    from: COMPARE_CLAUSE,
+    to: ":",
+    scenario: REFUSED_BY("trailing-slash-link"),
+    broken: (r) => r.status === 0,
+  },
+  {
+    name: "the inside-the-repository test (every differing path is refused, so a symlinked prefix reads as a boundary)",
+    from: INSIDE_LINE,
+    to: "INSIDE=1",
+    scenario: ADMITTED.find((c) => c.id === "symlinked-prefix"),
+    broken: (r) => r.status !== 0,
+  },
+  {
+    name: "the skip of a path not on disk (a deleted tracked file in a deleted directory is refused as unresolvable)",
+    from: '[ -e "$p" ] || continue',
+    to: ":",
+    scenario: ADMITTED.find((c) => c.id === "deleted-tracked-in-deleted-dir"),
+    broken: (r) => r.status !== 0,
+  },
+  {
+    name: "the nested-repository test (a nested repository named as the path itself reads as clean)",
+    from: NEST_CLAUSE,
+    to: ":",
+    scenario: REFUSED_BY("gitlink-as-path"),
+    broken: (r) => r.status === 0,
+  },
+  {
+    name: "the strictly-below test (the repository's own top level reads as a nested repository)",
+    from: NEST_CLAUSE,
+    to: 'if [ -n "$INSIDE" ] && [ -n "$NEST" ]; then printf \'%s\\n\' "$p"; fi',
+    scenario: ADMITTED.find((c) => c.id === "absolute-inside-repo"),
+    broken: (r) => r.status !== 0,
+  },
+  {
+    // T285-QA-1: `..` folded in text, not left in the spelling, or a path that climbs out reads as
+    // a symlink.
+    name: "the `..` fold (a path climbing out with `..` is compared unfolded and refused)",
+    from: 'if ($i == "..") { if (n > 0) n--; continue };',
+    to: 'if ($i == "..") { continue };',
+    scenario: ADMITTED.find((c) => c.id === "dotdot-from-subdirectory"),
+    broken: (r) => r.status !== 0,
+  },
+  {
+    name: "the absolute-path branch (an absolute path is joined to the working directory and refused)",
+    from: 'case "$p" in /*) LEX=$(printf \'%s\\n\' "$p" | norm) ;; *) LEX=$(printf \'%s\\n\' "$CWD_PHYS/$p" | norm) ;; esac',
+    to: "LEX=$(printf '%s\\n' \"$CWD_PHYS/$p\" | norm)",
+    scenario: ADMITTED.find((c) => c.id === "absolute-inside-repo"),
+    broken: (r) => r.status !== 0,
+  },
+];
+
+for (const m of DIRECT_MUTANTS) {
+  test(`Step 4 guard: caught when the clause is reverted — ${m.name}`, async () => {
+    assert.ok(SKILL_SRC.includes(m.from), "the line under mutation is present");
+    const src = SKILL_SRC.replace(m.from, () => m.to);
+    assert.notEqual(src, SKILL_SRC, "the mutation applied");
+    const results = runDirect(
+      await stepBlock(src),
+      m.scenario.setup,
+      m.scenario.input,
+      m.scenario.cwd,
+    );
+    assert.ok(
+      results.every(m.broken),
+      "the mutant must change the outcome: " + JSON.stringify(results),
+    );
+  });
+}

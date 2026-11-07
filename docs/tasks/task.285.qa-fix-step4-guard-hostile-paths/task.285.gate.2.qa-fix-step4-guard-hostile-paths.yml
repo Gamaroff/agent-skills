@@ -1,0 +1,71 @@
+schema: 2
+task: 'task.285.qa-fix-step4-guard-hostile-paths'
+task_title: 'qa-fix Step 4 guard survives hostile paths'
+gate: FAIL
+status_reason: 'T285-QA-1 is fixed, but the physical-path stop that fixed it ends the walk at a symlink inside the repository that points at the repository root, so an untracked file reached through it reads as clean.'
+reviewer: 'QA Engineer'
+head: '8b03b4a494d3e389a3feaa39160c20760fd58673'
+updated: '2026-11-07T05:36:12Z'
+
+top_issues:
+  - id: 'T285-QA-2'
+    severity: high
+    file: 'skills/qa-fix/SKILL.md'
+    finding: 'The root stop (PHYS equals TOP, then break) runs before the -L test. A symlink inside the repo that points at the repo root (rootlink -> .) resolves to TOP, so the walk ends and the path is not refused. With untracked real/new, the input rootlink/real/new exits 0 with no output under bash and zsh, while real/new is refused. git --literal-pathspecs ls-files --others -- rootlink/real/new lists nothing (rc 0), so the clean verdict is wrong: the "could not look" read as clean failure the block exists to stop. Reproduced by this reviewer and by the QA engineer in a scratch repository.'
+    suggested_action: 'Stop at the root only when the directory is not a symlink located inside the repository: when PHYS equals TOP and the directory is a symlink, refuse the path if the symlink''s own physical parent equals or sits under TOP, then break. Keep admitting an absolute path through a symlink whose parent is outside TOP. Add a rootlink scenario (refused) to the direct tests, with a mutant that removes the check.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 21
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    boundary: true
+    probes_executed: 34
+    escaped: 0
+    boundary_signals: ['refused', 'is refused']
+    notes: 'The 17 probe cases (34 runs, bash and zsh) all scored as their direction requires, 0 escaped. The record has no case for a symlink to the repository root, which is how T285-QA-2 passed it. Record: task.285.qa.2.qa-fix-step4-guard-hostile-paths.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'Advisory CR-2: each parent of each path forks a subshell (about 5 s for 2000 paths at depth 6). The block runs on a handful of paths, so this is not a defect.'
+  reliability:
+    status: CONCERNS
+    notes: 'T285-QA-2: a path through a symlink to the repository root reads as clean.'
+  maintainability:
+    status: PASS
+    notes: 'One description of the check; bundled copies in sync.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 1
+  note: 'T285-QA-1 verified fixed: ../real/g from a subdirectory and a symlinked-prefix absolute path are admitted, each held by a mutant.'
+
+recommendations:
+  immediate:
+    - action: 'Fix T285-QA-2 (refuse a symlink inside the repository that resolves to the root).'
+      refs: ['skills/qa-fix/SKILL.md', 'tests/qa-fix-step4-guard.test.js']
+  future:
+    - action: 'Memoise the physical-path check per distinct parent directory if the changed-path list ever grows large (CR-2, cleanup).'
+      refs: ['skills/qa-fix/SKILL.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T285-QA-2 fixed']

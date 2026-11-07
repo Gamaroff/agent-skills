@@ -1,0 +1,184 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "03de471aff7e9df6c9bd912d3076873dd1ce637f",
+  "dirty_paths": [
+    "docs/tasks/task-registry.md",
+    "docs/tasks/task.285.qa-fix-step4-guard-hostile-paths/task.285.gate.5.qa-fix-step4-guard-hostile-paths.yml",
+    "docs/tasks/task.285.qa-fix-step4-guard-hostile-paths/task.285.implementation.1.qa-fix-step4-guard-hostile-paths-initial-run.md",
+    "docs/tasks/task.285.qa-fix-step4-guard-hostile-paths/task.285.pr-review.1.qa-fix-step4-guard-hostile-paths.md",
+    "docs/tasks/task.285.qa-fix-step4-guard-hostile-paths/task.285.qa-fix-step4-guard-hostile-paths.md",
+    "docs/tasks/task.285.qa-fix-step4-guard-hostile-paths/task.285.qa.5.qa-fix-step4-guard-hostile-paths.md"
+  ],
+  "document": "docs/tasks/task.285.qa-fix-step4-guard-hostile-paths/task.285.qa-fix-step4-guard-hostile-paths.md",
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 12,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "83f799dd538e4bd2e88ae6e89604121e7ecdfe1b88719f2a172dae492e21f088",
+      "status": "PASS",
+      "description": "Path with $(...), backtick or variable is refused and executes nothing",
+      "code_citation": "skills/qa-fix/SKILL.md:878",
+      "test_citation": "tests/qa-fix-step4-guard.test.js:139",
+      "members": [
+        "{member: \"meta-substitution\", evidence: \"tests/qa-fix-step4-guard.test.js:139\", status: PASS}",
+        "{member: \"meta-backtick\", evidence: \"tests/qa-fix-step4-guard.test.js:152\", status: PASS}",
+        "{member: \"meta-variable\", evidence: \"tests/qa-fix-step4-guard.test.js:165\", status: PASS}"
+      ],
+      "non_member_fail": null,
+      "note": "Single-quoted heredoc at SKILL.md:878-880; run under bash and zsh; T268-QA-10 mutant at test:314."
+    },
+    {
+      "id": "#2",
+      "text_hash": "0992639879475e4b0373e6bbe72b938dd7bfd479aba0cf4bc4ef09ae8a589855",
+      "status": "PASS",
+      "description": "Nested-repo or symlinked-directory path refused with path named",
+      "code_citation": "skills/qa-fix/SKILL.md:911",
+      "test_citation": "tests/qa-fix-step4-guard.test.js:206",
+      "members": [
+        "{member: \"nested-repo\", evidence: \"tests/qa-fix-step4-guard.test.js:206\", status: PASS}",
+        "{member: \"symlinked directory\", evidence: \"tests/qa-fix-step4-guard.test.js:572\", status: PASS}",
+        "{member: \"rootlink, out-and-back, dotdot-after-symlink, trailing-slash-link, gitlink-as-path\", evidence: \"tests/qa-fix-step4-guard.test.js:597\", status: PASS}"
+      ],
+      "non_member_fail": null,
+      "note": "A directory above a gitlink holding an untracked file still reads clean (CR-1); outside this criterion, owned by task 286."
+    },
+    {
+      "id": "#3",
+      "text_hash": "0719cf8bc6b8a2db9fd02b46fd6acc68b1c67dd3c6de5eeaa8b8f1bb05be3f24",
+      "status": "PASS",
+      "description": "Tracked, deleted-tracked and intent-to-add paths admitted",
+      "code_citation": "skills/qa-fix/SKILL.md:890",
+      "test_citation": "tests/qa-fix-step4-guard.test.js:478",
+      "members": [
+        "{member: \"tracked\", evidence: \"tests/qa-fix-step4-guard.test.js:478\", status: PASS}",
+        "{member: \"deleted-tracked\", evidence: \"tests/qa-fix-step4-guard.test.js:487\", status: PASS}",
+        "{member: \"intent-to-add\", evidence: \"tests/qa-fix-step4-guard.test.js:496\", status: PASS}"
+      ],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#4",
+      "text_hash": "7f4579298cebf3901bbd32415eddc4aa518d38bbd9f2562ecf7c7a33fbe54534",
+      "status": "PASS",
+      "description": "Loop doc no longer shows bare git ls-files --others as the check",
+      "code_citation": "shared/resources/develop-pipeline-step-3-develop-loop.md:233",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Lines 233-235 point at the qa-fix Step 4 block; three bundled copies regenerated."
+    },
+    {
+      "id": "#5",
+      "text_hash": "902718fcc5773f51a12a4503e62e3cde80998abc0ba54a83b879fd649dc116ff",
+      "status": "PASS",
+      "description": "Whole-suite npm test wall time measured once with uptime, recorded in QA report",
+      "code_citation": "docs/tasks/task.285.qa-fix-step4-guard-hostile-paths/task.285.qa.5.qa-fix-step4-guard-hostile-paths.md:111",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Amended with approver Lorien Gamaroff (2026-11-07); criteria-drift reports reworded, approved true. QA report line 111 records 171 s once, exit 0, load 1.13, command CI=true npm test."
+    },
+    {
+      "id": "#6",
+      "text_hash": "c9a781e2593cfaa3058a48fe8f99c414186ad086541968b42dc63013db9a7525",
+      "status": "PASS",
+      "description": "No new test takes longer than 1 s on its own, measured with uptime",
+      "code_citation": "docs/tasks/task.285.qa-fix-step4-guard-hostile-paths/task.285.qa.5.qa-fix-step4-guard-hostile-paths.md:111",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "First pass failed low (single run, no command, earlier head). Re-measured by the main context on head 89583494: five runs of the named command, load recorded each, slowest case 569/572/584/564/633 ms, median 572 ms, bound 1000 ms; committed in QA report 5 (commit d4a6ac93). Re-graded by the main context against the same record rule; not re-dispatched."
+    },
+    {
+      "id": "#7",
+      "text_hash": "e978cee7c790d4ad1d02c8b823673716b945865363bdd43ebcbd31d306eb3300",
+      "status": "PASS",
+      "description": "Backslash, single quote, double quote paths refused; a\\\\ beside a not judged as a",
+      "code_citation": "skills/qa-fix/SKILL.md:887",
+      "test_citation": "tests/qa-fix-step4-guard.test.js:176",
+      "members": [
+        "{member: \"backslash-mutation\", evidence: \"tests/qa-fix-step4-guard.test.js:176\", status: PASS}",
+        "{member: \"single-quote\", evidence: \"tests/qa-fix-step4-guard.test.js:185\", status: PASS}",
+        "{member: \"double-quote\", evidence: \"tests/qa-fix-step4-guard.test.js:194\", status: PASS}"
+      ],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#8",
+      "text_hash": "dec297bfae8a49ac7653ede8a5306959e92bdb6015943ed234d303294f1fa15a",
+      "status": "PASS",
+      "description": "Reverting each new refusal and the --error-unmatch branch turns a named test red",
+      "code_citation": "docs/tasks/task.285.qa-fix-step4-guard-hostile-paths/task.285.qa.1.qa-fix-step4-guard-hostile-paths.md:126",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        "{member: \"heredoc slot\", evidence: \"qa.1 report:126; test:314\", status: PASS}",
+        "{member: \"backslash/quote refusal\", evidence: \"qa.1 report:127; test:319\", status: PASS}",
+        "{member: \"nested-repo clause\", evidence: \"qa.1 report:128; test:324\", status: PASS}",
+        "{member: \"--error-unmatch branch\", evidence: \"qa.1 report:129; DIRECT_MUTANTS\", status: PASS}",
+        "{member: \"symlink / physical-compare clause\", evidence: \"qa.2 report:46,56; qa.4 report:56; COMPARE_CLAUSE mutants\", status: PASS}"
+      ],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#9",
+      "text_hash": "8fc5483b4ab6a4dd6aaf5265a62e9d7f3bdc03a8fdc4f5212f5c4b922885ca97",
+      "status": "PASS",
+      "description": "npm run bundle -- --check and quick_validate on qa-fix pass",
+      "code_citation": ".github/workflows/validate.yml:128",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 03de471aff7e9df6c9bd912d3076873dd1ce637f — Graded from CI reading 1.",
+      "ci_reading": "CI reading 1: SUCCESS @ 03de471aff7e9df6c9bd912d3076873dd1ce637f"
+    },
+    {
+      "id": "#10",
+      "text_hash": "69abe0801b5a57693a746ad13dabea1d532741a2d6d8f3f5c14f3ca49143d52a",
+      "status": "PASS",
+      "description": "CI=true npm test passes",
+      "code_citation": ".github/workflows/test.yml:58",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 03de471aff7e9df6c9bd912d3076873dd1ce637f — Graded from CI reading 1.",
+      "ci_reading": "CI reading 1: SUCCESS @ 03de471aff7e9df6c9bd912d3076873dd1ce637f"
+    },
+    {
+      "id": "#11",
+      "text_hash": "d88bfdf676a436dfc74ca3f326b13431ee124c14ca69e1b47d0eb7e6c5732b84",
+      "status": "PASS",
+      "description": "CHANGELOG.md cites task 285",
+      "code_citation": "CHANGELOG.md:9",
+      "test_citation": "shared/resources/tests/changelog-cites.test.mjs",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#12",
+      "text_hash": "6c8e75c5e56bd9d639387a27b9f57de1cb02033383818c1e245305d91f1f2810",
+      "status": "PASS",
+      "description": "Two task 268 findings marked closed by task 285 in task 268 Deferred Work",
+      "code_citation": "docs/tasks/task.268.qa-fix-finds-the-whole-defect-the-first-time/task.268.qa-fix-finds-the-whole-defect-the-first-time.md:334",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#2",
+      "note": "CR-1 (gitlink beneath a directory), CR-2 and CR-3 are advisory, owned by task 286."
+    }
+  ]
+}

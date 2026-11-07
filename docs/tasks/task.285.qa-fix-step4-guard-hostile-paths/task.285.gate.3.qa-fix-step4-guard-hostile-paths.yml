@@ -1,0 +1,85 @@
+schema: 2
+task: 'task.285.qa-fix-step4-guard-hostile-paths'
+task_title: 'qa-fix Step 4 guard survives hostile paths'
+gate: FAIL
+status_reason: 'T285-QA-2 is fixed, but the safety re-probe found two more false-clean paths in the same parent walk: an early stop at the repository root skips an earlier symlink in the path, and a trailing slash hides a final symlink.'
+reviewer: 'QA Engineer'
+head: 'ff5413c4c9cbee503ae840c67e99e258ee8a91b6'
+updated: '2026-11-07T05:45:01Z'
+
+top_issues:
+  - id: 'T285-QA-3'
+    severity: high
+    file: 'skills/qa-fix/SKILL.md'
+    finding: 'The parent walk stops at the first prefix whose physical path equals TOP, without having checked the symlinks that come earlier in the path. Reproduced by the reviewer in bash and zsh: with sub/out -> ../.., the untracked path sub/out/<repo-name>/sub/new (and its absolute form) exits 0 with no output; with sub/self -> ../sub, sub/self/../real/new also exits 0. [ -e ] follows the link and git normalises .. lexically, so it lists nothing and the verdict is a false clean.'
+    suggested_action: 'Do not stop early: visit every parent, refuse a symlink whose containing directory resolves inside the repository, and refuse a .git only when the directory lies strictly below the root. Add out-and-back and dotdot-after-symlink scenarios, each with a mutant.'
+    suggested_owner: dev
+    status: open
+  - id: 'T285-QA-4'
+    severity: high
+    file: 'skills/qa-fix/SKILL.md'
+    finding: 'A path with a trailing slash never has its final component examined: dirname of link/ is ".", so the walk body does not run, and git ls-files -- link/ lists nothing where link lists the untracked symlink. Reproduced: link -> real with untracked real/new, input link/ exits 0 with no output.'
+    suggested_action: 'Strip trailing slashes from every path before any check. Add a trailing-slash scenario with a mutant.'
+    suggested_owner: dev
+    status: open
+  - id: 'T285-QA-5'
+    severity: medium
+    file: 'tests/qa-fix-step4-guard.test.js'
+    finding: 'The direct-run suite had a single refused scenario per root-stop clause (rootlink), so out-and-back links, a symlink followed by .., and a trailing-slash path passed every test.'
+    suggested_action: 'Add the scenarios with matching mutants (done together with T285-QA-3 and T285-QA-4).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 23
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    boundary: true
+    probes_executed: 34
+    escaped: 0
+    boundary_signals: ['refused', 'is refused']
+    notes: 'The 17 probe cases (34 runs, bash and zsh) pass with 0 escaped against this commit. The record has no symlink case, so T285-QA-3 and T285-QA-4 passed it; the reviewer reproduced both by running the block directly in scratch repositories. Record: task.285.qa.3.qa-fix-step4-guard-hostile-paths.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'Unchanged. The walk now runs to the filesystem root for an absolute path, which is a handful of extra directories per path.'
+  reliability:
+    status: CONCERNS
+    notes: 'T285-QA-3 and T285-QA-4: a path through a symlink reads as clean.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Three cycles in a row found a leak in the same text-based parent walk. The fix applied with this gate removes the early stop that all three shared.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 3
+  note: 'T285-QA-2 verified fixed: rootlink/real/new is refused, held by a case and a mutant.'
+
+recommendations:
+  immediate:
+    - action: 'Fix T285-QA-3, T285-QA-4 and T285-QA-5 (visit every parent, strip trailing slashes, add the scenarios and mutants).'
+      refs: ['skills/qa-fix/SKILL.md', 'tests/qa-fix-step4-guard.test.js']
+  future:
+    - action: 'Memoise the physical-path check per distinct parent directory if the changed-path list ever grows large (cycle 2 CR-2, cleanup).'
+      refs: ['skills/qa-fix/SKILL.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T285-QA-3, T285-QA-4 and T285-QA-5 fixed']
