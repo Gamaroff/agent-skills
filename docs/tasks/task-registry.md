@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-11-06
-**Next Available Task Number:** **286**
+**Next Available Task Number:** **287**
 
 ## How to use
 
@@ -400,3 +400,4 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 - **Tasks 279–282 were cut from the same 2026-11-06 review (cluster 8, engine group)**. One shippable unit each and all independent: 279 is develop-next, 280 is skill and test tooling, 281 is the observation engine, 282 is review-task. 279 edits the orchestrator that runs it, so land it alone. 282 and 275 both touch `tracker-comment.js`; land one, then rebase the other.
 
 - Filenames follow `task.[N].[kebab-case-name].md` per [AGENTS.md](../../AGENTS.md#file-naming).
+| 286 | [qa-fix Step 4 guard looks beneath gitlinks](task.286.qa-fix-step4-guard-looks-beneath-gitlinks/task.286.qa-fix-step4-guard-looks-beneath-gitlinks.md) | planned | refactoring | Medium | 2026-11-07 | 285 | — task 285 QA gate 5 residual: a directory above a gitlink with an untracked file reads clean (CR-1), plus two advisories (CR-2, CR-3) · four phases |
