@@ -8,7 +8,7 @@ category: refactoring
 status: planned
 priority: Medium
 created: 2026-11-06
-updated: 2026-11-06
+updated: 2026-11-07
 estimated_effort_hours: 16
 ---
 
@@ -96,7 +96,7 @@ None - each arm only turns a halt into an acceptance when a recorded basis exist
 **Risk Level**: Low
 
 **Changes**:
-- [ ] Put the three semantics to the user (what counts as equivalent, how many re-runs, who may defer) and record the answers in the plan.
+- [x] Put the three semantics to the user (what counts as equivalent, how many re-runs, who may defer) and record the answers in the plan.
 
 **Dependencies**: none.
 
@@ -314,6 +314,7 @@ None - each arm only turns a halt into an acceptance when a recorded basis exist
 | Date       | Version | Description                                          | Author      |
 | ---------- | ------- | ---------------------------------------------------- | ----------- |
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #32, #50, #117 | create-task |
+| 2026-11-07 | 1.1     | Phase 1 owner decisions recorded in the plan; all three arms approved (Arm 3 owner-only approval) | Claude      |
 <!-- change-log-end -->
 
 ---
@@ -321,7 +322,7 @@ None - each arm only turns a halt into an acceptance when a recorded basis exist
 ## Progress Tracking
 
 ### Phase 1: Owner decisions
-- [ ] Three answers recorded
+- [x] Three answers recorded
 
 ### Phase 2: Arm 1
 - [ ] Equivalent-commit measurement
