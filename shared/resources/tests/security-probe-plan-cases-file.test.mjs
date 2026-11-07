@@ -425,6 +425,14 @@ test("resolveCasesFile: a directory, an absolute name and a NUL are refused", ()
     mkdirSync(join(work, "d"));
     assert.equal(resolveCasesFile("d", work).why, "not-a-file");
     assert.equal(resolveCasesFile("/etc/passwd", work).why, "outside-work-dir");
+    // An absolute name that resolves INSIDE the directory is refused too: the name must be relative
+    // to the work item directory, whatever it points at (task 269 DoD 1, the isAbsolute guard).
+    writeFileSync(join(work, "in.json"), "[]");
+    assert.equal(
+      resolveCasesFile(join(work, "in.json"), work).why,
+      "outside-work-dir",
+    );
+    assert.equal(resolveCasesFile("in.json", work).ok, true);
     assert.equal(resolveCasesFile("a\0b", work).why, "bad-name");
     assert.equal(resolveCasesFile("", work).why, "bad-name");
     assert.equal(resolveCasesFile(7, work).why, "bad-name");

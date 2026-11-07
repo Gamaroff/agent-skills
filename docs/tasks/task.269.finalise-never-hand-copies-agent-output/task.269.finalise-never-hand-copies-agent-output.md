@@ -6,6 +6,7 @@ description: "Give finalise Steps 3b.1 and 3c a transcription-free route for the
 tags: [finalise, observation]
 category: refactoring
 status: ready-for-review
+pr_number: 857
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-07
@@ -315,6 +316,22 @@ None - `cases_file:` is an optional field; inline `cases` keeps working.
 ### Key Findings
 No open finding. Cycle 3 closed the CHANGELOG gap (T269-QA-6) and two advisory notes on the finalise reuse block.
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS (run 1)
+
+### Missing Criteria:
+
+- [ ] Criterion 6: five timed runs with `/proc/loadavg` beside each, on the PR head (evidence now in the `qa.3` addendum; awaiting a graded re-run)
+- [ ] Criterion 7: a mutation proof for each new refusal (13 new proofs in the `qa.3` addendum; awaiting a graded re-run)
+
+### Next Steps:
+
+- QA cycle 4 on the test assertion added while closing criterion 7, then 5c
+- Re-run `/finalise` (scoped: only criteria 6 and 7 are re-judged)
+
+**Detailed Verification Log:** See `task.269.dod.1.finalise-never-hand-copies-agent-output.md`.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -329,6 +346,7 @@ No open finding. Cycle 3 closed the CHANGELOG gap (T269-QA-6) and two advisory n
 | 2026-11-07 |         | QA gate CONCERNS (90/100) — 1 finding                    | qa-task     |
 | 2026-11-07 |         | QA findings fixed — T269-QA-6 plus two advisory notes, iteration 2 | qa-fix      |
 | 2026-11-07 |         | QA gate PASS (100/100) — 0 findings                      | qa-task     |
+| 2026-11-07 |         | DoD incomplete — 2 gaps identified (criteria 6, 7: records)    | finalise    |
 <!-- change-log-end -->
 
 ---
