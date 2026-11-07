@@ -297,24 +297,24 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-07
-**Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.285.qa.4.qa-fix-step4-guard-hostile-paths.md](./task.285.qa.4.qa-fix-step4-guard-hostile-paths.md)
-- **Gate File**: [task.285.gate.4.qa-fix-step4-guard-hostile-paths.yml](./task.285.gate.4.qa-fix-step4-guard-hostile-paths.yml)
+- **Full Report**: [task.285.qa.5.qa-fix-step4-guard-hostile-paths.md](./task.285.qa.5.qa-fix-step4-guard-hostile-paths.md)
+- **Gate File**: [task.285.gate.5.qa-fix-step4-guard-hostile-paths.yml](./task.285.gate.5.qa-fix-step4-guard-hostile-paths.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 30 in the guard file, 34 probe cases
+- **Tests Executed**: 37 in the guard file, 34 probe cases
 - **Phases Verified**: 5/5
-- **Critical Issues**: 1
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **Critical Issues**: 0
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-T285-QA-6 (high): the Step 4 parent walk never tests the changed path itself, so a nested repository root with an untracked file inside reads as clean. T285-QA-3, T285-QA-4 and T285-QA-5 are fixed.
+T285-QA-6 is fixed: the parent walk is replaced by a physical-identity decision, and the symlink and nested-repository class is refused in bash and zsh. One narrower false clean was reproduced (CR-1, advisory: reviewer high severity, medium confidence): a directory above a gitlink holding an untracked file reads clean. Two further advisories, CR-2 and CR-3, are recorded in the gate.
 
 <!-- change-log-start -->
 ## Change Log
@@ -334,6 +334,7 @@ T285-QA-6 (high): the Step 4 parent walk never tests the changed path itself, so
 | 2026-11-07 |         | QA findings fixed — T285-QA-3, T285-QA-4, T285-QA-5 (parent walk visits every parent; trailing slashes stripped; scenarios and mutants added), 1 iteration | qa-fix |
 | 2026-11-07 |         | QA gate FAIL (70/100) — 1 finding | qa-task |
 | 2026-11-07 |         | QA findings fixed — T285-QA-6 (third strike: the parent walk replaced by a lexical-vs-physical compare and a git top-level check), 1 iteration | qa-fix |
+| 2026-11-07 |         | QA gate CONCERNS (80/100) — 0 blocking findings, 3 advisories | qa-task |
 <!-- change-log-end -->
 
 ---

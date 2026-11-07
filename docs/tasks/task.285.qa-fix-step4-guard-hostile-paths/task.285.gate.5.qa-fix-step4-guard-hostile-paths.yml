@@ -1,0 +1,69 @@
+schema: 2
+task: 'task.285.qa-fix-step4-guard-hostile-paths'
+task_title: 'qa-fix Step 4 guard survives hostile paths'
+gate: CONCERNS
+status_reason: 'The replaced mechanism closes T285-QA-6 and the whole parent-walk class (the gitlink root, tracked symlink and trailing-slash shapes are refused in bash and zsh). One narrower false clean remains and was reproduced: a tracked directory that contains a gitlink holding an untracked file (pkg2 over pkg2/sm/untr) exits 0, while pkg2/sm is refused. The reviewer rated it high severity but medium confidence, so it does not enter top_issues; it is recorded as a recommendation.'
+reviewer: 'QA Engineer'
+head: '4fc3b848d0c8c13740c930e7467ad00dac798d0b'
+updated: '2026-11-07T06:06:05Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 37
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    boundary: true
+    probes_executed: 34
+    escaped: 0
+    boundary_signals: ['refused', 'is refused']
+    notes: 'The 17 probe cases (34 runs, bash and zsh) pass with 0 escaped against this commit. The corpus has no gitlink-under-a-directory case; the reviewer ran about 150 shapes, and QA reproduced CR-1 (pkg2 admitted, pkg2/sm refused) in bash and zsh. Record: task.285.qa.5.qa-fix-step4-guard-hostile-paths.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'The 37 tests in tests/qa-fix-step4-guard.test.js pass with CI=true; npm run ci:fast was exit 0 on this head.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The parent walk is gone, replaced by a physical-identity decision, which ends the cycle-by-cycle neighbour pattern for symlinks. A directory that merely contains a gitlink is still a neighbouring input the guard does not look beneath.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  note: 'T285-QA-6 verified fixed: smod, smod/ and ../smod (a gitlink root with an untracked file) and the tracked-symlink-to-directory inputs are refused in bash and zsh.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (reproduced by QA, reviewer high severity / medium confidence): a changed directory whose subtree holds a gitlink with an untracked file beneath reads clean. Refuse or flag a gitlink (mode 160000) beneath a changed directory, with a scenario and a mutant.'
+      refs: ['skills/qa-fix/SKILL.md', 'tests/qa-fix-step4-guard.test.js']
+      provenance: new-in-this-diff
+    - action: 'CR-3 (reviewer, medium/medium, not reproduced by QA): an absolute path that reaches a repository subdirectory through an external symlink is refused by git as outside the repository. Fail-loud and safe, so either rewrite to the physical spelling or document it as intended.'
+      refs: ['skills/qa-fix/SKILL.md']
+      provenance: new-in-this-diff
+    - action: 'CR-2 (reviewer, low/low, not reproduced): with TOP equal to the filesystem root the inside test compares against "//", which disables the check. Compare against the root with its trailing slash removed.'
+      refs: ['skills/qa-fix/SKILL.md']
+      provenance: new-in-this-diff
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 is accepted as a known residual or fixed in a follow-up task']
