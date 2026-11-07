@@ -66,4 +66,4 @@ recommendations:
 deployment_readiness:
   staging: CONDITIONAL
   production: CONDITIONAL
-  conditions: ['CR-1 is accepted as a known residual or fixed in a follow-up task']
+  conditions: ['CR-1, CR-2 and CR-3 are owned by follow-up task 286 (task.286.qa-fix-step4-guard-looks-beneath-gitlinks)']

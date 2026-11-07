@@ -108,7 +108,7 @@ None promoted. CR-1 is high severity at medium confidence and so stays advisory 
 ## NFR Assessment
 
 ### Performance — PASS
-Unchanged.
+Measured at Step 5c (head `03de471a`, load 0.85 to 1.33): whole suite `CI=true npm test` took 171 s once, exit 0, `uptime` load average 1.13 beside the run. Slowest new case 564 ms (bound 1000 ms). The qa-fix test files alone went from a 1356 ms median on `develop` to 5018 ms on the branch over five alternating pairs (+270%); the first Performance criterion was amended at 5c, with approval, to the one whole-suite measurement above.
 
 ### Reliability — PASS
 37 of 37 tests pass with `CI=true`.
