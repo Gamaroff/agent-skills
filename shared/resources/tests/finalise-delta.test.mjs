@@ -308,6 +308,80 @@ test("rerun-eligible control: a red inside the PR's own diff is in-diff, not re-
   }
 });
 
+test("rerun-eligible control: every spelling of an in-diff file is in-diff (T271-QA-1)", () => {
+  const { dir, green } = prRepo();
+  try {
+    const head = commit(dir, { "docs/n.md": "n\n" });
+    const spellings = [
+      "src/a.js",
+      "./src/a.js",
+      "src/./a.js",
+      "src//a.js",
+      join(dir, "src", "a.js"), // the absolute form a CI log prints
+      "docs/../src/a.js", // a `..` that stays inside the root
+    ];
+    for (const f of spellings) {
+      const r = rerun(dir, green, head, [
+        "--attempts",
+        "0",
+        "--failed-file",
+        f,
+      ]);
+      assert.equal(r.json.reason, "in-diff", `spelling ${f}`);
+      assert.equal(r.status, 1, `spelling ${f}`);
+    }
+    // The unmatched control: a file the PR did not change stays eligible under the same spellings.
+    const ok = rerun(dir, green, head, [
+      "--attempts",
+      "0",
+      "--failed-file",
+      join(dir, "src", "other.test.js"),
+    ]);
+    assert.equal(ok.json.reason, "eligible");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("rerun-eligible control: a failed file that is not a path inside the repository is bad-failed-file (T271-QA-2)", () => {
+  const { dir, green } = prRepo();
+  try {
+    const head = commit(dir, { "docs/n.md": "n\n" });
+    for (const f of [
+      "{failed-files}", // an unsubstituted placeholder
+      "src/*.test.js", // a glob
+      "../outside.test.js", // leaves the root
+      "/etc/passwd", // absolute, outside the root
+      "  ", // blank
+    ]) {
+      const r = rerun(dir, green, head, [
+        "--attempts",
+        "0",
+        "--failed-file",
+        f,
+      ]);
+      assert.equal(
+        r.json.reason,
+        "bad-failed-file",
+        `value ${JSON.stringify(f)}`,
+      );
+      assert.equal(r.status, 1, `value ${JSON.stringify(f)}`);
+    }
+    // One bad file among good ones refuses the whole call.
+    const mixed = rerun(dir, green, head, [
+      "--attempts",
+      "0",
+      "--failed-file",
+      "src/other.test.js",
+      "--failed-file",
+      "{failed-files}",
+    ]);
+    assert.equal(mixed.json.reason, "bad-failed-file");
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test("rerun-eligible control: a delta that changes code is code-changed, not re-run", () => {
   const { dir, green } = prRepo();
   try {

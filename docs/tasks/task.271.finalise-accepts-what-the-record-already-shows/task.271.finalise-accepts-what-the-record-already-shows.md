@@ -180,7 +180,7 @@ Not modified, against the plan: `finalise-dod-security-prompt.md` (Arm 3 is wire
 ### Files to Modify (Tests)
 
 7. ✅ `evals/shared/tests/finalise-dod-prompt-contract.test.mjs` - ran green unchanged (no pin moved)
-8. ✅ new: `shared/resources/tests/finalise-delta.test.mjs`, `finalise-deferral-match.test.mjs`, `executed-prose-no-background-git.test.mjs`
+8. ✅ new: `shared/resources/tests/finalise-delta.test.mjs`, `finalise-deferral-match.test.mjs`, `executed-prose-no-background-git.test.mjs`, `finalise-acceptance-blocks.test.mjs` (the two SKILL.md blocks run under bash and zsh, added in QA cycle 1)
 
 ### Files to Modify (Generated)
 
@@ -313,6 +313,27 @@ Not modified, against the plan: `finalise-dod-security-prompt.md` (Arm 3 is wire
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-07
+**Quality Score**: 60/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.271.qa.1.finalise-accepts-what-the-record-already-shows.md](./task.271.qa.1.finalise-accepts-what-the-record-already-shows.md)
+- **Gate File**: [task.271.gate.1.finalise-accepts-what-the-record-already-shows.yml](./task.271.gate.1.finalise-accepts-what-the-record-already-shows.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 8043
+- **Phases Verified**: 5/5
+- **Critical Issues**: 2
+- **NFR Status**: Security: FAIL, Performance: CONCERNS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+`rerun-eligible` returns eligible for a failed file the PR changed when the path is absolute, `../`-relative, `a/./b`, or an unsubstituted placeholder. The deferral matcher accepts an impossible approval date. The Step 3b.1 item 5a block does not run under zsh.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -323,6 +344,8 @@ Not modified, against the plan: `finalise-dod-security-prompt.md` (Arm 3 is wire
 | 2026-11-07 | 1.2     | Review passed (9/10): anchors re-measured, owner-only approver and exactly-once re-run stated, test-enumeration step added | review-task |
 | 2026-11-07 |         | Status → ready-for-development | review-task |
 | 2026-11-07 | 1.3     | Developed: `finalise-delta.js` (Arms 1 and 2), `finalise-deferral-match.js` (Arm 3), AC prompt and SKILL.md wiring, `finalise.deferralApprover`, fixture background-git fix; `ci:fast` green | develop |
+| 2026-11-07 |         | QA gate FAIL (60/100) — 4 findings | qa-task |
+| 2026-11-07 |         | QA findings fixed — 4 of 4 (failed-file canonicalisation, placeholder refusal, real-date check, zsh-portable owner read), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

@@ -34,7 +34,7 @@ Add three recorded acceptance arms to `/finalise` (equivalent-commit measurement
 | 1. create-branch           | ✅ Done    | Branch `feature/task.271.*` exists in git                              | Created from develop at 1bb1aaa4 | —                    | 2026-11-07T19:38Z |
 | 2. review-task             | ✅ Done    | `task.271.review.{N}.{name}.md` exists (or skip logged)                | 9/10, READY TO IMPLEMENT; no Explore subagents (pre-passes inline) | —                    | 2026-11-07T19:40Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline (plan + surface map known from review); ci:fast 8043 tests green | —                    | 2026-11-07T19:50Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #859; no tracker issue to comment on | —                    | 2026-11-07T19:52Z |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.271.qa.{N}.*.md`; `task.271.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.271.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
@@ -78,7 +78,25 @@ _Problems encountered and how they were resolved or escalated._
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### QA Cycle 1 — 2026-11-07
+
+| Item | Result |
+| ---- | ------ |
+| `/qa-task` gate | FAIL, 60/100: T271-QA-1, QA-2 (HIGH), QA-3, QA-4 (MEDIUM) |
+| `/qa-fix` | All four fixed in one commit; `ci:fast` 8055 tests, 0 failed |
+| Mutation proofs | Dropping the placeholder refusal, the canonicalisation, the real-date check and the newline in the owner read each turns a named test red; files restored (`cmp`) |
+| Bug found by the new test | The first zsh-safe owner read used `printf '%s'`, which dropped the last owner (no trailing newline); the zsh and bash test caught it before commit |
+| Timing comparison | The first attempt recorded no seconds (`bc` is not installed on this machine); rewritten to use shell arithmetic, to run in cycle 2 on an idle machine |
+| Process slip | Two `sed -i` edits on tracked task-document status lines against the "Edit tool only" rule; no content harm |
+
+Fix summary:
+
+- Struck mechanism: none (first cycle).
+- Narrowing residue: none (HIGH findings, not MEDIUM-only).
+- Probe: `git grep -l -F -i -e 'failed-file'` over SKILL.md, shared resources and hand-authored references.
+  `skills/finalise/SKILL.md` — updated (block rewritten, `bad-failed-file` named); `shared/resources/finalise-delta.js` — updated; `skills/finalise/references/finalise-delta.js` — generated copy, bundled.
+  `docs/reference/configuration.md` — unaffected (names the owner key, not the failed-file input). `CHANGELOG.md` — unaffected (states the arms, not path handling).
+- Population: 3 executed documents. Move: patch — the four findings are distinct defects in the deliverable, not one subject re-narrowed.
 
 ---
 

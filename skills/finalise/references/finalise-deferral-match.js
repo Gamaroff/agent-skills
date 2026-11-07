@@ -63,8 +63,30 @@ const REASONS = Object.freeze({
 });
 
 const CASE_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
-const TASK_RE = /^task\.\d+$/;
+// A positive integer with no leading zero, so task.0 and task.007 are not follow-up tasks.
+const TASK_RE = /^task\.[1-9]\d{0,8}$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * A real calendar date that is not in the future (T271-QA-3). The shape alone let 2026-13-45 and
+ * 0000-00-00 through into the DoD line. The date round-trips through Date.UTC, so a month or day
+ * that rolled over (2026-02-31) is refused.
+ */
+function isRealPastDate(s, now = Date.now()) {
+  if (!DATE_RE.test(s)) return false;
+  const [y, m, d] = s.split("-").map(Number);
+  if (y < 1970) return false;
+  const t = Date.UTC(y, m - 1, d);
+  const back = new Date(t);
+  if (
+    back.getUTCFullYear() !== y ||
+    back.getUTCMonth() !== m - 1 ||
+    back.getUTCDate() !== d
+  ) {
+    return false;
+  }
+  return t <= now;
+}
 
 function parseArgs(argv) {
   const out = {
@@ -130,8 +152,11 @@ function judge({ task, owner, date }, approvers) {
   if (!TASK_RE.test(String(task || "").trim())) {
     return { ok: false, why: "no follow-up task named (task.N)" };
   }
-  if (!DATE_RE.test(String(date || "").trim())) {
-    return { ok: false, why: "no approval date (YYYY-MM-DD)" };
+  if (!isRealPastDate(String(date || "").trim())) {
+    return {
+      ok: false,
+      why: "no approval date (a real YYYY-MM-DD, not in the future)",
+    };
   }
   if (cleanName(owner) === "") return { ok: false, why: "no approver named" };
   if (!approverListed(owner, approvers)) {
@@ -215,7 +240,7 @@ function workItemCandidates(text, id) {
   const out = [];
   deferredWorkItems(text).forEach((item, i) => {
     if (!namesCase(item, id)) return;
-    const task = /deferred to (task\.\d+)/i.exec(item);
+    const task = /deferred to (task\.\d+)(?![\w.-]*\w)/i.exec(item);
     const appr = /approved by (.+?) on (\d{4}-\d{2}-\d{2})/i.exec(item);
     out.push({
       source: `work item Deferred Work item ${i + 1}`,

@@ -268,6 +268,74 @@ test("control: a record with no follow-up task, or a malformed date, is unapprov
   }
 });
 
+test("control: an impossible, rolled-over or future approval date is unapproved (T271-QA-3)", () => {
+  const tomorrow = new Date(Date.now() + 2 * 86400000)
+    .toISOString()
+    .slice(0, 10);
+  const dates = ["2026-13-45", "0000-00-00", "2026-02-31", tomorrow];
+  const files = {};
+  dates.forEach((d, i) => {
+    files[`d${i}.yml`] = gate(GOOD_GATE_ENTRY.replace("2026-10-28", d));
+  });
+  files["ok.yml"] = gate(GOOD_GATE_ENTRY);
+  const { dir, paths } = fixture(files);
+  try {
+    dates.forEach((d, i) => {
+      const r = run([
+        "--case",
+        CASE,
+        "--gate",
+        paths[`d${i}.yml`],
+        "--approver",
+        OWNER,
+      ]);
+      assert.equal(r.json.reason, "unapproved", `date ${d}`);
+      assert.match(r.json.detail, /no approval date/, `date ${d}`);
+    });
+    const ok = run([
+      "--case",
+      CASE,
+      "--gate",
+      paths["ok.yml"],
+      "--approver",
+      OWNER,
+    ]);
+    assert.equal(ok.json.reason, "matched");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("control: a follow-up task must be a positive integer without leading zeros or a glued suffix", () => {
+  for (const t of ["task.0", "task.007", "task.9999999999"]) {
+    assert.equal(
+      eng.judge({ task: t, owner: OWNER, date: "2026-10-28" }, [OWNER]).ok,
+      false,
+      t,
+    );
+  }
+  assert.equal(
+    eng.judge({ task: "task.240", owner: OWNER, date: "2026-10-28" }, [OWNER])
+      .ok,
+    true,
+  );
+  const bullet = `- **CR10-1**, reproduced by \`${CASE}\`: deferred to task.240abc, approved by ${OWNER} on 2026-10-28.`;
+  const { dir, paths } = fixture({ "w.md": workItem(bullet) });
+  try {
+    const r = run([
+      "--case",
+      CASE,
+      "--work-item",
+      paths["w.md"],
+      "--approver",
+      OWNER,
+    ]);
+    assert.notEqual(r.json.reason, "matched");
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test("control: a work-item bullet outside the Deferred Work H2 is not read", () => {
   const doc = `# T\n\n## Notes\n\n${GOOD_BULLET}\n\n## Deferred Work\n\n- nothing here\n`;
   const { dir, paths } = fixture({ "w.md": doc });

@@ -29,7 +29,7 @@
  * stdout. `changed` is capped at 200 entries; `changedCount` is the real length.
  *
  * Reasons: docs-only → tree-equivalent | code-changed | disabled | unverifiable
- *          rerun-eligible → eligible | already-rerun | no-failed-file | in-diff | code-changed |
+ *          rerun-eligible → eligible | already-rerun | no-failed-file | bad-failed-file | in-diff | code-changed |
  *                           disabled | unverifiable
  *
  * Depends on ci-tree-equivalence.js (and the three modules it pulls in) and nothing else.
@@ -38,6 +38,8 @@
 "use strict";
 
 const { execFileSync } = require("child_process");
+const fs = require("fs");
+const path = require("path");
 
 const {
   isDocsPath,
@@ -66,6 +68,7 @@ const REASONS = Object.freeze({
   ALREADY_RERUN: "already-rerun",
   NO_FAILED_FILE: "no-failed-file",
   IN_DIFF: "in-diff",
+  BAD_FAILED_FILE: "bad-failed-file",
 });
 
 /** 0 for the one accepting reason of each command, 1 for every other answer. */
@@ -148,9 +151,34 @@ function repoRoot(exec, cwd) {
   }
 }
 
-/** Strip a leading `./` so a caller's spelling of a path cannot dodge the in-diff comparison. */
-function normaliseFile(p) {
-  return String(p).replace(/^(\.\/)+/, "");
+/**
+ * A failed-file spelling reduced to the repo-root-relative form git prints, or null when it cannot
+ * be (T271-QA-1, QA-2). `./x`, `a/./b`, `a//b` and an absolute path under the root all reduce to the
+ * same name as `a/b`; a path that leaves the root, an unsubstituted `{placeholder}`, a glob and a
+ * NUL are refused, because each would otherwise be "a file the PR did not change" by being no file.
+ */
+function canonicalFile(p, root) {
+  const raw = String(p);
+  if (raw.trim() === "" || /[{}*?\0]/.test(raw)) return null;
+  let abs = path.isAbsolute(raw) ? raw : path.resolve(root, raw);
+  // A symlinked directory in the spelling (macOS /var → /private/var) must not read as outside the root.
+  try {
+    abs = fs.realpathSync(abs);
+  } catch {
+    /* the file may not exist at this checkout: judge the spelling as written */
+  }
+  let realRoot = root;
+  try {
+    realRoot = fs.realpathSync(root);
+  } catch {
+    /* keep the root as given */
+  }
+  const rel = path.relative(realRoot, abs);
+  if (rel === "" || rel === ".." || rel.startsWith(".." + path.sep)) {
+    return null;
+  }
+  if (path.isAbsolute(rel)) return null;
+  return rel.split(path.sep).join("/");
 }
 
 /**
@@ -185,6 +213,18 @@ function decide(args, exec, cwd) {
           "no failing test file was named; a red whose file is unknown cannot be shown to lie outside the diff",
       });
     }
+  }
+
+  // Every failed file must reduce to a repo-relative name before the arm can say anything about it.
+  let failed = [];
+  if (args.command === "rerun-eligible") {
+    const bad = args.failedFiles.filter((f) => canonicalFile(f, root) === null);
+    if (bad.length > 0) {
+      return result(REASONS.BAD_FAILED_FILE, {
+        detail: `cannot reduce to a path inside the repository (an unsubstituted placeholder, a glob, or a path outside it): ${bad.join(", ")}`,
+      });
+    }
+    failed = args.failedFiles.map((f) => canonicalFile(f, root));
   }
 
   let base;
@@ -226,8 +266,8 @@ function decide(args, exec, cwd) {
         detail: "the PR's own diff could not be computed",
       });
     }
-    const inPr = new Set(prNames.map(normaliseFile));
-    const hit = args.failedFiles.map(normaliseFile).find((f) => inPr.has(f));
+    const inPr = new Set(prNames.map((f) => path.posix.normalize(f)));
+    const hit = failed.find((f) => inPr.has(f));
     if (hit !== undefined) {
       return result(REASONS.IN_DIFF, {
         detail: `${hit} is changed by this PR, so its red is the PR's own and is not re-run`,

@@ -819,12 +819,13 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
    source .agents/skills/finalise/references/read-config.sh || exit 1
    OWNERS=$(read_nested_config_key finalise deferralApprover)
    APPROVER_ARGS=()
-   IFS=',' read -r -a OWNER_LIST <<< "$OWNERS"
-   for o in "${OWNER_LIST[@]}"; do [ -n "${o// }" ] && APPROVER_ARGS+=(--approver "$o"); done
+   # One owner per line, read the same way in bash and zsh (`read -a` is bash only; zsh spells it -A).
+   while IFS= read -r o; do [ -n "${o// }" ] && APPROVER_ARGS+=(--approver "$o"); done < <(printf '%s\n' "$OWNERS" | tr ',' '\n')
    GATE_ARGS=()
    [ -n "{gate-file}" ] && GATE_ARGS=(--gate "{gate-file}")
    command node .agents/skills/finalise/references/finalise-deferral-match.js \
-     --case "{case-id}" "${GATE_ARGS[@]}" --work-item "{work-item}" "${APPROVER_ARGS[@]}" --json
+     --case "{case-id}" ${GATE_ARGS[@]+"${GATE_ARGS[@]}"} --work-item "{work-item}" \
+     ${APPROVER_ARGS[@]+"${APPROVER_ARGS[@]}"} --json
    ```
 
    Exit 0 with `reason: matched` is the only deferral. Move that probe out of `probes[]` and into
@@ -1435,17 +1436,22 @@ change, and one re-run is allowed. The decision is the engine's, never yours, an
 # Step 6, one re-run of a red outside the diff. INPUTS, substituted into THIS block: {green-head} (the
 # head of the newest earlier CI reading recorded SUCCESS for this PR — the DoD running summary's
 # `CI reading … @ <sha>` line, else `gh run list --branch <pr-branch> --status success --limit 1 --json
-# headSha -q '.[0].headSha'`), {pr-base} (the PR's target branch), {failed-files} (the failing test
-# file path(s), read from `gh run view <run-id> --log-failed`), {attempts} (the `CI re-run:` lines already
-# recorded in this DoD run: 0 on a first red).
+# headSha -q '.[0].headSha'`), {pr-base} (the PR's target branch), {attempts} (the `CI re-run:` lines
+# already recorded in this DoD run: 0 on a first red), and the failing test file path(s), one per line,
+# read from `gh run view <run-id> --log-failed` — that one goes into the heredoc below and nowhere else,
+# because a multi-line value substituted into a comment would end the comment.
 FAILED_ARGS=()
-for f in {failed-files}; do FAILED_ARGS+=(--failed-file "$f"); done
+while IFS= read -r f; do [ -n "$f" ] && FAILED_ARGS+=(--failed-file "$f"); done <<'FAILED_FILES_END'
+{failed-files}
+FAILED_FILES_END
 command node .agents/skills/finalise/references/finalise-delta.js rerun-eligible \
   --base "{green-head}" --head "$(git rev-parse HEAD)" --pr-base "{pr-base}" \
-  --attempts "{attempts}" "${FAILED_ARGS[@]}" --json
+  --attempts "{attempts}" ${FAILED_ARGS[@]+"${FAILED_ARGS[@]}"} --json
 ```
 
-Only `reason: eligible` re-runs. Every other answer — `in-diff` (the PR changed that file), `code-changed`
+`{failed-files}` is one path per line. A path the engine cannot reduce to a file inside the repository (an
+unsubstituted placeholder, a glob, a path outside the checkout) answers `bad-failed-file`, never `eligible`.
+Only `reason: eligible` re-runs. Every other answer — `in-diff` (the PR changed that file), `bad-failed-file`, `code-changed`
 (the delta from the green head touches more than documentation), `already-rerun` (one is recorded),
 `no-failed-file` (the red's file is unknown), `disabled`, `unverifiable` — leaves the FAILURE row below in
 force, and the DoD says which reason it was. When eligible, run `gh run rerun <run-id> --failed`, wait for
