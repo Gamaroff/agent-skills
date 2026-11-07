@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-11-06
-**Next Available Task Number:** **285**
+**Next Available Task Number:** **286**
 
 ## How to use
 
@@ -326,6 +326,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 282 | [review-task resolves the right task and reports every review](task.282.review-task-resolves-the-right-task-and-reports-every-review/task.282.review-task-resolves-the-right-task-and-reports-every-review.md) | planned | refactoring | Medium | 2026-11-06 | — | — task-id-first bare-number resolution and a numbered review comment stage (obs #128, #129) · independent, shares tracker-comment.js with 275 |
 | 283 | [Authoring and fix steps state the rules they keep missing](task.283.authoring-and-fix-steps-state-the-rules-they-keep-missing/task.283.authoring-and-fix-steps-state-the-rules-they-keep-missing.md) | planned | refactoring | Medium | 2026-11-06 | 266, 267 | — CHANGELOG placement check, multi-task create path with issue-body renderer, parser-widening importer audit, `command node` wrapper trap (obs #30, #34, #36, #146) · four independent phases |
 | 284 | [Migrate shipped payload heredocs to the file tool](task.284.migrate-payload-heredocs-to-file-tool/task.284.migrate-payload-heredocs-to-file-tool.md) | planned | refactoring | Medium | 2026-11-06 | 265 | — migration half of the task 265 split: 32 allow-listed heredoc sites to the file tool, plus the fresh-body-post citation sweep (obs #15, #85, #88, #106, #123, #158) · five phases, one per axis |
+| 285 | [qa-fix Step 4 guard survives hostile paths](task.285.qa-fix-step4-guard-hostile-paths/task.285.qa-fix-step4-guard-hostile-paths.md) | planned | refactoring | Medium | 2026-11-07 | — | — closes task 268's deferred T268-QA-10 (metacharacters in a path) and T268-QA-11 (nested-repo or symlinked path reads clean), plus two advisories · five phases |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
