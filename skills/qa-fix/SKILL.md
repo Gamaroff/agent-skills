@@ -854,11 +854,16 @@ magic is not interpreted, and a path that is neither on disk nor tracked is refu
 `git ls-files` lists nothing for it and "found nothing" would read as "clean". A path below a
 symlinked directory or a nested repository is refused too, naming it: the untracked listing cannot
 look through either, so it prints nothing for them, which is "could not look" and not "clean"
-(T268-QA-11). The walk over a path's parents stops at the repository root, found by comparing
-**physical** paths (`cd -P` and `pwd -P`) and not the path text, so a path that reaches the root
-through `..` or a symlinked prefix stops it too, instead of reading the root's own `.git` as a
-nested repository (T285-QA-1). A symlink that lives inside the repository and points back at the
-root is still refused: stopping there would end the walk and read the path as clean (T285-QA-2):
+(T268-QA-11). Trailing slashes are stripped first, because `git ls-files -- link/` lists nothing
+for a symlink `link` that `link` alone reports (T285-QA-3). The walk then visits **every** parent of
+a path up to the filesystem root and never stops early, because a stop at the repository root lets
+an earlier symlink in the same path (`sub/out/repo/sub/new`, `sub/self/../real/new`) read as clean
+(T285-QA-3). A parent that is a symlink is refused when the directory holding the link resolves
+inside the repository (`cd -P`, `pwd -P`), and refused when that cannot be resolved; a link outside
+the repository, such as a symlinked prefix of an absolute path, is admitted. A parent holding a
+`.git` is refused only when it lies strictly below the repository root, found by comparing
+**physical** paths and not the path text: the root's own `.git`, reached through `..`, is not a
+nested repository (T285-QA-1, T285-QA-2):
 
 ```bash
 IFS= read -r -d '' CHANGED_PATHS <<'QA_FIX_CHANGED_PATHS_END' || true
@@ -872,6 +877,7 @@ esac
 case "$CHANGED_PATHS" in
   *\\*|*\'*|*\"*) echo "HALT: a changed path holds a backslash, single quote or double quote — xargs reads those as syntax and would judge a different path"; exit 1 ;;
 esac
+CHANGED_PATHS=$(printf '%s\n' "$CHANGED_PATHS" | tr -s ' \t' '\n\n' | grep -v '^$' | sed -e 's#\(.\)/*$#\1#')
 MISSING=$(printf '%s\n' "$CHANGED_PATHS" | tr -s ' \t' '\n\n' | grep -v '^$' \
   | while IFS= read -r p; do [ -e "$p" ] || git --literal-pathspecs ls-files --error-unmatch -- "$p" >/dev/null 2>&1 || printf '%s\n' "$p"; done)
 [ -z "$MISSING" ] \
@@ -881,15 +887,14 @@ BOUNDARY=$(printf '%s\n' "$CHANGED_PATHS" | tr -s ' \t' '\n\n' | grep -v '^$' \
   | while IFS= read -r p; do
       d=$p
       while d=$(dirname -- "$d"); [ "$d" != "." ] && [ "$d" != "/" ]; do
-        PHYS=$(cd -P -- "$d" 2>/dev/null && pwd -P) || PHYS=""
-        if [ -n "$PHYS" ] && [ "$PHYS" = "$TOP" ]; then
-          if [ -L "$d" ]; then
-            PP=$(cd -P -- "$(dirname -- "$d")" 2>/dev/null && pwd -P) || PP=""
-            case "$PP/" in "$TOP"/*) printf '%s\n' "$p" ;; esac
-          fi
-          break
+        if [ -L "$d" ]; then
+          PP=$(cd -P -- "$(dirname -- "$d")" 2>/dev/null && pwd -P) || PP=""
+          case "$PP/" in "$TOP"/*|/) printf '%s\n' "$p"; break ;; esac
         fi
-        if [ -L "$d" ] || [ -e "$d/.git" ]; then printf '%s\n' "$p"; break; fi
+        PHYS=$(cd -P -- "$d" 2>/dev/null && pwd -P) || PHYS=""
+        if [ -e "$d/.git" ] && [ "$PHYS" != "$TOP" ]; then
+          case "$PHYS/" in "$TOP"/*) printf '%s\n' "$p"; break ;; esac
+        fi
       done
     done)
 [ -z "$BOUNDARY" ] \

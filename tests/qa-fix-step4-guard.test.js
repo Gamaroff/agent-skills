@@ -322,8 +322,8 @@ const MUTANTS = [
   },
   {
     name: "T268-QA-11: a nested repository is not refused, so nothing listed reads as clean",
-    from: '|| [ -e "$d/.git" ]',
-    to: "|| false",
+    from: 'if [ -e "$d/.git" ] && [ "$PHYS" != "$TOP" ]; then',
+    to: "if false; then",
   },
 ];
 
@@ -565,32 +565,75 @@ test("Step 4 guard: refuses a path below a symlinked directory, naming it", asyn
   }
 });
 
-// T285-QA-2: a symlink inside the repository that points back at the root resolves to $TOP. Stopping
-// the walk there read `rootlink/real/new` (untracked) as clean, because `ls-files` lists nothing
-// through a symlink.
-const ROOTLINK = {
-  setup: (d) => {
-    write(d, "real/tracked");
-    git(d, "add", "real/tracked");
-    write(d, "real/new");
-    fs.symlinkSync(".", path.join(d, "rootlink"));
+// Paths the guard must not read as clean. Each reaches an untracked file through a symlink that
+// `git ls-files --others` cannot look through, so "nothing listed" would be a false clean:
+// T285-QA-2 (a link back to the root), T285-QA-3 (a link that leaves the repo and returns, a link
+// followed by `..`, a trailing slash on a link).
+const REFUSED = [
+  {
+    id: "rootlink",
+    setup: (d) => {
+      write(d, "real/tracked");
+      git(d, "add", "real/tracked");
+      write(d, "real/new");
+      fs.symlinkSync(".", path.join(d, "rootlink"));
+    },
+    input: () => "rootlink/real/new",
+    expect: (r, input) =>
+      r.status === 1 && r.stdout === BOUNDARY_REFUSAL + input + "\n",
   },
-  input: () => "rootlink/real/new",
-};
+  {
+    id: "out-and-back",
+    setup: (d) => {
+      write(d, "sub/new");
+      fs.symlinkSync("../..", path.join(d, "sub", "out"));
+    },
+    input: (d) => "sub/out/" + path.basename(d) + "/sub/new",
+    expect: (r, input) =>
+      r.status === 1 && r.stdout === BOUNDARY_REFUSAL + input + "\n",
+  },
+  {
+    id: "dotdot-after-symlink",
+    setup: (d) => {
+      write(d, "real/new");
+      write(d, "sub/x");
+      fs.symlinkSync("../sub", path.join(d, "sub", "self"));
+    },
+    input: () => "sub/self/../real/new",
+    expect: (r, input) =>
+      r.status === 1 && r.stdout === BOUNDARY_REFUSAL + input + "\n",
+  },
+  {
+    // `link/` lists nothing where `link` lists the symlink: the trailing slash is stripped so the
+    // untracked symlink is reported.
+    id: "trailing-slash-link",
+    setup: (d) => {
+      write(d, "real/new");
+      fs.symlinkSync("real", path.join(d, "link"));
+    },
+    input: () => "link/",
+    expect: (r) => r.status === 1 && /untracked files under/.test(r.stdout),
+  },
+];
 
-test("Step 4 guard: refuses a path through a symlink that points at the repository root", async () => {
-  const block = await stepBlock(SKILL_SRC);
-  for (const r of runDirect(block, ROOTLINK.setup, ROOTLINK.input)) {
-    assert.deepEqual(
-      [r.status, r.stdout],
-      [1, BOUNDARY_REFUSAL + "rootlink/real/new\n"],
-      r.shell,
-    );
-  }
-});
+for (const c of REFUSED) {
+  test(`Step 4 guard: does not read ${c.id} as clean`, async () => {
+    const block = await stepBlock(SKILL_SRC);
+    let input;
+    const results = runDirect(block, c.setup, (d) => (input = c.input(d)));
+    for (const r of results) {
+      assert.ok(c.expect(r, input), `${r.shell}: ${JSON.stringify(r)}`);
+    }
+  });
+}
 
 // Mutants for what a fence: fixture cannot reach. Each reverts one clause; the named scenario must
 // stop reading as it did, or the clause is held by nothing.
+const REFUSED_BY = (id) => REFUSED.find((c) => c.id === id);
+const SYMLINK_CLAUSE =
+  'case "$PP/" in "$TOP"/*|/) printf \'%s\\n\' "$p"; break ;; esac';
+const GIT_CLAUSE = 'if [ -e "$d/.git" ] && [ "$PHYS" != "$TOP" ]; then';
+const PHYS_LINE = 'PHYS=$(cd -P -- "$d" 2>/dev/null && pwd -P) || PHYS=""';
 const DIRECT_MUTANTS = [
   {
     name: "the --error-unmatch branch (a deleted tracked path reads as mistyped)",
@@ -600,16 +643,16 @@ const DIRECT_MUTANTS = [
     broken: (r) => r.status !== 0,
   },
   {
-    name: "the in-repository symlink check at the root stop (a symlink to the root reads as clean)",
-    from: `case "$PP/" in "$TOP"/*) printf '%s\\n' "$p" ;; esac`,
+    name: "the in-repository symlink refusal (a symlink to the root reads as clean)",
+    from: SYMLINK_CLAUSE,
     to: ":",
-    scenario: ROOTLINK,
+    scenario: REFUSED_BY("rootlink"),
     broken: (r) => r.status === 0,
   },
   {
-    name: "the symlink clause (a path below a symlinked directory reads as clean)",
-    from: '[ -L "$d" ] ||',
-    to: "false ||",
+    name: "the symlink test (a path below a symlinked directory reads as clean)",
+    from: 'if [ -L "$d" ]; then',
+    to: "if false; then",
     scenario: {
       setup: (d) => {
         write(d, "real/f");
@@ -620,9 +663,37 @@ const DIRECT_MUTANTS = [
     broken: (r) => r.status === 0,
   },
   {
-    name: "the repository-root stop (an absolute path inside the repo reads as a nested repo)",
-    from: 'if [ -n "$PHYS" ] && [ "$PHYS" = "$TOP" ]; then',
-    to: "if false; then",
+    name: "the symlink location test (every symlink is refused, so a symlinked prefix reads as a nested repo)",
+    from: SYMLINK_CLAUSE,
+    to: 'case "$PP/" in *) printf \'%s\\n\' "$p"; break ;; esac',
+    scenario: ADMITTED.find((c) => c.id === "symlinked-prefix"),
+    broken: (r) => r.status !== 0,
+  },
+  {
+    name: "the early stop returns at the repository root (an earlier symlink in the path is never reached)",
+    from: PHYS_LINE,
+    to: PHYS_LINE + '\n        [ "$PHYS" = "$TOP" ] && break',
+    scenario: REFUSED_BY("out-and-back"),
+    broken: (r) => r.status === 0,
+  },
+  {
+    name: "the no-early-stop walk (a symlink before a `..` is never reached)",
+    from: PHYS_LINE,
+    to: PHYS_LINE + '\n        [ "$PHYS" = "$TOP" ] && break',
+    scenario: REFUSED_BY("dotdot-after-symlink"),
+    broken: (r) => r.status === 0,
+  },
+  {
+    name: "the trailing-slash strip (a symlink with a slash lists nothing)",
+    from: " | sed -e 's#\\(.\\)/*$#\\1#'",
+    to: "",
+    scenario: REFUSED_BY("trailing-slash-link"),
+    broken: (r) => r.status === 0,
+  },
+  {
+    name: "the strictly-below test (the repository root's own .git reads as a nested repo)",
+    from: GIT_CLAUSE,
+    to: 'if [ -e "$d/.git" ]; then',
     scenario: ADMITTED.find((c) => c.id === "absolute-inside-repo"),
     broken: (r) => r.status !== 0,
   },
@@ -630,15 +701,15 @@ const DIRECT_MUTANTS = [
     // T285-QA-1: comparing the path text instead of the physical path refuses `..` and a symlinked
     // prefix, because neither is spelled like the root.
     name: "the physical comparison (a path reaching the root through `..` reads as a nested repo)",
-    from: '[ "$PHYS" = "$TOP" ]',
-    to: '[ "$d" = "$TOP" ]',
+    from: GIT_CLAUSE,
+    to: 'if [ -e "$d/.git" ] && [ "$d" != "$TOP" ]; then',
     scenario: ADMITTED.find((c) => c.id === "dotdot-from-subdirectory"),
     broken: (r) => r.status !== 0,
   },
   {
     name: "the physical comparison (a symlinked prefix reads as a nested repo)",
-    from: '[ "$PHYS" = "$TOP" ]',
-    to: '[ "$d" = "$TOP" ]',
+    from: GIT_CLAUSE,
+    to: 'if [ -e "$d/.git" ] && [ "$d" != "$TOP" ]; then',
     scenario: ADMITTED.find((c) => c.id === "symlinked-prefix"),
     broken: (r) => r.status !== 0,
   },

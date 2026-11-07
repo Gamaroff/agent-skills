@@ -300,21 +300,21 @@ None.
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-07
-**Quality Score**: 80/100
+**Quality Score**: 70/100
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.285.qa.2.qa-fix-step4-guard-hostile-paths.md](./task.285.qa.2.qa-fix-step4-guard-hostile-paths.md)
-- **Gate File**: [task.285.gate.2.qa-fix-step4-guard-hostile-paths.yml](./task.285.gate.2.qa-fix-step4-guard-hostile-paths.yml)
+- **Full Report**: [task.285.qa.3.qa-fix-step4-guard-hostile-paths.md](./task.285.qa.3.qa-fix-step4-guard-hostile-paths.md)
+- **Gate File**: [task.285.gate.3.qa-fix-step4-guard-hostile-paths.yml](./task.285.gate.3.qa-fix-step4-guard-hostile-paths.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 21 in the guard file, 34 probe cases
+- **Tests Executed**: 23 in the guard file, 34 probe cases
 - **Phases Verified**: 5/5
-- **Critical Issues**: 1
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 2
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Key Findings
-T285-QA-2 (high): a symlink inside the repository that points at the repository root ends the Step 4 parent walk early, so an untracked file reached through it reads as clean. T285-QA-1 is fixed.
+T285-QA-3 and T285-QA-4 (high): the Step 4 parent walk stops early at the repository root, and ignores a trailing slash, so a path through a symlink can read as clean. T285-QA-2 is fixed.
 
 <!-- change-log-start -->
 ## Change Log
@@ -330,6 +330,8 @@ T285-QA-2 (high): a symlink inside the repository that points at the repository 
 | 2026-11-07 |         | QA findings fixed — T285-QA-1 (parent walk compares physical paths), 1 iteration | qa-fix |
 | 2026-11-07 |         | QA gate FAIL (80/100) — 1 finding | qa-task |
 | 2026-11-07 |         | QA findings fixed — T285-QA-2 (a symlink to the repository root is still refused), 1 iteration | qa-fix |
+| 2026-11-07 |         | QA gate FAIL (70/100) — 3 findings | qa-task |
+| 2026-11-07 |         | QA findings fixed — T285-QA-3, T285-QA-4, T285-QA-5 (parent walk visits every parent; trailing slashes stripped; scenarios and mutants added), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---
