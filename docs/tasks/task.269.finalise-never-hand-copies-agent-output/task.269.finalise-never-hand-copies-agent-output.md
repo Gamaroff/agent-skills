@@ -296,15 +296,15 @@ None - `cases_file:` is an optional field; inline `cases` keeps working.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-07
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.269.qa.2.finalise-never-hand-copies-agent-output.md](./task.269.qa.2.finalise-never-hand-copies-agent-output.md)
-- **Gate File**: [task.269.gate.2.finalise-never-hand-copies-agent-output.yml](./task.269.gate.2.finalise-never-hand-copies-agent-output.yml)
+- **Full Report**: [task.269.qa.3.finalise-never-hand-copies-agent-output.md](./task.269.qa.3.finalise-never-hand-copies-agent-output.md)
+- **Gate File**: [task.269.gate.3.finalise-never-hand-copies-agent-output.yml](./task.269.gate.3.finalise-never-hand-copies-agent-output.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 22 (new or changed), 7999 in the fast gate
@@ -313,7 +313,7 @@ None - `cases_file:` is an optional field; inline `cases` keeps working.
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-All five cycle-1 findings are fixed and held by tests that go red when the fix is reverted. One MEDIUM remains: no CHANGELOG entry cites task 269 (T269-QA-6).
+No open finding. Cycle 3 closed the CHANGELOG gap (T269-QA-6) and two advisory notes on the finalise reuse block.
 
 <!-- change-log-start -->
 ## Change Log
@@ -328,6 +328,7 @@ All five cycle-1 findings are fixed and held by tests that go red when the fix i
 | 2026-11-07 |         | QA findings fixed — T269-QA-1 to -5, 4 new tests, 5 mutation proofs, iteration 1 | qa-fix      |
 | 2026-11-07 |         | QA gate CONCERNS (90/100) — 1 finding                    | qa-task     |
 | 2026-11-07 |         | QA findings fixed — T269-QA-6 plus two advisory notes, iteration 2 | qa-fix      |
+| 2026-11-07 |         | QA gate PASS (100/100) — 0 findings                      | qa-task     |
 <!-- change-log-end -->
 
 ---
