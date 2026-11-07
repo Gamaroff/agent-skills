@@ -115,7 +115,8 @@ const waitLog = (work) =>
     : [];
 
 function stepBlock() {
-  return bind(blockBy(readDoc(FINALISE), "security-probe-plan.mjs"), {
+  // `--cases-base` is in the runner block only: the reuse block (task 269) also names the script.
+  return bind(blockBy(readDoc(FINALISE), "--cases-base"), {
     ".agents/skills/finalise/references/security-probe-plan.mjs": RUNNER,
     // A stand-in that logs its arguments, so the wait the block marks can be asserted (CR4-1).
     ".agents/skills/finalise/references/set-waiting-on.sh": WAIT_STUB,
@@ -611,7 +612,7 @@ test("Step 3b.1: a run killed mid-write leaves no result — never a partial or 
     ".claude/state/probe-plan-result.json",
     JSON.stringify({ reason: "ran", probes_executed: 99 }),
   );
-  const block = bind(blockBy(readDoc(FINALISE), "security-probe-plan.mjs"), {
+  const block = bind(blockBy(readDoc(FINALISE), "--cases-base"), {
     ".agents/skills/finalise/references/security-probe-plan.mjs": path.join(
       work,
       "killed-runner.mjs",
@@ -811,7 +812,7 @@ test("a runner that fails to load still removes the stale result and reports no 
     ".claude/state/probe-plan-result.json",
     JSON.stringify({ reason: "ran", probes_executed: 99 }),
   );
-  const block = bind(blockBy(readDoc(FINALISE), "security-probe-plan.mjs"), {
+  const block = bind(blockBy(readDoc(FINALISE), "--cases-base"), {
     ".agents/skills/finalise/references/security-probe-plan.mjs":
       "no-such-runner.mjs",
     ".agents/skills/finalise/references/set-waiting-on.sh": WAIT_STUB,

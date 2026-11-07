@@ -1811,6 +1811,152 @@ test("merge: unparseable output writes no record (CLI)", () => {
   }
 });
 
+// ── extract and the result hash (task 269, obs #142) ────────────────────────
+
+/** A subagent transcript whose final turn is `reply`, under a projects root inside `dir`. */
+function writeTranscript(dir, agentId, reply) {
+  const d = join(dir, "projects", "proj", "sess", "subagents");
+  mkdirSync(d, { recursive: true });
+  const lines = [
+    { type: "user", message: { role: "user", content: "go" } },
+    {
+      type: "assistant",
+      message: {
+        role: "assistant",
+        content: [{ type: "tool_use", name: "Read", input: {} }],
+      },
+    },
+    { type: "user", message: { role: "user", content: [] } },
+    {
+      type: "assistant",
+      message: { role: "assistant", content: [{ type: "text", text: reply }] },
+    },
+  ];
+  writeFileSync(
+    join(d, `agent-${agentId}.jsonl`),
+    lines.map((l) => JSON.stringify(l)).join("\n") + "\n",
+  );
+}
+
+function ac4() {
+  return agentYaml(
+    ["SC-1", "SC-2", "SC-3", "SC-4"].map((id) => ({
+      id,
+      status: "PASS",
+      note: `a long note for ${id}, which a hand copy would shorten`,
+    })),
+  );
+}
+
+test("extract: the AC block is written byte for byte, its hash recorded, and a changed byte is refused by merge (CLI)", () => {
+  const dir = mkRepo();
+  try {
+    const yaml = ac4();
+    writeTranscript(
+      dir,
+      "ab12",
+      "Here is my answer.\n```finalise-ac-yaml\n" + yaml + "```\n",
+    );
+    const ex = cli(dir, [
+      "extract",
+      "--agent-id",
+      "ab12",
+      "--projects-root",
+      "projects",
+      "--out",
+      "ac.yaml",
+      "--json",
+    ]);
+    const e = JSON.parse(ex.stdout);
+    assert.equal(e.reason, "extracted");
+    // The extracted file is the agent's block exactly (the fence's own line break is not part of it).
+    assert.equal(readFileSync(join(dir, "ac.yaml"), "utf8"), yaml);
+    assert.equal(e.bytes, Buffer.byteLength(yaml));
+    writeFileSync(join(dir, "scope.json"), JSON.stringify(scopeAt(dir, null)));
+    const rec = "docs/tasks/task.9.demo/task.9.dod.1.ac.json";
+    const merge = (sha) =>
+      JSON.parse(
+        cli(dir, [
+          "merge",
+          "--scope",
+          "scope.json",
+          "--result",
+          "ac.yaml",
+          ...(sha ? ["--sha256", sha] : []),
+          "--dod-n",
+          "1",
+          "--record-out",
+          rec,
+          "--json",
+        ]).stdout,
+      );
+    // Mutation target: the hash check. Without it the tampered file below would merge.
+    const tampered = yaml.replace("a long note", "a short note");
+    writeFileSync(join(dir, "tampered.yaml"), tampered);
+    const bad = JSON.parse(
+      cli(dir, [
+        "merge",
+        "--scope",
+        "scope.json",
+        "--result",
+        "tampered.yaml",
+        "--sha256",
+        e.sha256,
+        "--dod-n",
+        "1",
+        "--record-out",
+        rec,
+        "--json",
+      ]).stdout,
+    );
+    assert.equal(bad.reason, "result-hash-mismatch");
+    assert.equal(existsSync(join(dir, rec)), false, "nothing is recorded");
+    // Control: the extracted file with its own hash merges and the record says it was verified.
+    const ok = merge(e.sha256);
+    assert.equal(ok.reason, "merged");
+    const written = JSON.parse(readFileSync(join(dir, rec), "utf8"));
+    assert.deepEqual(written.result, {
+      bytes: e.bytes,
+      sha256: e.sha256,
+      verified: true,
+    });
+    // A hand copy (no --sha256) is recorded as unverified, not as absent.
+    const hand = merge(null);
+    assert.equal(hand.reason, "merged");
+    assert.equal(hand.record.result.verified, false);
+    assert.equal(hand.record.result.sha256, e.sha256);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("extract: a reply it cannot take a block from writes nothing and says why (CLI)", () => {
+  const dir = mkRepo();
+  try {
+    const run = (extra) =>
+      JSON.parse(
+        cli(dir, [
+          "extract",
+          "--projects-root",
+          "projects",
+          "--out",
+          "ac.yaml",
+          "--json",
+          ...extra,
+        ]).stdout,
+      );
+    assert.equal(run(["--agent-id", "nope"]).reason, "transcript-not-found");
+    writeTranscript(dir, "cd34", "no block here\n");
+    assert.equal(run(["--agent-id", "cd34"]).reason, "no-block");
+    assert.equal(existsSync(join(dir, "ac.yaml")), false);
+    // A usage error exits 2.
+    const u = cli(dir, ["extract", "--out", "x", "--json"]);
+    assert.equal(u.status, 2);
+  } finally {
+    cleanup(dir);
+  }
+});
+
 // ── CLI ───────────────────────────────────────────────────────────────────
 
 function cli(dir, argv) {
