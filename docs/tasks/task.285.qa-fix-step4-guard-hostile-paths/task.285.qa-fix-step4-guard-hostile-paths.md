@@ -5,17 +5,19 @@ type: task
 description: "Close the two deferred task 268 findings in the qa-fix Step 4 untracked-files guard (shell metacharacters in a path, nested-repo or symlinked paths) and the advisory gaps beside them."
 tags: [qa-fix, develop-task, security, deferred-work]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-11-07
 updated: 2026-11-07
+completed_date: 2026-11-07
+pr_number: 856
 estimated_effort_hours: 4
 github_issue: 855
 ---
 
 # Task 285: qa-fix Step 4 guard survives hostile paths
 
-**Status:** Ready for Review
+**Status:** Accepted
 **GitHub Issue**: [#855](https://github.com/Gamaroff/agent-skills/issues/855)
 
 ---
@@ -223,27 +225,27 @@ Documentation:
 
 ### Functional
 
-- [ ] A path holding `$(…)`, a backtick or a variable reference is refused and executes nothing, shown by a test whose marker file stays absent.
-- [ ] A path in a nested repository or behind a symlinked directory is refused with its path named, shown by a fixture each.
-- [ ] A tracked, a deleted-tracked and an intent-to-add path are admitted.
-- [ ] The loop doc no longer shows the bare `git ls-files --others` command as the check.
+- [x] A path holding `$(…)`, a backtick or a variable reference is refused and executes nothing, shown by a test whose marker file stays absent.
+- [x] A path in a nested repository or behind a symlinked directory is refused with its path named, shown by a fixture each.
+- [x] A tracked, a deleted-tracked and an intent-to-add path are admitted.
+- [x] The loop doc no longer shows the bare `git ls-files --others` command as the check.
 
 ### Performance
 
-- [ ] Suite median within 10% of `develop` (five alternating pairs, load recorded), figure recorded in the QA report.
-- [ ] No new test takes longer than one second on its own. Measured with `CI=true command node --test --test-reporter=spec tests/qa-fix-step4-guard.test.js`, reading each new case's reported `(…ms)` (bound 1000 ms), with `uptime` recorded beside the run; the figure goes in the QA report.
-- [ ] A path holding a backslash, single quote or double quote is refused (a named test per character class, bash and zsh), and a path `a\` beside a clean `a` is not judged as `a`.
+- [x] Whole-suite (`npm test`) wall time measured once on the branch, with `uptime` beside the run, and the figure recorded in the QA report. Amended at Step 5c from "suite median within 10% of `develop` (five alternating pairs)": that bound was written for a file of 17 tests, the file now holds 37 and each case runs under bash and zsh, so the qa-fix test files alone went from 1.36 s to 5.02 s (+270%), a few seconds in a whole suite. approved by Lorien Gamaroff (2026-11-07).
+- [x] No new test takes longer than one second on its own. Measured with `CI=true command node --test --test-reporter=spec tests/qa-fix-step4-guard.test.js`, reading each new case's reported `(…ms)` (bound 1000 ms), with `uptime` recorded beside the run; the figure goes in the QA report.
+- [x] A path holding a backslash, single quote or double quote is refused (a named test per character class, bash and zsh), and a path `a\` beside a clean `a` is not judged as `a`.
 
 ### Code Quality
 
-- [ ] Reverting each new refusal, and the `--error-unmatch` branch, turns a named test red (mutation list in the QA report).
-- [ ] `npm run bundle -- --check` and `quick_validate` on `qa-fix` pass.
-- [ ] `CI=true npm test` passes.
+- [x] Reverting each new refusal, and the `--error-unmatch` branch, turns a named test red (mutation list in the QA report).
+- [x] `npm run bundle -- --check` and `quick_validate` on `qa-fix` pass.
+- [x] `CI=true npm test` passes.
 
 ### Migration
 
-- [ ] `CHANGELOG.md` cites task 285.
-- [ ] The two task 268 findings are marked closed by task 285 in task 268's Deferred Work.
+- [x] `CHANGELOG.md` cites task 285.
+- [x] The two task 268 findings are marked closed by task 285 in task 268's Deferred Work.
 
 ---
 
@@ -314,13 +316,34 @@ None.
 - **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-T285-QA-6 is fixed: the parent walk is replaced by a physical-identity decision, and the symlink and nested-repository class is refused in bash and zsh. One narrower false clean was reproduced (CR-1, advisory: reviewer high severity, medium confidence): a directory above a gitlink holding an untracked file reads clean. Two further advisories, CR-2 and CR-3, are recorded in the gate.
+T285-QA-6 is fixed: the parent walk is replaced by a physical-identity decision, and the symlink and nested-repository class is refused in bash and zsh. One narrower false clean was reproduced (CR-1, advisory: reviewer high severity, medium confidence): a directory above a gitlink holding an untracked file reads clean. Two further advisories, CR-2 and CR-3, are recorded in the gate. All three are owned by follow-up task 286.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report**: `task.285.qa.5.qa-fix-step4-guard-hostile-paths.md`
+**Gate File**: `task.285.gate.5.qa-fix-step4-guard-hostile-paths.yml`
+**Gate Status**: CONCERNS (80/100), no open `top_issues`; every concern is owned by task 286
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** all 12 met. The first Performance criterion was amended at Step 5c with approval (Lorien Gamaroff, 2026-11-07), and the second was re-measured on the PR head.
+✅ **PR Review:** `task.285.pr-review.1.qa-fix-step4-guard-hostile-paths.md` (CONCERNS, all three findings closed); PR #856, CI green
+✅ **Documentation:** `CHANGELOG.md:9`, qa-fix `SKILL.md`, the loop doc and its three bundled copies
+✅ **Security Review:** 34 probes executed, 0 reproduced, 0 escaped
+✅ **Compliance Review:** not applicable
+
+**Follow-up:** task 286 owns CR-1 (a gitlink beneath a changed directory), CR-2 and CR-3.
+
+**Detailed Verification Log:** See `task.285.dod.1.qa-fix-step4-guard-hostile-paths.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-07
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                                                          | Author      |
-| ---------- | ------- | ------------------------------------------------------------------------------------ | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-07 | 1.0     | Initial draft — cut from task 268 gate 5 T268-QA-10, T268-QA-11 and two advisories | create-task |
 | 2026-11-07 |         | GitHub issue created (#855)                                                          | sync-github-task |
 | 2026-11-07 | 1.1     | Review passed (8/10) — mechanisms layered (heredoc + refusal of `\ ' "` because `xargs` reads them as syntax), anchors fixed, bound command and Phase 5 pinned suites named | review-task |
@@ -335,6 +358,7 @@ T285-QA-6 is fixed: the parent walk is replaced by a physical-identity decision,
 | 2026-11-07 |         | QA gate FAIL (70/100) — 1 finding | qa-task |
 | 2026-11-07 |         | QA findings fixed — T285-QA-6 (third strike: the parent walk replaced by a lexical-vs-physical compare and a git top-level check), 1 iteration | qa-fix |
 | 2026-11-07 |         | QA gate CONCERNS (80/100) — 0 blocking findings, 3 advisories | qa-task |
+| 2026-11-07 | 1.2 | DoD passed — accepted (PR #856) | finalise |
 <!-- change-log-end -->
 
 ---

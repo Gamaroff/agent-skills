@@ -1,0 +1,336 @@
+[
+  {
+    "sink": "filename",
+    "id": "empty",
+    "input": "",
+    "why": "empty slot",
+    "correct": "refused",
+    "direction": "hostile",
+    "expected": {
+      "stdout": "HALT: CHANGED_PATHS is empty or still holds a brace — substitute the paths this fix touched\n",
+      "exit": 1
+    },
+    "spec_ref": "docs/tasks/task.285.qa-fix-step4-guard-hostile-paths/task.285.qa-fix-step4-guard-hostile-paths.md:226"
+  },
+  {
+    "sink": "filename",
+    "id": "unfilled",
+    "input": "{changed-paths}",
+    "why": "slot left in",
+    "correct": "refused",
+    "direction": "hostile",
+    "expected": {
+      "stdout": "HALT: CHANGED_PATHS is empty or still holds a brace — substitute the paths this fix touched\n",
+      "exit": 1
+    },
+    "spec_ref": "docs/tasks/task.285.qa-fix-step4-guard-hostile-paths/task.285.qa-fix-step4-guard-hostile-paths.md:226"
+  },
+  {
+    "sink": "filename",
+    "id": "brace",
+    "input": "a{b",
+    "why": "brace in a path",
+    "correct": "refused",
+    "direction": "hostile",
+    "expected": {
+      "stdout": "HALT: CHANGED_PATHS is empty or still holds a brace — substitute the paths this fix touched\n",
+      "exit": 1
+    },
+    "spec_ref": "docs/tasks/task.285.qa-fix-step4-guard-hostile-paths/task.285.qa-fix-step4-guard-hostile-paths.md:226"
+  },
+  {
+    "sink": "filename",
+    "id": "untracked",
+    "input": "newdir",
+    "why": "an untracked file under the changed paths",
+    "correct": "refused",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/objects/.keep": "",
+        ".git/refs/.keep": "",
+        "newdir/new.txt": "x\n"
+      }
+    },
+    "expected": {
+      "stdout": "untracked files under the changed paths — stage them first:\nnewdir/new.txt\n",
+      "exit": 1
+    },
+    "spec_ref": "docs/tasks/task.285.qa-fix-step4-guard-hostile-paths/task.285.qa-fix-step4-guard-hostile-paths.md:226"
+  },
+  {
+    "sink": "filename",
+    "id": "blank",
+    "input": "   ",
+    "why": "whitespace-only slot",
+    "correct": "refused",
+    "direction": "hostile",
+    "expected": {
+      "stdout": "HALT: CHANGED_PATHS is empty or still holds a brace — substitute the paths this fix touched\n",
+      "exit": 1
+    },
+    "spec_ref": "docs/tasks/task.285.qa-fix-step4-guard-hostile-paths/task.285.qa-fix-step4-guard-hostile-paths.md:226"
+  },
+  {
+    "sink": "filename",
+    "id": "multi-second-untracked",
+    "input": "ignored newdir",
+    "why": "two paths, the untracked file under the second (zsh does not word-split a bare variable)",
+    "correct": "refused",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/objects/.keep": "",
+        ".git/refs/.keep": "",
+        ".gitignore": "ignored/\n",
+        "ignored/x": "x\n",
+        "newdir/new.txt": "x\n"
+      }
+    },
+    "expected": {
+      "stdout": "untracked files under the changed paths — stage them first:\nnewdir/new.txt\n",
+      "exit": 1
+    },
+    "spec_ref": "docs/tasks/task.285.qa-fix-step4-guard-hostile-paths/task.285.qa-fix-step4-guard-hostile-paths.md:226"
+  },
+  {
+    "sink": "filename",
+    "id": "missing-path",
+    "input": "nosuchdir",
+    "why": "a mistyped path lists nothing and would read as clean",
+    "correct": "refused",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/objects/.keep": "",
+        ".git/refs/.keep": "",
+        "other/x": "x\n"
+      }
+    },
+    "expected": {
+      "stdout": "HALT: these changed paths are neither on disk nor tracked — a mistyped path lists nothing and would read as clean:\nnosuchdir\n",
+      "exit": 1
+    },
+    "spec_ref": "docs/tasks/task.285.qa-fix-step4-guard-hostile-paths/task.285.qa-fix-step4-guard-hostile-paths.md:226"
+  },
+  {
+    "sink": "filename",
+    "id": "magic-pathspec-dir",
+    "input": ":(exclude)newdir newdir",
+    "why": "a path named like an exclude pathspec must be matched literally, not hide newdir",
+    "correct": "refused",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/objects/.keep": "",
+        ".git/refs/.keep": "",
+        ":(exclude)newdir/g": "x\n",
+        "newdir/new.txt": "x\n"
+      }
+    },
+    "expected": {
+      "stdout": "untracked files under the changed paths — stage them first:\n:(exclude)newdir/g\nnewdir/new.txt\n",
+      "exit": 1
+    },
+    "spec_ref": "docs/tasks/task.285.qa-fix-step4-guard-hostile-paths/task.285.qa-fix-step4-guard-hostile-paths.md:226"
+  },
+  {
+    "sink": "filename",
+    "id": "meta-substitution",
+    "input": "$(touch pwned)",
+    "why": "a command substitution in a path must not run",
+    "correct": "refused",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/objects/.keep": "",
+        ".git/refs/.keep": "",
+        "other/x": "x\n"
+      }
+    },
+    "expected": {
+      "stdout": "HALT: these changed paths are neither on disk nor tracked — a mistyped path lists nothing and would read as clean:\n$(touch\npwned)\n",
+      "exit": 1,
+      "absent": [
+        "pwned"
+      ]
+    },
+    "spec_ref": "docs/tasks/task.285.qa-fix-step4-guard-hostile-paths/task.285.qa-fix-step4-guard-hostile-paths.md:226"
+  },
+  {
+    "sink": "filename",
+    "id": "meta-backtick",
+    "input": "`touch pwned2`",
+    "why": "a backtick substitution in a path must not run",
+    "correct": "refused",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/objects/.keep": "",
+        ".git/refs/.keep": "",
+        "other/x": "x\n"
+      }
+    },
+    "expected": {
+      "stdout": "HALT: these changed paths are neither on disk nor tracked — a mistyped path lists nothing and would read as clean:\n`touch\npwned2`\n",
+      "exit": 1,
+      "absent": [
+        "pwned2"
+      ]
+    },
+    "spec_ref": "docs/tasks/task.285.qa-fix-step4-guard-hostile-paths/task.285.qa-fix-step4-guard-hostile-paths.md:226"
+  },
+  {
+    "sink": "filename",
+    "id": "meta-variable",
+    "input": "$HOME/x",
+    "why": "a variable reference in a path must reach the guard literally, not expanded",
+    "correct": "refused",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/objects/.keep": "",
+        ".git/refs/.keep": "",
+        "other/x": "x\n"
+      }
+    },
+    "expected": {
+      "stdout": "HALT: these changed paths are neither on disk nor tracked — a mistyped path lists nothing and would read as clean:\n$HOME/x\n",
+      "exit": 1
+    },
+    "spec_ref": "docs/tasks/task.285.qa-fix-step4-guard-hostile-paths/task.285.qa-fix-step4-guard-hostile-paths.md:226"
+  },
+  {
+    "sink": "filename",
+    "id": "backslash-mutation",
+    "input": "a\\",
+    "why": "a path ending in a backslash is judged as a different path by xargs",
+    "correct": "refused",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/objects/.keep": "",
+        ".git/refs/.keep": "",
+        ".gitignore": "a\n",
+        "a": "x\n",
+        "a\\": "x\n"
+      }
+    },
+    "expected": {
+      "stdout": "HALT: a changed path holds a backslash, single quote or double quote — xargs reads those as syntax and would judge a different path\n",
+      "exit": 1
+    },
+    "spec_ref": "docs/tasks/task.285.qa-fix-step4-guard-hostile-paths/task.285.qa-fix-step4-guard-hostile-paths.md:226"
+  },
+  {
+    "sink": "filename",
+    "id": "single-quote",
+    "input": "a'b",
+    "why": "a single quote in a path is syntax to xargs",
+    "correct": "refused",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/objects/.keep": "",
+        ".git/refs/.keep": "",
+        "other/x": "x\n"
+      }
+    },
+    "expected": {
+      "stdout": "HALT: a changed path holds a backslash, single quote or double quote — xargs reads those as syntax and would judge a different path\n",
+      "exit": 1
+    },
+    "spec_ref": "docs/tasks/task.285.qa-fix-step4-guard-hostile-paths/task.285.qa-fix-step4-guard-hostile-paths.md:226"
+  },
+  {
+    "sink": "filename",
+    "id": "double-quote",
+    "input": "a\"b",
+    "why": "a double quote in a path is syntax to xargs",
+    "correct": "refused",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/objects/.keep": "",
+        ".git/refs/.keep": "",
+        "other/x": "x\n"
+      }
+    },
+    "expected": {
+      "stdout": "HALT: a changed path holds a backslash, single quote or double quote — xargs reads those as syntax and would judge a different path\n",
+      "exit": 1
+    },
+    "spec_ref": "docs/tasks/task.285.qa-fix-step4-guard-hostile-paths/task.285.qa-fix-step4-guard-hostile-paths.md:226"
+  },
+  {
+    "sink": "filename",
+    "id": "nested-repo",
+    "input": "inner/f",
+    "why": "a path below a nested repository lists nothing and would read as clean",
+    "correct": "refused",
+    "direction": "hostile",
+    "fixture": {
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/objects/.keep": "",
+        ".git/refs/.keep": "",
+        "inner/.git/HEAD": "ref: refs/heads/main\n",
+        "inner/.git/objects/.keep": "",
+        "inner/.git/refs/.keep": "",
+        "inner/f": "x\n"
+      }
+    },
+    "expected": {
+      "stdout": "HALT: these changed paths sit below a symlink or a nested repository — the untracked listing cannot look through either, so \"nothing listed\" would read as clean:\ninner/f\n",
+      "exit": 1
+    },
+    "spec_ref": "docs/tasks/task.285.qa-fix-step4-guard-hostile-paths/task.285.qa-fix-step4-guard-hostile-paths.md:226"
+  },
+  {
+    "sink": "filename",
+    "id": "multi-clean",
+    "input": "ignored ignored2",
+    "why": "two filled paths with nothing untracked are admitted",
+    "correct": "admitted",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/objects/.keep": "",
+        ".git/refs/.keep": "",
+        ".gitignore": "ignored/\nignored2/\n",
+        "ignored/x": "x\n",
+        "ignored2/x": "x\n"
+      }
+    },
+    "spec_ref": "docs/tasks/task.285.qa-fix-step4-guard-hostile-paths/task.285.qa-fix-step4-guard-hostile-paths.md:228"
+  },
+  {
+    "sink": "filename",
+    "id": "filled-clean",
+    "input": "ignored",
+    "why": "a filled slot with nothing untracked is admitted",
+    "correct": "admitted",
+    "direction": "legitimate",
+    "fixture": {
+      "files": {
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ".git/objects/.keep": "",
+        ".git/refs/.keep": "",
+        ".gitignore": "ignored/\n",
+        "ignored/x": "x\n"
+      }
+    },
+    "spec_ref": "docs/tasks/task.285.qa-fix-step4-guard-hostile-paths/task.285.qa-fix-step4-guard-hostile-paths.md:228"
+  }
+]
