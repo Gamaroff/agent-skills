@@ -615,9 +615,54 @@ so aggregation reads the filled result.
 
 Skip it when `boundary` is `false` or `internal`. Otherwise:
 
-1. **Write the plan.** Save `SECURITY_RESULT.probe_plan` as a JSON array to
-   `.claude/state/probe-plan.json` (Write tool — it is YAML in your context, not a shell variable).
-   An absent or empty plan under `boundary: true` is written as `[]`; it is not skipped.
+1. **Write the plan — extracted, not retyped** (task 269). The security agent ends its answer with a
+   `finalise-probe-plan` block (the prompt's "plan block"); the host keeps the agent's transcript on disk,
+   so one command takes the block out of it and no character of the plan passes through you. `AGENT_ID`
+   is the id the Agent tool returned for the security dispatch:
+
+   ```bash
+   # INPUT, substituted into THIS block: {security agent id}.
+   AGENT_ID="{security agent id}"
+   case "$AGENT_ID" in ''|*'{'*) echo "HALT: AGENT_ID must be the security agent's id, substituted"; exit 1 ;; esac
+   command node .agents/skills/finalise/references/agent-reply-block.js extract \
+     --agent-id "$AGENT_ID" --block finalise-probe-plan --out .claude/state/probe-plan.json --json
+   ```
+
+   Read `reason`. `extracted`: the plan is on disk and byte-exact; record its `bytes` and `sha256` in the
+   DoD as "plan extracted from the agent's transcript". Anything else (`transcript-not-found`,
+   `transcript-ambiguous`, `transcript-unreadable`, `no-block`, `empty-block`, `entity-escaped`): the
+   extract wrote nothing; fall back to the old route — save `SECURITY_RESULT.probe_plan` as a JSON array to
+   `.claude/state/probe-plan.json` with the Write tool — and record "plan hand-copied (unverified):
+   {reason}" in the DoD, so a reader can tell a copy from an extraction. An absent or empty plan under
+   `boundary: true` is written as `[]`; it is not skipped.
+
+   **Reuse a plan that still holds.** When the work item's previous DoD run left a `…security.plan.json`
+   (the runner writes it, below), ask whether it can run again instead of planning afresh. `{engine
+   paths}` are the engine files the plan's controls probe, as `--engine-path` flags; `{prior head}` is
+   the `head` field of the previous run's AC record (`…dod.{N-1}.ac.json`):
+
+   ```bash
+   # INPUTS, substituted into THIS block (a fenced block is its own shell): STEM and DOD_N as Step 0
+   # bound them, {document-directory}, {prior head}, and one {engine path} per engine file (repeat the
+   # --engine-path flag below once per file: a plan that probes several files is reusable only when
+   # every one is unchanged). DOD_N is judged first: a first run has no {prior head} to substitute.
+   DOD_N="{Step 0's DOD_N}"
+   case "$DOD_N" in ''|*'{'*) echo "HALT: DOD_N is an unsubstituted placeholder"; exit 1 ;; *[!0-9]*) echo "HALT: DOD_N is not a number"; exit 1 ;; esac
+   STEM="{story.{P}.{E}.{S} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"
+   DOC_DIR="{document-directory}"
+   if [ "$DOD_N" -le 1 ]; then
+     echo "reuse: no previous DoD run (DOD_N=$DOD_N) — plan afresh"
+   else
+     case "$STEM$DOC_DIR{prior head}{engine path}" in *'{'*) echo "HALT: an input of the reuse block is an unsubstituted placeholder"; exit 1 ;; esac
+     command node .agents/skills/finalise/references/security-probe-plan.mjs reuse \
+       --prior-plan "$DOC_DIR/$STEM.dod.$((DOD_N-1)).security.plan.json" --prior-head "{prior head}" \
+       --repo-root "$(git rev-parse --show-toplevel)" --engine-path "{engine path}" --json
+   fi
+   ```
+
+   `reusable`: copy that plan file to `.claude/state/probe-plan.json` (a file copy, not a retype), skip
+   the plan block, and say "plan reused from dod.{N-1}" in the DoD. `not-reusable`: plan afresh, as above.
+   The plan's `cases_file` entries are checked by hash, so a cases file edited since is not reused.
 2. **Run it — backgrounded**, one call from the repository root (`run_in_background`), and read the
    `probe-plan exit=` line when the notification arrives. Each entry may run for minutes, and a
    foreground call is stopped at the host's tool timeout (120–600 s), which would leave no result
@@ -660,6 +705,7 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
      --plan .claude/state/probe-plan.json \
      --record "$DOC_DIR/$STEM.dod.$DOD_N.security.run.json" \
      --cases-base "$DOC_DIR/$STEM.dod.$DOD_N.security.cases" \
+     --reusable-plan "$DOC_DIR/$STEM.dod.$DOD_N.security.plan.json" \
      --repo-root "$(git rev-parse --show-toplevel)" \
      --json > "$RESULT.tmp"
    rc=$?
@@ -692,6 +738,13 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
    in transport, not the code's own text. On task.243 every `>` arrived as `&gt;`, and the run read
    49 legitimate cases as over-blocked (obs #133). On that refusal, restore the characters in
    `.claude/state/probe-plan.json`, check them against the code or a committed cases file, and re-run.
+   An entry may name a committed cases file with `cases_file` instead of carrying `cases`; the runner
+   copies its bytes (so U+0085, U+2028, VT, FF and a lone CR survive) and refuses a name that is
+   absolute, climbs out, is a symlink or is not a JSON array. Cases that carry an HTML entity are
+   refused as `plan-entry-cases-html-entity` when the plan has no literal `<` and the entry's own source
+   file does not carry that entity. `--reusable-plan` writes the plan as it ran, each inline `cases`
+   replaced by its committed file and hash; commit it beside the record, because the next run's `reuse`
+   reads it.
    Exit 1 (`bad-plan`) means the JSON you wrote is not an array: fix the file, re-run.
    **`probe-plan: no result` is not an empty plan** — the run did not complete (killed, or its output
    did not parse): re-run the step; never fill `SECURITY_RESULT` from an absent result.
@@ -806,8 +859,28 @@ still matches; an entry a sink models is probed, never skipped. A reason that fa
 **Never abort due to a single agent failure.** One failed section = manual review for that section only.
 
 **Then enforce the re-run scope on agent 1's answer, and write this run's AC record** (task 242).
-Save agent 1's YAML, verbatim, to `.claude/state/finalise-ac-result-${DOD_N}.yaml` with the file-write
-tool, then:
+Take agent 1's YAML out of its transcript — do not retype it (task 269). The AC agent answers in one
+`finalise-ac-yaml` block (its prompt says so); `AC_AGENT_ID` is the id the Agent tool returned for it:
+
+```bash
+# INPUTS, substituted into THIS block: {AC agent id}, and DOD_N exactly as Step 0 bound it.
+AC_AGENT_ID="{AC agent id}"
+DOD_N="{Step 0's DOD_N}"
+case "$AC_AGENT_ID$DOD_N" in ''|*'{'*) echo "HALT: AC_AGENT_ID and DOD_N must be substituted"; exit 1 ;; esac
+command node .agents/skills/finalise/references/finalise-rerun-scope.js extract \
+  --agent-id "$AC_AGENT_ID" --out ".claude/state/finalise-ac-result-${DOD_N}.yaml" --json \
+  | tee ".claude/state/finalise-ac-extract-${DOD_N}.json"
+```
+
+`reason: extracted`: the file is the agent's block byte for byte; read `sha256` from the output and
+pass it to `merge` below as `AC_SHA256` — `merge` re-hashes the file and answers `result-hash-mismatch`
+(nothing merged, nothing recorded) when it differs, then records `result.bytes`, `result.sha256` and
+`result.verified: true` in `…dod.{N}.ac.json`. Any other reason (`transcript-not-found`,
+`transcript-ambiguous`, `transcript-unreadable`, `no-block`, `empty-block`, `entity-escaped`) wrote
+nothing: fall back to saving agent 1's YAML, verbatim, to the same path with the file-write tool, leave
+`AC_SHA256` empty, and say "AC YAML hand-copied (unverified): {reason}" in the DoD. A record with
+`verified: false` says exactly that: its hash describes the file `merge` read, not proof it matches the
+agent's reply. Then:
 
 ```bash
 # INPUTS, substituted into THIS block, as in Step 3a: STEM and DOD_N exactly as Step 0 bound them.
@@ -819,9 +892,12 @@ case "$STEM$DOD_N" in *'{'*) echo "HALT: STEM and DOD_N must be substituted into
 case "$DOD_N" in ''|*[!0-9]*) echo "HALT: DOD_N ('$DOD_N') is not Step 0's run number"; exit 1 ;; esac
 AC_RECORD="{document-directory}/${STEM}.dod.${DOD_N}.ac.json"
 AC_MERGED_FILE=".claude/state/finalise-ac-merged-${DOD_N}.json"
+# The hash `extract` printed, or empty after a hand copy. Read back from its own output, not retyped.
+AC_SHA256=$(jq -r 'select(.reason == "extracted") | .sha256' ".claude/state/finalise-ac-extract-${DOD_N}.json" 2>/dev/null)
 command node .agents/skills/finalise/references/finalise-rerun-scope.js merge \
   --scope ".claude/state/finalise-rerun-scope-${DOD_N}.json" \
   --result ".claude/state/finalise-ac-result-${DOD_N}.yaml" \
+  ${AC_SHA256:+--sha256 "$AC_SHA256"} \
   --dod-n "$DOD_N" --record-out "$AC_RECORD" --json > "$AC_MERGED_FILE"
 [ $? -eq 0 ] || { echo "HALT: finalise-rerun-scope.js merge failed — see $AC_MERGED_FILE"; exit 1; }
 case "$(jq -r '.reason' "$AC_MERGED_FILE")" in

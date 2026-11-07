@@ -1,0 +1,217 @@
+{
+  "schema": 1,
+  "dod_n": 2,
+  "head": "e8a9f4d687cc7ba5f058d4ba3325e12fb3019675",
+  "dirty_paths": [
+    "docs/tasks/task.269.finalise-never-hand-copies-agent-output/task.269.implementation.1.finalise-never-hand-copies-agent-output-initial-run.md"
+  ],
+  "document": "docs/tasks/task.269.finalise-never-hand-copies-agent-output/task.269.finalise-never-hand-copies-agent-output.md",
+  "result": {
+    "bytes": 9517,
+    "sha256": "b9127c09411d5d8cd41732111993692e5721c7c046b998d7ad2d0d219a0f7aff",
+    "verified": true
+  },
+  "scope": {
+    "mode": "scoped",
+    "reason": "prior-record",
+    "rejudged": 7,
+    "carried": 3
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "22aede8376e49b3f919ba7678112068d33182f81d593a4b7ba4731ae042f9dff",
+      "status": "PASS",
+      "description": "cases_file plan yields byte-identical cases file for seven control characters",
+      "code_citation": "shared/resources/security-probe-plan.mjs:464",
+      "test_citation": "shared/resources/tests/security-probe-plan-cases-file.test.mjs:75",
+      "members": [],
+      "non_member_fail": null,
+      "note": "fs.copyFileSync copies the source file. The test writes the seven characters and asserts the Buffers are equal. The test name is in qa.1:118. It runs in npm test, which .github/workflows/test.yml:58 runs per PR. Only an 8-line assertion in the test file changed since the prior judgement, and it is in a different test."
+    },
+    {
+      "id": "#2",
+      "text_hash": "ac5c547cfa240d65ce98ded1c14217064b814e085529e77a429f4a3b4b399857",
+      "status": "PASS",
+      "description": "AC record carries byte count and SHA-256 of extracted block; a modified block is refused",
+      "code_citation": "shared/resources/finalise-rerun-scope.js:1073",
+      "test_citation": "shared/resources/tests/finalise-rerun-scope.test.mjs:1851",
+      "members": [],
+      "non_member_fail": null,
+      "note": "agent-reply-block.js:246-247 returns bytes and sha256. merge --sha256 refuses a mismatch with result-hash-mismatch (lines 1074-1079) and records result {bytes, sha256, verified} (1089). The test at :1895-1927 covers the tampered block (refused, nothing recorded) and the control (merged, verified true)."
+    },
+    {
+      "id": "#3",
+      "text_hash": "2dfceab955d414715450c556b649c0ddc59c9cd0005623dfe6888aa0c64f3afc",
+      "status": "PASS",
+      "description": "Escaped plan refused at the write step; control case accepted",
+      "code_citation": "shared/resources/security-probe-plan.mjs:378",
+      "test_citation": "shared/resources/tests/security-probe-plan-cases-file.test.mjs:132",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Tests at :132, :157 and :185 refuse escaped inline cases and escaped cases files, and accept the literal control. agent-reply-block.test.mjs does the same for extract. No source file changed since the prior judgement."
+    },
+    {
+      "id": "#4",
+      "text_hash": "7a34d75ee941211e4bfaaaaf81389b5b45ac1eb84821989914fabc68f454f2aa",
+      "status": "PASS",
+      "description": "Reuse path: matching hash and unchanged engine reuses; changed byte or engine path re-plans; DoD says plan reused",
+      "code_citation": "shared/resources/security-probe-plan.mjs:596",
+      "test_citation": "shared/resources/tests/security-probe-plan-cases-file.test.mjs:200",
+      "members": [],
+      "non_member_fail": null,
+      "note": "reusePlan gates on the cases-file hashes and the engine-path diff. The test covers unchanged (reusable), a changed cases byte, a changed engine path and an inline case. The 'plan reused from dod.{N-1}' wording is in skills/finalise/SKILL.md. The test name is recorded in qa.1:121. The test file ran 10 of 10 green here."
+    },
+    {
+      "id": "#5",
+      "text_hash": "4dcc4f356caf611321e6e9f7a9ac73c7df65fd6caafbec85d7dea678b61779ab",
+      "status": "PASS",
+      "description": "cases_file outside work-item directory or a symlink is refused; shown by a new test",
+      "code_citation": "shared/resources/security-probe-plan.mjs:175",
+      "test_citation": "shared/resources/tests/security-probe-plan-cases-file.test.mjs:423",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The new assertion at :428-433 holds the isAbsolute guard (security-probe-plan.mjs:178) with an absolute name that resolves inside the directory. The earlier test at :95 covers an absolute outside name, a '../' name and a symlink. Run here, the test file passes 10 of 10."
+    },
+    {
+      "id": "#6",
+      "text_hash": "11452e64f2e2e015cc21eb814535f8ce6357535c834f2b313e5d2573c5fa6d1c",
+      "status": "PASS",
+      "description": "No new test case over 1s; five runs, slowest per run with /proc/loadavg beside each, on PR head",
+      "code_citation": "docs/tasks/task.269.finalise-never-hand-copies-agent-output/task.269.qa.3.finalise-never-hand-copies-agent-output.md:68",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Bound: no case over 1 s. The qa.3 Addendum records five runs of 'TMPDIR=/tmp CI=true command node --test --test-reporter=spec' on the two new test files, each with /proc/loadavg beside it. The slowest cases were 374.7, 384.9, 381.4, 357.7 and 410.7 ms, a median of 381.4 ms and a maximum of 410.7 ms. I re-ran the third test file here: 388.7 ms for the slowest case. Code at bd986dc0 is the same as at PR head e8a9f4d6, because only task documents were added after the one test assertion. Runs 1 to 4 show an identical load triple, which is a weakness in the record. The margin of more than 2x makes it immaterial."
+    },
+    {
+      "id": "#7",
+      "text_hash": "110f3d95e920963f6727ce4bf76929eda044d1f89a81420a29f48c12207c2906",
+      "status": "PASS",
+      "description": "Each new refusal has a mutation proof recorded in the QA report",
+      "code_citation": "docs/tasks/task.269.finalise-never-hand-copies-agent-output/task.269.qa.3.finalise-never-hand-copies-agent-output.md:80",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "plan-entry-cases-file-symlink",
+          "evidence": "qa.1:120",
+          "status": "PASS"
+        },
+        {
+          "member": "plan-entry-cases-html-entity (cases)",
+          "evidence": "qa.1:119; qa.2:57",
+          "status": "PASS"
+        },
+        {
+          "member": "extract entity-escaped",
+          "evidence": "qa.1:123",
+          "status": "PASS"
+        },
+        {
+          "member": "merge result-hash-mismatch",
+          "evidence": "qa.1:122",
+          "status": "PASS"
+        },
+        {
+          "member": "reuse engine-changed / not-reusable",
+          "evidence": "qa.1:121; qa.2:55",
+          "status": "PASS"
+        },
+        {
+          "member": "resolveCasesFile / casesFileAccepted boundary",
+          "evidence": "qa.2:56",
+          "status": "PASS"
+        },
+        {
+          "member": "plan-entry-cases-file-outside-work-dir",
+          "evidence": "qa.3 Addendum M1a (absolute name, red after the new assertion) and M1b (climbing name, red with both checks removed)",
+          "status": "PASS"
+        },
+        {
+          "member": "plan-entry-cases-not-an-array",
+          "evidence": "qa.3 Addendum M2 (red with both guards removed, 1 fail)",
+          "status": "PASS"
+        },
+        {
+          "member": "plan-entry-cases-file-missing",
+          "evidence": "qa.3 Addendum M3 (red, 1 fail)",
+          "status": "PASS"
+        },
+        {
+          "member": "plan-entry-cases-file-not-json",
+          "evidence": "qa.3 Addendum M4 (red, 3 fail)",
+          "status": "PASS"
+        },
+        {
+          "member": "plan-entry-cases-file-hash-mismatch",
+          "evidence": "qa.3 Addendum M5 (red, 1 fail)",
+          "status": "PASS"
+        },
+        {
+          "member": "plan-entry-cases-and-cases-file",
+          "evidence": "qa.3 Addendum M6 (red, 1 fail)",
+          "status": "PASS"
+        },
+        {
+          "member": "plan-entry-html-entity (argv)",
+          "evidence": "qa.3 Addendum M7 (red, 2 fail)",
+          "status": "PASS"
+        },
+        {
+          "member": "extract no-block / empty-block / transcript-not-found / transcript-ambiguous / transcript-unreadable",
+          "evidence": "qa.3 Addendum E1 to E5 (each red, 1 to 2 fail)",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "PASS from merged members (14 counted)"
+    },
+    {
+      "id": "#8",
+      "text_hash": "4ebe7eb0e4844e0df815176b7f42d776b2bc0cf3440c8435836dd542207af2de",
+      "status": "PASS",
+      "description": "bundle --check reports 0 problems; CI=true npm test passes",
+      "code_citation": "docs/tasks/task.269.finalise-never-hand-copies-agent-output/task.269.qa.3.finalise-never-hand-copies-agent-output.md:56",
+      "test_citation": "package.json:26",
+      "members": [],
+      "non_member_fail": null,
+      "note": "I ran 'npm run bundle -- --check' here: 129 skills, 0 problems. qa.4 records ci:fast exit 0 and 41 of 41 passing on the three related test files. The changed test file passes 10 of 10 here. .github/workflows/test.yml:58 runs npm test per PR. Since the prior judgement only a test file and task documents changed, and neither is bundled."
+    },
+    {
+      "id": "#9",
+      "text_hash": "088c9c73561bddbe4832c6db45beb2c91bc866674d2828d39a6f10223c253fed",
+      "status": "PASS",
+      "description": "quick_validate.py skills/finalise passes",
+      "code_citation": "docs/tasks/task.269.finalise-never-hand-copies-agent-output/task.269.qa.1.finalise-never-hand-copies-agent-output.md:135",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "I ran 'python skills/create-skill/scripts/quick_validate.py skills/finalise' on HEAD: it passed and printed '✓ finalise'. qa.1:135 records the same run, and qa.2:71 records 'npm run validate -- skills/finalise/ # pass'. The criterion is a command outcome, not a behaviour a test can pin. Whether validate.yml runs it per PR was not checked."
+    },
+    {
+      "id": "#10",
+      "text_hash": "ac9228a4d7c7f16c259a4349143f2df421cdf1c166439afeaa53ee8254a6e627",
+      "status": "PASS",
+      "description": "Inline cases plans still run; an existing fixture passes unchanged",
+      "code_citation": "shared/resources/security-probe-plan.mjs:466",
+      "test_citation": "shared/resources/tests/read-only-agent-writes.test.mjs:156",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The inline-cases branch still writes JSON.stringify(entryCases) (:466). The pre-existing Step 3b.1 fixtures at read-only-agent-writes.test.mjs:156, :211 and :264 run inline-cases plans. The diff changes only their block selector (blockBy 'security-probe-plan.mjs' to '--cases-base') and no fixture body. Full suite passes (see #8)."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#6",
+      "note": "qa.3 Addendum timing runs 1 to 4 show an identical /proc/loadavg triple (2.22 3.82 3.99). The loads were probably sampled once per batch, not per run. It does not change the verdict, since the maximum is 410.7 ms against a 1000 ms bound."
+    },
+    {
+      "ac_id": "#1",
+      "note": "Carried advisory: the test's 'seven' characters are U+0085, U+2028, U+2029, VT, FF, U+001F and CR, which is correct."
+    },
+    {
+      "ac_id": "#8",
+      "note": "Carried advisory: the criterion says 'CI=true command npm test', and 'command' after an env assignment is not found in some shells, so the equivalent 'CI=true npm test' was used."
+    }
+  ]
+}

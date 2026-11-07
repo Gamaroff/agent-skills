@@ -1,0 +1,16 @@
+[
+  {
+    "argv": [
+      "--sink",
+      "path",
+      "--entry",
+      "shared/resources/security-probe-plan.mjs#casesFileAccepted",
+      "--args-json",
+      "[\"/home/gamaroff/Development/agent-skills/docs/tasks/task.269.finalise-never-hand-copies-agent-output\"]",
+      "--name",
+      "cases_file confinement"
+    ],
+    "cases_file": "task.269.dod.2.security.cases.json",
+    "cases_sha256": "f8f1685e60763c64fd26714fcc20577366458feb43fdb8dddf9fc55d748eed03"
+  }
+]

@@ -40,6 +40,7 @@ const path = require("path");
 const crypto = require("crypto");
 const { execFileSync } = require("child_process");
 const { parseYamlSubset } = require("./yaml-subset.js");
+const agentReplyBlock = require("./agent-reply-block.js");
 const {
   criteriaSection,
   RE_CHECKBOX,
@@ -810,6 +811,10 @@ function finish(s, ac, acs, docs, advisories, idMismatches, entries, opts) {
     // never reached a commit is re-judged rather than carried (CR2-4).
     dirty_paths: Array.isArray(s.dirty) ? s.dirty : [],
     document: opts.document ?? null,
+    // The AC answer this record was merged from: its size and SHA-256, and whether a hash handed
+    // over by `extract` was checked against it (task 269). `verified: false` is an honest record of
+    // a hand copy, not a defect: it says nothing checked the file against the agent's reply.
+    result: opts.result ?? null,
     scope: rerunScope,
     criteria: entries.length
       ? entries
@@ -938,7 +943,8 @@ function resolveDeferredCi(ac, ci) {
 const USAGE = [
   "usage:",
   "  finalise-rerun-scope.js scope --doc <document> --head <rev> [--prior <record.ac.json>] [--json]",
-  "  finalise-rerun-scope.js merge --scope <scope.json> --result <agent.yaml> [--dod-n <N>] [--record-out <path>] [--json]",
+  "  finalise-rerun-scope.js extract (--agent-id <id> | --transcript <file>) --out <path> [--block <info-string>] [--projects-root <dir>] [--json]",
+  "  finalise-rerun-scope.js merge --scope <scope.json> --result <agent.yaml> [--sha256 <hex>] [--dod-n <N>] [--record-out <path>] [--json]",
   "  finalise-rerun-scope.js resolve-ci --merged <merged.json> --rollup <CI_ROLLUP> [--ci-head <sha>] [--tree-eq <sha>] [--record <record.ac.json>] [--json]",
 ].join("\n");
 
@@ -958,6 +964,12 @@ function parseArgs(argv) {
     "--ci-head",
     "--tree-eq",
     "--record",
+    "--agent-id",
+    "--transcript",
+    "--block",
+    "--out",
+    "--projects-root",
+    "--sha256",
   ]);
   for (let i = 1; i < argv.length; i++) {
     const a = argv[i];
@@ -1045,19 +1057,38 @@ function main(argv) {
     ) {
       return usage(opts.json, `--scope is not a scope result: ${opts.scope}`);
     }
+    let resultBuf;
     try {
-      agentYaml = fs.readFileSync(path.resolve(cwd, opts.result), "utf8");
+      resultBuf = fs.readFileSync(path.resolve(cwd, opts.result));
+      agentYaml = resultBuf.toString("utf8");
     } catch {
       return usage(opts.json, `--result not readable: ${opts.result}`);
     }
     if (opts.dodN !== undefined && !/^\d+$/.test(opts.dodN))
       return usage(opts.json, "--dod-n must be a number");
+    if (opts.sha256 !== undefined && !/^[0-9a-f]{64}$/.test(opts.sha256))
+      return usage(opts.json, "--sha256 must be 64 lowercase hex digits");
+    // The file the merge reads must be the file `extract` wrote. A different hash is a refusal that
+    // writes nothing, so a file edited between the two steps never becomes the acceptance record.
+    const resultSha = agentReplyBlock.sha256(resultBuf);
+    if (opts.sha256 !== undefined && opts.sha256 !== resultSha)
+      return emit(opts.json, {
+        reason: "result-hash-mismatch",
+        exitCode: 0,
+        mode: s.mode,
+        message: `--result hashes to ${resultSha}, not the ${opts.sha256} extract recorded`,
+      });
     const r = merge(
       s,
       agentYaml,
       {
         dodN: opts.dodN ? Number(opts.dodN) : null,
         document: s.document ?? null,
+        result: {
+          bytes: resultBuf.length,
+          sha256: resultSha,
+          verified: opts.sha256 !== undefined,
+        },
       },
       io,
     );
@@ -1074,6 +1105,17 @@ function main(argv) {
     return emit(opts.json, r);
   }
   if (opts.cmd === "resolve-ci") return resolveCiCli(opts, cwd);
+  if (opts.cmd === "extract") {
+    const o = { ...opts, block: opts.block || "finalise-ac-yaml" };
+    const bad = agentReplyBlock.extractUsageError(o);
+    if (bad) return usage(opts.json, bad);
+    o.out = path.resolve(cwd, o.out);
+    const r = agentReplyBlock.extract(o);
+    return emit(opts.json, {
+      ...r,
+      message: r.message || `${r.bytes} bytes, sha256 ${r.sha256}`,
+    });
+  }
   return usage(
     opts.json,
     opts.cmd ? `unknown command: ${opts.cmd}` : "a command is required",

@@ -1,0 +1,82 @@
+[
+  {
+    "id": "cf-climb-one",
+    "direction": "hostile",
+    "input": "../task.269.plan.finalise-never-hand-copies-agent-output.md",
+    "why": "A single .. leaves the work-item directory while naming a file that exists, so a missing-file refusal cannot be what rejects it.",
+    "correct": "Refuse: the resolved path is outside the work directory.",
+    "spec_ref": "docs/tasks/task.269.finalise-never-hand-copies-agent-output/task.269.finalise-never-hand-copies-agent-output.md:206"
+  },
+  {
+    "id": "cf-climb-deep",
+    "direction": "hostile",
+    "input": "../../../../package.json",
+    "why": "A deep climb to a file at the repository root.",
+    "correct": "Refuse: containment is checked on the resolved path, not on depth.",
+    "spec_ref": "docs/tasks/task.269.finalise-never-hand-copies-agent-output/task.269.finalise-never-hand-copies-agent-output.md:206"
+  },
+  {
+    "id": "cf-climb-after-descent",
+    "direction": "hostile",
+    "input": "sub/../../task.269.plan.finalise-never-hand-copies-agent-output.md",
+    "why": "The climb is hidden behind a descent, so a leading-.. check misses it.",
+    "correct": "Refuse: normalise first, then check containment.",
+    "spec_ref": "docs/tasks/task.269.finalise-never-hand-copies-agent-output/task.269.finalise-never-hand-copies-agent-output.md:206"
+  },
+  {
+    "id": "cf-absolute",
+    "direction": "hostile",
+    "input": "/etc/passwd",
+    "why": "An absolute path is outside the work directory by definition.",
+    "correct": "Refuse: absolute names are refused outright.",
+    "spec_ref": "docs/tasks/task.269.finalise-never-hand-copies-agent-output/task.269.finalise-never-hand-copies-agent-output.md:206"
+  },
+  {
+    "id": "cf-absolute-inside",
+    "direction": "hostile",
+    "input": "/home/gamaroff/Development/agent-skills/docs/tasks/task.269.finalise-never-hand-copies-agent-output/task.269.plan.finalise-never-hand-copies-agent-output.md",
+    "why": "An absolute path that happens to resolve inside the directory still bypasses the name-under-directory contract.",
+    "correct": "Refuse: the spec has the name resolved under the work-item directory, so an absolute name is refused.",
+    "spec_ref": "docs/tasks/task.269.finalise-never-hand-copies-agent-output/task.269.finalise-never-hand-copies-agent-output.md:206"
+  },
+  {
+    "id": "cf-empty",
+    "direction": "hostile",
+    "input": "",
+    "why": "An empty name resolves to the directory itself.",
+    "correct": "Refuse: an empty name and the directory itself are not a cases file.",
+    "spec_ref": "docs/tasks/task.269.finalise-never-hand-copies-agent-output/task.269.finalise-never-hand-copies-agent-output.md:206"
+  },
+  {
+    "id": "cf-directory-itself",
+    "direction": "hostile",
+    "input": "task.269.qa.2.security.run.json.d",
+    "why": "An in-directory entry that is a directory, not a regular file.",
+    "correct": "Refuse: only a regular file is accepted.",
+    "spec_ref": "docs/tasks/task.269.finalise-never-hand-copies-agent-output/task.269.finalise-never-hand-copies-agent-output.md:206"
+  },
+  {
+    "id": "cf-nul-byte",
+    "direction": "hostile",
+    "input": "task.269.plan.finalise-never-hand-copies-agent-output.md\u0000.json",
+    "why": "A NUL byte can truncate the name at the filesystem call so a check sees a different path from the one opened.",
+    "correct": "Refuse: a name with a NUL byte is a bad name.",
+    "spec_ref": "docs/tasks/task.269.finalise-never-hand-copies-agent-output/task.269.finalise-never-hand-copies-agent-output.md:206"
+  },
+  {
+    "id": "cf-legit-flat",
+    "direction": "legitimate",
+    "input": "task.269.plan.finalise-never-hand-copies-agent-output.md",
+    "why": "A regular file directly in the work-item directory. Confinement must not refuse files that are inside it.",
+    "correct": "Accept: a regular file in the directory is accepted by the confinement check.",
+    "spec_ref": "docs/tasks/task.269.finalise-never-hand-copies-agent-output/task.269.finalise-never-hand-copies-agent-output.md:59"
+  },
+  {
+    "id": "cf-legit-nested",
+    "direction": "legitimate",
+    "input": "task.269.qa.2.security.run.json.d/3beb9af32894c2413c654709.json",
+    "why": "A regular file one level down inside the directory. A rule that bans every / also bans legitimate subdirectories.",
+    "correct": "Accept: a nested regular file that stays inside the directory is accepted.",
+    "spec_ref": "docs/tasks/task.269.finalise-never-hand-copies-agent-output/task.269.finalise-never-hand-copies-agent-output.md:59"
+  }
+]

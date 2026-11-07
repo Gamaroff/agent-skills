@@ -96,7 +96,11 @@ If no documentation update is required for the story type (e.g. pure internal re
 
 ## Output
 
-Return **YAML only** — no prose, no markdown wrapping around the YAML block:
+Return **YAML only** — no prose before or after it. Put the whole answer in **one** fenced block opened
+with the info string `finalise-ac-yaml` (three backticks, then `finalise-ac-yaml`), holding exactly the
+YAML below. `/finalise` takes the block out of your transcript file and records its size and hash; it
+does not retype your answer, so a second fenced block with that info string, or text outside the one
+block, is ignored at best. The shape:
 
 ```yaml
 ac_traceability:
