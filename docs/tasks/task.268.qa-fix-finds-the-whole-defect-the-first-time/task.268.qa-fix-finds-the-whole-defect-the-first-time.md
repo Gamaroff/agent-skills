@@ -212,7 +212,7 @@ None - prose only. The `Narrowing residue:` / `Move:` shape is unchanged; the `M
 
 - [ ] Each of the eight rules is present in `skills/qa-fix/SKILL.md`, citing its observation; the list is in the QA report.
 - [ ] Each rule fires on its fixture and not on its control, recorded per rule in the QA report.
-- [ ] A Step 7 post is refused when trigger (b) holds and the block is absent, shown by running the check on a fixture set recorded in the QA report.
+- [ ] A Step 7 post is warned about (the block is added, then the post goes ahead; the check never halts the cycle) when trigger (b) holds and the block is absent, shown by running the check on a fixture set recorded in the QA report.
 
 ### Performance
 
@@ -373,6 +373,7 @@ Security (18 probes, 0 reproduced), compliance (not applicable) and docs/changel
 | 2026-11-06 |         | QA findings fixed — Step 4 guard matches paths literally and refuses a nonexistent path; two more mutants proven, 1 iteration | qa-fix      |
 | 2026-11-06 |         | QA gate CONCERNS (80/100) — 2 findings, both deferred (budget spent) | qa-task     |
 | 2026-11-07 |         | DoD incomplete — 4 gaps identified | finalise    |
+| 2026-11-07 |         | Functional criterion 3 reworded from "refused" to "warned" to match the Step 7 design settled at gate 1 (T268-QA-2); criteria evidence recorded in QA report 5 | develop-next |
 <!-- change-log-end -->
 
 ---
