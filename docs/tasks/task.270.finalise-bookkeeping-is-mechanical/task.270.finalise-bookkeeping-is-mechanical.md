@@ -6,6 +6,7 @@ description: "Close three finalise bookkeeping gaps that a person had to notice 
 tags: [finalise, observation]
 category: refactoring
 status: ready-for-review
+pr_number: 858
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-07
@@ -175,13 +176,13 @@ None for consumers once Phase 1 pins the order: the halt must not fire on a plac
 **Scope**: the three behaviours.
 
 **Actions**:
-- [ ] `gaps` on a template leaves no `{CI_ROLLUP}`, `{CI_HEAD_1}` or "committed and pushed at 6a" text; `accepted` is unchanged. **Control**: a placeholder in a block the script does not own (a code span in a gap line) does not halt.
-- [ ] A work-item directory with a probe record and a `.d/` sidecar: after the 6a block, `git status --short` shows neither untracked.
-- [ ] A directory with `task.9.dod.1.x.md` and a foreign `task.9.dod.2.security.cases.1.json` allocates 3.
-- [ ] An `accepted` fill on a template whose CI reading line is still unfilled does not halt (or the CI line is filled before the call, shown by the same test). **Control**: a `gaps` fill with a surviving owned placeholder does halt.
-- [ ] 6a staging runs under bash **and** zsh (the existing 6a test's `SHELLS` loop): with no `security.*` artefact present the block does not abort (zsh `nomatch`), and with them present both the record and the `.d/` sidecar are staged.
-- [ ] Tests that read the template and must be updated or confirmed: `evals/shared/tests/finalise-bug-mode.test.mjs` (`:1390`) and `shared/resources/tests/finalise-gaps-path.test.mjs` (`:636`); the "committed and pushed at 6a" and `CI reading` literals found by `git grep -n 'committed and pushed at 6a\|CI reading' -- '*.test.*'` are listed in the QA report with their disposition.
-- [ ] Mutation proofs: revert each of the three edits; each turns exactly one named test red.
+- [x] `gaps` on a template leaves no `{CI_ROLLUP}`, `{CI_HEAD_1}` or "committed and pushed at 6a" text; `accepted` is unchanged. **Control**: a placeholder in a block the script does not own (a code span in a gap line) does not halt.
+- [x] A work-item directory with a probe record and a `.d/` sidecar: after the 6a block, `git status --short` shows neither untracked.
+- [x] A directory with `task.9.dod.1.x.md` and a foreign `task.9.dod.2.security.cases.1.json` allocates 3.
+- [x] An `accepted` fill on a template whose CI reading line is still unfilled does not halt (or the CI line is filled before the call, shown by the same test). **Control**: a `gaps` fill with a surviving owned placeholder does halt.
+- [x] 6a staging runs under bash **and** zsh (the existing 6a test's `SHELLS` loop): with no `security.*` artefact present the block does not abort (zsh `nomatch`), and with them present both the record and the `.d/` sidecar are staged.
+- [x] Tests that read the template and must be updated or confirmed: `evals/shared/tests/finalise-bug-mode.test.mjs` (`:1390`) and `shared/resources/tests/finalise-gaps-path.test.mjs` (`:636`); the "committed and pushed at 6a" and `CI reading` literals found by `git grep -n 'committed and pushed at 6a\|CI reading' -- '*.test.*'` are listed in the QA report with their disposition.
+- [x] Mutation proofs: revert each of the three edits; each turns exactly one named test red.
 
 **Command**: `CI=true command node --test` on the named files.
 
@@ -195,9 +196,9 @@ None for consumers once Phase 1 pins the order: the halt must not fire on a plac
 
 ### Functional
 
-- [ ] A `gaps` fill leaves no accepted-path placeholder and a surviving placeholder halts, shown by the new tests (names in the QA report).
-- [ ] 6a leaves no `${STEM}.dod.${DOD_N}.security.*` path untracked, shown by a test that runs the block's staging slice.
-- [ ] `DOD_N` is 3 in the obs #96 scratch layout, shown by a test.
+- [x] A `gaps` fill leaves no accepted-path placeholder and a surviving placeholder halts, shown by the new tests (names in the QA report).
+- [x] 6a leaves no `${STEM}.dod.${DOD_N}.security.*` path untracked, shown by a test that runs the block's staging slice.
+- [x] `DOD_N` is 3 in the obs #96 scratch layout, shown by a test.
 
 ### Performance
 
@@ -205,13 +206,13 @@ None for consumers once Phase 1 pins the order: the halt must not fire on a plac
 
 ### Code Quality
 
-- [ ] Each of the three fixes has a mutation proof in the QA report.
-- [ ] `command npm run bundle -- --check` reports 0 problems; `CI=true command npm test` passes.
-- [ ] `CI=true command node --test evals/shared/tests/finalise-bug-mode.test.mjs` passes.
+- [x] Each of the three fixes has a mutation proof in the QA report.
+- [x] `command npm run bundle -- --check` reports 0 problems; `CI=true command npm test` passes.
+- [x] `CI=true command node --test evals/shared/tests/finalise-bug-mode.test.mjs` passes.
 
 ### Migration
 
-- [ ] An existing accepted bug DoD fixture is unchanged by the fill.
+- [x] An existing accepted bug DoD fixture is unchanged by the fill.
 
 ---
 

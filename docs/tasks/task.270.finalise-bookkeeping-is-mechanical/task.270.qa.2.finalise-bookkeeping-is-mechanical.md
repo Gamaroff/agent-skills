@@ -65,6 +65,10 @@ The criterion asks for the median of five alternating runs of the full suite on 
 
 Median develop 1024 ms, branch 1303 ms, so +279 ms. Against 189 s that is +0.15%. This measures the whole of the added wall time (nothing else in the suite changed), and is not the five-run full-suite median the criterion names.
 
+### Template-literal tests: disposition
+
+`git grep -n 'committed and pushed at 6a\|CI reading' -- '*.test.*'` finds the literals in `ci-once-at-finalise`, `finalise-publish-boundary`, `ci-tree-equivalence`, `finalise-deferred-ci`, `finalise-fix-and-recheck`, `finalise-rerun-scope` and `finalise-gaps-path`. Disposition: **confirmed, no change needed**. The first six read `finalise/SKILL.md` or the CI echo lines, which this PR does not touch; `finalise-gaps-path` is the file this PR extends, and its `committed and pushed at 6a` pattern is the one the new gaps test asserts is absent from a gaps fill. All pass in the full run (8011 pass, 0 fail).
+
 ---
 
 ## Code Review

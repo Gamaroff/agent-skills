@@ -35,7 +35,7 @@ Close three finalise bookkeeping gaps: a GAPS bug DoD that reads as accepted, se
 | 2. review-task             | ✅ Done | `task.270.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT 8/10; 4 Important fixed in task + plan; run inline, no pre-pass subagents | —                    | 2026-11-07T17:14Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Implemented inline (plan + surface map); ci:fast 8011 pass / 0 fail | —                    | 2026-11-07T17:26Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #858 (no issue linked, so no comment) | —                    | 2026-11-07T17:27Z |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.270.qa.{N}.*.md`; `task.270.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.270.qa.{N}.*.md`; `task.270.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 2 QA cycles: CONCERNS 90, then PASS 97; 5c APPROVE | —                    | 2026-11-07T18:45Z |
 | 7. finalise                | ⏳ Pending | `task.270.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
@@ -77,6 +77,18 @@ _Problems encountered and how they were resolved or escalated._
 ## QA Iteration History
 
 _Track each QA review/fix cycle._
+
+### QA Cycle 1
+
+- **Gate**: CONCERNS (90/100), `task.270.gate.1.*`; one MEDIUM, T270-QA-1: no CHANGELOG entry citing task 270.
+- **Action**: Running qa-fix
+
+### QA Cycle 2
+
+- **Fix**: CHANGELOG entry added (commit 25791684); `changelog-cites.sh task.270` now answers `cites (task 270)`.
+- **Gate**: PASS (97/100), `task.270.gate.2.*`; full-diff refute pass found one low advisory item (template drift in the gaps rewrite), held by `finalise-gaps-path.test.mjs`.
+- **PR Review**: APPROVE (conformance lens only, `task.270.pr-review.1.*`; three low documentation findings, fixed in the same commit as this entry).
+- **Action**: Proceeding to 5c
 
 ---
 
