@@ -295,6 +295,27 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-07
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.285.qa.1.qa-fix-step4-guard-hostile-paths.md](./task.285.qa.1.qa-fix-step4-guard-hostile-paths.md)
+- **Gate File**: [task.285.gate.1.qa-fix-step4-guard-hostile-paths.yml](./task.285.gate.1.qa-fix-step4-guard-hostile-paths.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 7961 (full suite), 17 in the guard file, 34 probe cases
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+T285-QA-1 (medium): the parent walk refuses a legitimate path that reaches the repository through `..` or a symlinked prefix.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -305,6 +326,8 @@ None.
 | 2026-11-07 | 1.1     | Review passed (8/10) — mechanisms layered (heredoc + refusal of `\ ' "` because `xargs` reads them as syntax), anchors fixed, bound command and Phase 5 pinned suites named | review-task |
 | 2026-11-07 |         | Status → ready-for-development                                                        | review-task |
 | 2026-11-07 |         | Implemented — 8 files, 15 new tests (17 in the file) | develop |
+| 2026-11-07 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-11-07 |         | QA findings fixed — T285-QA-1 (parent walk compares physical paths), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

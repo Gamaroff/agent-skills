@@ -1,0 +1,64 @@
+schema: 2
+task: 'task.285.qa-fix-step4-guard-hostile-paths'
+task_title: 'qa-fix Step 4 guard survives hostile paths'
+gate: CONCERNS
+status_reason: 'All five phases delivered and the full suite is green, but the new parent walk refuses a legitimate path that reaches the repository through ".." or a symlinked prefix, because it stops only on a string match with the repository root.'
+reviewer: 'QA Engineer'
+head: '7675fdb9d621c69a182ee756496df195e99c5a16'
+updated: '2026-11-07T05:27:49Z'
+
+top_issues:
+  - id: 'T285-QA-1'
+    severity: medium
+    file: 'skills/qa-fix/SKILL.md'
+    finding: 'The parent walk in the Step 4 block stops only when the directory string equals $TOP. A path with a leading ".." (qa-fix run from a subdirectory) or an absolute path that reaches the repo through a symlinked prefix never matches, so the walk reaches the repository root, where .git exists, and refuses a legitimate path as "below a nested repository". Reproduced: from repo/a, "../real/g" is refused at "..". The prose claims the walk stops at the repository root.'
+    suggested_action: 'Compare physical paths (resolve each directory with cd -P / pwd -P) so the walk stops at the repository root however the path reaches it, or normalise every path relative to $TOP before the walk; add a subdirectory-cwd case and a symlinked-prefix case to the tests, each with a mutant.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 17
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    boundary: true
+    probes_executed: 34
+    escaped: 0
+    boundary_signals: ['refused', 'is refused']
+    notes: 'The Step 4 fence is a boundary (it refuses). The probe engine ran 17 hostile and admitted cases under bash and zsh: 34 executed, 0 escaped, every case scored as its direction requires. Record: task.285.qa.1.qa-fix-step4-guard-hostile-paths.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'New tests each finish well under one second; full suite 7961 pass, 0 fail.'
+  reliability:
+    status: CONCERNS
+    notes: 'T285-QA-1: a legitimate path is refused when it reaches the repository through ".." or a symlinked prefix. It fails closed and loudly, so it is a false refusal, not a false clean.'
+  maintainability:
+    status: PASS
+    notes: 'The loop doc now points at the Step 4 block instead of restating the check; bundled copies are in sync.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T285-QA-1 (parent walk stop condition).'
+      refs: ['skills/qa-fix/SKILL.md', 'tests/qa-fix-step4-guard.test.js']
+  future: []
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T285-QA-1 fixed']

@@ -439,7 +439,7 @@ function git(cwd, ...args) {
 }
 
 // `setup(dir)` builds the repository; `input(dir)` is the slot text. Returns one result per shell.
-function runDirect(block, setup, input) {
+function runDirect(block, setup, input, cwdOf = (d) => d) {
   const dir = fs.realpathSync(
     fs.mkdtempSync(path.join(os.tmpdir(), "qa-fix-step4-d-")),
   );
@@ -449,7 +449,7 @@ function runDirect(block, setup, input) {
     const script = block.replaceAll("{changed-paths}", () => input(dir));
     return SHELLS.map((shell) => {
       const r = spawnSync(shell, [...NO_RC[shell], "-c", script], {
-        cwd: dir,
+        cwd: cwdOf(dir),
         encoding: "utf8",
         env: {
           PATH: process.env.PATH,
@@ -463,6 +463,7 @@ function runDirect(block, setup, input) {
     });
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(dir + "-link", { force: true }); // the symlinked-prefix scenario's link, outside dir
   }
 }
 
@@ -508,12 +509,34 @@ const ADMITTED = [
     },
     input: (d) => path.join(d, "sub", "f"),
   },
+  {
+    // T285-QA-1: run from a subdirectory, a path that climbs out with `..` reaches the root through
+    // text that never equals the root's path. The walk must compare physical paths.
+    id: "dotdot-from-subdirectory",
+    setup: (d) => {
+      write(d, "real/g");
+      write(d, "a/b");
+      git(d, "add", "real/g", "a/b");
+    },
+    cwd: (d) => path.join(d, "a"),
+    input: () => "../real/g",
+  },
+  {
+    // T285-QA-1: an absolute path that reaches the repository through a symlinked prefix.
+    id: "symlinked-prefix",
+    setup: (d) => {
+      write(d, "sub/f");
+      git(d, "add", "sub/f");
+      fs.symlinkSync(d, d + "-link");
+    },
+    input: (d) => path.join(d + "-link", "sub", "f"),
+  },
 ];
 
 for (const c of ADMITTED) {
   test(`Step 4 guard: admits ${c.id}`, async () => {
     const block = await stepBlock(SKILL_SRC);
-    for (const r of runDirect(block, c.setup, c.input)) {
+    for (const r of runDirect(block, c.setup, c.input, c.cwd)) {
       assert.deepEqual(
         [r.status, r.stdout],
         [0, ""],
@@ -567,9 +590,25 @@ const DIRECT_MUTANTS = [
   },
   {
     name: "the repository-root stop (an absolute path inside the repo reads as a nested repo)",
-    from: ' && [ "$d" != "$TOP" ]',
-    to: "",
+    from: 'if [ -n "$PHYS" ] && [ "$PHYS" = "$TOP" ]; then break; fi',
+    to: "if false; then break; fi",
     scenario: ADMITTED.find((c) => c.id === "absolute-inside-repo"),
+    broken: (r) => r.status !== 0,
+  },
+  {
+    // T285-QA-1: comparing the path text instead of the physical path refuses `..` and a symlinked
+    // prefix, because neither is spelled like the root.
+    name: "the physical comparison (a path reaching the root through `..` reads as a nested repo)",
+    from: '[ "$PHYS" = "$TOP" ]',
+    to: '[ "$d" = "$TOP" ]',
+    scenario: ADMITTED.find((c) => c.id === "dotdot-from-subdirectory"),
+    broken: (r) => r.status !== 0,
+  },
+  {
+    name: "the physical comparison (a symlinked prefix reads as a nested repo)",
+    from: '[ "$PHYS" = "$TOP" ]',
+    to: '[ "$d" = "$TOP" ]',
+    scenario: ADMITTED.find((c) => c.id === "symlinked-prefix"),
     broken: (r) => r.status !== 0,
   },
 ];
@@ -583,6 +622,7 @@ for (const m of DIRECT_MUTANTS) {
       await stepBlock(src),
       m.scenario.setup,
       m.scenario.input,
+      m.scenario.cwd,
     );
     assert.ok(
       results.every(m.broken),

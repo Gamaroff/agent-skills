@@ -854,7 +854,10 @@ magic is not interpreted, and a path that is neither on disk nor tracked is refu
 `git ls-files` lists nothing for it and "found nothing" would read as "clean". A path below a
 symlinked directory or a nested repository is refused too, naming it: the untracked listing cannot
 look through either, so it prints nothing for them, which is "could not look" and not "clean"
-(T268-QA-11). The walk over a path's parents stops at the repository root:
+(T268-QA-11). The walk over a path's parents stops at the repository root, found by comparing
+**physical** paths (`cd -P` and `pwd -P`) and not the path text, so a path that reaches the root
+through `..` or a symlinked prefix stops it too, instead of reading the root's own `.git` as a
+nested repository (T285-QA-1):
 
 ```bash
 IFS= read -r -d '' CHANGED_PATHS <<'QA_FIX_CHANGED_PATHS_END' || true
@@ -876,7 +879,9 @@ TOP=$(git rev-parse --show-toplevel 2>/dev/null) || TOP=""
 BOUNDARY=$(printf '%s\n' "$CHANGED_PATHS" | tr -s ' \t' '\n\n' | grep -v '^$' \
   | while IFS= read -r p; do
       d=$p
-      while d=$(dirname -- "$d"); [ "$d" != "." ] && [ "$d" != "/" ] && [ "$d" != "$TOP" ]; do
+      while d=$(dirname -- "$d"); [ "$d" != "." ] && [ "$d" != "/" ]; do
+        PHYS=$(cd -P -- "$d" 2>/dev/null && pwd -P) || PHYS=""
+        if [ -n "$PHYS" ] && [ "$PHYS" = "$TOP" ]; then break; fi
         if [ -L "$d" ] || [ -e "$d/.git" ]; then printf '%s\n' "$p"; break; fi
       done
     done)
