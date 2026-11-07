@@ -3,7 +3,7 @@
 **Task**: `task.270.finalise-bookkeeping-is-mechanical.md`
 **Run Number**: 1
 **Started**: 2026-11-07 00:00
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -36,8 +36,8 @@ Close three finalise bookkeeping gaps: a GAPS bug DoD that reads as accepted, se
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Implemented inline (plan + surface map); ci:fast 8011 pass / 0 fail | —                    | 2026-11-07T17:26Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #858 (no issue linked, so no comment) | —                    | 2026-11-07T17:27Z |
 | 5–6. qa-task / qa-fix loop | ✅ Done | `task.270.qa.{N}.*.md`; `task.270.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 2 QA cycles: CONCERNS 90, then PASS 97; 5c APPROVE | —                    | 2026-11-07T18:45Z |
-| 7. finalise                | ⏳ Pending | `task.270.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 7. finalise                | ✅ Done | `task.270.dod.{N}.*.md`; task `status: accepted`                       | DoD 8/8, security 18 probes 0 reproduced; accepted at `37f201ba` | —                    | 2026-11-07T19:08Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Report committed with the Step 8 commit | —                    | 2026-11-07T19:09Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -65,6 +65,13 @@ Close three finalise bookkeeping gaps: a GAPS bug DoD that reads as accepted, se
 - Mutation proofs: four reverts (gaps rewrite, placeholder halt, `DOD_N` pattern, 6a staging append), each turned exactly its named tests red (2, 4, 2, 2 cases across bash and zsh); each restored, `bundle --check` clean.
 - Deviation: one test was first appended to `next-numbered.test.mjs` through a quoted heredoc, against the global rule to use Edit. The payload was code, not doc text.
 - Quality gate: first `ci:fast` exited 1 with 0 failing tests — the tmp-leak ratchet (`next-numbered` 34 > 30) caught the new `DOD_N` test's scratch dirs. Fixed by removing them; second run exit 0 (8011 pass, 0 fail, ratchet ok).
+
+### Step 7 — finalise
+
+- CI reading 1: SUCCESS @ `9d3be47a60ff` over 6 checks. CI reading 2: SUCCESS (tree-equivalent to `576d56699730`) @ `37f201bac5f7`, over 6 checks, after 30 s. Canonical PR comment posted. No tracker issue linked, so no tracker close.
+- The wall-time criterion was graded FAIL by the AC agent (QA 2 had timed three files only). Chose to run the measurement as written (ten alternating `CI=true npm test` runs, separate worktrees) instead of amending the criterion: median develop 170224 ms, branch 165366 ms (-2.9%). Recorded in QA 2, committed as `9d3be47a`. Loads were uneven (1.6 to 12.0).
+- The AC agent's YAML was hand-edited for criterion #4 after extraction, so the AC record's `verified` hash does not describe the edited text. Stated in the DoD.
+- The new 6a security-artefact staging ran live for the first time here and staged the record, its `.d/` sidecar, plan and cases files.
 
 ---
 
@@ -94,10 +101,10 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
-**Branch**: {populated after Step 1}
+**Finished**: 2026-11-07T19:09Z
+**Final Status**: Completed
+**Branch**: feature/task.270.finalise-bookkeeping-is-mechanical
 **PR**: #858 https://github.com/Gamaroff/agent-skills/pull/858
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 2
+**DoD Summary**: `task.270.dod.1.finalise-bookkeeping-is-mechanical.md` — 8/8 criteria, security 18 probes 0 reproduced, accepted
+**Tracker debt**: none (no tracker issue linked)
