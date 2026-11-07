@@ -252,14 +252,21 @@ function decide(args, exec, cwd) {
   if (args.command === "rerun-eligible") {
     const notFiles = failed.filter((f) => {
       try {
-        return (
-          String(
-            exec("git", ["cat-file", "-t", `${head}:${f}`], {
+        // A REGULAR file: mode 100644 or 100755. A blob of mode 120000 is a symlink, whose red is a
+        // red of the file it points at, so it can be the PR's own change under another name
+        // (T271-QA-11); a directory is a tree and a submodule a commit, and neither is a test file.
+        const line = String(
+          exec(
+            "git",
+            ["--literal-pathspecs", "ls-tree", "--full-tree", head, "--", f],
+            {
               ...EXEC_OPTS,
               cwd: root,
-            }),
-          ).trim() !== "blob"
-        );
+            },
+          ),
+        ).trim();
+        const m = /^(\d{6}) blob [0-9a-f]{40}\t(.+)$/.exec(line);
+        return !m || !["100644", "100755"].includes(m[1]) || m[2] !== f;
       } catch {
         return true;
       }

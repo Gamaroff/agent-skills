@@ -51,6 +51,7 @@ function consumer(owners) {
       "  immediate: []",
       "  future:",
       "    - action: 'oc10-x reproduces'",
+      "      case: oc10-x",
       "      deferred_to: task.901",
       "      approved_by: Pat Owner",
       "      approved_on: 2026-10-28",

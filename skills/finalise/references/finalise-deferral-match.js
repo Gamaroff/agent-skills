@@ -21,13 +21,15 @@
  *
  * Two record shapes are read, and only these:
  *   - the QA gate's `recommendations.future[]`: an entry whose `action` names the case id and which
- *     carries `deferred_to: task.N`, `approved_by: <name>`, `approved_on: YYYY-MM-DD`;
- *   - the work item's `## Deferred Work` section (an H2): a list item in the ONE form
- *     `[**finding-id**,] [reproduced by] `case-id`: deferred to task.N, approved by <name> on YYYY-MM-DD.`
- *     The lead is an allow-list: only those optional pieces and the one backticked case id (a bullet
- *     naming two cases matches neither), so no other word can qualify the approval. The clause is
- *     contiguous and ends the bullet, the bullet holds no negation word, and a bullet inside an HTML
- *     comment is not read. Anything else is a candidate with no facts: `unapproved`.
+ *     carries `case: <id>` (matched by equality, never by a mention in its prose),
+ *     `deferred_to: task.N`, `approved_by: <name>`, `approved_on: YYYY-MM-DD`;
+ *   - the work item's `## Deferred Work` section (an H2): a list item that is EXACTLY
+ *     `` `case-id`: deferred to task.N, approved by <name> on YYYY-MM-DD. ``
+ *     with no optional piece and no other word. A bullet inside an HTML comment is not read, and
+ *     anything else that names the case is a candidate with no facts: `unapproved`.
+ *   Every record that names the case must approve it, and agree on the follow-up task; one that does
+ *   not (a revocation, a prose mention) blocks, so a later record can withdraw an earlier approval.
+ *   The approver name is compared to the owner list exactly (no case or Unicode folding).
  *
  * FAILS CLOSED. Exit 0 means exactly one thing: `matched`. Every other answer exits 1 (a usage error
  * exits 2), so a shell `if` cannot round a "no" up to a deferral.
@@ -143,9 +145,11 @@ function cleanName(s) {
     .trim();
 }
 
+// Exact: no case folding and no Unicode folding, so "PAT OWNER" and a Kelvin-sign lookalike are not
+// the owner (T271-QA-10). The owner list is configuration; a name that must match is typed as listed.
 function approverListed(name, approvers) {
-  const n = cleanName(name).toLowerCase();
-  return n !== "" && approvers.some((a) => cleanName(a).toLowerCase() === n);
+  const n = cleanName(name);
+  return n !== "" && approvers.some((a) => cleanName(a) === n);
 }
 
 /**
@@ -190,15 +194,18 @@ function gateCandidates(text, id) {
     throw new Error("recommendations.future is not a list");
   const out = [];
   future.forEach((e, i) => {
-    const action =
-      typeof e === "string" ? e : e && typeof e === "object" ? e.action : "";
-    if (!namesCase(action, id)) return;
-    const f = e && typeof e === "object" ? e : {};
+    const f = e && typeof e === "object" && !Array.isArray(e) ? e : {};
+    const action = typeof e === "string" ? e : f.action;
+    // A record carries the case in its own `case:` field, matched by equality. An entry that merely
+    // MENTIONS the id in its prose is still a record about the case (it can block) but it has no
+    // facts, so it can never approve one (T271-QA-12).
+    const own = typeof f.case === "string" && f.case.trim() === id;
+    if (!own && !namesCase(action, id)) return;
     out.push({
       source: `gate recommendations.future[${i}]`,
-      task: f.deferred_to,
-      owner: f.approved_by,
-      date: f.approved_on,
+      task: own ? f.deferred_to : "",
+      owner: own && typeof f.approved_by === "string" ? f.approved_by : "",
+      date: own ? f.approved_on : "",
     });
   });
   return out;
@@ -240,32 +247,18 @@ function deferredWorkItems(text) {
   return items;
 }
 
-// One bullet, one clause (T271-QA-5, T271-QA-6): `<lead> deferred to task.N, approved by NAME on DATE.`
-// The lead holds the case id as its single backticked token; the clause is contiguous and closes the
-// bullet. Free prose that merely contains the three facts ("NOT deferred to task.5; was not approved
-// by ...") is not that form, and a bullet that is not that form yields a candidate with no facts,
-// which judge() answers `unapproved`, never `matched`.
+// ONE exact line (T271-QA-5, QA-9, QA-10, replacing three rounds of patching a prose matcher):
+//   `case-id`: deferred to task.N, approved by NAME on DATE.
+// There is no optional lead, no bold slot and no word list: the whole item is that sentence or it is a
+// bullet with no facts, which judge() answers `unapproved`. NAME is then compared to the configured
+// owners EXACTLY, so any prose that slipped into it ("Pat Owner, if Sam agrees") names nobody.
 const BULLET_RE =
-  /^(.*?)\bdeferred to (task\.\d+)\s*,\s*approved by (.+?) on (\d{4}-\d{2}-\d{2})\.?\s*$/i;
-const NEGATION_RE =
-  /\b(not|never|no|none|without|cannot|denied|declined|rejected|refused|revoked|withdrawn|pending|unapproved)\b|n't\b/i;
+  /^`([^`]+)`:\s+deferred to (task\.\d+),\s+approved by (.+?) on (\d{4}-\d{2}-\d{2})\.$/;
 
 /** The facts of a bullet in the one accepted form, or null. */
 function parseBullet(item, id) {
-  const count = (re) => (item.match(re) || []).length;
-  if (count(/deferred to/gi) !== 1 || count(/approved by/gi) !== 1) return null;
-  if (NEGATION_RE.test(item)) return null;
   const m = BULLET_RE.exec(item.trim());
-  if (!m) return null;
-  // The lead is an ALLOW-LIST, not a word filter (T271-QA-9): at most a bold finding id and
-  // "reproduced by", then the backticked case id and an optional colon. Any other word in the lead
-  // ("withheld", "if accepted", "is to be", "only if Sam agrees") is a bullet in another form, and
-  // a closed list of bad words would pass the next phrasing nobody listed.
-  const lead = m[1].trim();
-  const leadRe =
-    /^(?:\*\*[^*`]+\*\*,?\s*)?(?:reproduced by\s+)?(`[^`]+`)\s*:?$/i;
-  const lm = leadRe.exec(lead);
-  if (!lm || lm[1] !== `\`${id}\``) return null;
+  if (!m || m[1] !== id) return null;
   return { task: m[2], owner: m[3], date: m[4] };
 }
 
@@ -344,21 +337,32 @@ function decide(args) {
       detail: `no record names ${args.caseId}`,
     });
   }
+  // EVERY record that names the case must be a valid owner approval, and they must agree on the
+  // follow-up task. One that is not (a revocation, a prose mention, a different task) blocks, so a
+  // later record can withdraw an earlier approval instead of being ignored (T271-QA-12).
   const refusals = [];
+  const oks = [];
   for (const c of candidates) {
     const j = judge(c, args.approvers);
-    if (j.ok) {
-      return done(REASONS.MATCHED, {
-        owner: j.owner,
-        date: j.date,
-        task: j.task,
-        source: c.source,
-        rendered: `deferred (owner ${j.owner}, ${j.date}, ${j.task})`,
-        candidates: candidates.length,
-        detail: `${args.caseId} is deferred to ${j.task} (${c.source})`,
-      });
-    }
-    refusals.push(`${c.source}: ${j.why}`);
+    if (j.ok) oks.push({ c, j });
+    else refusals.push(`${c.source}: ${j.why}`);
+  }
+  if (refusals.length === 0 && new Set(oks.map((x) => x.j.task)).size > 1) {
+    refusals.push(
+      `records disagree on the follow-up task (${[...new Set(oks.map((x) => x.j.task))].join(", ")})`,
+    );
+  }
+  if (refusals.length === 0) {
+    const { c, j } = oks[0];
+    return done(REASONS.MATCHED, {
+      owner: j.owner,
+      date: j.date,
+      task: j.task,
+      source: c.source,
+      rendered: `deferred (owner ${j.owner}, ${j.date}, ${j.task})`,
+      candidates: candidates.length,
+      detail: `${args.caseId} is deferred to ${j.task} (${c.source})`,
+    });
   }
   return done(REASONS.UNAPPROVED, {
     candidates: candidates.length,

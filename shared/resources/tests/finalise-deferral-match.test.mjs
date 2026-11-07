@@ -56,6 +56,7 @@ const gate = (entry) =>
 
 const GOOD_GATE_ENTRY = [
   `    - action: 'Deferred: ${CASE} reproduces; replace the awk with a parser'`,
+  `      case: ${CASE}`,
   `      deferred_to: task.901`,
   `      approved_by: ${OWNER}`,
   `      approved_on: 2026-10-28`,
@@ -64,7 +65,7 @@ const GOOD_GATE_ENTRY = [
 
 const workItem = (bullet) =>
   `# T\n\n## Deferred Work\n\n${bullet}\n\n## Change Log\n`;
-const GOOD_BULLET = `- **CR10-1**, reproduced by \`${CASE}\`: deferred to task.901, approved by ${OWNER} on 2026-10-28.`;
+const GOOD_BULLET = `- \`${CASE}\`: deferred to task.901, approved by ${OWNER} on 2026-10-28.`;
 
 // ── the matching cases ────────────────────────────────────────────────────
 
@@ -111,7 +112,7 @@ test("work-item record: a Deferred Work bullet with task, approver and date matc
 });
 
 test("a continuation line of the bullet is read as part of it", () => {
-  const bullet = `- **CR10-1**, reproduced by \`${CASE}\`:\n  deferred to task.901,\n  approved by ${OWNER} on 2026-10-28.`;
+  const bullet = `- \`${CASE}\`:\n  deferred to task.901,\n  approved by ${OWNER} on 2026-10-28.`;
   const { dir, paths } = fixture({ "w.md": workItem(bullet) });
   try {
     const r = run([
@@ -154,7 +155,7 @@ test("either source suffices: the gate holds nothing, the work item holds the re
 // ── the unmatched controls ────────────────────────────────────────────────
 
 test("control: no approver recorded is unapproved (exit 1)", () => {
-  const entry = `    - action: '${CASE} reproduces'\n      deferred_to: task.901\n      approved_on: 2026-10-28\n`;
+  const entry = `    - action: '${CASE} reproduces'\n      case: ${CASE}\n      deferred_to: task.901\n      approved_on: 2026-10-28\n`;
   const { dir, paths } = fixture({ "g.yml": gate(entry) });
   try {
     const r = run([
@@ -319,7 +320,7 @@ test("control: a follow-up task must be a positive integer without leading zeros
       .ok,
     true,
   );
-  const bullet = `- **CR10-1**, reproduced by \`${CASE}\`: deferred to task.240abc, approved by ${OWNER} on 2026-10-28.`;
+  const bullet = `- \`${CASE}\`: deferred to task.240abc, approved by ${OWNER} on 2026-10-28.`;
   const { dir, paths } = fixture({ "w.md": workItem(bullet) });
   try {
     const r = run([
@@ -348,6 +349,11 @@ test("control: a bullet that is not the one accepted form never matches (T271-QA
     "conditional lead": `- If accepted, \`${CASE}\` deferred to task.901, ${ok}`,
     "future lead": `- \`${CASE}\` is to be deferred to task.901, ${ok}`,
     "only-if lead": `- \`${CASE}\`: only if Sam agrees, deferred to task.901, ${ok}`,
+    "bold slot, condition": `- **only if Sam agrees**, \`${CASE}\`: deferred to task.901, ${ok}`,
+    "bold slot, draft": `- **deferral is a draft**, \`${CASE}\`: deferred to task.901, ${ok}`,
+    "reproduced-by lead": `- reproduced by \`${CASE}\`: deferred to task.901, ${ok}`,
+    "approver with a rider": `- \`${CASE}\`: deferred to task.901, approved by ${OWNER}, if Sam agrees on 2026-10-28.`,
+    "approver in another case": `- \`${CASE}\`: deferred to task.901, approved by PAT OWNER on 2026-10-28.`,
     "bare id, no backticks": `- ${CASE}: deferred to task.901, ${ok}`,
     "text after the date": `- \`${CASE}\`: deferred to task.901, approved by ${OWNER} on 2026-10-28 unless Sam objects.`,
   };
@@ -479,10 +485,71 @@ test("an approver name compares exactly, not by prefix", () => {
     ]).ok,
     false,
   );
+  // Exact: a different case, or a Unicode lookalike (the Kelvin sign folds onto "k"), is not the owner.
+  for (const name of ["pat owner", "PAT OWNER", "Pat Owner "]) {
+    assert.equal(
+      eng.judge({ task: "task.1", owner: name, date: "2026-01-01" }, [OWNER])
+        .ok,
+      name === "Pat Owner ",
+      JSON.stringify(name),
+    );
+  }
   assert.equal(
-    eng.judge({ task: "task.1", owner: "pat owner", date: "2026-01-01" }, [
-      OWNER,
+    eng.judge({ task: "task.1", owner: "Ken Owner", date: "2026-01-01" }, [
+      "Ken Owner",
     ]).ok,
-    true,
+    false,
   );
+});
+
+test("control: every record that names the case must approve it - a later revocation, a prose mention and a task disagreement block (T271-QA-12)", () => {
+  const revoked = `${GOOD_BULLET}\n- \`${CASE}\`: deferral revoked by ${OWNER} on 2026-11-01.`;
+  const mentionOnly = gate(
+    GOOD_GATE_ENTRY +
+      `    - action: 'Do NOT defer ${CASE}; fix it now'\n      deferred_to: task.901\n      approved_by: ${OWNER}\n      approved_on: 2026-10-28\n`,
+  );
+  const otherTask = `${GOOD_BULLET}\n- \`${CASE}\`: deferred to task.902, approved by ${OWNER} on 2026-10-29.`;
+  const { dir, paths } = fixture({
+    "revoked.md": workItem(revoked),
+    "mention.yml": mentionOnly,
+    "tasks.md": workItem(otherTask),
+    "good.yml": gate(GOOD_GATE_ENTRY),
+    "w.md": workItem(GOOD_BULLET),
+  });
+  try {
+    const go = (extra) =>
+      run(["--case", CASE, ...extra, "--approver", OWNER]).json;
+    assert.equal(go(["--work-item", paths["revoked.md"]]).reason, "unapproved");
+    assert.equal(go(["--gate", paths["mention.yml"]]).reason, "unapproved");
+    const t = go(["--work-item", paths["tasks.md"]]);
+    assert.equal(t.reason, "unapproved");
+    assert.match(t.detail, /disagree/);
+    // The unmatched control: the gate and the work item agreeing is still a match.
+    const ok = go(["--gate", paths["good.yml"], "--work-item", paths["w.md"]]);
+    assert.equal(ok.reason, "matched");
+    assert.equal(ok.candidates, 2);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("control: a gate entry is matched on its own case field, not on a mention in its prose (T271-QA-12)", () => {
+  const noCaseField = gate(
+    GOOD_GATE_ENTRY.replace(`      case: ${CASE}\n`, ""),
+  );
+  const { dir, paths } = fixture({ "g.yml": noCaseField });
+  try {
+    const r = run([
+      "--case",
+      CASE,
+      "--gate",
+      paths["g.yml"],
+      "--approver",
+      OWNER,
+    ]);
+    assert.equal(r.json.reason, "unapproved");
+    assert.match(r.json.detail, /no follow-up task/);
+  } finally {
+    cleanup(dir);
+  }
 });

@@ -364,7 +364,9 @@ test("rerun-eligible control: a symlink the PR changed is in-diff, not its targe
       "--failed-file",
       "src/link.test.js",
     ]);
-    assert.equal(r.json.reason, "in-diff");
+    // A symlink is refused whatever it points at (T271-QA-11): its red is the target's red.
+    assert.equal(r.json.reason, "bad-failed-file");
+    assert.equal(r.status, 1);
     // Control: the target itself, which the PR did not change, stays eligible.
     const t = rerun(dir, prHead, head, [
       "--attempts",

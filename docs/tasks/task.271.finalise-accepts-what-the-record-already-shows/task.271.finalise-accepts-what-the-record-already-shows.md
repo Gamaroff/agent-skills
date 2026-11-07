@@ -318,21 +318,21 @@ Not modified, against the plan: `finalise-dod-security-prompt.md` (Arm 3 is wire
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-07
-**Quality Score**: 70/100
+**Quality Score**: 60/100
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.271.qa.3.finalise-accepts-what-the-record-already-shows.md](./task.271.qa.3.finalise-accepts-what-the-record-already-shows.md)
-- **Gate File**: [task.271.gate.3.finalise-accepts-what-the-record-already-shows.yml](./task.271.gate.3.finalise-accepts-what-the-record-already-shows.yml)
+- **Full Report**: [task.271.qa.4.finalise-accepts-what-the-record-already-shows.md](./task.271.qa.4.finalise-accepts-what-the-record-already-shows.md)
+- **Gate File**: [task.271.gate.4.finalise-accepts-what-the-record-already-shows.yml](./task.271.gate.4.finalise-accepts-what-the-record-already-shows.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 8057
+- **Tests Executed**: 8058
 - **Phases Verified**: 5/5
-- **Critical Issues**: 1
-- **NFR Status**: Security: FAIL, Performance: CONCERNS, Reliability: PASS, Maintainability: PASS
+- **Critical Issues**: 2
+- **NFR Status**: Security: FAIL, Performance: CONCERNS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Cycle 2's three findings are closed. The safety re-probe (21 probes) found that the Arm 3 bullet lead is still free prose behind a closed list of negation words, and that `rerun-eligible` reads a directory name as a failed file outside the diff.
+Cycle 3's findings are closed or narrowed. The safety re-probe (14 probes) found the same class a third time in the Arm 3 matcher (free prose in the bold slot of the lead, a later revocation ignored) and a symlink to a changed file passing the failed-file check. The third-strike rule applies: the fix replaces the grammar.
 
 <!-- change-log-start -->
 ## Change Log
@@ -350,6 +350,8 @@ Cycle 2's three findings are closed. The safety re-probe (21 probes) found that 
 | 2026-11-07 |         | QA findings fixed — 3 of 3 (anchored single-form deferral bullet, comments ignored, symlink final component kept), 1 iteration | qa-fix |
 | 2026-11-07 |         | QA gate FAIL (70/100) — 2 findings | qa-task |
 | 2026-11-07 |         | QA findings fixed — 2 of 2 (bullet lead as an allow-list, failed file must be a blob named against the toplevel), 1 iteration | qa-fix |
+| 2026-11-07 |         | QA gate FAIL (60/100) — 3 findings | qa-task |
+| 2026-11-07 |         | QA findings fixed — 3 of 3 (Arm 3 grammar replaced with one exact line, regular-file check, every record must approve), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

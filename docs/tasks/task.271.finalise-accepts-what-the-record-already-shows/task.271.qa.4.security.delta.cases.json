@@ -1,0 +1,44 @@
+[
+ {
+  "id": "ff.outside-diff",
+  "input": "src/other.test.js",
+  "direction": "legitimate",
+  "why": "a failing test file the PR did not change is the one thing the arm accepts"
+ },
+ {
+  "id": "ff.in-diff",
+  "input": "src/a.js",
+  "direction": "hostile",
+  "why": "the PR changed this file"
+ },
+ {
+  "id": "ff.directory",
+  "input": "src",
+  "direction": "hostile",
+  "why": "a directory is no test file"
+ },
+ {
+  "id": "ff.symlink-to-changed",
+  "input": "link-real.test.js",
+  "direction": "hostile",
+  "why": "a symlink whose target the PR changed is the PR own red"
+ },
+ {
+  "id": "ff.placeholder",
+  "input": "{failed-files}",
+  "direction": "hostile",
+  "why": "an unsubstituted placeholder is no file"
+ },
+ {
+  "id": "ff.parent",
+  "input": "../outside.test.js",
+  "direction": "hostile",
+  "why": "leaves the repository"
+ },
+ {
+  "id": "ff.missing",
+  "input": "src/missing.test.js",
+  "direction": "hostile",
+  "why": "a path that is not at the head is no test file"
+ }
+]

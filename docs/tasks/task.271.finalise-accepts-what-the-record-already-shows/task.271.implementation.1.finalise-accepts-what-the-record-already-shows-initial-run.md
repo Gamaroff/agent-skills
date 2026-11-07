@@ -140,6 +140,20 @@ Fix summary:
 - Population: 3 executed documents. Move: replace (deny-list to allow-list).
 - Advisory, not fixed: gate-entry `action` text and duplicate keys; exact-case comparison (macOS, task 210); `--base` ancestry; Kelvin-sign folding.
 
+### QA Cycle 4 — 2026-11-07
+
+| Item | Result |
+| ---- | ------ |
+| `/qa-task` gate | FAIL, 60/100, unscoped safety re-probe: T271-QA-10 (HIGH), T271-QA-11 (HIGH), T271-QA-12 (MEDIUM) |
+| Probe engine | 14 probes, 0 escapes; the matcher reproduced 4 of 7, the delta engine 1 of 7 |
+| `/qa-fix` | All three fixed; `ci:fast` 8060 tests, 0 failed |
+| Mutation proofs | Exact approver compare, every-record-must-approve and the regular-file mode check each turn a named test red; files restored (`cmp`) |
+| Third strike | Third consecutive HIGH on `finalise-deferral-match.js`. Fix replaced the mechanism: the bullet is one exact line with no optional slot and no word list, a gate entry matches on an explicit `case:` field, the approver is compared exactly, and every record that names the case must approve it |
+| Tests broken by the fix | The matcher tests and the bash and zsh block test used the old bullet and gate shapes; updated to the new ones, with refused controls for each rejected phrasing |
+| Performance | Four of five pairs, loaded machine (median 194 s against 180 s, spread 166 to 224 s); not a usable measurement, a clean rerun is still owed |
+
+Advisory, not fixed: the Deferred Work section ends only at the next H2; exact-case path compare (macOS, task 210); `--base` ancestry; follow-up task existence is not checked.
+
 ---
 
 ## Completion
