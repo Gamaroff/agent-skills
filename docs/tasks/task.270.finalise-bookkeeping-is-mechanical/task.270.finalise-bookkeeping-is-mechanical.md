@@ -5,17 +5,18 @@ type: task
 description: "Close three finalise bookkeeping gaps that a person had to notice by hand: a GAPS bug DoD that reads as accepted, security probe artefacts left untracked after the acceptance commit, and a DoD number that collides with another writer's files."
 tags: [finalise, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 pr_number: 858
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-07
+completed_date: 2026-11-07
 estimated_effort_hours: 4
 ---
 
 # Task 270: finalise bookkeeping is mechanical
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 ---
 
@@ -306,6 +307,22 @@ None identified.
 ### Key Findings
 Cycle 1's CHANGELOG finding is fixed. One low-confidence advisory item (template drift in the gaps rewrite) is already held by a committed test.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report**: `task.270.qa.2.finalise-bookkeeping-is-mechanical.md`; **Gate**: `task.270.gate.2.finalise-bookkeeping-is-mechanical.yml` ✅ PASS, 97/100; Step 5c PR review APPROVE.
+
+✅ **Acceptance Criteria:** all 8 met. The wall-time criterion was first graded open (QA 2 had timed three files only), then measured as written: ten alternating `CI=true npm test` runs, median develop 170224 ms vs branch 165366 ms (-2.9%).
+✅ **Tests and CI:** CI reading 1 SUCCESS over 6 checks on `9d3be47a`.
+✅ **Documentation:** CHANGELOG entry cites (task 270); bundled copy matches its source.
+✅ **Security Review:** PASS; 18 probes executed, 0 reproduced, 0 escaped.
+⚠️ **Compliance Review:** not applicable (internal tooling).
+
+**Detailed Verification Log:** See `task.270.dod.1.finalise-bookkeeping-is-mechanical.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-07
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -316,6 +333,7 @@ Cycle 1's CHANGELOG finding is fixed. One low-confidence advisory item (template
 | 2026-11-07 |         | Status → ready-for-development | review-task |
 | 2026-11-07 |         | QA gate CONCERNS (90/100) — 1 finding (no CHANGELOG entry) | qa-task |
 | 2026-11-07 |         | QA gate PASS (97/100) — 0 findings | qa-task |
+| 2026-11-07 | 1.2     | DoD passed — accepted (PR #858) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -356,4 +374,4 @@ None.
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted

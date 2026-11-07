@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": null,
+      "entry": "shell-argv:shared/resources/fill-verification-complete.sh",
+      "name": "fill-accepted-placeholder-halt",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 12,
+      "passed": 12,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": [
+        "bash",
+        "zsh"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "{input}",
+        "accepted"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-11-07T18:10:20.913Z"
+    },
+    {
+      "sink": null,
+      "entry": "shell-argv:shared/resources/fill-verification-complete.sh",
+      "name": "fill-gaps",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 6,
+      "passed": 6,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": [
+        "bash",
+        "zsh"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "{input}",
+        "gaps"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-11-07T18:10:21.091Z"
+    }
+  ],
+  "totals": {
+    "executed": 18,
+    "reproduced": 0,
+    "escaped": 0
+  },
+  "updated_at": "2026-11-07T18:10:21.091Z"
+}

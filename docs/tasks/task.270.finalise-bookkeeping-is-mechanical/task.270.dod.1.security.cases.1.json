@@ -1,0 +1,98 @@
+[
+  {
+    "id": "acc.leftover-owned-placeholder",
+    "input": "dod.md",
+    "direction": "hostile",
+    "why": "A non-exempt placeholder survives in the owned block.",
+    "correct": "Halt naming the line (exit 1).",
+    "spec_ref": "docs/tasks/task.270.finalise-bookkeeping-is-mechanical/task.270.finalise-bookkeeping-is-mechanical.md:106",
+    "fixture": {
+      "files": {
+        "dod.md": "# DoD\n\n## Step 5: Acceptance Decision\n\n**Outcome:** x\n- [ ] gap one\n\n## Verification Complete\n\n**Final Status:** {✅ ACCEPTED | ❌ GAPS IDENTIFIED - NOT ACCEPTED}\n**Completion Time:** {YYYY-MM-DDTHH:MMZ}\n**CI reading 1:** {CI_ROLLUP} @ `{CI_HEAD_1}` (the acceptance decision — Step 6)\n\n**Artifacts Generated:**\n\n- ✅ This DoD summary (committed and pushed at 6a)\n\n**Next Steps:**\n\n- do {NEXT_STEP}\n"
+      }
+    },
+    "expected": {
+      "exit": 1
+    }
+  },
+  {
+    "id": "acc.unbalanced-backtick",
+    "input": "dod.md",
+    "direction": "hostile",
+    "why": "A lone backtick does not form a code span, so the strip must not hide the placeholder.",
+    "correct": "Halt (exit 1).",
+    "spec_ref": "docs/tasks/task.270.finalise-bookkeeping-is-mechanical/task.270.finalise-bookkeeping-is-mechanical.md:106",
+    "fixture": {
+      "files": {
+        "dod.md": "# DoD\n\n## Step 5: Acceptance Decision\n\n**Outcome:** x\n- [ ] gap one\n\n## Verification Complete\n\n**Final Status:** {✅ ACCEPTED | ❌ GAPS IDENTIFIED - NOT ACCEPTED}\n**Completion Time:** {YYYY-MM-DDTHH:MMZ}\n**CI reading 1:** {CI_ROLLUP} @ `{CI_HEAD_1}` (the acceptance decision — Step 6)\n\n**Artifacts Generated:**\n\n- ✅ This DoD summary (committed and pushed at 6a)\n\n- see `{NEXT_STEP} here\n"
+      }
+    },
+    "expected": {
+      "exit": 1
+    }
+  },
+  {
+    "id": "acc.two-placeholders-around-span",
+    "input": "dod.md",
+    "direction": "hostile",
+    "why": "Placeholders either side of a code span.",
+    "correct": "Halt (exit 1).",
+    "spec_ref": "docs/tasks/task.270.finalise-bookkeeping-is-mechanical/task.270.finalise-bookkeeping-is-mechanical.md:106",
+    "fixture": {
+      "files": {
+        "dod.md": "# DoD\n\n## Step 5: Acceptance Decision\n\n**Outcome:** x\n- [ ] gap one\n\n## Verification Complete\n\n**Final Status:** {✅ ACCEPTED | ❌ GAPS IDENTIFIED - NOT ACCEPTED}\n**Completion Time:** {YYYY-MM-DDTHH:MMZ}\n**CI reading 1:** {CI_ROLLUP} @ `{CI_HEAD_1}` (the acceptance decision — Step 6)\n\n**Artifacts Generated:**\n\n- ✅ This DoD summary (committed and pushed at 6a)\n\n- {A} `ok` {B}\n"
+      }
+    },
+    "expected": {
+      "exit": 1
+    }
+  },
+  {
+    "id": "acc.ci-rollup-unfilled",
+    "input": "dod.md",
+    "direction": "legitimate",
+    "why": "{CI_ROLLUP} and the code-spanned {CI_HEAD_1} are exempt on an accepted fill.",
+    "correct": "Fill, exit 0.",
+    "spec_ref": "docs/tasks/task.270.finalise-bookkeeping-is-mechanical/task.270.finalise-bookkeeping-is-mechanical.md:182",
+    "fixture": {
+      "files": {
+        "dod.md": "# DoD\n\n## Step 5: Acceptance Decision\n\n**Outcome:** x\n- [ ] gap one\n\n## Verification Complete\n\n**Final Status:** {✅ ACCEPTED | ❌ GAPS IDENTIFIED - NOT ACCEPTED}\n**Completion Time:** {YYYY-MM-DDTHH:MMZ}\n**CI reading 1:** {CI_ROLLUP} @ `{CI_HEAD_1}` (the acceptance decision — Step 6)\n\n**Artifacts Generated:**\n\n- ✅ This DoD summary (committed and pushed at 6a)\n"
+      }
+    },
+    "expected": {
+      "exit": 0
+    }
+  },
+  {
+    "id": "acc.brace-in-code-span",
+    "input": "dod.md",
+    "direction": "legitimate",
+    "why": "A placeholder inside a code span is text.",
+    "correct": "Fill, exit 0.",
+    "spec_ref": "docs/tasks/task.270.finalise-bookkeeping-is-mechanical/task.270.finalise-bookkeeping-is-mechanical.md:179",
+    "fixture": {
+      "files": {
+        "dod.md": "# DoD\n\n## Step 5: Acceptance Decision\n\n**Outcome:** x\n- [ ] gap one\n\n## Verification Complete\n\n**Final Status:** {✅ ACCEPTED | ❌ GAPS IDENTIFIED - NOT ACCEPTED}\n**Completion Time:** {YYYY-MM-DDTHH:MMZ}\n**CI reading 1:** {CI_ROLLUP} @ `{CI_HEAD_1}` (the acceptance decision — Step 6)\n\n**Artifacts Generated:**\n\n- ✅ This DoD summary (committed and pushed at 6a)\n\n- ✅ row `DoD verified — {this file}`\n"
+      }
+    },
+    "expected": {
+      "exit": 0
+    }
+  },
+  {
+    "id": "acc.placeholder-outside-block",
+    "input": "dod.md",
+    "direction": "legitimate",
+    "why": "A placeholder in a section the script does not own must not halt.",
+    "correct": "Fill, exit 0.",
+    "spec_ref": "docs/tasks/task.270.finalise-bookkeeping-is-mechanical/task.270.finalise-bookkeeping-is-mechanical.md:179",
+    "fixture": {
+      "files": {
+        "dod.md": "# DoD\n\n## Step 5: Acceptance Decision\n\n**Outcome:** x\n- [ ] gap one\n\n## Verification Complete\n\n**Final Status:** {✅ ACCEPTED | ❌ GAPS IDENTIFIED - NOT ACCEPTED}\n**Completion Time:** {YYYY-MM-DDTHH:MMZ}\n**CI reading 1:** {CI_ROLLUP} @ `{CI_HEAD_1}` (the acceptance decision — Step 6)\n\n**Artifacts Generated:**\n\n- ✅ This DoD summary (committed and pushed at 6a)\n\n## Appendix\n\nnote {OUTSIDE}\n"
+      }
+    },
+    "expected": {
+      "exit": 0
+    }
+  }
+]

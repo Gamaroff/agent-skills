@@ -1,0 +1,136 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "576d56699730bfc44a2037f401ee2bd546c99927",
+  "dirty_paths": [],
+  "document": "docs/tasks/task.270.finalise-bookkeeping-is-mechanical/task.270.finalise-bookkeeping-is-mechanical.md",
+  "result": {
+    "bytes": 7636,
+    "sha256": "c83ef2b70a40380343d84adb9517a6dd64c8f1b59859cfd60fe1c3e375211736",
+    "verified": false
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 8,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "ecb36723432150623d9a6f47abdf7b927593d9cb05787efb519556083f3cfb9c",
+      "status": "PASS",
+      "description": "gaps fill leaves no accepted-path placeholder; surviving placeholder halts",
+      "code_citation": "shared/resources/fill-verification-complete.sh:96",
+      "test_citation": "shared/resources/tests/finalise-gaps-path.test.mjs:798",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The sed rewrite (:96-103) replaces the four accepted-path lines for gaps. The awk/grep halt (:121-124) catches any other {..} left in the block, with CI_ROLLUP exempt and code spans stripped. Tests at :798 (gaps leaves no accepted text, accepted keeps it) and :820 (survivor halts for both verdicts, code-span control does not). The file sits under shared/resources/tests, which QA reports runs in the full suite (8011 pass, 0 fail). The gate-1 mutation proofs name the tests that went red."
+    },
+    {
+      "id": "#2",
+      "text_hash": "15169d6ccf254321a208f661da21d56bdcc2463b57e6b5f43a91f79e704f1552",
+      "status": "PASS",
+      "description": "6a leaves no dod.N.security.* path untracked, shown by a staging-slice test",
+      "code_citation": "skills/finalise/SKILL.md:1925",
+      "test_citation": "shared/resources/tests/finalise-6a-registry-staging.test.mjs:248",
+      "members": [],
+      "non_member_fail": null,
+      "note": "find over STEM.dod.DOD_NUM.security.* appends to ADD_PATHS (:1924), then git add (:1934). The test at :248 runs the block under bash and zsh and asserts the record, the .d/ sidecar file and the cases file are staged. A foreign dod.2 security file is not staged (:276), and a no-artefact control at ~:285 shows the block does not abort."
+    },
+    {
+      "id": "#3",
+      "text_hash": "f7475df02f8e7b8cbfb72c6e0ec7e4624525341682bbcc0bf67a3e6e538ef8e3",
+      "status": "PASS",
+      "description": "DOD_N is 3 in the obs #96 scratch layout, shown by a test",
+      "code_citation": "skills/finalise/SKILL.md:173",
+      "test_citation": "shared/resources/tests/next-numbered.test.mjs:249",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The allocation pattern is now -name \\\"${STEM}.dod.*\\\". The test at :249 builds the dod.1.x.md + foreign dod.2.security.cases.1.json layout and expects 3. The old narrow pattern is the control and answers 2. It also pins the SKILL.md pattern literal (:277-278)."
+    },
+    {
+      "id": "#4",
+      "text_hash": "546f8d2e546317c6fe9a55fd0f609c8fefcc1c0cc809d62ee9ee5cda06496d54",
+      "status": "PASS",
+      "description": "npm test wall time within 10% of develop, median of five alternating runs with uptime",
+      "code_citation": "docs/tasks/task.270.finalise-bookkeeping-is-mechanical/task.270.qa.2.finalise-bookkeeping-is-mechanical.md:Full-suite measurement",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Re-judged by the main context after the agent's FAIL: the five-alternating-run CI=true npm test measurement was taken and committed (9d3be47a): median develop 170224 ms, branch 165366 ms (-2.9%), load recorded per run. Agent's original finding follows. re-measure. The criterion names CI=true npm test, median of five alternating runs on develop and on the branch. QA 2 timed only the three changed test files: five alternating runs, median develop 1024 ms vs branch 1303 ms, +279 ms, load 3.38-3.79 recorded beside each run. It records the full suite once, at 189 s on the branch (QA 1, load 3.6), with no develop baseline. The report says itself that this is not the five-run full-suite median. The 3-file figure is committed, load-recorded and well inside 10% (+0.15% of 189 s), so the bound is very likely met. But it was not taken on npm test as written, and not obviously on the current head 576d566. The criterion box is also still unticked in the task file. Graded against its text, so FAIL, low severity: one check, and behaviour is not in doubt."
+    },
+    {
+      "id": "#5",
+      "text_hash": "3823b39fa3d030862580a583d8cf269941c18a54793b94fab3bd28934a4c0b98",
+      "status": "PASS",
+      "description": "Each of the three fixes has a mutation proof in the QA report",
+      "code_citation": "docs/tasks/task.270.finalise-bookkeeping-is-mechanical/task.270.qa.1.finalise-bookkeeping-is-mechanical.md:Mutation proofs",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "fill script: gaps rewrite and placeholder halt",
+          "evidence": "qa.1 Mutation proofs: 'gaps rewrite disabled -> the two gaps-fill tests'; 'placeholder halt disabled -> four halt tests'",
+          "status": "PASS"
+        },
+        {
+          "member": "6a staging of security artefacts",
+          "evidence": "qa.1 Mutation proofs: '6a staging append dropped -> two staging tests'",
+          "status": "PASS"
+        },
+        {
+          "member": "DOD_N namespace pattern",
+          "evidence": "qa.1 Mutation proofs: 'DOD_N pattern reverted -> two DOD_N tests'",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "The committed QA report names the reverted edit and the count of tests that went red for each fix. The records are the developer's, and QA did not re-run them. That is adequate for a process criterion, since each record says what turned red."
+    },
+    {
+      "id": "#6",
+      "text_hash": "4ebe7eb0e4844e0df815176b7f42d776b2bc0cf3440c8435836dd542207af2de",
+      "status": "PASS",
+      "description": "bundle --check reports 0 problems; CI=true npm test passes",
+      "code_citation": ".github/workflows/ci.yml:1",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 9d3be47a60ffc76570fb601c60f014d2f3ccd6b9 — The evidence is a pass/fail reading of a test run. QA 1 records 8011 pass / 0 fail and bundle check 0 problems at the cycle-1 head 39a1608c, and CI was 6/6 SUCCESS there. Head 576d566 is later and its CI is still running, so the CI reading at finalise decides it.",
+      "ci_reading": "CI reading 1: SUCCESS @ 9d3be47a60ffc76570fb601c60f014d2f3ccd6b9"
+    },
+    {
+      "id": "#7",
+      "text_hash": "418ccf50981b8ce15605f7d83a7ce59a984ef7e324bda7250c79c1512266822e",
+      "status": "PASS",
+      "description": "finalise-bug-mode.test.mjs passes under CI=true node --test",
+      "code_citation": ".github/workflows/ci.yml:1",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 9d3be47a60ffc76570fb601c60f014d2f3ccd6b9 — QA 1 records 98 pass, 0 fail at 39a1608c. The only current-head evidence is the running CI, which runs this file as part of npm test, so it is deferred.",
+      "ci_reading": "CI reading 1: SUCCESS @ 9d3be47a60ffc76570fb601c60f014d2f3ccd6b9"
+    },
+    {
+      "id": "#8",
+      "text_hash": "99b30ee882134890dbd14ad1c731e63ec0bb3882fe62adf6b4f8808a8abb6dd7",
+      "status": "PASS",
+      "description": "An existing accepted bug DoD fixture is unchanged by the fill",
+      "code_citation": "shared/resources/fill-verification-complete.sh:95",
+      "test_citation": "shared/resources/tests/finalise-gaps-path.test.mjs:798",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The sed rewrite and the placeholder-halt exemption apply only under the gaps verdict, via the VERDICT = gaps guard at :95. The :798 test asserts an accepted fill keeps the accepted-path text, and CI_ROLLUP is exempt from the halt. The same test also covers the existing accepted-fill tests in this file (:635-639, accepted advances 8)."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#1",
+      "note": "QA 2 flags that if a template line the gaps sed rewrites is later reworded, the rewrite matches nothing. The stale text carries no braces, so the placeholder halt cannot catch it. The test at finalise-gaps-path.test.mjs:798 reads the real template and would go red, so the risk is already held by a test. Advisory only."
+    },
+    {
+      "ac_id": "criteria-drift",
+      "note": "criteria-drift.js exited 0 with reason 'clean' and no changed entries, so there is no amendment issue. Its base is the review commit 39a1608c (exact: false)."
+    }
+  ]
+}
