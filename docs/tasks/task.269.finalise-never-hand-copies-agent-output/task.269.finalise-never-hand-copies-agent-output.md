@@ -5,7 +5,7 @@ type: task
 description: "Give finalise Steps 3b.1 and 3c a transcription-free route for the security probe plan and the AC agent's YAML, and a byte check, so a model reply is never retyped into a file that decides acceptance."
 tags: [finalise, observation]
 category: refactoring
-status: ready-for-review
+status: in-progress
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-07
@@ -14,7 +14,7 @@ estimated_effort_hours: 16
 
 # Task 269: finalise never hand-copies agent output
 
-**Status:** Ready for Review
+**Status:** In Progress
 
 ---
 
@@ -294,6 +294,27 @@ None - `cases_file:` is an optional field; inline `cases` keeps working.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-07
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.269.qa.1.finalise-never-hand-copies-agent-output.md](./task.269.qa.1.finalise-never-hand-copies-agent-output.md)
+- **Gate File**: [task.269.gate.1.finalise-never-hand-copies-agent-output.yml](./task.269.gate.1.finalise-never-hand-copies-agent-output.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 7997
+- **Phases Verified**: 4/4
+- **Critical Issues**: 1
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+The reuse block in finalise Step 3b.1 reads variables it does not bind, so reuse cannot run as written (T269-QA-1). The reuse check also reads `reusable` for an engine path that matches nothing (T269-QA-2), and the cases_file confinement predicate is not reachable by the probe engine (T269-QA-3).
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -303,6 +324,8 @@ None - `cases_file:` is an optional field; inline `cases` keeps working.
 | 2026-11-07 | 1.1     | Review passed (8/10) — edit sources not bundled copies, hash-over-retyped-text and first-run limits stated, wall-clock criterion replaced, reuse/path criteria added, removed-literal sweep listed | review-task |
 | 2026-11-07 |         | Status → ready-for-development                           | review-task |
 | 2026-11-07 |         | Implemented — 15 files, 14 tests                         | develop     |
+| 2026-11-07 |         | QA gate FAIL (70/100) — 5 findings                       | qa-task     |
+| 2026-11-07 |         | QA findings fixed — T269-QA-1 to -5, 4 new tests, 5 mutation proofs, iteration 1 | qa-fix      |
 <!-- change-log-end -->
 
 ---
@@ -343,4 +366,4 @@ If Phase 1 finds no file route, file the AC half as its own task.
 
 ---
 
-**Status:** Ready for Review
+**Status:** In Progress

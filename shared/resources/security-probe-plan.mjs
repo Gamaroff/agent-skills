@@ -218,6 +218,15 @@ export function resolveCasesFile(name, workDir) {
 }
 
 /**
+ * The accept/refuse decision of `resolveCasesFile` as a boolean, so the probe engine can run it:
+ * it reads a falsy return as a refusal, and `resolveCasesFile` returns an object either way.
+ * `fn(name, ...args)`: the work directory is the fixed extra argument (`--args-json '["<dir>"]'`).
+ */
+export function casesFileAccepted(name, workDir) {
+  return resolveCasesFile(name, workDir).ok === true;
+}
+
+/**
  * The first HTML entity in a case list's text (inputs and fixtures alike), when it is an escape and
  * not a payload: `null` when there is none, or when the plan carries a literal `<` somewhere
  * (`planHasLiteralAngle`) or the entry's own source file carries the same entity (`sourceText`).
@@ -226,8 +235,15 @@ export function resolveCasesFile(name, workDir) {
  */
 export function casesEntityIn(cases, planHasLiteralAngle, sourceText) {
   if (planHasLiteralAngle) return null;
-  const m = HTML_ENTITY.exec(JSON.stringify(cases));
+  const text = JSON.stringify(cases);
+  const m = HTML_ENTITY.exec(text);
   if (!m) return null;
+  // The entry's OWN text is evidence too: an escaped reply turns every <, > and & into an entity, so
+  // one literal of the three beside an entity means this text was not escaped as a whole. This is the
+  // rule `agent-reply-block.js` applies to a block, and it is what lets a committed cases file whose
+  // payload is an entity on purpose (a test of HTML escaping) through (T269-QA-4).
+  if (/[<>&]/.test(text.replace(new RegExp(HTML_ENTITY.source, "g"), "")))
+    return null;
   if (typeof sourceText === "string" && sourceText.includes(m[0])) return null;
   return m[0];
 }
@@ -613,18 +629,25 @@ export function reusePlan({ priorPlan, priorHead, repoRoot, enginePaths }) {
     { encoding: "utf8" },
   );
   if (rev.status !== 0) return no("git-unreadable");
+  // A path that matches nothing makes `git diff --quiet` exit 0, which would read as "unchanged".
+  // Each engine path must therefore exist at the prior head AND at HEAD, as a file.
+  for (const p of enginePaths) {
+    if (typeof p !== "string" || p === "" || p.startsWith("-"))
+      return no("bad-engine-path");
+    for (const at of [priorHead, "HEAD"]) {
+      const has = spawnSync(
+        "git",
+        ["-C", repoRoot, "cat-file", "-e", `${at}:${p}`],
+        { encoding: "utf8" },
+      );
+      if (has.status !== 0) return no("engine-path-missing");
+    }
+  }
+  // Prior head against the WORKING TREE, not HEAD: an uncommitted edit to the engine changes what the
+  // plan probes just as a commit does.
   const diff = spawnSync(
     "git",
-    [
-      "-C",
-      repoRoot,
-      "diff",
-      "--quiet",
-      priorHead,
-      "HEAD",
-      "--",
-      ...enginePaths,
-    ],
+    ["-C", repoRoot, "diff", "--quiet", priorHead, "--", ...enginePaths],
     { encoding: "utf8" },
   );
   if (diff.status === 1) return no("engine-changed");

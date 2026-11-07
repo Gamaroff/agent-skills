@@ -48,7 +48,10 @@ function transcript(
 ) {
   const d = join(dir, root, "p", session, "subagents");
   mkdirSync(d, { recursive: true });
-  const half = Math.floor(reply.length / 2);
+  // Split at a line boundary, as the host does: a mid-line split would be joined with "\n" and differ.
+  const cut = reply.indexOf("\n", Math.floor(reply.length / 2));
+  const half = cut === -1 ? reply.length : cut;
+  const rest = cut === -1 ? "" : reply.slice(cut + 1);
   const rows = [
     { type: "user", message: { role: "user", content: "task" } },
     {
@@ -73,9 +76,12 @@ function transcript(
       type: "assistant",
       message: {
         role: "assistant",
-        content: [{ type: "text", text: reply.slice(half) }],
+        content: [{ type: "text", text: rest }],
       },
     },
+    // The host writes metadata lines after a turn (T269-QA-5): they are not a turn boundary.
+    { type: "attachment", attachment: { type: "x" } },
+    { type: "api-request", n: 1 },
   ];
   const f = join(d, `agent-${id}.jsonl`);
   writeFileSync(f, rows.map((r) => JSON.stringify(r)).join("\n") + "\n");

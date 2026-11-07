@@ -642,9 +642,20 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
    the `head` field of the previous run's AC record (`…dod.{N-1}.ac.json`):
 
    ```bash
-   command node .agents/skills/finalise/references/security-probe-plan.mjs reuse \
-     --prior-plan "$DOC_DIR/$STEM.dod.$((DOD_N-1)).security.plan.json" --prior-head "{prior head}" \
-     --repo-root "$(git rev-parse --show-toplevel)" --engine-path "{engine path}" --json
+   # INPUTS, substituted into THIS block (a fenced block is its own shell): STEM and DOD_N as Step 0
+   # bound them, {document-directory}, {prior head}, and one {engine path} per engine file.
+   STEM="{story.{P}.{E}.{S} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"
+   DOD_N="{Step 0's DOD_N}"
+   DOC_DIR="{document-directory}"
+   case "$STEM$DOD_N$DOC_DIR{prior head}{engine path}" in *'{'*) echo "HALT: an input of the reuse block is an unsubstituted placeholder"; exit 1 ;; esac
+   case "$DOD_N" in ''|*[!0-9]*) echo "HALT: DOD_N is not a number"; exit 1 ;; esac
+   if [ "$DOD_N" -le 1 ]; then
+     echo "reuse: no previous DoD run (DOD_N=$DOD_N) — plan afresh"
+   else
+     command node .agents/skills/finalise/references/security-probe-plan.mjs reuse \
+       --prior-plan "$DOC_DIR/$STEM.dod.$((DOD_N-1)).security.plan.json" --prior-head "{prior head}" \
+       --repo-root "$(git rev-parse --show-toplevel)" --engine-path "{engine path}" --json
+   fi
    ```
 
    `reusable`: copy that plan file to `.claude/state/probe-plan.json` (a file copy, not a retype), skip

@@ -107,8 +107,12 @@ function findTranscripts(agentId, root) {
 }
 
 /**
- * The reply text: the assistant `text` blocks after the last line that is not an assistant line (a
- * tool result is a `user` line, so this is the final turn only). `null` when there is none.
+ * The reply text: the assistant `text` blocks after the last `user` line (a tool result is a `user`
+ * line, so this is the final turn only). `null` when there is none. The host also writes metadata
+ * lines between and after the turns (`attachment`, `api-request`, `api-request-blob`, …): they are
+ * neither a turn boundary nor reply text, so they are skipped, not treated as a reset (T269-QA-5).
+ * Separate text blocks are joined with a newline, so one block's closing fence can never fuse with the
+ * next block's opening line.
  */
 function replyText(jsonl) {
   const lines = jsonl.split("\n").filter((l) => l.trim() !== "");
@@ -121,15 +125,18 @@ function replyText(jsonl) {
       return null;
     }
     if (o && o.type === "assistant" && o.message) tail.push(o.message);
-    else tail = [];
+    else if (o && o.type === "user") tail = [];
   }
-  let text = "";
+  const parts = [];
   for (const m of tail) {
     const c = m.content;
-    if (typeof c === "string") text += c;
+    if (typeof c === "string") parts.push(c);
     else if (Array.isArray(c))
-      for (const b of c) if (b && b.type === "text") text += b.text;
+      for (const b of c)
+        if (b && b.type === "text" && typeof b.text === "string")
+          parts.push(b.text);
   }
+  const text = parts.join("\n");
   return text === "" ? null : text;
 }
 

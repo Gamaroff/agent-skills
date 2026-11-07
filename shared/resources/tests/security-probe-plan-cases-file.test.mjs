@@ -23,6 +23,15 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { spawnBudget } from "../spawn-budget.mjs";
+import {
+  readDoc,
+  blockBy,
+  bind,
+  fixtureRepo,
+  write,
+  run as runShell,
+} from "./lib/executed-prose.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PLAN_MJS = join(HERE, "..", "security-probe-plan.mjs");
@@ -145,6 +154,34 @@ test("entity: inline cases that came back escaped are refused; a literal < elsew
     assert.deepEqual(await reasons([{ argv: ENTRY, cases: esc }]), []);
   }));
 
+test("entity: a cases file whose payload is an entity on purpose, beside a literal <, is accepted; the same entity with nothing literal is refused (T269-QA-4)", () =>
+  withDir(async (dir, work) => {
+    // Own-text evidence: one literal "<" in the file proves it was not escaped as a whole.
+    writeFileSync(
+      join(work, "mixed.json"),
+      JSON.stringify([
+        { id: "a", input: "&amp;lt;", spec_ref: "d.md:1" },
+        { id: "b", input: "<script>", spec_ref: "d.md:1" },
+      ]),
+    );
+    const mixed = await run(dir, work, [
+      { argv: ENTRY, cases_file: "mixed.json" },
+    ]);
+    assert.deepEqual(mixed.out.refusals, []);
+    // Control: the same payload with no literal anywhere is the escaped-reply shape.
+    writeFileSync(
+      join(work, "only.json"),
+      JSON.stringify([{ id: "a", input: "&amp;lt;", spec_ref: "d.md:1" }]),
+    );
+    const only = await run(dir, work, [
+      { argv: ENTRY, cases_file: "only.json" },
+    ]);
+    assert.deepEqual(
+      only.out.refusals.map((r) => r.reason),
+      ["plan-entry-cases-html-entity: &amp;"],
+    );
+  }));
+
 test("entity: a cases file that came back escaped is refused too", () =>
   withDir(async (dir, work) => {
     writeFileSync(
@@ -213,6 +250,21 @@ test("reuse: an unchanged plan is reusable; a changed cases byte, a changed engi
     assert.equal(ask().why, "cases-file-hash-mismatch");
     writeFileSync(casesPath, orig);
     assert.deepEqual(ask(), { reason: "reusable" });
+    // Not reusable: a path that matches nothing must not read as "unchanged" (T269-QA-2).
+    assert.equal(
+      ask({ enginePaths: ["lib/no-such-file.js"] }).why,
+      "engine-path-missing",
+    );
+    assert.equal(
+      ask({ enginePaths: ["lib/x.js", "lib/typo.js"] }).why,
+      "engine-path-missing",
+    );
+    assert.equal(ask({ enginePaths: ["--stat"] }).why, "bad-engine-path");
+    // Not reusable: an UNCOMMITTED edit to the engine changes what the plan probes too.
+    writeFileSync(join(dir, "lib", "x.js"), "export const a = 99;\n");
+    assert.equal(ask().why, "engine-changed");
+    writeFileSync(join(dir, "lib", "x.js"), "export const a = 1;\n");
+    assert.deepEqual(ask(), { reason: "reusable" });
     // Not reusable: the engine path changed since the prior head.
     writeFileSync(join(dir, "lib", "x.js"), "export const a = 2;\n");
     git("commit", "-q", "-am", "b");
@@ -224,6 +276,133 @@ test("reuse: an unchanged plan is reusable; a changed cases byte, a changed engi
     writeFileSync(inline, JSON.stringify([{ argv: ENTRY, cases: [] }]));
     assert.equal(ask({ priorPlan: inline }).why, "inline-cases");
   }));
+
+// --- the probe engine runs the confinement predicate (T269-QA-3) ------------------------------------
+
+test("casesFileAccepted: the probe engine executes hostile and legitimate names against it, and it engages", () =>
+  withDir(async (dir, work) => {
+    writeFileSync(join(work, "ok.json"), "[]");
+    writeFileSync(join(dir, "outside.json"), "[]");
+    symlinkSync(join(dir, "outside.json"), join(work, "link.json"));
+    mkdirSync(join(work, "sub"));
+    const c = (id, input, correct, direction) => ({
+      id,
+      sink: "path",
+      input,
+      why: id,
+      correct,
+      direction,
+    });
+    const cases = [
+      c("climbs", "../outside.json", "reject", "hostile"),
+      c("deep-climb", "sub/../../outside.json", "reject", "hostile"),
+      c("absolute", join(dir, "outside.json"), "reject", "hostile"),
+      c("symlink", "link.json", "reject", "hostile"),
+      c("directory", "sub", "reject", "hostile"),
+      c("nul", "ok.json\u0000.txt", "reject", "hostile"),
+      c("empty", "", "reject", "hostile"),
+      c("plain", "ok.json", "accept", "legitimate"),
+    ];
+    const casesFile = join(dir, "cases.json");
+    writeFileSync(casesFile, JSON.stringify(cases));
+    const r = spawnSync(
+      process.execPath,
+      [
+        join(HERE, "..", "security-probe.mjs"),
+        "--sink",
+        "path",
+        "--entry",
+        `${PLAN_MJS}#casesFileAccepted`,
+        "--args-json",
+        JSON.stringify([work]),
+        "--cases-file",
+        casesFile,
+        "--repo-root",
+        join(HERE, "..", "..", ".."),
+        "--json",
+      ],
+      { encoding: "utf8", timeout: spawnBudget("CASES_FILE_PROBE").timeoutMs },
+    );
+    assert.equal(r.status, 0, r.stderr);
+    const out = JSON.parse(r.stdout);
+    assert.equal(out.executed, cases.length, "every case was executed");
+    assert.equal(out.verdict, "engages");
+    assert.deepEqual(out.reproduced ?? [], []);
+  }));
+
+// --- the SKILL.md reuse block binds its own inputs (T269-QA-1) --------------------------------------
+
+const reuseBlock = () =>
+  blockBy(readDoc("skills/finalise/SKILL.md"), "--prior-plan", "reuse block");
+const REUSE_BINDS = (over = {}) => ({
+  ".agents/skills/finalise/references/security-probe-plan.mjs": PLAN_MJS,
+  "{story.{P}.{E}.{S} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}":
+    "task.9",
+  "{Step 0's DOD_N}": "2",
+  "{document-directory}": "docs/tasks/task.9.x",
+  "{engine path}": "lib/x.js",
+  ...over,
+});
+
+test("reuse block: it binds STEM, DOD_N and DOC_DIR itself, so it runs in a fresh shell and finds the prior plan", () => {
+  const { work } = fixtureRepo();
+  write(work, "lib/x.js", "export const a = 1;\n");
+  const git = (...a) =>
+    spawnSync("git", ["-C", work, ...a], { encoding: "utf8" });
+  git("add", "-A");
+  git(
+    "-c",
+    "user.email=t@example.com",
+    "-c",
+    "user.name=t",
+    "commit",
+    "-q",
+    "-m",
+    "x",
+  );
+  const head = git("rev-parse", "HEAD").stdout.trim();
+  write(
+    work,
+    "docs/tasks/task.9.x/task.9.dod.1.security.plan.json",
+    JSON.stringify([{ argv: ["--sink", "path", "--entry", "lib/x.js#f"] }]),
+  );
+  const code = bind(reuseBlock(), REUSE_BINDS({ "{prior head}": head }));
+  const r = runShell("bash", code, { cwd: work });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(JSON.parse(r.stdout).reason, "reusable");
+  // Control: DOD_N 1 has no previous run — the block says so and runs nothing.
+  const first = runShell(
+    "bash",
+    bind(
+      reuseBlock(),
+      REUSE_BINDS({ "{prior head}": head, "{Step 0's DOD_N}": "1" }),
+    ),
+    { cwd: work },
+  );
+  assert.equal(first.status, 0, first.stderr);
+  assert.match(first.stdout, /no previous DoD run/);
+  assert.doesNotMatch(first.stdout, /reusable/);
+});
+
+test("reuse block: an unsubstituted placeholder or a non-numeric DOD_N halts before anything runs", () => {
+  const { work } = fixtureRepo();
+  const raw = runShell("bash", reuseBlock(), { cwd: work });
+  assert.equal(raw.status, 1);
+  assert.match(
+    raw.stdout,
+    /HALT: an input of the reuse block is an unsubstituted placeholder/,
+  );
+  const bad = runShell(
+    "bash",
+    bind(
+      reuseBlock(),
+      REUSE_BINDS({ "{prior head}": "HEAD", "{Step 0's DOD_N}": "two" }),
+    ),
+    { cwd: work },
+  );
+  assert.equal(bad.status, 1);
+  assert.match(bad.stdout, /HALT: DOD_N is not a number/);
+});
 
 test("resolveCasesFile: a directory, an absolute name and a NUL are refused", () =>
   withDir(async (dir, work) => {
