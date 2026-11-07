@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`finalise` bookkeeping no longer depends on someone noticing** (task 270). A bug DoD with
+  verdict `gaps` has its four accepted-path lines rewritten (no "committed and pushed at 6a", no
+  Part B next step), and a placeholder left in the Verification Complete block now halts the fill.
+  Step 6a stages this run's `dod.N.security.*` record, its `.run.json.d/` sidecar and cases files, so
+  the acceptance commit leaves none of them untracked. The DoD number is allocated over the whole
+  `dod.*` namespace, so a foreign `dod.N.*` file can no longer share it.
 - **`finalise` takes agent output from the transcript, not a hand copy** (task 269). The security
   agent's probe plan (Step 3b.1) and the AC agent's YAML (Step 3c) are now extracted byte for byte
   from the subagent transcript by `agent-reply-block.js`, which refuses an HTML-escaped reply. The AC

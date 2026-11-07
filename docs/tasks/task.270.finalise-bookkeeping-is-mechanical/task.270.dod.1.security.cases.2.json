@@ -1,0 +1,50 @@
+[
+  {
+    "id": "gaps.template-fill",
+    "input": "dod.md",
+    "direction": "legitimate",
+    "why": "Gaps fill on the template rewrites the accepted-path lines and the CI line.",
+    "correct": "Fill, exit 0.",
+    "spec_ref": "docs/tasks/task.270.finalise-bookkeeping-is-mechanical/task.270.finalise-bookkeeping-is-mechanical.md:179",
+    "fixture": {
+      "files": {
+        "dod.md": "# DoD\n\n## Step 5: Acceptance Decision\n\n**Outcome:** x\n- [ ] gap one\n\n## Verification Complete\n\n**Final Status:** {✅ ACCEPTED | ❌ GAPS IDENTIFIED - NOT ACCEPTED}\n**Completion Time:** {YYYY-MM-DDTHH:MMZ}\n**CI reading 1:** {CI_ROLLUP} @ `{CI_HEAD_1}` (the acceptance decision — Step 6)\n\n**Artifacts Generated:**\n\n- ✅ This DoD summary (committed and pushed at 6a)\n"
+      }
+    },
+    "expected": {
+      "exit": 0
+    }
+  },
+  {
+    "id": "gaps.surviving-owned-placeholder",
+    "input": "dod.md",
+    "direction": "hostile",
+    "why": "An owned placeholder survives a gaps fill.",
+    "correct": "Halt (exit 1).",
+    "spec_ref": "docs/tasks/task.270.finalise-bookkeeping-is-mechanical/task.270.finalise-bookkeeping-is-mechanical.md:182",
+    "fixture": {
+      "files": {
+        "dod.md": "# DoD\n\n## Step 5: Acceptance Decision\n\n**Outcome:** x\n- [ ] gap one\n\n## Verification Complete\n\n**Final Status:** {✅ ACCEPTED | ❌ GAPS IDENTIFIED - NOT ACCEPTED}\n**Completion Time:** {YYYY-MM-DDTHH:MMZ}\n**CI reading 1:** {CI_ROLLUP} @ `{CI_HEAD_1}` (the acceptance decision — Step 6)\n\n**Artifacts Generated:**\n\n- ✅ This DoD summary (committed and pushed at 6a)\n\n- left {NEXT_STEP}\n"
+      }
+    },
+    "expected": {
+      "exit": 1
+    }
+  },
+  {
+    "id": "gaps.no-gap-line",
+    "input": "dod.md",
+    "direction": "hostile",
+    "why": "The gaps verdict refuses a file with no gap line, before writing.",
+    "correct": "Halt (exit 1).",
+    "spec_ref": "shared/resources/fill-verification-complete.sh:16",
+    "fixture": {
+      "files": {
+        "dod.md": "# DoD\n\n## Step 5: Acceptance Decision\n\n**Outcome:** x\n\n## Verification Complete\n\n**Final Status:** {✅ ACCEPTED | ❌ GAPS IDENTIFIED - NOT ACCEPTED}\n**Completion Time:** {YYYY-MM-DDTHH:MMZ}\n**CI reading 1:** {CI_ROLLUP} @ `{CI_HEAD_1}` (the acceptance decision — Step 6)\n\n**Artifacts Generated:**\n\n- ✅ This DoD summary (committed and pushed at 6a)\n"
+      }
+    },
+    "expected": {
+      "exit": 1
+    }
+  }
+]

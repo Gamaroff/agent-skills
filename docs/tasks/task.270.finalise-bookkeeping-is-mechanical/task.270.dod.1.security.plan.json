@@ -1,0 +1,26 @@
+[
+  {
+    "argv": [
+      "--entry",
+      "shell-argv:shared/resources/fill-verification-complete.sh",
+      "--argv",
+      "[\"{input}\", \"accepted\"]",
+      "--name",
+      "fill-accepted-placeholder-halt"
+    ],
+    "cases_file": "task.270.dod.1.security.cases.1.json",
+    "cases_sha256": "f6f90ba4795fd85de199a93dbbb97762122104997dfd63d3d0eab93df592ad1d"
+  },
+  {
+    "argv": [
+      "--entry",
+      "shell-argv:shared/resources/fill-verification-complete.sh",
+      "--argv",
+      "[\"{input}\", \"gaps\"]",
+      "--name",
+      "fill-gaps"
+    ],
+    "cases_file": "task.270.dod.1.security.cases.2.json",
+    "cases_sha256": "5a8bbf1d137bfbe8a135ef798722168bac8ebe7a1532c19c530c34b7ac25ba7c"
+  }
+]

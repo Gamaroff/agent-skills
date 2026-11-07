@@ -170,7 +170,7 @@ Before starting any verification, also create a co-located running summary file 
      ```bash
      STEM="{story.{P}.{E}.{S} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"   # the work item's filename stem
      source .agents/skills/finalise/references/newest-numbered.sh || exit 1
-     DOD_N=$(next_numbered "{document-directory}" dod -name "${STEM}.dod.*.md") || exit 1
+     DOD_N=$(next_numbered "{document-directory}" dod -name "${STEM}.dod.*") || exit 1
      ```
 
      and use `$DOD_N` as `{num}`. It is the highest existing `{num}` plus 1 (1 when there is none), never the number of reports plus 1: a directory holding `.1.` and `.3.` gets `.4.`, where a count would overwrite `.3.`. `next_numbered`'s header in the sourced file states the full rule (obs #272, task.186).
@@ -1913,6 +1913,16 @@ standalone.
      ADD_PATHS=("{document-path}" "$DOD_PATH" "{document-directory}/sprint-review-summary.md")
      COMMIT_MSG="docs(${STEM}): accept — DoD, sprint review"
    fi
+   # This run's security probe artefacts ride the same commit (obs #59, task.270): the record
+   # `{stem}.dod.{N}.security.run.json`, its `.run.json.d/` sidecar, and the plan and cases files.
+   # Prose said 6a carried them and no block staged them, so the sidecar needed a second commit.
+   # DOD_N is not an input of this block, so the run number is read off the DoD path resolved above.
+   # `find`, not a glob: an unmatched glob aborts zsh with "no matches found" before any HALT prints.
+   DOD_NUM=$(basename "$DOD_PATH" | sed -E 's/^.*\.dod\.([0-9]+)\..*$/\1/')
+   case "$DOD_NUM" in ''|*[!0-9]*) echo "HALT: cannot read the run number from $DOD_PATH"; exit 1 ;; esac
+   while IFS= read -r SEC_PATH; do
+     [ -n "$SEC_PATH" ] && ADD_PATHS+=("$SEC_PATH")
+   done < <(find "{document-directory}" -maxdepth 1 -name "${STEM}.dod.${DOD_NUM}.security.*" 2>/dev/null | sort)
    # --- acceptance artefacts resolved (the executed test slices to here) ---
    # The task registry is NOT added here. Step 7.4's `registry-tick.js --stage` already put this
    # task's row in the index, so a parallel session's uncommitted row or counter bump in the same
