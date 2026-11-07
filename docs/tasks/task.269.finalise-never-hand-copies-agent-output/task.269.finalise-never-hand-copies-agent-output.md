@@ -304,17 +304,17 @@ None - `cases_file:` is an optional field; inline `cases` keeps working.
 **Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.269.qa.3.finalise-never-hand-copies-agent-output.md](./task.269.qa.3.finalise-never-hand-copies-agent-output.md)
-- **Gate File**: [task.269.gate.3.finalise-never-hand-copies-agent-output.yml](./task.269.gate.3.finalise-never-hand-copies-agent-output.yml)
+- **Full Report**: [task.269.qa.4.finalise-never-hand-copies-agent-output.md](./task.269.qa.4.finalise-never-hand-copies-agent-output.md)
+- **Gate File**: [task.269.gate.4.finalise-never-hand-copies-agent-output.yml](./task.269.gate.4.finalise-never-hand-copies-agent-output.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 22 (new or changed), 7999 in the fast gate
+- **Tests Executed**: 41 in the three related test files, 7999 in the fast gate
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-No open finding. Cycle 3 closed the CHANGELOG gap (T269-QA-6) and two advisory notes on the finalise reuse block.
+No open finding. Cycle 4 reviewed the one test assertion added while closing DoD criterion 7; removing the guard it holds turns it red.
 
 ## Definition of Done - Gaps Identified
 
@@ -347,6 +347,7 @@ No open finding. Cycle 3 closed the CHANGELOG gap (T269-QA-6) and two advisory n
 | 2026-11-07 |         | QA findings fixed — T269-QA-6 plus two advisory notes, iteration 2 | qa-fix      |
 | 2026-11-07 |         | QA gate PASS (100/100) — 0 findings                      | qa-task     |
 | 2026-11-07 |         | DoD incomplete — 2 gaps identified (criteria 6, 7: records)    | finalise    |
+| 2026-11-07 |         | QA gate PASS (100/100) — 0 findings (cycle 4)            | qa-task     |
 <!-- change-log-end -->
 
 ---
