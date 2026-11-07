@@ -388,8 +388,24 @@ test("reuse block: an unsubstituted placeholder or a non-numeric DOD_N halts bef
   const { work } = fixtureRepo();
   const raw = runShell("bash", reuseBlock(), { cwd: work });
   assert.equal(raw.status, 1);
+  assert.match(raw.stdout, /HALT: DOD_N is an unsubstituted placeholder/);
+  // CR-1: a first run has no prior head or engine path to substitute — it must plan afresh, not halt.
+  const fill = (code, map) =>
+    Object.entries(map).reduce((c, [k, v]) => c.split(k).join(v), code);
+  const partial = REUSE_BINDS();
+  delete partial["{engine path}"];
+  const first = runShell(
+    "bash",
+    fill(reuseBlock(), { ...partial, "{Step 0's DOD_N}": "1" }),
+    { cwd: work },
+  );
+  assert.equal(first.status, 0, first.stdout + first.stderr);
+  assert.match(first.stdout, /no previous DoD run/);
+  // Control: from the second run on, the same missing inputs are a halt.
+  const second = runShell("bash", fill(reuseBlock(), partial), { cwd: work });
+  assert.equal(second.status, 1);
   assert.match(
-    raw.stdout,
+    second.stdout,
     /HALT: an input of the reuse block is an unsubstituted placeholder/,
   );
   const bad = runShell(

@@ -6,6 +6,13 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`finalise` takes agent output from the transcript, not a hand copy** (task 269). The security
+  agent's probe plan (Step 3b.1) and the AC agent's YAML (Step 3c) are now extracted byte for byte
+  from the subagent transcript by `agent-reply-block.js`, which refuses an HTML-escaped reply. The AC
+  record carries the result's size and SHA-256, and `merge --sha256` refuses a mismatch. A plan entry
+  may name a `cases_file` that is copied, not retyped, and confined to the work directory. A previous
+  plan is reused only when its cases files and the engine files it probes are unchanged. The old hand
+  copy remains as a recorded, unverified fallback.
 - **`qa-fix` Step 4 guard survives hostile paths** (task 285). The changed-paths slot now goes into a
   single-quoted heredoc, so a command substitution, a backtick or a `$VAR` in a path stays inert
   (T268-QA-10). A path below a symlinked directory or a nested repository is refused, naming it,
