@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **`finalise` accepts what the record already shows, and writes its basis** (task 271). Three
+  recorded arms, each refusing its unmatched control. A measured figure taken on an earlier commit
+  counts when the delta to the head is documentation only (`finalise-delta.js docs-only`). A red CI
+  reading outside the PR's diff over a docs-only delta gets exactly one recorded re-run
+  (`finalise-delta.js rerun-eligible`). A security probe that reproduces a case the owner already
+  deferred to a named task is rendered `deferred (owner, date, task)` rather than FAIL
+  (`finalise-deferral-match.js`; the owner list is `finalise.deferralApprover`, and unset means
+  nothing is deferred). The executed-prose fixture template no longer starts background git
+  maintenance, the suspected cause of a one-in-6142 ENOENT while copying it.
+
 ### Fixed
 
 - **`finalise` bookkeeping no longer depends on someone noticing** (task 270). A bug DoD with
