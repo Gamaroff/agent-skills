@@ -3,7 +3,7 @@
 **Task**: `task.268.qa-fix-finds-the-whole-defect-the-first-time.md`
 **Run Number**: 1
 **Started**: 2026-11-06 00:00
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -36,8 +36,8 @@ Add the probes, structural moves and gates qa-fix lacks (classifier direction, w
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | 8 rules in qa-fix SKILL.md; test + develop-loop doc updated; ci:fast green (7944 pass); no Explore subagent (plan exists, one-file change) | —                    | 2026-11-06T19:40Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #854 | —                    | 2026-11-06T19:29Z |
 | 5–6. qa-task / qa-fix loop | ✅ Done | `task.268.qa.{N}.*.md`; `task.268.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.268.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 7. finalise                | ✅ Done | `task.268.dod.{N}.*.md`; task `status: accepted`                       | run 1 gaps (4), run 2 accepted; criterion 3 reword approved | —                    | 2026-11-07T04:45Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     |       | —                    | 2026-11-07T05:00Z |
 
 ---
 
@@ -109,10 +109,12 @@ _Problems encountered and how they were resolved or escalated._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
-**Branch**: {populated after Step 1}
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**Finished**: 2026-11-07
+**Final Status**: Completed
+**Branch**: feature/task.268.qa-fix-finds-the-whole-defect-the-first-time
+**PR**: #854
+**QA Iterations**: 5 gates (PASS none; last CONCERNS 80/100)
+**DoD Summary**: `task.268.dod.2.qa-fix-finds-the-whole-defect-the-first-time.md` (run 1 found four gaps; run 2 accepted)
+**Tracker debt**: none (no issue linked). Deferred: T268-QA-10, T268-QA-11.
+**CI reading 1**: SUCCESS (tree-equivalent to 0bc1ddaca721) @ 6c3a817a5b92
+**CI reading 2**: SUCCESS (tree-equivalent to 0bc1ddaca721) @ 30890881e0f5
