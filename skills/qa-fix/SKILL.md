@@ -857,7 +857,8 @@ look through either, so it prints nothing for them, which is "could not look" an
 (T268-QA-11). The walk over a path's parents stops at the repository root, found by comparing
 **physical** paths (`cd -P` and `pwd -P`) and not the path text, so a path that reaches the root
 through `..` or a symlinked prefix stops it too, instead of reading the root's own `.git` as a
-nested repository (T285-QA-1):
+nested repository (T285-QA-1). A symlink that lives inside the repository and points back at the
+root is still refused: stopping there would end the walk and read the path as clean (T285-QA-2):
 
 ```bash
 IFS= read -r -d '' CHANGED_PATHS <<'QA_FIX_CHANGED_PATHS_END' || true
@@ -881,7 +882,13 @@ BOUNDARY=$(printf '%s\n' "$CHANGED_PATHS" | tr -s ' \t' '\n\n' | grep -v '^$' \
       d=$p
       while d=$(dirname -- "$d"); [ "$d" != "." ] && [ "$d" != "/" ]; do
         PHYS=$(cd -P -- "$d" 2>/dev/null && pwd -P) || PHYS=""
-        if [ -n "$PHYS" ] && [ "$PHYS" = "$TOP" ]; then break; fi
+        if [ -n "$PHYS" ] && [ "$PHYS" = "$TOP" ]; then
+          if [ -L "$d" ]; then
+            PP=$(cd -P -- "$(dirname -- "$d")" 2>/dev/null && pwd -P) || PP=""
+            case "$PP/" in "$TOP"/*) printf '%s\n' "$p" ;; esac
+          fi
+          break
+        fi
         if [ -L "$d" ] || [ -e "$d/.git" ]; then printf '%s\n' "$p"; break; fi
       done
     done)

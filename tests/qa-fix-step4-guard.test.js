@@ -565,6 +565,30 @@ test("Step 4 guard: refuses a path below a symlinked directory, naming it", asyn
   }
 });
 
+// T285-QA-2: a symlink inside the repository that points back at the root resolves to $TOP. Stopping
+// the walk there read `rootlink/real/new` (untracked) as clean, because `ls-files` lists nothing
+// through a symlink.
+const ROOTLINK = {
+  setup: (d) => {
+    write(d, "real/tracked");
+    git(d, "add", "real/tracked");
+    write(d, "real/new");
+    fs.symlinkSync(".", path.join(d, "rootlink"));
+  },
+  input: () => "rootlink/real/new",
+};
+
+test("Step 4 guard: refuses a path through a symlink that points at the repository root", async () => {
+  const block = await stepBlock(SKILL_SRC);
+  for (const r of runDirect(block, ROOTLINK.setup, ROOTLINK.input)) {
+    assert.deepEqual(
+      [r.status, r.stdout],
+      [1, BOUNDARY_REFUSAL + "rootlink/real/new\n"],
+      r.shell,
+    );
+  }
+});
+
 // Mutants for what a fence: fixture cannot reach. Each reverts one clause; the named scenario must
 // stop reading as it did, or the clause is held by nothing.
 const DIRECT_MUTANTS = [
@@ -574,6 +598,13 @@ const DIRECT_MUTANTS = [
     to: "false",
     scenario: ADMITTED.find((c) => c.id === "deleted-tracked"),
     broken: (r) => r.status !== 0,
+  },
+  {
+    name: "the in-repository symlink check at the root stop (a symlink to the root reads as clean)",
+    from: `case "$PP/" in "$TOP"/*) printf '%s\\n' "$p" ;; esac`,
+    to: ":",
+    scenario: ROOTLINK,
+    broken: (r) => r.status === 0,
   },
   {
     name: "the symlink clause (a path below a symlinked directory reads as clean)",
@@ -590,8 +621,8 @@ const DIRECT_MUTANTS = [
   },
   {
     name: "the repository-root stop (an absolute path inside the repo reads as a nested repo)",
-    from: 'if [ -n "$PHYS" ] && [ "$PHYS" = "$TOP" ]; then break; fi',
-    to: "if false; then break; fi",
+    from: 'if [ -n "$PHYS" ] && [ "$PHYS" = "$TOP" ]; then',
+    to: "if false; then",
     scenario: ADMITTED.find((c) => c.id === "absolute-inside-repo"),
     broken: (r) => r.status !== 0,
   },
