@@ -24,7 +24,7 @@ evidence:
 nfr_validation:
   security:
     status: PASS
-    evidence: executed
+    evidence: measured
     probes_executed: 21
     escaped: 0
     boundary_signals: []
