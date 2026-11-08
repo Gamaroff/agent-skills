@@ -1,0 +1,58 @@
+[
+  {
+    "id": "ff.outside",
+    "input": "src/other.test.js",
+    "direction": "legitimate",
+    "why": "red outside the PR diff",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:60"
+  },
+  {
+    "id": "ff.in-diff",
+    "input": "src/a.js",
+    "direction": "hostile",
+    "why": "PR changed it",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:60"
+  },
+  {
+    "id": "ff.in-diff-dot",
+    "input": "./src//a.js",
+    "direction": "hostile",
+    "why": "same file respelled",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:60"
+  },
+  {
+    "id": "ff.symlink",
+    "input": "link-real.test.js",
+    "direction": "hostile",
+    "why": "link to a changed file",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:60"
+  },
+  {
+    "id": "ff.dir",
+    "input": "src",
+    "direction": "hostile",
+    "why": "a directory is no test file",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:60"
+  },
+  {
+    "id": "ff.placeholder",
+    "input": "{failed-files}",
+    "direction": "hostile",
+    "why": "unsubstituted placeholder",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:60"
+  },
+  {
+    "id": "ff.parent",
+    "input": "../outside.test.js",
+    "direction": "hostile",
+    "why": "outside the repository",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:60"
+  },
+  {
+    "id": "ff.missing",
+    "input": "src/missing.test.js",
+    "direction": "hostile",
+    "why": "not a file at head",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:60"
+  }
+]

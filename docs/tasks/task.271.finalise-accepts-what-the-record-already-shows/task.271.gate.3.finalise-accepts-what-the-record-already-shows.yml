@@ -1,0 +1,80 @@
+schema: 2
+task: 'task.271.finalise-accepts-what-the-record-already-shows'
+task_title: 'finalise accepts what the record already shows'
+gate: FAIL
+status_reason: 'Cycle 2 fixes verified. The safety re-probe found that the Arm 3 bullet lead is still free prose guarded by a closed list of negation words (the probe accepted a conditional lead; the reviewer reproduced withheld, if accepted and is to be), and that rerun-eligible reads a directory name as a failed file outside the diff.'
+reviewer: 'QA Engineer'
+head: '31ee1c69002ce3e3431b58a36e0ef3ae8e50199b'
+updated: '2026-11-07T20:44:00Z'
+
+top_issues:
+  - id: 'T271-QA-8'
+    severity: medium
+    file: 'shared/resources/finalise-delta.js'
+    finding: 'A --failed-file that names a directory is never in the PR diff, so rerun-eligible answers eligible for it. Reproduced: with src/a.js changed by the PR, --failed-file src and --failed-file src/ both returned eligible. A second form of the same gap: with --workspace-root set to a subdirectory the name is reduced against that subdirectory while git prints toplevel-relative names, so a changed file named relative to the subdirectory reads as outside the diff.'
+    suggested_action: 'Require the failed file to be a blob at the head commit (git cat-file -t head:path) and reduce names against the git toplevel; add refused controls for a directory, a missing path and a subdirectory workspace root.'
+    suggested_owner: dev
+    status: open
+  - id: 'T271-QA-9'
+    severity: high
+    file: 'shared/resources/finalise-deferral-match.js'
+    finding: 'The lead of a Deferred Work bullet is unconstrained prose guarded by a closed list of negation words, so any phrasing the list does not hold is accepted as the owner approval. Reproduced by the probe engine (case.conditional-lead, outcome accepted: "only if Sam agrees, deferred to task.5, approved by Pat Owner on ...") and by the reviewer ("withheld;", "If accepted, ...", "is to be deferred to ...").'
+    suggested_action: 'Replace the word filter with an allow-list: the lead may be only an optional bold finding id, an optional "reproduced by", and the one backticked case id with an optional colon; any other word makes the bullet a candidate with no facts.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 8057
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 21
+    escaped: 0
+    boundary: true
+    boundary_signals: ["refuses"]
+    boundary_reason: ''
+    notes: 'Probe engine, cli form, path sink, against head 31ee1c69. finalise-delta.js failed-file: 11 executed, 0 reproduced (the cycle-2 symlink case now holds). finalise-deferral-match.js case: 10 executed, 1 reproduced (conditional lead accepted). No escapes. Records: task.271.qa.3.security.delta.run.json and task.271.qa.3.security.match.run.json.'
+  performance:
+    status: CONCERNS
+    notes: 'Five alternating npm test runs against develop (head aec627b3 against d3b71ef3, frozen worktrees) are still running; 2 of 5 pairs done (branch 166 s and 224 s, develop 165 s and 194 s) under varying machine load. The median is recorded when the job finishes. ci:fast ran 8057 tests, 0 failed.'
+  reliability:
+    status: PASS
+    notes: 'The finalise SKILL.md blocks run under bash and zsh.'
+  maintainability:
+    status: PASS
+    notes: 'Arms 1 and 2 share one engine that reuses the single docs-path definition; each accepting case has a refused control.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'A gate entry is judged on its structured fields only: its free-text action is never checked for negation (reproduced: "do not defer oc10" with valid deferred_to, approved_by and approved_on returned matched), and a duplicate approved_by key silently takes the later value. The gate is written by this pipeline, which is the design residual the owner accepted in Phase 1; hardening is to reject duplicate keys and apply the lead allow-list to the action text.'
+      refs: ['shared/resources/finalise-deferral-match.js']
+    - action: 'The failed-file comparison is exact-case, so DOCS/C.md does not match docs/c.md on a case-insensitive checkout. It matters only on macOS (task 210, deferred until a Mac is available).'
+      refs: ['shared/resources/finalise-delta.js']
+    - action: 'rerun-eligible never checks that --base (the green head) is an ancestor of --head; judged non-blocking because the arm compares code trees, the decided criterion.'
+      refs: ['shared/resources/finalise-delta.js']
+    - action: 'Approver names are folded with toLowerCase, which maps non-ASCII lookalikes (the Kelvin sign) to ASCII. Compare after NFC normalisation with ASCII-only case folding.'
+      refs: ['shared/resources/finalise-deferral-match.js']
+    - action: 'Follow-up task numbers are checked for shape only; the engine does not confirm the task exists.'
+      refs: ['shared/resources/finalise-deferral-match.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['Fix T271-QA-8 and T271-QA-9 and re-review']

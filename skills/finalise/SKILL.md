@@ -805,11 +805,57 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
    record still counts them (task.189 CR2-2). Still refused:
    add a `checks[]` entry `probe plan entry refused: {entry} — {reason}` with `status: FAIL` and
    no `severity`.
+5a. **A reproduced case the owner already deferred is rendered as deferred, not FAIL (task 271, obs #117).**
+   For each probe still in `probes[]` after item 3a, ask the deferral matcher whether the **owner**
+   deferred exactly that case to a named follow-up task. The matcher is mechanical; you never judge a
+   deferral yourself. The case id is the part of the probe's `key` after the first `:`. The owner list
+   is `finalise.deferralApprover` in `skills-config.yaml` (one name, or several separated by commas),
+   and **unset means nothing is ever deferred**:
+
+   ```bash
+   # Step 3b.1 item 5a — INPUTS, substituted into THIS block: {case-id} (the probe key after the first
+   # ':'), {record-file} (`deferrals.json` in the work-item directory).
+   # That file is the only record read: with none there is nothing to match, which is a no-match.
+   [ -f "{record-file}" ] || { echo '{"reason":"no-match","detail":"no deferrals.json beside the work item"}'; exit 1; }
+   source .agents/skills/finalise/references/read-config.sh || exit 1
+   OWNERS=$(read_nested_config_key finalise deferralApprover)
+   APPROVER_ARGS=()
+   # One owner per line, read the same way in bash and zsh (`read -a` is bash only; zsh spells it -A).
+   while IFS= read -r o; do [ -n "${o// }" ] && APPROVER_ARGS+=(--approver "$o"); done < <(printf '%s\n' "$OWNERS" | tr ',' '\n')
+   command node .agents/skills/finalise/references/finalise-deferral-match.js \
+     --case "{case-id}" --record "{record-file}" \
+     ${APPROVER_ARGS[@]+"${APPROVER_ARGS[@]}"} --json
+   ```
+
+   Exit 0 with `reason: matched` is the only deferral. Move that probe out of `probes[]` and into
+   `SECURITY_RESULT.deferred_probes[]` as `{key, id, rendered, task, owner, date, source}` (the `rendered`
+   line is `deferred (owner {name}, {date}, {task})`), and render it under the security section as
+   `**Deferred**: {rendered} — {source}`, beside the waiver line a `WAIVED` gate shows. It adds no FAIL
+   check. **Every other answer leaves the probe in `probes[]` as a FAIL** — `no-match` (no record names
+   the case), `unapproved` (a record names it but lacks a task, a valid date, or an owner approver),
+   `no-approver-configured`, `unverifiable` — and name the `reason` and `detail` beside the probe so
+   the owner sees why it was not deferred. **The one record read is `deferrals.json`**, a JSON file the
+   owner writes beside the work item, in exactly this shape and no other:
+
+   ```json
+   { "deferrals": [ { "case": "{case-id}", "deferred_to": "task.N",
+                      "approved_by": "{owner name}", "approved_on": "YYYY-MM-DD" } ] }
+   ```
+
+   It is read with `JSON.parse`, so a file that is not valid JSON, repeats a key, holds a field other
+   than those four, or holds a non-string value is `unverifiable` and the probe stays a FAIL. **Neither
+   the work item's prose nor the QA gate is read**: a `## Deferred Work` bullet or a gate entry is not a
+   deferral (earlier versions read them, and sixteen QA gates each found another spelling the reader
+   missed). If the owner deferred a case there only, copy it into `deferrals.json` first. Every entry
+   for the case must approve it and agree on the task, `approved_by` must equal an owner exactly, and
+   an entry for another case that names this id blocks. To **withdraw** a deferral, remove or edit its
+   entry. The matcher's header states all of this.
 6. **The zero-guard still applies — now to this run.** `boundary: true` with `probes_executed: 0`
    (an empty plan, every entry refused or declined) adds the `probe mode executed no candidates`
    FAIL check; a zero from this run **still takes the zero-guard**, because then the engine declined
    the entry, which is the guard's real case. Recompute `overall`: FAIL if any check or general
-   check FAILs or any probe reproduced, otherwise PASS.
+   check FAILs or any probe reproduced and still in `probes[]` (a probe item 5a moved to
+   `deferred_probes[]` does not count), otherwise PASS.
 7. **Say so.** Add `- Probe run by /finalise from the security agent's plan — {N} control(s), record
    `{record path}`` under the security section's Probe Results.
 
@@ -1392,10 +1438,46 @@ error (exit 2), not the defaults. `FAILURE`, `CANCELLED` and `UNKNOWN` heads nev
 with `ci.docsOnly.enabled: false` ([`docs/reference/configuration.md`](../../docs/reference/configuration.md)).
 **A `SUCCESS` reached this way is never recorded as plain `SUCCESS`** — see the table.
 
+**A red outside the diff gets exactly one recorded re-run (task 271, obs #50, GitHub only).** If
+`CI_ROLLUP` is `FAILURE` and the failing check is a test file this PR did not touch, over a delta from
+the last green head that is documentation only, the red is evidence about something other than this
+change, and one re-run is allowed. The decision is the engine's, never yours, and it exits **0 for
+`eligible` and for nothing else**:
+
+```bash
+# Step 6, one re-run of a red outside the diff. INPUTS, substituted into THIS block: {green-head} (the
+# head of the newest earlier CI reading recorded SUCCESS for this PR — the DoD running summary's
+# `CI reading … @ <sha>` line, else `gh run list --branch <pr-branch> --status success --limit 1 --json
+# headSha -q '.[0].headSha'`), {pr-base} (the PR's target branch), {attempts} (the `CI re-run:` lines
+# already recorded in this DoD run: 0 on a first red), and the failing test file path(s), one per line,
+# read from `gh run view <run-id> --log-failed` — that one goes into the heredoc below and nowhere else,
+# because a multi-line value substituted into a comment would end the comment.
+FAILED_ARGS=()
+while IFS= read -r f; do [ -n "$f" ] && FAILED_ARGS+=(--failed-file "$f"); done <<'FAILED_FILES_END'
+{failed-files}
+FAILED_FILES_END
+command node .agents/skills/finalise/references/finalise-delta.js rerun-eligible \
+  --base "{green-head}" --head "$(git rev-parse HEAD)" --pr-base "{pr-base}" \
+  --attempts "{attempts}" ${FAILED_ARGS[@]+"${FAILED_ARGS[@]}"} --json
+```
+
+`{failed-files}` is one path per line. A path the engine cannot reduce to a file inside the repository (an
+unsubstituted placeholder, a glob, a path outside the checkout) answers `bad-failed-file`, never `eligible`.
+Only `reason: eligible` re-runs. Every other answer — `in-diff` (the PR changed that file), `bad-failed-file`, `code-changed`
+(the delta from the green head touches more than documentation), `already-rerun` (one is recorded),
+`no-failed-file` (the red's file is unknown), `disabled`, `unverifiable` — leaves the FAILURE row below in
+force, and the DoD says which reason it was. When eligible, run `gh run rerun <run-id> --failed`, wait for
+the new run with the existing background poll (a foreground wait can outlive the tool timeout), and read the
+rollup again with the query above. **Accept only on a green second attempt, and record both attempts**
+in the DoD running summary: `CI re-run: attempt 1 FAILURE on {failing job}, {test file}, @ {sha12}; delta
+{green-head12}..{head12} is docs-only; attempt 2 {rollup} @ {sha12}`. A second red is the FAILURE row with no
+further re-run: the engine answers `already-rerun` from then on. A green second attempt is recorded as `CI
+reading 1: SUCCESS after one re-run (see the CI re-run line)`, never as plain `SUCCESS`.
+
 | `CI_ROLLUP` | Decision                                                                                                                                                                                                                                                                                                |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `SUCCESS`   | Proceed — CI column passes. When `CI_TREE_EQ` is set the head's own CI has **not** finished and the reading is satisfied by the docs-only rule above: record `CI reading 1: SUCCESS (tree-equivalent to {CI_TREE_EQ}) @ {CI_HEAD_1}`, never plain `SUCCESS`                                                                                                                                                                                                                                                                              |
-| `FAILURE`   | **Do NOT accept.** Gap: "CI is red on {failing job(s)} — acceptance requires a green run on a commit containing the final code." **One exception, and it is narrow:** a red on the docs link checker alone, reproduced by `doc-links.js` on the work item's own document and/or its co-located `.md` pipeline artifacts and nowhere else, is a Docs-section finding that Step 8a may fix and recheck once — see the clause under *When this step applies* there. Every other red is this row. |
+| `FAILURE`   | **Do NOT accept** — unless the one-re-run arm above ends in a green second attempt. Gap: "CI is red on {failing job(s)} — acceptance requires a green run on a commit containing the final code." **One exception, and it is narrow:** a red on the docs link checker alone, reproduced by `doc-links.js` on the work item's own document and/or its co-located `.md` pipeline artifacts and nowhere else, is a Docs-section finding that Step 8a may fix and recheck once — see the clause under *When this step applies* there. Every other red is this row. |
 | `PENDING`   | **Do NOT accept** — unless the tree-equivalence arm above returned `tree-equivalent` (then it is the `SUCCESS` row). Gap: "CI has not finished. Re-run `/finalise` once it completes." **Waiting is the correct action; assuming is not.**                                                                                                                                                                |
 | `CANCELLED` | **Undecided, not failed.** Almost always `cancel-in-progress` superseding a run. Re-sample; if it persists after the retries, check whether a newer commit has its own run and resolve against **that** head. Never record it as a red verdict.                                                         |
 | `NONE`      | **Undecided.** Re-sample first — an empty rollup is the normal state for the seconds between a push and its run registering. Only if it persists does it mean no checks are configured, and then record it explicitly in the DoD summary as _unverified by CI_ rather than treating absence as success. |

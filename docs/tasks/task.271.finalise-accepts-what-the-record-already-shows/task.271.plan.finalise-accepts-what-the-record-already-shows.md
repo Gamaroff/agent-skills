@@ -19,6 +19,12 @@ Sources in `shared/resources/` and `skills/finalise/` only, edited with the Edit
 
 Ask with `AskUserQuestion`, one question each: (1) equivalence for a measurement: same code tree by `ci-tree-equivalence.js`, or also require the same suite inputs; (2) re-run: once, only outside the diff, only docs-only delta; (3) deferral: which record counts (gate `recommendations.future`, Deferred Work) and who may approve. Write the answers here.
 
+**Answers (owner, 2026-11-07; recommendations accepted as given):**
+
+1. **Arm 1, equivalence**: same code tree as judged by `ci-tree-equivalence.js` (`tree-equivalent`); docs-only deltas count. No extra suite-input requirement. A missing load record, or any non-equivalent commit, stays `FAIL` with `note: "re-measure"`.
+2. **Arm 2, re-run**: exactly one re-run, never more. Only when the red test is outside the PR diff **and** the delta from the last green head is docs-only. Accept only on a green second attempt; record both attempts in the DoD.
+3. **Arm 3, deferral**: a mechanical match on case id against a `deferrals.json` record (superseded: the first design read the gate's `recommendations.future` or the work item's Deferred Work; QA cycles 12 and 16 replaced it). The entry must name a follow-up task and an approver, and **the approver must be the repository owner**. No match, no task, or no owner approval stays `FAIL`. The agent never judges a deferral.
+
 ### Phase 2: Arm 1
 
 `finalise-dod-ac-prompt.md:72`: replace "taken on the PR's head commit" with "taken on the head, or on a commit whose code tree equals the head's (`ci-tree-equivalence.js` answers `tree-equivalent`); cite the result". Run `evals/shared/tests/finalise-dod-prompt-contract.test.mjs`.

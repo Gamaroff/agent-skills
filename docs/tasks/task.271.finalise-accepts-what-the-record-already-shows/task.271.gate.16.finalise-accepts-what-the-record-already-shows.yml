@@ -1,0 +1,95 @@
+schema: 2
+task: 'task.271.finalise-accepts-what-the-record-already-shows'
+task_title: 'finalise accepts what the record already shows'
+gate: FAIL
+status_reason: 'Cycle 15 fixes verified. A thorough review (about 75 probes, each compared with a real YAML reader) found that the gap between the hand-rolled subset parser and real YAML is wide, not narrow: line breaks other than LF, escapes in double-quoted values, inline-value spellings of a second recommendations key, a multi-document stream, and non-YAML whitespace before a comment all let a gate match that a real YAML reader reads differently. Five of the shapes were reproduced by hand. The sixteen-gate budget is spent, and each cycle since gate 11 has closed a spelling and found another.'
+reviewer: 'QA Engineer'
+head: 'b749f3a97b07738d82425c232e946f49803a4f94'
+updated: '2026-11-08T17:18:00Z'
+
+top_issues:
+  - id: 'T271-QA-34'
+    severity: high
+    file: 'shared/resources/yaml-subset.js'
+    finding: 'Escapes in double-quoted values are never decoded, so a competing record written as "oc\x2d1" is invisible to the mention count and to the raw-text reconciliation. Reproduced by hand: an approving entry for oc1 plus a second entry with case "oc\x2d1", deferred_to task.9 and approved_by Mallory returns matched. The same hides a blocker in an immediate entry, a root key or a note.'
+    suggested_action: 'In strict mode throw on any double-quoted value containing a backslash, as is already done for quoted keys.'
+    suggested_owner: dev
+    status: open
+  - id: 'T271-QA-35'
+    severity: high
+    file: 'shared/resources/yaml-subset.js'
+    finding: 'A root-level row the parser cannot read is dropped silently when it has no deeper child rows, so the duplicate-key and leftover-row checks never see it. Reproduced by hand: after an approved block, "? recommendations" with ": {future: []}", and "!!str recommendations: {future: []}", each return matched, while a real YAML reader reads future: [] (the duplicate key wins).'
+    suggested_action: 'In strict mode throw on any root-mapping row that fails the key pattern once a strictUnder key is present.'
+    suggested_owner: dev
+    status: open
+  - id: 'T271-QA-36'
+    severity: high
+    file: 'shared/resources/yaml-subset.js'
+    finding: 'A lone CR, and NEL/LS/PS for YAML 1.1 readers, are line breaks to YAML but not to the parser, so a comment can hide whole rows. The reviewer reproduced a hidden second approved_by and a hidden second deferred_to this way; my own attempt with one lone-CR shape returned unverifiable (not reproduced by hand).'
+    suggested_action: 'In strict mode refuse any text containing a lone CR, U+0085, U+2028 or U+2029.'
+    suggested_owner: dev
+    status: open
+  - id: 'T271-QA-37'
+    severity: medium
+    file: 'shared/resources/yaml-subset.js'
+    finding: 'The strict comment rule matches any whitespace, including NBSP and U+3000, which YAML does not treat as separating a comment. Reproduced by hand: "approved_on: 2026-01-01" followed by a non-breaking space and "# 2099-01-01" returns matched; YAML reads the whole string as the value.'
+    suggested_action: 'In strict mode use space and tab only.'
+    suggested_owner: dev
+    status: open
+  - id: 'T271-QA-38'
+    severity: medium
+    file: 'shared/resources/yaml-subset.js'
+    finding: 'A multi-document stream is accepted: "---" rows fail the key pattern and are skipped. Reproduced by hand: an approved block followed by "---" and another mapping returns matched, where a real YAML reader refuses the stream.'
+    suggested_action: 'In strict mode refuse "---" other than as the first row, "..." and "%" rows.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 8067
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 6
+    escaped: 0
+    boundary: true
+    boundary_signals: ["refuses"]
+    boundary_reason: ''
+    notes: 'Six CLI runs by hand against head b749f3a9: five matched wrongly (an escaped key, two inline second-recommendations spellings, a non-breaking-space comment, a multi-document stream) and one lone-CR shape returned unverifiable. The reviewer ran about 75 probes, 60 gate variants compared with PyYAML and 15 finalise-delta runs, and compared the old and new lenient parse of 1089 tracked YAML files (identical). finalise-delta.js: no defect found.'
+  performance:
+    status: CONCERNS
+    notes: 'Not measured to the criterion; a clean rerun on an idle machine is owed.'
+  reliability:
+    status: PASS
+    notes: 'ci:fast 8067 tests, 0 failed.'
+  maintainability:
+    status: FAIL
+    notes: 'The deferral facts are read through a hand-rolled parser whose rules differ from YAML in many places. Each cycle since gate 11 has closed one spelling and found the next. A strict mode that rejects what it cannot prove it read is a long list; a structured format with a real parser has no such list.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Recommended design for the follow-up: record the deferral in a small JSON file beside the gate, read with JSON.parse (a real, strict parser with no spellings), instead of a recommendations.future entry read by the subset YAML parser.'
+      refs: ['shared/resources/finalise-deferral-match.js', 'skills/finalise/SKILL.md']
+    - action: 'ls-tree is parsed without -z; exact-case path compare (macOS, task 210).'
+      refs: ['shared/resources/finalise-delta.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['Fix T271-QA-34 to T271-QA-38 or move the facts out of YAML; the QA budget (16 gates) is spent, so continuing needs the owner']

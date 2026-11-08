@@ -1,0 +1,78 @@
+schema: 2
+task: 'task.271.finalise-accepts-what-the-record-already-shows'
+task_title: 'finalise accepts what the record already shows'
+gate: FAIL
+status_reason: 'Cycle 4 fixes verified. The unscoped re-probe found two fail-open paths in the Arm 3 matcher: a gate entry written as a YAML block scalar is truncated by the subset parser so a withdrawal in it is ignored, and the approver name is stripped of trailing underscores and asterisks so a different identity equals the owner. The five-gate QA budget is spent.'
+reviewer: 'QA Engineer'
+head: '2242958738bff6db59e70d5e98ac2a6d683cf471'
+updated: '2026-11-07T21:08:00Z'
+
+top_issues:
+  - id: 'T271-QA-13'
+    severity: high
+    file: 'shared/resources/finalise-deferral-match.js'
+    finding: 'The subset YAML parser stops a map at the first more-indented row, so a block or folded scalar (action: >- or |) truncates the gate entry. Reproduced by hand: a gate entry "action: >-" whose text says the oc1 deferral was withdrawn is not a candidate, and with a valid Deferred Work bullet the CLI returns matched (exit 0). A withdrawal written in ordinary YAML is silently ignored.'
+    suggested_action: 'Fail closed on the gate: scan the raw gate text for the case id and treat any future[] entry that mentions it but did not parse as a record as blocking, or return unverifiable when an entry holds a block scalar.'
+    suggested_owner: dev
+    status: open
+  - id: 'T271-QA-14'
+    severity: medium
+    file: 'shared/resources/finalise-deferral-match.js'
+    finding: 'cleanName strips leading and trailing underscore and asterisk characters from both the approver and the owner list. Reproduced by hand: "approved by sam_" with --approver sam returns matched, so a different identity equals the owner; the header comment claims an exact compare.'
+    suggested_action: 'Strip only a matching wrapper pair of backticks or quotes, or compare the trimmed strings.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 8060
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 4
+    escaped: 0
+    boundary: true
+    boundary_signals: ["refuses"]
+    boundary_reason: ''
+    notes: 'Cycle 4 probe cases (14) were run last cycle; this cycle two reviewer findings were reproduced by hand against head 22429587 (4 CLI runs). The cycle-4 findings (bold slot, later revocation, case-folded approver, symlink to a changed file) no longer reproduce.'
+  performance:
+    status: CONCERNS
+    notes: 'Not measured to the criterion: four of five alternating pairs on a loaded machine, spread inside one side exceeds the 10% bound. A clean rerun on an idle machine is owed.'
+  reliability:
+    status: PASS
+    notes: 'The finalise SKILL.md blocks run under bash and zsh; ci:fast 8060 tests, 0 failed.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Fifth consecutive cycle with a defect in the two new engines.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'ls-tree is parsed without -z, so a failed file with a non-ASCII, quote or newline name answers bad-failed-file (fails closed, but the re-run arm cannot serve such a file). Use ls-tree -z.'
+      refs: ['shared/resources/finalise-delta.js']
+    - action: 'Every record that merely mentions the case id must approve it, so an explanatory note naming the id blocks a legitimately approved deferral; the skill should say so.'
+      refs: ['shared/resources/finalise-deferral-match.js', 'skills/finalise/SKILL.md']
+    - action: 'A nested list item under unrelated parent text is read as a Deferred Work record.'
+      refs: ['shared/resources/finalise-deferral-match.js']
+    - action: 'The Deferred Work section ends only at the next H2; exact-case path compare (macOS, task 210); --base ancestry; follow-up task existence is not checked.'
+      refs: ['shared/resources/finalise-deferral-match.js', 'shared/resources/finalise-delta.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['Fix T271-QA-13 and T271-QA-14, then re-review; the QA budget (5 gates) is spent, so continuing needs the owner']

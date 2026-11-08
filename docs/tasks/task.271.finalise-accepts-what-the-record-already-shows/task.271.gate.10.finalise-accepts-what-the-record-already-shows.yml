@@ -1,0 +1,67 @@
+schema: 2
+task: 'task.271.finalise-accepts-what-the-record-already-shows'
+task_title: 'finalise accepts what the record already shows'
+gate: FAIL
+status_reason: 'Cycle 9 fixes verified: about 30 probes found no way to make the work-item reconciliation disagree with itself. One hole is left on the gate side: only the action and case fields of a future entry make it a record about the case, so a withdrawal written in any other field is read and counted as parsed, but never blocks. The ten-gate budget is spent.'
+reviewer: 'QA Engineer'
+head: '28731ff93766aa1d1e3d51520d3a74bbbb1be3c5'
+updated: '2026-11-08T15:31:00Z'
+
+top_issues:
+  - id: 'T271-QA-22'
+    severity: high
+    file: 'shared/resources/finalise-deferral-match.js'
+    finding: 'A gate future[] entry that names the case in any field other than action and an exact case: is not a record about the case, and the raw-versus-parsed reconciliation does not fire because the parser read the field. Reproduced by hand: an approved c1 entry plus a second entry {action: y, case: other, note: "withdraw c1 deferral"} returns matched (exit 0); the same gate without the note is the control and also returns matched.'
+    suggested_action: 'Treat an entry as a record about the case when any of its string keys or values names the case, and let only the entry whose case: field equals the id approve; every other such entry blocks.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 8064
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 2
+    escaped: 0
+    boundary: true
+    boundary_signals: ["refuses"]
+    boundary_reason: ''
+    notes: 'Two CLI runs by hand against head 28731ff9 (the finding and its control). The reviewer ran about 30 further probes on the work-item side (comments, fences, CRLF, setext headings, indentation, continuations, ids with dots or hyphens, prefix and suffix ids) and the gate parser; it found no way to make taken exceed the section count and the token definitions agree. finalise-delta.js was not re-probed (it held against about 30 probes at gate 9).'
+  performance:
+    status: CONCERNS
+    notes: 'Not measured to the criterion; a clean rerun on an idle machine is owed.'
+  reliability:
+    status: PASS
+    notes: 'ci:fast 8064 tests, 0 failed.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The work-item side now has a single comment pass and held; the gate side still decides "is this entry about the case" from two named fields.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Fence handling ignores fence type, length and indent, so a bullet Markdown renders as code (a mismatched closer, a four-space indent) is read as a live record. Low severity: the record is read but not rendered.'
+      refs: ['shared/resources/finalise-deferral-match.js']
+    - action: 'ls-tree is parsed without -z, so non-ASCII failed-file names fail closed; a nested list item is read as a record; exact-case path compare (macOS, task 210).'
+      refs: ['shared/resources/finalise-delta.js', 'shared/resources/finalise-deferral-match.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['Fix T271-QA-22, then re-review; the QA budget (10 gates) is spent, so continuing needs the owner']

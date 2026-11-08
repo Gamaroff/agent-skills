@@ -1,0 +1,72 @@
+schema: 2
+task: 'task.271.finalise-accepts-what-the-record-already-shows'
+task_title: 'finalise accepts what the record already shows'
+gate: FAIL
+status_reason: 'Cycle 13 fixed the repeated plain key, and no committed gate is wrongly refused (987 checked). The same class remains one level down: the subset parser silently drops rows it cannot read (a complex key, a row at an odd indent) and builds mappings on the prototype, so a repeated or shadowing key in those spellings is never seen. The fix is one rule: in strict mode, fail closed on any row the parser does not consume. The fourteen-gate budget is spent.'
+reviewer: 'QA Engineer'
+head: '91e83b8a9d7d0cc4adee0b7d4f23247a11356a40'
+updated: '2026-11-08T16:45:00Z'
+
+top_issues:
+  - id: 'T271-QA-30'
+    severity: medium
+    file: 'shared/resources/yaml-subset.js'
+    finding: 'The duplicate-key check only sees keys the parser reads. A row the parser does not consume is dropped silently, so an override in that spelling is never checked. Reproduced by hand: an approving entry followed by "? approved_by" and ": Mallory" returns matched (Pat Owner); an approving entry followed by "approved_by: Mallory" indented one space off its map returns matched. A real YAML reader sees a second approved_by overriding the approval.'
+    suggested_action: 'In strict mode, throw on any row the parser skips (a row KEY_RE rejects, a row at a different indent than its mapping, a tab indent) and on a quoted key containing a backslash, so the gate is unverifiable.'
+    suggested_owner: dev
+    status: open
+  - id: 'T271-QA-31'
+    severity: low
+    file: 'shared/resources/yaml-subset.js'
+    finding: 'A "__proto__" key is assigned on the object, not stored as a key. Reproduced by hand: an entry with "case: c1" and its task, approver and date supplied only under "__proto__:" returns matched, because the facts are read through the prototype.'
+    suggested_action: 'Reject "__proto__" (and "constructor"/"prototype") keys in strict mode, or build mappings with Object.create(null).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 8063
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 3
+    escaped: 0
+    boundary: true
+    boundary_signals: ["refuses"]
+    boundary_reason: ''
+    notes: 'Three CLI runs by hand against head 91e83b8a (a complex-key override, an odd-indent override, a __proto__ entry). The reviewer ran about 20 mutated gates and the matcher on all 987 committed gate files (no false unverifiable), and checked that the 33 bundled parser copies match and no caller passes a second argument. finalise-delta.js was not examined this gate (it held at gates 9-13).'
+  performance:
+    status: CONCERNS
+    notes: 'Not measured to the criterion; a clean rerun on an idle machine is owed.'
+  reliability:
+    status: PASS
+    notes: 'ci:fast 8063 tests, 0 failed.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Score 60 by the rule (security FAIL, two CONCERNS), as at gates 11-13. The remaining surface is the subset parser itself; a strict mode that rejects whatever it does not consume closes the class rather than another spelling.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'ls-tree is parsed without -z; exact-case path compare (macOS, task 210).'
+      refs: ['shared/resources/finalise-delta.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['Fix T271-QA-30 and T271-QA-31, then re-review; the QA budget (14 gates) is spent, so continuing needs the owner']

@@ -1,0 +1,30 @@
+[
+  {
+    "id": "b.docs",
+    "input": "HEAD~1",
+    "direction": "legitimate",
+    "why": "delta is docs-only",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:59"
+  },
+  {
+    "id": "b.code",
+    "input": "HEAD~2",
+    "direction": "hostile",
+    "why": "delta includes src/a.js",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:59"
+  },
+  {
+    "id": "b.norev",
+    "input": "no-such-rev",
+    "direction": "hostile",
+    "why": "unresolvable base",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:59"
+  },
+  {
+    "id": "b.flag",
+    "input": "--head",
+    "direction": "hostile",
+    "why": "flag given as a value",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:59"
+  }
+]

@@ -1,0 +1,85 @@
+schema: 2
+task: 'task.271.finalise-accepts-what-the-record-already-shows'
+task_title: 'finalise accepts what the record already shows'
+gate: FAIL
+status_reason: 'Cycle 1 fixes verified (all four closed, mutation-proved). The refute pass and the probe engine found three new defects: the Arm 3 work-item matcher accepts a negated bullet, a bullet inside an HTML comment, and one approval for several case ids (reproduced by the probe engine, 3 of 7 cases), and rerun-eligible follows a symlinked failing test file to its target name, so a symlink the PR changed reads as outside the diff.'
+reviewer: 'QA Engineer'
+head: 'aec627b3526572a45d17cbc8c66824337de6d331'
+updated: '2026-11-07T20:34:00Z'
+
+top_issues:
+  - id: 'T271-QA-5'
+    severity: high
+    file: 'shared/resources/finalise-deferral-match.js'
+    finding: 'The Deferred Work bullet matcher reads the first "deferred to task.N" and the first "approved by NAME on DATE" anywhere in the bullet, with no negation or structure check. Reproduced: "NOT deferred to task.5; was not approved by Pat Owner on 2026-01-02" returns matched, task.5, Pat Owner (probe case.negated, outcome accepted). Arm 3 can accept a denial as the owner approval.'
+    suggested_action: 'Match one anchored form, the whole bullet being "<case-id>[:,] deferred to task.N, approved by NAME on DATE.", and treat any other wording (a negation word, a second deferred-to or approved-by clause) as no candidate.'
+    suggested_owner: dev
+    status: open
+  - id: 'T271-QA-6'
+    severity: high
+    file: 'shared/resources/finalise-deferral-match.js'
+    finding: 'deferredWorkItems tracks code fences but not HTML comments, so a bullet inside a comment under ## Deferred Work is read as a live deferral (probe case.commented-out, outcome accepted); and a bullet naming several case ids gives every one of them the one approval (probe case.second-id, outcome accepted).'
+    suggested_action: 'Strip HTML comments before scanning, and make the case id the bullet leading token so a bullet that names two cases yields a candidate for the first only.'
+    suggested_owner: dev
+    status: open
+  - id: 'T271-QA-7'
+    severity: medium
+    file: 'shared/resources/finalise-delta.js'
+    finding: 'canonicalFile resolves the final path component with realpathSync, so a failing test file that is a symlink the PR changed reduces to its target name, which is not in the PR diff, and the arm answers eligible. Reproduced: src/link.test.js (symlink, changed by the PR) pointing at an existing src/other.js returns eligible; a dangling link returns in-diff only because realpath throws.'
+    suggested_action: 'Resolve symlinks in the parent directory only and keep the final component lexical, then compare to the diff names.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 8055
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 17
+    escaped: 0
+    boundary: true
+    boundary_signals: ["refuses"]
+    boundary_reason: ''
+    notes: 'Probe engine, cli form, path sink. finalise-delta.js failed-file: 10 executed, 0 reproduced (every spelling of an in-diff file and every non-path refused; the one legitimate case accepted). finalise-deferral-match.js case: 7 executed, 3 reproduced (negated, commented-out, second-id bullets accepted). No escapes. Records: task.271.qa.2.security.delta.run.json and task.271.qa.2.security.match.run.json.'
+  performance:
+    status: CONCERNS
+    notes: 'The five alternating npm test runs against develop (head aec627b3 against d3b71ef3, frozen worktrees) were still running when this gate was written; the median is recorded once they finish. ci:fast ran 8055 tests, 0 failed, on this head.'
+  reliability:
+    status: PASS
+    notes: 'The 5a block and the re-run block run correctly under bash and zsh (finalise-acceptance-blocks.test.mjs).'
+  maintainability:
+    status: PASS
+    notes: 'Arms 1 and 2 share one engine that reuses the single docs-path definition; each accepting case has a refused control.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'rerun-eligible never checks that --base (the green head) is an ancestor of --head; with --base equal to --head the delta is empty and an arbitrary failed file reads eligible. Judged non-blocking: the arm compares code trees, which is the decided criterion, and the caller always passes the PR own earlier green head. Cheap hardening: require git merge-base --is-ancestor.'
+      refs: ['shared/resources/finalise-delta.js']
+    - action: 'Approver names are folded with toLowerCase, which maps non-ASCII lookalikes (the Kelvin sign) to ASCII. Compare after NFC normalisation with ASCII-only case folding.'
+      refs: ['shared/resources/finalise-deferral-match.js']
+    - action: 'On a case-insensitive or NFD-normalising checkout the failed-file comparison is exact-case and exact-form; it matters only on macOS (task 210, deferred until a Mac is available).'
+      refs: ['shared/resources/finalise-delta.js']
+    - action: 'Follow-up task numbers are checked for shape only; the engine does not confirm the task exists. A placeholder left in --gate or --work-item reports unverifiable rather than a usage error.'
+      refs: ['shared/resources/finalise-deferral-match.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['Fix T271-QA-5 to T271-QA-7 and re-review']
