@@ -235,6 +235,20 @@ Advisory, not fixed: `ls-tree` without `-z`; a nested list item is read as a rec
 
 Advisory, not fixed: a bullet indented four spaces (an indented code block) is still read; `ls-tree` without `-z`; a nested list item is read as a record; exact-case compare (macOS, task 210).
 
+### QA Cycle 11 — 2026-11-08
+
+| Item | Result |
+| ---- | ------ |
+| `/qa-task` gate | FAIL, 60/100, unscoped: T271-QA-24 (MEDIUM), T271-QA-25 (MEDIUM). About 70 probes found no balanced pair |
+| Budget | Spent again; the owner granted a further cycle (`qa_max_cycles` 12) |
+| Cause | The code named a fixed set of places that count as the record: one exact heading spelling, and the `future` list |
+| `/qa-fix` | Any ATX H2 that renders as the section (closing hashes, case, spacing, emphasis, trailing colon) is the section. A gate record about the case outside `future[]` blocks: an `immediate[]` entry, any other key under `recommendations`, a root key that is not a prose field of the gate schema, and a note or nested value inside the approving entry |
+| Tests | Refused: six heading spellings, an immediate entry, another recommendations key, a root key, a note in the approving entry. Controls: gate prose (`top_issues`, `status_reason`) citing the id, an immediate entry about another case, an honest bullet under a variant heading, an unrelated H2, an H3. `ci:fast` 8068 tests, 0 failed |
+| Mutation proofs | Reverting to the exact heading, dropping the immediate-entry rule and dropping the stray-note rule each turn a named test red; file restored (`cmp`) |
+| Scoring | Gate 11 applies the rule (60); gates 8 and 10 recorded 90 for the same NFR set, which was wrong and was corrected in report 11 |
+
+Advisory, not fixed: withdrawal wording is not machine-readable (the skill now says a withdrawal must name the case id); a bullet indented four spaces is still read; `case` is compared after `trim()`; `ls-tree` without `-z`; exact-case compare (macOS, task 210).
+
 ---
 
 ## Completion

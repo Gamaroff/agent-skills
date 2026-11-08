@@ -844,7 +844,9 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
    section that names the case id (a comment, a prose line, a `+` bullet) also blocks, so keep the id
    out of everything but the record itself. Only the gate and the `## Deferred Work` section are read:
    record a withdrawal there (a revoking bullet naming the case blocks), because text under another H2
-   of the work item is not read. The matcher's header states all of this.
+   of the work item is not read. A withdrawal must NAME the case id: wording alone (`withdrawn`) is not
+   machine-readable. In the gate, an entry under `recommendations.immediate` or any key other than the
+   gate's prose fields that names the id blocks too, and so does a note inside the approving entry. The matcher's header states all of this.
 6. **The zero-guard still applies — now to this run.** `boundary: true` with `probes_executed: 0`
    (an empty plan, every entry refused or declined) adds the `probe mode executed no candidates`
    FAIL check; a zero from this run **still takes the zero-guard**, because then the engine declined

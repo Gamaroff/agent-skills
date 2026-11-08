@@ -190,6 +190,17 @@ function judge({ task, owner, date }, approvers) {
   };
 }
 
+/** Root keys of a gate whose prose may cite a case id without being a record about it. */
+const GATE_PROSE_KEYS = new Set([
+  "top_issues",
+  "status_reason",
+  "nfr_validation",
+  "deployment_readiness",
+  "evidence",
+  "criteria_drift",
+  "waiver",
+]);
+
 /** Candidates from the gate's recommendations.future[]; throws on an unreadable gate. */
 function gateCandidates(text, id) {
   const doc = parseYamlSubset(text);
@@ -215,6 +226,43 @@ function gateCandidates(text, id) {
       owner: own && typeof f.approved_by === "string" ? f.approved_by : "",
       date: own ? f.approved_on : "",
     });
+  });
+  // Records are not only future[] entries (T271-QA-25). A mention of the id in an `immediate[]` entry,
+  // in any other key under `recommendations`, or in a root key that is not a prose field of the
+  // gate schema (top_issues, status_reason, nfr_validation... legitimately cite ids) is a record
+  // about the case with no facts: it blocks. So does a mention inside the approving entry other than
+  // in its `case:` and `action:` (a note, a nested list).
+  const blocker = (source) =>
+    out.push({ source, task: "", owner: "", date: "" });
+  const recObj = rec && typeof rec === "object" ? rec : {};
+  (Array.isArray(recObj.immediate) ? recObj.immediate : []).forEach((e, i) => {
+    if (countParsedMentions(e, id) > 0)
+      blocker(`gate recommendations.immediate[${i}]`);
+  });
+  for (const [k, v] of Object.entries(recObj)) {
+    if (k !== "future" && k !== "immediate" && countParsedMentions(v, id) > 0)
+      blocker(`gate recommendations.${k}`);
+  }
+  for (const [k, v] of Object.entries(doc)) {
+    if (
+      !GATE_PROSE_KEYS.has(k) &&
+      k !== "recommendations" &&
+      countMentions(k, id) + countParsedMentions(v, id) > 0
+    )
+      blocker(`gate ${k}`);
+  }
+  (future || []).forEach((e, i) => {
+    if (!e || typeof e !== "object" || Array.isArray(e)) return;
+    if (typeof e.case !== "string" || e.case.trim() !== id) return;
+    const extra = Object.entries(e).filter(
+      ([k]) => k !== "case" && k !== "action",
+    );
+    const stray = extra.reduce(
+      (n, [k, v]) => n + countMentions(k, id) + countParsedMentions(v, id),
+      0,
+    );
+    if (stray > 0)
+      blocker(`gate recommendations.future[${i}] (a note names the case)`);
   });
   // The subset parser silently drops text it cannot read (a block scalar `action: >-`, a row deeper
   // than its map), and any line shape used to find that text can be defeated: by a comment line, by
@@ -261,6 +309,27 @@ function countParsedMentions(node, id) {
   return 0;
 }
 
+/** The title of an ATX H2 line (closing hashes dropped), or null when the line is not an H2. */
+function h2Title(line) {
+  const m = /^ {0,3}##(?!#)[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/.exec(line);
+  return m ? m[1] : null;
+}
+
+/**
+ * True for every spelling a renderer shows as the section: case, spacing, emphasis markers and a
+ * trailing colon do not change which section it is (T271-QA-24).
+ */
+function isDeferredWorkTitle(title) {
+  return (
+    String(title)
+      .replace(/[*_`]/g, "")
+      .replace(/:\s*$/, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase() === "deferred work"
+  );
+}
+
 /**
  * Markdown fences: one opens with 3+ backticks or tildes (up to 3 spaces of indent) and closes only
  * on the SAME character, at least as long, with nothing after it - so a `~~~` line inside a ``` fence
@@ -295,9 +364,10 @@ function deferredWorkItems(text) {
     fence = step.open;
     if (step.isFence) continue;
     if (fence) continue;
-    if (/^## /.test(line)) {
+    const h2 = h2Title(line);
+    if (h2 !== null) {
       flush();
-      inSection = /^## Deferred Work\s*$/.test(line);
+      inSection = isDeferredWorkTitle(h2);
       continue;
     }
     if (!inSection) continue;
@@ -380,8 +450,9 @@ function deferredWorkSectionText(visible) {
   for (const line of String(visible).split("\n")) {
     const step = fenceStep(line, fence);
     fence = step.open;
-    if (!step.isFence && !fence && /^## /.test(line)) {
-      inSection = /^## Deferred Work\s*$/.test(line);
+    const h2 = !step.isFence && !fence ? h2Title(line) : null;
+    if (h2 !== null) {
+      inSection = isDeferredWorkTitle(h2);
       continue;
     }
     if (inSection) out.push(line);

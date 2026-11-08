@@ -686,6 +686,68 @@ test("control: a gate entry that names the case in ANY field is a record about i
   }
 });
 
+test("control: every spelling of the section heading is the section, so a revocation under one is read (T271-QA-24)", () => {
+  const withSecond = (h) =>
+    `# T\n\n## Deferred Work\n\n${GOOD_BULLET}\n\n${h}\n\n- \`${CASE}\`: revoked\n`;
+  const files = {};
+  const spellings = [
+    "## Deferred Work ##",
+    "##  Deferred Work",
+    "## Deferred Work:",
+    "## Deferred work",
+    "## **Deferred Work**",
+    "   ## Deferred Work",
+  ];
+  spellings.forEach((h, i) => (files[`h${i}.md`] = withSecond(h)));
+  // Controls: an honest bullet under a variant heading is read; an unrelated H2 and an H3 are not it.
+  files["variant-ok.md"] = `# T\n\n## Deferred Work ##\n\n${GOOD_BULLET}\n`;
+  files["other-h2.md"] = withSecond("## Notes");
+  files["h3.md"] = withSecond("### Deferred Work");
+  const { dir, paths } = fixture(files);
+  try {
+    const go = (f) =>
+      run(["--case", CASE, "--work-item", paths[f], "--approver", OWNER]).json
+        .reason;
+    spellings.forEach((h, i) => assert.equal(go(`h${i}.md`), "unapproved", h));
+    assert.equal(go("variant-ok.md"), "matched");
+    // Text under another H2 is not read, by design; an H3 under the section stays part of it.
+    assert.equal(go("other-h2.md"), "matched");
+    assert.equal(go("h3.md"), "unapproved");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("control: a record about the case outside future[] blocks - immediate, other keys, unknown root keys, a note in the approving entry (T271-QA-25)", () => {
+  const head = (extra) =>
+    `schema: 1\nrecommendations:\n${extra}  future:\n${GOOD_GATE_ENTRY}`;
+  const files = {
+    "immediate.yml": head(`  immediate:\n    - action: ${CASE} revoked\n`),
+    "otherkey.yml": head(`  extra: ${CASE} revoked\n`),
+    "root.yml": `${head("")}top: ${CASE} revoked\n`,
+    "note.yml": gate(
+      GOOD_GATE_ENTRY + `      note: approval withdrawn for ${CASE}\n`,
+    ),
+    // Controls: gate prose may cite the id; an immediate entry about another case is fine.
+    "prose.yml": `${head("")}top_issues:\n  - id: X\n    finding: '${CASE} reproduced'\nstatus_reason: '${CASE} was a finding'\n`,
+    "immediate-other.yml": head(
+      `  immediate:\n    - action: other-case revoked\n`,
+    ),
+  };
+  const { dir, paths } = fixture(files);
+  try {
+    const go = (f) =>
+      run(["--case", CASE, "--gate", paths[f], "--approver", OWNER]).json
+        .reason;
+    for (const f of ["immediate", "otherkey", "root", "note"])
+      assert.equal(go(`${f}.yml`), "unapproved", f);
+    for (const f of ["prose", "immediate-other"])
+      assert.equal(go(`${f}.yml`), "matched", f);
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test("control: a fence closes only on a matching marker, so a record inside a code fence is not read (T271-QA-23)", () => {
   const fenced = (open, mid, close) =>
     `# T\n\n## Deferred Work\n\n${open}\n${GOOD_BULLET}\n${mid}\n${close}\n`;
