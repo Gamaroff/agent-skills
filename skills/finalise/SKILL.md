@@ -96,6 +96,7 @@ apply to a bug?" a lookup instead of a judgement.
 | Key | Step | story / task | bug |
 | --- | --- | --- | --- |
 | `running-summary` | Step 0 — running summary file | run | run — `{bug-prefix}.dod.{N}.{name}.md` from `assets/bug-dod-template.md` |
+| `preconditions` | Step 0 — preconditions preflight | run — gate or `WAIVED` record, pr-review or review decision, PR state | run — verdict (implementation report, or the bug report's `QA Verification`) and PR state; no gate, no pr-review |
 | `verification-complete` | Step 7.1 — the `## Verification Complete` block | run — append | run — **fill** the template's block in place; never append a second heading |
 | `read-document` | Step 1 — read the document | run | run — the bug report, frontmatter or header block (`references/bug-doc.js`) |
 | `qa-reports` | Step 2 — QA reports and gate | run | run — globs scoped to `${STEM}` (a co-located bug must not read its parent's); none expected; the verify loop's `#### QA Verification` and the implementation report are the QA record |
@@ -211,6 +212,59 @@ Before starting any verification, also create a co-located running summary file 
 If verifying `${PRD_ROOT}/.../story.1.311.1.example-system/story.1.311.1.example-system.md`, create:
 
 `${PRD_ROOT}/.../story.1.311.1.example-system/story.1.311.1.dod.1.example-system.md`
+
+#### Step 0b: Preconditions preflight — what is missing, before any agent runs
+
+`/finalise` assumes it runs inside `/develop-task`, `/develop-story` or `/develop-bug`, before the
+merge. Hand-built work (tasks 208 and 209: merged PRs with no gate and no pr-review) and a bug fixed
+outside `/develop-bug` hit a mid-run HALT or a silent skip the skill never warned about (obs #38,
+#40). This step answers the same questions first, in one line each, with the route to each input.
+Engine: `references/finalise-preconditions.js` (peer of `references/finalise-record-preflight.js`).
+
+```bash
+# INPUTS, substituted into THIS block — no block inherits another's variables.
+DOC_FILE="{the document path argument}"
+DOC_KIND="{story | task | bug — the kind the Document-kind block resolved}"
+case "$DOC_FILE$DOC_KIND" in *'{'*) echo "HALT: DOC_FILE and DOC_KIND must be substituted into this block (an unsubstituted placeholder found)"; exit 1 ;; esac
+# The PR comes from the same resolver Step 3a uses; an unresolved PR is an answer (missing `pr`), not an error.
+PR_NUMBER=$(bash .agents/skills/finalise/references/resolve-pr-number.sh --doc "$DOC_FILE" --json | jq -r '.pr // empty')
+# State and review decision come from the host. pr-read.sh emits neither; a host without `gh` answers
+# `unknown`, which the engine reports as unverifiable and never as missing.
+PR_STATE=unknown; REVIEW_DECISION=unknown
+if [ -n "$PR_NUMBER" ] && command -v gh >/dev/null 2>&1; then
+  if PR_VIEW=$(gh pr view "$PR_NUMBER" --json state,reviewDecision 2>/dev/null); then
+    PR_STATE=$(printf '%s' "$PR_VIEW" | jq -r '.state // "unknown"')
+    REVIEW_DECISION=$(printf '%s' "$PR_VIEW" | jq -r '.reviewDecision // "null"')
+    [ -n "$REVIEW_DECISION" ] || REVIEW_DECISION=null   # GitHub answers "" when no review is required
+  fi
+fi
+PRE_ARGS=(check --doc "$DOC_FILE" --kind "$DOC_KIND" --pr-state "$PR_STATE" --review-decision "$REVIEW_DECISION")
+[ -n "$PR_NUMBER" ] && PRE_ARGS+=(--pr "$PR_NUMBER")
+command node .agents/skills/finalise/references/finalise-preconditions.js "${PRE_ARGS[@]}"
+PRE_RC=$?
+[ "$PRE_RC" -eq 0 ] || { echo "HALT: preconditions — finalise would stop later on the input(s) named above; supply them by the route given, then re-run"; exit 1; }
+```
+
+Read `reason`: `ok` continues; `missing` HALTs with every missing input and its route on screen
+(`--json` adds `missing[]`, `unverifiable[]`, and for a bug `basis`); `unreadable` is a HALT, never
+a pass. **The preflight informs; it never waives.** A missing gate is not made acceptable by being
+named: the routes are to run the step that writes the input (`/qa-task`, `/review-pr`, the
+`/develop-bug` verify loop) or to record a `WAIVED` gate with `waiver.active: true` and a non-empty
+`waiver.approved_by`. It applies the rules Step 6 and Step 7 already apply, only earlier.
+`unverifiable` lines (the review decision or PR state on a host without `gh`) are reported and do not
+stop the run. When the PR is already merged and the document is a bug, the output also states the
+**post-merge route** that 6a follows.
+
+**Bug mode (`preconditions`):** run — the same block, `DOC_KIND` `bug`: no gate and no pr-review are
+expected (the develop-bug verify loop writes neither), so the inputs are the **verdict** and the PR.
+The verdict is the newest implementation report's last `**Verdict**:` when a report exists and reads
+exactly `PASS`; **only when no implementation report exists** it is the bug report's own
+`#### QA Verification` `**Verification Result**: ✅ Fixed` — anything else there (`⚠️ Still Failing`,
+the template's `✅ Fixed | ⚠️ Still Failing` placeholder, a missing line) is not a verdict. A report
+that exists decides alone: a `FAIL` is never overridden by the bug report's own line. The PR comes
+from the resolver's `linked-issue` rung when no branch, lock or frontmatter names one (the PR that
+closes the bug's `github_issue:`) or from a `pr_number:` the operator records in the bug's
+frontmatter.
 
 ### Step 1: Locate and Read the Story/Task Document
 
@@ -478,7 +532,9 @@ DIFF_FILE=".claude/state/pr-diff-$(date +%s).diff"
 
 **The PR number comes from `references/resolve-pr-number.sh`, never from the document body.** It
 reads, first answer wins: an explicit `--pr`, the PR whose head is the current branch (`pr-read.sh`),
-the pipeline lock's `pr_url` when the lock is for this document's directory, frontmatter
+the pipeline lock's `pr_url` when the lock is for this document's directory, for a bug report the
+newest PR GitHub records as closing the issue named by its `github_issue:` (the `linked-issue`
+rung — a bug finalised after its PR merged has no branch PR), frontmatter
 `pr_number:`, and a body `PR #N` only when PR N's head branch is the current branch. A task document
 cites other work's PRs, and the old first-match-in-the-body rule judged one of them on three runs
 (task.146 → #472, task.147 → #207, task.166 → #505; obs #184). Step 3a passes no `--pr`: finalise
@@ -2048,6 +2104,22 @@ standalone.
      | grep -vxF -f <(printf '%s\n' "$EXPECTED") || true)
    CARRY_SUFFIX=""
    [ -n "$CARRIED" ] && CARRY_SUFFIX='; 5c review carried'
+   # Post-merge bug route (task 272, obs #38). A bug finalised AFTER its PR merged is checked out on
+   # the base branch, which is the one place the acceptance commit must not go. It goes on a
+   # docs-only branch off that base, and the base is never pushed to. A story or task finalises
+   # before its merge, on its own branch, so only a bug takes this route. A re-run is already on
+   # the docs branch, so the switch below does not fire a second time.
+   POST_MERGE_BRANCH=""
+   if [ "$DOC_KIND" = "bug" ]; then
+     case "$BRANCH" in
+       develop|main|master)
+         POST_MERGE_BRANCH="docs/${STEM}-dod"
+         BASE_OF_DOCS="$BRANCH"
+         git checkout -b "$POST_MERGE_BRANCH" \
+           || { echo "HALT: cannot create $POST_MERGE_BRANCH off $BASE_OF_DOCS — the post-merge route never commits to the base branch"; exit 1; }
+         BRANCH="$POST_MERGE_BRANCH" ;;
+     esac
+   fi
    # Idempotent on re-run: when the artefacts are already committed there is nothing staged, and
    # `git commit` would exit 1 for "nothing to commit" — indistinguishable from a hook rejection.
    # Skip the COMMIT in that case (never the push, and never `--allow-empty`).
@@ -2063,6 +2135,13 @@ standalone.
    PUSH_EXIT=$?
    [ "$PUSH_EXIT" -eq 0 ] || { echo "HALT: acceptance push rejected (exit $PUSH_EXIT)"; exit 1; }
    CI_HEAD_2=$(git rev-parse HEAD)
+   # The post-merge route stops here. The docs branch has no PR yet, so 6b–6c have nothing to read;
+   # opening a PR is an outward-facing step the operator takes (or /create-pr does), and the re-run
+   # picks up from this commit.
+   if [ -n "$POST_MERGE_BRANCH" ]; then
+     echo "HALT: post-merge-docs-pr — the acceptance commit is pushed to $POST_MERGE_BRANCH (docs-only, off $BASE_OF_DOCS); $BASE_OF_DOCS was not pushed to. Open a PR for it (/create-pr --base $BASE_OF_DOCS), then re-run /finalise --bug on this branch: 6a skips the commit it already made and the branch rung resolves that PR"
+     exit 1
+   fi
    ```
 
    **Bug mode (`acceptance-commit`):** run — the block itself branches on `DOC_KIND` (bound in
@@ -2072,6 +2151,15 @@ standalone.
    `docs(${STEM}): DoD verified — finalise --bug`. The registry check is a no-op because the tick
    answered `not-a-task`. Nothing here is an instruction to edit the block: it ran verbatim in
    task mode only until TASK-125-BUG-16 moved the bug list from this note into the block.
+
+   **Post-merge bug route (task 272).** When a bug is finalised after its PR merged, the checkout
+   is the base branch. The block then commits to a docs-only branch `docs/${STEM}-dod` cut from that
+   base, pushes it, never pushes the base, and stops with `HALT: post-merge-docs-pr` naming the next
+   step: open a PR for the docs branch (`/create-pr --base <base>`) and re-run `/finalise --bug`
+   there. The re-run is already on a non-base branch, skips the commit it already made, and the
+   resolver's branch rung finds the docs PR. The base is `develop`, `main` or `master`; a project with
+   another trunk name finalises its bug on a non-base branch, which commits where it stands. A story
+   or task never takes this route.
 
    The `git diff --cached --quiet` guard is in the block, not beside it: the first version said
    "skip the commit when clean" in prose two lines below an unconditional `git commit`, and the prose
@@ -2439,11 +2527,23 @@ standalone.
      # `FAIL or PASS` / `PASS FAIL`, which read as PASS until task.138 (gate 11 future, obs #146).
      # Prose after a real verdict never starts with the other token.
      case "$VERDICT_AFTER" in /*|\|*|PASS*|FAIL*|[Oo][Rr]\ *|[Oo][Rr]) VERIFY_VERDICT='' ;; esac
+     # A fix with NO implementation report at all (a bug fixed outside /develop-bug, finalised after
+     # its PR merged — bug.19, obs #38) has no verify-loop verdict to read. The bug report's own
+     # `#### QA Verification` `**Verification Result**: ✅ Fixed` is the verdict then, and only then:
+     # a report that exists decides alone, so a FAIL is never overridden. The engine is the one
+     # reader (the same one Step 0b calls); an unreadable answer leaves the verdict empty and the
+     # HALT below fires. The basis is published in the comment body (VERDICT_BASIS).
+     VERDICT_BASIS="the develop-bug verify loop"
+     if [ -z "$VERIFY_VERDICT" ] && [ -z "$IMPLEMENTATION_REPORT" ]; then
+       QV=$(command node .agents/skills/finalise/references/finalise-preconditions.js bug-verdict --dir "{document-directory}" --stem "$STEM" --json 2>/dev/null) || QV=""
+       VERIFY_VERDICT=$(printf '%s' "$QV" | jq -r '.verdict // empty' 2>/dev/null)
+       [ -z "$VERIFY_VERDICT" ] || VERDICT_BASIS="the bug report's QA Verification (no implementation report exists)"
+     fi
      # Two states, two diagnostics (cycle-10 CR-3): no verdict line at all, or a line that
      # exists and was refused — the reader told to write one must learn that one exists.
      if [ -z "$VERIFY_VERDICT" ]; then
        if [ -z "$VERDICT_LINE" ]; then
-         echo "HALT: bug mode — no **Verdict**: PASS|FAIL line found in ${IMPLEMENTATION_REPORT:-<no ${STEM}.implementation.*.md or ${STEM}.*.implementation.*.md beside the bug>}; the verify loop's QA Iteration History is the bug's only verdict"; exit 1
+         echo "HALT: bug mode — no **Verdict**: PASS|FAIL line found in ${IMPLEMENTATION_REPORT:-<no ${STEM}.implementation.*.md or ${STEM}.*.implementation.*.md beside the bug>}; the verify loop's QA Iteration History is the bug's verdict; with NO implementation report, record **Verification Result**: ✅ Fixed under #### QA Verification in the bug report"; exit 1
        else
          echo "HALT: bug mode — the last **Verdict**: line in ${IMPLEMENTATION_REPORT} is not an exact PASS or FAIL: ${VERDICT_LINE}"; exit 1
        fi
@@ -2493,6 +2593,7 @@ standalone.
 
    **PR**: ${PR_URL}
    **Final Gate**: ${FINAL_GATE}
+   $([ "$DOC_KIND" = "bug" ] && echo "**Verdict basis**: ${VERDICT_BASIS}" || true)
    **Accepted**: $(date +%Y-%m-%d)
    **DoD Summary**: \`${DOD_PATH}\`
    **CI reading 1**: ${CI_ROLLUP}${CI_TREE_EQ:+ (tree-equivalent to ${CI_TREE_EQ})} @ \`${CI_HEAD_1:0:12}\` (acceptance decision)

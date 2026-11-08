@@ -1,0 +1,46 @@
+[
+  {
+    "argv": [
+      "--sink",
+      "path",
+      "--entry",
+      "cli:shared/resources/finalise-preconditions.js",
+      "--argv",
+      "[\"check\",\"--doc\",\"{input}\",\"--kind\",\"task\",\"--pr\",\"7\",\"--pr-state\",\"OPEN\"]",
+      "--name",
+      "finalise-preconditions check: gate/waiver"
+    ],
+    "cases_file": "task.272.dod.2.security.cases.1.json",
+    "cases_sha256": "567c275f0b20d7319745bcfce8edf6ea82f0d4de54e957ebfa0ac2f447fce483"
+  },
+  {
+    "argv": [
+      "--sink",
+      "path",
+      "--entry",
+      "shell-argv:shared/resources/resolve-pr-number.sh",
+      "--argv",
+      "[\"--doc\",\"{input}\"]",
+      "--fake-gh",
+      "tests/fixtures/fake-gh",
+      "--name",
+      "resolve-pr-number: linked-issue rung"
+    ],
+    "cases_file": "task.272.dod.2.security.cases.2.json",
+    "cases_sha256": "b2afd1e55222e980ace8b81c6b5779c07b553c53f1a51ba6f6ada05eb1ed1e53"
+  },
+  {
+    "argv": [
+      "--sink",
+      "path",
+      "--entry",
+      "cli:shared/resources/finalise-preconditions.js",
+      "--argv",
+      "[\"check\",\"--doc\",\"{input}\",\"--kind\",\"task\",\"--pr\",\"7\",\"--pr-state\",\"OPEN\"]",
+      "--name",
+      "finalise-preconditions check: waiver comment stripping"
+    ],
+    "cases_file": "task.272.dod.2.security.cases.3.json",
+    "cases_sha256": "ef997cc1949f200a9db0f997e236e8a6dfc814aecc256b64c38daa57efbd43e0"
+  }
+]

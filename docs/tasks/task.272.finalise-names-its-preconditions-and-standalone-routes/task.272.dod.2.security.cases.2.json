@@ -1,0 +1,72 @@
+[
+  {
+    "id": "legit-frontmatter-pr",
+    "input": "task.9.bug.1.demo.md",
+    "direction": "legitimate",
+    "why": "frontmatter names the PR",
+    "correct": "prints 5, exit 0",
+    "spec_ref": "shared/resources/resolve-pr-number.sh:6",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.bug.1.demo.md": "---\nid: task.9.bug.1\npr_number: 5\n---\n# b\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-no-source",
+    "input": "task.9.bug.1.demo.md",
+    "direction": "hostile",
+    "why": "no source names a PR",
+    "correct": "exit 1, no number",
+    "spec_ref": "shared/resources/resolve-pr-number.sh:6",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.bug.1.demo.md": "---\nid: task.9.bug.1\n---\n# b\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-linked-issue-unreadable",
+    "input": "task.9.bug.1.demo.md",
+    "direction": "hostile",
+    "why": "gh cannot answer the linked-issue read",
+    "correct": "exit 1, no number",
+    "spec_ref": "shared/resources/resolve-pr-number.sh:6",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.bug.1.demo.md": "---\nid: task.9.bug.1\ngithub_issue: 12\n---\n# b\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-body-citation",
+    "input": "task.9.bug.1.demo.md",
+    "direction": "hostile",
+    "why": "unconfirmed body citation",
+    "correct": "exit 1, no number",
+    "spec_ref": "shared/resources/resolve-pr-number.sh:6",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.bug.1.demo.md": "---\nid: task.9.bug.1\n---\n# b\nSee PR #99 and https://github.com/o/r/pull/98\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-issue-non-numeric",
+    "input": "task.9.bug.1.demo.md",
+    "direction": "hostile",
+    "why": "non-numeric issue id",
+    "correct": "exit 1, no number",
+    "spec_ref": "shared/resources/resolve-pr-number.sh:6",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.bug.1.demo.md": "---\nid: task.9.bug.1\ngithub_issue: 12abc\n---\n# b\n"
+      }
+    }
+  }
+]

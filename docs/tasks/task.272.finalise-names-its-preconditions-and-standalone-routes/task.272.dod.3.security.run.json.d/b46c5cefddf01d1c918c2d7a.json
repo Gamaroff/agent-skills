@@ -1,0 +1,33 @@
+{
+  "sink": "path",
+  "entry": "cli:shared/resources/finalise-preconditions.js",
+  "name": "finalise-preconditions check: waiver comment stripping",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 33,
+  "passed": 33,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": [
+    "check",
+    "--doc",
+    "{input}",
+    "--kind",
+    "task",
+    "--pr",
+    "7",
+    "--pr-state",
+    "OPEN"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-11-08T21:51:18.976Z"
+}

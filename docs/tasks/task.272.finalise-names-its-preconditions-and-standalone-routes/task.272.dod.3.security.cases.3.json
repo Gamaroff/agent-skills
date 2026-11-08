@@ -1,0 +1,530 @@
+[
+  {
+    "id": "legit-quoted-hash-approver",
+    "input": "task.9.demo.md",
+    "direction": "legitimate",
+    "why": "a '#' inside a quoted approver is part of the value",
+    "correct": "accepts (exit 0)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:94",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: true\n  approved_by: \"dr # smith\"\n"
+      }
+    }
+  },
+  {
+    "id": "legit-quoted-approver-then-comment",
+    "input": "task.9.demo.md",
+    "direction": "legitimate",
+    "why": "a real quoted approver followed by a comment",
+    "correct": "accepts (exit 0)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:94",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: true\n  approved_by: \"owner\" # signed off\n"
+      }
+    }
+  },
+  {
+    "id": "legit-apostrophe-comment-after-active",
+    "input": "task.9.demo.md",
+    "direction": "legitimate",
+    "why": "active: true with a trailing comment containing an apostrophe",
+    "correct": "accepts (exit 0)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:22",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: true # it's on\n  approved_by: owner\n"
+      }
+    }
+  },
+  {
+    "id": "legit-apostrophe-comment-after-approver",
+    "input": "task.9.demo.md",
+    "direction": "legitimate",
+    "why": "a real approver followed by a comment containing an apostrophe",
+    "correct": "accepts (exit 0)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:22",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: true\n  approved_by: owner # the owner's call\n"
+      }
+    }
+  },
+  {
+    "id": "legit-hash-no-space-approver",
+    "input": "task.9.demo.md",
+    "direction": "legitimate",
+    "why": "x#y with no space is a plain scalar in YAML, not a comment",
+    "correct": "accepts (exit 0)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:94",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: true\n  approved_by: x#y\n"
+      }
+    }
+  },
+  {
+    "id": "legit-tab-before-comment",
+    "input": "task.9.demo.md",
+    "direction": "legitimate",
+    "why": "tab-separated trailing comments after real values",
+    "correct": "accepts (exit 0)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:94",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: true\t# on\n  approved_by: owner\t# who\n"
+      }
+    }
+  },
+  {
+    "id": "legit-crlf",
+    "input": "task.9.demo.md",
+    "direction": "legitimate",
+    "why": "a valid approved waiver with CRLF line endings",
+    "correct": "accepts (exit 0)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:22",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\r\nwaiver:\r\n  active: true\r\n  approved_by: owner\r\n"
+      }
+    }
+  },
+  {
+    "id": "legit-crlf-with-comments",
+    "input": "task.9.demo.md",
+    "direction": "legitimate",
+    "why": "CRLF with trailing comments after real values",
+    "correct": "accepts (exit 0)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:94",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\r\nwaiver:\r\n  active: true # on\r\n  approved_by: owner # who\r\n"
+      }
+    }
+  },
+  {
+    "id": "legit-flow-style-waiver",
+    "input": "task.9.demo.md",
+    "direction": "legitimate",
+    "why": "flow-style waiver with real values",
+    "correct": "accepts (exit 0)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:22",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver: {active: true, approved_by: owner}\n"
+      }
+    }
+  },
+  {
+    "id": "legit-quoted-leading-hash",
+    "input": "task.9.demo.md",
+    "direction": "legitimate",
+    "why": "a quoted approver that begins with '#' is a non-empty value",
+    "correct": "accepts (exit 0)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:22",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: true\n  approved_by: \"# owner\"\n"
+      }
+    }
+  },
+  {
+    "id": "legit-full-line-comment-in-block",
+    "input": "task.9.demo.md",
+    "direction": "legitimate",
+    "why": "a comment line inside the waiver block does not break the real values",
+    "correct": "accepts (exit 0)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:94",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  # approved by the owner\n  active: true\n  approved_by: owner\n"
+      }
+    }
+  },
+  {
+    "id": "legit-single-quoted-hash-then-comment",
+    "input": "task.9.demo.md",
+    "direction": "legitimate",
+    "why": "single-quoted approver containing ' # ' plus a real comment",
+    "correct": "accepts (exit 0)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:94",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: true\n  approved_by: 'a # b' # c\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-active-comment-with-apostrophe",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "inactive waiver whose comment holds a quote and the text 'active: true'",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:94",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: false # it's off, not active: true\n  approved_by: owner\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-approver-in-sibling-comment-with-apostrophe",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "approver named only in a sibling comment that holds an apostrophe",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:94",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: true\n  reason: x # don't ask; approved_by: me\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-full-line-comment-with-apostrophe",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "a whole-line comment with a quote that spells 'active: true'",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:94",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: false\n  # it's not active: true\n  approved_by: owner\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-approver-only-comment-with-apostrophe",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "approved_by holds only a comment containing an apostrophe",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:94",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: true\n  approved_by: # it's me\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-approver-only-comment",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "approved_by holds only a comment",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:94",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: true\n  approved_by: # owner\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-approver-only-comment-no-space",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "approved_by: #owner is an empty value plus a comment",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:94",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: true\n  approved_by: #owner\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-null-approver-comment-with-apostrophe",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "null approver followed by a comment containing an apostrophe",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:94",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: true\n  approved_by: null # it's unset\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-tbd-approver-comment-with-apostrophe",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "TBD approver followed by a comment containing an apostrophe",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:94",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: true\n  approved_by: TBD # don't know yet\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-tilde-approver-comment",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "~ (null) approver followed by a plain comment",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:94",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: true\n  approved_by: ~ # n/a\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-tab-before-comment-active",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "inactive waiver; tab then a comment spelling 'active: true'",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:94",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: false\t# was active: true\n  approved_by: owner\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-tab-approver-only-comment",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "approved_by: then a tab then only a comment",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:94",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: true\n  approved_by:\t# owner\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-crlf-inactive-comment",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "CRLF; inactive waiver with a comment spelling 'active: true'",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:94",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\r\nwaiver:\r\n  active: false # was active: true\r\n  approved_by: owner\r\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-crlf-approver-only-comment",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "CRLF; approved_by holds only a comment",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:94",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\r\nwaiver:\r\n  active: true\r\n  approved_by: # owner\r\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-crlf-sibling-comment",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "CRLF; approver named only in a sibling comment",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:94",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\r\nwaiver:\r\n  active: true\r\n  reason: x # approved_by: me\r\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-crlf-empty-approver",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "CRLF; approved_by with no value at all",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:22",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\r\nwaiver:\r\n  active: true\r\n  approved_by:\r\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-empty-quoted-then-comment",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "empty quoted approver followed by a comment naming someone",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:94",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: true\n  approved_by: \"\" # owner\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-approver-next-line-comment-only",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "approved_by empty, the next line is only a comment",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:94",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: true\n  approved_by:\n  # owner\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-flow-style-trailing-comment",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "flow-style inactive waiver; trailing comment spells 'active: true'",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:94",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver: {active: false, approved_by: owner} # active: true\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-flow-style-apostrophe-comment-approver",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "flow-style waiver with no approver; trailing comment with a quote names one",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:94",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver: {active: true} # it's approved_by: me\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-waiver-header-comment-with-apostrophe",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "the waiver: line itself carries a comment with a quote spelling 'active: true'; the real value is false",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:94",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver: # don't use: active: true\n  active: false\n  approved_by: owner\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-double-comment-hash-only",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "approved_by is a comment that itself contains a second '#'",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:94",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: true\n  approved_by: # a # b\n"
+      }
+    }
+  }
+]

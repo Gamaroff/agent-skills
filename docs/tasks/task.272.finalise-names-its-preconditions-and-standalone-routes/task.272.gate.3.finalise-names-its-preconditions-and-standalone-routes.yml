@@ -1,0 +1,62 @@
+schema: 2
+task: 'task.272.finalise-names-its-preconditions-and-standalone-routes'
+task_title: 'finalise names its preconditions and standalone routes'
+gate: PASS
+status_reason: 'Both gaps from DoD run 1 closed on the committed head: the waiver parser ignores YAML comments (probe plan re-run: 21 executed, 0 reproduced; revert test red), and each engine rule has its own mutation proof in qa.3.'
+reviewer: 'QA Engineer'
+head: 'b1402296662b91e8e0e22964aa00e58649400a1c'
+updated: '2026-11-08T23:55:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 8104
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 21
+    escaped: 0
+    boundary_signals: []
+    boundary_reason: ''
+    notes: 'DoD security probe plan on the fixed tree: 21 executed, 0 reproduced (2 reproduced before the fix).'
+  performance:
+    status: PASS
+    notes: 'Cycle 2 measured -0.4% against develop; the cycle 3 change is a comment strip over a few lines.'
+  reliability:
+    status: PASS
+    notes: 'CI=true npm test green on the committed head (rc 0); bundle in sync.'
+  maintainability:
+    status: PASS
+    notes: 'One regex helper in waiverOf; the new test carries failing and control cases.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-11-08'
+  total_iterations: 1
+  verification_method: 'Probe plan re-run, revert test, full suite on the committed head'
+
+recommendations:
+  immediate: []
+  future: []
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

@@ -133,6 +133,7 @@ const markers = parseMarkers(skill);
 // shape is spelled out, and the table is held to it exactly.
 const EXPECTED_VERBS = {
   "running-summary": "run",
+  preconditions: "run", // task 272 — a bug runs it on its own inputs (verdict + PR), not a gate
   "verification-complete": "run",
   "read-document": "run",
   "qa-reports": "run",
@@ -419,7 +420,7 @@ function derivationBlock() {
       // exactly the run the block must refuse.
       .replace(/STEM="\{[^\n]*\}"/, 'STEM="${STEM_IN:-}"')
       .replace(/DOC_KIND="\{[^\n]*\}"/, 'DOC_KIND="${KIND_IN:-}"') +
-    '\nprintf "DOD_PATH=%s\\nFINAL_GATE=%s\\nDOC_KIND=%s\\nCLOSING=%s\\nCYCLES=%s\\n" "$DOD_PATH" "$FINAL_GATE" "$DOC_KIND" "$CLOSING_LINE" "$CYCLES"\n'
+    '\nprintf "DOD_PATH=%s\\nFINAL_GATE=%s\\nDOC_KIND=%s\\nCLOSING=%s\\nCYCLES=%s\\nBASIS=%s\\n" "$DOD_PATH" "$FINAL_GATE" "$DOC_KIND" "$CLOSING_LINE" "$CYCLES" "${VERDICT_BASIS:-}"\n'
   );
 }
 // `shape` is the implementation report's filename: "short" is the prefix
@@ -521,6 +522,90 @@ for (const shell of SHELLS) {
       assert.doesNotMatch(r.stdout, /^FINAL_GATE=/m, "nothing was derived");
     } finally {
       rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // task 272 (obs #38): a bug fixed outside /develop-bug and finalised after its PR merged has no
+  // implementation report. Its own `#### QA Verification` line is the verdict then — and only then.
+  const noReportFixture = (result, { report = null } = {}) => {
+    const dir = mkdtempSync(path.join(tmpdir(), "finalise-6b-noreport-"));
+    writeFileSync(path.join(dir, "task.67.bug.3.dod.1.fix.md"), "");
+    writeFileSync(
+      path.join(dir, "task.67.bug.3.six-b.md"),
+      `---\nid: task.67.bug.3\n---\n\n# Bug\n\n#### QA Verification\n\n**Verification Result**: ${result}\n`,
+    );
+    if (report !== null) {
+      writeFileSync(
+        path.join(dir, "task.67.bug.3.implementation.1.run.md"),
+        report,
+      );
+    }
+    return dir;
+  };
+
+  test(`[${shell}] 6b with NO implementation report takes the bug report's QA Verification ✅ Fixed as the verdict and says so (task 272)`, () => {
+    const dir = noReportFixture("✅ Fixed");
+    try {
+      const r = run(dir, "task.67.bug.3", "bug");
+      assert.equal(r.status, 0, r.stderr + r.stdout);
+      assert.match(r.stdout, /^FINAL_GATE=PASS$/m, r.stdout + r.stderr);
+      assert.match(
+        r.stdout,
+        /^BASIS=the bug report's QA Verification \(no implementation report exists\)$/m,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test(`[${shell}] 6b with no report still HALTs on anything but ✅ Fixed — Still Failing, the template placeholder (task 272 control)`, () => {
+    for (const result of [
+      "⚠️ Still Failing",
+      "✅ Fixed | ⚠️ Still Failing",
+      "",
+    ]) {
+      const dir = noReportFixture(result);
+      try {
+        const r = run(dir, "task.67.bug.3", "bug");
+        assert.equal(r.status, 1, `${result}: ${r.stdout}${r.stderr}`);
+        assert.match(
+          r.stdout,
+          /HALT: bug mode — no \*\*Verdict\*\*: PASS\|FAIL line found/,
+          result,
+        );
+        assert.match(
+          r.stdout,
+          /Verification Result\*\*: ✅ Fixed under #### QA Verification/,
+        );
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  test(`[${shell}] 6b: a report that EXISTS decides alone — a FAIL is published, a report with no verdict HALTs, the bug's own ✅ Fixed overrides neither (task 272 control)`, () => {
+    const fail = noReportFixture("✅ Fixed", {
+      report:
+        "## QA Iteration History\n\n### Verify Cycle 1\n**Verdict**: FAIL\n",
+    });
+    const none = noReportFixture("✅ Fixed", {
+      report:
+        "## QA Iteration History\n\n### Verify Cycle 1\n**Regression test**: pass\n",
+    });
+    try {
+      const f = run(fail, "task.67.bug.3", "bug");
+      assert.equal(f.status, 0, f.stderr + f.stdout);
+      assert.match(f.stdout, /^FINAL_GATE=FAIL$/m);
+      assert.match(f.stdout, /^BASIS=the develop-bug verify loop$/m);
+      const n = run(none, "task.67.bug.3", "bug");
+      assert.equal(n.status, 1, n.stdout + n.stderr);
+      assert.match(
+        n.stdout,
+        /HALT: bug mode — no \*\*Verdict\*\*: PASS\|FAIL line found/,
+      );
+    } finally {
+      rmSync(fail, { recursive: true, force: true });
+      rmSync(none, { recursive: true, force: true });
     }
   });
 
