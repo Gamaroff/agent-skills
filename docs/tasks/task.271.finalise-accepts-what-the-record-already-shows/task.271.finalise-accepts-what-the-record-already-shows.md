@@ -5,7 +5,7 @@ type: task
 description: "Give finalise three recorded arms it lacks, so work that the evidence already clears is no longer halted: a measurement on a code-identical earlier commit, one bounded re-run of a red outside the diff, and a probe reproduction the owner deferred."
 tags: [finalise, observation]
 category: refactoring
-status: ready-for-review
+status: in-progress
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-08
@@ -14,7 +14,7 @@ estimated_effort_hours: 16
 
 # Task 271: finalise accepts what the record already shows
 
-**Status:** Ready for Review
+**Status:** In Progress
 
 ---
 
@@ -318,21 +318,21 @@ Not modified, against the plan: `finalise-dod-security-prompt.md` (Arm 3 is wire
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-08
-**Quality Score**: 80/100
+**Quality Score**: 90/100
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.271.qa.7.finalise-accepts-what-the-record-already-shows.md](./task.271.qa.7.finalise-accepts-what-the-record-already-shows.md)
-- **Gate File**: [task.271.gate.7.finalise-accepts-what-the-record-already-shows.yml](./task.271.gate.7.finalise-accepts-what-the-record-already-shows.yml)
+- **Full Report**: [task.271.qa.8.finalise-accepts-what-the-record-already-shows.md](./task.271.qa.8.finalise-accepts-what-the-record-already-shows.md)
+- **Gate File**: [task.271.gate.8.finalise-accepts-what-the-record-already-shows.yml](./task.271.gate.8.finalise-accepts-what-the-record-already-shows.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 8063
+- **Tests Executed**: 8064
 - **Phases Verified**: 5/5
-- **Critical Issues**: 2
+- **Critical Issues**: 1
 - **NFR Status**: Security: FAIL, Performance: CONCERNS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Cycle 6's findings are closed in their original shapes. Two siblings remain in the Arm 3 matcher: a `#` line inside a YAML block scalar is stripped from the reconciliation, and the work item is read without one, so a withdrawal in a `+` bullet or a prose line is ignored. The seven-gate budget is spent.
+Cycle 7's findings are closed. One hole remains in the Arm 3 work-item reconciliation: a heading hidden inside an HTML comment ends the raw section early, so a withdrawal after it is not counted. The eight-gate budget is spent.
 
 <!-- change-log-start -->
 ## Change Log
@@ -358,6 +358,7 @@ Cycle 6's findings are closed in their original shapes. Two siblings remain in t
 | 2026-11-08 |         | QA findings fixed — 2 of 2 (the whole gate is reconciled against what the reader parsed, replacing the line-shape check); a further cycle granted by the owner | qa-fix |
 | 2026-11-08 |         | QA gate FAIL (80/100) — 2 findings; QA budget (7 gates) spent | qa-task |
 | 2026-11-08 |         | QA findings fixed — 2 of 2 (gate and Deferred Work section reconciled on raw text, nothing stripped); a further cycle granted by the owner | qa-fix |
+| 2026-11-08 |         | QA gate FAIL (90/100) — 1 finding; QA budget (8 gates) spent | qa-task |
 <!-- change-log-end -->
 
 ---
@@ -401,4 +402,4 @@ The measured-criteria card (finalise takes the measurement itself).
 
 ---
 
-**Status:** Ready for Review
+**Status:** In Progress
