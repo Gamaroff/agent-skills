@@ -1,0 +1,81 @@
+schema: 2
+task: 'task.271.finalise-accepts-what-the-record-already-shows'
+task_title: 'finalise accepts what the record already shows'
+gate: PASS
+status_reason: 'The JSON-record redesign holds. A thorough review (about 120 probes: shape and judge cases, case matching, argv, a 200k-iteration fuzz of the repeated-key scanner against JSON.parse, 21 runs of the skill block under bash and zsh, 16 finalise-delta scratch-repo runs) found no input that exits 0 wrongly. Five hand runs agree. Four low cleanups remain, none a safety defect.'
+reviewer: 'QA Engineer'
+head: '023d903e5d845c1147e652cb85c3c3881f84dec7'
+updated: '2026-11-08T17:44:00Z'
+
+top_issues:
+  - id: 'T271-QA-39'
+    severity: low
+    file: 'docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md'
+    finding: 'The Target Architecture bullet for Arm 3 (and the plan file) still say the gate or the work item is read; the matcher and the skill read deferrals.json only.'
+    suggested_action: 'Add a one-line superseded note to the bullet.'
+    suggested_owner: dev
+    status: open
+  - id: 'T271-QA-40'
+    severity: low
+    file: 'shared/resources/finalise-deferral-match.js'
+    finding: 'namesCase is dead code, exported only, and its token rule differs from countMentions.'
+    suggested_action: 'Delete namesCase and its export.'
+    suggested_owner: dev
+    status: open
+  - id: 'T271-QA-41'
+    severity: low
+    file: 'shared/resources/finalise-deferral-match.js'
+    finding: 'An entry for another case that names this id blocks correctly, but reports "no follow-up task named", hiding the cause.'
+    suggested_action: 'Give blocking entries their own reason.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 8059
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 5
+    escaped: 0
+    boundary: true
+    boundary_signals: ["refuses"]
+    boundary_reason: ''
+    notes: 'Five CLI runs by hand against head 023d903e: an escaped duplicate case id with another approver is unapproved; a repeated approved_by key is unverifiable; a non-breaking space in the approver is unapproved; trailing data after the JSON is unverifiable; the plain record matches. The reviewer ran about 120 probes with no wrong exit 0. finalise-delta.js: no defect found.'
+  performance:
+    status: CONCERNS
+    notes: 'The median-of-five npm test comparison within 10% of develop is not measured; it needs an idle machine.'
+  reliability:
+    status: PASS
+    notes: 'ci:fast 8059 tests, 0 failed.'
+  maintainability:
+    status: PASS
+    notes: 'One parser (JSON.parse) and one shape; the YAML parser work is reverted, so no shared file changes.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Skill block substitutes the case id into double quotes before the matcher validates it; check how probe keys are produced. The same pattern exists in the sibling blocks.'
+      refs: ['skills/finalise/SKILL.md']
+    - action: 'ls-tree is parsed without -z; exact-case path compare (macOS, task 210).'
+      refs: ['shared/resources/finalise-delta.js']
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: ['Measure the performance criterion on an idle machine before release']

@@ -315,24 +315,24 @@ Not modified, against the plan: `finalise-dod-security-prompt.md` (Arm 3 is wire
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-08
-**Quality Score**: 60/100
-**Gate Decision**: FAIL
+**Quality Score**: 90/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.271.qa.16.finalise-accepts-what-the-record-already-shows.md](./task.271.qa.16.finalise-accepts-what-the-record-already-shows.md)
-- **Gate File**: [task.271.gate.16.finalise-accepts-what-the-record-already-shows.yml](./task.271.gate.16.finalise-accepts-what-the-record-already-shows.yml)
+- **Full Report**: [task.271.qa.17.finalise-accepts-what-the-record-already-shows.md](./task.271.qa.17.finalise-accepts-what-the-record-already-shows.md)
+- **Gate File**: [task.271.gate.17.finalise-accepts-what-the-record-already-shows.yml](./task.271.gate.17.finalise-accepts-what-the-record-already-shows.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 8067
+- **Tests Executed**: 8059
 - **Phases Verified**: 5/5
-- **Critical Issues**: 3
-- **NFR Status**: Security: FAIL, Performance: CONCERNS, Reliability: PASS, Maintainability: FAIL
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-A thorough review found the gap between the hand-rolled subset parser and real YAML is wide: escapes in quoted values, inline second-recommendations spellings, line breaks other than LF, a non-breaking space before a comment and a multi-document stream all let a gate match that a real YAML reader reads differently. The recommendation is to move the facts to a JSON record. The sixteen-gate budget is spent.
+The JSON-record redesign holds: about 120 reviewer probes and five hand runs found no input that exits 0 wrongly. Three low cleanups remain; the performance criterion is unmeasured.
 
 <!-- change-log-start -->
 ## Change Log
@@ -376,6 +376,7 @@ A thorough review found the gap between the hand-rolled subset parser and real Y
 | 2026-11-08 |         | QA findings fixed — 2 of 2 (strict mode follows YAML's comment rule; a row left after the body throws); a further cycle granted by the owner | qa-fix |
 | 2026-11-08 |         | QA gate FAIL (60/100) — 5 findings; QA budget (16 gates) spent | qa-task |
 | 2026-11-08 |         | QA findings fixed — 5 of 5 by design change (Arm 3 reads a JSON deferrals record with JSON.parse; the YAML parser work is reverted); owner approved | qa-fix |
+| 2026-11-08 |         | QA gate PASS (90/100) — 3 low cleanups; JSON-record redesign holds | qa-task |
 <!-- change-log-end -->
 
 ---
