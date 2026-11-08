@@ -95,6 +95,18 @@ Command: `CI=true npm test`, five alternating runs, `develop` (`d3b71ef3`, workt
 
 Median develop 158949 ms, median branch 162689 ms: **+2.4%**, inside the 10% bound. All ten runs exited 0. The branch head measured is `71301805`; the later commits are one documentation line and one test file, so they do not change the engines.
 
+**Re-measured on head `a35d236e`** (the first figure was taken one commit earlier, and that commit changed a test file, so it is not a docs-only delta). Same command, same alternation, load read from `/proc/loadavg` before each run:
+
+| Run | develop (ms) | load before | branch (ms) | load before |
+| --- | --- | --- | --- | --- |
+| 1 | 164227 | 1.34 | 162056 | 4.04 |
+| 2 | 159545 | 4.03 | 160647 | 4.75 |
+| 3 | 161262 | 3.98 | 161074 | 4.22 |
+| 4 | 165076 | 4.54 | 162824 | 5.94 |
+| 5 | 159091 | 4.41 | 161273 | 5.81 |
+
+Median develop 161262 ms, median branch 161273 ms: **+0.0%**, inside the 10% bound. All ten runs exited 0. This is the figure that counts; the earlier +2.4% is kept as a second sample.
+
 ### Fixture-vanish cause (criterion 8)
 
 Not proven, recorded as not found. Commands tried: `GIT_TRACE2_EVENT=<file> node probe-fixture.mjs` on the executed-prose fixture template build, which showed 3 detached `git maintenance run --auto --quiet --detach` children; the template's repositories were then set to `maintenance.auto=false`, `gc.auto=0`, `receive.autogc=false`, held by `executed-prose-no-background-git.test.mjs` (reverting the setting turns it red). The one-in-6142 ENOENT itself was not reproduced, so the cause stays suspected.
