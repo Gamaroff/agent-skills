@@ -91,10 +91,14 @@ function waiverOf(text) {
   const lines = text.split("\n");
   const at = lines.findIndex((l) => /^waiver:/.test(l));
   if (at < 0) return { active: false, approvedBy: "" };
-  let block = lines[at];
+  // A YAML comment (`#` after whitespace, or at the line start) is not a value: `active: false # was
+  // active: true` is inactive, and `reason: x # approved_by: me` names no approver. A tail holding a
+  // quote character is left whole, so a quoted value that contains ` # ` is not cut.
+  const uncomment = (l) => l.replace(/(^|\s)#[^"'\n]*$/, "");
+  let block = uncomment(lines[at]);
   for (let i = at + 1; i < lines.length; i++) {
     if (/^\S/.test(lines[i]) && lines[i].trim() !== "") break;
-    block += "\n" + lines[i];
+    block += "\n" + uncomment(lines[i]);
   }
   const active = /\bactive:[ \t]*true\b/.test(block);
   const m =

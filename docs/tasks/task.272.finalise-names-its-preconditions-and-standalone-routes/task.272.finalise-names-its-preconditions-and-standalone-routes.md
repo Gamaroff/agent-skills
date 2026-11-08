@@ -6,6 +6,7 @@ description: "Make finalise state up front what it needs (gate, PR review, open 
 tags: [finalise, observation]
 category: refactoring
 status: ready-for-review
+pr_number: 860
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-08

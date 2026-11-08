@@ -104,6 +104,42 @@ test("a WAIVED gate with waiver.approved_by passes the gate check; one without d
   }
 });
 
+test("a YAML comment is not a waiver value: text after `#` sets neither active nor approved_by", (t) => {
+  const base = { [TASK]: "x\n", "task.9.pr-review.1.fx.md": "APPROVE\n" };
+  // The two cases the DoD probe plan reproduced on task.272 (dod.1): both were accepted.
+  for (const [label, gate] of [
+    [
+      "active: false with `active: true` in its comment",
+      "gate: WAIVED\nwaiver:\n  active: false # was active: true\n  approved_by: Owner Name\n",
+    ],
+    [
+      "approver only in a comment on another key",
+      "gate: WAIVED\nwaiver:\n  active: true\n  reason: x # approved_by: me\n",
+    ],
+    [
+      "approver on a whole-line comment",
+      "gate: WAIVED\nwaiver:\n  active: true\n  # approved_by: me\n",
+    ],
+  ]) {
+    const dir = fixture(t, { ...base, "task.9.gate.1.fx.yml": gate });
+    assert.deepEqual(inputs(check(taskArgs(dir))), ["waiver-approval"], label);
+  }
+  // Controls: a comment beside a real value changes nothing, and a quoted value holding ` # ` is whole.
+  for (const [label, gate] of [
+    [
+      "real values with trailing comments",
+      "gate: WAIVED\nwaiver:\n  active: true # yes\n  approved_by: Owner Name # the owner\n",
+    ],
+    [
+      "quoted approver containing ` # `",
+      'gate: WAIVED\nwaiver:\n  active: true\n  approved_by: "Owner # Name"\n',
+    ],
+  ]) {
+    const dir = fixture(t, { ...base, "task.9.gate.1.fx.yml": gate });
+    assert.equal(check(taskArgs(dir)).reason, "ok", label);
+  }
+});
+
 test("the inline waiver form `waiver: { active: true, approved_by: X }` is read", (t) => {
   const dir = fixture(t, {
     [TASK]: "x\n",
