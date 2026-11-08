@@ -1,0 +1,74 @@
+schema: 2
+task: 'task.271.finalise-accepts-what-the-record-already-shows'
+task_title: 'finalise accepts what the record already shows'
+gate: FAIL
+status_reason: 'Cycle 6 fixes verified. The unread-text reconciliation still has two holes: a full-line # inside a YAML block scalar is text to YAML but is stripped as a comment from the raw count, and the work item is not reconciled at all, so a withdrawal in a + bullet, a numbered item or prose beside a valid bullet is ignored. The seven-gate budget is spent.'
+reviewer: 'QA Engineer'
+head: 'c5eb9dd8ef288384451a55d1662038fb2c4cecfe'
+updated: '2026-11-08T12:00:00Z'
+
+top_issues:
+  - id: 'T271-QA-17'
+    severity: high
+    file: 'shared/resources/finalise-deferral-match.js'
+    finding: 'The raw count drops every line whose first non-blank character is #, but inside a block scalar such a line is text, and the subset parser drops the scalar body. Reproduced by hand: an approved case: oc1 entry plus an entry "action: >-" whose body is "# oc1 approval is revoked" gives raw 1 and parsed 1; the CLI returns matched (exit 0).'
+    suggested_action: 'Do not strip # lines by regex. Count the id on all lines and treat a mention in a line the parser did not read as blocking, or refuse any gate whose future block holds a block scalar.'
+    suggested_owner: dev
+    status: open
+  - id: 'T271-QA-18'
+    severity: high
+    file: 'shared/resources/finalise-deferral-match.js'
+    finding: 'Within ## Deferred Work only - and * bullets with indented continuations are read. A "+ `oc1`: approval withdrawn." bullet and a prose line "Note: oc1 approval is withdrawn." beside one valid bullet are both ignored; reproduced by hand, the CLI returns matched (exit 0). A numbered item and a table row, reported by the reviewer, were not reproduced by me.'
+    suggested_action: 'Reconcile the work item as the gate is reconciled: count whole-token mentions of the id in the whole Deferred Work section (minus HTML comments and fences) against the mentions in parsed bullets, and block on any surplus.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 8063
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 3
+    escaped: 0
+    boundary: true
+    boundary_signals: ["refuses"]
+    boundary_reason: ''
+    notes: 'Three CLI runs by hand against head c5eb9dd8: a block scalar whose body starts with #, a + bullet, a prose line. The cycle-6 shapes (comment line, earlier future: key, other section) no longer reproduce; the count-offset attack did not reproduce.'
+  performance:
+    status: CONCERNS
+    notes: 'Not measured to the criterion; a clean rerun on an idle machine is owed.'
+  reliability:
+    status: PASS
+    notes: 'ci:fast 8063 tests, 0 failed.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Seventh consecutive gate with a defect in the two new engines. Each fix has closed the reported shape and left a sibling; the matcher reads two hand-written text formats with parsers that drop what they cannot read.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'ls-tree is parsed without -z, so non-ASCII failed-file names fail closed; finalise-delta.js was not re-probed this cycle.'
+      refs: ['shared/resources/finalise-delta.js']
+    - action: 'A nested list item is read as a Deferred Work record; the section ends only at the next H2; exact-case path compare (macOS, task 210).'
+      refs: ['shared/resources/finalise-deferral-match.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['Fix T271-QA-17 and T271-QA-18, then re-review; the QA budget (7 gates) is spent, so continuing needs the owner']
