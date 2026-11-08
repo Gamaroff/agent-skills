@@ -84,13 +84,40 @@ const KEY_PREFIX_RE = /^(?:"[^"]+"|'[^']+'|[\w.-]+)\s*:/;
  * document as a record must not guess (task 271, T271-QA-28).
  */
 function put(obj, key, val, strict) {
-  if (strict && Object.prototype.hasOwnProperty.call(obj, key)) {
-    throw new Error(`duplicate key "${key}" in one mapping`);
+  if (strict) {
+    // (strict here is the boolean "opts present")
+    if (key === "__proto__" || key === "constructor" || key === "prototype") {
+      throw new Error(`key "${key}" is not allowed`);
+    }
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      throw new Error(`duplicate key "${key}" in one mapping`);
+    }
   }
   obj[key] = val;
 }
 
-function parseBlock(rows, start, indent, strict) {
+/**
+ * Strict mode accounts for every row. A row this parser does not consume is silently dropped, so a
+ * second key written in a spelling it cannot read (an odd indent, a `? key` complex key) would
+ * override a value without the duplicate check ever seeing it (T271-QA-30). After a block ends, a row
+ * still inside it (indented deeper than the block) is such a row; one shallower belongs to the parent.
+ * `whole` is set where nothing may remain at all (the document root and a list entry's own rows).
+ */
+function assertConsumed(rows, i, indent, unread, whole) {
+  if (!unread || i >= rows.length) return;
+  if (whole || rows[i].indent > indent) {
+    throw new Error(
+      `unreadable row (wrong indent or unsupported syntax): ${rows[i].text.slice(0, 60)}`,
+    );
+  }
+}
+
+// `opts` is null (lenient) or { under: Set<string> }. Repeated keys, prototype keys and escaped quoted
+// keys are refused everywhere. Unreadable rows are refused only inside a subtree under one of the
+// `under` keys (`unread`): prose elsewhere in a real document legitimately continues over lines this
+// parser cannot read, and refusing those would refuse 8% of the repository's committed gates.
+function parseBlock(rows, start, indent, opts, whole, unread) {
+  const strict = Boolean(opts);
   // Decide list vs map by the first row at this indent.
   if (
     start < rows.length &&
@@ -113,7 +140,7 @@ function parseBlock(rows, start, indent, strict) {
           synthetic.push(rows[j]);
           j++;
         }
-        const [val] = parseBlock(synthetic, 0, indent + 2, strict);
+        const [val] = parseBlock(synthetic, 0, indent + 2, opts, true, unread);
         arr.push(val);
         i = j;
       } else {
@@ -121,6 +148,7 @@ function parseBlock(rows, start, indent, strict) {
         i++;
       }
     }
+    assertConsumed(rows, i, indent, unread, whole);
     return [arr, i];
   }
 
@@ -129,10 +157,15 @@ function parseBlock(rows, start, indent, strict) {
   while (i < rows.length && rows[i].indent === indent) {
     const m = rows[i].text.match(KEY_RE);
     if (!m) {
+      if (unread)
+        throw new Error(`unreadable row: ${rows[i].text.slice(0, 60)}`);
       i++;
       continue;
     }
     const [, dq, sq, bare, rest] = m;
+    if (strict && dq !== undefined && dq.includes("\\")) {
+      throw new Error(`quoted key with an escape is not supported: ${dq}`);
+    }
     const key = dq !== undefined ? dq : sq !== undefined ? sq : bare;
     if (rest.trim() !== "") {
       put(obj, key, parseScalar(rest), strict);
@@ -142,7 +175,14 @@ function parseBlock(rows, start, indent, strict) {
     // Nested block: everything indented further than this key.
     let j = i + 1;
     if (j < rows.length && rows[j].indent > indent) {
-      const [val, next] = parseBlock(rows, j, rows[j].indent, strict);
+      const [val, next] = parseBlock(
+        rows,
+        j,
+        rows[j].indent,
+        opts,
+        false,
+        unread || Boolean(opts && opts.under.has(key)),
+      );
       put(obj, key, val, strict);
       i = next;
     } else {
@@ -150,15 +190,29 @@ function parseBlock(rows, start, indent, strict) {
       i = j;
     }
   }
+  assertConsumed(rows, i, indent, unread, whole);
   return [obj, i];
 }
 
-/** `options.rejectDuplicateKeys`: throw when a key repeats within one mapping (default: last wins). */
+/**
+ * `options.rejectDuplicateKeys`: throw when a key repeats within one mapping (default: last wins),
+ * on a `__proto__`/`constructor`/`prototype` key, and on a quoted key holding a backslash escape.
+ * `options.strictUnder`: key names whose subtree must be read completely; a row the parser would
+ * drop there (a `? key`, an odd indent) throws instead (task 271, T271-QA-28, 30, 31).
+ */
 function parseYamlSubset(text, options) {
+  // YAML forbids a tab in indentation. This parser counts one as a single column, so a tab-indented
+  // row lands at an indent the structure never expected; strict mode refuses it rather than guess.
+  if (options && options.rejectDuplicateKeys && /^ *\t/m.test(text)) {
+    throw new Error("a tab in indentation is not valid YAML");
+  }
   const rows = significantLines(text);
   if (!rows.length) return {};
-  const strict = Boolean(options && options.rejectDuplicateKeys);
-  const [val] = parseBlock(rows, 0, rows[0].indent, strict);
+  const opts =
+    options && options.rejectDuplicateKeys
+      ? { under: new Set(options.strictUnder || []) }
+      : null;
+  const [val] = parseBlock(rows, 0, rows[0].indent, opts, false, false);
   return val ?? {};
 }
 

@@ -264,6 +264,30 @@ test("duplicate keys — last wins by default; rejectDuplicateKeys throws (task 
   );
 });
 
+test("strict mode — unreadable rows under strictUnder, prototype keys, escaped keys and tabs throw; lenient elsewhere (task 271, T271-QA-30, 31)", () => {
+  const strict = { rejectDuplicateKeys: true, strictUnder: ["rec"] };
+  const body = "rec:\n  list:\n    - k: 1\n      v: 2\n";
+  // Default (lenient) behaviour is unchanged for every other reader.
+  assert.deepEqual(parseYamlSubset("a:\n  b: 1\n   c: 2\n"), { a: { b: 1 } });
+  for (const t of [
+    `${body}      ? v\n      : 3\n`,
+    `${body}       v: 3\n`,
+    "rec:\n  list:\n    - k: 1\n\tv: 2\n",
+    "x: 1\n__proto__: 2\n",
+    'x: 1\n"a\\x41": 2\n',
+  ]) {
+    assert.throws(() => parseYamlSubset(t, strict), undefined, t);
+  }
+  // Controls: the clean document parses; the same odd row OUTSIDE strictUnder is tolerated.
+  assert.deepEqual(parseYamlSubset(body, strict), {
+    rec: { list: [{ k: 1, v: 2 }] },
+  });
+  assert.deepEqual(
+    parseYamlSubset("rec:\n  z: 1\nother:\n  b: 1\n   c: 2\n", strict),
+    { rec: { z: 1 }, other: { b: 1 } },
+  );
+});
+
 test("quoted keys — a colon inside a quoted key does not split the key", () => {
   const out = parseYamlSubset(['"a: b": v', ""].join("\n"));
   assert.deepEqual(out, { "a: b": "v" });

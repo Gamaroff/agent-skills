@@ -200,7 +200,13 @@ const GATE_PROSE_KEYS = new Set([
 function gateCandidates(text, id) {
   // A repeated key is ambiguous (readers disagree on which value wins), so it makes the gate
   // unverifiable rather than guessing (T271-QA-28).
-  const doc = parseYamlSubset(text, { rejectDuplicateKeys: true });
+  // Everything under `recommendations` (where the facts live) must be read completely: a row the
+  // parser would drop there (a `? key`, an odd indent) could carry a second, overriding key
+  // (T271-QA-30). Prose elsewhere in a real gate legitimately continues over lines it cannot read.
+  const doc = parseYamlSubset(text, {
+    rejectDuplicateKeys: true,
+    strictUnder: ["recommendations"],
+  });
   if (doc === null || typeof doc !== "object" || Array.isArray(doc)) {
     throw new Error("the gate did not parse as a mapping");
   }

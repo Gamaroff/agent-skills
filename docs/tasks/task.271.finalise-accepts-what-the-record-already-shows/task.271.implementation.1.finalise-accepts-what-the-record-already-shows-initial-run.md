@@ -278,6 +278,22 @@ Advisory, not fixed: `ls-tree` without `-z`; exact-case path compare (macOS, tas
 
 Advisory, not fixed: `ls-tree` without `-z`; exact-case path compare (macOS, task 210).
 
+### QA Cycle 14 — 2026-11-08
+
+| Item | Result |
+| ---- | ------ |
+| `/qa-task` gate | FAIL, 60/100, unscoped: T271-QA-30 (MEDIUM), T271-QA-31 (LOW). The plain repeated-key fix held; 987 committed gates were not wrongly refused |
+| Budget | Spent again; the owner granted a further cycle (`qa_max_cycles` 15) |
+| Cause | The strict check saw only the keys the parser reads; rows it drops (a `? key`, an odd indent, a tab) and a `__proto__` key got past it |
+| `/qa-fix` | `parseYamlSubset` strict mode now also refuses `__proto__`/`constructor`/`prototype` keys, a quoted key holding a backslash, a tab in indentation, and — under the `strictUnder` keys the caller names — any row the parser would drop. The matcher names `recommendations`, where the facts live |
+| A first attempt that failed | Making unreadable rows an error document-wide refused 83 of 988 committed gates (multi-line prose is common). Narrowed to the `recommendations` subtree: 6 of 988 (0.6%) are refused, all historic gates with a multi-line scalar or flow list inside `recommendations`; such a gate cannot carry a deferral and reports `unverifiable` with the row named |
+| Tests | Parser: lenient default unchanged, each strict refusal, odd row outside `strictUnder` tolerated. Matcher: complex key, odd indent, tab, escaped key, `__proto__` all `unverifiable`, clean entry matches; two older tests now assert the fail-closed `unverifiable`. `ci:fast` 8065 tests, 0 failed |
+| Mutation proofs | Dropping the consumed-row check, the prototype-key refusal, the tab refusal and the escaped-key refusal each turn a named test red; file restored (`cmp`) |
+
+Known and accepted: a lenient odd-indent row in prose BEFORE `recommendations` ends the root mapping and the later keys are not read; that hides a record (no deferral), and a withdrawal in it names the case id, which the raw-text reconciliation blocks.
+
+Advisory, not fixed: `ls-tree` without `-z`; exact-case path compare (macOS, task 210).
+
 ---
 
 ## Completion

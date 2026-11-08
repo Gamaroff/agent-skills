@@ -455,20 +455,25 @@ test("control: text the gate reader cannot parse that names the case blocks (T27
     GOOD_GATE_ENTRY +
       `    - action: >-\n        something about another case\n      refs: []\n`,
   );
+  // Prose elsewhere in a real gate continues over lines the parser cannot read; that is allowed
+  // outside `recommendations`, and it must not refuse a gate that does not name the case.
+  const proseBlock = `${gate(GOOD_GATE_ENTRY)}top_issues:\n  - id: X\n    finding: >-\n      unrelated prose\n      over two lines\n`;
   const { go, dir, paths } = reasons({
     "w.yml": withdrawn,
     "c.yml": caseLost,
     "u.yml": unrelatedBlock,
+    "p.yml": proseBlock,
   });
   try {
-    assert.equal(go("w.yml"), "unapproved");
+    // Under `recommendations` a row the parser drops makes the gate unverifiable: never a match.
+    for (const f of ["w.yml", "c.yml", "u.yml"])
+      assert.equal(go(f), "unverifiable", f);
     assert.match(
       run(["--case", CASE, "--gate", paths["w.yml"], "--approver", OWNER]).json
         .detail,
-      /could not parse/,
+      /unreadable row/,
     );
-    assert.equal(go("c.yml"), "unapproved");
-    assert.equal(go("u.yml"), "matched");
+    assert.equal(go("p.yml"), "matched");
   } finally {
     cleanup(dir);
   }
@@ -494,8 +499,11 @@ test("control: no line shape hides a lost withdrawal - the whole gate is reconci
     "f.yml": hashInScalar,
   });
   try {
-    for (const g of ["a.yml", "b.yml", "c.yml", "e.yml", "f.yml"])
-      assert.equal(go(g), "unapproved", g);
+    // Never a match: the reconciliation blocks a lost mention in prose (c, e), and a block scalar
+    // under `recommendations` is unverifiable (a, b, f).
+    for (const g of ["c.yml", "e.yml"]) assert.equal(go(g), "unapproved", g);
+    for (const g of ["a.yml", "b.yml", "f.yml"])
+      assert.notEqual(go(g), "matched", g);
     assert.equal(go("d.yml"), "matched", "d.yml");
   } finally {
     cleanup(dir);
@@ -547,6 +555,28 @@ test("control: a repeated key in the gate is ambiguous and makes it unverifiable
     for (const f of ["approver", "case", "task", "future"])
       assert.equal(go(`${f}.yml`), "unverifiable", f);
     assert.equal(go("once.yml"), "matched");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("control: a row the parser would drop under recommendations, a prototype key, an escaped key and a tab make the gate unverifiable (T271-QA-30, T271-QA-31)", () => {
+  const base = `    - action: ok\n      case: ${CASE}\n      deferred_to: task.901\n      approved_by: ${OWNER}\n      approved_on: 2026-10-28\n`;
+  const { go, dir } = reasons({
+    "complex.yml": gate(`${base}      ? approved_by\n      : Mallory\n`),
+    "indent.yml": gate(`${base}       approved_by: Mallory\n`),
+    "tab.yml": gate(`${base}\tapproved_by: Mallory\n`),
+    "escape.yml": gate(`${base}      "approved_b\\x79": Mallory\n`),
+    "proto.yml": gate(
+      `    - action: ok\n      case: ${CASE}\n      __proto__:\n        deferred_to: task.901\n        approved_by: ${OWNER}\n        approved_on: 2026-10-28\n`,
+    ),
+    // Control: a clean entry still matches.
+    "clean.yml": gate(base),
+  });
+  try {
+    for (const f of ["complex", "indent", "tab", "escape", "proto"])
+      assert.equal(go(`${f}.yml`), "unverifiable", f);
+    assert.equal(go("clean.yml"), "matched");
   } finally {
     cleanup(dir);
   }
