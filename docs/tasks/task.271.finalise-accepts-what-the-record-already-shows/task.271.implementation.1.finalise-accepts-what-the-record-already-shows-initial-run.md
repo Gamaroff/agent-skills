@@ -332,10 +332,10 @@ Advisory, not fixed: `ls-tree` without `-z`; exact-case path compare (macOS, tas
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
-**Branch**: {populated after Step 1}
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required; reconcile later with /tracker-reconcile}
+**Finished**: 2026-11-08
+**Final Status**: Completed
+**Branch**: feature/task.271.finalise-accepts-what-the-record-already-shows
+**PR**: [#859](https://github.com/Gamaroff/agent-skills/pull/859)
+**QA Iterations**: 17 gates (15 FAIL or CONCERNS fixed, gate 17 PASS 90/100)
+**DoD Summary**: `task.271.dod.1.finalise-accepts-what-the-record-already-shows.md` — ACCEPTED. CI reading 1 SUCCESS @ `6be1064c`; CI reading 2 SUCCESS @ `e350b655` (6 of 6 checks both times). The DoD run closed four gaps its first AC pass found (basis assertions for Arms 1 and 2, the mutation record, the fixture-vanish commands, a wall-time figure on head) before accepting.
+**Tracker debt**: none — this task has no tracker issue.
