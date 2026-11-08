@@ -1,0 +1,30 @@
+{
+  "sink": "path",
+  "entry": "cli:shared/resources/finalise-delta.js",
+  "name": "finalise-delta.docs-only-base",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 4,
+  "passed": 4,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": [
+    "docs-only",
+    "--base",
+    "{input}",
+    "--head",
+    "HEAD",
+    "--json"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": "/home/gamaroff/Development/agent-skills/docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.qa.4.security.delta.setup.sh",
+  "ran_at": "2026-11-08T17:58:30.201Z"
+}

@@ -1,0 +1,173 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "a35d236ea40bf3d7be349750449ba72c8dbbc39d",
+  "dirty_paths": [],
+  "document": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md",
+  "result": {
+    "bytes": 8395,
+    "sha256": "074d381138a73feebdb51f7ccd6e7869dc2394283fe5cbf0f816809fe9dba3e3",
+    "verified": true
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 8,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "76060364e52318d49da5f286c2c2e57549f1e6ae09616527284ab1406d393771",
+      "status": "PASS",
+      "description": "Each arm accepts its matching case, refuses its unmatched control; named tests in QA report",
+      "code_citation": "shared/resources/finalise-delta.js:193",
+      "test_citation": "shared/resources/tests/finalise-delta.test.mjs:92",
+      "members": [
+        {
+          "member": "Arm 1 (docs-only tree equivalence): accept and code-changed refusal",
+          "evidence": "shared/resources/tests/finalise-delta.test.mjs:92,105",
+          "status": "PASS"
+        },
+        {
+          "member": "Arm 2 (one re-run of a red outside the diff): eligible, in-diff control, already-rerun",
+          "evidence": "shared/resources/tests/finalise-delta.test.mjs:275,310,497",
+          "status": "PASS"
+        },
+        {
+          "member": "Arm 3 (JSON deferral): matched record, no-approver, non-owner and different-id controls",
+          "evidence": "shared/resources/tests/finalise-deferral-match.test.mjs:79,104,125,136",
+          "status": "PASS"
+        },
+        {
+          "member": "Named tests recorded in the QA report",
+          "evidence": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.qa.17.finalise-accepts-what-the-record-already-shows.md:70",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "All three arms have an accept test and unmatched controls. The tests run under the test job in .github/workflows/test.yml (npm test, no paths-ignore seen). The QA report Addendum names them per arm."
+    },
+    {
+      "id": "#2",
+      "text_hash": "d72365e932772f3b11bd6659db3586d4f448ad8a687203b9457e17ee10fd2ace",
+      "status": "PASS",
+      "description": "Every accepted case writes its basis into the DoD record, shown by tests' assertions",
+      "code_citation": "skills/finalise/SKILL.md:1459",
+      "test_citation": "shared/resources/tests/finalise-delta.test.mjs:296",
+      "members": [
+        {
+          "member": "Arm 1: commits and equivalence result",
+          "evidence": "shared/resources/tests/finalise-delta.test.mjs:296 (asserts reason tree-equivalent, base, head, changed)",
+          "status": "PASS"
+        },
+        {
+          "member": "Arm 2: both CI attempts",
+          "evidence": "shared/resources/tests/finalise-delta.test.mjs:275-291 (asserts eligible plus base, head, changed); shared/resources/tests/finalise-delta.test.mjs:497 (attempt count gates the second re-run)",
+          "status": "PASS"
+        },
+        {
+          "member": "Arm 3: owner, date and task",
+          "evidence": "shared/resources/tests/finalise-deferral-match.test.mjs:79-95 (asserts rendered 'deferred (owner Pat Owner, 2026-10-28, task.901)')",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "The engine output is asserted for Arms 1 and 2 (the new assertions at :296 and :287-291) and for Arm 3 (the DoD line at :79). The wording of the two-attempt CI re-run line is an instruction in SKILL.md and no test pins its text; it is an agent-written line. This is an advisory, not a failure."
+    },
+    {
+      "id": "#3",
+      "text_hash": "e9f0fbd7dd373c7766f03d17650cd971603a5cb3af316c9b5b61f7ff260a53ce",
+      "status": "PASS",
+      "description": "With no matching record, finalise behaves as before (existing fixture passes unchanged)",
+      "code_citation": "skills/finalise/SKILL.md:819",
+      "test_citation": "evals/shared/tests/finalise-dod-prompt-contract.test.mjs",
+      "members": [],
+      "non_member_fail": null,
+      "note": "With no deferrals.json the block answers no-match and the probe stays a FAIL. Code-changed and no-match controls leave the old behaviour in force (finalise-delta.test.mjs:105, finalise-deferral-match.test.mjs:136). The existing contract test ran green with no pin moved (task Files Summary item 7; QA gate 17 records 8059 tests, 0 failed). The citation has no line number: it is a whole-file test."
+    },
+    {
+      "id": "#4",
+      "text_hash": "546f8d2e546317c6fe9a55fd0f609c8fefcc1c0cc809d62ee9ee5cda06496d54",
+      "status": "PASS",
+      "description": "npm test wall time within 10% of develop, median of five alternating runs with load",
+      "code_citation": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.qa.17.finalise-accepts-what-the-record-already-shows.md:108",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Bound is within 10%. The committed QA report (line 98) records a re-measure on a35d236e with the command (CI=true npm test, five alternating runs against develop) and the load read from /proc/loadavg before each run. I recomputed the medians from the table: develop 161262 ms, branch 161273 ms, +0.0%. Measured on a35d236e, tree-equivalent to head 6be1064c: finalise-delta.js docs-only --base a35d236e --head 6be1064c --json answered reason tree-equivalent (exit 0), and the only changed file is the QA report. The report is committed (git status is clean for it)."
+    },
+    {
+      "id": "#5",
+      "text_hash": "3521936f4284b650ae86b8496aae53a18896a39c145a768ca0426305df148467",
+      "status": "PASS",
+      "description": "Each arm has a mutation proof in the QA report",
+      "code_citation": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.qa.17.finalise-accepts-what-the-record-already-shows.md:76",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "Arm 1",
+          "evidence": "task.271.qa.17...md:80 (docs-path check dropped, 5 tests red; base-file read dropped, 2 red; restore checked with cmp)",
+          "status": "PASS"
+        },
+        {
+          "member": "Arm 2",
+          "evidence": "task.271.qa.17...md:81 (in-diff exclusion dropped, 1 red; unlimited re-runs, 1 red)",
+          "status": "PASS"
+        },
+        {
+          "member": "Arm 3",
+          "evidence": "task.271.qa.17...md:82 (five matcher mutations each turned a test red; QA report body also records them)",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Each arm has a revert and a count of red tests. The records give counts and mutation ids rather than the individual test names. That is a weaker record than the rule asks for, and it is an advisory, not a failure."
+    },
+    {
+      "id": "#6",
+      "text_hash": "4ebe7eb0e4844e0df815176b7f42d776b2bc0cf3440c8435836dd542207af2de",
+      "status": "PASS",
+      "description": "bundle --check reports 0 problems; npm test passes",
+      "code_citation": ".github/workflows/test.yml:1",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 6be1064c82f5ce6d2cbae6909991bd14655fbffd — The whole evidence is the state of the PR's CI run (the test workflow runs npm test). /finalise Step 6 grades it from CI reading 1.",
+      "ci_reading": "CI reading 1: SUCCESS @ 6be1064c82f5ce6d2cbae6909991bd14655fbffd"
+    },
+    {
+      "id": "#7",
+      "text_hash": "94d4ddc82316e41d5303b7cbf8c07d4649b870b11b4c972adc2664b5a928d5b1",
+      "status": "PASS",
+      "description": "finalise-dod-prompt-contract test passes",
+      "code_citation": ".github/workflows/test.yml:1",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 6be1064c82f5ce6d2cbae6909991bd14655fbffd — The only evidence is the CI state of the run that executes evals/shared/tests/finalise-dod-prompt-contract.test.mjs. /finalise Step 6 grades it from CI reading 1.",
+      "ci_reading": "CI reading 1: SUCCESS @ 6be1064c82f5ce6d2cbae6909991bd14655fbffd"
+    },
+    {
+      "id": "#8",
+      "text_hash": "0a3ffd1f5bc80225021fb5c22832253cd0b588aa343e57af7993736f75450241",
+      "status": "PASS",
+      "description": "Fixture-vanish cause stated in the QA report, or recorded not found with commands tried",
+      "code_citation": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.qa.17.finalise-accepts-what-the-record-already-shows.md:112",
+      "test_citation": "shared/resources/tests/executed-prose-no-background-git.test.mjs:24",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Documentation criterion. The cited text reads 'Not proven, recorded as not found' and names the commands tried (GIT_TRACE2_EVENT trace showing 3 detached git maintenance children, then maintenance.auto=false, gc.auto=0, receive.autogc=false). The pinning test runs in the per-PR npm test job. The code change is shared/resources/tests/lib/executed-prose.mjs:108."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#2",
+      "note": "The both-attempts CI re-run line is prose in skills/finalise/SKILL.md (about :1475) and no test asserts its text. The engine's basis fields and the attempt count are tested."
+    },
+    {
+      "ac_id": "#5",
+      "note": "The mutation records at qa.17.md:80-82 give red counts (5, 2, 1, 1) and mutation ids but not the red test names. Naming them would make the record auditable."
+    }
+  ]
+}

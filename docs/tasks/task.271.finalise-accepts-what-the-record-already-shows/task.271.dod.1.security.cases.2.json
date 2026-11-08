@@ -1,0 +1,37 @@
+[
+  {
+    "id": "at.0",
+    "input": "0",
+    "direction": "legitimate",
+    "why": "no re-run recorded yet",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:60"
+  },
+  {
+    "id": "at.1",
+    "input": "1",
+    "direction": "hostile",
+    "why": "exactly one re-run, already spent",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:60"
+  },
+  {
+    "id": "at.2",
+    "input": "2",
+    "direction": "hostile",
+    "why": "more than one recorded",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:60"
+  },
+  {
+    "id": "at.neg",
+    "input": "-1",
+    "direction": "hostile",
+    "why": "not a count",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:60"
+  },
+  {
+    "id": "at.float",
+    "input": "1.0",
+    "direction": "hostile",
+    "why": "not a count",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:60"
+  }
+]

@@ -5,17 +5,18 @@ type: task
 description: "Give finalise three recorded arms it lacks, so work that the evidence already clears is no longer halted: a measurement on a code-identical earlier commit, one bounded re-run of a red outside the diff, and a probe reproduction the owner deferred."
 tags: [finalise, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 pr_number: 859
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-08
+completed_date: 2026-11-08
 estimated_effort_hours: 16
 ---
 
 # Task 271: finalise accepts what the record already shows
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 ---
 
@@ -335,11 +336,34 @@ Not modified, against the plan: `finalise-dod-security-prompt.md` (Arm 3 is wire
 ### Key Findings
 The JSON-record redesign holds: about 120 reviewer probes and five hand runs found no input that exits 0 wrongly. Three low cleanups remain; the performance criterion is unmeasured.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.271.qa.17.finalise-accepts-what-the-record-already-shows.md`
+**Gate File**: `task.271.gate.17.finalise-accepts-what-the-record-already-shows.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 90/100 (the 10 points were for the unmeasured wall time, since measured at +0.0%)
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 8 of 8 met (#6 and #7 graded from CI reading 1, SUCCESS at `6be1064c`)
+✅ **PR Review:** PR #859; the 5c `/review-pr` report is CONCERNS and both findings are fixed
+✅ **Documentation:** `CHANGELOG.md`, `docs/reference/configuration.md` and `skills/finalise/SKILL.md` agree on the JSON deferral record
+✅ **Security Review:** ✅ PASS, 41 probes, 0 reproduced
+✅ **Compliance Review:** not applicable (internal tooling)
+✅ **Performance:** wall time +0.0% against `develop` (median of five alternating runs)
+
+**Detailed Verification Log:** See `task.271.dod.1.finalise-accepts-what-the-record-already-shows.md` for the evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-11-08
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                          | Author      |
-| ---------- | ------- | ---------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #32, #50, #117 | create-task |
 | 2026-11-07 | 1.1     | Phase 1 owner decisions recorded in the plan; all three arms approved (Arm 3 owner-only approval) | Claude      |
 | 2026-11-07 | 1.2     | Review passed (9/10): anchors re-measured, owner-only approver and exactly-once re-run stated, test-enumeration step added | review-task |
@@ -378,6 +402,7 @@ The JSON-record redesign holds: about 120 reviewer probes and five hand runs fou
 | 2026-11-08 |         | QA gate FAIL (60/100) — 5 findings; QA budget (16 gates) spent | qa-task |
 | 2026-11-08 |         | QA findings fixed — 5 of 5 by design change (Arm 3 reads a JSON deferrals record with JSON.parse; the YAML parser work is reverted); owner approved | qa-fix |
 | 2026-11-08 |         | QA gate PASS (90/100) — 3 low cleanups; JSON-record redesign holds | qa-task |
+| 2026-11-08 | 1.4 | DoD passed — accepted (PR #859) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -421,4 +446,4 @@ The measured-criteria card (finalise takes the measurement itself).
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted

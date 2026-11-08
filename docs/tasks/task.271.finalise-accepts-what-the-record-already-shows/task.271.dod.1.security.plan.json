@@ -1,0 +1,78 @@
+[
+  {
+    "argv": [
+      "--sink",
+      "path",
+      "--entry",
+      "cli:shared/resources/finalise-delta.js",
+      "--argv",
+      "[\"rerun-eligible\",\"--base\",\"HEAD~1\",\"--head\",\"HEAD\",\"--pr-base\",\"main\",\"--attempts\",\"0\",\"--failed-file\",\"{input}\",\"--json\"]",
+      "--fixture-setup",
+      "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.qa.4.security.delta.setup.sh",
+      "--name",
+      "finalise-delta.failed-file"
+    ],
+    "cases_file": "task.271.dod.1.security.cases.1.json",
+    "cases_sha256": "07f016d6dc67f6922e923b3cb501e64f25aebcde50b036e306cdcb96b9d51350"
+  },
+  {
+    "argv": [
+      "--sink",
+      "path",
+      "--entry",
+      "cli:shared/resources/finalise-delta.js",
+      "--argv",
+      "[\"rerun-eligible\",\"--base\",\"HEAD~1\",\"--head\",\"HEAD\",\"--pr-base\",\"main\",\"--attempts\",\"{input}\",\"--failed-file\",\"src/other.test.js\",\"--json\"]",
+      "--fixture-setup",
+      "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.qa.4.security.delta.setup.sh",
+      "--name",
+      "finalise-delta.attempts"
+    ],
+    "cases_file": "task.271.dod.1.security.cases.2.json",
+    "cases_sha256": "3e745d64c026233f74eaf09d994a0b3c335b9a0406f3065ead074d7190c7699d"
+  },
+  {
+    "argv": [
+      "--sink",
+      "path",
+      "--entry",
+      "cli:shared/resources/finalise-delta.js",
+      "--argv",
+      "[\"docs-only\",\"--base\",\"{input}\",\"--head\",\"HEAD\",\"--json\"]",
+      "--fixture-setup",
+      "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.qa.4.security.delta.setup.sh",
+      "--name",
+      "finalise-delta.docs-only-base"
+    ],
+    "cases_file": "task.271.dod.1.security.cases.3.json",
+    "cases_sha256": "2730fa5a57e121bd3eb5175c7d26158913262962d087703705e16fb4a5a84d36"
+  },
+  {
+    "argv": [
+      "--sink",
+      "path",
+      "--entry",
+      "cli:shared/resources/finalise-deferral-match.js",
+      "--argv",
+      "[\"--case\",\"{input}\",\"--record\",\"deferrals.json\",\"--approver\",\"Pat Owner\",\"--json\"]",
+      "--name",
+      "finalise-deferral-match.record"
+    ],
+    "cases_file": "task.271.dod.1.security.cases.4.json",
+    "cases_sha256": "d0fc3c40c5f0d8241b3d446fd95d96dfacd15fdbe2535f295839da4fd4db1b22"
+  },
+  {
+    "argv": [
+      "--sink",
+      "path",
+      "--entry",
+      "cli:shared/resources/finalise-deferral-match.js",
+      "--argv",
+      "[\"--case\",\"oc10-x\",\"--record\",\"deferrals.json\",\"--approver\",\"{input}\",\"--json\"]",
+      "--name",
+      "finalise-deferral-match.approver"
+    ],
+    "cases_file": "task.271.dod.1.security.cases.5.json",
+    "cases_sha256": "0e7edaf7a79aba43d7859d681c3a99112b077010686bd4dd2fb31fc065318580"
+  }
+]
