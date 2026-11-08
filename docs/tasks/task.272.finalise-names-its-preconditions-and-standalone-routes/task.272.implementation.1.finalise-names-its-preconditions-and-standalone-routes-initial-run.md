@@ -34,7 +34,7 @@ Add a preconditions preflight to `/finalise` and a defined standalone/post-merge
 | 1. create-branch           | ✅ Done | Branch `feature/task.272.*` exists in git                              | Branch created at `ff5f54c9` (plain `git checkout -b`, pushed; /create-branch skill not invoked — no prompts needed) | —                    | 2026-11-08T00:00Z |
 | 2. review-task             | ✅ Done | `task.272.review.{N}.{name}.md` exists (or skip logged)                | Review 8/10, READY TO IMPLEMENT; 4 important + 2 optional fixes applied; status → ready-for-development; report `task.272.review.1.*.md` | —                    | 2026-11-08T00:00Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (plan exists). Resolver `linked-issue` rung; `finalise-preconditions.js` engine; Step 0b preflight; 7.7 QA-Verification verdict fallback; 6a post-merge docs branch. Full `CI=true npm test` 8101 pass / 0 fail; bundle `--check` 0 problems | —                    | 2026-11-08T00:00Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
+| 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #860 (base develop); commit e67aeb4d; no linked issue to comment on | —                    | 2026-11-08T00:00Z |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.272.qa.{N}.*.md`; `task.272.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.272.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
@@ -71,7 +71,15 @@ Add a preconditions preflight to `/finalise` and a defined standalone/post-merge
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### QA Cycle 1 — gate FAIL (60/100)
+
+- Findings: T272-1 (exit after write), T272-2 (id regex outside doc-id.js), T272-3 (no CHANGELOG entry), T272-4 (performance criterion unmeasured).
+- Cause of 1 and 2: the new engine file was untracked when the full suite last ran, and both guards read tracked files only.
+- Fix: `emit` sets `process.exitCode`; the stem comes from `doc-id.js`; CHANGELOG `[Unreleased]` entry for task 272. A comment naming a test by its repo path made the bundler pull in four unrelated files; it now names the test by bare filename and the four copies were removed. `finalise` now bundles `doc-id.js`.
+- Probe: no executed document restated the changed behaviour (engine internals only). Population: 1.
+- Verification: `CI=true npm test` 8101 pass / 0 fail with the new files staged; bundle `--check` 0 problems.
+- T272-4 stays open for cycle 2: re-measure with five alternating runs (timing with python, not `bc`).
+- Independent review did not run: the findings ingester was skipped because the gate holds four findings.
 
 ---
 

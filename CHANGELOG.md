@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`finalise` names its preconditions and routes a bug finalised after its merge** (task 272).
+  A Step 0b preflight (`finalise-preconditions.js`) lists every missing input before any agent
+  runs: the QA gate or a `WAIVED` record with an approver, a pr-review or review decision, and the
+  PR state, each with the step that supplies it. A bug has its own inputs (the verdict and the PR).
+  `resolve-pr-number.sh` gains a bug-only `linked-issue` rung (the PR GitHub records as closing the
+  bug's `github_issue`). With no implementation report, a bug's `QA Verification` `✅ Fixed` is the
+  verdict and the comment says so. A bug finalised on the base branch commits to a docs-only
+  `docs/<stem>-dod` branch, pushes that, never the base, and stops with `post-merge-docs-pr`.
 - **`finalise` accepts what the record already shows, and writes its basis** (task 271). Three
   recorded arms, each refusing its unmatched control. A measured figure taken on an earlier commit
   counts when the delta to the head is documentation only (`finalise-delta.js docs-only`). A red CI

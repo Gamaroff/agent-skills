@@ -41,6 +41,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const docId = require("./doc-id.js");
 
 const ROUTES = Object.freeze({
   gate:
@@ -255,16 +256,15 @@ function bugVerdict(dir, stem) {
 }
 
 // ── check ─────────────────────────────────────────────────────────────────────────────────────
+// The stem is built from doc-id.js, the one parser of work-item ids (tests/doc-id-chokepoint.test.js).
+// A story or task bug names its parent in `id` and its own number in `seq`, so the bug stem is
+// `{parent}.bug.{seq}`; a general bug's `id` is already `bug.{N}`.
 function stemOf(docFile, kind) {
-  const b = path.basename(docFile);
-  const re =
-    kind === "task"
-      ? /^(task\.\d+)\./
-      : kind === "story"
-        ? /^(story\.\d+\.\d+\.\d+[A-Z]?)\./
-        : /^((?:story\.\d+\.\d+\.\d+[A-Z]?\.|task\.\d+\.)?bug\.\d+)\./;
-  const m = re.exec(b);
-  return m ? m[1] : "";
+  const r = docId.parse(path.basename(docFile));
+  if (!r.ok) return "";
+  if (kind === "task" || kind === "story") return r.kind === kind ? r.id : "";
+  if (r.kind === "bug") return r.id;
+  return r.artifact === "bug" && r.seq ? `${r.id}.bug.${r.seq}` : "";
 }
 
 function check({
@@ -435,13 +435,15 @@ function parseArgs(argv) {
   return a;
 }
 
+// Sets the exit code and returns; process.exit() after a write truncates a piped payload at ~64KB
+// (bug.3.stdout-truncation-on-exit; guarded by stdout-drain-on-exit.test.mjs).
 function emit(r, json) {
   const code = r.exitCode ?? (r.reason === "ok" ? 0 : 1);
   process.stdout.write(
     (json ? JSON.stringify({ ...r, exitCode: code }, null, 2) : render(r)) +
       "\n",
-    () => process.exit(code),
   );
+  process.exitCode = code;
 }
 
 function main(argv) {

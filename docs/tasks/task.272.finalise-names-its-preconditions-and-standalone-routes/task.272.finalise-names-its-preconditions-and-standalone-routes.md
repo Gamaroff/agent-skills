@@ -5,7 +5,7 @@ type: task
 description: "Make finalise state up front what it needs (gate, PR review, open PR) and say what a standalone or post-merge run does, for hand-built work and for a bug fixed outside develop-bug, so a missing input is a one-line answer instead of a mid-run HALT."
 tags: [finalise, observation]
 category: refactoring
-status: ready-for-review
+status: in-progress
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-08
@@ -14,7 +14,7 @@ estimated_effort_hours: 8
 
 # Task 272: finalise names its preconditions and standalone routes
 
-**Status:** Ready for Review
+**Status:** In Progress
 
 ---
 
@@ -283,6 +283,30 @@ None - a run that had every input behaves as before; one that lacked an input ha
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-08
+**Quality Score**: 60/100
+**Gate Decision**: FAIL
+
+### QA Report
+
+- **Full Report**: [task.272.qa.1.finalise-names-its-preconditions-and-standalone-routes.md](./task.272.qa.1.finalise-names-its-preconditions-and-standalone-routes.md)
+- **Gate File**: [task.272.gate.1.finalise-names-its-preconditions-and-standalone-routes.yml](./task.272.gate.1.finalise-names-its-preconditions-and-standalone-routes.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 8103
+- **Phases Verified**: 4/4
+- **Critical Issues**: 2
+- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: FAIL, Maintainability: PASS
+
+### Key Findings
+
+Two repository guards fail on the new engine file (exit after write; id regex outside doc-id.js), plus a missing CHANGELOG entry and an unmeasured performance criterion.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -292,6 +316,8 @@ None - a run that had every input behaves as before; one that lacked an input ha
 | 2026-11-08 | 1.1     | Review passed (8/10) — fixed gate/waiver field names, PR state source, removed-literal sweep, source paths, AC3 location | review-task |
 | 2026-11-08 |         | Status → ready-for-development                    | review-task |
 | 2026-11-08 |         | Implemented — 12 files, 49 new tests; status → ready-for-review | develop-task |
+| 2026-11-08 |         | QA gate FAIL (60/100) — 4 findings (2 high); status → in-progress | qa-task |
+| 2026-11-08 |         | QA findings fixed — 3 of 4 (guards, CHANGELOG), 1 iteration; performance re-measure pending | qa-fix |
 <!-- change-log-end -->
 
 ---
@@ -331,4 +357,4 @@ None.
 
 ---
 
-**Status:** Ready for Review
+**Status:** In Progress

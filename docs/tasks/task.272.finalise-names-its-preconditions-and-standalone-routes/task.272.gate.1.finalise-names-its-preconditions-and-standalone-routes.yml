@@ -1,0 +1,89 @@
+schema: 2
+task: 'task.272.finalise-names-its-preconditions-and-standalone-routes'
+task_title: 'finalise names its preconditions and standalone routes'
+gate: FAIL
+status_reason: 'The full suite is red on the committed branch: two repository guards that read only tracked files (stdout-drain, doc-id chokepoint) fail on the new engine file. They were green earlier only because the file was untracked.'
+reviewer: 'QA Engineer'
+head: 'e67aeb4d1c78f8cc6f0c45c09481721cc057b5ab'
+updated: '2026-11-08T22:40:00Z'
+
+top_issues:
+  - id: 'T272-1'
+    severity: high
+    file: 'shared/resources/finalise-preconditions.js'
+    finding: 'Line 442 calls process.exit() after writing to stdout, which truncates piped output at ~64KB; shared/resources/tests/stdout-drain-on-exit.test.mjs "no NEW file adopts exit-after-write" fails (CI red).'
+    suggested_action: 'Set process.exitCode and return instead of process.exit(); re-run the guard.'
+    suggested_owner: dev
+    status: open
+  - id: 'T272-2'
+    severity: high
+    file: 'shared/resources/finalise-preconditions.js'
+    finding: 'Lines 263-264 hold story and bug id regexes; tests/doc-id-chokepoint.test.js section 1 fails (id parsed outside doc-id.js).'
+    suggested_action: 'Derive the stem through doc-id.js (parse/build) instead of a local regex; re-run the chokepoint test.'
+    suggested_owner: dev
+    status: open
+  - id: 'T272-3'
+    severity: medium
+    file: 'CHANGELOG.md'
+    finding: 'changelog-cites.sh answers "missing (task 272)": no [Unreleased] entry cites the task, and /finalise 6d HALTs on it.'
+    suggested_action: 'Add an [Unreleased] entry citing (task 272).'
+    suggested_owner: dev
+    status: open
+  - id: 'T272-4'
+    severity: medium
+    file: 'docs/tasks/task.272.finalise-names-its-preconditions-and-standalone-routes/task.272.finalise-names-its-preconditions-and-standalone-routes.md'
+    finding: 'Performance criterion (median of five alternating CI=true npm test runs vs develop) is unmeasured: the timing harness had no bc so no durations were recorded, and every branch run was red (T272-1, T272-2). One red branch run took 2m44s wall.'
+    suggested_action: 'After T272-1 and T272-2, re-measure with five alternating runs against a develop worktree, uptime beside each, and record the median in the next QA report.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 8103
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary_reason: ''
+    notes: 'No criteria carry a boundary signal (probe-boundary-signals.mjs: boundary false, no matches). The engine reads operator-supplied paths only and writes nothing.'
+  performance:
+    status: CONCERNS
+    notes: 'Criterion unmeasured this cycle (T272-4).'
+  reliability:
+    status: FAIL
+    notes: 'Suite red on the committed state (T272-1, T272-2).'
+  maintainability:
+    status: PASS
+    notes: 'Sources in shared/resources, bundle check clean, one engine for both callers.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T272-1 and T272-2, then re-run CI=true npm test on the committed state.'
+      refs: ['shared/resources/finalise-preconditions.js']
+    - action: 'Add the CHANGELOG entry (T272-3).'
+      refs: ['CHANGELOG.md']
+  future:
+    - action: 'Local runs miss guards that read tracked files only: run npm test after git add for any new source file.'
+      refs: ['shared/resources/tests/stdout-drain-on-exit.test.mjs', 'tests/doc-id-chokepoint.test.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []
