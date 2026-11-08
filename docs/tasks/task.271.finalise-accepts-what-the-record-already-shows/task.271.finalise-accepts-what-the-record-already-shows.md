@@ -5,7 +5,7 @@ type: task
 description: "Give finalise three recorded arms it lacks, so work that the evidence already clears is no longer halted: a measurement on a code-identical earlier commit, one bounded re-run of a red outside the diff, and a probe reproduction the owner deferred."
 tags: [finalise, observation]
 category: refactoring
-status: in-progress
+status: ready-for-review
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-08
@@ -14,7 +14,7 @@ estimated_effort_hours: 16
 
 # Task 271: finalise accepts what the record already shows
 
-**Status:** In Progress
+**Status:** Ready for Review
 
 ---
 
@@ -146,7 +146,7 @@ The tests that read the AC prompt, to run before and after (found with `git grep
 - a matcher script with tests
 
 **Changes**:
-- [x] Match on case id against `recommendations.future[]` or Deferred Work with a named task and an owner approver; render as deferred with owner, date, task.
+- [x] Match on case id against `recommendations.future[]` with a named task and an owner approver; render as deferred with owner, date, task. (QA cycle 12: the work item's Deferred Work section is no longer read — owner-approved narrowing, see the implementation report.)
 - [x] Before adding the matcher script under `shared/resources/`, find the tests that enumerate that directory (`git grep -nE "readdirSync|git ls-files" -- 'tests/*.test.js' 'shared/resources/tests/*.test.mjs'`) and name each in the QA report with what it required of the new file. Run the banned-name pattern from `tests/no-consumer-names.test.js` over any fixture literals.
 
 **Dependencies**: Phase 1.
@@ -367,6 +367,7 @@ Cycle 11's findings are closed. The remaining finding is one class: the set of M
 | 2026-11-08 |         | QA gate FAIL (60/100) — 2 findings; QA budget (11 gates) spent | qa-task |
 | 2026-11-08 |         | QA findings fixed — 2 of 2 (every spelling of the section heading is the section; a gate record outside future[] that names the case blocks); a further cycle granted by the owner | qa-fix |
 | 2026-11-08 |         | QA gate FAIL (60/100) — 2 findings; QA budget (12 gates) spent | qa-task |
+| 2026-11-08 |         | QA findings fixed — 2 of 2 by design change (Arm 3 reads the structured QA gate only; the work item's Deferred Work section is no longer a source); owner approved | qa-fix |
 <!-- change-log-end -->
 
 ---
@@ -410,4 +411,4 @@ The measured-criteria card (finalise takes the measurement itself).
 
 ---
 
-**Status:** In Progress
+**Status:** Ready for Review

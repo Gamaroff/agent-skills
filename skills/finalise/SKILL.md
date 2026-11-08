@@ -814,17 +814,16 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
 
    ```bash
    # Step 3b.1 item 5a — INPUTS, substituted into THIS block: {case-id} (the probe key after the first
-   # ':'), {gate-file} (the newest QA gate beside the work item, or empty when there is none),
-   # {work-item} (the story/task document).
+   # ':'), {gate-file} (the newest QA gate beside the work item, or empty when there is none).
+   # The gate is the only record read: with no gate there is nothing to match, which is a no-match.
+   [ -n "{gate-file}" ] || { echo '{"reason":"no-match","detail":"no QA gate beside the work item"}'; exit 1; }
    source .agents/skills/finalise/references/read-config.sh || exit 1
    OWNERS=$(read_nested_config_key finalise deferralApprover)
    APPROVER_ARGS=()
    # One owner per line, read the same way in bash and zsh (`read -a` is bash only; zsh spells it -A).
    while IFS= read -r o; do [ -n "${o// }" ] && APPROVER_ARGS+=(--approver "$o"); done < <(printf '%s\n' "$OWNERS" | tr ',' '\n')
-   GATE_ARGS=()
-   [ -n "{gate-file}" ] && GATE_ARGS=(--gate "{gate-file}")
    command node .agents/skills/finalise/references/finalise-deferral-match.js \
-     --case "{case-id}" ${GATE_ARGS[@]+"${GATE_ARGS[@]}"} --work-item "{work-item}" \
+     --case "{case-id}" --gate "{gate-file}" \
      ${APPROVER_ARGS[@]+"${APPROVER_ARGS[@]}"} --json
    ```
 
@@ -835,18 +834,16 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
    check. **Every other answer leaves the probe in `probes[]` as a FAIL** — `no-match` (no record names
    the case), `unapproved` (a record names it but lacks a task, a valid date, or an owner approver),
    `no-approver-configured`, `unverifiable` — and name the `reason` and `detail` beside the probe so
-   the owner sees why it was not deferred. The records read are the gate's `recommendations.future[]`
-   entry (`case: {case-id}`, `deferred_to: task.N`, `approved_by`, `approved_on`) and the work item's
-   `## Deferred Work` bullet, which is exactly `` `{case-id}`: deferred to task.N, approved by {name} on {YYYY-MM-DD}. ``
-   (no optional piece, no other word); a bullet in any other wording, or inside an HTML comment, is not
-   a deferral. Every record that names the case must approve it, so a later revocation blocks, and the
-   approver is compared to the owner list exactly. Any other text in the gate or in the Deferred Work
-   section that names the case id (a comment, a prose line, a `+` bullet) also blocks, so keep the id
-   out of everything but the record itself. Only the gate and the `## Deferred Work` section are read:
-   record a withdrawal there (a revoking bullet naming the case blocks), because text under another H2
-   of the work item is not read. A withdrawal must NAME the case id: wording alone (`withdrawn`) is not
-   machine-readable. In the gate, an entry under `recommendations.immediate` or any key other than the
-   gate's prose fields that names the id blocks too, and so does a note inside the approving entry. The matcher's header states all of this.
+   the owner sees why it was not deferred. The one record read is the QA gate's `recommendations.future[]`
+   entry (`case: {case-id}`, `deferred_to: task.N`, `approved_by`, `approved_on`). **The work item's
+   prose is not read**: a `## Deferred Work` bullet is not a deferral, because the Markdown spellings
+   of one section are open-ended and the structured gate has no such surface. If the owner deferred a
+   case in the work item only, record it as a gate entry first. Every entry that names the case must
+   approve it, and the approver is compared to the owner list exactly. To **withdraw** a deferral,
+   remove or edit its gate entry; the entry is the only record that is read. Any other text in the gate
+   that names the case id (an `immediate` entry, another key, a note inside the approving entry, a
+   comment, a block scalar) blocks, so keep the id out of everything but the entry itself; the gate's
+   prose fields (`top_issues`, `status_reason`...) may cite it. The matcher's header states all of this.
 6. **The zero-guard still applies — now to this run.** `boundary: true` with `probes_executed: 0`
    (an empty plan, every entry refused or declined) adds the `probe mode executed no candidates`
    FAIL check; a zero from this run **still takes the zero-guard**, because then the engine declined

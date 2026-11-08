@@ -1,11 +1,15 @@
 /**
  * Behavioural tests for `finalise-deferral-match.js` (task 271, Arm 3). Each test runs the CLI
- * against throwaway gate and work-item files and asserts its exit code and `reason`.
+ * against throwaway gate files and asserts its exit code and `reason`.
  *
  * The matching case is held beside an unmatched control for every refusal the arm makes (no
  * approver, an approver who is not the owner, a different case id, no task, no date, no approver
  * configured), because a matcher that only ever accepts cannot be told from one that accepts
  * everything.
+ *
+ * Arm 3 reads the structured QA gate only. A work item's prose is not read: QA gates 4-12 each found
+ * another Markdown spelling of the section that the matcher missed, so the free-text source was
+ * dropped, and `--work-item` is refused (exit 2) so a stale caller learns the contract changed.
  *
  * Fixture names here are placeholders ("Pat Owner", "task.901"): the banned-name guard
  * (tests/no-consumer-names.test.js) scans shipped files, and these are shipped.
@@ -63,11 +67,15 @@ const GOOD_GATE_ENTRY = [
   ``,
 ].join("\n");
 
-const workItem = (bullet) =>
-  `# T\n\n## Deferred Work\n\n${bullet}\n\n## Change Log\n`;
-const GOOD_BULLET = `- \`${CASE}\`: deferred to task.901, approved by ${OWNER} on 2026-10-28.`;
+/** Run the CLI on a set of named gate files; returns a function name -> reason. */
+function reasons(files) {
+  const { dir, paths } = fixture(files);
+  const go = (f, id = CASE) =>
+    run(["--case", id, "--gate", paths[f], "--approver", OWNER]).json.reason;
+  return { go, dir, paths };
+}
 
-// ── the matching cases ────────────────────────────────────────────────────
+// ── the matching case ─────────────────────────────────────────────────────
 
 test("gate record: id, task, owner approver and date match (exit 0) and render the DoD line", () => {
   const { dir, paths } = fixture({ "g.yml": gate(GOOD_GATE_ENTRY) });
@@ -87,66 +95,6 @@ test("gate record: id, task, owner approver and date match (exit 0) and render t
       "deferred (owner Pat Owner, 2026-10-28, task.901)",
     );
     assert.match(r.json.source, /recommendations\.future\[0\]/);
-  } finally {
-    cleanup(dir);
-  }
-});
-
-test("work-item record: a Deferred Work bullet with task, approver and date matches", () => {
-  const { dir, paths } = fixture({ "w.md": workItem(GOOD_BULLET) });
-  try {
-    const r = run([
-      "--case",
-      CASE,
-      "--work-item",
-      paths["w.md"],
-      "--approver",
-      OWNER,
-    ]);
-    assert.equal(r.status, 0);
-    assert.equal(r.json.reason, "matched");
-    assert.equal(r.json.task, "task.901");
-  } finally {
-    cleanup(dir);
-  }
-});
-
-test("a continuation line of the bullet is read as part of it", () => {
-  const bullet = `- \`${CASE}\`:\n  deferred to task.901,\n  approved by ${OWNER} on 2026-10-28.`;
-  const { dir, paths } = fixture({ "w.md": workItem(bullet) });
-  try {
-    const r = run([
-      "--case",
-      CASE,
-      "--work-item",
-      paths["w.md"],
-      "--approver",
-      OWNER,
-    ]);
-    assert.equal(r.json.reason, "matched");
-  } finally {
-    cleanup(dir);
-  }
-});
-
-test("either source suffices: the gate holds nothing, the work item holds the record", () => {
-  const { dir, paths } = fixture({
-    "g.yml": gate("    - action: 'unrelated'\n      refs: []\n"),
-    "w.md": workItem(GOOD_BULLET),
-  });
-  try {
-    const r = run([
-      "--case",
-      CASE,
-      "--gate",
-      paths["g.yml"],
-      "--work-item",
-      paths["w.md"],
-      "--approver",
-      OWNER,
-    ]);
-    assert.equal(r.json.reason, "matched");
-    assert.match(r.json.source, /work item/);
   } finally {
     cleanup(dir);
   }
@@ -216,7 +164,6 @@ test("control: a different case id is no-match, even when another case is deferr
 test("control: the id is matched as a whole token, never as a prefix or substring of a longer id", () => {
   const { dir, paths } = fixture({ "g.yml": gate(GOOD_GATE_ENTRY) });
   try {
-    // The record names oc10-second-findings-cut-short; neither a prefix nor an extension may match it.
     for (const id of [
       "oc10-second",
       "oc10-second-findings-cut-short-2",
@@ -274,34 +221,14 @@ test("control: an impossible, rolled-over or future approval date is unapproved 
     .toISOString()
     .slice(0, 10);
   const dates = ["2026-13-45", "0000-00-00", "2026-02-31", tomorrow];
-  const files = {};
+  const files = { "ok.yml": gate(GOOD_GATE_ENTRY) };
   dates.forEach((d, i) => {
     files[`d${i}.yml`] = gate(GOOD_GATE_ENTRY.replace("2026-10-28", d));
   });
-  files["ok.yml"] = gate(GOOD_GATE_ENTRY);
-  const { dir, paths } = fixture(files);
+  const { go, dir } = reasons(files);
   try {
-    dates.forEach((d, i) => {
-      const r = run([
-        "--case",
-        CASE,
-        "--gate",
-        paths[`d${i}.yml`],
-        "--approver",
-        OWNER,
-      ]);
-      assert.equal(r.json.reason, "unapproved", `date ${d}`);
-      assert.match(r.json.detail, /no approval date/, `date ${d}`);
-    });
-    const ok = run([
-      "--case",
-      CASE,
-      "--gate",
-      paths["ok.yml"],
-      "--approver",
-      OWNER,
-    ]);
-    assert.equal(ok.json.reason, "matched");
+    dates.forEach((d, i) => assert.equal(go(`d${i}.yml`), "unapproved", d));
+    assert.equal(go("ok.yml"), "matched");
   } finally {
     cleanup(dir);
   }
@@ -320,119 +247,16 @@ test("control: a follow-up task must be a positive integer without leading zeros
       .ok,
     true,
   );
-  const bullet = `- \`${CASE}\`: deferred to task.240abc, approved by ${OWNER} on 2026-10-28.`;
-  const { dir, paths } = fixture({ "w.md": workItem(bullet) });
-  try {
-    const r = run([
-      "--case",
-      CASE,
-      "--work-item",
-      paths["w.md"],
-      "--approver",
-      OWNER,
-    ]);
-    assert.notEqual(r.json.reason, "matched");
-  } finally {
-    cleanup(dir);
-  }
-});
-
-test("control: a bullet that is not the one accepted form never matches (T271-QA-5, T271-QA-6)", () => {
-  const ok = "approved by " + OWNER + " on 2026-10-28.";
-  const bullets = {
-    negated: `- \`${CASE}\`: NOT deferred to task.901; was not approved by ${OWNER} on 2026-10-28.`,
-    "negated, contiguous": `- \`${CASE}\`: NOT deferred to task.901, ${ok}`,
-    "quoted approval": `- \`${CASE}\`: deferred to task.901; the approval by ${OWNER} on 2026-10-28 was a quote from Sam.`,
-    "second clause": `- \`${CASE}\`: deferred to task.901, ${ok} Later: deferred to task.902, ${ok}`,
-    "two case ids": `- \`${CASE}\` and \`other-case\`: deferred to task.901, ${ok}`,
-    "withheld lead": `- \`${CASE}\` withheld; deferred to task.901, ${ok}`,
-    "conditional lead": `- If accepted, \`${CASE}\` deferred to task.901, ${ok}`,
-    "future lead": `- \`${CASE}\` is to be deferred to task.901, ${ok}`,
-    "only-if lead": `- \`${CASE}\`: only if Sam agrees, deferred to task.901, ${ok}`,
-    "bold slot, condition": `- **only if Sam agrees**, \`${CASE}\`: deferred to task.901, ${ok}`,
-    "bold slot, draft": `- **deferral is a draft**, \`${CASE}\`: deferred to task.901, ${ok}`,
-    "reproduced-by lead": `- reproduced by \`${CASE}\`: deferred to task.901, ${ok}`,
-    "approver with a rider": `- \`${CASE}\`: deferred to task.901, approved by ${OWNER}, if Sam agrees on 2026-10-28.`,
-    "approver in another case": `- \`${CASE}\`: deferred to task.901, approved by PAT OWNER on 2026-10-28.`,
-    "bare id, no backticks": `- ${CASE}: deferred to task.901, ${ok}`,
-    "text after the date": `- \`${CASE}\`: deferred to task.901, approved by ${OWNER} on 2026-10-28 unless Sam objects.`,
-  };
-  const files = {};
-  Object.entries(bullets).forEach(([k, b], i) => {
-    files[`b${i}.md`] = workItem(b);
+  const { go, dir } = reasons({
+    "suffix.yml": gate(
+      GOOD_GATE_ENTRY.replace(
+        "deferred_to: task.901",
+        "deferred_to: task.240abc",
+      ),
+    ),
   });
-  files["comment.md"] =
-    `# T\n\n## Deferred Work\n\n<!--\n${GOOD_BULLET}\n-->\n`;
-  files["unterminated.md"] = `# T\n\n## Deferred Work\n\n<!-- ${GOOD_BULLET}\n`;
-  files["good.md"] = workItem(GOOD_BULLET);
-  // A closed comment hides only itself: the honest bullet after it still counts.
-  files["after-comment.md"] =
-    `# T\n\n## Deferred Work\n\n<!-- a note -->\n${GOOD_BULLET}\n`;
-  const { dir, paths } = fixture(files);
   try {
-    Object.keys(bullets).forEach((k, i) => {
-      const r = run([
-        "--case",
-        CASE,
-        "--work-item",
-        paths[`b${i}.md`],
-        "--approver",
-        OWNER,
-      ]);
-      assert.notEqual(r.json.reason, "matched", k);
-      assert.equal(r.status, 1, k);
-    });
-    for (const f of ["comment.md", "unterminated.md"]) {
-      const r = run([
-        "--case",
-        CASE,
-        "--work-item",
-        paths[f],
-        "--approver",
-        OWNER,
-      ]);
-      // A bullet nobody can see names the case: refused (unapproved, since T271-QA-18), never matched.
-      assert.equal(r.json.reason, "unapproved", f);
-      assert.equal(r.status, 1, f);
-    }
-    const after = run([
-      "--case",
-      CASE,
-      "--work-item",
-      paths["after-comment.md"],
-      "--approver",
-      OWNER,
-    ]);
-    assert.equal(after.json.reason, "matched");
-    // The unmatched control: the one accepted form still matches.
-    const ok2 = run([
-      "--case",
-      CASE,
-      "--work-item",
-      paths["good.md"],
-      "--approver",
-      OWNER,
-    ]);
-    assert.equal(ok2.json.reason, "matched");
-  } finally {
-    cleanup(dir);
-  }
-});
-
-test("control: a work-item bullet outside the Deferred Work H2 is not read", () => {
-  const doc = `# T\n\n## Notes\n\n${GOOD_BULLET}\n\n## Deferred Work\n\n- nothing here\n`;
-  const { dir, paths } = fixture({ "w.md": doc });
-  try {
-    const r = run([
-      "--case",
-      CASE,
-      "--work-item",
-      paths["w.md"],
-      "--approver",
-      OWNER,
-    ]);
-    assert.equal(r.status, 1);
-    assert.equal(r.json.reason, "no-match");
+    assert.equal(go("suffix.yml"), "unapproved");
   } finally {
     cleanup(dir);
   }
@@ -458,7 +282,7 @@ test("control: with no owner configured nothing matches, even a fully recorded d
   }
 });
 
-test("control: an unreadable source is unverifiable (exit 1), never a pass", () => {
+test("control: an unreadable gate is unverifiable (exit 1), never a pass", () => {
   const r = run([
     "--case",
     CASE,
@@ -471,13 +295,46 @@ test("control: an unreadable source is unverifiable (exit 1), never a pass", () 
   assert.equal(r.json.reason, "unverifiable");
 });
 
-test("usage: a missing case, a missing source and a bad id exit 2", () => {
+test("usage: a missing case, a missing gate, a bad id and the retired --work-item flag exit 2", () => {
   assert.equal(run(["--gate", "x", "--approver", OWNER]).status, 2);
   assert.equal(run(["--case", CASE, "--approver", OWNER]).status, 2);
   assert.equal(
     run(["--case", "bad id!", "--gate", "x", "--approver", OWNER]).status,
     2,
   );
+  // A work item is no longer a source: a caller still passing it must fail loudly, not be ignored,
+  // and a work item carrying a perfect bullet must not turn a no-match into a deferral.
+  const { dir, paths } = fixture({
+    "w.md": `# T\n\n## Deferred Work\n\n- \`${CASE}\`: deferred to task.901, approved by ${OWNER} on 2026-10-28.\n`,
+    "g.yml": gate("    - action: unrelated\n"),
+  });
+  try {
+    const r = run([
+      "--case",
+      CASE,
+      "--gate",
+      paths["g.yml"],
+      "--work-item",
+      paths["w.md"],
+      "--approver",
+      OWNER,
+    ]);
+    assert.equal(r.status, 2);
+    assert.match(r.stderr, /unknown argument "--work-item"/);
+    assert.equal(
+      run(["--case", CASE, "--work-item", paths["w.md"], "--approver", OWNER])
+        .status,
+      2,
+    );
+    // Control: the gate alone, with no record, is a plain no-match.
+    assert.equal(
+      run(["--case", CASE, "--gate", paths["g.yml"], "--approver", OWNER]).json
+        .reason,
+      "no-match",
+    );
+  } finally {
+    cleanup(dir);
+  }
 });
 
 test("an approver name compares exactly, not by prefix", () => {
@@ -487,7 +344,6 @@ test("an approver name compares exactly, not by prefix", () => {
     ]).ok,
     false,
   );
-  // Exact: a different case, or a Unicode lookalike (the Kelvin sign folds onto "k"), is not the owner.
   for (const name of ["pat owner", "PAT OWNER", "Pat Owner "]) {
     assert.equal(
       eng.judge({ task: "task.1", owner: name, date: "2026-01-01" }, [OWNER])
@@ -497,6 +353,7 @@ test("an approver name compares exactly, not by prefix", () => {
     );
   }
   assert.equal(
+    // The Kelvin sign (U+212A) folds onto "K": a lookalike is not the owner.
     eng.judge({ task: "task.1", owner: "Ken Owner", date: "2026-01-01" }, [
       "Ken Owner",
     ]).ok,
@@ -504,60 +361,89 @@ test("an approver name compares exactly, not by prefix", () => {
   );
 });
 
-test("control: every record that names the case must approve it - a later revocation, a prose mention and a task disagreement block (T271-QA-12)", () => {
-  const revoked = `${GOOD_BULLET}\n- \`${CASE}\`: deferral revoked by ${OWNER} on 2026-11-01.`;
+test("control: an approver is never matched by stripping trailing markup characters (T271-QA-14)", () => {
+  for (const n of ["Pat Owner_", "Pat Owner*", "_Pat Owner", "**Pat Owner"]) {
+    assert.equal(
+      eng.judge({ task: "task.1", owner: n, date: "2026-01-01" }, [OWNER]).ok,
+      false,
+      n,
+    );
+  }
+  for (const n of ["`Pat Owner`", '"Pat Owner"', "'Pat Owner'", "Pat Owner"]) {
+    assert.equal(
+      eng.judge({ task: "task.1", owner: n, date: "2026-01-01" }, [OWNER]).ok,
+      true,
+      n,
+    );
+  }
+});
+
+// ── every record that names the case must approve it ──────────────────────
+
+test("control: every record that names the case must approve it - a prose mention and a task disagreement block (T271-QA-12)", () => {
   const mentionOnly = gate(
     GOOD_GATE_ENTRY +
       `    - action: 'Do NOT defer ${CASE}; fix it now'\n      deferred_to: task.901\n      approved_by: ${OWNER}\n      approved_on: 2026-10-28\n`,
   );
-  const otherTask = `${GOOD_BULLET}\n- \`${CASE}\`: deferred to task.902, approved by ${OWNER} on 2026-10-29.`;
-  const { dir, paths } = fixture({
-    "revoked.md": workItem(revoked),
+  const otherTask = gate(
+    GOOD_GATE_ENTRY +
+      `    - action: second\n      case: ${CASE}\n      deferred_to: task.902\n      approved_by: ${OWNER}\n      approved_on: 2026-10-29\n`,
+  );
+  const sameTwice = gate(
+    GOOD_GATE_ENTRY +
+      `    - action: second\n      case: ${CASE}\n      deferred_to: task.901\n      approved_by: ${OWNER}\n      approved_on: 2026-10-29\n`,
+  );
+  const { go, dir, paths } = reasons({
     "mention.yml": mentionOnly,
-    "tasks.md": workItem(otherTask),
+    "tasks.yml": otherTask,
+    "twice.yml": sameTwice,
     "good.yml": gate(GOOD_GATE_ENTRY),
-    "w.md": workItem(GOOD_BULLET),
   });
   try {
-    const go = (extra) =>
-      run(["--case", CASE, ...extra, "--approver", OWNER]).json;
-    assert.equal(go(["--work-item", paths["revoked.md"]]).reason, "unapproved");
-    assert.equal(go(["--gate", paths["mention.yml"]]).reason, "unapproved");
-    const t = go(["--work-item", paths["tasks.md"]]);
-    assert.equal(t.reason, "unapproved");
-    assert.match(t.detail, /disagree/);
-    // The unmatched control: the gate and the work item agreeing is still a match.
-    const ok = go(["--gate", paths["good.yml"], "--work-item", paths["w.md"]]);
-    assert.equal(ok.reason, "matched");
-    assert.equal(ok.candidates, 2);
+    assert.equal(go("mention.yml"), "unapproved");
+    assert.equal(go("tasks.yml"), "unapproved");
+    assert.match(
+      run(["--case", CASE, "--gate", paths["tasks.yml"], "--approver", OWNER])
+        .json.detail,
+      /disagree/,
+    );
+    // Controls: two agreeing records, and the single record, still match.
+    assert.equal(go("twice.yml"), "matched");
+    assert.equal(go("good.yml"), "matched");
   } finally {
     cleanup(dir);
   }
 });
 
 test("control: a gate entry is matched on its own case field, not on a mention in its prose (T271-QA-12)", () => {
-  const noCaseField = gate(
-    GOOD_GATE_ENTRY.replace(`      case: ${CASE}\n`, ""),
-  );
-  const { dir, paths } = fixture({ "g.yml": noCaseField });
+  const { go, dir } = reasons({
+    "g.yml": gate(GOOD_GATE_ENTRY.replace(`      case: ${CASE}\n`, "")),
+  });
   try {
-    const r = run([
-      "--case",
-      CASE,
-      "--gate",
-      paths["g.yml"],
-      "--approver",
-      OWNER,
-    ]);
-    assert.equal(r.json.reason, "unapproved");
-    assert.match(r.json.detail, /no follow-up task/);
+    assert.equal(go("g.yml"), "unapproved");
   } finally {
     cleanup(dir);
   }
 });
 
+test("a deferral is withdrawn by removing or editing its gate entry - the only record that is read", () => {
+  const { go, dir } = reasons({
+    "present.yml": gate(GOOD_GATE_ENTRY),
+    "removed.yml": gate("    - action: unrelated\n"),
+    "edited.yml": gate(GOOD_GATE_ENTRY.replace(OWNER, "Sam Agent")),
+  });
+  try {
+    assert.equal(go("present.yml"), "matched");
+    assert.equal(go("removed.yml"), "no-match");
+    assert.equal(go("edited.yml"), "unapproved");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+// ── the parser drops text it cannot read: the whole gate is reconciled ────
+
 test("control: text the gate reader cannot parse that names the case blocks (T271-QA-13)", () => {
-  // A block scalar cuts the entry at its first deeper row; what follows is still on the record.
   const withdrawn = gate(
     GOOD_GATE_ENTRY +
       `    - action: >-\n        ${CASE} deferral withdrawn by the owner\n      refs: []\n`,
@@ -569,86 +455,45 @@ test("control: text the gate reader cannot parse that names the case blocks (T27
     GOOD_GATE_ENTRY +
       `    - action: >-\n        something about another case\n      refs: []\n`,
   );
-  const { dir, paths } = fixture({
+  const { go, dir, paths } = reasons({
     "w.yml": withdrawn,
     "c.yml": caseLost,
     "u.yml": unrelatedBlock,
-    "wi.md": workItem(GOOD_BULLET),
   });
   try {
-    const go = (g) =>
-      run([
-        "--case",
-        CASE,
-        "--gate",
-        paths[g],
-        "--work-item",
-        paths["wi.md"],
-        "--approver",
-        OWNER,
-      ]).json;
-    assert.equal(go("w.yml").reason, "unapproved");
-    assert.match(go("w.yml").detail, /could not parse/);
-    assert.equal(go("c.yml").reason, "unapproved");
-    // Controls: a block scalar that does not name the case blocks nothing.
-    assert.equal(go("u.yml").reason, "matched");
+    assert.equal(go("w.yml"), "unapproved");
+    assert.match(
+      run(["--case", CASE, "--gate", paths["w.yml"], "--approver", OWNER]).json
+        .detail,
+      /could not parse/,
+    );
+    assert.equal(go("c.yml"), "unapproved");
+    assert.equal(go("u.yml"), "matched");
   } finally {
     cleanup(dir);
   }
 });
 
-test("control: an approver is never matched by stripping trailing markup characters (T271-QA-14)", () => {
-  for (const n of ["Pat Owner_", "Pat Owner*", "_Pat Owner", "**Pat Owner"]) {
-    assert.equal(
-      eng.judge({ task: "task.1", owner: n, date: "2026-01-01" }, [OWNER]).ok,
-      false,
-      n,
-    );
-  }
-  // Controls: a matching wrapper pair of backticks or quotes is still removed.
-  for (const n of ["`Pat Owner`", '"Pat Owner"', "'Pat Owner'", "Pat Owner"]) {
-    assert.equal(
-      eng.judge({ task: "task.1", owner: n, date: "2026-01-01" }, [OWNER]).ok,
-      true,
-      n,
-    );
-  }
-});
-
-test("control: no line shape hides a lost withdrawal - the whole gate is reconciled (T271-QA-15, T271-QA-16)", () => {
+test("control: no line shape hides a lost withdrawal - the whole gate is reconciled (T271-QA-15, T271-QA-16, T271-QA-17)", () => {
   const lost = `    - action: >-\n        ${CASE} deferral withdrawn by the owner\n      refs: []\n`;
   const afterComment = gate(`${GOOD_GATE_ENTRY}# note\n${lost}`);
   const earlierFutureKey = `schema: 1\nnfr:\n  future:\nrecommendations:\n  future:\n${GOOD_GATE_ENTRY}${lost}`;
   const lostInOtherSection = `${gate(GOOD_GATE_ENTRY)}top_issues:\n  - id: X\n    finding: >-\n      ${CASE} was withdrawn\n`;
-  // Nothing is stripped: a `#` line inside a block scalar is text to YAML (T271-QA-17), so a comment
-  // that names the id blocks too.
   const hashInScalar = gate(
     `${GOOD_GATE_ENTRY}    - action: >-\n        # ${CASE} approval is revoked\n      refs: []\n`,
   );
   const fullLineComment = gate(`${GOOD_GATE_ENTRY}# ${CASE} was reproduced\n`);
   // Control: the id read by the parser anywhere is accounted for.
   const quotedElsewhere = `${gate(GOOD_GATE_ENTRY)}top_issues:\n  - id: X\n    finding: 'reproduced by ${CASE}'\n`;
-  const { dir, paths } = fixture({
+  const { go, dir } = reasons({
     "a.yml": afterComment,
     "b.yml": earlierFutureKey,
     "c.yml": lostInOtherSection,
     "d.yml": quotedElsewhere,
     "e.yml": fullLineComment,
     "f.yml": hashInScalar,
-    "wi.md": workItem(GOOD_BULLET),
   });
   try {
-    const go = (g) =>
-      run([
-        "--case",
-        CASE,
-        "--gate",
-        paths[g],
-        "--work-item",
-        paths["wi.md"],
-        "--approver",
-        OWNER,
-      ]).json.reason;
     for (const g of ["a.yml", "b.yml", "c.yml", "e.yml", "f.yml"])
       assert.equal(go(g), "unapproved", g);
     assert.equal(go("d.yml"), "matched", "d.yml");
@@ -660,7 +505,7 @@ test("control: no line shape hides a lost withdrawal - the whole gate is reconci
 test("control: a gate entry that names the case in ANY field is a record about it; only its own case: field approves (T271-QA-22)", () => {
   const second = (field) =>
     `    - action: y\n      case: other\n      ${field}: withdraw ${CASE} deferral\n`;
-  const files = {
+  const { go, dir } = reasons({
     "note.yml": gate(GOOD_GATE_ENTRY + second("note")),
     "reason.yml": gate(GOOD_GATE_ENTRY + second("reason")),
     "key.yml": gate(
@@ -671,12 +516,8 @@ test("control: a gate entry that names the case in ANY field is a record about i
     "longer.yml": gate(
       GOOD_GATE_ENTRY + second("note").replace(CASE, `${CASE}-2`),
     ),
-  };
-  const { dir, paths } = fixture(files);
+  });
   try {
-    const go = (f) =>
-      run(["--case", CASE, "--gate", paths[f], "--approver", OWNER]).json
-        .reason;
     for (const f of ["note.yml", "reason.yml", "key.yml"])
       assert.equal(go(f), "unapproved", f);
     for (const f of ["plain.yml", "longer.yml"])
@@ -686,42 +527,10 @@ test("control: a gate entry that names the case in ANY field is a record about i
   }
 });
 
-test("control: every spelling of the section heading is the section, so a revocation under one is read (T271-QA-24)", () => {
-  const withSecond = (h) =>
-    `# T\n\n## Deferred Work\n\n${GOOD_BULLET}\n\n${h}\n\n- \`${CASE}\`: revoked\n`;
-  const files = {};
-  const spellings = [
-    "## Deferred Work ##",
-    "##  Deferred Work",
-    "## Deferred Work:",
-    "## Deferred work",
-    "## **Deferred Work**",
-    "   ## Deferred Work",
-  ];
-  spellings.forEach((h, i) => (files[`h${i}.md`] = withSecond(h)));
-  // Controls: an honest bullet under a variant heading is read; an unrelated H2 and an H3 are not it.
-  files["variant-ok.md"] = `# T\n\n## Deferred Work ##\n\n${GOOD_BULLET}\n`;
-  files["other-h2.md"] = withSecond("## Notes");
-  files["h3.md"] = withSecond("### Deferred Work");
-  const { dir, paths } = fixture(files);
-  try {
-    const go = (f) =>
-      run(["--case", CASE, "--work-item", paths[f], "--approver", OWNER]).json
-        .reason;
-    spellings.forEach((h, i) => assert.equal(go(`h${i}.md`), "unapproved", h));
-    assert.equal(go("variant-ok.md"), "matched");
-    // Text under another H2 is not read, by design; an H3 under the section stays part of it.
-    assert.equal(go("other-h2.md"), "matched");
-    assert.equal(go("h3.md"), "unapproved");
-  } finally {
-    cleanup(dir);
-  }
-});
-
 test("control: a record about the case outside future[] blocks - immediate, other keys, unknown root keys, a note in the approving entry (T271-QA-25)", () => {
   const head = (extra) =>
     `schema: 1\nrecommendations:\n${extra}  future:\n${GOOD_GATE_ENTRY}`;
-  const files = {
+  const { go, dir } = reasons({
     "immediate.yml": head(`  immediate:\n    - action: ${CASE} revoked\n`),
     "otherkey.yml": head(`  extra: ${CASE} revoked\n`),
     "root.yml": `${head("")}top: ${CASE} revoked\n`,
@@ -733,94 +542,12 @@ test("control: a record about the case outside future[] blocks - immediate, othe
     "immediate-other.yml": head(
       `  immediate:\n    - action: other-case revoked\n`,
     ),
-  };
-  const { dir, paths } = fixture(files);
+  });
   try {
-    const go = (f) =>
-      run(["--case", CASE, "--gate", paths[f], "--approver", OWNER]).json
-        .reason;
     for (const f of ["immediate", "otherkey", "root", "note"])
       assert.equal(go(`${f}.yml`), "unapproved", f);
     for (const f of ["prose", "immediate-other"])
       assert.equal(go(`${f}.yml`), "matched", f);
-  } finally {
-    cleanup(dir);
-  }
-});
-
-test("control: a fence closes only on a matching marker, so a record inside a code fence is not read (T271-QA-23)", () => {
-  const fenced = (open, mid, close) =>
-    `# T\n\n## Deferred Work\n\n${open}\n${GOOD_BULLET}\n${mid}\n${close}\n`;
-  const files = {
-    // A ~~~ line does not close a ``` fence, so the approving bullet stays inside code.
-    "mismatch.md": `# T\n\n## Deferred Work\n\n\`\`\`\n~~~\n${GOOD_BULLET}\n`,
-    // A shorter closer does not close a longer fence.
-    "short.md": fenced("````", "", "```"),
-    // Controls: a proper closer ends the fence; the bullet after it is read.
-    "closed.md": `# T\n\n## Deferred Work\n\n\`\`\`\n~~~\n\`\`\`\n\n${GOOD_BULLET}\n`,
-    "tilde.md": `# T\n\n## Deferred Work\n\n~~~~\nx\n~~~~\n\n${GOOD_BULLET}\n`,
-  };
-  const { dir, paths } = fixture(files);
-  try {
-    const go = (f) =>
-      run(["--case", CASE, "--work-item", paths[f], "--approver", OWNER]).json
-        .reason;
-    for (const f of ["mismatch.md", "short.md"])
-      assert.notEqual(go(f), "matched", f);
-    for (const f of ["closed.md", "tilde.md"])
-      assert.equal(go(f), "matched", f);
-  } finally {
-    cleanup(dir);
-  }
-});
-
-test("control: no list shape hides a lost withdrawal - the Deferred Work section is reconciled (T271-QA-18)", () => {
-  const section = (extra) =>
-    `# T\n\n## Deferred Work\n\n${GOOD_BULLET}\n${extra}\n\n## Change Log\n`;
-  const variants = {
-    plus: section(`+ \`${CASE}\`: approval withdrawn.`),
-    numbered: section(`1. ${CASE} is withdrawn`),
-    prose: section(`\nNote: ${CASE} approval is withdrawn.`),
-    table: section(`\n| ${CASE} | revoked |`),
-  };
-  const files = { "ok.md": section("") };
-  // A heading or a fence inside an HTML comment is not one (T271-QA-19): the section runs on.
-  variants["hidden heading"] =
-    `# T\n\n## Deferred Work\n\n${GOOD_BULLET}\n<!--\n## Notes\n-->\nWithdrawn: ${CASE} is no longer deferred.\n`;
-  variants["hidden fence"] =
-    `# T\n\n## Deferred Work\n\n${GOOD_BULLET}\n<!--\n\`\`\`\n-->\nWithdrawn: ${CASE} is no longer deferred.\n\n## Change Log\n`;
-  // One comment pass serves both readers (T271-QA-20, T271-QA-21): a comment that spans lines cannot
-  // move the boundary, and an id a comment splits is counted on both sides.
-  variants["multi-line comment"] =
-    `# T\n\n## Deferred Work\n\n${GOOD_BULLET}\nx<!--\n-->## Other\n+ \`${CASE}\`: withdrawn, not deferred.\n`;
-  variants["split id"] =
-    `# T\n\n## Deferred Work\n\n- \`${CASE.slice(0, 3)}<!---->${CASE.slice(3)}\`: deferred to task.901, approved by ${OWNER} on 2026-10-28.\n+ \`${CASE}\`: withdrawn, not deferred.\n`;
-  variants["comment naming the id"] =
-    `# T\n\n## Notes\n\n<!-- ${CASE}: withdrawn -->\n\n## Deferred Work\n\n${GOOD_BULLET}\n`;
-  // Controls: another section may name the id; so may a different, longer id in this one.
-  files["heading-comment.md"] =
-    `# T\n\n## Deferred Work <!-- n -->\n\n${GOOD_BULLET}\n\n## Notes\n\nx\n`;
-  files["comment-only.md"] =
-    `# T\n\n## Deferred Work\n\n${GOOD_BULLET}\n<!-- a note -->\n`;
-  Object.entries(variants).forEach(([k, v]) => (files[`${k}.md`] = v));
-  files["other-section.md"] =
-    `${section("")}## Notes\n\n${CASE} was reproduced.\n`;
-  files["longer-id.md"] = section(`- \`${CASE}-2\`: not this case`);
-  const { dir, paths } = fixture(files);
-  try {
-    const go = (f) =>
-      run(["--case", CASE, "--work-item", paths[f], "--approver", OWNER]).json
-        .reason;
-    for (const k of Object.keys(variants))
-      assert.equal(go(`${k}.md`), "unapproved", k);
-    for (const f of [
-      "ok.md",
-      "other-section.md",
-      "longer-id.md",
-      "heading-comment.md",
-      "comment-only.md",
-    ])
-      assert.equal(go(f), "matched", f);
   } finally {
     cleanup(dir);
   }

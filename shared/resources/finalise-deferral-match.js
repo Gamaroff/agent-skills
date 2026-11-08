@@ -15,43 +15,44 @@
  *   3. it names an approver, and that approver is one the caller passed with `--approver`
  *      (the repository owner, read by the caller from `finalise.deferralApprover` in
  *      skills-config.yaml — this engine reads no configuration itself),
- *   4. it carries an approval date (YYYY-MM-DD).
+ *   4. it carries an approval date (YYYY-MM-DD, a real date, not in the future).
  * Anything less is not a deferral and the case stays a FAIL. With no `--approver`, nothing matches.
  *
- * Two record shapes are read, and only these:
- *   - the QA gate's `recommendations.future[]`: an entry whose `action` names the case id and which
- *     carries `case: <id>` (matched by equality; an entry that names the id in ANY other key or value
- *     is a record about the case that cannot approve it, and blocks),
- *     `deferred_to: task.N`, `approved_by: <name>`, `approved_on: YYYY-MM-DD`;
- *   - the work item's `## Deferred Work` section (an H2): a list item that is EXACTLY
- *     `` `case-id`: deferred to task.N, approved by <name> on YYYY-MM-DD. ``
- *     with no optional piece and no other word. A bullet inside an HTML comment is not read, and
- *     anything else that names the case is a candidate with no facts: `unapproved`.
- *   Every record that names the case must approve it, and agree on the follow-up task; one that does
- *   not (a revocation, a prose mention) blocks, so a later record can withdraw an earlier approval.
+ * ONE record shape is read: the QA gate's `recommendations.future[]` entry that carries
+ * `case: <id>` (matched by equality), `deferred_to: task.N`, `approved_by: <name>` and
+ * `approved_on: YYYY-MM-DD`. The gate is structured data, so there is no spelling of "the record"
+ * to guess at. A work item's prose is NOT read (task 271, QA gates 4-12): the set of Markdown
+ * spellings that render as one section is open-ended, and every gate found another.
+ *
+ * To WITHDRAW a deferral, remove or edit its gate entry: the entry is the only record that is read.
+ * Anything else in the gate that names the case id and is not that entry blocks, so a stray
+ * mention can never be mistaken for an approval:
+ *   - every `future[]` entry that names the id in ANY key or value is a candidate, and only the
+ *     entry whose `case:` equals the id carries facts; every candidate must approve and agree on
+ *     the follow-up task, so a second entry with another task or a missing fact blocks;
+ *   - the approving entry may name the id only in its `case:` and `action:` (a note blocks);
+ *   - an `immediate[]` entry, any other key under `recommendations`, and a root key that is not a
+ *     prose field of the gate schema (GATE_PROSE_KEYS) that names the id block. The prose fields
+ *     (top_issues, status_reason...) may cite the id: a finding legitimately does;
+ *   - the subset YAML parser drops text it cannot read, so the WHOLE gate is reconciled: every
+ *     occurrence of the id in the raw text must also occur in a key or value the parser took.
+ *     An occurrence it did not take (a block-scalar body, a comment) blocks.
  *   The approver name is compared to the owner list exactly (no case or Unicode folding).
- *   Both readers drop text they cannot read, so each source is reconciled: every occurrence of the
- *   case id in the whole gate (raw text, nothing stripped), and in the whole Deferred Work section,
- *   must also occur in a key, value or list item the reader took. One it did not take (a
- *   block-scalar body, a `+` bullet, a numbered item, prose, a table row, a comment) is a record
- *   naming the case that was not read, and it blocks. The work item's HTML comments are removed
- *   ONCE and the section is found and counted on that single text, so the item reader and the count
- *   cannot disagree; a comment anywhere that names the case id blocks.
  *
  * FAILS CLOSED. Exit 0 means exactly one thing: `matched`. Every other answer exits 1 (a usage error
- * exits 2), so a shell `if` cannot round a "no" up to a deferral.
+ * exits 2), so a shell `if` cannot round a "no" up to a deferral. `--work-item` is refused (exit 2):
+ * a caller still passing it learns the contract changed instead of being silently ignored.
  *
  * Usage:
- *   finalise-deferral-match.js --case <id> [--gate <gate.yml>] [--work-item <doc.md>]
+ *   finalise-deferral-match.js --case <id> --gate <gate.yml>
  *                              --approver <name> [--approver <name> ...] [--json]
- *   At least one of --gate and --work-item is required.
  *
  * `--json` prints { reason, case, owner, date, task, source, rendered, candidates, detail } and
  * nothing else on stdout. `rendered` is the DoD line, `deferred (owner <name>, <date>, <task>)`.
  *
  * Reasons: matched | no-match (no record names the case) | unapproved (a record names the case but
  * lacks a task, a valid date, or an approver on the list) | no-approver-configured | unverifiable
- * (a named source could not be read or parsed).
+ * (the gate could not be read or parsed).
  *
  * Depends on yaml-subset.js and nothing else.
  */
@@ -63,7 +64,7 @@ const fs = require("fs");
 const { parseYamlSubset } = require("./yaml-subset.js");
 
 const USAGE =
-  "usage: finalise-deferral-match.js --case <id> [--gate <gate.yml>] [--work-item <doc.md>] --approver <name> [--approver <name> ...] [--json]";
+  "usage: finalise-deferral-match.js --case <id> --gate <gate.yml> --approver <name> [--approver <name> ...] [--json]";
 
 class UsageError extends Error {}
 
@@ -102,13 +103,7 @@ function isRealPastDate(s, now = Date.now()) {
 }
 
 function parseArgs(argv) {
-  const out = {
-    caseId: "",
-    gate: "",
-    workItem: "",
-    approvers: [],
-    json: false,
-  };
+  const out = { caseId: "", gate: "", approvers: [], json: false };
   const need = (i, flag) => {
     const v = argv[i + 1];
     if (v === undefined || v.startsWith("--")) {
@@ -121,7 +116,6 @@ function parseArgs(argv) {
     if (a === "--json") out.json = true;
     else if (a === "--case") out.caseId = need(i++, a);
     else if (a === "--gate") out.gate = need(i++, a);
-    else if (a === "--work-item") out.workItem = need(i++, a);
     else if (a === "--approver") out.approvers.push(need(i++, a));
     else throw new UsageError(`unknown argument "${a}"`);
   }
@@ -130,8 +124,8 @@ function parseArgs(argv) {
       "--case is required and must be an id of letters, digits, '.', '_' or '-'",
     );
   }
-  if (!out.gate && !out.workItem) {
-    throw new UsageError("at least one of --gate and --work-item is required");
+  if (!out.gate) {
+    throw new UsageError("--gate is required");
   }
   return out;
 }
@@ -212,6 +206,8 @@ function gateCandidates(text, id) {
   if (future !== undefined && future !== null && !Array.isArray(future))
     throw new Error("recommendations.future is not a list");
   const out = [];
+  const blocker = (source) =>
+    out.push({ source, task: "", owner: "", date: "" });
   (future || []).forEach((e, i) => {
     const f = e && typeof e === "object" && !Array.isArray(e) ? e : {};
     // A record carries the case in its own `case:` field, matched by equality. An entry that merely
@@ -226,14 +222,20 @@ function gateCandidates(text, id) {
       owner: own && typeof f.approved_by === "string" ? f.approved_by : "",
       date: own ? f.approved_on : "",
     });
+    // The approving entry may name the id only in `case:` and `action:`; a note blocks.
+    if (own) {
+      const stray = Object.entries(f)
+        .filter(([k]) => k !== "case" && k !== "action")
+        .reduce(
+          (n, [k, v]) => n + countMentions(k, id) + countParsedMentions(v, id),
+          0,
+        );
+      if (stray > 0)
+        blocker(`gate recommendations.future[${i}] (a note names the case)`);
+    }
   });
-  // Records are not only future[] entries (T271-QA-25). A mention of the id in an `immediate[]` entry,
-  // in any other key under `recommendations`, or in a root key that is not a prose field of the
-  // gate schema (top_issues, status_reason, nfr_validation... legitimately cite ids) is a record
-  // about the case with no facts: it blocks. So does a mention inside the approving entry other than
-  // in its `case:` and `action:` (a note, a nested list).
-  const blocker = (source) =>
-    out.push({ source, task: "", owner: "", date: "" });
+  // Records are not only future[] entries (T271-QA-25): a mention in an `immediate[]` entry, in any
+  // other key under `recommendations`, or in a root key that is not a prose field of the gate schema.
   const recObj = rec && typeof rec === "object" ? rec : {};
   (Array.isArray(recObj.immediate) ? recObj.immediate : []).forEach((e, i) => {
     if (countParsedMentions(e, id) > 0)
@@ -251,34 +253,14 @@ function gateCandidates(text, id) {
     )
       blocker(`gate ${k}`);
   }
-  (future || []).forEach((e, i) => {
-    if (!e || typeof e !== "object" || Array.isArray(e)) return;
-    if (typeof e.case !== "string" || e.case.trim() !== id) return;
-    const extra = Object.entries(e).filter(
-      ([k]) => k !== "case" && k !== "action",
-    );
-    const stray = extra.reduce(
-      (n, [k, v]) => n + countMentions(k, id) + countParsedMentions(v, id),
-      0,
-    );
-    if (stray > 0)
-      blocker(`gate recommendations.future[${i}] (a note names the case)`);
-  });
   // The subset parser silently drops text it cannot read (a block scalar `action: >-`, a row deeper
-  // than its map), and any line shape used to find that text can be defeated: by a comment line, by
-  // an earlier `future:` key (T271-QA-13, 15, 16). So no shape is used. The WHOLE gate is the
-  // reference: every occurrence of the case id in its text must also occur in a value or key the
-  // parser actually read. An occurrence it did not read is a record the parser lost, and it blocks.
-  // Nothing is stripped, comments included: a `#` line inside a block scalar is TEXT to YAML and a
-  // regex cannot tell it from a comment (T271-QA-17). A comment naming the id therefore blocks.
+  // than its map), and any line shape used to find that text can be defeated (T271-QA-13, 15, 16).
+  // So no shape is used. The WHOLE gate is the reference: every occurrence of the case id in its
+  // text must also occur in a value or key the parser actually read. Nothing is stripped, comments
+  // included: a `#` line inside a block scalar is TEXT to YAML (T271-QA-17).
   const raw = countMentions(String(text), id);
   if (raw > countParsedMentions(doc, id)) {
-    out.push({
-      source: "gate (text the reader could not parse names the case)",
-      task: "",
-      owner: "",
-      date: "",
-    });
+    blocker("gate (text the reader could not parse names the case)");
   }
   return out;
 }
@@ -309,165 +291,6 @@ function countParsedMentions(node, id) {
   return 0;
 }
 
-/** The title of an ATX H2 line (closing hashes dropped), or null when the line is not an H2. */
-function h2Title(line) {
-  const m = /^ {0,3}##(?!#)[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/.exec(line);
-  return m ? m[1] : null;
-}
-
-/**
- * True for every spelling a renderer shows as the section: case, spacing, emphasis markers and a
- * trailing colon do not change which section it is (T271-QA-24).
- */
-function isDeferredWorkTitle(title) {
-  return (
-    String(title)
-      .replace(/[*_`]/g, "")
-      .replace(/:\s*$/, "")
-      .replace(/\s+/g, " ")
-      .trim()
-      .toLowerCase() === "deferred work"
-  );
-}
-
-/**
- * Markdown fences: one opens with 3+ backticks or tildes (up to 3 spaces of indent) and closes only
- * on the SAME character, at least as long, with nothing after it - so a `~~~` line inside a ``` fence
- * does not close it (T271-QA-23: a record the renderer shows as code is not a record).
- */
-function fenceStep(line, open) {
-  const m = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
-  if (!open) {
-    if (m && !(m[1][0] === "`" && m[2].includes("`"))) {
-      return { open: { ch: m[1][0], len: m[1].length }, isFence: true };
-    }
-    return { open: null, isFence: false };
-  }
-  if (m && m[1][0] === open.ch && m[1].length >= open.len && m[2].trim() === "")
-    return { open: null, isFence: true };
-  return { open, isFence: false };
-}
-
-/** The list items of the work item's `## Deferred Work` H2 (continuation lines joined). */
-function deferredWorkItems(text) {
-  const lines = String(text).split("\n");
-  const items = [];
-  let inSection = false;
-  let fence = null;
-  let cur = null;
-  const flush = () => {
-    if (cur !== null) items.push(cur.join(" "));
-    cur = null;
-  };
-  for (const line of lines) {
-    const step = fenceStep(line, fence);
-    fence = step.open;
-    if (step.isFence) continue;
-    if (fence) continue;
-    const h2 = h2Title(line);
-    if (h2 !== null) {
-      flush();
-      inSection = isDeferredWorkTitle(h2);
-      continue;
-    }
-    if (!inSection) continue;
-    if (/^\s*[-*] /.test(line)) {
-      flush();
-      cur = [line.replace(/^\s*[-*] /, "")];
-    } else if (cur !== null && /^\s+\S/.test(line)) {
-      cur.push(line.trim());
-    } else if (line.trim() === "") {
-      flush();
-    }
-  }
-  flush();
-  return items;
-}
-
-// ONE exact line (T271-QA-5, QA-9, QA-10, replacing three rounds of patching a prose matcher):
-//   `case-id`: deferred to task.N, approved by NAME on DATE.
-// There is no optional lead, no bold slot and no word list: the whole item is that sentence or it is a
-// bullet with no facts, which judge() answers `unapproved`. NAME is then compared to the configured
-// owners EXACTLY, so any prose that slipped into it ("Pat Owner, if Sam agrees") names nobody.
-const BULLET_RE =
-  /^`([^`]+)`:\s+deferred to (task\.\d+),\s+approved by (.+?) on (\d{4}-\d{2}-\d{2})\.$/;
-
-/** The facts of a bullet in the one accepted form, or null. */
-function parseBullet(item, id) {
-  const m = BULLET_RE.exec(item.trim());
-  if (!m || m[1] !== id) return null;
-  return { task: m[2], owner: m[3], date: m[4] };
-}
-
-function workItemCandidates(text, id) {
-  const out = [];
-  // An HTML comment is not rendered, so a bullet inside one is not on the record (T271-QA-6).
-  const visible = String(text)
-    .replace(/<!--[\s\S]*?-->/g, "")
-    .replace(/<!--[\s\S]*$/, "");
-  const items = deferredWorkItems(visible);
-  items.forEach((item, i) => {
-    if (!namesCase(item, id)) return;
-    const f = parseBullet(item, id);
-    out.push({
-      source: `work item Deferred Work item ${i + 1}`,
-      task: f ? f.task : "",
-      owner: f ? f.owner : "",
-      date: f ? f.date : "",
-    });
-  });
-  // Only `-` and `*` list items are read, so a `+` bullet, a numbered item, a table row or a prose
-  // line in the section can still name the case - a withdrawal, say (T271-QA-18). Reconcile the same
-  // way as the gate: every occurrence of the id in the section's visible text (fences and all) must
-  // also occur in an item the reader took, and a comment anywhere that names the id is a record
-  // nobody can see; a surplus is a record it did not read, and it blocks. Both counts run over the
-  // same comment-free text, so an id a comment splits (`c<!---->1`) is counted on both sides.
-  const taken = items.reduce((n, item) => n + countMentions(item, id), 0);
-  const unread =
-    countMentions(deferredWorkSectionText(visible), id) +
-    countMentions(commentText(text), id);
-  if (unread > taken) {
-    out.push({
-      source:
-        "work item Deferred Work (text the reader could not parse names the case)",
-      task: "",
-      owner: "",
-      date: "",
-    });
-  }
-  return out;
-}
-
-/**
- * The text under every `## Deferred Work` H2, up to the next H2 (fences kept). It is given the ONE
- * comment-free text the item reader also reads, so the two cannot disagree about where the section
- * is or what its text says (T271-QA-19, 20, 21).
- */
-function deferredWorkSectionText(visible) {
-  const out = [];
-  let inSection = false;
-  let fence = null;
-  for (const line of String(visible).split("\n")) {
-    const step = fenceStep(line, fence);
-    fence = step.open;
-    const h2 = !step.isFence && !fence ? h2Title(line) : null;
-    if (h2 !== null) {
-      inSection = isDeferredWorkTitle(h2);
-      continue;
-    }
-    if (inSection) out.push(line);
-  }
-  return out.join("\n");
-}
-
-/** Everything inside HTML comments (closed, and an unterminated one to the end of the text). */
-function commentText(text) {
-  const t = String(text);
-  const closed = t.match(/<!--[\s\S]*?-->/g) || [];
-  const tail = t.replace(/<!--[\s\S]*?-->/g, "").match(/<!--[\s\S]*$/);
-  return closed.concat(tail ? [tail[0]] : []).join("\n");
-}
-
 function readText(p) {
   return fs.readFileSync(p, "utf8");
 }
@@ -492,31 +315,21 @@ function decide(args) {
     });
   }
 
-  const candidates = [];
-  for (const [kind, p] of [
-    ["gate", args.gate],
-    ["work item", args.workItem],
-  ]) {
-    if (!p) continue;
-    let text;
-    try {
-      text = readText(p);
-    } catch (e) {
-      return done(REASONS.UNVERIFIABLE, {
-        detail: `the ${kind} could not be read: ${e.code || e.message}`,
-      });
-    }
-    try {
-      candidates.push(
-        ...(kind === "gate"
-          ? gateCandidates(text, args.caseId)
-          : workItemCandidates(text, args.caseId)),
-      );
-    } catch (e) {
-      return done(REASONS.UNVERIFIABLE, {
-        detail: `the ${kind} could not be parsed: ${e.message}`,
-      });
-    }
+  let text;
+  try {
+    text = readText(args.gate);
+  } catch (e) {
+    return done(REASONS.UNVERIFIABLE, {
+      detail: `the gate could not be read: ${e.code || e.message}`,
+    });
+  }
+  let candidates;
+  try {
+    candidates = gateCandidates(text, args.caseId);
+  } catch (e) {
+    return done(REASONS.UNVERIFIABLE, {
+      detail: `the gate could not be parsed: ${e.message}`,
+    });
   }
 
   if (candidates.length === 0) {
@@ -525,8 +338,7 @@ function decide(args) {
     });
   }
   // EVERY record that names the case must be a valid owner approval, and they must agree on the
-  // follow-up task. One that is not (a revocation, a prose mention, a different task) blocks, so a
-  // later record can withdraw an earlier approval instead of being ignored (T271-QA-12).
+  // follow-up task. One that is not (a prose mention, a different task) blocks (T271-QA-12).
   const refusals = [];
   const oks = [];
   for (const c of candidates) {
@@ -601,8 +413,6 @@ module.exports = {
   namesCase,
   judge,
   gateCandidates,
-  workItemCandidates,
-  deferredWorkItems,
   decide,
   main,
 };

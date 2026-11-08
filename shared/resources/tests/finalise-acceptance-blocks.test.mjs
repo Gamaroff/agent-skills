@@ -67,7 +67,6 @@ const item5a = (gate) =>
   bind(blockFive(), {
     "{case-id}": "oc10-x",
     "{gate-file}": gate,
-    "{work-item}": "w.md",
   });
 
 for (const shell of SHELLS) {
@@ -104,12 +103,13 @@ for (const shell of SHELLS) {
         JSON.parse(r.stdout.trim().split("\n").pop()).reason,
         "unapproved",
       );
-      // No gate file at all: the empty --gate array expands to nothing and the work item decides.
+      // No gate file at all: nothing is read, so there is no deferral (no-match, exit 1).
       const noGate = run(shell, item5a(""), { cwd: dir });
       assert.equal(
         JSON.parse(noGate.stdout.trim().split("\n").pop()).reason,
         "no-match",
       );
+      assert.equal(noGate.status, 1);
     } finally {
       cleanup(dir);
     }

@@ -249,6 +249,22 @@ Advisory, not fixed: a bullet indented four spaces (an indented code block) is s
 
 Advisory, not fixed: withdrawal wording is not machine-readable (the skill now says a withdrawal must name the case id); a bullet indented four spaces is still read; `case` is compared after `trim()`; `ls-tree` without `-z`; exact-case compare (macOS, task 210).
 
+### QA Cycle 12 — 2026-11-08
+
+| Item | Result |
+| ---- | ------ |
+| `/qa-task` gate | FAIL, 60/100, unscoped: T271-QA-26 (HIGH), T271-QA-27 (MEDIUM). Delta engine: nothing reproduced |
+| Budget | Spent again; the owner granted a further cycle (`qa_max_cycles` 13) and approved the redesign I recommended |
+| Cause | The work item is free-form Markdown, so the spellings that render as one section are open-ended; each gate since gate 4 found another |
+| `/qa-fix` | **Design change, owner-approved:** Arm 3 reads the structured QA gate only. The work item's Deferred Work section is no longer a source, so about 150 lines of heading, fence, comment and bullet code are deleted. `--work-item` is refused (exit 2) so a stale caller fails loudly. A deferral is withdrawn by removing or editing its gate entry. A case deferred in the work item only must first be recorded as a gate entry |
+| T271-QA-27 | Resolved by the same decision: the gate's prose fields may cite the id, and the skill now says a withdrawal is made in the entry, the only record read |
+| Tests | Matcher test rewritten gate-only (20 tests): a retired `--work-item` flag exits 2, a work item holding a perfect bullet cannot turn a no-match into a deferral, withdrawal by removal or edit. `ci:fast` 8061 tests, 0 failed (fewer because the work-item tests went) |
+| Mutation proofs | Re-accepting `--work-item`, dropping the stray-note rule and dropping the raw reconciliation each turn a named test red; file restored (`cmp`) |
+
+The task document's owner decision (Phase 1) named "the gate's `recommendations.future` or the work item's Deferred Work"; the second source is dropped on the owner's approval of this cycle. The criterion line in the task document says so.
+
+Advisory, not fixed: `ls-tree` without `-z`; exact-case path compare (macOS, task 210).
+
 ---
 
 ## Completion
