@@ -5,7 +5,7 @@ type: task
 description: "Give finalise three recorded arms it lacks, so work that the evidence already clears is no longer halted: a measurement on a code-identical earlier commit, one bounded re-run of a red outside the diff, and a probe reproduction the owner deferred."
 tags: [finalise, observation]
 category: refactoring
-status: ready-for-review
+status: in-progress
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-08
@@ -14,7 +14,7 @@ estimated_effort_hours: 16
 
 # Task 271: finalise accepts what the record already shows
 
-**Status:** Ready for Review
+**Status:** In Progress
 
 ---
 
@@ -322,17 +322,17 @@ Not modified, against the plan: `finalise-dod-security-prompt.md` (Arm 3 is wire
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.271.qa.15.finalise-accepts-what-the-record-already-shows.md](./task.271.qa.15.finalise-accepts-what-the-record-already-shows.md)
-- **Gate File**: [task.271.gate.15.finalise-accepts-what-the-record-already-shows.yml](./task.271.gate.15.finalise-accepts-what-the-record-already-shows.yml)
+- **Full Report**: [task.271.qa.16.finalise-accepts-what-the-record-already-shows.md](./task.271.qa.16.finalise-accepts-what-the-record-already-shows.md)
+- **Gate File**: [task.271.gate.16.finalise-accepts-what-the-record-already-shows.yml](./task.271.gate.16.finalise-accepts-what-the-record-already-shows.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 8065
+- **Tests Executed**: 8067
 - **Phases Verified**: 5/5
-- **Critical Issues**: 0
-- **NFR Status**: Security: FAIL, Performance: CONCERNS, Reliability: PASS, Maintainability: CONCERNS
+- **Critical Issues**: 3
+- **NFR Status**: Security: FAIL, Performance: CONCERNS, Reliability: PASS, Maintainability: FAIL
 
 ### Key Findings
-Cycle 14's fixes hold. One hole remains: the parser cuts a scalar at a `#` glued to its text, which YAML does not treat as a comment, so a gate whose four fields all carry a glued suffix matches. The fifteen-gate budget is spent.
+A thorough review found the gap between the hand-rolled subset parser and real YAML is wide: escapes in quoted values, inline second-recommendations spellings, line breaks other than LF, a non-breaking space before a comment and a multi-document stream all let a gate match that a real YAML reader reads differently. The recommendation is to move the facts to a JSON record. The sixteen-gate budget is spent.
 
 <!-- change-log-start -->
 ## Change Log
@@ -374,6 +374,7 @@ Cycle 14's fixes hold. One hole remains: the parser cuts a scalar at a `#` glued
 | 2026-11-08 |         | QA findings fixed — 2 of 2 (the gate's recommendations subtree must be read completely; prototype keys, escaped keys and tab indents are refused); a further cycle granted by the owner | qa-fix |
 | 2026-11-08 |         | QA gate FAIL (60/100) — 2 findings; QA budget (15 gates) spent | qa-task |
 | 2026-11-08 |         | QA findings fixed — 2 of 2 (strict mode follows YAML's comment rule; a row left after the body throws); a further cycle granted by the owner | qa-fix |
+| 2026-11-08 |         | QA gate FAIL (60/100) — 5 findings; QA budget (16 gates) spent | qa-task |
 <!-- change-log-end -->
 
 ---
@@ -417,4 +418,4 @@ The measured-criteria card (finalise takes the measurement itself).
 
 ---
 
-**Status:** Ready for Review
+**Status:** In Progress
