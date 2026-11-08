@@ -168,6 +168,19 @@ Advisory, not fixed: the Deferred Work section ends only at the next H2; exact-c
 
 Advisory, not fixed: `ls-tree` without `-z` (non-ASCII failed-file names fail closed); an explanatory note naming the case id blocks an approved deferral; a nested list item is read as a record; section end at next H2; exact-case compare (macOS, task 210).
 
+### QA Cycle 6 — 2026-11-08
+
+| Item | Result |
+| ---- | ------ |
+| `/qa-task` gate | FAIL, 80/100, unscoped: T271-QA-15 (HIGH), T271-QA-16 (HIGH) |
+| Budget | Spent again; the owner granted a further cycle (`qa_max_cycles` 7) |
+| Cause | The cycle-5 check located the unread text by line shape (the `future:` block), so a column-0 comment or an earlier `future:` key hid it. A second heuristic over the same parser |
+| `/qa-fix` | Mechanism replaced, no line shape: every occurrence of the case id in the whole gate text (full-line comments excluded) must also occur in a key or value the parser read; an unread occurrence is a blocking record |
+| Tests | A withdrawal after a comment, after an earlier `future:` key, and in another section are refused; controls: the id read in another section and an id in a full-line comment still match. `ci:fast` 8063 tests, 0 failed |
+| Mutation proofs | Disabling the reconciliation and counting comment lines each turn a named test red; file restored (`cmp`) |
+
+Advisory, not fixed: an inline comment naming the id fails closed; `ls-tree` without `-z`; a nested list item is read as a record; section end at next H2; exact-case compare (macOS, task 210).
+
 ---
 
 ## Completion

@@ -612,3 +612,39 @@ test("control: an approver is never matched by stripping trailing markup charact
     );
   }
 });
+
+test("control: no line shape hides a lost withdrawal - the whole gate is reconciled (T271-QA-15, T271-QA-16)", () => {
+  const lost = `    - action: >-\n        ${CASE} deferral withdrawn by the owner\n      refs: []\n`;
+  const afterComment = gate(`${GOOD_GATE_ENTRY}# note\n${lost}`);
+  const earlierFutureKey = `schema: 1\nnfr:\n  future:\nrecommendations:\n  future:\n${GOOD_GATE_ENTRY}${lost}`;
+  const lostInOtherSection = `${gate(GOOD_GATE_ENTRY)}top_issues:\n  - id: X\n    finding: >-\n      ${CASE} was withdrawn\n`;
+  // Controls: the id read by the parser anywhere is accounted for, and a full-line comment is no record.
+  const quotedElsewhere = `${gate(GOOD_GATE_ENTRY)}top_issues:\n  - id: X\n    finding: 'reproduced by ${CASE}'\n`;
+  const fullLineComment = gate(`${GOOD_GATE_ENTRY}# ${CASE} was reproduced\n`);
+  const { dir, paths } = fixture({
+    "a.yml": afterComment,
+    "b.yml": earlierFutureKey,
+    "c.yml": lostInOtherSection,
+    "d.yml": quotedElsewhere,
+    "e.yml": fullLineComment,
+    "wi.md": workItem(GOOD_BULLET),
+  });
+  try {
+    const go = (g) =>
+      run([
+        "--case",
+        CASE,
+        "--gate",
+        paths[g],
+        "--work-item",
+        paths["wi.md"],
+        "--approver",
+        OWNER,
+      ]).json.reason;
+    for (const g of ["a.yml", "b.yml", "c.yml"])
+      assert.equal(go(g), "unapproved", g);
+    for (const g of ["d.yml", "e.yml"]) assert.equal(go(g), "matched", g);
+  } finally {
+    cleanup(dir);
+  }
+});

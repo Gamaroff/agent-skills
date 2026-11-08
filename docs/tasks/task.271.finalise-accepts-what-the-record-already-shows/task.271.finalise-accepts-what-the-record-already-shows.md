@@ -5,7 +5,7 @@ type: task
 description: "Give finalise three recorded arms it lacks, so work that the evidence already clears is no longer halted: a measurement on a code-identical earlier commit, one bounded re-run of a red outside the diff, and a probe reproduction the owner deferred."
 tags: [finalise, observation]
 category: refactoring
-status: in-progress
+status: ready-for-review
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-08
@@ -14,7 +14,7 @@ estimated_effort_hours: 16
 
 # Task 271: finalise accepts what the record already shows
 
-**Status:** In Progress
+**Status:** Ready for Review
 
 ---
 
@@ -355,6 +355,7 @@ Cycle 5's findings are closed in their original shapes. The check added for the 
 | 2026-11-07 |         | QA gate FAIL (70/100) — 2 findings; QA budget (5 gates) spent | qa-task |
 | 2026-11-08 |         | QA findings fixed — 2 of 2 (unparsed gate text naming the case blocks, approver compared without stripping markup), 1 iteration; one extra cycle granted by the owner | qa-fix |
 | 2026-11-08 |         | QA gate FAIL (80/100) — 2 findings; QA budget (6 gates) spent | qa-task |
+| 2026-11-08 |         | QA findings fixed — 2 of 2 (the whole gate is reconciled against what the reader parsed, replacing the line-shape check); a further cycle granted by the owner | qa-fix |
 <!-- change-log-end -->
 
 ---
@@ -398,4 +399,4 @@ The measured-criteria card (finalise takes the measurement itself).
 
 ---
 
-**Status:** In Progress
+**Status:** Ready for Review

@@ -30,6 +30,9 @@
  *   Every record that names the case must approve it, and agree on the follow-up task; one that does
  *   not (a revocation, a prose mention) blocks, so a later record can withdraw an earlier approval.
  *   The approver name is compared to the owner list exactly (no case or Unicode folding).
+ *   The gate's YAML reader drops text it cannot read, so the whole gate is reconciled: every
+ *   occurrence of the case id in the gate text must also occur in a key or value the reader read,
+ *   and one it did not read blocks (no line shape is used to find it).
  *
  * FAILS CLOSED. Exit 0 means exactly one thing: `matched`. Every other answer exits 1 (a usage error
  * exits 2), so a shell `if` cannot round a "no" up to a deferral.
@@ -194,7 +197,6 @@ function gateCandidates(text, id) {
   if (future !== undefined && future !== null && !Array.isArray(future))
     throw new Error("recommendations.future is not a list");
   const out = [];
-  let accounted = 0;
   (future || []).forEach((e, i) => {
     const f = e && typeof e === "object" && !Array.isArray(e) ? e : {};
     const action = typeof e === "string" ? e : f.action;
@@ -203,7 +205,6 @@ function gateCandidates(text, id) {
     // facts, so it can never approve one (T271-QA-12).
     const own = typeof f.case === "string" && f.case.trim() === id;
     const mentions = namesCase(action, id);
-    accounted += (own ? 1 : 0) + (mentions ? 1 : 0);
     if (!own && !mentions) return;
     out.push({
       source: `gate recommendations.future[${i}]`,
@@ -212,14 +213,22 @@ function gateCandidates(text, id) {
       date: own ? f.approved_on : "",
     });
   });
-  // The subset parser cuts an entry at a block scalar (`action: >-`, `|`) or any deeper-indented row,
-  // so text it did not read can still name the case - a withdrawal, say (T271-QA-13). Count the lines
-  // of the future block that name the case against the lines the parsed entries account for; a line
-  // nobody accounts for is a record the parser lost, and it blocks.
-  const unread = futureBlockLines(text).filter((l) => namesCase(l, id)).length;
-  if (unread > accounted) {
+  // The subset parser silently drops text it cannot read (a block scalar `action: >-`, a row deeper
+  // than its map), and any line shape used to find that text can be defeated: by a comment line, by
+  // an earlier `future:` key (T271-QA-13, 15, 16). So no shape is used. The WHOLE gate is the
+  // reference: every occurrence of the case id in its text must also occur in a value or key the
+  // parser actually read. An occurrence it did not read is a record the parser lost, and it blocks.
+  // Full-line comments are not part of the record; an inline comment naming the id fails closed.
+  const raw = countMentions(
+    String(text)
+      .split("\n")
+      .filter((l) => !/^\s*#/.test(l))
+      .join("\n"),
+    id,
+  );
+  if (raw > countParsedMentions(doc, id)) {
     out.push({
-      source: "gate recommendations.future (text the reader could not parse)",
+      source: "gate (text the reader could not parse names the case)",
       task: "",
       owner: "",
       date: "",
@@ -228,23 +237,30 @@ function gateCandidates(text, id) {
   return out;
 }
 
-/** The raw lines under `future:` up to the next key at or above its indent. */
-function futureBlockLines(text) {
-  const lines = String(text).split("\n");
-  const at = lines.findIndex((l) => /^\s*future:\s*(#.*)?$/.test(l));
-  if (at < 0) return [];
-  const indent = lines[at].match(/^\s*/)[0].length;
-  const out = [];
-  for (const l of lines.slice(at + 1)) {
-    if (l.trim() === "") {
-      out.push(l);
-      continue;
-    }
-    const ind = l.match(/^\s*/)[0].length;
-    if (ind <= indent && !/^\s*- /.test(l)) break;
-    out.push(l);
-  }
-  return out;
+/** Occurrences of `id` as a whole token (not inside a longer id). */
+function countMentions(s, id) {
+  const esc = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return (
+    String(s).match(
+      new RegExp(
+        `(?<![A-Za-z0-9._-])${esc}(?![A-Za-z0-9_-]|\\.[A-Za-z0-9_-])`,
+        "g",
+      ),
+    ) || []
+  ).length;
+}
+
+/** Occurrences of `id` in every key and string value of a parsed document. */
+function countParsedMentions(node, id) {
+  if (typeof node === "string") return countMentions(node, id);
+  if (Array.isArray(node))
+    return node.reduce((n, v) => n + countParsedMentions(v, id), 0);
+  if (node && typeof node === "object")
+    return Object.entries(node).reduce(
+      (n, [k, v]) => n + countMentions(k, id) + countParsedMentions(v, id),
+      0,
+    );
+  return 0;
 }
 
 /** The list items of the work item's `## Deferred Work` H2 (continuation lines joined). */
