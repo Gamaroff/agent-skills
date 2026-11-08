@@ -91,10 +91,24 @@ function waiverOf(text) {
   const lines = text.split("\n");
   const at = lines.findIndex((l) => /^waiver:/.test(l));
   if (at < 0) return { active: false, approvedBy: "" };
-  // A YAML comment (`#` after whitespace, or at the line start) is not a value: `active: false # was
-  // active: true` is inactive, and `reason: x # approved_by: me` names no approver. A tail holding a
-  // quote character is left whole, so a quoted value that contains ` # ` is not cut.
-  const uncomment = (l) => l.replace(/(^|\s)#[^"'\n]*$/, "");
+  // A YAML comment (`#` at the line start or after whitespace, outside a quoted scalar) is not a value:
+  // `active: false # was active: true` is inactive, and `reason: x # approved_by: me` names no
+  // approver. A quote opens a scalar only where a scalar can start (line start, after whitespace or one
+  // of `:,[{-`), so the apostrophe in `owner's` or in a comment never hides the comment.
+  const uncomment = (raw) => {
+    const l = raw.replace(/\r$/, "");
+    let q = "";
+    for (let i = 0; i < l.length; i++) {
+      const c = l[i];
+      const prev = i === 0 ? " " : l[i - 1];
+      if (q) {
+        if (c === "\\" && q === '"') i++;
+        else if (c === q) q = "";
+      } else if ((c === '"' || c === "'") && /[\s:,[{-]/.test(prev)) q = c;
+      else if (c === "#" && /\s/.test(prev)) return l.slice(0, i);
+    }
+    return l;
+  };
   let block = uncomment(lines[at]);
   for (let i = at + 1; i < lines.length; i++) {
     if (/^\S/.test(lines[i]) && lines[i].trim() !== "") break;

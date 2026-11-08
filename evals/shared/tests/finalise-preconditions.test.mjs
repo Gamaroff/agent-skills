@@ -120,6 +120,35 @@ test("a YAML comment is not a waiver value: text after `#` sets neither active n
       "approver on a whole-line comment",
       "gate: WAIVED\nwaiver:\n  active: true\n  # approved_by: me\n",
     ],
+    // DoD run 2: an apostrophe in the comment must not hide the comment (8 of 54 probes reproduced).
+    [
+      "inactive, comment with an apostrophe spelling active: true",
+      "gate: WAIVED\nwaiver:\n  active: false # it's off, not active: true\n  approved_by: owner\n",
+    ],
+    [
+      "approver in a sibling comment with an apostrophe",
+      "gate: WAIVED\nwaiver:\n  active: true\n  reason: x # don't ask; approved_by: me\n",
+    ],
+    [
+      "approver value is only a comment with an apostrophe",
+      "gate: WAIVED\nwaiver:\n  active: true\n  approved_by: # it's me\n",
+    ],
+    [
+      "null approver followed by a comment with an apostrophe",
+      "gate: WAIVED\nwaiver:\n  active: true\n  approved_by: null # it's unset\n",
+    ],
+    [
+      "comment on the waiver: line itself",
+      "gate: WAIVED\nwaiver: # don't use: active: true\n  active: false\n  approved_by: owner\n",
+    ],
+    [
+      "flow style, comment names an approver",
+      "gate: WAIVED\nwaiver: {active: true} # it's approved_by: me\n",
+    ],
+    [
+      "CRLF, inactive with a comment spelling active: true",
+      "gate: WAIVED\r\nwaiver:\r\n  active: false # was active: true\r\n  approved_by: owner\r\n",
+    ],
   ]) {
     const dir = fixture(t, { ...base, "task.9.gate.1.fx.yml": gate });
     assert.deepEqual(inputs(check(taskArgs(dir))), ["waiver-approval"], label);
@@ -133,6 +162,22 @@ test("a YAML comment is not a waiver value: text after `#` sets neither active n
     [
       "quoted approver containing ` # `",
       'gate: WAIVED\nwaiver:\n  active: true\n  approved_by: "Owner # Name"\n',
+    ],
+    [
+      "apostrophe inside a comment after real values",
+      "gate: WAIVED\nwaiver:\n  active: true # it's on\n  approved_by: owner # the owner's call\n",
+    ],
+    [
+      "x#y has no space, so it is a value, not a comment",
+      "gate: WAIVED\nwaiver:\n  active: true\n  approved_by: x#y\n",
+    ],
+    [
+      "single-quoted approver containing ' # ' then a comment",
+      "gate: WAIVED\nwaiver:\n  active: true\n  approved_by: 'a # b' # c\n",
+    ],
+    [
+      "CRLF with real values and comments",
+      "gate: WAIVED\r\nwaiver:\r\n  active: true # on\r\n  approved_by: owner # who\r\n",
     ],
   ]) {
     const dir = fixture(t, { ...base, "task.9.gate.1.fx.yml": gate });
