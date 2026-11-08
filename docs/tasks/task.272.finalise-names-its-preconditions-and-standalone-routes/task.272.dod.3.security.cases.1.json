@@ -1,0 +1,177 @@
+[
+  {
+    "id": "legit-pass-gate",
+    "input": "task.9.demo.md",
+    "direction": "legitimate",
+    "why": "an ordinary gate",
+    "correct": "accepts (exit 0)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:22",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: PASS\n"
+      }
+    }
+  },
+  {
+    "id": "legit-waiver-approved",
+    "input": "task.9.demo.md",
+    "direction": "legitimate",
+    "why": "a properly approved waiver",
+    "correct": "accepts (exit 0)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:22",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: true\n  approved_by: owner\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-no-gate",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "no gate file",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:22",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-waived-inactive",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "inactive waiver",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:22",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: false\n  approved_by: owner\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-waived-empty-approver",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "empty approver",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:22",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: true\n  approved_by: \"\"\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-waived-null-approver",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "null approver",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:22",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: true\n  approved_by: null\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-waived-tbd-approver",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "placeholder approver",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:22",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: true\n  approved_by: TBD\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-active-in-comment",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "active:true only in a comment",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:22",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: false # was active: true\n  approved_by: owner\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-approver-outside-block",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "approved_by outside the waiver block",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:22",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: true\napproved_by: owner\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-waived-no-waiver-block",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "WAIVED with no waiver block",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:22",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\n"
+      }
+    }
+  },
+  {
+    "id": "hostile-approver-in-sibling-comment",
+    "input": "task.9.demo.md",
+    "direction": "hostile",
+    "why": "approver only in a comment",
+    "correct": "reports the gate precondition missing (exit 1)",
+    "spec_ref": "shared/resources/finalise-preconditions.js:22",
+    "sink": "path",
+    "fixture": {
+      "files": {
+        "task.9.demo.md": "---\nid: task.9\n---\n# t\n",
+        "task.9.pr-review.1.demo.md": "# r\n",
+        "task.9.gate.1.demo.yml": "gate: WAIVED\nwaiver:\n  active: true\n  reason: x # approved_by: me\n"
+      }
+    }
+  }
+]

@@ -5,17 +5,18 @@ type: task
 description: "Make finalise state up front what it needs (gate, PR review, open PR) and say what a standalone or post-merge run does, for hand-built work and for a bug fixed outside develop-bug, so a missing input is a one-line answer instead of a mid-run HALT."
 tags: [finalise, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 pr_number: 860
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-08
+completed_date: 2026-11-08
 estimated_effort_hours: 8
 ---
 
 # Task 272: finalise names its preconditions and standalone routes
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 ---
 
@@ -320,6 +321,7 @@ All four cycle-1 findings are closed. Suite and CI are green on the head. Wall t
 | 2026-11-08 |         | QA findings fixed — 3 of 4 (guards, CHANGELOG), 1 iteration; performance re-measure pending | qa-fix |
 | 2026-11-08 |         | QA gate PASS (95/100) — 0 findings; status → ready-for-review | qa-task |
 | 2026-11-08 |  | QA cycle 3 gate PASS (95/100) — waiver parser ignores YAML comments; per-rule mutation proofs | qa-task |
+| 2026-11-08 | 1.2 | DoD passed — accepted (PR #860) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -359,4 +361,4 @@ None.
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
