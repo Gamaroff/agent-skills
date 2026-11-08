@@ -222,6 +222,19 @@ Advisory, not fixed: `ls-tree` without `-z`; a nested list item is read as a rec
 
 Advisory, not fixed: `ls-tree` without `-z`; a nested list item is read as a record; exact-case compare (macOS, task 210).
 
+### QA Cycle 10 — 2026-11-08
+
+| Item | Result |
+| ---- | ------ |
+| `/qa-task` gate | FAIL, 90/100, unscoped: T271-QA-22 (HIGH). The work-item side held against about 30 probes |
+| Budget | Spent again; the owner granted a further cycle (`qa_max_cycles` 11) |
+| Cause | A gate entry counted as a record about the case only through two named fields (`action`, `case`), so a withdrawal in any other field was read as parsed text and never blocked |
+| `/qa-fix` | An entry that names the case in any key or value is a record about it; only the entry whose `case:` equals the id approves, every other blocks. Also (the reviewer's low item, taken in the same cycle, T271-QA-23): a fence closes only on the same marker, at least as long, so a record Markdown shows as code is not read |
+| Tests | Refused: a withdrawal in `note`, in `reason`, in a key; a bullet inside a ``` fence a `~~~` line cannot close. Controls: an unrelated second entry, a longer id, a proper closer, a tilde fence. `ci:fast` 8066 tests, 0 failed |
+| Mutation proofs | Reverting the entry rule to the `action` field, and closing a fence on any marker, each turn a named test red; file restored (`cmp`) |
+
+Advisory, not fixed: a bullet indented four spaces (an indented code block) is still read; `ls-tree` without `-z`; a nested list item is read as a record; exact-case compare (macOS, task 210).
+
 ---
 
 ## Completion

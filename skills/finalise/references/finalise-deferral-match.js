@@ -21,7 +21,8 @@
  *
  * Two record shapes are read, and only these:
  *   - the QA gate's `recommendations.future[]`: an entry whose `action` names the case id and which
- *     carries `case: <id>` (matched by equality, never by a mention in its prose),
+ *     carries `case: <id>` (matched by equality; an entry that names the id in ANY other key or value
+ *     is a record about the case that cannot approve it, and blocks),
  *     `deferred_to: task.N`, `approved_by: <name>`, `approved_on: YYYY-MM-DD`;
  *   - the work item's `## Deferred Work` section (an H2): a list item that is EXACTLY
  *     `` `case-id`: deferred to task.N, approved by <name> on YYYY-MM-DD. ``
@@ -203,12 +204,11 @@ function gateCandidates(text, id) {
   const out = [];
   (future || []).forEach((e, i) => {
     const f = e && typeof e === "object" && !Array.isArray(e) ? e : {};
-    const action = typeof e === "string" ? e : f.action;
     // A record carries the case in its own `case:` field, matched by equality. An entry that merely
-    // MENTIONS the id in its prose is still a record about the case (it can block) but it has no
-    // facts, so it can never approve one (T271-QA-12).
+    // MENTIONS the id anywhere - in `action`, in a note, in any key or value - is still a record about
+    // the case (it can block) but it has no facts, so it can never approve one (T271-QA-12, QA-22).
     const own = typeof f.case === "string" && f.case.trim() === id;
-    const mentions = namesCase(action, id);
+    const mentions = countParsedMentions(e, id) > 0;
     if (!own && !mentions) return;
     out.push({
       source: `gate recommendations.future[${i}]`,
@@ -262,23 +262,40 @@ function countParsedMentions(node, id) {
   return 0;
 }
 
+/**
+ * Markdown fences: one opens with 3+ backticks or tildes (up to 3 spaces of indent) and closes only
+ * on the SAME character, at least as long, with nothing after it - so a `~~~` line inside a ``` fence
+ * does not close it (T271-QA-23: a record the renderer shows as code is not a record).
+ */
+function fenceStep(line, open) {
+  const m = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+  if (!open) {
+    if (m && !(m[1][0] === "`" && m[2].includes("`"))) {
+      return { open: { ch: m[1][0], len: m[1].length }, isFence: true };
+    }
+    return { open: null, isFence: false };
+  }
+  if (m && m[1][0] === open.ch && m[1].length >= open.len && m[2].trim() === "")
+    return { open: null, isFence: true };
+  return { open, isFence: false };
+}
+
 /** The list items of the work item's `## Deferred Work` H2 (continuation lines joined). */
 function deferredWorkItems(text) {
   const lines = String(text).split("\n");
   const items = [];
   let inSection = false;
-  let inFence = false;
+  let fence = null;
   let cur = null;
   const flush = () => {
     if (cur !== null) items.push(cur.join(" "));
     cur = null;
   };
   for (const line of lines) {
-    if (/^\s*(```|~~~)/.test(line)) {
-      inFence = !inFence;
-      continue;
-    }
-    if (inFence) continue;
+    const step = fenceStep(line, fence);
+    fence = step.open;
+    if (step.isFence) continue;
+    if (fence) continue;
     if (/^## /.test(line)) {
       flush();
       inSection = /^## Deferred Work\s*$/.test(line);
@@ -360,10 +377,11 @@ function workItemCandidates(text, id) {
 function deferredWorkSectionText(visible) {
   const out = [];
   let inSection = false;
-  let inFence = false;
+  let fence = null;
   for (const line of String(visible).split("\n")) {
-    if (/^\s*(```|~~~)/.test(line)) inFence = !inFence;
-    else if (!inFence && /^## /.test(line)) {
+    const step = fenceStep(line, fence);
+    fence = step.open;
+    if (!step.isFence && !fence && /^## /.test(line)) {
       inSection = /^## Deferred Work\s*$/.test(line);
       continue;
     }

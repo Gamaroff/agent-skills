@@ -657,6 +657,61 @@ test("control: no line shape hides a lost withdrawal - the whole gate is reconci
   }
 });
 
+test("control: a gate entry that names the case in ANY field is a record about it; only its own case: field approves (T271-QA-22)", () => {
+  const second = (field) =>
+    `    - action: y\n      case: other\n      ${field}: withdraw ${CASE} deferral\n`;
+  const files = {
+    "note.yml": gate(GOOD_GATE_ENTRY + second("note")),
+    "reason.yml": gate(GOOD_GATE_ENTRY + second("reason")),
+    "key.yml": gate(
+      GOOD_GATE_ENTRY + `    - action: y\n      ${CASE}: withdrawn\n`,
+    ),
+    // Controls: an unrelated second entry blocks nothing; a longer id is another case.
+    "plain.yml": gate(GOOD_GATE_ENTRY + `    - action: y\n      case: other\n`),
+    "longer.yml": gate(
+      GOOD_GATE_ENTRY + second("note").replace(CASE, `${CASE}-2`),
+    ),
+  };
+  const { dir, paths } = fixture(files);
+  try {
+    const go = (f) =>
+      run(["--case", CASE, "--gate", paths[f], "--approver", OWNER]).json
+        .reason;
+    for (const f of ["note.yml", "reason.yml", "key.yml"])
+      assert.equal(go(f), "unapproved", f);
+    for (const f of ["plain.yml", "longer.yml"])
+      assert.equal(go(f), "matched", f);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("control: a fence closes only on a matching marker, so a record inside a code fence is not read (T271-QA-23)", () => {
+  const fenced = (open, mid, close) =>
+    `# T\n\n## Deferred Work\n\n${open}\n${GOOD_BULLET}\n${mid}\n${close}\n`;
+  const files = {
+    // A ~~~ line does not close a ``` fence, so the approving bullet stays inside code.
+    "mismatch.md": `# T\n\n## Deferred Work\n\n\`\`\`\n~~~\n${GOOD_BULLET}\n`,
+    // A shorter closer does not close a longer fence.
+    "short.md": fenced("````", "", "```"),
+    // Controls: a proper closer ends the fence; the bullet after it is read.
+    "closed.md": `# T\n\n## Deferred Work\n\n\`\`\`\n~~~\n\`\`\`\n\n${GOOD_BULLET}\n`,
+    "tilde.md": `# T\n\n## Deferred Work\n\n~~~~\nx\n~~~~\n\n${GOOD_BULLET}\n`,
+  };
+  const { dir, paths } = fixture(files);
+  try {
+    const go = (f) =>
+      run(["--case", CASE, "--work-item", paths[f], "--approver", OWNER]).json
+        .reason;
+    for (const f of ["mismatch.md", "short.md"])
+      assert.notEqual(go(f), "matched", f);
+    for (const f of ["closed.md", "tilde.md"])
+      assert.equal(go(f), "matched", f);
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test("control: no list shape hides a lost withdrawal - the Deferred Work section is reconciled (T271-QA-18)", () => {
   const section = (extra) =>
     `# T\n\n## Deferred Work\n\n${GOOD_BULLET}\n${extra}\n\n## Change Log\n`;
