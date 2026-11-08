@@ -5,7 +5,7 @@ type: task
 description: "Give finalise three recorded arms it lacks, so work that the evidence already clears is no longer halted: a measurement on a code-identical earlier commit, one bounded re-run of a red outside the diff, and a probe reproduction the owner deferred."
 tags: [finalise, observation]
 category: refactoring
-status: ready-for-review
+status: in-progress
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-08
@@ -14,7 +14,7 @@ estimated_effort_hours: 16
 
 # Task 271: finalise accepts what the record already shows
 
-**Status:** Ready for Review
+**Status:** In Progress
 
 ---
 
@@ -322,17 +322,17 @@ Not modified, against the plan: `finalise-dod-security-prompt.md` (Arm 3 is wire
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.271.qa.14.finalise-accepts-what-the-record-already-shows.md](./task.271.qa.14.finalise-accepts-what-the-record-already-shows.md)
-- **Gate File**: [task.271.gate.14.finalise-accepts-what-the-record-already-shows.yml](./task.271.gate.14.finalise-accepts-what-the-record-already-shows.yml)
+- **Full Report**: [task.271.qa.15.finalise-accepts-what-the-record-already-shows.md](./task.271.qa.15.finalise-accepts-what-the-record-already-shows.md)
+- **Gate File**: [task.271.gate.15.finalise-accepts-what-the-record-already-shows.yml](./task.271.gate.15.finalise-accepts-what-the-record-already-shows.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 8063
+- **Tests Executed**: 8065
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
 - **NFR Status**: Security: FAIL, Performance: CONCERNS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-The plain repeated-key fix holds and no committed gate is wrongly refused. The subset parser still drops rows it cannot read (a complex key, an odd-indent row) and stores a `__proto__` key on the prototype, so an override in those spellings matches. One rule closes the class: in strict mode, fail closed on any row the parser does not consume. The fourteen-gate budget is spent.
+Cycle 14's fixes hold. One hole remains: the parser cuts a scalar at a `#` glued to its text, which YAML does not treat as a comment, so a gate whose four fields all carry a glued suffix matches. The fifteen-gate budget is spent.
 
 <!-- change-log-start -->
 ## Change Log
@@ -372,6 +372,7 @@ The plain repeated-key fix holds and no committed gate is wrongly refused. The s
 | 2026-11-08 |         | QA findings fixed — 2 of 2 (a repeated key in the gate is unverifiable; approver doc cell corrected); a further cycle granted by the owner | qa-fix |
 | 2026-11-08 |         | QA gate FAIL (60/100) — 2 findings; QA budget (14 gates) spent | qa-task |
 | 2026-11-08 |         | QA findings fixed — 2 of 2 (the gate's recommendations subtree must be read completely; prototype keys, escaped keys and tab indents are refused); a further cycle granted by the owner | qa-fix |
+| 2026-11-08 |         | QA gate FAIL (60/100) — 2 findings; QA budget (15 gates) spent | qa-task |
 <!-- change-log-end -->
 
 ---
@@ -415,4 +416,4 @@ The measured-criteria card (finalise takes the measurement itself).
 
 ---
 
-**Status:** Ready for Review
+**Status:** In Progress
