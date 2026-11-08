@@ -282,10 +282,33 @@ test("strict mode — unreadable rows under strictUnder, prototype keys, escaped
   assert.deepEqual(parseYamlSubset(body, strict), {
     rec: { list: [{ k: 1, v: 2 }] },
   });
+  assert.deepEqual(parseYamlSubset("other:\n  b: 1\n   c: 2\n", strict), {
+    other: { b: 1 },
+  });
+});
+
+test("strict mode — a # glued to text is part of the value; whitespace-preceded # is a comment; a row left after the body throws (T271-QA-32, 33)", () => {
+  const strict = { rejectDuplicateKeys: true, strictUnder: ["rec"] };
+  // Strict follows YAML; the lenient default still cuts at any #.
+  assert.deepEqual(parseYamlSubset("a: Pat#z\n"), { a: "Pat" });
+  assert.deepEqual(parseYamlSubset("a: Pat#z\n", strict), { a: "Pat#z" });
+  // Controls: real comments are still comments.
   assert.deepEqual(
-    parseYamlSubset("rec:\n  z: 1\nother:\n  b: 1\n   c: 2\n", strict),
-    { rec: { z: 1 }, other: { b: 1 } },
+    parseYamlSubset("a: Pat # note\n# whole line\nb: 2\n", strict),
+    {
+      a: "Pat",
+      b: 2,
+    },
   );
+  // A row left over after the root mapping ends, once a strictUnder subtree was read, throws; with
+  // no strictUnder key present the same shape is tolerated.
+  assert.throws(
+    () => parseYamlSubset("rec:\n  z: 1\n junk\n", strict),
+    /after the document body/,
+  );
+  assert.deepEqual(parseYamlSubset("other:\n  z: 1\n junk\n", strict), {
+    other: { z: 1 },
+  });
 });
 
 test("quoted keys — a colon inside a quoted key does not split the key", () => {

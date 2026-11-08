@@ -582,6 +582,33 @@ test("control: a row the parser would drop under recommendations, a prototype ke
   }
 });
 
+test("control: a # glued to a fact is part of it, so it cannot approve; a real comment is ignored (T271-QA-32, T271-QA-33)", () => {
+  const entry = (suffix, tail = "") =>
+    `    - action: ok\n      case: ${CASE}${suffix.case}\n      deferred_to: task.901${suffix.task}\n      approved_by: ${OWNER}${suffix.by}\n      approved_on: 2026-10-28${suffix.on}\n${tail}`;
+  const none = { case: "", task: "", by: "", on: "" };
+  const { go, dir } = reasons({
+    "all.yml": gate(entry({ case: "", task: "#y", by: "#z", on: "#q" })),
+    "by.yml": gate(entry({ ...none, by: "#z" })),
+    "task.yml": gate(entry({ ...none, task: "#y" })),
+    // Controls: whitespace before the # makes it a comment, so these still match.
+    "comment.yml": gate(
+      entry({ case: " # c", task: " # t", by: " # b", on: " # d" }),
+    ),
+    "clean.yml": gate(entry(none)),
+    // A row left after the body, once recommendations was read, is unverifiable.
+    "tail.yml": `${gate(entry(none))} junk\n`,
+  });
+  try {
+    for (const f of ["all", "by", "task"])
+      assert.equal(go(`${f}.yml`), "unapproved", f);
+    for (const f of ["comment", "clean"])
+      assert.equal(go(`${f}.yml`), "matched", f);
+    assert.equal(go("tail.yml"), "unverifiable");
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test("control: a record about the case outside future[] blocks - immediate, other keys, unknown root keys, a note in the approving entry (T271-QA-25)", () => {
   const head = (extra) =>
     `schema: 1\nrecommendations:\n${extra}  future:\n${GOOD_GATE_ENTRY}`;

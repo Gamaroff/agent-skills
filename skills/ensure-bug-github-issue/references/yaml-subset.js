@@ -20,15 +20,23 @@
 // indistinguishable from a real dependency and sends the bundler looking for a
 // file that does not exist.)
 
-function stripComment(line) {
-  // Only strip a `#` that is not inside quotes.
+function stripComment(line, strict) {
+  // Only strip a `#` that is not inside quotes. Strict mode follows YAML: a comment starts at a `#`
+  // at the start of the line or after whitespace, so `Pat#z` stays one value (T271-QA-32). The
+  // lenient default cuts at any `#`, which the other readers of this parser rely on.
   let inS = false;
   let inD = false;
   for (let i = 0; i < line.length; i++) {
     const c = line[i];
     if (c === "'" && !inD) inS = !inS;
     else if (c === '"' && !inS) inD = !inD;
-    else if (c === "#" && !inS && !inD) return line.slice(0, i);
+    else if (
+      c === "#" &&
+      !inS &&
+      !inD &&
+      (!strict || i === 0 || /\s/.test(line[i - 1]))
+    )
+      return line.slice(0, i);
   }
   return line;
 }
@@ -53,10 +61,10 @@ function parseScalar(raw) {
 }
 
 /** Rows of {indent, text} for non-blank, non-comment lines. */
-function significantLines(text) {
+function significantLines(text, strict) {
   const out = [];
   for (const raw of text.split(/\r?\n/)) {
-    const noComment = stripComment(raw);
+    const noComment = stripComment(raw, strict);
     if (!noComment.trim()) continue;
     out.push({
       indent: noComment.match(/^\s*/)[0].length,
@@ -176,13 +184,15 @@ function parseBlock(rows, start, indent, opts, whole, unread) {
     // Nested block: everything indented further than this key.
     let j = i + 1;
     if (j < rows.length && rows[j].indent > indent) {
+      const enters = Boolean(opts && opts.under.has(key));
+      if (enters) opts.entered = true;
       const [val, next] = parseBlock(
         rows,
         j,
         rows[j].indent,
         opts,
         false,
-        unread || Boolean(opts && opts.under.has(key)),
+        unread || enters,
       );
       put(obj, key, val, strict);
       i = next;
@@ -207,13 +217,20 @@ function parseYamlSubset(text, options) {
   if (options && options.rejectDuplicateKeys && /^ *\t/m.test(text)) {
     throw new Error("a tab in indentation is not valid YAML");
   }
-  const rows = significantLines(text);
+  const strict = Boolean(options && options.rejectDuplicateKeys);
+  const rows = significantLines(text, strict);
   if (!rows.length) return {};
-  const opts =
-    options && options.rejectDuplicateKeys
-      ? { under: new Set(options.strictUnder || []) }
-      : null;
-  const [val] = parseBlock(rows, 0, rows[0].indent, opts, false, false);
+  const opts = strict
+    ? { under: new Set(options.strictUnder || []), entered: false }
+    : null;
+  const [val, next] = parseBlock(rows, 0, rows[0].indent, opts, false, false);
+  // Once a strictUnder subtree was read, nothing may be left over after the root mapping ends: a
+  // row the parser stopped at could hold a second, overriding key (T271-QA-33).
+  if (opts && opts.entered && next < rows.length) {
+    throw new Error(
+      `unreadable row after the document body: ${rows[next].text.slice(0, 60)}`,
+    );
+  }
   return val ?? {};
 }
 

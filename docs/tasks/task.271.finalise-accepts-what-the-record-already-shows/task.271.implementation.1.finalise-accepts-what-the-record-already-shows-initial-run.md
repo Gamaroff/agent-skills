@@ -294,6 +294,19 @@ Known and accepted: a lenient odd-indent row in prose BEFORE `recommendations` e
 
 Advisory, not fixed: `ls-tree` without `-z`; exact-case path compare (macOS, task 210).
 
+### QA Cycle 15 — 2026-11-08
+
+| Item | Result |
+| ---- | ------ |
+| `/qa-task` gate | FAIL, 60/100, unscoped: T271-QA-32 (MEDIUM, reproduced), T271-QA-33 (LOW, not reproduced as a wrong match). The reviewer made five tool calls, fewer than earlier gates |
+| Budget | Spent again; the owner granted a further cycle (`qa_max_cycles` 16) |
+| Cause | The subset parser cut a scalar at any `#`; YAML starts a comment only at a `#` after whitespace, so `Pat#z` was read as `Pat` |
+| `/qa-fix` | Strict mode follows YAML's comment rule (default unchanged). Once a `strictUnder` subtree was read, a row left after the root mapping ends throws, which closes the shallow-row gap |
+| Tests | A glued `#` on the task, approver, or all facts is `unapproved`; whitespace-preceded comments still match; a row after the body is `unverifiable`. Parser: the lenient default still cuts at any `#`. `ci:fast` 8067 tests, 0 failed. The 989 committed gates are refused 6 times, as before |
+| Mutation proofs | Cutting at any `#` in strict mode, and dropping the after-body check, each turn a named test red; file restored (`cmp`) |
+
+Advisory, not fixed: `ls-tree` without `-z`; exact-case path compare (macOS, task 210); `finalise-delta.js` was not re-probed at gates 14 and 15.
+
 ---
 
 ## Completion
