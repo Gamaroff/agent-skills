@@ -667,8 +667,17 @@ test("control: no list shape hides a lost withdrawal - the Deferred Work section
     table: section(`\n| ${CASE} | revoked |`),
   };
   const files = { "ok.md": section("") };
-  Object.entries(variants).forEach(([k, v]) => (files[`${k}.md`] = v));
+  // A heading or a fence inside an HTML comment is not one (T271-QA-19): the section runs on.
+  variants["hidden heading"] =
+    `# T\n\n## Deferred Work\n\n${GOOD_BULLET}\n<!--\n## Notes\n-->\nWithdrawn: ${CASE} is no longer deferred.\n`;
+  variants["hidden fence"] =
+    `# T\n\n## Deferred Work\n\n${GOOD_BULLET}\n<!--\n\`\`\`\n-->\nWithdrawn: ${CASE} is no longer deferred.\n\n## Change Log\n`;
   // Controls: another section may name the id; so may a different, longer id in this one.
+  files["heading-comment.md"] =
+    `# T\n\n## Deferred Work <!-- n -->\n\n${GOOD_BULLET}\n\n## Notes\n\nx\n`;
+  files["comment-only.md"] =
+    `# T\n\n## Deferred Work\n\n${GOOD_BULLET}\n<!-- a note -->\n`;
+  Object.entries(variants).forEach(([k, v]) => (files[`${k}.md`] = v));
   files["other-section.md"] =
     `${section("")}## Notes\n\n${CASE} was reproduced.\n`;
   files["longer-id.md"] = section(`- \`${CASE}-2\`: not this case`);
@@ -679,7 +688,13 @@ test("control: no list shape hides a lost withdrawal - the Deferred Work section
         .reason;
     for (const k of Object.keys(variants))
       assert.equal(go(`${k}.md`), "unapproved", k);
-    for (const f of ["ok.md", "other-section.md", "longer-id.md"])
+    for (const f of [
+      "ok.md",
+      "other-section.md",
+      "longer-id.md",
+      "heading-comment.md",
+      "comment-only.md",
+    ])
       assert.equal(go(f), "matched", f);
   } finally {
     cleanup(dir);

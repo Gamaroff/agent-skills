@@ -842,7 +842,9 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
    a deferral. Every record that names the case must approve it, so a later revocation blocks, and the
    approver is compared to the owner list exactly. Any other text in the gate or in the Deferred Work
    section that names the case id (a comment, a prose line, a `+` bullet) also blocks, so keep the id
-   out of everything but the record itself. The matcher's header states all of this.
+   out of everything but the record itself. Only the gate and the `## Deferred Work` section are read:
+   record a withdrawal there (a revoking bullet naming the case blocks), because text under another H2
+   of the work item is not read. The matcher's header states all of this.
 6. **The zero-guard still applies — now to this run.** `boundary: true` with `probes_executed: 0`
    (an empty plan, every entry refused or declined) adds the `probe mode executed no candidates`
    FAIL check; a zero from this run **still takes the zero-guard**, because then the engine declined

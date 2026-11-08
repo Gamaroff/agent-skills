@@ -195,6 +195,20 @@ Advisory, not fixed: an inline comment naming the id fails closed; `ls-tree` wit
 
 Advisory, not fixed: `ls-tree` without `-z`; a nested list item is read as a record; section end at next H2; exact-case compare (macOS, task 210). `finalise-delta.js` was last re-probed at gate 5.
 
+### QA Cycle 8 — 2026-11-08
+
+| Item | Result |
+| ---- | ------ |
+| `/qa-task` gate | FAIL, 90/100, unscoped: T271-QA-19 (HIGH). One finding where the two gates before found two |
+| Budget | Spent again; the owner granted a further cycle (`qa_max_cycles` 9) |
+| Cause | The Deferred Work section boundary was found on raw text while the item reader works on comment-stripped text, so a heading hidden in a comment ended the raw section early |
+| `/qa-fix` | The boundary is found on the same visible text, tracked per line (a heading or fence inside a comment is not one), while comment text still counts as section text |
+| Tests | Refused: a hidden heading, a hidden fence. Controls: a heading with a trailing comment, a comment-only line still match. `ci:fast` 8064 tests, 0 failed |
+| Mutation proof | Detecting the boundary on the raw line again turns a named test red; file restored (`cmp`) |
+| Owner decision | The owner did not answer whether a mention outside the section should block, so the documented boundary stands; `skills/finalise/SKILL.md` now says a withdrawal is recorded in the gate or the Deferred Work section, because text under another H2 is not read |
+
+Advisory, not fixed: `ls-tree` without `-z`; a nested list item is read as a record; exact-case compare (macOS, task 210).
+
 ---
 
 ## Completion

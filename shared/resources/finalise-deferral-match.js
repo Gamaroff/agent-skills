@@ -344,15 +344,42 @@ function workItemCandidates(text, id) {
   return out;
 }
 
-/** The raw text under every `## Deferred Work` H2, up to the next H2 (fences and comments kept). */
+/**
+ * The raw text under every `## Deferred Work` H2, up to the next H2 (fences and comments kept in the
+ * output). The BOUNDARY is found on the same visible text the item reader sees - a heading or a fence
+ * inside an HTML comment is not one (T271-QA-19) - while the comment text still counts as section text.
+ */
 function deferredWorkSectionText(text) {
   const out = [];
   let inSection = false;
   let inFence = false;
+  let inComment = false;
   for (const line of String(text).split("\n")) {
-    if (/^\s*(```|~~~)/.test(line)) inFence = !inFence;
-    else if (!inFence && /^## /.test(line)) {
-      inSection = /^## Deferred Work\s*$/.test(line);
+    let visible = "";
+    let i = 0;
+    while (i < line.length) {
+      if (inComment) {
+        const end = line.indexOf("-->", i);
+        if (end < 0) i = line.length;
+        else {
+          inComment = false;
+          i = end + 3;
+        }
+      } else {
+        const start = line.indexOf("<!--", i);
+        if (start < 0) {
+          visible += line.slice(i);
+          i = line.length;
+        } else {
+          visible += line.slice(i, start);
+          inComment = true;
+          i = start + 4;
+        }
+      }
+    }
+    if (/^\s*(```|~~~)/.test(visible)) inFence = !inFence;
+    else if (!inFence && /^## /.test(visible)) {
+      inSection = /^## Deferred Work\s*$/.test(visible);
       continue;
     }
     if (inSection) out.push(line);
