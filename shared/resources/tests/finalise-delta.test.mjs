@@ -284,6 +284,24 @@ test("rerun-eligible: a red outside the PR diff over a docs-only delta, no re-ru
     ]);
     assert.equal(r.status, 0);
     assert.equal(r.json.reason, "eligible");
+    // The basis the DoD line records: the two full commit ids and the files that changed between them.
+    assert.equal(r.json.base, green);
+    assert.equal(r.json.head, head);
+    assert.deepEqual(r.json.changed, ["docs/n.md"]);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("docs-only: the output carries the basis the DoD records - both commit ids and the changed files", () => {
+  const { dir, green } = prRepo();
+  try {
+    const head = commit(dir, { "README.md": "r2\n", "docs/n.md": "n\n" });
+    const r = run(dir, ["docs-only", "--base", green, "--head", head]);
+    assert.equal(r.json.reason, "tree-equivalent");
+    assert.equal(r.json.base, green);
+    assert.equal(r.json.head, head);
+    assert.deepEqual([...r.json.changed].sort(), ["README.md", "docs/n.md"]);
   } finally {
     cleanup(dir);
   }

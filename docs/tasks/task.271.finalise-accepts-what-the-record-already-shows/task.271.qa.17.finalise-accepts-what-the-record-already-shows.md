@@ -62,3 +62,39 @@ boundary: true; boundary_signals: ["refuses"]; probes_executed: 5; escaped: 0.
 **Quality Score**: 90/100 (100 minus 10 for the unmeasured performance criterion)
 **Deployment Recommendation**: READY
 **Next Steps**: three low cleanups to the exit gate; measure performance on an idle machine.
+
+---
+
+## Addendum (written by `/finalise`, 2026-11-08): records the DoD run asked for
+
+### Named tests per arm (criterion 1)
+
+- Arm 1 (docs-only tree equivalence): `finalise-delta.test.mjs`, accept "a delta of documentation files only is tree-equivalent"; refusals "code-changed", "unverifiable"; the output carries both commit ids and the changed files.
+- Arm 2 (one re-run of a red outside the diff): `finalise-delta.test.mjs`, accept "a red outside the PR diff over a docs-only delta, no re-run yet, is eligible"; control "a red inside the PR's own diff is in-diff, not re-run"; "already-rerun" once a re-run is recorded.
+- Arm 3 (deferral, JSON record): `finalise-deferral-match.test.mjs`, accept "record: id, task, owner approver and date match"; controls for no approver, a non-owner approver, a different case id, a missing task, a bad date, no owner configured, an unreadable record, repeated keys, unknown fields.
+
+### Mutation proofs per arm (criterion 5)
+
+Each is a revert, a run that names the test that went red, and a restore checked with `cmp`.
+
+- Arm 1: dropping the docs-path check turned 5 tests red (M1). Dropping the file the engine reads for the base turned the basis-carrying tests red (2 red, `/finalise` run 1).
+- Arm 2: dropping the in-diff exclusion turned 1 test red (M2); allowing unlimited re-runs turned 1 red (M4).
+- Arm 3: five mutations of the JSON matcher (duplicate-key check, unknown-field check, key decoding, exact approver compare, cross-case mention block) each turned a named test red (QA cycle 17, and the cross-case reason in `/finalise` run 1). Earlier designs' proofs (owner-list check, 2 red; real-date check; placeholder refusal) are recorded in the implementation report.
+
+### Wall time (criterion 4)
+
+Command: `CI=true npm test`, five alternating runs, `develop` (`d3b71ef3`, worktree) then the branch (`71301805`, worktree), each run timed with `date +%s%N`. The load average (the first field of `/proc/loadavg`, the figure `uptime` prints first) was read just before each run. The machine was **not idle**: the load was 1.9 to 5.7, because the probe plan and review agents ran alongside. The comparison is alternating, so both sides saw the same conditions.
+
+| Run | develop (ms) | load before | branch (ms) | load before |
+| --- | --- | --- | --- | --- |
+| 1 | 162026 | 1.92 | 161258 | 3.98 |
+| 2 | 158949 | 5.05 | 162689 | 4.20 |
+| 3 | 170786 | 5.62 | 164972 | 5.66 |
+| 4 | 158587 | 4.68 | 160949 | 4.68 |
+| 5 | 158848 | 4.21 | 168976 | 5.23 |
+
+Median develop 158949 ms, median branch 162689 ms: **+2.4%**, inside the 10% bound. All ten runs exited 0. The branch head measured is `71301805`; the later commits are one documentation line and one test file, so they do not change the engines.
+
+### Fixture-vanish cause (criterion 8)
+
+Not proven, recorded as not found. Commands tried: `GIT_TRACE2_EVENT=<file> node probe-fixture.mjs` on the executed-prose fixture template build, which showed 3 detached `git maintenance run --auto --quiet --detach` children; the template's repositories were then set to `maintenance.auto=false`, `gc.auto=0`, `receive.autogc=false`, held by `executed-prose-no-background-git.test.mjs` (reverting the setting turns it red). The one-in-6142 ENOENT itself was not reproduced, so the cause stays suspected.
