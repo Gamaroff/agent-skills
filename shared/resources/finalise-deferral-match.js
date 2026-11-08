@@ -29,11 +29,13 @@
  *   Every record that names the case must approve it, and agree on the follow-up task; one that does
  *   not (a revocation, a prose mention) blocks, so a later record can withdraw an earlier approval.
  *   The approver name is compared to the owner list exactly (no case or Unicode folding).
- *   Both readers drop text they cannot read, so each source is reconciled on its RAW text, with
- *   nothing stripped (no comment rule, no line shape): every occurrence of the case id in the whole
- *   gate, and in the whole Deferred Work section, must also occur in a key, value or list item the
- *   reader took. One it did not take (a block-scalar body, a `+` bullet, a numbered item, prose, a
- *   table row, a comment) is a record naming the case that was not read, and it blocks.
+ *   Both readers drop text they cannot read, so each source is reconciled: every occurrence of the
+ *   case id in the whole gate (raw text, nothing stripped), and in the whole Deferred Work section,
+ *   must also occur in a key, value or list item the reader took. One it did not take (a
+ *   block-scalar body, a `+` bullet, a numbered item, prose, a table row, a comment) is a record
+ *   naming the case that was not read, and it blocks. The work item's HTML comments are removed
+ *   ONCE and the section is found and counted on that single text, so the item reader and the count
+ *   cannot disagree; a comment anywhere that names the case id blocks.
  *
  * FAILS CLOSED. Exit 0 means exactly one thing: `matched`. Every other answer exits 1 (a usage error
  * exits 2), so a shell `if` cannot round a "no" up to a deferral.
@@ -329,10 +331,15 @@ function workItemCandidates(text, id) {
   });
   // Only `-` and `*` list items are read, so a `+` bullet, a numbered item, a table row or a prose
   // line in the section can still name the case - a withdrawal, say (T271-QA-18). Reconcile the same
-  // way as the gate: every occurrence of the id in the raw section text (comments, fences and all)
-  // must also occur in an item the reader took; a surplus is a record it did not read, and it blocks.
+  // way as the gate: every occurrence of the id in the section's visible text (fences and all) must
+  // also occur in an item the reader took, and a comment anywhere that names the id is a record
+  // nobody can see; a surplus is a record it did not read, and it blocks. Both counts run over the
+  // same comment-free text, so an id a comment splits (`c<!---->1`) is counted on both sides.
   const taken = items.reduce((n, item) => n + countMentions(item, id), 0);
-  if (countMentions(deferredWorkSectionText(text), id) > taken) {
+  const unread =
+    countMentions(deferredWorkSectionText(visible), id) +
+    countMentions(commentText(text), id);
+  if (unread > taken) {
     out.push({
       source:
         "work item Deferred Work (text the reader could not parse names the case)",
@@ -345,46 +352,31 @@ function workItemCandidates(text, id) {
 }
 
 /**
- * The raw text under every `## Deferred Work` H2, up to the next H2 (fences and comments kept in the
- * output). The BOUNDARY is found on the same visible text the item reader sees - a heading or a fence
- * inside an HTML comment is not one (T271-QA-19) - while the comment text still counts as section text.
+ * The text under every `## Deferred Work` H2, up to the next H2 (fences kept). It is given the ONE
+ * comment-free text the item reader also reads, so the two cannot disagree about where the section
+ * is or what its text says (T271-QA-19, 20, 21).
  */
-function deferredWorkSectionText(text) {
+function deferredWorkSectionText(visible) {
   const out = [];
   let inSection = false;
   let inFence = false;
-  let inComment = false;
-  for (const line of String(text).split("\n")) {
-    let visible = "";
-    let i = 0;
-    while (i < line.length) {
-      if (inComment) {
-        const end = line.indexOf("-->", i);
-        if (end < 0) i = line.length;
-        else {
-          inComment = false;
-          i = end + 3;
-        }
-      } else {
-        const start = line.indexOf("<!--", i);
-        if (start < 0) {
-          visible += line.slice(i);
-          i = line.length;
-        } else {
-          visible += line.slice(i, start);
-          inComment = true;
-          i = start + 4;
-        }
-      }
-    }
-    if (/^\s*(```|~~~)/.test(visible)) inFence = !inFence;
-    else if (!inFence && /^## /.test(visible)) {
-      inSection = /^## Deferred Work\s*$/.test(visible);
+  for (const line of String(visible).split("\n")) {
+    if (/^\s*(```|~~~)/.test(line)) inFence = !inFence;
+    else if (!inFence && /^## /.test(line)) {
+      inSection = /^## Deferred Work\s*$/.test(line);
       continue;
     }
     if (inSection) out.push(line);
   }
   return out.join("\n");
+}
+
+/** Everything inside HTML comments (closed, and an unterminated one to the end of the text). */
+function commentText(text) {
+  const t = String(text);
+  const closed = t.match(/<!--[\s\S]*?-->/g) || [];
+  const tail = t.replace(/<!--[\s\S]*?-->/g, "").match(/<!--[\s\S]*$/);
+  return closed.concat(tail ? [tail[0]] : []).join("\n");
 }
 
 function readText(p) {

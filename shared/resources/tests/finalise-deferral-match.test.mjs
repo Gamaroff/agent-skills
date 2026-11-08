@@ -672,6 +672,14 @@ test("control: no list shape hides a lost withdrawal - the Deferred Work section
     `# T\n\n## Deferred Work\n\n${GOOD_BULLET}\n<!--\n## Notes\n-->\nWithdrawn: ${CASE} is no longer deferred.\n`;
   variants["hidden fence"] =
     `# T\n\n## Deferred Work\n\n${GOOD_BULLET}\n<!--\n\`\`\`\n-->\nWithdrawn: ${CASE} is no longer deferred.\n\n## Change Log\n`;
+  // One comment pass serves both readers (T271-QA-20, T271-QA-21): a comment that spans lines cannot
+  // move the boundary, and an id a comment splits is counted on both sides.
+  variants["multi-line comment"] =
+    `# T\n\n## Deferred Work\n\n${GOOD_BULLET}\nx<!--\n-->## Other\n+ \`${CASE}\`: withdrawn, not deferred.\n`;
+  variants["split id"] =
+    `# T\n\n## Deferred Work\n\n- \`${CASE.slice(0, 3)}<!---->${CASE.slice(3)}\`: deferred to task.901, approved by ${OWNER} on 2026-10-28.\n+ \`${CASE}\`: withdrawn, not deferred.\n`;
+  variants["comment naming the id"] =
+    `# T\n\n## Notes\n\n<!-- ${CASE}: withdrawn -->\n\n## Deferred Work\n\n${GOOD_BULLET}\n`;
   // Controls: another section may name the id; so may a different, longer id in this one.
   files["heading-comment.md"] =
     `# T\n\n## Deferred Work <!-- n -->\n\n${GOOD_BULLET}\n\n## Notes\n\nx\n`;

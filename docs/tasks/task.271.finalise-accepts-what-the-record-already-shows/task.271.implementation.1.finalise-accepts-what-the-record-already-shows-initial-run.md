@@ -209,6 +209,19 @@ Advisory, not fixed: `ls-tree` without `-z`; a nested list item is read as a rec
 
 Advisory, not fixed: `ls-tree` without `-z`; a nested list item is read as a record; exact-case compare (macOS, task 210).
 
+### QA Cycle 9 — 2026-11-08
+
+| Item | Result |
+| ---- | ------ |
+| `/qa-task` gate | FAIL, 80/100, unscoped, both engines: T271-QA-20 (HIGH), T271-QA-21 (HIGH). `finalise-delta.js` held against about 30 probes |
+| Budget | Spent again; the owner granted a further cycle (`qa_max_cycles` 10) |
+| Cause | Two readers of one file stripped HTML comments by different rules (per line against across the text), so a multi-line comment moved the section boundary and an id split by a comment gave slack on one side |
+| `/qa-fix` | One shared pass: comments are removed once, the section is found and counted on that single text, and a comment anywhere that names the case id is counted as unread |
+| Tests | Refused: a multi-line comment, an id split by a comment, a comment naming the id. Earlier controls still match. `ci:fast` 8064 tests, 0 failed |
+| Mutation proofs | Finding the section on the raw text again, and dropping the comment count, each turn a named test red; file restored (`cmp`) |
+
+Advisory, not fixed: `ls-tree` without `-z`; a nested list item is read as a record; exact-case compare (macOS, task 210).
+
 ---
 
 ## Completion

@@ -5,7 +5,7 @@ type: task
 description: "Give finalise three recorded arms it lacks, so work that the evidence already clears is no longer halted: a measurement on a code-identical earlier commit, one bounded re-run of a red outside the diff, and a probe reproduction the owner deferred."
 tags: [finalise, observation]
 category: refactoring
-status: in-progress
+status: ready-for-review
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-08
@@ -14,7 +14,7 @@ estimated_effort_hours: 16
 
 # Task 271: finalise accepts what the record already shows
 
-**Status:** In Progress
+**Status:** Ready for Review
 
 ---
 
@@ -361,6 +361,7 @@ The delta engine held against about 30 probes. Cycle 8's finding is closed. Two 
 | 2026-11-08 |         | QA gate FAIL (90/100) — 1 finding; QA budget (8 gates) spent | qa-task |
 | 2026-11-08 |         | QA findings fixed — 1 of 1 (Deferred Work boundary found on the same visible text as the item reader); a further cycle granted by the owner | qa-fix |
 | 2026-11-08 |         | QA gate FAIL (80/100) — 2 findings; QA budget (9 gates) spent | qa-task |
+| 2026-11-08 |         | QA findings fixed — 2 of 2 (one shared comment pass for the section and the counts); a further cycle granted by the owner | qa-fix |
 <!-- change-log-end -->
 
 ---
@@ -404,4 +405,4 @@ The measured-criteria card (finalise takes the measurement itself).
 
 ---
 
-**Status:** In Progress
+**Status:** Ready for Review
