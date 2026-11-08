@@ -321,6 +321,13 @@ Advisory, not fixed: `ls-tree` without `-z`; exact-case path compare (macOS, tas
 
 Advisory, not fixed: `ls-tree` without `-z`; exact-case path compare (macOS, task 210). Performance is still unmeasured.
 
+### QA Cycle 17 — 2026-11-08
+
+| Item | Result |
+| ---- | ------ |
+| `/qa-task` gate | PASS, 90/100, unscoped: about 120 reviewer probes and five hand runs found no wrong exit 0 on the JSON-record matcher or `finalise-delta.js`. Open, all LOW: T271-QA-39 (stale Target Architecture bullet), T271-QA-40 (dead `namesCase`), T271-QA-41 (vague cross-case reason) |
+| **Action** | Proceeding to 5c (cosmetic residue: the LOWs are carried to the acceptance commit) |
+
 ---
 
 ## Completion

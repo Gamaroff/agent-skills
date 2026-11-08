@@ -128,14 +128,6 @@ function parseArgs(argv) {
   return out;
 }
 
-/** True when `id` occurs in `text` as a whole token: not inside a longer id. */
-function namesCase(text, id) {
-  const esc = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(
-    `(^|[^A-Za-z0-9._-])${esc}($|[^A-Za-z0-9._-]|\\.(?![A-Za-z0-9_-]))`,
-  ).test(String(text));
-}
-
 /**
  * The owner list is configuration, so a name there is trimmed and one matching wrapper pair of
  * backticks or quotes is removed (`Name` and "Name" compare equal). The RECORD's name is never
@@ -269,7 +261,7 @@ function recordCandidates(text, id) {
       });
     } else if (Object.values(e).some((v) => countMentions(v, id) > 0)) {
       // Another case's entry that names this id: a record about it with no facts, so it blocks.
-      out.push({ source, task: "", owner: "", date: "" });
+      out.push({ source, blocks: true, task: "", owner: "", date: "" });
     }
   });
   return out;
@@ -326,6 +318,12 @@ function decide(args) {
   const refusals = [];
   const oks = [];
   for (const c of candidates) {
+    if (c.blocks) {
+      refusals.push(
+        `${c.source}: names ${args.caseId} but is for another case`,
+      );
+      continue;
+    }
     const j = judge(c, args.approvers);
     if (j.ok) oks.push({ c, j });
     else refusals.push(`${c.source}: ${j.why}`);
@@ -394,7 +392,6 @@ module.exports = {
   REASONS,
   USAGE,
   parseArgs,
-  namesCase,
   judge,
   recordCandidates,
   findDuplicateKey,

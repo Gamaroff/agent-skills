@@ -337,6 +337,17 @@ test("control: every record for the case must approve it and agree on the task; 
   });
   try {
     assert.equal(go("mention.json"), "unapproved");
+    assert.match(
+      run([
+        "--case",
+        CASE,
+        "--record",
+        paths["mention.json"],
+        "--approver",
+        OWNER,
+      ]).json.detail,
+      /deferrals\[1\]: names oc10-second-findings-cut-short but is for another case/,
+    );
     assert.equal(go("tasks.json"), "unapproved");
     assert.match(
       run([

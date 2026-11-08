@@ -23,7 +23,7 @@ Ask with `AskUserQuestion`, one question each: (1) equivalence for a measurement
 
 1. **Arm 1, equivalence**: same code tree as judged by `ci-tree-equivalence.js` (`tree-equivalent`); docs-only deltas count. No extra suite-input requirement. A missing load record, or any non-equivalent commit, stays `FAIL` with `note: "re-measure"`.
 2. **Arm 2, re-run**: exactly one re-run, never more. Only when the red test is outside the PR diff **and** the delta from the last green head is docs-only. Accept only on a green second attempt; record both attempts in the DoD.
-3. **Arm 3, deferral**: a mechanical match on case id against the gate's `recommendations.future` or the work item's Deferred Work. The entry must name a follow-up task and an approver, and **the approver must be the repository owner**. No match, no task, or no owner approval stays `FAIL`. The agent never judges a deferral.
+3. **Arm 3, deferral**: a mechanical match on case id against a `deferrals.json` record (superseded: the first design read the gate's `recommendations.future` or the work item's Deferred Work; QA cycles 12 and 16 replaced it). The entry must name a follow-up task and an approver, and **the approver must be the repository owner**. No match, no task, or no owner approval stays `FAIL`. The agent never judges a deferral.
 
 ### Phase 2: Arm 1
 

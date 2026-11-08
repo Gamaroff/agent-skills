@@ -6,6 +6,7 @@ description: "Give finalise three recorded arms it lacks, so work that the evide
 tags: [finalise, observation]
 category: refactoring
 status: ready-for-review
+pr_number: 859
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-08
@@ -57,7 +58,7 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 
 - **Arm 1 (obs #32)**: a measured figure counts when taken on a commit whose code tree equals the head's, by `ci-tree-equivalence.js`; the AC agent cites the equivalence result, not the literal head.
 - **Arm 2 (obs #50)**: when the only red is a test file outside the PR diff and the delta from the last green head is entirely docs (tree-equivalence answers that), re-run the failed job **exactly once** (owner decision, Phase 1), record both attempts, and accept only on a green second attempt. Separately, find why the fixture template vanishes mid-copy (`fixtureRepo` in `shared/resources/tests/lib/executed-prose.mjs`).
-- **Arm 3 (obs #117)**: a reproduced probe whose case id matches an entry in the gate's `recommendations.future` (or the work item's Deferred Work) that names a follow-up task and an approver, **where the approver is the repository owner** (owner decision, Phase 1; the matcher compares the approver to an owner identity read from a named source, chosen in Phase 4, with a reader and a test, and with no source configured no deferral is accepted), is rendered "deferred (owner, date, task)" and not as FAIL, in the shape a `WAIVED` gate uses. No approver or no match stays FAIL.
+- **Arm 3 (obs #117)**: a reproduced probe whose case id matches an entry in `deferrals.json` beside the work item (superseded design: QA cycles 12 and 16 stopped reading the gate and the work item prose) that names a follow-up task and an approver, **where the approver is the repository owner** (owner decision, Phase 1; the matcher compares the approver to an owner identity read from a named source, chosen in Phase 4, with a reader and a test, and with no source configured no deferral is accepted), is rendered "deferred (owner, date, task)" and not as FAIL, in the shape a `WAIVED` gate uses. No approver or no match stays FAIL.
 
 ### Important Clarifications
 
