@@ -5,7 +5,7 @@ type: task
 description: "Give finalise three recorded arms it lacks, so work that the evidence already clears is no longer halted: a measurement on a code-identical earlier commit, one bounded re-run of a red outside the diff, and a probe reproduction the owner deferred."
 tags: [finalise, observation]
 category: refactoring
-status: ready-for-review
+status: in-progress
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-07
@@ -14,7 +14,7 @@ estimated_effort_hours: 16
 
 # Task 271: finalise accepts what the record already shows
 
-**Status:** Ready for Review
+**Status:** In Progress
 
 ---
 
@@ -317,22 +317,22 @@ Not modified, against the plan: `finalise-dod-security-prompt.md` (Arm 3 is wire
 
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
-**Testing Date**: 2026-11-07
-**Quality Score**: 70/100
+**Testing Date**: 2026-11-08
+**Quality Score**: 80/100
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.271.qa.5.finalise-accepts-what-the-record-already-shows.md](./task.271.qa.5.finalise-accepts-what-the-record-already-shows.md)
-- **Gate File**: [task.271.gate.5.finalise-accepts-what-the-record-already-shows.yml](./task.271.gate.5.finalise-accepts-what-the-record-already-shows.yml)
+- **Full Report**: [task.271.qa.6.finalise-accepts-what-the-record-already-shows.md](./task.271.qa.6.finalise-accepts-what-the-record-already-shows.md)
+- **Gate File**: [task.271.gate.6.finalise-accepts-what-the-record-already-shows.yml](./task.271.gate.6.finalise-accepts-what-the-record-already-shows.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 8060
+- **Tests Executed**: 8062
 - **Phases Verified**: 5/5
-- **Critical Issues**: 1
+- **Critical Issues**: 2
 - **NFR Status**: Security: FAIL, Performance: CONCERNS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Cycle 4's findings are closed. The final unscoped re-probe found two fail-open paths in the Arm 3 matcher: a withdrawal written as a YAML block scalar is ignored, and a trailing underscore on the approver name is stripped. The five-gate QA budget is spent.
+Cycle 5's findings are closed in their original shapes. The check added for the block-scalar withdrawal can be defeated by a column-0 comment inside the block or by an earlier `future:` key, so the withdrawal is still ignored. The six-gate budget is spent.
 
 <!-- change-log-start -->
 ## Change Log
@@ -354,6 +354,7 @@ Cycle 4's findings are closed. The final unscoped re-probe found two fail-open p
 | 2026-11-07 |         | QA findings fixed — 3 of 3 (Arm 3 grammar replaced with one exact line, regular-file check, every record must approve), 1 iteration | qa-fix |
 | 2026-11-07 |         | QA gate FAIL (70/100) — 2 findings; QA budget (5 gates) spent | qa-task |
 | 2026-11-08 |         | QA findings fixed — 2 of 2 (unparsed gate text naming the case blocks, approver compared without stripping markup), 1 iteration; one extra cycle granted by the owner | qa-fix |
+| 2026-11-08 |         | QA gate FAIL (80/100) — 2 findings; QA budget (6 gates) spent | qa-task |
 <!-- change-log-end -->
 
 ---
@@ -397,4 +398,4 @@ The measured-criteria card (finalise takes the measurement itself).
 
 ---
 
-**Status:** Ready for Review
+**Status:** In Progress
