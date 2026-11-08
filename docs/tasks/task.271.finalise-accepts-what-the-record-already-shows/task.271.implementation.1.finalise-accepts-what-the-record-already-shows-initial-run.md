@@ -265,6 +265,19 @@ The task document's owner decision (Phase 1) named "the gate's `recommendations.
 
 Advisory, not fixed: `ls-tree` without `-z`; exact-case path compare (macOS, task 210).
 
+### QA Cycle 13 — 2026-11-08
+
+| Item | Result |
+| ---- | ------ |
+| `/qa-task` gate | FAIL, 60/100, unscoped: T271-QA-28 (MEDIUM), T271-QA-29 (LOW). The redesign closed the Markdown class; about 50 scratch gates found only the repeated-key shape |
+| Budget | Spent again; the owner granted a further cycle (`qa_max_cycles` 14) |
+| Cause | The subset YAML parser keeps the last of a repeated key, so a gate entry a first-wins reader reads differently matched |
+| `/qa-fix` | `yaml-subset.js` gains an opt-in `rejectDuplicateKeys` (default unchanged, so its other readers are untouched); the matcher uses it, so a repeated key anywhere in the gate is `unverifiable`. The `deferralApprover` doc cell now says exact and case-sensitive |
+| Tests | Parser: default last-wins kept, the option throws on a flat, nested and repeated-`future` shape, distinct mappings are not duplicates. Matcher: a repeated `approved_by`, `case`, `deferred_to` and `future` are unverifiable, with a once-each control matched. `ci:fast` 8063 tests, 0 failed |
+| Mutation proofs | Dropping the option in the matcher, and disabling the check in the parser, each turn a named test red; files restored (`cmp`) |
+
+Advisory, not fixed: `ls-tree` without `-z`; exact-case path compare (macOS, task 210).
+
 ---
 
 ## Completion

@@ -242,6 +242,28 @@ test("quoted keys — unquoted keys are unaffected by the extension", () => {
   assert.deepEqual(out, { "a.b-c": 1, plain: 2, under_score: 3 });
 });
 
+test("duplicate keys — last wins by default; rejectDuplicateKeys throws (task 271, T271-QA-28)", () => {
+  const flat = "a: 1\na: 2\n";
+  const nested = "m:\n  - k: 1\n    k: 2\n";
+  const block = "f: []\nf:\n  - x: 1\n";
+  // Default behaviour is unchanged: the other readers of this parser rely on it.
+  assert.deepEqual(parseYamlSubset(flat), { a: 2 });
+  for (const t of [flat, nested, block]) {
+    assert.throws(
+      () => parseYamlSubset(t, { rejectDuplicateKeys: true }),
+      /duplicate key/,
+      t,
+    );
+  }
+  // Controls: the same key in two different mappings, and distinct keys, are not duplicates.
+  assert.deepEqual(
+    parseYamlSubset("m:\n  - k: 1\n  - k: 2\nn:\n  k: 3\n", {
+      rejectDuplicateKeys: true,
+    }),
+    { m: [{ k: 1 }, { k: 2 }], n: { k: 3 } },
+  );
+});
+
 test("quoted keys — a colon inside a quoted key does not split the key", () => {
   const out = parseYamlSubset(['"a: b": v', ""].join("\n"));
   assert.deepEqual(out, { "a: b": "v" });

@@ -197,7 +197,9 @@ const GATE_PROSE_KEYS = new Set([
 
 /** Candidates from the gate's recommendations.future[]; throws on an unreadable gate. */
 function gateCandidates(text, id) {
-  const doc = parseYamlSubset(text);
+  // A repeated key is ambiguous (readers disagree on which value wins), so it makes the gate
+  // unverifiable rather than guessing (T271-QA-28).
+  const doc = parseYamlSubset(text, { rejectDuplicateKeys: true });
   if (doc === null || typeof doc !== "object" || Array.isArray(doc)) {
     throw new Error("the gate did not parse as a mapping");
   }

@@ -527,6 +527,31 @@ test("control: a gate entry that names the case in ANY field is a record about i
   }
 });
 
+test("control: a repeated key in the gate is ambiguous and makes it unverifiable, never a match (T271-QA-28)", () => {
+  const entry = (lines) =>
+    `schema: 1\nrecommendations:\n  future:\n    - action: ok\n${lines}`;
+  const facts = `      deferred_to: task.901\n      approved_by: ${OWNER}\n      approved_on: 2026-10-28\n`;
+  const { go, dir } = reasons({
+    "approver.yml": entry(
+      `      case: ${CASE}\n      approved_by: eve\n${facts}`,
+    ),
+    "case.yml": entry(`      case: other\n      case: ${CASE}\n${facts}`),
+    "task.yml": entry(
+      `      case: ${CASE}\n      deferred_to: task.5\n${facts}`,
+    ),
+    "future.yml": `schema: 1\nrecommendations:\n  future: []\n  future:\n    - action: ok\n      case: ${CASE}\n${facts}`,
+    // Control: the same keys, each once, still match.
+    "once.yml": entry(`      case: ${CASE}\n${facts}`),
+  });
+  try {
+    for (const f of ["approver", "case", "task", "future"])
+      assert.equal(go(`${f}.yml`), "unverifiable", f);
+    assert.equal(go("once.yml"), "matched");
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test("control: a record about the case outside future[] blocks - immediate, other keys, unknown root keys, a note in the approving entry (T271-QA-25)", () => {
   const head = (extra) =>
     `schema: 1\nrecommendations:\n${extra}  future:\n${GOOD_GATE_ENTRY}`;

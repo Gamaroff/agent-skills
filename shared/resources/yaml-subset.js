@@ -78,7 +78,19 @@ function significantLines(text) {
 const KEY_RE = /^(?:"([^"]+)"|'([^']+)'|([\w.-]+))\s*:\s*(.*)$/;
 const KEY_PREFIX_RE = /^(?:"[^"]+"|'[^']+'|[\w.-]+)\s*:/;
 
-function parseBlock(rows, start, indent) {
+/**
+ * Set `obj[key]`. With `strict`, a key that repeats in one mapping throws: real YAML forbids it, and
+ * readers disagree on which value wins (this one keeps the last), so a caller that treats the
+ * document as a record must not guess (task 271, T271-QA-28).
+ */
+function put(obj, key, val, strict) {
+  if (strict && Object.prototype.hasOwnProperty.call(obj, key)) {
+    throw new Error(`duplicate key "${key}" in one mapping`);
+  }
+  obj[key] = val;
+}
+
+function parseBlock(rows, start, indent, strict) {
   // Decide list vs map by the first row at this indent.
   if (
     start < rows.length &&
@@ -101,7 +113,7 @@ function parseBlock(rows, start, indent) {
           synthetic.push(rows[j]);
           j++;
         }
-        const [val] = parseBlock(synthetic, 0, indent + 2);
+        const [val] = parseBlock(synthetic, 0, indent + 2, strict);
         arr.push(val);
         i = j;
       } else {
@@ -123,28 +135,30 @@ function parseBlock(rows, start, indent) {
     const [, dq, sq, bare, rest] = m;
     const key = dq !== undefined ? dq : sq !== undefined ? sq : bare;
     if (rest.trim() !== "") {
-      obj[key] = parseScalar(rest);
+      put(obj, key, parseScalar(rest), strict);
       i++;
       continue;
     }
     // Nested block: everything indented further than this key.
     let j = i + 1;
     if (j < rows.length && rows[j].indent > indent) {
-      const [val, next] = parseBlock(rows, j, rows[j].indent);
-      obj[key] = val;
+      const [val, next] = parseBlock(rows, j, rows[j].indent, strict);
+      put(obj, key, val, strict);
       i = next;
     } else {
-      obj[key] = null;
+      put(obj, key, null, strict);
       i = j;
     }
   }
   return [obj, i];
 }
 
-function parseYamlSubset(text) {
+/** `options.rejectDuplicateKeys`: throw when a key repeats within one mapping (default: last wins). */
+function parseYamlSubset(text, options) {
   const rows = significantLines(text);
   if (!rows.length) return {};
-  const [val] = parseBlock(rows, 0, rows[0].indent);
+  const strict = Boolean(options && options.rejectDuplicateKeys);
+  const [val] = parseBlock(rows, 0, rows[0].indent, strict);
   return val ?? {};
 }
 
