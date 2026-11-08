@@ -13,7 +13,8 @@ All notable changes to this project will be documented in this file. Format foll
   (`finalise-delta.js rerun-eligible`). A security probe that reproduces a case the owner already
   deferred to a named task is rendered `deferred (owner, date, task)` rather than FAIL
   (`finalise-deferral-match.js`; the owner list is `finalise.deferralApprover`, and unset means
-  nothing is deferred). The executed-prose fixture template no longer starts background git
+  nothing is deferred; the record is a `deferrals.json` beside the work item, read with
+  `JSON.parse` — neither the work item's prose nor the QA gate is read). The executed-prose fixture template no longer starts background git
   maintenance, the suspected cause of a one-in-6142 ENOENT while copying it.
 
 ### Fixed

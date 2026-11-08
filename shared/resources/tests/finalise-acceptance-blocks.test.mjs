@@ -43,22 +43,18 @@ function consumer(owners) {
     );
   }
   writeFileSync(
-    join(dir, "gate.yml"),
-    [
-      "schema: 1",
-      "gate: PASS",
-      "recommendations:",
-      "  immediate: []",
-      "  future:",
-      "    - action: 'oc10-x reproduces'",
-      "      case: oc10-x",
-      "      deferred_to: task.901",
-      "      approved_by: Pat Owner",
-      "      approved_on: 2026-10-28",
-      "",
-    ].join("\n"),
+    join(dir, "deferrals.json"),
+    JSON.stringify({
+      deferrals: [
+        {
+          case: "oc10-x",
+          deferred_to: "task.901",
+          approved_by: "Pat Owner",
+          approved_on: "2026-10-28",
+        },
+      ],
+    }),
   );
-  writeFileSync(join(dir, "w.md"), "# T\n");
   return dir;
 }
 
@@ -66,14 +62,14 @@ const blockFive = () => blockBy(SKILL, "APPROVER_ARGS", "item 5a block");
 const item5a = (gate) =>
   bind(blockFive(), {
     "{case-id}": "oc10-x",
-    "{gate-file}": gate,
+    "{record-file}": gate,
   });
 
 for (const shell of SHELLS) {
   test(`[${shell}] item 5a: a configured owner list reaches the matcher and the deferral matches`, () => {
     const dir = consumer("Pat Owner, Sam Two");
     try {
-      const r = run(shell, item5a("gate.yml"), { cwd: dir });
+      const r = run(shell, item5a("deferrals.json"), { cwd: dir });
       const out = JSON.parse(r.stdout.trim().split("\n").pop());
       assert.equal(out.reason, "matched", r.stderr);
       assert.equal(r.status, 0);
@@ -86,7 +82,7 @@ for (const shell of SHELLS) {
   test(`[${shell}] item 5a control: no owner configured refuses (no-approver-configured, exit 1)`, () => {
     const dir = consumer(null);
     try {
-      const r = run(shell, item5a("gate.yml"), { cwd: dir });
+      const r = run(shell, item5a("deferrals.json"), { cwd: dir });
       const out = JSON.parse(r.stdout.trim().split("\n").pop());
       assert.equal(out.reason, "no-approver-configured");
       assert.equal(r.status, 1);
@@ -95,16 +91,16 @@ for (const shell of SHELLS) {
     }
   });
 
-  test(`[${shell}] item 5a control: an owner who did not approve is unapproved, and an empty gate slot is read`, () => {
+  test(`[${shell}] item 5a control: an owner who did not approve is unapproved, and a missing record file is a no-match`, () => {
     const dir = consumer("Someone Else");
     try {
-      const r = run(shell, item5a("gate.yml"), { cwd: dir });
+      const r = run(shell, item5a("deferrals.json"), { cwd: dir });
       assert.equal(
         JSON.parse(r.stdout.trim().split("\n").pop()).reason,
         "unapproved",
       );
-      // No gate file at all: nothing is read, so there is no deferral (no-match, exit 1).
-      const noGate = run(shell, item5a(""), { cwd: dir });
+      // No record file at all: nothing is read, so there is no deferral (no-match, exit 1).
+      const noGate = run(shell, item5a("absent.json"), { cwd: dir });
       assert.equal(
         JSON.parse(noGate.stdout.trim().split("\n").pop()).reason,
         "no-match",

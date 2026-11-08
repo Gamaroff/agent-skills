@@ -307,6 +307,20 @@ Advisory, not fixed: `ls-tree` without `-z`; exact-case path compare (macOS, tas
 
 Advisory, not fixed: `ls-tree` without `-z`; exact-case path compare (macOS, task 210); `finalise-delta.js` was not re-probed at gates 14 and 15.
 
+### QA Cycle 16 — 2026-11-08
+
+| Item | Result |
+| ---- | ------ |
+| `/qa-task` gate | FAIL, 60/100, unscoped: T271-QA-34, 35, 36 (HIGH), 37, 38 (MEDIUM). A thorough reviewer (about 75 probes, each compared with a real YAML reader); five shapes reproduced by hand, one lone-CR shape not reproduced |
+| Budget | Spent again; the owner granted a further cycle (`qa_max_cycles` 17) and approved the redesign I recommended |
+| Cause | The facts were read through a hand-rolled YAML subset parser whose rules differ from YAML's in many places; each cycle since gate 11 closed one spelling and found the next |
+| `/qa-fix` | **Design change, owner-approved:** the record is `deferrals.json` beside the work item, read with `JSON.parse`. Neither the work item's prose nor the QA gate is read. The matcher refuses (`unverifiable`) a file that is not valid JSON, repeats a key in any object (a small tokenizer decodes escaped keys), has a root other than `{"deferrals": [...]}`, holds an unknown field or a non-string value. The record's approver is compared exactly (no wrapper or whitespace stripping). `--gate` and `--work-item` are refused (exit 2) |
+| Removed | The strict-mode work on `yaml-subset.js` (cycles 13-15) is reverted: the file and its test equal `develop` again, so the 34 bundled copies return to their original bytes and no other consumer carries the risk |
+| Tests | Matcher suite rewritten for JSON (18 tests): shape rules, repeated keys including an escaped key, escapes decoded before the id is compared, exact approver, every-record-must-approve, withdrawal by editing. Block test follows. `ci:fast` 8059 tests, 0 failed |
+| Mutation proofs | Dropping the duplicate-key check, the unknown-field check, key decoding, the exact approver compare, and the other-case mention block each turn a named test red; file restored (`cmp`) |
+
+Advisory, not fixed: `ls-tree` without `-z`; exact-case path compare (macOS, task 210). Performance is still unmeasured.
+
 ---
 
 ## Completion

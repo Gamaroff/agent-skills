@@ -814,16 +814,16 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
 
    ```bash
    # Step 3b.1 item 5a — INPUTS, substituted into THIS block: {case-id} (the probe key after the first
-   # ':'), {gate-file} (the newest QA gate beside the work item, or empty when there is none).
-   # The gate is the only record read: with no gate there is nothing to match, which is a no-match.
-   [ -n "{gate-file}" ] || { echo '{"reason":"no-match","detail":"no QA gate beside the work item"}'; exit 1; }
+   # ':'), {record-file} (`deferrals.json` in the work-item directory).
+   # That file is the only record read: with none there is nothing to match, which is a no-match.
+   [ -f "{record-file}" ] || { echo '{"reason":"no-match","detail":"no deferrals.json beside the work item"}'; exit 1; }
    source .agents/skills/finalise/references/read-config.sh || exit 1
    OWNERS=$(read_nested_config_key finalise deferralApprover)
    APPROVER_ARGS=()
    # One owner per line, read the same way in bash and zsh (`read -a` is bash only; zsh spells it -A).
    while IFS= read -r o; do [ -n "${o// }" ] && APPROVER_ARGS+=(--approver "$o"); done < <(printf '%s\n' "$OWNERS" | tr ',' '\n')
    command node .agents/skills/finalise/references/finalise-deferral-match.js \
-     --case "{case-id}" --gate "{gate-file}" \
+     --case "{case-id}" --record "{record-file}" \
      ${APPROVER_ARGS[@]+"${APPROVER_ARGS[@]}"} --json
    ```
 
@@ -834,16 +834,22 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
    check. **Every other answer leaves the probe in `probes[]` as a FAIL** — `no-match` (no record names
    the case), `unapproved` (a record names it but lacks a task, a valid date, or an owner approver),
    `no-approver-configured`, `unverifiable` — and name the `reason` and `detail` beside the probe so
-   the owner sees why it was not deferred. The one record read is the QA gate's `recommendations.future[]`
-   entry (`case: {case-id}`, `deferred_to: task.N`, `approved_by`, `approved_on`). **The work item's
-   prose is not read**: a `## Deferred Work` bullet is not a deferral, because the Markdown spellings
-   of one section are open-ended and the structured gate has no such surface. If the owner deferred a
-   case in the work item only, record it as a gate entry first. Every entry that names the case must
-   approve it, and the approver is compared to the owner list exactly. To **withdraw** a deferral,
-   remove or edit its gate entry; the entry is the only record that is read. Any other text in the gate
-   that names the case id (an `immediate` entry, another key, a note inside the approving entry, a
-   comment, a block scalar) blocks, so keep the id out of everything but the entry itself; the gate's
-   prose fields (`top_issues`, `status_reason`...) may cite it. The matcher's header states all of this.
+   the owner sees why it was not deferred. **The one record read is `deferrals.json`**, a JSON file the
+   owner writes beside the work item, in exactly this shape and no other:
+
+   ```json
+   { "deferrals": [ { "case": "{case-id}", "deferred_to": "task.N",
+                      "approved_by": "{owner name}", "approved_on": "YYYY-MM-DD" } ] }
+   ```
+
+   It is read with `JSON.parse`, so a file that is not valid JSON, repeats a key, holds a field other
+   than those four, or holds a non-string value is `unverifiable` and the probe stays a FAIL. **Neither
+   the work item's prose nor the QA gate is read**: a `## Deferred Work` bullet or a gate entry is not a
+   deferral (earlier versions read them, and sixteen QA gates each found another spelling the reader
+   missed). If the owner deferred a case there only, copy it into `deferrals.json` first. Every entry
+   for the case must approve it and agree on the task, `approved_by` must equal an owner exactly, and
+   an entry for another case that names this id blocks. To **withdraw** a deferral, remove or edit its
+   entry. The matcher's header states all of this.
 6. **The zero-guard still applies — now to this run.** `boundary: true` with `probes_executed: 0`
    (an empty plan, every entry refused or declined) adds the `probe mode executed no candidates`
    FAIL check; a zero from this run **still takes the zero-guard**, because then the engine declined
