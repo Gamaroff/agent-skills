@@ -14,21 +14,21 @@ top_issues:
     finding: 'The Target Architecture bullet for Arm 3 (and the plan file) still say the gate or the work item is read; the matcher and the skill read deferrals.json only.'
     suggested_action: 'Add a one-line superseded note to the bullet.'
     suggested_owner: dev
-    status: open
+    status: fixed
   - id: 'T271-QA-40'
     severity: low
     file: 'shared/resources/finalise-deferral-match.js'
     finding: 'namesCase is dead code, exported only, and its token rule differs from countMentions.'
     suggested_action: 'Delete namesCase and its export.'
     suggested_owner: dev
-    status: open
+    status: fixed
   - id: 'T271-QA-41'
     severity: low
     file: 'shared/resources/finalise-deferral-match.js'
     finding: 'An entry for another case that names this id blocks correctly, but reports "no follow-up task named", hiding the cause.'
     suggested_action: 'Give blocking entries their own reason.'
     suggested_owner: dev
-    status: open
+    status: fixed
 
 waiver:
   active: false
