@@ -19,6 +19,8 @@ Edit `skills/finalise/SKILL.md`, `skills/finalise/references/resolve-pr-number.s
 
 Ask with `AskUserQuestion`: for a bug finalised after its branch merged, where does the acceptance commit go (a branch off `develop` with a PR, or a direct docs commit)? Record the answer here.
 
+**Answered 2026-11-08 (owner):** a docs-only branch off `develop` with a PR. The base branch is never pushed to directly. The bug route in `skills/finalise/SKILL.md` must state this.
+
 ### Phase 2: The preflight
 
 Model on `finalise-record-preflight.js` (`skills/finalise/SKILL.md:536`–`:548`): a `check --doc … --json` CLI returning a `reason` and a `missing[]` list. Inputs: the gate files (`{dir}/*.gate.*.yml`), `approved_by` on a `WAIVED` gate, the newest `*.pr-review.*.md`, `reviewDecision` and PR state via `pr-read.sh`. Call it at Step 0 and print the named route on non-zero. Add a `preconditions` row to the bug-mode table and the matching `**Bug mode (\`preconditions\`):**` marker.

@@ -19,6 +19,8 @@
 #   lock         .claude/state/develop-pipeline.lock's `pr_url`, written at develop Step 4 — only
 #                when the lock's `task_or_story_directory`, canonicalised, IS the --doc directory,
 #                canonicalised. Another work item's lock never answers for this one
+#   linked-issue (bug reports only) the newest PR GitHub records as closing the issue named by the
+#                bug's `github_issue:` — the route for a bug finalised after its PR merged (task 272)
 #   frontmatter  `pr_number:` inside the document's leading `---` block
 #   body         the FIRST `PR #N` / `pull/N` in the document — only when PR N's head branch is
 #                the current branch (`pr_read --pr N`, PR_READ_HEAD_BRANCH). An unconfirmed
@@ -121,6 +123,30 @@ else
     miss "lock: the lock is for '${LOCK_DIR:-no directory}', not this document's directory"
   else
     answer "$LOCK_N" lock
+  fi
+fi
+
+# ── 3b. linked issue (bug reports only) ─────────────────────────────────────────────────────────
+# A bug fixed on a plain bugfix branch and finalised AFTER its PR merged has no branch PR (the
+# branch is gone or the checkout is on develop) and no lock. The bug's own `github_issue:` names an
+# issue the PR closed, and GitHub records that link (task 272, obs #38). Bugs only: a story or task
+# keeps the rungs above and below exactly as before.
+if printf '%s' "$(basename -- "$DOC")" | grep -qE '(^|\.)bug\.[0-9]+\.'; then
+  BUG_ISSUE=$(awk 'NR == 1 && $0 != "---" { exit } NR > 1 && $0 == "---" { exit } NR > 1 { print }' "$DOC" \
+    | sed -nE "s/^github_issue:[[:space:]]*['\"]?([1-9][0-9]*)['\"]?[[:space:]]*$/\1/p" | head -1)
+  if [ -z "$BUG_ISSUE" ]; then
+    miss "linked-issue: the bug has no github_issue:"
+  elif ! command -v gh >/dev/null 2>&1; then
+    miss "linked-issue: gh not on PATH — issue #$BUG_ISSUE's linked PR not read"
+  else
+    # The newest PR that references the issue as the one it closes. An unreadable answer is a miss,
+    # never a guess.
+    LINKED_N=$(gh issue view "$BUG_ISSUE" --json closedByPullRequestsReferences \
+      --jq '[.closedByPullRequestsReferences[].number] | max // empty' 2>/dev/null)
+    if printf '%s' "$LINKED_N" | grep -qE '^[1-9][0-9]*$'; then
+      answer "$LINKED_N" linked-issue
+    fi
+    miss "linked-issue: no PR is linked to issue #$BUG_ISSUE as closing it"
   fi
 fi
 

@@ -37,11 +37,22 @@ const SHA = "a".repeat(40);
 // The stub answers what pr-read.sh asks: `gh pr view [N] --json … --jq …`, printing the jq-shaped
 // line "number head base headBranch" itself. `branchPr` is the current branch's PR (null: none);
 // `prs` maps a PR number to its head branch.
-function stubBody({ branchPr = null, prs = {} } = {}) {
+function stubBody({ branchPr = null, prs = {}, closing = null } = {}) {
   const arms = Object.entries(prs)
     .map(([n, head]) => `    ${n}) echo "${n} ${SHA} develop ${head}" ;;`)
     .join("\n");
+  // `gh issue view N --json closedByPullRequestsReferences --jq …`: the stub prints the jq result
+  // itself — the newest closing PR's number, or nothing when the issue has none.
+  const issueArm =
+    closing === null
+      ? ""
+      : [
+          'if [ "$1" = "issue" ] && [ "$2" = "view" ]; then',
+          closing === "none" ? "  exit 0" : `  echo "${closing}"; exit 0`,
+          "fi",
+        ].join("\n");
   return [
+    issueArm,
     'if [ "$1" = "pr" ] && [ "$2" = "view" ]; then',
     '  case "$3" in',
     branchPr === null
@@ -78,14 +89,21 @@ function lock(work, { dir = DOC_DIR, prUrl = "" } = {}) {
 }
 
 // One fixture per case: { work, bin, argvLog }.
-function fixture(t, { doc, branchPr = null, prs = {} } = {}) {
+function fixture(
+  t,
+  { doc, branchPr = null, prs = {}, closing = null, docPath = DOC } = {},
+) {
   const f = fixtureRepo();
   t.after(() => cleanup(f.dir));
-  write(f.work, DOC, doc ?? docText());
+  write(f.work, docPath, doc ?? docText());
   write(f.work, "skills-config.yaml", "vcs: github\ntracker: github\n");
-  const { bin, argvLog } = ghStub(f.dir, stubBody({ branchPr, prs }));
+  const { bin, argvLog } = ghStub(f.dir, stubBody({ branchPr, prs, closing }));
   return { work: f.work, dir: f.dir, bin, argvLog };
 }
+
+const BUG_DOC = "docs/bugs/bug.5.fx/bug.5.fx.md";
+const bugText = (issue) =>
+  `---\nid: bug.5\ntype: bug\nstatus: fixed\n${issue === null ? "" : `github_issue: ${issue}\n`}---\n\n# Bug 5\n`;
 
 function resolve(shell, fx, args = ["--doc", DOC, "--json"], env = {}) {
   const quoted = args.map((a) => `'${a}'`).join(" ");
@@ -190,6 +208,61 @@ for (const shell of SHELLS) {
       const r = resolve(shell, fx);
       assert.equal(r.status, 0, r.stderr);
       assert.deepEqual(parse(r), { pr: 550, source: "body" });
+    });
+
+    test("linked-issue: a bug finalised after its PR merged resolves through its github_issue", (t) => {
+      const fx = fixture(t, {
+        docPath: BUG_DOC,
+        doc: bugText(651),
+        closing: 651,
+      });
+      const r = resolve(shell, fx, ["--doc", BUG_DOC, "--json"]);
+      assert.equal(r.status, 0, r.stderr);
+      assert.deepEqual(parse(r), { pr: 651, source: "linked-issue" });
+      assert.ok(
+        ghCalls(fx.argvLog).some((c) => /issue view 651/.test(c)),
+        "the rung asked gh about the bug's issue",
+      );
+    });
+
+    test("linked-issue: control — an issue no PR closes is a miss, never a guess", (t) => {
+      const fx = fixture(t, {
+        docPath: BUG_DOC,
+        doc: bugText(651),
+        closing: "none",
+      });
+      const r = resolve(shell, fx, ["--doc", BUG_DOC, "--json"]);
+      assert.equal(r.status, 1, r.stdout);
+      assert.deepEqual(parse(r), { pr: null, source: "none", reason: "none" });
+      assert.match(r.stderr, /linked-issue: no PR is linked to issue #651/);
+    });
+
+    test("linked-issue: control — a bug with no github_issue: names the gap and asks gh nothing", (t) => {
+      const fx = fixture(t, {
+        docPath: BUG_DOC,
+        doc: bugText(null),
+        closing: 651,
+      });
+      const r = resolve(shell, fx, ["--doc", BUG_DOC, "--json"]);
+      assert.equal(r.status, 1, r.stdout);
+      assert.match(r.stderr, /linked-issue: the bug has no github_issue:/);
+      assert.ok(
+        !ghCalls(fx.argvLog).some((c) => /^issue /.test(c)),
+        "no issue lookup without an issue",
+      );
+    });
+
+    test("linked-issue: control — a task document never takes the rung", (t) => {
+      const fx = fixture(t, {
+        doc: `---\nid: task.9\ngithub_issue: 651\n---\n\n# Task 9\n`,
+        closing: 651,
+      });
+      const r = resolve(shell, fx, ["--doc", DOC, "--json"]);
+      assert.equal(r.status, 1, r.stdout);
+      assert.ok(
+        !ghCalls(fx.argvLog).some((c) => /^issue /.test(c)),
+        "only a bug reads its linked issue",
+      );
     });
 
     test("none: no source at all → exit 1 and no number", (t) => {

@@ -5,16 +5,16 @@ type: task
 description: "Make finalise state up front what it needs (gate, PR review, open PR) and say what a standalone or post-merge run does, for hand-built work and for a bug fixed outside develop-bug, so a missing input is a one-line answer instead of a mid-run HALT."
 tags: [finalise, observation]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-11-06
-updated: 2026-11-06
+updated: 2026-11-08
 estimated_effort_hours: 8
 ---
 
 # Task 272: finalise names its preconditions and standalone routes
 
-**Status:** Planned
+**Status:** Ready for Review
 
 ---
 
@@ -48,12 +48,12 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 
 - `skills/finalise/SKILL.md:87` `#### What bug mode runs and skips` is a key/step table, bound to inline `**Bug mode (\`key\`):**` markers by `evals/shared/tests/finalise-bug-mode.test.mjs`. `pr-comment` is `run` for bugs at `:115` ("`FINAL_GATE` from the verify-loop verdict").
 - `skills/finalise/SKILL.md:480` documents the PR-number resolver order (explicit `--pr`, the PR whose head is the current branch via `pr-read.sh`, then the rest); `skills/finalise/references/resolve-pr-number.sh` implements it.
-- `:249`–`:358` read QA reports and gate files if present; `:442` is the message when none exist; `:345` handles a `WAIVED` gate (`approved_by`); `:1110` is the "Tests & PR Approved?" column rule using the newest `*.pr-review.*.md`.
+- `:249`–`:358` read QA reports and gate files if present; `:442` is the message when none exist; `:345` handles a `WAIVED` gate (`approved_by`); the "Tests & PR Approved?" column rule (its line number drifted since the grep; find it with `grep -n "PR Approved" skills/finalise/SKILL.md`) using the newest `*.pr-review.*.md`.
 - `grep -n -i "preflight" skills/finalise/SKILL.md` shows only `record-preflight` (`:103`, `:536`–`:548`, `finalise-record-preflight.js`), which checks criteria, not these inputs.
 
 ### Target Architecture
 
-- **A preconditions preflight** at Step 0 (before any subagent is dispatched): checks a gate file exists or a `WAIVED` record with `approved_by` is present; a pr-review report or a required review decision; the PR state (open or merged). It prints what is missing and the named route: run `/review-pr` and `/qa-task` before merge, or record a `WAIVED` gate with `approved_by` (obs #40).
+- **A preconditions preflight** at Step 0 (before any subagent is dispatched): checks a gate file exists or a `WAIVED` gate with `waiver.active: true` and a non-empty `waiver.approved_by` is present (the `qa-gate` schema's field names); a pr-review report or a required review decision; the PR state (open or merged). The PR `state` and `reviewDecision` come from `gh pr view <PR> --json state,reviewDecision,url` (as `finalise-dod-ac-prompt.md` Step 3 reads them), **not** from `pr-read.sh`, which emits only the PR number, head, base and head branch. On a Bitbucket remote, where `gh` has no answer, the preflight reports those two inputs as `unverifiable` and never as missing. It prints what is missing and the named route: run `/review-pr` and `/qa-task` before merge, or record a `WAIVED` gate with `approved_by` (obs #40).
 - **A standalone / post-merge bug route** stated in the bug-mode section: take the PR from the bug's linked PR or require `--pr`; accept the bug file's `#### QA Verification` `**Verification Result**: ✅ Fixed` as the verdict when no implementation report exists; and say where the acceptance commit goes when the branch is already merged (obs #38).
 
 ### Important Clarifications
@@ -138,6 +138,8 @@ None - a run that had every input behaves as before; one that lacked an input ha
 **Risk Level**: Low
 
 **Changes**:
+- [ ] Removed-literal sweep: list each sentence or token Phase 3 rewrites in the 7.7 and 6a blocks, run `git grep -n '<literal>' -- '*.test.*'` per item, and update every hit. Known pinning suites to read first: `evals/shared/tests/finalise-bug-mode.test.mjs`, `shared/resources/tests/finalise-acceptance-blocks.test.mjs`, `shared/resources/tests/finalise-6a-registry-staging.test.mjs`, `shared/resources/tests/acceptance-commit-carries-5c.test.mjs`, `evals/shared/tests/transition-protocol-parity.test.mjs`.
+- [ ] The new preflight test lives in `evals/shared/tests/` (reached by the `package.json` glob `evals/shared/tests/*.test.mjs`); confirm with `CI=true command npm test`.
 - [ ] Tests with mutation proofs; `command npm run bundle`, `command npm run bundle -- --check`.
 
 **Dependencies**: Phases 2 and 3.
@@ -148,9 +150,9 @@ None - a run that had every input behaves as before; one that lacked an input ha
 
 ### Files to Modify (Core Implementation)
 
-1. ✅ `skills/finalise/SKILL.md` - preflight call, bug route
-2. ✅ a new preconditions preflight script under `skills/finalise/references/` or `shared/resources/`
-3. ✅ `skills/finalise/references/resolve-pr-number.sh` - linked-PR rung
+1. ✅ `skills/finalise/SKILL.md` - preflight call, bug route (the preflight script is cited from here with a bare `references/` mention so the bundler reaches it)
+2. ✅ a new preconditions preflight script in `shared/resources/` beside `finalise-record-preflight.js` (the source; the `skills/finalise/references/` copy is generated)
+3. ✅ `shared/resources/resolve-pr-number.sh` - linked-PR rung (the `skills/finalise/references/` copy is generated; edit the source only)
 
 ### Files to Modify (Tests)
 
@@ -189,7 +191,7 @@ None - a run that had every input behaves as before; one that lacked an input ha
 
 - [ ] The preflight names every missing input and the route for the task 208/209 shape, shown by a named test recorded in the QA report.
 - [ ] A post-merge bug run completes 7.7 and 6a on the Phase 1 route, shown by a fixture run recorded in the QA report.
-- [ ] A run with all inputs present behaves as before (an existing fixture passes unchanged).
+- [ ] A run with all inputs present behaves as before: the existing `evals/shared/tests/finalise-*.test.mjs` and `shared/resources/tests/finalise-*.test.mjs` suites pass unchanged, shown in the QA report's test run.
 
 ### Performance
 
@@ -287,6 +289,9 @@ None - a run that had every input behaves as before; one that lacked an input ha
 | Date       | Version | Description                                       | Author      |
 | ---------- | ------- | ------------------------------------------------- | ----------- |
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #38, #40    | create-task |
+| 2026-11-08 | 1.1     | Review passed (8/10) — fixed gate/waiver field names, PR state source, removed-literal sweep, source paths, AC3 location | review-task |
+| 2026-11-08 |         | Status → ready-for-development                    | review-task |
+| 2026-11-08 |         | Implemented — 12 files, 49 new tests; status → ready-for-review | develop-task |
 <!-- change-log-end -->
 
 ---
@@ -326,4 +331,4 @@ None.
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review

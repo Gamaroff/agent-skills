@@ -9051,6 +9051,11 @@ test("uniform failure: the script that caused the false findings is declined, ex
       "filename",
       "--entry",
       "shell:shared/resources/resolve-pr-number.sh",
+      // The script now names `gh` (the bug-only linked-issue rung, task 272), and a shell entry
+      // that names it is declined `needs-fake-gh` without a fixture. The fake answers; the
+      // uniform usage failure (exit 2) is still what the run measures.
+      "--fake-gh",
+      join(REPO_ROOT, FAKE_GH),
       "--json",
     ],
     { cwd: REPO_ROOT, encoding: "utf8" },
