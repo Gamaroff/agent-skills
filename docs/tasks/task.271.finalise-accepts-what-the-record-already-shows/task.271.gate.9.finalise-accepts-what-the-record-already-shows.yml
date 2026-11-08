@@ -1,0 +1,72 @@
+schema: 2
+task: 'task.271.finalise-accepts-what-the-record-already-shows'
+task_title: 'finalise accepts what the record already shows'
+gate: FAIL
+status_reason: 'Cycle 8 fixes verified, and the delta engine held against about 30 probes. Two siblings remain in the Deferred Work reconciliation, both from the same cause: the section reader and the item reader handle HTML comments differently, one per line and one across the text, so a multi-line comment or an id split by a comment makes them disagree. The nine-gate budget is spent.'
+reviewer: 'QA Engineer'
+head: '3fdc7d2e42cc15150b51300f50ebef27aeaf79f5'
+updated: '2026-11-08T15:05:00Z'
+
+top_issues:
+  - id: 'T271-QA-20'
+    severity: high
+    file: 'shared/resources/finalise-deferral-match.js'
+    finding: 'A comment that spans lines makes the per-line section reader disagree with the item reader, which joins the lines. Reproduced by hand: an approved c1 bullet, then "x<!--", then "-->## Other", then a "+ `c1`: withdrawn, not deferred." line returns matched (exit 0). The item reader sees "x## Other", not a heading, and keeps the section open; the section reader ends the section at "## Other" and never counts the withdrawal.'
+    suggested_action: 'Strip comments once, with the one rule, and find the section and count over that single visible text; count a comment that names the case as blocking separately.'
+    suggested_owner: dev
+    status: open
+  - id: 'T271-QA-21'
+    severity: high
+    file: 'shared/resources/finalise-deferral-match.js'
+    finding: 'taken is counted on comment-stripped item text while the raw count is taken before stripping, so a comment inside the id creates a mention that exists only after stripping and gives slack. Reproduced by hand: the bullet "- `c<!---->1`: deferred to task.5, approved by Pat Owner on 2026-01-01." followed by "+ `c1`: withdrawn, not deferred." returns matched (exit 0).'
+    suggested_action: 'Count both sides over the same visible text, so an id that exists only after stripping is counted on both.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 8064
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 2
+    escaped: 0
+    boundary: true
+    boundary_signals: ["refuses"]
+    boundary_reason: ''
+    notes: 'Two CLI runs by hand against head 3fdc7d2e. The reviewer ran about 15 deferral probes (comment-split headings and fences, mismatched closers, heading spellings, gate escapes) and about 30 finalise-delta probes against scratch git repos (ref tags, shallow clone, rename, symlinks, odd names, --attempts spellings, mode-only change, docs-path classification); the delta engine yielded nothing that exits 0 when it must refuse.'
+  performance:
+    status: CONCERNS
+    notes: 'Not measured to the criterion; a clean rerun on an idle machine is owed.'
+  reliability:
+    status: PASS
+    notes: 'ci:fast 8064 tests, 0 failed.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Both new holes are the same class: two readers of one file handle HTML comments by different rules. One shared pass removes the class.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'ls-tree is parsed without -z, so non-ASCII failed-file names fail closed; a nested list item is read as a record; exact-case path compare (macOS, task 210).'
+      refs: ['shared/resources/finalise-delta.js', 'shared/resources/finalise-deferral-match.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['Fix T271-QA-20 and T271-QA-21 with one shared comment pass, then re-review; the QA budget (9 gates) is spent, so continuing needs the owner']

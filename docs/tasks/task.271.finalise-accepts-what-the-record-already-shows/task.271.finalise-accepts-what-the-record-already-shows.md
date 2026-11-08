@@ -5,7 +5,7 @@ type: task
 description: "Give finalise three recorded arms it lacks, so work that the evidence already clears is no longer halted: a measurement on a code-identical earlier commit, one bounded re-run of a red outside the diff, and a probe reproduction the owner deferred."
 tags: [finalise, observation]
 category: refactoring
-status: ready-for-review
+status: in-progress
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-08
@@ -14,7 +14,7 @@ estimated_effort_hours: 16
 
 # Task 271: finalise accepts what the record already shows
 
-**Status:** Ready for Review
+**Status:** In Progress
 
 ---
 
@@ -318,21 +318,21 @@ Not modified, against the plan: `finalise-dod-security-prompt.md` (Arm 3 is wire
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-08
-**Quality Score**: 90/100
+**Quality Score**: 80/100
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.271.qa.8.finalise-accepts-what-the-record-already-shows.md](./task.271.qa.8.finalise-accepts-what-the-record-already-shows.md)
-- **Gate File**: [task.271.gate.8.finalise-accepts-what-the-record-already-shows.yml](./task.271.gate.8.finalise-accepts-what-the-record-already-shows.yml)
+- **Full Report**: [task.271.qa.9.finalise-accepts-what-the-record-already-shows.md](./task.271.qa.9.finalise-accepts-what-the-record-already-shows.md)
+- **Gate File**: [task.271.gate.9.finalise-accepts-what-the-record-already-shows.yml](./task.271.gate.9.finalise-accepts-what-the-record-already-shows.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 8064
 - **Phases Verified**: 5/5
-- **Critical Issues**: 1
+- **Critical Issues**: 2
 - **NFR Status**: Security: FAIL, Performance: CONCERNS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Cycle 7's findings are closed. One hole remains in the Arm 3 work-item reconciliation: a heading hidden inside an HTML comment ends the raw section early, so a withdrawal after it is not counted. The eight-gate budget is spent.
+The delta engine held against about 30 probes. Cycle 8's finding is closed. Two siblings remain in the Arm 3 work-item reconciliation, from the section reader and the item reader handling HTML comments by different rules. The nine-gate budget is spent.
 
 <!-- change-log-start -->
 ## Change Log
@@ -360,6 +360,7 @@ Cycle 7's findings are closed. One hole remains in the Arm 3 work-item reconcili
 | 2026-11-08 |         | QA findings fixed — 2 of 2 (gate and Deferred Work section reconciled on raw text, nothing stripped); a further cycle granted by the owner | qa-fix |
 | 2026-11-08 |         | QA gate FAIL (90/100) — 1 finding; QA budget (8 gates) spent | qa-task |
 | 2026-11-08 |         | QA findings fixed — 1 of 1 (Deferred Work boundary found on the same visible text as the item reader); a further cycle granted by the owner | qa-fix |
+| 2026-11-08 |         | QA gate FAIL (80/100) — 2 findings; QA budget (9 gates) spent | qa-task |
 <!-- change-log-end -->
 
 ---
@@ -403,4 +404,4 @@ The measured-criteria card (finalise takes the measurement itself).
 
 ---
 
-**Status:** Ready for Review
+**Status:** In Progress
