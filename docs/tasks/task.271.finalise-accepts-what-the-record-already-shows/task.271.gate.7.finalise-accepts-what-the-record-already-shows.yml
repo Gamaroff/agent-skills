@@ -5,7 +5,7 @@ gate: FAIL
 status_reason: 'Cycle 6 fixes verified. The unread-text reconciliation still has two holes: a full-line # inside a YAML block scalar is text to YAML but is stripped as a comment from the raw count, and the work item is not reconciled at all, so a withdrawal in a + bullet, a numbered item or prose beside a valid bullet is ignored. The seven-gate budget is spent.'
 reviewer: 'QA Engineer'
 head: 'c5eb9dd8ef288384451a55d1662038fb2c4cecfe'
-updated: '2026-11-08T12:00:00Z'
+updated: '2026-11-08T14:48:22Z'
 
 top_issues:
   - id: 'T271-QA-17'

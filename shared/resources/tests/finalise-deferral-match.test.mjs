@@ -391,7 +391,9 @@ test("control: a bullet that is not the one accepted form never matches (T271-QA
         "--approver",
         OWNER,
       ]);
-      assert.equal(r.json.reason, "no-match", f);
+      // A bullet nobody can see names the case: refused (unapproved, since T271-QA-18), never matched.
+      assert.equal(r.json.reason, "unapproved", f);
+      assert.equal(r.status, 1, f);
     }
     const after = run([
       "--case",
@@ -618,15 +620,21 @@ test("control: no line shape hides a lost withdrawal - the whole gate is reconci
   const afterComment = gate(`${GOOD_GATE_ENTRY}# note\n${lost}`);
   const earlierFutureKey = `schema: 1\nnfr:\n  future:\nrecommendations:\n  future:\n${GOOD_GATE_ENTRY}${lost}`;
   const lostInOtherSection = `${gate(GOOD_GATE_ENTRY)}top_issues:\n  - id: X\n    finding: >-\n      ${CASE} was withdrawn\n`;
-  // Controls: the id read by the parser anywhere is accounted for, and a full-line comment is no record.
-  const quotedElsewhere = `${gate(GOOD_GATE_ENTRY)}top_issues:\n  - id: X\n    finding: 'reproduced by ${CASE}'\n`;
+  // Nothing is stripped: a `#` line inside a block scalar is text to YAML (T271-QA-17), so a comment
+  // that names the id blocks too.
+  const hashInScalar = gate(
+    `${GOOD_GATE_ENTRY}    - action: >-\n        # ${CASE} approval is revoked\n      refs: []\n`,
+  );
   const fullLineComment = gate(`${GOOD_GATE_ENTRY}# ${CASE} was reproduced\n`);
+  // Control: the id read by the parser anywhere is accounted for.
+  const quotedElsewhere = `${gate(GOOD_GATE_ENTRY)}top_issues:\n  - id: X\n    finding: 'reproduced by ${CASE}'\n`;
   const { dir, paths } = fixture({
     "a.yml": afterComment,
     "b.yml": earlierFutureKey,
     "c.yml": lostInOtherSection,
     "d.yml": quotedElsewhere,
     "e.yml": fullLineComment,
+    "f.yml": hashInScalar,
     "wi.md": workItem(GOOD_BULLET),
   });
   try {
@@ -641,9 +649,38 @@ test("control: no line shape hides a lost withdrawal - the whole gate is reconci
         "--approver",
         OWNER,
       ]).json.reason;
-    for (const g of ["a.yml", "b.yml", "c.yml"])
+    for (const g of ["a.yml", "b.yml", "c.yml", "e.yml", "f.yml"])
       assert.equal(go(g), "unapproved", g);
-    for (const g of ["d.yml", "e.yml"]) assert.equal(go(g), "matched", g);
+    assert.equal(go("d.yml"), "matched", "d.yml");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("control: no list shape hides a lost withdrawal - the Deferred Work section is reconciled (T271-QA-18)", () => {
+  const section = (extra) =>
+    `# T\n\n## Deferred Work\n\n${GOOD_BULLET}\n${extra}\n\n## Change Log\n`;
+  const variants = {
+    plus: section(`+ \`${CASE}\`: approval withdrawn.`),
+    numbered: section(`1. ${CASE} is withdrawn`),
+    prose: section(`\nNote: ${CASE} approval is withdrawn.`),
+    table: section(`\n| ${CASE} | revoked |`),
+  };
+  const files = { "ok.md": section("") };
+  Object.entries(variants).forEach(([k, v]) => (files[`${k}.md`] = v));
+  // Controls: another section may name the id; so may a different, longer id in this one.
+  files["other-section.md"] =
+    `${section("")}## Notes\n\n${CASE} was reproduced.\n`;
+  files["longer-id.md"] = section(`- \`${CASE}-2\`: not this case`);
+  const { dir, paths } = fixture(files);
+  try {
+    const go = (f) =>
+      run(["--case", CASE, "--work-item", paths[f], "--approver", OWNER]).json
+        .reason;
+    for (const k of Object.keys(variants))
+      assert.equal(go(`${k}.md`), "unapproved", k);
+    for (const f of ["ok.md", "other-section.md", "longer-id.md"])
+      assert.equal(go(f), "matched", f);
   } finally {
     cleanup(dir);
   }

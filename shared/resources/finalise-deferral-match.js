@@ -29,9 +29,11 @@
  *   Every record that names the case must approve it, and agree on the follow-up task; one that does
  *   not (a revocation, a prose mention) blocks, so a later record can withdraw an earlier approval.
  *   The approver name is compared to the owner list exactly (no case or Unicode folding).
- *   The gate's YAML reader drops text it cannot read, so the whole gate is reconciled: every
- *   occurrence of the case id in the gate text must also occur in a key or value the reader read,
- *   and one it did not read blocks (no line shape is used to find it).
+ *   Both readers drop text they cannot read, so each source is reconciled on its RAW text, with
+ *   nothing stripped (no comment rule, no line shape): every occurrence of the case id in the whole
+ *   gate, and in the whole Deferred Work section, must also occur in a key, value or list item the
+ *   reader took. One it did not take (a block-scalar body, a `+` bullet, a numbered item, prose, a
+ *   table row, a comment) is a record naming the case that was not read, and it blocks.
  *
  * FAILS CLOSED. Exit 0 means exactly one thing: `matched`. Every other answer exits 1 (a usage error
  * exits 2), so a shell `if` cannot round a "no" up to a deferral.
@@ -217,14 +219,9 @@ function gateCandidates(text, id) {
   // an earlier `future:` key (T271-QA-13, 15, 16). So no shape is used. The WHOLE gate is the
   // reference: every occurrence of the case id in its text must also occur in a value or key the
   // parser actually read. An occurrence it did not read is a record the parser lost, and it blocks.
-  // Full-line comments are not part of the record; an inline comment naming the id fails closed.
-  const raw = countMentions(
-    String(text)
-      .split("\n")
-      .filter((l) => !/^\s*#/.test(l))
-      .join("\n"),
-    id,
-  );
+  // Nothing is stripped, comments included: a `#` line inside a block scalar is TEXT to YAML and a
+  // regex cannot tell it from a comment (T271-QA-17). A comment naming the id therefore blocks.
+  const raw = countMentions(String(text), id);
   if (raw > countParsedMentions(doc, id)) {
     out.push({
       source: "gate (text the reader could not parse names the case)",
@@ -319,7 +316,8 @@ function workItemCandidates(text, id) {
   const visible = String(text)
     .replace(/<!--[\s\S]*?-->/g, "")
     .replace(/<!--[\s\S]*$/, "");
-  deferredWorkItems(visible).forEach((item, i) => {
+  const items = deferredWorkItems(visible);
+  items.forEach((item, i) => {
     if (!namesCase(item, id)) return;
     const f = parseBullet(item, id);
     out.push({
@@ -329,7 +327,37 @@ function workItemCandidates(text, id) {
       date: f ? f.date : "",
     });
   });
+  // Only `-` and `*` list items are read, so a `+` bullet, a numbered item, a table row or a prose
+  // line in the section can still name the case - a withdrawal, say (T271-QA-18). Reconcile the same
+  // way as the gate: every occurrence of the id in the raw section text (comments, fences and all)
+  // must also occur in an item the reader took; a surplus is a record it did not read, and it blocks.
+  const taken = items.reduce((n, item) => n + countMentions(item, id), 0);
+  if (countMentions(deferredWorkSectionText(text), id) > taken) {
+    out.push({
+      source:
+        "work item Deferred Work (text the reader could not parse names the case)",
+      task: "",
+      owner: "",
+      date: "",
+    });
+  }
   return out;
+}
+
+/** The raw text under every `## Deferred Work` H2, up to the next H2 (fences and comments kept). */
+function deferredWorkSectionText(text) {
+  const out = [];
+  let inSection = false;
+  let inFence = false;
+  for (const line of String(text).split("\n")) {
+    if (/^\s*(```|~~~)/.test(line)) inFence = !inFence;
+    else if (!inFence && /^## /.test(line)) {
+      inSection = /^## Deferred Work\s*$/.test(line);
+      continue;
+    }
+    if (inSection) out.push(line);
+  }
+  return out.join("\n");
 }
 
 function readText(p) {

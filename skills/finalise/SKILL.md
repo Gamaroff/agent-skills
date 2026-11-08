@@ -840,7 +840,9 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
    `## Deferred Work` bullet, which is exactly `` `{case-id}`: deferred to task.N, approved by {name} on {YYYY-MM-DD}. ``
    (no optional piece, no other word); a bullet in any other wording, or inside an HTML comment, is not
    a deferral. Every record that names the case must approve it, so a later revocation blocks, and the
-   approver is compared to the owner list exactly. The matcher's header states both.
+   approver is compared to the owner list exactly. Any other text in the gate or in the Deferred Work
+   section that names the case id (a comment, a prose line, a `+` bullet) also blocks, so keep the id
+   out of everything but the record itself. The matcher's header states all of this.
 6. **The zero-guard still applies — now to this run.** `boundary: true` with `probes_executed: 0`
    (an empty plan, every entry refused or declined) adds the `probe mode executed no candidates`
    FAIL check; a zero from this run **still takes the zero-guard**, because then the engine declined

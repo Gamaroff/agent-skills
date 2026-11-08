@@ -181,6 +181,20 @@ Advisory, not fixed: `ls-tree` without `-z` (non-ASCII failed-file names fail cl
 
 Advisory, not fixed: an inline comment naming the id fails closed; `ls-tree` without `-z`; a nested list item is read as a record; section end at next H2; exact-case compare (macOS, task 210).
 
+### QA Cycle 7 — 2026-11-08
+
+| Item | Result |
+| ---- | ------ |
+| `/qa-task` gate | FAIL, 80/100, unscoped: T271-QA-17 (HIGH), T271-QA-18 (HIGH) |
+| Budget | Spent again; the owner granted a further cycle (`qa_max_cycles` 8) |
+| Cause | Cycle 6 reconciled the gate but stripped full-line `#` lines from the raw count (text, inside a block scalar) and did not reconcile the work item at all |
+| `/qa-fix` | Both sources are reconciled on their RAW text with nothing stripped: every occurrence of the case id in the whole gate and in the whole Deferred Work section must also occur in a key, value or list item the reader took; a surplus blocks |
+| Tests | Refused: `#` inside a block scalar, a full-line comment, a `+` bullet, a numbered item, prose, a table row; a commented-out bullet now blocks (`unapproved`) rather than `no-match`. Controls: the id read in another gate section, the id in another work-item section, a longer id. `ci:fast` 8064 tests, 0 failed |
+| Mutation proofs | Disabling the work-item reconciliation and re-adding the comment strip each turn a named test red; file restored (`cmp`) |
+| Slip | I wrote gate 7's `updated:` by estimate; the gate-timestamp guard caught it in `ci:fast`; corrected from `date -u` |
+
+Advisory, not fixed: `ls-tree` without `-z`; a nested list item is read as a record; section end at next H2; exact-case compare (macOS, task 210). `finalise-delta.js` was last re-probed at gate 5.
+
 ---
 
 ## Completion
