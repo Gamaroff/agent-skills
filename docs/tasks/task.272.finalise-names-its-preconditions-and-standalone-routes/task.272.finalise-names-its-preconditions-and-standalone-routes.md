@@ -294,25 +294,24 @@ None - a run that had every input behaves as before; one that lacked an input ha
 
 ### QA Report
 
-- **Full Report**: [task.272.qa.2.finalise-names-its-preconditions-and-standalone-routes.md](./task.272.qa.2.finalise-names-its-preconditions-and-standalone-routes.md)
-- **Gate File**: [task.272.gate.2.finalise-names-its-preconditions-and-standalone-routes.yml](./task.272.gate.2.finalise-names-its-preconditions-and-standalone-routes.yml)
+- **Full Report**: [task.272.qa.3.finalise-names-its-preconditions-and-standalone-routes.md](./task.272.qa.3.finalise-names-its-preconditions-and-standalone-routes.md)
+- **Gate File**: [task.272.gate.3.finalise-names-its-preconditions-and-standalone-routes.yml](./task.272.gate.3.finalise-names-its-preconditions-and-standalone-routes.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 8103
+- **Tests Executed**: 8104
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-All four cycle-1 findings are closed. Suite and CI are green on the head. Wall time is 0.4% under develop (median of five alternating runs).
-
+All four cycle-1 findings are closed. Suite and CI are green on the head. Wall time is 0.4% under develop (median of five alternating runs). Cycle 3 closed two gaps `/finalise` found after the gate 2 PASS: the waiver parser read YAML comments as values (fixed, probe plan 0 reproduced), and criterion 5's mutation proofs are now listed per engine rule.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                       | Author      |
-| ---------- | ------- | ------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #38, #40    | create-task |
 | 2026-11-08 | 1.1     | Review passed (8/10) — fixed gate/waiver field names, PR state source, removed-literal sweep, source paths, AC3 location | review-task |
 | 2026-11-08 |         | Status → ready-for-development                    | review-task |
@@ -320,6 +319,7 @@ All four cycle-1 findings are closed. Suite and CI are green on the head. Wall t
 | 2026-11-08 |         | QA gate FAIL (60/100) — 4 findings (2 high); status → in-progress | qa-task |
 | 2026-11-08 |         | QA findings fixed — 3 of 4 (guards, CHANGELOG), 1 iteration; performance re-measure pending | qa-fix |
 | 2026-11-08 |         | QA gate PASS (95/100) — 0 findings; status → ready-for-review | qa-task |
+| 2026-11-08 |  | QA cycle 3 gate PASS (95/100) — waiver parser ignores YAML comments; per-rule mutation proofs | qa-task |
 <!-- change-log-end -->
 
 ---

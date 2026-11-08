@@ -90,6 +90,14 @@ Add a preconditions preflight to `/finalise` and a defined standalone/post-merge
 - **PR Review**: REQUEST CHANGES on the conformance lens alone (`task.272.pr-review.1.*`): PC-1 (high, trail) was this very entry missing, and PC-2 (low) was `pr_number` missing from the task frontmatter. Both are documentation-only and are fixed in the same commit as this entry; no code finding exists. The verdict reads APPROVE once they are closed.
 - **Action**: Proceeding to 5c
 
+### QA Cycle 3
+
+- **Trigger**: `/finalise` (DoD run 1) found two gaps after the gate 2 PASS: the security probe plan reproduced two cases (waiver parser read YAML comments as values), and criterion 5 listed five engine-rule mutation proofs in one line.
+- **Fix**: commit b1402296 (`waiverOf` strips comment tails, one test with failing and control cases); per-rule proofs in `task.272.qa.3.*`.
+- **Gate**: PASS (95/100), `task.272.gate.3.*`; probe plan re-run 21 executed, 0 reproduced; full suite green.
+- **PR Review**: not re-run; the cycle-3 diff is one regex and its test, and the review's findings were documentation only.
+- **Action**: Proceeding to 5c
+
 ---
 
 ## Completion
