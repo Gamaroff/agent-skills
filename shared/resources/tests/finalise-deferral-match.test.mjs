@@ -553,3 +553,62 @@ test("control: a gate entry is matched on its own case field, not on a mention i
     cleanup(dir);
   }
 });
+
+test("control: text the gate reader cannot parse that names the case blocks (T271-QA-13)", () => {
+  // A block scalar cuts the entry at its first deeper row; what follows is still on the record.
+  const withdrawn = gate(
+    GOOD_GATE_ENTRY +
+      `    - action: >-\n        ${CASE} deferral withdrawn by the owner\n      refs: []\n`,
+  );
+  const caseLost = gate(
+    `    - action: |\n        note\n      case: ${CASE}\n      deferred_to: task.901\n      approved_by: ${OWNER}\n      approved_on: 2026-10-28\n`,
+  );
+  const unrelatedBlock = gate(
+    GOOD_GATE_ENTRY +
+      `    - action: >-\n        something about another case\n      refs: []\n`,
+  );
+  const { dir, paths } = fixture({
+    "w.yml": withdrawn,
+    "c.yml": caseLost,
+    "u.yml": unrelatedBlock,
+    "wi.md": workItem(GOOD_BULLET),
+  });
+  try {
+    const go = (g) =>
+      run([
+        "--case",
+        CASE,
+        "--gate",
+        paths[g],
+        "--work-item",
+        paths["wi.md"],
+        "--approver",
+        OWNER,
+      ]).json;
+    assert.equal(go("w.yml").reason, "unapproved");
+    assert.match(go("w.yml").detail, /could not parse/);
+    assert.equal(go("c.yml").reason, "unapproved");
+    // Controls: a block scalar that does not name the case blocks nothing.
+    assert.equal(go("u.yml").reason, "matched");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("control: an approver is never matched by stripping trailing markup characters (T271-QA-14)", () => {
+  for (const n of ["Pat Owner_", "Pat Owner*", "_Pat Owner", "**Pat Owner"]) {
+    assert.equal(
+      eng.judge({ task: "task.1", owner: n, date: "2026-01-01" }, [OWNER]).ok,
+      false,
+      n,
+    );
+  }
+  // Controls: a matching wrapper pair of backticks or quotes is still removed.
+  for (const n of ["`Pat Owner`", '"Pat Owner"', "'Pat Owner'", "Pat Owner"]) {
+    assert.equal(
+      eng.judge({ task: "task.1", owner: n, date: "2026-01-01" }, [OWNER]).ok,
+      true,
+      n,
+    );
+  }
+});

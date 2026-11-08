@@ -154,6 +154,20 @@ Fix summary:
 
 Advisory, not fixed: the Deferred Work section ends only at the next H2; exact-case path compare (macOS, task 210); `--base` ancestry; follow-up task existence is not checked.
 
+### QA Cycle 5 — 2026-11-08
+
+| Item | Result |
+| ---- | ------ |
+| `/qa-task` gate | FAIL, 70/100, unscoped re-probe: T271-QA-13 (HIGH), T271-QA-14 (MEDIUM) |
+| Budget | The five-gate budget was spent; the owner granted one more cycle (`grant-qa-cycles.sh`, `qa_max_cycles` 6) |
+| `/qa-fix` | Both fixed; `ci:fast` 8062 tests, 0 failed |
+| T271-QA-13 | The gate reader now counts the lines of the `future:` block that name the case against the lines the parsed entries account for; an unaccounted line (a block scalar the subset parser cut) is a blocking record |
+| T271-QA-14 | `cleanName` removes one matching pair of backticks or quotes and nothing else, so `sam_` is not `sam` |
+| Mutation proofs | Disabling the unread-line check and re-adding the `_`/`*` strip each turn a named test red; file restored (`cmp`) |
+| Controls | A block scalar that does not name the case blocks nothing; wrapper pairs of backticks and quotes still match |
+
+Advisory, not fixed: `ls-tree` without `-z` (non-ASCII failed-file names fail closed); an explanatory note naming the case id blocks an approved deferral; a nested list item is read as a record; section end at next H2; exact-case compare (macOS, task 210).
+
 ---
 
 ## Completion

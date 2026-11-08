@@ -137,12 +137,14 @@ function namesCase(text, id) {
   ).test(String(text));
 }
 
-/** Strip surrounding backticks/quotes/brackets and trim, so `Name` and "Name" compare equal. */
+/**
+ * Trim, and remove ONE matching wrapper pair (backticks or quotes), so `Name` and "Name" compare
+ * equal. Nothing else is stripped: `sam_` and `sam*` are not `sam` (T271-QA-14).
+ */
 function cleanName(s) {
-  return String(s == null ? "" : s)
-    .trim()
-    .replace(/^[`'"*_]+|[`'"*_]+$/g, "")
-    .trim();
+  const t = String(s == null ? "" : s).trim();
+  const m = /^([`'"])(.*)\1$/s.exec(t);
+  return m ? m[2].trim() : t;
 }
 
 // Exact: no case folding and no Unicode folding, so "PAT OWNER" and a Kelvin-sign lookalike are not
@@ -189,18 +191,20 @@ function gateCandidates(text, id) {
   }
   const rec = doc.recommendations;
   const future = rec && typeof rec === "object" ? rec.future : undefined;
-  if (future === undefined || future === null) return [];
-  if (!Array.isArray(future))
+  if (future !== undefined && future !== null && !Array.isArray(future))
     throw new Error("recommendations.future is not a list");
   const out = [];
-  future.forEach((e, i) => {
+  let accounted = 0;
+  (future || []).forEach((e, i) => {
     const f = e && typeof e === "object" && !Array.isArray(e) ? e : {};
     const action = typeof e === "string" ? e : f.action;
     // A record carries the case in its own `case:` field, matched by equality. An entry that merely
     // MENTIONS the id in its prose is still a record about the case (it can block) but it has no
     // facts, so it can never approve one (T271-QA-12).
     const own = typeof f.case === "string" && f.case.trim() === id;
-    if (!own && !namesCase(action, id)) return;
+    const mentions = namesCase(action, id);
+    accounted += (own ? 1 : 0) + (mentions ? 1 : 0);
+    if (!own && !mentions) return;
     out.push({
       source: `gate recommendations.future[${i}]`,
       task: own ? f.deferred_to : "",
@@ -208,6 +212,38 @@ function gateCandidates(text, id) {
       date: own ? f.approved_on : "",
     });
   });
+  // The subset parser cuts an entry at a block scalar (`action: >-`, `|`) or any deeper-indented row,
+  // so text it did not read can still name the case - a withdrawal, say (T271-QA-13). Count the lines
+  // of the future block that name the case against the lines the parsed entries account for; a line
+  // nobody accounts for is a record the parser lost, and it blocks.
+  const unread = futureBlockLines(text).filter((l) => namesCase(l, id)).length;
+  if (unread > accounted) {
+    out.push({
+      source: "gate recommendations.future (text the reader could not parse)",
+      task: "",
+      owner: "",
+      date: "",
+    });
+  }
+  return out;
+}
+
+/** The raw lines under `future:` up to the next key at or above its indent. */
+function futureBlockLines(text) {
+  const lines = String(text).split("\n");
+  const at = lines.findIndex((l) => /^\s*future:\s*(#.*)?$/.test(l));
+  if (at < 0) return [];
+  const indent = lines[at].match(/^\s*/)[0].length;
+  const out = [];
+  for (const l of lines.slice(at + 1)) {
+    if (l.trim() === "") {
+      out.push(l);
+      continue;
+    }
+    const ind = l.match(/^\s*/)[0].length;
+    if (ind <= indent && !/^\s*- /.test(l)) break;
+    out.push(l);
+  }
   return out;
 }
 
