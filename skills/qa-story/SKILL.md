@@ -1378,7 +1378,7 @@ JSON
    else CR_BLOCKING=false; fi
    ```
 
-   `$CODE_REVIEW_BLOCKING_ARG` comes from the `code_review_blocking=` token in Skill `args` (see **Input Handling**). When `CR_BLOCKING=true`, append each `category: bug` + `confidence: high` finding to the gate `top_issues[]` as `{ id, severity, file, finding, suggested_action, suggested_owner: dev }` — `file` is the path from the finding's own `file:line`, which every code-review finding already carries; the existing **Gate Decision Criteria** then apply unchanged. **A finding whose `anchor_check` is `no-such-file`, `out-of-range`, `text-mismatch` or `unparseable` still maps when it qualifies** — a high-confidence bug is still a bug — but its `finding` gains `(location unverified: {file_line})`, and its `file` is `null` when the verdict is `no-such-file` or `unparseable` (neither names a usable path), so `/qa-fix` is never sent to a line as though it were verified. Otherwise — resolved advisory, or every cleanup or non-high-confidence finding — the gate is **unaffected**.
+   `$CODE_REVIEW_BLOCKING_ARG` comes from the `code_review_blocking=` token in Skill `args` (see **Input Handling**). When `CR_BLOCKING=true`, append each `category: bug` + `confidence: high` finding to the gate `top_issues[]` as `{ id, severity, file, finding, suggested_action, suggested_owner: dev }` — `file` is the path from the finding's own `file:line`, which every code-review finding already carries; the existing **Gate Decision Criteria** then apply unchanged. **A finding whose `anchor_check` is `no-such-file`, `out-of-range`, `text-mismatch` or `unparseable` still maps when it qualifies** — a high-confidence bug is still a bug — but its `finding` gains `(location unverified: {file_line})`, and its `file` is `null` when the verdict is `no-such-file` or `unparseable` (neither names a usable path), so `/qa-fix` is never sent to a line as though it were verified. Otherwise — resolved advisory, or every cleanup or non-high-confidence finding — the gate is **unaffected**, except for a bug QA reproduces by execution (5d; a `false` resolution still wins).
 
    **Re-rating a promoted finding.** QA may lower a promoted finding's severity only with a measured
    plausibility check: a corpus count, and whether any writer or template in the repository can
@@ -1864,7 +1864,7 @@ Re-enumerated {the boundary's inputs, named} and tested each against the current
 
 ## Code Review
 
-[From Phase 1.6 — advisory unless the story opted in via `code_review_blocking: true`. Omit if the diff had no reviewable code and no documentation claims to check; a docs-only change set takes the claim-check route, so its section is present.]
+[From Phase 1.6 — advisory unless the story opted in via `code_review_blocking: true` or QA reproduced the finding (5d). Omit if the diff had no reviewable code and no documentation claims to check; a docs-only change set takes the claim-check route, so its section is present.]
 
 **Correctness bugs ([count]):**
 [for each bug finding:]
@@ -2476,7 +2476,7 @@ cat > "$BODY_FILE" <<'EOF'
 
 ### 🔎 Code Review Findings
 
-[Top correctness bugs + notable cleanups from Phase 1.6, each `file:line — finding`. "None identified" if empty. Advisory unless the story opted in via code_review_blocking.]
+[Top correctness bugs + notable cleanups from Phase 1.6, each `file:line — finding`. "None identified" if empty. Advisory unless the story opted in via code_review_blocking or QA reproduced the finding (5d).]
 
 ### 🎯 Critical Issues
 

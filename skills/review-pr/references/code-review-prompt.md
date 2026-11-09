@@ -115,7 +115,7 @@ code_review:
     - id: CR-1                 # CR-{n}, stable within this run
       category: bug            # bug | cleanup
       severity: high           # low | medium | high   (bugs: rate real impact; cleanups: usually low)
-      confidence: high         # low | medium | high   (only bug + high gates, and only when opted in)
+      confidence: high         # low | medium | high   (only bug + high gates when opted in; a bug QA reproduces gates at any confidence, item 4)
       file_line: "src/x/y.ts:42"
       line_text: "if (user.id = target.id) {"   # the trimmed source text of that line
       finding: "<one sentence: what is wrong>"
@@ -156,7 +156,7 @@ There is no gate in standalone mode — the `top_issues[]` mapping below is QA-o
 ### QA use (`/qa-story`, `/qa-task`)
 
 1. **Always** renders all findings into the QA report `## Code Review` section and the PR comment (advisory).
-2. **Maps to the gate `top_issues[]` ONLY when the doc opts in** (see **Opt-in to blocking** below)
+2. **Maps to the gate `top_issues[]` ONLY when the doc opts in** (see **Opt-in to blocking** below; the one exception is a finding the caller reproduces, item 4)
    **AND** the finding is `category: bug` **AND** `confidence: high`. Such a finding is appended to
    `top_issues[]` as `{ id, severity, finding, suggested_action, suggested_owner }` — the exact shape
    the gate and the `qa-findings-ingester-prompt.md` → `/qa-fix` loop already consume, so no extra
