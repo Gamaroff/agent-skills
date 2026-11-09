@@ -239,14 +239,14 @@ A table of allowed flags per allowed command (`sed`, `find`, `sort`, and each ot
 
 ### Performance
 
-- [x] `CI=true npm test` median wall time within 10% of develop (five alternating pairs, load recorded, in the QA report). Measured on `npm run test:suite`, the suite `npm test` wraps, develop in a separate worktree. Median develop 205.6s, branch 207.5s, ratio 1.009. Pairs (develop/branch, load at each): 205.6/207.5 (7.19/6.07), 165.9/289.2 (4.77/8.05), 170.7/165.6 (5.83/4.16), 206.2/187.9 (6.00/5.20), 339.1/293.5 (31.09/9.88). Pair 2's branch run and pair 5 are host-load outliers, reported and kept. Figures also in the implementation report's QA Cycle 6 entry.
+- [x] `CI=true npm test` median wall time within 10% of develop (five alternating pairs, load recorded, in the QA report)
 - [x] The classifier adds under 10% to the median time of a 3,000-block docs scan against develop (median of five alternating pairs, `uptime` beside each, command and figures in the QA report)
 
 ### Code Quality
 
 - [x] Each fix has a mutation proof (revert, a test goes red), recorded in the QA report's findings table
 - [x] `npm run bundle:check` reports 0 problems
-- [x] `CI=true npm run ci` passes (exit 0 on `c42729c5`, 2026-11-09; the `tmp-leak` ratchet held)
+- [x] `CI=true npm run ci` passes
 
 ### Migration
 
