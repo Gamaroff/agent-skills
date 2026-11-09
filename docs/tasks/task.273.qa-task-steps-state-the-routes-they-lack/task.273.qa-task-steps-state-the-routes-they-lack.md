@@ -5,8 +5,9 @@ type: task
 description: "Add the missing routes to qa-task Steps 3b and 3c (docs-only review, reproduced medium finding, reviewer scratch directory, no mutation beside a running suite) and a vacuous-tool-criterion probe, so each QA cycle stops improvising them."
 tags: [qa-task, qa-story, review-task, create-task, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 pr_number: 861
+completed_date: 2026-11-09
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-09
@@ -221,7 +222,7 @@ None authored; the shared prompt-contract tests are run, not edited, unless a pi
 
 ### Migration
 
-- [x] ~~No QA report written after the change improvises a docs-only substitute (checked on the next docs-only task's QA report).~~ **Re-scoped on 2026-11-09 with the owner's approval, as a follow-up outside this task's acceptance.** It cannot be checked until a later docs-only task has been through QA, so it is no longer an acceptance criterion of this one. The check stays open and is carried in the gate's `recommendations.future`: when the next docs-only task's QA report is written, confirm it uses the docs-only route and does not improvise a substitute.
+- [x] ~~No QA report written after the change improvises a docs-only substitute (checked on the next docs-only task's QA report).~~ **Re-scoped on 2026-11-09, approved by Lorien Gamaroff (task owner), as a follow-up outside this task's acceptance.** It cannot be checked until a later docs-only task has been through QA, so it is no longer an acceptance criterion of this one. The check stays open and is carried in the gate's `recommendations.future`: when the next docs-only task's QA report is written, confirm it uses the docs-only route and does not improvise a substitute.
 
 ---
 
@@ -315,23 +316,27 @@ None identified.
 ### Key Findings
 Every MEDIUM finding from cycles 1 to 5 is fixed; the last, the gate-decision notes, was fixed after two extra cycles were granted. Cycle 6 passes with two open LOW wording residues (T273-CR-5, T273-CR-6) in the review prompt and the report templates. Three advisory review findings stay in the gate's future recommendations.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - PASSED ✅
 
-**Status:** IN PROGRESS
+**Status:** ACCEPTED
 
-### Missing Criteria:
+Run 1 of `/finalise` found two gaps; both are closed in run 2:
 
-- ⚠️ § 9 "npm test wall time within 10% of develop": measured on 30da588c; code changed after it (`code-review-prompt.md`, `qa-task/SKILL.md`, `qa-story/SKILL.md`), and `uptime` is not recorded beside each run. Re-measure on the head.
-- ⚠️ § 9 Migration "no later QA report improvises a docs-only substitute": checkable only on the next docs-only task's QA report, which does not exist yet.
+✅ **Timing (§ 9):** five alternating `CI=true npm test` runs on the head, every run exit 0, load average recorded beside each: median develop 193 s, head 167 s (recorded in QA report 6).
+✅ **Migration (§ 9):** re-scoped to a follow-up with the owner's recorded approval; the follow-up check is carried in gate 6 `recommendations.future`.
 
-### Next Steps:
+All Definition of Done criteria are verified:
 
-- [ ] Re-measure the five-run median on the PR head and record it in the newest QA report
-- [ ] Owner decision on the Migration criterion: re-scope it to a follow-up task, or hold acceptance until a later docs-only task has run
+✅ **Acceptance Criteria:** 7 of 7 (#1 to #3 carried from run 1; #4 and #7 closed above; #5 and #6 graded from CI on the head)
+✅ **QA:** gate 6 PASS (100/100); two LOW wording residues carried to `recommendations.future`
+✅ **PR:** #861, PR review report CONCERNS with both findings fixed; no review required by the host
+✅ **Security / Compliance:** PASS / not applicable (prose-only change)
+✅ **Documentation:** CHANGELOG cites (task 273); skill docs and bundled copies updated
+✅ **CI:** `SUCCESS` on 6b7d9f65; secret-scan and shellcheck were re-run once after a 504 while downloading their pinned tools
 
-**Estimated Effort:** Small (about 30 minutes for the re-measure; the second item is a decision).
+**Task marked as ACCEPTED on:** 2026-11-09
 
-**Detailed Verification Log:** See `task.273.dod.1.qa-task-steps-state-the-routes-they-lack.md`.
+**Detailed Verification Log:** See `task.273.dod.2.qa-task-steps-state-the-routes-they-lack.md` (run 1: `task.273.dod.1.…`).
 
 <!-- change-log-start -->
 ## Change Log
@@ -354,6 +359,7 @@ Every MEDIUM finding from cycles 1 to 5 is fixed; the last, the gate-decision no
 | 2026-11-09 |         | QA findings fixed — gate-decision notes rewritten, 5 iterations | qa-fix      |
 | 2026-11-09 |         | QA gate PASS (100/100) — 2 LOW findings open (cycle 6)          | qa-task     |
 | 2026-11-09 |         | DoD incomplete — 2 gaps identified                              | finalise    |
+| 2026-11-09 | 1.2     | DoD passed — accepted (PR #861)                                 | finalise    |
 <!-- change-log-end -->
 
 ---
