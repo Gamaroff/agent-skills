@@ -299,27 +299,27 @@ A table of allowed flags per allowed command (`sed`, `find`, `sort`, and each ot
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: WAIVED (owner)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-09
-**Quality Score**: 80/100
-**Gate Decision**: FAIL
+**Quality Score**: 82/100
+**Gate Decision**: WAIVED
 
 ### QA Report
 
-- **Full Report**: [task.289.qa.5.qa-snippet-runner-flag-level-allow-list.md](./task.289.qa.5.qa-snippet-runner-flag-level-allow-list.md)
-- **Gate File**: [task.289.gate.5.qa-snippet-runner-flag-level-allow-list.yml](./task.289.gate.5.qa-snippet-runner-flag-level-allow-list.yml)
+- **Full Report**: [task.289.qa.6.qa-snippet-runner-flag-level-allow-list.md](./task.289.qa.6.qa-snippet-runner-flag-level-allow-list.md)
+- **Gate File**: [task.289.gate.6.qa-snippet-runner-flag-level-allow-list.yml](./task.289.gate.6.qa-snippet-runner-flag-level-allow-list.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 292
-- **Phases Verified**: 4/5
-- **Critical Issues**: 1
-- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Tests Executed**: 300
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0 (1 high and 1 medium, both pre-existing and identical on develop, filed as task.290)
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
 
-The cycle 4 fixes hold. Cycle 5 found one more high-severity bypass, reproduced: the masker counts parentheses without regard to quotes, so `X=$(echo ")") touch out` is classified runnable. The QA budget (5 gates, 4 fixes) is spent; the owner decides between one more fix cycle and accepting the branch with the residual filed as a follow-up.
+The cycle 5 fix held. Cycle 6 found a `#` after an escaped space read as a comment (`echo a\ # ; touch out` classifies runnable and writes) and a RangeError on 20000-deep nesting. Both are identical on develop and neither is in code this task introduced. The owner accepted the branch as a strict improvement over develop and filed both as task.290, so the gate is waived by the owner, not passed.
 
 ## Change Log
 
@@ -342,6 +342,7 @@ The cycle 4 fixes hold. Cycle 5 found one more high-severity bypass, reproduced:
 | 2026-11-09 |         | QA findings fixed — 2 high findings, 4 iterations (third strike: substitution handling replaced) | qa-fix |
 | 2026-11-09 |         | QA gate FAIL (80/100) — 1 finding (budget spent: 5 gates, 4 fixes) | qa-task |
 | 2026-11-09 |         | QA findings fixed — 1 high finding, 5 iterations (masker made quote-aware; unreadable substitution refused for any word) | qa-fix |
+| 2026-11-09 |         | QA gate WAIVED by owner (82/100) — 2 pre-existing findings filed as task.290 | qa-task |
 
 <!-- change-log-end -->
 
