@@ -1,0 +1,198 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "1d60b861b1aceda5f69777a0b9f469b7a1812dda",
+  "dirty_paths": [
+    "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.bug.4.ansi-c-quote-and-continuation-evade-deny-list.md",
+    "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.gate.3.qa-engines-stop-passing-what-they-cannot-see.yml",
+    "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.implementation.1.qa-engines-stop-passing-what-they-cannot-see-initial-run.md",
+    "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.pr-review.1.qa-engines-stop-passing-what-they-cannot-see.md",
+    "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.qa-engines-stop-passing-what-they-cannot-see.md",
+    "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.qa.3.qa-engines-stop-passing-what-they-cannot-see.md",
+    "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.qa.3.security.cases.json",
+    "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.qa.3.security.run.json",
+    "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.qa.3.security.run.json.d/61d186d003bb238dc62996e3.json"
+  ],
+  "document": "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.qa-engines-stop-passing-what-they-cannot-see.md",
+  "result": {
+    "bytes": 9824,
+    "sha256": "f7bc25e8712af88e51323840b7d9151c0c786ec1fd1803dcf5e33f602a212e6f",
+    "verified": false
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 8,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "7a8b16e787f9e3c4f13271bc1b2094f61281c8f5db02106c8a47353996ef4485",
+      "status": "PASS",
+      "description": "Four base-scan shapes classify mutating (shape 4 refused), shown by named tests and controls",
+      "code_citation": "shared/resources/qa-execute-snippets.mjs:1871",
+      "test_citation": "shared/resources/tests/qa-execute-snippets.test.mjs:3825",
+      "members": [
+        {
+          "member": "shape 1: command after a heredoc body",
+          "evidence": "shared/resources/tests/qa-execute-snippets.test.mjs:3808",
+          "status": "PASS"
+        },
+        {
+          "member": "shape 2: command or backtick substitution inside double quotes",
+          "evidence": "shared/resources/tests/qa-execute-snippets.test.mjs:3809",
+          "status": "PASS"
+        },
+        {
+          "member": "shape 3: quoted deny-listed flag (single and double)",
+          "evidence": "shared/resources/tests/qa-execute-snippets.test.mjs:3811",
+          "status": "PASS"
+        },
+        {
+          "member": "shape 4: variable or expansion argument to a deny-listed command (plain, braced, dash-prefixed, $(...), ANSI-C, continuation)",
+          "evidence": "shared/resources/tests/qa-execute-snippets.test.mjs:3813",
+          "status": "PASS"
+        },
+        {
+          "member": "controls stay runnable",
+          "evidence": "shared/resources/tests/qa-execute-snippets.test.mjs:3830",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Each shape has a named, parameterised test (the table at lines 3806-3827 feeds the test at 3825). The controls test at 3830 keeps look-alikes runnable. The test file matches the shared/resources/tests/*.test.mjs glob in test:suite, which test.yml runs on every PR. QA 3 records a 39-case probe with 39 as required."
+    },
+    {
+      "id": "#2",
+      "text_hash": "aa4529f6f85ee335cae9337d8d16d61a81452bb414c15523fc841e38dd5cee13",
+      "status": "PASS",
+      "description": "Newly refused real-docs blocks listed with command (git grep count, runner output); fixed or annotated",
+      "code_citation": "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.dod.1.qa-engines-stop-passing-what-they-cannot-see.md:30",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Re-judged after the first pass failed it low for missing evidence. The DoD file now lists 17 newly refused blocks with command, runner output and a per-block annotation (annotated here, left as written). The re-judge agent summed the table to 17 and did not re-run the runner. Earlier reports of one block are corrected in the DoD."
+    },
+    {
+      "id": "#3",
+      "text_hash": "a343b2e1404572b734f71c0383d3178c08f9f5ab8dd037d4267da94f458f3a69",
+      "status": "PASS",
+      "description": "Second control against one entry coexists; width mismatch refused; both shown by named tests",
+      "code_citation": "shared/resources/security-probe.mjs",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:3002",
+      "members": [
+        {
+          "member": "two --name controls against one JS entry both survive",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:3002",
+          "status": "PASS"
+        },
+        {
+          "member": "width mismatch refused (exit 2, reason width-mismatch), with a four-column control",
+          "evidence": "shared/resources/tests/status-history-cli.test.mjs:356",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Both tests are named and sit in shared/resources/tests/*.test.mjs, which test.yml runs per-PR. status-history.js is the implementation of the width-mismatch refusal. The code_citation for the coexistence half is the --name keying in security-probe.mjs, whose line I did not pin. The tests are the load-bearing evidence."
+    },
+    {
+      "id": "#4",
+      "text_hash": "546f8d2e546317c6fe9a55fd0f609c8fefcc1c0cc809d62ee9ee5cda06496d54",
+      "status": "PASS",
+      "description": "CI=true npm test wall time within 10% of develop, median of five alternating runs with uptime",
+      "code_citation": "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.dod.1.qa-engines-stop-passing-what-they-cannot-see.md:62",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Re-judged after a re-measure. Five alternating pairs on 1d60b861 (tree-equivalent to head per finalise-delta.js), load recorded per run; medians develop 211.6 s, head 215.7 s, +1.9% against the 10% bound. Both sides exit 1 on the same two tests in the scratch worktrees; cause not investigated."
+    },
+    {
+      "id": "#5",
+      "text_hash": "de3be308bd69b0cbca8158b9f2b2668aa6c4ed98899df77cea9e497a599e25a2",
+      "status": "PASS",
+      "description": "Each fix has a mutation proof in the QA report",
+      "code_citation": "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.qa.2.qa-engines-stop-passing-what-they-cannot-see.md:132",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "bug 1: --fixture-copy follows a symlinked directory",
+          "evidence": "task.274.qa.2.qa-engines-stop-passing-what-they-cannot-see.md:135 (realpath containment disabled; test 'fixture-copy: every unusable value is declined bad-fixture-copy...' covered)",
+          "status": "PASS"
+        },
+        {
+          "member": "bug 2: dash-prefixed expansion still runnable",
+          "evidence": "task.274.qa.2.qa-engines-stop-passing-what-they-cannot-see.md:132 (couldBeFlag reverted; three named base-scan tests covered)",
+          "status": "PASS"
+        },
+        {
+          "member": "bug 3: syntax check flags template placeholders",
+          "evidence": "task.274.qa.2.qa-engines-stop-passing-what-they-cannot-see.md:133-134 (slot test replaced by return true; -- removed from argv; 'task.274 syntax controls' covered)",
+          "status": "PASS"
+        },
+        {
+          "member": "bug 4: ANSI-C quote and continuation evade the deny-list",
+          "evidence": "task.274.qa.3.qa-engines-stop-passing-what-they-cannot-see.md:137-139 (continuation fold removed; hasDecodedQuote call removed; opener widened to any $; named tests covered)",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "The units are bugs 1-4, the fixes named in QA reports 1-3. Each has a committed revert-and-named-test record. QA 2 line 137 and QA 3 line 141 add that a green baseline preceded the mutations and each file was restored with cmp clean. QA 2 states the guarded tests go red when the fix is reverted. 'covered' is terse, but each line names the reverted code and the test that caught it."
+    },
+    {
+      "id": "#6",
+      "text_hash": "4ebe7eb0e4844e0df815176b7f42d776b2bc0cf3440c8435836dd542207af2de",
+      "status": "PASS",
+      "description": "bundle --check reports 0 problems; CI=true npm test passes",
+      "code_citation": ".github/workflows/test.yml:58",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 40ad7cfd9cc72170577960701532ac6b7972e8b0 — The criterion asks that npm test passes and bundle --check is clean on the PR head, and CI is the deciding reading. For context, QA 3 records 8,135 pass, 0 fail on the fix commit and bundle --check 0 problems, with only documentation commits after that. The reading itself belongs to /finalise Step 6.",
+      "ci_reading": "CI reading 1: SUCCESS @ 40ad7cfd9cc72170577960701532ac6b7972e8b0"
+    },
+    {
+      "id": "#7",
+      "text_hash": "f3a156dc9f77104c3676b2c1d934be05fc8217f32807735a213ee8d3936b521c",
+      "status": "PASS",
+      "description": "Task.205-shape cases file under 100,000 bytes, measured with wc -c and recorded in the QA report",
+      "code_citation": "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.qa.2.qa-engines-stop-passing-what-they-cannot-see.md:72",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Bound is 100,000 bytes. QA 2 line 72 records 8,813 bytes, taken with `wc -c` on the real task.205 cases file (1,588,414 bytes) with its 48 embedded helper copies removed. QA 3 line 82 repeats it. It is a size, not a wall-clock figure, so the load rule does not apply. The code changes after the measurement do not touch the cases-file format."
+    },
+    {
+      "id": "#8",
+      "text_hash": "e01866b8ddd9fca159a3f21b76d852e502153df75b8d51942e96defa82415064",
+      "status": "PASS",
+      "description": "An existing committed cases file still runs unchanged",
+      "code_citation": "shared/resources/security-probe.mjs",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:3035",
+      "members": [
+        {
+          "member": "legacy named record entry on disk folds with its re-run",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:3035",
+          "status": "PASS"
+        },
+        {
+          "member": "unnamed JS control keeps its pre-task.144 entry-file name",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:3035",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "The test covers record-entry compatibility for pre-existing records. QA 1 also records that QA's own cases file ran through the engine unchanged. The cases-file schema is unchanged, and --fixture-copy is opt-in. The code_citation names the file, not a pinned line. The run-time evidence is the test."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#6",
+      "note": "QA 3 routes five pre-existing deny-list gaps (function named after an allow-listed command, `<>` redirection, `-fprint0`, sed `e`, `sort --compress-program`) to recommendations.future. All were reproduced as writing files when run, and the gate is CONCERNS on security. These are not caused by this change and no criterion here covers them. Report them to the reader."
+    },
+    {
+      "ac_id": "#4",
+      "note": "Load is recorded as a range ('7 to 9') and not per run. The QA 1 report says `uptime` was taken before each run, but no per-run values are committed."
+    }
+  ]
+}

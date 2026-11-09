@@ -1,0 +1,26 @@
+[
+  {
+    "argv": [
+      "--sink",
+      "url-authority",
+      "--entry",
+      "shared/resources/qa-execute-snippets.mjs#isRunnableBlock",
+      "--name",
+      "classify-dod-1-replay"
+    ],
+    "cases_file": "task.274.dod.1.security.cases.1.json",
+    "cases_sha256": "549fc9074f869abc517279e9794101236b24672dd82200aeb774d2b10e059743"
+  },
+  {
+    "argv": [
+      "--sink",
+      "url-authority",
+      "--entry",
+      "shared/resources/qa-execute-snippets.mjs#isRunnableBlock",
+      "--name",
+      "classify-dod-1-new"
+    ],
+    "cases_file": "task.274.dod.1.security.cases.2.json",
+    "cases_sha256": "dcb6bd5a7ff6d0ea439f43b0ad475df2956732d7a80f8b2a1e95255a3a2e6fe6"
+  }
+]

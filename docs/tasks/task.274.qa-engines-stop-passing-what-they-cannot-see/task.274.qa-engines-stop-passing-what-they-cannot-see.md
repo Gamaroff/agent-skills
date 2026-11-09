@@ -5,16 +5,18 @@ type: task
 description: "Fix five QA engine defects that pass or lose what they cannot see: the snippet runner's base scan and syntax blindness, the probe record that overwrites a second control, the MB-sized per-case fixtures, and a status-history row that does not match its table."
 tags: [qa-task, finalise, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-09
+completed_date: 2026-11-09
+pr_number: 863
 estimated_effort_hours: 16
 ---
 
 # Task 274: QA engines stop passing what they cannot see
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.274.review.1.qa-engines-initial-review.md` implemented 2026-11-09
 
 ---
@@ -336,12 +338,36 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`. Edit the `shared/resou
 
 ### Key Findings
 All four bugs are fixed and closed. The unscoped safety re-probe found five other gaps in the snippet runner's deny-list (function shadowing, `<>`, `find -fprint0`, sed `e`, `sort --compress-program`). They are identical on develop, outside this task's named shapes and absent from the tracked docs, so they are recorded as a follow-up in the gate's `recommendations.future`.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.274.qa.3.qa-engines-stop-passing-what-they-cannot-see.md`
+**Gate File**: `task.274.gate.3.qa-engines-stop-passing-what-they-cannot-see.yml`
+**Gate Status**: CONCERNS, 90/100, no open finding against the change set. The concern is five pre-existing deny-list gaps in the snippet runner, identical on develop, routed to the gate's `recommendations.future`.
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** all 8 success criteria met (two were closed during `/finalise` by recording evidence and re-measuring timing)
+✅ **PR Review:** `task.274.pr-review.1.qa-engines-stop-passing-what-they-cannot-see.md`, APPROVE
+✅ **Documentation:** CHANGELOG entry `(task 274)`; prose restatements and bundled copies updated
+✅ **Security Review:** 59 probes, 0 reproduced, 0 escaped
+✅ **Compliance Review:** not applicable (internal QA tooling)
+✅ **CI:** SUCCESS on `40ad7cfd9cc7` after one recorded re-run of a leak check on a test this PR does not touch
+
+**Open items for the owner:** a follow-up task for the five deny-list gaps (an allow-list), and a decision on the 17 real-docs blocks the runner now refuses (listed in the DoD file).
+
+**Detailed Verification Log:** See `task.274.dod.1.qa-engines-stop-passing-what-they-cannot-see.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-09
 
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                                     | Author      |
-| ---------- | ------- | --------------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #52, #54, #67, #68, #99   | create-task |
 | 2026-11-09 | 1.1     | Review passed (8/10) — shared-fixture work moved to security-probe-plan.mjs, shape 4 and row width decided, test files named, temp-dir removal and test sweep added | review-task |
 |            |         | Status → ready-for-development                                  | review-task |
@@ -351,6 +377,7 @@ All four bugs are fixed and closed. The unscoped safety re-probe found five othe
 | 2026-11-09 |         | QA gate FAIL (80/100) — 1 finding (1 high); bugs 1-3 closed     | qa-task    |
 | 2026-11-09 |         | QA findings fixed — bug 4 Ready for QA, 1 iteration; mutation-proven | qa-fix     |
 | 2026-11-09 |         | QA gate CONCERNS (90/100) — 0 findings; 5 pre-existing deny-list gaps routed to follow-up; bug 4 closed | qa-task    |
+| 2026-11-09 | 1.2 | DoD passed — accepted (PR #863) | finalise |
 <!-- change-log-end -->
 
 ---
