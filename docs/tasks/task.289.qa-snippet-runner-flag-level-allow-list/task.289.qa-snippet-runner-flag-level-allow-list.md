@@ -5,7 +5,7 @@ type: task
 description: "Replace the snippet runner's flag-level deny-list (DENY_PATTERNS) with a per-command flag allow-list, closing seven known ways a runnable block writes and deciding the 17 doc blocks task 274 now refuses."
 tags: [qa-task, finalise, security]
 category: refactoring
-status: ready-for-review
+status: in-progress
 priority: Medium
 created: 2026-11-09
 updated: 2026-11-09
@@ -14,7 +14,7 @@ estimated_effort_hours: 16
 
 # Task 289: QA snippet runner allows flags, not just commands
 
-**Status:** Ready for Review
+**Status:** In Progress
 **Review**: ✅ All review recommendations from `task.289.review.1.qa-snippet-runner-flag-level-allow-list.md` implemented 2026-11-09
 
 > Detailed implementation guide: [task.289.plan.qa-snippet-runner-flag-level-allow-list.md](task.289.plan.qa-snippet-runner-flag-level-allow-list.md)
@@ -307,19 +307,19 @@ A table of allowed flags per allowed command (`sed`, `find`, `sort`, and each ot
 
 ### QA Report
 
-- **Full Report**: [task.289.qa.4.qa-snippet-runner-flag-level-allow-list.md](./task.289.qa.4.qa-snippet-runner-flag-level-allow-list.md)
-- **Gate File**: [task.289.gate.4.qa-snippet-runner-flag-level-allow-list.yml](./task.289.gate.4.qa-snippet-runner-flag-level-allow-list.yml)
+- **Full Report**: [task.289.qa.5.qa-snippet-runner-flag-level-allow-list.md](./task.289.qa.5.qa-snippet-runner-flag-level-allow-list.md)
+- **Gate File**: [task.289.gate.5.qa-snippet-runner-flag-level-allow-list.yml](./task.289.gate.5.qa-snippet-runner-flag-level-allow-list.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 282
+- **Tests Executed**: 292
 - **Phases Verified**: 4/5
-- **Critical Issues**: 2
-- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **Critical Issues**: 1
+- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
 
-The cycle 3 fixes hold. Cycle 4 found two more high-severity bypasses, both reproduced: a process substitution and a prefix assignment holding a substitution each hide later flags from the table. The struck mechanism is the substitution handling, so the next fix replaces it with a masked reading.
+The cycle 4 fixes hold. Cycle 5 found one more high-severity bypass, reproduced: the masker counts parentheses without regard to quotes, so `X=$(echo ")") touch out` is classified runnable. The QA budget (5 gates, 4 fixes) is spent; the owner decides between one more fix cycle and accepting the branch with the residual filed as a follow-up.
 
 ## Change Log
 
@@ -340,6 +340,7 @@ The cycle 3 fixes hold. Cycle 4 found two more high-severity bypasses, both repr
 | 2026-11-09 |         | QA findings fixed — 2 high findings, 3 iterations (third strike: expansion reading replaced) | qa-fix |
 | 2026-11-09 |         | QA gate FAIL (80/100) — 2 findings | qa-task |
 | 2026-11-09 |         | QA findings fixed — 2 high findings, 4 iterations (third strike: substitution handling replaced) | qa-fix |
+| 2026-11-09 |         | QA gate FAIL (80/100) — 1 finding (budget spent: 5 gates, 4 fixes) | qa-task |
 
 <!-- change-log-end -->
 
