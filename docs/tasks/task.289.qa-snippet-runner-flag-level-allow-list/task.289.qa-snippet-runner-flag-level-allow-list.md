@@ -5,7 +5,7 @@ type: task
 description: "Replace the snippet runner's flag-level deny-list (DENY_PATTERNS) with a per-command flag allow-list, closing seven known ways a runnable block writes and deciding the 17 doc blocks task 274 now refuses."
 tags: [qa-task, finalise, security]
 category: refactoring
-status: ready-for-development
+status: ready-for-review
 priority: Medium
 created: 2026-11-09
 updated: 2026-11-09
@@ -14,7 +14,7 @@ estimated_effort_hours: 16
 
 # Task 289: QA snippet runner allows flags, not just commands
 
-**Status:** Ready for Development
+**Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.289.review.1.qa-snippet-runner-flag-level-allow-list.md` implemented 2026-11-09
 
 > Detailed implementation guide: [task.289.plan.qa-snippet-runner-flag-level-allow-list.md](task.289.plan.qa-snippet-runner-flag-level-allow-list.md)
@@ -115,11 +115,11 @@ A table of allowed flags per allowed command (`sed`, `find`, `sort`, and each ot
 - `shared/resources/tests/qa-execute-snippets.test.mjs`
 
 **Changes**:
-- [ ] Write one failing test per gap (seven), each asserting `mutating`, plus one control per gap that must stay `runnable`. Gap 7 is the `function cat { touch x; }; cat f` spelling: the `cat() { …; }` spelling is already `mutating` (unparseable, fail-closed), so keep it as a held control, not a failing case
-- [ ] Add failing-first tests for the cases probed beyond the seven: `uniq in out`, `file -C -m magic`, `sed --expression=1e f`, `sort -S 1 --compress-program=x f`
-- [ ] Set the controls' expected class from a run, not from the task 274 text: `find docs/$X -name z` classifies `placeholder` (unbound variable), not `runnable`; bind `X` or assert `placeholder`
-- [ ] Re-run the old-vs-new real-docs classifier over `git ls-files '*.md'` as the baseline; record the command and the count
-- [ ] Ask the owner: accept the 17 refused blocks, or add value tracking (record the answer in the Change Log)
+- [x] Write one failing test per gap (seven), each asserting `mutating`, plus one control per gap that must stay `runnable`. Gap 7 is the `function cat { touch x; }; cat f` spelling: the `cat() { …; }` spelling is already `mutating` (unparseable, fail-closed), so keep it as a held control, not a failing case
+- [x] Add failing-first tests for the cases probed beyond the seven: `uniq in out`, `file -C -m magic`, `sed --expression=1e f`, `sort -S 1 --compress-program=x f`
+- [x] Set the controls' expected class from a run, not from the task 274 text: `find docs/$X -name z` classifies `placeholder` (unbound variable), not `runnable`; bind `X` or assert `placeholder`
+- [x] Re-run the old-vs-new real-docs classifier over `git ls-files '*.md'` as the baseline; record the command and the count
+- [x] Ask the owner: accept the 17 refused blocks, or add value tracking (record the answer in the Change Log)
 
 **Dependencies**: none
 
@@ -133,10 +133,10 @@ A table of allowed flags per allowed command (`sed`, `find`, `sort`, and each ot
 - `shared/resources/qa-execute-snippets.mjs`
 
 **Changes**:
-- [ ] Add the per-command flag and operand table for every `SAFE_COMMANDS` member, `SAFE_FLAGS` beside it
-- [ ] Refuse any flag or operand outside the table with a named reason; a member with no entry is refused
-- [ ] Record the audit result per command (`grep`, `jq`, `diff`, `ls`, `cat`, `uniq`, `file`, and the rest) in a test that fails when a member has no record
-- [ ] Decide `SAFE_FLAGS` against the existing `DENY_PATTERNS` and `VARIABLE_ARGUMENT_COMMANDS` (`:751`): state for each whether the table replaces, extends or sits beside it
+- [x] Add the per-command flag and operand table for every `SAFE_COMMANDS` member, `SAFE_FLAGS` beside it
+- [x] Refuse any flag or operand outside the table with a named reason; a member with no entry is refused
+- [x] Record the audit result per command (`grep`, `jq`, `diff`, `ls`, `cat`, `uniq`, `file`, and the rest) in a test that fails when a member has no record
+- [x] Decide `SAFE_FLAGS` against the existing `DENY_PATTERNS` and `VARIABLE_ARGUMENT_COMMANDS` (`:751`): state for each whether the table replaces, extends or sits beside it
 
 **Dependencies**: Phase 1
 
@@ -150,10 +150,10 @@ A table of allowed flags per allowed command (`sed`, `find`, `sort`, and each ot
 - `shared/resources/qa-execute-snippets.mjs`
 
 **Changes**:
-- [ ] Refuse `<>`, and a function definition (`name()` and `function name`) whose name is an allowed command
-- [ ] Before removing a `DENY_PATTERNS` entry, list every test that pins its reason text: `git grep -n 'deny-list:' -- '*.test.*'` (record each hit with the removed or rewritten reason it pins)
-- [ ] Refuse a brace expansion or an unquoted expansion that can build a flag in an allowed command's argument list, and keep the controls runnable (`find docs/$X -name z`)
-- [ ] Remove `DENY_PATTERNS` entries the table now covers; keep a test for each removal
+- [x] Refuse `<>`, and a function definition (`name()` and `function name`) whose name is an allowed command
+- [x] Before removing a `DENY_PATTERNS` entry, list every test that pins its reason text: `git grep -n 'deny-list:' -- '*.test.*'` (record each hit with the removed or rewritten reason it pins)
+- [x] Refuse a brace expansion or an unquoted expansion that can build a flag in an allowed command's argument list, and keep the controls runnable (`find docs/$X -name z`)
+- [ ] Remove `DENY_PATTERNS` entries the table now covers; keep a test for each removal (not done: the owner-visible decision is that `DENY_PATTERNS` sits beside the table, see the implementation report Decisions Log)
 
 **Dependencies**: Phase 2
 
@@ -167,9 +167,9 @@ A table of allowed flags per allowed command (`sed`, `find`, `sort`, and each ot
 - `shared/resources/qa-runnable-prose-detection.md`, `shared/resources/probe-boundary-rule.md`, `CHANGELOG.md`, bundled `references/` copies
 
 **Changes**:
-- [ ] Re-run the real-docs classifier; list every newly refused block against develop, with command and output
-- [ ] Update the prose and run `npm run bundle`
-- [ ] CHANGELOG entry citing this task
+- [x] Re-run the real-docs classifier; list every newly refused block against develop, with command and output
+- [x] Update the prose and run `npm run bundle`
+- [x] CHANGELOG entry citing this task
 
 **Dependencies**: Phase 3
 
@@ -231,26 +231,26 @@ A table of allowed flags per allowed command (`sed`, `find`, `sort`, and each ot
 
 ### Functional
 
-- [ ] Each of the seven gaps classifies `mutating`, by a named test, and its control stays `runnable`
-- [ ] A flag or operand outside a table entry is refused with `flag-not-allowed`, by a named test per `SAFE_COMMANDS` member; a member with no entry is refused, by a named test
-- [ ] `uniq in out` and `file -C -m magic` classify `mutating`, by named tests
-- [ ] Every block the task 274 engine ran and the new engine refuses is listed in the QA report with the command and the runner output
+- [x] Each of the seven gaps classifies `mutating`, by a named test, and its control stays `runnable`
+- [x] A flag or operand outside a table entry is refused with `flag-not-allowed`, by a named test per `SAFE_COMMANDS` member; a member with no entry is refused, by a named test
+- [x] `uniq in out` and `file -C -m magic` classify `mutating`, by named tests
+- [x] Every block the task 274 engine ran and the new engine refuses is listed in the QA report with the command and the runner output
 
 ### Performance
 
 - [ ] `CI=true npm test` median wall time within 10% of develop (five alternating pairs, load recorded, in the QA report)
-- [ ] The classifier adds under 10% to the median time of a 3,000-block docs scan against develop (median of five alternating pairs, `uptime` beside each, command and figures in the QA report)
+- [x] The classifier adds under 10% to the median time of a 3,000-block docs scan against develop (median of five alternating pairs, `uptime` beside each, command and figures in the QA report)
 
 ### Code Quality
 
-- [ ] Each fix has a mutation proof (revert, a test goes red), recorded in the QA report's findings table
-- [ ] `npm run bundle:check` reports 0 problems
+- [x] Each fix has a mutation proof (revert, a test goes red), recorded in the QA report's findings table
+- [x] `npm run bundle:check` reports 0 problems
 - [ ] `CI=true npm run ci` passes
 
 ### Migration
 
-- [ ] CHANGELOG.md cites this task
-- [ ] The owner's decision on the 17 refused blocks is recorded in the Change Log
+- [x] CHANGELOG.md cites this task
+- [x] The owner's decision on the 17 refused blocks is recorded in the Change Log
 
 ---
 
@@ -306,6 +306,8 @@ A table of allowed flags per allowed command (`sed`, `find`, `sort`, and each ot
 | 2026-11-09 | 1.0     | Initial draft | create-task |
 | 2026-11-09 | 1.1     | Review 1 (8/10): table widened to all 31 SAFE_COMMANDS members and operands (uniq, file -C found writing); gap 7 repro and a control's class corrected; performance and mutation criteria given a bound and a location; deny-reason test sweep added | review-task |
 | 2026-11-09 |         | Status → ready-for-development | review-task |
+| 2026-11-09 |         | Owner decision on the 17 refused doc blocks: accept the refusal, no value tracking | develop-task |
+| 2026-11-09 |         | Status → ready-for-review | develop-task |
 
 <!-- change-log-end -->
 
@@ -313,10 +315,10 @@ A table of allowed flags per allowed command (`sed`, `find`, `sort`, and each ot
 
 ## Progress Tracking
 
-- [ ] Phase 1: Reproduce and decide
-- [ ] Phase 2: The flag table
-- [ ] Phase 3: Operators and expansions
-- [ ] Phase 4: Real docs and prose
+- [x] Phase 1: Reproduce and decide
+- [x] Phase 2: The flag table
+- [x] Phase 3: Operators and expansions
+- [x] Phase 4: Real docs and prose
 - [ ] Phase 5 (optional): temp-dir leak
 
 ---

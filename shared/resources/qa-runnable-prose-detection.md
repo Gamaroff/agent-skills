@@ -144,6 +144,28 @@ worth naming (`git push`, `gh pr comment`, `curl -X POST`, `rm -rf`, …).
 heard of is treated as dangerous, not as safe-by-default. A deny-list alone fails *open*: every command
 nobody thought to forbid runs.
 
+**The allow-list reaches the flags (task.289).** `SAFE_COMMANDS` decides which commands may run; the
+`SAFE_FLAGS` table beside it decides which flags and how many operands each may carry, and an entry's
+`why` records the audit. A flag outside its command's entry classifies `mutating` with the reason
+`flag-not-allowed: <command> <flag>`, so a spelling nobody thought of cannot run: `sort
+--compress-program=./x`, `find docs -fprint0 out`, `sed '1e touch x'` (the `e` command and the `s///e`
+and `w` flags), `uniq in out` (a second operand is the output file), `file -C`, `diff -l`, `tail -f` and
+`date -s` / `date 01011200` are all refused. A command with no entry is refused (`no-table-entry`), and a
+long-flag abbreviation is not on the list. Eight commands carry an explicit flag list (`sed`, `find`,
+`sort`, `uniq`, `file`, `diff`, `date`, `tail`); the rest are audited as having no flag that writes or
+runs a program. A sed script is parsed to the end by `sedScriptVerdict`: only commands that read,
+print, branch or substitute pass, a script built from a variable this block defines is refused, and a
+script sed itself would reject (a command followed by more text) runs nothing. The same pass refuses
+three shapes the table cannot express: the `<>` redirection (opens a file for read **and** write), a
+function named after an allowed command (`function cat { touch x; }; cat f`), and an unquoted expansion
+that word-splits into a flag (`x${IFS}-delete`, a variable this block gives two words, a brace
+expansion that spells `-delete`). `DENY_PATTERNS` and the variable-argument rule stay **beside** the
+table: they remain the only check on `git`, `gh`, `rm`, `curl` and `tee`, and the second line on the
+rest, and their reasons are pinned by tests. A flag forwarded through a helper function is refused when
+every table-governed command it may reach refuses it, because the scan cannot tell which one receives
+it. The table cannot return a variable that could be an option (`find "$DIR"`, `sed '2d' "$f"`) to the
+runnable set: that needs value tracking, which the owner declined for task 289.
+
 The practical consequence, and it is intentional: `gh` and `curl` are **not** on the allow-list in any
 form. Read-only `gh pr view` and `curl -sf` are skipped along with the mutating ones. Executing a
 network call from inside a QA gate is a side effect QA should not have, and the execution environment
