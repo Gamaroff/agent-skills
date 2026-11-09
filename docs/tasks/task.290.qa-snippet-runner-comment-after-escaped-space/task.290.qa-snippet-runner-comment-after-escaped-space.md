@@ -5,7 +5,7 @@ type: task
 description: "Make every comment scan in the snippet classifier agree with bash on where a comment starts, and make closingParen fail closed on deep nesting instead of throwing."
 tags: [qa-task, security, follow-up-289]
 category: refactoring
-status: ready-for-review
+status: in-progress
 priority: Medium
 created: 2026-11-09
 updated: 2026-11-09
@@ -14,7 +14,7 @@ estimated_effort_hours: 4
 
 # Task 290: QA snippet runner reads a # after an escaped space as a comment
 
-**Status:** Ready for Review
+**Status:** In Progress
 
 ---
 
@@ -202,17 +202,17 @@ Sign-off is disabled for this repository (`sign-off.enabled` is not set), so no 
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.290.qa.2.qa-snippet-runner-comment-after-escaped-space.md](./task.290.qa.2.qa-snippet-runner-comment-after-escaped-space.md)
-- **Gate File**: [task.290.gate.2.qa-snippet-runner-comment-after-escaped-space.yml](./task.290.gate.2.qa-snippet-runner-comment-after-escaped-space.yml)
+- **Full Report**: [task.290.qa.3.qa-snippet-runner-comment-after-escaped-space.md](./task.290.qa.3.qa-snippet-runner-comment-after-escaped-space.md)
+- **Gate File**: [task.290.gate.3.qa-snippet-runner-comment-after-escaped-space.yml](./task.290.gate.3.qa-snippet-runner-comment-after-escaped-space.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 322
+- **Tests Executed**: 327
 - **Phases Verified**: 0/1 clean
 - **Critical Issues**: 1
-- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-One HIGH finding: an even run of backslashes before a newline is joined as a continuation, so a write on the next line classifies runnable (bug 2). The cycle 1 finding is fixed.
+One HIGH finding: the comment-start rule treats CR, form feed, vertical tab and Unicode spaces as blanks, which bash does not, so a write after one classifies runnable (bug 3). The cycle 2 finding is fixed.
 
 <!-- change-log-start -->
 ## Change Log
@@ -227,6 +227,7 @@ One HIGH finding: an even run of backslashes before a newline is joined as a con
 | 2026-11-09 |         | QA findings fixed — cycle 1, 1 finding                           | qa-fix      |
 | 2026-11-09 |         | QA gate FAIL (80/100) — 1 finding                                | qa-task     |
 | 2026-11-09 |         | QA findings fixed — cycle 2, 1 finding                           | qa-fix      |
+| 2026-11-09 |         | QA gate FAIL (80/100) — 1 finding                                | qa-task     |
 <!-- change-log-end -->
 
 ---
@@ -255,6 +256,6 @@ Both findings are identical on `develop`; task.289 neither introduced nor fixed 
 
 ---
 
-**Status:** Ready for Review
+**Status:** In Progress
 
 **Next Steps**: run `/develop-task` on this task.
