@@ -3814,6 +3814,12 @@ const BASE_SCAN_SHAPES = {
     'A=delete; find docs "-${A}"',
   "a dash followed by a command substitution": "find docs -$(echo delete)",
   "a command substitution as a whole argument": "find docs $(echo -delete)",
+  // T274-QA-4: the quote-stripped reading does not model these two quote forms.
+  "an ANSI-C quoted flag": "find docs $'-delete'",
+  "an ANSI-C quoted flag written with a hex escape": "find docs $'\\x2ddelete'",
+  "a locale-translated quoted flag": 'find docs $"-delete"',
+  "a flag split by a line continuation": "find docs -dele\\\nte",
+  "a variable split by a line continuation": "X=-delete; find docs $\\\nX",
 };
 for (const [name, code] of Object.entries(BASE_SCAN_SHAPES)) {
   test(`task.274 base scan: ${name} is refused as mutating`, () => {
@@ -3832,6 +3838,12 @@ test("task.274 base scan controls: the look-alikes that write nothing stay runna
     "D=docs; ls $D",
     "X=y; find docs/$X -name z", // a literal path prefix: cannot be a flag
     'N=3; find docs -name "task.${N}.*"', // a quoted value with a literal prefix
+    // T274-QA-4 controls: a `$` that merely precedes a closing quote is not ANSI-C
+    // quoting, and a continuation in a harmless command is still harmless.
+    "find docs -name 'cost$'",
+    'find docs -name "a$"',
+    "find docs -name x \\\n  -type f",
+    "git \\\n  log",
     'echo "a $(echo b) c"', // a read-only substitution in double quotes
     // A `|` inside the substitution's own single quotes is text, not a pipeline: kept
     // as written it split the command and read `b'` as one (found in task.45's bug).

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-274-BUG-2
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-11-09
 
@@ -62,3 +62,4 @@ mutation-prove by restoring the anchored pattern.
 | Date | Status | Changed By | Notes |
 | --- | --- | --- | --- |
 | 2026-11-09 | Ready for QA | qa-fix | Fixed in QA cycle 1 fix; regression tests and mutation proofs added |
+| 2026-11-09 | Closed | qa-task | Verified by task.274.qa.2.qa-engines-stop-passing-what-they-cannot-see.md |

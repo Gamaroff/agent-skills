@@ -769,6 +769,31 @@ function couldBeFlag(lead) {
 }
 
 /**
+ * True when `word` holds an unquoted `$'…'` (ANSI-C) or `$"…"` (locale) opener.
+ * Inside single or double quotes a `$` followed by a quote is plain text, and a
+ * `$` that merely precedes a CLOSING quote (`'cost$'`, `"a$"`) is not an opener.
+ */
+function hasDecodedQuote(word) {
+  let quote = null;
+  for (let k = 0; k < word.length; k += 1) {
+    const ch = word[k];
+    if (quote === "'") {
+      if (ch === "'") quote = null;
+    } else if (quote === '"') {
+      if (ch === "\\") k += 1;
+      else if (ch === '"') quote = null;
+    } else if (ch === "\\") {
+      k += 1;
+    } else if (ch === "$" && (word[k + 1] === "'" || word[k + 1] === '"')) {
+      return true;
+    } else if (ch === "'" || ch === '"') {
+      quote = ch;
+    }
+  }
+  return false;
+}
+
+/**
  * The first deny-listed command in `prose` that is given an argument that could
  * become a flag through a variable expansion, or null. Single quotes make `'$X'`
  * text, so it is not one. Walks each simple command of the prose-stripped text.
@@ -797,6 +822,9 @@ function variableArgumentToDenyListed(prose) {
       .pop();
     if (!VARIABLE_ARGUMENT_COMMANDS.has(name)) continue;
     for (const arg of words.slice(i + 1)) {
+      // `$'-delete'` and `$"-delete"` are decoded by the shell, and the scan does
+      // not decode them: refuse the argument rather than guess (T274-QA-4).
+      if (hasDecodedQuote(arg)) return name;
       if (!/\$(?:\{|[A-Za-z_@*#?0-9])/.test(arg)) continue;
       // Refuse unless a literal prefix is known not to be a flag: `docs/$X` is
       // a path, `-$X` and `"-${X}"` are flags once the shell expands them.
@@ -1861,7 +1889,10 @@ function classifyInternal(
   // Scan prose-stripped code, not raw: a heredoc body or a comment that merely
   // MENTIONS `git push` is documentation. Scanning raw text would classify a doc
   // for its own examples and skip a block that is in fact safe to run.
-  const prose = stripProse(code);
+  // A backslash-newline is removed by the shell before it reads a word, so
+  // `-dele\<LF>te` is `-delete` (T274-QA-4). Only an ODD run of backslashes
+  // continues the line; an escaped pair (`\\`) followed by a newline does not.
+  const prose = stripProse(code).replace(/(?<!\\)((?:\\\\)*)\\\r?\n/g, "$1");
 
   // Judged twice: as written, and with quotes and backslashes removed, as the
   // command receives them. `find docs "-delete"` and `find docs '-delete'` both run
@@ -1886,7 +1917,7 @@ function classifyInternal(
   if (variableArg !== null)
     return {
       klass: "mutating",
-      reason: `deny-list: variable argument to ${variableArg} (the scan tracks no values)`,
+      reason: `deny-list: argument to ${variableArg} that the shell expands at run time (variable, substitution or $'…'; the scan tracks no values)`,
     };
 
   // Deliberately NOT split on a single `|`: sed accepts it as an s/// delimiter,

@@ -10,7 +10,8 @@ All notable changes to this project will be documented in this file. Format foll
   refuses four shapes that classified `runnable` and wrote: a command after a heredoc body (the strip is
   idempotent), `$(…)` or a backtick inside double quotes, a quoted deny-listed flag (`find docs
   "-delete"`), and a variable argument to a deny-listed command (`X=-delete; find docs $X` — refused,
-  since the scan tracks no values). A block that is not run but does not parse under `bash -n` /
+  since the scan tracks no values; an ANSI-C `$'…'` or `$"…"` argument is refused too, and a
+  backslash-newline is folded before the scan). A block that is not run but does not parse under `bash -n` /
   `zsh -n` is its own `high` `execution-failure` finding, beside its refusal. A second `--name` control
   against one JS entry no longer replaces the first. `security-probe.mjs --fixture-copy <file>`
   (repeatable) copies a shared repo file into every case directory once, so a cases file stops embedding

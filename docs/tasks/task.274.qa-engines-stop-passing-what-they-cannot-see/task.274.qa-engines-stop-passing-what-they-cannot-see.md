@@ -321,21 +321,21 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`. Edit the `shared/resou
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-09
-**Quality Score**: 70/100
+**Quality Score**: 80/100
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.274.qa.1.qa-engines-stop-passing-what-they-cannot-see.md](./task.274.qa.1.qa-engines-stop-passing-what-they-cannot-see.md)
-- **Gate File**: [task.274.gate.1.qa-engines-stop-passing-what-they-cannot-see.yml](./task.274.gate.1.qa-engines-stop-passing-what-they-cannot-see.yml)
+- **Full Report**: [task.274.qa.2.qa-engines-stop-passing-what-they-cannot-see.md](./task.274.qa.2.qa-engines-stop-passing-what-they-cannot-see.md)
+- **Gate File**: [task.274.gate.2.qa-engines-stop-passing-what-they-cannot-see.yml](./task.274.gate.2.qa-engines-stop-passing-what-they-cannot-see.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 25 probe cases plus the developer-reported suite (8,124 pass)
+- **Tests Executed**: 34 probe cases plus the suite (8,100 pass, 2 harness-only failures also present on develop)
 - **Phases Verified**: 5/5
-- **Critical Issues**: 2 high, 1 medium
-- **NFR Status**: Security: FAIL, Performance: CONCERNS, Reliability: PASS, Maintainability: CONCERNS
+- **Critical Issues**: 1 high
+- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-`--fixture-copy` follows a symlinked intermediate directory (outside bytes copied); a dash followed by an expansion still classifies runnable; the new syntax check flags a documented template. See bug reports 1-3.
+The three cycle-1 findings are fixed and mutation-proven. The refute pass found that an ANSI-C quoted flag and a line-continuation split still classify runnable and delete files when run (bug 4). The timing criterion (+4.7% median) and the cases-file size criterion (8,813 bytes) are met.
 
 <!-- change-log-start -->
 ## Change Log
@@ -348,6 +348,8 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`. Edit the `shared/resou
 | 2026-11-09 |         | Implemented — 7 source/test files + 2 docs + 17 bundled copies, 3 phases of fixes with mutation proofs | develop |
 | 2026-11-09 |         | QA gate FAIL (70/100) — 3 findings (2 high, 1 medium)           | qa-task    |
 | 2026-11-09 |         | QA findings fixed — 3 bugs Ready for QA, 1 iteration; mutation-proven | qa-fix     |
+| 2026-11-09 |         | QA gate FAIL (80/100) — 1 finding (1 high); bugs 1-3 closed     | qa-task    |
+| 2026-11-09 |         | QA findings fixed — bug 4 Ready for QA, 1 iteration; mutation-proven | qa-fix     |
 <!-- change-log-end -->
 
 ---

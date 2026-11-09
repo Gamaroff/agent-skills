@@ -338,7 +338,11 @@ values, so an argument that could become a flag through an expansion to `find`, 
 `gh`, `git` or `tee` classifies `mutating`, with the reason naming it. That is an argument that begins
 with the expansion (`$X`, `"$X"`, `${X}`, `$(…)`) or whose literal prefix is a dash with no `=` (`-$X`,
 `"-${X}"`, `-$(…)`). `docs/$X`, `"task.${N}.*"` and `--since="$D"` have a literal name or path in front
-and stay runnable. A shipped helper's own variables and the arguments a helper forwards are
+and stay runnable. Two quote forms the shell decodes before the command sees them are refused the same
+way, because the scan does not decode them: an unquoted ANSI-C `$'-delete'` (also `$'\x2ddelete'`) or
+locale `$"-delete"` argument. A `$` that only precedes a closing quote (`'cost$'`, `"a$"`) is not one. A
+backslash-newline is removed before classification, since the shell removes it before reading a word
+(`-dele\` newline `te` is `-delete`); only an odd run of backslashes continues the line. A shipped helper's own variables and the arguments a helper forwards are
 judged by the existing helper rules, not this one. A block this wrongly refuses is a false positive to
 rewrite with a literal argument, not a rule to loosen.
 
