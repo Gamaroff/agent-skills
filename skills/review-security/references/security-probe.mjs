@@ -1896,6 +1896,12 @@ export function runProbeSpec({
       try {
         const st = lstatSync(abs);
         if (st.isSymbolicLink()) throw new Error("a symbolic link");
+        // A symlinked DIRECTORY on the way passes the lexical check above and
+        // the leaf lstat: the real path must stay inside the real root
+        // (T274-QA-1).
+        if (!isWithin(root, realpathSync(abs))) {
+          throw new Error("resolves outside the repo root");
+        }
         if (!st.isFile()) throw new Error("not a regular file");
         // The bytes, never a decoded string: U+0085, U+2028 and a lone CR survive.
         sharedFiles.push([key, readFileSync(abs)]);

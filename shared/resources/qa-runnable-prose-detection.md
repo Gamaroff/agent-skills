@@ -334,9 +334,11 @@ line — the operator is now neutralised, which makes the strip idempotent); `$(
 double quotes (they run — only single quotes make them text); a deny-listed flag in quotes
 (`find docs "-delete"` — `DENY_PATTERNS` now also run over a copy with quotes removed); and a **variable
 argument to a deny-listed command** (`X=-delete; find docs $X`). The last is *refused*: the scan tracks no
-values, so an argument that begins with an expansion (`$X`, `"$X"`, `${X}`) to `find`, `sed`, `rm`, `curl`,
-`gh`, `git` or `tee` classifies `mutating`, with the reason naming it. `docs/$X` and `"task.${N}.*"` begin
-with a literal and stay runnable. A shipped helper's own variables and the arguments a helper forwards are
+values, so an argument that could become a flag through an expansion to `find`, `sed`, `rm`, `curl`,
+`gh`, `git` or `tee` classifies `mutating`, with the reason naming it. That is an argument that begins
+with the expansion (`$X`, `"$X"`, `${X}`, `$(…)`) or whose literal prefix is a dash with no `=` (`-$X`,
+`"-${X}"`, `-$(…)`). `docs/$X`, `"task.${N}.*"` and `--since="$D"` have a literal name or path in front
+and stay runnable. A shipped helper's own variables and the arguments a helper forwards are
 judged by the existing helper rules, not this one. A block this wrongly refuses is a false positive to
 rewrite with a literal argument, not a rule to loosen.
 

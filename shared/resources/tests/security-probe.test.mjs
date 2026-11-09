@@ -3181,6 +3181,27 @@ test("fixture-copy: every unusable value is declined `bad-fixture-copy` before a
       assert.equal(r.reason, "bad-fixture-copy", `${why}: ${r.reason}`);
       assert.equal(r.executed, 0, why);
     }
+    // T274-QA-1: a symlinked DIRECTORY on the way out of the root is refused;
+    // the control is a real directory with the same shape, which is copied.
+    const outside = mkdtempSync(join(tmpdir(), "probe-fixture-outside-"));
+    try {
+      writeFileSync(join(outside, "items.json"), '["OUTSIDE"]');
+      symlinkSync(outside, join(root, "linked-dir"));
+      mkdirSync(join(root, "real-dir"));
+      writeFileSync(join(root, "real-dir", "items.json"), '["MARKER"]');
+      const viaLink = runProbeSpec(
+        copySpec(root, { fixtureCopy: ["linked-dir/items.json"] }),
+      );
+      assert.equal(viaLink.reason, "bad-fixture-copy");
+      assert.equal(viaLink.executed, 0);
+      assert.match(viaLink.declined[0].detail, /outside the repo root/);
+      const viaReal = runProbeSpec(
+        copySpec(root, { fixtureCopy: ["real-dir/items.json"] }),
+      );
+      assert.notEqual(viaReal.reason, "bad-fixture-copy");
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
     // A form that materialises no fixture.files declines it too.
     const js = runProbeSpec({
       sink: "url-authority",

@@ -3808,6 +3808,12 @@ const BASE_SCAN_SHAPES = {
   "a variable argument to a deny-listed command": "X=-delete; find docs $X",
   "a braced variable argument to a deny-listed command":
     "X=-delete; find docs ${X}",
+  // T274-QA-2: a literal dash in front of the expansion is still a flag.
+  "a dash followed by a variable": "A=delete; find docs -$A",
+  "a double-quoted dash followed by a braced variable":
+    'A=delete; find docs "-${A}"',
+  "a dash followed by a command substitution": "find docs -$(echo delete)",
+  "a command substitution as a whole argument": "find docs $(echo -delete)",
 };
 for (const [name, code] of Object.entries(BASE_SCAN_SHAPES)) {
   test(`task.274 base scan: ${name} is refused as mutating`, () => {
@@ -3824,6 +3830,8 @@ test("task.274 base scan controls: the look-alikes that write nothing stay runna
     'find docs -name "x"', // a quoted value, not a deny-listed flag
     "X=hello; echo $X", // a variable argument to a command that is not deny-listed
     "D=docs; ls $D",
+    "X=y; find docs/$X -name z", // a literal path prefix: cannot be a flag
+    'N=3; find docs -name "task.${N}.*"', // a quoted value with a literal prefix
     'echo "a $(echo b) c"', // a read-only substitution in double quotes
     // A `|` inside the substitution's own single quotes is text, not a pipeline: kept
     // as written it split the command and read `b'` as one (found in task.45's bug).
@@ -3879,6 +3887,43 @@ test("task.274 syntax controls: a parseable mutating block refuses only; a runna
     slot.findings.filter((f) => f.syntax),
     [],
   );
+  // T274-QA-3: a MUTATING template (env -i … <command> <candidate>) is no more a
+  // syntax error than a placeholder one. Positive control: the same block with
+  // the slots filled with a stray `|` does parse-fail, so the check still runs.
+  const tmpl = executeFile(
+    SYNTAX_FILE('env -i HOME="$(mktemp -d)" <command> <candidate>'),
+    { allowZsh: false },
+  );
+  assert.equal(tmpl.results[0].klass, "mutating");
+  assert.deepEqual(
+    tmpl.findings.filter((f) => f.syntax),
+    [],
+  );
+  // The documented shapes the corpus scan found: a slot naming a path or a file.
+  for (const code of [
+    "rm -rf <path/to/skill-folder>",
+    "bash ./scripts/run.sh <data.json>",
+  ]) {
+    const t = executeFile(SYNTAX_FILE(code), { allowZsh: false });
+    assert.equal(t.results[0].klass, "mutating", code);
+    assert.deepEqual(
+      t.findings.filter((f) => f.syntax),
+      [],
+      code,
+    );
+  }
+  // A code string that starts with `--` is code, not an option to the shell.
+  const dash = executeFile(SYNTAX_FILE("--state-init --next"), {
+    allowZsh: false,
+  });
+  assert.deepEqual(
+    dash.findings.filter((f) => f.syntax),
+    [],
+  );
+  const broken = executeFile(SYNTAX_FILE("rm -rf /tmp/qa-never-run |"), {
+    allowZsh: false,
+  });
+  assert.equal(broken.findings.filter((f) => f.syntax).length, 1);
 });
 
 test("task.274 syntax: nothing in the checked block runs", () => {

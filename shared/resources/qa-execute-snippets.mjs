@@ -742,9 +742,10 @@ export const DENY_PATTERNS = [
 
 /**
  * The commands DENY_PATTERNS names for a flag or sub-command that writes. A
- * variable can carry that flag, so an argument that BEGINS with an expansion
- * (`$X`, `${X}`, `"$X"`, `"${X}/y"`) is refused on these (task.274, obs #67).
- * An argument with a literal first character cannot be a flag, so `docs/$X` and
+ * variable can carry that flag, so an argument whose literal prefix is empty or
+ * starts with a dash (`$X`, `${X}`, `"$X"`, `-$X`, `"-${X}"`, `-$(…)`, a bare
+ * `$(…)`) is refused on these (task.274, obs #67; T274-QA-2). A prefix that does
+ * not start with a dash cannot make the argument a flag, so `docs/$X` and
  * `"task.${N}.*"` stay runnable.
  */
 const VARIABLE_ARGUMENT_COMMANDS = new Set([
@@ -758,14 +759,29 @@ const VARIABLE_ARGUMENT_COMMANDS = new Set([
 ]);
 
 /**
- * The first deny-listed command in `prose` that is given an argument beginning
- * with a variable expansion, or null. Single quotes make `'$X'` text, so it is not
- * one. Walks each simple command of the prose-stripped text.
+ * Whether an argument whose literal text before an expansion is `lead` could
+ * become a flag: nothing before it, or a dash-led name the expansion can still
+ * complete (`-`, `-$X`). `--since=$D` has its name fixed by the `=`, so the
+ * expansion is only a value.
+ */
+function couldBeFlag(lead) {
+  return lead === "" || (lead.startsWith("-") && !lead.includes("="));
+}
+
+/**
+ * The first deny-listed command in `prose` that is given an argument that could
+ * become a flag through a variable expansion, or null. Single quotes make `'$X'`
+ * text, so it is not one. Walks each simple command of the prose-stripped text.
  */
 function variableArgumentToDenyListed(prose) {
   const WORD = /(?:[^\s"'\\]|\\[\s\S]|"(?:[^"\\]|\\[\s\S])*"|'[^']*')+/g;
   // Command separators; a `$(` or backtick starts an inner command of its own.
-  for (const segment of prose.split(/\n|;|&&|\|\||\||&|\$\(|`|\(/)) {
+  // The capture keeps each delimiter, so a segment knows whether a substitution
+  // follows it (`find docs -$(echo delete)`: the flag is cut off by the split).
+  const parts = prose.split(/(\n|;|&&|\|\||\||&|\$\(|`|\()/);
+  for (let p = 0; p < parts.length; p += 2) {
+    const segment = parts[p];
+    const next = parts[p + 1];
     const words = segment.match(WORD) ?? [];
     let i = 0;
     // Leading assignments, keywords and `command` are not the command.
@@ -780,8 +796,25 @@ function variableArgumentToDenyListed(prose) {
       .split("/")
       .pop();
     if (!VARIABLE_ARGUMENT_COMMANDS.has(name)) continue;
-    for (const arg of words.slice(i + 1))
-      if (/^"?\$(?:\{|[A-Za-z_@*#?0-9])/.test(arg)) return name;
+    for (const arg of words.slice(i + 1)) {
+      if (!/\$(?:\{|[A-Za-z_@*#?0-9])/.test(arg)) continue;
+      // Refuse unless a literal prefix is known not to be a flag: `docs/$X` is
+      // a path, `-$X` and `"-${X}"` are flags once the shell expands them.
+      const lead = arg.slice(0, arg.search(/\$/)).replace(/['"\\]/g, "");
+      if (couldBeFlag(lead)) return name;
+    }
+    // A substitution that follows this segment is part of its last argument
+    // (`-$(…)`), or a whole argument of its own (`find docs $(…)`).
+    if (next === "$(" || next === "`") {
+      const tail =
+        segment.endsWith(" ") || segment.endsWith("\t")
+          ? ""
+          : (segment.split(/\s+/).pop() ?? "");
+      const lead = tail.replace(/['"\\]/g, "");
+      if (words.length > i + 1 || tail === "") {
+        if (couldBeFlag(lead)) return name;
+      }
+    }
   }
   return null;
 }
@@ -2179,14 +2212,22 @@ export function sandboxEnv({ cwd, bindings = {} } = {}) {
   };
 }
 
+// A documented argument slot may name a path or a file: `<path/to/skill-folder>`,
+// `<bug.md>`. The classifier's own `<name>` slot grammar leaves those out (it
+// would change what classifies), so the syntax check reads the wider shape.
+const ANGLE_TEMPLATE = /(?<![<>&\w])<[A-Za-z][\w .:/-]*>/;
+
 /**
  * Whether a block that is NOT run should still be parsed. A `mutating` block is
  * real code, and so is one refused for an unbound variable. A block awaiting a
  * `{slot}` or `<slot>` is not: its placeholder routinely reads as a redirect or an
  * operator, so a parse failure there is the template, not broken prose.
  */
-function isSyntaxCheckable(klass, reason) {
-  if (klass === "mutating") return true;
+function isSyntaxCheckable(klass, reason, code = "") {
+  // A `mutating` block that still holds an unfilled slot is a template: `env -i
+  // <command> <candidate>` does not parse, and is not meant to (T274-QA-3).
+  if (klass === "mutating")
+    return unfilledSlots(code).length === 0 && !ANGLE_TEMPLATE.test(code);
   return klass === "placeholder" && /^unbound-variable/.test(reason ?? "");
 }
 
@@ -2199,7 +2240,7 @@ function syntaxFindings(code, shells, timeout) {
   const env = sandboxEnv({});
   const out = [];
   for (const shell of shells) {
-    const r = spawnSync(shell, ["-n", "-c", code], {
+    const r = spawnSync(shell, ["-n", "-c", "--", code], {
       timeout,
       encoding: "utf8",
       env,
@@ -2667,7 +2708,7 @@ export function executeFile(filePath, opts = {}) {
         // blocks refused as `mutating` and the report read `no-executable-blocks`.
         // So a block that is not run is still parsed, and one that does not parse is
         // a finding of its own, beside the refusal.
-        if (isSyntaxCheckable(klass, reason)) {
+        if (isSyntaxCheckable(klass, reason, code)) {
           for (const f of syntaxFindings(code, shells, timeout))
             findings.push({ ...f, line: block.line, origin: block.origin });
         }
