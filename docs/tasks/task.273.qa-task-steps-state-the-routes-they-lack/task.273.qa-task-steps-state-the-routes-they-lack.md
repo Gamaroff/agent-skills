@@ -295,15 +295,15 @@ None identified.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-09
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.273.qa.5.qa-task-steps-state-the-routes-they-lack.md](./task.273.qa.5.qa-task-steps-state-the-routes-they-lack.md)
-- **Gate File**: [task.273.gate.5.qa-task-steps-state-the-routes-they-lack.yml](./task.273.gate.5.qa-task-steps-state-the-routes-they-lack.yml)
+- **Full Report**: [task.273.qa.6.qa-task-steps-state-the-routes-they-lack.md](./task.273.qa.6.qa-task-steps-state-the-routes-they-lack.md)
+- **Gate File**: [task.273.gate.6.qa-task-steps-state-the-routes-they-lack.yml](./task.273.gate.6.qa-task-steps-state-the-routes-they-lack.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 3
@@ -312,7 +312,7 @@ None identified.
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle 1's CHANGELOG finding and the gating-rule findings of cycles 2 and 3 are fixed. Cycle 5, the last gate of the budget, found one MEDIUM: the "Code-review findings" note in the gate-decision section of `qa-task` and `qa-story` still says findings do not enter `top_issues` by default, with the step 5d exception on its last sentence only. The loop has escalated with that finding open. Three advisory review findings stay in the gate's future recommendations.
+Every MEDIUM finding from cycles 1 to 5 is fixed; the last, the gate-decision notes, was fixed after two extra cycles were granted. Cycle 6 passes with two open LOW wording residues (T273-CR-5, T273-CR-6) in the review prompt and the report templates. Three advisory review findings stay in the gate's future recommendations.
 
 <!-- change-log-start -->
 ## Change Log
@@ -333,6 +333,7 @@ Cycle 1's CHANGELOG finding and the gating-rule findings of cycles 2 and 3 are f
 | 2026-11-09 |         | QA findings fixed — Skill-arg paragraphs, closing sentences and matrix note, 4 iterations | qa-fix      |
 | 2026-11-09 |         | QA gate CONCERNS (90/100) — 1 finding (cycle 5, loop limit)     | qa-task     |
 | 2026-11-09 |         | QA findings fixed — gate-decision notes rewritten, 5 iterations | qa-fix      |
+| 2026-11-09 |         | QA gate PASS (100/100) — 2 LOW findings open (cycle 6)          | qa-task     |
 <!-- change-log-end -->
 
 ---

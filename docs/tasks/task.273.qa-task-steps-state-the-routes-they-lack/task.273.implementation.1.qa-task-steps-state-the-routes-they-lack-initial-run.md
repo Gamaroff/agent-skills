@@ -133,6 +133,15 @@ _Track each QA review/fix cycle._
 - Move: patch. The decision itself is consolidated once in `code-review-prompt.md` item 4; each skill's sentences stay local because a QA run executes them without opening the prompt. The next gate is the fifth and last.
 - Validation: `npm run bundle`, prettier clean, `CI=true npm run ci:fast` (result below). Single finding read directly.
 
+### QA Cycle 6 — 2026-11-09
+**Gate Result**: PASS
+**Issues Found**: 2 — both LOW wording residues: unqualified "it will not gate" in the review prompt (T273-CR-5) and four report-template lines that ignore the run-level arg (T273-CR-6); cycle 5's T273-CR-4 is fixed
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: pending — Step 5c
+**Loop exit**: Cosmetic-residue exit (route 2b) — `classifyLoopRoute` returned `cosmetic-residue` / `continue`: PASS gate at cycle 6 with HIGH 0 for cycles 5 and 6, all 2 open findings LOW and carried to `recommendations.future` by id
+**Action**: Proceeding to 5c (PR conformance review)
+
 ### Re-entry after the loop limit — 2026-11-09
 
 - The user granted 2 extra QA cycles (`grant-qa-cycles.sh`: `qa_max_cycles` 5 → 7, re-entered at 5b, `convergence_from_cycle` 6).
