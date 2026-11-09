@@ -163,7 +163,10 @@ backslash before it is not a continuation, so `#c\<newline>e echo x` is a commen
 command. A command or backtick substitution cuts a command's arguments where the scan reads them, so a
 governed command is refused when a substitution may stand where a flag goes (a word that starts with the
 substitution or with a dash: `sort -$(echo o) out in`) and always for `uniq` and `sed`; a literal prefix
-that is not a dash (`date -d "@$(stat -c %Y f)"`) cannot be a flag and passes. The same pass refuses
+that is not a dash (`date -d "@$(stat -c %Y f)"`) cannot be a flag and passes. Every `${…}` is an
+expansion whatever it holds (`${1}`, `${!X}`, `${#A}`, `${@:1}`), not only `${NAME}`, and a command that
+counts operands (`uniq`: the second is an output file) refuses an unquoted brace, glob or unnamed
+expansion in an operand (`uniq {in,out}`, `uniq *.txt`), because the word may become several. The same pass refuses
 three shapes the table cannot express: the `<>` redirection (opens a file for read **and** write), a
 function named after an allowed command (`function cat { touch x; }; cat f`), and an unquoted expansion
 that word-splits into a flag (`x${IFS}-delete`, a variable this block gives two words, a brace

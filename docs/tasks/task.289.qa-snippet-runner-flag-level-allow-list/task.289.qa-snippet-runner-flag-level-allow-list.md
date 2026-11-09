@@ -307,19 +307,19 @@ A table of allowed flags per allowed command (`sed`, `find`, `sort`, and each ot
 
 ### QA Report
 
-- **Full Report**: [task.289.qa.2.qa-snippet-runner-flag-level-allow-list.md](./task.289.qa.2.qa-snippet-runner-flag-level-allow-list.md)
-- **Gate File**: [task.289.gate.2.qa-snippet-runner-flag-level-allow-list.yml](./task.289.gate.2.qa-snippet-runner-flag-level-allow-list.yml)
+- **Full Report**: [task.289.qa.3.qa-snippet-runner-flag-level-allow-list.md](./task.289.qa.3.qa-snippet-runner-flag-level-allow-list.md)
+- **Gate File**: [task.289.gate.3.qa-snippet-runner-flag-level-allow-list.yml](./task.289.gate.3.qa-snippet-runner-flag-level-allow-list.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 260
+- **Tests Executed**: 274
 - **Phases Verified**: 4/5
 - **Critical Issues**: 2
-- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
 
-Cycle 1 fixes hold. Cycle 2 found two more high-severity bypasses of the flag table, both reproduced: a sed `#` comment ending in a backslash-newline hides a command, and a command substitution splits the arguments before the flag check.
+The cycle 2 fixes hold. Cycle 3 found two more high-severity shell-expansion bypasses, both reproduced: `${1}` and `${!X}` are not read as expansions, and a brace adds operands to `uniq`. Third consecutive gate with a high finding on the engine, so the next fix replaces the expansion reading rather than patching another spelling.
 
 ## Change Log
 
@@ -336,6 +336,8 @@ Cycle 1 fixes hold. Cycle 2 found two more high-severity bypasses of the flag ta
 | 2026-11-09 |         | QA findings fixed — 2 high findings, 1 iteration | qa-fix |
 | 2026-11-09 |         | QA gate FAIL (80/100) — 2 findings | qa-task |
 | 2026-11-09 |         | QA findings fixed — 2 high findings, 2 iterations | qa-fix |
+| 2026-11-09 |         | QA gate FAIL (80/100) — 2 findings | qa-task |
+| 2026-11-09 |         | QA findings fixed — 2 high findings, 3 iterations (third strike: expansion reading replaced) | qa-fix |
 
 <!-- change-log-end -->
 

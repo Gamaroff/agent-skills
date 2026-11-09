@@ -1192,11 +1192,17 @@ function shellWord(tok, resolve = null) {
         continue;
       }
       let value = null;
-      if ((m = /^\{([A-Za-z_][A-Za-z0-9_]*)([^}]*)\}/.exec(rest))) {
-        names.add(m[1]);
-        // `${NAME}` is its value; `${NAME:-x}` and the rest are not read here.
-        if (m[2] === "" && resolve) value = resolve(m[1]);
-        k += m[0].length;
+      if (rest.startsWith("{")) {
+        // EVERY `${…}` is an expansion, whatever it holds: `${1}`, `${!X}`,
+        // `${#A}`, `${@:1}` as much as `${NAME}`. Listing the spellings that name a
+        // variable left the others as literal text, so a flag they carried was
+        // never seen (QA 3). Only `${NAME}` alone has a value this reader can say.
+        const end = rest.indexOf("}");
+        const inner = end < 0 ? rest.slice(1) : rest.slice(1, end);
+        const id = /^[A-Za-z_][A-Za-z0-9_]*/.exec(inner);
+        if (id) names.add(id[0]);
+        if (id && id[0] === inner && resolve) value = resolve(id[0]);
+        k += end < 0 ? rest.length : end + 1;
       } else if ((m = /^[A-Za-z_][A-Za-z0-9_]*/.exec(rest))) {
         names.add(m[0]);
         if (resolve) value = resolve(m[0]);
@@ -1709,6 +1715,16 @@ function flagViolation(name, rawArgs, ctx) {
       if (hidden(w)) return out(unreadable(w));
       if (!afterDD && flagCapable(w))
         return out(`${w.tok} (an expansion that could be a flag)`);
+      // A command whose operands count (uniq: the second is an output file) cannot
+      // be judged on an unquoted word that may become several: a brace, a glob, or
+      // an expansion this reader cannot name (`uniq {in,out}`, `uniq *.txt`).
+      if (entry.maxOperands != null && !ctx.lenient) {
+        const bare = bareOf(w.tok).replace(/\$\{[A-Za-z_][A-Za-z0-9_]*\}/g, "");
+        if (/[*?[{`]/.test(bare) || (/\$/.test(bare) && w.names.size === 0))
+          return out(
+            `${w.tok} (an unquoted brace, glob or expansion can name more than one operand)`,
+          );
+      }
       operandCount += 1;
       if (entry.operandRe && !entry.operandRe.test(u))
         return out(

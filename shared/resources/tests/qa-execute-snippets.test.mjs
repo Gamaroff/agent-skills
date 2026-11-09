@@ -4101,6 +4101,28 @@ const T289_GAPS = {
     "date $(echo -s) now",
     /^flag-not-allowed: date command-substitution/,
   ],
+  // QA cycle 3: every `${…}` is an expansion, and a word that may become several
+  // operands cannot be counted.
+  "a ${1} that set -- made a flag": [
+    "set -- -o; sort ${1} out in",
+    /^flag-not-allowed: sort \$\{1\}/,
+  ],
+  "an indirect ${!X} that names a flag": [
+    "X=Y; Y=--output=out; sort ${!X} in",
+    /^flag-not-allowed: sort \$\{!X\}/,
+  ],
+  "uniq with a brace that adds the output operand": [
+    "uniq {in,out}",
+    /^flag-not-allowed: uniq \{in,out\}/,
+  ],
+  "uniq with a brace suffix that adds the output operand": [
+    "uniq in{,.out}",
+    /^flag-not-allowed: uniq in\{,\.out\}/,
+  ],
+  "uniq with a glob that may match two files": [
+    "uniq *.txt",
+    /^flag-not-allowed: uniq \*\.txt/,
+  ],
   "find -delete through a substitution": [
     "find . $(echo -delete)",
     /^(deny-list|flag-not-allowed)/,
@@ -4154,6 +4176,54 @@ for (const [name, code] of Object.entries(T289_CONTROLS)) {
     assert.equal(classifyBlock(code).klass, "runnable", code);
   });
 }
+
+// The population check QA 3 found missing: one list of expansion forms, run
+// against EVERY entry that judges flags, so a form one command refuses and
+// another passes is a red test and not a finding. An entry with `expansionOk`
+// says a flag it cannot see does no harm (diff, tail), and is held to the
+// operand forms only.
+const T289_FLAG_FORMS = [
+  "$1",
+  "${1}",
+  "${!X}",
+  "${#A}",
+  "${@:1}",
+  '"$@"',
+  "$(echo -o)",
+  "`echo -o`",
+  "$'-o'",
+];
+test("task.289 population: every explicit entry refuses an expansion where a flag may stand", () => {
+  const governed = Object.keys(SAFE_FLAGS).filter((c) => !SAFE_FLAGS[c].any);
+  assert.ok(governed.length >= 8, `only ${governed.length} governed commands`);
+  let judged = 0;
+  for (const cmd of governed) {
+    if (SAFE_FLAGS[cmd].expansionOk) continue;
+    for (const form of T289_FLAG_FORMS) {
+      judged += 1;
+      assert.equal(
+        classifyBlock(`${cmd} ${form} f`).klass,
+        "mutating",
+        `${cmd} ${form} f`,
+      );
+    }
+  }
+  assert.ok(judged >= 6 * T289_FLAG_FORMS.length, `judged only ${judged}`);
+});
+
+test("task.289 population: a command that counts operands refuses a word that may become several", () => {
+  for (const form of [
+    "{in,out}",
+    "in{,.out}",
+    "*.txt",
+    "in?",
+    "in[12]",
+    "in${1}",
+  ])
+    assert.equal(classifyBlock(`uniq ${form}`).klass, "mutating", form);
+  for (const ok of ["in", "-c in", '"$f"'.replace('"$f"', "'a b'")])
+    assert.equal(classifyBlock(`uniq ${ok}`).klass, "runnable", ok);
+});
 
 test("task.289 control: an unbound variable is still a placeholder, not a refusal", () => {
   assert.equal(classifyBlock("find docs/$X -name z").klass, "placeholder");

@@ -1,0 +1,73 @@
+schema: 2
+task: 'task.289.qa-snippet-runner-flag-level-allow-list'
+task_title: 'QA snippet runner allows flags, not just commands'
+gate: FAIL
+status_reason: 'The four cycle 1 and 2 bypasses hold. Cycle 3 (safety re-probe, unscoped) found two more high bypasses in the expansion reading, both reproduced under real bash: a ${1} or ${!X} word is not read as an expansion for any governed command outside the deny-list, and a brace expansion adds operands to uniq.'
+reviewer: 'QA Engineer'
+head: '20f03774694897ce0e86eae321bcba4826ddc90b'
+updated: '2026-11-09T15:09:48Z'
+
+top_issues:
+  - id: 'T289-CR3-1'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: "shellWord reads only `${NAME…}` as an expansion, so `${1}` and `${!X}` stay literal text and flagCapable never fires for sort, uniq, file, date or any other governed command outside the deny-list. `set -- -o; sort ${1} out in` and `X=Y; Y=--output=out; sort ${!X} in` classify runnable; under real bash each created `out` (QA ran the first). Controls: `sort -n in` stays runnable; `sort $1 out in` and `sort $X out in` are refused. origin: code-review, reproduced by QA"
+    suggested_action: 'Stop enumerating expansion spellings: for a governed command, refuse any word that holds an unquoted `$`, backtick, brace or glob where a flag may stand, and add a table-driven test that runs every SAFE_FLAGS entry through one shared list of expansion forms.'
+    suggested_owner: dev
+    status: open
+  - id: 'T289-CR3-2'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: "The brace check refuses only an alternative that could start a flag, and uniq's maxOperands counts the unexpanded words. `uniq {in,out}` and `uniq in{,.out}` classify runnable; under real bash `uniq {in,out}` created `out` (QA ran it). Controls: `uniq in` is runnable and `uniq in out` is refused. origin: code-review, reproduced by QA"
+    suggested_action: 'Refuse an unquoted brace expansion or glob in an operand of a command with maxOperands, or count each alternative as an operand.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 274
+  phases_verified: '4/5'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 31
+    escaped: 0
+    boundary: true
+    boundary_signals: ['refused', 'refuses']
+    notes: 'The shell-exec corpus (31 cases, 0 reproduced, 0 escaped) passes. The reviewer ran about 650 inputs (5k sed scripts under real GNU sed, 150k random blocks for exceptions, scaling to 1 MB: no sed bypass, no throw, linear time) and found two shell-expansion bypasses outside the corpus; QA reproduced both. Third consecutive gate with a high finding on this file.'
+  performance:
+    status: PASS
+    notes: 'Linear on every input the reviewer scaled (up to 1 MB); docs scan unchanged at 1 block newly refused.'
+  reliability:
+    status: PASS
+    notes: 'No exception on 150k random blocks; unknown flags and unreadable scripts fail closed.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Guard coverage is split: a deny-list regex catches ${1} and ${!X} for sed, find, rm, curl, gh, git and tee, while the flag table does not, so one expansion form gets a different verdict per command.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Third strike on qa-execute-snippets.mjs: replace the per-spelling expansion reading with one shape rule for governed commands (no unquoted expansion, brace or glob where a flag may stand or in a writing operand) instead of patching a fifth spelling.'
+      refs: ['shared/resources/qa-execute-snippets.mjs', 'shared/resources/tests/qa-execute-snippets.test.mjs']
+  future:
+    - action: 'Phase 5 (ctx-wrap- temp-directory leak) was left out of this task; it recurred once in a fast-gate run. File it separately.'
+      refs: ['shared/resources/tests/context-pressure-statusline.test.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['Both high findings fixed by replacing the expansion reading, then re-reviewed']

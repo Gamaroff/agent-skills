@@ -101,6 +101,18 @@ _Track each QA review/fix cycle._
 - **Verification**: 274 of 274 engine tests; `CI=true npm run ci:fast` exit 0 on the second run; `bundle:check` 0 problems. The first run failed the tmp-leak ratchet on a new `ctx-wrap` prefix, which is the known intermittent leak (Phase 5, not in this change) and did not recur.
 - **Struck mechanism**: none. Two cycles in a row found the scanner reading a construct differently from the tool, so the next re-review should enumerate that class rather than re-read these two fixes.
 
+### QA Cycle 3
+
+- **Gate**: FAIL (80/100). Safety re-probe, unscoped; about 650 inputs including 5k sed scripts under real GNU sed and 150k random blocks. The cycle 2 fixes held and no sed bypass or exception was found. Two high findings, both reproduced by QA with a control (PR #864 comment).
+- **T289-CR3-1**: `shellWord` read only `${NAME…}` as an expansion, so `${1}` and `${!X}` stayed literal and a flag they carried was never seen: `set -- -o; sort ${1} out in` wrote a file.
+- **T289-CR3-2**: the brace check looked only for a flag, and `uniq`'s operand count was taken on the unexpanded words: `uniq {in,out}` wrote `out`.
+- **Third strike**: `qa-execute-snippets.mjs` carried a HIGH finding in gates 1, 2 and 3. Struck mechanism: the enumeration of shell expansion spellings in `shellWord` and the brace check. Move: **replace**. Every `${…}` is now an expansion whatever it holds (a rule, not a list), a command with `maxOperands` refuses an unquoted brace, glob or unnamed expansion in an operand, and a table-driven population test runs every explicit `SAFE_FLAGS` entry through one shared list of nine expansion forms (non-vacuity floor: 6 entries). Other findings in the file: none.
+- **Mutation proofs**: disabling the `${` rule turned the two gap rows and the population test red; disabling the operand-shape check turned three gap rows and the second population test red.
+- **Both directions**: must-now-catch rows added (5 gap, 2 population tests); controls stay runnable (`uniq in`, `uniq -c f`, `sort -u f`, `find docs/$X -name z` with `X` set). `tail ${!X} f` stays runnable by design: `tail` has `expansionOk`, since no `tail` flag writes or runs a program and `-f` is a hang the block timeout ends.
+- **Docs scan against develop**: 1 block newly refused (`tail -f`), 0 newly runnable.
+- **Probe (Step 3.5)**: the rule's one live statement is `shared/resources/qa-runnable-prose-detection.md` (updated); population 1.
+- **Verification**: 282 of 282 engine tests; `CI=true npm run ci:fast` exit 0; `bundle:check` 0 problems.
+
 ---
 
 ## Completion
