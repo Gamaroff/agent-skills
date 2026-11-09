@@ -3,7 +3,7 @@
 **Task**: `task.289.qa-snippet-runner-flag-level-allow-list.md`
 **Run Number**: 1
 **Started**: 2026-11-09 13:27
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -35,9 +35,9 @@ Replace the snippet runner's flag-level deny-list with a per-command flag and op
 | 2. review-task             | ✅ Done | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               | skipped: review 1 current | —                    | 2026-11-09T13:59Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | inline; fast gate green | —                    | 2026-11-09T13:59Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #864; no issue linked | —                    | 2026-11-09T14:08Z |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done (6 gates; gate 6 WAIVED by owner; PR review CONCERNS) | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
+| 7. finalise                | ✅ Done (accepted; dod.1) | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     |       | —                    |                 |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -149,10 +149,12 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
-**Branch**: {populated after Step 1}
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**Finished**: 2026-11-09T18:17Z
+**Final Status**: Completed
+**Branch**: feature/task.289.qa-snippet-runner-flag-level-allow-list
+**PR**: #864
+**QA Iterations**: 6 gates, 5 fix cycles (gate 6 WAIVED by the owner; two findings filed as task.290)
+**DoD Summary**: `task.289.dod.1.qa-snippet-runner-flag-level-allow-list.md` — ACCEPTED. CI reading 1: SUCCESS @ `3ee09a37c150`. CI reading 2: SUCCESS @ `0ea53bc951dc` over 6 checks.
+**Tracker debt**: none (no tracker issue linked)
+
+**Finalise deviation, recorded not hidden**: the DoD AC agent ran three times. The first pass failed five criteria because the records they name "in the QA report" lived only in this uncommitted report, and two criteria had been reworded with no approver. Commits `a383342e` and `3ee09a37` wrote the records into the committed QA report and restored the criteria wording; 13 initial mutation proofs were re-run in an isolated worktree for the same reason. Nothing in a committed DoD was edited.
