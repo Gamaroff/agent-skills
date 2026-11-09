@@ -1,0 +1,10 @@
+[
+  {
+    "argv": [
+      "--sink",
+      "shell-exec",
+      "--entry",
+      "shared/resources/qa-execute-snippets.mjs#isRunnableBlock"
+    ]
+  }
+]

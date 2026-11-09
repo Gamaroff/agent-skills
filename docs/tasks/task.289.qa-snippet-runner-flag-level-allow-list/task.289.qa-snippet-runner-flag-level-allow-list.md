@@ -5,17 +5,18 @@ type: task
 description: "Replace the snippet runner's flag-level deny-list (DENY_PATTERNS) with a per-command flag allow-list, closing seven known ways a runnable block writes and deciding the 17 doc blocks task 274 now refuses."
 tags: [qa-task, finalise, security]
 category: refactoring
-status: ready-for-review
+status: accepted
 pr_number: 864
 priority: Medium
 created: 2026-11-09
 updated: 2026-11-09
+completed_date: 2026-11-09
 estimated_effort_hours: 16
 ---
 
 # Task 289: QA snippet runner allows flags, not just commands
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.289.review.1.qa-snippet-runner-flag-level-allow-list.md` implemented 2026-11-09
 
 > Detailed implementation guide: [task.289.plan.qa-snippet-runner-flag-level-allow-list.md](task.289.plan.qa-snippet-runner-flag-level-allow-list.md)
@@ -322,12 +323,36 @@ A table of allowed flags per allowed command (`sed`, `find`, `sort`, and each ot
 
 The cycle 5 fix held. Cycle 6 found a `#` after an escaped space read as a comment (`echo a\ # ; touch out` classifies runnable and writes) and a RangeError on 20000-deep nesting. Both are identical on develop and neither is in code this task introduced. The owner accepted the branch as a strict improvement over develop and filed both as task.290, so the gate is waived by the owner, not passed.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.289.qa.6.qa-snippet-runner-flag-level-allow-list.md`
+**Gate File**: `task.289.gate.6.qa-snippet-runner-flag-level-allow-list.yml`
+**Gate Status**: ⚠️ WAIVED by the owner — "go with #1", 2026-11-09 (budget spent after 6 gates)
+**Quality Score**: 82/100
+**Open at the waiver**: two findings identical on `develop`, filed as [task.290](../task.290.qa-snippet-runner-comment-after-escaped-space/task.290.qa-snippet-runner-comment-after-escaped-space.md): a `#` after an escaped space read as a comment (high), and a `RangeError` on 20,000-deep nesting (medium).
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** all 11 met; the measured and recorded ones are in the QA report's "Closing Records" section
+✅ **Tests:** 300 engine tests, a `T289_GAPS` table and a `T289_CONTROLS` table, run per PR through `test:suite`
+✅ **PR Review:** PR #864; `task.289.pr-review.1` verdict CONCERNS, all findings resolved
+✅ **Documentation:** `qa-runnable-prose-detection.md` and `probe-boundary-rule.md` updated and bundled; CHANGELOG cites the task
+✅ **Security Review:** the `isRunnableBlock` boundary held — 31 executed, 0 reproduced, 0 escaped
+⚠️ **Compliance Review:** not applicable (internal QA tooling)
+✅ **CI:** all six checks `SUCCESS` on head `3ee09a37c150`
+
+**Detailed Verification Log:** See `task.289.dod.1.qa-snippet-runner-flag-level-allow-list.md` for complete verification evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-11-09
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
-
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-09 | 1.0     | Initial draft | create-task |
 | 2026-11-09 | 1.1     | Review 1 (8/10): table widened to all 31 SAFE_COMMANDS members and operands (uniq, file -C found writing); gap 7 repro and a control's class corrected; performance and mutation criteria given a bound and a location; deny-reason test sweep added | review-task |
 | 2026-11-09 |         | Status → ready-for-development | review-task |
@@ -344,7 +369,7 @@ The cycle 5 fix held. Cycle 6 found a `#` after an escaped space read as a comme
 | 2026-11-09 |         | QA gate FAIL (80/100) — 1 finding (budget spent: 5 gates, 4 fixes) | qa-task |
 | 2026-11-09 |         | QA findings fixed — 1 high finding, 5 iterations (masker made quote-aware; unreadable substitution refused for any word) | qa-fix |
 | 2026-11-09 |         | QA gate WAIVED by owner (82/100) — 2 pre-existing findings filed as task.290 | qa-task |
-
+| 2026-11-09 | 1.2 | DoD passed — accepted (PR #864) | finalise |
 <!-- change-log-end -->
 
 ---
