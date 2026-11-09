@@ -35,9 +35,9 @@ Add the missing routes to qa-task Steps 3b/3c (docs-only review, reproduced medi
 | 2. review-task             | ✅ Done | `task.273.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT 8/10; 0 critical, 4 important fixed; pre-pass inline (no independent reader) | —                    | 2026-11-09T00:00Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline; ci:fast green on 2nd run (1st: one guard test needed an allowlist entry) | —                    | 2026-11-09T00:00Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #861; no tracker issue to comment on | —                    | 2026-11-09T00:00Z |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.273.qa.{N}.*.md`; `task.273.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | Loop limit reached after 5 gates; T273-CR-4 (MEDIUM) open, see Issues Log | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.273.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.273.qa.{N}.*.md`; `task.273.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 6 gates, 5 fixes; loop limit reached at gate 5 (T273-CR-4), 2 cycles granted by the user, gate 6 PASS 100/100; 5c CONCERNS, both findings fixed | —                    | 2026-11-09T04:40Z |
+| 7. finalise                | ✅ Done | `task.273.dod.{N}.*.md`; task `status: accepted`                       | Run 1: 2 gaps; run 2 accepted (dod.2); CI reading 1 SUCCESS @ 6b7d9f65, reading 2 SUCCESS (tree-equivalent to cb2bf8dc6657) @ 308e23dc | —                    | 2026-11-09T08:08Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Report committed with this row | —                    | 2026-11-09T08:13Z |
 
 ---
 
@@ -68,6 +68,15 @@ Add the missing routes to qa-task Steps 3b/3c (docs-only review, reproduced medi
 - Test edit: `evals/shared/tests/finding-anchors-callers.test.mjs` gained a `CONSUMER_CITE_ONLY` entry for the new prompt (it names `code-review-prompt.md` and defines `file_line`/`line_text`, so the guard counted it as a consumer). First `ci:fast` run was red on exactly that test; second run green.
 - Behavioural fixtures (task § 8) and the performance figures are left to the QA report, as the task's criteria say.
 - Cycle 1 Change Log row written once: "Implemented — …" by develop.
+
+### Step 7 — 2026-11-09
+
+- Run 1 of `/finalise` found two gaps: the timing was measured on 30da588c, before three later code changes, and the Migration criterion needs a later docs-only task's QA report. The user approved re-scoping the Migration criterion and re-measuring.
+- Timing: a first attempt on the LAN server was discarded (every run exit 1 on three environment failures, load average 5 to 20). Five alternating runs on the laptop: median develop 193 s, head 167 s, every run exit 0, load recorded in QA report 6.
+- Re-scope: the task text names the approver (`criteria-drift.js` reads approval only as "approved by <name>"); the first wording ("with the owner's approval") failed the amendment rule and was reworded. The follow-up check is in gate 6 `recommendations.future`. No follow-up task was created; `/create-task` is the route if one is wanted.
+- Run 2 re-dispatched only the acceptance-criteria agent (scoped). The security, compliance and docs sections were carried from run 1: `finalise-delta docs-only` from 0eb2e651 to the head is `tree-equivalent`, so their inputs did not change.
+- CI reading 1: SUCCESS @ 6b7d9f65. `secret-scan` and `shellcheck` had failed on a 504 downloading their pinned tools and passed on a re-run of those two jobs. CI reading 2: SUCCESS (tree-equivalent to cb2bf8dc6657) @ 308e23dc; no checks run on a docs-only push.
+- No tracker issue (the task has no `github_issue` or `jira_key`), so there was no issue to close and no board card to move.
 
 ---
 
@@ -138,7 +147,7 @@ _Track each QA review/fix cycle._
 **Issues Found**: 2 — both LOW wording residues: unqualified "it will not gate" in the review prompt (T273-CR-5) and four report-template lines that ignore the run-level arg (T273-CR-6); cycle 5's T273-CR-4 is fixed
 **HIGH findings**: 0
 **MEDIUM findings**: 0
-**PR Review**: pending — Step 5c
+**PR Review**: CONCERNS — 2 findings (coverage ticks, `pr_number`), both doc-only and fixed in 0eb2e651
 **Loop exit**: Cosmetic-residue exit (route 2b) — `classifyLoopRoute` returned `cosmetic-residue` / `continue`: PASS gate at cycle 6 with HIGH 0 for cycles 5 and 6, all 2 open findings LOW and carried to `recommendations.future` by id
 **Action**: Proceeding to 5c (PR conformance review)
 
@@ -202,10 +211,10 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-11-09T08:13Z
+**Final Status**: Completed
 **Branch**: feature/task.273.qa-task-steps-state-the-routes-they-lack
 **PR**: https://github.com/Gamaroff/agent-skills/pull/861
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**QA Iterations**: 6 gates, 5 fixes (loop limit at gate 5, 2 cycles granted)
+**DoD Summary**: `task.273.dod.2.qa-task-steps-state-the-routes-they-lack.md` (accepted)
+**Tracker debt**: none (no tracker issue)
