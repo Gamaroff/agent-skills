@@ -221,7 +221,7 @@ None authored; the shared prompt-contract tests are run, not edited, unless a pi
 
 ### Migration
 
-- [ ] No QA report written after the change improvises a docs-only substitute (checked on the next docs-only task's QA report).
+- [x] ~~No QA report written after the change improvises a docs-only substitute (checked on the next docs-only task's QA report).~~ **Re-scoped on 2026-11-09 with the owner's approval, as a follow-up outside this task's acceptance.** It cannot be checked until a later docs-only task has been through QA, so it is no longer an acceptance criterion of this one. The check stays open and is carried in the gate's `recommendations.future`: when the next docs-only task's QA report is written, confirm it uses the docs-only route and does not improvise a substitute.
 
 ---
 

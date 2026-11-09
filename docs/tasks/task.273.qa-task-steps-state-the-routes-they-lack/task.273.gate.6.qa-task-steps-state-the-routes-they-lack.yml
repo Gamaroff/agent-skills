@@ -71,6 +71,8 @@ recommendations:
       refs: ['skills/qa-task/SKILL.md']
     - action: 'Cycle 1 CR-3 (low confidence): say that the docs-only route reads ci.docsOnly.patterns and ignores ci.docsOnly.enabled.'
       refs: ['shared/resources/qa-docs-only-review-prompt.md']
+    - action: 'Migration check, re-scoped out of task.273 acceptance by the owner on 2026-11-09: when the next docs-only task is QA-reviewed, confirm its QA report uses the docs-only route and improvises no substitute.'
+      refs: ['skills/qa-task/SKILL.md']
     - action: 'Add a guard test that every file mentioning code_review_blocking also mentions the reproduced-bug exception, so a rule restated in prose cannot drift again.'
       refs: ['evals/shared/tests']
 

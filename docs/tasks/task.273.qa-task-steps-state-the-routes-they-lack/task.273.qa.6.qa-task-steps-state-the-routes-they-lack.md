@@ -88,6 +88,22 @@ No mutation proof this cycle: the fix is prose.
 
 ---
 
+## Performance re-measure on the PR head (added during `/finalise` run 1, 2026-11-09)
+
+The cycle-1 timing was taken at 30da588c, before three later code changes, so `/finalise` asked for it again on the head. Five alternating `CI=true npm test` runs on the laptop, `develop` at 22f13cce against the PR head cb2bf8dc, every run exit 0:
+
+| Run | develop | head | load average at start (develop / head) |
+|---|---|---|---|
+| 1 | 164 s | 167 s | 0.49, 0.31, 0.39 / 5.11, 2.16, 1.06 |
+| 2 | 164 s | 167 s | 6.70, 3.50, 1.70 / 4.25, 3.57, 2.01 |
+| 3 | 193 s | 190 s | 4.74, 3.75, 2.31 / 7.39, 5.19, 3.10 |
+| 4 | 218 s | 207 s | 6.86, 5.26, 3.46 / 7.80, 6.05, 4.11 |
+| 5 | 211 s | 166 s | 6.91, 6.09, 4.47 / 5.07, 5.38, 4.49 |
+
+**Median: develop 193 s, head 167 s (head 13% faster).** The head is not slower than `develop`, so the 10% bound holds. The spread (164 to 218 s) comes from machine load rising during the session (the load figures above), not from the change; the first pair, at the lowest load, reads 164 s against 167 s (+1.8%). An earlier attempt on the LAN server was discarded: every run exited 1 on three environment failures (missing tools) and the server was at load 5 to 20, so its times (450 to 1600 s) were not comparable.
+
+---
+
 ## Test Artifacts
 
 ### Test Commands Executed
