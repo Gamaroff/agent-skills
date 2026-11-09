@@ -5,16 +5,19 @@ type: task
 description: "Add the missing routes to qa-task Steps 3b and 3c (docs-only review, reproduced medium finding, reviewer scratch directory, no mutation beside a running suite) and a vacuous-tool-criterion probe, so each QA cycle stops improvising them."
 tags: [qa-task, qa-story, review-task, create-task, observation]
 category: refactoring
-status: planned
+status: accepted
+pr_number: 861
+completed_date: 2026-11-09
 priority: Medium
 created: 2026-11-06
-updated: 2026-11-06
+updated: 2026-11-09
 estimated_effort_hours: 8
 ---
 
 # Task 273: qa-task steps state the routes they lack
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.273.review.1.qa-task-steps-state-the-routes-they-lack.md` implemented 2026-11-09
 
 ---
 
@@ -47,13 +50,13 @@ Five situations recur in QA cycles that `qa-task` Steps 3b and 3c do not cover, 
 
 ### Current Architecture
 
-Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
+Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`; line numbers re-measured on 2026-11-09 at `develop` `22f13cce` by review (they drift within days, so re-grep the heading text, not the number).
 
-- `skills/qa-task/SKILL.md:444` `### Step 3b: Diff Code Review` and `:880` `### Step 3c: Mutation-Proof Spot Check`; `skills/qa-story/SKILL.md:945` `#### Phase 1.6: Diff Code Review`.
-- `:888`: "Run the proofs after the Step 3b diff reviewer has returned, or in a scratch worktree" covers a live reviewer, not a backgrounded suite or fast gate (obs #64).
-- `:456` and `:678` use `mktemp` for QA's own files; nothing gives the reviewer its own directory (`grep -n "scratch\|mktemp" shared/resources/code-review-prompt.md` is the plan's first check; `(unverified)` here).
-- `grep -n -E "confidence: high" skills/qa-task/SKILL.md` shows the promotion rule; `:1423` states code-review findings do not enter `top_issues` by default.
-- `ci.docsOnly.patterns` is the config key obs #74 names `(unverified: the plan greps its definition)`.
+- `skills/qa-task/SKILL.md:444` `### Step 3b: Diff Code Review` and `:882` `### Step 3c: Mutation-Proof Spot Check`; `skills/qa-story/SKILL.md:945` `#### Phase 1.6: Diff Code Review`.
+- `:890`: "Run the proofs after the Step 3b diff reviewer has returned, or in a scratch worktree" covers a live reviewer, not a backgrounded suite or fast gate (obs #64).
+- `:456` and `:678` use `mktemp` for QA's own files; nothing gives the reviewer its own directory. Confirmed 2026-11-09: `grep -n "scratch\|mktemp" shared/resources/code-review-prompt.md` returns no hits.
+- `grep -n -E "confidence: high" skills/qa-task/SKILL.md` shows the promotion rule (`:867`); `:1430` states code-review findings do not enter `top_issues` by default.
+- `ci.docsOnly.patterns` is defined in `docs/reference/configuration.md:297`; default `["**/*.md", "docs/**"]`. A `skills-config.yaml` anywhere in the delta, a path in an unusual form and a submodule pointer are never docs, whatever the patterns say (same file, `:423`).
 - Obs #78: `.prettierignore` excludes the four types (stated by the observation).
 
 ### Target Architecture
@@ -66,7 +69,9 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 
 ### Important Clarifications
 
-- Task 267 also adds `review-task` checks; the obs #78 review-side check is added there by number, so Phase 3 lands after 267 or merges `develop`.
+- Task 267 also adds `review-task` checks; the obs #78 review-side check is added there by number. Task 267 is `accepted` and merged (checked 2026-11-09), so Phase 3 starts from `develop` and takes the next free check number after 267's.
+- **Docs-only test.** The docs-only branch reuses the `ci.docsOnly` rule as `docs/reference/configuration.md` states it, including its never-docs exceptions; it does not write a second glob matcher. With the key unset it applies the documented default patterns. A change set that touches `skills-config.yaml` is not docs-only.
+- **Tests that react to the edited prose and the new file.** Run, and edit only where a pinned phrase moves: `evals/shared/tests/mutation-proving-pointers-parity.test.mjs`, `qa-execution-step-parity.test.mjs`, `probes-executed-population.test.mjs`, `qa-re-review-scope-parity.test.mjs`, `qa-gate-preconditions-parity.test.mjs`, `shared/resources/tests/payload-heredoc-ratchet.test.mjs`, `tests/explore-prompts-no-write.test.js`, `skills/qa-task/tests/status-vocabulary.test.js`. The new `shared/resources/qa-docs-only-review-prompt.md` must be cited from `qa-task` and `qa-story` or `bundle --check` reports it `UNREACHED`; found by `git grep -l -E "qa-task/SKILL|qa-story/SKILL|code-review-prompt|mutation-proving" -- '*.test.*' 'tests/**' 'evals/**'`.
 - A reviewer's confidence is never edited (the existing rule).
 
 ---
@@ -107,8 +112,8 @@ None - prose only. A docs-only change set takes a new review branch instead of a
 - `shared/resources/mutation-proving.md`, `shared/resources/code-review-prompt.md`
 
 **Changes**:
-- [ ] The no-overlap rule and the re-run rule (obs #64).
-- [ ] The reviewer's own scratch directory and the calibration-first rule (obs #116).
+- [x] The no-overlap rule and the re-run rule (obs #64).
+- [x] The reviewer's own scratch directory and the calibration-first rule (obs #116). The reviewer creates its own `mktemp -d` (no new placeholder, so `review-code` and `review-pr`, which also dispatch this prompt, need no change).
 
 **Dependencies**: none.
 
@@ -123,8 +128,8 @@ None - prose only. A docs-only change set takes a new review branch instead of a
 - a new fixed prompt under `shared/resources/` for the docs-only branch
 
 **Changes**:
-- [ ] Docs-only branch and its prompt (obs #74).
-- [ ] Reproduced-finding route (obs #125).
+- [x] Docs-only branch and its prompt (obs #74).
+- [x] Reproduced-finding route (obs #125).
 
 **Dependencies**: none.
 
@@ -139,7 +144,7 @@ None - prose only. A docs-only change set takes a new review branch instead of a
 - `skills/review-task/SKILL.md`, `skills/create-task/SKILL.md`
 
 **Changes**:
-- [ ] The "tool X processes Y" probe and the review-time flag (obs #78).
+- [x] The "tool X processes Y" probe and the review-time flag (obs #78).
 
 **Dependencies**: task 267 merged, or a merge of `develop`.
 
@@ -150,7 +155,7 @@ None - prose only. A docs-only change set takes a new review branch instead of a
 **Risk Level**: Low
 
 **Changes**:
-- [ ] Fixtures with controls (§ 8); `command npm run bundle`, `command npm run bundle -- --check`.
+- [x] Fixtures with controls (§ 8); `command npm run bundle`, `command npm run bundle -- --check`.
 
 **Dependencies**: Phases 1 to 3.
 
@@ -184,11 +189,11 @@ None authored; the shared prompt-contract tests are run, not edited, unless a pi
 **Scope**: each route is taken on its shape and not on a control.
 
 **Actions**:
-- [ ] Step 3c: a cycle with a backgrounded suite waits or uses a worktree; **control**: a cycle with no background process mutates in place.
-- [ ] Docs-only: a change set of Markdown only takes the branch; a set with one code file does not.
-- [ ] Reproduced finding: a medium finding QA reproduces enters `top_issues[]` with origin and unchanged confidence; an unreproduced medium stays advisory.
-- [ ] Reviewer scratch: a reviewer told it may execute is given a `mktemp -d` and does not write outside it.
-- [ ] Criterion probe: `prettier --check` on a `.md` file is flagged; a check that processes the file is not.
+- [x] Step 3c: a cycle with a backgrounded suite waits or uses a worktree; **control**: a cycle with no background process mutates in place.
+- [x] Docs-only: a change set of Markdown only takes the branch; a set with one code file does not.
+- [x] Reproduced finding: a medium finding QA reproduces enters `top_issues[]` with origin and unchanged confidence; an unreproduced medium stays advisory.
+- [x] Reviewer scratch: a reviewer told it may execute is given a `mktemp -d` and does not write outside it.
+- [x] Criterion probe: `prettier --check` on a `.md` file is flagged; a check that processes the file is not.
 
 **Command**: a fresh session running the step on each fixture; results in the QA report.
 
@@ -202,22 +207,22 @@ None authored; the shared prompt-contract tests are run, not edited, unless a pi
 
 ### Functional
 
-- [ ] Each of the five routes is present in `qa-task` and `qa-story` (where it applies), citing its observation; the list is in the QA report.
-- [ ] Each fires on its fixture and not on its control, recorded per route in the QA report.
-- [ ] The docs-only prompt returns the same findings YAML shape as `code-review-prompt.md`, shown by a run recorded in the QA report.
+- [x] Each of the five routes is present in `qa-task` and `qa-story` (where it applies), citing its observation; the list is in the QA report.
+- [x] Each fires on its fixture and not on its control, recorded per route in the QA report.
+- [x] The docs-only prompt returns the same findings YAML shape as `code-review-prompt.md`, shown by a run recorded in the QA report.
 
 ### Performance
 
-- [ ] `CI=true command npm test` wall time is within 10% of `develop`, as the median of five alternating runs with `uptime` beside each, recorded in the QA report.
+- [x] `CI=true command npm test` wall time is within 10% of `develop`, as the median of five alternating runs with `uptime` beside each, taken on the PR's head commit and recorded in the QA report.
 
 ### Code Quality
 
-- [ ] `command npm run bundle -- --check` reports 0 problems; `CI=true command npm test` passes.
-- [ ] `python skills/create-skill/scripts/quick_validate.py` passes for qa-task, qa-story, review-task and create-task.
+- [x] `command npm run bundle -- --check` reports 0 problems; `CI=true command npm test` passes.
+- [x] `python skills/create-skill/scripts/quick_validate.py` passes for qa-task, qa-story, review-task and create-task.
 
 ### Migration
 
-- [ ] No QA report written after the change improvises a docs-only substitute (checked on the next docs-only task's QA report).
+- [x] ~~No QA report written after the change improvises a docs-only substitute (checked on the next docs-only task's QA report).~~ **Re-scoped on 2026-11-09, approved by Lorien Gamaroff (task owner), as a follow-up outside this task's acceptance.** It cannot be checked until a later docs-only task has been through QA, so it is no longer an acceptance criterion of this one. The check stays open and is carried in the gate's `recommendations.future`: when the next docs-only task's QA report is written, confirm it uses the docs-only route and does not improvise a substitute.
 
 ---
 
@@ -290,12 +295,71 @@ None identified.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-09
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.273.qa.6.qa-task-steps-state-the-routes-they-lack.md](./task.273.qa.6.qa-task-steps-state-the-routes-they-lack.md)
+- **Gate File**: [task.273.gate.6.qa-task-steps-state-the-routes-they-lack.yml](./task.273.gate.6.qa-task-steps-state-the-routes-they-lack.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 3
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+Every MEDIUM finding from cycles 1 to 5 is fixed; the last, the gate-decision notes, was fixed after two extra cycles were granted. Cycle 6 passes with two open LOW wording residues (T273-CR-5, T273-CR-6) in the review prompt and the report templates. Three advisory review findings stay in the gate's future recommendations.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+Run 1 of `/finalise` found two gaps; both are closed in run 2:
+
+✅ **Timing (§ 9):** five alternating `CI=true npm test` runs on the head, every run exit 0, load average recorded beside each: median develop 193 s, head 167 s (recorded in QA report 6).
+✅ **Migration (§ 9):** re-scoped to a follow-up with the owner's recorded approval; the follow-up check is carried in gate 6 `recommendations.future`.
+
+All Definition of Done criteria are verified:
+
+✅ **Acceptance Criteria:** 7 of 7 (#1 to #3 carried from run 1; #4 and #7 closed above; #5 and #6 graded from CI on the head)
+✅ **QA:** gate 6 PASS (100/100); two LOW wording residues carried to `recommendations.future`
+✅ **PR:** #861, PR review report CONCERNS with both findings fixed; no review required by the host
+✅ **Security / Compliance:** PASS / not applicable (prose-only change)
+✅ **Documentation:** CHANGELOG cites (task 273); skill docs and bundled copies updated
+✅ **CI:** `SUCCESS` on 6b7d9f65; secret-scan and shellcheck were re-run once after a 504 while downloading their pinned tools
+
+**Task marked as ACCEPTED on:** 2026-11-09
+
+**Detailed Verification Log:** See `task.273.dod.2.qa-task-steps-state-the-routes-they-lack.md` (run 1: `task.273.dod.1.…`).
+
 <!-- change-log-start -->
 ## Change Log
 
 | Date       | Version | Description                                                     | Author      |
 | ---------- | ------- | --------------------------------------------------------------- | ----------- |
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #64, #74, #78, #116, #125 | create-task |
+| 2026-11-09 | 1.1     | Review passed (8/10) — re-measured anchors, resolved two `(unverified)` claims, added docs-only fallback, pinned-test list and Phase 3 dependency note | review-task |
+| 2026-11-09 |         | Status → ready-for-development                                  | review-task |
+| 2026-11-09 |         | Implemented — 4 phases; 7 sources, 1 new prompt, 1 test allowlist entry, bundled copies; ci:fast green | develop |
+| 2026-11-09 |         | QA gate CONCERNS (90/100) — 1 finding                           | qa-task     |
+| 2026-11-09 |         | QA findings fixed — CHANGELOG entry added, 1 iteration          | qa-fix      |
+| 2026-11-09 |         | QA gate CONCERNS (90/100) — 1 finding (cycle 2 refute pass)     | qa-task     |
+| 2026-11-09 |         | QA findings fixed — gating-rule restatements aligned with 5d, 2 iterations | qa-fix      |
+| 2026-11-09 |         | QA gate CONCERNS (90/100) — 1 finding (cycle 3)                 | qa-task     |
+| 2026-11-09 |         | QA findings fixed — remaining gating-rule restatements qualified, 3 iterations | qa-fix      |
+| 2026-11-09 |         | QA gate CONCERNS (90/100) — 1 finding (cycle 4)                 | qa-task     |
+| 2026-11-09 |         | QA findings fixed — Skill-arg paragraphs, closing sentences and matrix note, 4 iterations | qa-fix      |
+| 2026-11-09 |         | QA gate CONCERNS (90/100) — 1 finding (cycle 5, loop limit)     | qa-task     |
+| 2026-11-09 |         | QA findings fixed — gate-decision notes rewritten, 5 iterations | qa-fix      |
+| 2026-11-09 |         | QA gate PASS (100/100) — 2 LOW findings open (cycle 6)          | qa-task     |
+| 2026-11-09 |         | DoD incomplete — 2 gaps identified                              | finalise    |
+| 2026-11-09 | 1.2     | DoD passed — accepted (PR #861)                                 | finalise    |
 <!-- change-log-end -->
 
 ---
@@ -303,16 +367,16 @@ None identified.
 ## Progress Tracking
 
 ### Phase 1: Step 3c and the reviewer
-- [ ] Overlap and scratch rules
+- [x] Overlap and scratch rules
 
 ### Phase 2: The two Step 3b routes
-- [ ] Docs-only branch, reproduced route
+- [x] Docs-only branch, reproduced route
 
 ### Phase 3: The vacuous criterion
-- [ ] Probe and review flag
+- [x] Probe and review flag
 
 ### Phase 4: Evidence, bundle and sweep
-- [ ] Fixtures run, bundle clean
+- [x] Fixtures run, bundle clean
 
 ---
 
@@ -338,4 +402,4 @@ None.
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review

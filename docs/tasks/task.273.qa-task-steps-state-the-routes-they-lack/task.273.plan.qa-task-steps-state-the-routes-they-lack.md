@@ -17,7 +17,7 @@ Prose edits to `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md` and `shared
 
 ### Phase 1
 
-- `qa-task/SKILL.md:888` (Step 3c): extend the sentence: no other process may read the tree during a mutation, including a backgrounded suite or fast gate; wait, or `git worktree add --detach "$(mktemp -d)" HEAD`; a suite result whose run overlapped a mutation window is re-run before it is recorded. Mirror in `shared/resources/mutation-proving.md` rule list.
+- `qa-task/SKILL.md:890` (Step 3c; re-grep "Run the proofs after the Step 3b diff reviewer"): extend the sentence: no other process may read the tree during a mutation, including a backgrounded suite or fast gate; wait, or `git worktree add --detach "$(mktemp -d)" HEAD`; a suite result whose run overlapped a mutation window is re-run before it is recorded. Mirror in `shared/resources/mutation-proving.md` rule list.
 - `shared/resources/code-review-prompt.md`: add "if you execute anything, do it in the directory `{REVIEW_SCRATCH}` and never write outside it". Step 3b creates it with `mktemp -d` beside the existing `mktemp` calls (`:456`). Add: a probe the caller runs while a reviewer is live starts with a known-good calibration case.
 
 ### Phase 2
@@ -36,7 +36,7 @@ Fixtures and controls in the QA scratch directory only. `command npm run bundle`
 
 ## Key Patterns and References
 
-- `qa-task/SKILL.md:444` (Step 3b), `:880` (Step 3c).
+- `qa-task/SKILL.md:444` (Step 3b), `:882` (Step 3c).
 - Control design: `create-task` § 8 (obs #176).
 
 ## Testing Approach

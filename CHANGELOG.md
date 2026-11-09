@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`qa-task` and `qa-story` state five routes they lacked** (task 273). No mutation proof runs
+  beside a backgrounded suite or fast gate, and a suite result that overlapped a mutation window
+  is re-run before it is recorded (`mutation-proving.md` rule 7). A reviewer that executes
+  anything does so in its own `mktemp -d`, and a caller's probe beside a live reviewer starts with
+  a known-good calibration case. A change set whose every path is `ci.docsOnly` documentation
+  takes a claim-check review (`qa-docs-only-review-prompt.md`, the same `code_review:` findings
+  block) instead of improvising one. A finding QA reproduces by execution, with a passing control,
+  is QA's own finding whatever the reviewer's confidence. A "tool X passes on files Y" criterion
+  needs one probe that X processes Y, and `review-task` check 30 and `create-task` flag one whose
+  tool the ignore file excludes.
 - **`finalise` names its preconditions and routes a bug finalised after its merge** (task 272).
   A Step 0b preflight (`finalise-preconditions.js`) lists every missing input before any agent
   runs: the QA gate or a `WAIVED` record with an approver, a pr-review or review decision, and the

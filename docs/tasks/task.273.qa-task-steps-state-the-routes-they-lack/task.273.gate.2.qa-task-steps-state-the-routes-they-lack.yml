@@ -1,0 +1,70 @@
+schema: 2
+task: 'task.273.qa-task-steps-state-the-routes-they-lack'
+task_title: 'qa-task steps state the routes they lack'
+gate: CONCERNS
+status_reason: 'The cycle-1 CHANGELOG finding is fixed. The cycle-2 refute pass found that the new reproduced-finding route (5d) contradicts four unchanged restatements that still say only an opted-in high-confidence bug gates, and it leaves the code_review_blocking false escape hatch undecided.'
+reviewer: 'QA Engineer'
+head: 'a51684371aea75f6312d04eba07e5b98c58bea44'
+updated: '2026-11-09T04:04:33Z'
+
+top_issues:
+  - id: 'T273-CR-1'
+    severity: medium
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'Step 5d and code-review-prompt.md QA item 4 let a finding QA reproduces enter top_issues[] at any reviewer confidence and whether or not the doc opted in, but four unchanged restatements still say only a high-confidence bug on an opted-in doc gates: skills/qa-task/SKILL.md lines 893 and 1458, skills/qa-story/SKILL.md lines 1392 and 2176. code-review-prompt.md line 213 also says an explicit code_review_blocking false leaves the gate untouched, and nothing says whether 5d overrides it.'
+    suggested_action: 'Add an "except a finding QA reproduces (5d)" clause to the four restatements, and decide in one place (item 4 and line 213) that the false escape hatch governs the reviewer claims while a QA reproduction is a measurement that still gates. Then re-derive the population of restatements with git grep and update every hit.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    notes: 'No predicate-shaped function is added. boundary: false. The criteria classifier found no boundary signal.'
+  performance:
+    status: PASS
+    notes: 'Cycle 1 measured the full suite: develop median 162 s, head median 163 s. Cycle 2 added only a CHANGELOG entry and QA artifacts.'
+  reliability:
+    status: PASS
+    notes: 'No new failure path.'
+  maintainability:
+    status: PASS
+    notes: 'The restated-rule drift is carried as T273-CR-1, not as an NFR failure. See recommendations.future for three advisory findings from cycle 1.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Resolve T273-CR-1: align the four restatements with 5d and state which rule wins under an explicit code_review_blocking false.'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md', 'shared/resources/code-review-prompt.md']
+  future:
+    - action: 'Cycle 1 CR-1 (medium confidence, not reproducible by execution): add the unbound-read category to the docs-only claim-check prompt.'
+      refs: ['shared/resources/qa-docs-only-review-prompt.md']
+    - action: 'Cycle 1 CR-2 (low): state which file list decides the docs-only route on cycle 3 and later.'
+      refs: ['skills/qa-task/SKILL.md']
+    - action: 'Cycle 1 CR-3 (low confidence): say that the docs-only route reads ci.docsOnly.patterns and ignores ci.docsOnly.enabled.'
+      refs: ['shared/resources/qa-docs-only-review-prompt.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions:
+    - 'T273-CR-1 is resolved.'

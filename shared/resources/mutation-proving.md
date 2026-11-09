@@ -74,7 +74,7 @@ For each invariant a test claims to hold:
 
 ## Instrument rules
 
-Six rules, each from a run that produced a confident wrong number. They are about
+Seven rules, each from a run that produced a confident wrong number. They are about
 the run, not the test: a run that breaks one of these reports on itself, and its
 output is shaped exactly like a reading about the code.
 
@@ -118,6 +118,16 @@ output is shaped exactly like a reading about the code.
    implementation exports the empty string, which is what refusal also looks like.
    When a test's name contains *refused*, *rejected*, *halts* or *non-zero*, its
    assertion must read the status, not the falsiness of a payload.
+7. **No other process reads the tree during a mutation.** A mutation makes the
+   tree lie while it is applied, and anything reading it in that window measures
+   the lie: a dispatched reviewer, and equally a backgrounded suite or fast gate
+   (`ci:fast`, `npm test`). Wait until nothing else is running over the tree, or
+   mutate in a scratch worktree (`git worktree add --detach "$(mktemp -d)" HEAD`).
+   A suite result whose run overlapped a mutation window is **re-run before it is
+   recorded**: on task.189 cycle 6 a suite run over a mutating tree reported one
+   failure at 53012 ms against a 20000 ms budget, and the same test passed alone in
+   3145 ms (obs #64). The overlap is invisible in the output; a red that vanishes
+   when run alone is the only sign.
 
 And two rules about the check itself rather than the run.
 

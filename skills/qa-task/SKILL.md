@@ -47,7 +47,7 @@ Skill(qa-task, args="traceability_matrix=<path> code_review_blocking=true")
 ```
 
 - `traceability_matrix=<path>` — a pre-built traceability matrix (see Step 5 / traceability handling); absent → internal mapping.
-- `code_review_blocking=true` — run-level override. Set `CODE_REVIEW_BLOCKING_ARG` from this token (default empty when absent). It feeds the canonical resolution in **Step 3b step 6 (Gate mapping)** so high-confidence code-review bugs gate the build (and thus get fixed in the qa-fix loop) without needing per-task frontmatter. A task still opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch). Absent for standalone runs → code review stays advisory unless the task opts in via frontmatter.
+- `code_review_blocking=true` — run-level override. Set `CODE_REVIEW_BLOCKING_ARG` from this token (default empty when absent). It feeds the canonical resolution in **Step 3b step 6 (Gate mapping)** so high-confidence code-review bugs gate the build (and thus get fixed in the qa-fix loop) without needing per-task frontmatter. A task still opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch). Absent for standalone runs → code review stays advisory unless the task opts in via frontmatter, except a bug QA reproduces by execution (step 5d).
 
 ## When to Use This Skill
 
@@ -443,7 +443,7 @@ For each phase in the implementation plan:
 
 ### Step 3b: Diff Code Review
 
-Adversarially review the change set's **diff** for **correctness bugs** (logic errors, null/async/race, API misuse, broken invariants) and **cleanups** (reuse of existing utilities, simplification, efficiency) — the lens the document-anchored checks above do not provide. Governed by the **Adaptive Review Strategy**: run a single light pass in lite/small/re-review; a full pass otherwise; skip entirely when the diff touches no reviewable code. **One exception, and it overrides the strategy: cycle 2 is always a full refute pass** (step 1 below). A re-review that gets shallower each cycle is how a loop runs five times and learns nothing after the first.
+Adversarially review the change set's **diff** for **correctness bugs** (logic errors, null/async/race, API misuse, broken invariants) and **cleanups** (reuse of existing utilities, simplification, efficiency) — the lens the document-anchored checks above do not provide. Governed by the **Adaptive Review Strategy**: run a single light pass in lite/small/re-review; a full pass otherwise; skip entirely when the diff touches no reviewable code (a documentation-only diff is not skipped: it takes the claim-check route in step 2). **One exception, and it overrides the strategy: cycle 2 is always a full refute pass** (step 1 below). A re-review that gets shallower each cycle is how a loop runs five times and learns nothing after the first.
 
 1. **Scope the diff** to this cycle's changes and write it to a patch file (keeps diff bytes out of main context). First review → the whole branch diff. **Cycle 2 (exactly one prior gate) → the whole branch diff again, reviewed to refute** (see the refute directive under step 2). Cycle 3+ → files changed since the commit the last gate judged — its `head:`, never its `updated:` (task.135):
 
@@ -606,7 +606,7 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
    change with what cycle 1 learned. On one observed task, four narrowed re-reviews walked past a
    defect that had been present in the *original* commit and surfaced only at cycle 5.
 
-2. **Dispatch a read-only Explore subagent** with the prompt from `references/code-review-prompt.md` (the single source of truth — pass it verbatim), substituting `<DIFF_FILE>` and `<WORKING_DIR>` (repo root). It returns a `code_review:` YAML findings block. Never read the raw diff into main context. In lite/direct-tools mode use one subagent; for large/high-risk tasks the Adaptive Review Strategy may run it alongside the other parallel agents.
+2. **Choose the route, then dispatch a read-only Explore subagent.** **Docs-only change set → the claim-check prompt.** When every path in `git diff --name-only "$BASE...HEAD"` is documentation as `ci.docsOnly` defines it (every path matches `ci.docsOnly.patterns`, default `**/*.md` and `docs/**`; none is a path that rule never treats as docs, such as a `skills-config.yaml` in the delta — the rule and its exceptions are in `docs/reference/configuration.md`, so do not write a second matcher), dispatch the prompt from `references/qa-docs-only-review-prompt.md` instead: it checks each changed claim against the source it names and returns the same `code_review:` block. One code path in the set takes the code route below for the whole diff. Record the route in Review Methodology as `Diff review: docs-only claim check (every changed path matches ci.docsOnly.patterns)` or `Diff review: code review`; each cycle takes the route its own change set gives (obs #74). **Code route:** dispatch with the prompt from `references/code-review-prompt.md` (the single source of truth — pass it verbatim), substituting `<DIFF_FILE>` and `<WORKING_DIR>` (repo root). It returns a `code_review:` YAML findings block. Never read the raw diff into main context. In lite/direct-tools mode use one subagent; for large/high-risk tasks the Adaptive Review Strategy may run it alongside the other parallel agents.
 
    **Mark the wait on the pipeline lock** beside this dispatch — `bash .agents/skills/qa-task/references/set-waiting-on.sh "5a qa-task code review"` — and clear it (`… set-waiting-on.sh --clear`) as the first action after the `code_review:` block is read (source: `references/set-waiting-on.sh`; task.124 QA cycle 1, CR-3). Inside a `/develop-*` pipeline this skill runs as Step 5a, and a turn yielded while the reviewer runs is a wait the Stop hook would otherwise re-prompt as a stall; standalone there is no lock and both calls are silent no-ops.
 
@@ -851,6 +851,21 @@ JSON
    mutated line with the file tool and edit it back; `cmp <snapshot> <file>` must then print nothing
    (`references/file-write-rules.md#mutation-revert`).
 
+5d. **A reproduced finding is QA's own finding, whatever the reviewer's confidence** (obs #125).
+   When step 3's boundary rule has QA **reproduce a `category: bug` finding by execution** (run the
+   reported input, see the reported misbehaviour), run a **control**: an input the finding says is
+   handled correctly, or the same input against the base per 5b, which must **not** misbehave. A
+   finding that reproduces, passes its control and is not `pre-existing` per 5b enters `top_issues[]`
+   as a QA finding even when the reviewer rated it `confidence: medium` or `low`, and whether or not
+   the doc opted in (the opt-in below gates the reviewer's *claim*; a reproduction is a measurement).
+   **An explicit `code_review_blocking: false` still wins** (the escape hatch of item 6): the
+   reproduction is then recorded in `## Code Review` and the gate is untouched.
+   The reviewer's `confidence` is recorded **unchanged**, never edited to fit; the reproduction command,
+   its output and the control go in the QA report's `## Code Review` section; and the entry names its
+   origin (`origin: code-review, reproduced by QA`). Severity then follows the gate's deterministic
+   rules. A medium-confidence finding QA did **not** reproduce stays advisory. Task.242 cycle 7
+   reproduced a medium finding by execution and this skill had no route for it.
+
 6. **Gate mapping — resolve blocking, then map:** apply the **canonical resolution** from the **Opt-in to blocking** section of `references/code-review-prompt.md`. It combines a run-level override (from Skill `args`) with the task frontmatter flag; an explicit per-doc `false` is the escape hatch:
 
    ```bash
@@ -864,7 +879,7 @@ JSON
    else CR_BLOCKING=false; fi
    ```
 
-   `$CODE_REVIEW_BLOCKING_ARG` comes from the `code_review_blocking=` token in Skill `args` (see **Pipeline Skill args**). When `CR_BLOCKING=true`, append each finding that is `category: bug` AND `confidence: high` to the gate `top_issues[]` as `{ id, severity, file, finding, suggested_action, suggested_owner: dev }` — `file` is the path from the finding's own `file:line`, which every code-review finding already carries (Step 10's deterministic rules then decide). **A finding whose `anchor_check` is `no-such-file`, `out-of-range`, `text-mismatch` or `unparseable` still maps when it qualifies** — a high-confidence bug is still a bug — but its `finding` gains `(location unverified: {file_line})`, and its `file` is `null` when the verdict is `no-such-file` or `unparseable` (neither names a usable path), so `/qa-fix` is never sent to a line as though it were verified. Otherwise — resolved advisory, or every cleanup or non-high-confidence finding — the gate is **unaffected**.
+   `$CODE_REVIEW_BLOCKING_ARG` comes from the `code_review_blocking=` token in Skill `args` (see **Pipeline Skill args**). When `CR_BLOCKING=true`, append each finding that is `category: bug` AND `confidence: high` to the gate `top_issues[]` as `{ id, severity, file, finding, suggested_action, suggested_owner: dev }` — `file` is the path from the finding's own `file:line`, which every code-review finding already carries (Step 10's deterministic rules then decide). **A finding whose `anchor_check` is `no-such-file`, `out-of-range`, `text-mismatch` or `unparseable` still maps when it qualifies** — a high-confidence bug is still a bug — but its `finding` gains `(location unverified: {file_line})`, and its `file` is `null` when the verdict is `no-such-file` or `unparseable` (neither names a usable path), so `/qa-fix` is never sent to a line as though it were verified. Otherwise — resolved advisory, or every cleanup or non-high-confidence finding — the gate is **unaffected**, except for a bug QA reproduces by execution (5d; a `false` resolution still wins).
 
    **Re-rating a promoted finding.** QA may lower a promoted finding's severity only with a measured
    plausibility check: a corpus count, and whether any writer or template in the repository can
@@ -877,7 +892,7 @@ JSON
 **Post-condition — the findings block is in hand.** This step ends when the dispatched reviewer's `code_review:` block is in hand and recorded. A dispatched review that has not returned is **outstanding**, and the pass is not complete: the gate step refuses to write a gate and the PR-comment step refuses to publish one while a review is outstanding. Waiting is bounded by the wall-clock budget in `references/develop-pipeline-autonomous-defaults.md` §Subagents; a reviewer past its budget is recorded as `killed at N minutes` (never `stalled`) and the pass is performed inline per that table, with the independence loss recorded. A reviewer that is **unavailable** (no subagent dispatch in this session) or **failed** (returned nothing usable) is handled by the same table — and **output-file size is not a liveness signal**: a small or stale output file says nothing about whether the reviewer is working. The reason this is written down: task.106's gate 1 (`PASS` 95) was written and posted while its diff review was still running; the review returned a high and a medium minutes later (obs #56).
 
 
-This keeps the QA→qa-fix loop safe: only a high-confidence correctness bug triggers a fix cycle; cleanups and uncertain findings stay advisory. Under the develop-task pipeline (which sets the run-level override) this *is* the code-review-and-fix loop; standalone, behaviour is unchanged unless the task opts in via frontmatter.
+This keeps the QA→qa-fix loop safe: only a high-confidence correctness bug, or a bug QA reproduces itself (5d), triggers a fix cycle; cleanups and uncertain findings stay advisory. Under the develop-task pipeline (which sets the run-level override) this *is* the code-review-and-fix loop; standalone, behaviour is unchanged unless the task opts in via frontmatter, apart from a bug QA reproduces itself (5d).
 
 ### Step 3c: Mutation-Proof Spot Check
 
@@ -886,10 +901,15 @@ as coverage for a defect this cycle fixed, **revert the behaviour it names and
 confirm that test goes red** — full procedure, the outcomes table, and the shapes
 vacuity takes: [`references/mutation-proving.md`](references/mutation-proving.md).
 
-**Mutate only a tree no other agent is reading.** A mutation makes the tree lie while it is applied.
-Run the proofs after the Step 3b diff reviewer has returned, or in a scratch worktree
-(`git worktree add --detach "$SCRATCH" HEAD`), never in the working tree a dispatched reviewer is
-still reading (obs #266).
+**Mutate only a tree no other process is reading.** A mutation makes the tree lie while it is applied.
+That covers a dispatched reviewer and also a backgrounded suite or fast gate (`ci:fast`, `npm test`):
+a process that reads the tree during a mutation window measures the mutated tree. Run the proofs after
+the Step 3b diff reviewer has returned and with nothing else running over the tree, or in a scratch
+worktree (`git worktree add --detach "$(mktemp -d)" HEAD`), never in the working tree something is
+still reading (obs #266, #64). **A suite result whose run overlapped a mutation window is re-run
+before it is recorded.** Without that re-run a load-sensitive test fails for the overlap and the
+failure is recorded as the suite's (task.189 cycle 6: `tests/bundle-missing-source.test.js` took
+53012 ms against a 20000 ms budget and passed alone in 3145 ms).
 
 **A green suite is also evidence about the platform it ran on, and only that platform.** When the change set passes an environment-derived value (`os.tmpdir()`, `$TMPDIR`, `$HOME`) to a consumer that validates it, the platform-variance check in the diff-review step applies here too: run the affected tests once under the other value (`TMPDIR=/tmp node --test …`) before crediting them as coverage. A suite that is green on macOS and red on Linux CI is not a flake; it is the fixture path failing a containment check it never met locally (obs #17).
 
@@ -1067,6 +1087,16 @@ Performance and structural criteria ("defined once", "one pass", "offline") are 
 because no test carries them (obs #210). A behaviour criterion whose only evidence is a hand run,
 with no committed per-PR test, is a **MEDIUM** finding in `top_issues[]`, so it enters the fix loop
 rather than halting at finalise (obs #224).
+
+**A "tool X passes on files Y" criterion is confirmed by one probe that X processes Y, before PASS is
+recorded** (obs #78). A formatter, linter or checker skips what its ignore file excludes and exits 0
+having read nothing, so "passes" is true of the empty set. Run one probe: a deliberately malformed copy
+of one file in Y (the tool must fail on it), or the tool's own count of files it checked (it must be
+non-zero and include Y). Record the probe beside the criterion. If X reads none of Y, mark the criterion
+**unverified** and enter a **MEDIUM** `top_issues[]` entry naming the ignore file and a check that
+reaches the files (`doc-links.js` for links, `markdown-link-check`, a schema validator). Task.198's
+SC-5, `prettier --check` on Markdown, passed in three QA cycles while `.prettierignore` excludes `*.md`,
+`*.yml`, `*.yaml` and `*.json`.
 
 **A criterion over a set is checked member by member**, by the quantifier rule: rule 6 of
 `finalise-dod-ac-prompt.md` Step 3, in the `finalise` skill, which owns its wording. Each member it
@@ -1427,7 +1457,7 @@ deployment_readiness:
 
 **WAIVED** only when `waiver.active: true` with documented reason and approver.
 
-> **Code-review findings (Step 3b):** by default these do NOT enter `top_issues` and do NOT affect the gate. Only when the task doc opts in via `code_review_blocking: true` in its frontmatter are `category: bug` + `confidence: high` findings appended to `top_issues[]` — at which point rules 1–2 above apply unchanged. Cleanups and non-high-confidence findings are always advisory.
+> **Code-review findings (Step 3b):** a finding the reviewer merely claims does NOT enter `top_issues` and does NOT affect the gate by default. Only when blocking resolves to true (the run-level `code_review_blocking=true` arg or `code_review_blocking: true` in the task's frontmatter) are `category: bug` + `confidence: high` findings appended to `top_issues[]` — at which point rules 1–2 above apply unchanged. Cleanups and non-high-confidence findings are always advisory. One exception covers this whole note: a `category: bug` finding QA reproduces by execution (step 5d) enters `top_issues[]` at any confidence with no opt-in, unless the task sets `code_review_blocking: false`.
 
 ### Step 11: Write QA Report
 
@@ -1589,7 +1619,7 @@ Re-enumerated {the boundary's inputs, named} and tested each against the current
 
 ## Code Review
 
-{From Step 3b — advisory unless the doc opted in via `code_review_blocking: true`. Omit the section if the diff had no reviewable code.}
+{From Step 3b — advisory unless the doc opted in via `code_review_blocking: true` or QA reproduced the finding (5d). Omit the section if the diff had no reviewable code and no documentation claims to check; a docs-only change set takes the claim-check route, so its section is present.}
 
 **Correctness bugs ({count}):**
 {for each bug finding:}
@@ -1903,7 +1933,7 @@ cat > "$BODY_FILE" <<'EOF'
 
 ### Code Review Findings
 
-{Top correctness bugs + notable cleanups from Step 3b, each `file:line — finding`. 'None identified' if empty. Advisory unless the doc opted in via code_review_blocking.}
+{Top correctness bugs + notable cleanups from Step 3b, each `file:line — finding`. 'None identified' if empty. Advisory unless the doc opted in via code_review_blocking or QA reproduced the finding (5d).}
 
 ### Critical Issues
 
