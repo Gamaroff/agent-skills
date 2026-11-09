@@ -4148,6 +4148,27 @@ const T289_GAPS = {
     "X=$(echo a) date -s 2020-01-01",
     /^flag-not-allowed: date/,
   ],
+  // QA cycle 5: a quoted paren inside a substitution must not end it early.
+  "touch after a substitution holding a quoted close paren": [
+    "X=$(echo ')') touch out",
+    /^unrecognised-command: touch/,
+  ],
+  "python3 after a substitution holding a quoted open paren": [
+    "X=$(echo '(') python3 x.py",
+    /^unrecognised-command: python3/,
+  ],
+  "cp after a substitution holding a double-quoted close paren": [
+    'X=$(echo ")") cp in out',
+    /^unrecognised-command: cp/,
+  ],
+  "rm after a substitution holding an escaped close paren": [
+    "X=$(echo \\)) rm in",
+    /^unrecognised-command: rm/,
+  ],
+  "an unreadable substitution is refused whatever follows it": [
+    'X=$(echo "a) touch out',
+    /^unrecognised-command/,
+  ],
   "an unrecognised command after a prefix assignment holding a substitution": [
     "X=$(echo a) python3 x.py",
     /^unrecognised-command: python3/,
@@ -4195,6 +4216,12 @@ const T289_CONTROLS = {
   "a plain sed comment": "sed '# a comment' f",
   "uniq with one operand and a process substitution before a read":
     "diff <(sort a) <(sort b)",
+  "a quoted paren inside a substitution before a harmless governed command":
+    "X=$(echo ')') uniq in.txt",
+  "a nested quoted substitution before a harmless read":
+    "x=$(echo \"$(echo ')')\") ; sort -u f",
+  "a comment holding a quote and a paren beside a substitution":
+    "# it's (fine)\nx=$(sort -u f)",
   "a prefix assignment holding a substitution before a harmless governed command":
     "X=$(echo a) uniq in.txt",
   "tail with an expansion is a hang at worst, by design": "tail $(echo -f) x",

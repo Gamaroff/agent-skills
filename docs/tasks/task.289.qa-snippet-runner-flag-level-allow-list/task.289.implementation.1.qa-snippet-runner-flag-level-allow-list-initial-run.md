@@ -125,6 +125,17 @@ _Track each QA review/fix cycle._
 - **Probe (Step 3.5)**: the rule's one live statement is `shared/resources/qa-runnable-prose-detection.md` (updated). Population: 1.
 - **Verification**: 292 of 292 engine tests; `CI=true npm run ci:fast` exit 0; `bundle:check` 0 problems. Timing was not re-measured: the masked pass runs only for a block that holds a substitution.
 
+### QA Cycle 5
+
+- **Gate**: FAIL (80/100). Safety re-probe, unscoped: about 900 blocks, 61 runnable ones executed under real bash. The cycle 4 fixes held. One high finding, reproduced with a control (PR #864 comment). The owner granted one extra cycle (QA budget 6).
+- **T289-CR5-1**: `maskSubstitutions` counted parentheses without regard to quotes, so a quoted paren inside a substitution ended it early or made it unreadable; the cycle 4 carve-out then let an unreadable block through when it held no governed word. `X=$(echo ")") touch out` classified runnable and created `out`. Identical on develop (measured); kept because cycle 4 claimed the case closed.
+- **Third-strike check**: the file carried a HIGH at gates 2, 3, 4 and 5. The mechanism struck at cycle 4 (substitution handling) was replaced then; this finding is in that replacement's own boundary, and the fix completes it rather than adding a guess. The end of a substitution is now found the way the shell finds it (`closingParen`: quotes, escapes, a nested `$(` inside double quotes, comments), and an unreadable one is refused for any word. No heuristic about where a substitution may stand remains.
+- **Mutation proof**: restoring the naive paren count turned 5 tests red; restoring the carve-out turned 1 red. `cmp` clean after each restore.
+- **Both directions**: 18 further hostile spellings classify as expected (nested quotes, arithmetic, `case`, heredoc, backticks, escaped and commented parens, a command after `;` inside the substitution); controls stay runnable (`x=$(echo ")")`, `X=$(echo ")") uniq in.txt`, `x=$(sort -u f)`).
+- **Docs scan against develop**: 1 block newly refused (`tail -f`), 0 newly runnable, with the carve-out gone (the three blocks cycle 4 had to spare now parse or are refused by the first reading as before).
+- **Probe (Step 3.5)**: the rule's one live statement is `shared/resources/qa-runnable-prose-detection.md` (updated). Population: 1.
+- **Verification**: 300 of 300 engine tests; `CI=true npm run ci:fast` exit 0; `bundle:check` 0 problems.
+
 ---
 
 ## Completion

@@ -1471,6 +1471,39 @@ function sedScan(s, markForbidden) {
  * it stands for. The commands INSIDE a substitution are judged on their own, in
  * the unmasked reading.
  */
+/**
+ * Index of the `)` that closes the `(` at `open`, or -1. Quotes, escapes and
+ * comments hide a paren from the shell, so they hide it here: `$(echo ")")` ends
+ * at the LAST paren, and a scan that counted the quoted one ended early and
+ * read the rest of the line as a second command (QA 5).
+ */
+function closingParen(text, open) {
+  let d = 0;
+  for (let i = open; i < text.length; i += 1) {
+    const c = text[i];
+    if (c === "\\") i += 1;
+    else if (c === "'") {
+      const j = text.indexOf("'", i + 1);
+      if (j < 0) return -1;
+      i = j;
+    } else if (c === '"') {
+      for (i += 1; i < text.length && text[i] !== '"'; i += 1) {
+        if (text[i] === "\\") i += 1;
+        else if (text[i] === "$" && text[i + 1] === "(") {
+          const j = closingParen(text, i + 1);
+          if (j < 0) return -1;
+          i = j;
+        }
+      }
+      if (i >= text.length) return -1;
+    } else if (c === "#" && (i === 0 || /[\s;&|(]/.test(text[i - 1]))) {
+      while (i < text.length && text[i] !== "\n") i += 1;
+    } else if (c === "(") d += 1;
+    else if (c === ")" && (d -= 1) === 0) return i;
+  }
+  return -1;
+}
+
 function maskSubstitutions(text) {
   let out = "";
   let q = null;
@@ -1489,13 +1522,8 @@ function maskSubstitutions(text) {
     const two = text.slice(i, i + 2);
     const proc = q === null && (two === "<(" || two === ">(");
     if (two === "$(" || proc) {
-      let d = 0;
-      let j = i + 1;
-      for (; j < text.length; j += 1) {
-        if (text[j] === "(") d += 1;
-        else if (text[j] === ")" && (d -= 1) === 0) break;
-      }
-      if (j >= text.length) return null;
+      const j = closingParen(text, i + 1);
+      if (j < 0) return null;
       out += proc ? "/dev/fd/0" : "$__SUBST__";
       i = j;
       continue;
@@ -3131,19 +3159,15 @@ function classifyInternal(
     const masked = maskSubstitutions(prose);
     const maskedInv = masked === null ? null : commandInvocations(masked);
     const maskedRaw = maskedInv ? rawInvocations(masked, maskedInv) : null;
-    // A block the masked reading cannot parse is refused only when a command the
-    // table governs is in it: nothing is then left to judge.
-    if (
-      !maskedRaw &&
-      !/\b(?:sed|find|sort|uniq|file|date|diff|tail)\b/.test(prose)
-    ) {
-      // no governed command in the block: nothing for the table to judge
-    } else if (!maskedRaw)
+    // A block the masked reading cannot parse is refused, whatever it runs: a
+    // carve-out for "no governed command" let `X=$(echo ")") touch out` through,
+    // because the command the scan could not read was the one that mattered.
+    if (!maskedRaw)
       return verdict(
         "mutating",
-        "flag-not-allowed: a substitution the scan cannot read (fail-closed)",
+        "unrecognised-command: <unparseable> (a substitution the scan cannot read; fail-closed)",
       );
-    for (const m of maskedRaw ?? []) {
+    for (const m of maskedRaw) {
       // The unmasked reading already judged an unparseable word.
       if (m.keyword || m.word === "<unparseable>") continue;
       // A command written after a closed substitution (`X=$(true) python3 x.py`)
