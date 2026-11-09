@@ -4,7 +4,7 @@
 **Bug ID**: TASK-290-BUG-1
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-11-09
 
@@ -43,6 +43,7 @@ Fail closed: when the scan meets a backslash outside quotes followed by a quote 
 | ---- | ------ | ---------- | ----- |
 | 2026-11-09 | New | qa-task | Found in QA cycle 1 |
 | 2026-11-09 | Ready for QA | qa-fix | Fixed in cycle 1 |
+| 2026-11-09 | Closed | qa-task | Verified by task.290.qa.2.qa-snippet-runner-comment-after-escaped-space.md |
 
 ## Developer Fix Cycle
 

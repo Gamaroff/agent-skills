@@ -1,0 +1,65 @@
+schema: 2
+task: 'task.290.qa-snippet-runner-comment-after-escaped-space'
+task_title: 'QA snippet runner reads a # after an escaped space as a comment'
+gate: FAIL
+status_reason: 'T290-QA-1 is fixed, but the same backslash class still has one more member: commandInvocations joins a line ending in any run of backslashes to the next, so an even run (`echo a\\` then `touch out`) hides the write and classifies runnable.'
+reviewer: 'QA Engineer'
+head: 'fce7a9bdeae79cf503fe2e0033fad9e150acad4a'
+updated: '2026-11-09T20:24:30Z'
+
+top_issues:
+  - id: 'T290-QA-2'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'commandInvocations joins a backslash-newline with `.replace(/\\\n/g, " ")`, which matches the last backslash of any run, so an EVEN run (an escaped backslash, then a real newline) is also joined. `echo a\\` followed by a newline and `touch out` classifies runnable, and bash creates out. A random-combination probe (40000 blocks, a writer on the next line) found 165 such writes and every one was this shape; none came from any other shape. Identical on develop; the task is about the scanners agreeing with bash on backslashes, and cycle 1 fixed the odd-run half in stripProse.'
+    suggested_action: 'Join only an odd run: replace with a pattern that keeps the preceding pairs, for example `.replace(/(?<!\\)((?:\\\\)*)\\\n/g, "$1 ")`, so an even run leaves the newline as a command separator. Add gap rows (`echo a\\\\` + newline + `touch out`, and a four-backslash form), a control for a real odd continuation, and a differential context for each; re-run the docs scan.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 322
+  phases_verified: '1/1'
+  trace:
+    phases_covered: [1]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 31
+    escaped: 0
+    boundary_signals: []
+    notes: 'Probe engine (shell-exec sink, isRunnableBlock): 31 executed, 0 escaped. A 40000-block random-combination differential against real bash found only the even-run shape (T290-QA-2); T290-QA-1 shapes now refuse.'
+  performance:
+    status: PASS
+    notes: 'The added scans are linear over the lines; no regression expected. Timing was not re-measured.'
+  reliability:
+    status: PASS
+    notes: 'The new throws are caught by classifyFailClosed and read as mutating.'
+  maintainability:
+    status: PASS
+    notes: 'The call-site test lists the new non-scan site with a reason.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T290-QA-2: join only an odd run of backslashes in commandInvocations.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+  future:
+    - action: 'Hold the iterative closingParen with a test that fails if it is reverted.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T290-QA-2 fixed and re-reviewed']

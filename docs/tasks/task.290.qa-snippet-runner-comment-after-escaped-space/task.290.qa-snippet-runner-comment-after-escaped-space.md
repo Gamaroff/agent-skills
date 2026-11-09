@@ -202,17 +202,17 @@ Sign-off is disabled for this repository (`sign-off.enabled` is not set), so no 
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.290.qa.1.qa-snippet-runner-comment-after-escaped-space.md](./task.290.qa.1.qa-snippet-runner-comment-after-escaped-space.md)
-- **Gate File**: [task.290.gate.1.qa-snippet-runner-comment-after-escaped-space.yml](./task.290.gate.1.qa-snippet-runner-comment-after-escaped-space.yml)
+- **Full Report**: [task.290.qa.2.qa-snippet-runner-comment-after-escaped-space.md](./task.290.qa.2.qa-snippet-runner-comment-after-escaped-space.md)
+- **Gate File**: [task.290.gate.2.qa-snippet-runner-comment-after-escaped-space.yml](./task.290.gate.2.qa-snippet-runner-comment-after-escaped-space.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 316
+- **Tests Executed**: 322
 - **Phases Verified**: 0/1 clean
 - **Critical Issues**: 1
 - **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-One HIGH finding: a backslash outside quotes (an escaped quote, a backslash-newline) still makes the comment scan disagree with bash, and two blocks classify runnable and write under real bash (bug 1).
+One HIGH finding: an even run of backslashes before a newline is joined as a continuation, so a write on the next line classifies runnable (bug 2). The cycle 1 finding is fixed.
 
 <!-- change-log-start -->
 ## Change Log
@@ -225,6 +225,8 @@ One HIGH finding: a backslash outside quotes (an escaped quote, a backslash-newl
 | 2026-11-09 |         | Implemented; status → ready-for-review                           | develop-task |
 | 2026-11-09 |         | QA gate FAIL (80/100) — 1 finding                                | qa-task     |
 | 2026-11-09 |         | QA findings fixed — cycle 1, 1 finding                           | qa-fix      |
+| 2026-11-09 |         | QA gate FAIL (80/100) — 1 finding                                | qa-task     |
+| 2026-11-09 |         | QA findings fixed — cycle 2, 1 finding                           | qa-fix      |
 <!-- change-log-end -->
 
 ---

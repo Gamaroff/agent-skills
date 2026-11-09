@@ -86,6 +86,17 @@ Fix (cycle 1): T290-QA-1 closed by failing closed on a backslash before a quote 
 
 ---
 
+### QA Cycle 2 — 2026-11-09
+**Gate Result**: FAIL
+**Issues Found**: 1 HIGH: an even run of backslashes before a newline is joined as a continuation, so a write on the next line classifies runnable (T290-QA-2, bug 2). Cycle 1's finding verified fixed.
+**HIGH findings**: 1
+**MEDIUM findings**: 0
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+
+---
+
 ## Completion
 
 **Finished**: {populated at end}

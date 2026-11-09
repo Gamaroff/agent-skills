@@ -16,7 +16,8 @@ All notable changes to this project will be documented in this file. Format foll
   fails if the directory changes. Over the tracked docs no block changes verdict. A backslash before
   a quote outside quotes, and a backslash-newline before a line that starts with `#`, are refused
   (`echo \'a' # ; touch out' ; touch out2` and `echo a\` then `# ; touch out` both classified
-  `runnable` and wrote under bash); skipping the escaped character instead would have made one
+  `runnable` and wrote under bash). Only an odd run of backslashes before a newline joins the next
+  line; `echo a\\` then `touch out` hid the write behind an even run. Skipping the escaped character instead would have made one
   documentation block newly runnable.
 
 ## [v0.66.0] - 2026-11-09

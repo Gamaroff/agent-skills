@@ -2330,7 +2330,10 @@ function commandInvocations(code) {
     // Backslash line-continuations join one command across several lines. Splitting
     // on the raw newline first makes the continuation's tail look like a fresh
     // command: `git log ... -- \` + `apps packages` reported `apps` as a command.
-    .replace(/\\\n/g, " ")
+    // Only an ODD run joins: an even run is an escaped backslash followed by a
+    // real newline, which ends the command (task.290 QA 2: `echo a\\` + newline
+    // + `touch out` hid the write).
+    .replace(/(?<!\\)((?:\\\\)*)\\\n/g, "$1 ")
     // Arithmetic expansion is arithmetic, not an invocation. It must go before the
     // `$(` rule below, or `$((N + 1))` becomes a segment whose first token is `N`.
     .replace(/\$\(\([^)]*\)\)/g, " ")

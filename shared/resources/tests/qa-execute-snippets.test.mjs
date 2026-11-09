@@ -4526,6 +4526,12 @@ const T290_GAPS = {
     'echo \\"a" # ; touch out" ; touch out2',
   "a backslash-newline joins a # at column 0 to the word":
     "echo a\\\n# ; touch out",
+  // T290-QA-2: an even run of backslashes is an escaped backslash, not a join.
+  "an escaped backslash then a newline ends the command":
+    "echo a\\\\\ntouch out",
+  "four backslashes then a newline ends the command":
+    "echo a\\\\\\\\\ntouch out",
+  "an even run, then a write after a blank line": "echo a\\\\\n\ntouch out",
 };
 for (const [name, code] of Object.entries(T290_GAPS)) {
   test(`task.290 gap: ${name} is refused as mutating`, () => {
@@ -4543,6 +4549,8 @@ const T290_CONTROLS = {
   "a continuation then an indented comment is a comment":
     "echo a\\\n  # ; touch out",
   "a continuation with no comment": "echo a \\\n  b",
+  "an odd run joins the next line into the command": "echo a\\\nb",
+  "three backslashes then a newline still join": "echo a\\\\\\\nb",
   "an escaped backslash then a newline is not a continuation":
     "echo a\\\\\n# ok",
 };
@@ -4662,6 +4670,12 @@ const CONTEXTS = [
   "echo a\\\n# ; W",
   "echo a\\\\\n# ; W",
   "echo a\\\n  # ; W",
+  // T290-QA-2: even and odd backslash runs before a newline.
+  "echo a\\\\\nW",
+  "echo a\\\\\\\\\nW",
+  "echo a\\\\\n\nW",
+  "echo a\\\\\\\nW",
+  "echo 'a'\\\\\nW",
 ];
 
 test("task.290 differential: nothing the classifier calls runnable writes under real bash", () => {
