@@ -4,7 +4,7 @@
 **Bug ID**: TASK-274-BUG-4
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-11-09
 
@@ -62,3 +62,4 @@ Origin: code-review CR-1, reproduced by QA (confidence `high` as returned, uncha
 | --- | --- | --- | --- |
 | 2026-11-09 | New | qa-task | Found in QA cycle 2 refute pass |
 | 2026-11-09 | Ready for QA | qa-fix | Fixed in QA cycle 2 fix; regression tests and mutation proofs added |
+| 2026-11-09 | Closed | qa-task | Verified by task.274.qa.3.qa-engines-stop-passing-what-they-cannot-see.md |

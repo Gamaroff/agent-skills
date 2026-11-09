@@ -318,24 +318,24 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`. Edit the `shared/resou
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-09
-**Quality Score**: 80/100
-**Gate Decision**: FAIL
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.274.qa.2.qa-engines-stop-passing-what-they-cannot-see.md](./task.274.qa.2.qa-engines-stop-passing-what-they-cannot-see.md)
-- **Gate File**: [task.274.gate.2.qa-engines-stop-passing-what-they-cannot-see.yml](./task.274.gate.2.qa-engines-stop-passing-what-they-cannot-see.yml)
+- **Full Report**: [task.274.qa.3.qa-engines-stop-passing-what-they-cannot-see.md](./task.274.qa.3.qa-engines-stop-passing-what-they-cannot-see.md)
+- **Gate File**: [task.274.gate.3.qa-engines-stop-passing-what-they-cannot-see.yml](./task.274.gate.3.qa-engines-stop-passing-what-they-cannot-see.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 34 probe cases plus the suite (8,100 pass, 2 harness-only failures also present on develop)
+- **Tests Executed**: 39 probe cases plus the suite (8,135 pass, 0 fail)
 - **Phases Verified**: 5/5
-- **Critical Issues**: 1 high
-- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **Critical Issues**: 0
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-The three cycle-1 findings are fixed and mutation-proven. The refute pass found that an ANSI-C quoted flag and a line-continuation split still classify runnable and delete files when run (bug 4). The timing criterion (+4.7% median) and the cases-file size criterion (8,813 bytes) are met.
+All four bugs are fixed and closed. The unscoped safety re-probe found five other gaps in the snippet runner's deny-list (function shadowing, `<>`, `find -fprint0`, sed `e`, `sort --compress-program`). They are identical on develop, outside this task's named shapes and absent from the tracked docs, so they are recorded as a follow-up in the gate's `recommendations.future`.
 
 <!-- change-log-start -->
 ## Change Log
@@ -350,6 +350,7 @@ The three cycle-1 findings are fixed and mutation-proven. The refute pass found 
 | 2026-11-09 |         | QA findings fixed — 3 bugs Ready for QA, 1 iteration; mutation-proven | qa-fix     |
 | 2026-11-09 |         | QA gate FAIL (80/100) — 1 finding (1 high); bugs 1-3 closed     | qa-task    |
 | 2026-11-09 |         | QA findings fixed — bug 4 Ready for QA, 1 iteration; mutation-proven | qa-fix     |
+| 2026-11-09 |         | QA gate CONCERNS (90/100) — 0 findings; 5 pre-existing deny-list gaps routed to follow-up; bug 4 closed | qa-task    |
 <!-- change-log-end -->
 
 ---
