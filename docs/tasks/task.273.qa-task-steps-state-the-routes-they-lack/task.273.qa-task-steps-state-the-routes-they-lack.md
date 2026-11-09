@@ -293,6 +293,27 @@ None identified.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-09
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.273.qa.1.qa-task-steps-state-the-routes-they-lack.md](./task.273.qa.1.qa-task-steps-state-the-routes-they-lack.md)
+- **Gate File**: [task.273.gate.1.qa-task-steps-state-the-routes-they-lack.yml](./task.273.gate.1.qa-task-steps-state-the-routes-they-lack.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 3
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+One MEDIUM finding: `[Unreleased]` in `CHANGELOG.md` has no entry citing task 273, which `/finalise` 6d requires here. Three advisory review findings are recorded as future recommendations.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -302,6 +323,8 @@ None identified.
 | 2026-11-09 | 1.1     | Review passed (8/10) — re-measured anchors, resolved two `(unverified)` claims, added docs-only fallback, pinned-test list and Phase 3 dependency note | review-task |
 | 2026-11-09 |         | Status → ready-for-development                                  | review-task |
 | 2026-11-09 |         | Implemented — 4 phases; 7 sources, 1 new prompt, 1 test allowlist entry, bundled copies; ci:fast green | develop |
+| 2026-11-09 |         | QA gate CONCERNS (90/100) — 1 finding                           | qa-task     |
+| 2026-11-09 |         | QA findings fixed — CHANGELOG entry added, 1 iteration          | qa-fix      |
 <!-- change-log-end -->
 
 ---
