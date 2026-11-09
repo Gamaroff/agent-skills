@@ -100,6 +100,11 @@ E. UNBOUND READS IN EXECUTED PROSE (category: bug):
 - An empty findings list is a claim about the diff. Before returning one, confirm the diff was
   actually read and non-trivial — "found nothing" and "could not look" must not resolve to the
   same output.
+- If you EXECUTE anything to verify a candidate (a probe, a one-line script, a test), do it in a
+  directory you create with `mktemp -d` and write nothing outside it. That excludes <WORKING_DIR>
+  and every file beside <DIFF_FILE>: the caller keeps its own probe scripts and fixtures there, and
+  a write to one changes the caller's instrument without any output saying so. Reading is
+  unrestricted; the scratch directory is the only place you write.
 
 ## Output contract — emit EXACTLY this YAML and nothing else
 
@@ -155,7 +160,23 @@ There is no gate in standalone mode — the `top_issues[]` mapping below is QA-o
    `top_issues[]` as `{ id, severity, finding, suggested_action, suggested_owner }` — the exact shape
    the gate and the `qa-findings-ingester-prompt.md` → `/qa-fix` loop already consume, so no extra
    wiring is needed. The existing deterministic gate rules then decide (any high → FAIL, any medium → CONCERNS).
-3. **Never gates on** `category: cleanup`, on `confidence: low|medium`, or when the doc does not opt in.
+3. **Never gates on** `category: cleanup`, on `confidence: low|medium`, or when the doc does not opt in
+   — **except a finding the caller reproduces** (item 4).
+4. **A `category: bug` finding the caller reproduces by execution is the caller's own finding** (obs #125).
+   The rule above gates on the *reviewer's claim*; a reproduction replaces the claim with a measurement. When
+   QA runs the reported input and sees the reported misbehaviour, runs a **control** (an input the finding
+   says is handled correctly, or the same input on the base) that does not misbehave, and the finding is
+   not `pre-existing` under the provenance check, it enters `top_issues[]` as a QA finding, whatever
+   `confidence` the reviewer gave it and whether or not the doc opts in. The reviewer's `confidence` is
+   recorded **unchanged** (never edited upward to fit), the reproduction and the control go in the QA
+   report's `## Code Review` section, and the entry names its origin (`origin: code-review, reproduced
+   by QA`). A medium-confidence finding QA did **not** reproduce stays advisory. Severity then follows
+   the gate's deterministic rules.
+5. **A probe the caller runs while a reviewer is live starts with a known-good calibration case** (obs #116).
+   The reviewer is told to write only inside its own scratch directory, but the tree is still shared: a
+   changed probe script reads `unreadable` on every case and looks like a finding about the code. Run one
+   case whose answer is known first; if it does not give that answer, the instrument has changed, and the
+   probes are re-extracted before any of their results is believed.
 
 ### Opt-in to blocking (QA caller responsibility)
 

@@ -460,10 +460,15 @@ as coverage for a defect this cycle fixed, **revert the behaviour it names and
 confirm that test goes red** — full procedure, the outcomes table, and the shapes
 vacuity takes: [`references/mutation-proving.md`](references/mutation-proving.md).
 
-**Mutate only a tree no other agent is reading.** A mutation makes the tree lie while it is applied.
-Run the proofs after the Phase 1.6 diff reviewer has returned, or in a scratch worktree
-(`git worktree add --detach "$SCRATCH" HEAD`), never in the working tree a dispatched reviewer is
-still reading (obs #266).
+**Mutate only a tree no other process is reading.** A mutation makes the tree lie while it is applied.
+That covers a dispatched reviewer and also a backgrounded suite or fast gate (`ci:fast`, `npm test`):
+a process that reads the tree during a mutation window measures the mutated tree. Run the proofs after
+the Phase 1.6 diff reviewer has returned and with nothing else running over the tree, or in a scratch
+worktree (`git worktree add --detach "$(mktemp -d)" HEAD`), never in the working tree something is
+still reading (obs #266, #64). **A suite result whose run overlapped a mutation window is re-run
+before it is recorded.** Without that re-run a load-sensitive test fails for the overlap and the
+failure is recorded as the suite's (task.189 cycle 6: `tests/bundle-missing-source.test.js` took
+53012 ms against a 20000 ms budget and passed alone in 3145 ms).
 
 **A green suite is also evidence about the platform it ran on, and only that platform.** When the change set passes an environment-derived value (`os.tmpdir()`, `$TMPDIR`, `$HOME`) to a consumer that validates it, the platform-variance check in the diff-review step applies here too: run the affected tests once under the other value (`TMPDIR=/tmp node --test …`) before crediting them as coverage. A suite that is green on macOS and red on Linux CI is not a flake; it is the fixture path failing a containment check it never met locally (obs #17).
 
@@ -944,7 +949,7 @@ If any parallel agent fails to complete or reports critical errors:
 
 #### Phase 1.6: Diff Code Review
 
-Adversarially review the story's change set **diff** for **correctness bugs** (logic errors, null/async/race, API misuse, broken invariants) and **cleanups** (reuse of existing utilities, simplification, efficiency) — the lens the Phase 1.5 agents (coverage / TS-strict / a11y / DoD) and the document-anchored checks do **not** provide. Effort follows the **Phase 1.5 Adaptive decision tree**: a single light pass for lite/small/re-review; run it alongside the parallel agents for large/high-risk stories; skip entirely when the diff touches no reviewable code. **One exception, and it overrides the tree: cycle 2 is always a full refute pass** (step 1 below). A re-review that gets shallower each cycle is how a loop runs five times and learns nothing after the first.
+Adversarially review the story's change set **diff** for **correctness bugs** (logic errors, null/async/race, API misuse, broken invariants) and **cleanups** (reuse of existing utilities, simplification, efficiency) — the lens the Phase 1.5 agents (coverage / TS-strict / a11y / DoD) and the document-anchored checks do **not** provide. Effort follows the **Phase 1.5 Adaptive decision tree**: a single light pass for lite/small/re-review; run it alongside the parallel agents for large/high-risk stories; skip entirely when the diff touches no reviewable code (a documentation-only diff is not skipped: it takes the claim-check route in step 2). **One exception, and it overrides the tree: cycle 2 is always a full refute pass** (step 1 below). A re-review that gets shallower each cycle is how a loop runs five times and learns nothing after the first.
 
 1. **Scope the diff** and write it to a patch file (keeps diff bytes out of main context). First review → the whole branch diff. **Cycle 2 (exactly one prior gate) → the whole branch diff again, reviewed to refute** (see the refute directive under step 2). Cycle 3+ → the Phase 1 changed-file map, scoped to files changed since the commit the last gate judged — its `head:`, never its `updated:` (task.135):
 
@@ -1107,7 +1112,7 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
    change with what cycle 1 learned. On one observed task, four narrowed re-reviews walked past a
    defect that had been present in the *original* commit and surfaced only at cycle 5.
 
-2. **Dispatch a read-only Explore subagent** with the prompt from `references/code-review-prompt.md` (the single source of truth — pass it verbatim), substituting `<DIFF_FILE>` and `<WORKING_DIR>` (repo root). It returns a `code_review:` YAML findings block. Never read the raw diff into main context.
+2. **Choose the route, then dispatch a read-only Explore subagent.** **Docs-only change set → the claim-check prompt.** When every path in `git diff --name-only "$BASE...HEAD"` is documentation as `ci.docsOnly` defines it (every path matches `ci.docsOnly.patterns`, default `**/*.md` and `docs/**`; none is a path that rule never treats as docs, such as a `skills-config.yaml` in the delta — the rule and its exceptions are in `docs/reference/configuration.md`, so do not write a second matcher), dispatch the prompt from `references/qa-docs-only-review-prompt.md` instead: it checks each changed claim against the source it names and returns the same `code_review:` block. One code path in the set takes the code route below for the whole diff. Record the route in Review Methodology as `Diff review: docs-only claim check (every changed path matches ci.docsOnly.patterns)` or `Diff review: code review`; each cycle takes the route its own change set gives (obs #74). **Code route:** dispatch with the prompt from `references/code-review-prompt.md` (the single source of truth — pass it verbatim), substituting `<DIFF_FILE>` and `<WORKING_DIR>` (repo root). It returns a `code_review:` YAML findings block. Never read the raw diff into main context.
 
    **Mark the wait on the pipeline lock** beside this dispatch — `bash .agents/skills/qa-story/references/set-waiting-on.sh "5a qa-story code review"` — and clear it (`… set-waiting-on.sh --clear`) as the first action after the `code_review:` block is read (source: `references/set-waiting-on.sh`; task.124 QA cycle 1, CR-3). Inside a `/develop-*` pipeline this skill runs as Step 5a, and a turn yielded while the reviewer runs is a wait the Stop hook would otherwise re-prompt as a stall; standalone there is no lock and both calls are silent no-ops.
 
@@ -1345,6 +1350,18 @@ JSON
    a fix is 5b's (`/qa-fix`), and a gate written over an already-fixed tree records a finding that
    no longer exists while the commit under review still carries it (obs #106). `git status
    --porcelain` must be as it was when this step began, before Output 2 writes the gate.
+
+5d. **A reproduced finding is QA's own finding, whatever the reviewer's confidence** (obs #125).
+   When step 3's boundary rule has QA **reproduce a `category: bug` finding by execution** (run the
+   reported input, see the reported misbehaviour), run a **control**: an input the finding says is
+   handled correctly, or the same input against the base per 5b, which must **not** misbehave. A
+   finding that reproduces, passes its control and is not `pre-existing` per 5b enters `top_issues[]`
+   as a QA finding even when the reviewer rated it `confidence: medium` or `low`, and whether or not
+   the doc opted in (the opt-in below gates the reviewer's *claim*; a reproduction is a measurement).
+   The reviewer's `confidence` is recorded **unchanged**, never edited to fit; the reproduction command,
+   its output and the control go in the QA report's `## Code Review` section; and the entry names its
+   origin (`origin: code-review, reproduced by QA`). Severity then follows the gate's deterministic
+   rules. A medium-confidence finding QA did **not** reproduce stays advisory.
 
 6. **Gate mapping — resolve blocking, then map:** apply the **canonical resolution** from the **Opt-in to blocking** section of `references/code-review-prompt.md`. It combines a run-level override (from Skill `args`) with the story frontmatter flag; an explicit per-doc `false` is the escape hatch:
 
@@ -1605,6 +1622,16 @@ because no test carries them (obs #210). A behaviour criterion whose only eviden
 with no committed per-PR test, is a **MEDIUM** finding in `top_issues[]`, so it enters the fix loop
 rather than halting at finalise (obs #224).
 
+**A "tool X passes on files Y" criterion is confirmed by one probe that X processes Y, before PASS is
+recorded** (obs #78). A formatter, linter or checker skips what its ignore file excludes and exits 0
+having read nothing, so "passes" is true of the empty set. Run one probe: a deliberately malformed copy
+of one file in Y (the tool must fail on it), or the tool's own count of files it checked (it must be
+non-zero and include Y). Record the probe beside the criterion. If X reads none of Y, mark the criterion
+**unverified** and enter a **MEDIUM** `top_issues[]` entry naming the ignore file and a check that
+reaches the files (`doc-links.js` for links, `markdown-link-check`, a schema validator). Task.198's
+SC-5, `prettier --check` on Markdown, passed in three QA cycles while `.prettierignore` excludes `*.md`,
+`*.yml`, `*.yaml` and `*.json`.
+
 **A criterion over a set is checked member by member**, by the quantifier rule: rule 6 of
 `finalise-dod-ac-prompt.md` Step 3, in the `finalise` skill, which owns its wording. Each member it
 leaves unmapped is a **MEDIUM** `top_issues[]` entry naming the member (obs #23).
@@ -1835,7 +1862,7 @@ Re-enumerated {the boundary's inputs, named} and tested each against the current
 
 ## Code Review
 
-[From Phase 1.6 — advisory unless the story opted in via `code_review_blocking: true`. Omit if the diff had no reviewable code.]
+[From Phase 1.6 — advisory unless the story opted in via `code_review_blocking: true`. Omit if the diff had no reviewable code and no documentation claims to check; a docs-only change set takes the claim-check route, so its section is present.]
 
 **Correctness bugs ([count]):**
 [for each bug finding:]

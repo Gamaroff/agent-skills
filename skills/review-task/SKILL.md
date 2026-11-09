@@ -1255,6 +1255,17 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
       directory for unexpected writes, needed it too. It surfaced at develop as "found beyond the
       plan"
     - Flag as **Important** a reader of the directory the plan does not name
+30. **A criterion names a tool on a file type an ignore file excludes** (obs #78):
+    - Trigger: a success criterion or test case says a tool "passes" or "is clean" on a file type or
+      path (`prettier --check` on Markdown, a linter on YAML)
+    - Read the tool's ignore file or config (`.prettierignore`, `.eslintignore`, the tool's `exclude`
+      key) and confirm the file type is not excluded. A tool run over files it ignores exits 0 having
+      read nothing, so the criterion cannot fail
+    - Suggest a check that reaches the files: `doc-links.js` or `markdown-link-check` for links in
+      Markdown, a schema validator for YAML or JSON
+    - Worked example: task.198's SC-5 ran `prettier --check` on Markdown; `.prettierignore` excludes
+      `*.md`, `*.yml`, `*.yaml` and `*.json`, and the criterion passed in three QA cycles
+    - Flag as **Important** a criterion whose tool the ignore file excludes from its files
 
 **Common Hallucination Patterns to Detect**:
 
