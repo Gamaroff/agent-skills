@@ -1982,6 +1982,14 @@ function stripCommentQuoteAware(line) {
       i++;
       continue;
     }
+    // task.290 QA 1: outside quotes an escaped quote is a literal in bash, but
+    // this scan would open a quote there and strip real code as a comment
+    // (`echo \'a' # ; touch out' ; touch out2` ran `touch out2`). Skipping it
+    // widens what is runnable, so the line is refused instead: the throw is
+    // caught by classifyFailClosed and read as a mutating verdict.
+    if (c === "\\" && !single && !double && /['"]/.test(line[i + 1] ?? "")) {
+      throw new Error("escaped quote outside quotes");
+    }
     if (c === "'" && !double) {
       single = !single;
       continue;
@@ -2149,6 +2157,16 @@ function stripProse(code) {
   const out = [];
   const lines = code.split("\n");
   let heredocTerminator = null;
+
+  // task.290 QA 1: bash joins a line ending in an odd run of backslashes to the
+  // next, so a `#` at column 0 of that next line is mid-word, not a comment.
+  // Scanning per line strips it as one; refuse (fail closed) rather than guess.
+  for (let k = 0; k + 1 < lines.length; k += 1) {
+    const run = lines[k].match(/\\+$/);
+    if (run && run[0].length % 2 === 1 && lines[k + 1].startsWith("#")) {
+      throw new Error("backslash-newline before a comment");
+    }
+  }
 
   for (const raw of lines) {
     if (heredocTerminator !== null) {

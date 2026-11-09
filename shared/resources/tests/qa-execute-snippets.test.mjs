@@ -4519,6 +4519,13 @@ const T290_GAPS = {
   "an escaped tab does not start a word": "echo a\\\t# ; touch out",
   "an escaped space inside a case arm":
     "case x in x) echo a\\ # ; touch out ;; esac",
+  // task.290 QA 1 (T290-QA-1): a backslash outside quotes.
+  "an escaped quote does not open a quote":
+    "echo \\'a' # ; touch out' ; touch out2",
+  "an escaped double quote does not open a quote":
+    'echo \\"a" # ; touch out" ; touch out2',
+  "a backslash-newline joins a # at column 0 to the word":
+    "echo a\\\n# ; touch out",
 };
 for (const [name, code] of Object.entries(T290_GAPS)) {
   test(`task.290 gap: ${name} is refused as mutating`, () => {
@@ -4533,6 +4540,11 @@ const T290_CONTROLS = {
   "an escaped backslash leaves the space unescaped": "echo a\\\\ # ; touch out",
   "a comment after a semicolon": "echo a;# touch out",
   "a # in quotes is data": 'echo "a # b" && echo ok',
+  "a continuation then an indented comment is a comment":
+    "echo a\\\n  # ; touch out",
+  "a continuation with no comment": "echo a \\\n  b",
+  "an escaped backslash then a newline is not a continuation":
+    "echo a\\\\\n# ok",
 };
 for (const [name, code] of Object.entries(T290_CONTROLS)) {
   test(`task.290 control: ${name} stays runnable`, () => {
@@ -4581,6 +4593,7 @@ test("task.290 every comment scan calls the one rule", () => {
     (l) =>
       /if \(cmd === "#"\)/.test(l) || // sedScan: sed grammar, a different rule
       /^"#",$/.test(l) || // the command-word list
+      /lines\[k \+ 1\]\.startsWith\("#"\)/.test(l) || // stripProse: refuses a backslash-newline before a # (a line join, not a comment scan)
       /if \(text\[i\] !== "#"\) return false;/.test(l), // startsComment itself
   );
   assert.equal(
@@ -4643,6 +4656,12 @@ const CONTEXTS = [
   "echo a \\\n# ; W",
   "echo a | cat # ; W",
   "echo ${#PATH} ; W",
+  // task.290 QA 1: a backslash outside quotes.
+  "echo \\'a' # ; touch x' ; W",
+  'echo \\"a" # ; touch x" ; W',
+  "echo a\\\n# ; W",
+  "echo a\\\\\n# ; W",
+  "echo a\\\n  # ; W",
 ];
 
 test("task.290 differential: nothing the classifier calls runnable writes under real bash", () => {

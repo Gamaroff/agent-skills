@@ -14,8 +14,10 @@ All notable changes to this project will be documented in this file. Format foll
   `$(` (20000 of them threw `RangeError`), and the classifier turns any exception into a `mutating`
   verdict. A differential test runs every block the classifier calls `runnable` under real bash and
   fails if the directory changes. Over the tracked docs no block changes verdict. A backslash before
-  a quote outside quotes is still read as the quote opening (the strict reading); changing it makes
-  one documentation block newly runnable and was left out of scope.
+  a quote outside quotes, and a backslash-newline before a line that starts with `#`, are refused
+  (`echo \'a' # ; touch out' ; touch out2` and `echo a\` then `# ; touch out` both classified
+  `runnable` and wrote under bash); skipping the escaped character instead would have made one
+  documentation block newly runnable.
 
 ## [v0.66.0] - 2026-11-09
 

@@ -34,7 +34,7 @@ Make every comment scan in the snippet classifier agree with bash on where a com
 | 1. create-branch           | ✅ Done | Branch `feature/task.290.*` exists in git                              | Branch created at `fbdbd872` | —                    | 2026-11-09T20:10Z |
 | 2. review-task             | ✅ Done | `task.290.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT 8/10; 1 Important fixed; status → ready-for-development | —                    | 2026-11-09T20:30Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline; ci:fast green (8279 tests, 0 fail); docs scan 0/0 | —                    | 2026-11-09T20:45Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
+| 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #867; no issue linked | —                    | 2026-11-09T20:55Z |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.290.qa.{N}.*.md`; `task.290.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.290.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
@@ -73,6 +73,17 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-11-09
+**Gate Result**: FAIL
+**Issues Found**: 1 HIGH: a backslash outside quotes (escaped quote, backslash-newline) still hides code from the comment scan; two blocks classify runnable and write under bash (T290-QA-1, bug 1)
+**HIGH findings**: 1
+**MEDIUM findings**: 0
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+
+Fix (cycle 1): T290-QA-1 closed by failing closed on a backslash before a quote outside quotes and on a backslash-newline before a `#` line (no skip of the escaped character: it made a doc block newly runnable). Mutation-proven both throws; docs scan 3442 blocks, 0/0; ci:fast green. Probe: phrase "starts a comment|word start", population 1 (`qa-runnable-prose-detection.md`, updated) plus `CHANGELOG.md` (updated).
+
 ---
 
 ## Completion
@@ -80,7 +91,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: {populated after Step 1}
-**PR**: {populated after Step 4}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/867
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}

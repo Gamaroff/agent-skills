@@ -193,6 +193,27 @@ Sign-off is disabled for this repository (`sign-off.enabled` is not set), so no 
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-09
+**Quality Score**: 80/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.290.qa.1.qa-snippet-runner-comment-after-escaped-space.md](./task.290.qa.1.qa-snippet-runner-comment-after-escaped-space.md)
+- **Gate File**: [task.290.gate.1.qa-snippet-runner-comment-after-escaped-space.yml](./task.290.gate.1.qa-snippet-runner-comment-after-escaped-space.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 316
+- **Phases Verified**: 0/1 clean
+- **Critical Issues**: 1
+- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+One HIGH finding: a backslash outside quotes (an escaped quote, a backslash-newline) still makes the comment scan disagree with bash, and two blocks classify runnable and write under real bash (bug 1).
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -202,6 +223,8 @@ Sign-off is disabled for this repository (`sign-off.enabled` is not set), so no 
 | 2026-11-09 | 1.1     | Review passed (8/10) — one criterion given a named test; both defects reproduced | review-task |
 | 2026-11-09 |         | Status → ready-for-development                                   | review-task |
 | 2026-11-09 |         | Implemented; status → ready-for-review                           | develop-task |
+| 2026-11-09 |         | QA gate FAIL (80/100) — 1 finding                                | qa-task     |
+| 2026-11-09 |         | QA findings fixed — cycle 1, 1 finding                           | qa-fix      |
 <!-- change-log-end -->
 
 ---
