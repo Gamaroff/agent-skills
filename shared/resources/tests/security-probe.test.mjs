@@ -2967,7 +2967,9 @@ test("cli entry: the record carries the template, keys on its skeleton, and leav
     });
     recordRun(record, a, { name: "host-a" });
     recordRun(record, b, { name: "host-b" });
-    recordRun(record, js, { name: "js" });
+    // Unnamed: an unnamed JS control keeps the pre-task.144 file name below. A NAMED
+    // JS control is keyed on its name too (task.274, obs #68), tested separately.
+    recordRun(record, js);
     const rec = readRecord(record);
     assert.equal(
       rec.controls.length,
@@ -2976,7 +2978,7 @@ test("cli entry: the record carries the template, keys on its skeleton, and leav
     );
     const byName = Object.fromEntries(rec.controls.map((c) => [c.name, c]));
     assert.deepEqual(byName["host-a"].argv, HOST_ARGV);
-    assert.equal(byName.js.argv, null);
+    assert.equal(byName[null].argv, null);
     assert.equal(toRecordEntry(js).argv, null);
     // The template, never a substituted input.
     assert.ok(!JSON.stringify(byName["host-a"]).includes("evil.example.com"));
@@ -2994,6 +2996,224 @@ test("cli entry: the record carries the template, keys on its skeleton, and leav
     assert.match(out, /evidence: measured/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("record: two --name controls against one JS entry both survive; a re-run of one name replaces only itself (task.274, obs #68)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "probe-js-two-names-"));
+  try {
+    const record = join(dir, "run.json");
+    const run = () =>
+      runProbeSpec({
+        sink: "url-authority",
+        entry: entry("engaging-control"),
+        cases: CASES,
+      });
+    recordRun(record, run(), { name: "first-control" });
+    recordRun(record, run(), { name: "second-control" });
+    const rec = readRecord(record);
+    assert.deepEqual(
+      rec.controls.map((c) => c.name).sort(),
+      ["first-control", "second-control"],
+      "the second --name did not replace the first",
+    );
+    assert.equal(readdirSync(recordEntriesDir(record)).length, 2);
+    // Re-running one name replaces only its own entry.
+    recordRun(record, run(), { name: "first-control" });
+    assert.equal(readRecord(record).controls.length, 2);
+    // Whitespace around a name is not a different control (the cli: precedent).
+    recordRun(record, run(), { name: "  first-control " });
+    assert.equal(readRecord(record).controls.length, 2);
+    // Both controls are counted: executed is the sum, not one control's.
+    const one = run().executed;
+    assert.equal(readRecord(record).totals.executed, one * 2);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("record: an UNNAMED JS control keeps the pre-task.144 entry-file name, and a legacy named entry on disk folds with its re-run (task.274)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "probe-js-legacy-name-"));
+  try {
+    const record = join(dir, "run.json");
+    const legacyFile = (sink, ent) =>
+      `${createHash("sha256").update(`${sink}\u0000${ent}`).digest("hex").slice(0, 24)}.json`;
+    const result = runProbeSpec({
+      sink: "url-authority",
+      entry: entry("engaging-control"),
+      cases: CASES,
+    });
+    recordRun(record, result);
+    assert.ok(
+      readdirSync(recordEntriesDir(record)).includes(
+        legacyFile("url-authority", entry("engaging-control")),
+      ),
+    );
+    // A record written before this change holds a NAMED JS entry under the legacy
+    // file name. The fold keys on the entry's content, so a named re-run is the
+    // same control, not a second one.
+    const record2 = join(dir, "old.json");
+    const oldDir = recordEntriesDir(record2);
+    mkdirSync(oldDir, { recursive: true });
+    writeFileSync(
+      join(oldDir, legacyFile("url-authority", entry("engaging-control"))),
+      JSON.stringify(toRecordEntry(result, { name: "js" })),
+    );
+    recordRun(record2, result, { name: "js" });
+    assert.equal(readRecord(record2).controls.length, 1);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ── task.274 (obs #52): --fixture-copy names a shared file once, not once per case ──
+//
+// The numbered cases files reached 0.8–1.6 MB because every case embedded full
+// copies of the same bundled helpers in `fixture.files`. `fixtureCopy` copies the
+// named repo file into every case directory, read once per run.
+
+const COPY_ENTRY = "cli-needs-data.mjs";
+const copyRoot = (files = { "items.json": '["MARKER"]' }) =>
+  fenceRoot(files, {
+    copy: [`${FIXTURES}/${COPY_ENTRY}`],
+    prefix: "probe-fixture-copy-",
+  });
+const copySpec = (root, extra = {}) => ({
+  sink: "url-authority",
+  entry: `cli:${FIXTURES}/${COPY_ENTRY}`,
+  cases: [dataCase(), dataCase({ id: "d.legit2" })],
+  argv: DATA_ARGV,
+  repoRoot: root,
+  ...extra,
+});
+
+test("fixture-copy: a shared repo file reaches every case's directory with no per-case fixture.files — and without the flag the same cases are rejected (control)", () => {
+  const root = copyRoot();
+  try {
+    const withCopy = runProbeSpec(
+      copySpec(root, { fixtureCopy: ["items.json"] }),
+    );
+    assert.equal(withCopy.executed, 2, JSON.stringify(withCopy.declined));
+    assert.deepEqual(
+      withCopy.cases.map((c) => c.outcome),
+      ["accepted", "accepted"],
+    );
+    assert.deepEqual(withCopy.fixtureCopy, ["items.json"]);
+    // The record says what built each case directory.
+    assert.deepEqual(toRecordEntry(withCopy).fixture_copy, ["items.json"]);
+    // Control: the same cases, no flag, no fixture — the file is what made them pass.
+    const without = runProbeSpec(copySpec(root));
+    assert.deepEqual(
+      without.cases.map((c) => c.outcome),
+      ["rejected", "rejected"],
+    );
+    assert.equal(without.fixtureCopy, null);
+    assert.equal(toRecordEntry(without).fixture_copy, null);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fixture-copy: a case's own fixture.files of the same path wins over the shared copy", () => {
+  // The shared copy is the BAD file and the case supplies the good one, so the case
+  // is accepted only if its own file is written after the shared one.
+  const root = copyRoot({ "items.json": "nothing here" });
+  try {
+    const shared = runProbeSpec(
+      copySpec(root, { fixtureCopy: ["items.json"] }),
+    );
+    assert.match(shared.cases[0].detail, /carries no marker/, "premise");
+    const r = runProbeSpec(
+      copySpec(root, {
+        fixtureCopy: ["items.json"],
+        cases: [
+          dataCase({ fixture: { files: { "items.json": '["MARKER"]' } } }),
+        ],
+      }),
+    );
+    assert.equal(r.cases[0].outcome, "accepted", JSON.stringify(r.cases));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fixture-copy: the cases file stays small when the shared file is large (task.205 shape: 16 cases, 1 MB helper)", () => {
+  const big = '["MARKER"]' + " ".repeat(1_000_000);
+  const root = copyRoot({ "items.json": big });
+  try {
+    const cases = Array.from({ length: 16 }, (_, i) =>
+      dataCase({ id: `d.legit${i}` }),
+    );
+    assert.ok(
+      Buffer.byteLength(JSON.stringify(cases)) < 10_000,
+      "premise: the cases file names no copy",
+    );
+    const r = runProbeSpec(
+      copySpec(root, { fixtureCopy: ["items.json"], cases }),
+    );
+    assert.equal(r.executed, 16, JSON.stringify(r.declined));
+    assert.ok(r.cases.every((c) => c.outcome === "accepted"));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fixture-copy: every unusable value is declined `bad-fixture-copy` before a case runs", () => {
+  const root = copyRoot({
+    "items.json": '["MARKER"]',
+    "node_modules/pkg/items.json": "x",
+  });
+  try {
+    symlinkSync("items.json", join(root, "link.json"));
+    mkdirSync(join(root, "a-dir"));
+    const refused = {
+      "an absolute path": [join(root, "items.json")],
+      "a `..` segment": ["../items.json"],
+      "a symbolic link": ["link.json"],
+      "a directory": ["a-dir"],
+      "a missing file": ["nope.json"],
+      "a path under node_modules": ["node_modules/pkg/items.json"],
+      "an empty string": [""],
+      "a non-list": "items.json",
+    };
+    for (const [why, fixtureCopy] of Object.entries(refused)) {
+      const r = runProbeSpec(copySpec(root, { fixtureCopy }));
+      assert.equal(r.reason, "bad-fixture-copy", `${why}: ${r.reason}`);
+      assert.equal(r.executed, 0, why);
+    }
+    // T274-QA-1: a symlinked DIRECTORY on the way out of the root is refused;
+    // the control is a real directory with the same shape, which is copied.
+    const outside = mkdtempSync(join(tmpdir(), "probe-fixture-outside-"));
+    try {
+      writeFileSync(join(outside, "items.json"), '["OUTSIDE"]');
+      symlinkSync(outside, join(root, "linked-dir"));
+      mkdirSync(join(root, "real-dir"));
+      writeFileSync(join(root, "real-dir", "items.json"), '["MARKER"]');
+      const viaLink = runProbeSpec(
+        copySpec(root, { fixtureCopy: ["linked-dir/items.json"] }),
+      );
+      assert.equal(viaLink.reason, "bad-fixture-copy");
+      assert.equal(viaLink.executed, 0);
+      assert.match(viaLink.declined[0].detail, /outside the repo root/);
+      const viaReal = runProbeSpec(
+        copySpec(root, { fixtureCopy: ["real-dir/items.json"] }),
+      );
+      assert.notEqual(viaReal.reason, "bad-fixture-copy");
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
+    // A form that materialises no fixture.files declines it too.
+    const js = runProbeSpec({
+      sink: "url-authority",
+      entry: entry("engaging-control"),
+      cases: CASES,
+      fixtureCopy: ["items.json"],
+      repoRoot: root,
+    });
+    assert.equal(js.reason, "bad-fixture-copy");
+    assert.match(js.declined[0].detail, /cli:, shell-argv: and fence:/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 
@@ -6087,6 +6307,14 @@ test("shell-argv entry: every malformed flag combination exits 2 by name and wri
       "--fixture-setup on a shell-fn: entry": [
         ["--entry", "shell-fn:lib.sh#fn", "--fixture-setup", "setup.sh"],
         /^bad-fixture-setup: --fixture-setup applies to the cli: and shell-argv: entry forms only/,
+      ],
+      "--fixture-copy on a shell: entry (task.274)": [
+        ["--entry", "shell:two-args.sh", "--fixture-copy", "helper.sh"],
+        /^bad-fixture-copy: --fixture-copy applies to the cli:, shell-argv: and fence: entry forms only/,
+      ],
+      "--fixture-copy with no operand (task.274)": [
+        ["--entry", "shell-argv:two-args.sh", "--fixture-copy"],
+        /^--fixture-copy requires an operand/,
       ],
       "an embedded slot": [
         ["--entry", "shell-argv:two-args.sh", "--argv", '["--n={input}"]'],

@@ -1,0 +1,71 @@
+schema: 2
+task: 'task.274.qa-engines-stop-passing-what-they-cannot-see'
+task_title: 'QA engines stop passing what they cannot see'
+gate: FAIL
+status_reason: 'The three cycle-1 findings are fixed and mutation-proven. The cycle-2 refute pass found one more high defect in the same quote-variant class the task names: an ANSI-C quoted flag and a line-continuation split still classify runnable and delete files when run.'
+reviewer: 'QA Engineer'
+head: 'f6a7368844819aad09527932bc0a6b7a732ddd65'
+updated: '2026-11-09T10:27:41Z'
+
+top_issues:
+  - id: 'T274-QA-4'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'The quote-stripped second deny-list reading misses two forms, both classified runnable: find w $-delete in ANSI-C quoting (dollar, single quote, -delete, single quote) and a flag split by a backslash-newline continuation (-dele, backslash, newline, te). Both delete the directory when run under bash (reproduced in a scratch directory; controls: find w -delete is mutating, find docs -name x is runnable). Same output on develop, but the task scope names the quote variants of find -delete (obs #67), so the fix is unfinished. origin: code-review CR-1, reproduced by QA. Reviewer confidence high, unchanged.'
+    suggested_action: 'Fold backslash-newline and CRLF continuations before classification; refuse (or decode) $-single-quote and $-double-quote arguments to a deny-listed command; add both blocks plus the controls to the base-scan shape table and mutation-prove each.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 8100
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 34
+    escaped: 0
+    boundary_signals: ['refused', 'is refused']
+    boundary: true
+    notes: 'Classifier probed with 34 cases (22 hostile, 12 legitimate): 32 scored as required, 2 reproduced (h2.ansi-c-delete, h2.continuation-split = T274-QA-4). The cycle-1 hostile shapes and the symlinked-directory containment hold. No case wrote outside its sandbox.'
+  performance:
+    status: PASS
+    notes: 'Median of five alternating CI=true npm test runs: develop 228.2 s, head (f6a73688) 239.0 s, ratio 1.047 (+4.7%, target within 10%). Load average was 7 to 9 throughout, so the runs are noisy but unbiased by order. Both trees show the same 2 harness-only failures.'
+  reliability:
+    status: PASS
+    notes: 'Declined fixture-copy and width-mismatch paths return their reasons with no partial write; the syntax check parses and runs nothing.'
+  maintainability:
+    status: PASS
+    notes: 'Cycle-1 doc comment and qa-runnable-prose-detection.md now state the real rule; the template false positive is gone (one real finding in the corpus fixed by marking a fence text).'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T274-QA-4 with controls and mutation proofs.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+  future:
+    - action: 'sed with a variable operand (sed 2d "$f") is refused by the owner-accepted shape-4 rule; revisit if it blocks real docs.'
+      refs: ['docs/tasks/task.90.pipeline-lock-silent-success/task.90.pipeline-lock-silent-success.md']
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 1
+  verification_method: 'Original reproductions re-run on head; committed tests reverted one by one and each went red'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T274-QA-4 fixed and re-reviewed']

@@ -1,0 +1,65 @@
+schema: 2
+task: 'task.274.qa-engines-stop-passing-what-they-cannot-see'
+task_title: 'QA engines stop passing what they cannot see'
+gate: CONCERNS
+status_reason: 'The cycle-2 finding is fixed and mutation-proven, and nothing the change set introduced is open. The unscoped safety re-probe found five other gaps in the deny-list, all identical on develop, none named by this task, none present in the tracked docs; they are routed to recommendations.future.'
+reviewer: 'QA Engineer'
+head: '1d60b861b1aceda5f69777a0b9f469b7a1812dda'
+updated: '2026-11-09T11:34:18Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 8135
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 39
+    escaped: 0
+    boundary_signals: ['refused', 'is refused']
+    boundary: true
+    notes: 'Classifier probed with 39 cases (all as required, none reproduced, none escaped): the cycle-1 and cycle-2 shapes, the ANSI-C, locale-quote and continuation forms, and controls. CONCERNS because the re-probe found five pre-existing deny-list gaps (function shadowing an allow-listed name, the <> redirection, find -fprint0, sed e command and s///e flag, sort --compress-program); four were executed and wrote a file. They are identical on develop and absent from the tracked docs, so they are not this change set findings.'
+  performance:
+    status: PASS
+    notes: 'Cycle 2 measured the median of five alternating runs at +4.7% against develop (target within 10%). Since then the diff added one linear regex and one linear scan (125 ms on 320,000 backslashes); the cycle-2 qa-fix run of the full suite took no longer.'
+  reliability:
+    status: PASS
+    notes: 'Declined paths return reasons without partial writes; no state is left behind by the scan.'
+  maintainability:
+    status: PASS
+    notes: 'The rule is stated once in qa-runnable-prose-detection.md and cited by the CHANGELOG entry; the reason text names the general rule.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'The snippet runner classifies by deny-list, and a re-probe at gate 3 found five more ways a runnable block writes (reproduced by execution, identical on develop): a function named after an allow-listed command (echo () { touch out; }; echo hi), the read-write redirection <>out, find -fprint0 out, sed 1e touch out / s/a/touch out/e, and sort --compress-program (not executed). Replace the deny-list with an allow-list of accepted shapes (Step 2.6 consolidate), or file each as a bug. File a task.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+      provenance: pre-existing
+    - action: 'sed with a variable operand (sed 2d "$f") is refused by the owner-accepted shape-4 rule; revisit if it blocks real docs.'
+      refs: ['docs/tasks/task.90.pipeline-lock-silent-success/task.90.pipeline-lock-silent-success.md']
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 0
+  verification_method: 'Original reproductions re-run on head; committed tests reverted one by one and each went red'
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions: ['Owner decision on the pre-existing deny-list gaps (follow-up task) before the runner is trusted with untrusted documents']

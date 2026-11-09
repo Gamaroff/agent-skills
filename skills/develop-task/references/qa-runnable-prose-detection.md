@@ -299,6 +299,7 @@ A finding is raised when any of these holds:
 | Condition                                              | Finding             | `channel` | `confidence` |
 | ------------------------------------------------------ | ------------------- | --------- | ------------ |
 | Either shell exits non-zero                            | `execution-failure` | —         | `high`       |
+| A block that is **not run** (refused `mutating`, or `unbound-variable`) does not parse under `bash -n` / `zsh -n` | `execution-failure` with `syntax: true` | — | `high` |
 | The two shells disagree on stdout                      | `shell-disagreement` | `stdout` | `medium`     |
 | stdout **agrees** but the two shells disagree on exit status | `shell-disagreement` | `status` | `medium` |
 
@@ -319,6 +320,32 @@ single `kind` so every existing consumer keeps working; `channel` says which com
 Adding the status channel cannot turn a previously clean file red: a status disagreement implies at
 least one non-zero status, which has already raised `execution-failure`. It is a label on a failure the
 gate already caught, not a new gate.
+
+**A refusal does not say the block parses (task.274, obs #54).** On task.204 an apostrophe closed a
+single-quoted `node -e` body; three blocks failed to parse, Step 4b refused all of them as `mutating`, and
+the report read `no-executable-blocks` — the broken prose hid behind the refusal. So a block that is not
+run because it is `mutating`, or because a variable is unbound, is still parsed with `<shell> -n -c`
+(nothing executes), and a parse failure is its own `execution-failure` finding (`syntax: true`, `high`)
+beside the refusal. A block awaiting a `{slot}` or `<slot>` is **not** parsed: its placeholder routinely
+reads as an operator, so a failure there is the template.
+
+**What the base scan reads as a write (task.274, obs #67).** Four shapes classified `runnable` and wrote:
+a command after a heredoc body (`stripProse` kept the `<<EOF` opener, so a second pass swallowed the next
+line — the operator is now neutralised, which makes the strip idempotent); `$(…)` or a backtick inside
+double quotes (they run — only single quotes make them text); a deny-listed flag in quotes
+(`find docs "-delete"` — `DENY_PATTERNS` now also run over a copy with quotes removed); and a **variable
+argument to a deny-listed command** (`X=-delete; find docs $X`). The last is *refused*: the scan tracks no
+values, so an argument that could become a flag through an expansion to `find`, `sed`, `rm`, `curl`,
+`gh`, `git` or `tee` classifies `mutating`, with the reason naming it. That is an argument that begins
+with the expansion (`$X`, `"$X"`, `${X}`, `$(…)`) or whose literal prefix is a dash with no `=` (`-$X`,
+`"-${X}"`, `-$(…)`). `docs/$X`, `"task.${N}.*"` and `--since="$D"` have a literal name or path in front
+and stay runnable. Two quote forms the shell decodes before the command sees them are refused the same
+way, because the scan does not decode them: an unquoted ANSI-C `$'-delete'` (also `$'\x2ddelete'`) or
+locale `$"-delete"` argument. A `$` that only precedes a closing quote (`'cost$'`, `"a$"`) is not one. A
+backslash-newline is removed before classification, since the shell removes it before reading a word
+(`-dele\` newline `te` is `-delete`); only an odd run of backslashes continues the line. A shipped helper's own variables and the arguments a helper forwards are
+judged by the existing helper rules, not this one. A block this wrongly refuses is a false positive to
+rewrite with a literal argument, not a rule to loosen.
 
 ### 3aa. Defence in depth — the sandbox sentinel
 

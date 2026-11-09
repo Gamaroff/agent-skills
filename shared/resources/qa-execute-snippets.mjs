@@ -741,6 +741,113 @@ export const DENY_PATTERNS = [
 ];
 
 /**
+ * The commands DENY_PATTERNS names for a flag or sub-command that writes. A
+ * variable can carry that flag, so an argument whose literal prefix is empty or
+ * starts with a dash (`$X`, `${X}`, `"$X"`, `-$X`, `"-${X}"`, `-$(…)`, a bare
+ * `$(…)`) is refused on these (task.274, obs #67; T274-QA-2). A prefix that does
+ * not start with a dash cannot make the argument a flag, so `docs/$X` and
+ * `"task.${N}.*"` stay runnable.
+ */
+const VARIABLE_ARGUMENT_COMMANDS = new Set([
+  "find",
+  "sed",
+  "rm",
+  "curl",
+  "gh",
+  "git",
+  "tee",
+]);
+
+/**
+ * Whether an argument whose literal text before an expansion is `lead` could
+ * become a flag: nothing before it, or a dash-led name the expansion can still
+ * complete (`-`, `-$X`). `--since=$D` has its name fixed by the `=`, so the
+ * expansion is only a value.
+ */
+function couldBeFlag(lead) {
+  return lead === "" || (lead.startsWith("-") && !lead.includes("="));
+}
+
+/**
+ * True when `word` holds an unquoted `$'…'` (ANSI-C) or `$"…"` (locale) opener.
+ * Inside single or double quotes a `$` followed by a quote is plain text, and a
+ * `$` that merely precedes a CLOSING quote (`'cost$'`, `"a$"`) is not an opener.
+ */
+function hasDecodedQuote(word) {
+  let quote = null;
+  for (let k = 0; k < word.length; k += 1) {
+    const ch = word[k];
+    if (quote === "'") {
+      if (ch === "'") quote = null;
+    } else if (quote === '"') {
+      if (ch === "\\") k += 1;
+      else if (ch === '"') quote = null;
+    } else if (ch === "\\") {
+      k += 1;
+    } else if (ch === "$" && (word[k + 1] === "'" || word[k + 1] === '"')) {
+      return true;
+    } else if (ch === "'" || ch === '"') {
+      quote = ch;
+    }
+  }
+  return false;
+}
+
+/**
+ * The first deny-listed command in `prose` that is given an argument that could
+ * become a flag through a variable expansion, or null. Single quotes make `'$X'`
+ * text, so it is not one. Walks each simple command of the prose-stripped text.
+ */
+function variableArgumentToDenyListed(prose) {
+  const WORD = /(?:[^\s"'\\]|\\[\s\S]|"(?:[^"\\]|\\[\s\S])*"|'[^']*')+/g;
+  // Command separators; a `$(` or backtick starts an inner command of its own.
+  // The capture keeps each delimiter, so a segment knows whether a substitution
+  // follows it (`find docs -$(echo delete)`: the flag is cut off by the split).
+  const parts = prose.split(/(\n|;|&&|\|\||\||&|\$\(|`|\()/);
+  for (let p = 0; p < parts.length; p += 2) {
+    const segment = parts[p];
+    const next = parts[p + 1];
+    const words = segment.match(WORD) ?? [];
+    let i = 0;
+    // Leading assignments, keywords and `command` are not the command.
+    while (
+      i < words.length &&
+      (/^[A-Za-z_][A-Za-z0-9_]*\+?=/.test(words[i]) ||
+        /^(if|elif|while|until|then|else|do|!|\{|command)$/.test(words[i]))
+    )
+      i += 1;
+    const name = (words[i] ?? "")
+      .replace(/['"\\]/g, "")
+      .split("/")
+      .pop();
+    if (!VARIABLE_ARGUMENT_COMMANDS.has(name)) continue;
+    for (const arg of words.slice(i + 1)) {
+      // `$'-delete'` and `$"-delete"` are decoded by the shell, and the scan does
+      // not decode them: refuse the argument rather than guess (T274-QA-4).
+      if (hasDecodedQuote(arg)) return name;
+      if (!/\$(?:\{|[A-Za-z_@*#?0-9])/.test(arg)) continue;
+      // Refuse unless a literal prefix is known not to be a flag: `docs/$X` is
+      // a path, `-$X` and `"-${X}"` are flags once the shell expands them.
+      const lead = arg.slice(0, arg.search(/\$/)).replace(/['"\\]/g, "");
+      if (couldBeFlag(lead)) return name;
+    }
+    // A substitution that follows this segment is part of its last argument
+    // (`-$(…)`), or a whole argument of its own (`find docs $(…)`).
+    if (next === "$(" || next === "`") {
+      const tail =
+        segment.endsWith(" ") || segment.endsWith("\t")
+          ? ""
+          : (segment.split(/\s+/).pop() ?? "");
+      const lead = tail.replace(/['"\\]/g, "");
+      if (words.length > i + 1 || tail === "") {
+        if (couldBeFlag(lead)) return name;
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * CR-1 — a write redirection makes ANY command mutating, including an
  * allow-listed one. `echo pwned > /tmp/x` classified runnable and wrote the file;
  * the temp working directory is no defence, because an absolute or `~`-relative
@@ -1006,12 +1113,53 @@ function collapseQuotedSpans(text) {
       quote = null;
       openedAt = -1;
       out += ch;
+    } else if (
+      quote === '"' &&
+      (ch === "`" || (ch === "$" && text[i + 1] === "("))
+    ) {
+      // Inside DOUBLE quotes `$(…)` and backticks still RUN (single quotes are the
+      // only quoting that makes them text). Dropping them with the rest of the span
+      // hid the command from the scan: `echo "$(touch /tmp/x)"` created the file and
+      // classified runnable (task.274, obs #67). Kept verbatim, so the invocation
+      // scan reads the inner command; the surrounding text is still dropped.
+      const end = substitutionEnd(text, i);
+      // Its own quotes collapse like any others: kept as written, a `|` inside
+      // `grep 'a\|b'` would split the command and read `b'` as one.
+      out += collapseQuotedSpans(text.slice(i, end));
+      i = end - 1;
     }
     // else: content of a quoted span — dropped
   }
   // Same fail-closed rule as blankQuotedSpans: an unterminated quote hides nothing.
   if (quote !== null) return out.slice(0, outAtOpen) + text.slice(openedAt);
   return out;
+}
+
+/**
+ * The index just past the command substitution that starts at `text[start]`
+ * (`$(` to its matching `)`, or a backtick to the next unescaped backtick). An
+ * unclosed one runs to the end of the text: reading more is the fail-closed side.
+ * Parentheses inside the substitution's own quotes are counted too, which can only
+ * lengthen the span — again the safe side.
+ */
+function substitutionEnd(text, start) {
+  if (text[start] === "`") {
+    for (let i = start + 1; i < text.length; i += 1) {
+      if (text[i] === "\\") i += 1;
+      else if (text[i] === "`") return i + 1;
+    }
+    return text.length;
+  }
+  let depth = 0;
+  for (let i = start + 1; i < text.length; i += 1) {
+    if (text[i] === "\\") i += 1;
+    else if (text[i] === "(") depth += 1;
+    else if (text[i] === ")") {
+      depth -= 1;
+      if (depth === 0) return i + 1;
+    }
+  }
+  return text.length;
 }
 
 function stripProse(code) {
@@ -1053,7 +1201,20 @@ function stripProse(code) {
       // threw away any redirection that followed — `cat <<EOF > /tmp/pwned` had
       // its `> /tmp/pwned` removed before the write-redirect check ever saw it,
       // and classified runnable.
-      out.push(raw);
+      //
+      // The kept line has its heredoc OPERATOR neutralised (task.274, obs #67).
+      // `commandInvocations` strips text `stripNonCode` already stripped, and a
+      // surviving `<<EOF` made that second pass read the line after the opener as
+      // a body that never closed: `cat <<EOF` / `hello` / `EOF` / `touch /tmp/x`
+      // lost its `touch`. With the operator gone the output holds no heredoc, so
+      // stripping it again changes nothing (idempotent). The terminator word and
+      // everything else on the line stay, so the redirections still show.
+      const op = here[0].match(/^<<-?/)[0];
+      out.push(
+        raw.slice(0, here.index) +
+          " HEREDOC: " +
+          raw.slice(here.index + op.length),
+      );
       continue;
     }
     // Drop `# comment` — but ONLY outside quoted spans. A line regex fired on a
@@ -1674,7 +1835,16 @@ function addBody(table, name, body) {
 function classifyInternal(
   code,
   bindings = {},
-  { helperRoot = null, depth = 0, helperMode = false, inherited = null } = {},
+  {
+    helperRoot = null,
+    depth = 0,
+    helperMode = false,
+    inherited = null,
+    // True for the re-classification of forwarded ARGUMENTS (`forwardedHazard`):
+    // their variables are the caller's to judge, and the variable-argument rule is
+    // about a block's own text (task.274).
+    forwarded = false,
+  } = {},
 ) {
   // `defines`: every function this text defines, its own and those of the helpers
   // it sources — what a caller sourcing it inherits. `trusted`: the subset that
@@ -1719,12 +1889,36 @@ function classifyInternal(
   // Scan prose-stripped code, not raw: a heredoc body or a comment that merely
   // MENTIONS `git push` is documentation. Scanning raw text would classify a doc
   // for its own examples and skip a block that is in fact safe to run.
-  const prose = stripProse(code);
+  // A backslash-newline is removed by the shell before it reads a word, so
+  // `-dele\<LF>te` is `-delete` (T274-QA-4). Only an ODD run of backslashes
+  // continues the line; an escaped pair (`\\`) followed by a newline does not.
+  const prose = stripProse(code).replace(/(?<!\\)((?:\\\\)*)\\\r?\n/g, "$1");
 
+  // Judged twice: as written, and with quotes and backslashes removed, as the
+  // command receives them. `find docs "-delete"` and `find docs '-delete'` both run
+  // `-delete`, and neither matched a pattern that wants whitespace before the dash
+  // (task.274, obs #67 — the same two readings `forwardedHazard` applies to the
+  // arguments a helper forwards).
+  const unquotedProse = prose.replace(/['"\\]/g, "");
   for (const [re, name] of DENY_PATTERNS) {
-    if (re.test(prose))
+    if (re.test(prose) || re.test(unquotedProse))
       return { klass: "mutating", reason: `deny-list: ${name}` };
   }
+
+  // Shape 4 (task.274, obs #67; owner decision, Phase 1): a deny-listed command
+  // whose argument is a variable expansion. `X=-delete; find docs $X` runs
+  // `find docs -delete`, and no pattern above can see it because the flag is not in
+  // the text. The scan tracks no values, so it refuses the form instead.
+  // Not in helper mode: a shipped helper's variables are its call's arguments
+  // (`find "${dir}"`, `"$@"`), which `forwardedHazard` judges as written at the call
+  // site. Refusing them here would refuse every shipped read-only helper.
+  const variableArg =
+    helperMode || forwarded ? null : variableArgumentToDenyListed(prose);
+  if (variableArg !== null)
+    return {
+      klass: "mutating",
+      reason: `deny-list: argument to ${variableArg} that the shell expands at run time (variable, substitution or $'…'; the scan tracks no values)`,
+    };
 
   // Deliberately NOT split on a single `|`: sed accepts it as an s/// delimiter,
   // so splitting there tears `s|a|b|wfile` apart and the write disappears.
@@ -1806,7 +2000,9 @@ function classifyInternal(
     for (const cmd of cmds) {
       const name = cmd.replace(":", " ");
       for (const text of [args.join(" "), args.map(unquote).join(" ")]) {
-        const r = classifyInternal(`${name} ${text}`, bindings);
+        const r = classifyInternal(`${name} ${text}`, bindings, {
+          forwarded: true,
+        });
         if (r.klass === "mutating" && !/^unrecognised-command/.test(r.reason))
           return `${name}: ${r.reason}`;
       }
@@ -2045,6 +2241,53 @@ export function sandboxEnv({ cwd, bindings = {} } = {}) {
     PWD: cwd ?? process.cwd(),
     ...bindings,
   };
+}
+
+// A documented argument slot may name a path or a file: `<path/to/skill-folder>`,
+// `<bug.md>`. The classifier's own `<name>` slot grammar leaves those out (it
+// would change what classifies), so the syntax check reads the wider shape.
+const ANGLE_TEMPLATE = /(?<![<>&\w])<[A-Za-z][\w .:/-]*>/;
+
+/**
+ * Whether a block that is NOT run should still be parsed. A `mutating` block is
+ * real code, and so is one refused for an unbound variable. A block awaiting a
+ * `{slot}` or `<slot>` is not: its placeholder routinely reads as a redirect or an
+ * operator, so a parse failure there is the template, not broken prose.
+ */
+function isSyntaxCheckable(klass, reason, code = "") {
+  // A `mutating` block that still holds an unfilled slot is a template: `env -i
+  // <command> <candidate>` does not parse, and is not meant to (T274-QA-3).
+  if (klass === "mutating")
+    return unfilledSlots(code).length === 0 && !ANGLE_TEMPLATE.test(code);
+  return klass === "placeholder" && /^unbound-variable/.test(reason ?? "");
+}
+
+/**
+ * `<shell> -n -c <code>` for each shell: parse, run nothing. One execution-failure
+ * finding per shell that cannot parse the block (task.274, obs #54). `syntax: true`
+ * is what tells it from a run that exited non-zero.
+ */
+function syntaxFindings(code, shells, timeout) {
+  const env = sandboxEnv({});
+  const out = [];
+  for (const shell of shells) {
+    const r = spawnSync(shell, ["-n", "-c", "--", code], {
+      timeout,
+      encoding: "utf8",
+      env,
+    });
+    // A shell that could not be started, or timed out, says nothing about syntax.
+    if (r.error || r.status === 0 || r.status === null) continue;
+    const first = (r.stderr ?? "").split("\n").find((l) => l.trim() !== "");
+    out.push({
+      kind: "execution-failure",
+      shell,
+      confidence: "high",
+      syntax: true,
+      detail: `${shell} -n: syntax error, the block does not parse${first ? `: ${first}` : ""}`,
+    });
+  }
+  return out;
 }
 
 export function runBlock(
@@ -2491,6 +2734,15 @@ export function executeFile(filePath, opts = {}) {
           skipped: true,
           ...(changed === undefined ? {} : { changed }),
         });
+        // A refusal says nothing about whether the block PARSES (task.274, obs
+        // #54): an apostrophe that closed a single-quoted `node -e` body got three
+        // blocks refused as `mutating` and the report read `no-executable-blocks`.
+        // So a block that is not run is still parsed, and one that does not parse is
+        // a finding of its own, beside the refusal.
+        if (isSyntaxCheckable(klass, reason, code)) {
+          for (const f of syntaxFindings(code, shells, timeout))
+            findings.push({ ...f, line: block.line, origin: block.origin });
+        }
         continue;
       }
       const { runs, findings: blockFindings } = runBlock(code, {

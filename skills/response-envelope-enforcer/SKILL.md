@@ -342,7 +342,7 @@ async download(@Param('id') id: string) {
 
 ### Step 1: Identify File Type
 
-```bash
+```text
 # Controller file?
 *.controller.ts → Apply HTTP endpoint rules (Category 1)
 

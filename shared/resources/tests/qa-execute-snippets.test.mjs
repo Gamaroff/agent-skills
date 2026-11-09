@@ -19,6 +19,7 @@ import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -3667,11 +3668,21 @@ test("T191 CR2-3: a start-up variable set through a name the scan cannot read is
   for (const code of [
     "export BASH\\_ENV=h/write.sh; bash h/plain.sh",
     'export "BASH""_ENV"=h/write.sh; bash h/plain.sh',
-    'export "$(echo bash_env | tr a-z A-Z)=h/write.sh"; bash h/plain.sh',
     "read BASH\\_ENV <<< h/write.sh; export BASH\\_ENV; bash h/plain.sh",
     "local -n R=X; bash h/plain.sh",
   ])
     assert.match(at(code).reason ?? "", /^helper call with /, code);
+  // Since task.274 a substitution inside double quotes is scanned, so the raw and
+  // collapsed readings of this one no longer line up and the call is refused for
+  // that reason first. Still refused; the start-up hazard is no longer what names it.
+  const respelt = at(
+    'export "$(echo bash_env | tr a-z A-Z)=h/write.sh"; bash h/plain.sh',
+  );
+  assert.equal(respelt.klass, "mutating");
+  assert.match(
+    respelt.reason ?? "",
+    /^helper (call with |.* forwards its arguments)/,
+  );
   assert.match(
     at("bash h/plain.sh", { "BASH_FUNC_echo%%": "() { mv a b; }" }).reason ??
       "",
@@ -3780,4 +3791,168 @@ test("T191 CR2-6: a helper call in a block that changes PATH is refused", () => 
   assert.equal(at("source h/nf.sh; zz_helper_fn").klass, "runnable");
   // Reading PATH is not changing it.
   assert.equal(at('echo "$PATH"; bash h/plain.sh').klass, "runnable");
+});
+
+// ── task.274 (obs #67): four shapes the base scan could not see ──────────────
+//
+// Measured on task.191 QA-fix cycle 2: each classified `runnable` and writes (or
+// deletes) when run. Each row has a control that must stay runnable, so a fix
+// that refuses everything does not pass.
+
+const BASE_SCAN_SHAPES = {
+  "a command after a heredoc body": "cat <<EOF\nhello\nEOF\ntouch /tmp/x",
+  "a command substitution inside double quotes": 'echo "$(touch /tmp/x)"',
+  "a backtick substitution inside double quotes": 'echo "`touch /tmp/x`"',
+  "a double-quoted deny-listed flag": 'find docs "-delete"',
+  "a single-quoted deny-listed flag": "find docs '-delete'",
+  "a variable argument to a deny-listed command": "X=-delete; find docs $X",
+  "a braced variable argument to a deny-listed command":
+    "X=-delete; find docs ${X}",
+  // T274-QA-2: a literal dash in front of the expansion is still a flag.
+  "a dash followed by a variable": "A=delete; find docs -$A",
+  "a double-quoted dash followed by a braced variable":
+    'A=delete; find docs "-${A}"',
+  "a dash followed by a command substitution": "find docs -$(echo delete)",
+  "a command substitution as a whole argument": "find docs $(echo -delete)",
+  // T274-QA-4: the quote-stripped reading does not model these two quote forms.
+  "an ANSI-C quoted flag": "find docs $'-delete'",
+  "an ANSI-C quoted flag written with a hex escape": "find docs $'\\x2ddelete'",
+  "a locale-translated quoted flag": 'find docs $"-delete"',
+  "a flag split by a line continuation": "find docs -dele\\\nte",
+  "a variable split by a line continuation": "X=-delete; find docs $\\\nX",
+};
+for (const [name, code] of Object.entries(BASE_SCAN_SHAPES)) {
+  test(`task.274 base scan: ${name} is refused as mutating`, () => {
+    assert.equal(classifyBlock(code).klass, "mutating", code);
+  });
+}
+
+test("task.274 base scan controls: the look-alikes that write nothing stay runnable", () => {
+  for (const code of [
+    "cat <<EOF\nhello\nEOF\necho done", // heredoc, no write after it
+    "cat <<'EOF'\n$(touch /tmp/x)\nEOF", // the body is data, however it reads
+    "echo '$(touch /tmp/x)'", // single quotes: text, not substitution
+    "find docs -name x", // find, no action
+    'find docs -name "x"', // a quoted value, not a deny-listed flag
+    "X=hello; echo $X", // a variable argument to a command that is not deny-listed
+    "D=docs; ls $D",
+    "X=y; find docs/$X -name z", // a literal path prefix: cannot be a flag
+    'N=3; find docs -name "task.${N}.*"', // a quoted value with a literal prefix
+    // T274-QA-4 controls: a `$` that merely precedes a closing quote is not ANSI-C
+    // quoting, and a continuation in a harmless command is still harmless.
+    "find docs -name 'cost$'",
+    'find docs -name "a$"',
+    "find docs -name x \\\n  -type f",
+    "git \\\n  log",
+    'echo "a $(echo b) c"', // a read-only substitution in double quotes
+    // A `|` inside the substitution's own single quotes is text, not a pipeline: kept
+    // as written it split the command and read `b'` as one (found in task.45's bug).
+    "echo \"n=$(grep -c 'a\\|b' notes.txt) done\"",
+  ])
+    assert.equal(classifyBlock(code).klass, "runnable", code);
+});
+
+// ── task.274 (obs #54): a block that does not parse is a finding, not just a refusal ──
+//
+// On task.204 an apostrophe closed a single-quoted `node -e` body; three fenced
+// blocks failed to parse, Step 4b refused all of them as `mutating`, and the report
+// read `no-executable-blocks`. The refusal hid that the prose was broken.
+
+const SYNTAX_FILE = (code) => {
+  const file = join(tmp(), "SKILL.md");
+  writeFileSync(file, bash(code));
+  return file;
+};
+
+test("task.274 syntax: an unparseable block refused as mutating yields a high execution-failure finding, beside its refusal", () => {
+  // The apostrophe in "it's" ends the single-quoted node -e body; `rm -rf` makes
+  // it mutating, so it is never run.
+  const code = "node -e 'console.log(\"it's\")'\nrm -rf /tmp/qa-never-run";
+  const r = executeFile(SYNTAX_FILE(code), { allowZsh: false });
+  assert.equal(r.results[0].skipped, true, "still refused");
+  assert.equal(r.results[0].klass, "mutating", "the refusal is unchanged");
+  const f = r.findings.filter((x) => x.kind === "execution-failure");
+  assert.equal(f.length, 1, JSON.stringify(r.findings));
+  assert.equal(f[0].confidence, "high");
+  assert.equal(f[0].syntax, true);
+  assert.equal(f[0].shell, "bash");
+  assert.match(f[0].detail, /syntax/i);
+});
+
+test("task.274 syntax controls: a parseable mutating block refuses only; a runnable block is not syntax-checked twice; a template slot is not a syntax error", () => {
+  // Parseable and mutating: refusal, no finding.
+  const mut = executeFile(SYNTAX_FILE("rm -rf /tmp/qa-never-run"), {
+    allowZsh: false,
+  });
+  assert.equal(mut.results[0].klass, "mutating");
+  assert.deepEqual(mut.findings, []);
+  // Runnable and fine: no finding.
+  const ok = executeFile(SYNTAX_FILE("echo hello"), { allowZsh: false });
+  assert.deepEqual(ok.findings, []);
+  // A block with an unfilled `{slot}` and a dangling pipe does not parse, but it is
+  // a placeholder awaiting `--slot`, not broken prose.
+  const slot = executeFile(SYNTAX_FILE("git log {PR_NUMBER} |"), {
+    allowZsh: false,
+  });
+  assert.equal(slot.results[0].klass, "placeholder");
+  assert.deepEqual(
+    slot.findings.filter((f) => f.syntax),
+    [],
+  );
+  // T274-QA-3: a MUTATING template (env -i … <command> <candidate>) is no more a
+  // syntax error than a placeholder one. Positive control: the same block with
+  // the slots filled with a stray `|` does parse-fail, so the check still runs.
+  const tmpl = executeFile(
+    SYNTAX_FILE('env -i HOME="$(mktemp -d)" <command> <candidate>'),
+    { allowZsh: false },
+  );
+  assert.equal(tmpl.results[0].klass, "mutating");
+  assert.deepEqual(
+    tmpl.findings.filter((f) => f.syntax),
+    [],
+  );
+  // The documented shapes the corpus scan found: a slot naming a path or a file.
+  for (const code of [
+    "rm -rf <path/to/skill-folder>",
+    "bash ./scripts/run.sh <data.json>",
+  ]) {
+    const t = executeFile(SYNTAX_FILE(code), { allowZsh: false });
+    assert.equal(t.results[0].klass, "mutating", code);
+    assert.deepEqual(
+      t.findings.filter((f) => f.syntax),
+      [],
+      code,
+    );
+  }
+  // A code string that starts with `--` is code, not an option to the shell.
+  const dash = executeFile(SYNTAX_FILE("--state-init --next"), {
+    allowZsh: false,
+  });
+  assert.deepEqual(
+    dash.findings.filter((f) => f.syntax),
+    [],
+  );
+  const broken = executeFile(SYNTAX_FILE("rm -rf /tmp/qa-never-run |"), {
+    allowZsh: false,
+  });
+  assert.equal(broken.findings.filter((f) => f.syntax).length, 1);
+});
+
+test("task.274 syntax: nothing in the checked block runs", () => {
+  const marker = join(tmp(), "ran-marker");
+  // Parses, is refused as mutating (rm -rf), and would create the marker if run.
+  executeFile(SYNTAX_FILE(`touch ${marker}; rm -rf /tmp/qa-never-run`), {
+    allowZsh: false,
+  });
+  assert.equal(existsSync(marker), false, "bash -n only parses");
+});
+
+test("task.274 base scan: stripProse is idempotent, so a second scan sees what the first did", () => {
+  // commandInvocations re-strips text that stripNonCode already stripped. A kept
+  // heredoc opener made the second pass swallow the next line as a body.
+  const verdicts = ["cat <<EOF\nhello\nEOF\ntouch /tmp/x"].map((c) => [
+    classifyBlock(c).klass,
+    classifyBlock(c).reason,
+  ]);
+  assert.equal(verdicts[0][0], "mutating", JSON.stringify(verdicts));
 });
