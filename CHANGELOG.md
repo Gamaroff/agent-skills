@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **The QA snippet runner allows flags, not just commands** (task 289). `SAFE_FLAGS` gives every
+  `SAFE_COMMANDS` member an audited entry, and a flag or operand outside it classifies `mutating` as
+  `flag-not-allowed: <command> <flag>`, so a new spelling cannot run. Closed together: `sort
+  --compress-program`, `find -fprint0`, sed's `e` command and `s///e` flag (the script is parsed by
+  `sedScriptVerdict`), the `<>` redirection, a brace expansion or `${IFS}` that spells `-delete`, a
+  function named after an allowed command, `uniq in out`, `file -C`, `diff -l`, `tail -f` and `date -s`.
+  A variable that builds a sed script, and a forwarded helper argument that sed reads as a script, are
+  judged too. Over the tracked docs one block is newly refused against develop (a `tail -f` in the
+  loop-supervisor README), none newly runnable; the 18 blocks task 274 refused stay refused (the owner declined
+  value tracking). The `ctx-wrap-` temp-directory leak (the task's optional Phase 5) is not part of this change.
 - **The QA engines stop passing what they cannot see** (task 274). The snippet runner's base scan now
   refuses four shapes that classified `runnable` and wrote: a command after a heredoc body (the strip is
   idempotent), `$(…)` or a backtick inside double quotes, a quoted deny-listed flag (`find docs

@@ -847,6 +847,965 @@ function variableArgumentToDenyListed(prose) {
   return null;
 }
 
+// ── task.289: the flag allow-list ─────────────────────────────────────────────
+//
+// `SAFE_COMMANDS` decides which COMMANDS may run; this decides which FLAGS and how
+// many OPERANDS each may carry. DENY_PATTERNS can only name what somebody thought
+// to forbid, and every gap task 274 left open was a flag nobody had: a program
+// run by `sort --compress-program`, a file written by `find -fprint0`, a shell
+// command run by sed's `e`, a file written through `uniq in out`. A flag outside
+// its command's entry is refused, so a new spelling cannot run.
+//
+// DENY_PATTERNS and the shape-4 scan stay BESIDE this table (task.289 Phase 2):
+// they are the second line for the commands the table covers and the only line
+// for the ones it does not (`git`, `gh`, `rm`, `curl`, `tee`), and their reasons
+// are pinned by tests. The table is consulted after them.
+
+/** An entry whose every flag has been read and none writes or runs a program. */
+const ANY_FLAG = (why) => ({ any: true, why });
+
+/**
+ * One entry per `SAFE_COMMANDS` member (a member with no entry is refused).
+ *
+ * `short`/`shortValue`: single-letter flags without/with a value. `long`/
+ * `longValue`: long names without/with a value (`--name=value` or `--name value`).
+ * `numeric`: `-5` is allowed (`head -5`). `maxOperands`: positional operands.
+ * `why` records the audit. An exact long name only: GNU getopt accepts an
+ * abbreviation (`--comp=x`), and an abbreviation is not on the list, so it is
+ * refused rather than guessed at.
+ */
+export const SAFE_FLAGS = {
+  basename: ANY_FLAG("prints a path component; no write or exec flag"),
+  cat: ANY_FLAG("copies to stdout; no write or exec flag"),
+  comm: ANY_FLAG(
+    "compares two sorted files to stdout; --output-delimiter is a string",
+  ),
+  cut: ANY_FLAG("selects fields to stdout; no write or exec flag"),
+  date: {
+    short: "uIR",
+    shortValue: "dr",
+    // `date 01011200` sets the clock as `-s` does; only a `+FORMAT` is read-only.
+    operandRe: /^\+/,
+    long: ["utc", "universal", "rfc-email", "iso-8601", "rfc-3339"],
+    longValue: ["date", "reference"],
+    why: "-s/--set changes the clock and -f reads a file of dates: both left out",
+  },
+  diff: {
+    short: "abBdEiNnpqrsTtuwyZ",
+    shortValue: "UCFILxW",
+    long: [
+      "brief",
+      "report-identical-files",
+      "context",
+      "unified",
+      "recursive",
+      "new-file",
+      "text",
+      "ignore-case",
+      "ignore-space-change",
+      "ignore-all-space",
+      "ignore-blank-lines",
+      "ignore-tab-expansion",
+      "strip-trailing-cr",
+      "side-by-side",
+      "minimal",
+      "speed-large-files",
+      "expand-tabs",
+      "initial-tab",
+      "show-c-function",
+      "color",
+      "suppress-common-lines",
+      "left-column",
+      "normal",
+      "no-dereference",
+    ],
+    longValue: [
+      "label",
+      "ignore-matching-lines",
+      "exclude",
+      "width",
+      "tabsize",
+      "show-function-line",
+      "unified-context",
+    ],
+    // No `diff` flag writes a file or runs a program of the caller's choosing
+    // (`-l` runs `pr`, a fixed formatter found on PATH), so a variable that
+    // becomes one is harmless; it is why `diff "$A" "$B"` stays readable.
+    expansionOk: true,
+    why: "-l/--paginate runs `pr`; --to-file and -X read files: left out",
+  },
+  dirname: ANY_FLAG("prints a path component; no write or exec flag"),
+  echo: ANY_FLAG("prints its arguments; no write or exec flag"),
+  egrep: ANY_FLAG("searches files to stdout; no write or exec flag"),
+  false: ANY_FLAG("exits 1 and takes no flag that writes or runs a program"),
+  fgrep: ANY_FLAG("searches files to stdout; no write or exec flag"),
+  file: {
+    short: "bhiIkLNnpsz",
+    shortValue: "F",
+    long: [
+      "brief",
+      "mime",
+      "mime-type",
+      "mime-encoding",
+      "dereference",
+      "no-dereference",
+      "keep-going",
+      "raw",
+      "no-buffer",
+      "special-files",
+      "uncompress",
+      "preserve-date",
+    ],
+    longValue: ["separator"],
+    why: "-C compiles a magic file to disk, -m names one, -f reads a list: left out",
+  },
+  find: {
+    why: "-delete/-exec/-execdir/-ok/-okdir run or remove, -fls/-fprint/-fprint0/-fprintf write: left out; see FIND_BARE and FIND_VALUE",
+  },
+  grep: ANY_FLAG("searches files to stdout; no write or exec flag"),
+  head: ANY_FLAG("prints the start of a file; no write or exec flag"),
+  jq: ANY_FLAG(
+    "filters JSON to stdout; a program cannot write a file or run one",
+  ),
+  ls: ANY_FLAG("lists to stdout; no write or exec flag"),
+  printf: ANY_FLAG(
+    "formats to stdout; `-v` (assigns a variable) is caught by assignmentHazard",
+  ),
+  pwd: ANY_FLAG("prints the directory; -L and -P change only the spelling"),
+  readlink: ANY_FLAG("prints a link target; -m and -f create nothing"),
+  realpath: ANY_FLAG("prints a resolved path; creates nothing"),
+  sed: {
+    short: "nErsuz",
+    long: [
+      "quiet",
+      "silent",
+      "regexp-extended",
+      "separate",
+      "null-data",
+      "unbuffered",
+      "posix",
+    ],
+    why: "-i/--in-place edit files, -f/--file read a script that is not read here, -l and --follow-symlinks are unused; the script (first operand, -e, --expression) is parsed by sedScriptSafe",
+  },
+  seq: ANY_FLAG("prints numbers; -f/-s/-w only shape the output"),
+  sort: {
+    short: "bcCdfghiMmnRrsuVz",
+    shortValue: "kt",
+    long: [
+      "ignore-leading-blanks",
+      "dictionary-order",
+      "ignore-case",
+      "general-numeric-sort",
+      "ignore-nonprinting",
+      "month-sort",
+      "human-numeric-sort",
+      "numeric-sort",
+      "reverse",
+      "version-sort",
+      "check",
+      "merge",
+      "stable",
+      "unique",
+      "zero-terminated",
+      "debug",
+    ],
+    longValue: ["key", "field-separator", "sort"],
+    why: "-o/--output write a file, --compress-program runs a program, -T names a directory: left out",
+  },
+  stat: ANY_FLAG("prints file status; no write or exec flag"),
+  tail: {
+    short: "qvz",
+    shortValue: "cn",
+    numeric: true,
+    long: ["quiet", "silent", "verbose", "zero-terminated"],
+    longValue: ["bytes", "lines"],
+    // `tail` has no flag that writes or runs a program, so a variable that
+    // becomes one is a hang at worst, which the block timeout ends.
+    expansionOk: true,
+    why: "-f/-F/--follow never return and --pid waits: left out",
+  },
+  test: ANY_FLAG("evaluates a condition; its `-x` tokens are operators"),
+  tr: ANY_FLAG("translates stdin to stdout"),
+  true: ANY_FLAG("exits 0 and takes no flag that writes or runs a program"),
+  uniq: {
+    short: "cdDiuz",
+    shortValue: "fsw",
+    long: [
+      "count",
+      "repeated",
+      "all-repeated",
+      "ignore-case",
+      "unique",
+      "zero-terminated",
+      "group",
+    ],
+    longValue: ["skip-fields", "skip-chars", "check-chars"],
+    maxOperands: 1,
+    why: "a second operand is the OUTPUT file (`uniq in out` writes it)",
+  },
+  wc: ANY_FLAG("counts; --files0-from reads a list of names"),
+};
+
+/** `find`'s expressions that take no value, and those that take one. */
+const FIND_BARE = new Set([
+  "-print",
+  "-print0",
+  "-ls",
+  "-prune",
+  "-quit",
+  "-true",
+  "-false",
+  "-empty",
+  "-readable",
+  "-writable",
+  "-executable",
+  "-nouser",
+  "-nogroup",
+  "-depth",
+  "-xdev",
+  "-mount",
+  "-noleaf",
+  "-daystart",
+  "-follow",
+  "-not",
+  "-and",
+  "-or",
+  "-a",
+  "-o",
+  "-ignore_readdir_race",
+  "-noignore_readdir_race",
+  "-H",
+  "-L",
+  "-P",
+]);
+const FIND_VALUE = new Set([
+  "-name",
+  "-iname",
+  "-path",
+  "-ipath",
+  "-wholename",
+  "-iwholename",
+  "-regex",
+  "-iregex",
+  "-lname",
+  "-ilname",
+  "-type",
+  "-xtype",
+  "-maxdepth",
+  "-mindepth",
+  "-mtime",
+  "-mmin",
+  "-atime",
+  "-amin",
+  "-ctime",
+  "-cmin",
+  "-newer",
+  "-anewer",
+  "-cnewer",
+  "-size",
+  "-perm",
+  "-user",
+  "-group",
+  "-uid",
+  "-gid",
+  "-links",
+  "-inum",
+  "-samefile",
+  "-printf",
+  "-regextype",
+  "-used",
+  "-fstype",
+]);
+
+/**
+ * `tok` as the shell passes it to the command, with each expansion standing in as
+ * `X`: single quotes are literal, double quotes keep `$` and a few escapes, and an
+ * unquoted backslash escapes the next character. `firstExp` is where the first
+ * expansion sits in `text` (-1: none), `names` are the variables read, and
+ * `dynamic` is set for a command substitution, a backtick or arithmetic, whose
+ * output the scan cannot know.
+ */
+function shellWord(tok, resolve = null) {
+  let text = "";
+  let q = null;
+  let firstExp = -1;
+  let dynamic = false;
+  const names = new Set();
+  for (let k = 0; k < tok.length; k += 1) {
+    const ch = tok[k];
+    if (q === "'") {
+      if (ch === "'") q = null;
+      else text += ch;
+      continue;
+    }
+    if (ch === "\\") {
+      if (q === '"' && !'$`"\\\n'.includes(tok[k + 1] ?? "")) text += ch;
+      else if (k + 1 < tok.length) {
+        k += 1;
+        if (tok[k] !== "\n") text += tok[k];
+      }
+      continue;
+    }
+    if (ch === "'" && q === null) {
+      q = "'";
+      continue;
+    }
+    if (ch === '"') {
+      q = q === '"' ? null : '"';
+      continue;
+    }
+    if (ch === "`") {
+      dynamic = true;
+      if (firstExp < 0) firstExp = text.length;
+      text += "X";
+      continue;
+    }
+    if (ch === "$") {
+      const rest = tok.slice(k + 1);
+      let m;
+      // An unquoted `$'…'` (ANSI-C) or `$"…"` (locale) word is decoded by the shell
+      // before the command sees it (`$'-o'` is `-o`, `$'-\157'` too), and this reader
+      // does not decode it: it is an expansion whose value is unknown, so a flag
+      // spelled that way is refused where a flag may stand, as `$X` is.
+      if (q === null && (rest.startsWith("'") || rest.startsWith('"'))) {
+        dynamic = true;
+        if (firstExp < 0) firstExp = text.length;
+        text += "X";
+        const close = rest[0];
+        let j = 1;
+        while (j < rest.length && rest[j] !== close)
+          j += rest[j] === "\\" ? 2 : 1;
+        k += 1 + j;
+        continue;
+      }
+      if (rest.startsWith("(")) {
+        dynamic = true;
+        if (firstExp < 0) firstExp = text.length;
+        text += "X";
+        // Skip to the matching paren so the inner text is not read as the word.
+        let depth = 0;
+        for (; k < tok.length; k += 1) {
+          if (tok[k] === "(") depth += 1;
+          if (tok[k] === ")" && (depth -= 1) === 0) break;
+        }
+        continue;
+      }
+      let value = null;
+      if (rest.startsWith("{")) {
+        // EVERY `${…}` is an expansion, whatever it holds: `${1}`, `${!X}`,
+        // `${#A}`, `${@:1}` as much as `${NAME}`. Listing the spellings that name a
+        // variable left the others as literal text, so a flag they carried was
+        // never seen (QA 3). Only `${NAME}` alone has a value this reader can say.
+        const end = rest.indexOf("}");
+        const inner = end < 0 ? rest.slice(1) : rest.slice(1, end);
+        const id = /^[A-Za-z_][A-Za-z0-9_]*/.exec(inner);
+        if (id) names.add(id[0]);
+        if (id && id[0] === inner && resolve) value = resolve(id[0]);
+        k += end < 0 ? rest.length : end + 1;
+      } else if ((m = /^[A-Za-z_][A-Za-z0-9_]*/.exec(rest))) {
+        names.add(m[0]);
+        if (resolve) value = resolve(m[0]);
+        k += m[0].length;
+      } else if ((m = /^[0-9@*#?$!-]/.exec(rest))) {
+        k += 1;
+      } else {
+        text += ch;
+        continue;
+      }
+      if (firstExp < 0) firstExp = text.length;
+      text += value ?? "X";
+      continue;
+    }
+    text += ch;
+  }
+  return { text, firstExp, names, dynamic };
+}
+
+/** `tok` with every quoted or escaped span removed: what the shell still expands. */
+function bareOf(tok) {
+  let out = "";
+  let q = null;
+  for (let k = 0; k < tok.length; k += 1) {
+    const ch = tok[k];
+    if (q === "'") {
+      if (ch === "'") q = null;
+    } else if (q === '"') {
+      if (ch === "\\") k += 1;
+      else if (ch === '"') q = null;
+    } else if (ch === "\\") k += 1;
+    else if (ch === "'" || ch === '"') q = ch;
+    else out += ch;
+  }
+  return out;
+}
+
+/** The variables the block assigns (`NAME=value`) and the values it gives them. */
+function assignedVariables(prose) {
+  const out = new Map();
+  const re =
+    /(?:^|[\s;&|(])(?:(?:export|local|readonly|declare|typeset)\s+)?([A-Za-z_][A-Za-z0-9_]*)\+?=("(?:[^"\\]|\\[\s\S])*"|'[^']*'|[^\s;&|)]*)/g;
+  for (const m of prose.matchAll(re)) {
+    const list = out.get(m[1]) ?? [];
+    list.push(m[2]);
+    out.set(m[1], list);
+  }
+  // `for NAME in a b c; do`: each word is a value, when every word is a plain
+  // literal. A glob, a brace or an expansion in the list gives names the scan
+  // cannot read (`$` marks the value as unreadable).
+  for (const m of prose.matchAll(
+    /\bfor\s+([A-Za-z_][A-Za-z0-9_]*)\s+in\s+([^;\n]*?)\s*(?:;|\n)\s*do\b/g,
+  )) {
+    const list = out.get(m[1]) ?? [];
+    for (const word of m[2].split(/\s+/).filter(Boolean))
+      list.push(/[$`*?[{]/.test(word) ? "$" : word.replace(/^['"]|['"]$/g, ""));
+    out.set(m[1], list);
+  }
+  return out;
+}
+
+/**
+ * Whether a variable the block assigns could hold more than one word, or a flag
+ * the scan cannot read. A value the CALLER binds is the caller's; a value this
+ * block assigns is read here, and an unquoted `$NAME` whose value holds
+ * whitespace, or comes from a substitution, word-splits into extra arguments.
+ */
+function unsafeAssignment(values) {
+  return values.some((v) => /\s|\$|`/.test(v));
+}
+
+/**
+ * A sed script made only of commands that read, print, branch or substitute.
+ * Everything else is refused, and so is a script that cannot be parsed to the
+ * end: `e` runs a shell command (`1e cmd`, `s/a/b/e`), `w`/`W` write a file, and
+ * `r`/`R`/`f`/`F`/`v` are not needed. A bracket expression protects the
+ * delimiter inside it, as POSIX sed reads it.
+ *
+ * `sedScriptVerdict` tells a script that is READ AND FORBIDDEN (`forbidden`: an
+ * `e`, `w`, `r`... command or `s` flag, which a valid script would act on) from
+ * one the scan cannot read (`unreadable`). An invalid script makes sed exit before
+ * it runs anything, so only a forwarded argument, which may be a path and not a
+ * script at all, is allowed the second.
+ */
+export function sedScriptVerdict(s) {
+  let forbidden = false;
+  const ok = sedScan(s, () => {
+    forbidden = true;
+  });
+  return ok ? "safe" : forbidden ? "forbidden" : "unreadable";
+}
+
+export const sedScriptSafe = (s) => sedScriptVerdict(s) === "safe";
+
+function sedScan(s, markForbidden) {
+  let i = 0;
+  const n = s.length;
+  const skipBlank = () => {
+    while (i < n && (s[i] === " " || s[i] === "\t")) i += 1;
+  };
+  // Index after the closing `d` of a delimited part, or -1.
+  const readPart = (d, isRegex) => {
+    while (i < n) {
+      const ch = s[i];
+      if (ch === "\\") {
+        i += 2;
+        continue;
+      }
+      if (ch === "\n" && isRegex) return -1;
+      if (isRegex && ch === "[") {
+        i += 1;
+        if (s[i] === "^") i += 1;
+        if (s[i] === "]") i += 1;
+        while (i < n && s[i] !== "]") {
+          if (s[i] === "[" && /[:.=]/.test(s[i + 1] ?? "")) {
+            const close = s.indexOf(`${s[i + 1]}]`, i + 2);
+            if (close < 0) return -1;
+            i = close + 2;
+          } else i += 1;
+        }
+        if (i >= n) return -1;
+        i += 1;
+        continue;
+      }
+      i += 1;
+      if (ch === d) return i;
+    }
+    return -1;
+  };
+  const address = () => {
+    if (/[0-9]/.test(s[i] ?? "")) {
+      while (/[0-9]/.test(s[i] ?? "")) i += 1;
+      if (s[i] === "~") {
+        i += 1;
+        while (/[0-9]/.test(s[i] ?? "")) i += 1;
+      }
+      return true;
+    }
+    if (s[i] === "$") {
+      i += 1;
+      return true;
+    }
+    if (s[i] === "/" || s[i] === "\\") {
+      let d = "/";
+      if (s[i] === "\\") {
+        d = s[i + 1];
+        if (!d || d === "\n" || d === "\\") return null;
+        i += 2;
+      } else i += 1;
+      if (readPart(d, true) < 0) return null;
+      while (s[i] === "I" || s[i] === "M") i += 1;
+      return true;
+    }
+    return false;
+  };
+  const cmdEnd = () => {
+    skipBlank();
+    const c = s[i];
+    return c === undefined || /[\n;}#]/.test(c);
+  };
+  const toLineEnd = () => {
+    while (i < n && s[i] !== "\n") {
+      if (s[i] === "\\") i += 1;
+      i += 1;
+    }
+  };
+  for (;;) {
+    while (i < n && /[\s;]/.test(s[i])) i += 1;
+    if (i >= n) return true;
+    let a = address();
+    if (a === null) return false;
+    skipBlank();
+    if (a && s[i] === ",") {
+      i += 1;
+      skipBlank();
+      if (s[i] === "+" || s[i] === "~") i += 1;
+      a = address();
+      if (a === null || a === false) return false;
+      skipBlank();
+    }
+    while (s[i] === "!") {
+      i += 1;
+      skipBlank();
+    }
+    const cmd = s[i];
+    i += 1;
+    if (cmd === undefined) return false;
+    if (cmd === "{" || cmd === "}") continue;
+    // A command takes nothing after it but a separator: GNU sed rejects `pe x` as
+    // "extra characters after command" and runs nothing, so `hello` is not an `h`
+    // followed by an `e` command, it is unreadable (and harmless).
+    if ("pdDgGhHnNxP=z".includes(cmd)) {
+      if (!cmdEnd()) return false;
+      continue;
+    }
+    if ("qQlL".includes(cmd)) {
+      while (/[0-9 ]/.test(s[i] ?? "")) i += 1;
+      if (!cmdEnd()) return false;
+      continue;
+    }
+    if (cmd === "#") {
+      // A comment ends at the FIRST newline. GNU sed does not read a backslash
+      // before it as a continuation (that is a/i/c text), so `#c\<newline>e x`
+      // is a comment and then an `e` command, which toLineEnd() would swallow.
+      while (i < n && s[i] !== "\n") i += 1;
+      continue;
+    }
+    if (cmd === ":" || "btT".includes(cmd)) {
+      // GNU sed ends a label at whitespace or `;`, and reads what follows as the
+      // next command (`:a e echo x` runs `e`). So the label is one word, and only a
+      // separator or the end of the script may follow it: anything else is a script
+      // this scan does not read, which is refused, never skipped over.
+      while (i < n && (s[i] === " " || s[i] === "\t")) i += 1;
+      while (i < n && !/[\s;]/.test(s[i])) i += 1;
+      while (i < n && (s[i] === " " || s[i] === "\t")) i += 1;
+      if (i < n && s[i] !== "\n" && s[i] !== ";") return false;
+      continue;
+    }
+    if ("aic".includes(cmd)) {
+      toLineEnd();
+      continue;
+    }
+    if (cmd === "s") {
+      const d = s[i];
+      if (!d || d === "\n" || d === "\\") return false;
+      i += 1;
+      if (readPart(d, true) < 0) return false;
+      if (readPart(d, false) < 0) return false;
+      for (;;) {
+        const f = s[i];
+        if (f === undefined || /[\s;}#]/.test(f)) break;
+        if (/[gpiImM0-9]/.test(f)) {
+          i += 1;
+          continue;
+        }
+        if (/[ewW]/.test(f)) markForbidden();
+        return false; // `e`, `w`, and any flag not read
+      }
+      continue;
+    }
+    if (cmd === "y") {
+      const d = s[i];
+      if (!d || d === "\n" || d === "\\") return false;
+      i += 1;
+      if (readPart(d, false) < 0) return false;
+      if (readPart(d, false) < 0) return false;
+      if (!cmdEnd()) return false;
+      continue;
+    }
+    if ("efFrRwWv".includes(cmd)) markForbidden();
+    return false;
+  }
+}
+
+/**
+ * `text` with every command substitution, process substitution and backtick
+ * replaced by one word, or null when one is unterminated. `commandInvocations`
+ * turns each of them into a segment break, so the arguments it hands the flag
+ * table stop at the first (`sort <(echo a) -oout` reaches the table as `sort`),
+ * whether the substitution follows the command word or precedes it as a prefix
+ * assignment (`X=$(echo a) uniq in out`). Guessing where a substitution may stand
+ * was patched three times; masking removes the cut. A command substitution
+ * becomes `$__SUBST__`, a variable nothing defines, so it is an expansion of
+ * unknown value that the table refuses where a flag may stand (and that has no
+ * `$(` for `commandInvocations` to cut again); a process substitution becomes `/dev/fd/0`, the operand
+ * it stands for. The commands INSIDE a substitution are judged on their own, in
+ * the unmasked reading.
+ */
+/**
+ * Index of the `)` that closes the `(` at `open`, or -1. Quotes, escapes and
+ * comments hide a paren from the shell, so they hide it here: `$(echo ")")` ends
+ * at the LAST paren, and a scan that counted the quoted one ended early and
+ * read the rest of the line as a second command (QA 5).
+ */
+function closingParen(text, open) {
+  let d = 0;
+  for (let i = open; i < text.length; i += 1) {
+    const c = text[i];
+    if (c === "\\") i += 1;
+    else if (c === "'") {
+      const j = text.indexOf("'", i + 1);
+      if (j < 0) return -1;
+      i = j;
+    } else if (c === '"') {
+      for (i += 1; i < text.length && text[i] !== '"'; i += 1) {
+        if (text[i] === "\\") i += 1;
+        else if (text[i] === "$" && text[i + 1] === "(") {
+          const j = closingParen(text, i + 1);
+          if (j < 0) return -1;
+          i = j;
+        }
+      }
+      if (i >= text.length) return -1;
+    } else if (c === "#" && (i === 0 || /[\s;&|(]/.test(text[i - 1]))) {
+      while (i < text.length && text[i] !== "\n") i += 1;
+    } else if (c === "(") d += 1;
+    else if (c === ")" && (d -= 1) === 0) return i;
+  }
+  return -1;
+}
+
+function maskSubstitutions(text) {
+  let out = "";
+  let q = null;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text[i];
+    if (q === "'") {
+      out += c;
+      if (c === "'") q = null;
+      continue;
+    }
+    if (c === "\\") {
+      out += c + (text[i + 1] ?? "");
+      i += 1;
+      continue;
+    }
+    const two = text.slice(i, i + 2);
+    const proc = q === null && (two === "<(" || two === ">(");
+    if (two === "$(" || proc) {
+      const j = closingParen(text, i + 1);
+      if (j < 0) return null;
+      out += proc ? "/dev/fd/0" : "$__SUBST__";
+      i = j;
+      continue;
+    }
+    if (c === "`") {
+      const j = text.indexOf("`", i + 1);
+      if (j < 0) return null;
+      out += "$__SUBST__";
+      i = j;
+      continue;
+    }
+    if (c === '"') q = q === '"' ? null : '"';
+    else if (c === "'" && q === null) q = "'";
+    out += c;
+  }
+  return out;
+}
+
+/** Why `name`'s arguments are outside its entry, or null. `rawArgs` keep their quotes. */
+function flagViolation(name, rawArgs, ctx) {
+  const entry = SAFE_FLAGS[name];
+  if (!entry) return `flag-not-allowed: ${name} no-table-entry (fail-closed)`;
+  if (entry.any) return null;
+  // What a variable stands for, where the scan can say: the caller's binding, or
+  // the one literal this block assigns it. Anything else is not read.
+  const bound = ctx.bindings ?? {};
+  const resolver = (n) => {
+    if (Object.hasOwn(bound, n)) return String(bound[n]);
+    const vals = ctx.assigned.get(n);
+    if (vals && vals.length === 1 && !/[$`]/.test(vals[0]))
+      return shellWord(vals[0]).text;
+    return null;
+  };
+  // A name whose value is the caller's to judge: bound by the caller, or unbound
+  // (the block is then a placeholder and does not run).
+  const trusted = (n) =>
+    Object.hasOwn(bound, n) ||
+    (ctx.unbound?.has(n) ?? false) ||
+    IMPLICIT_VARS.has(n);
+  // `operands` drops a trailing `}`, which is the end of a brace expansion here
+  // (`{-dele,-delete}`). Only a `}` with no `{` to close is the end of a group.
+  const toks = [];
+  for (let i = 0; i < rawArgs.length; i += 1) {
+    const a = rawArgs[i];
+    if (REDIRECTION.test(a)) {
+      if (/^\d*[<>]+[&|]?$/.test(a)) i += 1;
+      continue;
+    }
+    let t = a.replace(/\)+$/, "");
+    while (t.endsWith("}") && t.split("}").length > t.split("{").length)
+      t = t.slice(0, -1);
+    if (t !== "") toks.push(t);
+  }
+  const words = toks.map((t) => ({ tok: t, ...shellWord(t, resolver) }));
+  // With no raw reading the scan has only its collapsed one, where a quoted
+  // span is `""`: that stands for text the table cannot judge (`"-delete"`).
+  const hidden = (w) => ctx.collapsed && /^(""|'')$/.test(w.tok);
+  const unreadable = (w) =>
+    `${w.tok} (a quoted argument the classifier cannot read here)`;
+  // An expansion where a flag may stand: its value could be the flag.
+  const flagCapable = (w) =>
+    !ctx.lenient &&
+    !entry.expansionOk &&
+    w.firstExp >= 0 &&
+    couldBeFlag(w.text.slice(0, w.firstExp));
+  // The things the shell does to an unquoted word BEFORE the command sees it. A
+  // shipped helper's variables are its call's arguments, judged at the call site.
+  const BRACE = /\{([^{}\s]*,[^{}\s]*)\}|\{([^{}\s]*\.\.[^{}\s]*)\}/g;
+  for (const w of ctx.lenient || entry.expansionOk ? [] : words) {
+    const bare = bareOf(w.tok);
+    if (/\$\{?IFS\b/.test(bare))
+      return `flag-not-allowed: ${name} word-splitting on \${IFS} can build a flag`;
+    for (const v of bare.matchAll(/\$\{?([A-Za-z_][A-Za-z0-9_]*)/g)) {
+      const n = v[1];
+      if (trusted(n)) continue;
+      // Defined here by something other than one plain assignment (`for`, `read`,
+      // a substitution, two assignments), or assigned more than one word.
+      if (!ctx.assigned.has(n) || unsafeAssignment(ctx.assigned.get(n)))
+        return `flag-not-allowed: ${name} word-splitting on $${n}, which this block defines in a way the scan cannot read, or gives more than one word`;
+    }
+    if (ctx.assigned.has("IFS") && /\$/.test(bare))
+      return `flag-not-allowed: ${name} unquoted expansion with IFS reassigned`;
+    if (new RegExp(BRACE.source).test(bare)) {
+      // The word's text with its quotes off: a quoted prefix still leads the word
+      // (`"-de"{lete,lete}`). A brace builds a flag when a flag is already being
+      // spelled, or when an alternative starts one.
+      for (const g of w.text.matchAll(BRACE)) {
+        const lead = w.text.slice(0, g.index);
+        const alts = (g[1] ?? g[2]).split(/,|\.\./);
+        if (
+          (lead.startsWith("-") && !lead.includes("=")) ||
+          (lead === "" && alts.some((a) => a === "" || a.startsWith("-")))
+        )
+          return `flag-not-allowed: ${name} brace expansion can build a flag`;
+      }
+    }
+  }
+  const out = (flag) => `flag-not-allowed: ${name} ${flag}`;
+  if (name === "find") {
+    for (let i = 0; i < words.length; i += 1) {
+      const w = words[i];
+      const u = w.text;
+      if (hidden(w)) return out(unreadable(w));
+      if (u.startsWith("-")) {
+        if (FIND_BARE.has(u) || /^-O[0-3]$/.test(u)) continue;
+        if (FIND_VALUE.has(u) || /^-newer[acBmt][acBmt]$/.test(u)) {
+          i += 1;
+          continue;
+        }
+        return out(u);
+      }
+      if (flagCapable(w))
+        return out(`${w.tok} (an expansion that could be a flag)`);
+    }
+    return null;
+  }
+  if (name === "sed") {
+    const scripts = [];
+    const files = [];
+    let haveScript = false;
+    let afterDD = false;
+    const blind = words.find(hidden);
+    if (blind) return out(unreadable(blind));
+    for (let i = 0; i < words.length; i += 1) {
+      const w = words[i];
+      const u = w.text;
+      if (afterDD || !u.startsWith("-") || u === "-") {
+        files.push(w);
+        continue;
+      }
+      if (u === "--") {
+        afterDD = true;
+        continue;
+      }
+      if (u.startsWith("--")) {
+        const nm = u.slice(2).split("=")[0];
+        if (SAFE_FLAGS.sed.long.includes(nm)) continue;
+        if (nm === "expression") {
+          haveScript = true;
+          if (u.includes("="))
+            scripts.push({ text: u.slice(u.indexOf("=") + 1), w });
+          else if (words[i + 1])
+            scripts.push({ text: words[(i += 1)].text, w: words[i] });
+          else return out("--expression (no script)");
+          continue;
+        }
+        return out(`--${nm}`);
+      }
+      for (let k = 1; k < u.length; k += 1) {
+        const c = u[k];
+        if (SAFE_FLAGS.sed.short.includes(c)) continue;
+        if (c === "e") {
+          haveScript = true;
+          if (k < u.length - 1) scripts.push({ text: u.slice(k + 1), w });
+          else if (words[i + 1])
+            scripts.push({ text: words[(i += 1)].text, w: words[i] });
+          else return out("-e (no script)");
+          break;
+        }
+        return out(`-${c}`);
+      }
+    }
+    if (!haveScript && files.length > 0) {
+      const first = files.shift();
+      scripts.push({ text: first.text, w: first });
+    }
+    for (const f of files)
+      if (flagCapable(f) && !afterDD)
+        return out(`${f.tok} (an expansion that could be a flag)`);
+    for (const sc of scripts) {
+      const w = sc.w ?? null;
+      if (w && w.dynamic) return out("a script built by a substitution");
+      // A value this block gives the script is read as written (the resolver put
+      // it into the text); a name it defines any other way could carry a
+      // delimiter and an `e` (`A='.*/touch x/e;s/z'; sed "s/$A/b/"`).
+      if (w && !ctx.lenient)
+        for (const n of w.names)
+          if (!trusted(n) && resolver(n) === null)
+            return out(
+              `script built from $${n}, whose value this block defines in a way the scan cannot read`,
+            );
+      // A shipped helper's script is its caller's argument, judged as written at
+      // the call site (`forwardedHazard`), where it holds no expansion.
+      if (ctx.lenient && w && w.firstExp >= 0) continue;
+      const v = sedScriptVerdict(sc.text);
+      // A forwarded argument is as likely a path as a script, and a script sed
+      // cannot parse runs nothing: only a script read and found forbidden stands.
+      if (v === "safe" || (ctx.lenient && v === "unreadable")) continue;
+      return out(
+        `script ${JSON.stringify(sc.text)} (a command outside the read-only set: e, w, r and others run or write)`,
+      );
+    }
+    return null;
+  }
+  // The generic entries.
+  let operandCount = 0;
+  let afterDD = false;
+  for (let i = 0; i < words.length; i += 1) {
+    const w = words[i];
+    const u = w.text;
+    if (afterDD || !u.startsWith("-") || u === "-") {
+      if (hidden(w)) return out(unreadable(w));
+      if (!afterDD && flagCapable(w))
+        return out(`${w.tok} (an expansion that could be a flag)`);
+      // A command whose operands count (uniq: the second is an output file) cannot
+      // be judged on an unquoted word that may become several: a brace, a glob, or
+      // an expansion this reader cannot name (`uniq {in,out}`, `uniq *.txt`).
+      if (entry.maxOperands != null && !ctx.lenient) {
+        const bare = bareOf(w.tok).replace(/\$\{[A-Za-z_][A-Za-z0-9_]*\}/g, "");
+        if (/[*?[{`]/.test(bare) || (/\$/.test(bare) && w.names.size === 0))
+          return out(
+            `${w.tok} (an unquoted brace, glob or expansion can name more than one operand)`,
+          );
+      }
+      operandCount += 1;
+      if (entry.operandRe && !entry.operandRe.test(u))
+        return out(
+          `operand ${JSON.stringify(u)} (only ${entry.operandRe} is read-only)`,
+        );
+      if (entry.maxOperands != null && operandCount > entry.maxOperands)
+        return out(
+          `operand ${JSON.stringify(u)} (at most ${entry.maxOperands}; a further operand may be an output file)`,
+        );
+      continue;
+    }
+    if (u === "--") {
+      afterDD = true;
+      continue;
+    }
+    if (u.startsWith("--")) {
+      const nm = u.slice(2).split("=")[0];
+      if ((entry.long ?? []).includes(nm)) continue;
+      if ((entry.longValue ?? []).includes(nm)) {
+        if (!u.includes("=")) i += 1;
+        continue;
+      }
+      return out(`--${nm}`);
+    }
+    if (entry.numeric && /^-\d+$/.test(u)) continue;
+    for (let k = 1; k < u.length; k += 1) {
+      const c = u[k];
+      if ((entry.short ?? "").includes(c)) continue;
+      if ((entry.shortValue ?? "").includes(c)) {
+        if (k === u.length - 1) i += 1;
+        break;
+      }
+      return out(`-${c}`);
+    }
+  }
+  return null;
+}
+
+/**
+ * `cat <> out` opens `out` for reading AND writing, creating it: a redirection
+ * that carries no `>` for WRITE_REDIRECT to see (task.289, gap 4).
+ */
+const READ_WRITE_REDIRECT = /(?:^|[^<>&])\d*<>/;
+
+/**
+ * Functions the text defines under the name of a command it may run. A
+ * definition changes what the name means, so `function cat { touch x; }; cat f`
+ * runs the body while the scan sees an allow-listed `cat` (task.289, gap 7). A
+ * helper's definitions are judged by `shadowsCommand` instead.
+ */
+function shadowingFunctions(code) {
+  const out = [];
+  // Both spellings need one of these two tokens, and most blocks hold neither.
+  if (!code.includes("function") && !code.includes("(")) return out;
+  const defs = [
+    /(?:^|[\s;&|({])function\s+([^\s(){};&|]+)/g,
+    /(?:^|[\s;&|({])([^\s(){};&|=]+)\s*\(\s*\)/g,
+  ];
+  for (const re of defs)
+    for (const m of code.matchAll(re)) {
+      const name = m[1]
+        .replace(/['"\\]/g, "")
+        .split("/")
+        .pop();
+      if (SAFE_COMMANDS.has(name) || COMMAND_RUNNERS.has(name)) out.push(name);
+    }
+  return out;
+}
+
 /**
  * CR-1 — a write redirection makes ANY command mutating, including an
  * allow-listed one. `echo pwned > /tmp/x` classified runnable and wrote the file;
@@ -1933,8 +2892,25 @@ function classifyInternal(
   }
 
   // CR-1 — a write redirection makes any command mutating, allow-listed or not.
-  if (WRITE_REDIRECT.test(blankConditionalSpans(stripNonCode(code)))) {
+  // `stripNonCode` is the costliest step of a classification and its result is
+  // used four times below, so it is made once.
+  const nonCode = stripNonCode(code);
+  const redirectScan = blankConditionalSpans(nonCode);
+  if (WRITE_REDIRECT.test(redirectScan)) {
     return { klass: "mutating", reason: "write-redirection" };
+  }
+  // task.289: `<>` opens a file for reading AND writing, and has no `>` to find.
+  if (redirectScan.includes("<>") && READ_WRITE_REDIRECT.test(redirectScan)) {
+    return { klass: "mutating", reason: "read-write-redirection" };
+  }
+  // task.289: a function named after a command changes what the name runs.
+  if (!helperMode && !forwarded) {
+    const shadowed = shadowingFunctions(nonCode);
+    if (shadowed.length > 0)
+      return {
+        klass: "mutating",
+        reason: `function-shadows-command: ${shadowed[0]}`,
+      };
   }
 
   // `command -v X` / `command -V X` is a pure lookup: it prints a path and runs
@@ -1949,7 +2925,7 @@ function classifyInternal(
   // `command node …` block unrunnable by the gate that prescribes the prefix
   // (obs #90). `command -p X` (PATH override) and `command -v` are NOT this case:
   // -v is rewritten above, and an option-bearing form stays a refused runner.
-  const codeForScan = stripNonCode(code)
+  const codeForScan = nonCode
     .replace(/\bcommand\s+-[vV]\b/g, "true")
     .replace(/(^|[\s;|&(])command\s+(?![-])/g, "$1");
 
@@ -1997,16 +2973,39 @@ function classifyInternal(
   const forwardedHazard = (cmds, args) => {
     if (args === null) return "arguments the classifier cannot read";
     if (args.length === 0) return null;
+    // task.289: the arguments are forwarded to EVERY command the function may run,
+    // and the scan cannot tell which one receives them. A deny-list reason on any
+    // of them stands. A flag outside a command's table stands only when EVERY
+    // table-governed command refuses it: `-name` for `find` is a flag `sed` has
+    // no entry for, and refusing it there would refuse every helper that runs
+    // both. A flag one command accepts and another would act on is the deny
+    // list's to catch (`sed -i`), as it was.
+    const flagRefusals = new Map();
+    const governed = [...cmds].filter(
+      (c) => SAFE_COMMANDS.has(c) && SAFE_FLAGS[c] && !SAFE_FLAGS[c].any,
+    );
     for (const cmd of cmds) {
       const name = cmd.replace(":", " ");
       for (const text of [args.join(" "), args.map(unquote).join(" ")]) {
         const r = classifyInternal(`${name} ${text}`, bindings, {
           forwarded: true,
         });
-        if (r.klass === "mutating" && !/^unrecognised-command/.test(r.reason))
-          return `${name}: ${r.reason}`;
+        if (r.klass !== "mutating" || /^unrecognised-command/.test(r.reason))
+          continue;
+        // A sed script read and found to run or write stands on its own: `-newer`
+        // is accepted by `find` and is `-n -e wer` to sed, which writes a file.
+        if (
+          /^flag-not-allowed/.test(r.reason) &&
+          !/^flag-not-allowed: sed script/.test(r.reason)
+        ) {
+          if (!flagRefusals.has(cmd)) flagRefusals.set(cmd, r.reason);
+          continue;
+        }
+        return `${name}: ${r.reason}`;
       }
     }
+    if (governed.length > 0 && governed.every((c) => flagRefusals.has(c)))
+      return `${governed[0]}: ${flagRefusals.get(governed[0])}`;
     return null;
   };
 
@@ -2103,19 +3102,19 @@ function classifyInternal(
       );
   }
 
+  const unrecognised = (w) => {
+    if (COMMAND_RUNNERS.has(w)) return true; // CR-5/CR-6 — before the allow-list
+    if (SHELL_KEYWORDS.has(w)) return false;
+    if (SAFE_COMMANDS.has(w)) return false;
+    // After the runner check: a helper that defines `xargs` does not make
+    // `xargs` safe — and no defined name that shadows a real command is trusted.
+    // A name that shadows nothing is safe only while PATH is the host's (CR2-6).
+    if (defines.has(w) && !movesPath && !shadowsCommand(w)) return false;
+    if (w.startsWith("git:")) return !SAFE_GIT_SUBCOMMANDS.has(w.slice(4));
+    return true;
+  };
   const unknown = invocations
-    .filter(({ word: w }, i) => {
-      if (admitted.has(i)) return false;
-      if (COMMAND_RUNNERS.has(w)) return true; // CR-5/CR-6 — before the allow-list
-      if (SHELL_KEYWORDS.has(w)) return false;
-      if (SAFE_COMMANDS.has(w)) return false;
-      // After the runner check: a helper that defines `xargs` does not make
-      // `xargs` safe — and no defined name that shadows a real command is trusted.
-      // A name that shadows nothing is safe only while PATH is the host's (CR2-6).
-      if (defines.has(w) && !movesPath && !shadowsCommand(w)) return false;
-      if (w.startsWith("git:")) return !SAFE_GIT_SUBCOMMANDS.has(w.slice(4));
-      return true;
-    })
+    .filter(({ word: w }, i) => !admitted.has(i) && unrecognised(w))
     .map((inv) => inv.word);
 
   if (unknown.length > 0) {
@@ -2123,6 +3122,80 @@ function classifyInternal(
       "mutating",
       `unrecognised-command: ${[...new Set(unknown.map((w) => w.replace(":", " ")))].join(", ")} (fail-closed)`,
     );
+  }
+
+  // task.289: every allowed command's flags and operands are judged against its
+  // table entry (SAFE_FLAGS). A flag nobody listed is refused, so a spelling nobody
+  // thought of cannot run. Lenient about expansions in helper mode and for
+  // forwarded arguments, where the variables are the caller's to judge.
+  // The variable maps are read once, and only when a table-governed command is
+  // there to judge: most blocks run none, and a docs scan classifies thousands.
+  let flagCtx = null;
+  for (const [i, inv] of invocations.entries()) {
+    if (
+      inv.keyword ||
+      admitted.has(i) ||
+      !SAFE_COMMANDS.has(inv.word) ||
+      defines.has(inv.word) ||
+      SAFE_FLAGS[inv.word]?.any
+    )
+      continue;
+    flagCtx ??= {
+      assigned: assignedVariables(prose),
+      bindings,
+      unbound: new Set(unboundVariables(code, bindings)),
+      lenient: helperMode || forwarded,
+      collapsed: !raw,
+    };
+    const why = flagViolation(inv.word, raw ? raw[i].args : inv.args, flagCtx);
+    if (why) return verdict("mutating", why);
+  }
+  // A substitution cuts the arguments above at its `$(` or `<(`, so what follows
+  // it, or what follows a prefix assignment holding one, was never judged. The
+  // same text with each substitution masked as one word has no cut, and every
+  // governed command in it is judged whole (QA 2, 4).
+  if (/\$\(|`|[<>]\(/.test(prose)) {
+    const masked = maskSubstitutions(prose);
+    const maskedInv = masked === null ? null : commandInvocations(masked);
+    const maskedRaw = maskedInv ? rawInvocations(masked, maskedInv) : null;
+    // A block the masked reading cannot parse is refused, whatever it runs: a
+    // carve-out for "no governed command" let `X=$(echo ")") touch out` through,
+    // because the command the scan could not read was the one that mattered.
+    if (!maskedRaw)
+      return verdict(
+        "mutating",
+        "unrecognised-command: <unparseable> (a substitution the scan cannot read; fail-closed)",
+      );
+    for (const m of maskedRaw) {
+      // The unmasked reading already judged an unparseable word.
+      if (m.keyword || m.word === "<unparseable>") continue;
+      // A command written after a closed substitution (`X=$(true) python3 x.py`)
+      // is an argument of the substitution's own segment in the unmasked reading,
+      // so the allow-list never saw it. It is judged here.
+      if (!commands.has(m.word) && unrecognised(m.word))
+        return verdict(
+          "mutating",
+          `unrecognised-command: ${m.word.replace(":", " ")} (fail-closed)`,
+        );
+      if (
+        !SAFE_COMMANDS.has(m.word) ||
+        defines.has(m.word) ||
+        SAFE_FLAGS[m.word]?.any
+      )
+        continue;
+      flagCtx ??= {
+        assigned: assignedVariables(prose),
+        bindings,
+        unbound: new Set(unboundVariables(code, bindings)),
+        lenient: helperMode || forwarded,
+        collapsed: !raw,
+      };
+      const why = flagViolation(m.word, m.args, {
+        ...flagCtx,
+        collapsed: false,
+      });
+      if (why) return verdict("mutating", why);
+    }
   }
 
   // A helper's `<dir>` comments and `$1` arguments are code and arguments, not

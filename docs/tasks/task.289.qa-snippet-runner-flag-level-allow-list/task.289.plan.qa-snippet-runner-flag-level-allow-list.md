@@ -29,19 +29,19 @@ sed '1e touch x' f                         # sed e command runs a shell command
 cat <> out                                 # read-write redirection opens (creates) the file
 find docs -de{lete,lete}                   # brace expansion builds -delete
 find docs -name x${IFS}-delete             # word-splitting builds -delete
-cat() { touch x; }; cat f                  # function shadows an allowed command
+function cat { touch x; }; cat f           # function shadows an allowed command
 ```
 
-Run each through `classifyBlock` on the current engine first and record which already classify `mutating` (the gate says none do). The table drives the later phases.
+Review probe on develop (2026-11-09, `classifyBlock`): gaps 1 to 6 and the `function` spelling of gap 7 classify `runnable`. The `cat() { touch x; }; cat f` spelling is already `mutating` (`unrecognised-command: <unparseable>`), so it is a control. Also `runnable` today and writing: `uniq in out`, `file -C -m magic`, `sed --expression=1e f`, `sort -S 1 --compress-program=x f`. Add them as failing-first cases. The control `find docs/$X -name z` classifies `placeholder`, not `runnable`; assert what the run returns. Re-run the probe in Phase 1 and record it. The table drives the later phases.
 
 **Owner question (ask, do not default):** accept the 17 refused blocks (`task.274…dod.1…md`) or add value tracking.
 
 ### Phase 2: The flag table
 
 **Files to modify:**
-- `shared/resources/qa-execute-snippets.mjs` — add `SAFE_FLAGS` next to `SAFE_COMMANDS` (`:407`): `{ sed: Set([...]), find: Set([...]), sort: Set([...]) }`.
+- `shared/resources/qa-execute-snippets.mjs` — add `SAFE_FLAGS` next to `SAFE_COMMANDS` (`:407`), one entry per member (31): allowed flags and operand count, e.g. `{ sed: {...}, find: {...}, sort: {...}, uniq: { maxOperands: 1 }, ... }`.
 
-**Exact changes:** where `classifyBlock` loops `DENY_PATTERNS` (`:1903`), also walk the flags of each allowed command with a table entry. A flag outside the entry returns `{ klass: "mutating", reason: "flag-not-allowed: <cmd> <flag>" }`. A command without an entry keeps today's behaviour until its audit says otherwise. Record the audit per command in a test (`AUDITED = { grep: "…", jq: "…" }`), and fail the test when a `SAFE_COMMANDS` member has no record.
+**Exact changes:** where `classifyBlock` loops `DENY_PATTERNS` (`:1903`), also walk the flags of each allowed command with a table entry. A flag outside the entry returns `{ klass: "mutating", reason: "flag-not-allowed: <cmd> <flag>" }`. A command without an entry is refused (fail-closed). Record the audit per command in a test (`AUDITED = { grep: "…", jq: "…" }`), and fail the test when a `SAFE_COMMANDS` member has no record.
 
 ### Phase 3: Operators and expansions
 
@@ -56,7 +56,7 @@ Re-run the classifier comparison (a scratch script over `git ls-files '*.md'`, c
 
 ### Phase 5 (optional): the `ctx-wrap-` leak
 
-`context-pressure-statusline.test.mjs` creates the directory at `:19` and removes `TMP` entries in an `after` hook. Find the path where a directory is created and not pushed, or where the hook does not run, and fix it. Split into its own task if it is not small.
+`context-pressure-statusline.test.mjs` creates the directory in its `tmpdir()` helper and removes `TMP` entries in an `after` hook (`scripts/test-tmpdir.mjs` is the ratchet that catches a leaking prefix; run `npm test`, not the file alone). Find the path where a directory is created and not pushed, or where the hook does not run, and fix it. Split into its own task if it is not small.
 
 ## Key Patterns and References
 

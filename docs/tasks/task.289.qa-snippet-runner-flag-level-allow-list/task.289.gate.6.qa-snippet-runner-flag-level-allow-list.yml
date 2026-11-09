@@ -1,0 +1,75 @@
+schema: 2
+task: 'task.289.qa-snippet-runner-flag-level-allow-list'
+task_title: 'QA snippet runner allows flags, not just commands'
+gate: WAIVED
+status_reason: 'Reviewed on its findings this gate is FAIL: one reproduced high finding, in the general comment scan, not in anything this task changed. The owner accepted the branch as a strict improvement over develop and filed the residual as task.290, so the gate is waived by the owner, not passed.'
+reviewer: 'QA Engineer'
+head: '92804a8f0c8871a5cc198144f66945bcc18a6cb9'
+updated: '2026-11-09T16:00:29Z'
+
+top_issues:
+  - id: 'T289-CR6-1'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: "A # after a backslash-escaped space is read as a comment by stripNonCode (it handles a backslash only inside double quotes) and by closingParen (it tests the previous character, which is the escaped space), but bash reads `a\\ #` as one word. `echo a\\ # ; touch out` classifies runnable and created `out` under real bash; `echo $(echo a\\ #) ; touch out`, a newline and `)` does the same. Control: `echo a # ; touch out` is a real comment and stays runnable. Identical on develop's engine (measured), so it is not caused by this diff and no cycle 1-5 claim covers it. origin: code-review, reproduced by QA"
+    suggested_action: 'One rule for where a # starts a comment (word start, not after a backslash-consumed character), used by every scanner that skips comments.'
+    suggested_owner: dev
+    status: follow-up task.290
+  - id: 'T289-CR6-2'
+    severity: medium
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'closingParen recurses once per nested double-quoted $( so `echo ` + `"$(` x20000 + `")` x20000 makes classifyBlock throw RangeError instead of failing closed. Identical on develop. Control: the same shape at depth 1000 returns mutating.'
+    suggested_action: 'Make closingParen iterative or bound the depth, and catch to a mutating verdict.'
+    suggested_owner: dev
+    status: follow-up task.290
+
+waiver:
+  active: true
+  reason: 'Budget spent (6 gates, 5 fixes). Owner accepted the branch as a strict improvement over develop (it closes every flag-level bypass found across gates 1-5) and filed both gate 6 findings as task.290.'
+  approved_by: 'owner (user), in session 2026-11-09: "go with #1"'
+
+quality_score: 82
+
+evidence:
+  tests_reviewed: 300
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 31
+    escaped: 0
+    boundary: true
+    boundary_signals: ['refused', 'refuses']
+    notes: 'The shell-exec corpus (31 cases, 0 reproduced, 0 escaped) passes. The reviewer ran about 1000 differential inputs (938 generated blocks, 39 judged runnable and run under real bash) plus about 30 hand probes; the cycle 5 fixes held. The one reproduced write is in the general comment scan and is identical on develop.'
+  performance:
+    status: PASS
+    notes: 'No resource-bound finding beyond the deep-nesting RangeError, identical on develop. Timing was not re-measured against develop.'
+  reliability:
+    status: CONCERNS
+    notes: 'A 20000-deep nested quoted substitution throws instead of failing closed (task.290).'
+  maintainability:
+    status: PASS
+    notes: 'One masked reading with a shell-faithful end finder; one expansion guard with a population test.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Merge task.289 and develop task.290 (shared comment rule, iterative closingParen, a differential test that runs runnable-classified blocks under bash).'
+      refs: ['docs/tasks/task.290.qa-snippet-runner-comment-after-escaped-space/']
+  future:
+    - action: 'diff and tail skip every expansion check by design (expansionOk): say so in the entries why text. The ctx-wrap- temp-directory leak (Phase 5) was left out of this task; file it separately.'
+      refs: ['shared/resources/qa-execute-snippets.mjs', 'shared/resources/tests/context-pressure-statusline.test.mjs']
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: ['task.290 filed for the two residual findings (done)']

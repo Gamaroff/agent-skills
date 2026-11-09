@@ -40,7 +40,9 @@ different block. Three things keep it a probe and not a snippet: the caller name
 engine chooses the command (`<shell> <script>`); and the run is the probe
 engine's sandbox — per-case directory, sandbox `HOME`/`TMPDIR`, escape sentinel —
 invoked by a reviewer, never by the QA snippet path. `SAFE_COMMANDS` is untouched
-(§2).
+(§2). The flags of the commands already on it are held by `SAFE_FLAGS`
+(`qa-runnable-prose-detection.md` §2a, task 289): a command added to `SAFE_COMMANDS`
+needs an audited entry there or it is refused.
 
 ## 2. The refusal: `node` must never join `SAFE_COMMANDS`
 

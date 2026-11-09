@@ -1,0 +1,73 @@
+schema: 2
+task: 'task.289.qa-snippet-runner-flag-level-allow-list'
+task_title: 'QA snippet runner allows flags, not just commands'
+gate: FAIL
+status_reason: 'Cycle 1 fixes hold, but the cycle 2 refute pass found two more high bypasses of the flag table, both reproduced by execution: a sed # comment ending in a backslash-newline hides a command (sed runs it), and a command substitution splits the arguments before the flag check (sort writes a file).'
+reviewer: 'QA Engineer'
+head: '665db04349f9d2cc004c121a86fd3f987f7f9022'
+updated: '2026-11-09T14:25:14Z'
+
+top_issues:
+  - id: 'T289-CR2-1'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: "sedScan handles a `#` comment with toLineEnd, which treats backslash-newline as a continuation, but GNU sed ends a comment at the first newline. `sed '#c\\<newline>e echo PWNED' f` classifies runnable and sed 4.10 ran the `e` command (QA ran it: it printed PWNED); `sed '#c\\<newline>w out' f` is runnable too. Control `sed '#c<newline>w out' f` (no backslash) is refused and `sed '# a comment' f` stays runnable. origin: code-review, reproduced by QA"
+    suggested_action: 'Scan a # comment to the first newline with no backslash handling (keep the continuation-aware scan for a/i/c text only); add gap rows with and without the backslash plus the plain-comment control.'
+    suggested_owner: dev
+    status: open
+  - id: 'T289-CR2-2'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: "commandInvocations rewrites `$(` into a segment break, so a table-governed command's arguments are cut at the first command substitution and flagViolation never sees them. `sort -$(echo o) out in` classifies runnable and sort wrote `out` (QA ran it: the file was created). `sort $(echo -o) out in`, `uniq in $(echo out)`, `tail $(echo -f) x` and `date $(echo -s) now` are runnable too. Controls: `sort -u f` and `sort f | uniq` stay runnable, and `grep -c x $(ls)` is already refused. origin: code-review, reproduced by QA"
+    suggested_action: 'Refuse a SAFE_FLAGS command whose argument text holds `$(` or a backtick where a flag or operand may stand, or keep the full argument text through the segment split for flagViolation; add a row per table entry for `-$(echo X)` and `$(echo -X)` plus the controls.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 260
+  phases_verified: '4/5'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 31
+    escaped: 0
+    boundary: true
+    boundary_signals: ['refused', 'refuses']
+    notes: 'The shell-exec corpus (31 cases, 0 reproduced, 0 escaped) passes, but the cycle 2 reviewer ran about 500 inputs and found two outside the corpus that classify runnable and write or execute; QA reproduced both. Both sit in code the corpus never models: the sed comment scan and the command-substitution segment split.'
+  performance:
+    status: PASS
+    notes: 'Developer measured parity with develop in cycle 1; no scan loop was added this cycle. QA did not re-measure.'
+  reliability:
+    status: PASS
+    notes: 'A flag outside a table entry, an entry-less command and an unreadable sed script fail closed; the two findings are inputs the scanner reads wrongly, not a missing fail-closed branch.'
+  maintainability:
+    status: PASS
+    notes: 'SAFE_FLAGS is data beside SAFE_COMMANDS with an audit test.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T289-CR2-1 and T289-CR2-2, each with a failing-first gap row and a control. Then enumerate the other places a scanner reads a construct differently from the real tool (sed `}` and `{` nesting, `y` and `s` delimiters, heredoc and `$((` arithmetic) before the next cycle.'
+      refs: ['shared/resources/qa-execute-snippets.mjs', 'shared/resources/tests/qa-execute-snippets.test.mjs']
+  future:
+    - action: 'Phase 5 (ctx-wrap- temp-directory leak) was left out of this task; file it separately.'
+      refs: ['shared/resources/tests/context-pressure-statusline.test.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['Both high findings fixed and re-reviewed']

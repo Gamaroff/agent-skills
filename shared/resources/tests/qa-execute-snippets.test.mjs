@@ -42,6 +42,8 @@ const {
   DENY_PATTERNS,
   main,
   SAFE_COMMANDS,
+  SAFE_FLAGS,
+  sedScriptVerdict,
   classifyBlock,
   commandWords,
   executeFile,
@@ -3763,6 +3765,10 @@ test("T191 CR3-1: a function's reach is every definition of its name, whichever 
     "runnable",
   );
   assert.equal(
+    // task.289 checked this control before keeping it: GNU sed 4.10 answers
+    // `sed hello` and `sed 'pe touch MARK'` with "extra characters after command",
+    // exit 1, and creates nothing, so `hello` is not `h` then an `e` command. The
+    // script scan reads it as unreadable, never as forbidden.
     at("source h/echo-f.sh; source h/sed-f.sh; f hello").klass,
     "runnable",
   );
@@ -3955,4 +3961,550 @@ test("task.274 base scan: stripProse is idempotent, so a second scan sees what t
     classifyBlock(c).reason,
   ]);
   assert.equal(verdicts[0][0], "mutating", JSON.stringify(verdicts));
+});
+
+// ── task.289: a flag allow-list beside the command allow-list ────────────────
+//
+// Task 274 left seven ways a block classifies `runnable` and writes, and the
+// review of this task found four more. Each is a flag, an operand or a piece of
+// shell syntax nobody had forbidden. Every row carries a control that must stay
+// runnable, so a fix that refuses everything does not pass. Mutation proofs are in
+// the implementation report: remove the named check and the named rows go red.
+
+const T289_GAPS = {
+  "sort --compress-program runs a program": [
+    "sort --compress-program=./x f",
+    /^flag-not-allowed: sort --compress-program$/,
+  ],
+  "sort -S beside --compress-program": [
+    "sort -S 1 --compress-program=x f",
+    /^flag-not-allowed: sort -S$/,
+  ],
+  "find -fprint0 writes a file": [
+    "find docs -fprint0 out",
+    /^flag-not-allowed: find -fprint0$/,
+  ],
+  "sed e command runs a shell command": [
+    "sed '1e touch x' f",
+    /^flag-not-allowed: sed script/,
+  ],
+  "sed --expression=1e": [
+    "sed --expression=1e f",
+    /^flag-not-allowed: sed script "1e"/,
+  ],
+  "sed s///e flag": ["sed 's/a/b/e' f", /^flag-not-allowed: sed script/],
+  "sed s///w flag": [
+    "sed 's/a/b/w out' f",
+    /^(deny-list: sed w write|flag-not-allowed: sed script)/,
+  ],
+  "the <> redirection opens a file read-write": [
+    "cat <> out",
+    /^read-write-redirection$/,
+  ],
+  "a brace expansion builds -delete": [
+    "find docs -de{lete,lete}",
+    /^flag-not-allowed: find /,
+  ],
+  "a brace expansion in operand position builds a flag": [
+    "find docs {-dele,-delete}",
+    /^flag-not-allowed: find brace expansion can build a flag$/,
+  ],
+  "word-splitting on ${IFS} builds -delete": [
+    "find docs -name x${IFS}-delete",
+    /^flag-not-allowed: find word-splitting on \$\{IFS\}/,
+  ],
+  "a variable this block gives two words": [
+    'D=" -delete"; find docs -name x$D',
+    /^flag-not-allowed: find word-splitting on \$D/,
+  ],
+  "a function named after an allowed command (function keyword)": [
+    "function cat { touch x; }; cat f",
+    /^function-shadows-command: cat$/,
+  ],
+  "a function named after an allowed command (parentheses)": [
+    "cat() { touch x; }; cat f",
+    /^function-shadows-command: cat$/,
+  ],
+  // QA cycle 1 (task.289): both reproduced by execution (GNU sed 4.10 printed
+  // PWNED; bash created `out`).
+  "a sed label followed by a command runs it (:a e)": [
+    "sed ':a e echo PWNED' f",
+    /^flag-not-allowed: sed script/,
+  ],
+  "a sed branch label followed by a command runs it (ta e)": [
+    "sed ':a;ta e echo P' f",
+    /^flag-not-allowed: sed script/,
+  ],
+  "an ANSI-C quoted flag is not seen as a flag (sort $'-o')": [
+    "sort $'-o' out in",
+    /^flag-not-allowed: sort .*an expansion that could be a flag/,
+  ],
+  "an ANSI-C octal-escaped flag (sort $'-\\157')": [
+    "sort $'-\\157' out in",
+    /^flag-not-allowed: sort .*an expansion that could be a flag/,
+  ],
+  'a locale-quoted flag (find $"-delete")': [
+    'find docs $"-delete"',
+    /^(deny-list|flag-not-allowed)/,
+  ],
+  "uniq writes its second operand": [
+    "uniq in.txt out.txt",
+    /^flag-not-allowed: uniq operand "out.txt"/,
+  ],
+  "file -C compiles a magic file to disk": [
+    "file -C -m magic",
+    /^flag-not-allowed: file -C$/,
+  ],
+  "sort -o writes a file": ["sort -o out f", /^(deny-list|flag-not-allowed)/],
+  "diff -l runs pr": ["diff -l a b", /^flag-not-allowed: diff -l$/],
+  "tail -f never returns": ["tail -f f", /^flag-not-allowed: tail -f$/],
+  "date -s sets the clock": ["date -s 12:00", /^flag-not-allowed: date -s$/],
+  "a flag abbreviation is not on the list": [
+    "sort --comp=./x f",
+    /^flag-not-allowed: sort --comp$/,
+  ],
+  // QA cycle 2: a sed comment ends at the first newline, backslash or not.
+  "a sed comment ending in a backslash does not hide an e command": [
+    "sed '#c\\\ne echo PWNED' f",
+    /^flag-not-allowed: sed script/,
+  ],
+  "a sed comment ending in a backslash does not hide a w command": [
+    "sed '#c\\\nw out' f",
+    /^flag-not-allowed: sed script/,
+  ],
+  // QA cycle 2: a substitution cuts the arguments the table sees.
+  "sort -$(echo o) writes a file": [
+    "sort -$(echo o) out in",
+    /^flag-not-allowed: sort /,
+  ],
+  "sort $(echo -o) writes a file": [
+    "sort $(echo -o) out in",
+    /^flag-not-allowed: sort /,
+  ],
+  "a quoted substitution is still one": [
+    'sort "$(echo -o)" out in',
+    /^flag-not-allowed: sort /,
+  ],
+  "a backtick substitution is still one": [
+    "sort `echo -o` out in",
+    /^(flag-not-allowed|unrecognised-command)/,
+  ],
+  "uniq operand through a substitution": [
+    "uniq in $(echo out)",
+    /^flag-not-allowed: uniq /,
+  ],
+  "date -s through a substitution": [
+    "date $(echo -s) now",
+    /^flag-not-allowed: date /,
+  ],
+  // QA cycle 3: every `${…}` is an expansion, and a word that may become several
+  // operands cannot be counted.
+  "a ${1} that set -- made a flag": [
+    "set -- -o; sort ${1} out in",
+    /^flag-not-allowed: sort \$\{1\}/,
+  ],
+  "an indirect ${!X} that names a flag": [
+    "X=Y; Y=--output=out; sort ${!X} in",
+    /^flag-not-allowed: sort \$\{!X\}/,
+  ],
+  "uniq with a brace that adds the output operand": [
+    "uniq {in,out}",
+    /^flag-not-allowed: uniq \{in,out\}/,
+  ],
+  "uniq with a brace suffix that adds the output operand": [
+    "uniq in{,.out}",
+    /^flag-not-allowed: uniq in\{,\.out\}/,
+  ],
+  "uniq with a glob that may match two files": [
+    "uniq *.txt",
+    /^flag-not-allowed: uniq \*\.txt/,
+  ],
+  // QA cycle 4: a process substitution and a prefix assignment cut the arguments too.
+  "uniq after a process substitution writes its output operand": [
+    "uniq <(echo a) out.txt",
+    /^flag-not-allowed: uniq/,
+  ],
+  "sort -oout after a process substitution": [
+    "sort <(echo a) -oout",
+    /^flag-not-allowed: sort/,
+  ],
+  "sed 1w after a process substitution": [
+    "sed -n <(echo a) -e '1w out' in.txt",
+    /^flag-not-allowed: sed/,
+  ],
+  "file -C after a process substitution": [
+    "file <(echo a) -C -m magic",
+    /^flag-not-allowed: file/,
+  ],
+  "uniq output operand after a prefix assignment holding a substitution": [
+    "X=$(echo a) uniq in.txt out.txt",
+    /^flag-not-allowed: uniq/,
+  ],
+  "sort -oout after a prefix assignment holding a substitution": [
+    "X=$(echo a) sort -oout in.txt",
+    /^flag-not-allowed: sort/,
+  ],
+  "date -s after a prefix assignment holding a substitution": [
+    "X=$(echo a) date -s 2020-01-01",
+    /^flag-not-allowed: date/,
+  ],
+  // QA cycle 5: a quoted paren inside a substitution must not end it early.
+  "touch after a substitution holding a quoted close paren": [
+    "X=$(echo ')') touch out",
+    /^unrecognised-command: touch/,
+  ],
+  "python3 after a substitution holding a quoted open paren": [
+    "X=$(echo '(') python3 x.py",
+    /^unrecognised-command: python3/,
+  ],
+  "cp after a substitution holding a double-quoted close paren": [
+    'X=$(echo ")") cp in out',
+    /^unrecognised-command: cp/,
+  ],
+  "rm after a substitution holding an escaped close paren": [
+    "X=$(echo \\)) rm in",
+    /^unrecognised-command: rm/,
+  ],
+  "an unreadable substitution is refused whatever follows it": [
+    'X=$(echo "a) touch out',
+    /^unrecognised-command/,
+  ],
+  "an unrecognised command after a prefix assignment holding a substitution": [
+    "X=$(echo a) python3 x.py",
+    /^unrecognised-command: python3/,
+  ],
+  "find -delete through a substitution": [
+    "find . $(echo -delete)",
+    /^(deny-list|flag-not-allowed)/,
+  ],
+};
+for (const [name, [code, reason]] of Object.entries(T289_GAPS)) {
+  test(`task.289 gap: ${name} is refused as mutating`, () => {
+    const r = classifyBlock(code);
+    assert.equal(r.klass, "mutating", code);
+    assert.match(r.reason ?? "", reason, code);
+  });
+}
+
+const T289_CONTROLS = {
+  "sort -n | uniq -c": "sort -n f | uniq -c",
+  "sort with a key and a separator": "sort -k2,2 -t, f",
+  "sort reverse after --": "sort -r -- -x",
+  "uniq with one operand": "uniq -c f",
+  "sed -n with a range": "sed -n '1,3p' f",
+  "sed label loop that joins lines": "sed ':a;N;$!ba;s/\\n/ /g' f",
+  "a $ followed by a quote is a quoted word, not an operand to refuse (grep)":
+    "grep -c 'a$' f",
+  "a plain single-quoted operand after sort": "sort -u 'f g'",
+  "sed -E substitution": "sed -E 's/a/b/g' f",
+  "sed two -e scripts": "sed -e p -e d f",
+  "sed clustered -ne": "sed -ne p f",
+  "sed with a branch and a hold": "sed -n '/a/{h;d};G;p' f",
+  "sed with an address and a y command": "sed '1,/x/y/abc/xyz/' f",
+  "sed with a bracket holding the delimiter": "sed 's/[/]/x/' f",
+  "find with names and types": "find docs -name '*.md' -type f -maxdepth 2",
+  "find with a group and -o": null, // pre-existing: `-o` is refused by the -o output rule
+  "find with numeric tests": "find . -mtime -1 -size +2 -newer f",
+  "find with a brace in a literal path": "find docs/{a,b} -name x",
+  "a brace in a quoted grep pattern": "grep -rn 'a{1,2}' docs",
+  "echo with a brace expansion": "echo a{b,c}",
+  "tail -n +2": "tail -n +2 f",
+  "head -5": "head -5 f",
+  "date -u with a format": "date -u +%FT%T",
+  "file -b": "file -b x",
+  "an unquoted variable the block gives one word": "X=y; find docs/$X -name z",
+  "a plain sed comment": "sed '# a comment' f",
+  "uniq with one operand and a process substitution before a read":
+    "diff <(sort a) <(sort b)",
+  "a quoted paren inside a substitution before a harmless governed command":
+    "X=$(echo ')') uniq in.txt",
+  "a nested quoted substitution before a harmless read":
+    "x=$(echo \"$(echo ')')\") ; sort -u f",
+  "a comment holding a quote and a paren beside a substitution":
+    "# it's (fine)\nx=$(sort -u f)",
+  "a prefix assignment holding a substitution before a harmless governed command":
+    "X=$(echo a) uniq in.txt",
+  "tail with an expansion is a hang at worst, by design": "tail $(echo -f) x",
+  "a sed comment before a command on the next line": "sed '# c\np' f",
+  "a sort piped to wc": "sort f | wc -l",
+  "a substitution that holds the governed command": "x=$(sort -u f)",
+  "a date value with a literal prefix cannot be a flag":
+    'date -u -d "@$(stat -c %Y f)" +%FT%T',
+};
+for (const [name, code] of Object.entries(T289_CONTROLS)) {
+  if (code === null) continue;
+  test(`task.289 control: ${name} stays runnable`, () => {
+    assert.equal(classifyBlock(code).klass, "runnable", code);
+  });
+}
+
+// The population check QA 3 found missing: one list of expansion forms, run
+// against EVERY entry that judges flags, so a form one command refuses and
+// another passes is a red test and not a finding. An entry with `expansionOk`
+// says a flag it cannot see does no harm (diff, tail), and is held to the
+// operand forms only.
+const T289_FLAG_FORMS = [
+  "$1",
+  "${1}",
+  "${!X}",
+  "${#A}",
+  "${@:1}",
+  '"$@"',
+  "$(echo -o)",
+  "`echo -o`",
+  "$'-o'",
+];
+test("task.289 population: every explicit entry refuses an expansion where a flag may stand", () => {
+  const governed = Object.keys(SAFE_FLAGS).filter((c) => !SAFE_FLAGS[c].any);
+  assert.ok(governed.length >= 8, `only ${governed.length} governed commands`);
+  let judged = 0;
+  for (const cmd of governed) {
+    if (SAFE_FLAGS[cmd].expansionOk) continue;
+    for (const form of T289_FLAG_FORMS) {
+      judged += 1;
+      assert.equal(
+        classifyBlock(`${cmd} ${form} f`).klass,
+        "mutating",
+        `${cmd} ${form} f`,
+      );
+    }
+  }
+  assert.ok(judged >= 6 * T289_FLAG_FORMS.length, `judged only ${judged}`);
+});
+
+test("task.289 population: a command that counts operands refuses a word that may become several", () => {
+  for (const form of [
+    "{in,out}",
+    "in{,.out}",
+    "*.txt",
+    "in?",
+    "in[12]",
+    "in${1}",
+  ])
+    assert.equal(classifyBlock(`uniq ${form}`).klass, "mutating", form);
+  for (const ok of ["in", "-c in", '"$f"'.replace('"$f"', "'a b'")])
+    assert.equal(classifyBlock(`uniq ${ok}`).klass, "runnable", ok);
+});
+
+test("task.289 control: an unbound variable is still a placeholder, not a refusal", () => {
+  assert.equal(classifyBlock("find docs/$X -name z").klass, "placeholder");
+  assert.equal(classifyBlock('tail -1 "$f"').klass, "placeholder");
+});
+
+test("task.289 table: every SAFE_COMMANDS member has an audited entry, and no entry is orphaned", () => {
+  // Non-vacuity: the set this loops over is not empty, and one of its members is
+  // a command a gap was found in.
+  assert.ok(
+    SAFE_COMMANDS.size >= 31,
+    `SAFE_COMMANDS holds ${SAFE_COMMANDS.size}`,
+  );
+  for (const name of ["sed", "find", "sort", "uniq", "file"])
+    assert.ok(SAFE_COMMANDS.has(name), name);
+  for (const name of SAFE_COMMANDS) {
+    const entry = SAFE_FLAGS[name];
+    assert.ok(entry, `${name} has no SAFE_FLAGS entry`);
+    assert.ok(
+      typeof entry.why === "string" && entry.why.length >= 8,
+      `${name} has no audit note`,
+    );
+  }
+  for (const name of Object.keys(SAFE_FLAGS))
+    assert.ok(
+      SAFE_COMMANDS.has(name),
+      `${name} is in SAFE_FLAGS, not SAFE_COMMANDS`,
+    );
+});
+
+test("task.289 table: a member with no entry is refused, not allowed", () => {
+  SAFE_COMMANDS.add("zzaudit");
+  try {
+    const r = classifyBlock("zzaudit -x f");
+    assert.equal(r.klass, "mutating");
+    assert.match(
+      r.reason,
+      /^flag-not-allowed: zzaudit no-table-entry \(fail-closed\)$/,
+    );
+  } finally {
+    SAFE_COMMANDS.delete("zzaudit");
+  }
+});
+
+test("task.289 table: each command with a flag list refuses a flag outside it, by name", () => {
+  const refused = {
+    sed: ["sed -f script.sed x", "sed", "-f"],
+    // -fprint0 is on no deny-list entry: only the table refuses it.
+    find: ["find docs -fprint0 out", "find", "-fprint0"],
+    sort: ["sort -T /tmp f", "sort", "-T"],
+    uniq: ["uniq -x f", "uniq", "-x"],
+    file: ["file -m magic x", "file", "-m"],
+    diff: ["diff -X list a b", "diff", "-X"],
+    tail: ["tail --pid=1 f", "tail", "--pid"],
+    date: ["date -f dates.txt", "date", "-f"],
+  };
+  const explicit = Object.keys(SAFE_FLAGS).filter((k) => !SAFE_FLAGS[k].any);
+  assert.deepEqual(
+    Object.keys(refused).sort(),
+    explicit.sort(),
+    "a new explicit entry needs a row here",
+  );
+  for (const [code, name, flag] of Object.values(refused)) {
+    const r = classifyBlock(code);
+    assert.equal(r.klass, "mutating", code);
+    assert.ok(
+      r.reason.startsWith(`flag-not-allowed: ${name} `) ||
+        r.reason.startsWith("deny-list"),
+      `${code}: ${r.reason}`,
+    );
+    assert.ok(
+      r.reason.includes(flag) || r.reason.startsWith("deny-list"),
+      `${code}: ${r.reason}`,
+    );
+  }
+});
+
+test("task.289 sedScriptVerdict: what is read-only, what is forbidden, what is not understood", () => {
+  for (const s of [
+    "p",
+    "1,3p",
+    "$!N",
+    "/a/I,+2d",
+    "s/a/b/g;s/c/d/",
+    "s|a|b|2p",
+    "y/abc/xyz/",
+    "1{h;d};G",
+    "# a comment with e and w in it",
+    "s/e/w/",
+    "a\\\nplain text e w",
+    ":a;N;$!ba;s/\\n/ /g",
+    "s/[/]/x/",
+  ])
+    assert.equal(sedScriptVerdict(s), "safe", s);
+  for (const s of [
+    "e touch x",
+    "1e touch x",
+    "s/a/b/e",
+    "s/a/b/w out",
+    "w out",
+    "wer",
+    "r in",
+    "$!{e x}",
+    "1,2{p;e x}",
+    "#c\\\ne echo x", // a comment ends at the first newline (QA 2)
+    "#c\\\nw out",
+  ])
+    assert.equal(sedScriptVerdict(s), "forbidden", s);
+  assert.equal(sedScriptVerdict("# c\\\np"), "safe", "comment, then p");
+  // Not understood, and not an `e`: a command with characters after it is an
+  // error to sed (it runs nothing), so `hello` and a path are unreadable.
+  // A label ends at whitespace or `;`; a command after it is read by sed (QA 1).
+  for (const s of [
+    "hello",
+    "pe touch x",
+    "s/a/b",
+    "docs/tasks/task.1.x",
+    "1,",
+    ":a e echo x",
+    ":a;ta e echo x",
+    "ba e echo x",
+  ])
+    assert.equal(sedScriptVerdict(s), "unreadable", s);
+});
+
+test("task.289 expansions: a quoted span cannot hide a flag, and the scan's collapsed reading refuses what it cannot read", () => {
+  // A quoted flag is a flag.
+  assert.equal(
+    classifyBlock("sort '--compress-program=./x' f").klass,
+    "mutating",
+  );
+  assert.equal(classifyBlock('sort "-o" out f').klass, "mutating");
+  // The collapsed reading (a substitution inside double quotes defeats the raw
+  // one) still refuses a flag it can read, and a quoted argument it cannot.
+  assert.equal(classifyBlock('echo "$(sort -n f)"').klass, "runnable");
+  assert.equal(
+    classifyBlock('echo "$(sort --compress-program=./x f)"').klass,
+    "mutating",
+  );
+  assert.equal(classifyBlock('echo "$(sort "-o" f)"').klass, "mutating");
+});
+
+test("task.289 forwarded arguments: a flag every governed command refuses stands; a path for find does not fail sed", () => {
+  // `hello` is a sed script (`h` then `e llo`); `p` prints. Both reach sed as the
+  // first operand of a helper that runs `sed "$@"`.
+  const root = cycle2Copy({ "sed-f.sh": 'f() { sed "$@"; }\n' });
+  const at = (code) => classifyBlock(code, {}, { helperRoot: root });
+  assert.equal(at("source h/sed-f.sh; f p x").klass, "runnable");
+  assert.equal(at("source h/sed-f.sh; f -f s.sed x").klass, "mutating");
+  assert.equal(at("source h/sed-f.sh; f 'e touch x' f").klass, "mutating");
+  // A path is not a sed script, and a script sed cannot parse runs nothing.
+  assert.equal(at("source h/sed-f.sh; f docs/tasks/x").klass, "runnable");
+  // `find` accepts `-newer x`, and sed reads the same words as `-n -e wer`, a `w`
+  // command that writes a file named `er`. One command accepting an argument does
+  // not clear it for another that acts on it.
+  const both = cycle2Copy({
+    "both.sh": 'h() { find docs "$@"; sed "$@" f; }\n',
+  });
+  const via = (code) => classifyBlock(code, {}, { helperRoot: both });
+  assert.equal(via("source h/both.sh; h -newer x").klass, "mutating");
+  assert.match(via("source h/both.sh; h -newer x").reason, /sed script "wer"/);
+  assert.equal(via("source h/both.sh; h -name x").klass, "runnable");
+});
+
+// The probes of the task 289 review, each reproduced by execution in a scratch
+// directory before the check was written (GNU sed 4.10).
+test("task.289 probes: a variable in a sed script, an indented function, a date operand", () => {
+  // `A='.*/touch MARK/e;s/z'; sed -n "s/$A/b/p" f` created MARK when run: the value
+  // carries its own delimiter and the `e` flag.
+  assert.equal(
+    classifyBlock(`A='.*/touch MARK/e;s/z'; sed -n "s/$A/b/p" f`).klass,
+    "mutating",
+  );
+  assert.equal(
+    classifyBlock(
+      `for A in '.*/touch MARK/e;s/z'; do sed -n "s/$A/b/p" f; done`,
+    ).klass,
+    "mutating",
+  );
+  // Controls: a literal value is read as written, an unbound name is a placeholder,
+  // and a name the caller binds is the caller's.
+  assert.equal(classifyBlock(`A=old; sed -n "s/$A/new/p" f`).klass, "runnable");
+  assert.equal(classifyBlock(`sed -n "s/$A/b/p" f`).klass, "placeholder");
+  assert.equal(
+    classifyBlock(`sed -n "s/$A/b/p" f`, { A: "old" }).klass,
+    "runnable",
+  );
+  // The shadowing regex matched only at the start of a line, and a list item keeps
+  // its indentation.
+  for (const code of [
+    "  function cat { touch x; }; cat f",
+    "if :; then function cat { touch x; }; fi; cat f",
+    "for i in 1; do function cat { touch x; }; done; cat f",
+    "\tcat() { touch x; }; cat f",
+  ])
+    assert.match(
+      classifyBlock(code).reason ?? "",
+      /^function-shadows-command: cat$/,
+      code,
+    );
+  // `date 01011200` sets the clock; only a +FORMAT operand is read-only.
+  assert.equal(classifyBlock("date 01011200").klass, "mutating");
+  assert.equal(classifyBlock("date -u +%s").klass, "runnable");
+});
+
+test("task.289 controls paired with each gap: the look-alike that writes nothing stays runnable", () => {
+  for (const code of [
+    "cat < f", // `<`, not `<>`
+    "cat f 2>&1",
+    "find docs -print0", // `-print0`, not `-fprint0`
+    "sed 's/e/w/' f", // an `e` and a `w` that are text
+    'find docs -name "x${IFS}y"', // quoted: one word
+    "find {docs,src} -name x", // a brace that builds a path, not a flag
+    "find docs -name 'a{b,c}'",
+    "sort -u f | uniq", // uniq with no output operand
+  ])
+    assert.equal(classifyBlock(code).klass, "runnable", code);
+  // A function named for no command is not refused as a shadow.
+  assert.doesNotMatch(
+    classifyBlock("zz_helper() { echo hi; }; zz_helper").reason ?? "",
+    /^function-shadows-command/,
+  );
 });
