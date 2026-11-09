@@ -109,7 +109,7 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`. Edit the `shared/resou
 **Risk Level**: Low
 
 **Changes**:
-- [ ] Ask the user: refuse variable arguments to deny-listed commands, or track values; `shared_files` or `--fixture-copy`.
+- [x] Ask the user: refuse variable arguments to deny-listed commands, or track values; `shared_files` or `--fixture-copy`. **Decided by the owner 2026-11-09: refuse variable arguments to deny-listed commands (no value tracking; a wrongly refused block is annotated in Phase 2); shared fixtures use `--fixture-copy`, copied once per run.**
 
 **Dependencies**: none.
 
@@ -326,7 +326,7 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`. Edit the `shared/resou
 ## Progress Tracking
 
 ### Phase 1: Decide shape 4 and the fixture form
-- [ ] Answers recorded
+- [x] Answers recorded
 
 ### Phase 2: The snippet runner
 - [ ] Shapes, syntax check, re-run
