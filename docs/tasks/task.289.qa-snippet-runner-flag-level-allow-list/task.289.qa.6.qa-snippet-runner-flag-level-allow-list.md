@@ -144,7 +144,8 @@ Each row names the finding, the change reverted and the tests that went red. `cm
 
 | Finding | Reverted | Went red |
 | --- | --- | --- |
-| Initial: 15 checks | `<>` refusal, function shadowing, generic flag loop, `find`, sed branch, sed verdict, brace, `IFS`, word-splitting, collapsed `hidden`, forwarded sed rule, `maxOperands`, `date` operand, sed-script variable, sed separator | one or more named tests each (QA 1 re-ran the generic loop and the `<>` refusal) |
+| Initial: `<>` refusal | refusal disabled | `task.289 gap: the <> redirection opens a file read-write is refused as mutating` (QA 1) |
+| Initial: generic flag loop | loop returns null | 11 task.289 tests (QA 1) |
 | T289-CR-1 (sed label) | `sedScan` label skip restored | three tests: the `:a e` and `ta e` gap rows, the `sedScriptVerdict` table |
 | T289-CR-2 (ANSI-C quoted flag) | `$'…'` / `$"…"` branch removed | the two `sort $'…'` gap rows |
 | T289-CR2-1 (sed comment) | `toLineEnd()` restored | two comment gap rows and the `sedScriptVerdict` test |
@@ -153,5 +154,27 @@ Each row names the finding, the change reverted and the tests that went red. `cm
 | T289-CR3-2 (brace operands of `uniq`) | operand-shape check disabled | three gap rows and the second population test |
 | T289-CR4-1, CR4-2 (process substitution, prefix assignment) | masked pass switched off | 14 tests: eight cycle 4 rows, six cycle 2 substitution rows, the population test |
 | T289-CR5-1 (quoted paren in a substitution) | naive paren count restored; carve-out restored | 5 tests; 1 test |
+
+### The other 13 initial-implementation proofs, re-run at `/finalise`
+
+QA 1 re-ran two of the developer's 15 proofs and left 13 as the developer's own record, with no test named. They were re-run on head `a383342e` in an isolated worktree: snapshot, revert the one behaviour, run `shared/resources/tests/qa-execute-snippets.test.mjs` (300 tests, all green before), record the red titles, restore, `cmp` clean. All 13 went red in a test about that behaviour.
+
+| # | Behaviour | Reverted (in `classifyInternal`, `flagViolation` or `sedScan`) | Tests that went red |
+| --- | --- | --- | --- |
+| 1 | function shadowing | the `shadowingFunctions` check skipped | 3: "a function named after an allowed command (function keyword) is refused as mutating"; "(parentheses) is refused as mutating"; "probes: a variable in a sed script, an indented function, a date operand" |
+| 2 | `find` flag table | an unlisted find flag continues instead of refusing | 2: "find -fprint0 writes a file is refused as mutating"; "table: each command with a flag list refuses a flag outside it, by name" |
+| 3 | sed branch commands (`:`, `b`, `t`, `T`) | the check that only a separator follows a label dropped | 1: "sedScriptVerdict: what is read-only, what is forbidden, what is not understood" |
+| 4 | sed verdict (`e f F r R w W v`) | those commands skipped to end of line instead of marked forbidden | 7, including "sed e command runs a shell command", "a sed comment ending in a backslash does not hide an e command", "sed --expression=1e", "sed 1w after a process substitution" |
+| 5 | brace expansion | the brace check disabled | 1: "a brace expansion in operand position builds a flag is refused as mutating" |
+| 6 | `${IFS}` | the `IFS` check disabled | 1: "word-splitting on ${IFS} builds -delete is refused as mutating" |
+| 7 | word-splitting | the untrusted `$n` check disabled | 1: "a variable this block gives two words is refused as mutating" |
+| 8 | collapsed `hidden` | `hidden` made `() => false` | 1: "expansions: a quoted span cannot hide a flag, and the scan's collapsed reading refuses what it cannot read" |
+| 9 | forwarded sed rule | a forbidden script accepted when forwarded | 1: "forwarded arguments: a flag every governed command refuses stands; a path for find does not fail sed" |
+| 10 | `maxOperands` | the operand-count refusal disabled | 3: "uniq after a process substitution writes its output operand"; "uniq output operand after a prefix assignment holding a substitution"; "uniq writes its second operand" |
+| 11 | `date` operand | the `operandRe` refusal disabled | 1: "probes: a variable in a sed script, an indented function, a date operand" |
+| 12 | sed-script variable | the "script built from `$n`" refusal disabled | 1: the same "probes" test as 11 |
+| 13 | sed separator | the `cmdEnd()` check after the simple commands skipped | 2: "sedScriptVerdict: what is read-only, what is forbidden, what is not understood"; "T191 CR3-1: a function's reach is every definition of its name, whichever was sourced last" |
+
+Weak holds, recorded and not fixed here: checks 1, 11 and 12 share one combined test, and checks 3 and 13 are held by the single `sedScriptVerdict` table test (13's second red is probably unrelated). A test per behaviour would hold each on its own. The `sed` label (3) and separator (13) mutations are the nearest branches to those labels: the label commands share one branch in `sedScan`.
 
 The per-cycle detail is in the implementation report's QA Iteration History, which is committed at the pipeline's last step.
