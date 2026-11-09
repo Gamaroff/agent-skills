@@ -5,7 +5,7 @@ type: task
 description: "Replace the snippet runner's flag-level deny-list (DENY_PATTERNS) with a per-command flag allow-list, closing seven known ways a runnable block writes and deciding the 17 doc blocks task 274 now refuses."
 tags: [qa-task, finalise, security]
 category: refactoring
-status: planned
+status: ready-for-development
 priority: Medium
 created: 2026-11-09
 updated: 2026-11-09
@@ -14,7 +14,8 @@ estimated_effort_hours: 16
 
 # Task 289: QA snippet runner allows flags, not just commands
 
-**Status:** Planned
+**Status:** Ready for Development
+**Review**: ✅ All review recommendations from `task.289.review.1.qa-snippet-runner-flag-level-allow-list.md` implemented 2026-11-09
 
 > Detailed implementation guide: [task.289.plan.qa-snippet-runner-flag-level-allow-list.md](task.289.plan.qa-snippet-runner-flag-level-allow-list.md)
 
@@ -74,7 +75,7 @@ A table of allowed flags per allowed command (`sed`, `find`, `sort`, and each ot
 ### In Scope
 
 ✅ **The seven gaps** in Section 2, each with a reproducing test written before the fix and a mutation proof.
-✅ **A flag allow-list** for `sed`, `find` and `sort`, and an audit of every other `SAFE_COMMANDS` member for a write or program-running flag.
+✅ **A flag and operand allow-list for every `SAFE_COMMANDS` member** (31 today, `command node -e` over the export). An entry lists the flags and the operand count each command may carry; a member with no entry is refused (`flag-not-allowed`/`no-table-entry`), so the table is fail-closed. Operands count because some commands write through a positional one: `uniq in out` and `file -C -m magic` classify `runnable` today and write a file (probed 2026-11-09 by `classifyBlock`; `uniq in.txt out.txt` created `out.txt`).
 ✅ **The 17 doc blocks**: list them again with the new engine (`task.274…dod.1…md`, section Supplementary evidence, criterion #2), and record the owner's decision.
 ✅ **Prose restatements** of the rule (`qa-runnable-prose-detection.md`, `probe-boundary-rule.md`) and the bundled copies.
 
@@ -114,7 +115,9 @@ A table of allowed flags per allowed command (`sed`, `find`, `sort`, and each ot
 - `shared/resources/tests/qa-execute-snippets.test.mjs`
 
 **Changes**:
-- [ ] Write one failing test per gap (seven), each asserting `mutating`, plus one control per gap that must stay `runnable`
+- [ ] Write one failing test per gap (seven), each asserting `mutating`, plus one control per gap that must stay `runnable`. Gap 7 is the `function cat { touch x; }; cat f` spelling: the `cat() { …; }` spelling is already `mutating` (unparseable, fail-closed), so keep it as a held control, not a failing case
+- [ ] Add failing-first tests for the cases probed beyond the seven: `uniq in out`, `file -C -m magic`, `sed --expression=1e f`, `sort -S 1 --compress-program=x f`
+- [ ] Set the controls' expected class from a run, not from the task 274 text: `find docs/$X -name z` classifies `placeholder` (unbound variable), not `runnable`; bind `X` or assert `placeholder`
 - [ ] Re-run the old-vs-new real-docs classifier over `git ls-files '*.md'` as the baseline; record the command and the count
 - [ ] Ask the owner: accept the 17 refused blocks, or add value tracking (record the answer in the Change Log)
 
@@ -130,9 +133,10 @@ A table of allowed flags per allowed command (`sed`, `find`, `sort`, and each ot
 - `shared/resources/qa-execute-snippets.mjs`
 
 **Changes**:
-- [ ] Add the per-command flag table for `sed`, `find`, `sort`
-- [ ] Refuse any flag outside the table with a named reason
-- [ ] Audit each other `SAFE_COMMANDS` member (`grep`, `jq`, `diff`, `ls`, `cat`, and the rest) and record the audit result per command
+- [ ] Add the per-command flag and operand table for every `SAFE_COMMANDS` member, `SAFE_FLAGS` beside it
+- [ ] Refuse any flag or operand outside the table with a named reason; a member with no entry is refused
+- [ ] Record the audit result per command (`grep`, `jq`, `diff`, `ls`, `cat`, `uniq`, `file`, and the rest) in a test that fails when a member has no record
+- [ ] Decide `SAFE_FLAGS` against the existing `DENY_PATTERNS` and `VARIABLE_ARGUMENT_COMMANDS` (`:751`): state for each whether the table replaces, extends or sits beside it
 
 **Dependencies**: Phase 1
 
@@ -146,7 +150,8 @@ A table of allowed flags per allowed command (`sed`, `find`, `sort`, and each ot
 - `shared/resources/qa-execute-snippets.mjs`
 
 **Changes**:
-- [ ] Refuse `<>`, and a function definition whose name is an allowed command
+- [ ] Refuse `<>`, and a function definition (`name()` and `function name`) whose name is an allowed command
+- [ ] Before removing a `DENY_PATTERNS` entry, list every test that pins its reason text: `git grep -n 'deny-list:' -- '*.test.*'` (record each hit with the removed or rewritten reason it pins)
 - [ ] Refuse a brace expansion or an unquoted expansion that can build a flag in an allowed command's argument list, and keep the controls runnable (`find docs/$X -name z`)
 - [ ] Remove `DENY_PATTERNS` entries the table now covers; keep a test for each removal
 
@@ -227,17 +232,18 @@ A table of allowed flags per allowed command (`sed`, `find`, `sort`, and each ot
 ### Functional
 
 - [ ] Each of the seven gaps classifies `mutating`, by a named test, and its control stays `runnable`
-- [ ] A flag outside a table entry is refused with `flag-not-allowed`, by a named test per audited command
+- [ ] A flag or operand outside a table entry is refused with `flag-not-allowed`, by a named test per `SAFE_COMMANDS` member; a member with no entry is refused, by a named test
+- [ ] `uniq in out` and `file -C -m magic` classify `mutating`, by named tests
 - [ ] Every block the task 274 engine ran and the new engine refuses is listed in the QA report with the command and the runner output
 
 ### Performance
 
 - [ ] `CI=true npm test` median wall time within 10% of develop (five alternating pairs, load recorded, in the QA report)
-- [ ] The classifier adds no measurable time to a 3,000-block docs scan (median of five, in the QA report)
+- [ ] The classifier adds under 10% to the median time of a 3,000-block docs scan against develop (median of five alternating pairs, `uptime` beside each, command and figures in the QA report)
 
 ### Code Quality
 
-- [ ] Each fix has a mutation proof (revert, a test goes red)
+- [ ] Each fix has a mutation proof (revert, a test goes red), recorded in the QA report's findings table
 - [ ] `npm run bundle:check` reports 0 problems
 - [ ] `CI=true npm run ci` passes
 
@@ -298,6 +304,8 @@ A table of allowed flags per allowed command (`sed`, `find`, `sort`, and each ot
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-11-09 | 1.0     | Initial draft | create-task |
+| 2026-11-09 | 1.1     | Review 1 (8/10): table widened to all 31 SAFE_COMMANDS members and operands (uniq, file -C found writing); gap 7 repro and a control's class corrected; performance and mutation criteria given a bound and a location; deny-reason test sweep added | review-task |
+| 2026-11-09 |         | Status → ready-for-development | review-task |
 
 <!-- change-log-end -->
 
