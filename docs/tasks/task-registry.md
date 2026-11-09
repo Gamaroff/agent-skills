@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-11-09
-**Next Available Task Number:** **291**
+**Next Available Task Number:** **292**
 
 ## How to use
 
@@ -405,3 +405,4 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 288 | [Gating-rule restatements carry the reproduced-bug exception](task.288.gating-rule-restatements-carry-the-reproduced-bug-exception/task.288.gating-rule-restatements-carry-the-reproduced-bug-exception.md) | planned | testing | Low | 2026-11-09 | — | — task 273 gate.6 carried items: reword T273-CR-5 and T273-CR-6, and add a guard test so a gating-rule restatement cannot drop the 5d exception · three phases |
 | 289 | [QA snippet runner allows flags, not just commands](task.289.qa-snippet-runner-flag-level-allow-list/task.289.qa-snippet-runner-flag-level-allow-list.md) | accepted | refactoring | Medium | 2026-11-09 | — | — task 274 follow-up: replace the flag-level deny-list with a per-command flag allow-list (seven known write gaps) and decide the 17 refused doc blocks · five phases |
 | 290 | [QA snippet runner reads a # after an escaped space as a comment](task.290.qa-snippet-runner-comment-after-escaped-space/task.290.qa-snippet-runner-comment-after-escaped-space.md) | planned | refactoring | Medium | 2026-11-09 | 289 | — task 289 QA gate 6 residual, owner-accepted: a `#` after an escaped space is read as a comment (a write classifies runnable), and `closingParen` throws on deep nesting |
+| 291 | [The context-pressure statusline test leaks a ctx-wrap- temp directory](task.291.context-pressure-statusline-test-leaks-ctx-wrap-directory/task.291.context-pressure-statusline-test-leaks-ctx-wrap-directory.md) | planned | testing | Low | 2026-11-09 | — | task 289 Phase 5, split out: an intermittent `ctx-wrap-` leak that trips the post-suite tmp-leak ratchet (failed CI once on task 274, once locally on task 289) |

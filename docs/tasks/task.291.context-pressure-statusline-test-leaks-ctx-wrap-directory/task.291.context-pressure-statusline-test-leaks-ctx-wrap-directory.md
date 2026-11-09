@@ -1,0 +1,228 @@
+---
+id: task.291
+title: "The context-pressure statusline test leaks a ctx-wrap- temp directory"
+type: task
+description: "Stop shared/resources/tests/context-pressure-statusline.test.mjs leaving a ctx-wrap- directory behind, which trips the post-suite tmp-leak ratchet intermittently and costs a CI re-run."
+tags: [testing, flaky-test, tmp-leak, follow-up-289]
+category: testing
+status: planned
+priority: Low
+created: 2026-11-09
+updated: 2026-11-09
+estimated_effort_hours: 2
+---
+
+# Task 291: The context-pressure statusline test leaks a ctx-wrap- temp directory
+
+**Status:** Planned
+
+---
+
+## 1. Overview
+
+`shared/resources/tests/context-pressure-statusline.test.mjs` creates `ctx-wrap-*` directories under the OS temp directory and removes them in an `after` hook, yet a `ctx-wrap-` directory sometimes survives the run. The post-suite check in `scripts/test-tmpdir.mjs` then fails on a prefix its ratchet does not list. It failed CI once on task 274's PR and once locally on task 289.
+
+**Scope**: the test file, and only if the cause turns out to be there, the wrapper it exercises.
+
+**Key deliverables**: a reproduction that counts the leaked directories, the fix, and a regression test that holds the fix.
+
+---
+
+## 2. Motivation
+
+### Current Problems
+
+1. **An intermittent red CI job**: the task 274 PR's `test` job passed all 8,135 tests and then failed the leak check on a new prefix, `ctx-wrap-`, in a test that PR did not touch. One recorded re-run was green. The task 289 `ci:fast` run failed the same way once and did not recur.
+2. **The cost is a re-run, and a wrong conclusion**: a reader sees a red job on a docs-only head and must work out that the leak is not theirs. Two DoD files carry that explanation by hand.
+3. **The ratchet cannot see the cause**: it reports the prefix and a count, not which test or why.
+
+### Benefits of the Fix
+
+1. **No flaky leak check**: a green suite stays green on a re-run.
+2. **The ratchet stays strict**: the fix removes the leak rather than listing `ctx-wrap-` in `tests/tmp-leak-ratchet.json`.
+
+---
+
+## 3. Technical Background
+
+### Current Architecture
+
+- The test's `tmpdir()` helper makes the directory and records it for removal (`shared/resources/tests/context-pressure-statusline.test.mjs:19`, `fs.mkdtempSync(path.join(os.tmpdir(), "ctx-wrap-"))`), and an `after` hook removes every recorded directory (`:17`, `after(() => TMP.forEach(... fs.rmSync(d, { recursive: true, force: true })))`).
+- The wrapper starts its recorder in the **background** and does not wait for it (`shared/resources/context-pressure-statusline.sh:30`, `{ printf '%s' "$input" | command node "$engine" record; } </dev/null >/dev/null 2>&1 &`).
+- The recorder creates its state directory, and any missing parent, on demand (`shared/resources/context-pressure.mjs:229`, `fs.mkdirSync(dir, { recursive: true, mode: 0o700 })`), where the directory is whatever `CONTEXT_PRESSURE_STATE_DIR` names (`:91`).
+- Two tests wait for the recorder's file before they finish (`:55` and `:104`, `waitFor(...)`). The test "an original holding shell metacharacters runs as one command" (`:85`) passes `CONTEXT_PRESSURE_STATE_DIR: path.join(tmpdir(), "s")` (`:93`) and does **not** wait.
+- The ratchet does not list the prefix (`git grep -n "ctx-wrap" -- tests` has no hit), so any leak of it fails as a new prefix. `scripts/test-tmpdir.mjs` says a prefix absent from one run is not proof of a fix (the header comment near `:25`).
+
+### Hypothesis (unverified until Phase 1)
+
+The `:85` test finishes while its background recorder is still running. The `after` hook removes `ctx-wrap-X`. The recorder then runs `mkdirSync(".../ctx-wrap-X/s", { recursive: true })`, which recreates `ctx-wrap-X`, and nothing removes it again. That fits an intermittent leak that depends on timing, and on only some runs.
+
+### Target Architecture
+
+No test finishes, and no `after` hook runs, while a recorder it started is still alive. Either each such test waits for the recorder's file, or the hook waits for every state directory it created before it removes anything.
+
+---
+
+## 4. Scope
+
+**In scope**
+- ✅ Reproduce the leak and prove the cause.
+- ✅ Fix it in the test file, or in the wrapper if the cause is there.
+- ✅ A regression test that fails if the leak returns.
+
+**Out of scope**
+- ❌ Adding `ctx-wrap-` to `tests/tmp-leak-ratchet.json`.
+- ❌ Changing what the recorder records.
+- ❌ Other leaking prefixes in the ratchet.
+
+---
+
+## 5. Breaking Changes
+
+None - API stable. The change is confined to a test, or to a background process's start-up order.
+
+---
+
+## 6. Implementation Plan
+
+> Detailed implementation guide: [task.291.plan.context-pressure-statusline-test-leaks-ctx-wrap-directory.md](task.291.plan.context-pressure-statusline-test-leaks-ctx-wrap-directory.md)
+
+### Phase 1: Reproduce, prove the cause, fix it
+
+**Risk**: Low
+
+**Files**: `shared/resources/tests/context-pressure-statusline.test.mjs` (and `shared/resources/context-pressure-statusline.sh` only if the cause is there)
+
+- [ ] Reproduce: run the file repeatedly under load and count the `ctx-wrap-*` directories left in a private `TMPDIR`.
+- [ ] Prove the cause: make the `:85` test's recorder slow (an engine that sleeps before it writes) and show the directory survives.
+- [ ] Fix it so no recorder outlives its directory.
+- [ ] Add the regression test (the slow-recorder case) and mutation-prove it.
+
+**Dependencies**: none.
+
+---
+
+## 7. Files Summary
+
+Core implementation:
+1. ✅ `shared/resources/tests/context-pressure-statusline.test.mjs` - the leaking test
+
+Possibly:
+2. ✅ `shared/resources/context-pressure-statusline.sh` - only if the fix belongs in the wrapper
+
+Documentation:
+3. ✅ `CHANGELOG.md` - a line citing task 291
+
+---
+
+## 8. Testing Strategy
+
+**Reproduction command** (from the repository root, with a private `TMPDIR`, so the count is this run's alone):
+
+```bash
+T=$(mktemp -d); for i in $(seq 1 100); do TMPDIR=$T command node --test shared/resources/tests/context-pressure-statusline.test.mjs >/dev/null 2>&1; done; ls "$T" | grep -c '^ctx-wrap-'; rm -rf "$T"
+```
+
+**Regression test**: a recorder made slow on purpose (`CONTEXT_PRESSURE_ENGINE` pointing at a stub that sleeps, then writes) must leave no `ctx-wrap-*` entry after the file's `after` hook has run and a grace period has passed. It must be red with the fix reverted.
+
+**Mutation proof**: revert the fix, run the regression test, name the test that goes red, restore.
+
+**Full suite**: `CI=true npm test` (the ratchet runs inside it); the file alone does not exercise the ratchet.
+
+---
+
+## 9. Success Criteria
+
+### Functional
+- [ ] The reproduction command prints 0 after the fix, and a number above 0 before it (both recorded in the QA report).
+- [ ] The regression test fails with the fix reverted.
+- [ ] `CI=true npm test` passes with `ctx-wrap` absent from `tests/tmp-leak-ratchet.json`.
+
+### Performance
+- [ ] The file's run time against `develop` is recorded in the QA report as the median of five alternating runs with the load noted, and rises by no more than 10%.
+- [ ] No test in the file waits longer than its existing `waitFor` bound.
+
+### Code Quality
+- [ ] No test in the file starts a background recorder without waiting for it or for the end of the process.
+- [ ] Lint and prettier pass on the changed files.
+
+### Migration
+- [ ] `CHANGELOG.md` cites this task.
+- [ ] `npm run bundle:check` reports 0 problems.
+
+---
+
+## 10. Risk Assessment
+
+**HIGH**: none.
+
+**MEDIUM**
+1. The leak has a second cause the first fix does not touch.
+   - Probability: Low. Impact: the flake continues.
+   - Mitigation: the reproduction count after the fix must be 0 over 100 runs, not 1.
+   - Rollback: revert the commit.
+
+**LOW**
+1. Waiting for the recorder slows the file. Mitigation: the existing `waitFor` polls every 50 ms, so the wait ends when the file appears.
+
+---
+
+## 11. Rollback Plan
+
+**Immediate (under 1 hour)**: revert the commit; no consumer state changes.
+- Triggers: the suite goes red on `develop`, or the file becomes flaky in a new way.
+- Validation: `CI=true npm run ci:fast` exits 0.
+
+**Partial**: revert the wrapper change and keep the test change, if both were made.
+
+**Forward fix**: if the cause is not the recorder, record what the reproduction showed and fix that instead.
+
+**Triggers**: Critical, a new leaking prefix appears. Non-critical, a slower run.
+
+---
+
+## Stakeholder Sign-off
+
+Sign-off is disabled for this repository (`sign-off.enabled` is not set), so no rows are scaffolded.
+
+---
+
+<!-- change-log-start -->
+## Change Log
+
+| Date       | Version | Description                                                                 | Author      |
+| ---------- | ------- | --------------------------------------------------------------------------- | ----------- |
+| 2026-11-09 | 1.0     | Initial draft, from task.289 Phase 5 (the optional leak fix, split out)    | create-task |
+<!-- change-log-end -->
+
+---
+
+## Progress Tracking
+
+### Phase 1
+- [ ] Reproduce and count
+- [ ] Prove the cause
+- [ ] Fix and add the regression test
+- [ ] Mutation proof, full suite, CHANGELOG
+
+---
+
+## References
+
+- **Parent**: task.289 plan, Phase 5 (`task.289.plan.qa-snippet-runner-flag-level-allow-list.md`)
+- **First sighting**: task.274 DoD, "CI re-run" (`task.274.dod.1.qa-engines-stop-passing-what-they-cannot-see.md`)
+- **Ratchet**: `scripts/test-tmpdir.mjs`, `tests/tmp-leak-ratchet.json`
+
+---
+
+## Notes
+
+### Important Reminders
+
+The cause above is a hypothesis read from the code, not a measurement. Phase 1 starts by reproducing the leak, and the fix follows what that shows.
+
+---
+
+**Status:** Planned
+
+**Next Steps**: run `/develop-task` on this task.
