@@ -1457,75 +1457,60 @@ function sedScan(s, markForbidden) {
 }
 
 /**
- * True when a command or backtick substitution could stand where `name` takes a
- * flag or an operand that writes. `commandInvocations` turns `$(` into a segment
- * break, so the arguments it hands the flag table stop at the substitution:
- * `sort -$(echo o) out in` reaches the table as `sort -`. The text after the word
- * is walked here instead, to the end of the simple command (an unquoted `;`, `|`
- * or `&`). A substitution is a hazard when its word starts with it or with a dash
- * (it may be a flag), or when `name` is `uniq` or `sed`, whose operands and
- * scripts can write whatever they hold. `date -d "@$(stat …)"` has a literal
- * prefix that is not a dash, so it cannot be a flag and is left alone.
- * A process substitution is not in this set: it stands for a /dev/fd path, an
- * operand and never a flag, and the command inside it is judged as its own segment.
+ * `text` with every command substitution, process substitution and backtick
+ * replaced by one word, or null when one is unterminated. `commandInvocations`
+ * turns each of them into a segment break, so the arguments it hands the flag
+ * table stop at the first (`sort <(echo a) -oout` reaches the table as `sort`),
+ * whether the substitution follows the command word or precedes it as a prefix
+ * assignment (`X=$(echo a) uniq in out`). Guessing where a substitution may stand
+ * was patched three times; masking removes the cut. A command substitution
+ * becomes `$__SUBST__`, a variable nothing defines, so it is an expansion of
+ * unknown value that the table refuses where a flag may stand (and that has no
+ * `$(` for `commandInvocations` to cut again); a process substitution becomes `/dev/fd/0`, the operand
+ * it stands for. The commands INSIDE a substitution are judged on their own, in
+ * the unmasked reading.
  */
-function substitutionAfterWord(prose, name) {
-  if (!/\$\(|`/.test(prose)) return false;
-  const always = name === "uniq" || name === "sed";
-  const find = new RegExp(`(^|[\\s;|&(\`])${name}(?=\\s|$)`, "g");
-  for (const line of prose.split("\n")) {
-    for (const m of line.matchAll(find)) {
-      const tail = line.slice(m.index + m[0].length);
-      let q = null;
-      let atStart = true;
-      let first = null;
-      const note = (ch) => {
-        if (first === null) first = ch;
-        atStart = false;
-      };
-      for (let k = 0; k < tail.length; k += 1) {
-        const c = tail[k];
-        if (q === "'") {
-          if (c === "'") q = null;
-          else note(c);
-          continue;
-        }
-        if (c === "\\") {
-          note(tail[k + 1] ?? "");
-          k += 1;
-          continue;
-        }
-        if (c === "`" || (c === "$" && tail[k + 1] === "(")) {
-          if (always || atStart || first === "-") return true;
-          if (c === "`") {
-            k = tail.indexOf("`", k + 1);
-            if (k < 0) return true;
-          } else {
-            let d = 0;
-            for (k += 1; k < tail.length; k += 1) {
-              if (tail[k] === "(") d += 1;
-              else if (tail[k] === ")" && (d -= 1) === 0) break;
-            }
-            if (k >= tail.length) return true;
-          }
-          note("x");
-          continue;
-        }
-        if (q === '"') {
-          if (c === '"') q = null;
-          else note(c);
-          continue;
-        }
-        if (c === "'" || c === '"') q = c;
-        else if (/\s/.test(c)) {
-          atStart = true;
-          first = null;
-        } else if (c === ";" || c === "|" || c === "&") break;
-        else note(c);
-      }
+function maskSubstitutions(text) {
+  let out = "";
+  let q = null;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text[i];
+    if (q === "'") {
+      out += c;
+      if (c === "'") q = null;
+      continue;
     }
+    if (c === "\\") {
+      out += c + (text[i + 1] ?? "");
+      i += 1;
+      continue;
+    }
+    const two = text.slice(i, i + 2);
+    const proc = q === null && (two === "<(" || two === ">(");
+    if (two === "$(" || proc) {
+      let d = 0;
+      let j = i + 1;
+      for (; j < text.length; j += 1) {
+        if (text[j] === "(") d += 1;
+        else if (text[j] === ")" && (d -= 1) === 0) break;
+      }
+      if (j >= text.length) return null;
+      out += proc ? "/dev/fd/0" : "$__SUBST__";
+      i = j;
+      continue;
+    }
+    if (c === "`") {
+      const j = text.indexOf("`", i + 1);
+      if (j < 0) return null;
+      out += "$__SUBST__";
+      i = j;
+      continue;
+    }
+    if (c === '"') q = q === '"' ? null : '"';
+    else if (c === "'" && q === null) q = "'";
+    out += c;
   }
-  return false;
+  return out;
 }
 
 /** Why `name`'s arguments are outside its entry, or null. `rawArgs` keep their quotes. */
@@ -3089,19 +3074,19 @@ function classifyInternal(
       );
   }
 
+  const unrecognised = (w) => {
+    if (COMMAND_RUNNERS.has(w)) return true; // CR-5/CR-6 — before the allow-list
+    if (SHELL_KEYWORDS.has(w)) return false;
+    if (SAFE_COMMANDS.has(w)) return false;
+    // After the runner check: a helper that defines `xargs` does not make
+    // `xargs` safe — and no defined name that shadows a real command is trusted.
+    // A name that shadows nothing is safe only while PATH is the host's (CR2-6).
+    if (defines.has(w) && !movesPath && !shadowsCommand(w)) return false;
+    if (w.startsWith("git:")) return !SAFE_GIT_SUBCOMMANDS.has(w.slice(4));
+    return true;
+  };
   const unknown = invocations
-    .filter(({ word: w }, i) => {
-      if (admitted.has(i)) return false;
-      if (COMMAND_RUNNERS.has(w)) return true; // CR-5/CR-6 — before the allow-list
-      if (SHELL_KEYWORDS.has(w)) return false;
-      if (SAFE_COMMANDS.has(w)) return false;
-      // After the runner check: a helper that defines `xargs` does not make
-      // `xargs` safe — and no defined name that shadows a real command is trusted.
-      // A name that shadows nothing is safe only while PATH is the host's (CR2-6).
-      if (defines.has(w) && !movesPath && !shadowsCommand(w)) return false;
-      if (w.startsWith("git:")) return !SAFE_GIT_SUBCOMMANDS.has(w.slice(4));
-      return true;
-    })
+    .filter(({ word: w }, i) => !admitted.has(i) && unrecognised(w))
     .map((inv) => inv.word);
 
   if (unknown.length > 0) {
@@ -3136,11 +3121,57 @@ function classifyInternal(
     };
     const why = flagViolation(inv.word, raw ? raw[i].args : inv.args, flagCtx);
     if (why) return verdict("mutating", why);
-    if (substitutionAfterWord(prose, inv.word))
+  }
+  // A substitution cuts the arguments above at its `$(` or `<(`, so what follows
+  // it, or what follows a prefix assignment holding one, was never judged. The
+  // same text with each substitution masked as one word has no cut, and every
+  // governed command in it is judged whole (QA 2, 4).
+  if (/\$\(|`|[<>]\(/.test(prose)) {
+    const masked = maskSubstitutions(prose);
+    const maskedInv = masked === null ? null : commandInvocations(masked);
+    const maskedRaw = maskedInv ? rawInvocations(masked, maskedInv) : null;
+    // A block the masked reading cannot parse is refused only when a command the
+    // table governs is in it: nothing is then left to judge.
+    if (
+      !maskedRaw &&
+      !/\b(?:sed|find|sort|uniq|file|date|diff|tail)\b/.test(prose)
+    ) {
+      // no governed command in the block: nothing for the table to judge
+    } else if (!maskedRaw)
       return verdict(
         "mutating",
-        `flag-not-allowed: ${inv.word} command-substitution (its arguments are not readable)`,
+        "flag-not-allowed: a substitution the scan cannot read (fail-closed)",
       );
+    for (const m of maskedRaw ?? []) {
+      // The unmasked reading already judged an unparseable word.
+      if (m.keyword || m.word === "<unparseable>") continue;
+      // A command written after a closed substitution (`X=$(true) python3 x.py`)
+      // is an argument of the substitution's own segment in the unmasked reading,
+      // so the allow-list never saw it. It is judged here.
+      if (!commands.has(m.word) && unrecognised(m.word))
+        return verdict(
+          "mutating",
+          `unrecognised-command: ${m.word.replace(":", " ")} (fail-closed)`,
+        );
+      if (
+        !SAFE_COMMANDS.has(m.word) ||
+        defines.has(m.word) ||
+        SAFE_FLAGS[m.word]?.any
+      )
+        continue;
+      flagCtx ??= {
+        assigned: assignedVariables(prose),
+        bindings,
+        unbound: new Set(unboundVariables(code, bindings)),
+        lenient: helperMode || forwarded,
+        collapsed: !raw,
+      };
+      const why = flagViolation(m.word, m.args, {
+        ...flagCtx,
+        collapsed: false,
+      });
+      if (why) return verdict("mutating", why);
+    }
   }
 
   // A helper's `<dir>` comments and `$1` arguments are code and arguments, not

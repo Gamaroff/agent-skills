@@ -113,6 +113,18 @@ _Track each QA review/fix cycle._
 - **Probe (Step 3.5)**: the rule's one live statement is `shared/resources/qa-runnable-prose-detection.md` (updated); population 1.
 - **Verification**: 282 of 282 engine tests; `CI=true npm run ci:fast` exit 0; `bundle:check` 0 problems.
 
+### QA Cycle 4
+
+- **Gate**: FAIL (80/100). Safety re-probe, unscoped, with a differential harness (12,797 generated blocks classified, the 1,945 runnable ones executed under real bash). The cycle 3 fixes held. Two high findings, both reproduced by QA with a control (PR #864 comment).
+- **T289-CR4-1**: a process substitution cuts a governed command's arguments: `uniq <(echo a) out.txt` and `sort <(echo a) -oout` wrote their files.
+- **T289-CR4-2**: a prefix assignment holding a substitution does too: `X=$(echo a) uniq in.txt out.txt` and `X=$(echo a) sort -oout in.txt` wrote theirs. QA also found the cause is wider than the flag table: a command written after a closed substitution is an argument of the substitution's segment, so the allow-list never saw it. `X=$(echo a) python3 x.py` and `X=$(echo a) ln -s a b` classify runnable on develop too (measured: same output on the base), so that part is pre-existing; it is closed here because the same mechanism is the finding.
+- **Third strike**: gates 2, 3 and 4 carry a HIGH on `qa-execute-snippets.mjs`. Struck mechanism: `substitutionAfterWord`, the heuristic that guessed where a substitution may stand (patched at cycle 2, found short at cycle 4). Move: **delete and replace**. `maskSubstitutions` swaps each substitution for one word (`$__SUBST__`; `/dev/fd/0` for a process substitution), the block is read a second time, and every governed command and every command the first reading never saw is judged in that text. Other findings in the file: none.
+- **Mutation proof**: switching the masked pass off turned 14 tests red (the eight new cycle 4 rows, the six cycle 2 substitution rows and the population test). `cmp` clean after restore.
+- **Both directions**: must-now-catch rows added (8); controls stay runnable (`X=$(echo a) uniq in.txt`, `diff <(sort a) <(sort b)`, `x=$(sort -u f)`, `date -u -d "@$(stat -c %Y f)" +%FT%T`). `tail $(echo -f) x` is now a control: `tail` has `expansionOk` (a hang at worst), and the old heuristic refused it only by accident. `sort a$(echo b)` is now refused as unquoted word splitting, which is what the shell does.
+- **Docs scan against develop**: 1 block newly refused (`tail -f`), 0 newly runnable. A first version also refused three doc blocks (an unparseable `!` plus backtick idiom, and a plan block the masked reader cannot parse); narrowed so an unparseable word is left to the first reading and a block with no governed command is not refused for being unreadable.
+- **Probe (Step 3.5)**: the rule's one live statement is `shared/resources/qa-runnable-prose-detection.md` (updated). Population: 1.
+- **Verification**: 292 of 292 engine tests; `CI=true npm run ci:fast` exit 0; `bundle:check` 0 problems. Timing was not re-measured: the masked pass runs only for a block that holds a substitution.
+
 ---
 
 ## Completion

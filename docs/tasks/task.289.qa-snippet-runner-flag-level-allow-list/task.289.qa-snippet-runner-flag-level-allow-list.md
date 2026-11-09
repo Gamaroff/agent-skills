@@ -307,19 +307,19 @@ A table of allowed flags per allowed command (`sed`, `find`, `sort`, and each ot
 
 ### QA Report
 
-- **Full Report**: [task.289.qa.3.qa-snippet-runner-flag-level-allow-list.md](./task.289.qa.3.qa-snippet-runner-flag-level-allow-list.md)
-- **Gate File**: [task.289.gate.3.qa-snippet-runner-flag-level-allow-list.yml](./task.289.gate.3.qa-snippet-runner-flag-level-allow-list.yml)
+- **Full Report**: [task.289.qa.4.qa-snippet-runner-flag-level-allow-list.md](./task.289.qa.4.qa-snippet-runner-flag-level-allow-list.md)
+- **Gate File**: [task.289.gate.4.qa-snippet-runner-flag-level-allow-list.yml](./task.289.gate.4.qa-snippet-runner-flag-level-allow-list.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 274
+- **Tests Executed**: 282
 - **Phases Verified**: 4/5
 - **Critical Issues**: 2
-- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-The cycle 2 fixes hold. Cycle 3 found two more high-severity shell-expansion bypasses, both reproduced: `${1}` and `${!X}` are not read as expansions, and a brace adds operands to `uniq`. Third consecutive gate with a high finding on the engine, so the next fix replaces the expansion reading rather than patching another spelling.
+The cycle 3 fixes hold. Cycle 4 found two more high-severity bypasses, both reproduced: a process substitution and a prefix assignment holding a substitution each hide later flags from the table. The struck mechanism is the substitution handling, so the next fix replaces it with a masked reading.
 
 ## Change Log
 
@@ -338,6 +338,8 @@ The cycle 2 fixes hold. Cycle 3 found two more high-severity shell-expansion byp
 | 2026-11-09 |         | QA findings fixed — 2 high findings, 2 iterations | qa-fix |
 | 2026-11-09 |         | QA gate FAIL (80/100) — 2 findings | qa-task |
 | 2026-11-09 |         | QA findings fixed — 2 high findings, 3 iterations (third strike: expansion reading replaced) | qa-fix |
+| 2026-11-09 |         | QA gate FAIL (80/100) — 2 findings | qa-task |
+| 2026-11-09 |         | QA findings fixed — 2 high findings, 4 iterations (third strike: substitution handling replaced) | qa-fix |
 
 <!-- change-log-end -->
 

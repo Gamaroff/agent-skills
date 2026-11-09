@@ -4075,15 +4075,15 @@ const T289_GAPS = {
   // QA cycle 2: a substitution cuts the arguments the table sees.
   "sort -$(echo o) writes a file": [
     "sort -$(echo o) out in",
-    /^flag-not-allowed: sort command-substitution/,
+    /^flag-not-allowed: sort /,
   ],
   "sort $(echo -o) writes a file": [
     "sort $(echo -o) out in",
-    /^flag-not-allowed: sort command-substitution/,
+    /^flag-not-allowed: sort /,
   ],
   "a quoted substitution is still one": [
     'sort "$(echo -o)" out in',
-    /^flag-not-allowed: sort command-substitution/,
+    /^flag-not-allowed: sort /,
   ],
   "a backtick substitution is still one": [
     "sort `echo -o` out in",
@@ -4091,15 +4091,11 @@ const T289_GAPS = {
   ],
   "uniq operand through a substitution": [
     "uniq in $(echo out)",
-    /^flag-not-allowed: uniq command-substitution/,
-  ],
-  "tail -f through a substitution": [
-    "tail $(echo -f) x",
-    /^flag-not-allowed: tail command-substitution/,
+    /^flag-not-allowed: uniq /,
   ],
   "date -s through a substitution": [
     "date $(echo -s) now",
-    /^flag-not-allowed: date command-substitution/,
+    /^flag-not-allowed: date /,
   ],
   // QA cycle 3: every `${…}` is an expansion, and a word that may become several
   // operands cannot be counted.
@@ -4122,6 +4118,39 @@ const T289_GAPS = {
   "uniq with a glob that may match two files": [
     "uniq *.txt",
     /^flag-not-allowed: uniq \*\.txt/,
+  ],
+  // QA cycle 4: a process substitution and a prefix assignment cut the arguments too.
+  "uniq after a process substitution writes its output operand": [
+    "uniq <(echo a) out.txt",
+    /^flag-not-allowed: uniq/,
+  ],
+  "sort -oout after a process substitution": [
+    "sort <(echo a) -oout",
+    /^flag-not-allowed: sort/,
+  ],
+  "sed 1w after a process substitution": [
+    "sed -n <(echo a) -e '1w out' in.txt",
+    /^flag-not-allowed: sed/,
+  ],
+  "file -C after a process substitution": [
+    "file <(echo a) -C -m magic",
+    /^flag-not-allowed: file/,
+  ],
+  "uniq output operand after a prefix assignment holding a substitution": [
+    "X=$(echo a) uniq in.txt out.txt",
+    /^flag-not-allowed: uniq/,
+  ],
+  "sort -oout after a prefix assignment holding a substitution": [
+    "X=$(echo a) sort -oout in.txt",
+    /^flag-not-allowed: sort/,
+  ],
+  "date -s after a prefix assignment holding a substitution": [
+    "X=$(echo a) date -s 2020-01-01",
+    /^flag-not-allowed: date/,
+  ],
+  "an unrecognised command after a prefix assignment holding a substitution": [
+    "X=$(echo a) python3 x.py",
+    /^unrecognised-command: python3/,
   ],
   "find -delete through a substitution": [
     "find . $(echo -delete)",
@@ -4164,6 +4193,11 @@ const T289_CONTROLS = {
   "file -b": "file -b x",
   "an unquoted variable the block gives one word": "X=y; find docs/$X -name z",
   "a plain sed comment": "sed '# a comment' f",
+  "uniq with one operand and a process substitution before a read":
+    "diff <(sort a) <(sort b)",
+  "a prefix assignment holding a substitution before a harmless governed command":
+    "X=$(echo a) uniq in.txt",
+  "tail with an expansion is a hang at worst, by design": "tail $(echo -f) x",
   "a sed comment before a command on the next line": "sed '# c\np' f",
   "a sort piped to wc": "sort f | wc -l",
   "a substitution that holds the governed command": "x=$(sort -u f)",

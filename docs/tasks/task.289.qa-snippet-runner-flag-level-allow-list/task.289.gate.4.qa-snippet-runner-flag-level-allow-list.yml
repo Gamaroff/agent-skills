@@ -1,0 +1,73 @@
+schema: 2
+task: 'task.289.qa-snippet-runner-flag-level-allow-list'
+task_title: 'QA snippet runner allows flags, not just commands'
+gate: FAIL
+status_reason: 'The cycle 3 replacement holds, but the substitution mechanism still cuts a governed command arguments: a process substitution and a prefix assignment holding a substitution both hide later flags from the table. Two high bypasses reproduced under real bash.'
+reviewer: 'QA Engineer'
+head: 'ac67a20b0374a0c24178f449fd0523fc94f6c173'
+updated: '2026-11-09T15:26:16Z'
+
+top_issues:
+  - id: 'T289-CR4-1'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: "A process substitution splits a governed command's arguments, so what follows never reaches the flag table, and substitutionAfterWord deliberately leaves it out. `uniq <(echo a) out.txt` and `sort <(echo a) -oout` classify runnable and each wrote its output file under real bash (QA ran both). `sed -n <(echo a) -e '1w out' in.txt`, `file <(echo a) -C -m magic` and `date <(echo a) 01011200` are runnable too. Controls: `uniq in.txt`, `sort -u <(echo a) <(echo b)` and `diff <(ls a) <(ls b)` stay runnable; the plain `uniq in.txt out.txt` and `sort -oout in.txt` are refused. origin: code-review, reproduced by QA"
+    suggested_action: 'Stop judging the cut arguments: mask each substitution with a one-word placeholder and run the governed commands in the masked text through the flag table.'
+    suggested_owner: dev
+    status: open
+  - id: 'T289-CR4-2'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: "A prefix assignment holding a substitution cuts the arguments before the table sees them, and substitutionAfterWord scans only text after the command word. `X=$(echo a) uniq in.txt out.txt` and `X=$(echo a) sort -oout in.txt` classify runnable; under real bash the first wrote `out.txt` and the second `out` (QA ran both). `X=$(echo a) date -s 2020-01-01` is runnable too. Controls: `X=$(echo a) uniq in.txt` stays runnable; the plain forms are refused. origin: code-review, reproduced by QA"
+    suggested_action: 'Same replacement as T289-CR4-1: mask substitutions and judge the governed command in the masked text, whatever precedes it.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 282
+  phases_verified: '4/5'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 31
+    escaped: 0
+    boundary: true
+    boundary_signals: ['refused', 'refuses']
+    notes: 'The shell-exec corpus (31 cases, 0 reproduced, 0 escaped) passes. The reviewer classified 12,797 generated blocks, ran the 1,945 that came back runnable under real bash, and found two bypasses, both in the substitution cut. Wrapper names (command, backslash, absolute path, quoted or split name, env, xargs, nice, timeout, exec), 1 MB lines and 100k nesting found nothing and threw no exception. The cycle 3 expansion rule and operand-shape check held.'
+  performance:
+    status: PASS
+    notes: 'No exception or slowdown at 1 MB lines and 100k nesting.'
+  reliability:
+    status: PASS
+    notes: 'Fails closed on every input the reviewer tried that it could not read.'
+  maintainability:
+    status: PASS
+    notes: 'The expansion guard is one rule with a population test; the substitution guard is a second heuristic beside the segment cut and is the struck mechanism.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Third strike (gates 2, 3 and 4 all carry a HIGH on this file) and the struck mechanism is the substitution handling: replace substitutionAfterWord with a masked reading of the whole text, so no substitution can cut a governed command arguments.'
+      refs: ['shared/resources/qa-execute-snippets.mjs', 'shared/resources/tests/qa-execute-snippets.test.mjs']
+  future:
+    - action: 'diff and tail skip every expansion check by design (expansionOk): say so in the entries why text. Phase 5 (ctx-wrap- temp-directory leak) was left out of this task; file it separately.'
+      refs: ['shared/resources/qa-execute-snippets.mjs', 'shared/resources/tests/context-pressure-statusline.test.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['Both high findings fixed by the masked reading, then re-reviewed']
