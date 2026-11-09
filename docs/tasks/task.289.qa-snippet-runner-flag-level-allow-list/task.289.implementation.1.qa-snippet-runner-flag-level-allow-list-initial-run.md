@@ -136,6 +136,15 @@ _Track each QA review/fix cycle._
 - **Probe (Step 3.5)**: the rule's one live statement is `shared/resources/qa-runnable-prose-detection.md` (updated). Population: 1.
 - **Verification**: 300 of 300 engine tests; `CI=true npm run ci:fast` exit 0; `bundle:check` 0 problems.
 
+### QA Cycle 6
+
+- **Gate**: WAIVED by the owner (82/100). On its findings the gate is FAIL: safety re-probe of the newest code (about 1000 differential inputs, 39 runnable ones run under bash) held the cycle 5 fix, and found one reproduced write and one crash in older code, both identical on develop. The owner raised the QA budget to 6 for this cycle, then accepted the branch as a strict improvement over develop.
+- **T289-CR6-1 (high)**: a `#` after a backslash-escaped space is read as a comment (`echo a\ # ; touch out` classifies runnable and writes). Filed as task.290.
+- **T289-CR6-2 (medium)**: `closingParen` recurses per nested double-quoted `$(` and throws `RangeError` at 20000 levels. Filed as task.290.
+- **Owner decision**: accept the branch and file the residual (recorded in gate 6's `waiver:` block). No code changed in this cycle.
+- **Measurements owed from earlier cycles, now taken**: `CI=true npm run ci` exit 0. Suite wall time (`npm run test:suite`, develop in a separate worktree, five alternating pairs, load recorded): median develop 205.6s, branch 207.5s, ratio 1.009; two runs were host-load outliers (pair 2 branch, 289.2s at load 8.05; pair 5, load 31.09), reported and kept.
+- **Action**: Proceeding to 5c.
+
 ---
 
 ## Completion
