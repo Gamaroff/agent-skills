@@ -17,12 +17,12 @@ Edit `shared/resources/` sources with the Edit tool, one hunk per call; never a 
 
 ### Phase 1
 
-`AskUserQuestion`: (a) obs #67 shape 4: refuse a variable argument to a deny-listed command, or track values; (b) obs #52: `shared_files` in the cases file, or `--fixture-copy <repo-path>`. Record here.
+Decided by the owner on 2026-11-09 (recorded in the task document, commit 598e16fe): (a) obs #67 shape 4: **refuse** a variable argument to a deny-listed command, no value tracking; (b) obs #52: **`--fixture-copy`**, copied once per run. The flag lands on `shared/resources/security-probe-plan.mjs` (it owns `--cases-base` and the numbered cases file), not on `security-probe.mjs`.
 
 ### Phase 2: The snippet runner
 
 - `classifyInternal` / `stripNonCode`: make `stripProse` idempotent (neutralise the heredoc operator it keeps) so the second pass cannot read every line after the opener as body; `collapseQuotedSpans` keeps `$(…)` and backticks inside double-quoted spans; run `DENY_PATTERNS` over an unquoted copy of the prose too.
-- Syntax check: for every block refused as mutating or placeholder-free, run `bash -n` (and `zsh -n` when present) on a temp file inside `mktemp -d`; a failure is a `high` finding `execution-failure`, separate from the refusal.
+- Syntax check: for every block refused as mutating or placeholder-free, run `bash -n` (and `zsh -n` when present) on a temp file inside `mktemp -d` that a `finally` block removes (`scripts/test-tmpdir.mjs` rejects a test directory with no removal); a failure is a `high` finding `execution-failure`, separate from the refusal.
 - Measure: run the runner over every executed doc (`SKILL.md`, `shared/resources/*.md`) before and after; list newly refused blocks with the command; fix or annotate each.
 
 ### Phase 3: The probe record
@@ -32,7 +32,7 @@ Edit `shared/resources/` sources with the Edit tool, one hunk per call; never a 
 
 ### Phase 4: status-history
 
-- `status-history.js`: read the first table header under `## Status History`, count columns, compare with the row to append; mismatch → exit 2 naming the file and both counts, or write in the header's shape per Phase 1. Test with a three-column table that fails on today's engine.
+- `status-history.js`: read the first table header under `## Status History`, count columns, compare with the row to append; mismatch → exit 2 naming the file and both counts (refuse; decided in the task document). Test with a three-column table that fails on today's engine.
 
 ### Phase 5
 

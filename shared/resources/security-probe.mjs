@@ -49,7 +49,17 @@
  *                        makes that run `errored`, never a verdict. Refused
  *                        (exit 2, `bad-fixture-setup`) with every other form;
  *                        recorded as `fixture_setup`
- *   --args-json <json>   a JSON ARRAY of fixed extra arguments appended after the
+ *   --fixture-copy <path> a repo-relative FILE copied byte for byte into every
+ *                        case's directory at the same relative path, before the
+ *                        case's own `fixture.files` (a case's file of the same
+ *                        path wins). Repeatable. For the files every case needs
+ *                        (a bundled helper, a shared config): the cases file
+ *                        names them once, as this flag, and not once per case
+ *                        (task.274, obs #52). Read once per run. The fence:,
+ *                        shell-argv: and cli: forms only; refused (exit 2,
+ *                        `bad-fixture-copy`) with every other form, and for an
+ *                        absolute path, a `..`, a symlink or a non-file
+ *   --args-json <json>  a JSON ARRAY of fixed extra arguments appended after the
  *                        case's input on every call — `fn(input, ...args)` — so a
  *                        `(text, opts)` validator is probeable (task.131). The JS
  *                        entry form only: refused (exit 2, `bad-args`) with every
@@ -1590,6 +1600,7 @@ export function runProbeSpec({
   args,
   slot,
   fixtureSetup,
+  fixtureCopy,
   timeoutMs,
   repoRoot = defaultRepoRoot(),
 } = {}) {
@@ -1646,6 +1657,9 @@ export function runProbeSpec({
     // forms, or null (task.181; the cli: form since task.254). Stated so the
     // record says what built each case directory.
     fixtureSetup: null,
+    // The repo-relative files `--fixture-copy` put in every case directory, or
+    // null (task.274). Stated so the record says what built each case directory.
+    fixtureCopy: null,
   };
 
   // `declined` is its own state and is NEVER folded into `executed: 0`. Both
@@ -1837,6 +1851,62 @@ export function runProbeSpec({
     }
   }
   base.fixtureSetup = setupPath;
+  // `fixtureCopy` (task.274, obs #52): files every case's directory needs, named
+  // ONCE here instead of embedded in every case's `fixture.files`. Validated at
+  // the boundary a library caller crosses, with the containment `fixtureSetup`
+  // gets, and read ONCE per run into `sharedFiles`. Declined, not ignored, on a
+  // form that materialises no `fixture.files`: a caller who passed it meant it.
+  let sharedFiles = [];
+  if (fixtureCopy !== undefined && fixtureCopy !== null) {
+    if (!isShellArgvForm && !isCliForm && !isFenceForm) {
+      return decline(
+        "bad-fixture-copy",
+        "--fixture-copy applies to the cli:, shell-argv: and fence: entry forms only",
+      );
+    }
+    if (
+      !Array.isArray(fixtureCopy) ||
+      fixtureCopy.some((p) => typeof p !== "string" || p.trim() === "")
+    ) {
+      return decline(
+        "bad-fixture-copy",
+        "--fixture-copy must be a non-empty list of repo-relative file paths",
+      );
+    }
+    const root = realpathSafe(resolve(repoRoot));
+    const seen = new Set();
+    for (const rel of fixtureCopy) {
+      if (isAbsolute(rel) || rel.split(/[\\/]/).includes("..")) {
+        return decline(
+          "bad-fixture-copy",
+          `${rel} must be a repo-relative path with no \`..\``,
+        );
+      }
+      const abs = resolve(root, rel);
+      if (!isWithin(root, abs) || abs === root) {
+        return decline("bad-fixture-copy", `${rel} is outside ${root}`);
+      }
+      if (relative(root, abs).split(sep).includes("node_modules")) {
+        return decline("bad-fixture-copy", `${rel} is under node_modules`);
+      }
+      const key = relative(root, abs);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      try {
+        const st = lstatSync(abs);
+        if (st.isSymbolicLink()) throw new Error("a symbolic link");
+        if (!st.isFile()) throw new Error("not a regular file");
+        // The bytes, never a decoded string: U+0085, U+2028 and a lone CR survive.
+        sharedFiles.push([key, readFileSync(abs)]);
+      } catch (e) {
+        return decline(
+          "bad-fixture-copy",
+          `${rel} is not a readable regular file: ${e.message}`,
+        );
+      }
+    }
+    base.fixtureCopy = sharedFiles.map(([k]) => k);
+  }
   // The cli: arm has no `gh` trip-wire and no `--fake-gh` (a CLI that consults
   // gh is a networked CLI), so a setup that names `gh` would run the host
   // binary. Declined, as the shell forms decline it without a fake (task.254).
@@ -2076,6 +2146,7 @@ export function runProbeSpec({
           block: fenceBlock,
           slot,
           docPath: resolved.entryPath,
+          sharedFiles,
           fakeGhDir,
           harnessDir,
           shells,
@@ -2096,6 +2167,7 @@ export function runProbeSpec({
           entryPath: resolved.entryPath,
           template,
           setupPath,
+          sharedFiles,
           fakeGhDir,
           harnessDir,
           shells,
@@ -2117,6 +2189,7 @@ export function runProbeSpec({
           runtime: cliRuntime,
           template,
           setupPath,
+          sharedFiles,
           harnessDir,
           sandboxRoot,
           sandboxHome,
@@ -2332,6 +2405,7 @@ export function runProbeSpec({
     args: base.args,
     slot: base.slot,
     fixtureSetup: base.fixtureSetup,
+    fixtureCopy: base.fixtureCopy,
   };
 }
 
@@ -2958,6 +3032,7 @@ function runCliCase(
     runtime = "node",
     template,
     setupPath = null,
+    sharedFiles = [],
     harnessDir,
     sandboxRoot,
     sandboxHome,
@@ -3006,7 +3081,9 @@ function runCliCase(
     );
     return;
   }
-  const files = Object.entries(c.fixture?.files ?? {});
+  // The run's shared files first (--fixture-copy, task.274), so a case's own file
+  // of the same path wins; both are what the fixture creates, for the path check.
+  const files = [...sharedFiles, ...Object.entries(c.fixture?.files ?? {})];
   // What the fixture creates: the sink's controls and input, when there is a
   // sink, and every `fixture.files` path (task.128 BUG-13; task.232).
   const paths = pathAssertionProblem(c.expected, [
@@ -3388,6 +3465,7 @@ function runShellArgvCase(
     entryPath,
     template,
     setupPath = null,
+    sharedFiles = [],
     fakeGhDir = null,
     harnessDir,
     shells,
@@ -3433,7 +3511,9 @@ function runShellArgvCase(
     decline(`case's ${problem}`);
     return;
   }
-  const files = Object.entries(c.fixture?.files ?? {});
+  // The run's shared files first (--fixture-copy, task.274), so a case's own file
+  // of the same path wins; both are what the fixture creates, for the path check.
+  const files = [...sharedFiles, ...Object.entries(c.fixture?.files ?? {})];
   // What the fixture creates: the sink's controls and input, when there is a
   // sink, and every `fixture.files` path (task.128 BUG-13; task.232).
   const paths = pathAssertionProblem(c.expected, [
@@ -3890,6 +3970,7 @@ function runFenceCase(
     block,
     slot,
     docPath,
+    sharedFiles = [],
     fakeGhDir = null,
     harnessDir,
     shells,
@@ -3954,7 +4035,9 @@ function runFenceCase(
     decline(`case's ${problem}`);
     return;
   }
-  const files = Object.entries(c.fixture?.files ?? {});
+  // The run's shared files first (--fixture-copy, task.274), so a case's own file
+  // of the same path wins; both are what the fixture creates, for the path check.
+  const files = [...sharedFiles, ...Object.entries(c.fixture?.files ?? {})];
   // What the fixture creates: every `fixture.files` path. An `absent` path it
   // writes would make every hostile case score accepted and the verdict read
   // `absent` behind a full count (task.128 BUG-13; task.180 QA cycle 2,
@@ -4057,8 +4140,8 @@ function runFenceCase(
 //
 // One record per review, one ENTRY FILE per control. `--record <path>` writes
 // this run's control to `<path>.d/<key>.json` — an atomic temp+rename to a name
-// derived from `{sink, entry}` (plus, for a cli: control, its --name or else its argv skeleton —
-// see controlKey), so two controls never share a file and a re-run
+// derived from `{sink, entry}` (plus its --name when it has one, and for an unnamed cli: control
+// its argv skeleton — see controlKey), so two controls never share a file and a re-run
 // of the same control replaces only its own — and then writes the folded
 // snapshot at `<path>` for readers. `readRecord` folds the entry directory,
 // never the snapshot, so the snapshot cannot mislead the engine.
@@ -4151,8 +4234,12 @@ const controlKey = (c) => {
     (typeof c.entry === "string" &&
       (c.entry.startsWith(CLI_PREFIX) ||
         c.entry.startsWith(SHELL_ARGV_PREFIX)));
-  if (!isCli) return base;
   const name = cliControlName(c);
+  // A JS-entry control is keyed on its stated name as well (task.274, obs #68):
+  // two --names against one entry were two controls the caller meant, and sink +
+  // entry alone made the second replace the first. An UNNAMED JS control keeps
+  // the bare key, so its entry-file name is the one it always had.
+  if (!isCli) return name !== null ? `${base}\u0000name:${name}` : base;
   if (name !== null) return `${base}\u0000name:${name}`;
   return Array.isArray(c.argv) ? `${base}\u0000${cliControlKey(c.argv)}` : base;
 };
@@ -4227,6 +4314,11 @@ export function toRecordEntry(result, { name, callSite } = {}) {
     // form — the record says what built each case directory.
     fixture_setup:
       typeof result.fixtureSetup === "string" ? result.fixtureSetup : null,
+    // The repo-relative files `--fixture-copy` put in every case directory
+    // (task.274), or null — the record says what built each case directory.
+    fixture_copy: Array.isArray(result.fixtureCopy)
+      ? [...result.fixtureCopy]
+      : null,
     ran_at: new Date().toISOString(),
   };
 }
@@ -4600,7 +4692,17 @@ export function main(argv = process.argv.slice(2)) {
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === "--json") opts.json = true;
-    else if (Object.hasOwn(OPERAND_FLAGS, a)) {
+    else if (a === "--fixture-copy") {
+      // Repeatable (task.274): every occurrence adds a file. Not in OPERAND_FLAGS,
+      // whose flags are single-valued and last-wins.
+      const operand = argv[i + 1];
+      if (operand === undefined || operand.startsWith("--")) {
+        process.stderr.write(`${a} requires an operand\n`);
+        return 2;
+      }
+      (opts.fixtureCopy ??= []).push(operand);
+      i += 1;
+    } else if (Object.hasOwn(OPERAND_FLAGS, a)) {
       // Checked at parse time: `argv[++i]` on a trailing flag yields undefined,
       // which a post-loop `!== undefined` guard cannot tell from the flag never
       // having been given — `--record` with no path used to exit 2 only because
@@ -4701,6 +4803,17 @@ export function main(argv = process.argv.slice(2)) {
   if (!takesArgv && opts.fixtureSetup !== undefined) {
     process.stderr.write(
       "bad-fixture-setup: --fixture-setup applies to the cli: and shell-argv: entry forms only\n",
+    );
+    return 2;
+  }
+  // `--fixture-copy` (task.274) is for the forms that materialise `fixture.files`.
+  if (
+    opts.fixtureCopy !== undefined &&
+    !takesArgv &&
+    !opts.entry.startsWith(FENCE_PREFIX)
+  ) {
+    process.stderr.write(
+      "bad-fixture-copy: --fixture-copy applies to the cli:, shell-argv: and fence: entry forms only\n",
     );
     return 2;
   }
@@ -4810,6 +4923,7 @@ export function main(argv = process.argv.slice(2)) {
     args: extraArgs,
     slot: opts.slot,
     fixtureSetup: opts.fixtureSetup,
+    fixtureCopy: opts.fixtureCopy,
     timeoutMs: opts.timeoutMs,
     repoRoot,
   });

@@ -5,16 +5,17 @@ type: task
 description: "Fix five QA engine defects that pass or lose what they cannot see: the snippet runner's base scan and syntax blindness, the probe record that overwrites a second control, the MB-sized per-case fixtures, and a status-history row that does not match its table."
 tags: [qa-task, finalise, observation]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-11-06
-updated: 2026-11-06
+updated: 2026-11-09
 estimated_effort_hours: 16
 ---
 
 # Task 274: QA engines stop passing what they cannot see
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.274.review.1.qa-engines-initial-review.md` implemented 2026-11-09
 
 ---
 
@@ -50,17 +51,17 @@ Five scripts that QA and finalise rely on report a clean or accepted result for 
 Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`. Edit the `shared/resources/` sources; the copies under `skills/*/references/` are generated.
 
 - `shared/resources/qa-execute-snippets.mjs` holds `classifyBlock`, `classifyInternal`, `stripNonCode`, `commandInvocations`, `collapseQuotedSpans`, `DENY_PATTERNS` (names from obs #67, measured against `origin/develop`).
-- `shared/resources/security-probe.mjs` holds `--record`, `--entry`, `--sink`, `--name`, `--cases-base` (`skills/finalise/SKILL.md:661`–`:662`).
+- `shared/resources/security-probe.mjs` holds `--record`, `--entry`, `--sink`, `--name` (header, lines 69–72). `--cases-base` and the numbered cases file belong to `shared/resources/security-probe-plan.mjs` (header, lines 13–35; `git grep -n "cases-base" -- shared`), so the shared-fixture change (obs #52) lands there, not in `security-probe.mjs`. (An earlier draft cited `skills/finalise/SKILL.md:661`–`:662` for these flags; those lines hold the `boundary: true` prose, not the flags.)
 - `shared/resources/status-history.js:48` defines `RE_ENTRY_ROW` (a data row opens with a date); `:40` builds `HEADER_ROW` from `COLUMNS` and a separator; the engine never compares the table's own header width to the row it appends (obs #99).
-- Test files: `shared/resources/tests/qa-execute-snippets.test.mjs` (load-flaky per memory; re-run alone before believing a red), the security-probe suite, and a status-history test `(unverified: the plan lists them)`.
+- Test files (all under `shared/resources/tests/`, reached by the `package.json` `test:suite` glob `shared/resources/tests/*.test.mjs`): `qa-execute-snippets.test.mjs` (load-flaky; re-run alone before believing a red), `security-probe.test.mjs`, `security-probe-plan-cases-file.test.mjs`, `status-history-cli.test.mjs`. `qa-execute-snippets.test.mjs` has 155 lines naming `runnable` (`git grep -nE "runnable" -- shared/resources/tests/qa-execute-snippets.test.mjs | wc -l`); Phase 2 reads each for a shape the new refusals reclassify.
 
 ### Target Architecture
 
-- **Base scan** (obs #67 shapes 1 to 3): make `stripProse` idempotent by neutralising the heredoc operator it keeps; keep `$(…)` and backticks inside double-quoted spans when collapsing; run `DENY_PATTERNS` over an unquoted copy of the prose too. Shape 4 (a variable argument to a deny-listed command) is decided separately in Phase 1.
-- **Syntax check** (obs #54): `bash -n` (and `zsh -n` when present) on every block refused as mutating or placeholder-free; a parse failure is an execution-failure finding, `high`, separate from the refusal.
+- **Base scan** (obs #67 shapes 1 to 3): make `stripProse` idempotent by neutralising the heredoc operator it keeps; keep `$(…)` and backticks inside double-quoted spans when collapsing; run `DENY_PATTERNS` over an unquoted copy of the prose too. Shape 4 (a variable argument to a deny-listed command, e.g. `X=-delete; find docs $X`) is **refused** (owner decision, Phase 1): the scan does not track values, so a deny-listed command whose argument is a variable expansion classifies as mutating. A block wrongly refused by this rule is annotated in Phase 2. **Controls**: the same variable argument to a command that is not deny-listed stays runnable.
+- **Syntax check** (obs #54): `bash -n` (and `zsh -n` when present) on every block refused as mutating or placeholder-free, on a temp file in a `mktemp -d` directory that a `finally` removes; a parse failure is an execution-failure finding, `high`, separate from the refusal.
 - **Record key** (obs #68): key a JS-entry control by sink + entry + name (or by the cases file's digest).
-- **Shared fixtures** (obs #52): a top-level `shared_files` in the cases file (or `--fixture-copy`), copied once per run.
-- **Row width** (obs #99): read the header; refuse with exit 2 naming the file and both counts, or write in the header's shape.
+- **Shared fixtures** (obs #52): the `--fixture-copy` flag (owner decision, Phase 1) on `security-probe-plan.mjs`: the shared files are copied into the numbered cases file once per run, not once per case. A cases file without the flag runs unchanged (a criterion).
+- **Row width** (obs #99): read the header; **refuse** with exit 2 naming the file and both counts (decided here: the criterion "a width mismatch is refused" fixes it; writing in the header's shape is not taken).
 
 ### Important Clarifications
 
@@ -79,7 +80,7 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`. Edit the `shared/resou
 
 ### Out of Scope
 
-❌ **Shape 4** if Phase 1 decides it needs value tracking: re-filed.
+❌ **Value tracking** for shape 4 (decided in Phase 1: refuse instead): not built; if a refused block proves too coarse, re-file.
 ❌ **Changing the probe verdict logic** (task 256, merged).
 
 ---
@@ -123,9 +124,10 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`. Edit the `shared/resou
 - `shared/resources/qa-execute-snippets.mjs`, its test
 
 **Changes**:
-- [ ] Shapes 1 to 3, each with a control.
-- [ ] `bash -n` / `zsh -n` finding (obs #54).
-- [ ] Measured re-run over the real docs; fix or annotate the newly refused blocks.
+- [x] Shapes 1 to 4, each with a control (shape 4: refuse a variable argument to a deny-listed command). *Shape 4 applies to a block's own text only: not in helper mode, and not to the arguments `forwardedHazard` re-classifies, whose variables the existing helper rules judge.*
+- [x] Read the 155 `runnable` lines in `qa-execute-snippets.test.mjs` for assertions the new refusals reclassify, before running the suite. *Result: one assertion changed — T191 CR2-3's respelled `export "$(…)=…"` is still refused, now by the raw/collapsed disagreement rather than the start-up hazard; the other 154 hold.*
+- [x] `bash -n` / `zsh -n` finding (obs #54). *Done as `<shell> -n -c <code>`, which parses and runs nothing, so no temp file or `mktemp -d` is created and none needs a `finally`. Runs on `mutating` blocks and `unbound-variable` placeholders; a `{slot}` / `<slot>` placeholder is not parsed.*
+- [x] Measured re-run over the real docs; fix or annotate the newly refused blocks. *3,621 blocks in 4,285 tracked docs, old vs new classifier: 1 newly refused, 0 newly runnable. The one is `sed '2d' "$f"` in a verification snippet of the historical `task.90` document (line 512), refused by the shape-4 rule the owner accepted; that document is not re-run by Step 4b, so it is recorded here and left as written.*
 
 **Dependencies**: Phase 1.
 
@@ -136,11 +138,11 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`. Edit the `shared/resou
 **Risk Level**: Medium
 
 **Files**:
-- `shared/resources/security-probe.mjs`, its test
+- `shared/resources/security-probe.mjs`, `shared/resources/security-probe-plan.mjs`, and their tests (`security-probe.test.mjs`, `security-probe-plan-cases-file.test.mjs`)
 
 **Changes**:
-- [ ] Key by name (obs #68); test two names against one entry.
-- [ ] Shared fixtures once per run (obs #52).
+- [x] Key by name (obs #68); test two names against one entry. *An unnamed JS control keeps its key and entry-file name; a legacy named entry on disk folds with its named re-run.*
+- [x] Shared fixtures once per run via `--fixture-copy` (obs #52). *The flag lives in `security-probe.mjs` (the engine that writes case directories), repeatable and read once per run; `security-probe-plan.mjs` needed no code change because a plan entry's argv reaches the engine unchanged, shown by a plan-runner test against the real engine. The record carries `fixture_copy`.*
 
 **Dependencies**: Phase 1.
 
@@ -154,7 +156,7 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`. Edit the `shared/resou
 - `shared/resources/status-history.js`, its test
 
 **Changes**:
-- [ ] Refuse on a width mismatch, or write in the header's shape (obs #99).
+- [x] Refuse on a width mismatch, or write in the header's shape (obs #99). *Refused: exit 2, `reason: width-mismatch`, naming the file and both counts.*
 
 **Dependencies**: none.
 
@@ -178,11 +180,12 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`. Edit the `shared/resou
 1. ✅ `shared/resources/qa-execute-snippets.mjs`
 2. ✅ `shared/resources/security-probe.mjs`
 3. ✅ `shared/resources/status-history.js`
+3a. ✅ `shared/resources/security-probe-plan.mjs` (`--fixture-copy`)
 
 ### Files to Modify (Tests)
 
 4. ✅ `shared/resources/tests/qa-execute-snippets.test.mjs`
-5. ✅ the security-probe and status-history test files (plan names them)
+5. ✅ `shared/resources/tests/security-probe.test.mjs`, `security-probe-plan-cases-file.test.mjs`, `status-history-cli.test.mjs`
 
 ### Files to Modify (Documentation)
 
@@ -201,7 +204,7 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`. Edit the `shared/resou
 **Scope**: each fix and its control.
 
 **Actions**:
-- [ ] The three base-scan shapes classify as mutating; **controls**: a heredoc with no write after it, a quoted `$(…)` in single quotes (text, not substitution) and `find docs -name x` stay runnable.
+- [ ] The four base-scan shapes classify as mutating (shape 4: `X=-delete; find docs $X`); **controls**: a heredoc with no write after it, a quoted `$(…)` in single quotes (text, not substitution), `find docs -name x`, and a variable argument to a command that is not deny-listed stay runnable.
 - [ ] An unparseable block yields a `high` execution-failure finding, distinct from a refusal; a parseable mutating block still refuses only.
 - [ ] Two `--name` controls against one entry both read back; shared fixtures are copied once and the cases file is under the precedent's size for the task.205 shape.
 - [ ] A three-column table and a four-column row: refusal with both counts; a four-column table accepts.
@@ -219,7 +222,7 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`. Edit the `shared/resou
 
 ### Functional
 
-- [ ] The four base-scan shapes classify as decided in Phase 1, shown by named tests in the QA report.
+- [ ] The four base-scan shapes classify as mutating (shape 4 refused, per the Phase 1 decision), shown by named tests and their controls in the QA report's test table.
 - [ ] The newly refused blocks in the real docs are listed with their command (`git grep` count and the runner's output) and each is fixed or annotated.
 - [ ] A second control against one entry coexists; a width mismatch is refused; both shown by named tests.
 
@@ -319,6 +322,9 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`. Edit the `shared/resou
 | Date       | Version | Description                                                     | Author      |
 | ---------- | ------- | --------------------------------------------------------------- | ----------- |
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #52, #54, #67, #68, #99   | create-task |
+| 2026-11-09 | 1.1     | Review passed (8/10) — shared-fixture work moved to security-probe-plan.mjs, shape 4 and row width decided, test files named, temp-dir removal and test sweep added | review-task |
+|            |         | Status → ready-for-development                                  | review-task |
+| 2026-11-09 |         | Implemented — 7 source/test files + 2 docs + 17 bundled copies, 3 phases of fixes with mutation proofs | develop |
 <!-- change-log-end -->
 
 ---
@@ -329,16 +335,16 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`. Edit the `shared/resou
 - [x] Answers recorded
 
 ### Phase 2: The snippet runner
-- [ ] Shapes, syntax check, re-run
+- [x] Shapes, syntax check, re-run
 
 ### Phase 3: The probe record and fixtures
-- [ ] Name key, shared fixtures
+- [x] Name key, shared fixtures
 
 ### Phase 4: status-history
-- [ ] Width check
+- [x] Width check
 
 ### Phase 5: Bundle and sweep
-- [ ] Mutation proofs, bundle clean
+- [ ] Mutation proofs (done for every fix), bundle clean (`--check` 0 problems), full `CI=true npm test`, perf measurement (QA)
 
 ---
 
@@ -360,8 +366,8 @@ Do not trust a single red from `qa-execute-snippets.test.mjs` under load; re-run
 
 ### Future Improvements
 
-Shape 4 (value tracking), if Phase 1 defers it.
+Shape 4 value tracking, if the refusal Phase 1 chose proves too coarse.
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review

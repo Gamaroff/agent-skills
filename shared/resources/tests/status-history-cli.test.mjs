@@ -325,3 +325,90 @@ test("--set-status refuses a status outside the lifecycle (exit 2); without the 
     assert.match(doc, /^\*\*Status\*\*: 🆕 New$/m);
   });
 });
+
+// task.274 Phase 4 (obs #99): a row of the wrong width was appended under a
+// three-column header, exit 0, no warning. The CLI now compares the table's own
+// header width with the row it is about to write.
+const THREE_COLUMN_BUG = [
+  "# Bug 99",
+  "",
+  "## Status History",
+  "",
+  "| Date | Status | Notes |",
+  "| --- | --- | --- |",
+  "| 2026-09-01 | New | Bug created |",
+  "",
+  "## Resolution Summary",
+  "",
+].join("\n");
+
+function withDoc(content, fn) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "status-history-width-"));
+  const file = path.join(dir, "bug.99.x.md");
+  fs.writeFileSync(file, content);
+  try {
+    fn(file);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("a four-column row under a three-column header is refused: exit 2, reason `width-mismatch`, both counts named, nothing written", () => {
+  withDoc(THREE_COLUMN_BUG, (file) => {
+    const r = run([...row(file, "in-progress"), "--json"]);
+    assert.equal(r.status, 2, r.stderr);
+    const j = JSON.parse(r.stdout);
+    assert.equal(j.reason, "width-mismatch");
+    assert.equal(j.exitCode, 2);
+    assert.ok(j.error.includes(file), "names the file");
+    assert.match(j.error, /3 columns/);
+    assert.match(j.error, /4 columns/);
+    assert.match(r.stderr, /3 columns/);
+    assert.equal(fs.readFileSync(file, "utf8"), THREE_COLUMN_BUG);
+  });
+});
+
+test("control: a four-column header accepts the four-column row (the template's own table)", () => {
+  withBug((file) => {
+    const r = run([...row(file, "in-progress"), "--json"]);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(JSON.parse(r.stdout).reason, "updated");
+  });
+});
+
+test("control: a heading with no table under it (a stub) is still laid down, not refused", () => {
+  withDoc(
+    "# Bug 99\n\n## Status History\n\n## Resolution Summary\n",
+    (file) => {
+      const r = run([...row(file, "new"), "--json"]);
+      assert.equal(r.status, 0, r.stderr);
+      assert.match(
+        fs.readFileSync(file, "utf8"),
+        /\| Date \| Status \| Changed By \| Notes \|/,
+      );
+    },
+  );
+});
+
+test("control: an escaped pipe inside a header cell does not add a column", () => {
+  const doc = THREE_COLUMN_BUG.replace(
+    "| Date | Status | Notes |\n| --- | --- | --- |",
+    "| Date | Status | Changed By | Notes \\| detail |\n| --- | --- | --- | --- |",
+  );
+  withDoc(doc, (file) => {
+    const r = run([...row(file, "new"), "--json"]);
+    assert.equal(r.status, 0, r.stderr);
+  });
+});
+
+test("the engine's own output is accepted by its next write (a table it created takes a second row)", () => {
+  withDoc(
+    "# Bug 99\n\n## Status History\n\n## Resolution Summary\n",
+    (file) => {
+      assert.equal(run(row(file, "new")).status, 0);
+      const second = run([...row(file, "in-progress"), "--json"]);
+      assert.equal(second.status, 0, second.stderr);
+      assert.equal(JSON.parse(second.stdout).reason, "updated");
+    },
+  );
+});

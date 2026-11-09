@@ -122,6 +122,31 @@ function findStatusHistory(content) {
   }
 }
 
+/**
+ * The number of columns in the Status History table's own header row, or `null`
+ * when there is nothing to compare against (no section, or a heading with no
+ * table under it). An escaped pipe (`\|`) inside a cell is not a column break.
+ *
+ * The header is the first table line in the section that is neither a data row
+ * nor the `| --- |` separator. Reading the table's own header, not `COLUMNS`, is
+ * the point: the writer's width and the document's width are two facts, and
+ * obs #99 was the engine appending one under the other without comparing them.
+ */
+function headerColumnCount(content) {
+  const found = findStatusHistory(content);
+  if (!found) return null;
+  for (const raw of content.slice(found.start, found.end).split("\n")) {
+    const line = raw.trim();
+    if (!line.startsWith("|")) continue;
+    if (isEntryRow(line) || /^\|[\s:|-]*-{3,}[\s:|-]*\|?$/.test(line)) continue;
+    return line
+      .replace(/^\|/, "")
+      .replace(/\|$/, "")
+      .split(/(?<!\\)\|/).length;
+  }
+  return null;
+}
+
 /** Entry rows currently recorded in the document, in document order. */
 function extractEntries(content) {
   const found = findStatusHistory(content);
@@ -306,7 +331,9 @@ function stripLead(value) {
 // tracker-comment.js, registry-tick.js): `--json` prints one line,
 // `{reason, exitCode, …}`; 0 is `updated` (or `unchanged` should a writer ever return the
 // content untouched — upsertStatusHistory always appends, so today it never does, and a
-// repeated call writes a second row); 2 is a usage error —
+// repeated call writes a second row); 2 is also `width-mismatch` — the table's
+// header has a different column count from the row to append (obs #99), nothing
+// written; 2 is a usage error —
 // a missing `--file`, an unknown flag, a value flag with no operand, or a file
 // that cannot be read. Usage errors were exit 1 until task.152.
 const USAGE =
@@ -384,6 +411,24 @@ function main(argv) {
     }
     base = set.content;
   }
+  // Refuse a row that does not fit the table (obs #99): a four-column row under a
+  // three-column header is a broken table with exit 0. Checked on `base`, after
+  // --set-status, but nothing has been written yet either way.
+  const tableWidth = headerColumnCount(base);
+  if (tableWidth !== null && tableWidth !== COLUMNS.length) {
+    const error = `${opts.file}: the Status History table has ${tableWidth} columns; the row to append has ${COLUMNS.length} columns (${COLUMNS.join(", ")}) — fix the table header, nothing was written`;
+    process.stderr.write(`${error}\n`);
+    if (json)
+      process.stdout.write(
+        JSON.stringify({
+          reason: "width-mismatch",
+          exitCode: 2,
+          file: opts.file,
+          error,
+        }) + "\n",
+      );
+    return 2;
+  }
   const after = upsertStatusHistory(base, { ...opts, status });
   if (after !== before) fs.writeFileSync(opts.file, after, "utf-8");
   const reason = after === before ? "unchanged" : "updated";
@@ -423,6 +468,7 @@ if (require.main === module) {
     setBugStatus,
     buildStatusHistoryBlock,
     findStatusHistory,
+    headerColumnCount,
     extractEntries,
     upsertStatusHistory,
     normaliseStatus,

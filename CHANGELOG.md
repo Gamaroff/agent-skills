@@ -6,6 +6,17 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **The QA engines stop passing what they cannot see** (task 274). The snippet runner's base scan now
+  refuses four shapes that classified `runnable` and wrote: a command after a heredoc body (the strip is
+  idempotent), `$(…)` or a backtick inside double quotes, a quoted deny-listed flag (`find docs
+  "-delete"`), and a variable argument to a deny-listed command (`X=-delete; find docs $X` — refused,
+  since the scan tracks no values). A block that is not run but does not parse under `bash -n` /
+  `zsh -n` is its own `high` `execution-failure` finding, beside its refusal. A second `--name` control
+  against one JS entry no longer replaces the first. `security-probe.mjs --fixture-copy <file>`
+  (repeatable) copies a shared repo file into every case directory once, so a cases file stops embedding
+  the same helper per case. `status-history.js` refuses (exit 2, `width-mismatch`) a row whose width
+  differs from the table's header. Over the 3,621 blocks in the tracked docs, one block is newly refused
+  (a verification snippet in the historical `task.90` document).
 - **`qa-task` and `qa-story` state five routes they lacked** (task 273). No mutation proof runs
   beside a backgrounded suite or fast gate, and a suite result that overlapped a mutation window
   is re-run before it is recorded (`mutation-proving.md` rule 7). A reviewer that executes

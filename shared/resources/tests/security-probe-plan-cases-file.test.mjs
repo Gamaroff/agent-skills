@@ -330,6 +330,67 @@ test("casesFileAccepted: the probe engine executes hostile and legitimate names 
     assert.deepEqual(out.reproduced ?? [], []);
   }));
 
+// --- --fixture-copy rides in a plan entry's argv (task.274, obs #52) --------------------------------
+
+test("fixture-copy: a plan entry's argv carries --fixture-copy to the real engine, and the cases file stays small", () =>
+  withDir(async (dir, work) => {
+    const FIX = "shared/resources/tests/fixtures/security-probe";
+    const repo = join(dir, "repo");
+    mkdirSync(join(repo, FIX), { recursive: true });
+    writeFileSync(
+      join(repo, FIX, "cli-needs-data.mjs"),
+      readFileSync(
+        join(HERE, "fixtures", "security-probe", "cli-needs-data.mjs"),
+      ),
+    );
+    writeFileSync(join(repo, "items.json"), '["MARKER"]' + " ".repeat(200_000));
+    const cases = [0, 1].map((i) => ({
+      id: `d.legit${i}`,
+      sink: "url-authority",
+      input: ".",
+      why: "needs the shared file",
+      correct: "admitted",
+      direction: "legitimate",
+    }));
+    const planFile = join(dir, "real-plan.json");
+    writeFileSync(
+      planFile,
+      JSON.stringify([
+        {
+          argv: [
+            "--sink",
+            "url-authority",
+            "--entry",
+            `cli:${FIX}/cli-needs-data.mjs`,
+            "--argv",
+            JSON.stringify(["merge-back", "{input}"]),
+            "--fixture-copy",
+            "items.json",
+          ],
+          cases,
+        },
+      ]),
+    );
+    const { out } = await runPlan({
+      plan: planFile,
+      record: join(work, "w.dod.1.security.run.json"),
+      casesBase: join(work, "w.dod.1.security.cases"),
+      repoRoot: repo,
+      engine: join(HERE, "..", "security-probe.mjs"),
+    });
+    assert.deepEqual(out.refusals, [], JSON.stringify(out.refusals));
+    assert.equal(out.probes_executed, 2, JSON.stringify(out.runs));
+    assert.deepEqual(
+      out.probes,
+      [],
+      "no case was over-blocked: the shared file arrived",
+    );
+    assert.ok(
+      readFileSync(out.cases_files[0]).length < 5_000,
+      "the numbered cases file holds the cases, not a copy of the 200 KB file",
+    );
+  }));
+
 // --- the SKILL.md reuse block binds its own inputs (T269-QA-1) --------------------------------------
 
 const reuseBlock = () =>

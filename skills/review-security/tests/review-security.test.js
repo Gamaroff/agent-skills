@@ -1026,11 +1026,17 @@ test("a re-run of the same control replaces only its own entry", async () => {
   const b = await probe("db-url/engaged");
   recordRun(rec, a, { name: "first" });
   recordRun(rec, b);
-  recordRun(rec, a, { name: "second" });
-  const r = readRecord(rec);
+  // Same name: the same control, so the re-run replaces its own entry only.
+  recordRun(rec, a, { name: "first" });
+  let r = readRecord(rec);
   assert.equal(r.controls.length, 2);
-  assert.equal(r.controls.find((c) => c.entry === a.entry).name, "second");
+  assert.equal(r.controls.find((c) => c.entry === a.entry).name, "first");
   assert.equal(fs.readdirSync(recordEntriesDir(rec)).length, 2);
+  // A different name is a different control (task.274, obs #68), not a replacement.
+  recordRun(rec, a, { name: "second" });
+  r = readRecord(rec);
+  assert.equal(r.controls.length, 3);
+  assert.equal(fs.readdirSync(recordEntriesDir(rec)).length, 3);
 });
 
 test("the engine never reads the snapshot — an edited snapshot cannot change the block", async () => {
@@ -1116,7 +1122,7 @@ test("a snapshot with no entry directory is a loud failure, never an empty recor
   assert.equal(run.stdout, "");
 });
 
-test("the fold dedupes by {sink, entry}, latest run wins, whatever the file names", async () => {
+test("the fold dedupes by {sink, entry, name}, latest run wins, whatever the file names", async () => {
   const { readRecord } = await engine();
   const rec = tmpRecord();
   const base = {
@@ -1130,12 +1136,14 @@ test("the fold dedupes by {sink, entry}, latest run wins, whatever the file name
   writeEntry(rec, "old.json", {
     ...base,
     ran_at: "2026-01-01T00:00:00Z",
-    name: "old",
+    name: "same",
+    note: "old",
   });
   writeEntry(rec, "new.json", {
     ...base,
     ran_at: "2026-01-02T00:00:00Z",
-    name: "new",
+    name: "same",
+    note: "new",
     executed: 7,
   });
   writeEntry(rec, "other.json", {
@@ -1145,7 +1153,7 @@ test("the fold dedupes by {sink, entry}, latest run wins, whatever the file name
   });
   const r = readRecord(rec);
   assert.equal(r.controls.length, 2, "one control per key");
-  assert.equal(r.controls.find((c) => c.entry === "e#f").name, "new");
+  assert.equal(r.controls.find((c) => c.entry === "e#f").executed, 7);
   assert.equal(r.totals.executed, 12, "a duplicate must not be counted twice");
 });
 
