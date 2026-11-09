@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.66.0] - 2026-11-09
+
 ### Added
 
 - **The QA snippet runner allows flags, not just commands** (task 289). `SAFE_FLAGS` gives every
