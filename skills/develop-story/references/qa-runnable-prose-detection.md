@@ -145,6 +145,38 @@ worth naming (`git push`, `gh pr comment`, `curl -X POST`, `rm -rf`, …).
 heard of is treated as dangerous, not as safe-by-default. A deny-list alone fails *open*: every command
 nobody thought to forbid runs.
 
+**The allow-list reaches the flags (task.289).** `SAFE_COMMANDS` decides which commands may run; the
+`SAFE_FLAGS` table beside it decides which flags and how many operands each may carry, and an entry's
+`why` records the audit. A flag outside its command's entry classifies `mutating` with the reason
+`flag-not-allowed: <command> <flag>`, so a spelling nobody thought of cannot run: `sort
+--compress-program=./x`, `find docs -fprint0 out`, `sed '1e touch x'` (the `e` command and the `s///e`
+and `w` flags), `uniq in out` (a second operand is the output file), `file -C`, `diff -l`, `tail -f` and
+`date -s` / `date 01011200` are all refused. A command with no entry is refused (`no-table-entry`), and a
+long-flag abbreviation is not on the list. Eight commands carry an explicit flag list (`sed`, `find`,
+`sort`, `uniq`, `file`, `diff`, `date`, `tail`); the rest are audited as having no flag that writes or
+runs a program. A sed script is parsed to the end by `sedScriptVerdict`: only commands that read,
+print, branch or substitute pass, a script built from a variable this block defines is refused, and a
+script sed itself would reject (a command followed by more text) runs nothing. A sed label (`:a`, `ba`,
+`ta`) is one word that ends at whitespace or `;`, and sed reads what follows as the next command, so
+`:a e echo x` runs `e`: only a separator or the end of the script may follow a label, and anything else
+is a script the scan does not read, which is refused. A sed `#` comment ends at the first newline: a
+backslash before it is not a continuation, so `#c\<newline>e echo x` is a comment and then an `e`
+command. A command substitution, process substitution or backtick cuts the arguments the scan reads for a command (`sort <(echo a) -oout` reaches the table as `sort`, and so does everything after a prefix assignment holding one: `X=$(echo a) uniq in out`). So the block is read a second time with each substitution masked as one word (`$__SUBST__`, an expansion of unknown value, refused where a flag may stand; `/dev/fd/0` for a process substitution), and every governed command, and every command the first reading never saw, is judged in that text. The commands inside a substitution are judged on their own. The end of a substitution is found the way the shell finds it: a paren inside quotes, after a backslash or in a comment does not close it (`X=$(echo ")") touch out` ends at the last paren). A block whose substitution cannot be read to its end is refused whatever it runs: a refusal that depends on finding a governed word is a refusal the unreadable word can hide from. Every `${…}` is an
+expansion whatever it holds (`${1}`, `${!X}`, `${#A}`, `${@:1}`), not only `${NAME}`, and a command that
+counts operands (`uniq`: the second is an output file) refuses an unquoted brace, glob or unnamed
+expansion in an operand (`uniq {in,out}`, `uniq *.txt`), because the word may become several. The same pass refuses
+three shapes the table cannot express: the `<>` redirection (opens a file for read **and** write), a
+function named after an allowed command (`function cat { touch x; }; cat f`), and an unquoted expansion
+that word-splits into a flag (`x${IFS}-delete`, a variable this block gives two words, a brace
+expansion that spells `-delete`). An unquoted ANSI-C `$'…'` or locale `$"…"` word is decoded by the
+shell before the command sees it (`sort $'-o' out in` is `sort -o out in`) and this reader does not
+decode it, so it counts as an expansion whose value is unknown and is refused where a flag may stand. `DENY_PATTERNS` and the variable-argument rule stay **beside** the
+table: they remain the only check on `git`, `gh`, `rm`, `curl` and `tee`, and the second line on the
+rest, and their reasons are pinned by tests. A flag forwarded through a helper function is refused when
+every table-governed command it may reach refuses it, because the scan cannot tell which one receives
+it. The table cannot return a variable that could be an option (`find "$DIR"`, `sed '2d' "$f"`) to the
+runnable set: that needs value tracking, which the owner declined for task 289.
+
 The practical consequence, and it is intentional: `gh` and `curl` are **not** on the allow-list in any
 form. Read-only `gh pr view` and `curl -sf` are skipped along with the mutating ones. Executing a
 network call from inside a QA gate is a side effect QA should not have, and the execution environment
@@ -299,6 +331,7 @@ A finding is raised when any of these holds:
 | Condition                                              | Finding             | `channel` | `confidence` |
 | ------------------------------------------------------ | ------------------- | --------- | ------------ |
 | Either shell exits non-zero                            | `execution-failure` | —         | `high`       |
+| A block that is **not run** (refused `mutating`, or `unbound-variable`) does not parse under `bash -n` / `zsh -n` | `execution-failure` with `syntax: true` | — | `high` |
 | The two shells disagree on stdout                      | `shell-disagreement` | `stdout` | `medium`     |
 | stdout **agrees** but the two shells disagree on exit status | `shell-disagreement` | `status` | `medium` |
 
@@ -319,6 +352,32 @@ single `kind` so every existing consumer keeps working; `channel` says which com
 Adding the status channel cannot turn a previously clean file red: a status disagreement implies at
 least one non-zero status, which has already raised `execution-failure`. It is a label on a failure the
 gate already caught, not a new gate.
+
+**A refusal does not say the block parses (task.274, obs #54).** On task.204 an apostrophe closed a
+single-quoted `node -e` body; three blocks failed to parse, Step 4b refused all of them as `mutating`, and
+the report read `no-executable-blocks` — the broken prose hid behind the refusal. So a block that is not
+run because it is `mutating`, or because a variable is unbound, is still parsed with `<shell> -n -c`
+(nothing executes), and a parse failure is its own `execution-failure` finding (`syntax: true`, `high`)
+beside the refusal. A block awaiting a `{slot}` or `<slot>` is **not** parsed: its placeholder routinely
+reads as an operator, so a failure there is the template.
+
+**What the base scan reads as a write (task.274, obs #67).** Four shapes classified `runnable` and wrote:
+a command after a heredoc body (`stripProse` kept the `<<EOF` opener, so a second pass swallowed the next
+line — the operator is now neutralised, which makes the strip idempotent); `$(…)` or a backtick inside
+double quotes (they run — only single quotes make them text); a deny-listed flag in quotes
+(`find docs "-delete"` — `DENY_PATTERNS` now also run over a copy with quotes removed); and a **variable
+argument to a deny-listed command** (`X=-delete; find docs $X`). The last is *refused*: the scan tracks no
+values, so an argument that could become a flag through an expansion to `find`, `sed`, `rm`, `curl`,
+`gh`, `git` or `tee` classifies `mutating`, with the reason naming it. That is an argument that begins
+with the expansion (`$X`, `"$X"`, `${X}`, `$(…)`) or whose literal prefix is a dash with no `=` (`-$X`,
+`"-${X}"`, `-$(…)`). `docs/$X`, `"task.${N}.*"` and `--since="$D"` have a literal name or path in front
+and stay runnable. Two quote forms the shell decodes before the command sees them are refused the same
+way, because the scan does not decode them: an unquoted ANSI-C `$'-delete'` (also `$'\x2ddelete'`) or
+locale `$"-delete"` argument. A `$` that only precedes a closing quote (`'cost$'`, `"a$"`) is not one. A
+backslash-newline is removed before classification, since the shell removes it before reading a word
+(`-dele\` newline `te` is `-delete`); only an odd run of backslashes continues the line. A shipped helper's own variables and the arguments a helper forwards are
+judged by the existing helper rules, not this one. A block this wrongly refuses is a false positive to
+rewrite with a literal argument, not a rule to loosen.
 
 ### 3aa. Defence in depth — the sandbox sentinel
 

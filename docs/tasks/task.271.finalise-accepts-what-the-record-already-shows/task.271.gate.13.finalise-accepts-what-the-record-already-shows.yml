@@ -1,0 +1,72 @@
+schema: 2
+task: 'task.271.finalise-accepts-what-the-record-already-shows'
+task_title: 'finalise accepts what the record already shows'
+gate: FAIL
+status_reason: 'The cycle 12 redesign (Arm 3 reads the structured gate only) closed the Markdown class: no work-item finding was possible. One gate-side hole remains: the subset YAML parser accepts a duplicate key and the last one wins, so the matcher exits 0 on an entry a first-wins reader reads as a different approver, case or task. Plus one stale doc cell. The thirteen-gate budget is spent.'
+reviewer: 'QA Engineer'
+head: '87dd3fba2c0f0d220a5ca0a6fd361ba982605007'
+updated: '2026-11-08T16:15:00Z'
+
+top_issues:
+  - id: 'T271-QA-28'
+    severity: medium
+    file: 'shared/resources/finalise-deferral-match.js'
+    finding: 'A duplicate key inside a gate entry is accepted and the last one wins. Reproduced by hand: "approved_by: eve" then "approved_by: Pat Owner" returns matched (owner Pat Owner); "case: other" then "case: c1" returns matched; "future: []" then a second "future:" holding the entry returns matched. A strict YAML loader rejects all three, and a first-wins reader sees a different approver, case or task. The ambiguity is accepted as an approval.'
+    suggested_action: 'Refuse (unverifiable) when a key repeats in the future[] entry that names the case, or anywhere under recommendations; add tests for a duplicate case, approved_by, deferred_to and future.'
+    suggested_owner: dev
+    status: open
+  - id: 'T271-QA-29'
+    severity: low
+    file: 'docs/reference/configuration.md'
+    finding: 'The finalise.deferralApprover cell (line 292) says the approver match is case-insensitive; the matcher is exact and case-sensitive, with no case or Unicode folding.'
+    suggested_action: 'Say exact and case-sensitive in the cell.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 8061
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 3
+    escaped: 0
+    boundary: true
+    boundary_signals: ["refuses"]
+    boundary_reason: ''
+    notes: 'Three CLI runs by hand against head 87dd3fba (duplicate approved_by, duplicate case, duplicate future). The reviewer ran about 50 scratch gates (flow style, anchors, merge keys, tabs, CRLF, BOM, multi-document, odd types, id prefix and suffix cases) and the item 5a block with a spaced, dash-leading and empty gate path; only the duplicate-key shape matched wrongly. finalise-delta.js was spot-checked (rename, symlink, chmod, bad rev) and held. The block was not run under zsh by the reviewer (the acceptance-blocks test does).'
+  performance:
+    status: CONCERNS
+    notes: 'Not measured to the criterion; a clean rerun on an idle machine is owed.'
+  reliability:
+    status: PASS
+    notes: 'ci:fast 8061 tests, 0 failed.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The surface is now small and structured, which is the point of the redesign. The score is 60 by the rule (security FAIL, two CONCERNS), as at gates 11 and 12.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'ls-tree is parsed without -z; exact-case path compare (macOS, task 210).'
+      refs: ['shared/resources/finalise-delta.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['Fix T271-QA-28 and T271-QA-29, then re-review; the QA budget (13 gates) is spent, so continuing needs the owner']

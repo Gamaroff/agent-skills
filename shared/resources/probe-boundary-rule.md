@@ -40,7 +40,9 @@ different block. Three things keep it a probe and not a snippet: the caller name
 engine chooses the command (`<shell> <script>`); and the run is the probe
 engine's sandbox — per-case directory, sandbox `HOME`/`TMPDIR`, escape sentinel —
 invoked by a reviewer, never by the QA snippet path. `SAFE_COMMANDS` is untouched
-(§2).
+(§2). The flags of the commands already on it are held by `SAFE_FLAGS`
+(`qa-runnable-prose-detection.md` §2a, task 289): a command added to `SAFE_COMMANDS`
+needs an audited entry there or it is refused.
 
 ## 2. The refusal: `node` must never join `SAFE_COMMANDS`
 
@@ -174,6 +176,7 @@ Declining conditions, each reported with its reason:
 | `bad-args` | `--args-json` is not a JSON array, or was given with a `shell:` / `shell-fn:` / `cli:` / `shell-argv:` / `fence:` entry, which cannot append an argument to a call. |
 | `bad-slot` | A `fence:` entry with no `--slot`, a `--slot` the block does not contain (a slot that substitutes nothing tests nothing), or a `--slot` given with any other form. |
 | `bad-fixture-setup` | A `--fixture-setup` given with any form but `cli:` and `shell-argv:`, or one outside the containment root, under `node_modules`, not a readable regular file, or (on `cli:`) naming `gh`. |
+| `bad-fixture-copy` | A `--fixture-copy` given with any form but `cli:`, `shell-argv:` and `fence:`, or one that is absolute, holds a `..`, leaves the containment root, is under `node_modules`, is a symbolic link, or is not a readable regular file (task.274). |
 
 ### `boundary: internal` is a decision, not a verdict
 
@@ -527,6 +530,11 @@ takes it.
     unnamed write replaces an entry whose full `argv` differs, the CLI prints a
     `warning: replaced control …` line and the write still happens — the
     remedy is `--name`, not a reordered template.
+  - **A JS-entry control is keyed on its `--name` too** (task.274, obs #68): two
+    `--name`s against one `path#export` are two controls and both read back; before
+    this, sink + entry alone made the second replace the first. An *unnamed* JS control
+    keeps its old key (and entry-file name), and a re-run of one name replaces only
+    its own entry.
 
   `cli:` does **not** touch §2: the engine chooses the interpreter by the
   script's extension (`process.execPath` for `.mjs` / `.js`, the host's
@@ -611,6 +619,16 @@ takes it.
   - **A case's `fixture`** (`env`, `files`) is honoured exactly as `fence:`
     honours it, and is written **before** the setup runs, so the setup may rely
     on it.
+  - **`--fixture-copy <repo-relative file>`** (repeatable; `cli:`, `shell-argv:` and
+    `fence:`) copies a file the repository already holds into every case directory, at
+    the same relative path, byte for byte, read once per run (task.274). Name a file
+    every case needs (a bundled helper, a shared config) with this flag instead of
+    embedding its full text in each case's `fixture.files`: that is what made the
+    task.205 cases files 0.8–1.6 MB each. A case's own `fixture.files` entry of the
+    same path wins. Declined `bad-fixture-copy` for any other form, and for a path
+    that is absolute, climbs, leaves the root, is a symlink or is not a file; the
+    record carries the list as `fixture_copy`. In a probe plan it rides in the
+    entry's `argv` like any other flag; a cases file without it runs unchanged.
 
   It is a shell form for `gh`: a script, a setup, or a case fixture's `env`
   values or `files` contents that name `gh` with no `--fake-gh` are declined

@@ -1,0 +1,92 @@
+schema: 2
+task: 'task.271.finalise-accepts-what-the-record-already-shows'
+task_title: 'finalise accepts what the record already shows'
+gate: FAIL
+status_reason: 'Two high-confidence fail-open defects in rerun-eligible (failed-file path spellings and an unsubstituted placeholder both return eligible), plus an impossible approval date accepted by the deferral matcher and a zsh-incompatible read -a in the new Step 3b.1 5a block.'
+reviewer: 'QA Engineer'
+head: '3f3dc02601d92328d3a4f60e0071adb46040ab79'
+updated: '2026-11-07T19:53:56Z'
+
+top_issues:
+  - id: 'T271-QA-1'
+    severity: high
+    file: 'shared/resources/finalise-delta.js'
+    finding: 'rerun-eligible compares raw --failed-file strings with repo-root-relative git names after stripping only a leading ./, so an absolute path (the form CI logs print), ../p/src/a.js and src/./a.js do not match a file the PR changed and the engine returns eligible (exit 0). Reproduced: with src/a.js changed by the PR, src/a.js and ./src/a.js give in-diff, while the absolute path, ../ spelling and src/./a.js give eligible.'
+    suggested_action: 'Canonicalise each failed file against the workspace root (path.resolve then path.relative), refuse a path that escapes the root, and add absolute, ../ and a/./b spellings of an in-diff file as refused controls.'
+    suggested_owner: dev
+    status: open
+  - id: 'T271-QA-2'
+    severity: high
+    file: 'shared/resources/finalise-delta.js'
+    finding: 'A --failed-file that is still an unsubstituted {placeholder} is the single literal word, never in the PR diff, so with a docs-only delta rerun-eligible returns eligible. Reproduced with --failed-file "{failed-files}". The SKILL.md block also expands {failed-files} unquoted, so a path with spaces splits and a glob expands.'
+    suggested_action: 'Make the engine refuse any --failed-file containing an unsubstituted {...} placeholder (usage error, exit 2), require the file to exist in the head tree, and change the SKILL.md block to read newline-delimited paths with while IFS= read -r.'
+    suggested_owner: dev
+    status: open
+  - id: 'T271-QA-3'
+    severity: medium
+    file: 'shared/resources/finalise-deferral-match.js'
+    finding: 'The approval date is checked by shape only (/^\d{4}-\d{2}-\d{2}$/), so 2026-13-45 or 0000-00-00 matches and the bogus date is rendered into the DoD line.'
+    suggested_action: 'Parse with Date.UTC, require month and day to round-trip, and add an impossible-date refused control.'
+    suggested_owner: dev
+    status: open
+  - id: 'T271-QA-4'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The Step 3b.1 item 5a block reads the owner list with IFS=, read -r -a, which zsh rejects (bad option: -a; zsh uses -A). Run under zsh the block prints "bad option: -a", passes no --approver, and every deferral reports no-approver-configured. Reproduced under bash (matched) and zsh (no-approver-configured) from the same block.'
+    suggested_action: 'Replace the array read with a portable loop over the comma-split list that works in bash and zsh, and add a test that runs the block under both shells.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 8043
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3, 4]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: true
+    boundary_signals: ["refuses"]
+    boundary_reason: ''
+    notes: 'Both engines are accept/reject predicates (boundary: true). The probe engine was not run this cycle because the code under test changes in the fix cycle; the hostile inputs were enumerated and run by hand against the CLI (not counted as probes_executed). The probe run is due in cycle 2 against the fixed code. Fail-open path spellings found by hand (T271-QA-1, T271-QA-2).'
+  performance:
+    status: CONCERNS
+    notes: 'The five alternating npm test runs against develop were still running when this gate was written; the result is recorded in the QA report once it completes. ci:fast measured 110.6 s for 8043 tests on this head.'
+  reliability:
+    status: CONCERNS
+    notes: 'The 5a block fails closed under zsh but reports the wrong reason (T271-QA-4).'
+  maintainability:
+    status: PASS
+    notes: 'Arms 1 and 2 share one engine that reuses the single docs-path definition; each accepting case has a refused control.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'The Deferred Work bullet that Arm 3 matches is free text in a document the same pipeline writes, so an agent can author a bullet naming the owner. The owner chose a mechanical match (Phase 1), so this is a recorded residual of the design, not a defect: consider requiring the bullet to be owner-attributable (commit author) or restricting Arm 3 to the gate record.'
+      refs: ['shared/resources/finalise-deferral-match.js']
+    - action: 'Follow-up task numbers are checked for shape only (task.0 and task.9999999999 pass) and the engine does not confirm the task exists. Cheap hardening: positive integer without leading zeros, trailing word boundary on the work-item pattern, existence check in the caller.'
+      refs: ['shared/resources/finalise-deferral-match.js']
+    - action: 'A placeholder left in --gate or --work-item reports unverifiable rather than a usage error; reject {...} in every path argument as exit 2.'
+      refs: ['shared/resources/finalise-deferral-match.js']
+    - action: 'On a case-insensitive checkout the failed-file comparison is case-sensitive, and --pr-base is resolved as a local ref that may be stale.'
+      refs: ['shared/resources/finalise-delta.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['Fix T271-QA-1 to T271-QA-4 and re-review']

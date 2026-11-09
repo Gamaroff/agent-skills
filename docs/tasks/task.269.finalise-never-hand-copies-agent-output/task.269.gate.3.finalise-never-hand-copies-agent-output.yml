@@ -1,0 +1,56 @@
+schema: 2
+task: 'task.269.finalise-never-hand-copies-agent-output'
+task_title: 'finalise never hand-copies agent output'
+gate: PASS
+status_reason: 'The cycle-2 MEDIUM is fixed: CHANGELOG.md cites task 269. The two advisory notes on the finalise reuse block are fixed and held by a test that goes red when the old order is restored. No new finding in the cycle-3 scope.'
+reviewer: 'QA Engineer'
+head: 'a9845bc0847b5c3cb9ac18e929f2e732d02a454a'
+updated: '2026-11-07T15:58:28Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 22
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 8
+    escaped: 0
+    boundary: true
+    boundary_signals: ['refused', 'is refused']
+    boundary_reason: 'resolveCasesFile is a path-confinement boundary; casesFileAccepted exposes it and the probe engine executed 8 names against it in cycle 2 (task.269.qa.2.security.run.json: 0 reproduced, 0 escaped). security-probe-plan.mjs is unchanged since that run.'
+    notes: 'Prior gate security PASS, so the re-review was scoped to files changed since gate 2.'
+  performance:
+    status: PASS
+    notes: 'No change to runtime code in this cycle.'
+  reliability:
+    status: PASS
+    notes: 'A first finalise run now plans afresh instead of halting on a missing prior head.'
+  maintainability:
+    status: PASS
+    notes: 'Bundle in sync; the full fast gate passed with 7999 tests.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future: []
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

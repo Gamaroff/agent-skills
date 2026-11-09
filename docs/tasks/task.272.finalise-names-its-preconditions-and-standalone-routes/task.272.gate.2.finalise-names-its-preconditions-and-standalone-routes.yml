@@ -1,0 +1,64 @@
+schema: 2
+task: 'task.272.finalise-names-its-preconditions-and-standalone-routes'
+task_title: 'finalise names its preconditions and standalone routes'
+gate: PASS
+status_reason: 'All four cycle-1 findings closed on the committed head: guards green, CHANGELOG entry present, performance measured at -0.4% against develop. CI green on the head.'
+reviewer: 'QA Engineer'
+head: '8f93238c8dd14e245807545fb3f2a1ef2435e8e9'
+updated: '2026-11-08T23:35:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 8103
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary_reason: ''
+    notes: 'No criteria carry a boundary signal. The engine reads operator-supplied paths and writes nothing.'
+  performance:
+    status: PASS
+    notes: 'Median of five alternating CI=true npm test runs: develop 162616 ms, branch 161957 ms (-0.4%); all ten runs exit 0.'
+  reliability:
+    status: PASS
+    notes: 'Full suite green on the committed head; CI green.'
+  maintainability:
+    status: PASS
+    notes: 'Stem built by doc-id.js; one engine for both callers; bundle check clean.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 0
+  fix_date: '2026-11-08'
+  total_iterations: 1
+  verification_method: 'Full suite on the committed head, CI read, timing runs'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Run the full suite after git add for any new source file: tracked-tree guards cannot see an untracked one.'
+      refs: ['shared/resources/tests/stdout-drain-on-exit.test.mjs', 'tests/doc-id-chokepoint.test.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

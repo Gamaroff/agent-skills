@@ -1,0 +1,50 @@
+[
+  {
+    "id": "a.owner",
+    "input": "Pat Owner",
+    "direction": "legitimate",
+    "why": "the configured owner",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:61",
+    "fixture": {
+      "files": {
+        "deferrals.json": "{\"deferrals\":[{\"case\":\"oc10-x\",\"deferred_to\":\"task.240\",\"approved_by\":\"Pat Owner\",\"approved_on\":\"2026-10-28\"}]}"
+      }
+    }
+  },
+  {
+    "id": "a.prefix",
+    "input": "Pat",
+    "direction": "hostile",
+    "why": "a prefix of the owner",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:61",
+    "fixture": {
+      "files": {
+        "deferrals.json": "{\"deferrals\":[{\"case\":\"oc10-x\",\"deferred_to\":\"task.240\",\"approved_by\":\"Pat Owner\",\"approved_on\":\"2026-10-28\"}]}"
+      }
+    }
+  },
+  {
+    "id": "a.list",
+    "input": "Pat Owner,Mallory",
+    "direction": "hostile",
+    "why": "comma-joined is one name, not the owner",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:61",
+    "fixture": {
+      "files": {
+        "deferrals.json": "{\"deferrals\":[{\"case\":\"oc10-x\",\"deferred_to\":\"task.240\",\"approved_by\":\"Pat Owner\",\"approved_on\":\"2026-10-28\"}]}"
+      }
+    }
+  },
+  {
+    "id": "a.wild",
+    "input": "*",
+    "direction": "hostile",
+    "why": "no wildcard approver",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:61",
+    "fixture": {
+      "files": {
+        "deferrals.json": "{\"deferrals\":[{\"case\":\"oc10-x\",\"deferred_to\":\"task.240\",\"approved_by\":\"Pat Owner\",\"approved_on\":\"2026-10-28\"}]}"
+      }
+    }
+  }
+]

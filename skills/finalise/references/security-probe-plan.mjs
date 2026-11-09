@@ -28,6 +28,20 @@
  *                 several, 1-based), beside the record, never a temp file (obs #299).
  *   --repo-root   the consumer's repository root; passed to the engine as --repo-root.
  *   --engine      the probe engine (default: security-probe.mjs beside this file).
+ *   --reusable-plan <file>   write the plan as it ran, each inline `cases` replaced by the numbered
+ *                 cases file written for it (`cases_file`) and its SHA-256 (`cases_sha256`), when
+ *                 every entry ran. Commit it beside the record; a later run's `reuse` checks it.
+ *
+ * An entry may carry `"cases_file": "<name>"` in place of `cases`: a committed cases file in the
+ * --cases-base directory, copied byte for byte into the numbered cases file (never re-serialised, so
+ * U+0085, U+2028, VT, FF and a lone CR survive). Refused when it is absolute, climbs out, is a symlink
+ * or is not a JSON array; `cases_sha256`, when given, must match. An entry's inline cases or file that
+ * carry an HTML entity are refused (`plan-entry-cases-html-entity`) when the plan has no literal `<`
+ * and the entry's own source file does not carry that entity (obs #65).
+ *
+ *   node security-probe-plan.mjs reuse --prior-plan <plan.json> --prior-head <rev> --repo-root <dir>
+ *        --engine-path <path> [--engine-path <path>...] [--json]
+ *   answers `reusable` or `not-reusable: <why>`; see reusePlan().
  *
  * The plan's argv must not carry --record, --repo-root, --cases-file, --json, --emit-block or
  * --timeout: this script owns them, so a plan cannot redirect the record or the containment root,
@@ -64,6 +78,7 @@
  * zero-guard reads probes_executed); 1 the plan file is unreadable or not a JSON array; 2 usage.
  */
 import { spawnSync } from "node:child_process";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -89,6 +104,7 @@ function parseArgs(argv) {
     "--cases-base": "casesBase",
     "--repo-root": "repoRoot",
     "--engine": "engine",
+    "--reusable-plan": "reusablePlan",
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -148,6 +164,106 @@ export function ownedFlagIn(argv) {
     if (OWNED_FLAGS.includes(flag)) return flag;
   }
   return null;
+}
+
+/**
+ * A cases file the plan names, resolved under the work-item directory only. `{ok:true, file, bytes,
+ * sha256}` with `file` the real path, or `{ok:false, why}`. Refused: a non-string or empty name, an
+ * absolute path or one that climbs out (`..`), a symlink (the link, or a parent that resolves outside),
+ * and anything that is not a regular file. The check runs on real paths: a name that merely looks
+ * inside the directory is not the test (task 269).
+ */
+export function resolveCasesFile(name, workDir) {
+  if (typeof name !== "string" || name === "" || name.includes("\0"))
+    return { ok: false, why: "bad-name" };
+  if (path.isAbsolute(name)) return { ok: false, why: "outside-work-dir" };
+  let root;
+  try {
+    root = fs.realpathSync(workDir);
+  } catch {
+    return { ok: false, why: "unreadable" };
+  }
+  const joined = path.resolve(root, name);
+  const rel = path.relative(root, joined);
+  if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel))
+    return { ok: false, why: "outside-work-dir" };
+  let st;
+  try {
+    st = fs.lstatSync(joined);
+  } catch {
+    return { ok: false, why: "missing" };
+  }
+  if (st.isSymbolicLink()) return { ok: false, why: "symlink" };
+  if (!st.isFile()) return { ok: false, why: "not-a-file" };
+  let real;
+  try {
+    real = fs.realpathSync(joined);
+  } catch {
+    return { ok: false, why: "unreadable" };
+  }
+  const realRel = path.relative(root, real);
+  if (realRel.startsWith("..") || path.isAbsolute(realRel))
+    return { ok: false, why: "outside-work-dir" };
+  let bytes;
+  try {
+    bytes = fs.readFileSync(real);
+  } catch {
+    return { ok: false, why: "unreadable" };
+  }
+  return {
+    ok: true,
+    file: real,
+    bytes,
+    sha256: crypto.createHash("sha256").update(bytes).digest("hex"),
+  };
+}
+
+/**
+ * The accept/refuse decision of `resolveCasesFile` as a boolean, so the probe engine can run it:
+ * it reads a falsy return as a refusal, and `resolveCasesFile` returns an object either way.
+ * `fn(name, ...args)`: the work directory is the fixed extra argument (`--args-json '["<dir>"]'`).
+ */
+export function casesFileAccepted(name, workDir) {
+  return resolveCasesFile(name, workDir).ok === true;
+}
+
+/**
+ * The first HTML entity in a case list's text (inputs and fixtures alike), when it is an escape and
+ * not a payload: `null` when there is none, or when the plan carries a literal `<` somewhere
+ * (`planHasLiteralAngle`) or the entry's own source file carries the same entity (`sourceText`).
+ * Otherwise every `<` in the plan came back as `&lt;`, and the cases would test a different input
+ * (obs #65). The check is on cases only; argv is `plan-entry-html-entity`'s, by design.
+ */
+export function casesEntityIn(cases, planHasLiteralAngle, sourceText) {
+  if (planHasLiteralAngle) return null;
+  const text = JSON.stringify(cases);
+  const m = HTML_ENTITY.exec(text);
+  if (!m) return null;
+  // The entry's OWN text is evidence too: an escaped reply turns every <, > and & into an entity, so
+  // one literal of the three beside an entity means this text was not escaped as a whole. This is the
+  // rule `agent-reply-block.js` applies to a block, and it is what lets a committed cases file whose
+  // payload is an entity on purpose (a test of HTML escaping) through (T269-QA-4).
+  if (/[<>&]/.test(text.replace(new RegExp(HTML_ENTITY.source, "g"), "")))
+    return null;
+  if (typeof sourceText === "string" && sourceText.includes(m[0])) return null;
+  return m[0];
+}
+
+/** The text of the file an entry probes (`fence:<path>#…` or `<path>#<export>`), or null. */
+export function entrySourceText(argv, repoRoot) {
+  const entry = valueOf(argv, "--entry");
+  if (typeof entry !== "string" || !repoRoot) return null;
+  const file = entry.replace(/^[a-z-]+:/, "").split("#")[0];
+  if (!file) return null;
+  try {
+    const root = fs.realpathSync(repoRoot);
+    const real = fs.realpathSync(path.resolve(root, file));
+    const rel = path.relative(root, real);
+    if (rel.startsWith("..") || path.isAbsolute(rel)) return null;
+    return fs.readFileSync(real, "utf8");
+  } catch {
+    return null;
+  }
 }
 
 /** The value following `flag` in an argv array, or null. */
@@ -231,6 +347,12 @@ export async function runPlan(options) {
     cases_files: [],
   };
   const engineDir = path.dirname(path.resolve(opts.engine));
+  // `cases_file:` names are resolved under the directory the numbered cases files are written to.
+  const workDir = path.dirname(path.resolve(opts.casesBase));
+  // A plan whose every `<` came back as `&lt;` has no literal one anywhere (obs #65).
+  const planHasLiteralAngle = JSON.stringify(plan).includes("<");
+  const casesWritten = new Map(); // plan index -> the numbered cases file written for it
+  const reusable = []; // the entries that ran, in a form `reuse` can check later
   for (let i = 0; i < plan.length; i++) {
     const item = plan[i] || {};
     const argv = item.argv;
@@ -258,21 +380,70 @@ export async function runPlan(options) {
       });
       continue;
     }
+    // `cases_file` names a committed cases file in the work-item directory instead of carrying the
+    // cases inline: the runner copies its bytes, so nothing between the file and the engine is a
+    // model retyping them (task 269, obs #136). It is an alternative to `cases`, never an addition.
+    let entryCases = item.cases;
+    let fromFile = null;
+    if (item.cases_file !== undefined) {
+      const refused = (reason) => {
+        out.refusals.push({ index: i, entry: entryName, reason });
+      };
+      if (item.cases != null) {
+        refused("plan-entry-cases-and-cases-file");
+        continue;
+      }
+      const r = resolveCasesFile(item.cases_file, workDir);
+      if (!r.ok) {
+        refused(`plan-entry-cases-file-${r.why}`);
+        continue;
+      }
+      if (item.cases_sha256 !== undefined && item.cases_sha256 !== r.sha256) {
+        refused("plan-entry-cases-file-hash-mismatch");
+        continue;
+      }
+      try {
+        entryCases = JSON.parse(r.bytes.toString("utf8"));
+      } catch {
+        refused("plan-entry-cases-file-not-json");
+        continue;
+      }
+      if (!Array.isArray(entryCases)) {
+        refused("plan-entry-cases-not-an-array");
+        continue;
+      }
+      fromFile = r;
+    }
+    if (entryCases != null) {
+      const entity = casesEntityIn(
+        entryCases,
+        planHasLiteralAngle,
+        entrySourceText(argv, opts.repoRoot),
+      );
+      if (entity !== null) {
+        out.refusals.push({
+          index: i,
+          entry: entryName,
+          reason: `plan-entry-cases-html-entity: ${entity}`,
+        });
+        continue;
+      }
+    }
     const extra = [];
     let cases = null;
-    if (Array.isArray(item.cases)) {
+    if (Array.isArray(entryCases)) {
       // Each probe's key is `<index>:<id>`, unique only while ids are unique within the entry
       // (task.189 CR3-2): a repeated id would give two probes one key, and one grade both.
       const seen = new Set();
       // findIndex, not find: a repeated FALSY element (null, null) is still a repeat (CR4-5).
-      const at = item.cases.findIndex((c) => {
+      const at = entryCases.findIndex((c) => {
         const id = c && c.id;
         if (seen.has(id)) return true;
         seen.add(id);
         return false;
       });
       if (at >= 0) {
-        const dup = { id: item.cases[at] && item.cases[at].id };
+        const dup = { id: entryCases[at] && entryCases[at].id };
         out.refusals.push({
           index: i,
           entry: entryName,
@@ -285,11 +456,21 @@ export async function runPlan(options) {
           ? `${opts.casesBase}.json`
           : `${opts.casesBase}.${i + 1}.json`;
       fs.mkdirSync(path.dirname(file), { recursive: true });
-      fs.writeFileSync(file, JSON.stringify(item.cases, null, 2) + "\n");
+      if (fromFile) {
+        // Bytes, never a string: a round trip through JSON.parse and stringify would normalise the
+        // control characters this route exists to keep. A file that is already at its numbered
+        // path is left alone (copying a file onto itself truncates nothing but proves nothing).
+        const sameFile =
+          fs.existsSync(file) && fs.realpathSync(file) === fromFile.file;
+        if (!sameFile) fs.copyFileSync(fromFile.file, file);
+      } else {
+        fs.writeFileSync(file, JSON.stringify(entryCases, null, 2) + "\n");
+      }
       out.cases_files.push(file);
+      casesWritten.set(i, file);
       extra.push("--cases-file", file);
-      cases = item.cases;
-    } else if (item.cases != null) {
+      cases = entryCases;
+    } else if (entryCases != null) {
       out.refusals.push({
         index: i,
         entry: entryName,
@@ -350,6 +531,19 @@ export async function runPlan(options) {
     for (const e of escapes) {
       out.escapes.push({ index: i, entry: res.entry ?? entryName, ...e });
     }
+    if (casesWritten.has(i)) {
+      const f = casesWritten.get(i);
+      reusable.push({
+        argv,
+        cases_file: path.basename(f),
+        cases_sha256: crypto
+          .createHash("sha256")
+          .update(fs.readFileSync(f))
+          .digest("hex"),
+      });
+    } else if (entryCases == null) {
+      reusable.push({ argv });
+    }
     const pool =
       cases ||
       (await corpusCases(res.sink ?? valueOf(argv, "--sink"), engineDir));
@@ -371,6 +565,16 @@ export async function runPlan(options) {
       }
     }
   }
+  // The plan as it ran, with each inline `cases` replaced by the committed cases file it was written
+  // to and that file's hash: the next run's `reuse` checks it instead of trusting a retyped copy.
+  // Written only when the caller asks and every entry ran, so a partial plan is never offered.
+  if (opts.reusablePlan && out.refusals.length === 0 && reusable.length > 0) {
+    fs.writeFileSync(
+      opts.reusablePlan,
+      JSON.stringify(reusable, null, 2) + "\n",
+    );
+    out.reusable_plan = opts.reusablePlan;
+  }
   if (out.runs.length > 0) {
     const r = await readExecuted(opts.record, opts.engine);
     if (r.ok) out.probes_executed = r.executed;
@@ -382,7 +586,121 @@ export async function runPlan(options) {
   return { exit: 0, out };
 }
 
+/**
+ * Can a prior run's plan be run again as it stands? (task 269, obs #136 option b.) `{reason:
+ * "reusable"|"not-reusable", why?}`. Reusable only when every fact that would make the cases stale
+ * is checked and holds: the plan reads, every entry that carries cases names a committed file whose
+ * hash is recorded and still matches, and the engine paths are unchanged since the prior record's
+ * head. Any doubt is `not-reusable` and the caller plans afresh: a plan that cannot be shown to be
+ * the same is a different plan.
+ */
+export function reusePlan({ priorPlan, priorHead, repoRoot, enginePaths }) {
+  const no = (why) => ({ reason: "not-reusable", why });
+  let plan;
+  try {
+    plan = JSON.parse(fs.readFileSync(priorPlan, "utf8"));
+  } catch {
+    return no("plan-unreadable");
+  }
+  if (!Array.isArray(plan) || plan.length === 0) return no("plan-empty");
+  const dir = path.dirname(path.resolve(priorPlan));
+  for (const e of plan) {
+    if (!e || typeof e !== "object") return no("plan-entry-invalid");
+    if (e.cases != null) return no("inline-cases");
+    if (e.cases_file === undefined) continue;
+    if (typeof e.cases_sha256 !== "string") return no("no-recorded-hash");
+    const r = resolveCasesFile(e.cases_file, dir);
+    if (!r.ok) return no(`cases-file-${r.why}`);
+    if (r.sha256 !== e.cases_sha256) return no("cases-file-hash-mismatch");
+  }
+  if (!Array.isArray(enginePaths) || enginePaths.length === 0)
+    return no("no-engine-paths");
+  if (typeof priorHead !== "string" || !/^[0-9a-zA-Z._/-]+$/.test(priorHead))
+    return no("bad-prior-head");
+  const rev = spawnSync(
+    "git",
+    [
+      "-C",
+      repoRoot,
+      "rev-parse",
+      "--verify",
+      "--quiet",
+      `${priorHead}^{commit}`,
+    ],
+    { encoding: "utf8" },
+  );
+  if (rev.status !== 0) return no("git-unreadable");
+  // A path that matches nothing makes `git diff --quiet` exit 0, which would read as "unchanged".
+  // Each engine path must therefore exist at the prior head AND at HEAD, as a file.
+  for (const p of enginePaths) {
+    if (typeof p !== "string" || p === "" || p.startsWith("-"))
+      return no("bad-engine-path");
+    for (const at of [priorHead, "HEAD"]) {
+      const has = spawnSync(
+        "git",
+        ["-C", repoRoot, "cat-file", "-e", `${at}:${p}`],
+        { encoding: "utf8" },
+      );
+      if (has.status !== 0) return no("engine-path-missing");
+    }
+  }
+  // Prior head against the WORKING TREE, not HEAD: an uncommitted edit to the engine changes what the
+  // plan probes just as a commit does.
+  const diff = spawnSync(
+    "git",
+    ["-C", repoRoot, "diff", "--quiet", priorHead, "--", ...enginePaths],
+    { encoding: "utf8" },
+  );
+  if (diff.status === 1) return no("engine-changed");
+  if (diff.status !== 0) return no("git-unreadable");
+  return { reason: "reusable" };
+}
+
+function reuseMain(argv) {
+  const o = { enginePaths: [], json: false };
+  const map = {
+    "--prior-plan": "priorPlan",
+    "--prior-head": "priorHead",
+    "--repo-root": "repoRoot",
+  };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === "--json") o.json = true;
+    else if (
+      a === "--engine-path" ||
+      Object.prototype.hasOwnProperty.call(map, a)
+    ) {
+      const v = argv[++i];
+      if (v === undefined || v === "") {
+        process.stderr.write(`${a} needs a value\n`);
+        return 2;
+      }
+      if (a === "--engine-path") o.enginePaths.push(v);
+      else o[map[a]] = v;
+    } else {
+      process.stderr.write(`unknown argument: ${a}\n`);
+      return 2;
+    }
+  }
+  for (const k of ["priorPlan", "priorHead", "repoRoot"]) {
+    if (!o[k]) {
+      process.stderr.write(
+        `reuse needs --${k.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase())}\n`,
+      );
+      return 2;
+    }
+  }
+  const r = reusePlan(o);
+  process.stdout.write(
+    o.json
+      ? JSON.stringify(r, null, 2) + "\n"
+      : `${r.reason}${r.why ? `: ${r.why}` : ""}\n`,
+  );
+  return 0;
+}
+
 async function main(argv) {
+  if (argv[0] === "reuse") return reuseMain(argv.slice(1));
   let opts;
   try {
     opts = parseArgs(argv);

@@ -4,6 +4,109 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.66.0] - 2026-11-09
+
+### Added
+
+- **The QA snippet runner allows flags, not just commands** (task 289). `SAFE_FLAGS` gives every
+  `SAFE_COMMANDS` member an audited entry, and a flag or operand outside it classifies `mutating` as
+  `flag-not-allowed: <command> <flag>`, so a new spelling cannot run. Closed together: `sort
+  --compress-program`, `find -fprint0`, sed's `e` command and `s///e` flag (the script is parsed by
+  `sedScriptVerdict`), the `<>` redirection, a brace expansion or `${IFS}` that spells `-delete`, a
+  function named after an allowed command, `uniq in out`, `file -C`, `diff -l`, `tail -f` and `date -s`.
+  A variable that builds a sed script, and a forwarded helper argument that sed reads as a script, are
+  judged too. Over the tracked docs one block is newly refused against develop (a `tail -f` in the
+  loop-supervisor README), none newly runnable; the 18 blocks task 274 refused stay refused (the owner declined
+  value tracking). The `ctx-wrap-` temp-directory leak (the task's optional Phase 5) is not part of this change.
+- **The QA engines stop passing what they cannot see** (task 274). The snippet runner's base scan now
+  refuses four shapes that classified `runnable` and wrote: a command after a heredoc body (the strip is
+  idempotent), `$(…)` or a backtick inside double quotes, a quoted deny-listed flag (`find docs
+  "-delete"`), and a variable argument to a deny-listed command (`X=-delete; find docs $X` — refused,
+  since the scan tracks no values; an ANSI-C `$'…'` or `$"…"` argument is refused too, and a
+  backslash-newline is folded before the scan). A block that is not run but does not parse under `bash -n` /
+  `zsh -n` is its own `high` `execution-failure` finding, beside its refusal. A second `--name` control
+  against one JS entry no longer replaces the first. `security-probe.mjs --fixture-copy <file>`
+  (repeatable) copies a shared repo file into every case directory once, so a cases file stops embedding
+  the same helper per case. `status-history.js` refuses (exit 2, `width-mismatch`) a row whose width
+  differs from the table's header. Over the 3,621 blocks in the tracked docs, one block is newly refused
+  (a verification snippet in the historical `task.90` document).
+- **`qa-task` and `qa-story` state five routes they lacked** (task 273). No mutation proof runs
+  beside a backgrounded suite or fast gate, and a suite result that overlapped a mutation window
+  is re-run before it is recorded (`mutation-proving.md` rule 7). A reviewer that executes
+  anything does so in its own `mktemp -d`, and a caller's probe beside a live reviewer starts with
+  a known-good calibration case. A change set whose every path is `ci.docsOnly` documentation
+  takes a claim-check review (`qa-docs-only-review-prompt.md`, the same `code_review:` findings
+  block) instead of improvising one. A finding QA reproduces by execution, with a passing control,
+  is QA's own finding whatever the reviewer's confidence. A "tool X passes on files Y" criterion
+  needs one probe that X processes Y, and `review-task` check 30 and `create-task` flag one whose
+  tool the ignore file excludes.
+- **`finalise` names its preconditions and routes a bug finalised after its merge** (task 272).
+  A Step 0b preflight (`finalise-preconditions.js`) lists every missing input before any agent
+  runs: the QA gate or a `WAIVED` record with an approver, a pr-review or review decision, and the
+  PR state, each with the step that supplies it. A bug has its own inputs (the verdict and the PR).
+  `resolve-pr-number.sh` gains a bug-only `linked-issue` rung (the PR GitHub records as closing the
+  bug's `github_issue`). With no implementation report, a bug's `QA Verification` `✅ Fixed` is the
+  verdict and the comment says so. A bug finalised on the base branch commits to a docs-only
+  `docs/<stem>-dod` branch, pushes that, never the base, and stops with `post-merge-docs-pr`.
+- **`finalise` accepts what the record already shows, and writes its basis** (task 271). Three
+  recorded arms, each refusing its unmatched control. A measured figure taken on an earlier commit
+  counts when the delta to the head is documentation only (`finalise-delta.js docs-only`). A red CI
+  reading outside the PR's diff over a docs-only delta gets exactly one recorded re-run
+  (`finalise-delta.js rerun-eligible`). A security probe that reproduces a case the owner already
+  deferred to a named task is rendered `deferred (owner, date, task)` rather than FAIL
+  (`finalise-deferral-match.js`; the owner list is `finalise.deferralApprover`, and unset means
+  nothing is deferred; the record is a `deferrals.json` beside the work item, read with
+  `JSON.parse` — neither the work item's prose nor the QA gate is read). The executed-prose fixture template no longer starts background git
+  maintenance, the suspected cause of a one-in-6142 ENOENT while copying it.
+
+### Fixed
+
+- **`finalise` bookkeeping no longer depends on someone noticing** (task 270). A bug DoD with
+  verdict `gaps` has its four accepted-path lines rewritten (no "committed and pushed at 6a", no
+  Part B next step), and a placeholder left in the Verification Complete block now halts the fill.
+  Step 6a stages this run's `dod.N.security.*` record, its `.run.json.d/` sidecar and cases files, so
+  the acceptance commit leaves none of them untracked. The DoD number is allocated over the whole
+  `dod.*` namespace, so a foreign `dod.N.*` file can no longer share it.
+- **`finalise` takes agent output from the transcript, not a hand copy** (task 269). The security
+  agent's probe plan (Step 3b.1) and the AC agent's YAML (Step 3c) are now extracted byte for byte
+  from the subagent transcript by `agent-reply-block.js`, which refuses an HTML-escaped reply. The AC
+  record carries the result's size and SHA-256, and `merge --sha256` refuses a mismatch. A plan entry
+  may name a `cases_file` that is copied, not retyped, and confined to the work directory. A previous
+  plan is reused only when its cases files and the engine files it probes are unchanged. The old hand
+  copy remains as a recorded, unverified fallback.
+- **`qa-fix` Step 4 guard survives hostile paths** (task 285). The changed-paths slot now goes into a
+  single-quoted heredoc, so a command substitution, a backtick or a `$VAR` in a path stays inert
+  (T268-QA-10). A path below a symlinked directory or a nested repository is refused, naming it,
+  where the untracked listing used to print nothing and read as clean (T268-QA-11). The check
+  compares each path's lexical spelling with its physical one, and asks git whether its directory is
+  the repository's own, rather than walking the path's parents: four QA cycles each closed one shape
+  of that walk and left a neighbour (a link to the root, a link that leaves and returns, a `..`
+  after a link, a trailing slash, a nested repository named as the path itself). A backslash,
+  single quote or double quote in a path is refused: `xargs` read a trailing backslash as syntax and
+  judged a different path. The develop-loop doc now points at the Step 4 block instead of restating
+  the bare `git ls-files --others` command.
+
+### Added
+
+- **`qa-fix` finds the whole defect the first time** (task 268). Step 3.5 gains a both-sides probe
+  for a classifier fix, a weakest-value probe, an earlier-refusal mutation re-run and a pre-fix
+  population search for a restated rule. Step 2.6 grows from four moves to six ("narrow the contract"
+  and "extract to a script"). Step 4 stages new files before the fast gate and Step 7 checks the fix
+  summary for the blocks the cycle owes. The develop-loop doc carries the same staging rule. The Step 4 guard is held by a fence-probe test
+  (`tests/qa-fix-step4-guard.test.js`).
+- **`review-task` catches twelve more plan-defect shapes at review** (task 267). Checks 23 to 29 are
+  new (parity guards enumerated, a refusal in a self-rewriting writer applied to its output, an
+  enumerated-class test named, fixture literals run through the banned-name guard, an async read's
+  timing, temp-dir removal, directory readers named), and checks 11, 13, 15, 20 and Step 6 item 4 are
+  sharpened. `review-story` gains check 19 (fixture literals) and `create-task` section 3.5 gains four
+  matching authoring items. Each shape was previously caught only at 5c, QA or finalise.
+- **`create-task` asks five more questions before a task is written** (task 266). Section 3.5 gains
+  four Critical items (a rule specified from one example, a classifier and a writer that read the
+  input differently, a second layer of defence with no test of its own, and a seeded remedy that
+  overrides a decision the tests hold) and one Should Add item (a timing bound that names one run).
+  `finalise-dod-ac-prompt.md` now grades a wall-clock bound on the median of at least five runs;
+  a single run is `FAIL` with `note: "re-measure"`.
+
 ## [v0.65.0] - 2026-11-06
 
 ### Added

@@ -478,6 +478,10 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
      A `/develop-bug` item never reads `accepted` and has no gate file: it is gated by the bug
      rows in `develop-next` Step 3 instead (`status: closed`, DoD `✅ ACCEPTED`, verify verdict
      `PASS`). They apply here unchanged and are not copied, so the two cannot drift.
+   - **Pipeline completeness:** the item's newest implementation report must pass
+     `node .agents/skills/develop-batch/references/pipeline-completeness.js --report <report>`
+     — exit 1 or 2, or no report, HALTs this item. The report lookup and the rule are
+     `develop-next` Step 3's, unchanged.
    - **Head-SHA check:** `gh pr view <PR#> --json headRefOid,state` must match
      `git rev-parse HEAD` on the item's local PR branch after the rebase (never gate one
      commit and merge another).

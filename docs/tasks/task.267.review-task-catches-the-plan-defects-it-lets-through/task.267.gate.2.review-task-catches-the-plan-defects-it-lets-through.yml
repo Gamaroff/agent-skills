@@ -1,0 +1,57 @@
+schema: 2
+task: 'task.267.review-task-catches-the-plan-defects-it-lets-through'
+task_title: 'review-task catches the plan defects it lets through'
+gate: PASS
+status_reason: 'Both cycle 1 findings closed: CHANGELOG cites task 267; the wall-time criterion is amended with an owner approval. Full ci:fast green (7944 pass, 0 fail). PR CI was still pending at this head (recorded, not gating).'
+reviewer: 'QA Engineer'
+head: '1294c8d025a9e1ce0ea3535e9111f8646477f5e9'
+updated: '2026-11-06T18:10:02Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 7946
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    boundary_signals: []
+    notes: 'Prose-only change; no boundary.'
+  performance:
+    status: PASS
+    notes: 'One quiet pair measured: develop 537 s, branch 464 s; five-run median waived with owner approval (criterion 5 amended).'
+  reliability:
+    status: PASS
+    notes: 'Check numbers 1-22 unchanged; pinning tests green.'
+  maintainability:
+    status: PASS
+    notes: 'Checks numbered 1-29; bundle check clean.'
+
+criteria_drift:
+  reason: drift
+  base: reviewed-blob
+  changed:
+    - id: '#5'
+      kind: reworded
+      approved: true
+      relaxes: true
+      relaxes_reason: 'The five-run median bound is waived for one measured quiet pair; approved by the owner.'
+
+recommendations:
+  immediate: []
+  future: []
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

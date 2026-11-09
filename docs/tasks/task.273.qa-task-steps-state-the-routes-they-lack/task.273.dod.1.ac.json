@@ -1,0 +1,124 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "0eb2e651b585550b5cf019199dd6d265dce3b8e4",
+  "dirty_paths": [],
+  "document": "docs/tasks/task.273.qa-task-steps-state-the-routes-they-lack/task.273.qa-task-steps-state-the-routes-they-lack.md",
+  "result": {
+    "bytes": 5679,
+    "sha256": "f9fd6b3fefc8cec0ec232db3cb00808e00183064413c09cdf8ec621416c1514d",
+    "verified": true
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 7,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "36776ebf9917be50f463116229134be479cbfd4dc566a86f8d225aafe0844a80",
+      "status": "PASS",
+      "description": "Five routes present in qa-task and qa-story, citing observations; list in QA report",
+      "code_citation": "skills/qa-task/SKILL.md:609",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Documentation criterion. qa-task SKILL.md carries the docs-only route (609, obs #74), the 5d reproduced-finding rule (854, obs #125), the scratch rule (842, obs #116) and the vacuous-criterion probe (1092, obs #78). The overlap rule is in Step 3c. QA report 1 line 62 lists all five routes with their observations and records that 5d and the probe paragraph are in both skills. criteria-drift reports clean."
+    },
+    {
+      "id": "#2",
+      "text_hash": "be10c639f25af38d47581314c13dfb5f22f960c5d4d4bf0f8b7da5cd503310ec",
+      "status": "PASS",
+      "description": "Each route fires on its fixture and not on its control, recorded per route",
+      "code_citation": "docs/tasks/task.273.qa-task-steps-state-the-routes-they-lack/task.273.qa.1.qa-task-steps-state-the-routes-they-lack.md:74",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "Docs-only route",
+          "evidence": "task.273.qa.1...md:74",
+          "status": "PASS"
+        },
+        {
+          "member": "Mutation overlap",
+          "evidence": "task.273.qa.1...md:75",
+          "status": "PASS"
+        },
+        {
+          "member": "Reproduced finding",
+          "evidence": "task.273.qa.1...md:76",
+          "status": "PASS"
+        },
+        {
+          "member": "Reviewer scratch",
+          "evidence": "task.273.qa.1...md:77",
+          "status": "PASS"
+        },
+        {
+          "member": "Criterion probe",
+          "evidence": "task.273.qa.1...md:78",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Process criterion. The fixtures table has a fixture and a control for each route (the scratch route has none), and each row is marked PASS. The overlap and probe rows are verified by reading the rule, which is weaker evidence than execution. The fixtures were recorded at the cycle-1 head, and later cycles edited the same prose."
+    },
+    {
+      "id": "#3",
+      "text_hash": "2a239307f9813e6369530d02f1207a053e558fc37b3f26fb300f48bb68788c36",
+      "status": "PASS",
+      "description": "Docs-only prompt returns same findings YAML shape, shown by recorded run",
+      "code_citation": "shared/resources/qa-docs-only-review-prompt.md:1",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "QA report 1 line 64 records an Explore run over a Markdown-only diff that returned a code_review block with reviewed, findings and truncated_count. The criterion asks for exactly that recorded run. The guard test evals/shared/tests/finding-anchors-callers.test.mjs pins the prompt as a consumer."
+    },
+    {
+      "id": "#4",
+      "text_hash": "8b23d6b8191e1370ce3776b511a9521e0c80604cae01cd8e99b6bd9a58abf1d7",
+      "status": "FAIL",
+      "description": "npm test wall time within 10% of develop, median of five alternating runs, on head",
+      "code_citation": "docs/tasks/task.273.qa-task-steps-state-the-routes-they-lack/task.273.qa.1.qa-task-steps-state-the-routes-they-lack.md:65",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": "re-measure",
+      "note": "re-measure. QA report 1 line 65 records develop median 162 s and head median 163 s (+0.6 percent) over five runs each, with exit codes. It was measured on 30da588c, not on the head 0eb2e651. finalise-delta docs-only from 30da588c to HEAD returns code-changed: shared/resources/code-review-prompt.md, qa-task/SKILL.md and qa-story/SKILL.md changed after it. Only the load average at start (0.5 to 1.6) is recorded, not uptime beside each run."
+    },
+    {
+      "id": "#5",
+      "text_hash": "4ebe7eb0e4844e0df815176b7f42d776b2bc0cf3440c8435836dd542207af2de",
+      "status": "DEFERRED-CI",
+      "description": "bundle --check reports 0 problems; npm test passes",
+      "code_citation": ".github/workflows/validate.yml:1",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Evidence is a command pass state. QA report 1 line 66 records 0 problems and exit 0 at 30da588c. QA report 6 line 87 records ci:fast exit 0 (8102 pass) at 6bb434f8, which is later but not the head. Graded from CI reading 1."
+    },
+    {
+      "id": "#6",
+      "text_hash": "bf85e12984525a1aa35f580a8a8c0efdc32465fcfc407c134960ce369464e6f5",
+      "status": "DEFERRED-CI",
+      "description": "quick_validate.py passes for qa-task, qa-story, review-task, create-task",
+      "code_citation": ".github/workflows/validate.yml:73",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "validate.yml runs quick_validate.py on every skill per PR. QA report 1 line 67 records a pass at 30da588c. The skills changed afterwards, so the CI result on the head decides."
+    },
+    {
+      "id": "#7",
+      "text_hash": "01dfe4cb478097c70ad71a95e54e9d7b1eaffaac53d81ebfe6bc93939675961e",
+      "status": "FAIL",
+      "description": "No later QA report improvises a docs-only substitute (next docs-only task)",
+      "code_citation": null,
+      "test_citation": null,
+      "members": [],
+      "non_member_fail": null,
+      "note": "The criterion is unticked in the task (line 224). QA report 1 line 68 records it UNVERIFIED because it names a later docs-only task's QA report, which does not exist yet. There is no evidence to cite, so it is not met. It is a follow-up check, not a defect in the change."
+    }
+  ],
+  "advisories": []
+}

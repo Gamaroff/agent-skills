@@ -1,0 +1,12 @@
+[
+ {"id":"ff.outside-diff","input":"src/other.test.js","direction":"legitimate","why":"a failing test file the PR did not change is the one thing the arm accepts"},
+ {"id":"ff.in-diff","input":"src/a.js","direction":"hostile","why":"the PR changed this file, so its red is the PR's own"},
+ {"id":"ff.dot-slash","input":"./src/a.js","direction":"hostile","why":"another spelling of the in-diff file"},
+ {"id":"ff.mid-dot","input":"src/./a.js","direction":"hostile","why":"another spelling of the in-diff file"},
+ {"id":"ff.double-slash","input":"src//a.js","direction":"hostile","why":"another spelling of the in-diff file"},
+ {"id":"ff.placeholder","input":"{failed-files}","direction":"hostile","why":"an unsubstituted placeholder is no file"},
+ {"id":"ff.glob","input":"src/*.js","direction":"hostile","why":"a glob names no one file"},
+ {"id":"ff.parent","input":"../outside.test.js","direction":"hostile","why":"leaves the repository"},
+ {"id":"ff.abs-outside","input":"/etc/passwd","direction":"hostile","why":"absolute and outside the repository"},
+ {"id":"ff.blank","input":"  ","direction":"hostile","why":"a blank name is no file"}
+]

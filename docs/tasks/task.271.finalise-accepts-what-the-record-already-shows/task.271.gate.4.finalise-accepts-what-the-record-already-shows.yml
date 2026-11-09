@@ -1,0 +1,87 @@
+schema: 2
+task: 'task.271.finalise-accepts-what-the-record-already-shows'
+task_title: 'finalise accepts what the record already shows'
+gate: FAIL
+status_reason: 'Cycle 3 fixes verified. The safety re-probe found the same class a third time in the Arm 3 matcher: the bold finding-id slot of the allow-listed lead takes free prose, a later revocation cannot override an earlier approval, and a gate entry is matched on any mention of the case id; and rerun-eligible accepts a symlink to a file the PR changed.'
+reviewer: 'QA Engineer'
+head: '6e09fba46d692e56d8e3eed037f180805ad9e002'
+updated: '2026-11-07T20:56:00Z'
+
+top_issues:
+  - id: 'T271-QA-10'
+    severity: high
+    file: 'shared/resources/finalise-deferral-match.js'
+    finding: 'The lead allow-list takes any text inside its bold slot, so free prose still qualifies the approval. Reproduced by the probe engine (case.bold-condition and case.bold-draft, outcome accepted): "- **only if Sam agrees**, `oc1`: deferred to task.5, approved by Sam on 2026-01-01." and "- **deferral is a draft**, ..." both return matched. Third consecutive gate with a HIGH on this file (QA-5/6, QA-9, QA-10): each cycle patched one phrasing of a text matcher over prose a pipeline writes.'
+    suggested_action: 'Replace the mechanism, not the pattern: the bullet is one exact line with no optional prose slot (`<case-id>`: deferred to task.N, approved by NAME on DATE.), and NAME is compared to the configured owner list exactly, so no free text remains in the grammar.'
+    suggested_owner: dev
+    status: open
+  - id: 'T271-QA-11'
+    severity: high
+    file: 'shared/resources/finalise-delta.js'
+    finding: 'The blob check accepts a symlink to a file, because a mode-120000 entry is also a blob. Reproduced by the probe engine (ff.symlink-to-changed, outcome accepted) and by hand: link.test.js pointing at tests/real.test.js, which the PR changed, returns eligible. The PR-owned red reads as lying outside the diff.'
+    suggested_action: 'Require the failed file to be a regular file at the head commit (git ls-tree mode 100644 or 100755), not a blob of any mode.'
+    suggested_owner: dev
+    status: open
+  - id: 'T271-QA-12'
+    severity: medium
+    file: 'shared/resources/finalise-deferral-match.js'
+    finding: 'The first record that matches wins and later records are ignored, so a later bullet that withdraws the deferral cannot change the answer. Reproduced by the probe engine (case.later-revocation, outcome accepted): a valid bullet followed by "- `rev-1`: deferral revoked by Pat Owner on 2026-02-01." still returns matched. A gate entry is also matched on any mention of the case id in its action text, with no negation or single-case check, so the two sources apply different strictness.'
+    suggested_action: 'Answer matched only when every record that names the case, in both sources, is a valid approval by the owner; a record that names the case in any other form blocks. Give a gate entry an explicit case field and match it by equality instead of by a mention in free text.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 8058
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 14
+    escaped: 0
+    boundary: true
+    boundary_signals: ["refuses"]
+    boundary_reason: ''
+    notes: 'Probe engine, cli form, path sink, against head 6e09fba4. finalise-deferral-match.js case: 7 executed, 4 reproduced (bold-slot condition, bold-slot draft, later revocation, approver differing by case). finalise-delta.js failed-file: 7 executed, 1 reproduced (symlink to a changed file). No escapes. Records: task.271.qa.4.security.match.run.json and task.271.qa.4.security.delta.run.json.'
+  performance:
+    status: CONCERNS
+    notes: 'Four of five alternating npm test pairs finished (head aec627b3 against d3b71ef3): branch 166, 224, 174, 214 s (median 194), develop 165, 194, 238, 166 s (median 180). The spread inside one side (166 to 224) exceeds the 10% bound under test because ci:fast and reviewer probes ran on the same machine; the figure cannot show a difference of 10%. A clean rerun on an idle machine is needed before it can count.'
+  reliability:
+    status: PASS
+    notes: 'The finalise SKILL.md blocks run under bash and zsh.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Three consecutive cycles patched one phrasing of the same text matcher; the grammar is being replaced rather than patched again.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'The approver comparison is case-insensitive and folds non-ASCII lookalikes (the Kelvin sign) onto ASCII. The strict-grammar replacement compares exactly.'
+      refs: ['shared/resources/finalise-deferral-match.js']
+    - action: 'The Deferred Work section ends only at the next H2, so a bullet under an H3 inside it is read. With a strict one-line grammar this is harmless; whether H3 subsections are in scope is a choice for the owner.'
+      refs: ['shared/resources/finalise-deferral-match.js']
+    - action: 'The failed-file comparison is exact-case, so DOCS/C.md does not match docs/c.md on a case-insensitive checkout. It matters only on macOS (task 210, deferred until a Mac is available).'
+      refs: ['shared/resources/finalise-delta.js']
+    - action: 'rerun-eligible never checks that --base (the green head) is an ancestor of --head; judged non-blocking because the arm compares code trees, the decided criterion.'
+      refs: ['shared/resources/finalise-delta.js']
+    - action: 'Follow-up task numbers are checked for shape only; the engine does not confirm the task exists.'
+      refs: ['shared/resources/finalise-deferral-match.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['Fix T271-QA-10 to T271-QA-12 (replace the Arm 3 grammar) and re-review']

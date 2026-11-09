@@ -958,6 +958,16 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
     - Adjacent to check 10: outcome reachability _reads_ one stated outcome through the deciding
       function; this check _runs_ a property over a set of inputs. Where one claim is both, run it
       and report it once, here
+    - **A new term in a boolean condition is held on an input where it alone decides** (obs #28).
+      When the plan adds an `||` / `&&` term to a guard or a cut condition and names the test that
+      holds it, run the plan's named mutation (drop that term) against the planned test inputs, not
+      only the fix against them. Confirming the fix's outcomes does not confirm each term is held.
+      A term whose removal leaves every planned input's outcome unchanged is redundant on those
+      inputs: the plan must add an input on which that term alone is true and decides, or drop the
+      term. Flag as **Important**. Worked example: task.184 named a mutation per new term and a
+      test for both; the review confirmed the test's outcomes and never ran the mutations. At
+      develop, dropping the second term left all 88 tests green, because on every planned input the
+      other disjunct was already true
 
 12. **Released-shape diff for compatibility handling** (obs #170):
     - Trigger: the document defines backward-compatibility, migration, "legacy" or old-format
@@ -990,6 +1000,13 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
       rule also uses. It would have been red at the wrong site, and it would have missed the
       token-free restatement that caused task.124 bug 13
     - Flag as **Important** when the key is shared or no token-free restatement is addressed
+    - **A lexical guard states its claim as a bounded set** (obs #13). When the key is a lexical
+      matcher over shell or prose ("fail on a restated grep"), the plan states the guard's claim as
+      a bounded set: a fixture table of the shapes it catches, with the known unseen shapes named.
+      "Any restatement" is an unbounded claim that every refute pass can widen. Flag as
+      **Important** when the claim is unbounded. Worked example: task.178's guard for a restated
+      tracker-key lookup missed or mis-split a new grep spelling in each of QA cycles 2 to 5, and
+      the run halted at the loop limit on the matcher alone, with no finding left in the deliverable
 
 14. **Call-site population** (obs #120):
     - Trigger: the document enumerates invocations of one of this repository's engines — it lists
@@ -1041,6 +1058,21 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
       `rm -f \.claude/state/develop-pipeline\.lock` and surfaced only when `ci:fast` ran: 8 of 9
       failures
     - Flag as **Important** when the plan removes a literal and lists no literal search
+    - **The population is every removed or rewritten sentence, listed before it is searched**
+      (obs #25). Enumerate each sentence, message or token the plan removes or rewrites, taken from
+      the plan's changed-text list and its Files Summary routing edits, not only its headline. Run
+      the literal search once per item and record the list with its hit counts in the review.
+      Worked example: task.181's sweep searched the `bad-argv` refusal text and found three pinned
+      assertions; the plan also removed a decline sentence in the routing docs, which
+      `skills/review-security/tests/review-security.test.js` pinned. It surfaced as the one failure
+      in the fast gate (1 of 5429)
+    - **Tests that pin a document by pattern are found by its file name** (obs #144). Also search
+      the test tree for the file name of each document whose text the plan rewrites
+      (`git grep -l "<basename>" -- '*.test.*' 'tests/**' 'evals/**'`) and read each hit for a
+      structural pin: a regex over a heading, a required phrase, a count of list items. A pattern pin
+      is invisible to a search for the literal. Worked example: task.249 rewrote a paragraph and
+      searched its literals, found nothing, and recorded "no test pins either"; two tests pinned it
+      by pattern and five of their cases went red on the first `ci:fast`
 
 16. **Other writers in a replaced region** (obs #242):
     - Trigger: the plan replaces, rewrites or deletes a whole region of a document — a section, a
@@ -1107,6 +1139,17 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
       Step 7 ×4; all three one-argv `rm` HALT sites were in orchestrator `SKILL.md` files, none in
       the step docs
     - Flag as **Important** when the list and the search disagree, or the search is missing
+    - **A sweep's population comes from the retired concept's own names** (obs #60). When the task
+      is a sweep (a rename, a retirement, a renumbering), the population is defined from the
+      concept's tokens: its file names, skill names, registry names and every placeholder spelling
+      found by grepping the concept's own docs, not from the spellings the author remembers. After a
+      mechanical rewrite, diff-pass the changed lines that mention legacy, old, previous or retired:
+      a rewrite can restate the legacy shape as the new one. Flag as **Important** a population
+      defined by one grep of remembered spellings. Worked example: task.207 defined its population
+      as one `git grep -E` over four remembered placeholder spellings; the sweep then found two
+      more spellings of the old id scheme (bare epic-and-story ids in 7 files, old-style epic branch
+      patterns in 5 files) and about 20 documents that taught "epic registry" by name with no
+      placeholder at all
 21. **Field names a plan consumes from another skill** (obs #296):
     - Trigger: the plan parses or consumes another skill's output — a YAML block, a JSON record, a
       report section, a gate field
@@ -1129,6 +1172,100 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
       the QA report's Findings table" names one
     - Flag as **Important** a criterion that names no location, or names only the implementation
       report. The fix costs one clause now and a failed DoD later
+23. **A parity claim enumerates the sibling's guards** (obs #22):
+    - Trigger: the plan claims parity with an existing mechanism — "as X does", "exactly as X",
+      "isolates runs as X does"
+    - Require the document to list the sibling's guards, read off the sibling's code and not
+      recalled, with a disposition per guard: a shared helper both arms call, reimplemented with a
+      test, or deliberately different with a reason. Prefer the shared helper at plan time: a parity
+      claim implemented by copying leaves each missed guard for a QA cycle to find
+    - Worked example: task.181 promised a new entry form `shell-argv:` honours a case fixture
+      "exactly as `fence:` honours it". The document listed the guards the author remembered. Three
+      QA cycles found the rest one at a time (the fixture-string `gh` check, `ghFreePath`, the
+      work-dir escape snapshot), each as "the sibling does X and this one does not"
+    - Flag as **Important** when a parity claim has no guard list, or the list was not read off the
+      sibling's code
+24. **A refusal added to a self-rewriting writer is applied to its own output** (obs #29):
+    - Trigger: the plan adds or tightens a refusal in a writer that later rewrites its own output —
+      an upsert, a replace-in-place engine, a migrator
+    - Require a success criterion that every document the writer produces is one its next write
+      accepts, enforced by running the same guard on the output before it is written, and held by a
+      property test over a generated family of shapes. The reproductions that motivated the task do
+      not hold a class
+    - Worked example: task.184 added two refusals to the QA-results writer, each checked
+      only against the section about to be replaced. QA cycle 1 found the writer producing a
+      document its own next write refused; cycle 2 found two more shapes of the same class. It
+      closed when one guard ran on both the input and the written section
+    - Flag as **Important** when the criterion or the property test is missing
+25. **A new member of an enumerated class names the tests that enumerate the class** (obs #90):
+    - Trigger: the plan adds a new workflow, script, npm script, skill or reference file — a member
+      of a class the repository lists somewhere
+    - Search for the tests and tables that list the class:
+      `git grep -nE "readdirSync|git ls-files" -- '*.test.*'`, plus the hand-kept tables beside
+      them. Require the document to name each test that will react to the new member and what it
+      will require of it. A requirement the plan ruled out of scope (a release table entry, a
+      registry row) is a decision for the plan to state
+    - Worked example: task.229 added `.github/workflows/secret-scan.yml`. Review passed it without
+      naming `tests/release-ci-verdict.test.js`, which reads every file in `.github/workflows/` and
+      fails on any workflow missing from `WORKFLOWS` in `scripts/release-ci-verdict.mjs`
+      (`command node --test tests/release-ci-verdict.test.js`: 1 failure, after the workflow was
+      added)
+    - Flag as **Important** when a test that enumerates the class is not named
+26. **Fixture literals are run through the banned-name guard** (obs #108):
+    - Trigger: the plan prescribes literal values for a test fixture — keys, hosts, names — that
+      will land in shipped files
+    - Run the pattern of the repository's banned-name guard over the plan's literals. In this
+      repository that is `tests/no-consumer-names.test.js`: read its pattern, then grep the plan and
+      its plan file for it. A guard whose pattern cannot be read is recorded as such
+    - Worked example: task.179's plan told the developer to test against a Jira browse URL whose
+      key was a real consumer's project key. The guard bans that key from every shipped line (this
+      very example cannot quote it). Review passed the plan at 9/10 and `ci:fast` failed on
+      `no shipped line names the consumer` (2 hits), a full gate round trip after the code was done
+    - Flag as **Important** a prescribed literal the guard matches
+27. **An asynchronous read is timed against the state's latency** (obs #111):
+    - Trigger: the plan reads asynchronous external state — a CI run, a deploy, a queue, a
+      background job's log
+    - Measure the state's latency against the point where the read fires, and cite the commands
+      (`gh run list`, `git log --format='%ad %s'`). A read that fires before the state typically
+      settles sees it pending nearly every time. Recommend the latest point that can still act on
+      it, or name "pending" as the expected outcome of the read
+    - Worked example: task.238 planned a one-time CI read at the start of each QA cycle. A QA review
+      took about 5 minutes and CI's slow lane about 5 minutes (`git log --format='%ad %s'`,
+      `gh run list --limit 8`), so the read would have seen the lane PENDING almost every time and
+      missed the red `Test` run the task cites, while every existence check passed
+    - Flag as **Important** a read that fires before the state typically settles
+28. **Planned temp directories name their removal** (obs #137):
+    - Trigger: planned test code creates a temp directory (`mkdtemp`, `mkdtempSync`)
+    - Require the removal: a `finally`, a `t.after`, or a shared helper. A plan that points at an
+      existing test to copy must say which of its properties are grandfathered: in this repository
+      `scripts/test-tmpdir.mjs` is a ratchet that rejects any new leaking prefix, and the existing
+      examples pass only because their prefixes are already listed
+    - Worked example: task.225's plan supplied test code creating directories with prefixes
+      `ls-replace-` and `ls-spawn-` and removing only a subdirectory. Review passed it at 9/10; the
+      first `npm run ci:fast` exited 1 with `fail 0` on the ratchet
+    - Flag as **Important** a planned temp directory with no removal
+29. **A new write into a directory names every reader of that directory** (obs #153):
+    - Trigger: the plan puts a new file, marker or side effect into a directory
+    - List every guard, watcher or scan that reads the directory (`git grep` the directory's name or
+      variable) and require the plan to name each one and what it does with the new entry. Threading
+      the new argument to the code that reads it on purpose is the usual check; the second reader,
+      which scans for writes it did not expect, is the one that slips past
+    - Worked example: task.255 put a trip-wire marker into `harnessDir`. The review found that
+      `runCliCase` needed `harnessDir` and missed that the setup's escape watch, which scans that
+      directory for unexpected writes, needed it too. It surfaced at develop as "found beyond the
+      plan"
+    - Flag as **Important** a reader of the directory the plan does not name
+30. **A criterion names a tool on a file type an ignore file excludes** (obs #78):
+    - Trigger: a success criterion or test case says a tool "passes" or "is clean" on a file type or
+      path (`prettier --check` on Markdown, a linter on YAML)
+    - Read the tool's ignore file or config (`.prettierignore`, `.eslintignore`, the tool's `exclude`
+      key) and confirm the file type is not excluded. A tool run over files it ignores exits 0 having
+      read nothing, so the criterion cannot fail
+    - Suggest a check that reaches the files: `doc-links.js` or `markdown-link-check` for links in
+      Markdown, a schema validator for YAML or JSON
+    - Worked example: task.198's SC-5 ran `prettier --check` on Markdown; `.prettierignore` excludes
+      `*.md`, `*.yml`, `*.yaml` and `*.json`, and the criterion passed in three QA cycles
+    - Flag as **Important** a criterion whose tool the ignore file excludes from its files
 
 **Common Hallucination Patterns to Detect**:
 
@@ -1149,11 +1286,18 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 - ❌ A new test file the project's test runner never reaches (check 18)
 - ❌ A resume or reconstruction rule changed with no list of the states it must hold in (check 19)
 - ❌ A hand-written site list with no search recorded beside it (check 20)
+- ❌ A parity claim with no guard list read off the sibling's code (check 23)
+- ❌ A refusal added to a self-rewriting writer, with no criterion that its output passes its own next write (check 24)
+- ❌ A new member of an enumerated class, with the tests that enumerate the class unnamed (check 25)
+- ❌ Prescribed fixture literals never run through the banned-name guard (check 26)
+- ❌ A read of asynchronous state that fires before the state typically settles (check 27)
+- ❌ A planned temp directory with no removal (check 28)
+- ❌ A new write into a directory whose other readers the plan does not name (check 29)
 
 **Issues to Flag**:
 
 - **Critical**: Invented libraries/APIs, incorrect paths, wrong patterns, a falsified invariant (check 11)
-- **Important**: Unverified technical claims, inconsistent approaches, and the plan shapes of checks 15–20 (an unsearched removed literal, an unnamed writer in a replaced region, a pattern identity key, an unreached test file, unlisted reconstruction states, a site list without its search)
+- **Important**: Unverified technical claims, inconsistent approaches, and the plan shapes of checks 15–20 (an unsearched removed literal, an unnamed writer in a replaced region, a pattern identity key, an unreached test file, unlisted reconstruction states, a site list without its search), and of checks 23–29 (a parity claim without a guard list, a self-rewriting writer's refusal not applied to its output, an enumerated class's tests unnamed, a fixture literal the banned-name guard matches, an early asynchronous read, a temp directory without removal, a directory reader unnamed)
 - **Optional**: Could be more specific or cite sources
 
 **Output**: Technical accuracy report with hallucinations identified
@@ -1333,6 +1477,15 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
      only be satisfied **after merge** — and finalise runs before merge. → **Important**: "move it to
      Deferred Work or Notes". Worked example: task.142's "observation #159 marked actioned once this
      merges".
+
+   - **A negative-content criterion is held by a scan test with a non-vacuity case** (obs #7). A
+     criterion of the form "no X in the change" or "no X anywhere" reads like a documentation
+     criterion until finalise classifies it. It is a claim over a population, and it is evidence
+     only when something enumerates that population on every PR. → **Important**: "name the scan
+     test and its non-vacuity case (a fixture the scan must flag), or rescope the criterion to a
+     documentation criterion naming the file and line". Worked example: task.201's AC10, "No
+     consumer-specific names; all limits from skills-config.yaml", had no test and halted at
+     `/finalise`.
 
    Two more shapes fail later than review, and each is **Important** too:
    - **A behaviour fix in prose lands in an executable block** (obs #258). When the fix a behaviour

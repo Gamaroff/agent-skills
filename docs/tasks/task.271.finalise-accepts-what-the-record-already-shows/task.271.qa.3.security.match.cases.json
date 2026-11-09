@@ -1,0 +1,12 @@
+[
+ {"id":"case.honest","input":"ok-1","direction":"legitimate","why":"a bullet in the one accepted form is the only deferral"},
+ {"id":"case.negated-lead","input":"neg-1","direction":"hostile","why":"a bullet that denies the deferral is not an approval"},
+ {"id":"case.negated-approval","input":"neg-2","direction":"hostile","why":"a bullet that denies the approval is not an approval"},
+ {"id":"case.trailing-condition","input":"quote-1","direction":"hostile","why":"text after the date makes the approval conditional"},
+ {"id":"case.two-cases","input":"multi-b","direction":"hostile","why":"one approval must not cover two cases"},
+ {"id":"case.bare-id","input":"bare-1","direction":"hostile","why":"the case id must be backticked"},
+ {"id":"case.conditional-lead","input":"if-1","direction":"hostile","why":"a conditional lead is not an unconditional approval"},
+ {"id":"case.commented-out","input":"cmt-1","direction":"hostile","why":"a commented-out bullet is not on the record"},
+ {"id":"case.prefix","input":"ok","direction":"hostile","why":"a prefix of a case id is not that case"},
+ {"id":"case.absent","input":"nothing-1","direction":"hostile","why":"a case no bullet names has no deferral"}
+]

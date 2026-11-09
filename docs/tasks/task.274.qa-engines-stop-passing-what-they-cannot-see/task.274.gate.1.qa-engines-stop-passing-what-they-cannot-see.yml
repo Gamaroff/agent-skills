@@ -1,0 +1,80 @@
+schema: 2
+task: 'task.274.qa-engines-stop-passing-what-they-cannot-see'
+task_title: 'QA engines stop passing what they cannot see'
+gate: FAIL
+status_reason: 'Two high-confidence defects in the new code reproduce by execution: --fixture-copy follows a symlinked intermediate directory (outside bytes copied), and a dash-prefixed expansion still classifies runnable (shape 4 incomplete). A third, the syntax check flagging a documented template, is medium.'
+reviewer: 'QA Engineer'
+head: '7caa465c2beb69b135f9b1f4fde8dcbe544a2deb'
+updated: '2026-11-09T09:26:28Z'
+
+top_issues:
+  - id: 'T274-QA-1'
+    severity: high
+    file: 'shared/resources/security-probe.mjs'
+    finding: '--fixture-copy checks containment lexically and rejects a symlink only at the leaf, so a symlinked intermediate directory lets a file outside the repo root be read and copied into every case directory (reproduced: case rejected by a script that exits 7 when it sees the outside text; control without the flag accepts). origin: code-review CR-1, reproduced by QA.'
+    suggested_action: 'Resolve with realpath and require the result to stay within the realpath of the root before reading; add a control and a mutation proof.'
+    suggested_owner: dev
+    status: open
+  - id: 'T274-QA-2'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'variableArgumentToDenyListed refuses only an argument that begins with an expansion; "find docs -$A", "find docs \"-${A}\"" and "find docs -$(echo delete)" still classify runnable (controls behave; same output on base, but the task names this shape as in scope, so it is unfinished). origin: code-review CR-2, reproduced by QA.'
+    suggested_action: 'Refuse any argument to these commands containing an expansion unless its first literal character is known not to be a dash; fix the false doc comment; add the three hostile blocks and two controls.'
+    suggested_owner: dev
+    status: open
+  - id: 'T274-QA-3'
+    severity: medium
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'The new bash -n / zsh -n check reports a high execution-failure for the documented template block at shared/resources/probe-boundary-rule.md:748 (env -i ... <command> <candidate>): a placeholder is read as a syntax error. origin: QA execution of Step 4b.'
+    suggested_action: 'Skip the syntax check for a block with an unfilled template slot; count remaining false positives over the tracked docs; add a control.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 8072
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 25
+    escaped: 0
+    boundary_signals: ['refused', 'is refused']
+    boundary: true
+    notes: 'Classifier probed with 25 cases (15 hostile, 10 legitimate), all as required, so the base-scan shapes hold. The --fixture-copy containment hole (T274-QA-1) is a security-relevant defect found by review and reproduced; the probe corpus did not model it.'
+  performance:
+    status: CONCERNS
+    notes: 'Wall-time criterion not yet measured: five alternating CI=true npm test runs against a develop worktree are in progress. Run 1 on develop took 179.9 s. Both worktrees show the same two harness-only failures (from-observation, test-clean-checkout). To be reported in cycle 2.'
+  reliability:
+    status: PASS
+    notes: 'width-mismatch refusal and fixture-copy decline paths return their reasons without partial writes.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The syntax check adds noise on documented templates (T274-QA-3); a doc comment in variableArgumentToDenyListed states a false rule.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T274-QA-1, T274-QA-2 and T274-QA-3 with controls and mutation proofs.'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/qa-execute-snippets.mjs']
+  future:
+    - action: 'sed with a variable operand (sed 2d "$f") is now refused by the owner-accepted shape-4 rule; revisit if it blocks real docs.'
+      refs: ['docs/tasks/task.90.pipeline-lock-silent-success/task.90.pipeline-lock-silent-success.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T274-QA-1 and T274-QA-2 fixed and re-reviewed']

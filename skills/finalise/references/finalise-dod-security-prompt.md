@@ -419,6 +419,16 @@ security_review:
   summary: "one-line summary of security review results"
 ```
 
+**The plan block.** When `boundary: true`, end your answer — after the YAML, as its last thing — with
+**one** fenced block opened with the info string `finalise-probe-plan` (three backticks, then
+`finalise-probe-plan`), holding the same `probe_plan` as a **JSON array**: the entries' `argv` lists and
+their `cases`, verbatim. `/finalise` Step 3b.1 takes that block out of your transcript file and runs it;
+it does not retype your answer, so characters a hand copy would change (`<`, `>`, a control character,
+a lone CR) reach the engine as you wrote them. If the two ever differ, the block is what runs. When the
+cases for a control already exist as a committed file in the work-item directory (a re-run), name it
+with `"cases_file": "<file name>"` in the block instead of repeating the cases; never both. You cannot
+create the file, so a first run carries its cases inline.
+
 **Citation rule**: `status: PASS` requires a non-null citation. Null → `FAIL`. `NOT_APPLICABLE` must include `note` explaining why.
 
 **Severity rule**: every `probes[]` entry and every FAIL `checks[]` entry carries `severity`. It is

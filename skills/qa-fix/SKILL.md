@@ -639,21 +639,23 @@ it — before the third patch, not after it.
   rule. This is your judgement, and it is allowed here because this step only *offers*; it exits
   nothing and forbids nothing.
 
-**The four moves.** Choose one, and record it in the fix plan:
+**The six moves.** Choose one, and record it in the fix plan:
 
 | Move | When it is right |
 | ---- | ---------------- |
 | **Consolidate the contract** | The subject is a record the skill passes between its own steps (a state file, run-state JSON, a handoff record), or a rule stated at several sites. Define it once: a field / writer / readers table; ownership moved into the skill's script so a test holds it; or one statement plus citations plus a single-statement test (task.130). When the subject is a deny-list over a parser's input, consolidating means an allow-list of the accepted shapes that refuses everything else; copying more of the parser is still a patch (obs #276). |
 | **Scope the claim** | The subject is a best-effort derivation (compatibility, migration, inference) that lacks the fact it needs. Flag the value `unverifiable`, document the limitation, or drop the precision. Do not add another rule (task.143 cycles 3 and 6). |
+| **Narrow the contract** | Successive fixes to one function each open a new edge at one boundary, and the task itself says the function's input cannot decide that boundary (task.202 ran five cycles on a parser the task called undecidable from its input, obs #42). Refuse every ambiguous shape and leave the decision to the caller; do not add another rule that guesses. |
+| **Extract to a script** | The subject is operational shell inside a fenced block of a skill document, and it has drawn a MEDIUM on two consecutive gates (task.189 drew one per cycle from one block; consolidating inside the block did not reduce its edges, obs #63). Move the shell to a script with one test per edge and leave a one-line call in the document. |
 | **Waive** | As in Step 2.5, with the reason stated. |
-| **Patch** | Allowed. Say why neither structural move applies — for example, the findings are distinct defects in the deliverable itself (task.117 gates 1→2, where the offer fires and patch is the right answer). |
+| **Patch** | Allowed. Say why no structural move applies — for example, the findings are distinct defects in the deliverable itself (task.117 gates 1→2, where the offer fires and patch is the right answer). |
 
 The fix summary carries the choice in a fixed shape, so the next cycle can see a change of shape
 without re-reading the diff:
 
 ```
 Narrowing residue: {subject} ({trigger: pipeline offer | repeat subject})
-Move: consolidate | scope the claim | waive | patch — {one sentence why}
+Move: consolidate | scope the claim | narrow the contract | extract to a script | waive | patch — {one sentence why}
 ```
 
 **How this differs from Step 2.5.** A third strike *forbids* the patch; this step only *asks why*.
@@ -718,6 +720,12 @@ three consecutive QA cycles each found a defect introduced by the previous cycle
 every one was one grep away; on task.124 four consecutive cycles each found the previous fix had
 made a sibling false in **another** file (obs #174):
 
+**Before fixing a finding that says a document states a value or rule wrongly, run the population
+command below first (obs #27).** Fixing the one restatement the finding cited leaves the rest, and
+the next cycle finds the same defect at a new site (task.182 cycles 1–3). Fix or consolidate the
+whole population in this cycle, and derive any guard's file set by the same search, never from a
+hand-kept list.
+
 | Probe | Ask |
 | ----- | --- |
 | **What did this edit make false elsewhere?** | Find every executed document that restates the subject — run the population command below, not a grep of the edited file — and check each hit against the new text. Record the population size. A population above 1 means the rule is restated at several sites, which is the shape Step 2.6's **consolidate** move exists for: say in the `Probe:` block which move you chose for it and why (obs #174). The fix summary carries a `Probe:` block: the command as run, then one line per hit, `updated` or `unaffected — {why}`. A documentation fix whose summary has no `Probe:` block has not run the probe (obs #177) |
@@ -761,7 +769,7 @@ Probe: {the population command, as run, with its phrase}
   {path} — updated
   {path} — unaffected — {why: e.g. cites the rule, restates nothing}
 Population: {N}
-Move: {when N > 1 — consolidate | scope the claim | waive | patch — one sentence why}
+Move: {when N > 1 — consolidate | scope the claim | narrow the contract | extract to a script | waive | patch — one sentence why}
 ```
 
 On task.145 the fix summary said the pass had run and recorded no phrase and no hits; the same rule
@@ -787,6 +795,17 @@ sites** rather than synthetic strings — each counter-example above was a real 
 | **Should not merge** | Two inputs a real call site treats as two — does the new rule still give them two? |
 | **Which direction did the last fix move?** | A fix for a split pushes toward merging, and vice versa — the test must carry the pair for the direction the finding did **not** name |
 
+**For a fix that widens or narrows a classifier, probe both sides of it (obs #16).** A classifier
+is any error/refusal split, allow/deny boundary or "could not look" class. Each fix pushes it one
+way, and a loop that only tests the named direction swings to the opposite false result (task.180
+ran HIGH 1, 1, 1 over one error/refusal split):
+
+| Probe | Ask |
+| ----- | --- |
+| **Must now catch** | One case the rule must now catch, that it did not before |
+| **Must still leave alone** | One case it must still leave alone, including a failure that happens after the decision was already made |
+| **Which direction did the last fix move?** | Name it, and test the other direction |
+
 **For a fix to a writer, a refusal or an input class, test the property, not the repro.** A repro
 is one point in its input class, and a test that counts the token the finding named passes on a
 residue of the same class:
@@ -796,6 +815,8 @@ residue of the same class:
 | **Is the writer idempotent?** | For a stacking, upsert, replace-in-place or normaliser fix, assert that write N and write N+1 are byte-identical, with only the payload varied — not a count of the token the finding named (obs #237) |
 | **Does the fix hold across the input class?** | Vary what precedes and follows the trigger, and where else the same token appears. A destructive-write post-condition compares the bytes outside the edited span; a count of what must exist cannot see a deletion (obs #238) |
 | **Which documented shapes does the new refusal reject?** | For a new refusal or completeness check over a shared input, run it against every documented shape of that input — its reference doc's examples — not only this repository's instance (obs #248) |
+| **What is the weakest value that satisfies the new requirement, and does it carry the ambiguity the requirement was added to remove?** | Required-field, non-empty and present-at-all checks are the usual shape: `{exit: 1}` satisfies a mandatory `expected` and keeps the ambiguity. Add a test with that value (obs #18) |
+| **Did this fix add or widen an earlier check on a path?** | Re-run the mutation proofs of the later-stage guards whose tests send input through that path: an earlier refusal can leave a later guard's test passing with the guard deleted (task.180 cycle 7 widened a pre-spawn check and cycle 6's guard test went vacuous). Record the re-runs in the fix summary (obs #20) |
 
 **Review the combination, not only each fix.** At least one real lifecycle defect was caused by
 two earlier fixes that were each correct alone. After the last fix in a cycle, re-read the full diff
@@ -809,6 +830,96 @@ Record anything found as a new finding in this cycle rather than fixing it silen
 count reflects what actually happened.
 
 ### Step 4: Validate
+
+**Make new files visible to the gate before running it (obs #56).** Guards that read
+`git ls-files` cannot see an untracked file, so a fast gate can pass and CI go red on the same
+tree. Before the commands below, run `git add -N -- {changed-paths}` for new files, or refuse to
+go on while any are untracked. The block below is the refusal branch only; the `git add -N` is a
+separate command you run first. `{changed-paths}` is a slot: substitute the space-separated paths
+this fix touched. A path holding a space, a brace or a newline is not supported, and the block
+refuses a value that is empty, blank or still holds a brace, which is what an unfilled slot looks
+like. The slot is substituted as text before any line of the block runs, so it goes into a
+**single-quoted heredoc**, where `$`, backticks and a command substitution stay inert; a
+double-quoted assignment would have run them (T268-QA-10). One limit remains, and the block
+cannot see it before the text is in place: a path holding a **newline** could carry a line equal
+to the delimiter `QA_FIX_CHANGED_PATHS_END`, which ends the heredoc early and leaves the rest to
+run as commands. Do not substitute a path with a newline. A value holding a backslash, a single quote or a double quote is refused,
+because `xargs` (no `-0`) reads those as syntax: a quote fails loudly, but a trailing backslash is
+consumed silently and the guard would judge a different path from the one on disk. The check does
+not repeat the slot text, because substitution would rewrite that copy too. The list is split with
+`tr` and handed to `xargs`, never by expanding the variable: zsh does not word-split an unquoted
+variable, so a two-path value reached `git ls-files` as one pathspec that matched nothing and the
+guard reported clean. Each path is matched literally (`--literal-pathspecs`), so a glob or pathspec
+magic is not interpreted, and a path that is neither on disk nor tracked is refused, because
+`git ls-files` lists nothing for it and "found nothing" would read as "clean". A path below a
+symlinked directory or a nested repository is refused too, naming it: the untracked listing cannot
+look through either, so it prints nothing for them, which is "could not look" and not "clean"
+(T268-QA-11). The check decides on **physical identity**, one path at a time, and does not walk the
+path's parents (a text walk was patched four times and left a neighbour each time: T285-QA-1 to
+T285-QA-6). For each path on disk it computes two spellings of the same place: the **lexical** one,
+the working directory's physical path joined to the path with `.` and `..` folded away in text,
+which is how git reads it; and the **physical** one, where every symlink in the directory part and
+a directory named as the path is followed (`cd -P`, `pwd -P`). A path whose lexical spelling
+is inside the repository and differs from its physical one passes through a symlink, so the
+untracked listing cannot look through it and the path is refused. That covers a link to the root, a
+link that leaves and returns, a `..` after a link, a trailing slash on a link, and a tracked link
+to a directory standing as the path itself. A symlink to a file standing as the path is a plain
+file to git, with nothing beneath it, and is not refused. A path whose lexical spelling is outside the repository, such as a
+symlinked prefix of an absolute path, is not judged here: git maps it itself, and a link outside the
+repository that points back inside is stopped by `git ls-files`, which cannot map the path and
+reports "could not look" (T285-CR-3). The second question is asked of git: the path's own
+directory (the path itself when it is a directory) must report the repository's top level, and
+another top level means a nested repository, which covers a submodule or nested root named as the
+path itself and anything below it (T285-QA-6). A directory git cannot report on, such as `.git`,
+is not refused. A path that is not on disk is skipped here, because the
+check above already accepted it as tracked and there is nothing on disk to look through:
+
+```bash
+IFS= read -r -d '' CHANGED_PATHS <<'QA_FIX_CHANGED_PATHS_END' || true
+{changed-paths}
+QA_FIX_CHANGED_PATHS_END
+case "$CHANGED_PATHS" in
+  *"{"*|*"}"*) echo "HALT: CHANGED_PATHS is empty or still holds a brace — substitute the paths this fix touched"; exit 1 ;;
+esac
+[ -n "$(printf '%s' "$CHANGED_PATHS" | tr -d ' \t\n')" ] \
+  || { echo "HALT: CHANGED_PATHS is empty or still holds a brace — substitute the paths this fix touched"; exit 1; }
+case "$CHANGED_PATHS" in
+  *\\*|*\'*|*\"*) echo "HALT: a changed path holds a backslash, single quote or double quote — xargs reads those as syntax and would judge a different path"; exit 1 ;;
+esac
+MISSING=$(printf '%s\n' "$CHANGED_PATHS" | tr -s ' \t' '\n\n' | grep -v '^$' \
+  | while IFS= read -r p; do [ -e "$p" ] || git --literal-pathspecs ls-files --error-unmatch -- "$p" >/dev/null 2>&1 || printf '%s\n' "$p"; done)
+[ -z "$MISSING" ] \
+  || { echo "HALT: these changed paths are neither on disk nor tracked — a mistyped path lists nothing and would read as clean:"; printf '%s\n' "$MISSING"; exit 1; }
+TOP=$(git rev-parse --show-toplevel 2>/dev/null) || TOP=""
+[ -z "$TOP" ] || TOP=$(cd -P -- "$TOP" 2>/dev/null && pwd -P) || TOP=""
+norm() { awk -F/ '{ n = 0; for (i = 1; i <= NF; i++) { if ($i == "" || $i == ".") continue; if ($i == "..") { if (n > 0) n--; continue }; s[++n] = $i }; out = ""; for (i = 1; i <= n; i++) out = out "/" s[i]; print (out == "" ? "/" : out) }'; }
+CWD_PHYS=$(pwd -P)
+BOUNDARY=""
+if [ -n "$TOP" ]; then
+  BOUNDARY=$(printf '%s\n' "$CHANGED_PATHS" | tr -s ' \t' '\n\n' | grep -v '^$' \
+    | while IFS= read -r p; do
+        [ -e "$p" ] || continue
+        case "$p" in /*) LEX=$(printf '%s\n' "$p" | norm) ;; *) LEX=$(printf '%s\n' "$CWD_PHYS/$p" | norm) ;; esac
+        case "$LEX/" in "$TOP"/*) INSIDE=1 ;; *) INSIDE="" ;; esac
+        if [ -d "$p" ]; then
+          DIR=$p; PHYS=$(cd -P -- "$p" 2>/dev/null && pwd -P) || PHYS=""
+        else
+          DIR=$(dirname -- "$p"); PHYS=$(cd -P -- "$DIR" 2>/dev/null && pwd -P) || PHYS=""
+          if [ -z "$PHYS" ]; then PHYS=""; else PHYS="$PHYS/$(basename -- "$p")"; fi
+        fi
+        if [ -n "$INSIDE" ] && [ "$PHYS" != "$LEX" ]; then printf '%s\n' "$p"; continue; fi
+        NEST=$(git -C "$DIR" rev-parse --show-toplevel 2>/dev/null) || NEST=""
+        [ -z "$NEST" ] || NEST=$(cd -P -- "$NEST" 2>/dev/null && pwd -P) || NEST=""
+        if [ -n "$INSIDE" ] && [ -n "$NEST" ] && [ "$NEST" != "$TOP" ]; then printf '%s\n' "$p"; fi
+      done)
+fi
+[ -z "$BOUNDARY" ] \
+  || { echo "HALT: these changed paths sit below a symlink or a nested repository — the untracked listing cannot look through either, so \"nothing listed\" would read as clean:"; printf '%s\n' "$BOUNDARY"; exit 1; }
+UNTRACKED=$(printf '%s\n' "$CHANGED_PATHS" | tr -s ' \t' '\n\n' | grep -v '^$' | xargs git --literal-pathspecs ls-files --others --exclude-standard --) \
+  || { echo "HALT: git ls-files could not look (not a repository, or a bad path) — not treating that as clean"; exit 1; }
+[ -z "$UNTRACKED" ] \
+  || { echo "untracked files under the changed paths — stage them first:"; printf '%s\n' "$UNTRACKED"; exit 1; }
+```
 
 ```bash
 # For your project:
@@ -915,6 +1026,21 @@ criterion #5 to fit what it could deliver. Five QA gates and 5c passed it, and o
 | `finalise` | Canonical summary — PR + final gate + QA cycle count + DoD path + accepted status (idempotent via marker) |
 
 **This step is best-effort.** If the comment cannot be posted (network error, auth issue), log the failure and continue — do not halt. The final canonical summary is posted by `/finalise` at pipeline end.
+
+**Check the summary for the blocks this cycle owes before posting (obs #113).** On task.238 cycle 5
+the summary carried no `Narrowing residue:` block and the post went out. Before composing the
+comment, check two conditions on this cycle's bug set:
+
+- **Step 2.6 applied this cycle** — either of its two triggers, (a) or (b), as Step 2.6 defines
+  them (trigger (b) is your judgement there). The summary must carry the `Narrowing residue:` /
+  `Move:` block. The Step 2.5 `Struck mechanism:` block is owed whenever a third strike was passed
+  in, and is checked the same way.
+- **A bug is a documentation fix** — the summary must carry the Step 3.5 `Probe:` block.
+
+When a block is owed and the summary lacks it, print the missing block's name and the reason, add the
+block, then post. If it cannot be added (the Move was never chosen), post anyway and log
+`⚠️ {block} owed and missing — posted without it`: this step is best-effort, so the check never halts
+the cycle. A `Move: waive — {reason}` line satisfies the check.
 
 Use the PR metadata stored in Step 0 (Prerequisites). Compose the comment body then post it via the active platform.
 

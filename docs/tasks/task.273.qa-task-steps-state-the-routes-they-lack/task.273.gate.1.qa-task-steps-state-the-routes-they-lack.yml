@@ -1,0 +1,70 @@
+schema: 2
+task: 'task.273.qa-task-steps-state-the-routes-they-lack'
+task_title: 'qa-task steps state the routes they lack'
+gate: CONCERNS
+status_reason: 'All five routes are present in qa-task and qa-story, each fires on its fixture and not on its control, and the suite is green with no timing regression. One MEDIUM finding: the CHANGELOG [Unreleased] section does not cite (task 273), which /finalise 6d HALTs on.'
+reviewer: 'QA Engineer'
+head: '30da588c5c12aaf6e96ae8df2cf488d62610db51'
+updated: '2026-11-09T04:01:01Z'
+
+top_issues:
+  - id: 'T273-CL-1'
+    severity: medium
+    file: 'CHANGELOG.md'
+    finding: 'changelog-cites.sh reports "missing (task 273)": ## [Unreleased] has no entry citing (task 273), and changelog.enforce is on for this repository, so /finalise 6d would HALT no-changelog-entry.'
+    suggested_action: 'Add an Added entry under [Unreleased] describing the five QA routes and citing (task 273).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    notes: 'Prose-only change plus one allowlist entry in a test. boundary: false. No predicate-shaped function is added: the only code touched is a Map entry in evals/shared/tests/finding-anchors-callers.test.mjs. The criteria classifier found no boundary signal.'
+  performance:
+    status: PASS
+    notes: 'CI=true npm test median of five alternating runs: develop 162 s, head 163 s (+0.6 percent, limit 10 percent); loads recorded beside each run.'
+  reliability:
+    status: PASS
+    notes: 'The mutation-overlap rule and re-run rule remove a known source of false suite failures. No new failure path.'
+  maintainability:
+    status: PASS
+    notes: 'Rules are stated once in shared sources and bundled; bundle --check reports 0 problems. See recommendations.future for three advisory review findings.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Add the CHANGELOG [Unreleased] entry citing (task 273).'
+      refs: ['CHANGELOG.md']
+  future:
+    - action: 'CR-1 (medium confidence, not reproducible by execution): the docs-only claim-check prompt carries no equivalent of code-review-prompt.md category E (unbound reads in fenced bash). A SKILL.md-only change set takes the docs-only route; Step 4b still executes its fenced blocks, which covers the gap in part. Consider adding category E to the docs-only prompt.'
+      refs: ['skills/qa-task/SKILL.md', 'shared/resources/qa-docs-only-review-prompt.md']
+    - action: 'CR-2 (low): the route is computed from the whole branch diff, while the review patch on cycle 3 and later is scoped to files changed since the last gate. State which list decides the route, or use the scoped list.'
+      refs: ['skills/qa-task/SKILL.md']
+    - action: 'CR-3 (low confidence): the docs-only route reads ci.docsOnly.patterns and ignores ci.docsOnly.enabled; say so explicitly.'
+      refs: ['shared/resources/qa-docs-only-review-prompt.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions:
+    - 'CHANGELOG entry citing (task 273) is added.'

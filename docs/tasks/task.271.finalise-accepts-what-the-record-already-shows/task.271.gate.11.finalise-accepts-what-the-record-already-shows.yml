@@ -1,0 +1,74 @@
+schema: 2
+task: 'task.271.finalise-accepts-what-the-record-already-shows'
+task_title: 'finalise accepts what the record already shows'
+gate: FAIL
+status_reason: 'Cycle 10 fixes verified: about 70 probes found no balanced pair on the gate side and the fence and comment handling held. Two medium holes remain, both in what counts as a record about the case: a heading that renders as the Deferred Work section but is not an exact match, and gate entries outside recommendations.future. The eleven-gate budget is spent.'
+reviewer: 'QA Engineer'
+head: '0bb75bf07f8cf550a0a6a5cf88a9eaed4659e271'
+updated: '2026-11-08T15:42:30Z'
+
+top_issues:
+  - id: 'T271-QA-24'
+    severity: medium
+    file: 'shared/resources/finalise-deferral-match.js'
+    finding: 'The section heading match is exact text, so a later H2 that renders as the same section ("## Deferred Work ##", "##  Deferred Work", "## Deferred Work:", "## Deferred work") is read as another H2 and its bullets are neither taken nor section text. Reproduced by hand: an approved c1 bullet, then "## Deferred Work ##" and "- `c1`: revoked", returns matched (exit 0).'
+    suggested_action: 'Normalise ATX headings (closing hashes, extra spaces, case, emphasis) before comparing, or count the id under every H2 that is not the exact section and block on it.'
+    suggested_owner: dev
+    status: open
+  - id: 'T271-QA-25'
+    severity: medium
+    file: 'shared/resources/finalise-deferral-match.js'
+    finding: 'Only recommendations.future[] entries are candidates. A mention of the id in recommendations.immediate[] or in a top-level key is counted as parsed, so it offsets the raw count and never blocks. Reproduced by hand: an approving future entry plus "immediate: [{action: c1 revoked}]" returns matched (exit 0), and so does a top-level "top: c1 revoked".'
+    suggested_action: 'Block when a parsed mention of the id sits anywhere in the gate outside the approving future[] entry that carries it, or at least treat immediate[] entries as non-approving candidates.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 8066
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 3
+    escaped: 0
+    boundary: true
+    boundary_signals: ["refuses"]
+    boundary_reason: ''
+    notes: 'Three CLI runs by hand against head 0bb75bf0 (a heading variant; an immediate entry; a top-level key). The reviewer ran about 70 further probes through main() on both sides: the balanced-pair attack on the gate failed (the parser does not decode escapes or expand aliases, so parsed mentions never exceed raw), and the fence and comment handling held. finalise-delta.js was not re-probed (it held against about 30 probes at gate 9).'
+  performance:
+    status: CONCERNS
+    notes: 'Not measured to the criterion; a clean rerun on an idle machine is owed.'
+  reliability:
+    status: PASS
+    notes: 'ci:fast 8066 tests, 0 failed.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Both holes are the same shape as earlier ones: the code names a fixed set of places that count as the record (an exact heading, the future list). The score is 60 by the rule; gates 8 and 10 recorded 90 for the same NFR set and are corrected here.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'A future entry with case equal to the id, full facts and a status word such as "withdrawn" in a field that does not name the id is accepted; withdrawal wording is not machine-readable, so say in the skill that a withdrawal must name the case id. case is also compared after trim().'
+      refs: ['shared/resources/finalise-deferral-match.js', 'skills/finalise/SKILL.md']
+    - action: 'A bullet indented four spaces (an indented code block) is still read; ls-tree is parsed without -z; a nested list item is read as a record; exact-case path compare (macOS, task 210).'
+      refs: ['shared/resources/finalise-deferral-match.js', 'shared/resources/finalise-delta.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['Fix T271-QA-24 and T271-QA-25, then re-review; the QA budget (11 gates) is spent, so continuing needs the owner']

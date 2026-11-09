@@ -1,0 +1,67 @@
+schema: 2
+task: 'task.271.finalise-accepts-what-the-record-already-shows'
+task_title: 'finalise accepts what the record already shows'
+gate: FAIL
+status_reason: 'Cycle 7 fixes verified. The Deferred Work reconciliation computes its section boundary from the raw text while the items side strips HTML comments first, so a heading hidden inside a comment ends the raw section early and a withdrawal after it is not counted. The eight-gate budget is spent.'
+reviewer: 'QA Engineer'
+head: '51321cb7381ee5c5b6d7a5454a40c0c932b96903'
+updated: '2026-11-08T14:54:30Z'
+
+top_issues:
+  - id: 'T271-QA-19'
+    severity: high
+    file: 'shared/resources/finalise-deferral-match.js'
+    finding: 'deferredWorkSectionText scans the unstripped text, while the items side strips HTML comments before it finds the section. A "## Notes" heading hidden inside a comment therefore ends the raw section early. Reproduced by hand: an approved oc-1 bullet, then "<!--", "## Notes", "-->", then "Withdrawn: oc-1 is no longer deferred." returns matched (exit 0); raw count 1, taken count 1.'
+    suggested_action: 'Compute the section boundary once with one comment rule for both counts, or count the id over the whole work item and allow only the occurrences inside accepted bullets.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 8064
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 2
+    escaped: 0
+    boundary: true
+    boundary_signals: ["refuses"]
+    boundary_reason: ''
+    notes: 'Two CLI runs by hand against head 51321cb7 (a heading hidden in a comment; a withdrawal under another H2). The cycle-7 shapes (# in a block scalar, + bullet, prose, numbered item, table row) no longer reproduce; about 20 further crafted files (CRLF, duplicate keys, multi-document, anchors, flow lists) did not get through, per the reviewer.'
+  performance:
+    status: CONCERNS
+    notes: 'Not measured to the criterion; a clean rerun on an idle machine is owed.'
+  reliability:
+    status: PASS
+    notes: 'ci:fast 8064 tests, 0 failed.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Eighth gate with a finding in the new engines, but the reviewer ran about 20 crafted files and found one reproduced hole, down from two per gate.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Owner decision: a withdrawal written under any other H2 of the work item returns matched, because the reconciliation reads only the Deferred Work section. Decide whether a mention of the case id anywhere in the work item outside accepted bullets should block, and say where a withdrawal is to be recorded in the skill text.'
+      refs: ['shared/resources/finalise-deferral-match.js', 'skills/finalise/SKILL.md']
+    - action: 'finalise-delta.js was not re-probed at gates 6 to 8; ls-tree is parsed without -z; a nested list item is read as a record; exact-case path compare (macOS, task 210).'
+      refs: ['shared/resources/finalise-delta.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['Fix T271-QA-19, then re-review; the QA budget (8 gates) is spent, so continuing needs the owner']

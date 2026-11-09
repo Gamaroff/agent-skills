@@ -1,0 +1,70 @@
+schema: 2
+task: 'task.273.qa-task-steps-state-the-routes-they-lack'
+task_title: 'qa-task steps state the routes they lack'
+gate: CONCERNS
+status_reason: 'The cycle-4 fix is verified. An end-to-end read of every gating-rule statement found the last two stale ones: the Code-review findings note in the gate-decision section of qa-task and qa-story still says findings do not enter top_issues by default and that only an opt-in appends them, with the 5d exception on the last sentence only.'
+reviewer: 'QA Engineer'
+head: 'b873e8cc3ae1cbb6cec3b66d54f74df1c30daec1'
+updated: '2026-11-09T04:23:38Z'
+
+top_issues:
+  - id: 'T273-CR-4'
+    severity: medium
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'The blockquote note headed "Code-review findings" (qa-task line 1460, qa-story line 2178) opens "by default these do NOT enter top_issues and do NOT affect the gate. Only when the doc opts in ... are bug + high findings appended". Step 5d gates a reproduced bug with no opt-in, and the run-level override also appends findings, so the note is false as written. The 5d exception sits on its last sentence only.'
+    suggested_action: 'Rewrite the note so its first two sentences describe the reviewer claim, and the carve-out for a bug QA reproduces by execution (an explicit code_review_blocking false still wins) applies to the whole note, in both skills.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    notes: 'No predicate-shaped function is added. boundary: false.'
+  performance:
+    status: PASS
+    notes: 'Prose-only change since the cycle 1 measurement.'
+  reliability:
+    status: PASS
+    notes: 'No new failure path.'
+  maintainability:
+    status: PASS
+    notes: 'The restated-rule drift is carried as T273-CR-4.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Resolve T273-CR-4: rewrite the two gate-decision notes. The budget of five gates is spent, so the fix needs a granted re-entry.'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+  future:
+    - action: 'Cycle 1 CR-1 (medium confidence, not reproducible by execution): add the unbound-read category to the docs-only claim-check prompt.'
+      refs: ['shared/resources/qa-docs-only-review-prompt.md']
+    - action: 'Cycle 1 CR-2 (low): state which file list decides the docs-only route on cycle 3 and later.'
+      refs: ['skills/qa-task/SKILL.md']
+    - action: 'Cycle 1 CR-3 (low confidence): say that the docs-only route reads ci.docsOnly.patterns and ignores ci.docsOnly.enabled.'
+      refs: ['shared/resources/qa-docs-only-review-prompt.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions:
+    - 'T273-CR-4 is resolved.'

@@ -5,16 +5,18 @@ type: task
 description: "Close three finalise bookkeeping gaps that a person had to notice by hand: a GAPS bug DoD that reads as accepted, security probe artefacts left untracked after the acceptance commit, and a DoD number that collides with another writer's files."
 tags: [finalise, observation]
 category: refactoring
-status: planned
+status: accepted
+pr_number: 858
 priority: Medium
 created: 2026-11-06
-updated: 2026-11-06
+updated: 2026-11-07
+completed_date: 2026-11-07
 estimated_effort_hours: 4
 ---
 
 # Task 270: finalise bookkeeping is mechanical
 
-**Status:** Planned
+**Status:** Accepted
 
 ---
 
@@ -49,7 +51,8 @@ Three small finalise defects share one cause: a step relies on a person or a pro
 Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 
 - `shared/resources/fill-verification-complete.sh:95` halts only when the Final Status placeholder survives; no check covers the other placeholders in the block (`grep -n -i placeholder` returns lines 8, 27, 95 only). The template is `skills/finalise/assets/bug-dod-template.md`.
-- `skills/finalise/SKILL.md:1834` and `:1837` build `ADD_PATHS` as the document, the DoD and (non-bug) `sprint-review-summary.md`; no `security.*` path is added. `:503` and `:661` show the artefact names.
+- `skills/finalise/SKILL.md:1910` and `:1913` build `ADD_PATHS` as the document, the DoD and (non-bug) `sprint-review-summary.md`; no `security.*` path is added (`grep -n ADD_PATHS skills/finalise/SKILL.md`, 2026-11-07; the `:1834`/`:1837` first written here had drifted). `:503` and `:661` show the artefact names. The 6a block binds `STEM`, `DOC_KIND` and `DOD_PATH` only: `DOD_N` is **not** an input of that block, so the staging edit derives the run number from `DOD_PATH`.
+- Finalise 7.1 calls `fill-verification-complete.sh "$DOD_PATH" accepted` (`SKILL.md:1601`) while the template's `**CI reading 1:** {CI_ROLLUP} @ \`{CI_HEAD_1}\`` line is still unfilled, so a halt on any surviving `{…}` would fire on every accepted bug run unless Phase 1 fixes the order (see Phase 1).
 - `skills/finalise/SKILL.md:173` allocates `DOD_N=$(next_numbered "{document-directory}" dod -name "${STEM}.dod.*.md")`. `shared/resources/newest-numbered.sh:50` `next_numbered` takes HIGHEST + 1 over the `-name` patterns it is given, so a narrower pattern misses `.dod.N.security.*` files. Obs #96 measured: with `task.9.dod.1.x.md` and a foreign `task.9.dod.2.security.cases.1.json`, the narrow pattern answers 2 and `-name 'task.9.dod.*'` answers 3.
 - Tests beside it: `shared/resources/tests/finalise-gaps-path.test.mjs`, `finalise-6a-registry-staging.test.mjs`.
 
@@ -84,7 +87,7 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 
 ## 5. Breaking Changes
 
-None - a surviving placeholder that used to pass now halts, which is the intended fix; no consumer relies on a placeholder surviving.
+None for consumers once Phase 1 pins the order: the halt must not fire on a placeholder that a later step of the same accepted run fills (`{CI_ROLLUP}`, `{CI_HEAD_1}`). A surviving placeholder that nothing later fills used to pass and now halts, which is the intended fix.
 
 ---
 
@@ -174,10 +177,13 @@ None - a surviving placeholder that used to pass now halts, which is the intende
 **Scope**: the three behaviours.
 
 **Actions**:
-- [ ] `gaps` on a template leaves no `{CI_ROLLUP}`, `{CI_HEAD_1}` or "committed and pushed at 6a" text; `accepted` is unchanged. **Control**: a placeholder in a block the script does not own (a code span in a gap line) does not halt.
-- [ ] A work-item directory with a probe record and a `.d/` sidecar: after the 6a block, `git status --short` shows neither untracked.
-- [ ] A directory with `task.9.dod.1.x.md` and a foreign `task.9.dod.2.security.cases.1.json` allocates 3.
-- [ ] Mutation proofs: revert each of the three edits; each turns exactly one named test red.
+- [x] `gaps` on a template leaves no `{CI_ROLLUP}`, `{CI_HEAD_1}` or "committed and pushed at 6a" text; `accepted` is unchanged. **Control**: a placeholder in a block the script does not own (a code span in a gap line) does not halt.
+- [x] A work-item directory with a probe record and a `.d/` sidecar: after the 6a block, `git status --short` shows neither untracked.
+- [x] A directory with `task.9.dod.1.x.md` and a foreign `task.9.dod.2.security.cases.1.json` allocates 3.
+- [x] An `accepted` fill on a template whose CI reading line is still unfilled does not halt (or the CI line is filled before the call, shown by the same test). **Control**: a `gaps` fill with a surviving owned placeholder does halt.
+- [x] 6a staging runs under bash **and** zsh (the existing 6a test's `SHELLS` loop): with no `security.*` artefact present the block does not abort (zsh `nomatch`), and with them present both the record and the `.d/` sidecar are staged.
+- [x] Tests that read the template and must be updated or confirmed: `evals/shared/tests/finalise-bug-mode.test.mjs` (`:1390`) and `shared/resources/tests/finalise-gaps-path.test.mjs` (`:636`); the "committed and pushed at 6a" and `CI reading` literals found by `git grep -n 'committed and pushed at 6a\|CI reading' -- '*.test.*'` are listed in the QA report with their disposition.
+- [x] Mutation proofs: revert each of the three edits; each turns exactly one named test red.
 
 **Command**: `CI=true command node --test` on the named files.
 
@@ -191,23 +197,23 @@ None - a surviving placeholder that used to pass now halts, which is the intende
 
 ### Functional
 
-- [ ] A `gaps` fill leaves no accepted-path placeholder and a surviving placeholder halts, shown by the new tests (names in the QA report).
-- [ ] 6a leaves no `${STEM}.dod.${DOD_N}.security.*` path untracked, shown by a test that runs the block's staging slice.
-- [ ] `DOD_N` is 3 in the obs #96 scratch layout, shown by a test.
+- [x] A `gaps` fill leaves no accepted-path placeholder and a surviving placeholder halts, shown by the new tests (names in the QA report).
+- [x] 6a leaves no `${STEM}.dod.${DOD_N}.security.*` path untracked, shown by a test that runs the block's staging slice.
+- [x] `DOD_N` is 3 in the obs #96 scratch layout, shown by a test.
 
 ### Performance
 
-- [ ] `CI=true command npm test` wall time is within 10% of `develop`, as the median of five alternating runs with `uptime` beside each, recorded in the QA report.
+- [x] `CI=true command npm test` wall time is within 10% of `develop`, as the median of five alternating runs with `uptime` beside each, recorded in the QA report.
 
 ### Code Quality
 
-- [ ] Each of the three fixes has a mutation proof in the QA report.
-- [ ] `command npm run bundle -- --check` reports 0 problems; `CI=true command npm test` passes.
-- [ ] `CI=true command node --test evals/shared/tests/finalise-bug-mode.test.mjs` passes.
+- [x] Each of the three fixes has a mutation proof in the QA report.
+- [x] `command npm run bundle -- --check` reports 0 problems; `CI=true command npm test` passes.
+- [x] `CI=true command node --test evals/shared/tests/finalise-bug-mode.test.mjs` passes.
 
 ### Migration
 
-- [ ] An existing accepted bug DoD fixture is unchanged by the fill.
+- [x] An existing accepted bug DoD fixture is unchanged by the fill.
 
 ---
 
@@ -280,12 +286,54 @@ None identified.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-07
+**Quality Score**: 97/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.270.qa.2.finalise-bookkeeping-is-mechanical.md](./task.270.qa.2.finalise-bookkeeping-is-mechanical.md)
+- **Gate File**: [task.270.gate.2.finalise-bookkeeping-is-mechanical.yml](./task.270.gate.2.finalise-bookkeeping-is-mechanical.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 8013 (8011 pass, 0 fail, 2 skipped)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+Cycle 1's CHANGELOG finding is fixed. One low-confidence advisory item (template drift in the gaps rewrite) is already held by a committed test.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report**: `task.270.qa.2.finalise-bookkeeping-is-mechanical.md`; **Gate**: `task.270.gate.2.finalise-bookkeeping-is-mechanical.yml` ✅ PASS, 97/100; Step 5c PR review APPROVE.
+
+✅ **Acceptance Criteria:** all 8 met. The wall-time criterion was first graded open (QA 2 had timed three files only), then measured as written: ten alternating `CI=true npm test` runs, median develop 170224 ms vs branch 165366 ms (-2.9%).
+✅ **Tests and CI:** CI reading 1 SUCCESS over 6 checks on `9d3be47a`.
+✅ **Documentation:** CHANGELOG entry cites (task 270); bundled copy matches its source.
+✅ **Security Review:** PASS; 18 probes executed, 0 reproduced, 0 escaped.
+⚠️ **Compliance Review:** not applicable (internal tooling).
+
+**Detailed Verification Log:** See `task.270.dod.1.finalise-bookkeeping-is-mechanical.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-07
+
 <!-- change-log-start -->
 ## Change Log
 
 | Date       | Version | Description                                         | Author      |
 | ---------- | ------- | --------------------------------------------------- | ----------- |
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #37, #59, #96 | create-task |
+| 2026-11-07 | 1.1     | Review passed (8/10) — fixed drifted ADD_PATHS anchors, zsh-unsafe glob and unbound DOD_N in the 6a plan, and the accepted-path halt ordering; added tests for both | review-task |
+| 2026-11-07 |         | Status → ready-for-development | review-task |
+| 2026-11-07 |         | QA gate CONCERNS (90/100) — 1 finding (no CHANGELOG entry) | qa-task |
+| 2026-11-07 |         | QA gate PASS (97/100) — 0 findings | qa-task |
+| 2026-11-07 | 1.2     | DoD passed — accepted (PR #858) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -293,16 +341,16 @@ None identified.
 ## Progress Tracking
 
 ### Phase 1: The fill script
-- [ ] Halt and gaps text
+- [x] Halt and gaps text (done in the script; the template is unchanged — the gaps rewrite lives in `fill-verification-complete.sh`)
 
 ### Phase 2: 6a staging
-- [ ] Security paths staged
+- [x] Security paths staged
 
 ### Phase 3: DOD_N namespace
-- [ ] Pattern widened
+- [x] Pattern widened
 
 ### Phase 4: Tests, bundle and sweep
-- [ ] Mutation proofs, bundle clean
+- [x] Mutation proofs, bundle clean
 
 ---
 
@@ -326,4 +374,4 @@ None.
 
 ---
 
-**Status:** Planned
+**Status:** Accepted

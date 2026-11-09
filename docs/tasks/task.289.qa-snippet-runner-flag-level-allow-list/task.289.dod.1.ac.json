@@ -1,0 +1,265 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "880af12baa7b6424d4ef621b84a470667881f2ed",
+  "dirty_paths": [],
+  "document": "docs/tasks/task.289.qa-snippet-runner-flag-level-allow-list/task.289.qa-snippet-runner-flag-level-allow-list.md",
+  "result": {
+    "bytes": 8620,
+    "sha256": "7ee6550c3cd06c5a29dcc61c14223dcc57d71766a558fff673e1543041d4e1e4",
+    "verified": true
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 11,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "5788d39c458d66c2887de051991ad3d24919b613ed9ec995bba2c1ab4df24f49",
+      "status": "PASS",
+      "description": "Each of the seven gaps classifies mutating by a named test; control stays runnable",
+      "code_citation": "shared/resources/qa-execute-snippets.mjs:1545",
+      "test_citation": "shared/resources/tests/qa-execute-snippets.test.mjs:4000",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Gap rows (e.g. <> redirection, word-splitting on ${IFS}) in the gap table, run by test:suite via shared/resources/tests/*.test.mjs; controls are in the same table."
+    },
+    {
+      "id": "#2",
+      "text_hash": "2c9112e5d1c24b86a38257dd09a30b686539e4e7c090276b09b5b46b0dedbd75",
+      "status": "PASS",
+      "description": "Flag/operand outside table entry refused flag-not-allowed; member with no entry refused",
+      "code_citation": "shared/resources/qa-execute-snippets.mjs:877",
+      "test_citation": "shared/resources/tests/qa-execute-snippets.test.mjs:4318",
+      "members": [],
+      "non_member_fail": null,
+      "note": "flag-not-allowed rows at test.mjs:3977-3993; table audit at 4294; no-entry refusal at 4318."
+    },
+    {
+      "id": "#3",
+      "text_hash": "e7162dd20c590ed481da7cbcbe3bc8917e61cce086117cceca5d28c6ce956f39",
+      "status": "PASS",
+      "description": "uniq in out and file -C -m magic classify mutating by named tests",
+      "code_citation": "shared/resources/qa-execute-snippets.mjs:1545",
+      "test_citation": "shared/resources/tests/qa-execute-snippets.test.mjs:4055",
+      "members": [],
+      "non_member_fail": null,
+      "note": "file -C -m magic row at 4055 and 4136; uniq output-operand tests named in QA 6 mutation table (maxOperands row)."
+    },
+    {
+      "id": "#4",
+      "text_hash": "f7ebefd2b410a209fc75c76233c5ac2772fd39cac5d25ad272ca761793c0a973",
+      "status": "PASS",
+      "description": "Every block task 274 ran and new engine refuses is listed in QA report",
+      "code_citation": "docs/tasks/task.289.qa-snippet-runner-flag-level-allow-list/task.289.qa.6.qa-snippet-runner-flag-level-allow-list.md:75",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The QA report lists 19 blocks (command and runner output at the cited section); 17 of them are the owner-decided refusals recorded in the Change Log."
+    },
+    {
+      "id": "#5",
+      "text_hash": "72a3b8dab12386b6e265825dadb7f47d8f36c4d38b8eb8b4418b53db45dabd38",
+      "status": "PASS",
+      "description": "CI=true npm test median wall time within 10% of develop",
+      "code_citation": "docs/tasks/task.289.qa-snippet-runner-flag-level-allow-list/task.289.qa.6.qa-snippet-runner-flag-level-allow-list.md:123",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Bound 10%; median develop 205.6 s vs branch 207.5 s (1.009), five alternating pairs with load per run, via suite-timing.sh on npm run test:suite. Measured on c42729c5, tree-equivalent to head per finalise-delta.js docs-only (exit 0)."
+    },
+    {
+      "id": "#6",
+      "text_hash": "2718f44912faf8e06df849df1b759803388ee3af58602debdf830a07a0330a11",
+      "status": "PASS",
+      "description": "Classifier adds under 10% to median 3,000-block docs scan time",
+      "code_citation": "docs/tasks/task.289.qa-snippet-runner-flag-level-allow-list/task.289.qa.6.qa-snippet-runner-flag-level-allow-list.md:109",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Bound 10%; median 492 ms vs 499 ms (+1.4%), 3,438 blocks, five alternating pairs with loadavg per run, via timing.mjs. Measured on 880af12b, tree-equivalent to head per finalise-delta.js docs-only (exit 0)."
+    },
+    {
+      "id": "#7",
+      "text_hash": "a16db4a7fe01e5daf5aa794b8987af1d71ac9c6e3f5ae96825015420e5b426b9",
+      "status": "PASS",
+      "description": "Each fix has a mutation proof (revert, a test goes red) in QA report",
+      "code_citation": "docs/tasks/task.289.qa-snippet-runner-flag-level-allow-list/task.289.qa.6.qa-snippet-runner-flag-level-allow-list.md:141",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "initial: <> refusal",
+          "evidence": "qa.6.md:146",
+          "status": "PASS"
+        },
+        {
+          "member": "initial: generic flag loop",
+          "evidence": "qa.6.md:147",
+          "status": "PASS"
+        },
+        {
+          "member": "initial: function shadowing",
+          "evidence": "qa.6.md:164",
+          "status": "PASS"
+        },
+        {
+          "member": "initial: find flag table",
+          "evidence": "qa.6.md:165",
+          "status": "PASS"
+        },
+        {
+          "member": "initial: sed branch",
+          "evidence": "qa.6.md:166",
+          "status": "PASS"
+        },
+        {
+          "member": "initial: sed verdict",
+          "evidence": "qa.6.md:167",
+          "status": "PASS"
+        },
+        {
+          "member": "initial: brace",
+          "evidence": "qa.6.md:168",
+          "status": "PASS"
+        },
+        {
+          "member": "initial: IFS",
+          "evidence": "qa.6.md:169",
+          "status": "PASS"
+        },
+        {
+          "member": "initial: word-splitting",
+          "evidence": "qa.6.md:170",
+          "status": "PASS"
+        },
+        {
+          "member": "initial: collapsed hidden",
+          "evidence": "qa.6.md:171",
+          "status": "PASS"
+        },
+        {
+          "member": "initial: forwarded sed rule",
+          "evidence": "qa.6.md:172",
+          "status": "PASS"
+        },
+        {
+          "member": "initial: maxOperands",
+          "evidence": "qa.6.md:173",
+          "status": "PASS"
+        },
+        {
+          "member": "initial: date operand",
+          "evidence": "qa.6.md:174",
+          "status": "PASS"
+        },
+        {
+          "member": "initial: sed-script variable",
+          "evidence": "qa.6.md:175",
+          "status": "PASS"
+        },
+        {
+          "member": "initial: sed separator",
+          "evidence": "qa.6.md:176",
+          "status": "PASS"
+        },
+        {
+          "member": "T289-CR-1",
+          "evidence": "qa.6.md:148",
+          "status": "PASS"
+        },
+        {
+          "member": "T289-CR-2",
+          "evidence": "qa.6.md:149",
+          "status": "PASS"
+        },
+        {
+          "member": "T289-CR2-1",
+          "evidence": "qa.6.md:150",
+          "status": "PASS"
+        },
+        {
+          "member": "T289-CR2-2",
+          "evidence": "qa.6.md:151",
+          "status": "PASS"
+        },
+        {
+          "member": "T289-CR3-1",
+          "evidence": "qa.6.md:152",
+          "status": "PASS"
+        },
+        {
+          "member": "T289-CR3-2",
+          "evidence": "qa.6.md:153",
+          "status": "PASS"
+        },
+        {
+          "member": "T289-CR4-1/CR4-2",
+          "evidence": "qa.6.md:154",
+          "status": "PASS"
+        },
+        {
+          "member": "T289-CR5-1",
+          "evidence": "qa.6.md:155",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Units: the 15 initial checks and the findings-driven fixes. 13 initial rows at qa.6:158-176 each name the reverted behaviour and the red test titles. The <> and generic-loop proofs are in the qa.6 table at 141-155 and QA 1:133-134. The sed separator also has QA 2:37. Findings rows cover CR-1, CR-2, CR2-1, CR2-2, CR3-1, CR3-2, CR4-1/CR4-2, CR5-1 with red tests named. Test titles spot-checked in test.mjs (4012, 4365)."
+    },
+    {
+      "id": "#8",
+      "text_hash": "445ca15be94ed041136b0735c1a9ed4c34370d985fca5da682eb0310badb0201",
+      "status": "PASS",
+      "description": "npm run bundle:check reports 0 problems",
+      "code_citation": "package.json:66",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 3ee09a37c15047f4ab13fcea5f6fbe92e31a8eeb — Evidence is CI or command state, graded by /finalise Step 6. QA 6 records 0 problems on c42729c5, with 129 skills checked.",
+      "ci_reading": "CI reading 1: SUCCESS @ 3ee09a37c15047f4ab13fcea5f6fbe92e31a8eeb"
+    },
+    {
+      "id": "#9",
+      "text_hash": "caadd0132685afc27184a0558c2e505e0249863240441d1f093f51912a7457f1",
+      "status": "PASS",
+      "description": "CI=true npm run ci passes",
+      "code_citation": ".github/workflows/test.yml:1",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 3ee09a37c15047f4ab13fcea5f6fbe92e31a8eeb — Asks that the CI run is green on the PR head; graded by /finalise Step 6 from the CI reading. QA 6:137 records exit 0 on c42729c5.",
+      "ci_reading": "CI reading 1: SUCCESS @ 3ee09a37c15047f4ab13fcea5f6fbe92e31a8eeb"
+    },
+    {
+      "id": "#10",
+      "text_hash": "435c7e61d205da756f29407164218aa5cf56c7a820234388627a038bd3e86bf5",
+      "status": "PASS",
+      "description": "CHANGELOG.md cites this task",
+      "code_citation": "CHANGELOG.md:9",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The line 'The QA snippet runner allows flags, not just commands (task 289)' cites the task and describes the change."
+    },
+    {
+      "id": "#11",
+      "text_hash": "0bdb1524d6af2698c77508931948d3a9d3ea6b643433287397dd08b245902a53",
+      "status": "PASS",
+      "description": "Owner decision on 17 refused blocks recorded in Change Log",
+      "code_citation": "docs/tasks/task.289.qa-snippet-runner-flag-level-allow-list/task.289.qa-snippet-runner-flag-level-allow-list.md:334",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The Change Log row dated 2026-11-09 reads 'Owner decision on the 17 refused doc blocks: accept the refusal, no value tracking'."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#7",
+      "note": "Weak holds recorded in qa.6:178 and not fixed: initial checks 1, 11 and 12 share one combined test, and 3 and 13 share the single sedScriptVerdict table test. Each still has a named red test, so this is not a failure."
+    }
+  ]
+}

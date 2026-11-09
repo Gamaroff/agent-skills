@@ -97,12 +97,27 @@ export function gitAsync(cwd, ...args) {
 // `../origin.git`, which git resolves from the working tree, so every copy talks to its own origin.
 let template = null;
 
+// Stop git spawning background work in the template. Without this each commit and push in
+// buildTemplate starts a detached `git maintenance run --auto --quiet --detach` (3 per build,
+// measured with GIT_TRACE2_EVENT). That child outlives the call, so it can still be touching the
+// template's object store while fixtureRepo()'s fs.cpSync is walking it — the same race obs #282
+// closed in ci-tree-equivalence.test.mjs, and the suspected cause of the one-in-6142 ENOENT while
+// copying `executed-prose-*/origin.git/objects` (task.205, obs #50; not reproduced). The config travels
+// with every copy, so a test's own commits in a copy start nothing either.
+function noBackgroundGit(repo) {
+  git(repo, "config", "maintenance.auto", "false");
+  git(repo, "config", "gc.auto", "0");
+  git(repo, "config", "receive.autogc", "false");
+}
+
 function buildTemplate() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "executed-prose-tpl-"));
   const origin = path.join(dir, "origin.git");
   const work = path.join(dir, "work");
   git(dir, "init", "-q", "--bare", "-b", "develop", origin);
+  noBackgroundGit(origin);
   git(dir, "clone", "-q", origin, work);
+  noBackgroundGit(work);
   git(work, "remote", "set-url", "origin", "../origin.git");
   git(work, "config", "user.email", "t@example.com");
   git(work, "config", "user.name", "t");

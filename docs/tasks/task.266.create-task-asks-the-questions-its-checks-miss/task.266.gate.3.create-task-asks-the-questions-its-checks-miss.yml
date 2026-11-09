@@ -1,0 +1,54 @@
+schema: 2
+task: 'task.266.create-task-asks-the-questions-its-checks-miss'
+task_title: 'create-task asks the questions its checks miss'
+gate: PASS
+status_reason: 'The Performance criterion is now measured: median of five alternating npm test runs is 733.2 s on the PR head against 737.1 s on develop (-0.5%), within the 10% bound, with uptime recorded beside each run. Closes the 5c coverage finding PC-1.'
+reviewer: 'QA Engineer'
+head: 'aacfcc2305ce60daeba869a1e88092bd572a3635'
+updated: '2026-11-06T13:12:15Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 97
+
+evidence:
+  tests_reviewed: 7944
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    boundary_signals: []
+    notes: 'Prose only; no input boundary.'
+  performance:
+    status: PASS
+    notes: 'Median 733.2 s (head) vs 737.1 s (develop), -0.5%; five alternating runs per arm; load recorded per run in QA report 3.'
+  reliability:
+    status: PASS
+    notes: 'Full suite passes on the head in all five runs. One develop run failed a load-sensitive timing budget in tests/bundle-missing-source.test.js (20188 ms over a 20000 ms budget); that file passes alone (18478 ms).'
+  maintainability:
+    status: PASS
+    notes: 'CARD_SECTIONS_BY_KIND untouched.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'tests/bundle-missing-source.test.js runs at 18.5 s against a 20 s budget when idle and exceeded it under load; consider a wider budget or a fixture that is cheaper.'
+      refs: ['tests/bundle-missing-source.test.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

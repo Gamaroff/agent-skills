@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "path",
+      "entry": "shell-argv:shared/resources/resolve-pr-number.sh",
+      "name": "resolve-pr-number: linked-issue rung",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 10,
+      "passed": 10,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": [
+        "bash",
+        "zsh"
+      ],
+      "interpreter": null,
+      "fake_gh": "/home/gamaroff/Development/agent-skills/tests/fixtures/fake-gh",
+      "argv": [
+        "--doc",
+        "{input}"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-11-08T21:07:09.174Z"
+    },
+    {
+      "sink": "path",
+      "entry": "cli:shared/resources/finalise-preconditions.js",
+      "name": "finalise-preconditions check: gate/waiver",
+      "call_site": null,
+      "verdict": "present-but-inert",
+      "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+      "executed": 11,
+      "passed": 9,
+      "reproduced": 2,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "check",
+        "--doc",
+        "{input}",
+        "--kind",
+        "task",
+        "--pr",
+        "7",
+        "--pr-state",
+        "OPEN"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "ran_at": "2026-11-08T21:07:07.890Z"
+    }
+  ],
+  "totals": {
+    "executed": 21,
+    "reproduced": 2,
+    "escaped": 0
+  },
+  "updated_at": "2026-11-08T21:07:09.174Z"
+}

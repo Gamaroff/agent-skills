@@ -1,0 +1,74 @@
+schema: 2
+task: 'task.271.finalise-accepts-what-the-record-already-shows'
+task_title: 'finalise accepts what the record already shows'
+gate: FAIL
+status_reason: 'Cycle 11 fixes verified. The remaining findings are all one class: the work item is free-form Markdown, and every gate has found another way for text to render as the Deferred Work section without being read as it (an entity, a link wrapper, a setext heading, an H1 or H3), plus one design question on the gate side. finalise-delta.js was reviewed line by line and nothing was reproduced. The twelve-gate budget is spent.'
+reviewer: 'QA Engineer'
+head: 'b9fbb0cd30a570d0caecead7a13e0b44a26bd8f6'
+updated: '2026-11-08T16:01:00Z'
+
+top_issues:
+  - id: 'T271-QA-26'
+    severity: high
+    file: 'shared/resources/finalise-deferral-match.js'
+    finding: 'Headings that render as the Deferred Work section are not recognised as it, so the text under them is never read. Reproduced by hand with a valid bullet under "## Deferred Work", then "## Notes", then each of: "## Deferred&nbsp;Work", a setext heading ("Deferred Work" over a line of dashes), and "# Deferred Work" (an H1), each followed by "- c1 withdrawn". All three return matched (exit 0). The reviewer also reported "## [Deferred Work]" and a numeric entity, which are the same class. Gate 11 fixed one spelling family (closing hashes, case, emphasis); Markdown has more, and the set cannot be listed.'
+    suggested_action: 'Stop deciding which headings are the section. Either drop the free-text work-item source and accept deferrals from the structured gate record only, or treat any heading, in any form, that is followed by text naming the case id as a blocker.'
+    suggested_owner: dev
+    status: open
+  - id: 'T271-QA-27'
+    severity: medium
+    file: 'shared/resources/finalise-deferral-match.js'
+    finding: 'A withdrawal written in an allow-listed prose key of the gate still matches. Reproduced by hand: a valid future[] entry plus "status_reason: c1 deferral withdrawn by owner" returns matched (exit 0). The allow-list was added because findings legitimately cite case ids; the cost is that a realistic place for a revocation is not read.'
+    suggested_action: 'Owner decision: either say in the skill that a withdrawal is made by editing or removing the future[] entry (the only record that is read), or block when a prose key names the id beside withdrawal words.'
+    suggested_owner: owner
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 8068
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 4
+    escaped: 0
+    boundary: true
+    boundary_signals: ["refuses"]
+    boundary_reason: ''
+    notes: 'Four CLI runs by hand against head b9fbb0cd (an entity heading, a setext heading, an H1, a prose-key withdrawal). The reviewer ran about 40 probes (25 heading spellings, 12 gate shapes) and read finalise-delta.js line by line without running it; no unmatched finding was reproduced for the delta engine.'
+  performance:
+    status: CONCERNS
+    notes: 'Not measured to the criterion; a clean rerun on an idle machine is owed.'
+  reliability:
+    status: PASS
+    notes: 'ci:fast 8068 tests, 0 failed.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Twelve gates in, the work-item grammar is still where each finding lands. The set of Markdown spellings that render as one section is open-ended, so a text matcher over it cannot be finished; the structured gate record has no such surface.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Recommended design for the follow-up: accept a deferral from one structured record in the QA gate only (case, deferred_to, approved_by, approved_on), drop the Deferred Work work-item source, and say in the skill that a deferral is withdrawn by removing or editing that entry.'
+      refs: ['shared/resources/finalise-deferral-match.js', 'skills/finalise/SKILL.md']
+    - action: 'A bullet indented four spaces is still read; ls-tree is parsed without -z; exact-case path compare (macOS, task 210).'
+      refs: ['shared/resources/finalise-deferral-match.js', 'shared/resources/finalise-delta.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['Fix T271-QA-26 and decide T271-QA-27; the QA budget (12 gates) is spent, so continuing needs the owner']

@@ -1,0 +1,29 @@
+{
+  "sink": "path",
+  "entry": "shell-argv:shared/resources/resolve-pr-number.sh",
+  "name": "resolve-pr-number: linked-issue rung",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 10,
+  "passed": 10,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": [
+    "bash",
+    "zsh"
+  ],
+  "interpreter": null,
+  "fake_gh": "/home/gamaroff/Development/agent-skills/tests/fixtures/fake-gh",
+  "argv": [
+    "--doc",
+    "{input}"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "ran_at": "2026-11-08T21:51:17.772Z"
+}

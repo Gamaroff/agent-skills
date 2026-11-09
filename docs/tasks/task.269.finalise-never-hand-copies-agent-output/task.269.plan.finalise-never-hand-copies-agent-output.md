@@ -13,6 +13,25 @@ task-ref: task.269.finalise-never-hand-copies-agent-output.md
 
 Edit `shared/resources/` and `skills/finalise/` sources only, using the Edit tool. Never a bundled copy.
 
+## Phase 1 finding (measured 2026-11-07)
+
+**A subagent's final message is on disk.** The host writes every subagent's transcript to
+`<claude-config-dir>/projects/<project-slug>/<session-id>/subagents/agent-<agentId>.jsonl` (config dir
+`$CLAUDE_CONFIG_DIR` or `~/.claude`), beside `agent-<agentId>.meta.json`. Measured on this session: 20
+transcripts, each a JSONL whose last `type: assistant` line carries the reply in `message.content[]`
+`type: text` blocks, byte-exact as the agent produced it. The reply reaches the orchestrator only as
+tool-result text, but the agent id is in that result, so the file is addressable without retyping.
+No environment variable names the session (`CLAUDE_SESSION_ID` is unset), so the extractor searches
+`projects/*/*/subagents/agent-<id>.jsonl` and refuses on zero or several matches.
+
+**Consequences for the design.**
+- The extractor reads the transcript, takes the last assistant text, and writes the **last** fenced block
+  carrying a given info string. Nothing passes through the orchestrator's context.
+- The layout is a host internal, not a contract. The extractor is fail-closed: `transcript-not-found` is a
+  named answer, and the caller then falls back to the hand copy and records it as **unverified**.
+- It also closes the first-run gap for the security plan (`cases_file:` alone cannot, because the
+  read-only agent cannot create a file): the plan is a fenced block, extracted the same way.
+
 ## Phase-by-Phase Implementation Guide
 
 ### Phase 1

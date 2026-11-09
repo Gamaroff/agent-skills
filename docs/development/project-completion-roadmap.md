@@ -20,7 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. Phase 19 is open (opened 2026-10-29): T245, then T244.
+chain, a human gate. Phase 20 is open (opened 2026-11-09): T289 (accepted), T290, T291.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -79,6 +79,18 @@ to merge rebases.
 
 - [x] **T245** Shared-checkout-safe guards and staging · deps: none · touches: finalise!, qa-skills~, orchestrators~, bundles~ · /develop-task docs/tasks/task.245.shared-checkout-safe-guards-and-staging/task.245.shared-checkout-safe-guards-and-staging.md · ✅ **accepted + merged** ([PR #796](https://github.com/Gamaroff/agent-skills/pull/796), QA PASS 100/100)
 - [x] **T244** The QA loop always ends on a gate · deps: none · touches: pipeline-steps!, qa-skills~, bundles~ · /develop-task docs/tasks/task.244.qa-loop-ends-on-a-gate/task.244.qa-loop-ends-on-a-gate.md
+
+## PHASE 20 — close the snippet runner's known write gaps (opened 2026-11-09)
+
+An **override**: without it the registry fallback selects T275 first, the lowest-numbered planned
+task. T289 goes first because the QA snippet runner decides what a QA gate executes, and task 274
+left seven ways a block classifies `runnable` and writes (reproduced by execution, identical on
+develop). Every QA run until T289 lands carries that exposure. **Tick the row `[x]` when T289 is
+accepted, and archive the phase at close.**
+
+- [x] **T289** QA snippet runner allows flags, not just commands · deps: none · touches: test-harness~, bundles~ · /develop-task docs/tasks/task.289.qa-snippet-runner-flag-level-allow-list/task.289.qa-snippet-runner-flag-level-allow-list.md
+- [ ] **T290** QA snippet runner reads a # after an escaped space as a comment · deps: none · touches: test-harness~, bundles~ · /develop-task docs/tasks/task.290.qa-snippet-runner-comment-after-escaped-space/task.290.qa-snippet-runner-comment-after-escaped-space.md
+- [ ] **T291** The context-pressure statusline test leaks a ctx-wrap- temp directory · deps: none · touches: test-harness~ · /develop-task docs/tasks/task.291.context-pressure-statusline-test-leaks-ctx-wrap-directory/task.291.context-pressure-statusline-test-leaks-ctx-wrap-directory.md
 
 ## Deferred / human-gated
 
@@ -231,3 +243,5 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-10-29 | **Phase 19 opened** with T245 (shared-checkout-safe guards and staging, cut from obs #126 and #127) then T244 (the QA loop always ends on a gate). An override of the registry order: T245 fixes the two ways a parallel session in the same checkout breaks a run, and T244's QA loop hits one of them on every cycle. Both `deps: none`; soft overlap on `qa-skills`. |
 | 2026-10-31 | **T245 accepted + merged — PR #796 merged** (`b0d1234f`). Registry edits are now staged per row so a parallel session's uncommitted row or counter bump in the same checkout no longer rides into a pipeline commit, and the QA re-review HALTs rather than proceeding when it cannot run. 7 QA gates, final gate PASS 100/100; DoD accepted. Next: T244. |
 | 2026-10-31 | **T244 accepted + merged — PR #797 merged** (`e4b9a634`). The QA budget now counts gates: the loop always ends on a gate, so a fix is never handed over unread. Gate 1 FAIL 70 (empty-gate first-review guard, fixed), gate 2 PASS 100, PR review APPROVE. |
+| 2026-11-09 | **Phase 20 opened** with T289 (QA snippet runner flag allow-list, a follow-up to task 274). An override of the registry order: it goes ahead of T275 because the runner decides what a QA gate executes and seven known write gaps stay open until it lands. |
+| 2026-11-09 | **T289 accepted + merged — PR #864** (`5197d44e`); row ticked. **T290 and T291 added to Phase 20**, T290 first (the runner follow-up: a write classifies runnable). T291 (the `ctx-wrap-` temp-directory leak, split out of T289 Phase 5; Low, no dependency). It is not about the snippet runner: it sits here only so the loop picks it up. |

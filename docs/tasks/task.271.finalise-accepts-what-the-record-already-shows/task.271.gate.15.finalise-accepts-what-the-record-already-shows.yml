@@ -1,0 +1,72 @@
+schema: 2
+task: 'task.271.finalise-accepts-what-the-record-already-shows'
+task_title: 'finalise accepts what the record already shows'
+gate: FAIL
+status_reason: 'Cycle 14 fixes verified (a complex key, an odd indent, a tab, an escaped key and a __proto__ key are all refused; 1088 tracked YAML files parse identically with no options). One hole remains, and it is a different class: the parser cuts a scalar at any # even when the # is glued to the text, which YAML does not treat as a comment, so a gate whose four fields all carry a glued suffix matches. The fifteen-gate budget is spent.'
+reviewer: 'QA Engineer'
+head: '89f46d3f0c745b9953a4a642c88d47d18a62a28d'
+updated: '2026-11-08T16:58:00Z'
+
+top_issues:
+  - id: 'T271-QA-32'
+    severity: medium
+    file: 'shared/resources/yaml-subset.js'
+    finding: 'stripComment cuts a line at any unquoted "#", but YAML starts a comment only at a "#" preceded by whitespace. Reproduced by hand: an entry with "case: oc10#x", "deferred_to: task.5#y", "approved_by: Pat#z" and "approved_on: 2026-01-01#q", run for --case oc10 --approver Pat, returns matched. A real YAML reader sees the values oc10#x, task.5#y, Pat#z and 2026-01-01#q, so none of them approves. The raw and parsed id counts agree, so the reconciliation does not catch it.'
+    suggested_action: 'In strict mode, strip a "#" only at the start of a line or after whitespace, so a glued "#" stays in the value and the facts fail their own checks.'
+    suggested_owner: dev
+    status: open
+  - id: 'T271-QA-33'
+    severity: low
+    file: 'shared/resources/yaml-subset.js'
+    finding: 'assertConsumed refuses only rows deeper than the block, so a row shallower than the block but still inside recommendations ends the root mapping and later rows go unread. The reviewer could not build a case where a valid record is hidden without naming the id, and the one shape I tried by hand (a bare "junk" row after the entry) returns unverifiable. Not reproduced as a wrong match.'
+    suggested_action: 'In strict mode, throw when rows remain after the root mapping ends once a strictUnder key was entered.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 8065
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 2
+    escaped: 0
+    boundary: true
+    boundary_signals: ["refuses"]
+    boundary_reason: ''
+    notes: 'Two CLI runs by hand against head 89f46d3f: the glued-# gate (matched, reproduced) and the shallow-row shape (unverifiable, not reproduced). The reviewer ran hidden-row, multi-document, flow-style and anchor probes and compared old and new parseYamlSubset on 1088 tracked YAML files (identical with no options). finalise-delta.js was not examined at gates 14 or 15; it held at gates 9-13.'
+  performance:
+    status: CONCERNS
+    notes: 'Not measured to the criterion; a clean rerun on an idle machine is owed.'
+  reliability:
+    status: PASS
+    notes: 'ci:fast 8065 tests, 0 failed.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Score 60 by the rule (security FAIL, two CONCERNS), as at gates 11-14. The hole is in how the subset parser defines a comment, reached only because the matcher trusts that parser for facts.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'ls-tree is parsed without -z; exact-case path compare (macOS, task 210); finalise-delta.js was not re-probed at gates 14 and 15.'
+      refs: ['shared/resources/finalise-delta.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['Fix T271-QA-32 (and T271-QA-33), then re-review; the QA budget (15 gates) is spent, so continuing needs the owner']

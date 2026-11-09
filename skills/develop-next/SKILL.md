@@ -322,6 +322,27 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
      Both report filename shapes count (`{bug-prefix}.implementation.*` and
      `{bug-prefix}.*.implementation.*`), ordered by the report number. The head-SHA, CI and quality-gate
      clauses below apply to a bug exactly as to a story or task.
+   - **Pipeline completeness** — the item's newest implementation report must record every pipeline step
+     as done. Keyed on the document's prefix (its stem minus the slug, which has no dots), so a task's
+     co-located bug never reads the task's report or the reverse: `{prefix}.implementation.{N}.*` or
+     `{prefix}.{slug}.implementation.{N}.*`, newest `N`. Run the guard on it; **exit 1 or 2, or no
+     report, is a HALT** with the printed problems and no merge, no tick (exit 2 is an unreadable
+     report, never complete). Lite mode waives nothing here: it degrades QA depth and skips no step. A
+     report of a run done by hand in a shortened shape (bug.128: no lock, `review-bug` skipped) fails
+     here, though every check above passes it.
+
+     ```bash
+     ITEM_DOC=<item.commandArg>                      # the work item's document
+     BASE=$(basename "$ITEM_DOC" .md); PREFIX=${BASE%.*}
+     REPORT=$(find "$(dirname "$ITEM_DOC")" -maxdepth 1 -type f -name '*implementation.[0-9]*.md' \
+       | awk -F/ -v p="$PREFIX" '{ b = $NF; if (index(b, p ".") != 1) next; r = substr(b, length(p) + 2);
+           if (match(r, /^(implementation|[^.]+\.implementation)\.[0-9]+\./)) { n = r;
+             sub(/^(implementation|[^.]+\.implementation)\./, "", n); sub(/\..*/, "", n); print n + 0 "\t" $(0) } }' \
+       | sort -n | tail -1 | cut -f2-)
+     [ -n "$REPORT" ] || { echo "HALT: no implementation report for $PREFIX"; exit 1; }
+     node .agents/skills/develop-next/references/pipeline-completeness.js --report "$REPORT" \
+       || { echo "HALT: pipeline incomplete — see the problems above"; exit 1; }
+     ```
    - **Head-SHA check** — the PR's source commit must equal `git rev-parse HEAD` on the local PR branch. Mismatch means the branch moved since it was tested → **HALT** (never gate one commit and merge another).
 
      ```bash

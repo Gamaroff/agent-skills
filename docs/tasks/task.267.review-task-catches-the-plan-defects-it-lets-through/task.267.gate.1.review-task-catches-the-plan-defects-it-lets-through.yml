@@ -1,0 +1,68 @@
+schema: 2
+task: 'task.267.review-task-catches-the-plan-defects-it-lets-through'
+task_title: 'review-task catches the plan defects it lets through'
+gate: CONCERNS
+status_reason: 'Prose change verified: checks 23-29 numbered, pinning tests and full ci:fast green (7944 pass, 0 fail), PR CI green. Two open items: no CHANGELOG [Unreleased] entry citing task 267, and the wall-time success criterion is unmeasured.'
+reviewer: 'QA Engineer'
+head: 'b4a302c27b04082f50599f51fd1b6cf0b642b60f'
+updated: '2026-11-06T15:22:02Z'
+
+top_issues:
+  - id: 'T267-QA-1'
+    severity: medium
+    file: 'CHANGELOG.md'
+    finding: 'No [Unreleased] entry cites (task 267); /finalise 6d HALTs without it.'
+    suggested_action: 'Add an [Unreleased] entry describing the new review-task checks 23-29, review-story check 19 and the create-task 3.5 twins, citing (task 267).'
+    suggested_owner: dev
+    status: open
+  - id: 'T267-QA-2'
+    severity: medium
+    file: 'docs/tasks/task.267.review-task-catches-the-plan-defects-it-lets-through/task.267.review-task-catches-the-plan-defects-it-lets-through.md'
+    finding: 'Success criterion 9 (CI=true npm test wall time within 10% of develop, median of five alternating runs with uptime beside each, recorded in the QA report) has no measurement.'
+    suggested_action: 'Run five alternating CI=true npm test runs on develop and on this branch, record the medians and uptime in the QA report (or amend the criterion with an approver if the owner waives it).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 7946
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    boundary_signals: []
+    notes: 'Prose-only change to three SKILL.md files; no boundary added.'
+  performance:
+    status: CONCERNS
+    notes: 'Wall-time criterion unmeasured (T267-QA-2).'
+  reliability:
+    status: PASS
+    notes: 'Check numbers 1-22 unchanged; five pinning tests green.'
+  maintainability:
+    status: PASS
+    notes: 'Checks numbered 1-29 contiguous; bundle check 0 problems.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Add the CHANGELOG entry and measure the wall-time criterion.'
+      refs: ['CHANGELOG.md']
+  future: []
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CHANGELOG entry citing task 267', 'wall-time measurement recorded']

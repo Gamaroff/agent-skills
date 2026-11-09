@@ -1,0 +1,67 @@
+schema: 2
+task: 'task.270.finalise-bookkeeping-is-mechanical'
+task_title: 'finalise bookkeeping is mechanical'
+gate: CONCERNS
+status_reason: 'All three fixes are present, held by tests and mutation-proved; CI and the full suite are green. One MEDIUM finding: no CHANGELOG [Unreleased] entry cites task 270, which /finalise 6d halts on.'
+reviewer: 'QA Engineer'
+head: '39a1608c73ae4651a1617a55eea351a2af4d4060'
+updated: '2026-11-07T18:05:00Z'
+
+top_issues:
+  - id: 'T270-QA-1'
+    severity: medium
+    file: 'CHANGELOG.md'
+    finding: 'No [Unreleased] entry cites (task 270); changelog-cites.sh answers "missing (task 270)" and /finalise 6d HALTs without it.'
+    suggested_action: 'Add an [Unreleased] entry citing (task 270) for the three finalise bookkeeping fixes.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 6
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: internal
+    internal_reason: 'The placeholder halt reads only the bug DoD this pipeline writes from its own template; no corpus sink models that artefact. Covered by committed tests with controls instead.'
+    boundary_signals: []
+    notes: 'No new input crosses a trust boundary. The 6a find pattern is built from STEM and a numeric run read off DOD_PATH, which is HALTed on when non-numeric.'
+  performance:
+    status: CONCERNS
+    notes: 'Criterion asks for a median of five alternating runs against develop within 10%. Not run. Bounded instead: the branch full CI=true npm test took 189 s (load average 3.6); the three suites add 200 test lines and the changed suites run in about 2 s together, under 1% of the total.'
+  reliability:
+    status: PASS
+    notes: 'zsh nomatch is avoided with find; unbound DOD_N removed; gaps rewrite and halt each have a control.'
+  maintainability:
+    status: PASS
+    notes: 'The verdict-specific text lives once, in fill-verification-complete.sh; the bundled copy matches (bundle --check 0 problems).'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Add the CHANGELOG [Unreleased] entry citing (task 270).'
+      refs: ['CHANGELOG.md']
+  future:
+    - action: 'If the 10% wall-time criterion is to be enforced, measure it on the LAN server where load is steady.'
+      refs: ['docs/tasks/task.270.finalise-bookkeeping-is-mechanical/task.270.finalise-bookkeeping-is-mechanical.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CHANGELOG entry added']

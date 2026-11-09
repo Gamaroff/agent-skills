@@ -1,0 +1,76 @@
+schema: 2
+task: 'task.271.finalise-accepts-what-the-record-already-shows'
+task_title: 'finalise accepts what the record already shows'
+gate: FAIL
+status_reason: 'Cycle 5 fixes verified. The unread-line check added for T271-QA-13 can be defeated: it ends its scan at a column-0 comment inside the future block and it locates the first future: key in the file rather than recommendations.future, so a withdrawal written as a block scalar is still ignored. The six-gate budget is spent.'
+reviewer: 'QA Engineer'
+head: '57933dc86f2a01cb4a9d7ae8aa477fefe06c5881'
+updated: '2026-11-08T09:00:00Z'
+
+top_issues:
+  - id: 'T271-QA-15'
+    severity: high
+    file: 'shared/resources/finalise-deferral-match.js'
+    finding: 'futureBlockLines stops at any column-0 comment line, but the YAML reader skips comments and keeps parsing the entries after it. Reproduced by hand: an approved oc1 bullet plus a gate whose future block has an entry, then "# note", then an entry "action: >-" with the text "WITHDRAWN: oc1 is NOT deferred" returns matched (exit 0); without the comment line it returns unapproved.'
+    suggested_action: 'Stop treating line shape as the block boundary. Read the future block from the parsed structure, or fail closed when the gate holds any block scalar or the case id appears in the gate text outside lines the parser accounted for.'
+    suggested_owner: dev
+    status: open
+  - id: 'T271-QA-16'
+    severity: high
+    file: 'shared/resources/finalise-deferral-match.js'
+    finding: 'The first "future:" key anywhere in the file is scanned, not recommendations.future. Reproduced by hand: an empty "nfr:\n  future:" key before "recommendations:" hides the real block from the check, and the same block-scalar withdrawal returns matched (exit 0).'
+    suggested_action: 'Locate the block as the child of recommendations:, or scan the whole gate text for lines naming the case and reconcile them with the parsed content.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 8062
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 6
+    escaped: 0
+    boundary: true
+    boundary_signals: ["refuses"]
+    boundary_reason: ''
+    notes: 'Six CLI runs by hand against head 57933dc8 (three gates, two controls). The cycle-5 findings (block scalar withdrawal, trailing underscore on the approver) no longer reproduce in their original shapes; the withdrawal still gets through when a comment line or an earlier future: key hides it from the new check.'
+  performance:
+    status: CONCERNS
+    notes: 'Not measured to the criterion; a clean rerun on an idle machine is owed.'
+  reliability:
+    status: PASS
+    notes: 'ci:fast 8062 tests, 0 failed.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Sixth consecutive gate with a defect in the two new engines; the unread-line check is a heuristic over line shape, the class that has failed each cycle.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'The unread-line count includes comment lines and extra fields that name the case, so a valid entry with a comment naming the id is refused (fails closed).'
+      refs: ['shared/resources/finalise-deferral-match.js']
+    - action: 'ls-tree is parsed without -z, so non-ASCII failed-file names fail closed.'
+      refs: ['shared/resources/finalise-delta.js']
+    - action: 'A nested list item is read as a Deferred Work record; the section ends only at the next H2; exact-case path compare (macOS, task 210).'
+      refs: ['shared/resources/finalise-deferral-match.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['Fix T271-QA-15 and T271-QA-16, then re-review; the QA budget (6 gates) is spent, so continuing needs the owner']

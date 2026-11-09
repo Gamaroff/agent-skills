@@ -1,0 +1,242 @@
+[
+  {
+    "id": "m.good",
+    "input": "oc10-x",
+    "direction": "legitimate",
+    "why": "owner-approved exact record",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:61",
+    "fixture": {
+      "files": {
+        "deferrals.json": "{\"deferrals\":[{\"case\":\"oc10-x\",\"deferred_to\":\"task.240\",\"approved_by\":\"Pat Owner\",\"approved_on\":\"2026-10-28\"}]}"
+      }
+    }
+  },
+  {
+    "id": "m.approver-case",
+    "input": "oc10-x",
+    "direction": "hostile",
+    "why": "approver differs from owner by case",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:61",
+    "fixture": {
+      "files": {
+        "deferrals.json": "{\"deferrals\":[{\"case\":\"oc10-x\",\"deferred_to\":\"task.240\",\"approved_by\":\"pat owner\",\"approved_on\":\"2026-10-28\"}]}"
+      }
+    }
+  },
+  {
+    "id": "m.approver-space",
+    "input": "oc10-x",
+    "direction": "hostile",
+    "why": "trailing space is not exactly the owner",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:61",
+    "fixture": {
+      "files": {
+        "deferrals.json": "{\"deferrals\":[{\"case\":\"oc10-x\",\"deferred_to\":\"task.240\",\"approved_by\":\"Pat Owner \",\"approved_on\":\"2026-10-28\"}]}"
+      }
+    }
+  },
+  {
+    "id": "m.approver-other",
+    "input": "oc10-x",
+    "direction": "hostile",
+    "why": "approver not on the list",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:61",
+    "fixture": {
+      "files": {
+        "deferrals.json": "{\"deferrals\":[{\"case\":\"oc10-x\",\"deferred_to\":\"task.240\",\"approved_by\":\"Mallory\",\"approved_on\":\"2026-10-28\"}]}"
+      }
+    }
+  },
+  {
+    "id": "m.dup-key-owner-last",
+    "input": "oc10-x",
+    "direction": "hostile",
+    "why": "repeated key: JSON.parse keeps the owner, other readers keep the first",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:61",
+    "fixture": {
+      "files": {
+        "deferrals.json": "{\"deferrals\":[{\"case\":\"oc10-x\",\"deferred_to\":\"task.240\",\"approved_by\":\"Mallory\",\"approved_by\":\"Pat Owner\",\"approved_on\":\"2026-10-28\"}]}"
+      }
+    }
+  },
+  {
+    "id": "m.dup-key-escaped",
+    "input": "oc10-x",
+    "direction": "hostile",
+    "why": "repeated key spelled with a unicode escape",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:61",
+    "fixture": {
+      "files": {
+        "deferrals.json": "{\"deferrals\":[{\"case\":\"oc10-x\",\"c\\u0061se\":\"oc10-y\",\"deferred_to\":\"task.240\",\"approved_by\":\"Pat Owner\",\"approved_on\":\"2026-10-28\"}]}"
+      }
+    }
+  },
+  {
+    "id": "m.unknown-field",
+    "input": "oc10-x",
+    "direction": "hostile",
+    "why": "an unknown field such as status is refused",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:61",
+    "fixture": {
+      "files": {
+        "deferrals.json": "{\"deferrals\":[{\"case\":\"oc10-x\",\"deferred_to\":\"task.240\",\"approved_by\":\"Pat Owner\",\"approved_on\":\"2026-10-28\",\"status\":\"revoked\"}]}"
+      }
+    }
+  },
+  {
+    "id": "m.root-extra",
+    "input": "oc10-x",
+    "direction": "hostile",
+    "why": "root holds a key besides deferrals",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:61",
+    "fixture": {
+      "files": {
+        "deferrals.json": "{\"deferrals\":[{\"case\":\"oc10-x\",\"deferred_to\":\"task.240\",\"approved_by\":\"Pat Owner\",\"approved_on\":\"2026-10-28\"}],\"revoked\":[\"oc10-x\"]}"
+      }
+    }
+  },
+  {
+    "id": "m.future-date",
+    "input": "oc10-x",
+    "direction": "hostile",
+    "why": "approval date in the future",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:61",
+    "fixture": {
+      "files": {
+        "deferrals.json": "{\"deferrals\":[{\"case\":\"oc10-x\",\"deferred_to\":\"task.240\",\"approved_by\":\"Pat Owner\",\"approved_on\":\"2099-01-01\"}]}"
+      }
+    }
+  },
+  {
+    "id": "m.impossible-date",
+    "input": "oc10-x",
+    "direction": "hostile",
+    "why": "2026-02-31 is not a real date",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:61",
+    "fixture": {
+      "files": {
+        "deferrals.json": "{\"deferrals\":[{\"case\":\"oc10-x\",\"deferred_to\":\"task.240\",\"approved_by\":\"Pat Owner\",\"approved_on\":\"2026-02-31\"}]}"
+      }
+    }
+  },
+  {
+    "id": "m.task-zero",
+    "input": "oc10-x",
+    "direction": "hostile",
+    "why": "task.0 is not a follow-up task",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:61",
+    "fixture": {
+      "files": {
+        "deferrals.json": "{\"deferrals\":[{\"case\":\"oc10-x\",\"deferred_to\":\"task.0\",\"approved_by\":\"Pat Owner\",\"approved_on\":\"2026-10-28\"}]}"
+      }
+    }
+  },
+  {
+    "id": "m.task-padded",
+    "input": "oc10-x",
+    "direction": "hostile",
+    "why": "task.007 has a leading zero",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:61",
+    "fixture": {
+      "files": {
+        "deferrals.json": "{\"deferrals\":[{\"case\":\"oc10-x\",\"deferred_to\":\"task.007\",\"approved_by\":\"Pat Owner\",\"approved_on\":\"2026-10-28\"}]}"
+      }
+    }
+  },
+  {
+    "id": "m.non-string",
+    "input": "oc10-x",
+    "direction": "hostile",
+    "why": "a non-string value",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:61",
+    "fixture": {
+      "files": {
+        "deferrals.json": "{\"deferrals\":[{\"case\":\"oc10-x\",\"deferred_to\":240,\"approved_by\":\"Pat Owner\",\"approved_on\":\"2026-10-28\"}]}"
+      }
+    }
+  },
+  {
+    "id": "m.second-unapproved",
+    "input": "oc10-x",
+    "direction": "hostile",
+    "why": "a second record for the case that is not owner-approved blocks",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:61",
+    "fixture": {
+      "files": {
+        "deferrals.json": "{\"deferrals\":[{\"case\":\"oc10-x\",\"deferred_to\":\"task.240\",\"approved_by\":\"Pat Owner\",\"approved_on\":\"2026-10-28\"},{\"case\":\"oc10-x\",\"deferred_to\":\"task.240\",\"approved_by\":\"Mallory\",\"approved_on\":\"2026-10-28\"}]}"
+      }
+    }
+  },
+  {
+    "id": "m.tasks-disagree",
+    "input": "oc10-x",
+    "direction": "hostile",
+    "why": "records disagree on the follow-up task",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:61",
+    "fixture": {
+      "files": {
+        "deferrals.json": "{\"deferrals\":[{\"case\":\"oc10-x\",\"deferred_to\":\"task.240\",\"approved_by\":\"Pat Owner\",\"approved_on\":\"2026-10-28\"},{\"case\":\"oc10-x\",\"deferred_to\":\"task.241\",\"approved_by\":\"Pat Owner\",\"approved_on\":\"2026-10-28\"}]}"
+      }
+    }
+  },
+  {
+    "id": "m.stray-mention",
+    "input": "oc10-x",
+    "direction": "hostile",
+    "why": "another case's entry names this id",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:61",
+    "fixture": {
+      "files": {
+        "deferrals.json": "{\"deferrals\":[{\"case\":\"oc10-x\",\"deferred_to\":\"task.240\",\"approved_by\":\"Pat Owner\",\"approved_on\":\"2026-10-28\"},{\"case\":\"oc10-y\",\"deferred_to\":\"task.240\",\"approved_by\":\"Pat Owner\",\"approved_on\":\"2026-10-28 oc10-x\"}]}"
+      }
+    }
+  },
+  {
+    "id": "m.other-case",
+    "input": "oc10-x",
+    "direction": "hostile",
+    "why": "an upper-case id is another case",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:61",
+    "fixture": {
+      "files": {
+        "deferrals.json": "{\"deferrals\":[{\"case\":\"OC10-X\",\"deferred_to\":\"task.240\",\"approved_by\":\"Pat Owner\",\"approved_on\":\"2026-10-28\"}]}"
+      }
+    }
+  },
+  {
+    "id": "m.bom",
+    "input": "oc10-x",
+    "direction": "hostile",
+    "why": "a BOM-prefixed file is not the accepted shape",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:61",
+    "fixture": {
+      "files": {
+        "deferrals.json": "﻿{\"deferrals\":[{\"case\":\"oc10-x\",\"deferred_to\":\"task.240\",\"approved_by\":\"Pat Owner\",\"approved_on\":\"2026-10-28\"}]}"
+      }
+    }
+  },
+  {
+    "id": "m.trailing-comma",
+    "input": "oc10-x",
+    "direction": "hostile",
+    "why": "invalid JSON",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:61",
+    "fixture": {
+      "files": {
+        "deferrals.json": "{\"deferrals\":[{\"case\":\"oc10-x\",\"deferred_to\":\"task.240\",\"approved_by\":\"Pat Owner\",\"approved_on\":\"2026-10-28\"},]}"
+      }
+    }
+  },
+  {
+    "id": "m.empty",
+    "input": "oc10-x",
+    "direction": "hostile",
+    "why": "no record names the case",
+    "spec_ref": "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.finalise-accepts-what-the-record-already-shows.md:61",
+    "fixture": {
+      "files": {
+        "deferrals.json": "{\"deferrals\":[]}"
+      }
+    }
+  }
+]

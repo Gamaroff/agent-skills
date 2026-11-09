@@ -1,0 +1,70 @@
+schema: 2
+task: 'task.273.qa-task-steps-state-the-routes-they-lack'
+task_title: 'qa-task steps state the routes they lack'
+gate: CONCERNS
+status_reason: 'The cycle-2 fix is verified (four restatements aligned, escape-hatch rule decided once, cross-references correct). The scoped review found the same defect class at six sites the cycle-2 population probe missed, including the gate-mapping step itself.'
+reviewer: 'QA Engineer'
+head: '351de3c9c773e7a98582c5b6a25de518eb73ed52'
+updated: '2026-11-09T04:10:36Z'
+
+top_issues:
+  - id: 'T273-CR-2'
+    severity: medium
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'The gate-mapping step (qa-task line 882, qa-story line 1381) still ends "every cleanup or non-high-confidence finding — the gate is unaffected", which contradicts step 5d. The report-template lines "advisory unless the doc opted in" (qa-task 1622 and 1936, qa-story 1867 and 2479) are also unqualified. The cycle-2 probe searched for "stay advisory", "always advisory" and "non-high-confidence", which did not match these sites.'
+    suggested_action: 'Run the population with the phrases "unaffected" and "advisory unless" and "opted in" as well, then qualify every hit with "except a bug QA reproduces (5d), unless code_review_blocking is explicitly false". Better, replace the restatements by one sentence that cites code-review-prompt.md item 4.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    notes: 'No predicate-shaped function is added. boundary: false.'
+  performance:
+    status: PASS
+    notes: 'Prose-only change since the cycle 1 measurement.'
+  reliability:
+    status: PASS
+    notes: 'No new failure path.'
+  maintainability:
+    status: PASS
+    notes: 'The restated-rule drift is carried as T273-CR-2.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Resolve T273-CR-2 by qualifying or replacing every remaining restatement of the gating rule in qa-task and qa-story.'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+  future:
+    - action: 'Cycle 1 CR-1 (medium confidence, not reproducible by execution): add the unbound-read category to the docs-only claim-check prompt.'
+      refs: ['shared/resources/qa-docs-only-review-prompt.md']
+    - action: 'Cycle 1 CR-2 (low): state which file list decides the docs-only route on cycle 3 and later.'
+      refs: ['skills/qa-task/SKILL.md']
+    - action: 'Cycle 1 CR-3 (low confidence): say that the docs-only route reads ci.docsOnly.patterns and ignores ci.docsOnly.enabled.'
+      refs: ['shared/resources/qa-docs-only-review-prompt.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions:
+    - 'T273-CR-2 is resolved.'

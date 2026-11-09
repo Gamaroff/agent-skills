@@ -148,6 +148,10 @@ const CONSUMER_CITE_ONLY = new Map([
     "the producer — it defines file_line and line_text; checking them is its consumers' job",
   ],
   [
+    "shared/resources/qa-docs-only-review-prompt.md",
+    "a second producer of the same findings block — it defines file_line and line_text and cites the code-review prompt for the QA handling; checking them is the QA skills' job, and they read anchor_check",
+  ],
+  [
     "shared/resources/pr-conformance-prompt.md",
     "the sibling lens's prompt — it cites the code reviewer to define ref's path:line form",
   ],

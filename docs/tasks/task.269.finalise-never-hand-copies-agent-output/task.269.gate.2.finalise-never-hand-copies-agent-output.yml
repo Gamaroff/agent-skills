@@ -1,0 +1,65 @@
+schema: 2
+task: 'task.269.finalise-never-hand-copies-agent-output'
+task_title: 'finalise never hand-copies agent output'
+gate: CONCERNS
+status_reason: 'All five cycle-1 findings are fixed and each fix is held by a committed test that goes red when the fix is reverted. The refute pass found no high-confidence bug. One MEDIUM remains: the change has no CHANGELOG entry citing task 269, which /finalise 6d refuses.'
+reviewer: 'QA Engineer'
+head: 'be88b282a909a5bfd2d1356b38fbe93115ceda61'
+updated: '2026-11-07T15:51:24Z'
+
+top_issues:
+  - id: 'T269-QA-6'
+    severity: medium
+    file: 'CHANGELOG.md'
+    finding: 'No [Unreleased] entry cites task 269 (changelog-cites.sh answers missing for task 269); /finalise step 6d stops on it.'
+    suggested_action: 'Add an [Unreleased] entry under Fixed or Changed that cites (task 269) and says finalise now takes the security plan and the AC YAML from the subagent transcript with a byte and hash check.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 22
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 8
+    escaped: 0
+    boundary: true
+    boundary_signals: ['refused', 'is refused']
+    boundary_reason: 'resolveCasesFile is a path-confinement boundary; casesFileAccepted exposes it as a boolean and the probe engine executed 8 hostile and legitimate names against it (verdict engages, 0 reproduced, 0 escaped).'
+    notes: 'Run record task.269.qa.2.security.run.json. The same 8-case run is a committed test.'
+  performance:
+    status: PASS
+    notes: 'New test files run in under 0.5 s each; the full fast CI gate passed with 7999 tests.'
+  reliability:
+    status: PASS
+    notes: 'Extraction fails safe to the recorded hand copy; reuse refuses a path that matches nothing and a dirty engine file.'
+  maintainability:
+    status: PASS
+    notes: 'One extractor, one hash check; bundled copies in sync (bundle:check 0 problems).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T269-QA-6 (CHANGELOG entry). While in SKILL.md, also apply CR-1 and CR-2 from the code review: judge DOD_N first and the other placeholders only after the skip, and say to repeat --engine-path once per engine file.'
+      refs: ['CHANGELOG.md', 'skills/finalise/SKILL.md']
+  future: []
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T269-QA-6 fixed']

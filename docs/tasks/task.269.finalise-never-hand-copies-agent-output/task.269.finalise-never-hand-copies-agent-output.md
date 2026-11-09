@@ -5,16 +5,18 @@ type: task
 description: "Give finalise Steps 3b.1 and 3c a transcription-free route for the security probe plan and the AC agent's YAML, and a byte check, so a model reply is never retyped into a file that decides acceptance."
 tags: [finalise, observation]
 category: refactoring
-status: planned
+status: accepted
+completed_date: 2026-11-07
+pr_number: 857
 priority: Medium
 created: 2026-11-06
-updated: 2026-11-06
+updated: 2026-11-07
 estimated_effort_hours: 16
 ---
 
 # Task 269: finalise never hand-copies agent output
 
-**Status:** Planned
+**Status:** Accepted
 
 ---
 
@@ -64,6 +66,9 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 - This is engine work: a script, a schema field and tests. It is why the estimate is 16h.
 - It must not weaken the existing `plan-entry-html-entity` rule, which is deliberately `argv`-only.
 - A subagent's reply reaches the orchestrator as context, not as a file; "extract by one command" needs an output file the host provides `(unverified: the plan decides how, by reading the Agent tool's output-file behaviour)`.
+- **A hash over retyped text proves only that the text is self-consistent.** If Phase 1 finds no output file, the orchestrator must still hand the block to the extractor by retyping it, and a hash computed over that copy cannot show the copy matches the agent's answer. In that case the AC route keeps the recorded hash as a tamper check between extract and merge (the file the merge reads is the file the extractor wrote), says plainly that it is not a transcription check, and the task narrows to the probe route per the Medium risk below. Do not describe the hash as a transcription check in the DoD or the QA report unless a file route exists.
+- **`cases_file:` removes transcription only where a committed cases file already exists** (a re-run, or the reuse path). The read-only security agent cannot create a file, so a first-run plan's inline `cases` still reaches the orchestrator as reply text. The entity refusal is what covers that gap, and only for the four entities; control-character loss on a first run is not closed by this task and is not claimed to be.
+- **Source files, not generated copies.** `skills/finalise/references/security-probe.mjs` and `finalise-rerun-scope.js` are bundled copies (`AUTO-GENERATED — DO NOT EDIT`). The sources are `shared/resources/security-probe.mjs`, `shared/resources/security-probe-plan.mjs` (where entries are read, the entity refusal sits at `:256` and the numbered cases file is written at `:289`) and `shared/resources/finalise-rerun-scope.js`. `skills/finalise/SKILL.md` is a source.
 
 ---
 
@@ -99,7 +104,7 @@ None - `cases_file:` is an optional field; inline `cases` keeps working.
 **Risk Level**: Low
 
 **Changes**:
-- [ ] Establish whether a subagent's reply is available as a file; record the finding in the plan before designing the extractor.
+- [x] Establish whether a subagent's reply is available as a file; record the finding in the plan before designing the extractor.
 
 **Dependencies**: none.
 
@@ -110,14 +115,14 @@ None - `cases_file:` is an optional field; inline `cases` keeps working.
 **Risk Level**: High
 
 **Files**:
-- `skills/finalise/references/security-probe.mjs` (and its plan reader)
+- `shared/resources/security-probe-plan.mjs` (entry reader, entity refusal, numbered cases file) and `shared/resources/security-probe.mjs`
 - `shared/resources/finalise-dod-security-prompt.md`
 - `skills/finalise/SKILL.md` Step 3b.1
 
 **Changes**:
-- [ ] `cases_file:` per entry, copied into the numbered cases file byte for byte.
-- [ ] Reuse path with hash check (obs #136 option b).
-- [ ] Entity check at the write step (obs #65).
+- [x] `cases_file:` per entry, copied into the numbered cases file byte for byte.
+- [x] Reuse path with hash check (obs #136 option b).
+- [x] Entity check at the write step (obs #65).
 
 **Dependencies**: Phase 1.
 
@@ -129,11 +134,11 @@ None - `cases_file:` is an optional field; inline `cases` keeps working.
 
 **Files**:
 - `shared/resources/finalise-dod-ac-prompt.md`
-- `skills/finalise/references/finalise-rerun-scope.js`
+- `shared/resources/finalise-rerun-scope.js`
 - `skills/finalise/SKILL.md` Step 3c
 
 **Changes**:
-- [ ] Fenced end block, one-command extract, byte count and SHA-256 recorded in the AC record.
+- [x] Fenced end block, one-command extract, byte count and SHA-256 recorded in the AC record.
 
 **Dependencies**: Phase 1.
 
@@ -144,8 +149,9 @@ None - `cases_file:` is an optional field; inline `cases` keeps working.
 **Risk Level**: Low
 
 **Changes**:
-- [ ] Tests with mutation proofs (§ 8).
-- [ ] `command npm run bundle`, `command npm run bundle -- --check`.
+- [x] Removed-literal sweep: the sentences Steps 3b.1 and 3c lose ("Save `SECURITY_RESULT.probe_plan` as a JSON array", "Save agent 1's YAML, verbatim") are pinned by tests found by `git grep -n 'probe-plan.json\|finalise-ac-result-' -- '*.test.*'`; known hits: `evals/shared/tests/finalise-rerun-scope-blocks.test.mjs`, `evals/shared/tests/finalise-dod-prompt-contract.test.mjs`, `shared/resources/tests/read-only-agent-writes.test.mjs`, `shared/resources/tests/finalise-dod-ac-kinds.test.mjs`, `shared/resources/tests/security-input-corpus.test.mjs`. Update each to the new wording; re-run the grep before editing.
+- [x] Tests with mutation proofs (§ 8).
+- [x] `command npm run bundle`, `command npm run bundle -- --check`.
 
 **Dependencies**: Phases 2 and 3.
 
@@ -155,14 +161,14 @@ None - `cases_file:` is an optional field; inline `cases` keeps working.
 
 ### Files to Modify (Core Implementation)
 
-1. ✅ `skills/finalise/references/security-probe.mjs` - `cases_file:`
-2. ✅ `skills/finalise/references/finalise-rerun-scope.js` - extract and hash
+1. ✅ `shared/resources/security-probe-plan.mjs`, `shared/resources/security-probe.mjs` - `cases_file:`, reuse path, entity refusal
+2. ✅ `shared/resources/finalise-rerun-scope.js` - extract and hash
 3. ✅ `shared/resources/finalise-dod-security-prompt.md`, `shared/resources/finalise-dod-ac-prompt.md` - output shape
 4. ✅ `skills/finalise/SKILL.md` - Steps 3b.1 and 3c
 
 ### Files to Modify (Tests)
 
-5. ✅ new tests beside `shared/resources/tests/finalise-rerun-scope.test.mjs` and the security-probe suite
+5. ✅ new tests beside `shared/resources/tests/finalise-rerun-scope.test.mjs` and `shared/resources/tests/security-probe.test.mjs`; existing pins updated (see Phase 4)
 
 ### Files to Modify (Generated)
 
@@ -177,10 +183,10 @@ None - `cases_file:` is an optional field; inline `cases` keeps working.
 **Scope**: the new routes.
 
 **Actions**:
-- [ ] A plan entry with `cases_file:` yields a numbered cases file byte-identical to the source, including U+0085, U+2028, U+2029, VT, FF, U+001F and lone CR.
-- [ ] An entity-bearing inline case is refused when the same plan has no literal `<`. **Control**: an entity carried on purpose in an `input` whose source file also has it is accepted.
-- [ ] The extracted AC block hashes to the recorded value; a one-byte change fails the check.
-- [ ] Mutation proofs: remove the byte copy, the hash check and the entity refusal; each turns exactly one named test red.
+- [x] A plan entry with `cases_file:` yields a numbered cases file byte-identical to the source, including U+0085, U+2028, U+2029, VT, FF, U+001F and lone CR.
+- [x] An entity-bearing inline case is refused when the same plan has no literal `<`. **Control**: an entity carried on purpose in an `input` whose source file also has it is accepted.
+- [x] The extracted AC block hashes to the recorded value; a one-byte change fails the check.
+- [x] Mutation proofs: remove the byte copy, the hash check and the entity refusal; each turns exactly one named test red.
 
 **Command**: `CI=true command node --test` on the named files.
 
@@ -194,23 +200,25 @@ None - `cases_file:` is an optional field; inline `cases` keeps working.
 
 ### Functional
 
-- [ ] A plan using `cases_file:` produces a cases file byte-identical to its source for the seven control characters, shown by the new test (name recorded in the QA report).
-- [ ] The AC record carries the byte count and SHA-256 of the extracted block; a modified block is refused.
-- [ ] An escaped plan is refused at the write step; the control case is accepted.
+- [x] A plan using `cases_file:` produces a cases file byte-identical to its source for the seven control characters, shown by the new test (name recorded in the QA report).
+- [x] The AC record carries the byte count and SHA-256 of the extracted block; a modified block is refused.
+- [x] An escaped plan is refused at the write step; the control case is accepted.
+- [x] The reuse path: a prior plan whose hash matches its committed cases files, with engine paths unchanged since the prior record's head, is reused and the DoD says "plan reused from dod.{N-1}"; a one-byte change to a cases file, or a changed engine path, makes it re-plan. Shown by a new test (name recorded in the QA report).
+- [x] `cases_file:` outside the work-item directory, or a symlink, is refused; shown by a new test.
 
 ### Performance
 
-- [ ] `CI=true command npm test` wall time is within 10% of `develop`, as the median of five alternating runs with `uptime` beside each, recorded in the QA report.
+- [x] No new test case takes over one second: `CI=true command node --test --test-reporter=spec` on the new test files, five runs, slowest case per run with `/proc/loadavg` beside each, recorded in the QA report on the PR head commit. (A whole-suite wall-clock bound against `develop` was dropped: task 285 showed it cannot be held per PR and had to be amended at 5c.)
 
 ### Code Quality
 
-- [ ] Each new refusal has a mutation proof recorded in the QA report.
-- [ ] `command npm run bundle -- --check` reports 0 problems; `CI=true command npm test` passes.
-- [ ] `python skills/create-skill/scripts/quick_validate.py skills/finalise` passes.
+- [x] Each new refusal has a mutation proof recorded in the QA report.
+- [x] `command npm run bundle -- --check` reports 0 problems; `CI=true command npm test` passes.
+- [x] `python skills/create-skill/scripts/quick_validate.py skills/finalise` passes.
 
 ### Migration
 
-- [ ] Inline `cases` plans still run (an existing fixture passes unchanged).
+- [x] Inline `cases` plans still run (an existing fixture passes unchanged).
 
 ---
 
@@ -288,12 +296,67 @@ None - `cases_file:` is an optional field; inline `cases` keeps working.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-07
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.269.qa.4.finalise-never-hand-copies-agent-output.md](./task.269.qa.4.finalise-never-hand-copies-agent-output.md)
+- **Gate File**: [task.269.gate.4.finalise-never-hand-copies-agent-output.yml](./task.269.gate.4.finalise-never-hand-copies-agent-output.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 41 in the three related test files, 7999 in the fast gate
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No open finding. Cycle 4 reviewed the one test assertion added while closing DoD criterion 7; removing the guard it holds turns it red.
+
+## Definition of Done - Gaps Identified — run 1 (historical, superseded)
+
+Run 1 found two record gaps (criteria 6 and 7). They were closed with evidence in the `qa.3` addendum and graded again in run 2. See `task.269.dod.1.finalise-never-hand-copies-agent-output.md`.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+All Definition of Done criteria were verified in run 2 (a scoped re-run of run 1):
+
+✅ **Acceptance Criteria:** 10 of 10 met (7 re-judged, 3 carried); criteria 6 and 7 now rest on the `qa.3` addendum
+✅ **QA Gate:** PASS (100/100), gate 4; the 5c PR review 2 is APPROVE
+✅ **Security Review:** PASS; 10 probes executed against `casesFileAccepted`, 0 reproduced
+✅ **Compliance Review:** not applicable (internal tooling)
+✅ **Documentation:** `CHANGELOG.md` cites task 269; `skills/finalise/SKILL.md` updated
+✅ **CI:** SUCCESS on the decision head `e8a9f4d6`
+
+**Recommendation for the owner:** consider requiring the `*.security.cases.json` name pattern for `cases_file` (recorded in `gate.4`).
+
+**Task marked as ACCEPTED on:** 2026-11-07
+
+**Detailed Verification Log:** See `task.269.dod.2.finalise-never-hand-copies-agent-output.md`.
+
 <!-- change-log-start -->
 ## Change Log
 
 | Date       | Version | Description                                              | Author      |
 | ---------- | ------- | -------------------------------------------------------- | ----------- |
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #65, #136, #142    | create-task |
+| 2026-11-07 | 1.1     | Review passed (8/10) — edit sources not bundled copies, hash-over-retyped-text and first-run limits stated, wall-clock criterion replaced, reuse/path criteria added, removed-literal sweep listed | review-task |
+| 2026-11-07 |         | Status → ready-for-development                           | review-task |
+| 2026-11-07 |         | Implemented — 15 files, 14 tests                         | develop     |
+| 2026-11-07 |         | QA gate FAIL (70/100) — 5 findings                       | qa-task     |
+| 2026-11-07 |         | QA findings fixed — T269-QA-1 to -5, 4 new tests, 5 mutation proofs, iteration 1 | qa-fix      |
+| 2026-11-07 |         | QA gate CONCERNS (90/100) — 1 finding                    | qa-task     |
+| 2026-11-07 |         | QA findings fixed — T269-QA-6 plus two advisory notes, iteration 2 | qa-fix      |
+| 2026-11-07 |         | QA gate PASS (100/100) — 0 findings                      | qa-task     |
+| 2026-11-07 |         | DoD incomplete — 2 gaps identified (criteria 6, 7: records)    | finalise    |
+| 2026-11-07 |         | QA gate PASS (100/100) — 0 findings (cycle 4)            | qa-task     |
+| 2026-11-07 | 1.2     | DoD passed — accepted (PR #857)                          | finalise    |
 <!-- change-log-end -->
 
 ---
@@ -301,16 +364,16 @@ None - `cases_file:` is an optional field; inline `cases` keeps working.
 ## Progress Tracking
 
 ### Phase 1: Measure how the reply reaches the orchestrator
-- [ ] Finding recorded
+- [x] Finding recorded
 
 ### Phase 2: Probe plan route
-- [ ] `cases_file:`, reuse path, entity refusal
+- [x] `cases_file:`, reuse path, entity refusal
 
 ### Phase 3: AC YAML route
-- [ ] Extract and hash
+- [x] Extract and hash
 
 ### Phase 4: Evidence, bundle and sweep
-- [ ] Tests, mutation proofs, bundle clean
+- [x] Tests, mutation proofs, bundle clean
 
 ---
 
@@ -334,4 +397,4 @@ If Phase 1 finds no file route, file the AC half as its own task.
 
 ---
 
-**Status:** Planned
+**Status:** Accepted

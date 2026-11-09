@@ -1,0 +1,66 @@
+schema: 2
+task: 'task.289.qa-snippet-runner-flag-level-allow-list'
+task_title: 'QA snippet runner allows flags, not just commands'
+gate: FAIL
+status_reason: 'The flag table and the masked reading hold against about 900 probes, but the masker counts parentheses without regard to quotes, so a quoted paren inside a substitution makes it fail, and the carve-out added in cycle 4 then lets a block with no governed command through. One high bypass, reproduced under real bash.'
+reviewer: 'QA Engineer'
+head: '00d18dc7124a22c932fa4e98f8e458f8b0eddaaf'
+updated: '2026-11-09T15:41:42Z'
+
+top_issues:
+  - id: 'T289-CR5-1'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: "maskSubstitutions counts parentheses without regard to quotes or escapes, so a quoted paren inside a substitution ends the mask early or returns null. The masked reading then fails to parse, and the cycle 4 carve-out skips the refusal when no governed word (sed, find, sort, uniq, file, date, diff, tail) is in the block. `X=$(echo ')') touch out`, `X=$(echo '(') python3 x.py`, `X=$(echo \")\") cp in out` and `X=$(echo \")\") rm in` classify runnable; under real bash `X=$(echo \")\") touch out` created `out` (QA ran it). Control: `X=$(true) touch out` is refused (unrecognised-command). The same inputs are runnable on develop's engine, so the hole pre-dates the branch, but cycle 4 claimed this case as closed and the carve-out is what leaves it open. origin: code-review, reproduced by QA"
+    suggested_action: 'Fail closed whenever the mask returns null or the masked reading cannot be parsed and the block holds a substitution, for any word and not only a governed one; make the masker quote- and escape-aware, and measure the docs scan (the cycle 4 carve-out existed to keep three doc blocks runnable).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 292
+  phases_verified: '4/5'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 31
+    escaped: 0
+    boundary: true
+    boundary_signals: ['refused', 'refuses']
+    notes: 'The shell-exec corpus (31 cases, 0 reproduced, 0 escaped) passes. The reviewer ran about 900 blocks (741 writer-by-substitution-context combinations, about 100 boundary and carve-out blocks, a 3000-block fuzz whose 61 runnable results ran under real bash) and found one bypass, in the masker. The flag table, the expansion rule, the operand check and the process-substitution and prefix-assignment cases held.'
+  performance:
+    status: PASS
+    notes: 'No resource-bound finding on maskSubstitutions or rawInvocations; the docs-scan timing was not re-measured after the cycle 4 pass.'
+  reliability:
+    status: CONCERNS
+    notes: 'A block the masked reading cannot parse is let through when it holds no governed command: the fail-closed rule has an exception that the finding exploits.'
+  maintainability:
+    status: PASS
+    notes: 'One masked reading replaced a heuristic; the expansion guard is one rule with a population test.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'The QA budget is spent (5 gates, 4 fixes). Decide: grant one more fix cycle for T289-CR5-1 (fail closed on an unparseable masked reading for any word, quote-aware masker, docs-scan measured), or accept the branch as a strict improvement over develop and file the residual as a follow-up task.'
+      refs: ['shared/resources/qa-execute-snippets.mjs', 'shared/resources/tests/qa-execute-snippets.test.mjs']
+  future:
+    - action: 'diff and tail skip every expansion check by design (expansionOk): say so in the entries why text. Phase 5 (ctx-wrap- temp-directory leak) was left out of this task; file it separately.'
+      refs: ['shared/resources/qa-execute-snippets.mjs', 'shared/resources/tests/context-pressure-statusline.test.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T289-CR5-1 fixed and re-reviewed, or accepted by the owner with a follow-up filed']

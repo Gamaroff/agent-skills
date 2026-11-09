@@ -1,0 +1,93 @@
+schema: 2
+task: 'task.269.finalise-never-hand-copies-agent-output'
+task_title: 'finalise never hand-copies agent output'
+gate: FAIL
+status_reason: 'The new plan-reuse block in finalise Step 3b.1 reads DOC_DIR, STEM and DOD_N that no line in its own block binds, so reuse cannot run as written. The reuse check also answers reusable for an engine path that matches nothing, and the cases_file confinement predicate is not reachable by the probe engine.'
+reviewer: 'QA Engineer'
+head: '625f92f534704820c09a793c37e683df30b56380'
+updated: '2026-11-07T15:30:39Z'
+
+top_issues:
+  - id: 'T269-QA-1'
+    severity: high
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The reuse block in Step 3b.1 reads $DOC_DIR, $STEM and $DOD_N (line 646) but binds none of them; DOC_DIR is first set in a later block (line 666). Each fenced block is its own shell, so the prior-plan path collapses to "/.dod.-1.security.plan.json" and the check answers not-reusable or errors. DOD_N=1 also yields DOD_N-1=0, where no prior run exists.'
+    suggested_action: 'Bind STEM, DOD_N and DOC_DIR in the reuse block as {placeholder} substitutions with the unsubstituted-placeholder HALT the other blocks use, and skip the block when DOD_N is 1.'
+    suggested_owner: dev
+    status: open
+  - id: 'T269-QA-2'
+    severity: medium
+    file: 'shared/resources/security-probe-plan.mjs'
+    finding: 'reusePlan passes when it matches nothing: git diff --quiet exits 0 for an --engine-path that does not exist at either revision (reproduced), and it ignores uncommitted edits to the engine. A mistyped path returns reusable.'
+    suggested_action: 'Require each engine path to exist at the prior head and at HEAD, and also diff the working tree, so a path that matches nothing or a dirty engine file is not-reusable; add a test for each.'
+    suggested_owner: dev
+    status: open
+  - id: 'T269-QA-3'
+    severity: medium
+    file: 'shared/resources/security-probe-plan.mjs'
+    finding: 'resolveCasesFile is a path-confinement boundary (it accepts or refuses a caller-supplied name) but the probe engine cannot reach it: it returns an object, not a boolean, so probes_executed is 0 for this boundary. It is covered only by hand-written tests.'
+    suggested_action: 'Export a boolean predicate (casesFileAccepted(name, workDir)) over resolveCasesFile and run the probe engine on it with a path sink and --args-json for the work directory, recording the run.'
+    suggested_owner: dev
+    status: open
+  - id: 'T269-QA-4'
+    severity: low
+    file: 'shared/resources/security-probe-plan.mjs'
+    finding: 'planHasLiteralAngle looks for a literal "<" only in the plan JSON, which for a cases_file entry holds argv and not the cases; a legitimate escaped payload in a committed cases file is refused unless the entry source carries the entity, and any stray "<" in any argv disables the check for the whole plan.'
+    suggested_action: 'Judge literal-angle presence on the entry own cases text (the cases file bytes or the inline cases) rather than the whole plan.'
+    suggested_owner: dev
+    status: open
+  - id: 'T269-QA-5'
+    severity: low
+    file: 'shared/resources/agent-reply-block.js'
+    finding: 'replyText concatenates the final-turn assistant text segments with no separator, and any non-assistant line (the host also writes attachment lines) after the last reply resets the tail, so extraction reports transcript-unreadable.'
+    suggested_action: 'Join assistant text segments with a newline and skip metadata line types instead of resetting the tail; add a test with an attachment line after the reply.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 18
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: true
+    boundary_signals: ['refused', 'is refused']
+    boundary_reason: 'resolveCasesFile is a path-confinement boundary the engine cannot reach (T269-QA-3), so probes_executed is 0 until a boolean predicate is exported.'
+    notes: 'cases_file confinement is covered by committed tests (outside, traversal, symlink, directory, NUL); the engine run is the open item.'
+  performance:
+    status: PASS
+    notes: 'Slowest new test case 145 ms across five runs.'
+  reliability:
+    status: CONCERNS
+    notes: 'The reuse path can answer reusable on a path that matches nothing (T269-QA-2); extraction fails safe to the hand copy.'
+  maintainability:
+    status: PASS
+    notes: 'One extractor, one hash check; the removed-literal sweep updated the five pinning tests.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T269-QA-1 through T269-QA-3 before merge'
+      refs: ['skills/finalise/SKILL.md', 'shared/resources/security-probe-plan.mjs']
+  future: []
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T269-QA-1 fixed', 'T269-QA-2 fixed', 'T269-QA-3 fixed']

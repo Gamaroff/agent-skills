@@ -86,6 +86,23 @@ TMP=$(mktemp) && sed -E \
   echo "HALT: bug mode — could not rewrite $DOD_PATH" >&2
   exit 1
 }
+# A GAPS file must not read as an accepted one (obs #37, task.270). The template's block carries four
+# accepted-path lines: the 6a commit claim, the Status History row, the CI reading placeholder and the
+# Part B next step. The Final Status fill above leaves them, so a GAPS file said "committed and pushed
+# at 6a" and pointed at Part B. Each is rewritten here to text that holds for this verdict. A line
+# already edited by hand matches no pattern and is left alone, so this is idempotent. No replacement
+# holds `|` (the delimiter), `&` or a placeholder brace.
+if [ "$VERDICT" = gaps ]; then
+  TMP=$(mktemp) && sed -E \
+    -e 's|^- ✅ This DoD summary \(committed and pushed at 6a\)$|- ✅ This DoD summary (carries the gap list under Step 5 Outcome; there is no acceptance commit)|' \
+    -e 's|^- ✅ Bug report: Status History row `DoD verified.*$|- ✅ Bug report: Status History row `DoD incomplete` (8.3); no Resolution Summary and no `status: closed`, the bug stays open|' \
+    -e 's|^\*\*CI reading 1:\*\* \{CI_ROLLUP\} @ .*$|**CI reading 1:** see the CI rollup line under Step 5 (GAPS: no acceptance decision was taken)|' \
+    -e 's|^- develop-bug Step 7 Part B: Resolution Summary.*$|- Close the gaps listed under Step 5 Outcome, then re-run finalise (it writes the next DoD number); the bug stays open|' \
+    "$DOD_PATH" >"$TMP" && mv "$TMP" "$DOD_PATH" || {
+    echo "HALT: bug mode — could not rewrite the accepted-path lines of $DOD_PATH" >&2
+    exit 1
+  }
+fi
 # Exactly one heading and one status line, on the WRITTEN file.
 [ "$(grep -c '^## Verification Complete$' "$DOD_PATH")" = 1 ] && [ "$(grep -c '^\*\*Final Status:\*\*' "$DOD_PATH")" = 1 ] || {
   echo "HALT: bug mode — $DOD_PATH must carry exactly one ## Verification Complete heading and one **Final Status:** line" >&2
@@ -95,3 +112,16 @@ grep -qxF "**Final Status:** $LINE" "$DOD_PATH" || {
   echo "HALT: bug mode — the Final Status placeholder in $DOD_PATH was not filled (is the template's line intact?)" >&2
   exit 1
 }
+# Any other `{…}` placeholder left in the block is a HALT, naming the line (obs #37, task.270). Scope is
+# the owned block only (`## Verification Complete` to the next `##`), and code spans are stripped first:
+# the template documents `DoD verified — {this file}` as a code span, and that is text, not a gap.
+# {CI_ROLLUP} is exempt: finalise 7.1 calls the `accepted` fill before the orchestrator writes the CI
+# reading, nothing later fills it by script, and a halt there would stop every accepted bug run. The
+# `gaps` fill above has already replaced that line. ({CI_HEAD_1} sits in a code span, so it is stripped.)
+LEFT=$(awk '/^## Verification Complete$/{f=1;next} /^## /{f=0} f' "$DOD_PATH" \
+  | sed -e 's/`[^`]*`//g' -e 's/{CI_ROLLUP}//g' | grep -n '{[^}]*}' || true)
+if [ -n "$LEFT" ]; then
+  echo "HALT: bug mode — a placeholder survives in the ## Verification Complete block of $DOD_PATH:" >&2
+  printf '%s\n' "$LEFT" >&2
+  exit 1
+fi

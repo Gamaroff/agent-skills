@@ -5,16 +5,19 @@ type: task
 description: "Add the probes, structural moves and gates qa-fix lacks (classifier direction, weakest value, earlier refusal, restatement population, undecidable boundary, extract-to-script, mechanical trigger b, untracked-file fast gate) so repeat-finding loops end sooner."
 tags: [qa-fix, develop-task, observation]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 created: 2026-11-06
-updated: 2026-11-06
+updated: 2026-11-07
+completed_date: 2026-11-07
+pr_number: 854
 estimated_effort_hours: 8
 ---
 
 # Task 268: qa-fix finds the whole defect the first time
 
-**Status:** Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.268.review.1.qa-fix-finds-the-whole-defect-the-first-time.md` implemented 2026-11-06
 
 ---
 
@@ -53,6 +56,7 @@ Eight recurring ways a QA fix loop circles the same subject are not covered by `
 
 Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 
+- Line numbers below were re-measured on 2026-11-06 at `develop` `5363f369`: Step 3.5 is at `:687`, Step 4 at `:811`, Step 7 at `:907`, the optional summary blocks near `:972`; the anchors in the plan file are offset by up to 5 lines, so find each by its heading.
 - `skills/qa-fix/SKILL.md:623` `### Step 2.6: Offer the structural move before another patch` has **two triggers** ((a) pipeline offer, (b) repeat subject, a judgement) and a four-row move table: Consolidate the contract, Scope the claim, Waive, Patch. The summary shape `Narrowing residue:` / `Move:` is at `:655`.
 - `:683` `### Step 3.5: Adversarial pass over the fixes themselves` has the lifecycle table, the documentation table at `:719` (`What did this edit make false elsewhere?` with a population command), the identity-rule both-directions table at `:770`, and the writer/refusal/input-class table that follows (`Is the writer idempotent?`, `Does the fix hold across the input class?`, `Which documented shapes does the new refusal reject?`). None asks for the classifier direction, the weakest value, or re-running later mutation proofs.
 - `:807` `### Step 4: Validate` runs lint and test commands with no staging step; `grep -n "git add -N" skills/qa-fix/SKILL.md` returns nothing.
@@ -127,7 +131,7 @@ None - prose only. The `Narrowing residue:` / `Move:` shape is unchanged; the `M
 **Changes**:
 - [ ] Move 5, narrow the contract (obs #42): when successive fixes to one function each open a new edge at one boundary and the task says the boundary cannot be decided from the function's input, refuse every ambiguous shape and leave the decision to the caller.
 - [ ] Move 6, extract to a script (obs #63): when the repeat subject is operational shell in a fenced block and has drawn MEDIUMs on two consecutive gates, move it to a script with a test per edge and leave a one-line call.
-- [ ] Update the "four moves" wording and the `Move:` allowed values.
+- [ ] Update the "four moves" wording (one site, `skills/qa-fix/SKILL.md:642`) and the `Move:` allowed values, and update `tests/qa-fix-structural-move.test.js` (`:96`, `:125`) in the same change.
 - [ ] Step 7 (obs #113): before posting, check whether any bug in this cycle's set names an earlier bug of the same work item (`bug.N` text or the same `file:` as a previous gate's entry); when one does, the summary must carry the `Narrowing residue:` block or the post is refused. Same for a documentation fix and the `Probe:` block.
 
 **Dependencies**: Phase 1.
@@ -175,7 +179,9 @@ None - prose only. The `Narrowing residue:` / `Move:` shape is unchanged; the `M
 
 ### Files to Modify (Tests)
 
-None authored. `shared/resources/tests/qa-narrowing-residue.test.mjs` and `evals/shared/tests/qa-narrowing-offer-wiring.test.mjs` are run, not edited.
+4. ✅ `tests/qa-fix-structural-move.test.js` - it pins the old shape by pattern, found by `git grep -ln "qa-fix/SKILL\|four moves\|Narrowing residue" -- '*.test.*' 'tests/**' 'evals/**'`: the `Move: consolidate | scope the claim | waive | patch — {one sentence why}` line (`:125`, an exact-line match) and the four-row move list (`:96`). Widen the `Move:` pin to the six values and add the two new rows to the list, in the same change as the `SKILL.md` edit.
+
+`shared/resources/tests/qa-narrowing-residue.test.mjs` and `evals/shared/tests/qa-narrowing-offer-wiring.test.mjs` are run, not edited. Run `CI=true command node --test tests/qa-fix-structural-move.test.js tests/identity-rule-probe.test.js` too.
 
 ---
 
@@ -206,23 +212,23 @@ None authored. `shared/resources/tests/qa-narrowing-residue.test.mjs` and `evals
 
 ### Functional
 
-- [ ] Each of the eight rules is present in `skills/qa-fix/SKILL.md`, citing its observation; the list is in the QA report.
-- [ ] Each rule fires on its fixture and not on its control, recorded per rule in the QA report.
-- [ ] A Step 7 post is refused when trigger (b) holds and the block is absent, shown by running the check on a fixture set recorded in the QA report.
+- [x] Each of the eight rules is present in `skills/qa-fix/SKILL.md`, citing its observation; the list is in the QA report.
+- [x] Each rule fires on its fixture and not on its control, recorded per rule in the QA report.
+- [x] A Step 7 post is warned about (the block is added, then the post goes ahead; the check never halts the cycle) when trigger (b) holds and the block is absent, shown by running the check on a fixture set recorded in the QA report. (Reworded from "refused" after review; approved by Lorien Gamaroff, 2026-11-07.)
 
 ### Performance
 
-- [ ] `CI=true command npm test` wall time is within 10% of `develop`, as the median of five alternating runs with `uptime` beside each, recorded in the QA report.
+- [x] `CI=true command npm test` wall time is within 10% of `develop`, as the median of five alternating runs with `uptime` beside each, recorded in the QA report.
 
 ### Code Quality
 
-- [ ] `CI=true command node --test shared/resources/tests/qa-narrowing-residue.test.mjs evals/shared/tests/qa-narrowing-offer-wiring.test.mjs` passes.
-- [ ] `command npm run bundle -- --check` reports 0 problems.
-- [ ] `python skills/create-skill/scripts/quick_validate.py skills/qa-fix` passes.
+- [x] `CI=true command node --test shared/resources/tests/qa-narrowing-residue.test.mjs evals/shared/tests/qa-narrowing-offer-wiring.test.mjs tests/qa-fix-structural-move.test.js tests/identity-rule-probe.test.js` passes.
+- [x] `command npm run bundle -- --check` reports 0 problems.
+- [x] `python skills/create-skill/scripts/quick_validate.py skills/qa-fix` passes.
 
 ### Migration
 
-- [ ] No remaining prose says "four moves" (`git grep -n "four moves" -- skills shared` returns nothing outside generated copies).
+- [x] No remaining prose says "four moves" (`git grep -n "four moves" -- skills shared` returns nothing outside generated copies).
 
 ---
 
@@ -302,12 +308,94 @@ None identified.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-06
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.268.qa.5.qa-fix-finds-the-whole-defect-the-first-time.md](./task.268.qa.5.qa-fix-finds-the-whole-defect-the-first-time.md)
+- **Gate File**: [task.268.gate.5.qa-fix-finds-the-whole-defect-the-first-time.yml](./task.268.gate.5.qa-fix-finds-the-whole-defect-the-first-time.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 22
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+Two medium edge cases remain in the Step 4 guard: shell metacharacters in a path (T268-QA-10) and a nested-repo or symlinked path (T268-QA-11). The QA budget is spent, so both are deferred.
+
+## Deferred Work
+
+- **T268-QA-10** (MEDIUM) — closed by task 285 (2026-11-07), carded as task 285 (2026-11-07) — carried to gate 5 `recommendations.future` (QA budget spent, cycle 5): shell metacharacters in a changed path are expanded by the double-quoted slot assignment in qa-fix Step 4; substitute through a single-quoted heredoc or refuse them, with a hostile probe case.
+- **T268-QA-11** (MEDIUM) — closed by task 285 (2026-11-07), carded as task 285 (2026-11-07) — carried to gate 5 `recommendations.future` (QA budget spent, cycle 5): a path in a nested repository or behind a symlinked directory reads clean in the Step 4 guard; refuse or document it.
+
+## Definition of Done - Gaps Identified, run 1 (historical, superseded by run 2)
+
+**Status:** SUPERSEDED — all four gaps closed in run 2 (see the section below)
+
+Security (18 probes, 0 reproduced), compliance (not applicable) and docs/changelog pass. Four acceptance criteria are not met as written.
+
+### Missing Criteria:
+
+- [ ] Functional #3: Step 7 warns and posts instead of refusing when trigger (b) holds and the block is absent, and no fixture run of the check is recorded in a QA report.
+- [ ] Functional #1: no QA report lists the eight rules with their observations.
+- [ ] Functional #2: no per-rule fixture and control record against the final `SKILL.md`.
+- [ ] Performance #4: the recorded median is about +29% (192 s vs 247 s), taken under load at an earlier commit.
+
+### Next Steps:
+
+- Decide #3 (make the check refuse, or amend the criterion), then record the fixture run.
+- Write the eight-rule list and per-rule results into a QA report; re-measure the suite time on a quiet machine or amend #4.
+- Re-run `/finalise`.
+
+**Estimated Effort:** Small to Medium.
+
+**Detailed Verification Log:** See `task.268.dod.1.qa-fix-finds-the-whole-defect-the-first-time.md`.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report**: `task.268.qa.5.qa-fix-finds-the-whole-defect-the-first-time.md` (with the criteria evidence added at run 2)
+**Gate File**: `task.268.gate.5.qa-fix-finds-the-whole-defect-the-first-time.yml`
+**Gate Status**: CONCERNS (80/100), accepted with two deferred MEDIUMs
+
+✅ **Acceptance Criteria:** all 8 met (run 2); the reword of Functional criterion 3 is approved by Lorien Gamaroff
+✅ **Tests:** the four named test files pass (53/53); `bundle --check` 0 problems; `quick_validate` passes
+✅ **Performance:** suite median 160 s on `develop` and on the branch
+✅ **Security Review:** 18 probes executed, 0 reproduced, 0 escapes
+✅ **Compliance / Docs:** not applicable / `CHANGELOG.md` cites task 268
+⚠️ **Deferred:** T268-QA-10 and T268-QA-11 (see Deferred Work)
+
+**Detailed Verification Log:** See `task.268.dod.2.qa-fix-finds-the-whole-defect-the-first-time.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-07
+
 <!-- change-log-start -->
 ## Change Log
 
 | Date       | Version | Description                                                                  | Author      |
 | ---------- | ------- | ---------------------------------------------------------------------------- | ----------- |
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #16, #18, #20, #27, #42, #56, #63, #113 | create-task |
+| 2026-11-06 | 1.1     | Review passed (9/10) — added `tests/qa-fix-structural-move.test.js` to the files to modify, refreshed line anchors | review-task |
+| 2026-11-06 |         | Status → ready-for-development                                               | review-task |
+| 2026-11-06 |         | QA gate CONCERNS (85/100) — 3 medium findings                                | qa-task     |
+| 2026-11-06 |         | QA findings fixed — CHANGELOG entry, Step 7 wording, Step 4 guard slot, 1 iteration | qa-fix      |
+| 2026-11-06 |         | QA gate FAIL (70/100) — 1 high, 1 medium finding                             | qa-task     |
+| 2026-11-06 |         | QA findings fixed — Step 4 guard repaired and held by `tests/qa-fix-step4-guard.test.js`, 2 iterations | qa-fix      |
+| 2026-11-06 |         | QA gate FAIL (70/100) — 1 high, 1 medium finding | qa-task     |
+| 2026-11-06 |         | QA findings fixed — Step 4 guard splits its slot in bash and zsh; multi-path cases and a second mutant added, 1 iteration | qa-fix      |
+| 2026-11-06 |         | QA gate CONCERNS (80/100) — 2 findings | qa-task     |
+| 2026-11-06 |         | QA findings fixed — Step 4 guard matches paths literally and refuses a nonexistent path; two more mutants proven, 1 iteration | qa-fix      |
+| 2026-11-06 |         | QA gate CONCERNS (80/100) — 2 findings, both deferred (budget spent) | qa-task     |
+| 2026-11-07 |         | DoD incomplete — 4 gaps identified | finalise    |
+| 2026-11-07 |         | Functional criterion 3 reworded from "refused" to "warned" to match the Step 7 design settled at gate 1 (T268-QA-2); criteria evidence recorded in QA report 5 | develop-next |
+| 2026-11-07 | 1.2     | DoD passed — accepted (PR #854) | finalise    |
 <!-- change-log-end -->
 
 ---
@@ -353,4 +441,4 @@ Task 269 candidates (qa-task step gaps) sit in the same QA loop; none depends on
 
 ---
 
-**Status:** Planned
+**Status:** Accepted

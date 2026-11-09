@@ -1,0 +1,31 @@
+{
+  "sink": "path",
+  "entry": "cli:shared/resources/finalise-deferral-match.js",
+  "name": "finalise-deferral-match.case",
+  "call_site": null,
+  "verdict": "present-but-inert",
+  "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+  "executed": 7,
+  "passed": 4,
+  "reproduced": 3,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": [
+    "--case",
+    "{input}",
+    "--work-item",
+    "w.md",
+    "--approver",
+    "Pat Owner",
+    "--json"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": "/home/gamaroff/Development/agent-skills/docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.qa.2.security.match.setup.sh",
+  "ran_at": "2026-11-07T20:30:23.295Z"
+}

@@ -1,0 +1,182 @@
+[
+  {
+    "id": "h4.dq-bs-nl-subst",
+    "sink": "url-authority",
+    "input": "echo \"a\\\n$(touch /tmp/x)\"",
+    "why": "a backslash-newline inside double quotes, then a command substitution that runs",
+    "correct": "reject",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.qa-engines-stop-passing-what-they-cannot-see.md:60"
+  },
+  {
+    "id": "h4.param-assign-subst",
+    "sink": "url-authority",
+    "input": "echo \"${x:=$(touch /tmp/x)}\"",
+    "why": "a substitution inside a parameter expansion inside double quotes",
+    "correct": "reject",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.qa-engines-stop-passing-what-they-cannot-see.md:60"
+  },
+  {
+    "id": "h4.param-pattern-subst",
+    "sink": "url-authority",
+    "input": "echo \"${x/$(touch /tmp/y)/}\"",
+    "why": "a substitution in a pattern-replace expansion inside double quotes",
+    "correct": "reject",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.qa-engines-stop-passing-what-they-cannot-see.md:60"
+  },
+  {
+    "id": "h4.locale-subst",
+    "sink": "url-authority",
+    "input": "echo $\"$(touch /tmp/x)\"",
+    "why": "a $\"...\" locale quote that holds a substitution",
+    "correct": "reject",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.qa-engines-stop-passing-what-they-cannot-see.md:60"
+  },
+  {
+    "id": "h4.var-default-flag",
+    "sink": "url-authority",
+    "input": "find docs ${x:--delete}",
+    "why": "a variable argument with a default that is a deny-listed flag (shape 4)",
+    "correct": "reject",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.qa-engines-stop-passing-what-they-cannot-see.md:60"
+  },
+  {
+    "id": "h4.at-expand",
+    "sink": "url-authority",
+    "input": "set -- -delete; find docs \"$@\"",
+    "why": "positional-parameter expansion as the argument of a deny-listed command",
+    "correct": "reject",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.qa-engines-stop-passing-what-they-cannot-see.md:60"
+  },
+  {
+    "id": "h4.star-expand",
+    "sink": "url-authority",
+    "input": "set -- -delete; find docs $*",
+    "why": "$* as the argument of a deny-listed command",
+    "correct": "reject",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.qa-engines-stop-passing-what-they-cannot-see.md:60"
+  },
+  {
+    "id": "h4.array-expand",
+    "sink": "url-authority",
+    "input": "a=(-delete); find docs ${a[@]}",
+    "why": "an array expansion as the argument of a deny-listed command",
+    "correct": "reject",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.qa-engines-stop-passing-what-they-cannot-see.md:60"
+  },
+  {
+    "id": "h4.indirect-expand",
+    "sink": "url-authority",
+    "input": "x=y; y=-delete; find docs ${!x}",
+    "why": "an indirect expansion as the argument of a deny-listed command",
+    "correct": "reject",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.qa-engines-stop-passing-what-they-cannot-see.md:60"
+  },
+  {
+    "id": "h4.sed-var-split",
+    "sink": "url-authority",
+    "input": "x='-i'; sed $x s/a/b/ notes.txt",
+    "why": "an unquoted variable carrying sed's in-place flag",
+    "correct": "reject",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.qa-engines-stop-passing-what-they-cannot-see.md:60"
+  },
+  {
+    "id": "h4.ansi-octal-flag",
+    "sink": "url-authority",
+    "input": "find docs -$'\\144'elete",
+    "why": "an ANSI-C quoted octal letter inside a deny-listed flag",
+    "correct": "reject",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.qa-engines-stop-passing-what-they-cannot-see.md:60"
+  },
+  {
+    "id": "h4.ansi-nul-flag",
+    "sink": "url-authority",
+    "input": "find docs $'-delete\\0x'",
+    "why": "an ANSI-C quoted flag that the shell truncates at NUL",
+    "correct": "reject",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.qa-engines-stop-passing-what-they-cannot-see.md:60"
+  },
+  {
+    "id": "h4.cont-in-flag",
+    "sink": "url-authority",
+    "input": "find docs -del\\\nete",
+    "why": "a line continuation in the middle of a deny-listed flag",
+    "correct": "reject",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.qa-engines-stop-passing-what-they-cannot-see.md:60"
+  },
+  {
+    "id": "l4.ls",
+    "sink": "url-authority",
+    "input": "ls -la",
+    "why": "a plain read-only command stays runnable",
+    "correct": "accept",
+    "direction": "legitimate",
+    "spec_ref": "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.qa-engines-stop-passing-what-they-cannot-see.md:207"
+  },
+  {
+    "id": "l4.find-md",
+    "sink": "url-authority",
+    "input": "find . -name '*.md'",
+    "why": "find with no action stays runnable",
+    "correct": "accept",
+    "direction": "legitimate",
+    "spec_ref": "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.qa-engines-stop-passing-what-they-cannot-see.md:207"
+  },
+  {
+    "id": "l4.pipe",
+    "sink": "url-authority",
+    "input": "cat notes.txt | sort | uniq",
+    "why": "a read-only pipeline stays runnable",
+    "correct": "accept",
+    "direction": "legitimate",
+    "spec_ref": "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.qa-engines-stop-passing-what-they-cannot-see.md:207"
+  },
+  {
+    "id": "l4.git-status",
+    "sink": "url-authority",
+    "input": "git status",
+    "why": "a read-only git subcommand stays runnable",
+    "correct": "accept",
+    "direction": "legitimate",
+    "spec_ref": "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.qa-engines-stop-passing-what-they-cannot-see.md:207"
+  },
+  {
+    "id": "l4.ansi-echo",
+    "sink": "url-authority",
+    "input": "echo $'a\\tb'",
+    "why": "an ANSI-C quote as data to a non-deny-listed command stays runnable",
+    "correct": "accept",
+    "direction": "legitimate",
+    "spec_ref": "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.qa-engines-stop-passing-what-they-cannot-see.md:207"
+  },
+  {
+    "id": "l4.continuation-echo",
+    "sink": "url-authority",
+    "input": "echo a \\\n b",
+    "why": "a continuation in a harmless command stays runnable",
+    "correct": "accept",
+    "direction": "legitimate",
+    "spec_ref": "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.qa-engines-stop-passing-what-they-cannot-see.md:207"
+  },
+  {
+    "id": "l4.dq-home",
+    "sink": "url-authority",
+    "input": "echo \"$HOME\"",
+    "why": "a variable argument to a command that is not deny-listed stays runnable",
+    "correct": "accept",
+    "direction": "legitimate",
+    "spec_ref": "docs/tasks/task.274.qa-engines-stop-passing-what-they-cannot-see/task.274.qa-engines-stop-passing-what-they-cannot-see.md:207"
+  }
+]

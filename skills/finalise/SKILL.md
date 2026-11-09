@@ -96,6 +96,7 @@ apply to a bug?" a lookup instead of a judgement.
 | Key | Step | story / task | bug |
 | --- | --- | --- | --- |
 | `running-summary` | Step 0 — running summary file | run | run — `{bug-prefix}.dod.{N}.{name}.md` from `assets/bug-dod-template.md` |
+| `preconditions` | Step 0 — preconditions preflight | run — gate or `WAIVED` record, pr-review or review decision, PR state | run — verdict (implementation report, or the bug report's `QA Verification`) and PR state; no gate, no pr-review |
 | `verification-complete` | Step 7.1 — the `## Verification Complete` block | run — append | run — **fill** the template's block in place; never append a second heading |
 | `read-document` | Step 1 — read the document | run | run — the bug report, frontmatter or header block (`references/bug-doc.js`) |
 | `qa-reports` | Step 2 — QA reports and gate | run | run — globs scoped to `${STEM}` (a co-located bug must not read its parent's); none expected; the verify loop's `#### QA Verification` and the implementation report are the QA record |
@@ -170,7 +171,7 @@ Before starting any verification, also create a co-located running summary file 
      ```bash
      STEM="{story.{P}.{E}.{S} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"   # the work item's filename stem
      source .agents/skills/finalise/references/newest-numbered.sh || exit 1
-     DOD_N=$(next_numbered "{document-directory}" dod -name "${STEM}.dod.*.md") || exit 1
+     DOD_N=$(next_numbered "{document-directory}" dod -name "${STEM}.dod.*") || exit 1
      ```
 
      and use `$DOD_N` as `{num}`. It is the highest existing `{num}` plus 1 (1 when there is none), never the number of reports plus 1: a directory holding `.1.` and `.3.` gets `.4.`, where a count would overwrite `.3.`. `next_numbered`'s header in the sourced file states the full rule (obs #272, task.186).
@@ -211,6 +212,59 @@ Before starting any verification, also create a co-located running summary file 
 If verifying `${PRD_ROOT}/.../story.1.311.1.example-system/story.1.311.1.example-system.md`, create:
 
 `${PRD_ROOT}/.../story.1.311.1.example-system/story.1.311.1.dod.1.example-system.md`
+
+#### Step 0b: Preconditions preflight — what is missing, before any agent runs
+
+`/finalise` assumes it runs inside `/develop-task`, `/develop-story` or `/develop-bug`, before the
+merge. Hand-built work (tasks 208 and 209: merged PRs with no gate and no pr-review) and a bug fixed
+outside `/develop-bug` hit a mid-run HALT or a silent skip the skill never warned about (obs #38,
+#40). This step answers the same questions first, in one line each, with the route to each input.
+Engine: `references/finalise-preconditions.js` (peer of `references/finalise-record-preflight.js`).
+
+```bash
+# INPUTS, substituted into THIS block — no block inherits another's variables.
+DOC_FILE="{the document path argument}"
+DOC_KIND="{story | task | bug — the kind the Document-kind block resolved}"
+case "$DOC_FILE$DOC_KIND" in *'{'*) echo "HALT: DOC_FILE and DOC_KIND must be substituted into this block (an unsubstituted placeholder found)"; exit 1 ;; esac
+# The PR comes from the same resolver Step 3a uses; an unresolved PR is an answer (missing `pr`), not an error.
+PR_NUMBER=$(bash .agents/skills/finalise/references/resolve-pr-number.sh --doc "$DOC_FILE" --json | jq -r '.pr // empty')
+# State and review decision come from the host. pr-read.sh emits neither; a host without `gh` answers
+# `unknown`, which the engine reports as unverifiable and never as missing.
+PR_STATE=unknown; REVIEW_DECISION=unknown
+if [ -n "$PR_NUMBER" ] && command -v gh >/dev/null 2>&1; then
+  if PR_VIEW=$(gh pr view "$PR_NUMBER" --json state,reviewDecision 2>/dev/null); then
+    PR_STATE=$(printf '%s' "$PR_VIEW" | jq -r '.state // "unknown"')
+    REVIEW_DECISION=$(printf '%s' "$PR_VIEW" | jq -r '.reviewDecision // "null"')
+    [ -n "$REVIEW_DECISION" ] || REVIEW_DECISION=null   # GitHub answers "" when no review is required
+  fi
+fi
+PRE_ARGS=(check --doc "$DOC_FILE" --kind "$DOC_KIND" --pr-state "$PR_STATE" --review-decision "$REVIEW_DECISION")
+[ -n "$PR_NUMBER" ] && PRE_ARGS+=(--pr "$PR_NUMBER")
+command node .agents/skills/finalise/references/finalise-preconditions.js "${PRE_ARGS[@]}"
+PRE_RC=$?
+[ "$PRE_RC" -eq 0 ] || { echo "HALT: preconditions — finalise would stop later on the input(s) named above; supply them by the route given, then re-run"; exit 1; }
+```
+
+Read `reason`: `ok` continues; `missing` HALTs with every missing input and its route on screen
+(`--json` adds `missing[]`, `unverifiable[]`, and for a bug `basis`); `unreadable` is a HALT, never
+a pass. **The preflight informs; it never waives.** A missing gate is not made acceptable by being
+named: the routes are to run the step that writes the input (`/qa-task`, `/review-pr`, the
+`/develop-bug` verify loop) or to record a `WAIVED` gate with `waiver.active: true` and a non-empty
+`waiver.approved_by`. It applies the rules Step 6 and Step 7 already apply, only earlier.
+`unverifiable` lines (the review decision or PR state on a host without `gh`) are reported and do not
+stop the run. When the PR is already merged and the document is a bug, the output also states the
+**post-merge route** that 6a follows.
+
+**Bug mode (`preconditions`):** run — the same block, `DOC_KIND` `bug`: no gate and no pr-review are
+expected (the develop-bug verify loop writes neither), so the inputs are the **verdict** and the PR.
+The verdict is the newest implementation report's last `**Verdict**:` when a report exists and reads
+exactly `PASS`; **only when no implementation report exists** it is the bug report's own
+`#### QA Verification` `**Verification Result**: ✅ Fixed` — anything else there (`⚠️ Still Failing`,
+the template's `✅ Fixed | ⚠️ Still Failing` placeholder, a missing line) is not a verdict. A report
+that exists decides alone: a `FAIL` is never overridden by the bug report's own line. The PR comes
+from the resolver's `linked-issue` rung when no branch, lock or frontmatter names one (the PR that
+closes the bug's `github_issue:`) or from a `pr_number:` the operator records in the bug's
+frontmatter.
 
 ### Step 1: Locate and Read the Story/Task Document
 
@@ -478,7 +532,9 @@ DIFF_FILE=".claude/state/pr-diff-$(date +%s).diff"
 
 **The PR number comes from `references/resolve-pr-number.sh`, never from the document body.** It
 reads, first answer wins: an explicit `--pr`, the PR whose head is the current branch (`pr-read.sh`),
-the pipeline lock's `pr_url` when the lock is for this document's directory, frontmatter
+the pipeline lock's `pr_url` when the lock is for this document's directory, for a bug report the
+newest PR GitHub records as closing the issue named by its `github_issue:` (the `linked-issue`
+rung — a bug finalised after its PR merged has no branch PR), frontmatter
 `pr_number:`, and a body `PR #N` only when PR N's head branch is the current branch. A task document
 cites other work's PRs, and the old first-match-in-the-body rule judged one of them on three runs
 (task.146 → #472, task.147 → #207, task.166 → #505; obs #184). Step 3a passes no `--pr`: finalise
@@ -615,9 +671,54 @@ so aggregation reads the filled result.
 
 Skip it when `boundary` is `false` or `internal`. Otherwise:
 
-1. **Write the plan.** Save `SECURITY_RESULT.probe_plan` as a JSON array to
-   `.claude/state/probe-plan.json` (Write tool — it is YAML in your context, not a shell variable).
-   An absent or empty plan under `boundary: true` is written as `[]`; it is not skipped.
+1. **Write the plan — extracted, not retyped** (task 269). The security agent ends its answer with a
+   `finalise-probe-plan` block (the prompt's "plan block"); the host keeps the agent's transcript on disk,
+   so one command takes the block out of it and no character of the plan passes through you. `AGENT_ID`
+   is the id the Agent tool returned for the security dispatch:
+
+   ```bash
+   # INPUT, substituted into THIS block: {security agent id}.
+   AGENT_ID="{security agent id}"
+   case "$AGENT_ID" in ''|*'{'*) echo "HALT: AGENT_ID must be the security agent's id, substituted"; exit 1 ;; esac
+   command node .agents/skills/finalise/references/agent-reply-block.js extract \
+     --agent-id "$AGENT_ID" --block finalise-probe-plan --out .claude/state/probe-plan.json --json
+   ```
+
+   Read `reason`. `extracted`: the plan is on disk and byte-exact; record its `bytes` and `sha256` in the
+   DoD as "plan extracted from the agent's transcript". Anything else (`transcript-not-found`,
+   `transcript-ambiguous`, `transcript-unreadable`, `no-block`, `empty-block`, `entity-escaped`): the
+   extract wrote nothing; fall back to the old route — save `SECURITY_RESULT.probe_plan` as a JSON array to
+   `.claude/state/probe-plan.json` with the Write tool — and record "plan hand-copied (unverified):
+   {reason}" in the DoD, so a reader can tell a copy from an extraction. An absent or empty plan under
+   `boundary: true` is written as `[]`; it is not skipped.
+
+   **Reuse a plan that still holds.** When the work item's previous DoD run left a `…security.plan.json`
+   (the runner writes it, below), ask whether it can run again instead of planning afresh. `{engine
+   paths}` are the engine files the plan's controls probe, as `--engine-path` flags; `{prior head}` is
+   the `head` field of the previous run's AC record (`…dod.{N-1}.ac.json`):
+
+   ```bash
+   # INPUTS, substituted into THIS block (a fenced block is its own shell): STEM and DOD_N as Step 0
+   # bound them, {document-directory}, {prior head}, and one {engine path} per engine file (repeat the
+   # --engine-path flag below once per file: a plan that probes several files is reusable only when
+   # every one is unchanged). DOD_N is judged first: a first run has no {prior head} to substitute.
+   DOD_N="{Step 0's DOD_N}"
+   case "$DOD_N" in ''|*'{'*) echo "HALT: DOD_N is an unsubstituted placeholder"; exit 1 ;; *[!0-9]*) echo "HALT: DOD_N is not a number"; exit 1 ;; esac
+   STEM="{story.{P}.{E}.{S} | task.{id} | bug mode: the bug prefix, e.g. task.67.bug.3}"
+   DOC_DIR="{document-directory}"
+   if [ "$DOD_N" -le 1 ]; then
+     echo "reuse: no previous DoD run (DOD_N=$DOD_N) — plan afresh"
+   else
+     case "$STEM$DOC_DIR{prior head}{engine path}" in *'{'*) echo "HALT: an input of the reuse block is an unsubstituted placeholder"; exit 1 ;; esac
+     command node .agents/skills/finalise/references/security-probe-plan.mjs reuse \
+       --prior-plan "$DOC_DIR/$STEM.dod.$((DOD_N-1)).security.plan.json" --prior-head "{prior head}" \
+       --repo-root "$(git rev-parse --show-toplevel)" --engine-path "{engine path}" --json
+   fi
+   ```
+
+   `reusable`: copy that plan file to `.claude/state/probe-plan.json` (a file copy, not a retype), skip
+   the plan block, and say "plan reused from dod.{N-1}" in the DoD. `not-reusable`: plan afresh, as above.
+   The plan's `cases_file` entries are checked by hash, so a cases file edited since is not reused.
 2. **Run it — backgrounded**, one call from the repository root (`run_in_background`), and read the
    `probe-plan exit=` line when the notification arrives. Each entry may run for minutes, and a
    foreground call is stopped at the host's tool timeout (120–600 s), which would leave no result
@@ -660,6 +761,7 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
      --plan .claude/state/probe-plan.json \
      --record "$DOC_DIR/$STEM.dod.$DOD_N.security.run.json" \
      --cases-base "$DOC_DIR/$STEM.dod.$DOD_N.security.cases" \
+     --reusable-plan "$DOC_DIR/$STEM.dod.$DOD_N.security.plan.json" \
      --repo-root "$(git rev-parse --show-toplevel)" \
      --json > "$RESULT.tmp"
    rc=$?
@@ -692,6 +794,13 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
    in transport, not the code's own text. On task.243 every `>` arrived as `&gt;`, and the run read
    49 legitimate cases as over-blocked (obs #133). On that refusal, restore the characters in
    `.claude/state/probe-plan.json`, check them against the code or a committed cases file, and re-run.
+   An entry may name a committed cases file with `cases_file` instead of carrying `cases`; the runner
+   copies its bytes (so U+0085, U+2028, VT, FF and a lone CR survive) and refuses a name that is
+   absolute, climbs out, is a symlink or is not a JSON array. Cases that carry an HTML entity are
+   refused as `plan-entry-cases-html-entity` when the plan has no literal `<` and the entry's own source
+   file does not carry that entity. `--reusable-plan` writes the plan as it ran, each inline `cases`
+   replaced by its committed file and hash; commit it beside the record, because the next run's `reuse`
+   reads it.
    Exit 1 (`bad-plan`) means the JSON you wrote is not an array: fix the file, re-run.
    **`probe-plan: no result` is not an empty plan** — the run did not complete (killed, or its output
    did not parse): re-run the step; never fill `SECURITY_RESULT` from an absent result.
@@ -752,11 +861,57 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
    record still counts them (task.189 CR2-2). Still refused:
    add a `checks[]` entry `probe plan entry refused: {entry} — {reason}` with `status: FAIL` and
    no `severity`.
+5a. **A reproduced case the owner already deferred is rendered as deferred, not FAIL (task 271, obs #117).**
+   For each probe still in `probes[]` after item 3a, ask the deferral matcher whether the **owner**
+   deferred exactly that case to a named follow-up task. The matcher is mechanical; you never judge a
+   deferral yourself. The case id is the part of the probe's `key` after the first `:`. The owner list
+   is `finalise.deferralApprover` in `skills-config.yaml` (one name, or several separated by commas),
+   and **unset means nothing is ever deferred**:
+
+   ```bash
+   # Step 3b.1 item 5a — INPUTS, substituted into THIS block: {case-id} (the probe key after the first
+   # ':'), {record-file} (`deferrals.json` in the work-item directory).
+   # That file is the only record read: with none there is nothing to match, which is a no-match.
+   [ -f "{record-file}" ] || { echo '{"reason":"no-match","detail":"no deferrals.json beside the work item"}'; exit 1; }
+   source .agents/skills/finalise/references/read-config.sh || exit 1
+   OWNERS=$(read_nested_config_key finalise deferralApprover)
+   APPROVER_ARGS=()
+   # One owner per line, read the same way in bash and zsh (`read -a` is bash only; zsh spells it -A).
+   while IFS= read -r o; do [ -n "${o// }" ] && APPROVER_ARGS+=(--approver "$o"); done < <(printf '%s\n' "$OWNERS" | tr ',' '\n')
+   command node .agents/skills/finalise/references/finalise-deferral-match.js \
+     --case "{case-id}" --record "{record-file}" \
+     ${APPROVER_ARGS[@]+"${APPROVER_ARGS[@]}"} --json
+   ```
+
+   Exit 0 with `reason: matched` is the only deferral. Move that probe out of `probes[]` and into
+   `SECURITY_RESULT.deferred_probes[]` as `{key, id, rendered, task, owner, date, source}` (the `rendered`
+   line is `deferred (owner {name}, {date}, {task})`), and render it under the security section as
+   `**Deferred**: {rendered} — {source}`, beside the waiver line a `WAIVED` gate shows. It adds no FAIL
+   check. **Every other answer leaves the probe in `probes[]` as a FAIL** — `no-match` (no record names
+   the case), `unapproved` (a record names it but lacks a task, a valid date, or an owner approver),
+   `no-approver-configured`, `unverifiable` — and name the `reason` and `detail` beside the probe so
+   the owner sees why it was not deferred. **The one record read is `deferrals.json`**, a JSON file the
+   owner writes beside the work item, in exactly this shape and no other:
+
+   ```json
+   { "deferrals": [ { "case": "{case-id}", "deferred_to": "task.N",
+                      "approved_by": "{owner name}", "approved_on": "YYYY-MM-DD" } ] }
+   ```
+
+   It is read with `JSON.parse`, so a file that is not valid JSON, repeats a key, holds a field other
+   than those four, or holds a non-string value is `unverifiable` and the probe stays a FAIL. **Neither
+   the work item's prose nor the QA gate is read**: a `## Deferred Work` bullet or a gate entry is not a
+   deferral (earlier versions read them, and sixteen QA gates each found another spelling the reader
+   missed). If the owner deferred a case there only, copy it into `deferrals.json` first. Every entry
+   for the case must approve it and agree on the task, `approved_by` must equal an owner exactly, and
+   an entry for another case that names this id blocks. To **withdraw** a deferral, remove or edit its
+   entry. The matcher's header states all of this.
 6. **The zero-guard still applies — now to this run.** `boundary: true` with `probes_executed: 0`
    (an empty plan, every entry refused or declined) adds the `probe mode executed no candidates`
    FAIL check; a zero from this run **still takes the zero-guard**, because then the engine declined
    the entry, which is the guard's real case. Recompute `overall`: FAIL if any check or general
-   check FAILs or any probe reproduced, otherwise PASS.
+   check FAILs or any probe reproduced and still in `probes[]` (a probe item 5a moved to
+   `deferred_probes[]` does not count), otherwise PASS.
 7. **Say so.** Add `- Probe run by /finalise from the security agent's plan — {N} control(s), record
    `{record path}`` under the security section's Probe Results.
 
@@ -806,8 +961,28 @@ still matches; an entry a sink models is probed, never skipped. A reason that fa
 **Never abort due to a single agent failure.** One failed section = manual review for that section only.
 
 **Then enforce the re-run scope on agent 1's answer, and write this run's AC record** (task 242).
-Save agent 1's YAML, verbatim, to `.claude/state/finalise-ac-result-${DOD_N}.yaml` with the file-write
-tool, then:
+Take agent 1's YAML out of its transcript — do not retype it (task 269). The AC agent answers in one
+`finalise-ac-yaml` block (its prompt says so); `AC_AGENT_ID` is the id the Agent tool returned for it:
+
+```bash
+# INPUTS, substituted into THIS block: {AC agent id}, and DOD_N exactly as Step 0 bound it.
+AC_AGENT_ID="{AC agent id}"
+DOD_N="{Step 0's DOD_N}"
+case "$AC_AGENT_ID$DOD_N" in ''|*'{'*) echo "HALT: AC_AGENT_ID and DOD_N must be substituted"; exit 1 ;; esac
+command node .agents/skills/finalise/references/finalise-rerun-scope.js extract \
+  --agent-id "$AC_AGENT_ID" --out ".claude/state/finalise-ac-result-${DOD_N}.yaml" --json \
+  | tee ".claude/state/finalise-ac-extract-${DOD_N}.json"
+```
+
+`reason: extracted`: the file is the agent's block byte for byte; read `sha256` from the output and
+pass it to `merge` below as `AC_SHA256` — `merge` re-hashes the file and answers `result-hash-mismatch`
+(nothing merged, nothing recorded) when it differs, then records `result.bytes`, `result.sha256` and
+`result.verified: true` in `…dod.{N}.ac.json`. Any other reason (`transcript-not-found`,
+`transcript-ambiguous`, `transcript-unreadable`, `no-block`, `empty-block`, `entity-escaped`) wrote
+nothing: fall back to saving agent 1's YAML, verbatim, to the same path with the file-write tool, leave
+`AC_SHA256` empty, and say "AC YAML hand-copied (unverified): {reason}" in the DoD. A record with
+`verified: false` says exactly that: its hash describes the file `merge` read, not proof it matches the
+agent's reply. Then:
 
 ```bash
 # INPUTS, substituted into THIS block, as in Step 3a: STEM and DOD_N exactly as Step 0 bound them.
@@ -819,9 +994,12 @@ case "$STEM$DOD_N" in *'{'*) echo "HALT: STEM and DOD_N must be substituted into
 case "$DOD_N" in ''|*[!0-9]*) echo "HALT: DOD_N ('$DOD_N') is not Step 0's run number"; exit 1 ;; esac
 AC_RECORD="{document-directory}/${STEM}.dod.${DOD_N}.ac.json"
 AC_MERGED_FILE=".claude/state/finalise-ac-merged-${DOD_N}.json"
+# The hash `extract` printed, or empty after a hand copy. Read back from its own output, not retyped.
+AC_SHA256=$(jq -r 'select(.reason == "extracted") | .sha256' ".claude/state/finalise-ac-extract-${DOD_N}.json" 2>/dev/null)
 command node .agents/skills/finalise/references/finalise-rerun-scope.js merge \
   --scope ".claude/state/finalise-rerun-scope-${DOD_N}.json" \
   --result ".claude/state/finalise-ac-result-${DOD_N}.yaml" \
+  ${AC_SHA256:+--sha256 "$AC_SHA256"} \
   --dod-n "$DOD_N" --record-out "$AC_RECORD" --json > "$AC_MERGED_FILE"
 [ $? -eq 0 ] || { echo "HALT: finalise-rerun-scope.js merge failed — see $AC_MERGED_FILE"; exit 1; }
 case "$(jq -r '.reason' "$AC_MERGED_FILE")" in
@@ -1316,10 +1494,46 @@ error (exit 2), not the defaults. `FAILURE`, `CANCELLED` and `UNKNOWN` heads nev
 with `ci.docsOnly.enabled: false` ([`docs/reference/configuration.md`](../../docs/reference/configuration.md)).
 **A `SUCCESS` reached this way is never recorded as plain `SUCCESS`** — see the table.
 
+**A red outside the diff gets exactly one recorded re-run (task 271, obs #50, GitHub only).** If
+`CI_ROLLUP` is `FAILURE` and the failing check is a test file this PR did not touch, over a delta from
+the last green head that is documentation only, the red is evidence about something other than this
+change, and one re-run is allowed. The decision is the engine's, never yours, and it exits **0 for
+`eligible` and for nothing else**:
+
+```bash
+# Step 6, one re-run of a red outside the diff. INPUTS, substituted into THIS block: {green-head} (the
+# head of the newest earlier CI reading recorded SUCCESS for this PR — the DoD running summary's
+# `CI reading … @ <sha>` line, else `gh run list --branch <pr-branch> --status success --limit 1 --json
+# headSha -q '.[0].headSha'`), {pr-base} (the PR's target branch), {attempts} (the `CI re-run:` lines
+# already recorded in this DoD run: 0 on a first red), and the failing test file path(s), one per line,
+# read from `gh run view <run-id> --log-failed` — that one goes into the heredoc below and nowhere else,
+# because a multi-line value substituted into a comment would end the comment.
+FAILED_ARGS=()
+while IFS= read -r f; do [ -n "$f" ] && FAILED_ARGS+=(--failed-file "$f"); done <<'FAILED_FILES_END'
+{failed-files}
+FAILED_FILES_END
+command node .agents/skills/finalise/references/finalise-delta.js rerun-eligible \
+  --base "{green-head}" --head "$(git rev-parse HEAD)" --pr-base "{pr-base}" \
+  --attempts "{attempts}" ${FAILED_ARGS[@]+"${FAILED_ARGS[@]}"} --json
+```
+
+`{failed-files}` is one path per line. A path the engine cannot reduce to a file inside the repository (an
+unsubstituted placeholder, a glob, a path outside the checkout) answers `bad-failed-file`, never `eligible`.
+Only `reason: eligible` re-runs. Every other answer — `in-diff` (the PR changed that file), `bad-failed-file`, `code-changed`
+(the delta from the green head touches more than documentation), `already-rerun` (one is recorded),
+`no-failed-file` (the red's file is unknown), `disabled`, `unverifiable` — leaves the FAILURE row below in
+force, and the DoD says which reason it was. When eligible, run `gh run rerun <run-id> --failed`, wait for
+the new run with the existing background poll (a foreground wait can outlive the tool timeout), and read the
+rollup again with the query above. **Accept only on a green second attempt, and record both attempts**
+in the DoD running summary: `CI re-run: attempt 1 FAILURE on {failing job}, {test file}, @ {sha12}; delta
+{green-head12}..{head12} is docs-only; attempt 2 {rollup} @ {sha12}`. A second red is the FAILURE row with no
+further re-run: the engine answers `already-rerun` from then on. A green second attempt is recorded as `CI
+reading 1: SUCCESS after one re-run (see the CI re-run line)`, never as plain `SUCCESS`.
+
 | `CI_ROLLUP` | Decision                                                                                                                                                                                                                                                                                                |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `SUCCESS`   | Proceed — CI column passes. When `CI_TREE_EQ` is set the head's own CI has **not** finished and the reading is satisfied by the docs-only rule above: record `CI reading 1: SUCCESS (tree-equivalent to {CI_TREE_EQ}) @ {CI_HEAD_1}`, never plain `SUCCESS`                                                                                                                                                                                                                                                                              |
-| `FAILURE`   | **Do NOT accept.** Gap: "CI is red on {failing job(s)} — acceptance requires a green run on a commit containing the final code." **One exception, and it is narrow:** a red on the docs link checker alone, reproduced by `doc-links.js` on the work item's own document and/or its co-located `.md` pipeline artifacts and nowhere else, is a Docs-section finding that Step 8a may fix and recheck once — see the clause under *When this step applies* there. Every other red is this row. |
+| `FAILURE`   | **Do NOT accept** — unless the one-re-run arm above ends in a green second attempt. Gap: "CI is red on {failing job(s)} — acceptance requires a green run on a commit containing the final code." **One exception, and it is narrow:** a red on the docs link checker alone, reproduced by `doc-links.js` on the work item's own document and/or its co-located `.md` pipeline artifacts and nowhere else, is a Docs-section finding that Step 8a may fix and recheck once — see the clause under *When this step applies* there. Every other red is this row. |
 | `PENDING`   | **Do NOT accept** — unless the tree-equivalence arm above returned `tree-equivalent` (then it is the `SUCCESS` row). Gap: "CI has not finished. Re-run `/finalise` once it completes." **Waiting is the correct action; assuming is not.**                                                                                                                                                                |
 | `CANCELLED` | **Undecided, not failed.** Almost always `cancel-in-progress` superseding a run. Re-sample; if it persists after the retries, check whether a newer commit has its own run and resolve against **that** head. Never record it as a red verdict.                                                         |
 | `NONE`      | **Undecided.** Re-sample first — an empty rollup is the normal state for the seconds between a push and its run registering. Only if it persists does it mean no checks are configured, and then record it explicitly in the DoD summary as _unverified by CI_ rather than treating absence as success. |
@@ -1837,6 +2051,16 @@ standalone.
      ADD_PATHS=("{document-path}" "$DOD_PATH" "{document-directory}/sprint-review-summary.md")
      COMMIT_MSG="docs(${STEM}): accept — DoD, sprint review"
    fi
+   # This run's security probe artefacts ride the same commit (obs #59, task.270): the record
+   # `{stem}.dod.{N}.security.run.json`, its `.run.json.d/` sidecar, and the plan and cases files.
+   # Prose said 6a carried them and no block staged them, so the sidecar needed a second commit.
+   # DOD_N is not an input of this block, so the run number is read off the DoD path resolved above.
+   # `find`, not a glob: an unmatched glob aborts zsh with "no matches found" before any HALT prints.
+   DOD_NUM=$(basename "$DOD_PATH" | sed -E 's/^.*\.dod\.([0-9]+)\..*$/\1/')
+   case "$DOD_NUM" in ''|*[!0-9]*) echo "HALT: cannot read the run number from $DOD_PATH"; exit 1 ;; esac
+   while IFS= read -r SEC_PATH; do
+     [ -n "$SEC_PATH" ] && ADD_PATHS+=("$SEC_PATH")
+   done < <(find "{document-directory}" -maxdepth 1 -name "${STEM}.dod.${DOD_NUM}.security.*" 2>/dev/null | sort)
    # --- acceptance artefacts resolved (the executed test slices to here) ---
    # The task registry is NOT added here. Step 7.4's `registry-tick.js --stage` already put this
    # task's row in the index, so a parallel session's uncommitted row or counter bump in the same
@@ -1880,6 +2104,22 @@ standalone.
      | grep -vxF -f <(printf '%s\n' "$EXPECTED") || true)
    CARRY_SUFFIX=""
    [ -n "$CARRIED" ] && CARRY_SUFFIX='; 5c review carried'
+   # Post-merge bug route (task 272, obs #38). A bug finalised AFTER its PR merged is checked out on
+   # the base branch, which is the one place the acceptance commit must not go. It goes on a
+   # docs-only branch off that base, and the base is never pushed to. A story or task finalises
+   # before its merge, on its own branch, so only a bug takes this route. A re-run is already on
+   # the docs branch, so the switch below does not fire a second time.
+   POST_MERGE_BRANCH=""
+   if [ "$DOC_KIND" = "bug" ]; then
+     case "$BRANCH" in
+       develop|main|master)
+         POST_MERGE_BRANCH="docs/${STEM}-dod"
+         BASE_OF_DOCS="$BRANCH"
+         git checkout -b "$POST_MERGE_BRANCH" \
+           || { echo "HALT: cannot create $POST_MERGE_BRANCH off $BASE_OF_DOCS — the post-merge route never commits to the base branch"; exit 1; }
+         BRANCH="$POST_MERGE_BRANCH" ;;
+     esac
+   fi
    # Idempotent on re-run: when the artefacts are already committed there is nothing staged, and
    # `git commit` would exit 1 for "nothing to commit" — indistinguishable from a hook rejection.
    # Skip the COMMIT in that case (never the push, and never `--allow-empty`).
@@ -1895,6 +2135,13 @@ standalone.
    PUSH_EXIT=$?
    [ "$PUSH_EXIT" -eq 0 ] || { echo "HALT: acceptance push rejected (exit $PUSH_EXIT)"; exit 1; }
    CI_HEAD_2=$(git rev-parse HEAD)
+   # The post-merge route stops here. The docs branch has no PR yet, so 6b–6c have nothing to read;
+   # opening a PR is an outward-facing step the operator takes (or /create-pr does), and the re-run
+   # picks up from this commit.
+   if [ -n "$POST_MERGE_BRANCH" ]; then
+     echo "HALT: post-merge-docs-pr — the acceptance commit is pushed to $POST_MERGE_BRANCH (docs-only, off $BASE_OF_DOCS); $BASE_OF_DOCS was not pushed to. Open a PR for it (/create-pr --base $BASE_OF_DOCS), then re-run /finalise --bug on this branch: 6a skips the commit it already made and the branch rung resolves that PR"
+     exit 1
+   fi
    ```
 
    **Bug mode (`acceptance-commit`):** run — the block itself branches on `DOC_KIND` (bound in
@@ -1904,6 +2151,15 @@ standalone.
    `docs(${STEM}): DoD verified — finalise --bug`. The registry check is a no-op because the tick
    answered `not-a-task`. Nothing here is an instruction to edit the block: it ran verbatim in
    task mode only until TASK-125-BUG-16 moved the bug list from this note into the block.
+
+   **Post-merge bug route (task 272).** When a bug is finalised after its PR merged, the checkout
+   is the base branch. The block then commits to a docs-only branch `docs/${STEM}-dod` cut from that
+   base, pushes it, never pushes the base, and stops with `HALT: post-merge-docs-pr` naming the next
+   step: open a PR for the docs branch (`/create-pr --base <base>`) and re-run `/finalise --bug`
+   there. The re-run is already on a non-base branch, skips the commit it already made, and the
+   resolver's branch rung finds the docs PR. The base is `develop`, `main` or `master`; a project with
+   another trunk name finalises its bug on a non-base branch, which commits where it stands. A story
+   or task never takes this route.
 
    The `git diff --cached --quiet` guard is in the block, not beside it: the first version said
    "skip the commit when clean" in prose two lines below an unconditional `git commit`, and the prose
@@ -2271,11 +2527,23 @@ standalone.
      # `FAIL or PASS` / `PASS FAIL`, which read as PASS until task.138 (gate 11 future, obs #146).
      # Prose after a real verdict never starts with the other token.
      case "$VERDICT_AFTER" in /*|\|*|PASS*|FAIL*|[Oo][Rr]\ *|[Oo][Rr]) VERIFY_VERDICT='' ;; esac
+     # A fix with NO implementation report at all (a bug fixed outside /develop-bug, finalised after
+     # its PR merged — bug.19, obs #38) has no verify-loop verdict to read. The bug report's own
+     # `#### QA Verification` `**Verification Result**: ✅ Fixed` is the verdict then, and only then:
+     # a report that exists decides alone, so a FAIL is never overridden. The engine is the one
+     # reader (the same one Step 0b calls); an unreadable answer leaves the verdict empty and the
+     # HALT below fires. The basis is published in the comment body (VERDICT_BASIS).
+     VERDICT_BASIS="the develop-bug verify loop"
+     if [ -z "$VERIFY_VERDICT" ] && [ -z "$IMPLEMENTATION_REPORT" ]; then
+       QV=$(command node .agents/skills/finalise/references/finalise-preconditions.js bug-verdict --dir "{document-directory}" --stem "$STEM" --json 2>/dev/null) || QV=""
+       VERIFY_VERDICT=$(printf '%s' "$QV" | jq -r '.verdict // empty' 2>/dev/null)
+       [ -z "$VERIFY_VERDICT" ] || VERDICT_BASIS="the bug report's QA Verification (no implementation report exists)"
+     fi
      # Two states, two diagnostics (cycle-10 CR-3): no verdict line at all, or a line that
      # exists and was refused — the reader told to write one must learn that one exists.
      if [ -z "$VERIFY_VERDICT" ]; then
        if [ -z "$VERDICT_LINE" ]; then
-         echo "HALT: bug mode — no **Verdict**: PASS|FAIL line found in ${IMPLEMENTATION_REPORT:-<no ${STEM}.implementation.*.md or ${STEM}.*.implementation.*.md beside the bug>}; the verify loop's QA Iteration History is the bug's only verdict"; exit 1
+         echo "HALT: bug mode — no **Verdict**: PASS|FAIL line found in ${IMPLEMENTATION_REPORT:-<no ${STEM}.implementation.*.md or ${STEM}.*.implementation.*.md beside the bug>}; the verify loop's QA Iteration History is the bug's verdict; with NO implementation report, record **Verification Result**: ✅ Fixed under #### QA Verification in the bug report"; exit 1
        else
          echo "HALT: bug mode — the last **Verdict**: line in ${IMPLEMENTATION_REPORT} is not an exact PASS or FAIL: ${VERDICT_LINE}"; exit 1
        fi
@@ -2325,6 +2593,7 @@ standalone.
 
    **PR**: ${PR_URL}
    **Final Gate**: ${FINAL_GATE}
+   $([ "$DOC_KIND" = "bug" ] && echo "**Verdict basis**: ${VERDICT_BASIS}" || true)
    **Accepted**: $(date +%Y-%m-%d)
    **DoD Summary**: \`${DOD_PATH}\`
    **CI reading 1**: ${CI_ROLLUP}${CI_TREE_EQ:+ (tree-equivalent to ${CI_TREE_EQ})} @ \`${CI_HEAD_1:0:12}\` (acceptance decision)

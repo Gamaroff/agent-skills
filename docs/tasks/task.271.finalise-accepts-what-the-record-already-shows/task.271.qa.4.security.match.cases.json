@@ -1,0 +1,9 @@
+[
+ {"id":"case.honest","input":"ok-1","direction":"legitimate","why":"a bullet in the one accepted form is the only deferral"},
+ {"id":"case.bold-condition","input":"bold-1","direction":"hostile","why":"prose in the bold slot qualifies the approval"},
+ {"id":"case.bold-draft","input":"bold-2","direction":"hostile","why":"prose in the bold slot says the deferral is a draft"},
+ {"id":"case.later-revocation","input":"rev-1","direction":"hostile","why":"a later record that withdraws the deferral must win over an earlier approval"},
+ {"id":"case.approver-case","input":"case-1","direction":"hostile","why":"an approver name that differs from the configured owner by case is not the owner"},
+ {"id":"case.conditional-lead","input":"if-1","direction":"hostile","why":"a conditional lead is not an unconditional approval"},
+ {"id":"case.absent","input":"nothing-1","direction":"hostile","why":"a case no bullet names has no deferral"}
+]

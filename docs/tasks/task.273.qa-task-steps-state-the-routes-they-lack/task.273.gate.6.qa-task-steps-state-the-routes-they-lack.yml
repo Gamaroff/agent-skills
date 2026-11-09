@@ -1,0 +1,82 @@
+schema: 2
+task: 'task.273.qa-task-steps-state-the-routes-they-lack'
+task_title: 'qa-task steps state the routes they lack'
+gate: PASS
+status_reason: 'The cycle-5 finding is fixed: both gate-decision notes are correct and agree with step 5d and the Resolution matrix. The end-to-end sweep found two LOW wording residues, kept open as LOW entries (cosmetic residue).'
+reviewer: 'QA Engineer'
+head: '6bb434f8bc068fc254ec3e9a56ff1ac70868797a'
+updated: '2026-11-09T04:36:35Z'
+
+top_issues:
+  - id: 'T273-CR-5'
+    severity: low
+    file: 'shared/resources/code-review-prompt.md'
+    finding: 'Line 96 says "confidence: low (it will not gate)", unqualified, while a bug QA reproduces gates at any confidence (item 4 under QA use).'
+    suggested_action: 'Reword to "it will not gate on the reviewer claim alone", or drop the parenthetical.'
+    suggested_owner: dev
+    status: open
+  - id: 'T273-CR-6'
+    severity: low
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'The report-template lines "advisory unless the doc opted in ... or QA reproduced the finding (5d)" (qa-task lines 1622 and 1936, qa-story lines 1867 and 2479) ignore the run-level code_review_blocking=true arg, under which findings gate with no frontmatter flag.'
+    suggested_action: 'Reword the four lines to "advisory unless blocking resolves to true (run-level arg or frontmatter) or QA reproduced the finding (5d)".'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 3
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    notes: 'No predicate-shaped function is added. boundary: false.'
+  performance:
+    status: PASS
+    notes: 'Prose-only change since the cycle 1 measurement.'
+  reliability:
+    status: PASS
+    notes: 'No new failure path.'
+  maintainability:
+    status: PASS
+    notes: 'Two LOW wording residues are open as T273-CR-5 and T273-CR-6.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'T273-CR-5 (LOW): reword "confidence: low (it will not gate)" to "it will not gate on the reviewer claim alone", or drop the parenthetical.'
+      refs: ['shared/resources/code-review-prompt.md']
+    - action: 'T273-CR-6 (LOW): reword the four report-template lines to "advisory unless blocking resolves to true (run-level arg or frontmatter) or QA reproduced the finding (5d)".'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+    - action: 'Cycle 1 CR-1 (medium confidence, not reproducible by execution): add the unbound-read category to the docs-only claim-check prompt.'
+      refs: ['shared/resources/qa-docs-only-review-prompt.md']
+    - action: 'Cycle 1 CR-2 (low): state which file list decides the docs-only route on cycle 3 and later.'
+      refs: ['skills/qa-task/SKILL.md']
+    - action: 'Cycle 1 CR-3 (low confidence): say that the docs-only route reads ci.docsOnly.patterns and ignores ci.docsOnly.enabled.'
+      refs: ['shared/resources/qa-docs-only-review-prompt.md']
+    - action: 'Migration check, re-scoped out of task.273 acceptance by the owner on 2026-11-09: when the next docs-only task is QA-reviewed, confirm its QA report uses the docs-only route and improvises no substitute.'
+      refs: ['skills/qa-task/SKILL.md']
+    - action: 'Add a guard test that every file mentioning code_review_blocking also mentions the reproduced-bug exception, so a rule restated in prose cannot drift again.'
+      refs: ['evals/shared/tests']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
