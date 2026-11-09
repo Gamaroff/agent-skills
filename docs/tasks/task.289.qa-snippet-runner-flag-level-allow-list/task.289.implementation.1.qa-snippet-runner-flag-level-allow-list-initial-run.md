@@ -91,6 +91,16 @@ _Track each QA review/fix cycle._
 - **Verification**: 260 of 260 engine tests; `CI=true npm run ci:fast` exit 0; `bundle:check` 0 problems.
 - **No struck mechanism, no narrowing residue** (first fix cycle).
 
+### QA Cycle 2
+
+- **Gate**: FAIL (80/100). Full refute pass plus safety re-probe by an Explore reviewer; two high findings, both reproduced by QA with a control (PR #864 comment). Cycle 1's two fixes held.
+- **T289-CR2-1**: a sed `#` comment ended at a backslash-newline in `sedScan`, but GNU sed ends it at the first newline, so `sed '#c\<newline>e echo PWNED' f` ran `e`. Fix: scan a comment to the first newline. Mutation proof: restoring `toLineEnd()` turned the two comment gap rows and the sedScriptVerdict test red.
+- **T289-CR2-2**: `$(` is a segment break, so a governed command's arguments were cut before the flag table saw them: `sort -$(echo o) out in` wrote a file. Fix: `substitutionAfterWord` refuses a substitution where a flag may stand (a word starting with it or with a dash) and always for `uniq` and `sed`. Mutation proof: disabling the call turned six substitution gap rows red.
+- **Narrowing**: the first version refused every substitution after a governed command and newly refused seven copies of the `date -u -d "@$(stat …)"` block in `pipeline-resume-detector-prompt.md`. Narrowed to tokens that could be a flag; the docs scan is back to 1 block newly refused (`tail -f`), 0 newly runnable.
+- **Probe (Step 3.5)**: `git grep` for the rule's wording over `shared/resources/*.md`, `docs` and `skills/*/SKILL.md`: the live statement is `shared/resources/qa-runnable-prose-detection.md` (updated); the other hits are closed task documents. Population: 1.
+- **Verification**: 274 of 274 engine tests; `CI=true npm run ci:fast` exit 0 on the second run; `bundle:check` 0 problems. The first run failed the tmp-leak ratchet on a new `ctx-wrap` prefix, which is the known intermittent leak (Phase 5, not in this change) and did not recur.
+- **Struck mechanism**: none. Two cycles in a row found the scanner reading a construct differently from the tool, so the next re-review should enumerate that class rather than re-read these two fixes.
+
 ---
 
 ## Completion

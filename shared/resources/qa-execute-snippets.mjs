@@ -1397,7 +1397,10 @@ function sedScan(s, markForbidden) {
       continue;
     }
     if (cmd === "#") {
-      toLineEnd();
+      // A comment ends at the FIRST newline. GNU sed does not read a backslash
+      // before it as a continuation (that is a/i/c text), so `#c\<newline>e x`
+      // is a comment and then an `e` command, which toLineEnd() would swallow.
+      while (i < n && s[i] !== "\n") i += 1;
       continue;
     }
     if (cmd === ":" || "btT".includes(cmd)) {
@@ -1445,6 +1448,78 @@ function sedScan(s, markForbidden) {
     if ("efFrRwWv".includes(cmd)) markForbidden();
     return false;
   }
+}
+
+/**
+ * True when a command or backtick substitution could stand where `name` takes a
+ * flag or an operand that writes. `commandInvocations` turns `$(` into a segment
+ * break, so the arguments it hands the flag table stop at the substitution:
+ * `sort -$(echo o) out in` reaches the table as `sort -`. The text after the word
+ * is walked here instead, to the end of the simple command (an unquoted `;`, `|`
+ * or `&`). A substitution is a hazard when its word starts with it or with a dash
+ * (it may be a flag), or when `name` is `uniq` or `sed`, whose operands and
+ * scripts can write whatever they hold. `date -d "@$(stat …)"` has a literal
+ * prefix that is not a dash, so it cannot be a flag and is left alone.
+ * A process substitution is not in this set: it stands for a /dev/fd path, an
+ * operand and never a flag, and the command inside it is judged as its own segment.
+ */
+function substitutionAfterWord(prose, name) {
+  if (!/\$\(|`/.test(prose)) return false;
+  const always = name === "uniq" || name === "sed";
+  const find = new RegExp(`(^|[\\s;|&(\`])${name}(?=\\s|$)`, "g");
+  for (const line of prose.split("\n")) {
+    for (const m of line.matchAll(find)) {
+      const tail = line.slice(m.index + m[0].length);
+      let q = null;
+      let atStart = true;
+      let first = null;
+      const note = (ch) => {
+        if (first === null) first = ch;
+        atStart = false;
+      };
+      for (let k = 0; k < tail.length; k += 1) {
+        const c = tail[k];
+        if (q === "'") {
+          if (c === "'") q = null;
+          else note(c);
+          continue;
+        }
+        if (c === "\\") {
+          note(tail[k + 1] ?? "");
+          k += 1;
+          continue;
+        }
+        if (c === "`" || (c === "$" && tail[k + 1] === "(")) {
+          if (always || atStart || first === "-") return true;
+          if (c === "`") {
+            k = tail.indexOf("`", k + 1);
+            if (k < 0) return true;
+          } else {
+            let d = 0;
+            for (k += 1; k < tail.length; k += 1) {
+              if (tail[k] === "(") d += 1;
+              else if (tail[k] === ")" && (d -= 1) === 0) break;
+            }
+            if (k >= tail.length) return true;
+          }
+          note("x");
+          continue;
+        }
+        if (q === '"') {
+          if (c === '"') q = null;
+          else note(c);
+          continue;
+        }
+        if (c === "'" || c === '"') q = c;
+        else if (/\s/.test(c)) {
+          atStart = true;
+          first = null;
+        } else if (c === ";" || c === "|" || c === "&") break;
+        else note(c);
+      }
+    }
+  }
+  return false;
 }
 
 /** Why `name`'s arguments are outside its entry, or null. `rawArgs` keep their quotes. */
@@ -3045,6 +3120,11 @@ function classifyInternal(
     };
     const why = flagViolation(inv.word, raw ? raw[i].args : inv.args, flagCtx);
     if (why) return verdict("mutating", why);
+    if (substitutionAfterWord(prose, inv.word))
+      return verdict(
+        "mutating",
+        `flag-not-allowed: ${inv.word} command-substitution (its arguments are not readable)`,
+      );
   }
 
   // A helper's `<dir>` comments and `$1` arguments are code and arguments, not

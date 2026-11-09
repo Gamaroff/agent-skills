@@ -4063,6 +4063,48 @@ const T289_GAPS = {
     "sort --comp=./x f",
     /^flag-not-allowed: sort --comp$/,
   ],
+  // QA cycle 2: a sed comment ends at the first newline, backslash or not.
+  "a sed comment ending in a backslash does not hide an e command": [
+    "sed '#c\\\ne echo PWNED' f",
+    /^flag-not-allowed: sed script/,
+  ],
+  "a sed comment ending in a backslash does not hide a w command": [
+    "sed '#c\\\nw out' f",
+    /^flag-not-allowed: sed script/,
+  ],
+  // QA cycle 2: a substitution cuts the arguments the table sees.
+  "sort -$(echo o) writes a file": [
+    "sort -$(echo o) out in",
+    /^flag-not-allowed: sort command-substitution/,
+  ],
+  "sort $(echo -o) writes a file": [
+    "sort $(echo -o) out in",
+    /^flag-not-allowed: sort command-substitution/,
+  ],
+  "a quoted substitution is still one": [
+    'sort "$(echo -o)" out in',
+    /^flag-not-allowed: sort command-substitution/,
+  ],
+  "a backtick substitution is still one": [
+    "sort `echo -o` out in",
+    /^(flag-not-allowed|unrecognised-command)/,
+  ],
+  "uniq operand through a substitution": [
+    "uniq in $(echo out)",
+    /^flag-not-allowed: uniq command-substitution/,
+  ],
+  "tail -f through a substitution": [
+    "tail $(echo -f) x",
+    /^flag-not-allowed: tail command-substitution/,
+  ],
+  "date -s through a substitution": [
+    "date $(echo -s) now",
+    /^flag-not-allowed: date command-substitution/,
+  ],
+  "find -delete through a substitution": [
+    "find . $(echo -delete)",
+    /^(deny-list|flag-not-allowed)/,
+  ],
 };
 for (const [name, [code, reason]] of Object.entries(T289_GAPS)) {
   test(`task.289 gap: ${name} is refused as mutating`, () => {
@@ -4099,6 +4141,12 @@ const T289_CONTROLS = {
   "date -u with a format": "date -u +%FT%T",
   "file -b": "file -b x",
   "an unquoted variable the block gives one word": "X=y; find docs/$X -name z",
+  "a plain sed comment": "sed '# a comment' f",
+  "a sed comment before a command on the next line": "sed '# c\np' f",
+  "a sort piped to wc": "sort f | wc -l",
+  "a substitution that holds the governed command": "x=$(sort -u f)",
+  "a date value with a literal prefix cannot be a flag":
+    'date -u -d "@$(stat -c %Y f)" +%FT%T',
 };
 for (const [name, code] of Object.entries(T289_CONTROLS)) {
   if (code === null) continue;
@@ -4210,8 +4258,11 @@ test("task.289 sedScriptVerdict: what is read-only, what is forbidden, what is n
     "r in",
     "$!{e x}",
     "1,2{p;e x}",
+    "#c\\\ne echo x", // a comment ends at the first newline (QA 2)
+    "#c\\\nw out",
   ])
     assert.equal(sedScriptVerdict(s), "forbidden", s);
+  assert.equal(sedScriptVerdict("# c\\\np"), "safe", "comment, then p");
   // Not understood, and not an `e`: a command with characters after it is an
   // error to sed (it runs nothing), so `hello` and a path are unreadable.
   // A label ends at whitespace or `;`; a command after it is read by sed (QA 1).

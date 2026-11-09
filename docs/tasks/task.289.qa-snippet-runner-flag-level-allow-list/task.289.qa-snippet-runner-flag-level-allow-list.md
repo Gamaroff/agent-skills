@@ -307,19 +307,19 @@ A table of allowed flags per allowed command (`sed`, `find`, `sort`, and each ot
 
 ### QA Report
 
-- **Full Report**: [task.289.qa.1.qa-snippet-runner-flag-level-allow-list.md](./task.289.qa.1.qa-snippet-runner-flag-level-allow-list.md)
-- **Gate File**: [task.289.gate.1.qa-snippet-runner-flag-level-allow-list.yml](./task.289.gate.1.qa-snippet-runner-flag-level-allow-list.yml)
+- **Full Report**: [task.289.qa.2.qa-snippet-runner-flag-level-allow-list.md](./task.289.qa.2.qa-snippet-runner-flag-level-allow-list.md)
+- **Gate File**: [task.289.gate.2.qa-snippet-runner-flag-level-allow-list.yml](./task.289.gate.2.qa-snippet-runner-flag-level-allow-list.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 252
+- **Tests Executed**: 260
 - **Phases Verified**: 4/5
 - **Critical Issues**: 2
 - **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-Two high-severity bypasses of the new flag table, both reproduced: a sed label followed by a command, and an ANSI-C quoted flag.
+Cycle 1 fixes hold. Cycle 2 found two more high-severity bypasses of the flag table, both reproduced: a sed `#` comment ending in a backslash-newline hides a command, and a command substitution splits the arguments before the flag check.
 
 ## Change Log
 
@@ -334,6 +334,8 @@ Two high-severity bypasses of the new flag table, both reproduced: a sed label f
 | 2026-11-09 |         | Status → ready-for-review | develop-task |
 | 2026-11-09 |         | QA gate FAIL (80/100) — 2 findings | qa-task |
 | 2026-11-09 |         | QA findings fixed — 2 high findings, 1 iteration | qa-fix |
+| 2026-11-09 |         | QA gate FAIL (80/100) — 2 findings | qa-task |
+| 2026-11-09 |         | QA findings fixed — 2 high findings, 2 iterations | qa-fix |
 
 <!-- change-log-end -->
 

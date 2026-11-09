@@ -159,7 +159,12 @@ print, branch or substitute pass, a script built from a variable this block defi
 script sed itself would reject (a command followed by more text) runs nothing. A sed label (`:a`, `ba`,
 `ta`) is one word that ends at whitespace or `;`, and sed reads what follows as the next command, so
 `:a e echo x` runs `e`: only a separator or the end of the script may follow a label, and anything else
-is a script the scan does not read, which is refused. The same pass refuses
+is a script the scan does not read, which is refused. A sed `#` comment ends at the first newline: a
+backslash before it is not a continuation, so `#c\<newline>e echo x` is a comment and then an `e`
+command. A command or backtick substitution cuts a command's arguments where the scan reads them, so a
+governed command is refused when a substitution may stand where a flag goes (a word that starts with the
+substitution or with a dash: `sort -$(echo o) out in`) and always for `uniq` and `sed`; a literal prefix
+that is not a dash (`date -d "@$(stat -c %Y f)"`) cannot be a flag and passes. The same pass refuses
 three shapes the table cannot express: the `<>` redirection (opens a file for read **and** write), a
 function named after an allowed command (`function cat { touch x; }; cat f`), and an unquoted expansion
 that word-splits into a flag (`x${IFS}-delete`, a variable this block gives two words, a brace
