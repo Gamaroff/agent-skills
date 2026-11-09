@@ -171,7 +171,9 @@ There is no gate in standalone mode — the `top_issues[]` mapping below is QA-o
    recorded **unchanged** (never edited upward to fit), the reproduction and the control go in the QA
    report's `## Code Review` section, and the entry names its origin (`origin: code-review, reproduced
    by QA`). A medium-confidence finding QA did **not** reproduce stays advisory. Severity then follows
-   the gate's deterministic rules.
+   the gate's deterministic rules. **An explicit `code_review_blocking: false` still wins**: the
+   reproduction is recorded in the report and the gate is untouched (see the `CR_BLOCKING=false` line
+   below).
 5. **A probe the caller runs while a reviewer is live starts with a known-good calibration case** (obs #116).
    The reviewer is told to write only inside its own scratch directory, but the tree is still shared: a
    changed probe script reads `unreadable` on every case and looks like a finding about the code. Run one
@@ -210,7 +212,8 @@ fi
   `top_issues[]`; the skill's existing deterministic gate rules then apply unchanged. On the next
   `/qa-fix` cycle these are fixed alongside the document-derived issues, then re-reviewed — i.e. the
   code-review-and-fix loop.
-- `CR_BLOCKING=false` → all findings stay advisory; the gate is untouched.
+- `CR_BLOCKING=false` → all findings stay advisory, including one QA reproduces (item 4 under "QA use");
+  the gate is untouched.
 
 **Resolution matrix:**
 

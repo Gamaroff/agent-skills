@@ -302,8 +302,8 @@ None identified.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.273.qa.1.qa-task-steps-state-the-routes-they-lack.md](./task.273.qa.1.qa-task-steps-state-the-routes-they-lack.md)
-- **Gate File**: [task.273.gate.1.qa-task-steps-state-the-routes-they-lack.yml](./task.273.gate.1.qa-task-steps-state-the-routes-they-lack.yml)
+- **Full Report**: [task.273.qa.2.qa-task-steps-state-the-routes-they-lack.md](./task.273.qa.2.qa-task-steps-state-the-routes-they-lack.md)
+- **Gate File**: [task.273.gate.2.qa-task-steps-state-the-routes-they-lack.yml](./task.273.gate.2.qa-task-steps-state-the-routes-they-lack.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 3
@@ -312,7 +312,7 @@ None identified.
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-One MEDIUM finding: `[Unreleased]` in `CHANGELOG.md` has no entry citing task 273, which `/finalise` 6d requires here. Three advisory review findings are recorded as future recommendations.
+Cycle 1's CHANGELOG finding is fixed. Cycle 2 (refute pass) found one MEDIUM: the new reproduced-finding route (5d) contradicts four unchanged restatements of the gating rule in `qa-task` and `qa-story`, and does not say whether `code_review_blocking: false` overrides it. Three advisory review findings stay in the gate's future recommendations.
 
 <!-- change-log-start -->
 ## Change Log
@@ -325,6 +325,8 @@ One MEDIUM finding: `[Unreleased]` in `CHANGELOG.md` has no entry citing task 27
 | 2026-11-09 |         | Implemented — 4 phases; 7 sources, 1 new prompt, 1 test allowlist entry, bundled copies; ci:fast green | develop |
 | 2026-11-09 |         | QA gate CONCERNS (90/100) — 1 finding                           | qa-task     |
 | 2026-11-09 |         | QA findings fixed — CHANGELOG entry added, 1 iteration          | qa-fix      |
+| 2026-11-09 |         | QA gate CONCERNS (90/100) — 1 finding (cycle 2 refute pass)     | qa-task     |
+| 2026-11-09 |         | QA findings fixed — gating-rule restatements aligned with 5d, 2 iterations | qa-fix      |
 <!-- change-log-end -->
 
 ---

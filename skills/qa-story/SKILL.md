@@ -1358,6 +1358,8 @@ JSON
    finding that reproduces, passes its control and is not `pre-existing` per 5b enters `top_issues[]`
    as a QA finding even when the reviewer rated it `confidence: medium` or `low`, and whether or not
    the doc opted in (the opt-in below gates the reviewer's *claim*; a reproduction is a measurement).
+   **An explicit `code_review_blocking: false` still wins** (the escape hatch of the gate-mapping
+   step): the reproduction is then recorded in `## Code Review` and the gate is untouched.
    The reviewer's `confidence` is recorded **unchanged**, never edited to fit; the reproduction command,
    its output and the control go in the QA report's `## Code Review` section; and the entry names its
    origin (`origin: code-review, reproduced by QA`). Severity then follows the gate's deterministic
@@ -1389,7 +1391,7 @@ JSON
 **Post-condition — the findings block is in hand.** This step ends when the dispatched reviewer's `code_review:` block is in hand and recorded. A dispatched review that has not returned is **outstanding**, and the pass is not complete: the gate step refuses to write a gate and the PR-comment step refuses to publish one while a review is outstanding. Waiting is bounded by the wall-clock budget in `references/develop-pipeline-autonomous-defaults.md` §Subagents; a reviewer past its budget is recorded as `killed at N minutes` (never `stalled`) and the pass is performed inline per that table, with the independence loss recorded. A reviewer that is **unavailable** (no subagent dispatch in this session) or **failed** (returned nothing usable) is handled by the same table — and **output-file size is not a liveness signal**: a small or stale output file says nothing about whether the reviewer is working. The reason this is written down: task.106's gate 1 (`PASS` 95) was written and posted while its diff review was still running; the review returned a high and a medium minutes later (obs #56).
 
 
-This is the single diff-aware code reviewer for the story; Phase 2B below defers to it rather than duplicating it. It keeps the QA→qa-fix loop safe: only a high-confidence correctness bug triggers a fix cycle. Under the develop-story pipeline (which sets the run-level override) this _is_ the code-review-and-fix loop; standalone, behaviour is unchanged unless the story opts in via frontmatter.
+This is the single diff-aware code reviewer for the story; Phase 2B below defers to it rather than duplicating it. It keeps the QA→qa-fix loop safe: only a high-confidence correctness bug, or a bug QA reproduces itself (5d), triggers a fix cycle. Under the develop-story pipeline (which sets the run-level override) this _is_ the code-review-and-fix loop; standalone, behaviour is unchanged unless the story opts in via frontmatter.
 
 #### Phase 1.7: Execute the Documented Commands
 
@@ -2173,7 +2175,7 @@ If risk_summary exists, apply its thresholds first (≥9 → FAIL, ≥6 → CONC
 
 - **WAIVED** only when waiver.active: true with reason/approver
 
-> **Code-review findings (Phase 1.6):** by default these do NOT enter `top_issues` and do NOT affect the gate. Only when the story opts in via `code_review_blocking: true` in its frontmatter are `category: bug` + `confidence: high` findings appended to `top_issues[]` — at which point the top_issues severity rules above apply unchanged. Cleanups and non-high-confidence findings are always advisory.
+> **Code-review findings (Phase 1.6):** by default these do NOT enter `top_issues` and do NOT affect the gate. Only when the story opts in via `code_review_blocking: true` in its frontmatter are `category: bug` + `confidence: high` findings appended to `top_issues[]` — at which point the top_issues severity rules above apply unchanged. Cleanups and non-high-confidence findings are always advisory, except a bug QA reproduces by execution (step 5d).
 
 **Detailed criteria:**
 
