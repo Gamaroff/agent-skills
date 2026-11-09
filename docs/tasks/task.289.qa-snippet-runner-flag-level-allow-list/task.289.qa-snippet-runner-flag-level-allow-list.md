@@ -297,6 +297,30 @@ A table of allowed flags per allowed command (`sed`, `find`, `sort`, and each ot
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-09
+**Quality Score**: 80/100
+**Gate Decision**: FAIL
+
+### QA Report
+
+- **Full Report**: [task.289.qa.1.qa-snippet-runner-flag-level-allow-list.md](./task.289.qa.1.qa-snippet-runner-flag-level-allow-list.md)
+- **Gate File**: [task.289.gate.1.qa-snippet-runner-flag-level-allow-list.yml](./task.289.gate.1.qa-snippet-runner-flag-level-allow-list.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 252
+- **Phases Verified**: 4/5
+- **Critical Issues**: 2
+- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+Two high-severity bypasses of the new flag table, both reproduced: a sed label followed by a command, and an ANSI-C quoted flag.
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -308,6 +332,8 @@ A table of allowed flags per allowed command (`sed`, `find`, `sort`, and each ot
 | 2026-11-09 |         | Status → ready-for-development | review-task |
 | 2026-11-09 |         | Owner decision on the 17 refused doc blocks: accept the refusal, no value tracking | develop-task |
 | 2026-11-09 |         | Status → ready-for-review | develop-task |
+| 2026-11-09 |         | QA gate FAIL (80/100) — 2 findings | qa-task |
+| 2026-11-09 |         | QA findings fixed — 2 high findings, 1 iteration | qa-fix |
 
 <!-- change-log-end -->
 

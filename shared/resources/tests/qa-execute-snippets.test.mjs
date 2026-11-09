@@ -4025,6 +4025,28 @@ const T289_GAPS = {
     "cat() { touch x; }; cat f",
     /^function-shadows-command: cat$/,
   ],
+  // QA cycle 1 (task.289): both reproduced by execution (GNU sed 4.10 printed
+  // PWNED; bash created `out`).
+  "a sed label followed by a command runs it (:a e)": [
+    "sed ':a e echo PWNED' f",
+    /^flag-not-allowed: sed script/,
+  ],
+  "a sed branch label followed by a command runs it (ta e)": [
+    "sed ':a;ta e echo P' f",
+    /^flag-not-allowed: sed script/,
+  ],
+  "an ANSI-C quoted flag is not seen as a flag (sort $'-o')": [
+    "sort $'-o' out in",
+    /^flag-not-allowed: sort .*an expansion that could be a flag/,
+  ],
+  "an ANSI-C octal-escaped flag (sort $'-\\157')": [
+    "sort $'-\\157' out in",
+    /^flag-not-allowed: sort .*an expansion that could be a flag/,
+  ],
+  'a locale-quoted flag (find $"-delete")': [
+    'find docs $"-delete"',
+    /^(deny-list|flag-not-allowed)/,
+  ],
   "uniq writes its second operand": [
     "uniq in.txt out.txt",
     /^flag-not-allowed: uniq operand "out.txt"/,
@@ -4056,6 +4078,10 @@ const T289_CONTROLS = {
   "sort reverse after --": "sort -r -- -x",
   "uniq with one operand": "uniq -c f",
   "sed -n with a range": "sed -n '1,3p' f",
+  "sed label loop that joins lines": "sed ':a;N;$!ba;s/\\n/ /g' f",
+  "a $ followed by a quote is a quoted word, not an operand to refuse (grep)":
+    "grep -c 'a$' f",
+  "a plain single-quoted operand after sort": "sort -u 'f g'",
   "sed -E substitution": "sed -E 's/a/b/g' f",
   "sed two -e scripts": "sed -e p -e d f",
   "sed clustered -ne": "sed -ne p f",
@@ -4188,7 +4214,17 @@ test("task.289 sedScriptVerdict: what is read-only, what is forbidden, what is n
     assert.equal(sedScriptVerdict(s), "forbidden", s);
   // Not understood, and not an `e`: a command with characters after it is an
   // error to sed (it runs nothing), so `hello` and a path are unreadable.
-  for (const s of ["hello", "pe touch x", "s/a/b", "docs/tasks/task.1.x", "1,"])
+  // A label ends at whitespace or `;`; a command after it is read by sed (QA 1).
+  for (const s of [
+    "hello",
+    "pe touch x",
+    "s/a/b",
+    "docs/tasks/task.1.x",
+    "1,",
+    ":a e echo x",
+    ":a;ta e echo x",
+    "ba e echo x",
+  ])
     assert.equal(sedScriptVerdict(s), "unreadable", s);
 });
 

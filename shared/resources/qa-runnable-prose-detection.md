@@ -155,11 +155,16 @@ long-flag abbreviation is not on the list. Eight commands carry an explicit flag
 `sort`, `uniq`, `file`, `diff`, `date`, `tail`); the rest are audited as having no flag that writes or
 runs a program. A sed script is parsed to the end by `sedScriptVerdict`: only commands that read,
 print, branch or substitute pass, a script built from a variable this block defines is refused, and a
-script sed itself would reject (a command followed by more text) runs nothing. The same pass refuses
+script sed itself would reject (a command followed by more text) runs nothing. A sed label (`:a`, `ba`,
+`ta`) is one word that ends at whitespace or `;`, and sed reads what follows as the next command, so
+`:a e echo x` runs `e`: only a separator or the end of the script may follow a label, and anything else
+is a script the scan does not read, which is refused. The same pass refuses
 three shapes the table cannot express: the `<>` redirection (opens a file for read **and** write), a
 function named after an allowed command (`function cat { touch x; }; cat f`), and an unquoted expansion
 that word-splits into a flag (`x${IFS}-delete`, a variable this block gives two words, a brace
-expansion that spells `-delete`). `DENY_PATTERNS` and the variable-argument rule stay **beside** the
+expansion that spells `-delete`). An unquoted ANSI-C `$'…'` or locale `$"…"` word is decoded by the
+shell before the command sees it (`sort $'-o' out in` is `sort -o out in`) and this reader does not
+decode it, so it counts as an expansion whose value is unknown and is refused where a flag may stand. `DENY_PATTERNS` and the variable-argument rule stay **beside** the
 table: they remain the only check on `git`, `gh`, `rm`, `curl` and `tee`, and the second line on the
 rest, and their reasons are pinned by tests. A flag forwarded through a helper function is refused when
 every table-governed command it may reach refuses it, because the scan cannot tell which one receives

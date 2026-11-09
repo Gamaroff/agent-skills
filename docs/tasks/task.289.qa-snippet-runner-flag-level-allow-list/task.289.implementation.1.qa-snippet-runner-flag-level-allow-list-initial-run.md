@@ -34,7 +34,7 @@ Replace the snippet runner's flag-level deny-list with a per-command flag and op
 | 1. create-branch           | ✅ Done | Branch `feature/task.{id}.*` exists in git                             | already checked out | —                    | 2026-11-09T13:59Z |
 | 2. review-task             | ✅ Done | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               | skipped: review 1 current | —                    | 2026-11-09T13:59Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | inline; fast gate green | —                    | 2026-11-09T13:59Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
+| 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #864; no issue linked | —                    | 2026-11-09T14:08Z |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
@@ -80,6 +80,16 @@ _Problems encountered and how they were resolved or escalated._
 ## QA Iteration History
 
 _Track each QA review/fix cycle._
+
+### QA Cycle 1
+
+- **Gate**: FAIL (80/100). Two high findings from the diff reviewer, both reproduced by QA with a control (PR #864 comment).
+- **T289-CR-1**: a sed label ends at whitespace in GNU sed, so `sed ':a e echo PWNED' f` ran `e`. Fix: `sedScan` reads a label as one word and refuses anything but a separator after it. Mutation proof: restoring the old skip turned three tests red (the `:a e` and `ta e` gap rows, the sedScriptVerdict table).
+- **T289-CR-2**: `shellWord` did not decode `$'…'`, so `sort $'-o' out in` wrote a file. Fix: an unquoted `$'…'` or `$"…"` word is a dynamic expansion, refused where a flag may stand. Mutation proof: removing the branch turned the two `sort $'…'` gap rows red.
+- **Probe (Step 3.5)**: `git grep -l -F -i -e 'sedScriptVerdict'` and `-e 'ANSI-C'` over the executed documents: 1 hit each, `shared/resources/qa-runnable-prose-detection.md` — updated. Population: 1.
+- **Both directions**: must-now-catch rows added (5); must-still-leave-alone controls added (3: label loop `:a;N;$!ba`, `grep -c 'a$'`, `sort -u 'f g'`). Docs scan against develop unchanged: 1 block newly refused (`tail -f`), none newly runnable.
+- **Verification**: 260 of 260 engine tests; `CI=true npm run ci:fast` exit 0; `bundle:check` 0 problems.
+- **No struck mechanism, no narrowing residue** (first fix cycle).
 
 ---
 

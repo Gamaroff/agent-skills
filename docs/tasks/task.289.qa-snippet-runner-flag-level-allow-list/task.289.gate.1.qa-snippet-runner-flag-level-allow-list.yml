@@ -1,0 +1,73 @@
+schema: 2
+task: 'task.289.qa-snippet-runner-flag-level-allow-list'
+task_title: 'QA snippet runner allows flags, not just commands'
+gate: FAIL
+status_reason: 'Two high-severity bypasses of the new flag table, both reproduced by execution: a sed label followed by a space and a command (sed runs it), and an ANSI-C quoted flag that shellWord does not decode (sort writes a file).'
+reviewer: 'QA Engineer'
+head: '74de549fa0ff79a7c0b0b9be68278f72549a59ec'
+updated: '2026-11-09T14:13:46Z'
+
+top_issues:
+  - id: 'T289-CR-1'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: "sedScan skips a `:`/`b`/`t`/`T` label to the next newline or `;`, but GNU sed ends a label at whitespace and parses the rest as a new command. `sed ':a e echo PWNED' f` and `sed ':a;ta e echo P' f` classify runnable; sed runs the `e` command (QA ran the first: it printed PWNED). Control `sed ':a;N;$!ba;s/\\n/ /g' f` stays runnable. origin: code-review, reproduced by QA"
+    suggested_action: 'Parse a label as a whitespace-terminated word and require a command separator after it (or return unreadable when anything follows the label on the line); add a gap-table row and a control.'
+    suggested_owner: dev
+    status: open
+  - id: 'T289-CR-2'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: "shellWord keeps the `$` of an ANSI-C `$'...'` or locale `$\"...\"` word as literal text, so `sort $'-o' out in` and `sort $'-\\157' out in` have no leading dash, count as operands and classify runnable; bash writes `out` (QA ran the first: the file was created). The same hole exists for every table command, since a flag spelled this way is never seen as a flag. Control `sort -u in` stays runnable. origin: code-review, reproduced by QA"
+    suggested_action: 'Make shellWord treat `$'"'"'` and `$"` as quoting: decode the escapes, or mark the word dynamic so the table refuses it; add a gap-table row per command class and a control.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 252
+  phases_verified: '4/5'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 31
+    escaped: 0
+    boundary: true
+    boundary_signals: ['refused', 'refuses']
+    notes: 'The shell-exec corpus (31 cases, 0 reproduced, 0 escaped) passes, but the diff reviewer found two inputs outside that corpus that classify runnable and write or execute; QA reproduced both.'
+  performance:
+    status: PASS
+    notes: 'Docs scan 460-487 ms against develop 472-499 ms over six alternating pairs (load about 1.5), measured by the developer; QA did not re-measure.'
+  reliability:
+    status: PASS
+    notes: 'A flag outside a table entry, an entry-less command and an unreadable sed script all fail closed.'
+  maintainability:
+    status: PASS
+    notes: 'SAFE_FLAGS is data beside SAFE_COMMANDS with an audit test; the engine file grew by about 900 lines.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T289-CR-1 and T289-CR-2, each with a failing-first gap row and a control.'
+      refs: ['shared/resources/qa-execute-snippets.mjs', 'shared/resources/tests/qa-execute-snippets.test.mjs']
+  future:
+    - action: 'Phase 5 (ctx-wrap- temp-directory leak) was left out of this task; file it separately.'
+      refs: ['shared/resources/tests/context-pressure-statusline.test.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['Both high findings fixed and re-reviewed']

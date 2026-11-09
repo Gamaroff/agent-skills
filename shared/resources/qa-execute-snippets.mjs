@@ -1163,6 +1163,21 @@ function shellWord(tok, resolve = null) {
     if (ch === "$") {
       const rest = tok.slice(k + 1);
       let m;
+      // An unquoted `$'…'` (ANSI-C) or `$"…"` (locale) word is decoded by the shell
+      // before the command sees it (`$'-o'` is `-o`, `$'-\157'` too), and this reader
+      // does not decode it: it is an expansion whose value is unknown, so a flag
+      // spelled that way is refused where a flag may stand, as `$X` is.
+      if (q === null && (rest.startsWith("'") || rest.startsWith('"'))) {
+        dynamic = true;
+        if (firstExp < 0) firstExp = text.length;
+        text += "X";
+        const close = rest[0];
+        let j = 1;
+        while (j < rest.length && rest[j] !== close)
+          j += rest[j] === "\\" ? 2 : 1;
+        k += 1 + j;
+        continue;
+      }
       if (rest.startsWith("(")) {
         dynamic = true;
         if (firstExp < 0) firstExp = text.length;
@@ -1386,7 +1401,14 @@ function sedScan(s, markForbidden) {
       continue;
     }
     if (cmd === ":" || "btT".includes(cmd)) {
-      while (i < n && s[i] !== "\n" && s[i] !== ";") i += 1;
+      // GNU sed ends a label at whitespace or `;`, and reads what follows as the
+      // next command (`:a e echo x` runs `e`). So the label is one word, and only a
+      // separator or the end of the script may follow it: anything else is a script
+      // this scan does not read, which is refused, never skipped over.
+      while (i < n && (s[i] === " " || s[i] === "\t")) i += 1;
+      while (i < n && !/[\s;]/.test(s[i])) i += 1;
+      while (i < n && (s[i] === " " || s[i] === "\t")) i += 1;
+      if (i < n && s[i] !== "\n" && s[i] !== ";") return false;
       continue;
     }
     if ("aic".includes(cmd)) {
