@@ -227,6 +227,9 @@ fi
 | `true` | `true` | blocking |
 | `true` | `false` | advisory (escape hatch) |
 
+The matrix resolves `CR_BLOCKING` for the reviewer's claim only. A bug the caller reproduces (item 4
+under "QA use") gates in every row except those whose `CR_BLOCKING` resolves to `false`.
+
 The flag lives in frontmatter (not an embedded block) so it is trivially greppable and consistent with
 the other behaviour-driving keys the QA skills already read (`status`, `github_issue`, `jira_key`). The
 `top_issues[]` entries use the `finding:` key — matching `qa-findings-ingester-prompt.md` and the

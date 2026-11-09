@@ -1,0 +1,70 @@
+schema: 2
+task: 'task.273.qa-task-steps-state-the-routes-they-lack'
+task_title: 'qa-task steps state the routes they lack'
+gate: CONCERNS
+status_reason: 'The cycle-3 fix is verified. A wider search found three more restatements of the gating rule that still say a standalone run stays advisory unless the doc opts in, with no 5d exception: the Skill-arg paragraphs and the closing sentence of the gate-mapping step.'
+reviewer: 'QA Engineer'
+head: '4369f285805a8042797f6824d009c7931e1cad1c'
+updated: '2026-11-09T04:15:47Z'
+
+top_issues:
+  - id: 'T273-CR-3'
+    severity: medium
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'The Skill-arg paragraphs (qa-task line 50, qa-story line 90) end "Absent for standalone runs -> code review stays advisory unless the task opts in via frontmatter", and the closing sentence of the gate-mapping step (qa-task line 895, qa-story line 1394) ends "standalone, behaviour is unchanged unless the task opts in". Step 5d gates a reproduced bug in a standalone run with no opt-in, so all four contradict it. The Resolution matrix in code-review-prompt.md resolves CR_BLOCKING for the reviewer claim only and says nothing of 5d.'
+    suggested_action: 'Append the 5d exception to the four sentences, and add one sentence under the Resolution matrix stating that it resolves the reviewer claim and that a QA reproduction gates in every row except where CR_BLOCKING resolves to false.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    notes: 'No predicate-shaped function is added. boundary: false.'
+  performance:
+    status: PASS
+    notes: 'Prose-only change since the cycle 1 measurement.'
+  reliability:
+    status: PASS
+    notes: 'No new failure path.'
+  maintainability:
+    status: PASS
+    notes: 'The restated-rule drift is carried as T273-CR-3.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Resolve T273-CR-3 and list every wording of the rule, not only the changed ones, in the fix probe.'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md', 'shared/resources/code-review-prompt.md']
+  future:
+    - action: 'Cycle 1 CR-1 (medium confidence, not reproducible by execution): add the unbound-read category to the docs-only claim-check prompt.'
+      refs: ['shared/resources/qa-docs-only-review-prompt.md']
+    - action: 'Cycle 1 CR-2 (low): state which file list decides the docs-only route on cycle 3 and later.'
+      refs: ['skills/qa-task/SKILL.md']
+    - action: 'Cycle 1 CR-3 (low confidence): say that the docs-only route reads ci.docsOnly.patterns and ignores ci.docsOnly.enabled.'
+      refs: ['shared/resources/qa-docs-only-review-prompt.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions:
+    - 'T273-CR-3 is resolved.'

@@ -47,7 +47,7 @@ Skill(qa-task, args="traceability_matrix=<path> code_review_blocking=true")
 ```
 
 - `traceability_matrix=<path>` — a pre-built traceability matrix (see Step 5 / traceability handling); absent → internal mapping.
-- `code_review_blocking=true` — run-level override. Set `CODE_REVIEW_BLOCKING_ARG` from this token (default empty when absent). It feeds the canonical resolution in **Step 3b step 6 (Gate mapping)** so high-confidence code-review bugs gate the build (and thus get fixed in the qa-fix loop) without needing per-task frontmatter. A task still opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch). Absent for standalone runs → code review stays advisory unless the task opts in via frontmatter.
+- `code_review_blocking=true` — run-level override. Set `CODE_REVIEW_BLOCKING_ARG` from this token (default empty when absent). It feeds the canonical resolution in **Step 3b step 6 (Gate mapping)** so high-confidence code-review bugs gate the build (and thus get fixed in the qa-fix loop) without needing per-task frontmatter. A task still opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch). Absent for standalone runs → code review stays advisory unless the task opts in via frontmatter, except a bug QA reproduces by execution (step 5d).
 
 ## When to Use This Skill
 
@@ -892,7 +892,7 @@ JSON
 **Post-condition — the findings block is in hand.** This step ends when the dispatched reviewer's `code_review:` block is in hand and recorded. A dispatched review that has not returned is **outstanding**, and the pass is not complete: the gate step refuses to write a gate and the PR-comment step refuses to publish one while a review is outstanding. Waiting is bounded by the wall-clock budget in `references/develop-pipeline-autonomous-defaults.md` §Subagents; a reviewer past its budget is recorded as `killed at N minutes` (never `stalled`) and the pass is performed inline per that table, with the independence loss recorded. A reviewer that is **unavailable** (no subagent dispatch in this session) or **failed** (returned nothing usable) is handled by the same table — and **output-file size is not a liveness signal**: a small or stale output file says nothing about whether the reviewer is working. The reason this is written down: task.106's gate 1 (`PASS` 95) was written and posted while its diff review was still running; the review returned a high and a medium minutes later (obs #56).
 
 
-This keeps the QA→qa-fix loop safe: only a high-confidence correctness bug, or a bug QA reproduces itself (5d), triggers a fix cycle; cleanups and uncertain findings stay advisory. Under the develop-task pipeline (which sets the run-level override) this *is* the code-review-and-fix loop; standalone, behaviour is unchanged unless the task opts in via frontmatter.
+This keeps the QA→qa-fix loop safe: only a high-confidence correctness bug, or a bug QA reproduces itself (5d), triggers a fix cycle; cleanups and uncertain findings stay advisory. Under the develop-task pipeline (which sets the run-level override) this *is* the code-review-and-fix loop; standalone, behaviour is unchanged unless the task opts in via frontmatter, apart from a bug QA reproduces itself (5d).
 
 ### Step 3c: Mutation-Proof Spot Check
 

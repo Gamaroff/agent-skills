@@ -302,8 +302,8 @@ None identified.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.273.qa.3.qa-task-steps-state-the-routes-they-lack.md](./task.273.qa.3.qa-task-steps-state-the-routes-they-lack.md)
-- **Gate File**: [task.273.gate.3.qa-task-steps-state-the-routes-they-lack.yml](./task.273.gate.3.qa-task-steps-state-the-routes-they-lack.yml)
+- **Full Report**: [task.273.qa.4.qa-task-steps-state-the-routes-they-lack.md](./task.273.qa.4.qa-task-steps-state-the-routes-they-lack.md)
+- **Gate File**: [task.273.gate.4.qa-task-steps-state-the-routes-they-lack.yml](./task.273.gate.4.qa-task-steps-state-the-routes-they-lack.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 3
@@ -312,7 +312,7 @@ None identified.
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle 1's CHANGELOG finding and cycle 2's gating-rule finding are fixed. Cycle 3 (scoped re-review) found one MEDIUM: six more restatements of the gating rule in `qa-task` and `qa-story` (the gate-mapping step and the report templates) still contradict step 5d. Three advisory review findings stay in the gate's future recommendations.
+Cycle 1's CHANGELOG finding and the gating-rule findings of cycles 2 and 3 are fixed. Cycle 4 found one MEDIUM: four more restatements (the Skill-arg paragraphs and the closing sentence of the gate-mapping step in `qa-task` and `qa-story`) and the Resolution matrix still omit step 5d. Three advisory review findings stay in the gate's future recommendations.
 
 <!-- change-log-start -->
 ## Change Log
@@ -329,6 +329,8 @@ Cycle 1's CHANGELOG finding and cycle 2's gating-rule finding are fixed. Cycle 3
 | 2026-11-09 |         | QA findings fixed — gating-rule restatements aligned with 5d, 2 iterations | qa-fix      |
 | 2026-11-09 |         | QA gate CONCERNS (90/100) — 1 finding (cycle 3)                 | qa-task     |
 | 2026-11-09 |         | QA findings fixed — remaining gating-rule restatements qualified, 3 iterations | qa-fix      |
+| 2026-11-09 |         | QA gate CONCERNS (90/100) — 1 finding (cycle 4)                 | qa-task     |
+| 2026-11-09 |         | QA findings fixed — Skill-arg paragraphs, closing sentences and matrix note, 4 iterations | qa-fix      |
 <!-- change-log-end -->
 
 ---
