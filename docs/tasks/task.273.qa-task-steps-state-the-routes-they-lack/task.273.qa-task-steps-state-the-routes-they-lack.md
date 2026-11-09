@@ -6,6 +6,7 @@ description: "Add the missing routes to qa-task Steps 3b and 3c (docs-only revie
 tags: [qa-task, qa-story, review-task, create-task, observation]
 category: refactoring
 status: ready-for-review
+pr_number: 861
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-09
@@ -153,7 +154,7 @@ None - prose only. A docs-only change set takes a new review branch instead of a
 **Risk Level**: Low
 
 **Changes**:
-- [ ] Fixtures with controls (§ 8); `command npm run bundle`, `command npm run bundle -- --check`.
+- [x] Fixtures with controls (§ 8); `command npm run bundle`, `command npm run bundle -- --check`.
 
 **Dependencies**: Phases 1 to 3.
 
@@ -187,11 +188,11 @@ None authored; the shared prompt-contract tests are run, not edited, unless a pi
 **Scope**: each route is taken on its shape and not on a control.
 
 **Actions**:
-- [ ] Step 3c: a cycle with a backgrounded suite waits or uses a worktree; **control**: a cycle with no background process mutates in place.
-- [ ] Docs-only: a change set of Markdown only takes the branch; a set with one code file does not.
-- [ ] Reproduced finding: a medium finding QA reproduces enters `top_issues[]` with origin and unchanged confidence; an unreproduced medium stays advisory.
-- [ ] Reviewer scratch: a reviewer told it may execute is given a `mktemp -d` and does not write outside it.
-- [ ] Criterion probe: `prettier --check` on a `.md` file is flagged; a check that processes the file is not.
+- [x] Step 3c: a cycle with a backgrounded suite waits or uses a worktree; **control**: a cycle with no background process mutates in place.
+- [x] Docs-only: a change set of Markdown only takes the branch; a set with one code file does not.
+- [x] Reproduced finding: a medium finding QA reproduces enters `top_issues[]` with origin and unchanged confidence; an unreproduced medium stays advisory.
+- [x] Reviewer scratch: a reviewer told it may execute is given a `mktemp -d` and does not write outside it.
+- [x] Criterion probe: `prettier --check` on a `.md` file is flagged; a check that processes the file is not.
 
 **Command**: a fresh session running the step on each fixture; results in the QA report.
 
@@ -205,18 +206,18 @@ None authored; the shared prompt-contract tests are run, not edited, unless a pi
 
 ### Functional
 
-- [ ] Each of the five routes is present in `qa-task` and `qa-story` (where it applies), citing its observation; the list is in the QA report.
-- [ ] Each fires on its fixture and not on its control, recorded per route in the QA report.
-- [ ] The docs-only prompt returns the same findings YAML shape as `code-review-prompt.md`, shown by a run recorded in the QA report.
+- [x] Each of the five routes is present in `qa-task` and `qa-story` (where it applies), citing its observation; the list is in the QA report.
+- [x] Each fires on its fixture and not on its control, recorded per route in the QA report.
+- [x] The docs-only prompt returns the same findings YAML shape as `code-review-prompt.md`, shown by a run recorded in the QA report.
 
 ### Performance
 
-- [ ] `CI=true command npm test` wall time is within 10% of `develop`, as the median of five alternating runs with `uptime` beside each, taken on the PR's head commit and recorded in the QA report.
+- [x] `CI=true command npm test` wall time is within 10% of `develop`, as the median of five alternating runs with `uptime` beside each, taken on the PR's head commit and recorded in the QA report.
 
 ### Code Quality
 
-- [ ] `command npm run bundle -- --check` reports 0 problems; `CI=true command npm test` passes.
-- [ ] `python skills/create-skill/scripts/quick_validate.py` passes for qa-task, qa-story, review-task and create-task.
+- [x] `command npm run bundle -- --check` reports 0 problems; `CI=true command npm test` passes.
+- [x] `python skills/create-skill/scripts/quick_validate.py` passes for qa-task, qa-story, review-task and create-task.
 
 ### Migration
 
@@ -350,7 +351,7 @@ Every MEDIUM finding from cycles 1 to 5 is fixed; the last, the gate-decision no
 - [x] Probe and review flag
 
 ### Phase 4: Evidence, bundle and sweep
-- [ ] Fixtures run, bundle clean
+- [x] Fixtures run, bundle clean
 
 ---
 
