@@ -315,6 +315,24 @@ None identified.
 ### Key Findings
 Every MEDIUM finding from cycles 1 to 5 is fixed; the last, the gate-decision notes, was fixed after two extra cycles were granted. Cycle 6 passes with two open LOW wording residues (T273-CR-5, T273-CR-6) in the review prompt and the report templates. Three advisory review findings stay in the gate's future recommendations.
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### Missing Criteria:
+
+- ⚠️ § 9 "npm test wall time within 10% of develop": measured on 30da588c; code changed after it (`code-review-prompt.md`, `qa-task/SKILL.md`, `qa-story/SKILL.md`), and `uptime` is not recorded beside each run. Re-measure on the head.
+- ⚠️ § 9 Migration "no later QA report improvises a docs-only substitute": checkable only on the next docs-only task's QA report, which does not exist yet.
+
+### Next Steps:
+
+- [ ] Re-measure the five-run median on the PR head and record it in the newest QA report
+- [ ] Owner decision on the Migration criterion: re-scope it to a follow-up task, or hold acceptance until a later docs-only task has run
+
+**Estimated Effort:** Small (about 30 minutes for the re-measure; the second item is a decision).
+
+**Detailed Verification Log:** See `task.273.dod.1.qa-task-steps-state-the-routes-they-lack.md`.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -335,6 +353,7 @@ Every MEDIUM finding from cycles 1 to 5 is fixed; the last, the gate-decision no
 | 2026-11-09 |         | QA gate CONCERNS (90/100) — 1 finding (cycle 5, loop limit)     | qa-task     |
 | 2026-11-09 |         | QA findings fixed — gate-decision notes rewritten, 5 iterations | qa-fix      |
 | 2026-11-09 |         | QA gate PASS (100/100) — 2 LOW findings open (cycle 6)          | qa-task     |
+| 2026-11-09 |         | DoD incomplete — 2 gaps identified                              | finalise    |
 <!-- change-log-end -->
 
 ---
