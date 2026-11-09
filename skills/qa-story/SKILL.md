@@ -2175,7 +2175,7 @@ If risk_summary exists, apply its thresholds first (≥9 → FAIL, ≥6 → CONC
 
 - **WAIVED** only when waiver.active: true with reason/approver
 
-> **Code-review findings (Phase 1.6):** by default these do NOT enter `top_issues` and do NOT affect the gate. Only when the story opts in via `code_review_blocking: true` in its frontmatter are `category: bug` + `confidence: high` findings appended to `top_issues[]` — at which point the top_issues severity rules above apply unchanged. Cleanups and non-high-confidence findings are always advisory, except a bug QA reproduces by execution (step 5d).
+> **Code-review findings (Phase 1.6):** a finding the reviewer merely claims does NOT enter `top_issues` and does NOT affect the gate by default. Only when blocking resolves to true (the run-level `code_review_blocking=true` arg or `code_review_blocking: true` in the story's frontmatter) are `category: bug` + `confidence: high` findings appended to `top_issues[]` — at which point the top_issues severity rules above apply unchanged. Cleanups and non-high-confidence findings are always advisory. One exception covers this whole note: a `category: bug` finding QA reproduces by execution (step 5d) enters `top_issues[]` at any confidence with no opt-in, unless the story sets `code_review_blocking: false`.
 
 **Detailed criteria:**
 

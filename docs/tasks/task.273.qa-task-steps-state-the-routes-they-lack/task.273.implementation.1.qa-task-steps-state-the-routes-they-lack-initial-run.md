@@ -133,6 +133,17 @@ _Track each QA review/fix cycle._
 - Move: patch. The decision itself is consolidated once in `code-review-prompt.md` item 4; each skill's sentences stay local because a QA run executes them without opening the prompt. The next gate is the fifth and last.
 - Validation: `npm run bundle`, prettier clean, `CI=true npm run ci:fast` (result below). Single finding read directly.
 
+### Re-entry after the loop limit — 2026-11-09
+
+- The user granted 2 extra QA cycles (`grant-qa-cycles.sh`: `qa_max_cycles` 5 → 7, re-entered at 5b, `convergence_from_cycle` 6).
+
+### QA Fix 5 — 2026-11-09
+
+- Fixed T273-CR-4: rewrote the "Code-review findings" note in the gate-decision section of `qa-task` and `qa-story`. Its opening sentences now describe the reviewer's claim and name both ways blocking resolves to true (run-level arg, frontmatter); one closing sentence carves out, for the whole note, a bug QA reproduces by execution (5d), unless the doc sets `code_review_blocking: false`.
+- Probe: read both notes end to end, as the cycle-5 reviewer did, and re-ran the phrase search of cycle 4 (`opted in|opts in|unless the (task|story|doc)|stay advisory|always advisory|unaffected`) over the QA skills and `code-review-prompt.md`: every remaining hit already carries the exception or concerns PR reviews. Population: 2 notes changed, 0 other hits unaffected-but-wrong.
+- Move: patch. The rule's decision lives once in `code-review-prompt.md` item 4; the notes stay local so a QA run reads a true sentence where it executes.
+- Validation: `npm run bundle`, prettier clean, `CI=true npm run ci:fast` exit 0 (8102 pass, 0 fail). Single finding read directly.
+
 ### QA Cycle 1 — 2026-11-09
 **Gate Result**: CONCERNS
 **Issues Found**: 1 — no CHANGELOG `[Unreleased]` entry citing (task 273) (T273-CL-1, MEDIUM); 3 advisory review findings in `recommendations.future`

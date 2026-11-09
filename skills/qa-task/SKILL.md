@@ -1457,7 +1457,7 @@ deployment_readiness:
 
 **WAIVED** only when `waiver.active: true` with documented reason and approver.
 
-> **Code-review findings (Step 3b):** by default these do NOT enter `top_issues` and do NOT affect the gate. Only when the task doc opts in via `code_review_blocking: true` in its frontmatter are `category: bug` + `confidence: high` findings appended to `top_issues[]` — at which point rules 1–2 above apply unchanged. Cleanups and non-high-confidence findings are always advisory, except a bug QA reproduces by execution (step 5d).
+> **Code-review findings (Step 3b):** a finding the reviewer merely claims does NOT enter `top_issues` and does NOT affect the gate by default. Only when blocking resolves to true (the run-level `code_review_blocking=true` arg or `code_review_blocking: true` in the task's frontmatter) are `category: bug` + `confidence: high` findings appended to `top_issues[]` — at which point rules 1–2 above apply unchanged. Cleanups and non-high-confidence findings are always advisory. One exception covers this whole note: a `category: bug` finding QA reproduces by execution (step 5d) enters `top_issues[]` at any confidence with no opt-in, unless the task sets `code_review_blocking: false`.
 
 ### Step 11: Write QA Report
 

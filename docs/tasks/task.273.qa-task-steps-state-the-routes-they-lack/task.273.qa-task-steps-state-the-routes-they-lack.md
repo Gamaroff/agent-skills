@@ -332,6 +332,7 @@ Cycle 1's CHANGELOG finding and the gating-rule findings of cycles 2 and 3 are f
 | 2026-11-09 |         | QA gate CONCERNS (90/100) — 1 finding (cycle 4)                 | qa-task     |
 | 2026-11-09 |         | QA findings fixed — Skill-arg paragraphs, closing sentences and matrix note, 4 iterations | qa-fix      |
 | 2026-11-09 |         | QA gate CONCERNS (90/100) — 1 finding (cycle 5, loop limit)     | qa-task     |
+| 2026-11-09 |         | QA findings fixed — gate-decision notes rewritten, 5 iterations | qa-fix      |
 <!-- change-log-end -->
 
 ---
