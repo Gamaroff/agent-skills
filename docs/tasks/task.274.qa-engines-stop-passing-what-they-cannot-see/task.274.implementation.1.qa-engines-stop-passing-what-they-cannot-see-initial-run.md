@@ -34,10 +34,10 @@ Run the full develop-task pipeline for task 274: five QA engine defects (snippet
 | 1. create-branch           | ✅ Done | Branch `feature/task.274.*` exists in git                              | Branch created at `598e16fe` |  —                    | 2026-11-09T08:54Z |
 | 2. review-task             | ✅ Done | `task.274.review.{N}.{name}.md` exists (or skip logged)                | Review 8/10, READY TO IMPLEMENT; 6 important fixes applied; status promoted to Ready for Development | —                    | 2026-11-09T09:20Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline; Phases 2–5 implemented, mutation-proven, suite green | —                    | 2026-11-09T09:20Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.274.qa.{N}.*.md`; `task.274.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.274.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #863; no linked issue, so no comment | —                    | 2026-11-09T09:22Z |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.274.qa.{N}.*.md`; `task.274.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 3 gates (FAIL 70, FAIL 80, CONCERNS 90); PR review APPROVE |  —                    | 2026-11-09T11:38Z |
+| 7. finalise                | ✅ Done | `task.274.dod.{N}.*.md`; task `status: accepted`                       | Accepted; CI readings 1 and 2 SUCCESS (reading 1 after one re-run of an unrelated leak check) | —                    | 2026-11-09T12:36Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Report committed with the final commit | —                    | 2026-11-09T12:37Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -82,6 +82,29 @@ _Problems encountered and how they were resolved or escalated._
 ## QA Iteration History
 
 _Track each QA review/fix cycle._
+
+### QA Cycle 1
+
+- Gate FAIL (70/100): T274-QA-1 (high, `--fixture-copy` follows a symlinked directory), T274-QA-2 (high, dash-prefixed expansion still runnable), T274-QA-3 (medium, syntax check flags templates). QA reproduced all three by execution, each with a control.
+- Fix 1: realpath containment in `security-probe.mjs`. Fix 2: `couldBeFlag` plus delimiter-aware segment scan. Fix 3: template skip in `isSyntaxCheckable`, wider angle-slot shape, `--` before the code string; `response-envelope-enforcer/SKILL.md` pseudo-code fence marked `text`.
+- Mutation proofs (all `covered`, committed tests went red, file restored byte-identical each time): reverted `couldBeFlag` → three base-scan tests; dropped the slot test, dropped `--` → the syntax-controls test; disabled the realpath check → the fixture-copy decline test.
+- Population probe (rule restated): `qa-runnable-prose-detection.md` updated; the other hits of the search phrase restate nothing about this rule.
+- Not done in this cycle, owed to QA cycle 2: the timing criterion (the first pair was contaminated by concurrent probes and was discarded; re-measure clean on the final commit), `wc -c` of a task.205-shape cases file.
+
+### QA Cycle 2
+
+- Gate FAIL (80/100), one finding: T274-QA-4 (high, an ANSI-C `$'-delete'` and a backslash-newline split flag classify runnable and delete files when run). Found by the refute pass, reproduced by QA with controls. Bugs 1-3 verified fixed and closed. Timing criterion met (median +4.7%, load 7-9, so noisy); task.205-shape cases file 8,813 bytes.
+- Fix (Step 2.6, repeat subject → narrow the contract): continuations folded (odd backslash runs only) right after `stripProse`; `hasDecodedQuote` refuses an unquoted `$'…'` / `$"…"` argument to a deny-listed command. Docs: `qa-runnable-prose-detection.md`, CHANGELOG.
+- Mutation proofs (all `covered`): dropping the fold → two tests red; dropping the `hasDecodedQuote` call → three red; widening the opener to any `$` → the controls test red. Real-docs diff: 3,435 shell blocks, 0 newly refused. Suite 8,135 pass, 0 fail. The findings-ingester subagent did not run (one finding, read inline).
+- **Action**: Running qa-fix (cycle 2 → cycle 3)
+
+### QA Cycle 3
+
+- Gate CONCERNS (90/100), `top_issues[]` empty. Bug 4 verified fixed and closed (all four bugs closed). Unscoped safety re-probe (gate 2 failed on security): the reviewer found five other deny-list gaps (function shadowing an allow-listed name, the `<>` redirection, `find -fprint0`, sed `e` command and `s///e` flag, `sort --compress-program`); QA reproduced four by execution. Provenance: identical on develop, not a shape the task names, 0 hits in the 3,435 tracked shell blocks, so `pre-existing` and routed to the gate's `recommendations.future` with a named follow-up.
+- Probe record: 39 cases, 0 reproduced, 0 escaped. Mutation proofs (all `covered`) repeated at `1d60b861`. `TMPDIR=/tmp` run of the two engine test files: 509 pass.
+- Judgement call for the owner: the five gaps are not fixed on this branch. Fixing them is another fix cycle (2 gates remain); the structural answer is an allow-list.
+- **Action**: Proceeding to 5c
+- **PR Review**: APPROVE — `task.274.pr-review.1.qa-engines-stop-passing-what-they-cannot-see.md` (conformance lens only; 2 low findings: unticked criteria and absent `pr_number`, both for finalise)
 
 ---
 
