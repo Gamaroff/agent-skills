@@ -33,7 +33,7 @@ Replace the snippet classifier's separate regex re-implementations of bash's bla
 | -------------------------- | ---------- | ---------------------------------------------------------------------- | ----- | -------------------- | --------------- |
 | 1. create-branch           | ✅ Done | Branch `feature/task.292.*` exists in git                              | Branch created at `89366af8` | —                    | 2026-11-10T04:10Z |
 | 2. review-task             | ✅ Done | `task.292.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT 9/10, 0 critical, 0 important | —                    | 2026-11-10T04:25Z |
-| 3. develop                 | ⏳ Pending | Task status == `Ready for Review`                                      |       | —                    |                 |
+| 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (no /develop); 4 phases; 350 tests, fast gate green | —                    | 2026-11-10T05:12Z |
 | 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.292.qa.{N}.*.md`; `task.292.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.292.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
@@ -63,6 +63,15 @@ Replace the snippet classifier's separate regex re-implementations of bash's bla
   - Differential on the unchanged engine: `node scripts/qa-snippets-differential.mjs --atoms blanks --count 20000 --seed 1` → total 20000, runnable 2416, writes 10; every writer holds a CR/FF/VT/NBSP/U+2028 before `#` (T290-QA-3 reproduced).
   - Docs scan against a copy of the engine widened by one rule (`if (c === "\\" && double)` → `if (c === "\\")` in `stripCommentQuoteAware`): newly runnable 1, `docs/tasks/task.83.platform-aware-skill-exclusion/task.83.bug.1.tracker-resolution-divergence.md:102`. Unwidened engine against `develop`: 3444 blocks, 0 newly runnable, 0 newly refused.
   - Suite rows red before the fix: `node --test --test-name-pattern=task.292 shared/resources/tests/qa-execute-snippets.test.mjs` → 5 gap rows and the fixed-seed slice fail, 2 controls and the blind-classifier calibration pass.
+- Step 3 evidence (all re-measured at `be6fb8b4`):
+  - Four commits on the branch: instruments (`9ae56d55`), tokenizer + comment scan (`6d96fc98`), stripProse/quote/blank scans (`115ddb38`), substitution mask + joins + whitespace guard (`be6fb8b4`), plus the doc/CHANGELOG commit that follows.
+  - Full differential, seed 101, 60000 blocks per set (escapes, blanks, splits, nesting): 0 writes in all four. On the pre-change engine the same generator found writes in blanks (10, the cap), escapes (1), nesting (4) and splits (10, the cap).
+  - Docs scan against `develop`: 3444 blocks, runnable 257 → 257, newly runnable 0, newly refused 0. Pass time over the corpus, five runs with `uptime` beside each (load 3.5–3.7 throughout): `develop` 490/486/503/485/520 ms, now 339/336/346/332/359 ms; median 503 → 339 ms (−33%), no outliers dropped.
+  - Fixed-seed slice in the suite (seed 1, 4000 blocks per set, five sets): 2.70/2.70/2.68/2.69/2.67 s, median 2.69 s against the 10 s bound.
+  - Deep nest (`echo "$(echo ` x N): N=1000/3000/6000 classify in 22/29/36 ms; `develop` 68/668/2585 ms.
+  - Mutation proofs (each reverted, each named): CR/FF/VT/NBSP/U+2028 made blanks in the tokenizer → five T290-QA-3 gap rows and the slice red; blank normalisation removed → five assignment-gap rows and the slice red; escaped-quote refusal removed → the tokenizer-refusal row red and the docs scan reports `task.83.bug.1…md:102` newly runnable; an unlisted `\s` added → the whitespace guard red.
+- Decision: an escaped quote outside quotes stays refused in the tokenizer. Reading it correctly makes `task.83.bug.1…md:102` newly runnable, and the plan's constraint is 0 newly runnable. Widening it is a separate decision for the owner.
+- Decision: normalise non-blank whitespace once in `classifyInternal` (and the exported `commandInvocations`/`unboundVariables` entries) instead of rewriting 48 `\s` sites; the allowlist test names every function that holds a `\s` and why it is safe.
 - Review report: docs/tasks/task.292.qa-snippet-classifier-one-bash-tokenizer/task.292.review.1.qa-snippet-classifier-one-bash-tokenizer.md. The two pre-pass Explore subagents did not run; they were done inline, so independent review of the pre-pass did not run.
 
 ---
@@ -70,6 +79,11 @@ Replace the snippet classifier's separate regex re-implementations of bash's bla
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
+
+- **Not migrated: the `WORD` regex in `variableArgumentToDenyListed` and the assignment regex in `assignedVariables`.** Both still carry a quote-aware regex, and the plan's table did not name them. They read text that regexes have already cut at `;`, `&&`, `$(` and newlines without regard to quotes, so a tokenizer read of a fragment would see an unterminated quote and refuse blocks it accepts today. Moving them means moving the segmentation onto tokens, which is a change of segmentation and not of lexing. The differential (240000 blocks) and the docs scan show no write through them. For QA to judge: raise it as a follow-up task or accept as out of scope.
+- **Deep-nest speed regressed, then was fixed.** The first migration made a 3000-deep nest 3.5x slower (2.4 s against 0.67 s) and a 6000-deep one overflow the stack, because `collapseQuotedSpans` recursed per level and re-tokenised each slice. Rewritten as one pass with an explicit stack; now 36 ms at 6000.
+- **`tmp-leak` ratchet tripped once** on a new prefix `ctx-wrap` from `context-pressure-statusline.test.mjs`, the leak tracked by task.291. Not this change: the three gates before and the one after it passed. Removed the stray directory and re-ran: green.
+- A `pkill -f` I ran to stop a hung test run also ended its own shell; no state was lost.
 
 ---
 
