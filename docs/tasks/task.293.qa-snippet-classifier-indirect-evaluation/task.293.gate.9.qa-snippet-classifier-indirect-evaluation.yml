@@ -2,7 +2,7 @@ schema: 2
 task: 'task.293.qa-snippet-classifier-indirect-evaluation'
 task_title: 'QA snippet classifier refuses indirect evaluation'
 gate: CONCERNS
-status_reason: 'Gate 9 (fourth owner-granted extra cycle, scoped to routes that keep the substitution text in the source). The independent reviewer found no block that classifies runnable and runs a command: hand-built early-closing bracket shapes, backtick substitutions holding a bracket, builtins outside the evaluating-word list (refused by the unrecognised-command rule) and about 18,000 random array-subscript blocks. CONCERNS, not PASS: the owner narrowed the task at gate 5 and four residual shapes stay documented and open, and the fix cost some over-refusal.'
+status_reason: 'Gate 9 (fourth owner-granted extra cycle, scoped to routes that keep the substitution text in the source). The independent reviewer found no block that classifies runnable and runs a command: hand-built early-closing bracket shapes, backtick substitutions holding a bracket, builtins outside the evaluating-word list (refused by the unrecognised-command rule) and about 18,000 random array-subscript blocks. CONCERNS, not PASS: the owner narrowed the task at gate 5 and three residual shapes stay documented and open, and the fix cost some over-refusal.'
 reviewer: 'QA Engineer'
 head: '134931e556a624edeaa1a3f291030861824c51ce'
 updated: '2026-11-10T12:32:42Z'
