@@ -54,6 +54,8 @@
     "check:generated": "npm run generate-catalog && npm run generate-skill-deps && git diff --exit-code -- docs/reference/skill-catalog.md README.md shared/resources/skill-dependencies.json",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "qa-snippets:differential": "node scripts/qa-snippets-differential.mjs",
+    "qa-snippets:docscan": "node scripts/qa-snippets-docscan.mjs",
     "lint:secrets": "bash scripts/lint-secrets.sh",
     "lint:shell": "bash scripts/lint-shell.sh",
     "test:clean-checkout": "bash scripts/test-clean-checkout.sh",

@@ -5,7 +5,7 @@ type: task
 description: "Replace the snippet classifier's separate regex re-implementations of bash's blank, quote, escape and line-join rules with one tokenizer every scan reads, refusing what it cannot read, and close the open T290-QA-3 write gap."
 tags: [qa-task, security, follow-up-290]
 category: refactoring
-status: planned
+status: ready-for-development
 priority: High
 created: 2026-11-10
 updated: 2026-11-10
@@ -15,7 +15,7 @@ github_issue: 868
 
 # Task 292: One bash tokenizer for the QA snippet classifier
 
-**Status:** Planned
+**Status:** Ready for Development
 **GitHub Issue**: [#868](https://github.com/Gamaroff/agent-skills/issues/868)
 
 ---
@@ -279,6 +279,8 @@ Sign-off is disabled for this repository (`sign-off.enabled` is not set), so no 
 | Date       | Version | Description                                                                  | Author      |
 | ---------- | ------- | ---------------------------------------------------------------------------- | ----------- |
 | 2026-11-10 | 1.0     | Initial draft, from task.290's not-converging QA loop and waived T290-QA-3   | create-task |
+| 2026-11-10 | 1.1     | Review passed (9/10) — no changes required; 3 optional notes in the review report | review-task |
+| 2026-11-10 |         | Status → ready-for-development                                               | review-task |
 <!-- change-log-end -->
 
 ---
@@ -317,6 +319,6 @@ QA artifacts will land in this directory: `task.292.qa.{N}.*.md`, `task.292.bug.
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Development
 
 **Next Steps**: run `/develop-task` on this task.
