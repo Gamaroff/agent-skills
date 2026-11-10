@@ -5,7 +5,7 @@ type: task
 description: "Add `npm run test:remote`: sync the working tree to the shared LAN server (.249), run the root test scripts there in a container that mirrors test.yml, and exit with their status, so the overheating laptop only syncs files and prints output."
 tags: [infrastructure, testing, developer-tooling, remote-test]
 category: infrastructure
-status: ready-for-review
+status: in-progress
 priority: Medium
 created: 2026-11-10
 updated: 2026-11-10
@@ -15,7 +15,7 @@ github_issue: 871
 
 # Technical Task: Run the test suite on the LAN server (test:remote)
 
-**Status:** Ready for Review
+**Status:** In Progress
 
 **Review**: ✅ All review recommendations from `task.295.review.1.test-remote-lan-server-route.md` implemented 2026-11-10
 
@@ -332,17 +332,17 @@ This task does not use sign-off (`sign-off.enabled` is not `true` in `skills-con
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.295.qa.2.test-remote-lan-server-route.md](./task.295.qa.2.test-remote-lan-server-route.md)
-- **Gate File**: [task.295.gate.2.test-remote-lan-server-route.yml](./task.295.gate.2.test-remote-lan-server-route.yml)
+- **Full Report**: [task.295.qa.3.test-remote-lan-server-route.md](./task.295.qa.3.test-remote-lan-server-route.md)
+- **Gate File**: [task.295.gate.3.test-remote-lan-server-route.yml](./task.295.gate.3.test-remote-lan-server-route.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 8
+- **Tests Executed**: 13
 - **Phases Verified**: 6/6
 - **Critical Issues**: 1
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Cycle 1's two findings are fixed. The cycle-2 refute pass found that the run timeout does not stop the remote container (T295-QA-3, reproduced on the server), that the per-branch directory key collides and is unlocked (T295-QA-4), and that `--reap` reads a directory mtime rsync overwrites (T295-QA-5).
+The gate-2 findings are fixed. The review of that fix found the container lock is taken after the sync it protects (T295-QA-6), a dropped ssh leaves the container running (T295-QA-7), and a failing `docker ps` lets `--reap` delete a live directory (T295-QA-8).
 
 <!-- change-log-start -->
 ## Change Log
@@ -359,6 +359,8 @@ Cycle 1's two findings are fixed. The cycle-2 refute pass found that the run tim
 | 2026-11-10 |         | Status → in-progress | qa-task |
 | 2026-11-10 |         | QA findings fixed after gates 1 and 2 (5 findings, 2 fix cycles); ready for re-gate | qa-fix |
 | 2026-11-10 |         | Status → ready-for-review | qa-fix |
+| 2026-11-10 |         | QA gate FAIL (65/100) — 3 findings, 1 high | qa-task |
+| 2026-11-10 |         | Status → in-progress | qa-task |
 <!-- change-log-end -->
 
 ---
