@@ -5,7 +5,7 @@ type: task
 description: "Add `npm run test:remote`: sync the working tree to the shared LAN server (.249), run the root test scripts there in a container that mirrors test.yml, and exit with their status, so the overheating laptop only syncs files and prints output."
 tags: [infrastructure, testing, developer-tooling, remote-test]
 category: infrastructure
-status: ready-for-review
+status: in-progress
 priority: Medium
 created: 2026-11-10
 updated: 2026-11-10
@@ -15,7 +15,7 @@ github_issue: 871
 
 # Technical Task: Run the test suite on the LAN server (test:remote)
 
-**Status:** Ready for Review
+**Status:** In Progress
 
 **Review**: ✅ All review recommendations from `task.295.review.1.test-remote-lan-server-route.md` implemented 2026-11-10
 
@@ -325,24 +325,24 @@ This task does not use sign-off (`sign-off.enabled` is not `true` in `skills-con
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-10
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 65/100
+**Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.295.qa.1.test-remote-lan-server-route.md](./task.295.qa.1.test-remote-lan-server-route.md)
-- **Gate File**: [task.295.gate.1.test-remote-lan-server-route.yml](./task.295.gate.1.test-remote-lan-server-route.yml)
+- **Full Report**: [task.295.qa.2.test-remote-lan-server-route.md](./task.295.qa.2.test-remote-lan-server-route.md)
+- **Gate File**: [task.295.gate.2.test-remote-lan-server-route.yml](./task.295.gate.2.test-remote-lan-server-route.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 7
+- **Tests Executed**: 8
 - **Phases Verified**: 6/6
-- **Critical Issues**: 0
+- **Critical Issues**: 1
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-`--host` or `--timeout-min` as the last argument hangs the runner (T295-QA-1), and the CHANGELOG has no entry citing task 295 (T295-QA-2).
+Cycle 1's two findings are fixed. The cycle-2 refute pass found that the run timeout does not stop the remote container (T295-QA-3, reproduced on the server), that the per-branch directory key collides and is unlocked (T295-QA-4), and that `--reap` reads a directory mtime rsync overwrites (T295-QA-5).
 
 <!-- change-log-start -->
 ## Change Log
@@ -355,6 +355,8 @@ This task does not use sign-off (`sign-off.enabled` is not `true` in `skills-con
 | 2026-11-10 | 1.2     | Implemented: test:remote runner, container, guard test, docs; four container parity fixes recorded in Notes | develop-task |
 | 2026-11-10 |         | Status → ready-for-review | develop-task |
 | 2026-11-10 |         | QA gate CONCERNS (80/100) — 2 findings | qa-task |
+| 2026-11-10 |         | QA gate FAIL (65/100) — 3 findings, 1 high | qa-task |
+| 2026-11-10 |         | Status → in-progress | qa-task |
 <!-- change-log-end -->
 
 ---
