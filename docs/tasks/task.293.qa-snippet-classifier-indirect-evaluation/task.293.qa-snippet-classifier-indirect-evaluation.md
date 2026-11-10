@@ -5,7 +5,7 @@ type: task
 description: "Close the QA snippet classifier's indirect-evaluation holes (T292-CR-1..3): quoted command substitutions reached through printf -v and similar subscript operands, prompt-escape expansion, and quoted data re-evaluated as arithmetic."
 tags: [qa-task, security, follow-up-292]
 category: refactoring
-status: ready-for-review
+status: in-progress
 priority: Medium
 created: 2026-11-10
 updated: 2026-11-10
@@ -15,7 +15,7 @@ github_issue:
 
 # Technical Task: QA snippet classifier refuses indirect evaluation
 
-**Status:** Ready for Review
+**Status:** In Progress
 
 **Review**: ✅ All review recommendations from `task.293.review.1.qa-snippet-classifier-indirect-evaluation.md` implemented 2026-11-10
 
@@ -225,17 +225,17 @@ Documentation:
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.293.qa.7.qa-snippet-classifier-indirect-evaluation.md](./task.293.qa.7.qa-snippet-classifier-indirect-evaluation.md)
-- **Gate File**: [task.293.gate.7.qa-snippet-classifier-indirect-evaluation.yml](./task.293.gate.7.qa-snippet-classifier-indirect-evaluation.yml)
+- **Full Report**: [task.293.qa.8.qa-snippet-classifier-indirect-evaluation.md](./task.293.qa.8.qa-snippet-classifier-indirect-evaluation.md)
+- **Gate File**: [task.293.gate.8.qa-snippet-classifier-indirect-evaluation.yml](./task.293.gate.8.qa-snippet-classifier-indirect-evaluation.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 383 in the suite file; `ci:fast` 8346, 0 fail at the gate-6 fix commit
+- **Tests Executed**: 383 in the suite file; `ci:fast` 8346, 0 fail at the gate-7 fix commit
 - **Phases Verified**: 2/3 clean
 - **Critical Issues**: 1 (high)
 - **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Gate 7 (second owner-granted extra cycle). The word-scoped bracket scan stops at a paren, so `a=([0+(1)'$(cmd)']=1)` still runs. Reproduced under real bash.
+Gate 8 (third owner-granted extra cycle). The bracket depth resets at a separator inside a quoted span, so `a=([';'0'$(cmd)']=1)` still runs. Reproduced under real bash.
 
 ## Change Log
 
@@ -259,6 +259,7 @@ Gate 7 (second owner-granted extra cycle). The word-scoped bracket scan stops at
 | 2026-11-10 |  | QA finding fixed — 1 high closed by making the bracket rule word-scoped, 6 iterations | qa-fix |
 | 2026-11-10 |  | QA gate FAIL (85/100) — 1 high finding on the second extra cycle | qa-task |
 | 2026-11-10 |  | QA finding fixed — 1 high closed by counting bracket depth over the segment, 7 iterations | qa-fix |
+| 2026-11-10 |  | QA gate FAIL (85/100) — 1 high finding on the third extra cycle | qa-task |
 <!-- change-log-end -->
 
 ## References
