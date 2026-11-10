@@ -10,11 +10,13 @@ priority: High
 created: 2026-11-10
 updated: 2026-11-10
 estimated_effort_hours: 16
+github_issue: 868
 ---
 
 # Task 292: One bash tokenizer for the QA snippet classifier
 
 **Status:** Planned
+**GitHub Issue**: [#868](https://github.com/Gamaroff/agent-skills/issues/868)
 
 ---
 
