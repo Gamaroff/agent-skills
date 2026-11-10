@@ -294,7 +294,7 @@ Sign-off is disabled for this repository (`sign-off.enabled` is not set), so no 
 ### Key Findings
 The engine is unchanged since gate 3; only tests changed. The blank-normalisation line and the one-tokenizer consumer count are now held by committed tests, each mutation-proven red. Suite 379/379, security probe 31 executed, 0 escaped. One medium finding: criterion 10 was reworded after review with no approver (T292-QA4-1); the owner approves or restores it. T292-CR-1..3 stay open as pre-existing follow-ups.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified (run 1, historical, superseded by run 2 below)
 
 **Status:** IN PROGRESS (`ready-for-review`; not accepted)
 
@@ -316,6 +316,24 @@ The engine is unchanged since gate 3; only tests changed. The blank-normalisatio
 
 **Estimated Effort:** Medium (3-4 hours)
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS (`ready-for-review`; not accepted)
+
+**QA Gate:** CONCERNS, 90/100 (`task.292.gate.4…yml`). Not blocking. Run 1's gaps #7 and #10 and the security probe plan are closed: 11 of 13 criteria pass, security PASS (31 executed, 0 reproduced, 0 escaped), CI green on `e0cdb5dc`. **Detailed Verification Log:** `task.292.dod.2.qa-snippet-classifier-one-bash-tokenizer.md`.
+
+### Missing Criteria:
+
+- [ ] **#5 (low):** The docs scan timing in QA 4 was taken on `9a3b04e9`; the delta to HEAD changes a test file, so it is not tree-equivalent. Re-measure on HEAD.
+- [ ] **#6 (low):** The slice timing in QA 4 was taken on `9a3b04e9`, same reason. Re-measure on HEAD.
+
+### Next Steps:
+
+- [ ] Re-measure #5 and #6 on HEAD (median of five, `uptime` beside each run) and record them in a QA report.
+- [ ] Re-run `/finalise`; the scope will re-judge only #5, #6 and the CI-state criterion.
+
+**Estimated Effort:** Small (under 30 minutes)
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -332,6 +350,7 @@ The engine is unchanged since gate 3; only tests changed. The blank-normalisatio
 | 2026-11-10 |         | QA gate CONCERNS (90/100) — 0 blocking findings, 3 pre-existing follow-ups  | qa-task     |
 | 2026-11-10 |  | DoD incomplete — 4 gaps identified (criteria 5, 6, 7, 10) | finalise |
 | 2026-11-10 |  | QA gate CONCERNS (90/100) — 1 medium finding (criterion 10 reworded, unapproved), 3 pre-existing follow-ups | qa-task |
+| 2026-11-10 |  | DoD incomplete — 2 gaps identified (criteria 5, 6) | finalise |
 <!-- change-log-end -->
 
 ---

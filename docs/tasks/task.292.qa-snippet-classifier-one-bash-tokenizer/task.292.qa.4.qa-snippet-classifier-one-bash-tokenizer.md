@@ -61,6 +61,25 @@ No new finding. Suite 379/379 under `CI=true`. The security probe plan is re-run
 
 ---
 
+## Re-measure on HEAD `e0cdb5dc` (closes DoD 2 gaps, criteria 5 and 6)
+
+`/finalise` run 2 failed criteria 5 and 6 because the figures above were taken on `9a3b04e9` and the delta to HEAD changes a test file. The engine is unchanged (`cmp` clean against `7ec74b57`). Re-measured on `e0cdb5dc`, nothing else running.
+
+**Criterion 5.** `node scripts/qa-snippets-docscan.mjs --time`, five runs. Load average (1 / 5 / 15 min): 1.75 / 1.68 / 1.87 for runs 1–4; 1.85 / 1.70 / 1.88 for run 5.
+
+| Run | develop | now |
+| --- | --- | --- |
+| 1 | 538 ms | 382 ms |
+| 2 | 527 ms | 368 ms |
+| 3 | 525 ms | 367 ms |
+| 4 | 532 ms | 366 ms |
+| 5 | 506 ms | 353 ms |
+| **median** | **527 ms** | **367 ms** (−30%) |
+
+3447 blocks, runnable 257 on `develop` and 256 now, 0 newly runnable, 1 newly refused (`task.45.bug.1…md:76`).
+
+**Criterion 6.** `CI=true node --test --test-name-pattern="differential slice: nothing" shared/resources/tests/qa-execute-snippets.test.mjs`, five runs: 3031, 2920, 2942, 2886, 2983 ms, **median 2942 ms**, under the 10 s bound. Load at the runs: 1.85 / 1.70 / 1.88; 1.85 / 1.70 / 1.88; 1.78 / 1.69 / 1.87; 1.72 / 1.68 / 1.87; 1.72 / 1.68 / 1.87.
+
 ## Gate 4 review (`/qa-task`, head `e32c06c3`)
 
 **Gate:** [task.292.gate.4.qa-snippet-classifier-one-bash-tokenizer.yml](./task.292.gate.4.qa-snippet-classifier-one-bash-tokenizer.yml) — CONCERNS, 90/100.
