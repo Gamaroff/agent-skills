@@ -72,7 +72,9 @@ while [ $# -gt 0 ]; do
 done
 
 [[ "$HOST" =~ ^[A-Za-z0-9._@:-]+$ && "$HOST" != -* ]] || usage_error "host '$HOST' is not a plain USER@HOST"
-[[ "$TIMEOUT_MIN" =~ ^[0-9]+$ && "$TIMEOUT_MIN" -gt 0 ]] || usage_error "timeout '$TIMEOUT_MIN' must be a positive whole number of minutes"
+# At most four digits, and base 10: a leading zero ("08") is invalid octal to bash arithmetic.
+[[ "$TIMEOUT_MIN" =~ ^[0-9]{1,4}$ && "$((10#$TIMEOUT_MIN))" -gt 0 ]] || usage_error "timeout '$TIMEOUT_MIN' must be a positive whole number of minutes (1 to 9999)"
+TIMEOUT_MIN=$((10#$TIMEOUT_MIN))
 
 [ "${#SCRIPTS[@]}" -gt 0 ] || SCRIPTS=("ci:fast")
 
@@ -103,15 +105,34 @@ fi
 # --- reap -------------------------------------------------------------------------------------
 if [ -n "$REAP_DAYS" ]; then
   echo "▶ removing agent-skills-test-* directories under $HOST:~ untouched for $REAP_DAYS day(s)"
-  ssh -o BatchMode=yes "$HOST" "find \"\$HOME\" -maxdepth 1 -type d -name 'agent-skills-test-*' -mtime +$REAP_DAYS -print -exec rm -rf {} +"
+  # A directory with a running container of the same name is skipped. A run touches its directory
+  # at start, because `rsync -a` copies the local repo root's mtime onto it.
+  ssh -o BatchMode=yes "$HOST" bash -s -- "$REAP_DAYS" <<'REAP_SCRIPT'
+days=$1
+running=$(docker ps --format '{{.Names}}' 2>/dev/null)
+find "$HOME" -maxdepth 1 -type d -name 'agent-skills-test-*' -mtime +"$days" -print | while IFS= read -r d; do
+  case $'\n'"$running"$'\n' in
+    *$'\n'"${d##*/}"$'\n'*) echo "skipped (a container is running): $d"; continue ;;
+  esac
+  echo "$d"
+  rm -rf -- "$d"
+done
+REAP_SCRIPT
   STATUS=$?
   exit "$STATUS"
 fi
 
 # --- per-branch directory ---------------------------------------------------------------------
+# The key is a readable slug plus a hash of the full identity, so "feature/foo" and "feature-foo",
+# or two long names with one 50-character prefix, never share a directory. A detached HEAD prints
+# the literal "HEAD" with exit 0, so it is keyed on the commit instead.
 BRANCH=$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo detached)
-SLUG=$(printf '%s' "$BRANCH" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//' | cut -c1-50)
-RUN_DIR="agent-skills-test-${SLUG:-detached}"
+if [ "$BRANCH" = "HEAD" ] || [ "$BRANCH" = "detached" ]; then
+  BRANCH="detached-$(git -C "$REPO_ROOT" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)"
+fi
+SLUG=$(printf '%s' "$BRANCH" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//' | cut -c1-40)
+BRANCH_HASH=$(printf '%s' "$BRANCH" | sha256sum | cut -c1-8)
+RUN_DIR="agent-skills-test-${SLUG:-run}-${BRANCH_HASH}"
 
 echo "▶ $HOST:~/$RUN_DIR  scripts: ${SCRIPTS[*]}  (timeout ${TIMEOUT_MIN}m)"
 echo "▶ server load before the run:"
@@ -157,8 +178,23 @@ ssh -o BatchMode=yes "$HOST" "docker image inspect $IMAGE >/dev/null 2>&1 || doc
 
 # --- run --------------------------------------------------------------------------------------
 # Only validated script names, the sanitised directory slug and a hex tag are spliced below.
-REMOTE_CMD="cd \"\$HOME/$RUN_DIR\" && docker run --rm --user \"\$(id -u):\$(id -g)\" --cpu-shares 128 -v \"\$PWD:/work\" -w /work -e HOME=/home/node -e CI=true -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*' $IMAGE bash scripts/remote-test/container.sh ${SCRIPTS[*]}"
+#
+# The bound is enforced on the server, in the container: `timeout` runs the scripts there (and
+# kills their process group), `--init` reaps what they leave behind, and the container is named
+# after the run directory, so a second run on the same directory fails on the name instead of
+# syncing over a tree that is in use. The local `timeout` below is a backstop one minute later: it
+# only stops the ssh client, so on expiry (or Ctrl-C) the named container is killed explicitly.
+REMOTE_CMD="cd \"\$HOME/$RUN_DIR\" && touch . && docker run --rm --init --name $RUN_DIR --user \"\$(id -u):\$(id -g)\" --cpu-shares 128 -v \"\$PWD:/work\" -w /work -e HOME=/home/node -e CI=true -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*' $IMAGE timeout -k 30s ${TIMEOUT_MIN}m bash scripts/remote-test/container.sh ${SCRIPTS[*]}"
 
-timeout --foreground -k 1m "${TIMEOUT_MIN}m" ssh -o BatchMode=yes "$HOST" "$REMOTE_CMD"
+kill_remote_container() {
+  ssh -o BatchMode=yes -o ConnectTimeout=10 "$HOST" "docker kill $RUN_DIR" >/dev/null 2>&1 || true
+}
+trap 'kill_remote_container; rm -f "$EXCLUDES"; exit 130' INT TERM
+
+timeout --foreground -k 1m "$((TIMEOUT_MIN + 1))m" ssh -o BatchMode=yes "$HOST" "$REMOTE_CMD"
 STATUS=$?
+if [ "$STATUS" -eq 124 ] || [ "$STATUS" -eq 137 ]; then
+  echo "✗ the run hit its ${TIMEOUT_MIN}-minute limit; stopping container $RUN_DIR on $HOST" >&2
+  kill_remote_container
+fi
 exit "$STATUS"

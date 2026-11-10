@@ -19,7 +19,7 @@ npm run test:remote -- --reap 7              # remove per-branch directories unt
 | `--run SCRIPT`                                   | A root npm script (`[A-Za-z0-9:._-]+`). Anything else exits 2.      |
 | `--host USER@HOST` / `TEST_REMOTE_HOST`          | The server. Default `ci@192.168.1.249`.                             |
 | `--timeout-min N` / `TEST_REMOTE_TIMEOUT_MIN`    | Wall-clock ceiling for the run. Default 30. Exit status 124.        |
-| `--reap DAYS`                                    | Remove stale `~/agent-skills-test-*` directories, then exit.        |
+| `--reap DAYS`                                    | Remove `~/agent-skills-test-*` directories untouched for DAYS days, skipping any with a running container, then exit. |
 | `TEST_LOCAL=1`                                   | Run on this machine. The only way to run locally.                   |
 
 ## When to use it
@@ -29,10 +29,10 @@ Use the route whenever the server is up. Run locally (`TEST_LOCAL=1`) only when 
 ## What happens
 
 1. A probe checks that the server answers and has `rsync` and a working `docker`.
-2. The tree is synced to `~/agent-skills-test-<branch-slug>/` on the server: tracked files plus untracked files git does not ignore. Gitignored paths, `.env` and `.secrets/` are not sent, and `node_modules/` is installed on the server.
+2. The tree is synced to `~/agent-skills-test-<branch-slug>-<hash>/` on the server (the hash is of the full branch name, or of the commit when detached, so two branches never share a directory): tracked files plus untracked files git does not ignore. Gitignored paths, `.env` and `.secrets/` are not sent, and `node_modules/` is installed on the server.
 3. `.git` is synced separately so history-backed tests run. In a linked worktree `.git` is a file; the route says so, and those tests may fail or skip remotely.
-4. A container built from `scripts/remote-test/Dockerfile` (Node 22, `python3-yaml`, `gawk`, `mawk`, `zsh`, `jq`, `git`) runs `npm ci` when `package-lock.json` changed, then each script in order. It runs as your UID at `--cpu-shares 128`.
-5. `ssh` runs under `timeout --foreground -k 1m`. The route exits with that status.
+4. A container built from `scripts/remote-test/Dockerfile` (a `node:22-trixie` base with `python3-yaml`, `gawk`, `mawk`, `zsh`, `jq`, `git`, `rsync` and `shellcheck`) runs `npm ci` when `package-lock.json` changed, then each script in order. It runs as your UID at `--cpu-shares 128`, named after the run directory, so a second run on the same directory fails on the name instead of syncing over a tree in use.
+5. The limit is enforced inside the container (`timeout`, with `--init`), so a hung test is killed on the server. The local `ssh` runs under a backstop one minute longer, and if it fires the named container is killed. The route exits with the run's status.
 
 The remote run is a clean-checkout run: the gitignored `.agents/skills` symlink is absent there. A test that passes locally and fails remotely because of that symlink is a real finding, not a route bug (see [traps](./traps.md)).
 

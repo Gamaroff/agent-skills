@@ -37,6 +37,7 @@ function makeStubs(t) {
     `#!/usr/bin/env bash
 printf 'ssh %s\\n' "$*" >>"${log}"
 case "$*" in
+  *"bash -s"*) cat >"${dir}/reap.sh"; exit 0 ;;
   *"docker version"*) [ "\${STUB_PROBE_FAIL:-}" = "1" ] && exit 255; exit 0 ;;
   *container.sh*) exit "\${STUB_RUN_STATUS:-0}" ;;
 esac
@@ -65,7 +66,55 @@ function run(t, args, env = {}) {
     env: { ...process.env, PATH: `${stubs.dir}:${process.env.PATH}`, ...env },
   });
   const calls = fs.readFileSync(stubs.log, "utf8").split("\n").filter(Boolean);
-  return { ...res, calls };
+  return { ...res, calls, stubDir: stubs.dir };
+}
+
+/** A throwaway git repo holding a copy of the runner, so branch names can be varied. */
+function makeRepo(t) {
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), "remote-runner-repo-"));
+  t.after(() => fs.rmSync(repo, { recursive: true, force: true }));
+  fs.cpSync(
+    path.join(REPO_ROOT, "scripts", "remote-test"),
+    path.join(repo, "scripts", "remote-test"),
+    { recursive: true },
+  );
+  const git = (...a) =>
+    spawnSync(
+      "git",
+      [
+        "-c",
+        "user.email=t@t",
+        "-c",
+        "user.name=t",
+        "-c",
+        "commit.gpgsign=false",
+        ...a,
+      ],
+      { cwd: repo, encoding: "utf8" },
+    );
+  git("init", "-q", "-b", "main");
+  git("add", "-A");
+  git("commit", "-q", "-m", "init");
+  return { repo, git };
+}
+
+/** The container name (= run directory) the run call used, from the stubbed ssh log. */
+function runName(t, repo, env = {}) {
+  const stubs = makeStubs(t);
+  const res = spawnSync(
+    "bash",
+    [path.join(repo, "scripts/remote-test/run.sh")],
+    {
+      cwd: repo,
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${stubs.dir}:${process.env.PATH}`, ...env },
+    },
+  );
+  const calls = fs.readFileSync(stubs.log, "utf8").split("\n").filter(Boolean);
+  const runCall = calls.find((c) => c.includes("container.sh"));
+  const m = runCall && runCall.match(/--name (\S+)/);
+  assert.ok(m, `no named run call; status ${res.status}: ${res.stderr}`);
+  return m[1];
 }
 
 test("a --run name with shell metacharacters exits 2 before any ssh", (t) => {
@@ -183,6 +232,105 @@ test("the default target is ci:fast", (t) => {
   assert.ok(runCall, "a container run call is expected");
   assert.match(runCall, /container\.sh ci:fast$/);
   assert.match(runCall, /--cpu-shares 128/);
+});
+
+test("the run is named, bounded inside the container, and reaped by --init", (t) => {
+  const r = run(t, ["--timeout-min", "20"]);
+  const runCall = r.calls.find((c) => c.includes("container.sh"));
+  assert.match(runCall, /docker run --rm --init --name agent-skills-test-\S+/);
+  assert.match(
+    runCall,
+    /timeout -k 30s 20m bash scripts\/remote-test\/container\.sh ci:fast$/,
+  );
+});
+
+test("a run that hits the limit kills the named container; an ordinary failure does not", (t) => {
+  const timedOut = run(t, [], { STUB_RUN_STATUS: "124" });
+  assert.equal(timedOut.status, 124);
+  const name = timedOut.calls
+    .find((c) => c.includes("container.sh"))
+    .match(/--name (\S+)/)[1];
+  assert.ok(
+    timedOut.calls.some((c) => c.includes(`docker kill ${name}`)),
+    `a timed-out run must docker kill ${name}; calls: ${timedOut.calls.join(" | ")}`,
+  );
+  const failed = run(t, [], { STUB_RUN_STATUS: "1" });
+  assert.equal(failed.status, 1);
+  assert.ok(
+    !failed.calls.some((c) => c.includes("docker kill")),
+    "an ordinary failure must not kill anything",
+  );
+});
+
+test("branch names that differ get different run directories, and detached HEADs key on the commit", (t) => {
+  const { repo, git } = makeRepo(t);
+  const names = new Map();
+  for (const b of ["feature/foo", "feature-foo", "Feature/Foo"]) {
+    git("checkout", "-q", "-B", b);
+    names.set(b, runName(t, repo));
+  }
+  assert.equal(new Set(names.values()).size, 3, `collision: ${[...names]}`);
+  // The same branch twice must keep one directory, or nothing is ever reused.
+  git("checkout", "-q", "-B", "feature/foo");
+  assert.equal(runName(t, repo), names.get("feature/foo"));
+  git("checkout", "-q", "--detach");
+  const first = runName(t, repo);
+  assert.match(first, /^agent-skills-test-detached-/);
+  git("commit", "-q", "--allow-empty", "-m", "second");
+  assert.notEqual(
+    runName(t, repo),
+    first,
+    "two detached commits must not share a directory",
+  );
+});
+
+test("--timeout-min accepts a leading zero and refuses an absurd length", (t) => {
+  const ok = run(t, ["--timeout-min", "08"]);
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.match(
+    ok.calls.find((c) => c.includes("container.sh")),
+    /timeout -k 30s 8m /,
+  );
+  const long = run(t, ["--timeout-min", "99999999999999999999"]);
+  assert.equal(long.status, 2);
+  assert.deepEqual(long.calls, []);
+});
+
+test("--reap removes a stale directory but skips one with a running container", (t) => {
+  const r = run(t, ["--reap", "3"]);
+  assert.equal(r.status, 0, r.stderr);
+  const script = path.join(r.stubDir, "reap.sh");
+  assert.ok(fs.existsSync(script), "the reap script is sent to ssh on stdin");
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "remote-runner-home-"));
+  t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+  const old = new Date(Date.now() - 40 * 86400 * 1000);
+  for (const d of ["agent-skills-test-stale", "agent-skills-test-busy"]) {
+    fs.mkdirSync(path.join(home, d));
+    fs.utimesSync(path.join(home, d), old, old);
+  }
+  fs.mkdirSync(path.join(home, "agent-skills-test-fresh"));
+  fs.mkdirSync(path.join(home, "unrelated-old"));
+  fs.utimesSync(path.join(home, "unrelated-old"), old, old);
+  fs.writeFileSync(
+    path.join(r.stubDir, "docker"),
+    "#!/usr/bin/env bash\necho agent-skills-test-busy\n",
+    { mode: 0o755 },
+  );
+  const res = spawnSync("bash", [script, "3"], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      HOME: home,
+      PATH: `${r.stubDir}:${process.env.PATH}`,
+    },
+  });
+  assert.equal(res.status, 0, res.stderr);
+  const left = fs.readdirSync(home).sort();
+  assert.deepEqual(left, [
+    "agent-skills-test-busy",
+    "agent-skills-test-fresh",
+    "unrelated-old",
+  ]);
 });
 
 test("the sync deletes stale files and never uses --files-from", (t) => {
