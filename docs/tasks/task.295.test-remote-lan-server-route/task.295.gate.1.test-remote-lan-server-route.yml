@@ -1,0 +1,75 @@
+schema: 2
+task: 'task.295.test-remote-lan-server-route'
+task_title: 'Run the test suite on the LAN server (test:remote)'
+gate: CONCERNS
+status_reason: 'Route works and its server-side acceptance evidence is recorded, but a missing option value hangs the runner and the CHANGELOG has no entry citing task 295.'
+reviewer: 'QA Engineer'
+head: '5fd76f122c0be839974356680abf44b338369da0'
+updated: '2026-11-10T14:56:01Z'
+
+top_issues:
+  - id: 'T295-QA-1'
+    severity: medium
+    file: 'scripts/remote-test/run.sh'
+    finding: '`run.sh --host` or `--timeout-min` as the LAST argument never terminates: `shift 2` fails with one argument left, leaves the arguments unchanged, and the while loop spins forever (reproduced: exit 124 under timeout 5, also with TEST_LOCAL=1; control `--run`/`--reap` with no value exit 2). origin: code-review, reproduced by QA'
+    suggested_action: 'Refuse a missing value for --host and --timeout-min with usage_error before shifting (as --run and --reap already do); add a guard test that `--host` and `--timeout-min` with no value exit 2'
+    suggested_owner: dev
+    status: open
+  - id: 'T295-QA-2'
+    severity: medium
+    file: 'CHANGELOG.md'
+    finding: 'changelog-cites.sh reports "missing (task 295)": no [Unreleased] entry cites (task 295); /finalise 6d HALTs without it. CHANGELOG.md also carries another session uncommitted edits, so only this task hunk may be staged.'
+    suggested_action: 'Add one [Unreleased] entry citing (task 295); stage only that hunk (git add -p), never the other session edits'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 7
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: ['never']
+    boundary: true
+    notes: 'The --run validation is a boundary. security-probe.mjs (shell-argv, sink filename) ran 28 cases but its filename corpus expects a cycle-number output, so it scored every refusal as "accepted" and measured nothing about this entry; not credited. By hand: metacharacter, substitution, newline and leading-dash names all exit 2 before any ssh, and the committed guard test covers metacharacters. No escapes.'
+  performance:
+    status: PASS
+    notes: 'Low CPU weight (CpuShares=128) confirmed by docker inspect; laptop load stayed 1 to 3 during a full run.'
+  reliability:
+    status: CONCERNS
+    notes: 'Exit status is the remote status; unreachable server exits 1 without falling back. The missing-value hang (T295-QA-1) is a reliability defect.'
+  maintainability:
+    status: PASS
+    notes: 'shellcheck clean, offline guard test with mutation proofs, contributor doc and AGENTS.md section present.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T295-QA-1 and T295-QA-2'
+      refs: ['scripts/remote-test/run.sh', 'CHANGELOG.md']
+  future:
+    - action: 'testing-remote.md step 4 lists the image contents without shellcheck, rsync or the trixie base; align it with the Dockerfile'
+      refs: ['docs/contributing/testing-remote.md']
+    - action: '--reap keys on the top-level directory mtime, which a sync that changes only nested files does not refresh; a live directory could be reaped'
+      refs: ['scripts/remote-test/run.sh']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T295-QA-1 fixed', 'T295-QA-2 fixed']

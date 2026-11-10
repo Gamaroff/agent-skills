@@ -323,6 +323,27 @@ This task does not use sign-off (`sign-off.enabled` is not `true` in `skills-con
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-10
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.295.qa.1.test-remote-lan-server-route.md](./task.295.qa.1.test-remote-lan-server-route.md)
+- **Gate File**: [task.295.gate.1.test-remote-lan-server-route.yml](./task.295.gate.1.test-remote-lan-server-route.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 7
+- **Phases Verified**: 6/6
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+`--host` or `--timeout-min` as the last argument hangs the runner (T295-QA-1), and the CHANGELOG has no entry citing task 295 (T295-QA-2).
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -333,6 +354,7 @@ This task does not use sign-off (`sign-off.enabled` is not `true` in `skills-con
 | 2026-11-10 |         | Status → ready-for-development | review-task |
 | 2026-11-10 | 1.2     | Implemented: test:remote runner, container, guard test, docs; four container parity fixes recorded in Notes | develop-task |
 | 2026-11-10 |         | Status → ready-for-review | develop-task |
+| 2026-11-10 |         | QA gate CONCERNS (80/100) — 2 findings | qa-task |
 <!-- change-log-end -->
 
 ---
