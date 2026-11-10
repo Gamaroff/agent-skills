@@ -20,7 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. Phase 20 is open (opened 2026-11-09): T289 (accepted), T290 (merged with an owner waiver), T292 (accepted), T293 (accepted), T294, T291, T295 (accepted). Phase 21 is open (opened 2026-11-10): T301, T303, T302.
+chain, a human gate. Phase 20 is open (opened 2026-11-09): T289 (accepted), T290 (merged with an owner waiver), T292 (accepted), T293 (accepted), T294, T291, T295 (accepted). Phase 21 is open (opened 2026-11-10): T301, T303, T302, T296. Phase 22 is open (opened 2026-11-10): T297, T300, T298, T299.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -101,12 +101,29 @@ accepted, and archive the phase at close.**
 An **override**: without it the registry fallback selects the lowest-numbered planned task, which is
 T275 or older work, ahead of these. They follow PR #873 (the PreCompact hook keeps the lock) and task
 295 (`test:remote`), and the owner asked for them to be queued. T301 and T303 both edit the PreCompact
-hook, so whichever merges second rebases (`pipeline-lock~`). T302 is independent. **Tick each row
-`[x]` when its task is accepted, and archive the phase at close.**
+hook, so whichever merges second rebases (`pipeline-lock~`). T302 and T296 both edit
+`scripts/remote-test/run.sh` (no tag covers it, so both carry `test-harness~`), so the second to
+merge rebases. **Tick each row `[x]` when its task is accepted, and archive the phase at close.**
 
 - [ ] **T301** PreCompact pause comment names the cycle and the pause count · deps: none · touches: pipeline-lock~, pipeline-steps~, test-harness~, bundles~ · /develop-task docs/tasks/task.301.precompact-pause-comment-names-cycle-and-count/task.301.precompact-pause-comment-names-cycle-and-count.md
 - [ ] **T303** Pause commits restart CI and block the docs-only shortcut · deps: none · touches: pipeline-lock~, finalise~, test-harness~, bundles~ · /develop-task docs/tasks/task.303.pause-commits-restart-ci-and-block-docs-only-shortcut/task.303.pause-commits-restart-ci-and-block-docs-only-shortcut.md
 - [ ] **T302** test:remote from a linked worktree · deps: none · touches: test-harness~ · /develop-task docs/tasks/task.302.test-remote-from-a-linked-worktree/task.302.test-remote-from-a-linked-worktree.md
+- [ ] **T296** test:remote per-run lock and image-tag prune · deps: none · touches: test-harness~ · /develop-task docs/tasks/task.296.test-remote-per-run-lock-and-image-prune/task.296.test-remote-per-run-lock-and-image-prune.md
+
+## PHASE 22 — skill fixes cut from the task.295 observations (opened 2026-11-10)
+
+An **override**: without it the registry fallback selects the lowest-numbered planned task, which is
+T275 or older work, ahead of these. Each task was cut from observations #161 to #165 logged while
+finishing task 295, and each starts with a premise check, because two of the observations were
+partly wrong when read against the code (T297, T300). The four are independent; they edit different
+skills, but all regenerate bundled copies (`bundles~`), so whichever merges later runs
+`npm run bundle` again. **Tick each row `[x]` when its task is accepted, and archive the phase at
+close.**
+
+- [ ] **T297** QA loop fast gate and an earlier structural move · deps: none · touches: pipeline-steps~, qa-skills~, bundles~ · /develop-task docs/tasks/task.297.qa-loop-fast-gate-and-earlier-structural-move/task.297.qa-loop-fast-gate-and-earlier-structural-move.md
+- [ ] **T300** security-probe names the sink it observes · deps: none · touches: finalise~, bundles~ · /develop-task docs/tasks/task.300.security-probe-names-the-sink-it-observes/task.300.security-probe-names-the-sink-it-observes.md
+- [ ] **T298** review-task runs a plan's command and checks CI parity · deps: none · touches: review-skills~, templates~, bundles~ · /develop-task docs/tasks/task.298.review-task-runs-plan-command-and-ci-parity/task.298.review-task-runs-plan-command-and-ci-parity.md
+- [ ] **T299** Orchestration reads status and time from the instrument · deps: none · touches: pipeline-steps~, test-harness~, bundles~ · /develop-task docs/tasks/task.299.orchestration-status-and-timestamp-from-the-instrument/task.299.orchestration-status-and-timestamp-from-the-instrument.md
 
 ## Deferred / human-gated
 
@@ -269,3 +286,4 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-11-10 | **T294 added to Phase 20**, ahead of T291: the allow-list design (a block runs only when every word is a known-safe literal) that closes the three residuals T293 left open, plus T293 gate 9's two test cleanups. A security gap in what the runner executes, so it queues before the housekeeping item. |
 | 2026-11-10 | **T295 added to Phase 20**, after T291: `npm run test:remote`, which runs the suite on the .249 LAN server so the throttling laptop only syncs files. Not a snippet-runner item; it sits here because it touches only `package.json` and has no dependency, so it can run whenever the loop reaches it. |
 | 2026-11-10 | **T295 accepted + merged — PR #872** (`62a4026c`); row ticked. **Phase 21 opened** with T301, T303 and T302, follow-ups to the PreCompact lock fix (PR #873, `5e491e3a`) and the test route: the pause comment names the cycle and count, a pause commit no longer forces a full-CI wait, and `test:remote` works from a linked worktree. |
+| 2026-11-10 | **T296 added to Phase 21** and **Phase 22 opened** with T297, T300, T298 and T299, the tasks cut from observations #161 to #165 (the QA loop fast gate, the probe's stated limits, review-task running a plan's command, status and time read from the instrument). Each opens with a premise check. |
