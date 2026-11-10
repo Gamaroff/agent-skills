@@ -91,7 +91,9 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
-### Cycle 1 — gate FAIL (80/100), 1 HIGH
+### QA Cycle 1 — gate FAIL (80/100), 1 HIGH
+
+**Action**: Running qa-fix
 
 - **Found (QA 5a):** T292-QA-1. `echo $[1<<z]`, a writer line, then `z` classified runnable; bash writes. Diff reviewer CR-1, reproduced by QA with a control. Bug report `task.292.bug.1`.
 - **Fix (5b):** the lexer refuses `$[`, refuses `<<` inside an open `(( ))` and refuses `<<` in a word with an unclosed `[`. A first version (refuse `$[` only) left `echo ;(($()$()<<z))` runnable; the new `arith` differential atom set found it (seed 11), so the cycle fixed the class, not the instance. The `qa-fix` ingester subagent did not run (one finding, already in hand), so independent ingest did not run.
@@ -99,7 +101,9 @@ _Track each QA review/fix cycle._
 - **Mutation proofs:** `$[` refusal reverted: 3 tests red. `(( ))` refusal removed: 2 red. Subscript refusal removed: only the tokenizer unit row red (the classify row is also refused by the allow-list).
 - **Scope note:** a first `((` blanket refusal turned `if ((a>b))` mutating and broke an existing test; narrowed to a `<<` inside an open `(( ))`.
 
-### Cycle 2 — gate FAIL (80/100), 1 HIGH
+### QA Cycle 2 — gate FAIL (80/100), 1 HIGH
+
+**Action**: Running qa-fix
 
 - **Found (QA 5a, refute pass plus safety re-probe):** T292-QA-2. `commandInvocations` removed `$(( … ))` with a pattern that ends at the first `)`, so `echo $((1+$(touch W)))` classified runnable while bash wrote. Reviewer CR-1, reproduced by QA with a control; identical on `develop`. Bug 1 verified and closed. Bug report `task.292.bug.2`.
 - **Fix (5b):** `openSubst` refuses a `$((` whose body holds `$(` or a backtick. Class sweep read every `.replace(/…/)` in the engine; the `blankConditionalSpans` copies feed the redirect path only and the command scan still sees the original text. The `qa-fix` ingester subagent did not run (one finding, already in hand), so independent ingest did not run.
@@ -107,6 +111,14 @@ _Track each QA review/fix cycle._
 - **Mutation proof:** `refuseArithSubst` call removed: 8 tests red (seven rows and the tokenizer row).
 - **Why the differential missed it in cycle 1:** the `arith` set had no operator and no atom with a writer inside, so `$((1+$(touch out)))` could not be built. Both atoms are added.
 - **Open:** this is the second HIGH on `qa-execute-snippets.mjs`; a third would trip the third-strike rule. The `WORD` and assignment regexes remain the known follow-up.
+
+### QA Cycle 3 — gate CONCERNS (90/100), 0 blocking
+
+**Action**: Proceeding to 5c
+
+- **Found (QA 5a, unscoped safety re-probe):** no finding attributable to this change. Reviewer CR-1 to CR-3 (`printf -v` and kin with a quoted `a[$(cmd)]`; PS4 and `${x@P}`; quoted data re-evaluated as arithmetic) are runnable-and-writing but identical on `develop`, absent from the corpus and outside the task's out-of-scope list, so they are `pre-existing` and routed to gate 3 `recommendations.future` for a follow-up task. Bug 2 verified and closed. The independent reviewer ran in 102 s.
+- **Evidence:** suite 371/371; `arith` differential seed 61 (60000) and all six sets seed 62 (30000 each): 0 writes; docs scan 3446 blocks, 0 newly runnable, 1 newly refused; probe 31 executed, 0 escaped; mutation (`refuseArithSubst` removed) 8 red.
+- **PR Review**: CONCERNS (5c, conformance lens only) — PC-1 trail medium (this section's headings and row, fixed here), PC-2 consistency low (boxes ticked), PC-3 coverage low/low dismissed after measurement (a recursive scan overflows the stack near 7365 frames, so the 20000-deep test goes red for it). No open coverage finding. Report `task.292.pr-review.1.*`.
 
 ---
 
