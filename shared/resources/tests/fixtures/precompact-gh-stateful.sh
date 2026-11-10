@@ -14,7 +14,7 @@
 # Anything else (auth status, repo view, api -X PATCH) succeeds silently.
 printf '%s\n' "$*" >> "$GH_LOG"
 mkdir -p "$GH_STATE"
-next_n() { ls "$GH_STATE" 2>/dev/null | grep -c "^$1-" ; }
+next_n() { local n=0 f; for f in "$GH_STATE/$1-"*; do [ -e "$f" ] && n=$((n + 1)); done; echo "$n"; }
 case "$1 $2" in
   "auth status") exit 0 ;;
   "repo view") echo "o/r"; exit 0 ;;
