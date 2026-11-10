@@ -68,7 +68,7 @@ Reviewer: dispatched about 21:28Z, returned in 80.9 s (`duration_ms` 80955).
 | Control table stays `runnable` | `task.294 control blocks` and the task.293 control table (both verdicts) | PASS |
 | Differential writes nothing | `residual` set added: old engine 10 writes in 5000 blocks, new engine 0; slice test green | PASS |
 | Docs-scan median within +10% | base 1160 ms, new 1102 ms (5 runs each: base 1160 1127 1193 1377 1139, new 1102 1225 1085 1131 1024; load 3.0 to 3.2) | PASS |
-| Differential slice under 10 s | 4406 4380 4302 4287 4325 ms, median 4380 ms (load 2.8 to 3.0) | PASS |
+| Differential slice under 10 s | QA cycle: 4406 4380 4302 4287 4325 ms, median 4380 ms (load 2.8 to 3.0). Re-measured at finalise with `uptime` beside each run on head `3c720169`: median 4189 ms (table under Code Review) | PASS |
 | `CI=true` suite green, prettier, lint | 392/392 in the file; `ci:fast` on the LAN server 8371 pass, 0 fail; prettier clean | PASS |
 | `bundle:check` 0 problems | 129 skills checked, 0 problems | PASS |
 | Every change mutation-proven | Six development proofs in the implementation report, plus one re-run here (below) | PASS |
@@ -148,13 +148,35 @@ The same script against `origin/develop` gave the identical verdicts and the ide
 
 mutation-proven: allow-list call in `classifyInternal` replaced by `null` → 7 committed tests red (`arithmetic expansion is arithmetic, not an invocation`, `BUG-6/verify: a glued arithmetic evaluation is not an invocation`, `task.292 control (T292-QA-2): plain arithmetic stays runnable`, `task.292 differential slice`, `task.293 safe blocks near the class stay runnable…`, `task.294 every residual shape writes under real bash…`, `task.294 each refusal is held on an input where it alone decides`) → covered. Restored; `cmp` against the snapshot printed nothing, and the file then passed 392/392. The other five proofs are development-time (in the implementation report) and are not re-run here, so this report claims one re-proven and five `dev-only`.
 
-The five `dev-only` proofs, copied from the implementation report's Decisions Log (reverted behaviour → red test), are:
+The five development-time proofs, from the implementation report's Decisions Log (reverted behaviour → red test), are:
 
-- `$((` name check removed → 4 tests red.
-- `[[` arithmetic-operand check removed → 2 tests red.
-- `=` command-word check removed → 3 tests red.
+- `$((` name check removed → 4 tests red (development count; re-run below).
+- `[[` arithmetic-operand check removed → 2 tests red (re-run below).
+- `=` command-word check removed → 3 tests red (re-run below).
 - Helper rule and start-up rule swapped in order → the Phase 5 helper-call test red.
 - `mapfile` added to the command table → the six-word unrecognised-command test red.
+
+**Three of them re-run at finalise (2026-11-10, head `3c720169`), each naming the red tests.** For each, the engine was snapshotted, the one behaviour reverted, `CI=true node --test shared/resources/tests/qa-execute-snippets.test.mjs` run, the engine restored from the snapshot and confirmed byte-identical (`cmp`, and `git diff` clean):
+
+| Reverted behaviour | Red | Tests that went red |
+| --- | --- | --- |
+| `$((` name check (`ALLOW_ARITH_TEXT` test) disabled | 8 of 392 | `arithmetic expansion is arithmetic, not an invocation`; `BUG-6/verify: a glued arithmetic evaluation is not an invocation`; `task.292 control (T292-QA-2): plain arithmetic stays runnable`; `task.292 differential slice: nothing the classifier calls runnable writes under real bash`; `task.293 safe blocks near the class stay runnable (earlier layers), and task.294 states the allow-list verdict`; `task.294 every residual shape writes under real bash, was admitted before, and is refused now`; `task.294 each refusal is held on an input where it alone decides`; `task.294 defeat the first layer: the allow-list alone refuses every residual shape` |
+| `[[` arithmetic-operand check disabled | 2 of 392 | `task.293 safe blocks near the class stay runnable (earlier layers), and task.294 states the allow-list verdict`; `task.294 each refusal is held on an input where it alone decides` |
+| `=` rejected as part of a command word disabled | 3 of 392 | `task.293 safe blocks near the class stay runnable (earlier layers), and task.294 states the allow-list verdict`; `task.294 defeat the first layer: the allow-list alone refuses every residual shape`; `task.294 each refusal is held on an input where it alone decides` |
+
+The `$((` count differs from the development record (8 now, 4 then): the development count was taken before the later tests existed, so the measured 8 is the figure of record. The two other development-time proofs (helper-rule order, `mapfile`) name their red test above and were not re-run.
+
+**Differential slice timing, re-measured at finalise on head `3c720169`, `uptime` read immediately before each run** (`CI=true node --test --test-name-pattern="task.292 differential slice: nothing" shared/resources/tests/qa-execute-snippets.test.mjs`, wall clock of the whole command including node start-up, so an upper bound on the slice):
+
+| Run | Load (1m, 5m, 15m) | Wall clock (ms) |
+| --- | --- | --- |
+| 1 | 1.66, 1.73, 2.05 | 4246 |
+| 2 | 1.69, 1.73, 2.05 | 4178 |
+| 3 | 1.69, 1.73, 2.05 | 4263 |
+| 4 | 1.72, 1.74, 2.05 | 4152 |
+| 5 | 1.82, 1.76, 2.05 | 4189 |
+
+Median 4189 ms, under the 10 s bound. The code last changed at `291d7750`; every commit since is documentation only, so this is the same code as the PR head.
 
 **Documentation blocks newly refused** (docs scan, 256 runnable before, 251 now, 0 newly runnable). The scan prints each file and line with `runnable` before and `mutating` now. The reason column below was read from `classifyBlock` on each block at finalise (2026-11-10), because the scan does not print it:
 
