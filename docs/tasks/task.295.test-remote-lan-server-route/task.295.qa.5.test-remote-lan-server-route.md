@@ -101,6 +101,28 @@ Every earlier reliability finding is fixed and held by a mutation-proved test.
 
 ---
 
+## Acceptance runs (re-run during `/finalise`, 2026-11-10)
+
+The first full `ci:fast` run on the final tree came after the QA loop, during `/finalise`. Each run is `npm run test:remote` from a clean clone of the pushed branch, and the laptop process list was sampled every 20 s while it ran.
+
+| Run | Head | Exit | Result |
+| --- | --- | --- | --- |
+| Green 1 | `80781138` | 1 | 8365 tests, 1 fail: `no test file hardcodes a spawn timeout` (`tests/test-remote-runner.test.js` carried `timeout: 5000`). A real defect, fixed in `13486822` by taking the timeout from the shared spawn budget; reverting that change turns the guard red |
+| Green 2 | `13486822` | 0 | 8365 tests, 8362 pass, 0 fail, 3 skipped, 7 m 04 s |
+| Red | scratch commit, one assertion changed in a throwaway clone on a scratch branch (never on the PR branch; the clone was discarded) | 1 | 8365 tests, 1 fail: `a --run name with shell metacharacters exits 2 before any ssh`; the failure is in the output |
+
+Load, from `uptime`:
+
+| Run | Laptop before | Laptop after | .249 before | .249 after |
+| --- | --- | --- | --- | --- |
+| Green 1 | 0.51 0.52 1.28 | 0.29 0.27 0.75 | 3.63 6.13 8.81 | 11.78 16.11 12.55 |
+| Green 2 | 0.46 0.31 0.74 | 2.33 1.92 1.48 | 14.53 16.20 12.72 | 6.23 13.43 14.22 |
+| Red | 2.33 1.95 1.50 | 0.97 1.65 1.56 | 4.53 12.45 13.88 | 5.06 6.95 10.45 |
+
+.249 was busy for the whole session (another user on a shared host), so its figures say nothing about this route. The laptop stayed near idle.
+
+Laptop process list during the runs: 31, 38 and 24 samples. Every sample showed only `ssh` (and its `timeout` wrapper). One sample in green 2 matched `bash shared/resources/advance-pipeline-lock.test.sh`, which is another session's script in this checkout, not something the route started; no `node --test` and no `ci:fast` process ran locally. Green 2 printed 87 `PASS ... zsh` lines and no zsh or awk skip notice. After each run no `agent-skills-test` container was left on .249.
+
 ## Test Artifacts
 
 ```bash
