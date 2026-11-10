@@ -4677,6 +4677,59 @@ test("task.290 every comment scan reads the one rule (the tokenizer, task.292)",
   );
 });
 
+// task.292 criterion 7: the call-site test COUNTS the consumers of the one lexer. A scan that reads
+// lexical facts (comment starts, quotes, substitutions, joins) from `tokenize` is listed here; a new
+// `tokenize(` call site fails the count until it is listed, and a listed scan that stops calling the
+// tokenizer (directly, or through the scan it composes) fails its own row.
+test("task.292 the tokenizer's consumers are counted, and each scan still reads it", () => {
+  const src = readFileSync(MODULE, "utf8");
+  const bodyOf = (name) => {
+    const at = src.indexOf(`function ${name}(`);
+    assert.ok(at >= 0, `${name} exists`);
+    const end = src.indexOf("\n}\n", at);
+    return src.slice(at, end);
+  };
+  // Direct consumers: the function body calls `tokenize(`.
+  const DIRECT = [
+    "cutJoins",
+    "maskSubstitutions",
+    "collapseQuotedSpans",
+    "stripProse",
+  ];
+  // Composed consumers: the scan reads the tokenizer through the named direct consumers.
+  const COMPOSED = { stripNonCode: ["collapseQuotedSpans", "stripProse"] };
+  const callSites = [...src.matchAll(/\btokenize\(/g)].length - 1; // minus the definition
+  assert.equal(
+    callSites,
+    DIRECT.length,
+    "a `tokenize(` call site that is not in DIRECT: list the new consumer or remove the call",
+  );
+  for (const name of DIRECT) {
+    assert.match(bodyOf(name), /\btokenize\(/, `${name} reads the tokenizer`);
+  }
+  for (const [name, via] of Object.entries(COMPOSED)) {
+    for (const v of via) {
+      assert.match(
+        bodyOf(name),
+        new RegExp(`\\b${v}\\(`),
+        `${name} reads it through ${v}`,
+      );
+    }
+  }
+  // The prose pass of the classifier reads joins and comments from the same consumers.
+  assert.match(
+    src,
+    /const prose = cutJoins\(stripProse\(code\), ""\);/,
+    "the prose pass reads cutJoins and stripProse",
+  );
+  // A scan that re-derives a comment start with its own regex is not a consumer. These are the
+  // shapes the regex-era scans used; none may reappear.
+  assert.ok(
+    !/\/\^\\s\*#|\[\^\\s\]\*#|\(\?:\^\|\\s\)#/.test(src),
+    "no regex re-derives a comment start",
+  );
+});
+
 // The differential test: what the classifier calls runnable, run under real bash.
 const WRITERS = [
   "touch out",
@@ -4784,6 +4837,28 @@ for (const [name, code] of Object.entries(T292_GAPS)) {
     assert.equal(classifyBlock(code).klass, "mutating", JSON.stringify(code));
   });
 }
+
+// QA gate 3 / finalise (criterion 10): the blank normalisation at the top of `classifyInternal` was
+// absorbed by the suite and by 24000 differential blocks, so a revert turned nothing red. These rows
+// hold it. `command` followed by a character bash does not treat as a blank is ONE unknown word, and
+// without the normalisation the `command\s+` strip reads it as the `command` builtin and calls the
+// block runnable (found by comparing verdicts with the line removed).
+const T292_COMMAND_BLANKS = [
+  "command\recho hi",
+  "command\fecho hi",
+  "command echo hi",
+  "command echo hi",
+  "echo a; command\vecho hi",
+  "command\r-v echo",
+];
+for (const code of T292_COMMAND_BLANKS) {
+  test(`task.292 classifyInternal normalises blanks: ${JSON.stringify(code)} is refused`, () => {
+    assert.equal(classifyBlock(code).klass, "mutating", JSON.stringify(code));
+  });
+}
+test("task.292 classifyInternal normalises blanks: a real blank after `command` still runs", () => {
+  assert.equal(classifyBlock("command echo hi").klass, "runnable");
+});
 
 // QA cycle 1 (T292-QA-1): inside `$[ ]` and `(( ))` bash reads `<<` as a left shift, so the lines
 // up to a line equal to the word are NOT a heredoc body; bash runs the writer. Each of these writes
