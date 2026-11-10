@@ -366,6 +366,7 @@ No code defect is open. The guard's documented window is wrong (a few seconds, w
 | 2026-11-10 |         | QA gate CONCERNS (80/100) — 1 finding | qa-task |
 | 2026-11-10 |         | QA findings fixed after gate 4 (1 finding, 4 fix cycles in all); ready for re-gate | qa-fix |
 | 2026-11-10 |         | QA gate CONCERNS (85/100) — 1 finding | qa-task |
+| 2026-11-10 |         | QA finding fixed after gate 5 (wording, 5 fix cycles in all); the PR review reads it | qa-fix |
 <!-- change-log-end -->
 
 ---
@@ -449,3 +450,4 @@ None.
 ### Future Improvements
 
 - A cross-repository lock on .249, if overlapping gates recur.
+- A per-run lock for one branch (an atomic `mkdir` on the run directory before the sync), if two runs on one branch recur. Today the container-name check is a best-effort guard with a window of minutes.

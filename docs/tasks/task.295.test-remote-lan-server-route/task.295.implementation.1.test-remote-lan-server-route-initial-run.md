@@ -92,7 +92,9 @@ _Track each QA review/fix cycle._
 - **Fix 3** (`3502406d` plus a comment correction): lock check before the first rsync with a message naming `docker rm -f`; 255 kills the named container, 125 does not; `--reap` aborts when `docker ps` fails; the directory is touched right after the sync. Guard tests 13 to 17; five mutations each turned a named test red. Live proof on .249: with a container holding the run's name, `test:remote` exited 1 before any sync, and the probe container was removed (0 left).
 - **Gate 4** (CONCERNS 80, head `d602cdea`, scoped review): no high, none reproduced. T295-QA-9 (medium): the container-name check covers the run, not the sync and image build before it, and the docs call it a lock. Three LOW items to `recommendations.future`.
 - **Fix 4** (`510da7e9`): third gate on this mechanism (QA-4 key, QA-6 order, QA-9 window), so the claim was scoped, not patched again (Step 2.6, scope the claim): the script comment and `testing-remote.md` now call it a best-effort guard with its window; a real lock stays the task's Future Improvements item. Also touch chained as `touch && { inspect || build; }`; two tests added (filter anchored on the run name, failed lock check stops the run), both mutation-proved. The touch-chaining change is not held by a test: the stub fails the whole ssh call, so it cannot tell the two parses apart.
-- **Next**: gate 5, the last in the budget (gates 1 to 4 used), scoped to the files changed since `d602cdea`; then 5c.
+- **Gate 5** (CONCERNS 85, head `19108b83`, scoped review; the last gate in the 5-gate budget): no code defect. T295-QA-10 (medium, wording): the documented guard window said "a few seconds" where it is the whole sync plus a first-use build, and the `run.sh` comment cited the cross-repository lock item for a same-branch lock.
+- **Fix 5**: wording only, in `run.sh`, `testing-remote.md`, the task's Future Improvements (a per-run lock item added) and one test title. Not re-gated: the budget is spent, so the Step 5c review is the gate that reads it. Two LOW items stay in `recommendations.future` (deferred SIGTERM trap, 9999-minute cap).
+- **Next**: Step 5c `/review-pr`.
 
 ---
 
