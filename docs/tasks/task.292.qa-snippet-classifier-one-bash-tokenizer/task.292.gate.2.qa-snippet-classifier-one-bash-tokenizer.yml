@@ -1,0 +1,74 @@
+schema: 2
+task: 'task.292.qa-snippet-classifier-one-bash-tokenizer'
+task_title: 'One bash tokenizer for the QA snippet classifier'
+gate: FAIL
+status_reason: 'Cycle 1 fix verified (bug 1 closed), but the cycle 2 refute pass found a second write the classifier calls runnable: the arithmetic-removal regex in commandInvocations stops at the first ")" and erases a command substitution inside $(( )), so "echo $((1+$(touch W)))" classifies runnable while bash writes. Reproduced by execution; identical on develop, but it is the same class as the task goal and the open HIGH.'
+reviewer: 'QA Engineer'
+head: 'aac91b150289548f8f8396dbe257cc2a670b0569'
+updated: '2026-11-10T05:33:10Z'
+
+top_issues:
+  - id: 'T292-QA-2'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'commandInvocations removes arithmetic with .replace(/\$\(\([^)]*\)\)/g, " "); [^)]* stops at the first ")" so a $( ) or backtick inside $(( )) is deleted with it. "echo $((1+$(touch W)))", "x=$((1+$(touch W)))", "echo $((1+`touch W`))", the double-quoted form and the unquoted-heredoc-body form classify runnable and bash creates W. Control: "echo $((1))" runnable, "echo $((1+2)); touch W" mutating, and "echo $(( (1) + $(touch W) ))" already mutating. Same verdict on develop. Reviewer CR-1 (high), reproduced by QA. Bug report task.292.bug.2.'
+    suggested_action: 'Drive arithmetic removal from the tokenizer, or refuse a $(( body holding $( or a backtick; add rows for the five shapes, a "+" atom to the arith differential set, and mutation-prove the fix.'
+    suggested_owner: dev
+    origin: 'code-review, reproduced by QA'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 362
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 31
+    escaped: 0
+    boundary_signals: ["never"]
+    boundary: true
+    notes: 'shell-exec probe on isRunnableBlock: 31 executed, 0 reproduced, 0 escaped (record task.292.qa.2.security.run.json). The refute pass found a shape the corpus and the arith atom set do not cover ($(( with a nested substitution); reproduced by hand (T292-QA-2).'
+  performance:
+    status: PASS
+    notes: 'Cycle 1 measurements stand; cycle 1 fix adds one backwards word scan per <<. Fixed-seed slice 3.26 s in this cycle (bound 10 s).'
+  reliability:
+    status: PASS
+    notes: 'Unmodelled shapes throw and classifyFailClosed returns mutating; suite 362/362 under CI=true.'
+  maintainability:
+    status: PASS
+    notes: 'The regex that causes T292-QA-2 is one of the lexical copies the task set out to remove; the open follow-up about WORD and the assignment regex stands.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 1
+  notes: 'task.292.bug.1 (T292-QA-1) verified fixed and closed. Verification: the nine shift rows and controls pass; arith differential seed 41 at 60000 blocks and all six sets seed 42 at 30000 show 0 writes; reviewer probed about 70 shapes without finding a shift shape runnable.'
+
+recommendations:
+  immediate:
+    - action: 'Fix T292-QA-2: stop the arithmetic regex erasing a nested substitution; add rows and a "+" atom.'
+      refs: ['shared/resources/qa-execute-snippets.mjs', 'shared/resources/tests/qa-execute-snippets.test.mjs', 'scripts/qa-snippets-differential.mjs']
+  future:
+    - action: 'Decide whether to move the WORD and assignment regexes onto tokens (follow-up task). T292-QA-2 is a third regex of that kind; consider one sweep for every regex that parses a bash construct.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'The blank normalisation in classifyInternal is absorbed by the two other sites; keep as defence in depth or drop it.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T292-QA-2 fixed and re-reviewed']

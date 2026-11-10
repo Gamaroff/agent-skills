@@ -1552,7 +1552,27 @@ function lexBash(code) {
   let arithInner = 0;
   let i = 0;
 
+  // `$((` opens arithmetic expansion, where a `$(` or a backtick still runs a command. The command
+  // scan removes an arithmetic expansion with a pattern that ends at the first `)`, which erased a
+  // nested substitution with it: `echo $((1+$(touch W)))` read as runnable while bash wrote
+  // (task 292, QA cycle 2). Arithmetic is not modelled, so a body that holds either is refused here,
+  // where every caller sees it. The scan stops at the first hit, so a run of `$((` is not quadratic.
+  const refuseArithSubst = (at) => {
+    let depth = 0;
+    for (let j = at + 2; j < n; j += 1) {
+      const ch = code[j];
+      if (ch === "(") depth += 1;
+      else if (ch === ")") {
+        depth -= 1;
+        if (depth === 0) return;
+      } else if (ch === "`" || (ch === "$" && code[j + 1] === "(")) {
+        refuse("command substitution inside $(( ))");
+      }
+    }
+  };
+
   const openSubst = (form, at, width) => {
+    if (form === "$(" && code[at + 2] === "(") refuseArithSubst(at);
     const f = stack[stack.length - 1];
     const tok = {
       kind: "subst",

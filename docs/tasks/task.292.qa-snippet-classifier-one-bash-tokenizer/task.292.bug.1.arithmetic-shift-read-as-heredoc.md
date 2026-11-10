@@ -2,7 +2,7 @@
 id: task.292.bug.1
 title: "A left shift inside $[ ] is read as a heredoc, hiding a write from the classifier"
 type: bug
-status: ready-for-qa
+status: closed
 severity: high
 priority: P0
 created: 2026-11-10
@@ -15,7 +15,7 @@ updated: 2026-11-10
 **Bug ID**: TASK-292-BUG-1
 **Severity**: HIGH
 **Priority**: P0
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (diff code review CR-1, reproduced by execution)
 **Date Found**: 2026-11-10
 
@@ -76,3 +76,4 @@ In the lexer, throw (refuse) when `<<` is met inside a `$[` body, and add `$[` a
 | ---------- | ------------ | ---------- | ------------------------------ |
 | 2026-11-10 | New          | qa-task    | Found by diff review CR-1      |
 | 2026-11-10 | Ready for QA | qa-fix     | Refusals added, tests, bundles |
+| 2026-11-10 | Closed | qa-task | Verified by task.292.qa.2.qa-snippet-classifier-one-bash-tokenizer.md |

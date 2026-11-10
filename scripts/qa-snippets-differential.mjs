@@ -143,6 +143,11 @@ export const ATOM_SETS = {
     ";",
     "$(",
     ")",
+    // An operator, and substitutions that carry a writer: without these the random run cannot
+    // build `$((1+$(touch out)))`, where the writer sits inside an arithmetic body (T292-QA-2).
+    "+",
+    "$(touch out)",
+    "`touch out`",
   ],
 };
 

@@ -4819,6 +4819,36 @@ test("task.292 tokenizer refuses (( and a << inside a subscript", () => {
   assert.throws(() => tokenize("a[1<<z]=1\nz\n"), /tokenize: .*subscript/);
   assert.doesNotThrow(() => tokenize("( (echo a) )"));
 });
+// QA cycle 2 (T292-QA-2): the command scan removed `$(( … ))` with a pattern that ended at the
+// first `)`, so a substitution inside the arithmetic went with it. Each writes under bash.
+const T292_ARITH_SUBST = {
+  "a plain expansion": "echo $((1+$(touch out)))\n",
+  "an assignment": "x=$((1+$(touch out)))\n",
+  "a backtick": "echo $((1+`touch out`))\n",
+  "double quotes": 'echo "$((1+$(touch out)))"\n',
+  "an unquoted heredoc body": "cat <<z\n$((1+$(touch out)))\nz\n",
+  "a parameter default": "echo ${x:-$((1+$(touch out)))}\n",
+  "a nested expansion": "echo $((1+$((2+$(touch out)))))\n",
+};
+for (const [name, code] of Object.entries(T292_ARITH_SUBST)) {
+  test(`task.292 gap (T292-QA-2): ${name} holding a command substitution is mutating`, () => {
+    assert.equal(classifyBlock(code).klass, "mutating", JSON.stringify(code));
+  });
+}
+test("task.292 control (T292-QA-2): plain arithmetic stays runnable", () => {
+  assert.equal(classifyBlock("echo $((1))\n").klass, "runnable");
+  assert.equal(classifyBlock("echo $((1+2)) hi\n").klass, "runnable");
+  assert.equal(classifyBlock("n=$((n + 1))\n").klass, "runnable");
+  assert.equal(classifyBlock("echo $((1+2)) ; echo done\n").klass, "runnable");
+});
+test("task.292 tokenizer refuses a substitution inside $(( ))", () => {
+  assert.throws(
+    () => tokenize("echo $((1+$(date)))"),
+    /tokenize: .*inside \$\(\( \)\)/,
+  );
+  assert.throws(() => tokenize("echo $((1+`date`))"), /tokenize: .*inside/);
+  assert.doesNotThrow(() => tokenize("echo $((1+2)) $(date)"));
+});
 test("task.292 tokenizer refuses the legacy arithmetic form $[", () => {
   assert.throws(() => tokenize("echo $[1+1]"), /tokenize: .*arithmetic/);
 });
