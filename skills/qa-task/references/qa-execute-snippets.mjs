@@ -3140,6 +3140,28 @@ const LIVE_EXPANSION = /\$(?=[A-Za-z_0-9{(\[@*#?!$-])|[A-Za-z0-9_}\]]\[/g;
 // command output (`x=$(printf 'a[\044(cmd)]')`, task 293 QA-3).
 const EXPANDED_ASSIGNMENT =
   /(?:^|[\s;&|({])[A-Za-z_][A-Za-z0-9_]*\+?=[^\n;&|]{0,300}[A-Za-z0-9_]\[[^\]\n]{0,300}[$`]/;
+// True when an opening `[` sits earlier in the same word, so a quote at `at` is part of a subscript
+// (`${a['$(cmd)']}`, `a=([0'$(cmd)']=1)`, `a[x'$(cmd)']`). Word-scoped, not "the character before the
+// quote": that version missed `[0'…']` (task 293 QA gate 6). Bounded: the scan stops at the first
+// blank, separator or paren, so a run of text cannot make the check quadratic.
+function inSubscriptWord(code, at) {
+  for (let i = at - 1; i >= 0 && at - i <= 512; i -= 1) {
+    const c = code[i];
+    if (c === "[") return true;
+    if (
+      c === " " ||
+      c === "\t" ||
+      c === "\n" ||
+      c === ";" ||
+      c === "&" ||
+      c === "|" ||
+      c === "(" ||
+      c === ")"
+    )
+      return false;
+  }
+  return false;
+}
 // Text that spells a command substitution, whatever carries it: `$(` (not `$((`), an escaped `$\(`,
 // or a backtick. The caller drops the ones the tokenizer parsed as real substitutions.
 const LOOSE_LITERAL = /\$(?:\((?!\()|\\\()|`/g;
@@ -3283,7 +3305,7 @@ function indirectEvaluationHazard(code) {
   for (const q of quotes) {
     const hits = literals[q.quote];
     if (!hits || !anyIn(hits, q.start + q.quote.length, q.end - 2)) continue;
-    if (code[q.start - 1] === "[")
+    if (inSubscriptWord(code, q.start))
       return "a quoted substitution used as a subscript, which bash evaluates as arithmetic";
     if (blockEvaluates()) return REFUSED;
   }

@@ -5164,6 +5164,11 @@ const T293_SHAPES = {
     "printf -v a\\[\\$\\(touch\\ W\\)\\] x",
   "QA-7 escaped unquoted word to test -v": "test -v a\\[\\$\\(touch\\ W\\)\\]",
   "QA-7 escaped unquoted word to read": "read a\\[\\$\\(touch\\ W\\)\\] <<< x",
+  // QA gate 6 (T293-QA-9): the quote sits later in the subscript word, after a bracket and an open paren.
+  "QA-9 compound array subscript, digit then quote":
+    "a=([0'$(touch W)']=1); echo hi",
+  "QA-9 compound array subscript, backtick": "a=([0'`touch W`']=1); echo hi",
+  "QA-9 compound array subscript, letter": "a=([x'$(touch W)']=1); echo hi",
   "QA-4 literal piped into read, evaluated by [[ -eq ]]":
     "echo 'a[$(touch W)]' | { read x; [[ $x -eq 1 ]]; }",
 };
@@ -5226,6 +5231,8 @@ const T293_DECIDERS = {
     "set -- 'a[ $(touch W)]'; echo ${@:$1}",
   "digit-led subscript: only a live expansion (default-deny alone)":
     "set -- 'a[ $(touch W)]'; v=(1); echo ${v[1+$1]}",
+  "quote later in a subscript word (word-scoped bracket rule alone)":
+    "a=([0'$(touch W)']=1); echo hi",
   "escaped unquoted word (carrier default-deny alone)":
     "[[ a\\[\\$\\(touch\\ W\\)\\] -eq 1 ]]",
   "here-document body literal (heredoc loop alone)":
@@ -5271,6 +5278,7 @@ test("task.293 safe blocks near the class stay runnable", () => {
     "x=a'[5]'; echo $((x))", // QA-3 control: no substitution in the literal
     "echo 'a[5]' | { read x; echo $((x)); }", // QA-4 control
     "echo 'run $(date)'; x=5", // a printed literal, nothing evaluates a value
+    "a=([0'5']=1); echo hi", // QA-9 control: a subscript quote, no substitution
     "[[ a\\[5\\] -eq 1 ]]", // QA-7 control: escaped, no substitution
     "printf -v a\\[5\\] x", // QA-7 control
     "echo a\\[\\$\\(date\\)\\]", // an escaped literal that is only printed

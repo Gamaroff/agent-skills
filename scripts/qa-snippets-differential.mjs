@@ -171,6 +171,10 @@ export const ATOM_SETS = {
     "set -- 'a[ $(touch out)]'",
     "echo ${@:$1}",
     "v=(1); echo ${v[1+$1]}",
+    // QA gate 6 (T293-QA-9): a quote later in a compound-assignment subscript word.
+    "a=([0'$(touch out)']=1); echo hi",
+    "a=([0'`touch out`']=1); echo hi",
+    "a=([x'$(touch out)']=1)",
     // QA cycle 4 (T293-QA-7): the literal as backslash-escaped text in an unquoted word.
     "[[ a\\[\\$\\(touch\\ out\\)\\] -eq 1 ]]",
     "printf -v a\\[\\$\\(touch\\ out\\)\\] x",
