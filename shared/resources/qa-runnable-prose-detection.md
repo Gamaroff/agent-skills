@@ -283,8 +283,13 @@ The claim is **bounded**, not "any indirect evaluation": the table in `qa-execut
 (`npm run qa-snippets:differential -- --atoms indirect`) generates their combinations. **Known
 unseen shapes:** a value laundered through a command's output with the substitution spelled by an
 escape (`x=$(printf 'a[\044(cmd)]'); echo $((x))`; the plain `y=$(echo 'a[$(cmd)]')` form is now
-refused by the block-level rule); and the `[` or `$` itself arriving by expansion (`b='['; x="a${b}…"`). Both reproduce under bash
-and are recorded, not closed. The rule sits after the helper
+refused by the block-level rule); the `[` or `$` itself arriving by expansion (`b='['; x="a${b}…"`);
+and a literal **split across adjacent quote tokens**, so that no `$(` or backtick exists in the
+source (`read x <<< "a[$""(cmd)]"; echo $((x))`, the same through `printf -v`; found by the fifth QA
+gate of task 293, which ended the QA budget). All three reproduce under bash and are recorded, not
+closed. Text-level detection of the literal has been widened four times and each widening lost to a
+new carrier, so the remainder is not another patch: it needs an allow-list design (run only blocks
+whose every word is a known-safe literal), filed as its own task. The rule sits after the helper
 rule on purpose, so a helper call that also names a start-up variable keeps its `helper call with …`
 reason. A documentation block that needs one of these shapes is rewritten to avoid the indirection.
 

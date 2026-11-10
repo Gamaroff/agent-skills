@@ -25,8 +25,10 @@ All notable changes to this project will be documented in this file. Format foll
   unquoted word, so the carrier is default-deny as well: any substitution text the tokenizer did not
   parse as real counts. The differential gains an `indirect` atom set (10 writes
   on the previous engine, 0 now) and the docs scan finds two blocks newly refused and none newly
-  runnable. Known unseen shapes: a value laundered through a command's output, and a `[` or `$`
-  that itself arrives by expansion.
+  runnable. Known unseen shapes: a value laundered through a command's output, a `[` or `$`
+  that itself arrives by expansion, and a literal split across adjacent quote tokens
+  (`"a[$""(cmd)]"`, found by the fifth and last QA gate). The owner narrowed the task there: these
+  are recorded, and the remainder needs an allow-list design as its own task.
 
 - **The QA snippet classifier reads bash's lexical rules once** (task 292). A carriage return, form
   feed, vertical tab, no-break space or line separator before a `#` was taken for a blank, so
