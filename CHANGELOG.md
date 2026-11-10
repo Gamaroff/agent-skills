@@ -64,6 +64,14 @@ All notable changes to this project will be documented in this file. Format foll
   line; `echo a\\` then `touch out` hid the write behind an even run. Skipping the escaped character instead would have made one
   documentation block newly runnable.
 
+### Added
+
+- **`npm run test:remote` runs the test suite on the LAN server** (task 295). It syncs the working
+  tree to `ci@192.168.1.249`, runs `ci:fast` (or `--run <script>`) in a container that mirrors the CI
+  workflow, and exits with the run's own status; the laptop only runs `ssh` and `rsync`. An
+  unreachable server exits 1 and names `TEST_LOCAL=1`, the one local escape. Usage and host rules:
+  `docs/contributing/testing-remote.md`.
+
 ## [v0.66.0] - 2026-11-09
 
 ### Added

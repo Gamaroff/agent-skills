@@ -46,11 +46,14 @@ while [ $# -gt 0 ]; do
       shift 2
       ;;
     --host)
-      HOST="${2:-}"
+      # An option with no value would make `shift 2` fail and the loop spin forever.
+      [ $# -ge 2 ] || usage_error "--host needs a USER@HOST value"
+      HOST="$2"
       shift 2
       ;;
     --timeout-min)
-      TIMEOUT_MIN="${2:-}"
+      [ $# -ge 2 ] || usage_error "--timeout-min needs a number of minutes"
+      TIMEOUT_MIN="$2"
       shift 2
       ;;
     --reap)

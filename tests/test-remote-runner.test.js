@@ -93,6 +93,32 @@ test("an unknown argument and a bad host exit 2 before any ssh", (t) => {
   }
 });
 
+test("--host and --timeout-min with no value exit 2 instead of hanging", (t) => {
+  for (const args of [
+    ["--host"],
+    ["--timeout-min"],
+    ["--run", "x", "--host"],
+  ]) {
+    const stubs = makeStubs(t);
+    // A hang ends in SIGTERM after 5s: status null, signal set, so it cannot pass as a refusal.
+    const r = spawnSync("bash", [RUNNER, ...args], {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+      timeout: 5000,
+      env: { ...process.env, PATH: `${stubs.dir}:${process.env.PATH}` },
+    });
+    assert.equal(
+      r.status,
+      2,
+      `${args.join(" ")} must exit 2, got ${r.status} (signal ${r.signal})`,
+    );
+    assert.deepEqual(
+      fs.readFileSync(stubs.log, "utf8").split("\n").filter(Boolean),
+      [],
+    );
+  }
+});
+
 test("an unreachable server fails loudly, names TEST_LOCAL=1 and does not run locally", (t) => {
   const r = run(t, [], { STUB_PROBE_FAIL: "1" });
   assert.notEqual(r.status, 0);
