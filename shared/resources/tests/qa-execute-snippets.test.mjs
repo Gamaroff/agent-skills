@@ -33,6 +33,11 @@ import { loadSensitive, neverRan, spawnBudget } from "../spawn-budget.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  ATOM_SETS,
+  BARE_SETS,
+  runDifferential,
+} from "../../../scripts/qa-snippets-differential.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MODULE = join(__dirname, "..", "qa-execute-snippets.mjs");
@@ -55,6 +60,7 @@ const {
   sandboxEnv,
   snapshotTree,
   splitTableRow,
+  tokenize,
   unboundVariables,
   unescapeCell,
   zshAvailable,
@@ -4591,28 +4597,136 @@ test("task.290 the classifier never throws: any exception is a mutating verdict"
   }
 });
 
-test("task.290 every comment scan calls the one rule", () => {
+// task.292: `\s` counts CR, FF, VT, NBSP and U+2028 as blanks and bash does not. Every function of the
+// engine that holds a `\s` is named here with the reason that is safe. A new one fails the run until
+// it is added WITH a reason, and an entry whose function no longer holds a `\s` fails as stale.
+const MARKDOWN = "reads Markdown or a table cell, not bash input";
+const NORMALISED =
+  "reads bash input after NOT_A_BASH_BLANK has turned every non-blank whitespace character into a word character, so `\\s` can only match space, tab or newline";
+const WHITESPACE_ALLOWLIST = {
+  extractBlocks: MARKDOWN,
+  isDelimiterRow: MARKDOWN,
+  looksLikeCommand: MARKDOWN,
+  fenceMask: MARKDOWN,
+  sedWritesFile: NORMALISED,
+  scriptWrites: NORMALISED,
+  sedScan: `${NORMALISED}; sed's own grammar, not bash's`,
+  hasOutputFlagWrite: `${NORMALISED}; the deny-list patterns after it only match MORE than a blank, which is the strict side`,
+  variableArgumentToDenyListed: NORMALISED,
+  assignedVariables: NORMALISED,
+  unsafeAssignment: NORMALISED,
+  flagViolation: NORMALISED,
+  shadowingFunctions: NORMALISED,
+  commandInvocations: NORMALISED,
+  unboundVariables: NORMALISED,
+  assignmentHazard: NORMALISED,
+  shadowsCommand: NORMALISED,
+  prepareHelperText: NORMALISED,
+  addBody: NORMALISED,
+  classifyInternal: NORMALISED,
+};
+test("task.292 every function holding a \\s is on the allowlist, with a reason", () => {
+  const holders = new Set();
+  let fn = "(top level)";
+  for (const line of readFileSync(MODULE, "utf8").split("\n")) {
+    const m = /^(?:export )?(?:async )?function\s+([A-Za-z0-9_]+)/.exec(line);
+    if (m) fn = m[1];
+    const code = line.trim();
+    if (/\\[sS]/.test(line) && !/^(\/\/|\*|\/\*)/.test(code)) holders.add(fn);
+  }
+  const unlisted = [...holders].filter((f) => !(f in WHITESPACE_ALLOWLIST));
+  assert.deepEqual(unlisted, [], `a \\s in a function with no stated reason`);
+  const stale = Object.keys(WHITESPACE_ALLOWLIST).filter(
+    (f) => !holders.has(f),
+  );
+  assert.deepEqual(stale, [], "allowlist entries that hold no \\s any more");
+  assert.ok(holders.size >= 15, "non-vacuity: the scan found the holders");
+  // The normalisation the NORMALISED reason rests on is real, at every entry that reads raw text.
+  assert.equal(commandWords("A=1\recho touch out").join(","), "touch");
+  assert.equal(
+    commandWords("A=1 echo touch out").join(","),
+    "echo",
+    "a real blank still ends the assignment",
+  );
+});
+
+test("task.290 every comment scan reads the one rule (the tokenizer, task.292)", () => {
   const src = readFileSync(MODULE, "utf8");
-  // Each `"#"` literal is either the rule itself, a comment-start scan that calls it,
-  // or one of two sites that are not a shell comment scan (sed's own grammar, and the
-  // command-word list).
+  // Each `"#"` literal is either the tokenizer's word-start rule, or one of two sites that are
+  // not a shell comment scan (sed's own grammar, and the command-word list).
   const hits = [...src.matchAll(/^.*"#".*$/gm)].map((m) => m[0].trim());
   const known = hits.filter(
     (l) =>
       /if \(cmd === "#"\)/.test(l) || // sedScan: sed grammar, a different rule
       /^"#",$/.test(l) || // the command-word list
-      /lines\[k \+ 1\]\.startsWith\("#"\)/.test(l) || // stripProse: refuses a backslash-newline before a # (a line join, not a comment scan)
-      /if \(text\[i\] !== "#"\) return false;/.test(l), // startsComment itself
+      /^case "#": \{$/.test(l), // the tokenizer: where the word-start rule lives
   );
   assert.equal(
     hits.length,
     known.length,
-    `a "#" test that is not startsComment: ${hits.filter((l) => !known.includes(l)).join(" | ")}`,
+    `a "#" test that is not the tokenizer's: ${hits.filter((l) => !known.includes(l)).join(" | ")}`,
   );
-  assert.ok(known.length >= 3, "non-vacuity: the three known sites exist");
+  assert.equal(known.length, 3, "non-vacuity: the three known sites exist");
   assert.ok(
-    (src.match(/startsComment\(/g) ?? []).length >= 3,
-    "startsComment is defined and called from closingParen and stripCommentQuoteAware",
+    known.some((l) => l === 'case "#": {'),
+    "the tokenizer's rule exists",
+  );
+  assert.ok(
+    !/function startsComment|function closingParen/.test(src),
+    "the regex-era comment scans are gone",
+  );
+});
+
+// task.292 criterion 7: the call-site test COUNTS the consumers of the one lexer. A scan that reads
+// lexical facts (comment starts, quotes, substitutions, joins) from `tokenize` is listed here; a new
+// `tokenize(` call site fails the count until it is listed, and a listed scan that stops calling the
+// tokenizer (directly, or through the scan it composes) fails its own row.
+test("task.292 the tokenizer's consumers are counted, and each scan still reads it", () => {
+  const src = readFileSync(MODULE, "utf8");
+  const bodyOf = (name) => {
+    const at = src.indexOf(`function ${name}(`);
+    assert.ok(at >= 0, `${name} exists`);
+    const end = src.indexOf("\n}\n", at);
+    return src.slice(at, end);
+  };
+  // Direct consumers: the function body calls `tokenize(`.
+  const DIRECT = [
+    "cutJoins",
+    "maskSubstitutions",
+    "collapseQuotedSpans",
+    "stripProse",
+  ];
+  // Composed consumers: the scan reads the tokenizer through the named direct consumers.
+  const COMPOSED = { stripNonCode: ["collapseQuotedSpans", "stripProse"] };
+  const callSites = [...src.matchAll(/\btokenize\(/g)].length - 1; // minus the definition
+  assert.equal(
+    callSites,
+    DIRECT.length,
+    "a `tokenize(` call site that is not in DIRECT: list the new consumer or remove the call",
+  );
+  for (const name of DIRECT) {
+    assert.match(bodyOf(name), /\btokenize\(/, `${name} reads the tokenizer`);
+  }
+  for (const [name, via] of Object.entries(COMPOSED)) {
+    for (const v of via) {
+      assert.match(
+        bodyOf(name),
+        new RegExp(`\\b${v}\\(`),
+        `${name} reads it through ${v}`,
+      );
+    }
+  }
+  // The prose pass of the classifier reads joins and comments from the same consumers.
+  assert.match(
+    src,
+    /const prose = cutJoins\(stripProse\(code\), ""\);/,
+    "the prose pass reads cutJoins and stripProse",
+  );
+  // A scan that re-derives a comment start with its own regex is not a consumer. These are the
+  // shapes the regex-era scans used; none may reappear.
+  assert.ok(
+    !/\/\^\\s\*#|\[\^\\s\]\*#|\(\?:\^\|\\s\)#/.test(src),
+    "no regex re-derives a comment start",
   );
 });
 
@@ -4708,4 +4822,276 @@ test("task.290 differential: nothing the classifier calls runnable writes under 
   }
   assert.ok(generated >= 200, `generated ${generated} blocks, floor 200`);
   assert.ok(executed >= 1, `executed ${executed} runnable blocks, floor 1`);
+});
+
+// task.292: the instruments are committed, so a regression fails a run and not a later QA gate.
+const T292_GAPS = {
+  "a CR before a # is part of the word": "echo a\r# ; touch out",
+  "a form feed before a # is part of the word": "echo a\f# ; touch out",
+  "a vertical tab before a # is part of the word": "echo a\v# ; touch out",
+  "a no-break space before a # is part of the word": "echo a # ; touch out",
+  "a line separator before a # is part of the word": "echo a # ; touch out",
+};
+for (const [name, code] of Object.entries(T292_GAPS)) {
+  test(`task.292 gap (T290-QA-3): ${name} is refused as mutating`, () => {
+    assert.equal(classifyBlock(code).klass, "mutating", JSON.stringify(code));
+  });
+}
+
+// QA gate 3 / finalise (criterion 10): the blank normalisation at the top of `classifyInternal` was
+// absorbed by the suite and by 24000 differential blocks, so a revert turned nothing red. These rows
+// hold it. `command` followed by a character bash does not treat as a blank is ONE unknown word, and
+// without the normalisation the `command\s+` strip reads it as the `command` builtin and calls the
+// block runnable (found by comparing verdicts with the line removed).
+const T292_COMMAND_BLANKS = [
+  "command\recho hi",
+  "command\fecho hi",
+  "command echo hi",
+  "command echo hi",
+  "echo a; command\vecho hi",
+  "command\r-v echo",
+];
+for (const code of T292_COMMAND_BLANKS) {
+  test(`task.292 classifyInternal normalises blanks: ${JSON.stringify(code)} is refused`, () => {
+    assert.equal(classifyBlock(code).klass, "mutating", JSON.stringify(code));
+  });
+}
+test("task.292 classifyInternal normalises blanks: a real blank after `command` still runs", () => {
+  assert.equal(classifyBlock("command echo hi").klass, "runnable");
+});
+
+// QA cycle 1 (T292-QA-1): inside `$[ ]` and `(( ))` bash reads `<<` as a left shift, so the lines
+// up to a line equal to the word are NOT a heredoc body; bash runs the writer. Each of these writes
+// under bash; the control is a real heredoc, which must stay runnable.
+const T292_SHIFTS = {
+  "$[ ] shift": "echo $[1<<z]\ntouch out\nz\n",
+  "$[ ] shift with blanks": "echo $[ 1 << z ]\ntouch out\nz\n",
+  "$[ ] inside double quotes": 'echo "$[1<<z]"\ntouch out\nz\n',
+  "$[ ] inside a substitution": "echo $(echo $[1<<z])\ntouch out\nz\n",
+  "$(( )) shift": "echo $((1<<z))\ntouch out\nz\n",
+  "(( )) shift": "((1<<z))\ntouch out\nz\n",
+  "(( )) assignment shift": "((x=1<<z))\ntouch out\nz\n",
+  // Found by the seeded differential (arith set, seed 11) after the first fix.
+  "(( )) with empty substitutions": "echo ;(($()$()<<z))\ntouch out",
+  "an assignment subscript": "a[1<<z]=1\ntouch out\nz\n",
+};
+for (const [name, code] of Object.entries(T292_SHIFTS)) {
+  test(`task.292 gap (T292-QA-1): ${name} is refused as mutating`, () => {
+    assert.equal(classifyBlock(code).klass, "mutating", JSON.stringify(code));
+  });
+}
+test("task.292 control (T292-QA-1): a real heredoc and a quoted $[ stay runnable", () => {
+  assert.equal(classifyBlock("cat <<z\nhi\nz\n").klass, "runnable");
+  assert.equal(classifyBlock("echo '$[1<<z]'\n").klass, "runnable");
+  assert.equal(classifyBlock("( cat <<z\nhi\nz\n)").klass, "runnable");
+  assert.equal(classifyBlock("cat x[1]<<z\nhi\nz\n").klass, "runnable");
+});
+test("task.292 tokenizer refuses (( and a << inside a subscript", () => {
+  assert.throws(
+    () => tokenize("((1<<z))\nz\n"),
+    /tokenize: .*arithmetic command/,
+  );
+  assert.throws(() => tokenize("a[1<<z]=1\nz\n"), /tokenize: .*subscript/);
+  assert.doesNotThrow(() => tokenize("( (echo a) )"));
+});
+// QA cycle 2 (T292-QA-2): the command scan removed `$(( … ))` with a pattern that ended at the
+// first `)`, so a substitution inside the arithmetic went with it. Each writes under bash.
+const T292_ARITH_SUBST = {
+  "a plain expansion": "echo $((1+$(touch out)))\n",
+  "an assignment": "x=$((1+$(touch out)))\n",
+  "a backtick": "echo $((1+`touch out`))\n",
+  "double quotes": 'echo "$((1+$(touch out)))"\n',
+  "an unquoted heredoc body": "cat <<z\n$((1+$(touch out)))\nz\n",
+  "a parameter default": "echo ${x:-$((1+$(touch out)))}\n",
+  "a nested expansion": "echo $((1+$((2+$(touch out)))))\n",
+};
+for (const [name, code] of Object.entries(T292_ARITH_SUBST)) {
+  test(`task.292 gap (T292-QA-2): ${name} holding a command substitution is mutating`, () => {
+    assert.equal(classifyBlock(code).klass, "mutating", JSON.stringify(code));
+  });
+}
+test("task.292 control (T292-QA-2): plain arithmetic stays runnable", () => {
+  assert.equal(classifyBlock("echo $((1))\n").klass, "runnable");
+  assert.equal(classifyBlock("echo $((1+2)) hi\n").klass, "runnable");
+  assert.equal(classifyBlock("n=$((n + 1))\n").klass, "runnable");
+  assert.equal(classifyBlock("echo $((1+2)) ; echo done\n").klass, "runnable");
+});
+test("task.292 tokenizer refuses a substitution inside $(( ))", () => {
+  assert.throws(
+    () => tokenize("echo $((1+$(date)))"),
+    /tokenize: .*inside \$\(\( \)\)/,
+  );
+  assert.throws(() => tokenize("echo $((1+`date`))"), /tokenize: .*inside/);
+  assert.doesNotThrow(() => tokenize("echo $((1+2)) $(date)"));
+});
+test("task.292 tokenizer refuses the legacy arithmetic form $[", () => {
+  assert.throws(() => tokenize("echo $[1+1]"), /tokenize: .*arithmetic/);
+});
+
+// The same blank-class defect one scan over: a word split on `\s` hides the command bash runs.
+// bash reads `A=1<X>echo touch out` as the assignment `A="1<X>echo"` and then runs `touch out`.
+const T292_SPLITS = {
+  "a CR": "\r",
+  "a form feed": "\f",
+  "a vertical tab": "\v",
+  "a no-break space": " ",
+  "a line separator": " ",
+};
+for (const [name, ch] of Object.entries(T292_SPLITS)) {
+  test(`task.292 gap: ${name} after an assignment glues the next word on`, () => {
+    const code = `A=1${ch}echo touch out`;
+    assert.equal(classifyBlock(code).klass, "mutating", JSON.stringify(code));
+  });
+}
+
+test("task.292 control: a space after an assignment is a blank (the command is echo)", () => {
+  assert.equal(classifyBlock("A=1 echo touch out").klass, "runnable");
+});
+
+// The tokenizer itself: the lexical facts every scan reads (task.292).
+const kinds = (code) =>
+  tokenize(code).tokens.map((t) => `${t.kind}@${t.start}`);
+test("task.292 tokenizer: a # starts a comment only at the start of a word", () => {
+  assert.deepEqual(kinds("echo a # x"), ["comment@7"]);
+  assert.deepEqual(kinds("echo a\t# x"), ["comment@7"]);
+  assert.deepEqual(
+    kinds("echo a\\ # x"),
+    [],
+    "an escaped blank joins the word",
+  );
+  assert.deepEqual(kinds("echo a#b"), [], "mid-word");
+  assert.deepEqual(kinds("echo ${#x}"), [], "a ${#x} length is not a comment");
+  assert.deepEqual(kinds("echo a\r# x"), [], "CR is a word character");
+});
+
+test("task.292 tokenizer: a backslash-newline joins a line, and an even run does not", () => {
+  assert.deepEqual(
+    kinds("echo a\\\n# x"),
+    ["join@6"],
+    "a join keeps the word going",
+  );
+  assert.deepEqual(kinds("echo a \\\n# x"), ["join@7", "comment@9"]);
+  assert.deepEqual(
+    kinds("echo a\\\\\n# x"),
+    ["comment@9"],
+    "escaped backslash, then a real newline",
+  );
+});
+
+test("task.292 tokenizer: quotes hide a # and a heredoc operator", () => {
+  assert.deepEqual(
+    kinds("echo 'a # b' # c").filter((k) => k.startsWith("comment")),
+    ["comment@13"],
+  );
+  assert.ok(!kinds("echo '<<EOF'").some((k) => k.startsWith("heredoc")));
+  assert.ok(
+    kinds("cat <<EOF\nx\nEOF\n").some((k) => k.startsWith("heredoc-body")),
+  );
+});
+
+test("task.292 tokenizer: substitutions in an unquoted heredoc body are read, in a quoted one are not", () => {
+  assert.ok(
+    kinds("cat <<EOF\n$(touch out)\nEOF").some((k) => k.startsWith("subst")),
+  );
+  assert.ok(
+    !kinds("cat <<'EOF'\n$(touch out)\nEOF").some((k) => k.startsWith("subst")),
+  );
+  assert.equal(classifyBlock("cat <<EOF\n$(touch out)\nEOF").klass, "mutating");
+  assert.equal(
+    classifyBlock("cat <<'EOF'\n$(touch out)\nEOF").klass,
+    "runnable",
+  );
+});
+
+test("task.292 tokenizer: a shape it does not model is refused, not guessed", () => {
+  for (const code of [
+    "echo 'unterminated",
+    'echo "unterminated',
+    "echo $(unterminated",
+    "echo ${unterminated",
+    "echo \\'x",
+    "echo \"${x:-'a'}\"",
+  ])
+    assert.throws(() => tokenize(code), /^Error: tokenize:/, code);
+});
+
+test("task.292 tokenizer: a ${…} with its own quotes and expansions is one piece", () => {
+  assert.deepEqual(
+    kinds('echo ${n#"${n%%[!0]*}"} # c').filter((k) => k.startsWith("comment")),
+    ["comment@24"],
+  );
+});
+
+test("task.292 tokenizer: nesting is bounded by the heap, not the call stack", () => {
+  const nest = (n) => 'echo "$(echo '.repeat(n) + "x" + ')"'.repeat(n);
+  // Linear in depth, so 20000 levels is well under a second. The scans before the tokenizer
+  // re-masked every level (quadratic; 6000 levels took 2.6 s), and a recursive collapse overflowed
+  // the stack at 6000.
+  let t;
+  assert.doesNotThrow(() => (t = tokenize(nest(20000))));
+  assert.equal(t.tokens.filter((k) => k.kind === "subst").length, 20000);
+  const started = Date.now();
+  let r;
+  assert.doesNotThrow(() => (r = classifyBlock(nest(20000))));
+  assert.equal(r.klass, "runnable");
+  assert.ok(
+    Date.now() - started < 3000,
+    loadSensitive("a 20000-deep nest is read in linear time"),
+  );
+  // A write at the bottom of the nest is still seen.
+  assert.equal(
+    classifyBlock(nest(5000).replace("echo x", "touch out")).klass,
+    "mutating",
+  );
+});
+
+const T292_CONTROLS = {
+  "a space before a # is a comment": "echo a # ; touch out",
+  "a tab before a # is a comment": "echo a\t# ; touch out",
+};
+for (const [name, code] of Object.entries(T292_CONTROLS)) {
+  test(`task.292 control: ${name} stays runnable`, () => {
+    assert.equal(classifyBlock(code).klass, "runnable", JSON.stringify(code));
+  });
+}
+
+// The fixed-seed slice of the random differential (scripts/qa-snippets-differential.mjs). The full
+// run (>= 200000 blocks) is a by-hand Phase 4 deliverable; this slice is sized to the 10 s bound.
+const T292_SLICE = { seed: 1, count: 4000 };
+test("task.292 differential slice: nothing the classifier calls runnable writes under real bash", () => {
+  let runnable = 0;
+  for (const [name, atoms] of Object.entries(ATOM_SETS)) {
+    const r = runDifferential({
+      isRunnable: (code) => isRunnableBlock(code),
+      atoms,
+      seed: T292_SLICE.seed,
+      count: T292_SLICE.count,
+      bare: BARE_SETS.has(name),
+    });
+    assert.equal(
+      r.writes,
+      0,
+      `${name}: classified runnable, but bash wrote: ${JSON.stringify(r.first)}`,
+    );
+    runnable += r.runnable;
+  }
+  assert.ok(
+    runnable >= 100,
+    `slice executed ${runnable} runnable blocks, floor 100`,
+  );
+});
+
+test("task.292 differential slice: the instrument finds a write when the classifier is blind", () => {
+  // Calibration on a known failure: a classifier that calls everything runnable must be caught
+  // by the same generator, or the slice's green above proves nothing.
+  const r = runDifferential({
+    isRunnable: () => true,
+    atoms: ATOM_SETS.blanks,
+    seed: T292_SLICE.seed,
+    count: 200,
+  });
+  assert.ok(
+    r.writes > 0,
+    "a blind classifier produced no write: the instrument is dead",
+  );
 });

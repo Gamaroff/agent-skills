@@ -1,0 +1,312 @@
+{
+  "schema": 1,
+  "dod_n": 2,
+  "head": "e0cdb5dc61fedb5b8f1a8fe9bf9aa3a635e3fc9d",
+  "dirty_paths": [],
+  "document": "docs/tasks/task.292.qa-snippet-classifier-one-bash-tokenizer/task.292.qa-snippet-classifier-one-bash-tokenizer.md",
+  "result": {
+    "bytes": 13997,
+    "sha256": "366a837e8a1efad38955aa8ec9cce15ff574a31140ea55f6b46a3237c2bbc682",
+    "verified": true
+  },
+  "scope": {
+    "mode": "scoped",
+    "reason": "prior-record",
+    "rejudged": 10,
+    "carried": 3
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "e84381fbd593a824f411e19662a688cac996961d0409be593b916be7bfdb3b51",
+      "status": "PASS",
+      "description": "echo a, then CR/FF/VT/NBSP/U+2028, then '# ; touch out' classifies mutating",
+      "code_citation": "shared/resources/qa-execute-snippets.mjs:1507",
+      "test_citation": "shared/resources/tests/qa-execute-snippets.test.mjs:4835",
+      "members": [
+        {
+          "member": "CR",
+          "evidence": "shared/resources/tests/qa-execute-snippets.test.mjs:4829",
+          "status": "PASS"
+        },
+        {
+          "member": "FF",
+          "evidence": "shared/resources/tests/qa-execute-snippets.test.mjs:4830",
+          "status": "PASS"
+        },
+        {
+          "member": "VT",
+          "evidence": "shared/resources/tests/qa-execute-snippets.test.mjs:4831",
+          "status": "PASS"
+        },
+        {
+          "member": "NBSP",
+          "evidence": "shared/resources/tests/qa-execute-snippets.test.mjs:4832",
+          "status": "PASS"
+        },
+        {
+          "member": "U+2028",
+          "evidence": "shared/resources/tests/qa-execute-snippets.test.mjs:4833",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "T292_GAPS (test:4828-4834) holds one row per character (CR, FF, VT, NBSP, U+2028). Each row asserts classifyBlock(...).klass === 'mutating' (test:4836-4838). The tokenizer (engine:1507) and NOT_A_BASH_BLANK (engine:3096, applied at 2569/2715/3117) supply the behaviour. The lane is the 'shared/resources/tests/*.test.mjs' glob in package.json test:suite, run by .github/workflows/test.yml on pull_request, which has no paths-ignore. The set has five members and all five have rows."
+    },
+    {
+      "id": "#2",
+      "text_hash": "bbbd14bb8f095ec2a21fc6e37fe9dd281cf9773263de4452dcef876cf20eb698",
+      "status": "PASS",
+      "description": "Every task.290 gap row stays mutating; every control stays runnable",
+      "code_citation": "shared/resources/qa-execute-snippets.mjs:1507",
+      "test_citation": "shared/resources/tests/qa-execute-snippets.test.mjs:4542",
+      "members": [
+        {
+          "member": "T290_GAPS (12 rows)",
+          "evidence": "shared/resources/tests/qa-execute-snippets.test.mjs:4542",
+          "status": "PASS"
+        },
+        {
+          "member": "T290_CONTROLS",
+          "evidence": "shared/resources/tests/qa-execute-snippets.test.mjs:4563",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "T290_GAPS (test:4519-4541, 12 rows) are asserted mutating by the loop at test:4542-4546. T290_CONTROLS (test:4548) are asserted runnable by the loop at test:4563. The T292 controls (space and tab before '#') follow at test:5060 onward. QA 4 reports 379/379 under CI=true. Same lane as #1."
+    },
+    {
+      "id": "#3",
+      "text_hash": "bbe9fb2e10e6b72ce5ce61cd9365de1639fb0ee35bd92e9e6a945cd15d2357ee",
+      "status": "PASS",
+      "description": "No input makes classifyBlock throw; the never-throws test stays green",
+      "code_citation": "shared/resources/qa-execute-snippets.mjs:1507",
+      "test_citation": "shared/resources/tests/qa-execute-snippets.test.mjs:4590",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The test at 4590 feeds null, undefined, 42 and {} and asserts doesNotThrow with a fail-closed mutating verdict. The 20000-deep nest also asserts doesNotThrow (test:5025 onward). The test is present and unchanged."
+    },
+    {
+      "id": "#4",
+      "text_hash": "d48d67ca331a241cf7ed578e916684c513aaaf74bde1686af39f5dba44894b52",
+      "status": "PASS",
+      "description": "Full random differential of at least 200000 blocks, 0 writes, recorded with seed and command",
+      "code_citation": "docs/tasks/task.292.qa-snippet-classifier-one-bash-tokenizer/task.292.qa.3.qa-snippet-classifier-one-bash-tokenizer.md:137",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Bound is a block count of at least 200000 with 0 writes. QA 3 lines 126-127 and 137-138 record `--atoms arith --count 60000 --seed 61` and `--atoms all --count 30000 --seed 62`, both with 0 writes. Together that is 240000 blocks across the atom sets, on 7ec74b57, which is tree-equivalent to HEAD (finalise-delta.js docs-only gave tree-equivalent). Caveat: the single `all` run is 6x30000 = 180000, so the 200000 total depends on adding the arith run. This is not a wall-clock bound, so the load rule does not apply."
+    },
+    {
+      "id": "#5",
+      "text_hash": "060e04797bd33ae7164accf3ccefd7e73de3be54fa976a11ec2d16f73fd57548",
+      "status": "FAIL",
+      "description": "Docs scan time vs develop recorded as median of five alternating runs with uptime",
+      "code_citation": "docs/tasks/task.292.qa-snippet-classifier-one-bash-tokenizer/task.292.qa.4.qa-snippet-classifier-one-bash-tokenizer.md:35",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": "wall-clock figure taken on 9a3b04e9, not on HEAD e0cdb5dc; finalise-delta.js docs-only returned code-changed",
+      "note": "re-measure. QA 4 lines 35-46 record five runs, median 384 ms against 543 ms on develop (-29%), within the 10% bound. The five runs have load averages beside them and the command is named. However, the figure was taken on 9a3b04e9, and `finalise-delta.js docs-only --base 9a3b04e9 --head HEAD` returned reason code-changed (exit 1): shared/resources/tests/qa-execute-snippets.test.mjs is not a docs path. The prompt's rule leaves such a figure FAIL. The engine is unchanged (QA 4 line 5), so a re-measure at HEAD is expected to pass. Note also that 'alternating' runs are shown as separate develop/now columns, with no load per column."
+    },
+    {
+      "id": "#6",
+      "text_hash": "d9de91f4cdd91a7d1525bf257345acbffc2880680c341203794f343402321b84",
+      "status": "FAIL",
+      "description": "Fixed-seed differential slice runs under 10 seconds (median of five runs)",
+      "code_citation": "docs/tasks/task.292.qa-snippet-classifier-one-bash-tokenizer/task.292.qa.4.qa-snippet-classifier-one-bash-tokenizer.md:50",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": "wall-clock figure taken on 9a3b04e9, not on HEAD; delta to HEAD is code-changed (test file edited)",
+      "note": "re-measure. QA 4 line 50 records five runs (3368, 4343, 3799, 3079 and 3046 ms), median 3368 ms, under the 10 s bound. Load is recorded per run and the command is named. The figure was taken on 9a3b04e9. finalise-delta.js returned code-changed because the test file changed in e32c06c3, and the changed file is the one that holds the timed slice test (test:5061). The prompt's rule leaves the figure FAIL."
+    },
+    {
+      "id": "#7",
+      "text_hash": "e13f689b91fccc0724553213a20e4873c59f30d9e85f85b39004c38ad5472f40",
+      "status": "PASS",
+      "description": "Every non-sedScan scan reads lexical facts from tokenize; call-site test counts consumers",
+      "code_citation": "shared/resources/qa-execute-snippets.mjs:1910",
+      "test_citation": "shared/resources/tests/qa-execute-snippets.test.mjs:4684",
+      "members": [
+        {
+          "member": "closingParen (deleted)",
+          "evidence": "shared/resources/qa-execute-snippets.mjs (no definition; grep empty)",
+          "status": "PASS"
+        },
+        {
+          "member": "startsComment (deleted)",
+          "evidence": "shared/resources/tests/qa-execute-snippets.test.mjs:4733",
+          "status": "PASS"
+        },
+        {
+          "member": "maskSubstitutions",
+          "evidence": "shared/resources/qa-execute-snippets.mjs:1939",
+          "status": "PASS"
+        },
+        {
+          "member": "stripCommentQuoteAware (folded into stripProse)",
+          "evidence": "shared/resources/qa-execute-snippets.mjs:2440",
+          "status": "PASS"
+        },
+        {
+          "member": "blankQuotedSpans (replaced by collapseQuotedSpans)",
+          "evidence": "shared/resources/qa-execute-snippets.mjs:2373",
+          "status": "PASS"
+        },
+        {
+          "member": "stripProse",
+          "evidence": "shared/resources/qa-execute-snippets.mjs:2440",
+          "status": "PASS"
+        },
+        {
+          "member": "stripNonCode",
+          "evidence": "shared/resources/qa-execute-snippets.mjs:2476",
+          "status": "PASS"
+        },
+        {
+          "member": "commandInvocations line joins (cutJoins)",
+          "evidence": "shared/resources/qa-execute-snippets.mjs:1910",
+          "status": "PASS"
+        },
+        {
+          "member": "prose-pass join",
+          "evidence": "shared/resources/qa-execute-snippets.mjs:3164",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "PASS from merged members (9 counted)"
+    },
+    {
+      "id": "#8",
+      "text_hash": "3217b0e8e13b3ead2f6a548b8c5df85e14a7c7e4e66c5f5538a0560c19bc8d92",
+      "status": "PASS",
+      "description": "A test fails on a \\\\s in qa-execute-snippets.mjs outside an allowlist with reasons",
+      "code_citation": "shared/resources/qa-execute-snippets.mjs:3096",
+      "test_citation": "shared/resources/tests/qa-execute-snippets.test.mjs:4628",
+      "members": [],
+      "non_member_fail": null,
+      "note": "WHITESPACE_ALLOWLIST (test:4606-4627) maps each of the 20 functions to a reason constant (MARKDOWN or NORMALISED, test:4603-4605). The test scans the engine for functions holding \\\\s, fails on an unlisted one and on a stale entry (test:4637-4642), and has a non-vacuity floor. QA 1 line 145 records the mutation proof."
+    },
+    {
+      "id": "#9",
+      "text_hash": "1cda330662f1ca2132cff69d1b60761bf4bc14231acbedffa25028f87a79595e",
+      "status": "PASS",
+      "description": "A test fails if the substitution scan is made recursive again",
+      "code_citation": "shared/resources/qa-execute-snippets.mjs:1507",
+      "test_citation": "shared/resources/tests/qa-execute-snippets.test.mjs:5025",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The test at test:5025 tokenizes and classifies a 20000-deep nest. It asserts doesNotThrow, 20000 subst tokens and a 3 s bound. A recursive scan overflows the stack at that depth. QA 4 line 16 records the mutation: recursion added to openSubst turns this test red (1 red). The earlier advisory that no mutation run existed is closed."
+    },
+    {
+      "id": "#10",
+      "text_hash": "8eff386f29e481d0dc204aa10c07cd8a3c16b3d4359e7c3d305618db6105da02",
+      "status": "PASS",
+      "description": "Every change is mutation-proven (section 8), red test named in QA report; owner-approved wording",
+      "code_citation": "docs/tasks/task.292.qa-snippet-classifier-one-bash-tokenizer/task.292.qa.4.qa-snippet-classifier-one-bash-tokenizer.md:12",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "maskSubstitutions",
+          "evidence": "qa.4.md:19",
+          "status": "PASS"
+        },
+        {
+          "member": "collapseQuotedSpans",
+          "evidence": "qa.4.md:20",
+          "status": "PASS"
+        },
+        {
+          "member": "stripProse",
+          "evidence": "qa.4.md:21",
+          "status": "PASS"
+        },
+        {
+          "member": "stripNonCode",
+          "evidence": "qa.4.md:22",
+          "status": "PASS"
+        },
+        {
+          "member": "cutJoins and prose-pass join",
+          "evidence": "qa.4.md:23-24",
+          "status": "PASS"
+        },
+        {
+          "member": "recursive substitution scan",
+          "evidence": "qa.4.md:16",
+          "status": "PASS"
+        },
+        {
+          "member": "tokenizer blank set / NOT_A_BASH_BLANK",
+          "evidence": "qa.1.md:145-146",
+          "status": "PASS"
+        },
+        {
+          "member": "classifyInternal blank normalisation",
+          "evidence": "qa.4.md:17-18",
+          "status": "PASS"
+        },
+        {
+          "member": "T292-QA-1 fixes ($[ and << in (( ))",
+          "evidence": "qa.4.md:14-15",
+          "status": "PASS"
+        },
+        {
+          "member": "bug 2 fix (refuseArithSubst)",
+          "evidence": "qa.3.md:117",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Amendment: criteria-drift.js reports #10 reworded with approved: true (approver text 'Lorien Gamaroff)', parsed with a trailing parenthesis, which is cosmetic). The bound is unchanged, so the amendment rule does not fail it. Units come from section 8: each scan migration, the recursive substitution scan, and the tokenizer blank set. The fixes the QA reports name are added: T292-QA-1, bug 2 and the classifyInternal line. Each unit has a committed record naming the red test. QA 4 lines 19-24 cover maskSubstitutions (24 red), collapseQuotedSpans (19), stripProse (28), stripNonCode (38), cutJoins (7) and the prose-pass join (1). QA 4 line 16 covers recursion. QA 4 lines 14-15 cover T292-QA-1. QA 4 line 18 covers the classifyInternal normalisation (six rows red once the rows were added; line 17 says it was unproven before). QA 3 line 117 covers refuseArithSubst (bug 2). QA 1 line 146 covers the tokenizer blank set ('a # starts a comment only at the start of a word'). QA 1 line 145 covers NOT_A_BASH_BLANK. Every line names the red test and what was reverted. Residual: the escaped-quote refusal mutation is recorded only in the implementation report, which is uncommitted at this point. It is not a section 8 unit, so it is noted but not failed."
+    },
+    {
+      "id": "#11",
+      "text_hash": "fc033e955521eb43a9791032b4d339a3104c09726e742340a9d893ee4d3d410d",
+      "status": "PASS",
+      "description": "Lint and prettier pass on the changed .mjs files",
+      "code_citation": ".github/workflows/test.yml:1",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ e0cdb5dc61fedb5b8f1a8fe9bf9aa3a635e3fc9d — Asks that the PR's CI run (lint/format checks) is green on the head. /finalise Step 6 grades it from CI reading 1.",
+      "ci_reading": "CI reading 1: SUCCESS @ e0cdb5dc61fedb5b8f1a8fe9bf9aa3a635e3fc9d"
+    },
+    {
+      "id": "#12",
+      "text_hash": "a7db1b4b5838b79878bbccfd95a5d27e494dc5210c9fc637f97c3d5e5bb77c21",
+      "status": "PASS",
+      "description": "CHANGELOG.md updated and npm run bundle:check reports 0 problems",
+      "code_citation": "CHANGELOG.md:9",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Documentation half: CHANGELOG.md:9-24 is a new entry headed 'The QA snippet classifier reads bash's lexical rules once (task 292)', and it describes the tokenizer change, so it cites the work item and says what changed. No changelog corpus guard was found. Bundle half: I ran `npm run bundle:check` at HEAD and it reported '129 skill(s) checked, 0 problems'. validate.yml (around line 139) enforces the same check per PR."
+    },
+    {
+      "id": "#13",
+      "text_hash": "a38aa7eea4e74cc607f477d2984257dbe1264dac7dc10f8b651560f80caf7aec",
+      "status": "PASS",
+      "description": "Docs scan reports 0 blocks newly runnable against develop, recorded in QA report",
+      "code_citation": "docs/tasks/task.292.qa-snippet-classifier-one-bash-tokenizer/task.292.qa.3.qa-snippet-classifier-one-bash-tokenizer.md:128",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Bound is 0 newly runnable. QA 3 line 128 records 3446 blocks, runnable 257 to 256, 0 newly runnable, 1 newly refused. The command is `command node scripts/qa-snippets-docscan.mjs` (line 139 area). It was run on 7ec74b57, which is tree-equivalent to HEAD (finalise-delta.js). QA 1 and QA 2 also record 0 newly runnable."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#5",
+      "note": "The QA 4 engine is byte-identical to 9a3b04e9 (QA 4 line 5), so only a re-measure on HEAD, or a tree-equivalent M, is needed. The delta is a test-file edit, which finalise-delta.js treats as code-changed. Re-running qa-snippets-docscan.mjs --time and the slice test five times on HEAD, with uptime, clears #5 and #6."
+    },
+    {
+      "ac_id": "#10",
+      "note": "criteria-drift.js parses the approver as 'Lorien Gamaroff)' (trailing parenthesis), approved: true. The wording is accepted. Cosmetic only."
+    },
+    {
+      "ac_id": "#4",
+      "note": "Carried criterion: the prior advisory stands. QA 1's seed-101 run has no recorded command, and the 200000 total depends on adding the arith run to the 'all' run."
+    }
+  ]
+}

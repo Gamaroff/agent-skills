@@ -6,6 +6,22 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The QA snippet classifier reads bash's lexical rules once** (task 292). A carriage return, form
+  feed, vertical tab, no-break space or line separator before a `#` was taken for a blank, so
+  `echo a`, then one of them, then `# ; touch out` classified `runnable` and created `out` under
+  bash; the same defect one scan over let `A=1`, a CR, `echo touch out` through, because bash
+  glues the CR onto the word and runs `touch`. A single `tokenize` now says what is a blank (space,
+  tab and newline only), what an escape hides, where a comment starts, what a substitution or a
+  heredoc body holds, and where a line joins; `stripProse`, the quote collapse, the substitution
+  mask and both line-join passes read it instead of five regex copies of those rules, and the
+  classifier turns every other whitespace character into a word character before any scan splits
+  on `\s`. A substitution inside an unquoted heredoc body runs in bash and is now judged. Deep
+  nests are linear (6000 levels: 36 ms, from 2.6 s) and no longer overflow the stack. The random
+  differential and the docs scan are committed as `npm run qa-snippets:differential` and
+  `npm run qa-snippets:docscan`. Over the tracked docs no block changes verdict. An escaped quote
+  outside quotes is still refused, on purpose: reading it correctly makes one documentation block
+  newly runnable.
+
 - **The QA snippet runner reads a `#` after an escaped space as part of the word** (task 290).
   `echo a\ # ; touch out` classified `runnable` and created `out` under bash, because the comment
   scans took the escaped space for whitespace. One rule, `startsComment`, now serves `stripNonCode`

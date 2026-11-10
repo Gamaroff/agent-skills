@@ -1457,6 +1457,465 @@ function sedScan(s, markForbidden) {
   }
 }
 
+// ── The lexical layer: one tokenizer (task.292) ───────────────────────────────
+
+/**
+ * How bash reads a block into words, quotes, escapes, comments, substitutions and heredocs —
+ * once. Every scan that needs a lexical fact reads it from here instead of re-deriving it.
+ *
+ * Bash's rules, as encoded:
+ * - Blanks are space, tab and newline. Nothing else separates words: CR, FF, VT, NBSP and every
+ *   Unicode space are word characters (T290-QA-3 was a scan that thought they were blanks).
+ * - Outside quotes a backslash quotes the next character, and backslash-newline is a line join.
+ *   Reading left to right is what makes an even run of backslashes (escaped backslashes) differ
+ *   from an odd one: no parity is counted anywhere.
+ * - Inside double quotes a backslash escapes the next character (only `$`, backtick, `"`, `\` and
+ *   newline are special there, and every other escaped character is inert either way). Inside
+ *   single quotes nothing is special.
+ * - A `#` starts a comment only at the start of a word: at the start of the text, or after a
+ *   blank, newline, `;`, `&`, `|` or `(`. After any other operator the scan reads the `#` as a
+ *   word character, which leaves the rest of the line to be scanned as code (the safe side).
+ * - `$(`, `<(`, `>(` and backtick open a substitution whose body is code again; they nest on an
+ *   explicit stack, so a deep nest is bounded by the heap and not the call stack.
+ * - `<<WORD` and `<<-WORD` start a heredoc whose body is data, from the next line to the line
+ *   that is the terminator.
+ *
+ * A shape this does not model throws `Error("tokenize: …")`, and `classifyFailClosed` reads a
+ * throw as `mutating`: an unterminated quote, substitution or `${…}`, a single quote inside a
+ * double-quoted `${…}`, a heredoc form other than a plain word, a heredoc inside a substitution,
+ * and a nest deeper than `MAX_TOKEN_DEPTH`.
+ *
+ * `${…}` has a frame of its own (its body is read for quotes, escapes and nested expansions, so
+ * `${n#"${n%%[!0]*}"}` is one piece). An unquoted heredoc body is read as a double-quoted string
+ * (bash expands it), so a `$(…)` in it is a `subst` token, whose commands the scans judge.
+ *
+ * Tokens (all spans are `[start, end)` into the text; sorted by `start`):
+ * - `comment`: the `#` to the end of the line, newline excluded.
+ * - `join`: a backslash-newline that bash removes before it reads a word.
+ * - `quote`: a single- or double-quoted span, quotes included; `quote` is the quote character.
+ * - `subst`: a substitution, `form` one of `"$("`, `"<("`, `">("` or "`"; `depth` is the number of
+ *   substitutions around it (0: outermost) and `inDouble` whether a double quote directly
+ *   encloses it.
+ * - `heredoc-op`: the `<<` or `<<-`.
+ * - `heredoc-body`: the body lines and the terminator line, with the newline that ends it.
+ */
+export const MAX_TOKEN_DEPTH = 100000;
+
+const TOKEN_CACHE = new Map();
+const TOKEN_CACHE_MAX = 64;
+
+/** The tokens of `code`, or a thrown refusal. Memoised: the scans ask about the same text repeatedly. */
+export function tokenize(code) {
+  const cached = TOKEN_CACHE.get(code);
+  if (cached) return cached;
+  const result = lexBash(code);
+  if (TOKEN_CACHE.size >= TOKEN_CACHE_MAX)
+    TOKEN_CACHE.delete(TOKEN_CACHE.keys().next().value);
+  TOKEN_CACHE.set(code, result);
+  return result;
+}
+
+// Frame kinds: the top level, a `$(`/`<(`/`>(` body, a backtick body, a double-quoted span, a `${…}` body.
+const F_CODE = 0;
+const F_PAREN = 1;
+const F_TICK = 2;
+const F_DQ = 3;
+const F_PARAM = 4;
+
+function lexBash(code) {
+  const n = code.length;
+  const tokens = [];
+  const stack = [{ t: F_CODE, tok: null, d: 0 }];
+  const refuse = (why) => {
+    throw new Error(`tokenize: ${why}`);
+  };
+  // An escaped quote outside quotes is a literal in bash and the tokenizer reads it as one, but
+  // reading it makes the block `task.83.bug.1…md:102` runnable where the scan refused it before
+  // (task.290 docs scan), and a lexical refactor may not widen what QA executes. So it is refused
+  // here, on purpose; widening it is a separate, reviewed decision.
+  const refuseEscapedQuote = (next) => {
+    if (next === "'" || next === '"') refuse("escaped quote outside quotes");
+  };
+  const push = (t, tok, d = 0) => {
+    if (stack.length >= MAX_TOKEN_DEPTH) refuse("nesting too deep");
+    stack.push({ t, tok, d });
+  };
+  // Substitutions around the current position: the depth a new `subst` token carries.
+  let substDepth = 0;
+  // Heredocs opened on the current line, whose bodies start at its newline.
+  let pending = [];
+  // True when the next character would begin a word.
+  let wordStart = true;
+  // Inside an arithmetic command `(( … ))` (code frame only): `<<` is a left shift there.
+  // `arithInner` counts the single parentheses opened inside it.
+  let arith = 0;
+  let arithInner = 0;
+  let i = 0;
+
+  // `$((` opens arithmetic expansion, where a `$(` or a backtick still runs a command. The command
+  // scan removes an arithmetic expansion with a pattern that ends at the first `)`, which erased a
+  // nested substitution with it: `echo $((1+$(touch W)))` read as runnable while bash wrote
+  // (task 292, QA cycle 2). Arithmetic is not modelled, so a body that holds either is refused here,
+  // where every caller sees it. The scan stops at the first hit, so a run of `$((` is not quadratic.
+  const refuseArithSubst = (at) => {
+    let depth = 0;
+    for (let j = at + 2; j < n; j += 1) {
+      const ch = code[j];
+      if (ch === "(") depth += 1;
+      else if (ch === ")") {
+        depth -= 1;
+        if (depth === 0) return;
+      } else if (ch === "`" || (ch === "$" && code[j + 1] === "(")) {
+        refuse("command substitution inside $(( ))");
+      }
+    }
+  };
+
+  const openSubst = (form, at, width) => {
+    if (form === "$(" && code[at + 2] === "(") refuseArithSubst(at);
+    const f = stack[stack.length - 1];
+    const tok = {
+      kind: "subst",
+      form,
+      start: at,
+      end: -1,
+      depth: substDepth,
+      inDouble: f.t === F_DQ || (f.t === F_PARAM && f.inDq === true),
+    };
+    tokens.push(tok);
+    push(form === "`" ? F_TICK : F_PAREN, tok, 1);
+    substDepth += 1;
+    i = at + width;
+    wordStart = true; // the body is a fresh command list
+  };
+
+  const closeFrame = (end) => {
+    const f = stack.pop();
+    if (f.tok) f.tok.end = end;
+    if (f.t === F_PAREN || f.t === F_TICK) substDepth -= 1;
+  };
+
+  // `${…}` opens a frame of its own: its body is read for quotes, escapes and nested expansions,
+  // and ends at the `}` that is not hidden by them. It makes no token (no scan asks about it).
+  const openParam = (at) => {
+    const f = stack[stack.length - 1];
+    if (stack.length >= MAX_TOKEN_DEPTH) refuse("nesting too deep");
+    stack.push({
+      t: F_PARAM,
+      tok: null,
+      d: 0,
+      inDq: f.t === F_DQ || (f.t === F_PARAM && f.inDq === true),
+    });
+    i = at + 2;
+  };
+
+  const readHeredocOpener = (at) => {
+    let p = at + 2;
+    const strip = code[p] === "-";
+    if (strip) p += 1;
+    while (code[p] === " " || code[p] === "\t") p += 1;
+    const escaped = code[p] === "\\";
+    if (escaped) p += 1;
+    const q = code[p] === "'" || code[p] === '"' ? code[p++] : "";
+    const m = /^[A-Za-z_][A-Za-z0-9_]*/.exec(code.slice(p, p + 256));
+    if (!m) refuse("heredoc delimiter is not a plain word");
+    p += m[0].length;
+    if (q !== "") {
+      if (code[p] !== q) refuse("heredoc delimiter quote does not close");
+      p += 1;
+    }
+    tokens.push({
+      kind: "heredoc-op",
+      start: at,
+      end: at + 2 + (strip ? 1 : 0),
+    });
+    // Escaping or quoting any part of the delimiter makes the body literal.
+    pending.push({ delim: m[0], quoted: q !== "" || escaped });
+    return p;
+  };
+
+  const readHeredocBodies = (from) => {
+    let p = from;
+    for (const h of pending) {
+      const bodyStart = p;
+      let textEnd = p; // the end of the body proper, terminator line excluded
+      // No terminator before the end of the text: the body runs to the end, as bash reads it.
+      while (p < n) {
+        const eol = code.indexOf("\n", p);
+        const line = code.slice(p, eol < 0 ? n : eol);
+        const lineStart = p;
+        p = eol < 0 ? n : eol + 1;
+        if (line.trim() === h.delim) {
+          textEnd = lineStart;
+          break;
+        }
+        textEnd = p;
+      }
+      tokens.push({ kind: "heredoc-body", start: bodyStart, end: p });
+      if (!h.quoted && textEnd > bodyStart) {
+        // An unquoted body is expanded like a double-quoted string: `$(…)`, backticks and `${…}`
+        // in it run. Read it as one, with its `"` neutralised (a quote is a literal there), and
+        // keep only the substitutions it holds.
+        const body = code.slice(bodyStart, textEnd).replace(/"/g, "x");
+        for (const t of lexBash(`"${body}"`).tokens)
+          if (t.kind === "subst" || t.kind === "join")
+            tokens.push({
+              ...t,
+              start: t.start + bodyStart - 1,
+              end: t.end + bodyStart - 1,
+            });
+      }
+    }
+    pending = [];
+    return p;
+  };
+
+  while (i < n) {
+    const f = stack[stack.length - 1];
+    const c = code[i];
+
+    if (f.t === F_DQ) {
+      if (c === "\\") {
+        if (i + 1 >= n) refuse("unterminated double quote");
+        if (code[i + 1] === "\n")
+          tokens.push({ kind: "join", start: i, end: i + 2 });
+        i += 2;
+      } else if (c === '"') {
+        closeFrame(i + 1);
+        i += 1;
+        wordStart = false;
+      } else if (c === "$" && code[i + 1] === "(") {
+        openSubst("$(", i, 2);
+      } else if (c === "$" && code[i + 1] === "{") {
+        openParam(i);
+      } else if (c === "`") {
+        openSubst("`", i, 1);
+      } else i += 1;
+      continue;
+    }
+
+    if (f.t === F_PARAM) {
+      if (c === "\\") {
+        if (i + 1 >= n) refuse("unterminated ${");
+        if (!f.inDq) refuseEscapedQuote(code[i + 1]);
+        i += 2;
+      } else if (c === "}") {
+        closeFrame(i + 1);
+        i += 1;
+        wordStart = false;
+      } else if (c === "$" && code[i + 1] === "(") {
+        openSubst("$(", i, 2);
+      } else if (c === "$" && code[i + 1] === "{") {
+        openParam(i);
+      } else if (c === "`") {
+        openSubst("`", i, 1);
+      } else if (c === '"') {
+        const tok = { kind: "quote", quote: '"', start: i, end: -1 };
+        tokens.push(tok);
+        push(F_DQ, tok);
+        i += 1;
+      } else if (c === "'") {
+        // Inside a double-quoted `${…}` a single quote is a literal in some operators and a quote
+        // in others; the scan does not guess.
+        if (f.inDq)
+          refuse("single quote inside a double-quoted parameter expansion");
+        const j = code.indexOf("'", i + 1);
+        if (j < 0) refuse("unterminated single quote");
+        tokens.push({ kind: "quote", quote: "'", start: i, end: j + 1 });
+        i = j + 1;
+      } else i += 1;
+      continue;
+    }
+
+    // Code: the top level, or the body of a substitution.
+    switch (c) {
+      case "\\": {
+        if (code[i + 1] === "\n") {
+          // The join leaves `wordStart` as it was: `a\<LF>#` is one word, `a \<LF>#` a comment.
+          tokens.push({ kind: "join", start: i, end: i + 2 });
+          i += 2;
+        } else {
+          refuseEscapedQuote(code[i + 1]);
+          i += i + 1 < n ? 2 : 1;
+          wordStart = false;
+        }
+        break;
+      }
+      case "'": {
+        const j = code.indexOf("'", i + 1);
+        if (j < 0) refuse("unterminated single quote");
+        tokens.push({ kind: "quote", quote: "'", start: i, end: j + 1 });
+        i = j + 1;
+        wordStart = false;
+        break;
+      }
+      case '"': {
+        const tok = { kind: "quote", quote: '"', start: i, end: -1 };
+        tokens.push(tok);
+        push(F_DQ, tok);
+        i += 1;
+        wordStart = false;
+        break;
+      }
+      case "`": {
+        if (f.t === F_TICK) {
+          closeFrame(i + 1);
+          i += 1;
+          wordStart = false;
+        } else openSubst("`", i, 1);
+        break;
+      }
+      case "$": {
+        const next = code[i + 1];
+        if (next === "(") openSubst("$(", i, 2);
+        else if (next === "[") {
+          // The legacy arithmetic form `$[ … ]`. Arithmetic is not modelled, and inside it `<<` is
+          // a left shift, not a heredoc opener: reading it as one hid the lines up to the delimiter
+          // from every scan while bash ran them (task 292, QA cycle 1). Refuse, never guess.
+          refuse("legacy arithmetic $[");
+        } else if (next === "{") {
+          openParam(i);
+          wordStart = false;
+        } else if (next === "'") {
+          // $'…': a single-quoted span in which a backslash escapes the next character.
+          let j = i + 2;
+          while (j < n && code[j] !== "'") j += code[j] === "\\" ? 2 : 1;
+          if (j >= n) refuse("unterminated $'");
+          tokens.push({ kind: "quote", quote: "$'", start: i, end: j + 1 });
+          i = j + 1;
+          wordStart = false;
+        } else {
+          i += 1;
+          wordStart = false;
+        }
+        break;
+      }
+      case "(": {
+        // `((` is bash's arithmetic command, where `<<` is a left shift, not a heredoc opener.
+        // A subshell inside a subshell is written `( (`, so two adjacent parentheses in code are
+        // arithmetic and are not modelled (task 292, QA cycle 1: the differential found
+        // `((` + `$()$()<<z` + `))` hiding a writer behind a mis-read heredoc).
+        if (f.t === F_CODE && arith > 0) {
+          arithInner += 1;
+        } else if (f.t === F_CODE && code[i + 1] === "(") {
+          arith = 1;
+          arithInner = 0;
+          i += 2;
+          wordStart = true;
+          break;
+        }
+        if (f.t === F_PAREN) f.d += 1;
+        i += 1;
+        wordStart = true;
+        break;
+      }
+      case ")": {
+        if (f.t === F_CODE && arith > 0) {
+          if (arithInner > 0) arithInner -= 1;
+          else if (code[i + 1] === ")") {
+            arith = 0;
+            i += 1; // the second `)` is consumed below
+          }
+        }
+        if (f.t === F_PAREN && (f.d -= 1) === 0) {
+          closeFrame(i + 1);
+          wordStart = false;
+        } else wordStart = false;
+        i += 1;
+        break;
+      }
+      case "<": {
+        if (code[i + 1] === "<") {
+          if (code[i + 2] === "<") {
+            i += 3; // here-string
+            wordStart = false;
+          } else {
+            if (f.t !== F_CODE) refuse("heredoc inside a substitution");
+            if (arith > 0) refuse("<< inside an arithmetic command");
+            // `name[1<<z]=…`: inside an assignment subscript `<<` is a left shift too. A `[` that
+            // opens the current word and is not yet closed means the word may be a subscript.
+            let w = i;
+            while (w > 0 && !/[ \t\n;&|()<>`]/.test(code[w - 1])) w -= 1;
+            const word = code.slice(w, i);
+            if (word.lastIndexOf("[") > word.lastIndexOf("]"))
+              refuse("<< inside a subscript");
+            i = readHeredocOpener(i);
+            wordStart = false;
+          }
+        } else if (code[i + 1] === "(") openSubst("<(", i, 2);
+        else {
+          i += 1;
+          wordStart = false;
+        }
+        break;
+      }
+      case ">": {
+        if (code[i + 1] === "(") openSubst(">(", i, 2);
+        else {
+          i += 1;
+          wordStart = false;
+        }
+        break;
+      }
+      case ";":
+      case "&":
+      case "|":
+      case " ":
+      case "\t": {
+        i += 1;
+        wordStart = true;
+        break;
+      }
+      case "\n": {
+        i += 1;
+        wordStart = true;
+        if (pending.length > 0) {
+          if (f.t !== F_CODE) refuse("heredoc inside a substitution");
+          i = readHeredocBodies(i);
+        }
+        break;
+      }
+      case "#": {
+        if (wordStart) {
+          const eol = code.indexOf("\n", i);
+          const end = eol < 0 ? n : eol;
+          tokens.push({ kind: "comment", start: i, end });
+          i = end;
+        } else i += 1;
+        break;
+      }
+      default: {
+        i += 1;
+        wordStart = false;
+      }
+    }
+  }
+
+  if (stack.length > 1) {
+    const open = stack[stack.length - 1];
+    refuse(
+      open.t === F_DQ
+        ? "unterminated double quote"
+        : "unterminated command substitution",
+    );
+  }
+  // A heredoc opened on the last line (no newline after it) has an empty body.
+  tokens.sort((a, b) => a.start - b.start);
+  return { tokens };
+}
+
+/** `text` with every line join (a backslash-newline bash removes) replaced by `filler`. */
+function cutJoins(text, filler) {
+  let out = "";
+  let at = 0;
+  for (const t of tokenize(text).tokens) {
+    if (t.kind !== "join") continue;
+    out += text.slice(at, t.start) + filler;
+    at = t.end;
+  }
+  return out + text.slice(at);
+}
+
 /**
  * `text` with every command substitution, process substitution and backtick
  * replaced by one word, or null when one is unterminated. `commandInvocations`
@@ -1470,99 +1929,28 @@ function sedScan(s, markForbidden) {
  * `$(` for `commandInvocations` to cut again); a process substitution becomes `/dev/fd/0`, the operand
  * it stands for. The commands INSIDE a substitution are judged on their own, in
  * the unmasked reading.
+ *
+ * Read off the tokenizer (task.292): the substitutions are its outermost `subst` tokens, so a
+ * paren or backtick hidden by a quote, an escape or a comment is not one, and nesting costs one
+ * linear pass instead of one re-mask per level. A text it cannot read is null.
  */
-/**
- * Index of the `)` that closes the `(` at `open`, or -1. Quotes, escapes and
- * comments hide a paren from the shell, so they hide it here: `$(echo ")")` ends
- * at the LAST paren, and a scan that counted the quoted one ended early and
- * read the rest of the line as a second command (QA 5).
- */
-function closingParen(text, open) {
-  // An explicit stack, not recursion: a double-quoted `$(` inside a substitution
-  // opens a new frame, so nesting depth is bounded by the heap, not the call
-  // stack (task.290: 20000 nested `"$(` threw RangeError). A "p" frame counts
-  // parens; a "q" frame is an open double quote, which a `)` cannot close.
-  const stack = [{ t: "p", d: 0 }];
-  for (let i = open; i < text.length; i += 1) {
-    const c = text[i];
-    const top = stack[stack.length - 1];
-    if (top.t === "q") {
-      if (c === "\\") i += 1;
-      else if (c === '"') stack.pop();
-      else if (c === "$" && text[i + 1] === "(") {
-        stack.push({ t: "p", d: 1 });
-        i += 1;
-      }
-    } else if (c === "\\") i += 1;
-    else if (c === "'") {
-      const j = text.indexOf("'", i + 1);
-      if (j < 0) return -1;
-      i = j;
-    } else if (c === '"') stack.push({ t: "q" });
-    else if (startsComment(text, i)) {
-      while (i < text.length && text[i] !== "\n") i += 1;
-    } else if (c === "(") top.d += 1;
-    else if (c === ")" && (top.d -= 1) === 0) {
-      stack.pop();
-      if (stack.length === 0) return i;
-    }
-  }
-  return -1;
-}
-
-/**
- * True when the `#` at `text[i]` starts a shell comment: it begins a word, so it
- * is at the start of the text or follows whitespace, `;`, `&`, `|` or `(` that
- * is NOT itself escaped. `a\ #` is one word (the space is a literal), `a#b` and
- * `$#` are mid-word. The one rule every comment scan calls (task.290); the
- * callers track quotes themselves, so a `#` inside quotes never reaches here.
- * Unsure reads as "not a comment": the rest of the line is then scanned as code.
- */
-function startsComment(text, i) {
-  if (text[i] !== "#") return false;
-  if (i === 0) return true;
-  if (!/[\s;&|(]/.test(text[i - 1])) return false;
-  let slashes = 0;
-  for (let k = i - 2; k >= 0 && text[k] === "\\"; k -= 1) slashes += 1;
-  return slashes % 2 === 0;
-}
-
 function maskSubstitutions(text) {
-  let out = "";
-  let q = null;
-  for (let i = 0; i < text.length; i += 1) {
-    const c = text[i];
-    if (q === "'") {
-      out += c;
-      if (c === "'") q = null;
-      continue;
-    }
-    if (c === "\\") {
-      out += c + (text[i + 1] ?? "");
-      i += 1;
-      continue;
-    }
-    const two = text.slice(i, i + 2);
-    const proc = q === null && (two === "<(" || two === ">(");
-    if (two === "$(" || proc) {
-      const j = closingParen(text, i + 1);
-      if (j < 0) return null;
-      out += proc ? "/dev/fd/0" : "$__SUBST__";
-      i = j;
-      continue;
-    }
-    if (c === "`") {
-      const j = text.indexOf("`", i + 1);
-      if (j < 0) return null;
-      out += "$__SUBST__";
-      i = j;
-      continue;
-    }
-    if (c === '"') q = q === '"' ? null : '"';
-    else if (c === "'" && q === null) q = "'";
-    out += c;
+  let tokens;
+  try {
+    ({ tokens } = tokenize(text));
+  } catch {
+    return null;
   }
-  return out;
+  let out = "";
+  let at = 0;
+  for (const t of tokens) {
+    if (t.kind !== "subst" || t.start < at) continue; // nested in one already masked
+    out +=
+      text.slice(at, t.start) +
+      (t.form === "<(" || t.form === ">(" ? "/dev/fd/0" : "$__SUBST__");
+    at = t.end;
+  }
+  return out + text.slice(at);
 }
 
 /** Why `name`'s arguments are outside its entry, or null. `rawArgs` keep their quotes. */
@@ -1962,111 +2350,11 @@ const IMPLICIT_VARS = new Set([
 ]);
 
 /**
- * Remove a `#` comment from one line, respecting quoting.
- *
- * Walks the line tracking single- and double-quote state so a `#` inside a string
- * is data, not a comment. `${#var}` is preserved because a `#` only opens a
- * comment at the start of a word (start of line or after whitespace).
- */
-function stripCommentQuoteAware(line) {
-  let single = false;
-  let double = false;
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
-    // Backslash handling stays inside double quotes only. `startsComment` reads
-    // an escaped space itself (`a\ #` is one word). Skipping the byte after a
-    // backslash outside quotes too would also stop `\'` opening a quote, which is
-    // what bash does, but it makes blocks runnable that the scan refuses today
-    // (task.290 docs scan: 1 block) and widening is out of scope. The wrong
-    // reading is the strict one: an unclosed quote leaves more text as code.
-    if (c === "\\" && double) {
-      i++;
-      continue;
-    }
-    // task.290 QA 1: outside quotes an escaped quote is a literal in bash, but
-    // this scan would open a quote there and strip real code as a comment
-    // (`echo \'a' # ; touch out' ; touch out2` ran `touch out2`). Skipping it
-    // widens what is runnable, so the line is refused instead: the throw is
-    // caught by classifyFailClosed and read as a mutating verdict.
-    if (c === "\\" && !single && !double && /['"]/.test(line[i + 1] ?? "")) {
-      throw new Error("escaped quote outside quotes");
-    }
-    if (c === "'" && !double) {
-      single = !single;
-      continue;
-    }
-    if (c === '"' && !single) {
-      double = !double;
-      continue;
-    }
-    if (!single && !double && startsComment(line, i)) {
-      return line.slice(0, i);
-    }
-  }
-  return line;
-}
-
-/**
  * Drop comments and heredoc bodies. Quoted spans are KEPT — a placeholder is
  * very often written inside quotes (`--issue "{TRACKER_ISSUE}"`), so blanking
  * quotes before placeholder detection would classify a templated block as
  * runnable and then execute it.
  */
-/**
- * Blank the CONTENTS of every quoted span on one line, preserving the quote
- * characters, the line's length and its newlines.
- *
- * BUG-6 root cause C — the two `.replace()` calls this replaces ran in sequence
- * and neither knew about the other's quote type. `'[^']*'` was applied first, so
- * in `echo "it's fine"; touch /tmp/x; echo "don't"` the two apostrophes — each
- * of them literal text inside a double-quoted string — paired with each other
- * and erased `; touch /tmp/x; echo "` from the scan while bash still executed it.
- * Walking the line once, tracking which quote is open, is the only way to get
- * this right: inside single quotes nothing escapes, inside double quotes a
- * backslash does.
- */
-function blankQuotedSpans(text) {
-  let out = "";
-  let quote = null;
-  // Where the currently-open quote started, so an unterminated one can be undone.
-  let openedAt = -1;
-  for (let i = 0; i < text.length; i += 1) {
-    const ch = text[i];
-    if (quote === null) {
-      if (ch === "'" || ch === '"') {
-        quote = ch;
-        openedAt = i;
-        out += ch;
-      } else if (ch === "\\" && i + 1 < text.length) {
-        // A backslash outside quotes escapes the next character, including a
-        // quote — `\'` opens nothing.
-        out += ch + text[i + 1];
-        i += 1;
-      } else {
-        out += ch;
-      }
-    } else if (quote === '"' && ch === "\\" && i + 1 < text.length) {
-      out += "  ";
-      i += 1;
-    } else if (ch === quote) {
-      quote = null;
-      openedAt = -1;
-      out += ch;
-    } else {
-      out += ch === "\n" ? "\n" : " ";
-    }
-  }
-  // An unterminated quote must blank NOTHING. `echo don't` followed by a
-  // `touch /tmp/x` on the next line has one apostrophe and no closer; blanking
-  // from it to the end of the block would hide the `touch` from the command scan
-  // while bash still ran it — a fail-open route of exactly the kind this function
-  // exists to close. Leaving the span intact keeps the scanner fail-closed: it
-  // sees more text, never less. (The regex pair this replaced got this right by
-  // accident, because `'[^']*'` simply did not match without a closer.)
-  if (quote !== null) return out.slice(0, openedAt) + text.slice(openedAt);
-  return out;
-}
-
 /**
  * Like `blankQuotedSpans`, but COLLAPSES each quoted span to its bare quote pair
  * instead of preserving its length.
@@ -2081,152 +2369,103 @@ function blankQuotedSpans(text) {
  * mutual-awareness defect the regex pair had.
  */
 function collapseQuotedSpans(text) {
+  // Read off the tokenizer (task.292): a quote token is replaced by its bare quote pair, and the
+  // text between them is untouched. A text the tokenizer cannot read throws (fail closed).
+  const { tokens } = tokenize(text);
+  // Inside DOUBLE quotes `$(…)` and backticks still RUN (single quotes are the only quoting that
+  // makes them text). Dropping them with the rest of the span hid the command from the scan:
+  // `echo "$(touch /tmp/x)"` created the file and classified runnable (task.274, obs #67). Each
+  // outermost substitution in a double-quoted span is kept, its own quotes collapsed like any
+  // others (kept as written, a `|` inside `grep 'a\|b'` would split the command and read `b'` as
+  // one); the surrounding text is dropped.
+  //
+  // One pass with an explicit stack, not recursion: a nest 6000 deep overflowed the call stack.
+  // Each entry is a span we are inside: a quote (its text is dropped) or a kept substitution
+  // (its text flows through). `cursor` is the text accounted for so far.
   let out = "";
-  let quote = null;
-  let openedAt = -1;
-  let outAtOpen = 0;
-  for (let i = 0; i < text.length; i += 1) {
-    const ch = text[i];
-    if (quote === null) {
-      if (ch === "'" || ch === '"') {
-        quote = ch;
-        openedAt = i;
-        outAtOpen = out.length;
-        out += ch;
-      } else if (ch === "\\" && i + 1 < text.length) {
-        out += ch + text[i + 1];
-        i += 1;
-      } else {
-        out += ch;
-      }
-    } else if (quote === '"' && ch === "\\" && i + 1 < text.length) {
-      i += 1; // escaped char inside double quotes is content — dropped
-    } else if (ch === quote) {
-      quote = null;
-      openedAt = -1;
-      out += ch;
-    } else if (
-      quote === '"' &&
-      (ch === "`" || (ch === "$" && text[i + 1] === "("))
-    ) {
-      // Inside DOUBLE quotes `$(…)` and backticks still RUN (single quotes are the
-      // only quoting that makes them text). Dropping them with the rest of the span
-      // hid the command from the scan: `echo "$(touch /tmp/x)"` created the file and
-      // classified runnable (task.274, obs #67). Kept verbatim, so the invocation
-      // scan reads the inner command; the surrounding text is still dropped.
-      const end = substitutionEnd(text, i);
-      // Its own quotes collapse like any others: kept as written, a `|` inside
-      // `grep 'a\|b'` would split the command and read `b'` as one.
-      out += collapseQuotedSpans(text.slice(i, end));
-      i = end - 1;
+  let cursor = 0;
+  const stack = [];
+  const top = () => stack[stack.length - 1];
+  const emitting = () => stack.length === 0 || top().quote === false;
+  const advance = (pos) => {
+    if (emitting() && pos > cursor) out += text.slice(cursor, pos);
+    if (pos > cursor) cursor = pos;
+  };
+  const closeUntil = (pos) => {
+    while (stack.length > 0 && top().end <= pos) {
+      const e = top();
+      advance(e.end);
+      stack.pop();
+      if (e.quote) out += e.closer;
     }
-    // else: content of a quoted span — dropped
+  };
+  for (const t of tokens) {
+    if (t.kind !== "quote" && t.kind !== "subst") continue;
+    closeUntil(t.start);
+    if (t.kind === "quote") {
+      if (!emitting()) continue; // inside a span being dropped
+      advance(t.start);
+      out += t.quote === "$'" ? "$'" : t.quote;
+      stack.push({
+        end: t.end,
+        quote: true,
+        q: t.quote,
+        closer: t.quote === '"' ? '"' : "'",
+      });
+    } else if (!emitting() && top().q === '"') {
+      cursor = Math.max(cursor, t.start); // jump over the dropped text to the substitution
+      stack.push({ end: t.end, quote: false });
+    }
   }
-  // Same fail-closed rule as blankQuotedSpans: an unterminated quote hides nothing.
-  if (quote !== null) return out.slice(0, outAtOpen) + text.slice(openedAt);
+  closeUntil(Infinity);
+  advance(text.length);
   return out;
 }
 
 /**
- * The index just past the command substitution that starts at `text[start]`
- * (`$(` to its matching `)`, or a backtick to the next unescaped backtick). An
- * unclosed one runs to the end of the text: reading more is the fail-closed side.
- * Parentheses inside the substitution's own quotes are counted too, which can only
- * lengthen the span — again the safe side.
+ * `code` without its comments and heredoc bodies, read off the tokenizer (task.292): a comment
+ * token is cut, a heredoc body is cut, and the heredoc OPERATOR is neutralised to ` HEREDOC: `.
+ * Nothing here re-derives where a quote, escape or heredoc starts, so a `<<` inside a quote is
+ * not a heredoc and a `#` after a CR is not a comment — the tokenizer already said so. A text it
+ * cannot read throws, which `classifyFailClosed` reads as mutating.
+ *
+ * - The opener LINE is kept whole: `cat <<EOF > /tmp/pwned` must still show its `>` redirection.
+ * - The operator is neutralised (task.274, obs #67) so that stripping the output again changes
+ *   nothing: `commandInvocations` re-strips text `stripNonCode` already stripped, and a surviving
+ *   `<<EOF` made that second pass read the next line as a body that never closed.
+ * - An UNQUOTED heredoc body is expanded by bash, so a `$(…)` or backtick in it runs. The body is
+ *   cut, but each outermost substitution in it is kept on a line of its own for the invocation
+ *   scan to judge.
  */
-function substitutionEnd(text, start) {
-  if (text[start] === "`") {
-    for (let i = start + 1; i < text.length; i += 1) {
-      if (text[i] === "\\") i += 1;
-      else if (text[i] === "`") return i + 1;
-    }
-    return text.length;
-  }
-  let depth = 0;
-  for (let i = start + 1; i < text.length; i += 1) {
-    if (text[i] === "\\") i += 1;
-    else if (text[i] === "(") depth += 1;
-    else if (text[i] === ")") {
-      depth -= 1;
-      if (depth === 0) return i + 1;
-    }
-  }
-  return text.length;
-}
-
 function stripProse(code) {
-  const out = [];
-  const lines = code.split("\n");
-  let heredocTerminator = null;
-
-  // task.290 QA 1: bash joins a line ending in an odd run of backslashes to the
-  // next, so a `#` at column 0 of that next line is mid-word, not a comment.
-  // Scanning per line strips it as one; refuse (fail closed) rather than guess.
-  for (let k = 0; k + 1 < lines.length; k += 1) {
-    const run = lines[k].match(/\\+$/);
-    if (run && run[0].length % 2 === 1 && lines[k + 1].startsWith("#")) {
-      throw new Error("backslash-newline before a comment");
-    }
-  }
-
-  for (const raw of lines) {
-    if (heredocTerminator !== null) {
-      if (raw.trim() === heredocTerminator) heredocTerminator = null;
-      continue; // heredoc body is data
-    }
-    // A REAL heredoc: `<<` or `<<-`, never `<<<` (here-string) and never the
-    // second `<` of one. `grep -q x <<<"DATA"` used to swallow every following
-    // line as heredoc body, hiding a trailing `rm -rf` from both scans.
-    // BUG-6 root cause C — run the detector over a quote-blanked copy of the
-    // line. `echo "example: cat <<EOF"` is documentation ABOUT a heredoc, not a
-    // heredoc; treating it as one set a terminator that never arrived, so every
-    // following line was discarded as heredoc body and a trailing `touch /tmp/x`
-    // was hidden from both scans while bash still ran it.
-    // The opener must be matched against the RAW line: in `cat <<'EOF'` the quotes
-    // around the terminator are heredoc SYNTAX, and blanking them first erases the
-    // terminator name and loses the body-shielding that the quoted form exists
-    // for. So match raw, then consult the blanked copy — same length, so offsets
-    // line up — purely to ask whether the `<<` itself sat inside a quoted span.
-    const scan = blankQuotedSpans(raw);
-    let here = null;
-    for (const m of raw.matchAll(
-      /(?<!<)<<-?(?!<)\s*\\?(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/g,
-    )) {
-      if (scan[m.index] === raw[m.index]) {
-        here = m; // real shell syntax, not text inside a string
-        break;
-      }
-    }
-    if (here) {
-      heredocTerminator = here[2];
-      // Keep the WHOLE opener line, not just the part before `<<`. Truncating it
-      // threw away any redirection that followed — `cat <<EOF > /tmp/pwned` had
-      // its `> /tmp/pwned` removed before the write-redirect check ever saw it,
-      // and classified runnable.
-      //
-      // The kept line has its heredoc OPERATOR neutralised (task.274, obs #67).
-      // `commandInvocations` strips text `stripNonCode` already stripped, and a
-      // surviving `<<EOF` made that second pass read the line after the opener as
-      // a body that never closed: `cat <<EOF` / `hello` / `EOF` / `touch /tmp/x`
-      // lost its `touch`. With the operator gone the output holds no heredoc, so
-      // stripping it again changes nothing (idempotent). The terminator word and
-      // everything else on the line stay, so the redirections still show.
-      const op = here[0].match(/^<<-?/)[0];
-      out.push(
-        raw.slice(0, here.index) +
-          " HEREDOC: " +
-          raw.slice(here.index + op.length),
+  const { tokens } = tokenize(code);
+  let out = "";
+  let at = 0;
+  for (const t of tokens) {
+    if (t.start < at) continue; // inside a span already cut
+    if (t.kind === "comment") {
+      out += code.slice(at, t.start);
+      at = t.end;
+    } else if (t.kind === "heredoc-op") {
+      out += code.slice(at, t.start) + " HEREDOC: ";
+      at = t.end;
+    } else if (t.kind === "heredoc-body") {
+      out += code.slice(at, t.start);
+      at = t.end;
+      const kept = tokens.filter(
+        (s) =>
+          s.kind === "subst" &&
+          s.depth === 0 &&
+          s.start >= t.start &&
+          s.end <= t.end,
       );
-      continue;
+      for (const s of kept) out += code.slice(s.start, s.end) + "\n";
+      // The terminator was the last line: no newline follows the cut.
+      if (kept.length === 0 && t.end === code.length && out.endsWith("\n"))
+        out = out.slice(0, -1);
     }
-    // Drop `# comment` — but ONLY outside quoted spans. A line regex fired on a
-    // `#` inside a string, deleting the rest of the line from both scans while
-    // execution still used the original code: `echo "note # here"; rm -rf /tmp/x`
-    // classified runnable and the `rm -rf` ran.
-    let line = stripCommentQuoteAware(raw);
-    out.push(line);
   }
-  return out.join("\n");
+  return out + code.slice(at);
 }
 
 /**
@@ -2326,14 +2565,14 @@ export function commandWords(code) {
  * helper rule needs both.
  */
 function commandInvocations(code) {
-  const stripped = stripNonCode(code)
-    // Backslash line-continuations join one command across several lines. Splitting
-    // on the raw newline first makes the continuation's tail look like a fresh
-    // command: `git log ... -- \` + `apps packages` reported `apps` as a command.
-    // Only an ODD run joins: an even run is an escaped backslash followed by a
-    // real newline, which ends the command (task.290 QA 2: `echo a\\` + newline
-    // + `touch out` hid the write).
-    .replace(/(?<!\\)((?:\\\\)*)\\\n/g, "$1 ")
+  // `commandWords` is exported and reads raw text: state the blank class here too (see
+  // classifyInternal), so a CR, FF, VT, NBSP or U+2028 never separates two words.
+  code = code.replace(NOT_A_BASH_BLANK, "\u0001");
+  // Backslash line-continuations join one command across several lines. Splitting on the raw
+  // newline first makes the continuation's tail look like a fresh command: `git log ... -- \` +
+  // `apps packages` reported `apps` as a command. Which backslash-newlines join is the
+  // tokenizer's to say (an even run is an escaped backslash then a real newline, task.290 QA 2).
+  const stripped = cutJoins(stripNonCode(code), " ")
     // Arithmetic expansion is arithmetic, not an invocation. It must go before the
     // `$(` rule below, or `$((N + 1))` becomes a segment whose first token is `N`.
     .replace(/\$\(\([^)]*\)\)/g, " ")
@@ -2474,8 +2713,9 @@ function commandInvocations(code) {
 /** Variables the block reads but never assigns. */
 export function unboundVariables(code, bindings) {
   const stripped = code
+    .replace(NOT_A_BASH_BLANK, "\u0001")
     .split("\n")
-    .filter((l) => !/^\s*#/.test(l))
+    .filter((l) => !/^[ \t]*#/.test(l))
     .join("\n");
 
   const assigned = new Set();
@@ -2853,6 +3093,9 @@ function addBody(table, name, body) {
   table.set(name, bodies);
 }
 
+/** Every character `\s` matches that bash does not treat as a blank (see classifyInternal). */
+const NOT_A_BASH_BLANK = /[^\S \t\n]/g;
+
 function classifyInternal(
   code,
   bindings = {},
@@ -2867,6 +3110,12 @@ function classifyInternal(
     forwarded = false,
   } = {},
 ) {
+  // task.292: bash's blanks are space, tab and newline only. A CR, FF, VT, NBSP or U+2028 is a
+  // character OF a word, but every scan below splits and matches with `\s`, which counts them as
+  // blanks: `A=1<CR>echo touch out` read as the command `echo` when bash runs `touch`. Stated once,
+  // here: those characters become one word character before any scan reads the text, so no `\s`
+  // below can see a blank that bash does not. The text is only ever classified, never executed.
+  code = code.replace(NOT_A_BASH_BLANK, "\u0001");
   // `defines`: every function this text defines, its own and those of the helpers
   // it sources — what a caller sourcing it inherits. `trusted`: the subset that
   // may stand as a known word (`shadowsCommand`). `forwardsTo`: for each defined
@@ -2911,9 +3160,9 @@ function classifyInternal(
   // MENTIONS `git push` is documentation. Scanning raw text would classify a doc
   // for its own examples and skip a block that is in fact safe to run.
   // A backslash-newline is removed by the shell before it reads a word, so
-  // `-dele\<LF>te` is `-delete` (T274-QA-4). Only an ODD run of backslashes
-  // continues the line; an escaped pair (`\\`) followed by a newline does not.
-  const prose = stripProse(code).replace(/(?<!\\)((?:\\\\)*)\\\r?\n/g, "$1");
+  // `-dele\<LF>te` is `-delete` (T274-QA-4). Which backslash-newlines join is the tokenizer's to
+  // say: an escaped pair (`\\`) followed by a newline does not.
+  const prose = cutJoins(stripProse(code), "");
 
   // Judged twice: as written, and with quotes and backslashes removed, as the
   // command receives them. `find docs "-delete"` and `find docs '-delete'` both run

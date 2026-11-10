@@ -213,6 +213,36 @@ Three further rules fall out of the same principle, each added after a review fo
   recognised by its trailing `)`. That is why the scanner no longer erases bare parentheses — without
   the `)` there is nothing to distinguish `*://*/pull/*)` from `/usr/bin/[t]ouch`.
 
+### 2a-i. The lexical layer: one tokenizer (task 292)
+
+Every question of the form "where does this quote, comment, substitution, heredoc or line join start
+and end" is answered by one function, `tokenize(code)` in `qa-execute-snippets.mjs`, not by a regex of
+each scan's own. `stripProse` (comments, heredoc bodies and the heredoc operator), the quote collapse,
+the substitution mask and both line-join passes read its tokens. What it encodes, once:
+
+- **Blanks are space, tab and newline.** A carriage return, form feed, vertical tab, no-break space or
+  line separator is a character of a word. `classifyInternal` (and the exported `commandWords` and
+  `unboundVariables`) turn each of those into one word character before any scan splits on `\s`, so a
+  `\s` below that point can only match a real blank. A test fails on a `\s` in a function that is not
+  on its allowlist with a reason.
+- **Escapes are read left to right**, so an even run of backslashes (an escaped backslash) differs from
+  an odd one without counting parity anywhere. Inside double quotes a backslash escapes the next
+  character; inside single quotes nothing is special.
+- **A `#` starts a comment only at the start of a word**, never after an escaped blank, a CR or mid-word.
+- **Substitutions** (`$(`, backtick, `<(`, `>(`) and `${…}` nest on an explicit stack, so a deep nest
+  costs linear time and cannot overflow the call stack.
+- **An unquoted heredoc body is expanded by bash**, so a substitution in it is judged as a command; a
+  quoted heredoc body is data.
+
+A shape the tokenizer does not model throws, and the classifier reads a throw as `mutating`: an
+unterminated quote, substitution or `${`, a single quote inside a double-quoted `${…}`, a heredoc whose
+delimiter is not a plain word, a heredoc inside a substitution, and an escaped quote outside quotes
+(read correctly it would make one documentation block newly runnable, and a lexical refactor does not
+widen what QA executes). The random differential (`npm run qa-snippets:differential`) and the docs
+scan (`npm run qa-snippets:docscan`) hold it: the first runs every block the classifier calls
+`runnable` under real bash and fails if the directory changes, the second fails if a change makes a
+documentation block newly runnable.
+
 ### 2aa. Helper calls run only when the helper itself would
 
 `bash`, `sh`, `source` and `.` execute a file, which is exactly what the allow-list exists to refuse —

@@ -5,17 +5,19 @@ type: task
 description: "Replace the snippet classifier's separate regex re-implementations of bash's blank, quote, escape and line-join rules with one tokenizer every scan reads, refusing what it cannot read, and close the open T290-QA-3 write gap."
 tags: [qa-task, security, follow-up-290]
 category: refactoring
-status: planned
+status: accepted
 priority: High
 created: 2026-11-10
 updated: 2026-11-10
+completed_date: 2026-11-10
 estimated_effort_hours: 16
 github_issue: 868
+pr_number: 869
 ---
 
 # Task 292: One bash tokenizer for the QA snippet classifier
 
-**Status:** Planned
+**Status:** Accepted
 **GitHub Issue**: [#868](https://github.com/Gamaroff/agent-skills/issues/868)
 
 ---
@@ -131,10 +133,10 @@ None - API stable. `classifyBlock`, `isRunnableBlock` and the other exports keep
 
 **Files**: `scripts/qa-snippets-differential.mjs` (new), `scripts/qa-snippets-docscan.mjs` (new), `shared/resources/tests/qa-execute-snippets.test.mjs`, `package.json`
 
-- [ ] Commit the random differential: seeded generator over atom sets (including CR, FF, VT, NBSP, U+2028, tab, backslash runs, both quotes, `$(`, backticks, heredocs), a writer appended, every `runnable` block run under `bash` in a fresh temp directory removed in a `finally`; reports total, runnable, writes, and the first writing blocks.
-- [ ] Commit the docs scan: every fenced block in `git ls-files '*.md'`, classified by `develop`'s engine (from `git show develop:shared/resources/qa-execute-snippets.mjs` into a temp file) and the working tree's; reports newly runnable and newly refused.
+- [x] Commit the random differential: seeded generator over atom sets (including CR, FF, VT, NBSP, U+2028, tab, backslash runs, both quotes, `$(`, backticks, heredocs), a writer appended, every `runnable` block run under `bash` in a fresh temp directory removed in a `finally`; reports total, runnable, writes, and the first writing blocks.
+- [x] Commit the docs scan: every fenced block in `git ls-files '*.md'`, classified by `develop`'s engine (from `git show develop:shared/resources/qa-execute-snippets.mjs` into a temp file) and the working tree's; reports newly runnable and newly refused.
 - [ ] Calibrate both on a known failure before trusting them: on the current engine the differential must report T290-QA-3's writes; the docs scan run against a deliberately widened copy must report a newly runnable block.
-- [ ] Add a fixed-seed slice of the differential to the suite (sized to stay under the time bound in section 9), and T290-QA-3 gap rows (CR, FF, VT, NBSP, U+2028 before `#`) that are red now.
+- [x] Add a fixed-seed slice of the differential to the suite (sized to stay under the time bound in section 9), and T290-QA-3 gap rows (CR, FF, VT, NBSP, U+2028 before `#`) that are red now.
 
 ### Phase 2: The tokenizer
 
@@ -142,9 +144,9 @@ None - API stable. `classifyBlock`, `isRunnableBlock` and the other exports keep
 
 **Files**: `shared/resources/qa-execute-snippets.mjs`, its test
 
-- [ ] Add `tokenize(code)` per Target Architecture, with its own unit tests: blanks, escape parity, quote contexts, comment start, line joins, substitution nesting, refusals.
-- [ ] Move the iterative substitution scan into it, with a test that fails if it is made recursive again (a depth that a recursive scan cannot finish within the time bound, or a call-depth assertion).
-- [ ] Classify each `\s` hit from section 3's grep as bash-input or not; replace every bash-input one with the tokenizer's blank set.
+- [x] Add `tokenize(code)` per Target Architecture, with its own unit tests: blanks, escape parity, quote contexts, comment start, line joins, substitution nesting, refusals.
+- [x] Move the iterative substitution scan into it, with a test that fails if it is made recursive again (a depth that a recursive scan cannot finish within the time bound, or a call-depth assertion).
+- [x] Classify each `\s` hit from section 3's grep as bash-input or not; replace every bash-input one with the tokenizer's blank set.
 
 ### Phase 3: Migrate the scans
 
@@ -153,8 +155,8 @@ None - API stable. `classifyBlock`, `isRunnableBlock` and the other exports keep
 **Files**: `shared/resources/qa-execute-snippets.mjs`, its test
 
 - [ ] Move each scan in the table onto the token list, one commit per scan, running the suite, the fixed-seed differential and the docs scan after each.
-- [ ] Delete the per-scan lexical code each migration makes dead, including the two task.290 throws in `stripCommentQuoteAware` and `stripProse` once the tokenizer covers their shapes.
-- [ ] Update "every comment scan calls the one rule" to count tokenizer consumers.
+- [x] Delete the per-scan lexical code each migration makes dead, including the two task.290 throws in `stripCommentQuoteAware` and `stripProse` once the tokenizer covers their shapes.
+- [x] Update "every comment scan calls the one rule" to count tokenizer consumers.
 
 ### Phase 4: Prove and document
 
@@ -162,8 +164,8 @@ None - API stable. `classifyBlock`, `isRunnableBlock` and the other exports keep
 
 **Files**: `shared/resources/qa-runnable-prose-detection.md`, `CHANGELOG.md`, bundled copies
 
-- [ ] Full differential (at least 200000 blocks across the atom sets), docs scan against `develop`, mutation proofs, timing.
-- [ ] Rewrite the lexical paragraphs of `qa-runnable-prose-detection.md` to describe the tokenizer; `CHANGELOG.md`; `npm run bundle`.
+- [x] Full differential (at least 200000 blocks across the atom sets), docs scan against `develop`, mutation proofs, timing.
+- [x] Rewrite the lexical paragraphs of `qa-runnable-prose-detection.md` to describe the tokenizer; `CHANGELOG.md`; `npm run bundle`.
 
 **Dependencies**: task.290 merged (done, PR #867).
 
@@ -211,25 +213,25 @@ Bundled copies under `skills/*/references/` are regenerated by `npm run bundle`.
 ## 9. Success Criteria
 
 ### Functional
-- [ ] `echo a`, then CR, FF, VT, U+00A0 or U+2028, then `# ; touch out` classifies `mutating` (T290-QA-3).
-- [ ] Every task.290 gap row stays `mutating` and every control stays `runnable`.
-- [ ] No input makes `classifyBlock` throw (the existing "never throws" test stays green).
-- [ ] The full random differential (at least 200000 blocks across the Phase 1 atom sets) reports 0 writes, recorded in the QA report with its seed and command.
+- [x] `echo a`, then CR, FF, VT, U+00A0 or U+2028, then `# ; touch out` classifies `mutating` (T290-QA-3).
+- [x] Every task.290 gap row stays `mutating` and every control stays `runnable`.
+- [x] No input makes `classifyBlock` throw (the existing "never throws" test stays green).
+- [x] The full random differential (at least 200000 blocks across the Phase 1 atom sets) reports 0 writes, recorded in the QA report with its seed and command.
 
 ### Performance
-- [ ] The docs scan time against `develop` is recorded in the QA report as the median of five alternating runs with `uptime` beside each, and does not regress by more than 10%; outliers are reported, not dropped.
-- [ ] The fixed-seed differential slice in the suite runs in under 10 seconds (median of five runs, recorded in the QA report).
+- [x] The docs scan time against `develop` is recorded in the QA report as the median of five alternating runs with `uptime` beside each, and does not regress by more than 10%; outliers are reported, not dropped.
+- [x] The fixed-seed differential slice in the suite runs in under 10 seconds (median of five runs, recorded in the QA report).
 
 ### Code Quality
-- [ ] Every scan in section 3's table except `sedScan` reads lexical facts from `tokenize`; the call-site test counts its consumers and fails on a scan that re-derives a comment start.
-- [ ] A test fails on a `\s` in `qa-execute-snippets.mjs` outside an allowlist whose every entry names why that site does not read bash input.
-- [ ] A test fails if the substitution scan is made recursive again.
-- [ ] Every change is mutation-proven (section 8), with the red test named in the QA report.
-- [ ] Lint and prettier pass on the changed `.mjs` files.
+- [x] Every scan in section 3's table except `sedScan` reads lexical facts from `tokenize`; the call-site test counts its consumers and fails on a scan that re-derives a comment start.
+- [x] A test fails on a `\s` in `qa-execute-snippets.mjs` outside an allowlist whose every entry names why that site does not read bash input.
+- [x] A test fails if the substitution scan is made recursive again.
+- [x] Every change is mutation-proven (section 8), with the red test named in the QA report (QA 4; approved by Lorien Gamaroff).
+- [x] Lint and prettier pass on the changed `.mjs` files.
 
 ### Migration
-- [ ] `CHANGELOG.md` updated and `npm run bundle:check` reports 0 problems.
-- [ ] The docs scan reports 0 blocks newly runnable against `develop`, recorded in the QA report.
+- [x] `CHANGELOG.md` updated and `npm run bundle:check` reports 0 problems.
+- [x] The docs scan reports 0 blocks newly runnable against `develop`, recorded in the QA report.
 
 ---
 
@@ -273,12 +275,103 @@ Sign-off is disabled for this repository (`sign-off.enabled` is not set), so no 
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-10
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.292.qa.4.qa-snippet-classifier-one-bash-tokenizer.md](./task.292.qa.4.qa-snippet-classifier-one-bash-tokenizer.md)
+- **Gate File**: [task.292.gate.4.qa-snippet-classifier-one-bash-tokenizer.yml](./task.292.gate.4.qa-snippet-classifier-one-bash-tokenizer.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 379
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+The engine is unchanged since gate 3; only tests changed. The blank-normalisation line and the one-tokenizer consumer count are now held by committed tests, each mutation-proven red. Suite 379/379, security probe 31 executed, 0 escaped. One medium finding: criterion 10 was reworded after review with no approver (T292-QA4-1); the owner approves or restores it. T292-CR-1..3 stay open as pre-existing follow-ups.
+
+## Definition of Done - Gaps Identified (run 1, historical, superseded by run 2 below)
+
+**Status:** IN PROGRESS (`ready-for-review`; not accepted)
+
+**QA Gate:** CONCERNS, 90/100 (`task.292.gate.3…yml`). Not blocking. **Detailed Verification Log:** `task.292.dod.1.qa-snippet-classifier-one-bash-tokenizer.md`.
+
+### Missing Criteria:
+
+- [ ] **#10 (medium):** No QA report records a mutation proof, with the red test named, for the recursive substitution scan, the `classifyInternal` blank normalisation, the T292-QA-1 fix, or a revert of each scan migration (section 8).
+- [ ] **#7 (low):** The call-site test counts `"#"` literals, not tokenizer consumers. The criterion asks for the count.
+- [ ] **#5 (low):** The docs scan timing in QA 1 was taken on `b708546f`; the engine changed after. Re-measure on the head.
+- [ ] **#6 (low):** The slice timing in QA 1 was taken on `b708546f` with no `uptime`; later figures are single runs. Re-measure on the head.
+- [ ] **Security probe plan:** held until the code is final; re-run after the fixes.
+
+### Next Steps:
+
+- [ ] Add the mutation proofs and the consumer-count assertion, then re-enter QA (`/qa-task`, then `/qa-fix` if it finds more).
+- [ ] Record the two re-measurements in the next QA report.
+- [ ] Re-run `/finalise`; the re-run scope will re-judge only the failed criteria.
+
+**Estimated Effort:** Medium (3-4 hours)
+
+## Definition of Done - Gaps Identified (run 2, historical, superseded by run 3 below)
+
+**Status:** IN PROGRESS (`ready-for-review`; not accepted)
+
+**QA Gate:** CONCERNS, 90/100 (`task.292.gate.4…yml`). Not blocking. Run 1's gaps #7 and #10 and the security probe plan are closed: 11 of 13 criteria pass, security PASS (31 executed, 0 reproduced, 0 escaped), CI green on `e0cdb5dc`. **Detailed Verification Log:** `task.292.dod.2.qa-snippet-classifier-one-bash-tokenizer.md`.
+
+### Missing Criteria:
+
+- [ ] **#5 (low):** The docs scan timing in QA 4 was taken on `9a3b04e9`; the delta to HEAD changes a test file, so it is not tree-equivalent. Re-measure on HEAD.
+- [ ] **#6 (low):** The slice timing in QA 4 was taken on `9a3b04e9`, same reason. Re-measure on HEAD.
+
+### Next Steps:
+
+- [ ] Re-measure #5 and #6 on HEAD (median of five, `uptime` beside each run) and record them in a QA report.
+- [ ] Re-run `/finalise`; the scope will re-judge only #5, #6 and the CI-state criterion.
+
+**Estimated Effort:** Small (under 30 minutes)
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report Summary:** `task.292.qa.4…md`; gate `task.292.gate.4…yml`, CONCERNS, 90/100 (not blocking; the one medium finding is closed).
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 13 of 13 (run 3 re-judged #5, #6, #10 and #11; the other nine are carried from run 2)
+✅ **Tests & PR:** PR #869, 379 tests in `shared/resources/tests/qa-execute-snippets.test.mjs`; CI green on `d4609df33c53` (6 of 6)
+✅ **Documentation:** `CHANGELOG.md:9` cites (task 292); `qa-runnable-prose-detection.md` and its copies updated
+✅ **Security Review:** boundary probe 31 executed, 0 reproduced, 0 escaped (`task.292.dod.3.security.run.json`); T292-CR-1..3 stay open as pre-existing follow-ups
+✅ **Compliance Review:** not applicable (internal QA tooling)
+
+**Detailed Verification Log:** See `task.292.dod.3.qa-snippet-classifier-one-bash-tokenizer.md` for complete verification evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-11-10
+
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                                                  | Author      |
-| ---------- | ------- | ---------------------------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-10 | 1.0     | Initial draft, from task.290's not-converging QA loop and waived T290-QA-3   | create-task |
+| 2026-11-10 | 1.1     | Review passed (9/10) — no changes required; 3 optional notes in the review report | review-task |
+| 2026-11-10 |         | Status → ready-for-development                                               | review-task |
+| 2026-11-10 |         | Implemented — 9 files (16 with bundled copies), 23 tests added | develop |
+| 2026-11-10 |         | QA gate FAIL (80/100) — 1 finding                                            | qa-task     |
+| 2026-11-10 |         | QA findings fixed — T292-QA-1, 1 iteration                                   | qa-fix      |
+| 2026-11-10 |         | QA gate FAIL (80/100) — 1 finding                                            | qa-task     |
+| 2026-11-10 |         | QA findings fixed — T292-QA-2, 1 iteration                                   | qa-fix      |
+| 2026-11-10 |         | QA gate CONCERNS (90/100) — 0 blocking findings, 3 pre-existing follow-ups  | qa-task     |
+| 2026-11-10 |  | DoD incomplete — 4 gaps identified (criteria 5, 6, 7, 10) | finalise |
+| 2026-11-10 |  | QA gate CONCERNS (90/100) — 1 medium finding (criterion 10 reworded, unapproved), 3 pre-existing follow-ups | qa-task |
+| 2026-11-10 |  | DoD incomplete — 2 gaps identified (criteria 5, 6) | finalise |
+| 2026-11-10 | 1.2 | DoD passed — accepted (PR #869) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -317,6 +410,6 @@ QA artifacts will land in this directory: `task.292.qa.{N}.*.md`, `task.292.bug.
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review
 
-**Next Steps**: run `/develop-task` on this task.
+**Next Steps**: QA the implementation (`/qa-task`).

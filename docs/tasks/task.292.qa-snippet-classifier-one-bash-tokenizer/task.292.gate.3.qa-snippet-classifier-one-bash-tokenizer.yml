@@ -1,0 +1,73 @@
+schema: 2
+task: 'task.292.qa-snippet-classifier-one-bash-tokenizer'
+task_title: 'One bash tokenizer for the QA snippet classifier'
+gate: CONCERNS
+status_reason: 'Both earlier HIGHs are fixed and verified (bugs 1 and 2 closed). The unscoped safety re-probe found three further shapes the classifier calls runnable while bash writes (printf -v and other re-evaluated subscripts, PS4 and ${x@P}, quoted data re-evaluated as arithmetic). All three are identical on develop, absent from the tracked corpus, and sit in areas the task excludes (the command-level allow-list and full bash parsing), so they are routed to recommendations.future, not blocking; security is CONCERNS because known holes remain.'
+reviewer: 'QA Engineer'
+head: '7ec74b57107f194eaa22bddcd89bc902fc1e746c'
+updated: '2026-11-10T05:48:08Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 371
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 31
+    escaped: 0
+    boundary_signals: ["never"]
+    boundary: true
+    notes: 'shell-exec probe on isRunnableBlock: 31 executed, 0 reproduced, 0 escaped (record task.292.qa.3.security.run.json). The reviewer ran about 245 probe blocks; 22 runnable ones wrote under real bash, all in three classes that are identical on develop and outside this task (CR-1 to CR-3). QA reproduced 12 shapes with controls. The lexical class this task owns is clean: differential arith seed 61 (60000) and all sets seed 62 (30000 each) show 0 writes.'
+  performance:
+    status: PASS
+    notes: 'Reviewer timed 8 repeated constructs up to N=32000: near-linear, no throws. Slice test 3.36 s (bound 10 s).'
+  reliability:
+    status: PASS
+    notes: 'Unmodelled shapes throw and classifyFailClosed returns mutating; suite 371/371 under CI=true.'
+  maintainability:
+    status: PASS
+    notes: 'The lexical copies are replaced by one tokenizer. The WORD and assignment regexes remain, as documented.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  notes: 'task.292.bug.1 (T292-QA-1) closed in cycle 2; task.292.bug.2 (T292-QA-2) verified and closed in cycle 3. Bug 2 verification: five bug shapes plus nested form classify mutating; removing refuseArithSubst turns 8 tests red (independently re-run by QA); arith differential seed 61 shows 0 writes.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'T292-CR-1 (pre-existing, high/high reviewer rating): assignmentHazard only sets startupHazard, which is read only for helper-function calls, so a direct printf -v / read / test -v / [[ -v ]] / unset / [[ -eq ]] operand holding a quoted a[$(cmd)] subscript is runnable while bash runs the command (printf -v with the name text a[$(touch W)] and a value x writes). Provenance: identical verdict on develop, zero hits in the tracked corpus; command-level allow-list is task.289 scope. Needs its own task: refuse a $( or backtick inside any quoted argument of an operand-evaluating builtin.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+      provenance: pre-existing
+    - action: 'T292-CR-2 (pre-existing): PS4 (and PS0/PS1/PS2) are not startup-variable hazards on the direct path, and ${x@P} expands prompt escapes, so PS4 set to $(touch W) followed by set -x, or x set to $(touch W) followed by echo ${x@P}, is runnable and writes. Provenance: identical on develop, zero corpus hits (one prose mention of PS4=).'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+      provenance: pre-existing
+    - action: 'T292-CR-3 (pre-existing): data bash later re-evaluates as arithmetic is read as inert text: x set to the quoted text a[$(touch W)], then $((x)), [[ $x -eq 1 ]], ${x:0:$x} or ${!x}, is runnable and writes. Provenance: identical on develop, zero corpus hits. Suggested direction: refuse a quoted literal holding $( or a backtick when assigned to a variable. The three findings share one cause (indirect evaluation), so one task should sweep the class.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+      provenance: pre-existing
+    - action: 'Decide whether to move the WORD and assignment regexes onto tokens (follow-up task).'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'The blank normalisation in classifyInternal is absorbed by the two other sites; keep as defence in depth or drop it.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['Owner accepts that three indirect-evaluation holes (T292-CR-1 to CR-3) stay open on this branch exactly as on develop, and files the follow-up task']
