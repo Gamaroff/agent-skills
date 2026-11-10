@@ -165,6 +165,12 @@ export const ATOM_SETS = {
     "x=a'[$(touch out)]'",
     "echo 'a[$(touch out)]' | { read x; echo $((x)); }",
     "cat <<'EOF' | { read x; echo $((x)); }\na[$(touch out)]\nEOF",
+    // QA cycle 3 (T293-QA-5, T293-QA-6): positional offsets and digit-led subscripts.
+    "set -- 'a[ $(touch out)]'; echo ${@:$1}",
+    "set -- 'a[ $(touch out)]'; v=(1); echo ${v[1+$1]}",
+    "set -- 'a[ $(touch out)]'",
+    "echo ${@:$1}",
+    "v=(1); echo ${v[1+$1]}",
     "let x",
     "(( x ))",
     "true",

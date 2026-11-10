@@ -225,17 +225,17 @@ Documentation:
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.293.qa.2.qa-snippet-classifier-indirect-evaluation.md](./task.293.qa.2.qa-snippet-classifier-indirect-evaluation.md)
-- **Gate File**: [task.293.gate.2.qa-snippet-classifier-indirect-evaluation.yml](./task.293.gate.2.qa-snippet-classifier-indirect-evaluation.yml)
+- **Full Report**: [task.293.qa.3.qa-snippet-classifier-indirect-evaluation.md](./task.293.qa.3.qa-snippet-classifier-indirect-evaluation.md)
+- **Gate File**: [task.293.gate.3.qa-snippet-classifier-indirect-evaluation.yml](./task.293.gate.3.qa-snippet-classifier-indirect-evaluation.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 383 in the suite file; `ci:fast` 8346, 0 fail at the fix commit
+- **Tests Executed**: 383 in the suite file; `ci:fast` 8346, 0 fail at the cycle-2 fix commit
 - **Phases Verified**: 2/3 clean
-- **Critical Issues**: 2 (high)
+- **Critical Issues**: 1 high, 1 medium
 - **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Cycle 1's two bypasses are fixed. The cycle-2 refute pass found two more of the same family, both reproduced under real bash: a bare word joined to a quoted literal (`x=a'[$(cmd)]'`), and a literal piped into a later `read`.
+Cycle 2's block-level rule held. The safety re-probe found two more spellings of the same family that the enumerated arithmetic-read detector misses (the offset of a positional expansion, and a subscript starting with a digit); both reproduce under real bash. Third consecutive HIGH in the same file: the detector must be replaced, not extended.
 
 ## Change Log
 
@@ -250,6 +250,8 @@ Cycle 1's two bypasses are fixed. The cycle-2 refute pass found two more of the 
 | 2026-11-10 |  | QA findings fixed — 2 high closed (assembled subscript value, quoted substitution as subscript), 1 iteration | qa-fix |
 | 2026-11-10 |  | QA gate FAIL (70/100) — 2 high findings | qa-task |
 | 2026-11-10 |  | QA findings fixed — 2 high closed (joined word and quoted literal, literal piped into read) with a block-level rule, 2 iterations | qa-fix |
+| 2026-11-10 |  | QA gate FAIL (70/100) — 1 high, 1 medium finding | qa-task |
+| 2026-11-10 |  | QA findings fixed — 1 high, 1 medium closed by replacing the arithmetic-read list with a default-deny test (third strike), 3 iterations | qa-fix |
 <!-- change-log-end -->
 
 ## References

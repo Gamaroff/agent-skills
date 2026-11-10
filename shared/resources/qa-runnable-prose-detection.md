@@ -257,13 +257,15 @@ reproduce under real bash, and a block holding one is `mutating` with a reason t
   (`x='a[$(cmd)]'`, `x="a[\$(cmd)]"`, `x=$'a[\x24(cmd)]'`, a joined word such as `x=a'[$(cmd)]'`, an
   unquoted escaped form, a literal piped into `read`, a quoted-delimiter here-document body). "Evaluates something" is any live
   `printf`, `read`, `test`, `unset`, `declare`, `typeset`, `local`, `export`, `readonly`, `let`, `eval`,
-  `for`, `select`, `case`, `[`, `[[` or `((` in the block, or an arithmetic read: `$((x))`, `$[x]`,
-  `${v:0:$x}`, `${!x}`, `${a[x]}`. Bash evaluates the subscript `a[$(cmd)]` as arithmetic when it reads
-  the name, so the substitution runs. The rule is **block-level on purpose** (QA cycle 2): the
-  per-segment and character-before-the-quote versions each lost to one more spelling, because a pipe,
-  a joined word or a variable carries the literal to the evaluation. No value is tracked. The price is
-  over-refusal of a block that only prints such a literal next to a test or a loop; the docs scan
-  measures it.
+  `for`, `select`, `case`, `[`, `[[` or `((` in the block, **or any live parameter expansion or
+  `name[`** (`$x`, `${…}`, `$((…))`, `$1`, `$@`, `a[x]=1`) outside single quotes, comments and
+  quoted here-documents. Bash evaluates the subscript `a[$(cmd)]` as arithmetic when it reads the
+  name, so the substitution runs. The rule is **block-level and default-deny on purpose**: the
+  per-segment and character-before-the-quote versions each lost to one more spelling (QA cycle 2),
+  and a list of the arithmetic spellings lost three times (`$((x))`, then `${@:$1}`, then
+  `${v[1+$1]}`; QA cycle 3, third strike), because every list of the places bash evaluates a
+  variable is incomplete. No value is tracked. The price is over-refusal of a block that holds such
+  a literal and also expands any variable; the docs scan measures it (one block, this task's plan).
 - **A subscript built by expansion, and a quoted substitution used as a subscript** (QA cycle 1). An
   assignment whose value holds an expansion inside `name[…]` (`x="a[$y$z]"`, `x="a[${d}(cmd)]"`) is
   refused, because the text that `$((x))`, `read "$x"`, `test -v "$x"` or `[[ $x -eq 1 ]]` later

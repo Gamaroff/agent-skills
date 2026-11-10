@@ -3120,11 +3120,13 @@ const EVALUATING_WORD =
   /(?<![^\s;&|({])(?:printf|read|test|unset|declare|typeset|local|export|readonly|let|eval|for|select|case|\[\[?|\(\()(?=[\s;&|)]|$)/g;
 const ESCAPED_SUBSTITUTION_ASSIGNMENT =
   /(?:^|[\s;&|({])[A-Za-z_][A-Za-z0-9_]*(?:\[[^\]\s]*\])?\+?=\S*\\[$`]/;
-// A place that is not an evaluating word yet reads a variable as arithmetic: `$(( x ))`, `$[ x ]`,
-// an offset `${v:0:$x}`, `${!x}`, a subscript `${a[x]}` / `${a[$x]}` / `a[x]=1`. Bounded repeats, so
-// a long run of openers cannot make the scan quadratic.
-const ARITHMETIC_READ =
-  /\$\(\(|\$\[|\$\{[A-Za-z_][A-Za-z0-9_]*:|\$\{![A-Za-z_]|[A-Za-z0-9_}]\[[A-Za-z_$]/;
+// DEFAULT-DENY, not a list of arithmetic spellings (task 293, third strike). Three cycles in a row
+// found one more place where bash reads a variable as arithmetic (`$((x))`, then `${@:$1}`, then
+// `${v[1+$1]}`), because every listing of those places is incomplete. So any live parameter
+// expansion (`$name`, `${…}`, `$((…))`, `$[…]`, `$1`, `$@`) or a name followed by `[` (a subscript,
+// `a[x]=1`) counts, wherever it is, unless it sits in inert text (single quotes, a comment, a
+// quoted-delimiter here-document). `$'…'` is not an expansion.
+const LIVE_EXPANSION = /\$(?=[A-Za-z_0-9{(\[@*#?!$-])|[A-Za-z0-9_}\]]\[/g;
 // An assignment whose value is built by expansion into a subscript (`x="a[$y$z]"`). The text that a
 // later `$((x))`, `read "$x"`, `test -v "$x"`, `unset "$x"`, `[[ $x -eq 1 ]]`, `${v:0:$x}` or `${!x}`
 // evaluates is not in the block, so it cannot be judged, and the build is refused instead of
@@ -3181,27 +3183,36 @@ function indirectEvaluationHazard(code) {
   const bodies = []; // here-document bodies
   const substStarts = []; // command substitutions the tokenizer found
   let dead = null; // comment and heredoc body: not code
+  let inert = null; // text in which nothing expands: single quotes, comments, quoted here-documents
   let quoted = null; // a quote's interior: its separators are not the shell's
   const marks = () => {
     if (dead !== null) return;
     dead = new Int32Array(n + 2);
     quoted = new Int32Array(n + 2);
+    inert = new Int32Array(n + 2);
     for (const t of tokenize(code).tokens) {
       if (t.kind === "comment" || t.kind === "heredoc-body") {
         if (t.kind === "heredoc-body") bodies.push(t);
         dead[t.start] += 1;
         dead[t.end] -= 1;
+        inert[t.start] += 1;
+        inert[t.end] -= 1;
       } else if (t.kind === "subst") {
         substStarts.push(t.start);
       } else if (t.kind === "quote") {
         quotes.push(t);
         quoted[t.start + 1] += 1;
         quoted[t.end - 1] -= 1;
+        if (t.quote === "'" || t.quote === "$'") {
+          inert[t.start] += 1; // nothing inside single quotes expands
+          inert[t.end] -= 1;
+        }
       }
     }
     for (let i = 1; i <= n; i += 1) {
       dead[i] += dead[i - 1];
       quoted[i] += quoted[i - 1];
+      inert[i] += inert[i - 1];
     }
   };
   let lastSep = null; // index of the last live command separator at or before each position
@@ -3255,7 +3266,7 @@ function indirectEvaluationHazard(code) {
   const blockEvaluates = () =>
     (evaluates ??=
       matchStarts(EVALUATING_WORD, code).some((i) => dead[i] === 0) ||
-      ARITHMETIC_READ.test(prose));
+      matchStarts(LIVE_EXPANSION, code).some((i) => inert[i] === 0));
   const REFUSED =
     "a quoted substitution in a block that also evaluates a value as code or arithmetic";
   for (const q of quotes) {

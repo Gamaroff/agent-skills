@@ -5152,6 +5152,11 @@ const T293_SHAPES = {
     "read x <<'EOF'\na[$(touch W)]\nEOF\necho $((x))",
   "QA-4 quoted here-document piped into read":
     "cat <<'EOF' | { read x; echo $((x)); }\na[$(touch W)]\nEOF",
+  // QA cycle 3 (T293-QA-5, T293-QA-6): arithmetic reads the cycle-2 detector did not list.
+  "QA-5 positional offset ${@:$1}": "set -- 'a[ $(touch W)]'; echo ${@:$1}",
+  "QA-5 positional offset ${*:$1}": "set -- 'a[ $(touch W)]'; echo ${*:$1}",
+  "QA-6 subscript beginning with a digit":
+    "set -- 'a[ $(touch W)]'; v=(1); echo ${v[1+$1]}",
   "QA-4 literal piped into read, evaluated by [[ -eq ]]":
     "echo 'a[$(touch W)]' | { read x; [[ $x -eq 1 ]]; }",
 };
@@ -5210,6 +5215,10 @@ const T293_DECIDERS = {
     "x=a'[$(touch W)]'; echo $((x))",
   "literal in another pipeline stage than the read (block rule alone)":
     "echo 'a[$(touch W)]' | { read x; echo $((x)); }",
+  "positional offset: no evaluating word, only a live expansion (default-deny alone)":
+    "set -- 'a[ $(touch W)]'; echo ${@:$1}",
+  "digit-led subscript: only a live expansion (default-deny alone)":
+    "set -- 'a[ $(touch W)]'; v=(1); echo ${v[1+$1]}",
   "here-document body literal (heredoc loop alone)":
     "cat <<'EOF' | { read x; echo $((x)); }\na[$(touch W)]\nEOF",
   "literal evaluated through a named subscript, no evaluating word":
@@ -5253,6 +5262,8 @@ test("task.293 safe blocks near the class stay runnable", () => {
     "x=a'[5]'; echo $((x))", // QA-3 control: no substitution in the literal
     "echo 'a[5]' | { read x; echo $((x)); }", // QA-4 control
     "echo 'run $(date)'; x=5", // a printed literal, nothing evaluates a value
+    "set -- 2; echo ${@:$1}", // QA-5 control: no substitution literal
+    "set -- 0; v=(1); echo ${v[$1]}", // QA-6 control: a subscript, no literal
   ]) {
     assert.equal(classifyBlock(code).klass, "runnable", code);
   }
