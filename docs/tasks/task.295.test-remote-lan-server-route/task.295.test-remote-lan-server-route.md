@@ -5,7 +5,7 @@ type: task
 description: "Add `npm run test:remote`: sync the working tree to the shared LAN server (.249), run the root test scripts there in a container that mirrors test.yml, and exit with their status, so the overheating laptop only syncs files and prints output."
 tags: [infrastructure, testing, developer-tooling, remote-test]
 category: infrastructure
-status: ready-for-development
+status: ready-for-review
 priority: Medium
 created: 2026-11-10
 updated: 2026-11-10
@@ -15,7 +15,7 @@ github_issue: 871
 
 # Technical Task: Run the test suite on the LAN server (test:remote)
 
-**Status:** Ready for Development
+**Status:** Ready for Review
 
 **Review**: ✅ All review recommendations from `task.295.review.1.test-remote-lan-server-route.md` implemented 2026-11-10
 
@@ -135,54 +135,54 @@ None. The change adds one script and files beside it. No existing script, test o
 
 **Risk**: Low. **Dependencies**: none.
 
-- [ ] Re-measure the server's tools and load (`ssh ci@192.168.1.249` toolchain probe, `uptime`, `docker ps`) and the laptop's `uptime`.
-- [ ] Confirm npm 9.2.0 against this `package-lock.json` (`lockfileVersion`) before deciding whether the host or the container installs dependencies.
-- [ ] Read the `eval:all` scenarios and drivers for network or credential needs (the default driver is replay; `evals/shared/drivers/claude-sdk.mjs` and `evals/shared/lib/gh-sandbox.mjs` read the environment). Record the verdict for the default-target decision.
+- [x] Re-measure the server's tools and load (`ssh ci@192.168.1.249` toolchain probe, `uptime`, `docker ps`) and the laptop's `uptime`.
+- [x] Confirm npm 9.2.0 against this `package-lock.json` (`lockfileVersion`) before deciding whether the host or the container installs dependencies.
+- [x] Read the `eval:all` scenarios and drivers for network or credential needs (the default driver is replay; `evals/shared/drivers/claude-sdk.mjs` and `evals/shared/lib/gh-sandbox.mjs` read the environment). Record the verdict for the default-target decision.
 - [x] The owner's three answers are recorded in Notes › Owner Decisions (container, `ci:fast`, agents required to use the route). Nothing to ask.
 
 ### Phase 1: Runner skeleton, argument grammar and exit codes
 
 **Risk**: Medium. **Dependencies**: Phase 0.
 
-- [ ] Add the runner and a sourced library with `server_ready HOST TOOL...` (one SSH round trip, `BatchMode=yes`, `ConnectTimeout=6`).
-- [ ] Parse `--run <script>` (repeatable, validated `^[A-Za-z0-9:._-]+$`, exit 2 before any ssh), `--host`, `TEST_REMOTE_HOST`, `TEST_LOCAL=1`.
-- [ ] Unreachable server: exit non-zero with a message that names `TEST_LOCAL=1`. Never fall back silently.
-- [ ] Capture `STATUS=$?` straight after the ssh call and `exit "$STATUS"` at the end. Use `;` between steps in any `case` arm, and never pipe the run into `tail` or `grep`.
+- [x] Add the runner and a sourced library with `server_ready HOST TOOL...` (one SSH round trip, `BatchMode=yes`, `ConnectTimeout=6`).
+- [x] Parse `--run <script>` (repeatable, validated `^[A-Za-z0-9:._-]+$`, exit 2 before any ssh), `--host`, `TEST_REMOTE_HOST`, `TEST_LOCAL=1`.
+- [x] Unreachable server: exit non-zero with a message that names `TEST_LOCAL=1`. Never fall back silently.
+- [x] Capture `STATUS=$?` straight after the ssh call and `exit "$STATUS"` at the end. Use `;` between steps in any `case` arm, and never pipe the run into `tail` or `grep`.
 
 ### Phase 2: Sync, container and dependency install
 
 **Risk**: High. **Dependencies**: Phase 1.
 
-- [ ] Sync the tree as git sees it: tracked plus untracked-not-ignored, excluding gitignored paths and `node_modules/`; keep `.env` and secrets out. **`--files-from` does not delete stale remote files.** Measured in review 1: with `printf 'a/keep\0' | rsync -a --delete --from0 --files-from=- ./ dst/`, `dst/a/stale` and `dst/rootstale` both survive. So do not use `--files-from` with `--delete`. Use `rsync -a --delete --exclude-from=<list of gitignored paths>`, with plain `--exclude` (never `--delete-excluded`) for `node_modules/`, `.home/` and `.lock-hash`, so the remote install and its cache survive the sync. Prove it with a stale-file case (delete a tracked file locally, confirm it is gone remotely).
-- [ ] Per-branch remote directory `~ci/agent-skills-test-<branch-slug>`. In a linked worktree `.git` is a file, so no exclude may assume a `.git/` directory.
-- [ ] Sync `.git` so the history-backed replay test runs; otherwise state in the output that it skips.
-- [ ] Container image mirroring `test.yml` (`node:22-bookworm` plus `python3-yaml gawk mawk zsh jq git`, and `shellcheck` if Phase 0 finds a script needing it); `--user "$(id -u):$(id -g)"`, `--rm`, `--cpu-shares 128`.
-- [ ] `npm ci` in the container, skipped when a stored hash of `package-lock.json` is unchanged.
+- [x] Sync the tree as git sees it: tracked plus untracked-not-ignored, excluding gitignored paths and `node_modules/`; keep `.env` and secrets out. **`--files-from` does not delete stale remote files.** Measured in review 1: with `printf 'a/keep\0' | rsync -a --delete --from0 --files-from=- ./ dst/`, `dst/a/stale` and `dst/rootstale` both survive. So do not use `--files-from` with `--delete`. Use `rsync -a --delete --exclude-from=<list of gitignored paths>`, with plain `--exclude` (never `--delete-excluded`) for `node_modules/`, `.home/` and `.lock-hash`, so the remote install and its cache survive the sync. Prove it with a stale-file case (delete a tracked file locally, confirm it is gone remotely).
+- [x] Per-branch remote directory `~ci/agent-skills-test-<branch-slug>`. In a linked worktree `.git` is a file, so no exclude may assume a `.git/` directory.
+- [x] Sync `.git` so the history-backed replay test runs; otherwise state in the output that it skips.
+- [x] Container image mirroring `test.yml` (built on `node:22-trixie`, not bookworm: see Notes › Parity findings; plus `python3-yaml gawk mawk zsh jq git`, and `shellcheck` if Phase 0 finds a script needing it); `--user "$(id -u):$(id -g)"`, `--rm`, `--cpu-shares 128`.
+- [x] `npm ci` in the container, skipped when a stored hash of `package-lock.json` is unchanged.
 
 ### Phase 3: Timeout, teardown and shared-host behaviour
 
 **Risk**: Medium. **Dependencies**: Phase 2.
 
-- [ ] Wrap the remote run in `timeout --foreground -k 1m <N>m`; the bound has a default and an override.
-- [ ] Print `uptime` and running containers on the server before the run, so a contended host is visible.
-- [ ] Stay under `~ci/`; never write to the C: drive; never prune globally.
-- [ ] Reap stale per-branch directories on request.
+- [x] Wrap the remote run in `timeout --foreground -k 1m <N>m`; the bound has a default and an override.
+- [x] Print `uptime` and running containers on the server before the run, so a contended host is visible.
+- [x] Stay under `~ci/`; never write to the C: drive; never prune globally.
+- [x] Reap stale per-branch directories on request.
 
 ### Phase 4: Tests and acceptance runs
 
 **Risk**: Medium. **Dependencies**: Phase 3.
 
-- [ ] A guard test (offline, no ssh) for argument validation, exit 2 on `'x;y'`, and the unreachable-server message.
-- [ ] Run the five acceptance checks in § 9 on .249 and record the evidence in the QA report.
-- [ ] Mutation-prove each guard: revert the behaviour and confirm a test goes red.
+- [x] A guard test (offline, no ssh) for argument validation, exit 2 on `'x;y'`, and the unreachable-server message.
+- [x] Run the five acceptance checks in § 9 on .249 and record the evidence in the QA report. (Run in Step 3; `/qa-task` restates the evidence in its report.)
+- [x] Mutation-prove each guard: revert the behaviour and confirm a test goes red.
 
 ### Phase 5: Docs, `AGENTS.md` and optional `--auto`
 
 **Risk**: Low. **Dependencies**: Phase 4.
 
-- [ ] A contributor doc under `docs/contributing/` (usage, host rules, troubleshooting), linked from `docs/contributing/README.md`.
-- [ ] One `AGENTS.md` line: test runs go to `test:remote` when .249 is up, `TEST_LOCAL=1` otherwise (owner decision 3). `CLAUDE.md` is a symlink to `AGENTS.md`, so edit `AGENTS.md` only. `tests/executable-instructions.test.js` (line 374) checks that `npm run <name>` mentions in documents name a real `package.json` script, so add the `package.json` script before the docs that mention it.
-- [ ] Optional, only if cheap: `--auto` probes the server and falls back to local, for scripted callers. The plain form still fails loudly.
+- [x] A contributor doc under `docs/contributing/` (usage, host rules, troubleshooting), linked from `docs/contributing/README.md`.
+- [x] One `AGENTS.md` line: test runs go to `test:remote` when .249 is up, `TEST_LOCAL=1` otherwise (owner decision 3). `CLAUDE.md` is a symlink to `AGENTS.md`, so edit `AGENTS.md` only. `tests/executable-instructions.test.js` (line 374) checks that `npm run <name>` mentions in documents name a real `package.json` script, so add the `package.json` script before the docs that mention it.
+- [x] Optional, not done by decision (see Notes): `--auto` probes the server and falls back to local, for scripted callers. The plain form still fails loudly.
 
 ---
 
@@ -331,6 +331,8 @@ This task does not use sign-off (`sign-off.enabled` is not `true` in `skills-con
 | 2026-11-10 | 1.0     | Initial draft | create-task |
 | 2026-11-10 | 1.1     | Review passed (8/10): rsync plan fixed (`--files-from` leaves stale files), evidence location named for server-only criteria, script-before-docs order | review-task |
 | 2026-11-10 |         | Status → ready-for-development | review-task |
+| 2026-11-10 | 1.2     | Implemented: test:remote runner, container, guard test, docs; four container parity fixes recorded in Notes | develop-task |
+| 2026-11-10 |         | Status → ready-for-review | develop-task |
 <!-- change-log-end -->
 
 ---
@@ -338,36 +340,36 @@ This task does not use sign-off (`sign-off.enabled` is not `true` in `skills-con
 ## Progress Tracking
 
 ### Phase 0: Re-measure and decide
-- [ ] Re-measure server and laptop
-- [ ] Check eval:all for network or credential needs
-- [ ] Record the owner's three answers
+- [x] Re-measure server and laptop
+- [x] Check eval:all for network or credential needs
+- [x] Record the owner's three answers
 
 ### Phase 1: Runner skeleton, argument grammar and exit codes
-- [ ] Runner and probe
-- [ ] Argument validation
-- [ ] Loud failure naming TEST_LOCAL=1
-- [ ] Exit-code capture
+- [x] Runner and probe
+- [x] Argument validation
+- [x] Loud failure naming TEST_LOCAL=1
+- [x] Exit-code capture
 
 ### Phase 2: Sync, container and dependency install
-- [ ] rsync of the working tree
-- [ ] Per-branch directory
-- [ ] Container image and run flags
-- [ ] Lockfile-keyed npm ci
+- [x] rsync of the working tree
+- [x] Per-branch directory
+- [x] Container image and run flags
+- [x] Lockfile-keyed npm ci
 
 ### Phase 3: Timeout, teardown and shared-host behaviour
-- [ ] Timeout with -k
-- [ ] Load print before the run
-- [ ] Reap stale directories
+- [x] Timeout with -k
+- [x] Load print before the run
+- [x] Reap stale directories
 
 ### Phase 4: Tests and acceptance runs
-- [ ] Offline guard tests
-- [ ] Five acceptance runs
-- [ ] Mutation proof
+- [x] Offline guard tests
+- [x] Five acceptance runs
+- [x] Mutation proof
 
 ### Phase 5: Docs, AGENTS.md and optional --auto
-- [ ] Contributor doc
-- [ ] AGENTS.md line
-- [ ] Optional --auto
+- [x] Contributor doc
+- [x] AGENTS.md line
+- [x] Optional --auto (decided against; see Notes)
 
 ---
 
@@ -391,7 +393,19 @@ This task does not use sign-off (`sign-off.enabled` is not `true` in `skills-con
 
 ### Known Issues
 
-None yet.
+None.
+
+### Phase 0 decisions and parity findings (2026-11-10)
+
+- **Server re-measured**: node v22.22.1, npm 9.2.0, `package-lock.json` `lockfileVersion` 3 (npm 9 reads it), docker present, zsh and shellcheck missing on the host. Load 2.9 to 5.3 with the tinker-city containers running: contended, so the low CPU weight matters.
+- **`eval:all` verdict**: the default driver is replay; the live drivers read `ANTHROPIC_API_KEY` and skip without it, so `eval:all` needs no network or credentials by default. `ci:fast` stays the default target (owner decision 2); `eval:all` is reachable through `--run eval:all`.
+- **Parity findings** — the container is only as good as it is faithful to CI, and each gap below made a real test fail remotely until fixed:
+  1. `node:22-bookworm` ships jq 1.6 (exits 0 on `jq -e` over empty input) and git 2.39: the zero-byte-lock cases and a gitlink-commit test failed. Fixed by building on `node:22-trixie` (jq 1.7.1, git 2.47).
+  2. `shellcheck` must be on PATH under `CI=true` (`tests/ci-tool-skips.test.js`): added to the image.
+  3. No UTF-8 locale: zsh printed `§` as escapes and a text match failed. `LANG=C.UTF-8` set.
+  4. `HOME=/tmp/...` is refused by the observation-log tests (workspace under a temporary directory): `HOME=/home/node`.
+- **`--auto` not built.** A mode that falls back to local on an unreachable server is the silent fall back the route exists to refuse, and its only caller would be a script that should set `TEST_LOCAL=1` itself.
+- **A route run syncs the working tree as it is.** Uncommitted edits from another session in the same checkout travel to the server and can fail bundle-freshness tests there (seen in runs 2 to 5). For a verdict on committed work, run from a clean clone.
 
 ### Owner Decisions (2026-11-10)
 

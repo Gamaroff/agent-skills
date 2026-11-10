@@ -36,6 +36,12 @@ Use the route whenever the server is up. Run locally (`TEST_LOCAL=1`) only when 
 
 The remote run is a clean-checkout run: the gitignored `.agents/skills` symlink is absent there. A test that passes locally and fails remotely because of that symlink is a real finding, not a route bug (see [traps](./traps.md)).
 
+## It syncs the tree as it is
+
+Uncommitted edits travel to the server with everything else. If another session edits the same checkout, its half-finished work can fail bundle-freshness tests remotely. For a verdict on committed work, run the route from a clean clone of the branch.
+
+Changing `scripts/remote-test/Dockerfile` builds a new image tag on the next run and leaves the old one. Remove the old tags yourself (`ssh ci@192.168.1.249 'docker rmi agent-skills-test:<tag>'`); never prune globally.
+
 ## Host rules
 
 The server is shared with another repository's CI runner and is also a gaming PC. It is WSL2.
