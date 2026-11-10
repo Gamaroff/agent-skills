@@ -218,24 +218,24 @@ Documentation:
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-10
-**Quality Score**: 85/100
-**Gate Decision**: FAIL
+**Quality Score**: 88/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.293.qa.8.qa-snippet-classifier-indirect-evaluation.md](./task.293.qa.8.qa-snippet-classifier-indirect-evaluation.md)
-- **Gate File**: [task.293.gate.8.qa-snippet-classifier-indirect-evaluation.yml](./task.293.gate.8.qa-snippet-classifier-indirect-evaluation.yml)
+- **Full Report**: [task.293.qa.9.qa-snippet-classifier-indirect-evaluation.md](./task.293.qa.9.qa-snippet-classifier-indirect-evaluation.md)
+- **Gate File**: [task.293.gate.9.qa-snippet-classifier-indirect-evaluation.yml](./task.293.gate.9.qa-snippet-classifier-indirect-evaluation.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 383 in the suite file; `ci:fast` 8346, 0 fail at the gate-7 fix commit
-- **Phases Verified**: 2/3 clean
-- **Critical Issues**: 1 (high)
-- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **Tests Executed**: 383 in the suite file; `ci:fast` 8346, 0 fail
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Gate 8 (third owner-granted extra cycle). The bracket depth resets at a separator inside a quoted span, so `a=([';'0'$(cmd)']=1)` still runs. Reproduced under real bash.
+Gate 9 (fourth owner-granted extra cycle). The independent reviewer found no block that classifies runnable and runs a command, including about 18,000 fuzzed array-subscript blocks. Owner-accepted residuals stay documented; the allow-list redesign is its own task.
 
 ## Change Log
 
@@ -261,6 +261,7 @@ Gate 8 (third owner-granted extra cycle). The bracket depth resets at a separato
 | 2026-11-10 |  | QA finding fixed — 1 high closed by counting bracket depth over the segment, 7 iterations | qa-fix |
 | 2026-11-10 |  | QA gate FAIL (85/100) — 1 high finding on the third extra cycle | qa-task |
 | 2026-11-10 |  | QA finding fixed — 1 high closed by never resetting the bracket depth, 8 iterations | qa-fix |
+| 2026-11-10 |  | QA gate CONCERNS (88/100) — 0 findings; documented residuals open | qa-task |
 <!-- change-log-end -->
 
 ## References

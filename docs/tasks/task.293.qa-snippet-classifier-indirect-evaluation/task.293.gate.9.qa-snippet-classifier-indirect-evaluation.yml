@@ -1,0 +1,64 @@
+schema: 2
+task: 'task.293.qa-snippet-classifier-indirect-evaluation'
+task_title: 'QA snippet classifier refuses indirect evaluation'
+gate: CONCERNS
+status_reason: 'Gate 9 (fourth owner-granted extra cycle, scoped to routes that keep the substitution text in the source). The independent reviewer found no block that classifies runnable and runs a command: hand-built early-closing bracket shapes, backtick substitutions holding a bracket, builtins outside the evaluating-word list (refused by the unrecognised-command rule) and about 18,000 random array-subscript blocks. CONCERNS, not PASS: the owner narrowed the task at gate 5 and four residual shapes stay documented and open, and the fix cost some over-refusal.'
+reviewer: 'QA Engineer'
+head: '134931e556a624edeaa1a3f291030861824c51ce'
+updated: '2026-11-10T12:32:42Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 88
+
+evidence:
+  tests_reviewed: 383
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 31
+    boundary: true
+    escaped: 0
+    boundary_signals: ["refused"]
+    notes: 'The classifier is the boundary. 31 corpus cases executed, 0 escaped; the reviewer fuzzed about 18,000 random array-subscript blocks and found no write. CONCERNS because the owner-accepted residuals (printf octal launder, a bracket or dollar arriving by expansion, a literal split across quote tokens) are known open routes.'
+  performance:
+    status: PASS
+    notes: 'The bracket map and the literal checks are linear passes; docs scan median +4.5% at the gate-8 fix (bound +10%).'
+  reliability:
+    status: PASS
+    notes: 'ci:fast green at the gate-8 fix on the laptop (8346 tests, 0 fail on the second run; the first run tripped the known ctx-wrap temp leak, task 291). Clean-checkout ci:fast on the LAN server: see the report.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Nine gates. The classifier detects hazardous text, which the owner-accepted residuals show cannot be exhaustive; the allow-list redesign is its own task.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'File and schedule the allow-list design (run only blocks whose every word is a known-safe literal) as its own task; it closes the three documented residuals and the family behind them.'
+      refs: ['shared/resources/qa-runnable-prose-detection.md']
+      provenance: documented-unseen-shape
+    - action: 'Cleanup: the test "a helper call that also names a start-up variable keeps its pinned reason" asserts only mutating, so it cannot fail on the ordering it names; pass a helperRoot and assert the reason string.'
+      refs: ['shared/resources/tests/qa-execute-snippets.test.mjs']
+    - action: 'Cleanup: EVALUATING_WORD omits set, mapfile, readarray, getopts, trap, compgen, wait and shift; they are refused today only by the unrecognised-command rule (the gate-9 reviewer confirmed this for mapfile, getopts, wait and coproc); add a test that locks the dependency.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'Over-refusal: an unbalanced bracket in earlier text refuses a later quoted substitution literal. The docs scan finds one block newly refused (this task plan); watch for more.'
+      refs: ['shared/resources/qa-runnable-prose-detection.md']
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: ['Owner-accepted residuals stay documented; allow-list task filed']
