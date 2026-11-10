@@ -5,7 +5,7 @@ type: task
 description: "Add `npm run test:remote`: sync the working tree to the shared LAN server (.249), run the root test scripts there in a container that mirrors test.yml, and exit with their status, so the overheating laptop only syncs files and prints output."
 tags: [infrastructure, testing, developer-tooling, remote-test]
 category: infrastructure
-status: in-progress
+status: ready-for-review
 priority: Medium
 created: 2026-11-10
 updated: 2026-11-10
@@ -15,7 +15,7 @@ github_issue: 871
 
 # Technical Task: Run the test suite on the LAN server (test:remote)
 
-**Status:** In Progress
+**Status:** Ready for Review
 
 **Review**: ✅ All review recommendations from `task.295.review.1.test-remote-lan-server-route.md` implemented 2026-11-10
 
@@ -357,6 +357,8 @@ Cycle 1's two findings are fixed. The cycle-2 refute pass found that the run tim
 | 2026-11-10 |         | QA gate CONCERNS (80/100) — 2 findings | qa-task |
 | 2026-11-10 |         | QA gate FAIL (65/100) — 3 findings, 1 high | qa-task |
 | 2026-11-10 |         | Status → in-progress | qa-task |
+| 2026-11-10 |         | QA findings fixed after gates 1 and 2 (5 findings, 2 fix cycles); ready for re-gate | qa-fix |
+| 2026-11-10 |         | Status → ready-for-review | qa-fix |
 <!-- change-log-end -->
 
 ---

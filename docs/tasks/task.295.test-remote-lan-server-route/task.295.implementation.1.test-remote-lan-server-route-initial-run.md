@@ -34,8 +34,8 @@ Add `npm run test:remote`: sync the tree to the LAN server (.249), run root scri
 | 1. create-branch           | ✅ Done | Branch `feature/task.295.*` exists in git                              | Branch created at `9bf53185`; tracker #871 → In Progress | —                    | 2026-11-10T14:20Z |
 | 2. review-task             | ✅ Done | `task.295.review.{N}.{name}.md` exists (or skip logged)                | Review 1: 8/10 READY; rsync plan fixed; status → ready-for-development; pre-pass agents run inline (no independent review) | —                    | 2026-11-10T14:45Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (plan + inline surface map); runner, container, guard test, docs; 6 real runs on .249; clean-clone run green (8353 tests, 0 fail) | —                    | 2026-11-10T14:56Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.295.qa.{N}.*.md`; `task.295.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
+| 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #872 https://github.com/Gamaroff/agent-skills/pull/872; issue #871 commented; PR body written inline (no Explore summariser); foreign uncommitted edits left out | —                    | 2026-11-10T15:10Z |
+| 5–6. qa-task / qa-fix loop | 🔄 In progress (gate 1 CONCERNS 80; fix 1 done; gate 2 next) | `task.295.qa.{N}.*.md`; `task.295.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.295.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
@@ -82,14 +82,22 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1
+
+- **Gate**: CONCERNS, 80/100, head `5fd76f12`. Findings: T295-QA-1 (missing `--host`/`--timeout-min` value hangs `run.sh`), T295-QA-2 (no CHANGELOG entry citing task 295). Two LOW items went to `recommendations.future`.
+- **Fix** (`7dd8e0a8`): both options refuse a missing value with exit 2. Guard test added (8/8 pass); mutation-proved: the original `run.sh` turns it red (`got null (signal SIGTERM)`). CHANGELOG `[Unreleased]` Added entry staged by hunk only; the other session's CHANGELOG edits stay unstaged. `changelog-cites.sh task.295` now reads `cites (task 295)`.
+- **Gate 2** (FAIL 65, head `7dd8e0a8`, refute pass by a dispatched reviewer): T295-QA-3 (high: the timeout kills only the local ssh, the remote container survived; reproduced on .249), T295-QA-4 (branch key collisions, detached HEAD), T295-QA-5 (`--reap` reads an mtime rsync overwrites).
+- **Fix 2** (`5548cf09`): scripts run under `timeout` inside a named `--init` container, with a local backstop that `docker kill`s it; the run directory carries a hash of the full branch name (commit when detached) and the container name doubles as a per-directory lock; a run touches its directory and `--reap` skips a directory with a running container; `--timeout-min` is base 10 and capped. Guard tests 8 to 13; six mutations each turned a named test red (kill on timeout, hash, detached, inner timeout, reap skip, base 10). Live proof on .249: `--timeout-min 1` exited 124 after 80 s and left 0 `agent-skills-test-*` containers. The probe container used for the reproduction was killed by hand (0 left).
+- **Next**: gate 3, scoped to the files changed since `7dd8e0a8`.
+
 ---
 
 ## Completion
 
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
-**Branch**: {populated after Step 1}
-**PR**: {populated after Step 4}
+**Branch**: feature/task.295.test-remote-lan-server-route
+**PR**: https://github.com/Gamaroff/agent-skills/pull/872
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}
