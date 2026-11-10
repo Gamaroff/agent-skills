@@ -20,7 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. Phase 20 is open (opened 2026-11-09): T289 (accepted), T290 (merged with an owner waiver), T292, T291.
+chain, a human gate. Phase 20 is open (opened 2026-11-09): T289 (accepted), T290 (merged with an owner waiver), T292 (accepted), T293 (accepted), T291.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -91,7 +91,7 @@ accepted, and archive the phase at close.**
 - [x] **T289** QA snippet runner allows flags, not just commands · deps: none · touches: test-harness~, bundles~ · /develop-task docs/tasks/task.289.qa-snippet-runner-flag-level-allow-list/task.289.qa-snippet-runner-flag-level-allow-list.md
 - [x] **T290** QA snippet runner reads a # after an escaped space as a comment · deps: none · touches: test-harness~, bundles~ · /develop-task docs/tasks/task.290.qa-snippet-runner-comment-after-escaped-space/task.290.qa-snippet-runner-comment-after-escaped-space.md
 - [x] **T292** One bash tokenizer for the QA snippet classifier · deps: none · touches: test-harness~, bundles~ · /develop-task docs/tasks/task.292.qa-snippet-classifier-one-bash-tokenizer/task.292.qa-snippet-classifier-one-bash-tokenizer.md · ✅ **accepted + merged** ([PR #869](https://github.com/Gamaroff/agent-skills/pull/869), QA CONCERNS 90/100)
-- [ ] **T293** QA snippet classifier refuses indirect evaluation · deps: none · touches: test-harness~, bundles~ · /develop-task docs/tasks/task.293.qa-snippet-classifier-indirect-evaluation/task.293.qa-snippet-classifier-indirect-evaluation.md
+- [x] **T293** QA snippet classifier refuses indirect evaluation · deps: none · touches: test-harness~, bundles~ · /develop-task docs/tasks/task.293.qa-snippet-classifier-indirect-evaluation/task.293.qa-snippet-classifier-indirect-evaluation.md
 - [ ] **T291** The context-pressure statusline test leaks a ctx-wrap- temp directory · deps: none · touches: test-harness~ · /develop-task docs/tasks/task.291.context-pressure-statusline-test-leaks-ctx-wrap-directory/task.291.context-pressure-statusline-test-leaks-ctx-wrap-directory.md
 
 ## Deferred / human-gated
@@ -251,3 +251,4 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-11-10 | **T292 added to Phase 20**, ahead of T291: one bash tokenizer for the snippet classifier, carrying the waived T290-QA-3 (a write still classifies runnable). |
 | 2026-11-10 | **T293 added to Phase 20**, ahead of T291: the T292-CR-1..3 indirect-evaluation holes, a security gap in what the runner executes. |
 | 2026-11-10 | **T292 accepted + merged — PR #869** (`9d0eb530`); row ticked. One tokenizer now serves every lexical scan in the snippet classifier, and the T290-QA-3 write gap is closed. Four QA gates (gate 4 CONCERNS 90/100, no open finding), DoD run 3 accepted 13 of 13. Three pre-existing indirect-evaluation holes (T292-CR-1..3) stay open and are filed as T293. |
+| 2026-11-10 | **T293 accepted + merged — PR #870** (`3b71f9e9`); row ticked. The snippet classifier now refuses a block when bash would evaluate quoted or assembled text as code, by default-deny rules rather than a list of spellings. Nine QA gates (eight FAIL, then CONCERNS 88/100); the owner narrowed the task at gate 5 and granted extra cycles at gates 5 to 8. Three residual shapes stay open by decision and are documented (printf octal launder, a bracket or dollar arriving by expansion, a literal split across quote tokens); the allow-list redesign that closes them is a separate task, not yet filed. Docs scan +2.3%, one block newly refused (the task plan quoting the hazard). |
