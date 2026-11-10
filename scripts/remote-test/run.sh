@@ -196,9 +196,10 @@ ssh -o BatchMode=yes "$HOST" "touch \"\$HOME/$RUN_DIR\" && docker image inspect 
 #
 # The bound is enforced on the server, in the container: `timeout` runs the scripts there (and
 # kills their process group), `--init` reaps what they leave behind, and the container is named
-# after the run directory, so a second run on the same directory fails on the name instead of
-# syncing over a tree that is in use. The local `timeout` below is a backstop one minute later: it
-# only stops the ssh client, so on expiry (or Ctrl-C) the named container is killed explicitly.
+# after the run directory. The name is the lock: it is checked before the sync above, and the
+# `docker run --name` here is the atomic backstop for two runs that start together. The local
+# `timeout` below is a backstop one minute later: it only stops the ssh client, so on expiry, a
+# dropped session (255) or Ctrl-C the named container is killed explicitly.
 REMOTE_CMD="cd \"\$HOME/$RUN_DIR\" && touch . && docker run --rm --init --name $RUN_DIR --user \"\$(id -u):\$(id -g)\" --cpu-shares 128 -v \"\$PWD:/work\" -w /work -e HOME=/home/node -e CI=true -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*' $IMAGE timeout -k 30s ${TIMEOUT_MIN}m bash scripts/remote-test/container.sh ${SCRIPTS[*]}"
 
 kill_remote_container() {
