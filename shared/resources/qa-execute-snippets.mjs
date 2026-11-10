@@ -3139,27 +3139,23 @@ const LIVE_EXPANSION = /\$(?=[A-Za-z_0-9{(\[@*#?!$-])|[A-Za-z0-9_}\]]\[/g;
 // command output (`x=$(printf 'a[\044(cmd)]')`, task 293 QA-3).
 const EXPANDED_ASSIGNMENT =
   /(?:^|[\s;&|({])[A-Za-z_][A-Za-z0-9_]*\+?=[^\n;&|]{0,300}[A-Za-z0-9_]\[[^\]\n]{0,300}[$`]/;
-// True when an opening `[` sits earlier in the same word, so a quote at `at` is part of a subscript
-// (`${a['$(cmd)']}`, `a=([0'$(cmd)']=1)`, `a[x'$(cmd)']`). Word-scoped, not "the character before the
-// quote": that version missed `[0'…']` (task 293 QA gate 6). Bounded: the scan stops at the first
-// blank, separator or paren, so a run of text cannot make the check quadratic.
-function inSubscriptWord(code, at) {
-  for (let i = at - 1; i >= 0 && at - i <= 512; i -= 1) {
+// For every position, whether a `[` opened earlier in the same command segment has not been closed
+// yet, so a quote there sits inside a subscript (`${a['$(cmd)']}`, `a=([0'$(cmd)']=1)`,
+// `a=([0+(1)'$(cmd)']=1)`). Depth-tracked over the whole segment, not "the character before the
+// quote" (task 293 QA gate 6) and not "the same word" (gate 7: a paren inside the subscript ended a
+// word scan and hid the `[`). One forward pass, so the cost is linear with no length cap. It reads
+// brackets in quoted text too; that can only over-refuse.
+function unclosedBracketMap(code) {
+  const open = new Uint8Array(code.length + 1);
+  let depth = 0;
+  for (let i = 0; i < code.length; i += 1) {
     const c = code[i];
-    if (c === "[") return true;
-    if (
-      c === " " ||
-      c === "\t" ||
-      c === "\n" ||
-      c === ";" ||
-      c === "&" ||
-      c === "|" ||
-      c === "(" ||
-      c === ")"
-    )
-      return false;
+    if (c === "[") depth += 1;
+    else if (c === "]") depth = depth > 0 ? depth - 1 : 0;
+    else if (c === ";" || c === "&" || c === "|" || c === "\n") depth = 0;
+    open[i] = depth > 0 ? 1 : 0;
   }
-  return false;
+  return open;
 }
 // Text that spells a command substitution, whatever carries it: `$(` (not `$((`), an escaped `$\(`,
 // or a backtick. The caller drops the ones the tokenizer parsed as real substitutions.
@@ -3301,10 +3297,11 @@ function indirectEvaluationHazard(code) {
       matchStarts(LIVE_EXPANSION, code).some((i) => inert[i] === 0));
   const REFUSED =
     "a quoted substitution in a block that also evaluates a value as code or arithmetic";
+  let openBrackets = null; // built on the first literal only
   for (const q of quotes) {
     const hits = literals[q.quote];
     if (!hits || !anyIn(hits, q.start + q.quote.length, q.end - 2)) continue;
-    if (inSubscriptWord(code, q.start))
+    if ((openBrackets ??= unclosedBracketMap(code))[q.start] === 1)
       return "a quoted substitution used as a subscript, which bash evaluates as arithmetic";
     if (blockEvaluates()) return REFUSED;
   }

@@ -24,8 +24,9 @@ All notable changes to this project will be documented in this file. Format foll
   holding such a literal. QA cycle 4 found the literal carried as backslash-escaped text in an
   unquoted word, so the carrier is default-deny as well: any substitution text the tokenizer did not
   parse as real counts. QA gate 6 found a quoted substitution later in a compound-assignment
-  subscript (`a=([0'$(cmd)']=1)`), so the bracket rule is word-scoped instead of looking only at the
-  character before the quote. The differential gains an `indirect` atom set (10 writes
+  subscript (`a=([0'$(cmd)']=1)`), so the bracket rule no longer looks only at the character before
+  the quote, and gate 7 found a paren inside the subscript (`a=([0+(1)'$(cmd)']=1)`) hiding the
+  bracket from a same-word scan, so brackets are now counted by depth over the command segment. The differential gains an `indirect` atom set (10 writes
   on the previous engine, 0 now) and the docs scan finds two blocks newly refused and none newly
   runnable. Known unseen shapes: a value laundered through a command's output, a `[` or `$`
   that itself arrives by expansion, and a literal split across adjacent quote tokens

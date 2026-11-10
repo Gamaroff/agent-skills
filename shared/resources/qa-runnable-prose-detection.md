@@ -273,9 +273,11 @@ reproduce under real bash, and a block holding one is `mutating` with a reason t
 - **A subscript built by expansion, and a quoted substitution used as a subscript** (QA cycle 1). An
   assignment whose value holds an expansion inside `name[…]` (`x="a[$y$z]"`, `x="a[${d}(cmd)]"`) is
   refused, because the text that `$((x))`, `read "$x"`, `test -v "$x"` or `[[ $x -eq 1 ]]` later
-  evaluates is not in the block. A quoted literal substitution anywhere in the same word after a `[`
-  (`${a['$(cmd)']}`, `a['$(cmd)']=1`, and, since QA gate 6, `a=([0'$(cmd)']=1)`, where the quote
-  follows the `0` and the `[` follows a `(`) is refused too. A `[` that follows a `(` or has no expansion
+  evaluates is not in the block. A quoted literal substitution inside a `[` that is still open in
+  the same command segment (`${a['$(cmd)']}`, `a['$(cmd)']=1`, and, since QA gates 6 and 7,
+  `a=([0'$(cmd)']=1)` and `a=([0+(1)'$(cmd)']=1)`) is refused too. Brackets are counted by depth
+  over the segment; a character-before-the-quote test and then a same-word scan each lost to one
+  more spelling, the second to a paren inside the subscript. A `[` that follows a `(` or has no expansion
   inside it (a `sed` pattern such as `([0-9]+)`) is not a subscript, which is why the shipped helpers
   that count with `n=$(sed …); $((n + 1))` stay runnable.
 
