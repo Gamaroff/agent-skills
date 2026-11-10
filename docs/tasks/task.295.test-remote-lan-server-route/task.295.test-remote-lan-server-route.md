@@ -5,13 +5,14 @@ type: task
 description: "Add `npm run test:remote`: sync the working tree to the shared LAN server (.249), run the root test scripts there in a container that mirrors test.yml, and exit with their status, so the overheating laptop only syncs files and prints output."
 tags: [infrastructure, testing, developer-tooling, remote-test]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-11-10
 updated: 2026-11-10
 estimated_effort_hours: 16
 github_issue: 871
 pr_number: 872
+completed_date: 2026-11-10
 ---
 
 # Technical Task: Run the test suite on the LAN server (test:remote)
@@ -240,27 +241,27 @@ None.
 
 Criteria 1, 2 and 5 need the real server, which CI cannot reach, so they are held by a committed record, not a per-PR test: the QA report's "Acceptance runs" section carries each command, its exit status and the relevant output lines. Criteria 3 and 4 are held by the offline guard test (Phase 4).
 
-- [ ] `npm run test:remote` on a clean tree runs `ci:fast` on .249 and exits 0. While it runs, the laptop's `ps` shows no `node --test` or `test.sh` process, only `ssh` and `rsync`. Evidence: QA report, "Acceptance runs".
-- [ ] **A red run is red.** With one assertion broken on a scratch commit, `npm run test:remote` exits non-zero with the failure in its output. The scratch commit is then reverted. Evidence: QA report, "Acceptance runs".
-- [ ] `npm run test:remote -- --run 'x;y'` exits 2 before any `ssh` (held by the offline guard test).
-- [ ] With `TEST_REMOTE_HOST=nobody@192.0.2.1` it exits non-zero, names `TEST_LOCAL=1`, and does not run locally (held by the offline guard test).
-- [ ] The zsh and awk variants run on the server: the output carries no "skipping: zsh missing" or awk-variant skip notice. Evidence: QA report, "Acceptance runs".
+- [x] `npm run test:remote` on a clean tree runs `ci:fast` on .249 and exits 0. While it runs, the laptop's `ps` shows no `node --test` or `test.sh` process, only `ssh` and `rsync`. Evidence: QA report, "Acceptance runs".
+- [x] **A red run is red.** With one assertion broken on a scratch commit, `npm run test:remote` exits non-zero with the failure in its output. The scratch commit is then reverted. Evidence: QA report, "Acceptance runs".
+- [x] `npm run test:remote -- --run 'x;y'` exits 2 before any `ssh` (held by the offline guard test).
+- [x] With `TEST_REMOTE_HOST=nobody@192.0.2.1` it exits non-zero, names `TEST_LOCAL=1`, and does not run locally (held by the offline guard test).
+- [x] The zsh and awk variants run on the server: the output carries no "skipping: zsh missing" or awk-variant skip notice. Evidence: QA report, "Acceptance runs".
 
 ### Performance
 
-- [ ] `uptime` on the laptop and on .249 is recorded before and after the acceptance run, in the QA report (committed by acceptance; never only the implementation report).
-- [ ] The route runs at a low CPU weight (`--cpu-shares 128`), verified by `docker inspect` on a live run.
+- [x] `uptime` on the laptop and on .249 is recorded before and after the acceptance run, in the QA report (committed by acceptance; never only the implementation report).
+- [x] The route runs at a low CPU weight (`--cpu-shares 128`), verified by `docker inspect` on a live run.
 
 ### Code Quality
 
-- [ ] Every file the task adds passes `npm run lint:shell` and `npm run format:check`; the offline guard passes under `CI=true`.
-- [ ] `npm run ci:fast` is green on the final tree.
-- [ ] `shellcheck` is clean on the new scripts, run through `lint:shell`.
+- [x] Every file the task adds passes `npm run lint:shell` and `npm run format:check`; the offline guard passes under `CI=true`.
+- [x] `npm run ci:fast` is green on the final tree.
+- [x] `shellcheck` is clean on the new scripts, run through `lint:shell`.
 
 ### Migration
 
-- [ ] The contributor doc exists and `AGENTS.md` carries the one line (subject to the owner's Phase 0 answer).
-- [ ] No existing script's behaviour changed (`git diff` of `package.json` shows one added line).
+- [x] The contributor doc exists and `AGENTS.md` carries the one line (subject to the owner's Phase 0 answer).
+- [x] No existing script's behaviour changed (`git diff` of `package.json` shows one added line).
 
 ---
 
@@ -345,11 +346,34 @@ This task does not use sign-off (`sign-off.enabled` is not `true` in `skills-con
 ### Key Findings
 No code defect is open. The guard's documented window is wrong (a few seconds, where it is minutes) and a comment points at the wrong Future Improvements item (T295-QA-10).
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.295.qa.5.test-remote-lan-server-route.md`
+**Gate File**: `task.295.gate.5.test-remote-lan-server-route.yml`
+**Gate Status**: CONCERNS, 85/100 (no high item open; the loop spent its five gates, then the Step 5c PR review found no open coverage finding)
+
+All Definition of Done criteria were verified:
+
+✅ **Acceptance Criteria:** 12 of 12 met. The server-only ones are held by the acceptance runs recorded in the QA report (green exit 0 with 8365 tests and 0 fail on the final tree; a deliberate red run exits 1)
+✅ **Tests and CI:** the offline guard passes (19 tests); CI reading 1 SUCCESS, tree-equivalent to `13486822`
+✅ **Documentation:** contributor guide, index entry, `AGENTS.md` section and a CHANGELOG entry citing task 295
+✅ **Security Review:** PASS; the `--run` and `--host` validators were probed (34 candidates, 0 reproduced)
+✅ **Compliance Review:** not applicable (developer tooling)
+
+**Deviation:** the first full `ci:fast` run on the final tree came during `/finalise` and found a hardcoded spawn timeout in the guard test; it was fixed in `13486822` and verified inline, not by a further QA cycle.
+
+**Detailed Verification Log:** See `task.295.dod.1.test-remote-lan-server-route.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-10
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-10 | 1.0     | Initial draft | create-task |
 | 2026-11-10 | 1.1     | Review passed (8/10): rsync plan fixed (`--files-from` leaves stale files), evidence location named for server-only criteria, script-before-docs order | review-task |
 | 2026-11-10 |         | Status → ready-for-development | review-task |
@@ -368,6 +392,7 @@ No code defect is open. The guard's documented window is wrong (a few seconds, w
 | 2026-11-10 |         | QA findings fixed after gate 4 (1 finding, 4 fix cycles in all); ready for re-gate | qa-fix |
 | 2026-11-10 |         | QA gate CONCERNS (85/100) — 1 finding | qa-task |
 | 2026-11-10 |         | QA finding fixed after gate 5 (wording, 5 fix cycles in all); the PR review reads it | qa-fix |
+| 2026-11-10 | 1.3 | DoD passed — accepted (PR #872) | finalise |
 <!-- change-log-end -->
 
 ---
