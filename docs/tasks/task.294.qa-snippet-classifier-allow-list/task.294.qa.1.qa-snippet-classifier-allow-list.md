@@ -156,15 +156,27 @@ The five `dev-only` proofs, copied from the implementation report's Decisions Lo
 - Helper rule and start-up rule swapped in order → the Phase 5 helper-call test red.
 - `mapfile` added to the command table → the six-word unrecognised-command test red.
 
-**Documentation blocks newly refused** (docs scan, 256 runnable before, 251 now, 0 newly runnable). The scan reports each file and line with `runnable` before and `mutating` now; it does not print the reason, which the classifier gives per block as `not-allow-listed: <class>`:
+**Documentation blocks newly refused** (docs scan, 256 runnable before, 251 now, 0 newly runnable). The scan prints each file and line with `runnable` before and `mutating` now. The reason column below was read from `classifyBlock` on each block at finalise (2026-11-10), because the scan does not print it:
 
-| File | Line |
-| --- | --- |
-| `docs/tasks/task.148.structural-move-before-prose-patch/task.148.bug.1.population-misses-hand-authored-references.md` | 17 |
-| `docs/tasks/task.185.review-pr-eval-suite/task.185.plan.review-pr-eval-suite.md` | 28 |
-| `docs/tasks/task.193.scripts-reach-only-skills-that-run-them/task.193.plan.scripts-reach-only-skills-that-run-them.md` | 45 |
-| `docs/tasks/task.36.setup-consumer-statusmap-fix/task.36.plan.setup-consumer-statusmap-fix.md` | 34 |
-| `docs/tasks/task.92.shellcheck-ci-lane/task.92.plan.shellcheck-ci-lane.md` | 47 |
+| File | Line | Reason |
+| --- | --- | --- |
+| `docs/tasks/task.148.structural-move-before-prose-patch/task.148.bug.1.population-misses-hand-authored-references.md` | 17 | `not-allow-listed: arithmetic expansion with a name or an expansion` (`n=$((n+1))`) |
+| `docs/tasks/task.185.review-pr-eval-suite/task.185.plan.review-pr-eval-suite.md` | 28 | `not-allow-listed: arithmetic expansion with a name or an expansion` |
+| `docs/tasks/task.193.scripts-reach-only-skills-that-run-them/task.193.plan.scripts-reach-only-skills-that-run-them.md` | 45 | `not-allow-listed: expansion form ${` (`${d#skills/}`) |
+| `docs/tasks/task.36.setup-consumer-statusmap-fix/task.36.plan.setup-consumer-statusmap-fix.md` | 34 | `not-allow-listed: ANSI-C or locale quote` (`$'…'`) |
+| `docs/tasks/task.92.shellcheck-ci-lane/task.92.plan.shellcheck-ci-lane.md` | 47 | `not-allow-listed: expansion form ${` (`${#FILES[@]}`) |
+
+**Docs-scan timing, re-measured at finalise with `uptime` beside each run** (`scripts/qa-snippets-docscan.mjs --time`, base `develop` against the working tree, load averages 1m/5m/15m read immediately before each run):
+
+| Run | Load (1m, 5m, 15m) | develop (ms) | now (ms) |
+| --- | --- | --- | --- |
+| 1 | 1.29, 1.76, 2.13 | 394 | 376 |
+| 2 | 1.29, 1.76, 2.13 | 422 | 411 |
+| 3 | 1.29, 1.76, 2.13 | 404 | 383 |
+| 4 | 1.29, 1.76, 2.13 | 408 | 393 |
+| 5 | 1.29, 1.76, 2.13 | 427 | 471 |
+
+Median develop 408 ms, now 393 ms: within +10% (the run-5 outlier is the only one above its base). The five QA-cycle runs above (1102 ms now against 1160 ms base) were taken under higher load; both sets agree on the verdict.
 
 ---
 
