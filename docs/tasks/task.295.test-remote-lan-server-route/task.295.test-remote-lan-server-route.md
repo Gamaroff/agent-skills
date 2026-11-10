@@ -136,7 +136,7 @@ None. The change adds one script and files beside it. No existing script, test o
 - [ ] Re-measure the server's tools and load (`ssh ci@192.168.1.249` toolchain probe, `uptime`, `docker ps`) and the laptop's `uptime`.
 - [ ] Confirm npm 9.2.0 against this `package-lock.json` (`lockfileVersion`) before deciding whether the host or the container installs dependencies.
 - [ ] Read the `eval:all` scenarios and drivers for network or credential needs (the default driver is replay; `evals/shared/drivers/claude-sdk.mjs` and `evals/shared/lib/gh-sandbox.mjs` read the environment). Record the verdict for the default-target decision.
-- [ ] Record the owner's three answers (container or host, `ci:fast` or `ci`, whether agents are required to use the route) in this document's Notes. Ask when unrecorded; never assume.
+- [x] The owner's three answers are recorded in Notes › Owner Decisions (container, `ci:fast`, agents required to use the route). Nothing to ask.
 
 ### Phase 1: Runner skeleton, argument grammar and exit codes
 
@@ -179,7 +179,7 @@ None. The change adds one script and files beside it. No existing script, test o
 **Risk**: Low. **Dependencies**: Phase 4.
 
 - [ ] A contributor doc under `docs/contributing/` (usage, host rules, troubleshooting), linked from `docs/contributing/README.md`.
-- [ ] One `AGENTS.md` line: test runs go to `test:remote` when .249 is up, `TEST_LOCAL=1` otherwise (conditional on the owner's answer in Phase 0).
+- [ ] One `AGENTS.md` line: test runs go to `test:remote` when .249 is up, `TEST_LOCAL=1` otherwise (owner decision 3).
 - [ ] Optional, only if cheap: `--auto` probes the server and falls back to local, for scripted callers. The plain form still fails loudly.
 
 ---
@@ -387,11 +387,11 @@ This task does not use sign-off (`sign-off.enabled` is not `true` in `skills-con
 
 None yet.
 
-### Open Questions for the Owner
+### Owner Decisions (2026-11-10)
 
-1. Container (recommended) or a host install of zsh and shellcheck?
-2. Default remote target `ci:fast` (recommended) or the full `ci`?
-3. Must agents in this repository use `test:remote` when the server is up, as tinker-city requires?
+1. **Container**, not a host install of zsh and shellcheck.
+2. **Default target is `ci:fast`.** `eval:all` stays reachable through `--run eval:all`, and Phase 0 still checks it for network or credential needs.
+3. **Agents must use `test:remote` when .249 is up**, and `TEST_LOCAL=1` only when it is down. Phase 5 adds the `AGENTS.md` line unconditionally.
 
 ### Future Improvements
 
