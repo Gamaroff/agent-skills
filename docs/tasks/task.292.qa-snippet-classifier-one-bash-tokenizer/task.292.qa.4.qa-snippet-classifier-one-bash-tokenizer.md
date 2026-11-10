@@ -58,3 +58,43 @@ No new finding. Suite 379/379 under `CI=true`. The security probe plan is re-run
 - [x] Mutation proofs recorded with red tests named (criterion 10)
 - [x] Consumer-count test (criterion 7)
 - [x] Timings on the head with load (criteria 5, 6)
+
+---
+
+## Gate 4 review (`/qa-task`, head `e32c06c3`)
+
+**Gate:** [task.292.gate.4.qa-snippet-classifier-one-bash-tokenizer.yml](./task.292.gate.4.qa-snippet-classifier-one-bash-tokenizer.yml) — CONCERNS, 90/100.
+
+### Review Methodology
+
+Direct tools. Diff review: code review, scoped to files changed since gate 3 (head `7ec74b57`): `shared/resources/tests/qa-execute-snippets.test.mjs` only. Re-review scope: files changed since gate 3 (head `7ec74b57`; 1 code file) — default. Step 4b: not applicable (no runnable prose in the change set). CI_SUMMARY: CI on e32c06c3d691: pending (read once, not waited on).
+
+### Re-Review Context
+
+| Previous item | Status |
+| --- | --- |
+| Gate 3 `top_issues` | none |
+| DoD 1 gaps #5, #6, #7, #10 | closed in this report above (timings, consumer-count test, mutation proofs) |
+| T292-CR-1..3 | unchanged, pre-existing, in `recommendations.future` |
+
+### New Findings This Cycle
+
+- **[medium]** task document, criterion 10: reworded after review (`(QA 4)` appended) with no approver; `criteria-drift.js` reports `reworded`, `approved: false`. The bound is unchanged. Owner approves or restores the text (T292-QA4-1).
+
+Searched: engine byte-identical to `7ec74b57` (`cmp` clean), so the engine and its security surface were not re-read; the test diff (75 lines) was read in full.
+
+### Evidence
+
+- `CI=true node --test shared/resources/tests/qa-execute-snippets.test.mjs`: 379 pass, 0 fail.
+- `security-probe.mjs --sink shell-exec --entry 'shared/resources/qa-execute-snippets.mjs#isRunnableBlock'`: 31 executed, 0 reproduced, 0 escaped, verdict `engages` (`task.292.qa.4.security.run.json`).
+- mutation-proven: the `classifyInternal` blank normalisation line deleted → six `classifyInternal normalises blanks` rows red → covered.
+- mutation-proven: an unused function calling `tokenize(` added → `task.292 the tokenizer's consumers are counted, and each scan still reads it` red → covered. A first attempt (a top-level `void tokenize("")`) broke module loading and was discarded as `mutation-void`.
+- After each mutation the engine was restored from a snapshot; `cmp` clean, `git diff` clean.
+
+### Code Review
+
+Correctness bugs (0). Cleanups (0). The blank rows assert behaviour (`classifyBlock(...).klass`). The consumer-count test reads source text by design (it counts call sites) and is paired with those behavioural rows.
+
+### NFR
+
+Security CONCERNS (known holes unchanged, pre-existing); Performance, Reliability, Maintainability PASS.
