@@ -5,17 +5,19 @@ type: task
 description: "Replace the snippet classifier's separate regex re-implementations of bash's blank, quote, escape and line-join rules with one tokenizer every scan reads, refusing what it cannot read, and close the open T290-QA-3 write gap."
 tags: [qa-task, security, follow-up-290]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: High
 created: 2026-11-10
 updated: 2026-11-10
+completed_date: 2026-11-10
 estimated_effort_hours: 16
 github_issue: 868
+pr_number: 869
 ---
 
 # Task 292: One bash tokenizer for the QA snippet classifier
 
-**Status:** Ready for Review
+**Status:** Accepted
 **GitHub Issue**: [#868](https://github.com/Gamaroff/agent-skills/issues/868)
 
 ---
@@ -316,7 +318,7 @@ The engine is unchanged since gate 3; only tests changed. The blank-normalisatio
 
 **Estimated Effort:** Medium (3-4 hours)
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified (run 2, historical, superseded by run 3 below)
 
 **Status:** IN PROGRESS (`ready-for-review`; not accepted)
 
@@ -333,6 +335,24 @@ The engine is unchanged since gate 3; only tests changed. The blank-normalisatio
 - [ ] Re-run `/finalise`; the scope will re-judge only #5, #6 and the CI-state criterion.
 
 **Estimated Effort:** Small (under 30 minutes)
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report Summary:** `task.292.qa.4…md`; gate `task.292.gate.4…yml`, CONCERNS, 90/100 (not blocking; the one medium finding is closed).
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 13 of 13 (run 3 re-judged #5, #6, #10 and #11; the other nine are carried from run 2)
+✅ **Tests & PR:** PR #869, 379 tests in `shared/resources/tests/qa-execute-snippets.test.mjs`; CI green on `d4609df33c53` (6 of 6)
+✅ **Documentation:** `CHANGELOG.md:9` cites (task 292); `qa-runnable-prose-detection.md` and its copies updated
+✅ **Security Review:** boundary probe 31 executed, 0 reproduced, 0 escaped (`task.292.dod.3.security.run.json`); T292-CR-1..3 stay open as pre-existing follow-ups
+✅ **Compliance Review:** not applicable (internal QA tooling)
+
+**Detailed Verification Log:** See `task.292.dod.3.qa-snippet-classifier-one-bash-tokenizer.md` for complete verification evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-11-10
 
 <!-- change-log-start -->
 ## Change Log
@@ -351,6 +371,7 @@ The engine is unchanged since gate 3; only tests changed. The blank-normalisatio
 | 2026-11-10 |  | DoD incomplete — 4 gaps identified (criteria 5, 6, 7, 10) | finalise |
 | 2026-11-10 |  | QA gate CONCERNS (90/100) — 1 medium finding (criterion 10 reworded, unapproved), 3 pre-existing follow-ups | qa-task |
 | 2026-11-10 |  | DoD incomplete — 2 gaps identified (criteria 5, 6) | finalise |
+| 2026-11-10 | 1.2 | DoD passed — accepted (PR #869) | finalise |
 <!-- change-log-end -->
 
 ---
