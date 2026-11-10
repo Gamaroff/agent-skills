@@ -221,12 +221,12 @@ Documentation:
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-10
-**Quality Score**: 80/100
+**Quality Score**: 85/100
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.293.qa.5.qa-snippet-classifier-indirect-evaluation.md](./task.293.qa.5.qa-snippet-classifier-indirect-evaluation.md)
-- **Gate File**: [task.293.gate.5.qa-snippet-classifier-indirect-evaluation.yml](./task.293.gate.5.qa-snippet-classifier-indirect-evaluation.yml)
+- **Full Report**: [task.293.qa.6.qa-snippet-classifier-indirect-evaluation.md](./task.293.qa.6.qa-snippet-classifier-indirect-evaluation.md)
+- **Gate File**: [task.293.gate.6.qa-snippet-classifier-indirect-evaluation.yml](./task.293.gate.6.qa-snippet-classifier-indirect-evaluation.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 383 in the suite file; `ci:fast` 8346, 0 fail at the cycle-4 fix commit
@@ -235,7 +235,7 @@ Documentation:
 - **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-The last permitted gate. A substitution literal split across adjacent quote tokens has no substitution text in the source and reaches evaluation through `read`, `printf -v` or a here-string. Reproduced under real bash. The QA budget is spent; the owner decides between a waiver and narrowing the task.
+Gate 6 (one owner-granted extra cycle). One in-scope route: a quoted substitution inside an indexed-array compound-assignment subscript (`a=([0'$(cmd)']=1)`). Reproduced under real bash. The three documented residuals were excluded from scope.
 
 ## Change Log
 
@@ -255,6 +255,7 @@ The last permitted gate. A substitution literal split across adjacent quote toke
 | 2026-11-10 |  | QA gate FAIL (80/100) — 1 high finding | qa-task |
 | 2026-11-10 |  | QA finding fixed — 1 high closed by making the literal carrier default-deny, 4 iterations | qa-fix |
 | 2026-11-10 |  | QA gate FAIL (80/100) — 1 high finding; QA budget spent | qa-task |
+| 2026-11-10 |  | QA gate FAIL (85/100) — 1 high finding on the owner-granted extra cycle | qa-task |
 <!-- change-log-end -->
 
 ## References
