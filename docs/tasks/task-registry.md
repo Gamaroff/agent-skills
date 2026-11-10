@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-11-10
-**Next Available Task Number:** **297**
+**Next Available Task Number:** **301**
 
 ## How to use
 
@@ -411,3 +411,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 294 | [QA snippet classifier allow-list](task.294.qa-snippet-classifier-allow-list/task.294.qa-snippet-classifier-allow-list.md) | planned | refactoring | Medium | 2026-11-10 | task.293 | task 293 follow-up: run a block only when every word is a known-safe literal, closing the three documented residuals (printf octal launder, a [ or $ arriving by expansion, a literal split across quote tokens); folds in the two gate-9 test cleanups |
 | 295 | [Run the test suite on the LAN server (test:remote)](task.295.test-remote-lan-server-route/task.295.test-remote-lan-server-route.md) | accepted | infrastructure | Medium | 2026-11-10 | — | — handoff from a tinker-city session: `npm run test:remote` syncs the tree to the .249 LAN server, runs the root scripts there in a CI-parity container, exits with their status; the overheating laptop only syncs and prints · six phases |
 | 296 | [test:remote per-run lock and image-tag prune](task.296.test-remote-per-run-lock-and-image-prune/task.296.test-remote-per-run-lock-and-image-prune.md) | planned | infrastructure | Low | 2026-11-10 | task.295 | follow-up to task 295: an atomic per-run lock replaces the best-effort container-name guard, and `--prune-images` removes old `agent-skills-test` tags · four phases |
+| 297 | [QA loop fast gate and an earlier structural move](task.297.qa-loop-fast-gate-and-earlier-structural-move/task.297.qa-loop-fast-gate-and-earlier-structural-move.md) | planned | refactoring | Medium | 2026-11-10 | — | cut from observations #161, #162: find why task.295 never ran the fast gate after a fix, and make the structural-move offer fire at the second repeat · independent of tasks 298 to 300 · four phases |
+| 298 | [review-task runs a plan's command and checks CI parity](task.298.review-task-runs-plan-command-and-ci-parity/task.298.review-task-runs-plan-command-and-ci-parity.md) | planned | refactoring | Low | 2026-11-10 | — | cut from observation #163 · independent of tasks 297, 299, 300 · three phases |
+| 299 | [Orchestration reads status and time from the instrument](task.299.orchestration-status-and-timestamp-from-the-instrument/task.299.orchestration-status-and-timestamp-from-the-instrument.md) | planned | refactoring | Low | 2026-11-10 | — | cut from observation #164 · independent of tasks 297, 298, 300 · three phases |
+| 300 | [security-probe names the sink it observes](task.300.security-probe-names-the-sink-it-observes/task.300.security-probe-names-the-sink-it-observes.md) | planned | refactoring | Low | 2026-11-10 | — | cut from observation #165 · independent of tasks 297 to 299 · four phases |
