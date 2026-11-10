@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-11-10
-**Next Available Task Number:** **301**
+**Next Available Task Number:** **304**
 
 ## How to use
 
@@ -415,3 +415,6 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 298 | [review-task runs a plan's command and checks CI parity](task.298.review-task-runs-plan-command-and-ci-parity/task.298.review-task-runs-plan-command-and-ci-parity.md) | planned | refactoring | Low | 2026-11-10 | — | cut from observation #163 · independent of tasks 297, 299, 300 · three phases |
 | 299 | [Orchestration reads status and time from the instrument](task.299.orchestration-status-and-timestamp-from-the-instrument/task.299.orchestration-status-and-timestamp-from-the-instrument.md) | planned | refactoring | Low | 2026-11-10 | — | cut from observation #164 · independent of tasks 297, 298, 300 · three phases |
 | 300 | [security-probe names the sink it observes](task.300.security-probe-names-the-sink-it-observes/task.300.security-probe-names-the-sink-it-observes.md) | planned | refactoring | Low | 2026-11-10 | — | cut from observation #165 · independent of tasks 297 to 299 · four phases |
+| 301 | [PreCompact pause comment names the cycle and the pause count](task.301.precompact-pause-comment-names-cycle-and-count/task.301.precompact-pause-comment-names-cycle-and-count.md) | planned | refactoring | Medium | 2026-11-10 | — | follow-up to PR #873: cycle and `pause N` in the step-scoped comment, the Step 1 paused-lock tests, a test for the stateful gh fixture counter · four phases |
+| 302 | [test:remote from a linked worktree](task.302.test-remote-from-a-linked-worktree/task.302.test-remote-from-a-linked-worktree.md) | planned | infrastructure | Low | 2026-11-10 | — | follow-up to task 295: `.git` is a file in a linked worktree and `npm ci`'s prepare hook exits 128 on the server · three phases |
+| 303 | [Pause commits restart CI and block the docs-only shortcut](task.303.pause-commits-restart-ci-and-block-docs-only-shortcut/task.303.pause-commits-restart-ci-and-block-docs-only-shortcut.md) | planned | refactoring | Medium | 2026-11-10 | — | each pipeline pause commit cancels the previous head's CI run, which reads red and forces a full-CI wait at step 8 · three phases |
