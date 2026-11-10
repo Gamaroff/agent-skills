@@ -24,7 +24,12 @@ Cut from observation #165.
 
 The `/finalise` probe plan for task.295 covered a command-line flag boundary (the `--run` and `--host` validators feeding a remote shell command) and reported 34 candidates, 0 reproduced. The runner decides "reproduced" by an observable sink; for a flag value that never reaches a sink it can observe, a clean score proves less than it reads as. This task makes the report say which sink the result could see.
 
-**Unverified:** the observation was written from a session summary. Phase 1 confirms by reading the runner.
+**Premise check (2026-11-10, read `security-probe.mjs`):** the observation's mechanism was **wrong**, and the real gap is narrower.
+
+- **Wrong:** "a flag value that never reaches a file sink cannot show as reproduced." For a validator, `computeVerdict` (`security-probe.mjs:1485-1500`) counts a hostile case as reproduced when the entry **accepts** it (`outcome === "accepted"`), whatever it later does. A refusal boundary such as the `--run` and `--host` validators is observed exactly as it should be: refused or accepted. For that boundary, "0 reproduced" is a true statement about the validator.
+- **Right, and narrower:** what an accepted value does afterwards is not observed. The runner watches writes inside its sandbox, and states in a code comment that a write to an absolute path outside it "is not observed — a stated limit (TASK-180-016)" (`security-probe.mjs:271`). That limit lives in a source comment only. `skills/finalise/SKILL.md` § Probe Results (`:1103`) does not carry it into the DoD, so a reader of "34 candidates, 0 reproduced" does not see it. **Task.295's result was a true claim about refusal; it was not a claim about what the remote shell would do with an accepted value.**
+
+**Re-scoped:** surface the stated limits (the out-of-sandbox write, and "effects after an accepted value are not observed") on the Probe Results line. Whether a per-entry "sink" field is still wanted is a decision for Phase 1, not a premise.
 
 ## 2. Motivation
 
@@ -50,7 +55,7 @@ A new field in the probe run record. Consumers that read the record must tolerat
 
 ### Phase 1: Confirm — Risk: Low
 
-- [ ] Read the three scripts; record in the QA report how "reproduced" is decided and which sinks exist. If the premise is false, close the task and the observation with that finding.
+- [ ] The premise check above is done. Phase 1 decides the shape: list every limit the runner's comments state (grep `stated limit` and `is not observed` in `security-probe.mjs`), and choose between a fixed "limits" line on the Probe Results and a per-entry field. Record the choice and its reason in the QA report.
 
 ### Phase 2: Record the sink — Risk: Medium
 

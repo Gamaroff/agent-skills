@@ -28,7 +28,11 @@ On task.295 the QA loop gated five times, and the first full `ci:fast` run on th
 
 ## 2. Motivation
 
-- **The loop already has a fast gate.** `shared/resources/develop-pipeline-step-5-6-qa-loop.md:1263` runs `develop.fastGateCommand` (suggested value `npm run ci:fast`) each qa-fix cycle, and `docs/reference/configuration.md:101` marks the key REQUIRED. This repository's own `skills-config.yaml` carries no such key (grep returned nothing), so the gate may have been skipped as unconfigured on task.295. **(unverified)** — Phase 1 settles it.
+- **The loop already has a fast gate.** `shared/resources/develop-pipeline-step-5-6-qa-loop.md:1263` runs `develop.fastGateCommand` (suggested value `npm run ci:fast`) each qa-fix cycle, and `docs/reference/configuration.md:101` marks the key REQUIRED. This repository's own `skills-config.yaml` carries no such key (grep returned nothing), so the gate may have been skipped as unconfigured on task.295. **Premise check (2026-11-10):**
+
+- **Confirmed:** `skills-config.yaml` has no `develop:` block and no `fastGateCommand` (grep). The loop's step 0a (`develop-pipeline-step-5-6-qa-loop.md:1228`) runs the placeholder `<fastGateCommand>`; the develop loop's extraction treats an unset key as "skipped, never fail" (`develop-pipeline-step-3-develop-loop.md:283-286`), and the doc says so deliberately.
+- **Unknown, and recorded nowhere:** whether step 0a ran in task.295's five cycles. The implementation report and QA reports contain no fast-gate line for any cycle. A full run did happen earlier (implementation report: run 6, 8353 tests, green) but before fix 1, which is what introduced the failing literal.
+- **So:** the fix is not "add a gate", it exists. It is that an unset key skips the gate with no trace, which is exactly the case in this repo.
 - **The structural-move offer already exists** at `skills/qa-fix/SKILL.md:636-658`, with a trigger "(b) a repeat subject" that is the author's judgement. On task.295 the offer fired late. **(unverified)** whether it fired and was declined, or did not fire.
 
 ## 3. Technical Background
@@ -56,7 +60,7 @@ None expected. If the fix makes an unset `develop.fastGateCommand` a HALT, a con
 ### Phase 1: Diagnose — Risk: Low
 
 - [ ] Read task.295's implementation report and QA reports to see whether the fast gate ran each cycle and whether the offer fired.
-- [ ] Check this repository's `skills-config.yaml` for the key and record the answer.
+- [ ] The key check is done (unset in this repo). Remaining: whether the structural-move offer fired before cycle 3 of task.295, and why no cycle records a gate run. Also decide whether this repository should set `develop.fastGateCommand: npm run ci:fast` in `skills-config.yaml`, which may be the whole fix for the gate half.
 
 ### Phase 2: Fix the gate — Risk: Medium
 
