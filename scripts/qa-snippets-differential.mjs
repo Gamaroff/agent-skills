@@ -125,6 +125,77 @@ export const ATOM_SETS = {
     "#",
     " ",
   ],
+  // Indirect evaluation (task 293): a value built harmlessly and evaluated by a later feature. The
+  // block carries its own writer inside a literal (BARE_SETS), so the only way it writes is bash
+  // evaluating that literal: as a prompt (`PS4`, `${x@P}`) or as an arithmetic subscript. The
+  // state the evaluators need (`a=(1)`, `y=abcdef`) is an atom, so the generator can form it.
+  indirect: [
+    "x='a[$(touch out)]'",
+    "x='$(touch out)'",
+    'x="a[\\$(touch out)]"',
+    "PS4='$(touch out)'",
+    "PS4=$x",
+    "set -x",
+    "a=(1)",
+    "y=abcdef",
+    "echo $((x))",
+    "echo ${x@P}",
+    "echo ${!x}",
+    "echo ${y:0:$x}",
+    "[[ $x -eq 1 ]]",
+    'unset "$x"',
+    'unset -v "$x"',
+    'read -r "$x" <<< 1',
+    'test -v "$x"',
+    "printf -v 'a[$(touch out)]' x",
+    "[[ -v 'a[$(touch out)]' ]]",
+    // QA cycle 1 (T293-QA-1, T293-QA-2): a value assembled by expansion; a quoted substitution as a
+    // subscript inside a parameter expansion.
+    "y='$'",
+    "z='(touch out)'",
+    'x="a[$y$z]"',
+    "d='$'",
+    'x="a[${d}(touch out)]"',
+    "echo ${a['$(touch out)']}",
+    // Whole shapes as one atom each, so a short random block can form them (the calibration run
+    // against the cycle-1 engine found no write without these).
+    "y='$'; z='(touch out)'; x=\"a[$y$z]\"",
+    "a=(1); echo ${a['$(touch out)']}",
+    // QA cycle 2 (T293-QA-3, T293-QA-4): a joined word, and a literal piped into a read.
+    "x=a'[$(touch out)]'",
+    "echo 'a[$(touch out)]' | { read x; echo $((x)); }",
+    "cat <<'EOF' | { read x; echo $((x)); }\na[$(touch out)]\nEOF",
+    // QA cycle 3 (T293-QA-5, T293-QA-6): positional offsets and digit-led subscripts.
+    "set -- 'a[ $(touch out)]'; echo ${@:$1}",
+    "set -- 'a[ $(touch out)]'; v=(1); echo ${v[1+$1]}",
+    "set -- 'a[ $(touch out)]'",
+    "echo ${@:$1}",
+    "v=(1); echo ${v[1+$1]}",
+    // QA gate 8 (T293-QA-11): a separator inside a quoted span of the subscript.
+    "a=([';'0'$(touch out)']=1); echo hi",
+    "a=([\"0;\"'$(touch out)']=1); echo hi",
+    "a=([' & | '0'`touch out`']=1)",
+    // QA gate 7 (T293-QA-10): parens inside the subscript.
+    "a=([0+(1)'$(touch out)']=1); echo hi",
+    "a=([(0)+'$(touch out)']=1); echo hi",
+    "a=([((0))+(1)'`touch out`']=1)",
+    // QA gate 6 (T293-QA-9): a quote later in a compound-assignment subscript word.
+    "a=([0'$(touch out)']=1); echo hi",
+    "a=([0'`touch out`']=1); echo hi",
+    "a=([x'$(touch out)']=1)",
+    // QA cycle 4 (T293-QA-7): the literal as backslash-escaped text in an unquoted word.
+    "[[ a\\[\\$\\(touch\\ out\\)\\] -eq 1 ]]",
+    "printf -v a\\[\\$\\(touch\\ out\\)\\] x",
+    "test -v a\\[\\$\\(touch\\ out\\)\\]",
+    "read a\\[\\$\\(touch\\ out\\)\\] <<< x",
+    "let x",
+    "(( x ))",
+    "true",
+    ";",
+    ";",
+    "\n",
+    "\n",
+  ],
   // Arithmetic, where `<<` is a left shift and not a heredoc opener (task 292, QA cycle 1): the
   // `\nz\n` atom is the line a mis-read heredoc would take for its delimiter.
   arith: [
@@ -182,7 +253,7 @@ export function generateBlocks(atoms, seed, count, bare = false) {
 }
 
 /** Atom sets whose blocks carry no prefix and no appended writer (see generateBlocks). */
-export const BARE_SETS = new Set(["splits"]);
+export const BARE_SETS = new Set(["splits", "indirect"]);
 
 /**
  * Run `bash -c code` in a fresh directory and say whether it left anything there. The directory

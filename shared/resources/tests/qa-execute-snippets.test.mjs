@@ -4695,6 +4695,7 @@ test("task.292 the tokenizer's consumers are counted, and each scan still reads 
     "maskSubstitutions",
     "collapseQuotedSpans",
     "stripProse",
+    "indirectEvaluationHazard", // task.293: reads quote spans to find a literal substitution
   ];
   // Composed consumers: the scan reads the tokenizer through the named direct consumers.
   const COMPOSED = { stripNonCode: ["collapseQuotedSpans", "stripProse"] };
@@ -5094,4 +5095,218 @@ test("task.292 differential slice: the instrument finds a write when the classif
     r.writes > 0,
     "a blind classifier produced no write: the instrument is dead",
   );
+});
+
+// ── task.293 — indirect evaluation ─────────────────────────────────────────────────────────────
+// A value is built or stored harmlessly and a later bash feature evaluates it. Each shape is run
+// under REAL bash first (the marker file proves the hole is real, so a test cannot pass by matching
+// the classifier's own idea of the block), then classified. The table is the claim's bound: a fourth
+// spelling is a failing row here, not a new finding. State a spelling needs is declared in the block
+// (`y=abcdef`, `a=(1)`): without it bash does not evaluate the subscript and nothing reproduces.
+const T293_SHAPES = {
+  "CR-1 printf -v with a quoted subscript": "printf -v 'a[$(touch W)]' x",
+  "CR-1 read into a name holding a subscript":
+    "x='a[$(touch W)]'; read -r \"$x\" <<< 1",
+  "CR-1 test -v on a name holding a subscript":
+    "x='a[$(touch W)]'; test -v \"$x\"",
+  "CR-1 [[ -v ]] with a quoted subscript": "[[ -v 'a[$(touch W)]' ]]",
+  "CR-1 unset of a name holding a subscript":
+    "a=(1); x='a[$(touch W)]'; unset \"$x\"",
+  "CR-1 unset -v of a name holding a subscript":
+    "a=(1); x='a[$(touch W)]'; unset -v \"$x\"",
+  "CR-1 [[ -eq ]] with a quoted subscript": "[[ 'a[$(touch W)]' -eq 1 ]]",
+  "CR-2 PS4 with set -x": "PS4='$(touch W)'; set -x; true",
+  "CR-2 ${x@P}": "x='$(touch W)'; echo ${x@P}",
+  "CR-3 $((x))": "x='a[$(touch W)]'; echo $((x))",
+  "CR-3 [[ $x -eq 1 ]]": "x='a[$(touch W)]'; [[ $x -eq 1 ]]",
+  "CR-3 ${y:0:$x}": "y=abcdef; x='a[$(touch W)]'; echo ${y:0:$x}",
+  "CR-3 ${!x}": "a=(1); x='a[$(touch W)]'; echo ${!x}",
+  // The class, in spellings this document does not name: a different builtin and quoting.
+  "control: let on a double-quoted escaped substitution":
+    'x="a[\\$(touch W)]"; let x',
+  "control: declare then (( ))": "declare y='a[$(touch W)]'; (( y ))",
+  "control: ANSI-C quoted spelling of $(":
+    "x=$'a[\\x24(touch W)]'; echo $((x))",
+  "control: escaped, unquoted assignment":
+    "x=a\\[\\$\\(touch\\ W\\)\\]; echo $((x))",
+  // QA cycle 1 (T293-QA-1, T293-QA-2): the value is assembled by expansion, or the quoted
+  // substitution sits in a subscript inside a parameter expansion.
+  "QA-1 value assembled from two variables":
+    "y='$'; z='(touch W)'; x=\"a[$y$z]\"; echo $((x))",
+  "QA-1 value assembled with ${d} and read by [[ -eq ]]":
+    "d='$'; x=\"a[${d}(touch W)]\"; [[ $x -eq 1 ]]",
+  "QA-1 value assembled from a nested substitution":
+    "x=\"a[$(printf '$')(touch W)]\"; echo $((x))",
+  "QA-1 value assembled, then read by read (found by the random differential)":
+    "y='$'; z='(touch W)'; x=\"a[$y$z]\"; read -r \"$x\" <<< 1",
+  "QA-2 quoted substitution as a subscript in ${a[...]}":
+    "a=(1); echo ${a['$(touch W)']}",
+  // QA cycle 2 (T293-QA-3, T293-QA-4): the literal reaches the evaluation through a joined word or
+  // a pipe, which the character before the quote and the command segment cannot follow.
+  "QA-3 bare word joined to a quoted literal": "x=a'[$(touch W)]'; echo $((x))",
+  "QA-3 double-quoted prefix joined to a quoted literal":
+    "x=\"pre\"'[$(touch W)]'; echo $((x))",
+  "QA-4 literal piped into a later read":
+    "echo 'a[$(touch W)]' | { read x; echo $((x)); }",
+  "QA-4 quoted here-document body read into a variable (found by QA's own probe)":
+    "read x <<'EOF'\na[$(touch W)]\nEOF\necho $((x))",
+  "QA-4 quoted here-document piped into read":
+    "cat <<'EOF' | { read x; echo $((x)); }\na[$(touch W)]\nEOF",
+  // QA cycle 3 (T293-QA-5, T293-QA-6): arithmetic reads the cycle-2 detector did not list.
+  "QA-5 positional offset ${@:$1}": "set -- 'a[ $(touch W)]'; echo ${@:$1}",
+  "QA-5 positional offset ${*:$1}": "set -- 'a[ $(touch W)]'; echo ${*:$1}",
+  "QA-6 subscript beginning with a digit":
+    "set -- 'a[ $(touch W)]'; v=(1); echo ${v[1+$1]}",
+  // QA cycle 4 (T293-QA-7): the literal is backslash-escaped text in an UNQUOTED word.
+  "QA-7 escaped unquoted word in [[ -eq ]]":
+    "[[ a\\[\\$\\(touch\\ W\\)\\] -eq 1 ]]",
+  "QA-7 escaped unquoted word to printf -v":
+    "printf -v a\\[\\$\\(touch\\ W\\)\\] x",
+  "QA-7 escaped unquoted word to test -v": "test -v a\\[\\$\\(touch\\ W\\)\\]",
+  "QA-7 escaped unquoted word to read": "read a\\[\\$\\(touch\\ W\\)\\] <<< x",
+  // QA gate 6 (T293-QA-9): the quote sits later in the subscript word, after a bracket and an open paren.
+  "QA-9 compound array subscript, digit then quote":
+    "a=([0'$(touch W)']=1); echo hi",
+  "QA-9 compound array subscript, backtick": "a=([0'`touch W`']=1); echo hi",
+  "QA-9 compound array subscript, letter": "a=([x'$(touch W)']=1); echo hi",
+  // QA gate 7 (T293-QA-10): a paren inside the subscript hid the bracket from a word scan.
+  "QA-10 paren after the index": "a=([0+(1)'$(touch W)']=1); echo hi",
+  "QA-10 paren before the operator": "a=([(0)+'$(touch W)']=1); echo hi",
+  "QA-10 nested parens": "a=([((0))+(1)'$(touch W)']=1); echo hi",
+  // QA gate 8 (T293-QA-11): a separator inside a quoted span reset the bracket depth.
+  "QA-11 quoted semicolon in the index": "a=([';'0'$(touch W)']=1); echo hi",
+  "QA-11 double-quoted semicolon": `a=(["0;"'$(touch W)']=1); echo hi`,
+  "QA-11 quoted ampersand and pipe": "a=([' & | '0'$(touch W)']=1); echo hi",
+  "QA-4 literal piped into read, evaluated by [[ -eq ]]":
+    "echo 'a[$(touch W)]' | { read x; [[ $x -eq 1 ]]; }",
+};
+
+// Bash's own behaviour, calibrated where it is known to run the marker: the instrument is dead if a
+// shape that must reproduce does not.
+const T293_REPRODUCES = new Set(Object.keys(T293_SHAPES));
+
+test("task.293 every indirect-evaluation shape writes under real bash, and the classifier refuses it", () => {
+  const base = tmp();
+  let reproduced = 0;
+  for (const [name, code] of Object.entries(T293_SHAPES)) {
+    const dir = mkdtempSync(join(base, "s-"));
+    try {
+      spawnSync("bash", ["-c", code.replaceAll("W", "marker")], {
+        cwd: dir,
+        timeout: CLI_BUDGET.timeoutMs,
+      });
+      const wrote = existsSync(join(dir, "marker"));
+      assert.ok(
+        wrote,
+        `${name}: bash did not run the substitution — the shape does not reproduce, drop it from the table or declare the state it needs`,
+      );
+      reproduced += 1;
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+    const v = classifyBlock(code);
+    assert.equal(v.klass, "mutating", `${name}: ${code}`);
+    assert.match(v.reason, /^indirect-evaluation: /, name);
+  }
+  assert.equal(reproduced, T293_REPRODUCES.size, "every row reproduced");
+});
+
+// Each refusal is held on an input where IT ALONE decides. A table whose every row is also caught by
+// the quoted-literal rule would stay green with a prompt-variable refusal deleted (found by the
+// mutation proof: the first PS4 row passed with that term removed).
+const T293_DECIDERS = {
+  "prompt variable: a value read from a file":
+    "read -r v < payload; PS4=$v; set -x; true",
+  "prompt variable: read into it from a file":
+    "read -r PS4 < payload; set -x; true",
+  "prompt-escape transform: a value read from a file":
+    "read -r v < payload; echo ${v@P}",
+  "escaped substitution assigned without a quote":
+    "x=a\\[\\$\\(touch\\ W\\)\\]; echo $((x))",
+  "quoted substitution assigned, no evaluating word":
+    "x='a[$(touch W)]'; echo $((x))",
+  "quoted substitution handed to a builtin, not assigned":
+    "printf -v 'a[$(touch W)]' x",
+  "value built by expansion, read as arithmetic (no quoted substitution)":
+    "y='$'; z='(touch W)'; x=\"a[$y$z]\"; echo $((x))",
+  "quoted substitution as a subscript (no assignment, no builtin)":
+    "a=(1); echo ${a['$(touch W)']}",
+  "joined word, evaluated far from the literal (block rule alone)":
+    "x=a'[$(touch W)]'; echo $((x))",
+  "literal in another pipeline stage than the read (block rule alone)":
+    "echo 'a[$(touch W)]' | { read x; echo $((x)); }",
+  "positional offset: no evaluating word, only a live expansion (default-deny alone)":
+    "set -- 'a[ $(touch W)]'; echo ${@:$1}",
+  "digit-led subscript: only a live expansion (default-deny alone)":
+    "set -- 'a[ $(touch W)]'; v=(1); echo ${v[1+$1]}",
+  "quote later in a subscript word (bracket-depth rule alone)":
+    "a=([0'$(touch W)']=1); echo hi",
+  "paren inside the subscript (bracket-depth rule alone)":
+    "a=([0+(1)'$(touch W)']=1); echo hi",
+  "quoted separator in the subscript (never-reset depth alone)":
+    "a=([';'0'$(touch W)']=1); echo hi",
+  "escaped unquoted word (carrier default-deny alone)":
+    "[[ a\\[\\$\\(touch\\ W\\)\\] -eq 1 ]]",
+  "here-document body literal (heredoc loop alone)":
+    "cat <<'EOF' | { read x; echo $((x)); }\na[$(touch W)]\nEOF",
+  "literal evaluated through a named subscript, no evaluating word":
+    "x='a[$(touch W)]'; a=(1); echo ${a[x]}",
+};
+
+test("task.293 each refusal is held on an input where it alone decides", () => {
+  const base = tmp();
+  for (const [name, code] of Object.entries(T293_DECIDERS)) {
+    const dir = mkdtempSync(join(base, "d-"));
+    try {
+      writeFileSync(join(dir, "payload"), "$(touch marker)\n");
+      spawnSync("bash", ["-c", code.replaceAll("W", "marker")], {
+        cwd: dir,
+        timeout: CLI_BUDGET.timeoutMs,
+      });
+      assert.ok(
+        existsSync(join(dir, "marker")),
+        `${name}: bash did not run the payload`,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+    assert.equal(classifyBlock(code).klass, "mutating", name);
+    assert.match(classifyBlock(code).reason, /^indirect-evaluation: /, name);
+  }
+});
+
+test("task.293 safe blocks near the class stay runnable", () => {
+  for (const code of [
+    "echo '$(date)'", // a quoted literal that is only printed
+    "x=5; echo $((x + 1))", // arithmetic over a number
+    "n=3; [[ $n -eq 3 ]] && echo ok",
+    "echo PS4", // a mention, not a prompt variable set
+    "grep -n 'PS1' docs/x.md", // a pattern
+    'printf "%s\\n" hello',
+    "a=(1); echo ${a[0]}", // a plain subscript
+    'n=$(wc -l < f); echo "$n"', // built by expansion, never read as arithmetic
+    'x=5; y="$x"; echo hi', // an expanded value with no arithmetic read
+    "[ -f x ] && echo ok", // the test command, not a subscript
+    "x=a'[5]'; echo $((x))", // QA-3 control: no substitution in the literal
+    "echo 'a[5]' | { read x; echo $((x)); }", // QA-4 control
+    "echo 'run $(date)'; x=5", // a printed literal, nothing evaluates a value
+    "a=([0'5']=1); echo hi", // QA-9 control: a subscript quote, no substitution
+    "a=([0+(1)'5']=1); echo hi", // QA-10 control: parens in the subscript, no substitution
+    "a=([';'0'5']=1); echo hi", // QA-11 control: a quoted separator, no substitution
+    "[[ a\\[5\\] -eq 1 ]]", // QA-7 control: escaped, no substitution
+    "printf -v a\\[5\\] x", // QA-7 control
+    "echo a\\[\\$\\(date\\)\\]", // an escaped literal that is only printed
+    "# note: $(cmd) and `x` in a comment\n[[ 1 -eq 1 ]]", // a comment is not a literal
+    "set -- 2; echo ${@:$1}", // QA-5 control: no substitution literal
+    "set -- 0; v=(1); echo ${v[$1]}", // QA-6 control: a subscript, no literal
+  ]) {
+    assert.equal(classifyBlock(code).klass, "runnable", code);
+  }
+});
+
+test("task.293 a helper call that also names a start-up variable keeps its pinned reason", () => {
+  // The direct-use refusal sits after the helper rule, so the `helper call with …` strings other
+  // tests pin are unchanged for a helper call.
+  const v = classifyBlock("export PS4='$(mv a b)'; bash h/read.sh", {}, {});
+  assert.equal(v.klass, "mutating");
 });

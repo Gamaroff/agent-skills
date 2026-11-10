@@ -242,6 +242,62 @@ scan (`npm run qa-snippets:docscan`) hold it: the first runs every block the cla
 `runnable` under real bash and fails if the directory changes, the second fails if a change makes a
 documentation block newly runnable.
 
+### 2a-ii. Indirect evaluation is refused where it is built (task 293)
+
+Some shapes build a value harmlessly and let a later bash feature evaluate it. Judged command by
+command, every part looks safe, because the command that runs is not in the text. Three families
+reproduce under real bash, and a block holding one is `mutating` with a reason that starts
+`indirect-evaluation:`:
+
+- **Prompt expansion.** Setting `PS0`, `PS1`, `PS2` or `PS4` (assignment, `export`, `declare`, `read`,
+  `printf -v` and the like), or using `${x@P}`. Bash expands prompt escapes, and those include command
+  substitution, so `PS4=…` then `set -x`, or `${x@P}` on a value read from elsewhere, runs it. Merely
+  mentioning the name (`echo PS4`) is not refused.
+- **A quoted literal that holds a substitution, in a block that also evaluates something**
+  (`x='a[$(cmd)]'`, `x="a[\$(cmd)]"`, `x=$'a[\x24(cmd)]'`, a joined word such as `x=a'[$(cmd)]'`, an
+  unquoted escaped form, a literal piped into `read`, a quoted-delimiter here-document body). "Evaluates something" is any live
+  `printf`, `read`, `test`, `unset`, `declare`, `typeset`, `local`, `export`, `readonly`, `let`, `eval`,
+  `for`, `select`, `case`, `[`, `[[` or `((` in the block, **or any live parameter expansion or
+  `name[`** (`$x`, `${…}`, `$((…))`, `$1`, `$@`, `a[x]=1`) outside single quotes, comments and
+  quoted here-documents. Bash evaluates the subscript `a[$(cmd)]` as arithmetic when it reads the
+  name, so the substitution runs. The rule is **block-level and default-deny on purpose**: the
+  per-segment and character-before-the-quote versions each lost to one more spelling (QA cycle 2),
+  and a list of the arithmetic spellings lost three times (`$((x))`, then `${@:$1}`, then
+  `${v[1+$1]}`; QA cycle 3, third strike), because every list of the places bash evaluates a
+  variable is incomplete. No value is tracked. The price is over-refusal of a block that holds such
+  a literal and also expands any variable; the docs scan measures it (one block, this task's plan).
+  The **carrier** is default-deny too (QA cycle 4): a list of quote kinds missed the same literal
+  written as backslash-escaped text in an unquoted word (`a\[\$\(cmd\)\]`), so any `$(`, `$\(` or
+  backtick text the tokenizer did not parse as a real substitution counts as a literal, outside
+  comments, whatever carries it.
+- **A subscript built by expansion, and a quoted substitution used as a subscript** (QA cycle 1). An
+  assignment whose value holds an expansion inside `name[…]` (`x="a[$y$z]"`, `x="a[${d}(cmd)]"`) is
+  refused, because the text that `$((x))`, `read "$x"`, `test -v "$x"` or `[[ $x -eq 1 ]]` later
+  evaluates is not in the block. A quoted literal substitution inside a `[` that is still open in
+  the block (`${a['$(cmd)']}`, `a['$(cmd)']=1`, and, since QA gates 6 to 8, `a=([0'$(cmd)']=1)`,
+  `a=([0+(1)'$(cmd)']=1)` and `a=([';'0'$(cmd)']=1)`) is refused too. Brackets are counted by depth
+  over the whole block and the depth is never reset: a character-before-the-quote test, a same-word
+  scan and a per-segment count each lost to one more spelling (a paren, then a quoted `;`), and
+  every reset was a place to lose the bracket. The price is over-refusal: an unbalanced `[` in
+  earlier text (a lone `echo '['`) refuses a later quoted substitution literal. A `[` that follows a `(` or has no expansion
+  inside it (a `sed` pattern such as `([0-9]+)`) is not a subscript, which is why the shipped helpers
+  that count with `n=$(sed …); $((n + 1))` stay runnable.
+
+The claim is **bounded**, not "any indirect evaluation": the table in `qa-execute-snippets.test.mjs`
+(`task.293 — indirect evaluation`) lists the shapes, and the `indirect` atom set of the differential
+(`npm run qa-snippets:differential -- --atoms indirect`) generates their combinations. **Known
+unseen shapes:** a value laundered through a command's output with the substitution spelled by an
+escape (`x=$(printf 'a[\044(cmd)]'); echo $((x))`; the plain `y=$(echo 'a[$(cmd)]')` form is now
+refused by the block-level rule); the `[` or `$` itself arriving by expansion (`b='['; x="a${b}…"`);
+and a literal **split across adjacent quote tokens**, so that no `$(` or backtick exists in the
+source (`read x <<< "a[$""(cmd)]"; echo $((x))`, the same through `printf -v`; found by the fifth QA
+gate of task 293, which ended the QA budget). All three reproduce under bash and are recorded, not
+closed. Text-level detection of the literal has been widened four times and each widening lost to a
+new carrier, so the remainder is not another patch: it needs an allow-list design (run only blocks
+whose every word is a known-safe literal), filed as its own task. The rule sits after the helper
+rule on purpose, so a helper call that also names a start-up variable keeps its `helper call with …`
+reason. A documentation block that needs one of these shapes is rewritten to avoid the indirection.
+
 ### 2aa. Helper calls run only when the helper itself would
 
 `bash`, `sh`, `source` and `.` execute a file, which is exactly what the allow-list exists to refuse —

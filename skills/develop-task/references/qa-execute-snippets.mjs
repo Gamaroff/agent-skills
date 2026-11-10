@@ -3096,6 +3096,238 @@ function addBody(table, name, body) {
 /** Every character `\s` matches that bash does not treat as a blank (see classifyInternal). */
 const NOT_A_BASH_BLANK = /[^\S \t\n]/g;
 
+// task.293 — INDIRECT EVALUATION. A value is built or stored harmlessly, and a later bash feature
+// evaluates it: a prompt variable (`PS4`, `PS0`, `PS1`, `PS2`) or `${x@P}` expands prompt escapes,
+// which include command substitution, and a name or operand bash reads as arithmetic (`printf -v`,
+// `read`, `test -v`, `unset`, `$((x))`, `[[ $x -eq 1 ]]`, `${v:0:$x}`, `${!x}`) evaluates the
+// subscript `a[$(cmd)]` it holds. The scans above judge each command for what it does directly and
+// cannot see the later evaluation. So the class is refused where its source can be seen: a quoted
+// literal that holds a substitution, where it is assigned or handed to a builtin that evaluates its
+// operand. That covers the variable used later without tracking it (the assignment is the refusal).
+//
+// BOUNDED CLAIM, not "any indirect evaluation": the shapes this refuses are the table in
+// qa-execute-snippets.test.mjs ("task.293 — indirect evaluation"). Known unseen shape: a value
+// laundered through a command's OUTPUT (`y=$(echo 'a[$(cmd)]'); echo $((y))`).
+// Set or declared, not merely mentioned: `echo PS4` and `echo "$PS1"` run nothing a prompt expands.
+const PROMPT_VARIABLE_AT = /\bPS[0124]\b/g;
+const PROMPT_TRANSFORM = /@P\s*\}/;
+// Words that declare or set a variable, and words that make a later quoted literal an operand bash
+// evaluates (or assigns): the segment before the literal is searched for any of them, so
+// `read -r x <<< '…'` and `[[ '…' -eq 1 ]]` count. Lookbehind, not a consumed separator, so that
+// every match of the global scan is found once, in one linear pass.
+const DECLARING_WORD =
+  /(?<![^\s;&|({])(?:export|declare|typeset|local|readonly|read|printf|mapfile|readarray|getopts|for|select|let)(?=[\s;&|)]|$)/g;
+const EVALUATING_WORD =
+  /(?<![^\s;&|({])(?:printf|read|test|unset|declare|typeset|local|export|readonly|let|eval|for|select|case|\[\[?|\(\()(?=[\s;&|)]|$)/g;
+const ESCAPED_SUBSTITUTION_ASSIGNMENT =
+  /(?:^|[\s;&|({])[A-Za-z_][A-Za-z0-9_]*(?:\[[^\]\s]*\])?\+?=\S*\\[$`]/;
+// DEFAULT-DENY, not a list of arithmetic spellings (task 293, third strike). Three cycles in a row
+// found one more place where bash reads a variable as arithmetic (`$((x))`, then `${@:$1}`, then
+// `${v[1+$1]}`), because every listing of those places is incomplete. So any live parameter
+// expansion (`$name`, `${…}`, `$((…))`, `$[…]`, `$1`, `$@`) or a name followed by `[` (a subscript,
+// `a[x]=1`) counts, wherever it is, unless it sits in inert text (single quotes, a comment, a
+// quoted-delimiter here-document). `$'…'` is not an expansion.
+const LIVE_EXPANSION = /\$(?=[A-Za-z_0-9{(\[@*#?!$-])|[A-Za-z0-9_}\]]\[/g;
+// An assignment whose value is built by expansion into a subscript (`x="a[$y$z]"`). The text that a
+// later `$((x))`, `read "$x"`, `test -v "$x"`, `unset "$x"`, `[[ $x -eq 1 ]]`, `${v:0:$x}` or `${!x}`
+// evaluates is not in the block, so it cannot be judged, and the build is refused instead of
+// tracking the variable to every place it is read (found by the random differential: the first
+// version also required an arithmetic read, and `read "$x"` slipped past it).
+// Only a value with an expansion INSIDE a `name[...]` is refused: bash reads a variable as a
+// subscript only through `name[expr]`, and `n=$(sed 's/([0-9]+)/\1/'); echo $((n + 1))` is what the
+// shipped helpers do (the `[` there follows a `(`, and no expansion sits inside the brackets).
+// Known unseen shapes: the `[` or `$` arriving by expansion (`b='['`), and a value laundered through
+// command output (`x=$(printf 'a[\044(cmd)]')`, task 293 QA-3).
+const EXPANDED_ASSIGNMENT =
+  /(?:^|[\s;&|({])[A-Za-z_][A-Za-z0-9_]*\+?=[^\n;&|]{0,300}[A-Za-z0-9_]\[[^\]\n]{0,300}[$`]/;
+// For every position, whether a `[` opened earlier in the block has not been closed yet, so a quote
+// there may sit inside a subscript (`${a['$(cmd)']}`, `a=([0'$(cmd)']=1)`, `a=([0+(1)'$(cmd)']=1)`,
+// `a=([';'0'$(cmd)']=1)`). Depth over the whole block, never reset: not "the character before the
+// quote" (task 293 QA gate 6), not "the same word" (gate 7: a paren hid the `[`), and not "the same
+// segment" (gate 8: a quoted `;` reset the depth). Every reset was a place to lose the bracket, so
+// there is none. One forward pass, so the cost is linear with no length cap. It reads brackets in
+// quoted text too; that can only over-refuse, which is the price of having no reset to defeat.
+function unclosedBracketMap(code) {
+  const open = new Uint8Array(code.length + 1);
+  let depth = 0;
+  for (let i = 0; i < code.length; i += 1) {
+    const c = code[i];
+    if (c === "[") depth += 1;
+    else if (c === "]") depth = depth > 0 ? depth - 1 : 0;
+    open[i] = depth > 0 ? 1 : 0;
+  }
+  return open;
+}
+// Text that spells a command substitution, whatever carries it: `$(` (not `$((`), an escaped `$\(`,
+// or a backtick. The caller drops the ones the tokenizer parsed as real substitutions.
+const LOOSE_LITERAL = /\$(?:\((?!\()|\\\()|`/g;
+// A literal substitution inside a quoted span, by quote kind. `$'…'` escapes can spell `$(` or a backtick.
+const LITERAL_IN_SINGLE = /\$\(|`/g;
+const LITERAL_IN_DOUBLE = /\\\$\(|\\`/g;
+const LITERAL_IN_ANSI_C = /\$\(|`|\\[xuU0-7]/g;
+
+/** Start index of every match of the global `re` in `text`, ascending. */
+function matchStarts(re, text) {
+  const out = [];
+  for (const m of text.matchAll(re)) out.push(m.index);
+  return out;
+}
+
+/** Whether the ascending `starts` holds a value in `[lo, hi]`. */
+function anyIn(starts, lo, hi) {
+  let a = 0;
+  let b = starts.length;
+  while (a < b) {
+    const mid = (a + b) >> 1;
+    if (starts[mid] < lo) a = mid + 1;
+    else b = mid;
+  }
+  return a < starts.length && starts[a] <= hi;
+}
+
+/**
+ * Why `code` builds a value that a later bash feature would evaluate as code, or null.
+ *
+ * Linear in the text: the spans of the tokenizer are marked with a difference array and every
+ * search is a global scan with a binary search over its hits, never a rescan per quote (a 20000-deep
+ * nest of 20000 quotes made the first version quadratic; task.292's nesting test caught it).
+ */
+function indirectEvaluationHazard(code) {
+  const n = code.length;
+  // Each check below runs only when its trigger text is present: the docs scan classifies thousands
+  // of blocks and almost none of them hold any of these (task 293's 10% cost bound).
+  const hasPrompt = /PS[0124]/.test(code);
+  const hasSubstitution = code.includes("$(") || /[`\\]/.test(code);
+  const hasSubscript = code.includes("[") && /[$`]/.test(code);
+  if (!hasPrompt && !hasSubstitution && !hasSubscript && !code.includes("@P"))
+    return null;
+  const quotes = [];
+  const bodies = []; // here-document bodies
+  const substStarts = []; // command substitutions the tokenizer found
+  let dead = null; // comment and heredoc body: not code
+  let comment = null; // comment text: never evaluated, never a literal carrier
+  let inert = null; // text in which nothing expands: single quotes, comments, quoted here-documents
+  let quoted = null; // a quote's interior: its separators are not the shell's
+  const marks = () => {
+    if (dead !== null) return;
+    dead = new Int32Array(n + 2);
+    quoted = new Int32Array(n + 2);
+    inert = new Int32Array(n + 2);
+    comment = new Int32Array(n + 2);
+    for (const t of tokenize(code).tokens) {
+      if (t.kind === "comment" || t.kind === "heredoc-body") {
+        if (t.kind === "heredoc-body") bodies.push(t);
+        else {
+          comment[t.start] += 1;
+          comment[t.end] -= 1;
+        }
+        dead[t.start] += 1;
+        dead[t.end] -= 1;
+        inert[t.start] += 1;
+        inert[t.end] -= 1;
+      } else if (t.kind === "subst") {
+        substStarts.push(t.start);
+      } else if (t.kind === "quote") {
+        quotes.push(t);
+        quoted[t.start + 1] += 1;
+        quoted[t.end - 1] -= 1;
+        if (t.quote === "'" || t.quote === "$'") {
+          inert[t.start] += 1; // nothing inside single quotes expands
+          inert[t.end] -= 1;
+        }
+      }
+    }
+    for (let i = 1; i <= n; i += 1) {
+      dead[i] += dead[i - 1];
+      quoted[i] += quoted[i - 1];
+      inert[i] += inert[i - 1];
+      comment[i] += comment[i - 1];
+    }
+  };
+  let lastSep = null; // index of the last live command separator at or before each position
+  const segmentStart = (at) => {
+    if (lastSep === null) {
+      marks();
+      lastSep = new Int32Array(n);
+      let cur = -1;
+      for (let i = 0; i < n; i += 1) {
+        if (dead[i] === 0 && quoted[i] === 0 && ";&|\n({`".includes(code[i]))
+          cur = i;
+        lastSep[i] = cur;
+      }
+    }
+    return at <= 0 ? 0 : lastSep[at - 1] + 1;
+  };
+
+  // A prompt variable set or declared (not merely mentioned), and the `@P` transform.
+  if (hasPrompt) {
+    marks();
+    const declaring = matchStarts(DECLARING_WORD, code);
+    for (const m of code.matchAll(PROMPT_VARIABLE_AT)) {
+      if (dead[m.index] !== 0) continue;
+      const after = code.slice(m.index + 3, m.index + 5);
+      if (after[0] === "=" || after === "+=")
+        return "a prompt variable (PS0, PS1, PS2, PS4), whose value bash expands as a prompt string";
+      if (anyIn(declaring, segmentStart(m.index), m.index - 1))
+        return "a prompt variable (PS0, PS1, PS2, PS4), whose value bash expands as a prompt string";
+    }
+  }
+  const prose = stripProse(code);
+  if (PROMPT_TRANSFORM.test(prose)) return "a ${…@P} prompt-escape expansion";
+  if (code.includes("\\") && ESCAPED_SUBSTITUTION_ASSIGNMENT.test(prose))
+    return "a variable assigned an escaped substitution that a later expansion evaluates";
+  if (hasSubscript && EXPANDED_ASSIGNMENT.test(prose))
+    return "a variable built by expansion into a subscript, which a later read evaluates as arithmetic";
+  if (!hasSubstitution) return null;
+
+  // A quoted literal that holds a substitution, in a block that also evaluates something.
+  marks();
+  const literals = {
+    "'": matchStarts(LITERAL_IN_SINGLE, code),
+    '"': matchStarts(LITERAL_IN_DOUBLE, code),
+    "$'": matchStarts(LITERAL_IN_ANSI_C, code),
+  };
+  // BLOCK-level, not per segment: the literal can reach the evaluation through a pipe, a joined
+  // word (`x=a'[$(cmd)]'`), a variable or a here-string, and a segment boundary or the character
+  // before the quote cannot follow it (task 293 QA cycle 2: two more spellings of the same family
+  // after cycle 1's two). The cost is over-refusal, measured by the docs scan.
+  let evaluates = null; // computed on the first literal only: most blocks hold none
+  const blockEvaluates = () =>
+    (evaluates ??=
+      matchStarts(EVALUATING_WORD, code).some((i) => dead[i] === 0) ||
+      matchStarts(LIVE_EXPANSION, code).some((i) => inert[i] === 0));
+  const REFUSED =
+    "a quoted substitution in a block that also evaluates a value as code or arithmetic";
+  let openBrackets = null; // built on the first literal only
+  for (const q of quotes) {
+    const hits = literals[q.quote];
+    if (!hits || !anyIn(hits, q.start + q.quote.length, q.end - 2)) continue;
+    if ((openBrackets ??= unclosedBracketMap(code))[q.start] === 1)
+      return "a quoted substitution used as a subscript, which bash evaluates as arithmetic";
+    if (blockEvaluates()) return REFUSED;
+  }
+  // A quoted-delimiter here-document body is a literal too: `read x <<'EOF'` then `$((x))`.
+  for (const b of bodies) {
+    // An unquoted here-document expands its own `$(…)` (a `subst` token inside the body), which the
+    // substitution rules already judge; only a body with none is literal text.
+    if (substStarts.some((s) => s >= b.start && s < b.end)) continue;
+    if (anyIn(literals["'"], b.start, b.end - 1) && blockEvaluates())
+      return REFUSED;
+  }
+  // DEFAULT-DENY on the carrier as well (QA cycle 4: an unquoted `a\[\$\(cmd\)\]` word carried the
+  // literal past a list of quote kinds). Any `$(` or backtick text the tokenizer did not parse as a
+  // real substitution is literal text, whatever carries it. `$((` is arithmetic, not a substitution.
+  if (substStarts.length > 0 || hasSubstitution) {
+    const real = new Set(substStarts);
+    for (const m of code.matchAll(LOOSE_LITERAL)) {
+      if (real.has(m.index) || comment[m.index] !== 0) continue;
+      if (blockEvaluates()) return REFUSED;
+      break;
+    }
+  }
+  return null;
+}
+
 function classifyInternal(
   code,
   bindings = {},
@@ -3394,6 +3626,13 @@ function classifyInternal(
     if (calls.length > 0 && movesPath)
       return verdict("mutating", "helper call with PATH changed");
   }
+
+  // task.293: a value built harmlessly and evaluated later (prompt escapes, arithmetic operands).
+  // After the helper rule on purpose: a helper call that also names a start-up variable keeps the
+  // `helper call with …` reason its tests pin; a direct use, which that rule never reaches, lands here.
+  const indirect = indirectEvaluationHazard(code);
+  if (indirect !== null)
+    return verdict("mutating", `indirect-evaluation: ${indirect}`);
 
   // A call to a helper-defined function is only as permissive as its arguments
   // would be if written to each command it reaches: `newest_numbered docs dod

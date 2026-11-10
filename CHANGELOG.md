@@ -6,6 +6,34 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The QA snippet classifier refuses indirect evaluation** (task 293). A value built harmlessly and
+  evaluated later ran a command that the text never showed: `printf -v 'a[$(cmd)]' x`, `read`,
+  `test -v`, `[[ -v ]]` and `unset` on a name holding a quoted subscript; `PS4` with `set -x` and
+  `${x@P}`, which expand prompt escapes; and a quoted substitution kept in a variable and then read
+  as arithmetic (`$((x))`, `[[ $x -eq 1 ]]`, `${y:0:$x}`, `${!x}`). All classified `runnable` and wrote
+  a file under bash. They are now `mutating`, with the reason `indirect-evaluation: …`, by refusing
+  the build (a quoted literal holding `$(` or a backtick, where it is assigned or handed to an
+  evaluating builtin; a prompt variable set; `@P`) instead of tracking the value. A value built by
+  expansion into a subscript (`x="a[$y$z]"`) and a quoted substitution directly after a `[`
+  (`${a['$(cmd)']}`) are refused too: both were found by QA, and the first by the random
+  differential on a `read "$x"` spelling. QA cycle 2 found a joined word (`x=a'[$(cmd)]'`) and a
+  literal piped into `read`, so the quoted-literal rule is now block-level: a quoted substitution in
+  a block that also evaluates a value is refused. QA cycle 3 found two more arithmetic reads the rule
+  did not list (`${@:$1}`, `${v[1+$1]}`), the third strike on one mechanism, so the list of
+  arithmetic spellings was replaced by a default-deny test: any live expansion or `name[` in a block
+  holding such a literal. QA cycle 4 found the literal carried as backslash-escaped text in an
+  unquoted word, so the carrier is default-deny as well: any substitution text the tokenizer did not
+  parse as real counts. QA gate 6 found a quoted substitution later in a compound-assignment
+  subscript (`a=([0'$(cmd)']=1)`), so the bracket rule no longer looks only at the character before
+  the quote, and gate 7 found a paren inside the subscript (`a=([0+(1)'$(cmd)']=1)`) hiding the
+  bracket from a same-word scan, so brackets were counted by depth over the command segment; gate 8 found a
+  quoted `;` resetting that depth (`a=([';'0'$(cmd)']=1)`), so the depth is now never reset. The differential gains an `indirect` atom set (10 writes
+  on the previous engine, 0 now) and the docs scan finds two blocks newly refused and none newly
+  runnable. Known unseen shapes: a value laundered through a command's output, a `[` or `$`
+  that itself arrives by expansion, and a literal split across adjacent quote tokens
+  (`"a[$""(cmd)]"`, found by the fifth and last QA gate). The owner narrowed the task there: these
+  are recorded, and the remainder needs an allow-list design as its own task.
+
 - **The QA snippet classifier reads bash's lexical rules once** (task 292). A carriage return, form
   feed, vertical tab, no-break space or line separator before a `#` was taken for a blank, so
   `echo a`, then one of them, then `# ; touch out` classified `runnable` and created `out` under

@@ -1,0 +1,78 @@
+schema: 2
+task: 'task.293.qa-snippet-classifier-indirect-evaluation'
+task_title: 'QA snippet classifier refuses indirect evaluation'
+gate: FAIL
+status_reason: 'Two reproduced bypasses of the new refusal (a value assembled from pieces, and a quoted substitution used as an array subscript inside a parameter expansion) still classify runnable and write under real bash; the documented tests and docs scan are otherwise green.'
+reviewer: 'QA Engineer'
+head: '0f0ff8e5e47e42e2b427efe20ad633676df04d22'
+updated: '2026-11-10T10:30:01Z'
+
+top_issues:
+  - id: 'T293-QA-1'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'A value assembled from pieces escapes the refusal because only a literal holding the substitution inside ONE quoted span is seen: y=$(dollar), z=(touch out) then x="a[$y$z]" with echo $((x)) (also ${d}( and a nested printf substitution) classifies runnable and creates the file under bash 5.3. Reproduced by QA by execution; the previous engine does the same, and the task scope names the kept-then-evaluated family.'
+    suggested_action: 'Fail closed when a variable assigned in the block is read where bash evaluates arithmetic or a subscript ($((x)), [[ -eq ]], ${v:0:$x}, ${!x}, unset/read/test -v operands) and its assignment is not a plain literal; add the shapes to the table, the decider rows and the differential atoms.'
+    suggested_owner: dev
+    status: open
+    origin: 'code-review CR-1, reproduced by QA'
+  - id: 'T293-QA-2'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'A quoted literal substitution used as an array subscript inside a parameter expansion is not an assignment and follows no evaluating word, so a=(1); echo ${a[quote-open $(touch out) quote-close]} classifies runnable and creates the file under bash 5.3. Reproduced by QA by execution.'
+    suggested_action: 'Treat a quoted literal substitution inside ${name[...]} or name[...] as an evaluating position (refuse a quoted literal holding a substitution when a [ opens before it in the same word), and add the shape to the table and decider rows.'
+    suggested_owner: dev
+    status: open
+    origin: 'code-review CR-2, reproduced by QA'
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 382
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 31
+    boundary: true
+    escaped: 0
+    boundary_signals: ["refused"]
+    notes: 'The classifier is the boundary. 31 corpus cases executed, 0 escaped, hostile cases rejected and legitimate accepted. Beyond the corpus, QA reproduced two bypasses of the new refusal (T293-QA-1, T293-QA-2) under real bash.'
+  performance:
+    status: PASS
+    notes: 'Docs scan median 391 to 424 ms (+8.4%, within 10%, load 6-8); differential slice median 3.47 s (bound 10 s); 20000-deep nest 206 ms.'
+  reliability:
+    status: PASS
+    notes: 'CI=true npm run ci:fast green on the committed head (8346 tests, 0 fail). Six mutations each red on the decider test; QA re-ran one (assigned-literal rule) and both task.293 shape tests went red.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The refusal is a textual allow-list over spellings, and the bounded claim in the docs is now contradicted by two further shapes of the same family. Over-refusal of safe literals (CR-4) is advisory.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Close T293-QA-1 and T293-QA-2, then extend the table, decider rows and differential atoms with them.'
+      refs: ['shared/resources/qa-execute-snippets.mjs', 'shared/resources/tests/qa-execute-snippets.test.mjs', 'scripts/qa-snippets-differential.mjs']
+  future:
+    - action: 'CR-3: a value laundered through command output (x=$(printf a[\044(cmd)]); echo $((x))) is the shape the docs name as unseen; reproduced runnable. Decide whether to close it with the variable-read rule in T293-QA-1 or keep it as a recorded residual.'
+      refs: ['shared/resources/qa-runnable-prose-detection.md']
+      provenance: documented-unseen-shape
+    - action: 'CR-4: narrow over-refusal of safe literals that are only printed or compared (msg=run $(cmd), printf %s, test -f, case, [[ == ]]); measured: 0 of the docs-scan blocks affected beyond the two justified. CR-5: grep PS1= is refused as an assignment.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T293-QA-1 and T293-QA-2 closed and re-reviewed']

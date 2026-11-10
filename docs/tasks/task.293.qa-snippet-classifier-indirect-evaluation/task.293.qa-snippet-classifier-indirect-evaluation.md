@@ -5,17 +5,21 @@ type: task
 description: "Close the QA snippet classifier's indirect-evaluation holes (T292-CR-1..3): quoted command substitutions reached through printf -v and similar subscript operands, prompt-escape expansion, and quoted data re-evaluated as arithmetic."
 tags: [qa-task, security, follow-up-292]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 created: 2026-11-10
 updated: 2026-11-10
+completed_date: 2026-11-10
+pr_number: 870
 estimated_effort_hours: 16
 github_issue:
 ---
 
 # Technical Task: QA snippet classifier refuses indirect evaluation
 
-**Status:** Planned
+**Status:** Ready for Review
+
+**Review**: ✅ All review recommendations from `task.293.review.1.qa-snippet-classifier-indirect-evaluation.md` implemented 2026-11-10
 
 Follow-up to [task 292](../task.292.qa-snippet-classifier-one-bash-tokenizer/task.292.qa-snippet-classifier-one-bash-tokenizer.md) (issue #868). The three findings were raised by gate 3's safety re-probe, are identical on `develop`, and were left open on purpose.
 
@@ -56,11 +60,12 @@ All three findings share one cause: the classifier checks each command for what 
 
 Current state (grepped on 2026-11-10 at `develop` plus task 292's branch):
 
-- `assignmentHazard` — `shared/resources/qa-execute-snippets.mjs:2818` *(`function assignmentHazard({ word, args })`)*. It refuses `printf -v` outright, and for `export`, `local`, `readonly` and `read` it requires a plain variable name. It does not look at `test -v`, `[[ -v ]]`, `unset` or `[[ -eq ]]`.
-- `startupHazard` — set at `:3142` from `STARTUP_VARIABLE` over the stripped code and at `:3246` from `assignmentHazard`. It only fires for a helper-function call (`:3391`), so a direct use is not refused.
+- `assignmentHazard` — `shared/resources/qa-execute-snippets.mjs:2818` *(`function assignmentHazard({ word, args })`)*. It *returns a reason* for `printf -v`, and for `export`, `local`, `readonly` and `read` with a non-plain variable name. It does not look at `test -v`, `[[ -v ]]`, `unset` or `[[ -eq ]]`. **Returning a reason is not refusing:** the reason only becomes a verdict through `startupHazard`, below.
+- `startupHazard` — set at `:3142` from `STARTUP_VARIABLE` over the stripped code and at `:3247` from `assignmentHazard`. It only fires for a helper-function call (`:3391`, `calls.length > 0 && startupHazard`), so a direct use is not refused. This is why `printf -v 'a[$(touch W)]' x` is `runnable` although `assignmentHazard` flags it.
+- Existing tests pin the helper-call reason strings (`shared/resources/tests/qa-execute-snippets.test.mjs:3412`, `:3682`, `:3697`, `:3736`, `:3800`, each `^helper call with …`). The new direct-use refusal takes its own reason prefix and leaves those strings unchanged.
 - The tokenizer from task 292 is `tokenize` at `:1507` *(`function tokenize`)*; quoted spans are already collapsed before these checks run.
 
-Claims from the gate that Phase 1 must reproduce before any code is written: CR-1's `read` and `unset` spellings, and CR-3's `${!x}` and `${x:0:$x}` spellings *(unverified in this document; gate 4 states them)*.
+Reproduced at review under real bash (GNU bash 5.3.20, scratch directory, marker file `W`): `printf -v`, `PS4` with `set -x`, `${x@P}`, `$((x))`, `[[ $x -eq 1 ]]`, `read -r "$x"` and `test -v "$x"` write `W` as stated. `${y:0:$x}`, `unset "$x"` and `${!x}` write `W` only when the state they read exists: `y` must be set (`y=abcdef`), and the array must be declared (`a=(1)`). Without that state they do not reproduce, so the Phase 1 tests declare it. Phase 1 still re-runs each on the developer's bash and drops any that does not reproduce; `unset -v "$x"` reproduces too and joins the family.
 
 **Direction (not a decision):** refuse a quoted literal that holds `$(` or a backtick when it is assigned to a variable or passed to an operand-evaluating builtin, and refuse the prompt variables and `@P` outright. Phase 1 confirms whether that is enough or whether it over-refuses blocks the docs scan currently runs.
 
@@ -99,27 +104,28 @@ None to any API. The behavioural change is that blocks using these shapes move f
 
 **Risk**: Low. **Files**: tests only.
 
-- [ ] Write one failing test per spelling in section 2, each running the block under real bash in a scratch directory and asserting the file it should not create.
-- [ ] Run the docs scan (`scripts/qa-snippets-docscan.mjs`) before any change and record the baseline `runnable` count and the command.
-- [ ] List every spelling that does not reproduce and drop it from the plan.
+- [x] Write one failing test per spelling in section 2, each running the block under real bash in a scratch directory and asserting the file it should not create.
+- [x] Run the docs scan (`scripts/qa-snippets-docscan.mjs`) before any change and record the baseline `runnable` count and the command. *(Baseline: 257 runnable of 3448 blocks; `node scripts/qa-snippets-docscan.mjs --time --json`.)*
+- [x] List every spelling that does not reproduce and drop it from the plan. *(None dropped: `${y:0:$x}`, `unset` and `${!x}` reproduce once `y` is set and the array is declared; the tests declare it.)*
 
 ### Phase 2: Refuse the class
 
 **Risk**: Medium. **Files**: `shared/resources/qa-execute-snippets.mjs`. **Depends on**: Phase 1.
 
-- [ ] Refuse prompt variables (`PS0`, `PS1`, `PS2`, `PS4`) and `${…@P}`.
-- [ ] Refuse a quoted literal holding `$(` or a backtick when assigned to a variable or passed to an operand-evaluating builtin.
-- [ ] Extend `assignmentHazard` for `test -v`, `[[ -v ]]`, `unset` and `[[ -eq ]]` operands.
-- [ ] Refuse a variable used where bash evaluates arithmetic (`$((x))`, `[[ $x -eq 1 ]]`, `${x:0:$x}`, `${!x}`) when that variable was assigned a quoted substitution literal.
+- [x] Make a direct use refuse, not only a helper call: the new check `indirectEvaluationHazard` sits after the helper rule and returns `indirect-evaluation: …`, so the pinned `helper call with …` strings are unchanged.
+- [x] Refuse prompt variables (`PS0`, `PS1`, `PS2`, `PS4`) set or declared, and `${…@P}`. *(A bare mention such as `echo PS4` stays runnable, because an existing test pins that.)*
+- [x] Refuse a quoted literal holding `$(` or a backtick when assigned to a variable or passed to an operand-evaluating builtin.
+- [x] Cover `test -v`, `[[ -v ]]`, `unset` and `[[ -eq ]]` operands. *(Done in the new check, not by extending `assignmentHazard`: that function only reaches a verdict through a helper call, and the new check judges the quoted literal where it is built.)*
+- [x] Refuse a variable used where bash evaluates arithmetic (`$((x))`, `[[ $x -eq 1 ]]`, `${x:0:$x}`, `${!x}`) when that variable was assigned a quoted substitution literal. *(Done by refusing the assignment, so no value is tracked. A value laundered through a command's output stays an unseen shape, named in the detection doc.)*
 
 ### Phase 3: Differential run, docs scan, mutation proofs
 
 **Risk**: Low. **Depends on**: Phase 2.
 
-- [ ] Add the new shapes to the differential generator and run it; 0 writes.
-- [ ] Re-run the docs scan; record blocks newly refused and justify each.
-- [ ] Mutation-prove every new refusal; name the red test in the QA report.
-- [ ] Update `qa-runnable-prose-detection.md` and run `npm run bundle`.
+- [x] Add the new shapes to the differential generator and run it (`node scripts/qa-snippets-differential.mjs --count <N> --seed <S> --atoms <set>`, the three values recorded in the QA report); 0 writes. *(`--atoms indirect --seed 1 --count 3000`: 0 writes; the previous engine wrote 10 on the same blocks. Seeds 2 and 3 at 20000: 0 writes.)*
+- [x] Re-run the docs scan; record blocks newly refused and justify each. *(2 newly refused, 0 newly runnable: `task.163.plan…md:26`, an escaped backtick in a double-quoted assignment, a documentation block no QA run needs; `task.293.plan…md:26`, the `printf -v` hazard sample itself.)*
+- [x] Mutation-prove every new refusal; name the red test in the QA report. *(Six mutations, one per refusal branch, each red on `task.293 each refusal is held on an input where it alone decides`.)*
+- [x] Update `qa-runnable-prose-detection.md` and run `npm run bundle`.
 
 ---
 
@@ -165,7 +171,7 @@ Documentation:
 **Performance**
 
 - [ ] Docs scan median within 10% of the baseline (five runs, load recorded, outliers reported), recorded in the QA report.
-- [ ] Differential slice median under 10 s (five runs), recorded in the QA report.
+- [ ] Differential slice median under 10 s (five runs of `node scripts/qa-snippets-differential.mjs` at the fixed slice's count, seed and atoms, `uptime` beside each), recorded in the QA report.
 
 **Code quality**
 
@@ -208,9 +214,49 @@ Documentation:
 
 ## Progress Tracking
 
-- [ ] Phase 1
-- [ ] Phase 2
-- [ ] Phase 3
+- [x] Phase 1
+- [x] Phase 2
+- [x] Phase 3
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-10
+**Quality Score**: 88/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.293.qa.9.qa-snippet-classifier-indirect-evaluation.md](./task.293.qa.9.qa-snippet-classifier-indirect-evaluation.md)
+- **Gate File**: [task.293.gate.9.qa-snippet-classifier-indirect-evaluation.yml](./task.293.gate.9.qa-snippet-classifier-indirect-evaluation.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 383 in the suite file; `ci:fast` 8346, 0 fail
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+Gate 9 (fourth owner-granted extra cycle). The independent reviewer found no block that classifies runnable and runs a command, including about 18,000 fuzzed array-subscript blocks. Owner-accepted residuals stay documented; the allow-list redesign is its own task.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report Summary:** gate `task.293.gate.9.qa-snippet-classifier-indirect-evaluation.yml`, CONCERNS, 88/100, no open finding. Gates 1 to 8 were FAIL; the owner narrowed the task at gate 5 and granted extra cycles. The three residual shapes are owner-accepted and documented.
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 10/10 met (measurements and mutation proofs recorded in QA report 9, "Finalise evidence record")
+✅ **PR Review:** `task.293.pr-review.1.qa-snippet-classifier-indirect-evaluation.md`, APPROVE
+✅ **CI:** SUCCESS on the head before acceptance (hosted CI, 6 checks)
+✅ **Documentation:** `shared/resources/qa-runnable-prose-detection.md` and `CHANGELOG.md` updated
+✅ **Security Review:** boundary probed, 31 candidates executed, 0 reproduced
+⚠️ **Compliance Review:** not applicable (no data, payment, UI or health scope)
+
+**Detailed Verification Log:** See `task.293.dod.1.qa-snippet-classifier-indirect-evaluation.md` for the evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-11-10
 
 ## Change Log
 
@@ -218,6 +264,26 @@ Documentation:
 | Date | Version | Description | Author |
 | --- | --- | --- | --- |
 | 2026-11-10 | 1.0 | Initial draft | create-task |
+| 2026-11-10 | 1.1 | Review passed (8/10) — corrected the `assignmentHazard`/`startupHazard` description (a direct use is not refused today), recorded which spellings reproduce and their preconditions, named the differential command | review-task |
+| 2026-11-10 |  | Status → ready-for-development | review-task |
+| 2026-11-10 |  | Implemented: `indirectEvaluationHazard` in `qa-execute-snippets.mjs`, `indirect` differential atom set, tests, docs, CHANGELOG. Status → ready-for-review | develop-task |
+| 2026-11-10 |  | QA gate FAIL (70/100) — 2 high findings | qa-task |
+| 2026-11-10 |  | QA findings fixed — 2 high closed (assembled subscript value, quoted substitution as subscript), 1 iteration | qa-fix |
+| 2026-11-10 |  | QA gate FAIL (70/100) — 2 high findings | qa-task |
+| 2026-11-10 |  | QA findings fixed — 2 high closed (joined word and quoted literal, literal piped into read) with a block-level rule, 2 iterations | qa-fix |
+| 2026-11-10 |  | QA gate FAIL (70/100) — 1 high, 1 medium finding | qa-task |
+| 2026-11-10 |  | QA findings fixed — 1 high, 1 medium closed by replacing the arithmetic-read list with a default-deny test (third strike), 3 iterations | qa-fix |
+| 2026-11-10 |  | QA gate FAIL (80/100) — 1 high finding | qa-task |
+| 2026-11-10 |  | QA finding fixed — 1 high closed by making the literal carrier default-deny, 4 iterations | qa-fix |
+| 2026-11-10 |  | QA gate FAIL (80/100) — 1 high finding; QA budget spent | qa-task |
+| 2026-11-10 |  | QA gate FAIL (85/100) — 1 high finding on the owner-granted extra cycle | qa-task |
+| 2026-11-10 |  | QA finding fixed — 1 high closed by making the bracket rule word-scoped, 6 iterations | qa-fix |
+| 2026-11-10 |  | QA gate FAIL (85/100) — 1 high finding on the second extra cycle | qa-task |
+| 2026-11-10 |  | QA finding fixed — 1 high closed by counting bracket depth over the segment, 7 iterations | qa-fix |
+| 2026-11-10 |  | QA gate FAIL (85/100) — 1 high finding on the third extra cycle | qa-task |
+| 2026-11-10 |  | QA finding fixed — 1 high closed by never resetting the bracket depth, 8 iterations | qa-fix |
+| 2026-11-10 |  | QA gate CONCERNS (88/100) — 0 findings; documented residuals open | qa-task |
+| 2026-11-10 | 1.2 | DoD passed — accepted (PR #870) | finalise |
 <!-- change-log-end -->
 
 ## References
