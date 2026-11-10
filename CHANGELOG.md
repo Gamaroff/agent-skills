@@ -6,6 +6,18 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The QA snippet classifier refuses indirect evaluation** (task 293). A value built harmlessly and
+  evaluated later ran a command that the text never showed: `printf -v 'a[$(cmd)]' x`, `read`,
+  `test -v`, `[[ -v ]]` and `unset` on a name holding a quoted subscript; `PS4` with `set -x` and
+  `${x@P}`, which expand prompt escapes; and a quoted substitution kept in a variable and then read
+  as arithmetic (`$((x))`, `[[ $x -eq 1 ]]`, `${y:0:$x}`, `${!x}`). All classified `runnable` and wrote
+  a file under bash. They are now `mutating`, with the reason `indirect-evaluation: …`, by refusing
+  the build (a quoted literal holding `$(` or a backtick, where it is assigned or handed to an
+  evaluating builtin; a prompt variable set; `@P`) instead of tracking the value. The differential
+  gains an `indirect` atom set (10 writes on the previous engine, 0 now) and the docs scan finds two
+  blocks newly refused and none newly runnable. Known unseen shape: a value laundered through a
+  command's output.
+
 - **The QA snippet classifier reads bash's lexical rules once** (task 292). A carriage return, form
   feed, vertical tab, no-break space or line separator before a `#` was taken for a blank, so
   `echo a`, then one of them, then `# ; touch out` classified `runnable` and created `out` under

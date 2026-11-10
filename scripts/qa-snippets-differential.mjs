@@ -125,6 +125,38 @@ export const ATOM_SETS = {
     "#",
     " ",
   ],
+  // Indirect evaluation (task 293): a value built harmlessly and evaluated by a later feature. The
+  // block carries its own writer inside a literal (BARE_SETS), so the only way it writes is bash
+  // evaluating that literal: as a prompt (`PS4`, `${x@P}`) or as an arithmetic subscript. The
+  // state the evaluators need (`a=(1)`, `y=abcdef`) is an atom, so the generator can form it.
+  indirect: [
+    "x='a[$(touch out)]'",
+    "x='$(touch out)'",
+    'x="a[\\$(touch out)]"',
+    "PS4='$(touch out)'",
+    "PS4=$x",
+    "set -x",
+    "a=(1)",
+    "y=abcdef",
+    "echo $((x))",
+    "echo ${x@P}",
+    "echo ${!x}",
+    "echo ${y:0:$x}",
+    "[[ $x -eq 1 ]]",
+    'unset "$x"',
+    'unset -v "$x"',
+    'read -r "$x" <<< 1',
+    'test -v "$x"',
+    "printf -v 'a[$(touch out)]' x",
+    "[[ -v 'a[$(touch out)]' ]]",
+    "let x",
+    "(( x ))",
+    "true",
+    ";",
+    ";",
+    "\n",
+    "\n",
+  ],
   // Arithmetic, where `<<` is a left shift and not a heredoc opener (task 292, QA cycle 1): the
   // `\nz\n` atom is the line a mis-read heredoc would take for its delimiter.
   arith: [
@@ -182,7 +214,7 @@ export function generateBlocks(atoms, seed, count, bare = false) {
 }
 
 /** Atom sets whose blocks carry no prefix and no appended writer (see generateBlocks). */
-export const BARE_SETS = new Set(["splits"]);
+export const BARE_SETS = new Set(["splits", "indirect"]);
 
 /**
  * Run `bash -c code` in a fresh directory and say whether it left anything there. The directory

@@ -242,6 +242,32 @@ scan (`npm run qa-snippets:docscan`) hold it: the first runs every block the cla
 `runnable` under real bash and fails if the directory changes, the second fails if a change makes a
 documentation block newly runnable.
 
+### 2a-ii. Indirect evaluation is refused where it is built (task 293)
+
+Some shapes build a value harmlessly and let a later bash feature evaluate it. Judged command by
+command, every part looks safe, because the command that runs is not in the text. Three families
+reproduce under real bash, and a block holding one is `mutating` with a reason that starts
+`indirect-evaluation:`:
+
+- **Prompt expansion.** Setting `PS0`, `PS1`, `PS2` or `PS4` (assignment, `export`, `declare`, `read`,
+  `printf -v` and the like), or using `${x@P}`. Bash expands prompt escapes, and those include command
+  substitution, so `PS4=…` then `set -x`, or `${x@P}` on a value read from elsewhere, runs it. Merely
+  mentioning the name (`echo PS4`) is not refused.
+- **A quoted literal that holds a substitution, where it is assigned** (`x='a[$(cmd)]'`, `x="a[\$(cmd)]"`,
+  `x=$'a[\x24(cmd)]'`, an unquoted escaped form) **or handed to a builtin that evaluates its operand**
+  (`printf -v`, `read`, `test -v`, `[[ -v … ]]`, `[[ … -eq … ]]`, `unset`, `declare`, `let`, `(( ))`).
+  Bash evaluates the subscript `a[$(cmd)]` as arithmetic when it reads the name, so the substitution
+  runs. This also covers the variable used later in `$((x))`, `[[ $x -eq 1 ]]`, `${v:0:$x}` or
+  `${!x}`: the assignment is the refusal, so no value is tracked.
+
+The claim is **bounded**, not "any indirect evaluation": the table in `qa-execute-snippets.test.mjs`
+(`task.293 — indirect evaluation`) lists the shapes, and the `indirect` atom set of the differential
+(`npm run qa-snippets:differential -- --atoms indirect`) generates their combinations. **Known
+unseen shape:** a value laundered through a command's output (`y=$(echo 'a[$(cmd)]'); echo $((y))`),
+where the literal is not assigned and no evaluating builtin precedes it. The rule sits after the helper
+rule on purpose, so a helper call that also names a start-up variable keeps its `helper call with …`
+reason. A documentation block that needs one of these shapes is rewritten to avoid the indirection.
+
 ### 2aa. Helper calls run only when the helper itself would
 
 `bash`, `sh`, `source` and `.` execute a file, which is exactly what the allow-list exists to refuse —

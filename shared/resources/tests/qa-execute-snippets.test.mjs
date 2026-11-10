@@ -4695,6 +4695,7 @@ test("task.292 the tokenizer's consumers are counted, and each scan still reads 
     "maskSubstitutions",
     "collapseQuotedSpans",
     "stripProse",
+    "indirectEvaluationHazard", // task.293: reads quote spans to find a literal substitution
   ];
   // Composed consumers: the scan reads the tokenizer through the named direct consumers.
   const COMPOSED = { stripNonCode: ["collapseQuotedSpans", "stripProse"] };
@@ -5094,4 +5095,128 @@ test("task.292 differential slice: the instrument finds a write when the classif
     r.writes > 0,
     "a blind classifier produced no write: the instrument is dead",
   );
+});
+
+// ── task.293 — indirect evaluation ─────────────────────────────────────────────────────────────
+// A value is built or stored harmlessly and a later bash feature evaluates it. Each shape is run
+// under REAL bash first (the marker file proves the hole is real, so a test cannot pass by matching
+// the classifier's own idea of the block), then classified. The table is the claim's bound: a fourth
+// spelling is a failing row here, not a new finding. State a spelling needs is declared in the block
+// (`y=abcdef`, `a=(1)`): without it bash does not evaluate the subscript and nothing reproduces.
+const T293_SHAPES = {
+  "CR-1 printf -v with a quoted subscript": "printf -v 'a[$(touch W)]' x",
+  "CR-1 read into a name holding a subscript":
+    "x='a[$(touch W)]'; read -r \"$x\" <<< 1",
+  "CR-1 test -v on a name holding a subscript":
+    "x='a[$(touch W)]'; test -v \"$x\"",
+  "CR-1 [[ -v ]] with a quoted subscript": "[[ -v 'a[$(touch W)]' ]]",
+  "CR-1 unset of a name holding a subscript":
+    "a=(1); x='a[$(touch W)]'; unset \"$x\"",
+  "CR-1 unset -v of a name holding a subscript":
+    "a=(1); x='a[$(touch W)]'; unset -v \"$x\"",
+  "CR-1 [[ -eq ]] with a quoted subscript": "[[ 'a[$(touch W)]' -eq 1 ]]",
+  "CR-2 PS4 with set -x": "PS4='$(touch W)'; set -x; true",
+  "CR-2 ${x@P}": "x='$(touch W)'; echo ${x@P}",
+  "CR-3 $((x))": "x='a[$(touch W)]'; echo $((x))",
+  "CR-3 [[ $x -eq 1 ]]": "x='a[$(touch W)]'; [[ $x -eq 1 ]]",
+  "CR-3 ${y:0:$x}": "y=abcdef; x='a[$(touch W)]'; echo ${y:0:$x}",
+  "CR-3 ${!x}": "a=(1); x='a[$(touch W)]'; echo ${!x}",
+  // The class, in spellings this document does not name: a different builtin and quoting.
+  "control: let on a double-quoted escaped substitution":
+    'x="a[\\$(touch W)]"; let x',
+  "control: declare then (( ))": "declare y='a[$(touch W)]'; (( y ))",
+  "control: ANSI-C quoted spelling of $(":
+    "x=$'a[\\x24(touch W)]'; echo $((x))",
+  "control: escaped, unquoted assignment":
+    "x=a\\[\\$\\(touch\\ W\\)\\]; echo $((x))",
+};
+
+// Bash's own behaviour, calibrated where it is known to run the marker: the instrument is dead if a
+// shape that must reproduce does not.
+const T293_REPRODUCES = new Set(Object.keys(T293_SHAPES));
+
+test("task.293 every indirect-evaluation shape writes under real bash, and the classifier refuses it", () => {
+  const base = tmp();
+  let reproduced = 0;
+  for (const [name, code] of Object.entries(T293_SHAPES)) {
+    const dir = mkdtempSync(join(base, "s-"));
+    try {
+      spawnSync("bash", ["-c", code.replaceAll("W", "marker")], {
+        cwd: dir,
+        timeout: CLI_BUDGET.timeoutMs,
+      });
+      const wrote = existsSync(join(dir, "marker"));
+      assert.ok(
+        wrote,
+        `${name}: bash did not run the substitution — the shape does not reproduce, drop it from the table or declare the state it needs`,
+      );
+      reproduced += 1;
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+    const v = classifyBlock(code);
+    assert.equal(v.klass, "mutating", `${name}: ${code}`);
+    assert.match(v.reason, /^indirect-evaluation: /, name);
+  }
+  assert.equal(reproduced, T293_REPRODUCES.size, "every row reproduced");
+});
+
+// Each refusal is held on an input where IT ALONE decides. A table whose every row is also caught by
+// the quoted-literal rule would stay green with a prompt-variable refusal deleted (found by the
+// mutation proof: the first PS4 row passed with that term removed).
+const T293_DECIDERS = {
+  "prompt variable: a value read from a file":
+    "read -r v < payload; PS4=$v; set -x; true",
+  "prompt variable: read into it from a file":
+    "read -r PS4 < payload; set -x; true",
+  "prompt-escape transform: a value read from a file":
+    "read -r v < payload; echo ${v@P}",
+  "escaped substitution assigned without a quote":
+    "x=a\\[\\$\\(touch\\ W\\)\\]; echo $((x))",
+  "quoted substitution assigned, no evaluating word":
+    "x='a[$(touch W)]'; echo $((x))",
+  "quoted substitution handed to a builtin, not assigned":
+    "printf -v 'a[$(touch W)]' x",
+};
+
+test("task.293 each refusal is held on an input where it alone decides", () => {
+  const base = tmp();
+  for (const [name, code] of Object.entries(T293_DECIDERS)) {
+    const dir = mkdtempSync(join(base, "d-"));
+    try {
+      writeFileSync(join(dir, "payload"), "$(touch marker)\n");
+      spawnSync("bash", ["-c", code.replaceAll("W", "marker")], {
+        cwd: dir,
+        timeout: CLI_BUDGET.timeoutMs,
+      });
+      assert.ok(
+        existsSync(join(dir, "marker")),
+        `${name}: bash did not run the payload`,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+    assert.equal(classifyBlock(code).klass, "mutating", name);
+    assert.match(classifyBlock(code).reason, /^indirect-evaluation: /, name);
+  }
+});
+
+test("task.293 safe blocks near the class stay runnable", () => {
+  for (const code of [
+    "echo '$(date)'", // a quoted literal that is only printed
+    "x=5; echo $((x + 1))", // arithmetic over a number
+    "n=3; [[ $n -eq 3 ]] && echo ok",
+    "echo PS4", // a mention, not a prompt variable set
+    "grep -n 'PS1' docs/x.md", // a pattern
+    'printf "%s\\n" hello',
+  ]) {
+    assert.equal(classifyBlock(code).klass, "runnable", code);
+  }
+});
+
+test("task.293 a helper call that also names a start-up variable keeps its pinned reason", () => {
+  // The direct-use refusal sits after the helper rule, so the `helper call with …` strings other
+  // tests pin are unchanged for a helper call.
+  const v = classifyBlock("export PS4='$(mv a b)'; bash h/read.sh", {}, {});
+  assert.equal(v.klass, "mutating");
 });
