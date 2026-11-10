@@ -66,7 +66,8 @@ None expected. If the fix makes an unset `develop.fastGateCommand` a HALT, a con
 
 **Files:** `shared/resources/develop-pipeline-step-5-6-qa-loop.md`, the bundled copies (`npm run bundle`).
 
-- [ ] Whatever Phase 1 found: an unset key must not read as "no gate". State it in the QA report or HALT.
+- [x] This repository now sets `develop.fastGateCommand: npm run ci:fast` in `skills-config.yaml` (done 2026-11-10, outside this task, so the next task in this repo is gated).
+- [ ] The remaining generic fix: an unset key must leave a trace. The gate step records "fast gate skipped: develop.fastGateCommand unset" in the QA report (or HALTs), so a skip is visible to the reader of the gate.
 - [ ] Say in the gate step that a per-file run is not the gate.
 
 ### Phase 3: Fix the offer — Risk: Low
