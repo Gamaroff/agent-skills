@@ -1,0 +1,151 @@
+[
+  {
+    "id": "run-semicolon",
+    "input": "x;y",
+    "direction": "hostile",
+    "why": "A `;` in a --run name would end the remote npm command and start another in the ssh-spliced shell string.",
+    "correct": "Refused with usage exit 2 before any ssh.",
+    "expected": {
+      "exit": 2
+    },
+    "spec_ref": "docs/tasks/task.295.test-remote-lan-server-route/task.295.test-remote-lan-server-route.md:149"
+  },
+  {
+    "id": "run-cmd-subst",
+    "input": "$(touch PWNED)",
+    "direction": "hostile",
+    "why": "Command substitution would run on the local shell or the server when the name is spliced.",
+    "correct": "Refused with exit 2 and nothing created.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "PWNED"
+      ]
+    },
+    "spec_ref": "docs/tasks/task.295.test-remote-lan-server-route/task.295.test-remote-lan-server-route.md:149"
+  },
+  {
+    "id": "run-backtick",
+    "input": "`touch PWNED`",
+    "direction": "hostile",
+    "why": "Backtick substitution is a second command-substitution spelling.",
+    "correct": "Refused with exit 2 and nothing created.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "PWNED"
+      ]
+    },
+    "spec_ref": "docs/tasks/task.295.test-remote-lan-server-route/task.295.test-remote-lan-server-route.md:149"
+  },
+  {
+    "id": "run-space",
+    "input": "ci:fast evil",
+    "direction": "hostile",
+    "why": "A space splits one name into two arguments of the remote command, so a second script or flag is smuggled.",
+    "correct": "Refused with exit 2.",
+    "expected": {
+      "exit": 2
+    },
+    "spec_ref": "docs/tasks/task.295.test-remote-lan-server-route/task.295.test-remote-lan-server-route.md:149"
+  },
+  {
+    "id": "run-newline",
+    "input": "ci:fast\nrm -rf ~",
+    "direction": "hostile",
+    "why": "A newline ends the remote command line and starts another.",
+    "correct": "Refused with exit 2.",
+    "expected": {
+      "exit": 2
+    },
+    "spec_ref": "docs/tasks/task.295.test-remote-lan-server-route/task.295.test-remote-lan-server-route.md:149"
+  },
+  {
+    "id": "run-trailing-newline",
+    "input": "ci:fast\n",
+    "direction": "hostile",
+    "why": "An anchored match can accept a name with a trailing newline in some implementations; the newline is then spliced.",
+    "correct": "Refused with exit 2.",
+    "expected": {
+      "exit": 2
+    },
+    "spec_ref": "docs/tasks/task.295.test-remote-lan-server-route/task.295.test-remote-lan-server-route.md:149"
+  },
+  {
+    "id": "run-pipe-and",
+    "input": "a&&b|c",
+    "direction": "hostile",
+    "why": "Shell chaining and pipe metacharacters.",
+    "correct": "Refused with exit 2.",
+    "expected": {
+      "exit": 2
+    },
+    "spec_ref": "docs/tasks/task.295.test-remote-lan-server-route/task.295.test-remote-lan-server-route.md:149"
+  },
+  {
+    "id": "run-empty",
+    "input": "",
+    "direction": "hostile",
+    "why": "An empty name would splice nothing and run an unintended default.",
+    "correct": "Refused with exit 2.",
+    "expected": {
+      "exit": 2
+    },
+    "spec_ref": "docs/tasks/task.295.test-remote-lan-server-route/task.295.test-remote-lan-server-route.md:149"
+  },
+  {
+    "id": "run-leading-dash",
+    "input": "-rf",
+    "direction": "hostile",
+    "why": "A leading dash would be read by `npm run` as an option, though the character class allows it.",
+    "correct": "Refused with exit 2.",
+    "expected": {
+      "exit": 2
+    },
+    "spec_ref": "docs/tasks/task.295.test-remote-lan-server-route/task.295.test-remote-lan-server-route.md:149"
+  },
+  {
+    "id": "run-non-ascii",
+    "input": "café",
+    "direction": "hostile",
+    "why": "A locale-dependent A-Za-z range can admit accented letters; the stated grammar is plain ASCII.",
+    "correct": "Refused with exit 2.",
+    "expected": {
+      "exit": 2
+    },
+    "spec_ref": "docs/tasks/task.295.test-remote-lan-server-route/task.295.test-remote-lan-server-route.md:149"
+  },
+  {
+    "id": "run-legit-colon",
+    "input": "ci:fast",
+    "direction": "legitimate",
+    "why": "The default script name must pass validation.",
+    "correct": "Passes validation (not exit 2); stops at the unreachable server with exit 1.",
+    "expected": {
+      "exit": 1
+    },
+    "spec_ref": "docs/tasks/task.295.test-remote-lan-server-route/task.295.test-remote-lan-server-route.md:149"
+  },
+  {
+    "id": "run-legit-all",
+    "input": "eval:all",
+    "direction": "legitimate",
+    "why": "A named root script with a colon, given in the task as reachable via --run.",
+    "correct": "Passes validation; exit 1 at the unreachable server.",
+    "expected": {
+      "exit": 1
+    },
+    "spec_ref": "docs/tasks/task.295.test-remote-lan-server-route/task.295.test-remote-lan-server-route.md:98"
+  },
+  {
+    "id": "run-legit-chars",
+    "input": "test.suite_1-a",
+    "direction": "legitimate",
+    "why": "Dot, underscore, hyphen and digits are in the allowed class.",
+    "correct": "Passes validation; exit 1 at the unreachable server.",
+    "expected": {
+      "exit": 1
+    },
+    "spec_ref": "docs/tasks/task.295.test-remote-lan-server-route/task.295.test-remote-lan-server-route.md:149"
+  }
+]

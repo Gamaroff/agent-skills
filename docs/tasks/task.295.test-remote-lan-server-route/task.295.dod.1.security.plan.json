@@ -1,0 +1,30 @@
+[
+  {
+    "argv": [
+      "--entry",
+      "shell-argv:scripts/remote-test/run.sh",
+      "--argv",
+      "[\"--run\",\"{input}\",\"--host\",\"probe@127.0.0.1\"]",
+      "--sink",
+      "filename",
+      "--name",
+      "run.sh --run script-name validation"
+    ],
+    "cases_file": "task.295.dod.1.security.cases.1.json",
+    "cases_sha256": "6cb2ba940764c0335cea7f10ca78699cc196a07053ff7ea8f5b6c6917f258ec0"
+  },
+  {
+    "argv": [
+      "--entry",
+      "shell-argv:scripts/remote-test/run.sh",
+      "--argv",
+      "[\"--run\",\"ci:fast\",\"--host\",\"{input}\"]",
+      "--sink",
+      "filename",
+      "--name",
+      "run.sh --host validation"
+    ],
+    "cases_file": "task.295.dod.1.security.cases.2.json",
+    "cases_sha256": "06df4f0a3acf8879c99ccf4b1caa3bf089038df7f85875028af254460d05f52f"
+  }
+]

@@ -5,17 +5,21 @@ type: task
 description: "Add `npm run test:remote`: sync the working tree to the shared LAN server (.249), run the root test scripts there in a container that mirrors test.yml, and exit with their status, so the overheating laptop only syncs files and prints output."
 tags: [infrastructure, testing, developer-tooling, remote-test]
 category: infrastructure
-status: planned
+status: accepted
 priority: Medium
 created: 2026-11-10
 updated: 2026-11-10
 estimated_effort_hours: 16
 github_issue: 871
+pr_number: 872
+completed_date: 2026-11-10
 ---
 
 # Technical Task: Run the test suite on the LAN server (test:remote)
 
-**Status:** Planned
+**Status:** Ready for Review
+
+**Review**: ✅ All review recommendations from `task.295.review.1.test-remote-lan-server-route.md` implemented 2026-11-10
 
 **GitHub Issue**: [#871](https://github.com/Gamaroff/agent-skills/issues/871)
 
@@ -133,54 +137,54 @@ None. The change adds one script and files beside it. No existing script, test o
 
 **Risk**: Low. **Dependencies**: none.
 
-- [ ] Re-measure the server's tools and load (`ssh ci@192.168.1.249` toolchain probe, `uptime`, `docker ps`) and the laptop's `uptime`.
-- [ ] Confirm npm 9.2.0 against this `package-lock.json` (`lockfileVersion`) before deciding whether the host or the container installs dependencies.
-- [ ] Read the `eval:all` scenarios and drivers for network or credential needs (the default driver is replay; `evals/shared/drivers/claude-sdk.mjs` and `evals/shared/lib/gh-sandbox.mjs` read the environment). Record the verdict for the default-target decision.
+- [x] Re-measure the server's tools and load (`ssh ci@192.168.1.249` toolchain probe, `uptime`, `docker ps`) and the laptop's `uptime`.
+- [x] Confirm npm 9.2.0 against this `package-lock.json` (`lockfileVersion`) before deciding whether the host or the container installs dependencies.
+- [x] Read the `eval:all` scenarios and drivers for network or credential needs (the default driver is replay; `evals/shared/drivers/claude-sdk.mjs` and `evals/shared/lib/gh-sandbox.mjs` read the environment). Record the verdict for the default-target decision.
 - [x] The owner's three answers are recorded in Notes › Owner Decisions (container, `ci:fast`, agents required to use the route). Nothing to ask.
 
 ### Phase 1: Runner skeleton, argument grammar and exit codes
 
 **Risk**: Medium. **Dependencies**: Phase 0.
 
-- [ ] Add the runner and a sourced library with `server_ready HOST TOOL...` (one SSH round trip, `BatchMode=yes`, `ConnectTimeout=6`).
-- [ ] Parse `--run <script>` (repeatable, validated `^[A-Za-z0-9:._-]+$`, exit 2 before any ssh), `--host`, `TEST_REMOTE_HOST`, `TEST_LOCAL=1`.
-- [ ] Unreachable server: exit non-zero with a message that names `TEST_LOCAL=1`. Never fall back silently.
-- [ ] Capture `STATUS=$?` straight after the ssh call and `exit "$STATUS"` at the end. Use `;` between steps in any `case` arm, and never pipe the run into `tail` or `grep`.
+- [x] Add the runner and a sourced library with `server_ready HOST TOOL...` (one SSH round trip, `BatchMode=yes`, `ConnectTimeout=6`).
+- [x] Parse `--run <script>` (repeatable, validated `^[A-Za-z0-9:._-]+$`, exit 2 before any ssh), `--host`, `TEST_REMOTE_HOST`, `TEST_LOCAL=1`.
+- [x] Unreachable server: exit non-zero with a message that names `TEST_LOCAL=1`. Never fall back silently.
+- [x] Capture `STATUS=$?` straight after the ssh call and `exit "$STATUS"` at the end. Use `;` between steps in any `case` arm, and never pipe the run into `tail` or `grep`.
 
 ### Phase 2: Sync, container and dependency install
 
 **Risk**: High. **Dependencies**: Phase 1.
 
-- [ ] `rsync -a --delete` of the tree as git sees it: tracked plus untracked-not-ignored, excluding gitignored paths and `node_modules/`; keep `.env` and secrets out.
-- [ ] Per-branch remote directory `~ci/agent-skills-test-<branch-slug>`. In a linked worktree `.git` is a file, so no exclude may assume a `.git/` directory.
-- [ ] Sync `.git` so the history-backed replay test runs; otherwise state in the output that it skips.
-- [ ] Container image mirroring `test.yml` (`node:22-bookworm` plus `python3-yaml gawk mawk zsh jq git`, and `shellcheck` if Phase 0 finds a script needing it); `--user "$(id -u):$(id -g)"`, `--rm`, `--cpu-shares 128`.
-- [ ] `npm ci` in the container, skipped when a stored hash of `package-lock.json` is unchanged.
+- [x] Sync the tree as git sees it: tracked plus untracked-not-ignored, excluding gitignored paths and `node_modules/`; keep `.env` and secrets out. **`--files-from` does not delete stale remote files.** Measured in review 1: with `printf 'a/keep\0' | rsync -a --delete --from0 --files-from=- ./ dst/`, `dst/a/stale` and `dst/rootstale` both survive. So do not use `--files-from` with `--delete`. Use `rsync -a --delete --exclude-from=<list of gitignored paths>`, with plain `--exclude` (never `--delete-excluded`) for `node_modules/`, `.home/` and `.lock-hash`, so the remote install and its cache survive the sync. Prove it with a stale-file case (delete a tracked file locally, confirm it is gone remotely).
+- [x] Per-branch remote directory `~ci/agent-skills-test-<branch-slug>`. In a linked worktree `.git` is a file, so no exclude may assume a `.git/` directory.
+- [x] Sync `.git` so the history-backed replay test runs; otherwise state in the output that it skips.
+- [x] Container image mirroring `test.yml` (built on `node:22-trixie`, not bookworm: see Notes › Parity findings; plus `python3-yaml gawk mawk zsh jq git`, and `shellcheck` if Phase 0 finds a script needing it); `--user "$(id -u):$(id -g)"`, `--rm`, `--cpu-shares 128`.
+- [x] `npm ci` in the container, skipped when a stored hash of `package-lock.json` is unchanged.
 
 ### Phase 3: Timeout, teardown and shared-host behaviour
 
 **Risk**: Medium. **Dependencies**: Phase 2.
 
-- [ ] Wrap the remote run in `timeout --foreground -k 1m <N>m`; the bound has a default and an override.
-- [ ] Print `uptime` and running containers on the server before the run, so a contended host is visible.
-- [ ] Stay under `~ci/`; never write to the C: drive; never prune globally.
-- [ ] Reap stale per-branch directories on request.
+- [x] Wrap the remote run in `timeout --foreground -k 1m <N>m`; the bound has a default and an override.
+- [x] Print `uptime` and running containers on the server before the run, so a contended host is visible.
+- [x] Stay under `~ci/`; never write to the C: drive; never prune globally.
+- [x] Reap stale per-branch directories on request.
 
 ### Phase 4: Tests and acceptance runs
 
 **Risk**: Medium. **Dependencies**: Phase 3.
 
-- [ ] A guard test (offline, no ssh) for argument validation, exit 2 on `'x;y'`, and the unreachable-server message.
-- [ ] Run the five acceptance checks in § 9 on .249 and record the evidence in the QA report.
-- [ ] Mutation-prove each guard: revert the behaviour and confirm a test goes red.
+- [x] A guard test (offline, no ssh) for argument validation, exit 2 on `'x;y'`, and the unreachable-server message.
+- [x] Run the five acceptance checks in § 9 on .249 and record the evidence in the QA report. (Run in Step 3; `/qa-task` restates the evidence in its report.)
+- [x] Mutation-prove each guard: revert the behaviour and confirm a test goes red.
 
 ### Phase 5: Docs, `AGENTS.md` and optional `--auto`
 
 **Risk**: Low. **Dependencies**: Phase 4.
 
-- [ ] A contributor doc under `docs/contributing/` (usage, host rules, troubleshooting), linked from `docs/contributing/README.md`.
-- [ ] One `AGENTS.md` line: test runs go to `test:remote` when .249 is up, `TEST_LOCAL=1` otherwise (owner decision 3).
-- [ ] Optional, only if cheap: `--auto` probes the server and falls back to local, for scripted callers. The plain form still fails loudly.
+- [x] A contributor doc under `docs/contributing/` (usage, host rules, troubleshooting), linked from `docs/contributing/README.md`.
+- [x] One `AGENTS.md` line: test runs go to `test:remote` when .249 is up, `TEST_LOCAL=1` otherwise (owner decision 3). `CLAUDE.md` is a symlink to `AGENTS.md`, so edit `AGENTS.md` only. `tests/executable-instructions.test.js` (line 374) checks that `npm run <name>` mentions in documents name a real `package.json` script, so add the `package.json` script before the docs that mention it.
+- [x] Optional, not done by decision (see Notes): `--auto` probes the server and falls back to local, for scripted callers. The plain form still fails loudly.
 
 ---
 
@@ -235,27 +239,29 @@ None.
 
 ### Functional
 
-- [ ] `npm run test:remote` on a clean tree runs `ci:fast` on .249 and exits 0. While it runs, the laptop's `ps` shows no `node --test` or `test.sh` process, only `ssh` and `rsync`.
-- [ ] **A red run is red.** With one assertion broken on a scratch commit, `npm run test:remote` exits non-zero with the failure in its output. The scratch commit is then reverted.
-- [ ] `npm run test:remote -- --run 'x;y'` exits 2 before any `ssh`.
-- [ ] With `TEST_REMOTE_HOST=nobody@192.0.2.1` it exits non-zero, names `TEST_LOCAL=1`, and does not run locally.
-- [ ] The zsh and awk variants run on the server: the output carries no "skipping: zsh missing" or awk-variant skip notice.
+Criteria 1, 2 and 5 need the real server, which CI cannot reach, so they are held by a committed record, not a per-PR test: the QA report's "Acceptance runs" section carries each command, its exit status and the relevant output lines. Criteria 3 and 4 are held by the offline guard test (Phase 4).
+
+- [x] `npm run test:remote` on a clean tree runs `ci:fast` on .249 and exits 0. While it runs, the laptop's `ps` shows no `node --test` or `test.sh` process, only `ssh` and `rsync`. Evidence: QA report, "Acceptance runs".
+- [x] **A red run is red.** With one assertion broken on a scratch commit, `npm run test:remote` exits non-zero with the failure in its output. The scratch commit is then reverted. Evidence: QA report, "Acceptance runs".
+- [x] `npm run test:remote -- --run 'x;y'` exits 2 before any `ssh` (held by the offline guard test).
+- [x] With `TEST_REMOTE_HOST=nobody@192.0.2.1` it exits non-zero, names `TEST_LOCAL=1`, and does not run locally (held by the offline guard test).
+- [x] The zsh and awk variants run on the server: the output carries no "skipping: zsh missing" or awk-variant skip notice. Evidence: QA report, "Acceptance runs".
 
 ### Performance
 
-- [ ] `uptime` on the laptop and on .249 is recorded before and after the acceptance run, in the QA report (committed by acceptance; never only the implementation report).
-- [ ] The route runs at a low CPU weight (`--cpu-shares 128`), verified by `docker inspect` on a live run.
+- [x] `uptime` on the laptop and on .249 is recorded before and after the acceptance run, in the QA report (committed by acceptance; never only the implementation report).
+- [x] The route runs at a low CPU weight (`--cpu-shares 128`), verified by `docker inspect` on a live run.
 
 ### Code Quality
 
-- [ ] Every file the task adds passes `npm run lint:shell` and `npm run format:check`; the offline guard passes under `CI=true`.
-- [ ] `npm run ci:fast` is green on the final tree.
-- [ ] `shellcheck` is clean on the new scripts, run through `lint:shell`.
+- [x] Every file the task adds passes `npm run lint:shell` and `npm run format:check`; the offline guard passes under `CI=true`.
+- [x] `npm run ci:fast` is green on the final tree.
+- [x] `shellcheck` is clean on the new scripts, run through `lint:shell`.
 
 ### Migration
 
-- [ ] The contributor doc exists and `AGENTS.md` carries the one line (subject to the owner's Phase 0 answer).
-- [ ] No existing script's behaviour changed (`git diff` of `package.json` shows one added line).
+- [x] The contributor doc exists and `AGENTS.md` carries the one line (subject to the owner's Phase 0 answer).
+- [x] No existing script's behaviour changed (`git diff` of `package.json` shows one added line).
 
 ---
 
@@ -319,12 +325,74 @@ This task does not use sign-off (`sign-off.enabled` is not `true` in `skills-con
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-10
+**Quality Score**: 85/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.295.qa.5.test-remote-lan-server-route.md](./task.295.qa.5.test-remote-lan-server-route.md)
+- **Gate File**: [task.295.gate.5.test-remote-lan-server-route.yml](./task.295.gate.5.test-remote-lan-server-route.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 19
+- **Phases Verified**: 6/6
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No code defect is open. The guard's documented window is wrong (a few seconds, where it is minutes) and a comment points at the wrong Future Improvements item (T295-QA-10).
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.295.qa.5.test-remote-lan-server-route.md`
+**Gate File**: `task.295.gate.5.test-remote-lan-server-route.yml`
+**Gate Status**: CONCERNS, 85/100 (no high item open; the loop spent its five gates, then the Step 5c PR review found no open coverage finding)
+
+All Definition of Done criteria were verified:
+
+✅ **Acceptance Criteria:** 12 of 12 met. The server-only ones are held by the acceptance runs recorded in the QA report (green exit 0 with 8365 tests and 0 fail on the final tree; a deliberate red run exits 1)
+✅ **Tests and CI:** the offline guard passes (19 tests); CI reading 1 SUCCESS, tree-equivalent to `13486822`
+✅ **Documentation:** contributor guide, index entry, `AGENTS.md` section and a CHANGELOG entry citing task 295
+✅ **Security Review:** PASS; the `--run` and `--host` validators were probed (34 candidates, 0 reproduced)
+✅ **Compliance Review:** not applicable (developer tooling)
+
+**Deviation:** the first full `ci:fast` run on the final tree came during `/finalise` and found a hardcoded spawn timeout in the guard test; it was fixed in `13486822` and verified inline, not by a further QA cycle.
+
+**Detailed Verification Log:** See `task.295.dod.1.test-remote-lan-server-route.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-10
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-10 | 1.0     | Initial draft | create-task |
+| 2026-11-10 | 1.1     | Review passed (8/10): rsync plan fixed (`--files-from` leaves stale files), evidence location named for server-only criteria, script-before-docs order | review-task |
+| 2026-11-10 |         | Status → ready-for-development | review-task |
+| 2026-11-10 | 1.2     | Implemented: test:remote runner, container, guard test, docs; four container parity fixes recorded in Notes | develop-task |
+| 2026-11-10 |         | Status → ready-for-review | develop-task |
+| 2026-11-10 |         | QA gate CONCERNS (80/100) — 2 findings | qa-task |
+| 2026-11-10 |         | QA gate FAIL (65/100) — 3 findings, 1 high | qa-task |
+| 2026-11-10 |         | Status → in-progress | qa-task |
+| 2026-11-10 |         | QA findings fixed after gates 1 and 2 (5 findings, 2 fix cycles); ready for re-gate | qa-fix |
+| 2026-11-10 |         | Status → ready-for-review | qa-fix |
+| 2026-11-10 |         | QA gate FAIL (65/100) — 3 findings, 1 high | qa-task |
+| 2026-11-10 |         | Status → in-progress | qa-task |
+| 2026-11-10 |         | QA findings fixed after gate 3 (3 findings, 3 fix cycles in all); ready for re-gate | qa-fix |
+| 2026-11-10 |         | Status → ready-for-review | qa-fix |
+| 2026-11-10 |         | QA gate CONCERNS (80/100) — 1 finding | qa-task |
+| 2026-11-10 |         | QA findings fixed after gate 4 (1 finding, 4 fix cycles in all); ready for re-gate | qa-fix |
+| 2026-11-10 |         | QA gate CONCERNS (85/100) — 1 finding | qa-task |
+| 2026-11-10 |         | QA finding fixed after gate 5 (wording, 5 fix cycles in all); the PR review reads it | qa-fix |
+| 2026-11-10 | 1.3 | DoD passed — accepted (PR #872) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -332,36 +400,36 @@ This task does not use sign-off (`sign-off.enabled` is not `true` in `skills-con
 ## Progress Tracking
 
 ### Phase 0: Re-measure and decide
-- [ ] Re-measure server and laptop
-- [ ] Check eval:all for network or credential needs
-- [ ] Record the owner's three answers
+- [x] Re-measure server and laptop
+- [x] Check eval:all for network or credential needs
+- [x] Record the owner's three answers
 
 ### Phase 1: Runner skeleton, argument grammar and exit codes
-- [ ] Runner and probe
-- [ ] Argument validation
-- [ ] Loud failure naming TEST_LOCAL=1
-- [ ] Exit-code capture
+- [x] Runner and probe
+- [x] Argument validation
+- [x] Loud failure naming TEST_LOCAL=1
+- [x] Exit-code capture
 
 ### Phase 2: Sync, container and dependency install
-- [ ] rsync of the working tree
-- [ ] Per-branch directory
-- [ ] Container image and run flags
-- [ ] Lockfile-keyed npm ci
+- [x] rsync of the working tree
+- [x] Per-branch directory
+- [x] Container image and run flags
+- [x] Lockfile-keyed npm ci
 
 ### Phase 3: Timeout, teardown and shared-host behaviour
-- [ ] Timeout with -k
-- [ ] Load print before the run
-- [ ] Reap stale directories
+- [x] Timeout with -k
+- [x] Load print before the run
+- [x] Reap stale directories
 
 ### Phase 4: Tests and acceptance runs
-- [ ] Offline guard tests
-- [ ] Five acceptance runs
-- [ ] Mutation proof
+- [x] Offline guard tests
+- [x] Five acceptance runs
+- [x] Mutation proof
 
 ### Phase 5: Docs, AGENTS.md and optional --auto
-- [ ] Contributor doc
-- [ ] AGENTS.md line
-- [ ] Optional --auto
+- [x] Contributor doc
+- [x] AGENTS.md line
+- [x] Optional --auto (decided against; see Notes)
 
 ---
 
@@ -385,7 +453,19 @@ This task does not use sign-off (`sign-off.enabled` is not `true` in `skills-con
 
 ### Known Issues
 
-None yet.
+None.
+
+### Phase 0 decisions and parity findings (2026-11-10)
+
+- **Server re-measured**: node v22.22.1, npm 9.2.0, `package-lock.json` `lockfileVersion` 3 (npm 9 reads it), docker present, zsh and shellcheck missing on the host. Load 2.9 to 5.3 with the tinker-city containers running: contended, so the low CPU weight matters.
+- **`eval:all` verdict**: the default driver is replay; the live drivers read `ANTHROPIC_API_KEY` and skip without it, so `eval:all` needs no network or credentials by default. `ci:fast` stays the default target (owner decision 2); `eval:all` is reachable through `--run eval:all`.
+- **Parity findings** — the container is only as good as it is faithful to CI, and each gap below made a real test fail remotely until fixed:
+  1. `node:22-bookworm` ships jq 1.6 (exits 0 on `jq -e` over empty input) and git 2.39: the zero-byte-lock cases and a gitlink-commit test failed. Fixed by building on `node:22-trixie` (jq 1.7.1, git 2.47).
+  2. `shellcheck` must be on PATH under `CI=true` (`tests/ci-tool-skips.test.js`): added to the image.
+  3. No UTF-8 locale: zsh printed `§` as escapes and a text match failed. `LANG=C.UTF-8` set.
+  4. `HOME=/tmp/...` is refused by the observation-log tests (workspace under a temporary directory): `HOME=/home/node`.
+- **`--auto` not built.** A mode that falls back to local on an unreachable server is the silent fall back the route exists to refuse, and its only caller would be a script that should set `TEST_LOCAL=1` itself.
+- **A route run syncs the working tree as it is.** Uncommitted edits from another session in the same checkout travel to the server and can fail bundle-freshness tests there (seen in runs 2 to 5). For a verdict on committed work, run from a clean clone.
 
 ### Owner Decisions (2026-11-10)
 
@@ -396,3 +476,4 @@ None yet.
 ### Future Improvements
 
 - A cross-repository lock on .249, if overlapping gates recur.
+- A per-run lock for one branch (an atomic `mkdir` on the run directory before the sync), if two runs on one branch recur. Today the container-name check is a best-effort guard with a window of minutes.

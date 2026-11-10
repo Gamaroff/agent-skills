@@ -1,0 +1,82 @@
+schema: 2
+task: 'task.295.test-remote-lan-server-route'
+task_title: 'Run the test suite on the LAN server (test:remote)'
+gate: FAIL
+status_reason: 'Both cycle-1 findings are fixed, but the cycle-2 refute pass found and QA reproduced a high defect: the timeout kills only the local ssh client, so the remote container keeps running after exit 124. Three medium findings (branch-key collisions, --reap reading a stale directory mtime) came with it.'
+reviewer: 'QA Engineer'
+head: '7dd8e0a8c8116d09f332ce8f5872586d651a99a7'
+updated: '2026-11-10T16:11:15Z'
+
+top_issues:
+  - id: 'T295-QA-3'
+    severity: high
+    file: 'scripts/remote-test/run.sh'
+    finding: 'The run timeout bounds only the local ssh client. After `timeout` fires (exit 124) the remote `docker run` keeps going: it has no --name, no in-container timeout and no tty, so a hung suite burns CPU on the shared server until someone notices. Reproduced on .249 with the real image: `timeout --foreground -k 1m 5 ssh ... docker run --rm --name qa295-probe ... sleep 120` returned 124 and `docker ps` still listed the container 3 seconds later (killed by hand afterwards; 0 left). The docs claim a bounded run. origin: code-review (refute pass, CR-1, high/high), reproduced by QA'
+    suggested_action: 'Enforce the bound on the server: name the container per run directory and run the scripts under `timeout` inside it (or trap and `docker kill` the named container), add --init so the process tree is signalled; add a guard test that a timed-out run issues the kill'
+    suggested_owner: dev
+    status: open
+  - id: 'T295-QA-4'
+    severity: medium
+    file: 'scripts/remote-test/run.sh'
+    finding: 'The per-branch directory key is lossy and unlocked. `feature/foo`, `feature-foo` and `Feature/Foo` all map to agent-skills-test-feature-foo (reproduced), and on a detached HEAD `git rev-parse --abbrev-ref HEAD` prints `HEAD` with exit 0 (reproduced), so the `|| echo detached` fallback never fires and every detached checkout shares agent-skills-test-head. Two runs on one key rsync --delete over each other while the other container reads the tree. origin: code-review (CR-3, CR-4), reproduced by QA'
+    suggested_action: 'Key on the slug plus a short hash of the full branch name (a commit sha or path hash when detached) and take a per-directory lock on the server for the run'
+    suggested_owner: dev
+    status: open
+  - id: 'T295-QA-5'
+    severity: medium
+    file: 'scripts/remote-test/run.sh'
+    finding: '--reap judges staleness by the top-level directory mtime, but `rsync -a` copies the source root mtime onto the remote directory (reproduced: a 40-day-old source root gave a 40-day-old destination root after a fresh sync), so a directory used today can read as weeks old and be removed, and nothing checks for a container that mounts it. Reviewer rated this high; re-rated medium because it needs an explicit operator `--reap` and removes only a re-creatable cache directory. The deletion itself was not executed (it would remove real directories on the shared server). origin: code-review (CR-2, high/medium), mechanism reproduced by QA'
+    suggested_action: 'Touch a marker file on every run and reap by its mtime; skip any directory a running container has mounted'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 65
+
+evidence:
+  tests_reviewed: 8
+  phases_verified: '6/6'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: ['never']
+    boundary: true
+    notes: 'Unchanged from cycle 1: the --run validation is the boundary; security-probe.mjs scored a corpus that does not fit this entry, so it is not credited. The refute pass found no injection path: only validated script names, a sanitised slug and a hex tag are spliced into the remote command.'
+  performance:
+    status: PASS
+    notes: 'CpuShares=128 confirmed on the live container in cycle 1. See T295-QA-3 for the leaked-container case.'
+  reliability:
+    status: CONCERNS
+    notes: 'T295-QA-3 (timeout leaves the remote container running), T295-QA-4 (shared run directory), T295-QA-5 (reap). The cycle-1 hang is fixed and held by a committed guard test.'
+  maintainability:
+    status: PASS
+    notes: 'shellcheck clean; guard test 8/8; CHANGELOG now cites task 295.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T295-QA-3, T295-QA-4 and T295-QA-5'
+      refs: ['scripts/remote-test/run.sh', 'tests/test-remote-runner.test.js']
+  future:
+    - action: 'testing-remote.md step 4 lists the image contents without shellcheck, rsync or the trixie base; align it with the Dockerfile'
+      refs: ['docs/contributing/testing-remote.md']
+    - action: '--timeout-min 08 or 09 is refused with a bash octal error and a misleading message (reproduced, exit 2), and a very long digit string has no upper bound; normalise with 10#$TIMEOUT_MIN and cap it'
+      refs: ['scripts/remote-test/run.sh']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T295-QA-3 fixed', 'T295-QA-4 fixed', 'T295-QA-5 fixed']

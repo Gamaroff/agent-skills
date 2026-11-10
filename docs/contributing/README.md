@@ -11,6 +11,7 @@ How to author, package, validate, and release skills for this library.
 - [Packaging](./packaging.md) — distribution, validation, shared resources
 - [Evals](./evals/README.md) — four-layer test suite, drivers, live tracker scenarios
 - [Releases](./releases.md) — versioning, release checklist, publishing
+- [Running tests on the LAN server](./testing-remote.md) — `npm run test:remote`: run the suite on the shared server instead of the laptop
 - [Traps](./traps.md) — repo-specific things that cost time: shell functions, symlinks, generated trees, CI quirks
 
 ## See also
