@@ -21,6 +21,19 @@ const path = require("path");
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const { spawnSync } = require("child_process");
+const { pathToFileURL } = require("node:url");
+
+// The spawn timeout is the shared budget, never a literal chosen against an idle machine
+// (tests/test-harness-concurrency.test.js fails on a hardcoded `timeout:` figure).
+let budget;
+test.before(async () => {
+  const { spawnBudget } = await import(
+    pathToFileURL(
+      path.join(__dirname, "..", "shared", "resources", "spawn-budget.mjs"),
+    ).href
+  );
+  budget = spawnBudget("TEST_REMOTE_RUNNER");
+});
 
 const REPO_ROOT = path.resolve(__dirname, "..");
 const RUNNER = path.join(REPO_ROOT, "scripts", "remote-test", "run.sh");
@@ -151,11 +164,11 @@ test("--host and --timeout-min with no value exit 2 instead of hanging", (t) => 
     ["--run", "x", "--host"],
   ]) {
     const stubs = makeStubs(t);
-    // A hang ends in SIGTERM after 5s: status null, signal set, so it cannot pass as a refusal.
+    // A hang ends in SIGTERM at the budget: status null, signal set, so it cannot pass as a refusal.
     const r = spawnSync("bash", [RUNNER, ...args], {
       cwd: REPO_ROOT,
       encoding: "utf8",
-      timeout: 5000,
+      timeout: budget.timeoutMs,
       env: { ...process.env, PATH: `${stubs.dir}:${process.env.PATH}` },
     });
     assert.equal(
