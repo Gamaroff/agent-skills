@@ -1,0 +1,78 @@
+schema: 2
+task: 'task.293.qa-snippet-classifier-indirect-evaluation'
+task_title: 'QA snippet classifier refuses indirect evaluation'
+gate: FAIL
+status_reason: 'Cycle 2 (refute pass plus safety re-probe) reproduced two more bypasses of the same family under bash 5.3: a bare word joined to a quoted literal (x=a quote-open [$(cmd)] quote-close) and a literal piped into a later read. Both classify runnable and write; both controls stay clean. The cycle-1 fixes held.'
+reviewer: 'QA Engineer'
+head: 'c685463bcf8a91feea417dca85b393ea0c5ee2e2'
+updated: '2026-11-10T10:42:21Z'
+
+top_issues:
+  - id: 'T293-QA-3'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'The assigned-literal rule keys on the single character before the quote being an equals sign, so a value joined from a bare word and a quoted literal escapes it: x=a then single-quoted [$(touch W)] followed by echo $((x)) classifies runnable and creates W under bash 5.3 (also x="pre" then the single-quoted literal). Reproduced by QA by execution; the control x=a then single-quoted [5] stays runnable and writes nothing.'
+    suggested_action: 'Decide assignment by the enclosing assignment word (name= or name[..]= whose value spans the quote), not by the character before the quote; add the joined-word shapes to the table, decider rows and differential atoms.'
+    suggested_owner: dev
+    status: open
+    origin: 'code-review CR-1, reproduced by QA'
+  - id: 'T293-QA-4'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'The evaluating-word rule searches only the literal own command segment, and a pipe starts a new segment, so echo with a single-quoted a[$(touch W)] piped into a brace group running read x then echo $((x)) classifies runnable and creates W under bash 5.3 (printf is caught only because printf is itself an evaluating word). Reproduced by QA by execution; the control with a[5] stays runnable and writes nothing.'
+    suggested_action: 'Refuse a quoted literal holding a substitution whenever the block also holds an evaluating read (read, $((..)), [[ -eq ]], unset, test -v), or treat a literal that reaches stdin or a here-string as the operand of a later read; add the shape to the table, decider rows and differential atoms.'
+    suggested_owner: dev
+    status: open
+    origin: 'code-review CR-2, reproduced by QA'
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 383
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 31
+    boundary: true
+    escaped: 0
+    boundary_signals: ["refused"]
+    notes: 'The classifier is the boundary. 31 corpus cases executed, 0 escaped. Beyond the corpus the independent reviewer enumerated the evaluation routes again and QA reproduced two further bypasses (T293-QA-3, T293-QA-4) under real bash. Cycle 1 findings QA-1 and QA-2 are fixed.'
+  performance:
+    status: PASS
+    notes: 'The reviewer timed x=a[ at 1e4, 4e4 and 1e5 repeats and found it linear; docs scan 0 newly runnable, 2 newly refused, cost within the earlier measured bound.'
+  reliability:
+    status: PASS
+    notes: 'CI=true npm run ci:fast green at the fix commit (8346 tests, 0 fail). QA re-ran the assembled-value mutation: both task.293 shape and decider tests went red, then the engine was restored byte-identical.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Two cycles in a row each found new same-family spellings of a textual allow-list, so the per-spelling approach has not converged. The fix cycle should replace the segment-local test with a block-level rule rather than add a third spelling.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Close T293-QA-3 and T293-QA-4 with a block-level rule (any quoted literal holding a substitution plus any evaluating read in the same block is refused), then extend the table, decider rows and differential atoms.'
+      refs: ['shared/resources/qa-execute-snippets.mjs', 'shared/resources/tests/qa-execute-snippets.test.mjs', 'scripts/qa-snippets-differential.mjs']
+  future:
+    - action: 'CR-3 from cycle 1 (a value laundered through command output) and a bracket or dollar sign that arrives by expansion remain recorded unseen shapes; a block-level rule for T293-QA-4 may close the first.'
+      refs: ['shared/resources/qa-runnable-prose-detection.md']
+      provenance: documented-unseen-shape
+    - action: 'CR-4 and CR-5 over-refusal of printed literals and grep PS1= remain advisory.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T293-QA-3 and T293-QA-4 closed and re-reviewed']

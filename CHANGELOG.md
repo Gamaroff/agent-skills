@@ -16,7 +16,9 @@ All notable changes to this project will be documented in this file. Format foll
   evaluating builtin; a prompt variable set; `@P`) instead of tracking the value. A value built by
   expansion into a subscript (`x="a[$y$z]"`) and a quoted substitution directly after a `[`
   (`${a['$(cmd)']}`) are refused too: both were found by QA, and the first by the random
-  differential on a `read "$x"` spelling. The differential gains an `indirect` atom set (10 writes
+  differential on a `read "$x"` spelling. QA cycle 2 found a joined word (`x=a'[$(cmd)]'`) and a
+  literal piped into `read`, so the quoted-literal rule is now block-level: a quoted substitution in
+  a block that also evaluates a value is refused. The differential gains an `indirect` atom set (10 writes
   on the previous engine, 0 now) and the docs scan finds two blocks newly refused and none newly
   runnable. Known unseen shapes: a value laundered through a command's output, and a `[` or `$`
   that itself arrives by expansion.

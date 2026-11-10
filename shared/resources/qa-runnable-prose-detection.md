@@ -253,12 +253,17 @@ reproduce under real bash, and a block holding one is `mutating` with a reason t
   `printf -v` and the like), or using `${x@P}`. Bash expands prompt escapes, and those include command
   substitution, so `PS4=…` then `set -x`, or `${x@P}` on a value read from elsewhere, runs it. Merely
   mentioning the name (`echo PS4`) is not refused.
-- **A quoted literal that holds a substitution, where it is assigned** (`x='a[$(cmd)]'`, `x="a[\$(cmd)]"`,
-  `x=$'a[\x24(cmd)]'`, an unquoted escaped form) **or handed to a builtin that evaluates its operand**
-  (`printf -v`, `read`, `test -v`, `[[ -v … ]]`, `[[ … -eq … ]]`, `unset`, `declare`, `let`, `(( ))`).
-  Bash evaluates the subscript `a[$(cmd)]` as arithmetic when it reads the name, so the substitution
-  runs. This also covers the variable used later in `$((x))`, `[[ $x -eq 1 ]]`, `${v:0:$x}` or
-  `${!x}`: the assignment is the refusal, so no value is tracked.
+- **A quoted literal that holds a substitution, in a block that also evaluates something**
+  (`x='a[$(cmd)]'`, `x="a[\$(cmd)]"`, `x=$'a[\x24(cmd)]'`, a joined word such as `x=a'[$(cmd)]'`, an
+  unquoted escaped form, a literal piped into `read`, a quoted-delimiter here-document body). "Evaluates something" is any live
+  `printf`, `read`, `test`, `unset`, `declare`, `typeset`, `local`, `export`, `readonly`, `let`, `eval`,
+  `for`, `select`, `case`, `[`, `[[` or `((` in the block, or an arithmetic read: `$((x))`, `$[x]`,
+  `${v:0:$x}`, `${!x}`, `${a[x]}`. Bash evaluates the subscript `a[$(cmd)]` as arithmetic when it reads
+  the name, so the substitution runs. The rule is **block-level on purpose** (QA cycle 2): the
+  per-segment and character-before-the-quote versions each lost to one more spelling, because a pipe,
+  a joined word or a variable carries the literal to the evaluation. No value is tracked. The price is
+  over-refusal of a block that only prints such a literal next to a test or a loop; the docs scan
+  measures it.
 - **A subscript built by expansion, and a quoted substitution used as a subscript** (QA cycle 1). An
   assignment whose value holds an expansion inside `name[…]` (`x="a[$y$z]"`, `x="a[${d}(cmd)]"`) is
   refused, because the text that `$((x))`, `read "$x"`, `test -v "$x"` or `[[ $x -eq 1 ]]` later
@@ -270,9 +275,9 @@ reproduce under real bash, and a block holding one is `mutating` with a reason t
 The claim is **bounded**, not "any indirect evaluation": the table in `qa-execute-snippets.test.mjs`
 (`task.293 — indirect evaluation`) lists the shapes, and the `indirect` atom set of the differential
 (`npm run qa-snippets:differential -- --atoms indirect`) generates their combinations. **Known
-unseen shapes:** a value laundered through a command's output (`y=$(echo 'a[$(cmd)]'); echo $((y))`,
-or `x=$(printf 'a[\044(cmd)]')`), where the literal is not assigned and no evaluating builtin precedes
-it; and the `[` or `$` itself arriving by expansion (`b='['; x="a${b}…"`). Both reproduce under bash
+unseen shapes:** a value laundered through a command's output with the substitution spelled by an
+escape (`x=$(printf 'a[\044(cmd)]'); echo $((x))`; the plain `y=$(echo 'a[$(cmd)]')` form is now
+refused by the block-level rule); and the `[` or `$` itself arriving by expansion (`b='['; x="a${b}…"`). Both reproduce under bash
 and are recorded, not closed. The rule sits after the helper
 rule on purpose, so a helper call that also names a start-up variable keeps its `helper call with …`
 reason. A documentation block that needs one of these shapes is rewritten to avoid the indirection.

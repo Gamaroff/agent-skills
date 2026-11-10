@@ -161,6 +161,10 @@ export const ATOM_SETS = {
     // against the cycle-1 engine found no write without these).
     "y='$'; z='(touch out)'; x=\"a[$y$z]\"",
     "a=(1); echo ${a['$(touch out)']}",
+    // QA cycle 2 (T293-QA-3, T293-QA-4): a joined word, and a literal piped into a read.
+    "x=a'[$(touch out)]'",
+    "echo 'a[$(touch out)]' | { read x; echo $((x)); }",
+    "cat <<'EOF' | { read x; echo $((x)); }\na[$(touch out)]\nEOF",
     "let x",
     "(( x ))",
     "true",

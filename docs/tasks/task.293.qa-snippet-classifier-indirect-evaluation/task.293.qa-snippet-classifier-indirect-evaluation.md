@@ -225,17 +225,17 @@ Documentation:
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.293.qa.1.qa-snippet-classifier-indirect-evaluation.md](./task.293.qa.1.qa-snippet-classifier-indirect-evaluation.md)
-- **Gate File**: [task.293.gate.1.qa-snippet-classifier-indirect-evaluation.yml](./task.293.gate.1.qa-snippet-classifier-indirect-evaluation.yml)
+- **Full Report**: [task.293.qa.2.qa-snippet-classifier-indirect-evaluation.md](./task.293.qa.2.qa-snippet-classifier-indirect-evaluation.md)
+- **Gate File**: [task.293.gate.2.qa-snippet-classifier-indirect-evaluation.yml](./task.293.gate.2.qa-snippet-classifier-indirect-evaluation.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 382 in the suite file; `ci:fast` 8346, 0 fail
+- **Tests Executed**: 383 in the suite file; `ci:fast` 8346, 0 fail at the fix commit
 - **Phases Verified**: 2/3 clean
 - **Critical Issues**: 2 (high)
 - **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Two same-family bypasses of the new refusal reproduce under real bash: a value assembled from pieces and read as arithmetic, and a quoted substitution used as an array subscript inside a parameter expansion.
+Cycle 1's two bypasses are fixed. The cycle-2 refute pass found two more of the same family, both reproduced under real bash: a bare word joined to a quoted literal (`x=a'[$(cmd)]'`), and a literal piped into a later `read`.
 
 ## Change Log
 
@@ -248,6 +248,8 @@ Two same-family bypasses of the new refusal reproduce under real bash: a value a
 | 2026-11-10 |  | Implemented: `indirectEvaluationHazard` in `qa-execute-snippets.mjs`, `indirect` differential atom set, tests, docs, CHANGELOG. Status → ready-for-review | develop-task |
 | 2026-11-10 |  | QA gate FAIL (70/100) — 2 high findings | qa-task |
 | 2026-11-10 |  | QA findings fixed — 2 high closed (assembled subscript value, quoted substitution as subscript), 1 iteration | qa-fix |
+| 2026-11-10 |  | QA gate FAIL (70/100) — 2 high findings | qa-task |
+| 2026-11-10 |  | QA findings fixed — 2 high closed (joined word and quoted literal, literal piped into read) with a block-level rule, 2 iterations | qa-fix |
 <!-- change-log-end -->
 
 ## References

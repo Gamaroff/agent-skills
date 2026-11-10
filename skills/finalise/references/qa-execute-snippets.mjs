@@ -3121,6 +3121,11 @@ const EVALUATING_WORD =
   /(?<![^\s;&|({])(?:printf|read|test|unset|declare|typeset|local|export|readonly|let|eval|for|select|case|\[\[?|\(\()(?=[\s;&|)]|$)/g;
 const ESCAPED_SUBSTITUTION_ASSIGNMENT =
   /(?:^|[\s;&|({])[A-Za-z_][A-Za-z0-9_]*(?:\[[^\]\s]*\])?\+?=\S*\\[$`]/;
+// A place that is not an evaluating word yet reads a variable as arithmetic: `$(( x ))`, `$[ x ]`,
+// an offset `${v:0:$x}`, `${!x}`, a subscript `${a[x]}` / `${a[$x]}` / `a[x]=1`. Bounded repeats, so
+// a long run of openers cannot make the scan quadratic.
+const ARITHMETIC_READ =
+  /\$\(\(|\$\[|\$\{[A-Za-z_][A-Za-z0-9_]*:|\$\{![A-Za-z_]|[A-Za-z0-9_}]\[[A-Za-z_$]/;
 // An assignment whose value is built by expansion into a subscript (`x="a[$y$z]"`). The text that a
 // later `$((x))`, `read "$x"`, `test -v "$x"`, `unset "$x"`, `[[ $x -eq 1 ]]`, `${v:0:$x}` or `${!x}`
 // evaluates is not in the block, so it cannot be judged, and the build is refused instead of
@@ -3166,27 +3171,44 @@ function anyIn(starts, lo, hi) {
  */
 function indirectEvaluationHazard(code) {
   const n = code.length;
-  const { tokens } = tokenize(code);
+  // Each check below runs only when its trigger text is present: the docs scan classifies thousands
+  // of blocks and almost none of them hold any of these (task 293's 10% cost bound).
+  const hasPrompt = /PS[0124]/.test(code);
+  const hasSubstitution = code.includes("$(") || /[`\\]/.test(code);
+  const hasSubscript = code.includes("[") && /[$`]/.test(code);
+  if (!hasPrompt && !hasSubstitution && !hasSubscript && !code.includes("@P"))
+    return null;
   const quotes = [];
-  const dead = new Int32Array(n + 2); // comment and heredoc body: not code
-  const quoted = new Int32Array(n + 2); // a quote's interior: its separators are not the shell's
-  for (const t of tokens) {
-    if (t.kind === "comment" || t.kind === "heredoc-body") {
-      dead[t.start] += 1;
-      dead[t.end] -= 1;
-    } else if (t.kind === "quote") {
-      quotes.push(t);
-      quoted[t.start + 1] += 1;
-      quoted[t.end - 1] -= 1;
+  const bodies = []; // here-document bodies
+  const substStarts = []; // command substitutions the tokenizer found
+  let dead = null; // comment and heredoc body: not code
+  let quoted = null; // a quote's interior: its separators are not the shell's
+  const marks = () => {
+    if (dead !== null) return;
+    dead = new Int32Array(n + 2);
+    quoted = new Int32Array(n + 2);
+    for (const t of tokenize(code).tokens) {
+      if (t.kind === "comment" || t.kind === "heredoc-body") {
+        if (t.kind === "heredoc-body") bodies.push(t);
+        dead[t.start] += 1;
+        dead[t.end] -= 1;
+      } else if (t.kind === "subst") {
+        substStarts.push(t.start);
+      } else if (t.kind === "quote") {
+        quotes.push(t);
+        quoted[t.start + 1] += 1;
+        quoted[t.end - 1] -= 1;
+      }
     }
-  }
-  for (let i = 1; i <= n; i += 1) {
-    dead[i] += dead[i - 1];
-    quoted[i] += quoted[i - 1];
-  }
+    for (let i = 1; i <= n; i += 1) {
+      dead[i] += dead[i - 1];
+      quoted[i] += quoted[i - 1];
+    }
+  };
   let lastSep = null; // index of the last live command separator at or before each position
   const segmentStart = (at) => {
     if (lastSep === null) {
+      marks();
       lastSep = new Int32Array(n);
       let cur = -1;
       for (let i = 0; i < n; i += 1) {
@@ -3199,38 +3221,58 @@ function indirectEvaluationHazard(code) {
   };
 
   // A prompt variable set or declared (not merely mentioned), and the `@P` transform.
-  const declaring = matchStarts(DECLARING_WORD, code);
-  for (const m of code.matchAll(PROMPT_VARIABLE_AT)) {
-    if (dead[m.index] !== 0) continue;
-    const after = code.slice(m.index + 3, m.index + 5);
-    if (after[0] === "=" || after === "+=")
-      return "a prompt variable (PS0, PS1, PS2, PS4), whose value bash expands as a prompt string";
-    if (anyIn(declaring, segmentStart(m.index), m.index - 1))
-      return "a prompt variable (PS0, PS1, PS2, PS4), whose value bash expands as a prompt string";
+  if (hasPrompt) {
+    marks();
+    const declaring = matchStarts(DECLARING_WORD, code);
+    for (const m of code.matchAll(PROMPT_VARIABLE_AT)) {
+      if (dead[m.index] !== 0) continue;
+      const after = code.slice(m.index + 3, m.index + 5);
+      if (after[0] === "=" || after === "+=")
+        return "a prompt variable (PS0, PS1, PS2, PS4), whose value bash expands as a prompt string";
+      if (anyIn(declaring, segmentStart(m.index), m.index - 1))
+        return "a prompt variable (PS0, PS1, PS2, PS4), whose value bash expands as a prompt string";
+    }
   }
   const prose = stripProse(code);
   if (PROMPT_TRANSFORM.test(prose)) return "a ${…@P} prompt-escape expansion";
-  if (ESCAPED_SUBSTITUTION_ASSIGNMENT.test(prose))
+  if (code.includes("\\") && ESCAPED_SUBSTITUTION_ASSIGNMENT.test(prose))
     return "a variable assigned an escaped substitution that a later expansion evaluates";
-  if (EXPANDED_ASSIGNMENT.test(prose))
+  if (hasSubscript && EXPANDED_ASSIGNMENT.test(prose))
     return "a variable built by expansion into a subscript, which a later read evaluates as arithmetic";
+  if (!hasSubstitution) return null;
 
-  // A quoted literal that holds a substitution, assigned or handed to an evaluating builtin.
+  // A quoted literal that holds a substitution, in a block that also evaluates something.
+  marks();
   const literals = {
     "'": matchStarts(LITERAL_IN_SINGLE, code),
     '"': matchStarts(LITERAL_IN_DOUBLE, code),
     "$'": matchStarts(LITERAL_IN_ANSI_C, code),
   };
-  const evaluating = matchStarts(EVALUATING_WORD, code);
+  // BLOCK-level, not per segment: the literal can reach the evaluation through a pipe, a joined
+  // word (`x=a'[$(cmd)]'`), a variable or a here-string, and a segment boundary or the character
+  // before the quote cannot follow it (task 293 QA cycle 2: two more spellings of the same family
+  // after cycle 1's two). The cost is over-refusal, measured by the docs scan.
+  let evaluates = null; // computed on the first literal only: most blocks hold none
+  const blockEvaluates = () =>
+    (evaluates ??=
+      matchStarts(EVALUATING_WORD, code).some((i) => dead[i] === 0) ||
+      ARITHMETIC_READ.test(prose));
+  const REFUSED =
+    "a quoted substitution in a block that also evaluates a value as code or arithmetic";
   for (const q of quotes) {
     const hits = literals[q.quote];
     if (!hits || !anyIn(hits, q.start + q.quote.length, q.end - 2)) continue;
     if (code[q.start - 1] === "[")
       return "a quoted substitution used as a subscript, which bash evaluates as arithmetic";
-    if (code[q.start - 1] === "=")
-      return "a quoted substitution assigned to a variable, which a later expansion evaluates";
-    if (anyIn(evaluating, segmentStart(q.start), q.start - 1))
-      return "a quoted substitution handed to a builtin that evaluates its operand";
+    if (blockEvaluates()) return REFUSED;
+  }
+  // A quoted-delimiter here-document body is a literal too: `read x <<'EOF'` then `$((x))`.
+  for (const b of bodies) {
+    // An unquoted here-document expands its own `$(…)` (a `subst` token inside the body), which the
+    // substitution rules already judge; only a body with none is literal text.
+    if (substStarts.some((s) => s >= b.start && s < b.end)) continue;
+    if (anyIn(literals["'"], b.start, b.end - 1) && blockEvaluates())
+      return REFUSED;
   }
   return null;
 }

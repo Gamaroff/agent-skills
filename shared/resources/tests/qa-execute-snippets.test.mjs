@@ -5141,6 +5141,19 @@ const T293_SHAPES = {
     "y='$'; z='(touch W)'; x=\"a[$y$z]\"; read -r \"$x\" <<< 1",
   "QA-2 quoted substitution as a subscript in ${a[...]}":
     "a=(1); echo ${a['$(touch W)']}",
+  // QA cycle 2 (T293-QA-3, T293-QA-4): the literal reaches the evaluation through a joined word or
+  // a pipe, which the character before the quote and the command segment cannot follow.
+  "QA-3 bare word joined to a quoted literal": "x=a'[$(touch W)]'; echo $((x))",
+  "QA-3 double-quoted prefix joined to a quoted literal":
+    "x=\"pre\"'[$(touch W)]'; echo $((x))",
+  "QA-4 literal piped into a later read":
+    "echo 'a[$(touch W)]' | { read x; echo $((x)); }",
+  "QA-4 quoted here-document body read into a variable (found by QA's own probe)":
+    "read x <<'EOF'\na[$(touch W)]\nEOF\necho $((x))",
+  "QA-4 quoted here-document piped into read":
+    "cat <<'EOF' | { read x; echo $((x)); }\na[$(touch W)]\nEOF",
+  "QA-4 literal piped into read, evaluated by [[ -eq ]]":
+    "echo 'a[$(touch W)]' | { read x; [[ $x -eq 1 ]]; }",
 };
 
 // Bash's own behaviour, calibrated where it is known to run the marker: the instrument is dead if a
@@ -5193,6 +5206,14 @@ const T293_DECIDERS = {
     "y='$'; z='(touch W)'; x=\"a[$y$z]\"; echo $((x))",
   "quoted substitution as a subscript (no assignment, no builtin)":
     "a=(1); echo ${a['$(touch W)']}",
+  "joined word, evaluated far from the literal (block rule alone)":
+    "x=a'[$(touch W)]'; echo $((x))",
+  "literal in another pipeline stage than the read (block rule alone)":
+    "echo 'a[$(touch W)]' | { read x; echo $((x)); }",
+  "here-document body literal (heredoc loop alone)":
+    "cat <<'EOF' | { read x; echo $((x)); }\na[$(touch W)]\nEOF",
+  "literal evaluated through a named subscript, no evaluating word":
+    "x='a[$(touch W)]'; a=(1); echo ${a[x]}",
 };
 
 test("task.293 each refusal is held on an input where it alone decides", () => {
@@ -5229,6 +5250,9 @@ test("task.293 safe blocks near the class stay runnable", () => {
     'n=$(wc -l < f); echo "$n"', // built by expansion, never read as arithmetic
     'x=5; y="$x"; echo hi', // an expanded value with no arithmetic read
     "[ -f x ] && echo ok", // the test command, not a subscript
+    "x=a'[5]'; echo $((x))", // QA-3 control: no substitution in the literal
+    "echo 'a[5]' | { read x; echo $((x)); }", // QA-4 control
+    "echo 'run $(date)'; x=5", // a printed literal, nothing evaluates a value
   ]) {
     assert.equal(classifyBlock(code).klass, "runnable", code);
   }
