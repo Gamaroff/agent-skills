@@ -5,10 +5,12 @@ type: task
 description: "Close the QA snippet classifier's indirect-evaluation holes (T292-CR-1..3): quoted command substitutions reached through printf -v and similar subscript operands, prompt-escape expansion, and quoted data re-evaluated as arithmetic."
 tags: [qa-task, security, follow-up-292]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-11-10
 updated: 2026-11-10
+completed_date: 2026-11-10
+pr_number: 870
 estimated_effort_hours: 16
 github_issue:
 ---
@@ -237,6 +239,25 @@ Documentation:
 ### Key Findings
 Gate 9 (fourth owner-granted extra cycle). The independent reviewer found no block that classifies runnable and runs a command, including about 18,000 fuzzed array-subscript blocks. Owner-accepted residuals stay documented; the allow-list redesign is its own task.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report Summary:** gate `task.293.gate.9.qa-snippet-classifier-indirect-evaluation.yml`, CONCERNS, 88/100, no open finding. Gates 1 to 8 were FAIL; the owner narrowed the task at gate 5 and granted extra cycles. The three residual shapes are owner-accepted and documented.
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 10/10 met (measurements and mutation proofs recorded in QA report 9, "Finalise evidence record")
+✅ **PR Review:** `task.293.pr-review.1.qa-snippet-classifier-indirect-evaluation.md`, APPROVE
+✅ **CI:** SUCCESS on the head before acceptance (hosted CI, 6 checks)
+✅ **Documentation:** `shared/resources/qa-runnable-prose-detection.md` and `CHANGELOG.md` updated
+✅ **Security Review:** boundary probed, 31 candidates executed, 0 reproduced
+⚠️ **Compliance Review:** not applicable (no data, payment, UI or health scope)
+
+**Detailed Verification Log:** See `task.293.dod.1.qa-snippet-classifier-indirect-evaluation.md` for the evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-11-10
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -262,6 +283,7 @@ Gate 9 (fourth owner-granted extra cycle). The independent reviewer found no blo
 | 2026-11-10 |  | QA gate FAIL (85/100) — 1 high finding on the third extra cycle | qa-task |
 | 2026-11-10 |  | QA finding fixed — 1 high closed by never resetting the bracket depth, 8 iterations | qa-fix |
 | 2026-11-10 |  | QA gate CONCERNS (88/100) — 0 findings; documented residuals open | qa-task |
+| 2026-11-10 | 1.2 | DoD passed — accepted (PR #870) | finalise |
 <!-- change-log-end -->
 
 ## References

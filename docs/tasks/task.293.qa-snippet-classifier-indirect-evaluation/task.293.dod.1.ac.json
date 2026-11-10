@@ -1,0 +1,223 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "94dfae39aa2da59c581c22a28a2e7a7c009c6cb9",
+  "dirty_paths": [
+    "docs/tasks/task.293.qa-snippet-classifier-indirect-evaluation/task.293.gate.9.qa-snippet-classifier-indirect-evaluation.yml",
+    "docs/tasks/task.293.qa-snippet-classifier-indirect-evaluation/task.293.implementation.1.qa-snippet-classifier-indirect-evaluation-initial-run.md",
+    "docs/tasks/task.293.qa-snippet-classifier-indirect-evaluation/task.293.pr-review.1.qa-snippet-classifier-indirect-evaluation.md"
+  ],
+  "document": "docs/tasks/task.293.qa-snippet-classifier-indirect-evaluation/task.293.qa-snippet-classifier-indirect-evaluation.md",
+  "result": {
+    "bytes": 11179,
+    "sha256": "0a30ac0bd419a95456268a990dbc270db836c4301722267a8682dcf87510a2b6",
+    "verified": true
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 10,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "6476f49914297ecbb96f7031659f7136167eb0ee510149a731c834bd5fe3b0b0",
+      "status": "PASS",
+      "description": "Every section-2 spelling Phase 1 reproduces classifies mutating",
+      "code_citation": "shared/resources/qa-execute-snippets.mjs:3294",
+      "test_citation": "shared/resources/tests/qa-execute-snippets.test.mjs:5188",
+      "members": [
+        {
+          "member": "each entry of T293_SHAPES (loop at test :5188-5200)",
+          "evidence": "shared/resources/tests/qa-execute-snippets.test.mjs:5188",
+          "status": "PASS"
+        },
+        {
+          "member": "each refusal branch alone (T293_DECIDERS, 18 entries)",
+          "evidence": "shared/resources/tests/qa-execute-snippets.test.mjs:5256",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Each shape is run under real bash (marker file must appear) and then classified mutating. The test sits under shared/resources/tests/*.test.mjs, which npm test selects, and .github/workflows/test.yml:58 runs npm test on every PR. The three owner-accepted residuals (printf octal launder, a bracket or dollar arriving by expansion, a literal split across quote tokens) are documented known shapes, recorded in QA reports 5-9, gate 9 and CHANGELOG.md. They are not counted against this criterion."
+    },
+    {
+      "id": "#2",
+      "text_hash": "9c0dbb7f1a0796d531fbc45490601a1b7ee69a1d5a507529c33fd60c616660a1",
+      "status": "PASS",
+      "description": "Control instance classifies mutating; safe block stays runnable",
+      "code_citation": "shared/resources/qa-execute-snippets.mjs:3140",
+      "test_citation": "shared/resources/tests/qa-execute-snippets.test.mjs:5278",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The mutating control is the decider table at :5217-5255, which includes classes the task does not name, such as the here-document body and the named-subscript case. The safe-block test at :5278 asserts that 22 near-class blocks, including 'echo hi'-style and printed-literal blocks, stay runnable. Both tests are in the per-PR npm test lane."
+    },
+    {
+      "id": "#3",
+      "text_hash": "31366d3eb0861da26f355069cad4fb3580dd4d22a4f84303e61bff3de532813b",
+      "status": "PASS",
+      "description": "Differential run writes nothing; block count in QA report",
+      "code_citation": "docs/tasks/task.293.qa-snippet-classifier-indirect-evaluation/task.293.qa.9.qa-snippet-classifier-indirect-evaluation.md:89",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Bound: 0 writes, with the block count recorded. Measured: `node scripts/qa-snippets-differential.mjs --atoms all --seed 1 --count 4000` gave 4000 blocks per family and 0 writes in every family (five runs). `--atoms indirect --seed 1 --count 3000` gave 3000 blocks and 0 writes. The record is in the committed QA report 9 (commit 343fec09). The count of 0 is not a wall-clock bound, so the load and median rules do not apply."
+    },
+    {
+      "id": "#4",
+      "text_hash": "f8164268c58aed543827b26f18c41a7ddc55564949890e4ea690dfdd3cac5315",
+      "status": "PASS",
+      "description": "Docs scan median within 10% of baseline, five runs, load recorded",
+      "code_citation": "docs/tasks/task.293.qa-snippet-classifier-indirect-evaluation/task.293.qa.9.qa-snippet-classifier-indirect-evaluation.md:101",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Bound: median at most +10%. Command: `node scripts/qa-snippets-docscan.mjs --time --json`. Five runs are tabled at lines 93-99 with load beside each. Median base is 469 ms and median now is 480 ms, +2.3%. The cold-cache outlier (run 1) is reported. Measured on 94dfae39. `finalise-delta.js docs-only --base 94dfae39 --head HEAD` returned reason tree-equivalent (exit 0, docs changes only), so the figure counts: measured on 94dfae39, tree-equivalent to head."
+    },
+    {
+      "id": "#5",
+      "text_hash": "be993daa378f12bad2f59d14d428ce8e4a04acd11929157b6710c11225b9f9aa",
+      "status": "PASS",
+      "description": "Differential slice median under 10 s, five runs, uptime beside each",
+      "code_citation": "docs/tasks/task.293.qa-snippet-classifier-indirect-evaluation/task.293.qa.9.qa-snippet-classifier-indirect-evaluation.md:113",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Bound: median under 10 s. Command: `node scripts/qa-snippets-differential.mjs --atoms all --seed 1 --count 4000`. Five runs (6868, 4661, 9938, 3458, 11012 ms) are tabled at lines 105-111 with load beside each. The median is 6868 ms. The outliers (runs 3 and 5, over 10 s) are reported and attributed to load of about 3.5. Measured on 94dfae39, tree-equivalent to HEAD 343fec09 per finalise-delta.js (docs-only, exit 0)."
+    },
+    {
+      "id": "#6",
+      "text_hash": "b5960c3b7363c1fbf6ca89241c5e04d14f5b5e50408d3b307fd6946989e51de4",
+      "status": "PASS",
+      "description": "CI=true suite green; lint and prettier pass on changed .mjs files",
+      "code_citation": ".github/workflows/test.yml:55",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 343fec09050b82582f725ae5f294b8a33dd2429f — Ungraded. test.yml runs format:check at line 55 and npm test at line 58 on every PR. At the read, `gh pr checks 870` showed the test and validate jobs still pending. For information only: QA report 9 records the clean-checkout run on the LAN server as 7747 pass and 3 fail. All 3 failures are environmental (missing zsh and shellcheck). The laptop run is cited as 8346 tests with 0 failures 'on the second run', and the committed record does not explain the first run. /finalise Step 6 decides from CI reading 1.",
+      "ci_reading": "CI reading 1: SUCCESS @ 343fec09050b82582f725ae5f294b8a33dd2429f"
+    },
+    {
+      "id": "#7",
+      "text_hash": "8ceb605f394e1eee299c59bcfd771970f1831b4887334ff5e7e9d8cb3d070d87",
+      "status": "PASS",
+      "description": "npm run bundle:check clean",
+      "code_citation": "docs/tasks/task.293.qa-snippet-classifier-indirect-evaluation/task.293.qa.9.qa-snippet-classifier-indirect-evaluation.md:115",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Bound: clean, meaning 0 problems. Command: `npm run bundle:check`. Result: 129 skills checked, 0 problems, in committed QA report 9. The diff modifies shared/resources/qa-runnable-prose-detection.md, and QA report 9 also records that the bundled copies match the source. The copies are excluded from the diff file as stated."
+    },
+    {
+      "id": "#8",
+      "text_hash": "c0e4e317e5246f4d7e645eb33111cd2983089b915b27c4af9145948f18b2e157",
+      "status": "PASS",
+      "description": "Every change mutation-proven, red test named in QA report",
+      "code_citation": "docs/tasks/task.293.qa-snippet-classifier-indirect-evaluation/task.293.qa.9.qa-snippet-classifier-indirect-evaluation.md:119",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "Base refusals (six branches)",
+          "evidence": "task.293.qa.9...md:121 (each branch removed in turn, decider test red six times); task.293.gate.1...yml:54; task.293.qa.1...md:104. The branch entries are the T293_DECIDERS keys in the test file.",
+          "status": "PASS"
+        },
+        {
+          "member": "Subscript rule",
+          "evidence": "task.293.qa.9...md:122",
+          "status": "PASS"
+        },
+        {
+          "member": "Assembled-value rule EXPANDED_ASSIGNMENT",
+          "evidence": "task.293.qa.9...md:123",
+          "status": "PASS"
+        },
+        {
+          "member": "Block rule blockEvaluates",
+          "evidence": "task.293.qa.9...md:124",
+          "status": "PASS"
+        },
+        {
+          "member": "Arithmetic-read detector",
+          "evidence": "task.293.qa.9...md:125",
+          "status": "PASS"
+        },
+        {
+          "member": "Here-document loop",
+          "evidence": "task.293.qa.9...md:126",
+          "status": "PASS"
+        },
+        {
+          "member": "Default-deny expansion test",
+          "evidence": "task.293.qa.9...md:127",
+          "status": "PASS"
+        },
+        {
+          "member": "Carrier-level default-deny",
+          "evidence": "task.293.qa.9...md:128",
+          "status": "PASS"
+        },
+        {
+          "member": "Word-scoped bracket rule (cycle 6)",
+          "evidence": "task.293.qa.9...md:129",
+          "status": "PASS"
+        },
+        {
+          "member": "Bracket depth over the segment (cycle 7)",
+          "evidence": "task.293.qa.9...md:130",
+          "status": "PASS"
+        },
+        {
+          "member": "Bracket depth never reset (cycle 8)",
+          "evidence": "task.293.qa.9...md:131",
+          "status": "PASS"
+        },
+        {
+          "member": "QA cycles 5 and 9 (no code change)",
+          "evidence": "task.293.implementation.1...md:153-163 (no code change between gates 5 and 6) and :203 (0 issues). No fix exists, so no mutation is owed.",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "The committed table in QA report 9 (commit 343fec09, lines 119-131) names each change, the mutation and the red tests (the decider test `task.293 each refusal is held on an input where it alone decides` and the shape table T293_SHAPES). Each mutation record states what was reverted and which test went red, not just that the step was done. The six base branches are grouped in one row rather than one row each. Their identities are the named T293_DECIDERS entries, and QA report 1 and gate 1 record 'six mutations each red on the decider test'. A grouped row that shows the red test is accepted. The record does not give a per-branch line, which is an advisory-level weakness."
+    },
+    {
+      "id": "#9",
+      "text_hash": "629154856d3ce72b0cfb49554fce95ed3f3e5493c6b48abf6de4f0519998964c",
+      "status": "PASS",
+      "description": "CHANGELOG.md cites (task 293)",
+      "code_citation": "CHANGELOG.md:9",
+      "test_citation": "shared/resources/tests/changelog-cites.test.mjs:1",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Line 9 reads 'The QA snippet classifier refuses indirect evaluation (task 293)', so the entry names the work item as required. changelog-cites.test.mjs is the repository's changelog citation guard, and the pattern shared/resources/tests/*.test.mjs puts it in the npm test run on every PR."
+    },
+    {
+      "id": "#10",
+      "text_hash": "62f443dfd5bf864f6bfa4442187512d3219815fd8b362bd60a377f3b94c6d2f9",
+      "status": "PASS",
+      "description": "Newly refused docs-scan blocks listed in QA report with reason",
+      "code_citation": "docs/tasks/task.293.qa-snippet-classifier-indirect-evaluation/task.293.qa.9.qa-snippet-classifier-indirect-evaluation.md:133",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "task.293.plan.qa-snippet-classifier-indirect-evaluation.md:26 (runnable to mutating)",
+          "evidence": "task.293.qa.9...md:133",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Line 133 lists the one newly refused block, gives the reason (a command-substitution literal in a block that also holds an unbalanced '[') and records 0 newly runnable. It also says QA report 1 listed two at cycle 1 and why only one remains. The unit set is the docs-scan diff, which has one member."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#6",
+      "note": "The laptop run is cited as 8346 tests, 0 fail 'on the second run', and the committed record does not say what failed on the first run. The server run has 3 environmental failures, which the record attributes to missing zsh and shellcheck. Hosted CI (test and validate) was still pending at the read."
+    },
+    {
+      "ac_id": "#8",
+      "note": "The six base-branch mutations are recorded as one grouped row. A per-branch line would be stronger evidence."
+    }
+  ]
+}
