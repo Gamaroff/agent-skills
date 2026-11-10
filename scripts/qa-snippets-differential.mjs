@@ -76,6 +76,39 @@ export const ATOM_SETS = {
     "\n",
     ";",
   ],
+  // Non-blank "whitespace" between WORDS at command position. `A=1<CR>echo touch out` is, to bash,
+  // the command `touch out` with `A=1<CR>echo` as an assignment; a scan that splits words on `\s`
+  // reads `echo touch out`. Whole words with a separator glued on, so the generator can form the
+  // shape; the bare separators after them are extra. The block carries its own writer (BARE_SETS).
+  splits: [
+    "A=1\r",
+    "A=1\f",
+    "A=1\v",
+    "A=1 ",
+    "A=1 ",
+    "A=1 ",
+    "echo\r",
+    "echo ",
+    "echo ",
+    "env\v",
+    "env ",
+    "touch out",
+    "touch\f",
+    "out\n",
+    "x\r",
+    "tee",
+    "\n",
+    "\n",
+    "\r",
+    "\f",
+    "\v",
+    " ",
+    " ",
+    " ",
+    " ",
+    "\t",
+    ";",
+  ],
   nesting: [
     "$(",
     ")",
@@ -110,17 +143,22 @@ const WRITERS = [" ; touch out", "\ntouch out"];
  * `count` blocks from one atom set: `echo ` + 2..8 atoms + a writer. A pure function of
  * (atoms, seed, count), so a failing block is reproduced by its seed and index.
  */
-export function generateBlocks(atoms, seed, count) {
+export function generateBlocks(atoms, seed, count, bare = false) {
   const next = rng(seed);
   const blocks = [];
   for (let n = 0; n < count; n += 1) {
     const len = 2 + (next() % 7);
-    let code = "echo ";
+    let code = bare ? "" : "echo ";
     for (let k = 0; k < len; k += 1) code += atoms[next() % atoms.length];
-    blocks.push(code + WRITERS[n % WRITERS.length]);
+    // A bare block holds its own writer among its atoms: the classifier must not see one it
+    // would refuse on sight, so the hazard is whatever a misread word split leaves hidden.
+    blocks.push(bare ? code : code + WRITERS[n % WRITERS.length]);
   }
   return blocks;
 }
+
+/** Atom sets whose blocks carry no prefix and no appended writer (see generateBlocks). */
+export const BARE_SETS = new Set(["splits"]);
 
 /**
  * Run `bash -c code` in a fresh directory and say whether it left anything there. The directory
@@ -151,8 +189,9 @@ export function runDifferential({
   count,
   timeoutMs = 2000,
   keep = 10,
+  bare = false,
 }) {
-  const blocks = generateBlocks(atoms, seed, count);
+  const blocks = generateBlocks(atoms, seed, count, bare);
   let runnable = 0;
   const writers = [];
   for (const code of blocks) {
@@ -221,6 +260,7 @@ async function main() {
       atoms: ATOM_SETS[name],
       seed: opts.seed,
       count: opts.count,
+      bare: BARE_SETS.has(name),
     });
     report.sets[name] = r;
     writes += r.writes;

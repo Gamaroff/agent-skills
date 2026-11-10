@@ -35,6 +35,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   ATOM_SETS,
+  BARE_SETS,
   runDifferential,
 } from "../../../scripts/qa-snippets-differential.mjs";
 
@@ -59,6 +60,7 @@ const {
   sandboxEnv,
   snapshotTree,
   splitTableRow,
+  tokenize,
   unboundVariables,
   unescapeCell,
   zshAvailable,
@@ -4616,8 +4618,8 @@ test("task.290 every comment scan calls the one rule", () => {
   );
   assert.ok(known.length >= 3, "non-vacuity: the three known sites exist");
   assert.ok(
-    (src.match(/startsComment\(/g) ?? []).length >= 3,
-    "startsComment is defined and called from closingParen and stripCommentQuoteAware",
+    (src.match(/startsComment\(/g) ?? []).length >= 2,
+    "startsComment is defined and called from closingParen (stripProse reads the tokenizer's comment tokens)",
   );
 });
 
@@ -4729,6 +4731,110 @@ for (const [name, code] of Object.entries(T292_GAPS)) {
   });
 }
 
+// The same blank-class defect one scan over: a word split on `\s` hides the command bash runs.
+// bash reads `A=1<X>echo touch out` as the assignment `A="1<X>echo"` and then runs `touch out`.
+const T292_SPLITS = {
+  "a CR": "\r",
+  "a form feed": "\f",
+  "a vertical tab": "\v",
+  "a no-break space": " ",
+  "a line separator": " ",
+};
+for (const [name, ch] of Object.entries(T292_SPLITS)) {
+  test(`task.292 gap: ${name} after an assignment glues the next word on`, () => {
+    const code = `A=1${ch}echo touch out`;
+    assert.equal(classifyBlock(code).klass, "mutating", JSON.stringify(code));
+  });
+}
+
+test("task.292 control: a space after an assignment is a blank (the command is echo)", () => {
+  assert.equal(classifyBlock("A=1 echo touch out").klass, "runnable");
+});
+
+// The tokenizer itself: the lexical facts every scan reads (task.292).
+const kinds = (code) =>
+  tokenize(code).tokens.map((t) => `${t.kind}@${t.start}`);
+test("task.292 tokenizer: a # starts a comment only at the start of a word", () => {
+  assert.deepEqual(kinds("echo a # x"), ["comment@7"]);
+  assert.deepEqual(kinds("echo a\t# x"), ["comment@7"]);
+  assert.deepEqual(
+    kinds("echo a\\ # x"),
+    [],
+    "an escaped blank joins the word",
+  );
+  assert.deepEqual(kinds("echo a#b"), [], "mid-word");
+  assert.deepEqual(kinds("echo ${#x}"), [], "a ${#x} length is not a comment");
+  assert.deepEqual(kinds("echo a\r# x"), [], "CR is a word character");
+});
+
+test("task.292 tokenizer: a backslash-newline joins a line, and an even run does not", () => {
+  assert.deepEqual(
+    kinds("echo a\\\n# x"),
+    ["join@6"],
+    "a join keeps the word going",
+  );
+  assert.deepEqual(kinds("echo a \\\n# x"), ["join@7", "comment@9"]);
+  assert.deepEqual(
+    kinds("echo a\\\\\n# x"),
+    ["comment@9"],
+    "escaped backslash, then a real newline",
+  );
+});
+
+test("task.292 tokenizer: quotes hide a # and a heredoc operator", () => {
+  assert.deepEqual(
+    kinds("echo 'a # b' # c").filter((k) => k.startsWith("comment")),
+    ["comment@13"],
+  );
+  assert.ok(!kinds("echo '<<EOF'").some((k) => k.startsWith("heredoc")));
+  assert.ok(
+    kinds("cat <<EOF\nx\nEOF\n").some((k) => k.startsWith("heredoc-body")),
+  );
+});
+
+test("task.292 tokenizer: substitutions in an unquoted heredoc body are read, in a quoted one are not", () => {
+  assert.ok(
+    kinds("cat <<EOF\n$(touch out)\nEOF").some((k) => k.startsWith("subst")),
+  );
+  assert.ok(
+    !kinds("cat <<'EOF'\n$(touch out)\nEOF").some((k) => k.startsWith("subst")),
+  );
+  assert.equal(classifyBlock("cat <<EOF\n$(touch out)\nEOF").klass, "mutating");
+  assert.equal(
+    classifyBlock("cat <<'EOF'\n$(touch out)\nEOF").klass,
+    "runnable",
+  );
+});
+
+test("task.292 tokenizer: a shape it does not model is refused, not guessed", () => {
+  for (const code of [
+    "echo 'unterminated",
+    'echo "unterminated',
+    "echo $(unterminated",
+    "echo ${unterminated",
+    "echo \\'x",
+    "echo \"${x:-'a'}\"",
+  ])
+    assert.throws(() => tokenize(code), /^Error: tokenize:/, code);
+});
+
+test("task.292 tokenizer: a ${…} with its own quotes and expansions is one piece", () => {
+  assert.deepEqual(
+    kinds('echo ${n#"${n%%[!0]*}"} # c').filter((k) => k.startsWith("comment")),
+    ["comment@24"],
+  );
+});
+
+test("task.292 tokenizer: nesting is bounded by the heap, not the call stack", () => {
+  const nest = (n) => 'echo "$(echo '.repeat(n) + "x" + ')"'.repeat(n);
+  // The tokenizer is linear: 20000 levels is milliseconds. (The classifier's other scans are
+  // quadratic in depth until they read the tokens, so it is measured at 1000 here.)
+  let t;
+  assert.doesNotThrow(() => (t = tokenize(nest(20000))));
+  assert.equal(t.tokens.filter((k) => k.kind === "subst").length, 20000);
+  assert.doesNotThrow(() => classifyBlock(nest(1000)));
+});
+
 const T292_CONTROLS = {
   "a space before a # is a comment": "echo a # ; touch out",
   "a tab before a # is a comment": "echo a\t# ; touch out",
@@ -4750,6 +4856,7 @@ test("task.292 differential slice: nothing the classifier calls runnable writes 
       atoms,
       seed: T292_SLICE.seed,
       count: T292_SLICE.count,
+      bare: BARE_SETS.has(name),
     });
     assert.equal(
       r.writes,
