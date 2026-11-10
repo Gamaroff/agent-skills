@@ -1457,6 +1457,387 @@ function sedScan(s, markForbidden) {
   }
 }
 
+// ── The lexical layer: one tokenizer (task.292) ───────────────────────────────
+
+/**
+ * How bash reads a block into words, quotes, escapes, comments, substitutions and heredocs —
+ * once. Every scan that needs a lexical fact reads it from here instead of re-deriving it.
+ *
+ * Bash's rules, as encoded:
+ * - Blanks are space, tab and newline. Nothing else separates words: CR, FF, VT, NBSP and every
+ *   Unicode space are word characters (T290-QA-3 was a scan that thought they were blanks).
+ * - Outside quotes a backslash quotes the next character, and backslash-newline is a line join.
+ *   Reading left to right is what makes an even run of backslashes (escaped backslashes) differ
+ *   from an odd one: no parity is counted anywhere.
+ * - Inside double quotes a backslash escapes the next character (only `$`, backtick, `"`, `\` and
+ *   newline are special there, and every other escaped character is inert either way). Inside
+ *   single quotes nothing is special.
+ * - A `#` starts a comment only at the start of a word: at the start of the text, or after a
+ *   blank, newline, `;`, `&`, `|` or `(`. After any other operator the scan reads the `#` as a
+ *   word character, which leaves the rest of the line to be scanned as code (the safe side).
+ * - `$(`, `<(`, `>(` and backtick open a substitution whose body is code again; they nest on an
+ *   explicit stack, so a deep nest is bounded by the heap and not the call stack.
+ * - `<<WORD` and `<<-WORD` start a heredoc whose body is data, from the next line to the line
+ *   that is the terminator.
+ *
+ * A shape this does not model throws `Error("tokenize: …")`, and `classifyFailClosed` reads a
+ * throw as `mutating`: an unterminated quote, substitution or `${…}`, a single quote inside a
+ * double-quoted `${…}`, a heredoc form other than a plain word, a heredoc inside a substitution,
+ * and a nest deeper than `MAX_TOKEN_DEPTH`.
+ *
+ * `${…}` has a frame of its own (its body is read for quotes, escapes and nested expansions, so
+ * `${n#"${n%%[!0]*}"}` is one piece). An unquoted heredoc body is read as a double-quoted string
+ * (bash expands it), so a `$(…)` in it is a `subst` token, whose commands the scans judge.
+ *
+ * Tokens (all spans are `[start, end)` into the text; sorted by `start`):
+ * - `comment`: the `#` to the end of the line, newline excluded.
+ * - `join`: a backslash-newline that bash removes before it reads a word.
+ * - `quote`: a single- or double-quoted span, quotes included; `quote` is the quote character.
+ * - `subst`: a substitution, `form` one of `"$("`, `"<("`, `">("` or "`"; `depth` is the number of
+ *   substitutions around it (0: outermost) and `inDouble` whether a double quote directly
+ *   encloses it.
+ * - `heredoc-op`: the `<<` or `<<-`.
+ * - `heredoc-body`: the body lines and the terminator line, with the newline that ends it.
+ */
+export const MAX_TOKEN_DEPTH = 100000;
+
+const TOKEN_CACHE = new Map();
+const TOKEN_CACHE_MAX = 64;
+
+/** The tokens of `code`, or a thrown refusal. Memoised: the scans ask about the same text repeatedly. */
+export function tokenize(code) {
+  const cached = TOKEN_CACHE.get(code);
+  if (cached) return cached;
+  const result = lexBash(code);
+  if (TOKEN_CACHE.size >= TOKEN_CACHE_MAX)
+    TOKEN_CACHE.delete(TOKEN_CACHE.keys().next().value);
+  TOKEN_CACHE.set(code, result);
+  return result;
+}
+
+// Frame kinds: the top level, a `$(`/`<(`/`>(` body, a backtick body, a double-quoted span, a `${…}` body.
+const F_CODE = 0;
+const F_PAREN = 1;
+const F_TICK = 2;
+const F_DQ = 3;
+const F_PARAM = 4;
+
+function lexBash(code) {
+  const n = code.length;
+  const tokens = [];
+  const stack = [{ t: F_CODE, tok: null, d: 0 }];
+  const refuse = (why) => {
+    throw new Error(`tokenize: ${why}`);
+  };
+  const push = (t, tok, d = 0) => {
+    if (stack.length >= MAX_TOKEN_DEPTH) refuse("nesting too deep");
+    stack.push({ t, tok, d });
+  };
+  // Substitutions around the current position: the depth a new `subst` token carries.
+  let substDepth = 0;
+  // Heredocs opened on the current line, whose bodies start at its newline.
+  let pending = [];
+  // True when the next character would begin a word.
+  let wordStart = true;
+  let i = 0;
+
+  const openSubst = (form, at, width) => {
+    const f = stack[stack.length - 1];
+    const tok = {
+      kind: "subst",
+      form,
+      start: at,
+      end: -1,
+      depth: substDepth,
+      inDouble: f.t === F_DQ || (f.t === F_PARAM && f.inDq === true),
+    };
+    tokens.push(tok);
+    push(form === "`" ? F_TICK : F_PAREN, tok, 1);
+    substDepth += 1;
+    i = at + width;
+    wordStart = true; // the body is a fresh command list
+  };
+
+  const closeFrame = (end) => {
+    const f = stack.pop();
+    if (f.tok) f.tok.end = end;
+    if (f.t === F_PAREN || f.t === F_TICK) substDepth -= 1;
+  };
+
+  // `${…}` opens a frame of its own: its body is read for quotes, escapes and nested expansions,
+  // and ends at the `}` that is not hidden by them. It makes no token (no scan asks about it).
+  const openParam = (at) => {
+    const f = stack[stack.length - 1];
+    if (stack.length >= MAX_TOKEN_DEPTH) refuse("nesting too deep");
+    stack.push({
+      t: F_PARAM,
+      tok: null,
+      d: 0,
+      inDq: f.t === F_DQ || (f.t === F_PARAM && f.inDq === true),
+    });
+    i = at + 2;
+  };
+
+  const readHeredocOpener = (at) => {
+    let p = at + 2;
+    const strip = code[p] === "-";
+    if (strip) p += 1;
+    while (code[p] === " " || code[p] === "\t") p += 1;
+    const escaped = code[p] === "\\";
+    if (escaped) p += 1;
+    const q = code[p] === "'" || code[p] === '"' ? code[p++] : "";
+    const m = /^[A-Za-z_][A-Za-z0-9_]*/.exec(code.slice(p, p + 256));
+    if (!m) refuse("heredoc delimiter is not a plain word");
+    p += m[0].length;
+    if (q !== "") {
+      if (code[p] !== q) refuse("heredoc delimiter quote does not close");
+      p += 1;
+    }
+    tokens.push({
+      kind: "heredoc-op",
+      start: at,
+      end: at + 2 + (strip ? 1 : 0),
+    });
+    // Escaping or quoting any part of the delimiter makes the body literal.
+    pending.push({ delim: m[0], quoted: q !== "" || escaped });
+    return p;
+  };
+
+  const readHeredocBodies = (from) => {
+    let p = from;
+    for (const h of pending) {
+      const bodyStart = p;
+      let textEnd = p; // the end of the body proper, terminator line excluded
+      // No terminator before the end of the text: the body runs to the end, as bash reads it.
+      while (p < n) {
+        const eol = code.indexOf("\n", p);
+        const line = code.slice(p, eol < 0 ? n : eol);
+        const lineStart = p;
+        p = eol < 0 ? n : eol + 1;
+        if (line.trim() === h.delim) {
+          textEnd = lineStart;
+          break;
+        }
+        textEnd = p;
+      }
+      tokens.push({ kind: "heredoc-body", start: bodyStart, end: p });
+      if (!h.quoted && textEnd > bodyStart) {
+        // An unquoted body is expanded like a double-quoted string: `$(…)`, backticks and `${…}`
+        // in it run. Read it as one, with its `"` neutralised (a quote is a literal there), and
+        // keep only the substitutions it holds.
+        const body = code.slice(bodyStart, textEnd).replace(/"/g, "x");
+        for (const t of lexBash(`"${body}"`).tokens)
+          if (t.kind === "subst" || t.kind === "join")
+            tokens.push({
+              ...t,
+              start: t.start + bodyStart - 1,
+              end: t.end + bodyStart - 1,
+            });
+      }
+    }
+    pending = [];
+    return p;
+  };
+
+  while (i < n) {
+    const f = stack[stack.length - 1];
+    const c = code[i];
+
+    if (f.t === F_DQ) {
+      if (c === "\\") {
+        if (i + 1 >= n) refuse("unterminated double quote");
+        if (code[i + 1] === "\n")
+          tokens.push({ kind: "join", start: i, end: i + 2 });
+        i += 2;
+      } else if (c === '"') {
+        closeFrame(i + 1);
+        i += 1;
+        wordStart = false;
+      } else if (c === "$" && code[i + 1] === "(") {
+        openSubst("$(", i, 2);
+      } else if (c === "$" && code[i + 1] === "{") {
+        openParam(i);
+      } else if (c === "`") {
+        openSubst("`", i, 1);
+      } else i += 1;
+      continue;
+    }
+
+    if (f.t === F_PARAM) {
+      if (c === "\\") {
+        if (i + 1 >= n) refuse("unterminated ${");
+        i += 2;
+      } else if (c === "}") {
+        closeFrame(i + 1);
+        i += 1;
+        wordStart = false;
+      } else if (c === "$" && code[i + 1] === "(") {
+        openSubst("$(", i, 2);
+      } else if (c === "$" && code[i + 1] === "{") {
+        openParam(i);
+      } else if (c === "`") {
+        openSubst("`", i, 1);
+      } else if (c === '"') {
+        const tok = { kind: "quote", quote: '"', start: i, end: -1 };
+        tokens.push(tok);
+        push(F_DQ, tok);
+        i += 1;
+      } else if (c === "'") {
+        // Inside a double-quoted `${…}` a single quote is a literal in some operators and a quote
+        // in others; the scan does not guess.
+        if (f.inDq)
+          refuse("single quote inside a double-quoted parameter expansion");
+        const j = code.indexOf("'", i + 1);
+        if (j < 0) refuse("unterminated single quote");
+        tokens.push({ kind: "quote", quote: "'", start: i, end: j + 1 });
+        i = j + 1;
+      } else i += 1;
+      continue;
+    }
+
+    // Code: the top level, or the body of a substitution.
+    switch (c) {
+      case "\\": {
+        if (code[i + 1] === "\n") {
+          // The join leaves `wordStart` as it was: `a\<LF>#` is one word, `a \<LF>#` a comment.
+          tokens.push({ kind: "join", start: i, end: i + 2 });
+          i += 2;
+        } else {
+          i += i + 1 < n ? 2 : 1;
+          wordStart = false;
+        }
+        break;
+      }
+      case "'": {
+        const j = code.indexOf("'", i + 1);
+        if (j < 0) refuse("unterminated single quote");
+        tokens.push({ kind: "quote", quote: "'", start: i, end: j + 1 });
+        i = j + 1;
+        wordStart = false;
+        break;
+      }
+      case '"': {
+        const tok = { kind: "quote", quote: '"', start: i, end: -1 };
+        tokens.push(tok);
+        push(F_DQ, tok);
+        i += 1;
+        wordStart = false;
+        break;
+      }
+      case "`": {
+        if (f.t === F_TICK) {
+          closeFrame(i + 1);
+          i += 1;
+          wordStart = false;
+        } else openSubst("`", i, 1);
+        break;
+      }
+      case "$": {
+        const next = code[i + 1];
+        if (next === "(") openSubst("$(", i, 2);
+        else if (next === "{") {
+          openParam(i);
+          wordStart = false;
+        } else if (next === "'") {
+          // $'…': a single-quoted span in which a backslash escapes the next character.
+          let j = i + 2;
+          while (j < n && code[j] !== "'") j += code[j] === "\\" ? 2 : 1;
+          if (j >= n) refuse("unterminated $'");
+          tokens.push({ kind: "quote", quote: "$'", start: i, end: j + 1 });
+          i = j + 1;
+          wordStart = false;
+        } else {
+          i += 1;
+          wordStart = false;
+        }
+        break;
+      }
+      case "(": {
+        if (f.t === F_PAREN) f.d += 1;
+        i += 1;
+        wordStart = true;
+        break;
+      }
+      case ")": {
+        if (f.t === F_PAREN && (f.d -= 1) === 0) {
+          closeFrame(i + 1);
+          wordStart = false;
+        } else wordStart = false;
+        i += 1;
+        break;
+      }
+      case "<": {
+        if (code[i + 1] === "<") {
+          if (code[i + 2] === "<") {
+            i += 3; // here-string
+            wordStart = false;
+          } else {
+            if (f.t !== F_CODE) refuse("heredoc inside a substitution");
+            i = readHeredocOpener(i);
+            wordStart = false;
+          }
+        } else if (code[i + 1] === "(") openSubst("<(", i, 2);
+        else {
+          i += 1;
+          wordStart = false;
+        }
+        break;
+      }
+      case ">": {
+        if (code[i + 1] === "(") openSubst(">(", i, 2);
+        else {
+          i += 1;
+          wordStart = false;
+        }
+        break;
+      }
+      case ";":
+      case "&":
+      case "|":
+      case " ":
+      case "\t": {
+        i += 1;
+        wordStart = true;
+        break;
+      }
+      case "\n": {
+        i += 1;
+        wordStart = true;
+        if (pending.length > 0) {
+          if (f.t !== F_CODE) refuse("heredoc inside a substitution");
+          i = readHeredocBodies(i);
+        }
+        break;
+      }
+      case "#": {
+        if (wordStart) {
+          const eol = code.indexOf("\n", i);
+          const end = eol < 0 ? n : eol;
+          tokens.push({ kind: "comment", start: i, end });
+          i = end;
+        } else i += 1;
+        break;
+      }
+      default: {
+        i += 1;
+        wordStart = false;
+      }
+    }
+  }
+
+  if (stack.length > 1) {
+    const open = stack[stack.length - 1];
+    refuse(
+      open.t === F_DQ
+        ? "unterminated double quote"
+        : "unterminated command substitution",
+    );
+  }
+  // A heredoc opened on the last line (no newline after it) has an empty body.
+  tokens.sort((a, b) => a.start - b.start);
+  return { tokens };
+}
+
 /**
  * `text` with every command substitution, process substitution and backtick
  * replaced by one word, or null when one is unterminated. `commandInvocations`
@@ -1520,11 +1901,12 @@ function closingParen(text, open) {
  */
 function startsComment(text, i) {
   if (text[i] !== "#") return false;
-  if (i === 0) return true;
-  if (!/[\s;&|(]/.test(text[i - 1])) return false;
-  let slashes = 0;
-  for (let k = i - 2; k >= 0 && text[k] === "\\"; k -= 1) slashes += 1;
-  return slashes % 2 === 0;
+  // The tokenizer decides (task.292): it knows blanks are space, tab and newline only, so a CR,
+  // FF, VT, NBSP or U+2028 before `#` is a word character and the `#` is not a comment. A text it
+  // cannot read throws, and `classifyFailClosed` reads the throw as mutating.
+  return tokenize(text).tokens.some(
+    (t) => t.kind === "comment" && t.start === i,
+  );
 }
 
 function maskSubstitutions(text) {

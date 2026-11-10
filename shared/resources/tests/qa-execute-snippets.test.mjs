@@ -33,6 +33,10 @@ import { loadSensitive, neverRan, spawnBudget } from "../spawn-budget.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  ATOM_SETS,
+  runDifferential,
+} from "../../../scripts/qa-snippets-differential.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MODULE = join(__dirname, "..", "qa-execute-snippets.mjs");
@@ -4602,7 +4606,8 @@ test("task.290 every comment scan calls the one rule", () => {
       /if \(cmd === "#"\)/.test(l) || // sedScan: sed grammar, a different rule
       /^"#",$/.test(l) || // the command-word list
       /lines\[k \+ 1\]\.startsWith\("#"\)/.test(l) || // stripProse: refuses a backslash-newline before a # (a line join, not a comment scan)
-      /if \(text\[i\] !== "#"\) return false;/.test(l), // startsComment itself
+      /if \(text\[i\] !== "#"\) return false;/.test(l) || // startsComment itself
+      /^case "#": \{$/.test(l), // the tokenizer: where the word-start rule lives (task.292)
   );
   assert.equal(
     hits.length,
@@ -4708,4 +4713,68 @@ test("task.290 differential: nothing the classifier calls runnable writes under 
   }
   assert.ok(generated >= 200, `generated ${generated} blocks, floor 200`);
   assert.ok(executed >= 1, `executed ${executed} runnable blocks, floor 1`);
+});
+
+// task.292: the instruments are committed, so a regression fails a run and not a later QA gate.
+const T292_GAPS = {
+  "a CR before a # is part of the word": "echo a\r# ; touch out",
+  "a form feed before a # is part of the word": "echo a\f# ; touch out",
+  "a vertical tab before a # is part of the word": "echo a\v# ; touch out",
+  "a no-break space before a # is part of the word": "echo a # ; touch out",
+  "a line separator before a # is part of the word": "echo a # ; touch out",
+};
+for (const [name, code] of Object.entries(T292_GAPS)) {
+  test(`task.292 gap (T290-QA-3): ${name} is refused as mutating`, () => {
+    assert.equal(classifyBlock(code).klass, "mutating", JSON.stringify(code));
+  });
+}
+
+const T292_CONTROLS = {
+  "a space before a # is a comment": "echo a # ; touch out",
+  "a tab before a # is a comment": "echo a\t# ; touch out",
+};
+for (const [name, code] of Object.entries(T292_CONTROLS)) {
+  test(`task.292 control: ${name} stays runnable`, () => {
+    assert.equal(classifyBlock(code).klass, "runnable", JSON.stringify(code));
+  });
+}
+
+// The fixed-seed slice of the random differential (scripts/qa-snippets-differential.mjs). The full
+// run (>= 200000 blocks) is a by-hand Phase 4 deliverable; this slice is sized to the 10 s bound.
+const T292_SLICE = { seed: 1, count: 4000 };
+test("task.292 differential slice: nothing the classifier calls runnable writes under real bash", () => {
+  let runnable = 0;
+  for (const [name, atoms] of Object.entries(ATOM_SETS)) {
+    const r = runDifferential({
+      isRunnable: (code) => isRunnableBlock(code),
+      atoms,
+      seed: T292_SLICE.seed,
+      count: T292_SLICE.count,
+    });
+    assert.equal(
+      r.writes,
+      0,
+      `${name}: classified runnable, but bash wrote: ${JSON.stringify(r.first)}`,
+    );
+    runnable += r.runnable;
+  }
+  assert.ok(
+    runnable >= 100,
+    `slice executed ${runnable} runnable blocks, floor 100`,
+  );
+});
+
+test("task.292 differential slice: the instrument finds a write when the classifier is blind", () => {
+  // Calibration on a known failure: a classifier that calls everything runnable must be caught
+  // by the same generator, or the slice's green above proves nothing.
+  const r = runDifferential({
+    isRunnable: () => true,
+    atoms: ATOM_SETS.blanks,
+    seed: T292_SLICE.seed,
+    count: 200,
+  });
+  assert.ok(
+    r.writes > 0,
+    "a blind classifier produced no write: the instrument is dead",
+  );
 });
