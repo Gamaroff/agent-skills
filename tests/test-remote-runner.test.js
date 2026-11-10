@@ -38,7 +38,8 @@ function makeStubs(t) {
 printf 'ssh %s\\n' "$*" >>"${log}"
 case "$*" in
   *"bash -s"*) cat >"${dir}/reap.sh"; exit 0 ;;
-  *"docker ps -a"*) [ -n "\${STUB_CONTAINER:-}" ] && echo "\${STUB_CONTAINER}"; exit 0 ;;
+  *"docker ps -a"*) [ "\${STUB_CHECK_FAIL:-}" = "1" ] && exit 255; [ -n "\${STUB_CONTAINER:-}" ] && echo "\${STUB_CONTAINER}"; exit 0 ;;
+  *"touch "*"docker image inspect"*) [ "\${STUB_TOUCH_FAIL:-}" = "1" ] && exit 1; exit 0 ;;
   *"docker version"*) [ "\${STUB_PROBE_FAIL:-}" = "1" ] && exit 255; exit 0 ;;
   *container.sh*) exit "\${STUB_RUN_STATUS:-0}" ;;
 esac
@@ -347,6 +348,31 @@ test("a container already holding the run's name stops the run before any sync",
     !r.calls.some((c) => c.includes("container.sh")),
     "no container may be started",
   );
+});
+
+test("the lock check filters on the exact run name, and a failed check stops the run before any sync", (t) => {
+  const ok = run(t, []);
+  const check = ok.calls.find((c) => c.includes("docker ps -a"));
+  const name = ok.calls
+    .find((c) => c.includes("container.sh"))
+    .match(/--name (\S+)/)[1];
+  assert.ok(
+    check.includes(`--filter name=^/${name}$`),
+    `the filter must be anchored on the run name; got: ${check}`,
+  );
+  const failed = run(t, [], { STUB_CHECK_FAIL: "1" });
+  assert.equal(failed.status, 1);
+  assert.match(failed.stderr, /could not check/);
+  assert.ok(!failed.calls.some((c) => c.startsWith("rsync")));
+});
+
+// The stub fails the whole ssh call, so this holds that a failing image step stops the run; it cannot
+// tell `touch && { inspect || build; }` from `touch && inspect || build` (a shell parse detail).
+test("a failing touch or image step stops the run before the container starts", (t) => {
+  const r = run(t, [], { STUB_TOUCH_FAIL: "1" });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /could not build the test image/);
+  assert.ok(!r.calls.some((c) => c.includes("container.sh")));
 });
 
 test("a dropped ssh session (255) kills the named container; docker's own failure (125) does not", (t) => {

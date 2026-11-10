@@ -136,9 +136,12 @@ RUN_DIR="agent-skills-test-${SLUG:-run}-${BRANCH_HASH}"
 
 echo "▶ $HOST:~/$RUN_DIR  scripts: ${SCRIPTS[*]}  (timeout ${TIMEOUT_MIN}m)"
 
-# The container is named after the run directory, and that name is the lock. It is checked here,
-# before the sync, because `rsync --delete` would otherwise rewrite the tree of a run still using
-# it. `docker run --name` below stays as the atomic backstop for two runs that start together.
+# A best-effort guard, not a lock. The container is named after the run directory, and a container
+# of that name means a run is executing in it (or one was left behind), so the sync is refused
+# here: `rsync --delete` would rewrite the tree under it. The guard has a window: the container
+# does not exist while a run is still syncing or building the image, so two runs started within
+# that window are not stopped (the second then fails on the name at `docker run`, after its
+# sync). A real lock is the task's Future Improvements item, not something to grow here.
 EXISTING=$(ssh -o BatchMode=yes "$HOST" "docker ps -a -q --filter name=^/${RUN_DIR}\$") || {
   echo "✗ could not check $HOST for a running or stale container named $RUN_DIR" >&2
   exit 1
@@ -186,7 +189,7 @@ fi
 
 # --- image: built on the server on first use, tagged by a hash of the Dockerfile --------------
 IMAGE="agent-skills-test:$(sha256sum "$REPO_ROOT/scripts/remote-test/Dockerfile" | cut -c1-12)"
-ssh -o BatchMode=yes "$HOST" "touch \"\$HOME/$RUN_DIR\" && docker image inspect $IMAGE >/dev/null 2>&1 || docker build -q -t $IMAGE \"\$HOME/$RUN_DIR/scripts/remote-test\" >/dev/null" || {
+ssh -o BatchMode=yes "$HOST" "touch \"\$HOME/$RUN_DIR\" && { docker image inspect $IMAGE >/dev/null 2>&1 || docker build -q -t $IMAGE \"\$HOME/$RUN_DIR/scripts/remote-test\" >/dev/null; }" || {
   echo "✗ could not build the test image $IMAGE on $HOST" >&2
   exit 1
 }
@@ -196,8 +199,8 @@ ssh -o BatchMode=yes "$HOST" "touch \"\$HOME/$RUN_DIR\" && docker image inspect 
 #
 # The bound is enforced on the server, in the container: `timeout` runs the scripts there (and
 # kills their process group), `--init` reaps what they leave behind, and the container is named
-# after the run directory. The name is the lock: it is checked before the sync above, and the
-# `docker run --name` here is the atomic backstop for two runs that start together. The local
+# after the run directory. The name backs the guard above: a second run on the same directory is
+# refused before its sync when the container exists, and fails here on the name otherwise. The local
 # `timeout` below is a backstop one minute later: it only stops the ssh client, so on expiry, a
 # dropped session (255) or Ctrl-C the named container is killed explicitly.
 REMOTE_CMD="cd \"\$HOME/$RUN_DIR\" && touch . && docker run --rm --init --name $RUN_DIR --user \"\$(id -u):\$(id -g)\" --cpu-shares 128 -v \"\$PWD:/work\" -w /work -e HOME=/home/node -e CI=true -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*' $IMAGE timeout -k 30s ${TIMEOUT_MIN}m bash scripts/remote-test/container.sh ${SCRIPTS[*]}"
