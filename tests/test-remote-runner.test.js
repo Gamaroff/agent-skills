@@ -38,6 +38,7 @@ function makeStubs(t) {
 printf 'ssh %s\\n' "$*" >>"${log}"
 case "$*" in
   *"bash -s"*) cat >"${dir}/reap.sh"; exit 0 ;;
+  *"docker ps -a"*) [ -n "\${STUB_CONTAINER:-}" ] && echo "\${STUB_CONTAINER}"; exit 0 ;;
   *"docker version"*) [ "\${STUB_PROBE_FAIL:-}" = "1" ] && exit 255; exit 0 ;;
   *container.sh*) exit "\${STUB_RUN_STATUS:-0}" ;;
 esac
@@ -331,6 +332,69 @@ test("--reap removes a stale directory but skips one with a running container", 
     "agent-skills-test-fresh",
     "unrelated-old",
   ]);
+});
+
+test("a container already holding the run's name stops the run before any sync", (t) => {
+  const r = run(t, [], { STUB_CONTAINER: "abc123" });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /already exists/);
+  assert.match(r.stderr, /docker rm -f agent-skills-test-/);
+  assert.ok(
+    !r.calls.some((c) => c.startsWith("rsync")),
+    `no rsync may run while the name is taken; calls: ${r.calls.join(" | ")}`,
+  );
+  assert.ok(
+    !r.calls.some((c) => c.includes("container.sh")),
+    "no container may be started",
+  );
+});
+
+test("a dropped ssh session (255) kills the named container; docker's own failure (125) does not", (t) => {
+  const dropped = run(t, [], { STUB_RUN_STATUS: "255" });
+  assert.equal(dropped.status, 255);
+  assert.ok(
+    dropped.calls.some((c) => c.includes("docker kill agent-skills-test-")),
+  );
+  const nameTaken = run(t, [], { STUB_RUN_STATUS: "125" });
+  assert.equal(nameTaken.status, 125);
+  assert.ok(
+    !nameTaken.calls.some((c) => c.includes("docker kill")),
+    "status 125 means another run owns the name; killing it would stop that run",
+  );
+});
+
+test("the run directory is touched after the sync and before the image build", (t) => {
+  const r = run(t, []);
+  const rsyncAt = r.calls.findIndex((c) => c.startsWith("rsync"));
+  const touchAt = r.calls.findIndex(
+    (c) => c.includes("touch ") && c.includes("docker image inspect"),
+  );
+  assert.ok(rsyncAt >= 0 && touchAt > rsyncAt, `calls: ${r.calls.join(" | ")}`);
+});
+
+test("--reap deletes nothing when docker ps fails", (t) => {
+  const r = run(t, ["--reap", "3"]);
+  const script = path.join(r.stubDir, "reap.sh");
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "remote-runner-home-"));
+  t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+  const old = new Date(Date.now() - 40 * 86400 * 1000);
+  fs.mkdirSync(path.join(home, "agent-skills-test-live"));
+  fs.utimesSync(path.join(home, "agent-skills-test-live"), old, old);
+  fs.writeFileSync(
+    path.join(r.stubDir, "docker"),
+    "#!/usr/bin/env bash\nexit 1\n",
+    { mode: 0o755 },
+  );
+  const res = spawnSync("bash", [script, "3"], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      HOME: home,
+      PATH: `${r.stubDir}:${process.env.PATH}`,
+    },
+  });
+  assert.notEqual(res.status, 0, "a failing docker ps must fail the reap");
+  assert.deepEqual(fs.readdirSync(home), ["agent-skills-test-live"]);
 });
 
 test("the sync deletes stale files and never uses --files-from", (t) => {

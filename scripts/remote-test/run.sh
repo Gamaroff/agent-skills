@@ -109,7 +109,7 @@ if [ -n "$REAP_DAYS" ]; then
   # at start, because `rsync -a` copies the local repo root's mtime onto it.
   ssh -o BatchMode=yes "$HOST" bash -s -- "$REAP_DAYS" <<'REAP_SCRIPT'
 days=$1
-running=$(docker ps --format '{{.Names}}' 2>/dev/null)
+running=$(docker ps --format '{{.Names}}') || { echo "docker ps failed: not reaping, a live run could not be told from a stale directory" >&2; exit 1; }
 find "$HOME" -maxdepth 1 -type d -name 'agent-skills-test-*' -mtime +"$days" -print | while IFS= read -r d; do
   case $'\n'"$running"$'\n' in
     *$'\n'"${d##*/}"$'\n'*) echo "skipped (a container is running): $d"; continue ;;
@@ -135,6 +135,21 @@ BRANCH_HASH=$(printf '%s' "$BRANCH" | sha256sum | cut -c1-8)
 RUN_DIR="agent-skills-test-${SLUG:-run}-${BRANCH_HASH}"
 
 echo "▶ $HOST:~/$RUN_DIR  scripts: ${SCRIPTS[*]}  (timeout ${TIMEOUT_MIN}m)"
+
+# The container is named after the run directory, and that name is the lock. It is checked here,
+# before the sync, because `rsync --delete` would otherwise rewrite the tree of a run still using
+# it. `docker run --name` below stays as the atomic backstop for two runs that start together.
+EXISTING=$(ssh -o BatchMode=yes "$HOST" "docker ps -a -q --filter name=^/${RUN_DIR}\$") || {
+  echo "✗ could not check $HOST for a running or stale container named $RUN_DIR" >&2
+  exit 1
+}
+if [ -n "$EXISTING" ]; then
+  {
+    echo "✗ a container named $RUN_DIR already exists on $HOST: another run is using ~/$RUN_DIR, or one was left behind."
+    echo "  Wait for it, or remove a stale one with: ssh $HOST docker rm -f $RUN_DIR"
+  } >&2
+  exit 1
+fi
 echo "▶ server load before the run:"
 ssh -o BatchMode=yes "$HOST" 'uptime; docker ps --format "  {{.Names}} {{.Status}}"'
 
@@ -171,7 +186,7 @@ fi
 
 # --- image: built on the server on first use, tagged by a hash of the Dockerfile --------------
 IMAGE="agent-skills-test:$(sha256sum "$REPO_ROOT/scripts/remote-test/Dockerfile" | cut -c1-12)"
-ssh -o BatchMode=yes "$HOST" "docker image inspect $IMAGE >/dev/null 2>&1 || docker build -q -t $IMAGE \"\$HOME/$RUN_DIR/scripts/remote-test\" >/dev/null" || {
+ssh -o BatchMode=yes "$HOST" "touch \"\$HOME/$RUN_DIR\" && docker image inspect $IMAGE >/dev/null 2>&1 || docker build -q -t $IMAGE \"\$HOME/$RUN_DIR/scripts/remote-test\" >/dev/null" || {
   echo "✗ could not build the test image $IMAGE on $HOST" >&2
   exit 1
 }
@@ -193,8 +208,11 @@ trap 'kill_remote_container; rm -f "$EXCLUDES"; exit 130' INT TERM
 
 timeout --foreground -k 1m "$((TIMEOUT_MIN + 1))m" ssh -o BatchMode=yes "$HOST" "$REMOTE_CMD"
 STATUS=$?
-if [ "$STATUS" -eq 124 ] || [ "$STATUS" -eq 137 ]; then
-  echo "✗ the run hit its ${TIMEOUT_MIN}-minute limit; stopping container $RUN_DIR on $HOST" >&2
+# 124 and 137 are the limit or a kill, 255 is a dropped ssh session; none of them says the remote
+# container stopped. 125 (docker could not start it, e.g. the name is taken) is left alone: the
+# container by that name belongs to another run.
+if [ "$STATUS" -eq 124 ] || [ "$STATUS" -eq 137 ] || [ "$STATUS" -eq 255 ]; then
+  echo "✗ the run ended with status $STATUS (its ${TIMEOUT_MIN}-minute limit, a kill, or a dropped ssh session); stopping container $RUN_DIR on $HOST" >&2
   kill_remote_container
 fi
 exit "$STATUS"
