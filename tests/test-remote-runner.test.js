@@ -350,7 +350,7 @@ test("a container already holding the run's name stops the run before any sync",
   );
 });
 
-test("the lock check filters on the exact run name, and a failed check stops the run before any sync", (t) => {
+test("the container-name guard filters on the exact run name, and a failed check stops the run before any sync", (t) => {
   const ok = run(t, []);
   const check = ok.calls.find((c) => c.includes("docker ps -a"));
   const name = ok.calls

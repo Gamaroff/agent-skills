@@ -138,10 +138,11 @@ echo "▶ $HOST:~/$RUN_DIR  scripts: ${SCRIPTS[*]}  (timeout ${TIMEOUT_MIN}m)"
 
 # A best-effort guard, not a lock. The container is named after the run directory, and a container
 # of that name means a run is executing in it (or one was left behind), so the sync is refused
-# here: `rsync --delete` would rewrite the tree under it. The guard has a window: the container
-# does not exist while a run is still syncing or building the image, so two runs started within
-# that window are not stopped (the second then fails on the name at `docker run`, after its
-# sync). A real lock is the task's Future Improvements item, not something to grow here.
+# here: `rsync --delete` would rewrite the tree under it. The guard has a window that lasts from
+# this check until the container exists: the whole sync and, on first use, the image build, so
+# minutes. A second run started inside it is not stopped; the run that reaches `docker run` second
+# fails on the name, and its sync may already have rewritten the tree under the first run. A per-run
+# lock (an atomic mkdir on the run directory) is listed in the task's Future Improvements.
 EXISTING=$(ssh -o BatchMode=yes "$HOST" "docker ps -a -q --filter name=^/${RUN_DIR}\$") || {
   echo "✗ could not check $HOST for a running or stale container named $RUN_DIR" >&2
   exit 1
