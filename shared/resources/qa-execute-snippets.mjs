@@ -3120,6 +3120,18 @@ const EVALUATING_WORD =
   /(?<![^\s;&|({])(?:printf|read|test|unset|declare|typeset|local|export|readonly|let|eval|for|select|case|\[\[?|\(\()(?=[\s;&|)]|$)/g;
 const ESCAPED_SUBSTITUTION_ASSIGNMENT =
   /(?:^|[\s;&|({])[A-Za-z_][A-Za-z0-9_]*(?:\[[^\]\s]*\])?\+?=\S*\\[$`]/;
+// An assignment whose value is built by expansion into a subscript (`x="a[$y$z]"`). The text that a
+// later `$((x))`, `read "$x"`, `test -v "$x"`, `unset "$x"`, `[[ $x -eq 1 ]]`, `${v:0:$x}` or `${!x}`
+// evaluates is not in the block, so it cannot be judged, and the build is refused instead of
+// tracking the variable to every place it is read (found by the random differential: the first
+// version also required an arithmetic read, and `read "$x"` slipped past it).
+// Only a value with an expansion INSIDE a `name[...]` is refused: bash reads a variable as a
+// subscript only through `name[expr]`, and `n=$(sed 's/([0-9]+)/\1/'); echo $((n + 1))` is what the
+// shipped helpers do (the `[` there follows a `(`, and no expansion sits inside the brackets).
+// Known unseen shapes: the `[` or `$` arriving by expansion (`b='['`), and a value laundered through
+// command output (`x=$(printf 'a[\044(cmd)]')`, task 293 QA-3).
+const EXPANDED_ASSIGNMENT =
+  /(?:^|[\s;&|({])[A-Za-z_][A-Za-z0-9_]*\+?=[^\n;&|]{0,300}[A-Za-z0-9_]\[[^\]\n]{0,300}[$`]/;
 // A literal substitution inside a quoted span, by quote kind. `$'…'` escapes can spell `$(` or a backtick.
 const LITERAL_IN_SINGLE = /\$\(|`/g;
 const LITERAL_IN_DOUBLE = /\\\$\(|\\`/g;
@@ -3199,6 +3211,8 @@ function indirectEvaluationHazard(code) {
   if (PROMPT_TRANSFORM.test(prose)) return "a ${…@P} prompt-escape expansion";
   if (ESCAPED_SUBSTITUTION_ASSIGNMENT.test(prose))
     return "a variable assigned an escaped substitution that a later expansion evaluates";
+  if (EXPANDED_ASSIGNMENT.test(prose))
+    return "a variable built by expansion into a subscript, which a later read evaluates as arithmetic";
 
   // A quoted literal that holds a substitution, assigned or handed to an evaluating builtin.
   const literals = {
@@ -3210,6 +3224,8 @@ function indirectEvaluationHazard(code) {
   for (const q of quotes) {
     const hits = literals[q.quote];
     if (!hits || !anyIn(hits, q.start + q.quote.length, q.end - 2)) continue;
+    if (code[q.start - 1] === "[")
+      return "a quoted substitution used as a subscript, which bash evaluates as arithmetic";
     if (code[q.start - 1] === "=")
       return "a quoted substitution assigned to a variable, which a later expansion evaluates";
     if (anyIn(evaluating, segmentStart(q.start), q.start - 1))

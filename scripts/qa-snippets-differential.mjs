@@ -149,6 +149,18 @@ export const ATOM_SETS = {
     'test -v "$x"',
     "printf -v 'a[$(touch out)]' x",
     "[[ -v 'a[$(touch out)]' ]]",
+    // QA cycle 1 (T293-QA-1, T293-QA-2): a value assembled by expansion; a quoted substitution as a
+    // subscript inside a parameter expansion.
+    "y='$'",
+    "z='(touch out)'",
+    'x="a[$y$z]"',
+    "d='$'",
+    'x="a[${d}(touch out)]"',
+    "echo ${a['$(touch out)']}",
+    // Whole shapes as one atom each, so a short random block can form them (the calibration run
+    // against the cycle-1 engine found no write without these).
+    "y='$'; z='(touch out)'; x=\"a[$y$z]\"",
+    "a=(1); echo ${a['$(touch out)']}",
     "let x",
     "(( x ))",
     "true",

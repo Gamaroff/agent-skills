@@ -216,6 +216,27 @@ Documentation:
 - [x] Phase 2
 - [x] Phase 3
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-10
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.293.qa.1.qa-snippet-classifier-indirect-evaluation.md](./task.293.qa.1.qa-snippet-classifier-indirect-evaluation.md)
+- **Gate File**: [task.293.gate.1.qa-snippet-classifier-indirect-evaluation.yml](./task.293.gate.1.qa-snippet-classifier-indirect-evaluation.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 382 in the suite file; `ci:fast` 8346, 0 fail
+- **Phases Verified**: 2/3 clean
+- **Critical Issues**: 2 (high)
+- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+Two same-family bypasses of the new refusal reproduce under real bash: a value assembled from pieces and read as arithmetic, and a quoted substitution used as an array subscript inside a parameter expansion.
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -225,6 +246,8 @@ Documentation:
 | 2026-11-10 | 1.1 | Review passed (8/10) — corrected the `assignmentHazard`/`startupHazard` description (a direct use is not refused today), recorded which spellings reproduce and their preconditions, named the differential command | review-task |
 | 2026-11-10 |  | Status → ready-for-development | review-task |
 | 2026-11-10 |  | Implemented: `indirectEvaluationHazard` in `qa-execute-snippets.mjs`, `indirect` differential atom set, tests, docs, CHANGELOG. Status → ready-for-review | develop-task |
+| 2026-11-10 |  | QA gate FAIL (70/100) — 2 high findings | qa-task |
+| 2026-11-10 |  | QA findings fixed — 2 high closed (assembled subscript value, quoted substitution as subscript), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ## References

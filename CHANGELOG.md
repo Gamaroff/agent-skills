@@ -13,10 +13,13 @@ All notable changes to this project will be documented in this file. Format foll
   as arithmetic (`$((x))`, `[[ $x -eq 1 ]]`, `${y:0:$x}`, `${!x}`). All classified `runnable` and wrote
   a file under bash. They are now `mutating`, with the reason `indirect-evaluation: …`, by refusing
   the build (a quoted literal holding `$(` or a backtick, where it is assigned or handed to an
-  evaluating builtin; a prompt variable set; `@P`) instead of tracking the value. The differential
-  gains an `indirect` atom set (10 writes on the previous engine, 0 now) and the docs scan finds two
-  blocks newly refused and none newly runnable. Known unseen shape: a value laundered through a
-  command's output.
+  evaluating builtin; a prompt variable set; `@P`) instead of tracking the value. A value built by
+  expansion into a subscript (`x="a[$y$z]"`) and a quoted substitution directly after a `[`
+  (`${a['$(cmd)']}`) are refused too: both were found by QA, and the first by the random
+  differential on a `read "$x"` spelling. The differential gains an `indirect` atom set (10 writes
+  on the previous engine, 0 now) and the docs scan finds two blocks newly refused and none newly
+  runnable. Known unseen shapes: a value laundered through a command's output, and a `[` or `$`
+  that itself arrives by expansion.
 
 - **The QA snippet classifier reads bash's lexical rules once** (task 292). A carriage return, form
   feed, vertical tab, no-break space or line separator before a `#` was taken for a blank, so

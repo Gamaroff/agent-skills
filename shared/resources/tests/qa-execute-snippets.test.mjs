@@ -5129,6 +5129,18 @@ const T293_SHAPES = {
     "x=$'a[\\x24(touch W)]'; echo $((x))",
   "control: escaped, unquoted assignment":
     "x=a\\[\\$\\(touch\\ W\\)\\]; echo $((x))",
+  // QA cycle 1 (T293-QA-1, T293-QA-2): the value is assembled by expansion, or the quoted
+  // substitution sits in a subscript inside a parameter expansion.
+  "QA-1 value assembled from two variables":
+    "y='$'; z='(touch W)'; x=\"a[$y$z]\"; echo $((x))",
+  "QA-1 value assembled with ${d} and read by [[ -eq ]]":
+    "d='$'; x=\"a[${d}(touch W)]\"; [[ $x -eq 1 ]]",
+  "QA-1 value assembled from a nested substitution":
+    "x=\"a[$(printf '$')(touch W)]\"; echo $((x))",
+  "QA-1 value assembled, then read by read (found by the random differential)":
+    "y='$'; z='(touch W)'; x=\"a[$y$z]\"; read -r \"$x\" <<< 1",
+  "QA-2 quoted substitution as a subscript in ${a[...]}":
+    "a=(1); echo ${a['$(touch W)']}",
 };
 
 // Bash's own behaviour, calibrated where it is known to run the marker: the instrument is dead if a
@@ -5177,6 +5189,10 @@ const T293_DECIDERS = {
     "x='a[$(touch W)]'; echo $((x))",
   "quoted substitution handed to a builtin, not assigned":
     "printf -v 'a[$(touch W)]' x",
+  "value built by expansion, read as arithmetic (no quoted substitution)":
+    "y='$'; z='(touch W)'; x=\"a[$y$z]\"; echo $((x))",
+  "quoted substitution as a subscript (no assignment, no builtin)":
+    "a=(1); echo ${a['$(touch W)']}",
 };
 
 test("task.293 each refusal is held on an input where it alone decides", () => {
@@ -5209,6 +5225,10 @@ test("task.293 safe blocks near the class stay runnable", () => {
     "echo PS4", // a mention, not a prompt variable set
     "grep -n 'PS1' docs/x.md", // a pattern
     'printf "%s\\n" hello',
+    "a=(1); echo ${a[0]}", // a plain subscript
+    'n=$(wc -l < f); echo "$n"', // built by expansion, never read as arithmetic
+    'x=5; y="$x"; echo hi', // an expanded value with no arithmetic read
+    "[ -f x ] && echo ok", // the test command, not a subscript
   ]) {
     assert.equal(classifyBlock(code).klass, "runnable", code);
   }

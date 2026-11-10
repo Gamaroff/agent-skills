@@ -260,12 +260,21 @@ reproduce under real bash, and a block holding one is `mutating` with a reason t
   Bash evaluates the subscript `a[$(cmd)]` as arithmetic when it reads the name, so the substitution
   runs. This also covers the variable used later in `$((x))`, `[[ $x -eq 1 ]]`, `${v:0:$x}` or
   `${!x}`: the assignment is the refusal, so no value is tracked.
+- **A subscript built by expansion, and a quoted substitution used as a subscript** (QA cycle 1). An
+  assignment whose value holds an expansion inside `name[…]` (`x="a[$y$z]"`, `x="a[${d}(cmd)]"`) is
+  refused, because the text that `$((x))`, `read "$x"`, `test -v "$x"` or `[[ $x -eq 1 ]]` later
+  evaluates is not in the block. A quoted literal substitution directly after a `[`
+  (`${a['$(cmd)']}`, `a['$(cmd)']=1`) is refused too. A `[` that follows a `(` or has no expansion
+  inside it (a `sed` pattern such as `([0-9]+)`) is not a subscript, which is why the shipped helpers
+  that count with `n=$(sed …); $((n + 1))` stay runnable.
 
 The claim is **bounded**, not "any indirect evaluation": the table in `qa-execute-snippets.test.mjs`
 (`task.293 — indirect evaluation`) lists the shapes, and the `indirect` atom set of the differential
 (`npm run qa-snippets:differential -- --atoms indirect`) generates their combinations. **Known
-unseen shape:** a value laundered through a command's output (`y=$(echo 'a[$(cmd)]'); echo $((y))`),
-where the literal is not assigned and no evaluating builtin precedes it. The rule sits after the helper
+unseen shapes:** a value laundered through a command's output (`y=$(echo 'a[$(cmd)]'); echo $((y))`,
+or `x=$(printf 'a[\044(cmd)]')`), where the literal is not assigned and no evaluating builtin precedes
+it; and the `[` or `$` itself arriving by expansion (`b='['; x="a${b}…"`). Both reproduce under bash
+and are recorded, not closed. The rule sits after the helper
 rule on purpose, so a helper call that also names a start-up variable keeps its `helper call with …`
 reason. A documentation block that needs one of these shapes is rewritten to avoid the indirection.
 
