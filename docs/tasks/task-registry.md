@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-11-10
-**Next Available Task Number:** **295**
+**Next Available Task Number:** **296**
 
 ## How to use
 
@@ -409,3 +409,4 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 292 | [One bash tokenizer for the QA snippet classifier](task.292.qa-snippet-classifier-one-bash-tokenizer/task.292.qa-snippet-classifier-one-bash-tokenizer.md) | accepted | refactoring | High | 2026-11-10 | — | task 290 follow-up: replaces the classifier's per-scan regex copies of bash's lexical rules (struck by task 290's not-converging QA loop) and closes the owner-waived T290-QA-3 (CR/FF/VT/Unicode space before `#`) |
 | 293 | [QA snippet classifier refuses indirect evaluation](task.293.qa-snippet-classifier-indirect-evaluation/task.293.qa-snippet-classifier-indirect-evaluation.md) | accepted | refactoring | Medium | 2026-11-10 | task.292 | task 292 follow-up: closes T292-CR-1..3 (printf -v and similar subscript operands, PS4 and ${x@P}, quoted data re-evaluated as arithmetic) as one class; the WORD/assignment-regex migration is a separate, optional task |
 | 294 | [QA snippet classifier allow-list](task.294.qa-snippet-classifier-allow-list/task.294.qa-snippet-classifier-allow-list.md) | planned | refactoring | Medium | 2026-11-10 | task.293 | task 293 follow-up: run a block only when every word is a known-safe literal, closing the three documented residuals (printf octal launder, a [ or $ arriving by expansion, a literal split across quote tokens); folds in the two gate-9 test cleanups |
+| 295 | [Run the test suite on the LAN server (test:remote)](task.295.test-remote-lan-server-route/task.295.test-remote-lan-server-route.md) | planned | infrastructure | Medium | 2026-11-10 | — | — handoff from a tinker-city session: `npm run test:remote` syncs the tree to the .249 LAN server, runs the root scripts there in a CI-parity container, exits with their status; the overheating laptop only syncs and prints · six phases |
