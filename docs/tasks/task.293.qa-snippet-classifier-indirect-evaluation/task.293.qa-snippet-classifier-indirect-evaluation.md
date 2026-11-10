@@ -5,7 +5,7 @@ type: task
 description: "Close the QA snippet classifier's indirect-evaluation holes (T292-CR-1..3): quoted command substitutions reached through printf -v and similar subscript operands, prompt-escape expansion, and quoted data re-evaluated as arithmetic."
 tags: [qa-task, security, follow-up-292]
 category: refactoring
-status: in-progress
+status: ready-for-review
 priority: Medium
 created: 2026-11-10
 updated: 2026-11-10
@@ -15,7 +15,7 @@ github_issue:
 
 # Technical Task: QA snippet classifier refuses indirect evaluation
 
-**Status:** In Progress
+**Status:** Ready for Review
 
 **Review**: ✅ All review recommendations from `task.293.review.1.qa-snippet-classifier-indirect-evaluation.md` implemented 2026-11-10
 
@@ -260,6 +260,7 @@ Gate 8 (third owner-granted extra cycle). The bracket depth resets at a separato
 | 2026-11-10 |  | QA gate FAIL (85/100) — 1 high finding on the second extra cycle | qa-task |
 | 2026-11-10 |  | QA finding fixed — 1 high closed by counting bracket depth over the segment, 7 iterations | qa-fix |
 | 2026-11-10 |  | QA gate FAIL (85/100) — 1 high finding on the third extra cycle | qa-task |
+| 2026-11-10 |  | QA finding fixed — 1 high closed by never resetting the bracket depth, 8 iterations | qa-fix |
 <!-- change-log-end -->
 
 ## References

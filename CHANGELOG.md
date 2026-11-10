@@ -26,7 +26,8 @@ All notable changes to this project will be documented in this file. Format foll
   parse as real counts. QA gate 6 found a quoted substitution later in a compound-assignment
   subscript (`a=([0'$(cmd)']=1)`), so the bracket rule no longer looks only at the character before
   the quote, and gate 7 found a paren inside the subscript (`a=([0+(1)'$(cmd)']=1)`) hiding the
-  bracket from a same-word scan, so brackets are now counted by depth over the command segment. The differential gains an `indirect` atom set (10 writes
+  bracket from a same-word scan, so brackets were counted by depth over the command segment; gate 8 found a
+  quoted `;` resetting that depth (`a=([';'0'$(cmd)']=1)`), so the depth is now never reset. The differential gains an `indirect` atom set (10 writes
   on the previous engine, 0 now) and the docs scan finds two blocks newly refused and none newly
   runnable. Known unseen shapes: a value laundered through a command's output, a `[` or `$`
   that itself arrives by expansion, and a literal split across adjacent quote tokens

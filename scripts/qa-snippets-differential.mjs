@@ -171,6 +171,10 @@ export const ATOM_SETS = {
     "set -- 'a[ $(touch out)]'",
     "echo ${@:$1}",
     "v=(1); echo ${v[1+$1]}",
+    // QA gate 8 (T293-QA-11): a separator inside a quoted span of the subscript.
+    "a=([';'0'$(touch out)']=1); echo hi",
+    "a=([\"0;\"'$(touch out)']=1); echo hi",
+    "a=([' & | '0'`touch out`']=1)",
     // QA gate 7 (T293-QA-10): parens inside the subscript.
     "a=([0+(1)'$(touch out)']=1); echo hi",
     "a=([(0)+'$(touch out)']=1); echo hi",

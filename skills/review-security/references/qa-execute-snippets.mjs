@@ -3140,12 +3140,13 @@ const LIVE_EXPANSION = /\$(?=[A-Za-z_0-9{(\[@*#?!$-])|[A-Za-z0-9_}\]]\[/g;
 // command output (`x=$(printf 'a[\044(cmd)]')`, task 293 QA-3).
 const EXPANDED_ASSIGNMENT =
   /(?:^|[\s;&|({])[A-Za-z_][A-Za-z0-9_]*\+?=[^\n;&|]{0,300}[A-Za-z0-9_]\[[^\]\n]{0,300}[$`]/;
-// For every position, whether a `[` opened earlier in the same command segment has not been closed
-// yet, so a quote there sits inside a subscript (`${a['$(cmd)']}`, `a=([0'$(cmd)']=1)`,
-// `a=([0+(1)'$(cmd)']=1)`). Depth-tracked over the whole segment, not "the character before the
-// quote" (task 293 QA gate 6) and not "the same word" (gate 7: a paren inside the subscript ended a
-// word scan and hid the `[`). One forward pass, so the cost is linear with no length cap. It reads
-// brackets in quoted text too; that can only over-refuse.
+// For every position, whether a `[` opened earlier in the block has not been closed yet, so a quote
+// there may sit inside a subscript (`${a['$(cmd)']}`, `a=([0'$(cmd)']=1)`, `a=([0+(1)'$(cmd)']=1)`,
+// `a=([';'0'$(cmd)']=1)`). Depth over the whole block, never reset: not "the character before the
+// quote" (task 293 QA gate 6), not "the same word" (gate 7: a paren hid the `[`), and not "the same
+// segment" (gate 8: a quoted `;` reset the depth). Every reset was a place to lose the bracket, so
+// there is none. One forward pass, so the cost is linear with no length cap. It reads brackets in
+// quoted text too; that can only over-refuse, which is the price of having no reset to defeat.
 function unclosedBracketMap(code) {
   const open = new Uint8Array(code.length + 1);
   let depth = 0;
@@ -3153,7 +3154,6 @@ function unclosedBracketMap(code) {
     const c = code[i];
     if (c === "[") depth += 1;
     else if (c === "]") depth = depth > 0 ? depth - 1 : 0;
-    else if (c === ";" || c === "&" || c === "|" || c === "\n") depth = 0;
     open[i] = depth > 0 ? 1 : 0;
   }
   return open;

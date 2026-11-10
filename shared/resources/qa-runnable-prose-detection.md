@@ -274,10 +274,12 @@ reproduce under real bash, and a block holding one is `mutating` with a reason t
   assignment whose value holds an expansion inside `name[…]` (`x="a[$y$z]"`, `x="a[${d}(cmd)]"`) is
   refused, because the text that `$((x))`, `read "$x"`, `test -v "$x"` or `[[ $x -eq 1 ]]` later
   evaluates is not in the block. A quoted literal substitution inside a `[` that is still open in
-  the same command segment (`${a['$(cmd)']}`, `a['$(cmd)']=1`, and, since QA gates 6 and 7,
-  `a=([0'$(cmd)']=1)` and `a=([0+(1)'$(cmd)']=1)`) is refused too. Brackets are counted by depth
-  over the segment; a character-before-the-quote test and then a same-word scan each lost to one
-  more spelling, the second to a paren inside the subscript. A `[` that follows a `(` or has no expansion
+  the block (`${a['$(cmd)']}`, `a['$(cmd)']=1`, and, since QA gates 6 to 8, `a=([0'$(cmd)']=1)`,
+  `a=([0+(1)'$(cmd)']=1)` and `a=([';'0'$(cmd)']=1)`) is refused too. Brackets are counted by depth
+  over the whole block and the depth is never reset: a character-before-the-quote test, a same-word
+  scan and a per-segment count each lost to one more spelling (a paren, then a quoted `;`), and
+  every reset was a place to lose the bracket. The price is over-refusal: an unbalanced `[` in
+  earlier text (a lone `echo '['`) refuses a later quoted substitution literal. A `[` that follows a `(` or has no expansion
   inside it (a `sed` pattern such as `([0-9]+)`) is not a subscript, which is why the shipped helpers
   that count with `n=$(sed …); $((n + 1))` stay runnable.
 
