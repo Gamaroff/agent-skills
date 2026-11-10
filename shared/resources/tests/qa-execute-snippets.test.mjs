@@ -4508,3 +4508,204 @@ test("task.289 controls paired with each gap: the look-alike that writes nothing
     /^function-shadows-command/,
   );
 });
+
+// task.290: one reading of `#`, an iterative closingParen, no exception path.
+const T290_GAPS = {
+  "a # after an escaped space is part of the word": "echo a\\ # ; touch out",
+  "the same, nested in a substitution": "echo $(echo a\\ #\n) ; touch out",
+  "the same, in a substitution closed on the next line":
+    "echo $(echo a\\ #) ; touch out\n)",
+  "an escaped semicolon does not start a word": "echo a\\;# ; touch out",
+  "an escaped tab does not start a word": "echo a\\\t# ; touch out",
+  "an escaped space inside a case arm":
+    "case x in x) echo a\\ # ; touch out ;; esac",
+  // task.290 QA 1 (T290-QA-1): a backslash outside quotes.
+  "an escaped quote does not open a quote":
+    "echo \\'a' # ; touch out' ; touch out2",
+  "an escaped double quote does not open a quote":
+    'echo \\"a" # ; touch out" ; touch out2',
+  "a backslash-newline joins a # at column 0 to the word":
+    "echo a\\\n# ; touch out",
+  // T290-QA-2: an even run of backslashes is an escaped backslash, not a join.
+  "an escaped backslash then a newline ends the command":
+    "echo a\\\\\ntouch out",
+  "four backslashes then a newline ends the command":
+    "echo a\\\\\\\\\ntouch out",
+  "an even run, then a write after a blank line": "echo a\\\\\n\ntouch out",
+};
+for (const [name, code] of Object.entries(T290_GAPS)) {
+  test(`task.290 gap: ${name} is refused as mutating`, () => {
+    assert.equal(classifyBlock(code).klass, "mutating", code);
+  });
+}
+
+const T290_CONTROLS = {
+  "a real comment hides the rest of the line": "echo a # ; touch out",
+  "a # inside a word is not a comment": "echo a#b",
+  "$# is the argument count": "echo $#",
+  "an escaped backslash leaves the space unescaped": "echo a\\\\ # ; touch out",
+  "a comment after a semicolon": "echo a;# touch out",
+  "a # in quotes is data": 'echo "a # b" && echo ok',
+  "a continuation then an indented comment is a comment":
+    "echo a\\\n  # ; touch out",
+  "a continuation with no comment": "echo a \\\n  b",
+  "an odd run joins the next line into the command": "echo a\\\nb",
+  "three backslashes then a newline still join": "echo a\\\\\\\nb",
+  "an escaped backslash then a newline is not a continuation":
+    "echo a\\\\\n# ok",
+};
+for (const [name, code] of Object.entries(T290_CONTROLS)) {
+  test(`task.290 control: ${name} stays runnable`, () => {
+    assert.equal(classifyBlock(code).klass, "runnable", code);
+  });
+}
+
+test("task.290 closingParen: deep nesting is refused, not thrown", () => {
+  // The task's shape: `"$(` x N then `")` x N. Unbalanced as bash reads it, so refused at every depth.
+  const shape = (n) => "echo " + '"$('.repeat(n) + '")'.repeat(n);
+  for (const n of [1000, 20000]) {
+    let r;
+    assert.doesNotThrow(() => (r = classifyBlock(shape(n))), `depth ${n}`);
+    assert.equal(r.klass, "mutating", `depth ${n}`);
+  }
+  // A well-formed nest is read to its end. (The scan re-masks each level, so cost grows
+  // with the square of the depth: 1000 is ~0.1s, 3000 is ~0.7s.)
+  const nested = (n) => 'echo "$(echo '.repeat(n) + "x" + ')"'.repeat(n);
+  let r;
+  assert.doesNotThrow(() => (r = classifyBlock(nested(1000))));
+  assert.equal(r.klass, "runnable");
+  // And a substitution that nests a write is still refused at depth.
+  assert.equal(
+    classifyBlock('echo "$(echo "$(echo "$(touch out)")")"').klass,
+    "mutating",
+  );
+});
+
+test("task.290 the classifier never throws: any exception is a mutating verdict", () => {
+  // A non-string reaches the scanners as an input they cannot read.
+  for (const bad of [null, undefined, 42, {}]) {
+    let r;
+    assert.doesNotThrow(() => (r = classifyBlock(bad)), String(bad));
+    assert.equal(r.klass, "mutating", String(bad));
+    assert.match(r.reason, /fail-closed/, String(bad));
+  }
+});
+
+test("task.290 every comment scan calls the one rule", () => {
+  const src = readFileSync(MODULE, "utf8");
+  // Each `"#"` literal is either the rule itself, a comment-start scan that calls it,
+  // or one of two sites that are not a shell comment scan (sed's own grammar, and the
+  // command-word list).
+  const hits = [...src.matchAll(/^.*"#".*$/gm)].map((m) => m[0].trim());
+  const known = hits.filter(
+    (l) =>
+      /if \(cmd === "#"\)/.test(l) || // sedScan: sed grammar, a different rule
+      /^"#",$/.test(l) || // the command-word list
+      /lines\[k \+ 1\]\.startsWith\("#"\)/.test(l) || // stripProse: refuses a backslash-newline before a # (a line join, not a comment scan)
+      /if \(text\[i\] !== "#"\) return false;/.test(l), // startsComment itself
+  );
+  assert.equal(
+    hits.length,
+    known.length,
+    `a "#" test that is not startsComment: ${hits.filter((l) => !known.includes(l)).join(" | ")}`,
+  );
+  assert.ok(known.length >= 3, "non-vacuity: the three known sites exist");
+  assert.ok(
+    (src.match(/startsComment\(/g) ?? []).length >= 3,
+    "startsComment is defined and called from closingParen and stripCommentQuoteAware",
+  );
+});
+
+// The differential test: what the classifier calls runnable, run under real bash.
+const WRITERS = [
+  "touch out",
+  "tee out",
+  "cp in out",
+  "rm in",
+  "sort -o out in",
+  "uniq in out",
+];
+const CONTEXTS = [
+  "echo a\\ # ; W",
+  "echo a # ; W",
+  "echo a#b ; W",
+  "echo $# # ; W",
+  "echo $# ; W",
+  "echo a\\\\ # ; W",
+  "echo a\\;# ; W",
+  "echo a;# ; W",
+  "echo a\\\t# ; W",
+  "echo $(echo a\\ #\n) ; W",
+  "echo $(echo a\\ #) ; W\n)",
+  "echo $(echo a # \n) ; W",
+  'echo "$(echo a\\ #)" ; W',
+  "true; W",
+  "true && W",
+  "true || W",
+  "true | W",
+  "false || W",
+  "X=1 W",
+  "(W)",
+  "{ W; }",
+  'echo "$(W)"',
+  "echo `W`",
+  "cat in # W",
+  "cat in #W",
+  "cat in; # W",
+  "cat in ;#W",
+  "if true; then W; fi",
+  "for i in 1; do W; done",
+  "case x in x) W ;; esac",
+  "case x in x) echo a\\ # ; W ;; esac",
+  "echo a\\ # x\nW",
+  "echo \\' ; W ; echo \\' # x",
+  "echo 'a # b' ; W",
+  'echo "a # b" ; W',
+  "echo a \\\n# ; W",
+  "echo a | cat # ; W",
+  "echo ${#PATH} ; W",
+  // task.290 QA 1: a backslash outside quotes.
+  "echo \\'a' # ; touch x' ; W",
+  'echo \\"a" # ; touch x" ; W',
+  "echo a\\\n# ; W",
+  "echo a\\\\\n# ; W",
+  "echo a\\\n  # ; W",
+  // T290-QA-2: even and odd backslash runs before a newline.
+  "echo a\\\\\nW",
+  "echo a\\\\\\\\\nW",
+  "echo a\\\\\n\nW",
+  "echo a\\\\\\\nW",
+  "echo 'a'\\\\\nW",
+];
+
+test("task.290 differential: nothing the classifier calls runnable writes under real bash", () => {
+  const base = tmp();
+  let generated = 0;
+  let executed = 0;
+  for (const w of WRITERS) {
+    for (const ctx of CONTEXTS) {
+      const code = ctx.replaceAll("W", w);
+      generated += 1;
+      if (classifyBlock(code).klass !== "runnable") continue;
+      const dir = mkdtempSync(join(base, "d-"));
+      try {
+        writeFileSync(join(dir, "in"), "b\na\n");
+        const before = readdirSync(dir).sort();
+        spawnSync("bash", ["-c", code], {
+          cwd: dir,
+          timeout: CLI_BUDGET.timeoutMs,
+        });
+        executed += 1;
+        assert.deepEqual(
+          readdirSync(dir).sort(),
+          before,
+          `classified runnable, but bash changed the directory: ${JSON.stringify(code)}`,
+        );
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  }
+  assert.ok(generated >= 200, `generated ${generated} blocks, floor 200`);
+  assert.ok(executed >= 1, `executed ${executed} runnable blocks, floor 1`);
+});

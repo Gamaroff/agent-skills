@@ -1,0 +1,65 @@
+schema: 2
+task: 'task.290.qa-snippet-runner-comment-after-escaped-space'
+task_title: 'QA snippet runner reads a # after an escaped space as a comment'
+gate: FAIL
+status_reason: 'T290-QA-2 is fixed, but startsComment and the old line scan test the previous character with a regex whitespace class that includes CR, FF, VT and Unicode spaces, none of which are blanks to bash, so `echo a<CR># ; touch out` classifies runnable and writes.'
+reviewer: 'QA Engineer'
+head: '4223cfac3ccd7aa30d2d042c82f4b09503e18f06'
+updated: '2026-11-09T20:31:00Z'
+
+top_issues:
+  - id: 'T290-QA-3'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'startsComment tests the character before a `#` with `/[\s;&|(]/`. In JavaScript `\s` also matches CR, form feed, vertical tab, NBSP and U+2028, which bash does not treat as word separators, so the `#` there is mid-word and `; touch out` runs. `echo a` + CR + `# ; touch out` (and the FF, VT, NBSP and U+2028 forms) classify runnable and bash creates out; a space or tab before the `#` is a real comment and writes nothing. Found by a random differential with CR and tab atoms (2 hits in 80000). Identical on develop (the old line scan used `\s` too).'
+    suggested_action: 'Replace the class with the blanks bash uses: a space, a tab, a newline, or one of `;` `&` `|` `(`, for example `/[ \t\n;&|(]/`. Add gap rows for CR, FF, VT, NBSP and U+2028 before a `#`, keep the space and tab controls, add differential contexts, and re-run the docs scan.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 327
+  phases_verified: '1/1'
+  trace:
+    phases_covered: [1]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 31
+    escaped: 0
+    boundary_signals: []
+    notes: 'Probe engine: 31 executed, 0 escaped. Random differentials against bash (200000 blocks over six atom sets) found only T290-QA-3 after cycle 2.'
+  performance:
+    status: PASS
+    notes: 'No change.'
+  reliability:
+    status: PASS
+    notes: 'No change.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Backslash and whitespace handling for comments now sits in three scanners (the stripper, the continuation join, startsComment). Three gates in a row found a HIGH in the same file.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T290-QA-3 (blank class), or take the structural move the third strike asks for.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+  future:
+    - action: 'Hold the iterative closingParen with a test that fails if it is reverted.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T290-QA-3 fixed and re-reviewed']

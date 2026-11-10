@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **The QA snippet runner reads a `#` after an escaped space as part of the word** (task 290).
+  `echo a\ # ; touch out` classified `runnable` and created `out` under bash, because the comment
+  scans took the escaped space for whitespace. One rule, `startsComment`, now serves `stripNonCode`
+  and `closingParen`: a `#` opens a comment only at the start of a word, after whitespace, `;`, `&`,
+  `|` or `(` that no backslash escapes. `closingParen` no longer recurses per nested double-quoted
+  `$(` (20000 of them threw `RangeError`), and the classifier turns any exception into a `mutating`
+  verdict. A differential test runs every block the classifier calls `runnable` under real bash and
+  fails if the directory changes. Over the tracked docs no block changes verdict. A backslash before
+  a quote outside quotes, and a backslash-newline before a line that starts with `#`, are refused
+  (`echo \'a' # ; touch out' ; touch out2` and `echo a\` then `# ; touch out` both classified
+  `runnable` and wrote under bash). Only an odd run of backslashes before a newline joins the next
+  line; `echo a\\` then `touch out` hid the write behind an even run. Skipping the escaped character instead would have made one
+  documentation block newly runnable.
+
 ## [v0.66.0] - 2026-11-09
 
 ### Added

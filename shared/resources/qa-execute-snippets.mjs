@@ -1477,30 +1477,53 @@ function sedScan(s, markForbidden) {
  * read the rest of the line as a second command (QA 5).
  */
 function closingParen(text, open) {
-  let d = 0;
+  // An explicit stack, not recursion: a double-quoted `$(` inside a substitution
+  // opens a new frame, so nesting depth is bounded by the heap, not the call
+  // stack (task.290: 20000 nested `"$(` threw RangeError). A "p" frame counts
+  // parens; a "q" frame is an open double quote, which a `)` cannot close.
+  const stack = [{ t: "p", d: 0 }];
   for (let i = open; i < text.length; i += 1) {
     const c = text[i];
-    if (c === "\\") i += 1;
+    const top = stack[stack.length - 1];
+    if (top.t === "q") {
+      if (c === "\\") i += 1;
+      else if (c === '"') stack.pop();
+      else if (c === "$" && text[i + 1] === "(") {
+        stack.push({ t: "p", d: 1 });
+        i += 1;
+      }
+    } else if (c === "\\") i += 1;
     else if (c === "'") {
       const j = text.indexOf("'", i + 1);
       if (j < 0) return -1;
       i = j;
-    } else if (c === '"') {
-      for (i += 1; i < text.length && text[i] !== '"'; i += 1) {
-        if (text[i] === "\\") i += 1;
-        else if (text[i] === "$" && text[i + 1] === "(") {
-          const j = closingParen(text, i + 1);
-          if (j < 0) return -1;
-          i = j;
-        }
-      }
-      if (i >= text.length) return -1;
-    } else if (c === "#" && (i === 0 || /[\s;&|(]/.test(text[i - 1]))) {
+    } else if (c === '"') stack.push({ t: "q" });
+    else if (startsComment(text, i)) {
       while (i < text.length && text[i] !== "\n") i += 1;
-    } else if (c === "(") d += 1;
-    else if (c === ")" && (d -= 1) === 0) return i;
+    } else if (c === "(") top.d += 1;
+    else if (c === ")" && (top.d -= 1) === 0) {
+      stack.pop();
+      if (stack.length === 0) return i;
+    }
   }
   return -1;
+}
+
+/**
+ * True when the `#` at `text[i]` starts a shell comment: it begins a word, so it
+ * is at the start of the text or follows whitespace, `;`, `&`, `|` or `(` that
+ * is NOT itself escaped. `a\ #` is one word (the space is a literal), `a#b` and
+ * `$#` are mid-word. The one rule every comment scan calls (task.290); the
+ * callers track quotes themselves, so a `#` inside quotes never reaches here.
+ * Unsure reads as "not a comment": the rest of the line is then scanned as code.
+ */
+function startsComment(text, i) {
+  if (text[i] !== "#") return false;
+  if (i === 0) return true;
+  if (!/[\s;&|(]/.test(text[i - 1])) return false;
+  let slashes = 0;
+  for (let k = i - 2; k >= 0 && text[k] === "\\"; k -= 1) slashes += 1;
+  return slashes % 2 === 0;
 }
 
 function maskSubstitutions(text) {
@@ -1949,9 +1972,23 @@ function stripCommentQuoteAware(line) {
   let double = false;
   for (let i = 0; i < line.length; i++) {
     const c = line[i];
+    // Backslash handling stays inside double quotes only. `startsComment` reads
+    // an escaped space itself (`a\ #` is one word). Skipping the byte after a
+    // backslash outside quotes too would also stop `\'` opening a quote, which is
+    // what bash does, but it makes blocks runnable that the scan refuses today
+    // (task.290 docs scan: 1 block) and widening is out of scope. The wrong
+    // reading is the strict one: an unclosed quote leaves more text as code.
     if (c === "\\" && double) {
       i++;
       continue;
+    }
+    // task.290 QA 1: outside quotes an escaped quote is a literal in bash, but
+    // this scan would open a quote there and strip real code as a comment
+    // (`echo \'a' # ; touch out' ; touch out2` ran `touch out2`). Skipping it
+    // widens what is runnable, so the line is refused instead: the throw is
+    // caught by classifyFailClosed and read as a mutating verdict.
+    if (c === "\\" && !single && !double && /['"]/.test(line[i + 1] ?? "")) {
+      throw new Error("escaped quote outside quotes");
     }
     if (c === "'" && !double) {
       single = !single;
@@ -1961,12 +1998,7 @@ function stripCommentQuoteAware(line) {
       double = !double;
       continue;
     }
-    if (
-      c === "#" &&
-      !single &&
-      !double &&
-      (i === 0 || /\s/.test(line[i - 1]))
-    ) {
+    if (!single && !double && startsComment(line, i)) {
       return line.slice(0, i);
     }
   }
@@ -2125,6 +2157,16 @@ function stripProse(code) {
   const out = [];
   const lines = code.split("\n");
   let heredocTerminator = null;
+
+  // task.290 QA 1: bash joins a line ending in an odd run of backslashes to the
+  // next, so a `#` at column 0 of that next line is mid-word, not a comment.
+  // Scanning per line strips it as one; refuse (fail closed) rather than guess.
+  for (let k = 0; k + 1 < lines.length; k += 1) {
+    const run = lines[k].match(/\\+$/);
+    if (run && run[0].length % 2 === 1 && lines[k + 1].startsWith("#")) {
+      throw new Error("backslash-newline before a comment");
+    }
+  }
 
   for (const raw of lines) {
     if (heredocTerminator !== null) {
@@ -2287,7 +2329,10 @@ function commandInvocations(code) {
     // Backslash line-continuations join one command across several lines. Splitting
     // on the raw newline first makes the continuation's tail look like a fresh
     // command: `git log ... -- \` + `apps packages` reported `apps` as a command.
-    .replace(/\\\n/g, " ")
+    // Only an ODD run joins: an even run is an escaped backslash followed by a
+    // real newline, which ends the command (task.290 QA 2: `echo a\\` + newline
+    // + `touch out` hid the write).
+    .replace(/(?<!\\)((?:\\\\)*)\\\n/g, "$1 ")
     // Arithmetic expansion is arithmetic, not an invocation. It must go before the
     // `$(` rule below, or `$((N + 1))` becomes a segment whose first token is `N`.
     .replace(/\$\(\([^)]*\)\)/g, " ")
@@ -2758,8 +2803,24 @@ function resolveHelperCall(inv, { helperRoot, depth, bindings, inherited }) {
  * `helperMode` are this function's own recursion state.
  */
 export function classifyBlock(code, bindings = {}, opts = {}) {
-  const { klass, reason } = classifyInternal(code, bindings, opts);
+  const { klass, reason } = classifyFailClosed(code, bindings, opts);
   return { klass, reason };
+}
+
+/**
+ * `classifyInternal` that never throws: an input the classifier cannot read is
+ * refused, not an exception (task.290). A thrown error would reach the caller as
+ * a crash, and a caller that treated "no verdict" as "no objection" would run it.
+ */
+function classifyFailClosed(code, bindings, opts) {
+  try {
+    return classifyInternal(code, bindings, opts);
+  } catch {
+    return {
+      klass: "mutating",
+      reason: "unrecognised-command: <unparseable> (fail-closed)",
+    };
+  }
 }
 
 /**
@@ -2768,7 +2829,7 @@ export function classifyBlock(code, bindings = {}, opts = {}) {
  * hostile corpus can be run against it (task.191 QA-2).
  */
 export function isRunnableBlock(code, bindings = {}, opts = {}) {
-  return classifyInternal(code, bindings, opts).klass === "runnable";
+  return classifyFailClosed(code, bindings, opts).klass === "runnable";
 }
 
 /**
