@@ -4785,6 +4785,44 @@ for (const [name, code] of Object.entries(T292_GAPS)) {
   });
 }
 
+// QA cycle 1 (T292-QA-1): inside `$[ ]` and `(( ))` bash reads `<<` as a left shift, so the lines
+// up to a line equal to the word are NOT a heredoc body; bash runs the writer. Each of these writes
+// under bash; the control is a real heredoc, which must stay runnable.
+const T292_SHIFTS = {
+  "$[ ] shift": "echo $[1<<z]\ntouch out\nz\n",
+  "$[ ] shift with blanks": "echo $[ 1 << z ]\ntouch out\nz\n",
+  "$[ ] inside double quotes": 'echo "$[1<<z]"\ntouch out\nz\n',
+  "$[ ] inside a substitution": "echo $(echo $[1<<z])\ntouch out\nz\n",
+  "$(( )) shift": "echo $((1<<z))\ntouch out\nz\n",
+  "(( )) shift": "((1<<z))\ntouch out\nz\n",
+  "(( )) assignment shift": "((x=1<<z))\ntouch out\nz\n",
+  // Found by the seeded differential (arith set, seed 11) after the first fix.
+  "(( )) with empty substitutions": "echo ;(($()$()<<z))\ntouch out",
+  "an assignment subscript": "a[1<<z]=1\ntouch out\nz\n",
+};
+for (const [name, code] of Object.entries(T292_SHIFTS)) {
+  test(`task.292 gap (T292-QA-1): ${name} is refused as mutating`, () => {
+    assert.equal(classifyBlock(code).klass, "mutating", JSON.stringify(code));
+  });
+}
+test("task.292 control (T292-QA-1): a real heredoc and a quoted $[ stay runnable", () => {
+  assert.equal(classifyBlock("cat <<z\nhi\nz\n").klass, "runnable");
+  assert.equal(classifyBlock("echo '$[1<<z]'\n").klass, "runnable");
+  assert.equal(classifyBlock("( cat <<z\nhi\nz\n)").klass, "runnable");
+  assert.equal(classifyBlock("cat x[1]<<z\nhi\nz\n").klass, "runnable");
+});
+test("task.292 tokenizer refuses (( and a << inside a subscript", () => {
+  assert.throws(
+    () => tokenize("((1<<z))\nz\n"),
+    /tokenize: .*arithmetic command/,
+  );
+  assert.throws(() => tokenize("a[1<<z]=1\nz\n"), /tokenize: .*subscript/);
+  assert.doesNotThrow(() => tokenize("( (echo a) )"));
+});
+test("task.292 tokenizer refuses the legacy arithmetic form $[", () => {
+  assert.throws(() => tokenize("echo $[1+1]"), /tokenize: .*arithmetic/);
+});
+
 // The same blank-class defect one scan over: a word split on `\s` hides the command bash runs.
 // bash reads `A=1<X>echo touch out` as the assignment `A="1<X>echo"` and then runs `touch out`.
 const T292_SPLITS = {

@@ -1546,6 +1546,10 @@ function lexBash(code) {
   let pending = [];
   // True when the next character would begin a word.
   let wordStart = true;
+  // Inside an arithmetic command `(( … ))` (code frame only): `<<` is a left shift there.
+  // `arithInner` counts the single parentheses opened inside it.
+  let arith = 0;
+  let arithInner = 0;
   let i = 0;
 
   const openSubst = (form, at, width) => {
@@ -1744,7 +1748,12 @@ function lexBash(code) {
       case "$": {
         const next = code[i + 1];
         if (next === "(") openSubst("$(", i, 2);
-        else if (next === "{") {
+        else if (next === "[") {
+          // The legacy arithmetic form `$[ … ]`. Arithmetic is not modelled, and inside it `<<` is
+          // a left shift, not a heredoc opener: reading it as one hid the lines up to the delimiter
+          // from every scan while bash ran them (task 292, QA cycle 1). Refuse, never guess.
+          refuse("legacy arithmetic $[");
+        } else if (next === "{") {
           openParam(i);
           wordStart = false;
         } else if (next === "'") {
@@ -1762,12 +1771,32 @@ function lexBash(code) {
         break;
       }
       case "(": {
+        // `((` is bash's arithmetic command, where `<<` is a left shift, not a heredoc opener.
+        // A subshell inside a subshell is written `( (`, so two adjacent parentheses in code are
+        // arithmetic and are not modelled (task 292, QA cycle 1: the differential found
+        // `((` + `$()$()<<z` + `))` hiding a writer behind a mis-read heredoc).
+        if (f.t === F_CODE && arith > 0) {
+          arithInner += 1;
+        } else if (f.t === F_CODE && code[i + 1] === "(") {
+          arith = 1;
+          arithInner = 0;
+          i += 2;
+          wordStart = true;
+          break;
+        }
         if (f.t === F_PAREN) f.d += 1;
         i += 1;
         wordStart = true;
         break;
       }
       case ")": {
+        if (f.t === F_CODE && arith > 0) {
+          if (arithInner > 0) arithInner -= 1;
+          else if (code[i + 1] === ")") {
+            arith = 0;
+            i += 1; // the second `)` is consumed below
+          }
+        }
         if (f.t === F_PAREN && (f.d -= 1) === 0) {
           closeFrame(i + 1);
           wordStart = false;
@@ -1782,6 +1811,14 @@ function lexBash(code) {
             wordStart = false;
           } else {
             if (f.t !== F_CODE) refuse("heredoc inside a substitution");
+            if (arith > 0) refuse("<< inside an arithmetic command");
+            // `name[1<<z]=…`: inside an assignment subscript `<<` is a left shift too. A `[` that
+            // opens the current word and is not yet closed means the word may be a subscript.
+            let w = i;
+            while (w > 0 && !/[ \t\n;&|()<>`]/.test(code[w - 1])) w -= 1;
+            const word = code.slice(w, i);
+            if (word.lastIndexOf("[") > word.lastIndexOf("]"))
+              refuse("<< inside a subscript");
             i = readHeredocOpener(i);
             wordStart = false;
           }

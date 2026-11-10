@@ -125,6 +125,25 @@ export const ATOM_SETS = {
     "#",
     " ",
   ],
+  // Arithmetic, where `<<` is a left shift and not a heredoc opener (task 292, QA cycle 1): the
+  // `\nz\n` atom is the line a mis-read heredoc would take for its delimiter.
+  arith: [
+    "$[",
+    "]",
+    "$((",
+    "))",
+    "((",
+    "<<",
+    "<<z",
+    "1",
+    "z",
+    "\nz\n",
+    "\n",
+    " ",
+    ";",
+    "$(",
+    ")",
+  ],
 };
 
 /** A seeded linear congruential generator; the sequence is a pure function of the seed. */

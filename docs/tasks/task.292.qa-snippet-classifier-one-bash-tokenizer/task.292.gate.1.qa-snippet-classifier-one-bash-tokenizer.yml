@@ -1,0 +1,69 @@
+schema: 2
+task: 'task.292.qa-snippet-classifier-one-bash-tokenizer'
+task_title: 'One bash tokenizer for the QA snippet classifier'
+gate: FAIL
+status_reason: 'The tokenizer closes T290-QA-3 and every instrument is clean, but a left shift inside $[ ] (echo $[1<<z] then a writer then z) is read as a heredoc and classifies runnable while bash writes. Reproduced by execution; the task requires the tokenizer to refuse shapes it does not model.'
+reviewer: 'QA Engineer'
+head: 'b708546f54d6ad5bd967f4166489673f96c2fabc'
+updated: '2026-11-10T05:17:12Z'
+
+top_issues:
+  - id: 'T292-QA-1'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'The lexer reads every << in code position as a heredoc opener, so inside $[ ... ] (a left shift in bash) the lines up to a line equal to the word are hidden as heredoc body; "echo $[1<<z]", "touch /tmp/qa292-a", "z" classifies runnable and bash creates the file. Control: the $(( )) form is refused, a real heredoc stays runnable. Reviewer CR-1 (confidence high), reproduced by QA; base gives the same verdict, but the task scope says unmodelled shapes are refused. Bug report task.292.bug.1.'
+    suggested_action: 'Refuse (throw) on $[ or on << inside a $[ body; add rows for $[1<<z] and $((1<<z)) with a trailing writer; add $[ and << to the differential atom sets.'
+    suggested_owner: dev
+    origin: 'code-review, reproduced by QA'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 350
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 31
+    escaped: 0
+    boundary_signals: ["never"]
+    boundary: true
+    notes: 'shell-exec probe on isRunnableBlock: 31 executed, 0 reproduced, 0 escaped. The reviewer found one shape the corpus does not cover ($[1<<z]); reproduced by hand (T292-QA-1).'
+  performance:
+    status: PASS
+    notes: 'Docs scan median 333 ms against 491 ms on develop (five alternating runs, load 2.96-3.05). Fixed-seed slice median 2.67 s (bound 10 s). 20000-deep nest is linear.'
+  reliability:
+    status: PASS
+    notes: 'Unmodelled shapes throw and classifyFailClosed returns mutating; no input makes classifyBlock throw.'
+  maintainability:
+    status: PASS
+    notes: 'Five lexical copies replaced by one tokenizer. Two regexes (WORD in variableArgumentToDenyListed, assignment regex in assignedVariables) are knowingly left; documented in the implementation report.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T292-QA-1: refuse $[ / << inside $[ ] and add rows and atoms.'
+      refs: ['shared/resources/qa-execute-snippets.mjs', 'shared/resources/tests/qa-execute-snippets.test.mjs', 'scripts/qa-snippets-differential.mjs']
+  future:
+    - action: 'Decide whether to move the WORD and assignment regexes onto tokens (follow-up task).'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'The blank normalisation in classifyInternal is absorbed by the two other sites (removing it alone turns nothing red); keep as defence in depth or drop it.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T292-QA-1 fixed and re-reviewed']

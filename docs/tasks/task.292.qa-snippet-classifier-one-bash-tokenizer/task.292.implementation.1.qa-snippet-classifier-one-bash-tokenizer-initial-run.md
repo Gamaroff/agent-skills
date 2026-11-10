@@ -34,7 +34,7 @@ Replace the snippet classifier's separate regex re-implementations of bash's bla
 | 1. create-branch           | ✅ Done | Branch `feature/task.292.*` exists in git                              | Branch created at `89366af8` | —                    | 2026-11-10T04:10Z |
 | 2. review-task             | ✅ Done | `task.292.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT 9/10, 0 critical, 0 important | —                    | 2026-11-10T04:25Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (no /develop); 4 phases; 350 tests, fast gate green | —                    | 2026-11-10T05:12Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
+| 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #869 → develop; in-review comment posted; body written from commits (Explore summariser not run) | —                    | 2026-11-10T05:10Z |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.292.qa.{N}.*.md`; `task.292.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.292.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
@@ -91,6 +91,14 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### Cycle 1 — gate FAIL (80/100), 1 HIGH
+
+- **Found (QA 5a):** T292-QA-1. `echo $[1<<z]`, a writer line, then `z` classified runnable; bash writes. Diff reviewer CR-1, reproduced by QA with a control. Bug report `task.292.bug.1`.
+- **Fix (5b):** the lexer refuses `$[`, refuses `<<` inside an open `(( ))` and refuses `<<` in a word with an unclosed `[`. A first version (refuse `$[` only) left `echo ;(($()$()<<z))` runnable; the new `arith` differential atom set found it (seed 11), so the cycle fixed the class, not the instance. The `qa-fix` ingester subagent did not run (one finding, already in hand), so independent ingest did not run.
+- **Evidence:** suite 362/362; `arith` differential seeds 11/12/13 at 60000 blocks each: 0 writes (seed 11 wrote once before the second change); seeds 31/32, all six sets, 30000 each: 0 writes; docs scan 3445 blocks, 0 newly runnable, 0 newly refused; slice median about 2.9 s (bound 10 s); `CI=true npm run ci:fast` green once the QA report's bug link was staged.
+- **Mutation proofs:** `$[` refusal reverted: 3 tests red. `(( ))` refusal removed: 2 red. Subscript refusal removed: only the tokenizer unit row red (the classify row is also refused by the allow-list).
+- **Scope note:** a first `((` blanket refusal turned `if ((a>b))` mutating and broke an existing test; narrowed to a `<<` inside an open `(( ))`.
+
 ---
 
 ## Completion
@@ -98,7 +106,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: {populated after Step 1}
-**PR**: {populated after Step 4}
+**PR**: [#869](https://github.com/Gamaroff/agent-skills/pull/869)
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}

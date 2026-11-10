@@ -273,6 +273,27 @@ Sign-off is disabled for this repository (`sign-off.enabled` is not set), so no 
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-10
+**Quality Score**: 80/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.292.qa.1.qa-snippet-classifier-one-bash-tokenizer.md](./task.292.qa.1.qa-snippet-classifier-one-bash-tokenizer.md)
+- **Gate File**: [task.292.gate.1.qa-snippet-classifier-one-bash-tokenizer.yml](./task.292.gate.1.qa-snippet-classifier-one-bash-tokenizer.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 350
+- **Phases Verified**: 4/4
+- **Critical Issues**: 1
+- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+A left shift inside `$[ ]` is read as a heredoc, so a writer after it classifies runnable (bug 1, reproduced by execution). Everything else holds: fast gate green, 0 writes in the differential, 0 newly runnable blocks in the docs scan.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -282,6 +303,8 @@ Sign-off is disabled for this repository (`sign-off.enabled` is not set), so no 
 | 2026-11-10 | 1.1     | Review passed (9/10) — no changes required; 3 optional notes in the review report | review-task |
 | 2026-11-10 |         | Status → ready-for-development                                               | review-task |
 | 2026-11-10 |         | Implemented — 9 files (16 with bundled copies), 23 tests added | develop |
+| 2026-11-10 |         | QA gate FAIL (80/100) — 1 finding                                            | qa-task     |
+| 2026-11-10 |         | QA findings fixed — T292-QA-1, 1 iteration                                   | qa-fix      |
 <!-- change-log-end -->
 
 ---
