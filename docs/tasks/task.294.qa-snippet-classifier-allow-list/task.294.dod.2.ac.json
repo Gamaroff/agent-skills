@@ -1,0 +1,215 @@
+{
+  "schema": 1,
+  "dod_n": 2,
+  "head": "efb28edec9a14103e9d00c931519f9f8ecc8ff85",
+  "dirty_paths": [
+    "docs/tasks/task.294.qa-snippet-classifier-allow-list/task.294.implementation.1.qa-snippet-classifier-allow-list-initial-run.md"
+  ],
+  "document": "docs/tasks/task.294.qa-snippet-classifier-allow-list/task.294.qa-snippet-classifier-allow-list.md",
+  "result": {
+    "bytes": 9781,
+    "sha256": "082fe731b2c93ebdbc2192b029682f81ab9601b8d1ca4f7a626065290a014c03",
+    "verified": true
+  },
+  "scope": {
+    "mode": "scoped",
+    "reason": "prior-record",
+    "rejudged": 7,
+    "carried": 4
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "3b93194618e9af9dfad43cbe5ee056b30ecf5a6f46b0cf4781608f9bb5cb0b26",
+      "status": "PASS",
+      "description": "Three residual shapes from QA report 9 classify mutating, each shown writing under real bash",
+      "code_citation": "shared/resources/qa-execute-snippets.mjs:4116",
+      "test_citation": "shared/resources/tests/qa-execute-snippets.test.mjs:5424",
+      "members": [
+        {
+          "member": "stored substitution with octal-escaped dollar, read as arithmetic",
+          "evidence": "shared/resources/tests/qa-execute-snippets.test.mjs:5397",
+          "status": "PASS"
+        },
+        {
+          "member": "dollar arriving by expansion (b/d variables)",
+          "evidence": "shared/resources/tests/qa-execute-snippets.test.mjs:5399",
+          "status": "PASS"
+        },
+        {
+          "member": "adjacent quotes splice the dollar away (read <<<)",
+          "evidence": "shared/resources/tests/qa-execute-snippets.test.mjs:5401",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "The test at 5424 runs each row under real bash and requires a marker file. It also requires the row to be runnable with the allow-list off, and mutating with `not-allow-listed:` with it on. The table also holds a fourth row (printf -v) and two spellings the earlier layers already refuse. Per-PR lane: test.yml runs `npm test` on pull_request (no paths-ignore), and test:suite globs shared/resources/tests/*.test.mjs."
+    },
+    {
+      "id": "#2",
+      "text_hash": "750b5de616051bb311978d1295caf2369f47963120d85a12cba52e5876165fd8",
+      "status": "PASS",
+      "description": "Control table of ordinary safe blocks stays runnable",
+      "code_citation": "shared/resources/qa-execute-snippets.mjs:4116",
+      "test_citation": "shared/resources/tests/qa-execute-snippets.test.mjs:5447",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The control table asserts runnable for echo, ls|grep, for/if/case blocks, arithmetic and the task-77 predicate. The task.293 control table at 5348 states the allow-list verdict too. Same per-PR lane as #1."
+    },
+    {
+      "id": "#3",
+      "text_hash": "95b199a1ec82452bbc6c6cd77776f15d0506606d70a1fb4a03e1f66f44309f81",
+      "status": "PASS",
+      "description": "Differential run writes nothing: 0 writes, block count recorded in QA report",
+      "code_citation": "scripts/qa-snippets-differential.mjs:214",
+      "test_citation": "shared/resources/tests/qa-execute-snippets.test.mjs:5099",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The diff adds a `residual` atom set (differential.mjs:214, added to BARE_SETS at :283). The slice test runs every ATOM_SET at a fixed seed (4000 blocks per set) and asserts r.writes === 0. The QA report (qa.1.md:67-69) records the old engine at 10 writes in 5000 blocks and the new engine at 0, with the slice test green. This is a behaviour criterion with a per-PR test, so the measured-criterion path does not apply."
+    },
+    {
+      "id": "#4",
+      "text_hash": "b6c27caee370a79061869ccce7e59330c30db087d315b8643bcca77dc7ad480c",
+      "status": "PASS",
+      "description": "Docs-scan median over five runs within +10% of pre-change median, uptime per run",
+      "code_citation": "docs/tasks/task.294.qa-snippet-classifier-allow-list/task.294.qa.1.qa-snippet-classifier-allow-list.md:193",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Bound: now median within +10% of develop median. Command: scripts/qa-snippets-docscan.mjs --time, five runs each, load recorded before each run (QA report :193-201). Medians recomputed from the table: develop 408 ms (394 404 408 422 427), now 393 ms (376 383 393 411 471). Measured on head 3c720169. I ran finalise-delta.js docs-only --base 291d7750 --head HEAD: reason tree-equivalent, exit 0 (11 docs-only paths), and 291d7750 is the last code change, so measured on M, tree-equivalent to head. The earlier QA-cycle set (1102 vs 1160 ms, :70) agrees."
+    },
+    {
+      "id": "#5",
+      "text_hash": "c95ab14e0ef6822add68e7d8bcff44686bc2daad407bd882408fa32cc2155240",
+      "status": "PASS",
+      "description": "Differential slice median over five runs under 10 s, recorded with load",
+      "code_citation": "docs/tasks/task.294.qa-snippet-classifier-allow-list/task.294.qa.1.qa-snippet-classifier-allow-list.md:171",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Bound: median under 10 s. Command: CI=true node --test --test-name-pattern=\\\"task.292 differential slice: nothing\\\" on the test file, whole-command wall clock (:169-179). Five runs with uptime beside each: 4246 4178 4263 4152 4189 ms, median 4189 ms (recomputed). Taken on head 3c720169; finalise-delta.js docs-only from 291d7750 to HEAD returned tree-equivalent (exit 0), so it counts. The report names the commit and the load for every run."
+    },
+    {
+      "id": "#6",
+      "text_hash": "3dd2812a64d7a60a5acc51a90950f2fad1db3fc8b0e51b04b479bc247625aacf",
+      "status": "PASS",
+      "description": "CI=true suite green; prettier --check and lint pass on every changed .mjs",
+      "code_citation": "docs/tasks/task.294.qa-snippet-classifier-allow-list/task.294.qa.1.qa-snippet-classifier-allow-list.md:72",
+      "test_citation": "shared/resources/tests/qa-execute-snippets.test.mjs:5424",
+      "members": [],
+      "non_member_fail": null,
+      "note": "QA report records 392 pass, 0 fail, prettier clean on the three changed .mjs, and ci:fast pass. Per-PR lane: test.yml runs format:check and npm test on pull_request. The report records no separate lint run on .mjs; package.json defines no JS linter (lint:shell and lint:secrets cover other file kinds). See advisories."
+    },
+    {
+      "id": "#7",
+      "text_hash": "bb86fa63779aeb81f504727c49e00ec3008cd9d4c4a45687eb508efefc13550c",
+      "status": "PASS",
+      "description": "npm run bundle:check reports 0 problems",
+      "code_citation": "docs/tasks/task.294.qa-snippet-classifier-allow-list/task.294.qa.1.qa-snippet-classifier-allow-list.md:73",
+      "test_citation": ".github/workflows/validate.yml:128",
+      "members": [],
+      "non_member_fail": null,
+      "note": "QA report line 73 records 129 skills checked, 0 problems. validate.yml runs the bundle check on pull_request, and its shared/resources/** path filter matches this PR. The code delta since the run-1 record is documentation only."
+    },
+    {
+      "id": "#8",
+      "text_hash": "40e767328b3e086e0173bcb5d77c3fab89baa25686877d654468bb1648c814e2",
+      "status": "PASS",
+      "description": "Every change mutation-proven: QA report names reverted behaviour and red test for each",
+      "code_citation": "docs/tasks/task.294.qa-snippet-classifier-allow-list/task.294.qa.1.qa-snippet-classifier-allow-list.md:149",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "allow-list call in classifyInternal replaced by null",
+          "evidence": "docs/tasks/task.294.qa-snippet-classifier-allow-list/task.294.qa.1.qa-snippet-classifier-allow-list.md:149",
+          "status": "PASS"
+        },
+        {
+          "member": "`$((` name check removed",
+          "evidence": "docs/tasks/task.294.qa-snippet-classifier-allow-list/task.294.qa.1.qa-snippet-classifier-allow-list.md:163",
+          "status": "PASS"
+        },
+        {
+          "member": "`[[` arithmetic-operand check removed",
+          "evidence": "docs/tasks/task.294.qa-snippet-classifier-allow-list/task.294.qa.1.qa-snippet-classifier-allow-list.md:164",
+          "status": "PASS"
+        },
+        {
+          "member": "`=` command-word check removed",
+          "evidence": "docs/tasks/task.294.qa-snippet-classifier-allow-list/task.294.qa.1.qa-snippet-classifier-allow-list.md:165",
+          "status": "PASS"
+        },
+        {
+          "member": "helper rule and start-up rule order swapped",
+          "evidence": "docs/tasks/task.294.qa-snippet-classifier-allow-list/task.294.qa.1.qa-snippet-classifier-allow-list.md:155",
+          "status": "PASS"
+        },
+        {
+          "member": "mapfile added to the command table",
+          "evidence": "docs/tasks/task.294.qa-snippet-classifier-allow-list/task.294.qa.1.qa-snippet-classifier-allow-list.md:157",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "PASS from merged members (6 counted)"
+    },
+    {
+      "id": "#9",
+      "text_hash": "792e1d998a946bc74760b70ddb582b3f3c538b753866b1f849d2aa3e4d474416",
+      "status": "PASS",
+      "description": "Two gate-9 cleanups done, each mutation-proven (QA report)",
+      "code_citation": "docs/tasks/task.294.qa-snippet-classifier-allow-list/task.294.qa.1.qa-snippet-classifier-allow-list.md:155",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "helper-call reason pinned (helper/start-up order swap)",
+          "evidence": "docs/tasks/task.294.qa-snippet-classifier-allow-list/task.294.qa.1.qa-snippet-classifier-allow-list.md:155",
+          "status": "PASS"
+        },
+        {
+          "member": "set/shift and six-word unrecognised-command tests",
+          "evidence": "docs/tasks/task.294.qa-snippet-classifier-allow-list/task.294.qa.1.qa-snippet-classifier-allow-list.md:157",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "The same committed lines as in #8. Each cleanup has a record naming the reverted behaviour and the test that went red. Neither was re-run at QA (dev-only). The helper test is named only by role in the report, and the task doc names it exactly."
+    },
+    {
+      "id": "#10",
+      "text_hash": "5454c05fae63dea34c07216d2b4aa4b4bf105176f8b5d65da2944c23b37e63f0",
+      "status": "PASS",
+      "description": "CHANGELOG.md cites (task 294)",
+      "code_citation": "CHANGELOG.md:9",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "I read CHANGELOG.md:9. The Unreleased > Changed entry is headed `The QA snippet classifier runs a block only when every non-literal word is on a closed list (task 294).` and describes the change. The repository has no changelog corpus guard in tests/ (release-ci-gate.test.js only sandboxes a changelog), so the test citation is not applicable."
+    },
+    {
+      "id": "#11",
+      "text_hash": "6be7d5487b9b76619341873617080eed1a4dbc8e9fded2f721c4395787cb1bce",
+      "status": "PASS",
+      "description": "Every newly refused documentation block listed in QA report with reason; 0 newly runnable",
+      "code_citation": "docs/tasks/task.294.qa-snippet-classifier-allow-list/task.294.qa.1.qa-snippet-classifier-allow-list.md:181",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The report states 256 runnable before, 251 now, 0 newly runnable, then lists five blocks (task.148:17, task.185:28, task.193:45, task.36:34, task.92:47), each with its reason. The count and the list agree."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#8",
+      "note": "The helper-order proof (:156) and the mapfile proof (:157) are named in the QA report only by role (the Phase 5 helper-call test, the six-word unrecognised-command test). They are dev-only, copied from the uncommitted implementation report, and not re-run. Naming the exact test titles (test.mjs:5307 area, and :5589) would remove the dependence on the task doc."
+    },
+    {
+      "ac_id": "#6",
+      "note": "The criterion asks for lint on changed .mjs. The QA report records no lint run, and the repo has no JS linter, so only the prettier and test halves have evidence."
+    },
+    {
+      "ac_id": "#3",
+      "note": "Carried. The QA report line 68 still records the 0-writes differential."
+    }
+  ]
+}

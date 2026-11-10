@@ -5,18 +5,19 @@ type: task
 description: "Replace the QA snippet classifier's refusal rules with an allow-list: a shell block runs only when every word is a known-safe literal. Closes the three residual indirect-evaluation shapes task 293 left open, and folds in two advisory test cleanups from its gate 9."
 tags: [qa-task, security, follow-up-293]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-11-10
 updated: 2026-11-10
 estimated_effort_hours: 16
 github_issue:
 pr_number: 874
+completed_date: 2026-11-10
 ---
 
 # Technical Task: QA snippet classifier allow-list
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 Follow-up to [task 293](../task.293.qa-snippet-classifier-indirect-evaluation/task.293.qa-snippet-classifier-indirect-evaluation.md) (PR #870). The owner's "Narrow T293" decision at gate 5 split this out: task 293 closed the indirect-evaluation family by refusal rules, and three shapes it could not close stay documented. Detail: [QA report 9](../task.293.qa-snippet-classifier-indirect-evaluation/task.293.qa.9.qa-snippet-classifier-indirect-evaluation.md), [gate 9](../task.293.qa-snippet-classifier-indirect-evaluation/task.293.gate.9.qa-snippet-classifier-indirect-evaluation.yml) `recommendations.future`.
 
@@ -262,17 +263,43 @@ Population commands: `git grep -ln "qa-execute-snippets" -- 'skills/*/references
 
 ### Key Findings
 No gate issues. One high review finding (git evaluating a plain-literal `-c` or `GIT_*` string) reproduces but is identical on the base and outside this task, so it is a follow-up in the gate's `recommendations.future`.
+## Definition of Done - PASSED ✅
 
-## Change Log
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.294.qa.1.qa-snippet-classifier-allow-list.md`
+**Gate File**: `task.294.gate.1.qa-snippet-classifier-allow-list.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100
+**PR review**: `task.294.pr-review.1.qa-snippet-classifier-allow-list.md`, CONCERNS with three document-only findings, all closed
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** all 11 met (the run-2 record, `task.294.dod.2.ac.json`). Run 1 found two gaps in the QA record (per-run load on the slice timing, red tests named for three mutation proofs); both were closed by re-measuring, not by rewording.
+✅ **Tests:** 392 pass in `shared/resources/tests/qa-execute-snippets.test.mjs`; `ci:fast` green on the LAN server
+✅ **Security Review:** ✅ PASS — the boundary probe executed 31 candidates, 0 reproduced, 0 escaped (`task.294.dod.2.security.run.json`)
+✅ **Documentation:** `CHANGELOG.md` cites `(task 294)`; `shared/resources/qa-runnable-prose-detection.md` §2a-iii added
+✅ **Compliance Review:** not applicable (internal classifier, no data, payments, UI or health data)
+
+**Known follow-up, not a gap:** git evaluating a plain-literal `-c` or `GIT_*` string classifies `runnable`; identical on the base and outside this task, recorded in the gate's `recommendations.future`.
+
+**Detailed Verification Log:** see `task.294.dod.1.qa-snippet-classifier-allow-list.md` and `task.294.dod.2.qa-snippet-classifier-allow-list.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-10
 
 <!-- change-log-start -->
+## Change Log
+
 | Date | Version | Description | Author |
-| --- | --- | --- | --- |
+|------|---------|-------------|--------|
 | 2026-11-10 | 1.0 | Initial draft | create-task |
 | 2026-11-10 | 1.1 | Review passed (8/10) — corrected the Phase 5 `set`/`shift` claim (measured `runnable`), pinned the residual-shape strings to §2a-ii, refreshed the docs-scan figure | review-task |
 | 2026-11-10 |  | Status → ready-for-development | review-task |
 | 2026-11-10 |  | Status → ready-for-review | develop-task |
 | 2026-11-10 |  | QA gate PASS (95/100) — 0 issues; 1 pre-existing high review finding routed to future work | qa-task |
+| 2026-11-10 | 1.2 | DoD passed — accepted (PR #874) | finalise |
 <!-- change-log-end -->
 
 ## References
