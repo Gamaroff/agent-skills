@@ -5,7 +5,7 @@ type: task
 description: "Replace the QA snippet classifier's refusal rules with an allow-list: a shell block runs only when every word is a known-safe literal. Closes the three residual indirect-evaluation shapes task 293 left open, and folds in two advisory test cleanups from its gate 9."
 tags: [qa-task, security, follow-up-293]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-11-10
 updated: 2026-11-10
@@ -15,7 +15,7 @@ github_issue:
 
 # Technical Task: QA snippet classifier allow-list
 
-**Status:** Planned
+**Status:** Ready for Review
 
 Follow-up to [task 293](../task.293.qa-snippet-classifier-indirect-evaluation/task.293.qa-snippet-classifier-indirect-evaluation.md) (PR #870). The owner's "Narrow T293" decision at gate 5 split this out: task 293 closed the indirect-evaluation family by refusal rules, and three shapes it could not close stay documented. Detail: [QA report 9](../task.293.qa-snippet-classifier-indirect-evaluation/task.293.qa.9.qa-snippet-classifier-indirect-evaluation.md), [gate 9](../task.293.qa-snippet-classifier-indirect-evaluation/task.293.gate.9.qa-snippet-classifier-indirect-evaluation.yml) `recommendations.future`.
 
@@ -41,7 +41,7 @@ Follow-up to [task 293](../task.293.qa-snippet-classifier-indirect-evaluation/ta
 
 - Three shapes reproduce under real bash and classify `runnable`: a value laundered through command output with the substitution spelled by an octal escape (`x=$(printf 'a[\044(cmd)]'); echo $((x))`), a `[` or `$` that arrives by expansion (`b='['; x="a${b}…"`), and a literal split across adjacent quote tokens (`read x <<< "a[$""(cmd)]"; echo $((x))`). Source: `shared/resources/qa-runnable-prose-detection.md` §2a-ii, "Known unseen shapes".
 - Task 293 widened text-level detection of the literal four times and each widening lost to a new carrier. A refusal list is incomplete by construction.
-- `EVALUATING_WORD` (`shared/resources/qa-execute-snippets.mjs:3119`) omits `set`, `mapfile`, `readarray`, `getopts`, `trap`, `compgen`, `wait` and `shift`. Today they are refused only by the unrecognised-command rule, and no test locks that dependency.
+- `EVALUATING_WORD` (`shared/resources/qa-execute-snippets.mjs:3119`) omits `set`, `mapfile`, `readarray`, `getopts`, `trap`, `compgen`, `wait` and `shift`. Measured on 2026-11-10 with `classifyBlock`: `mapfile`, `readarray`, `getopts`, `trap`, `compgen` and `wait` classify `mutating` with reason `unrecognised-command: <name> (fail-closed)`, and no test locks that dependency. `set -- a` and `shift` are in the command table and classify `runnable` (reason null), so the unrecognised-command rule does not refuse them.
 - The test `task.293 a helper call that also names a start-up variable keeps its pinned reason` (`shared/resources/tests/qa-execute-snippets.test.mjs:5307`) asserts only `mutating`, so it cannot fail on the ordering it names.
 
 **Benefits**
@@ -54,7 +54,7 @@ Follow-up to [task 293](../task.293.qa-snippet-classifier-indirect-evaluation/ta
 
 **Current architecture.** `classifyBlock` (`shared/resources/qa-execute-snippets.mjs:3045`) wraps `classifyFailClosed`, which calls `classifyInternal`. `isRunnableBlock` (`:3071`) is `klass === "runnable"`. `classifyInternal` tokenizes with the one bash tokenizer task 292 introduced, classifies commands against a table, and applies refusal rules in order. A command not in the table is refused by the `unrecognised-command` rule. Task 293's rules sit in `indirectEvaluationHazard` (`:3194`), built from `EVALUATING_WORD` (`:3119`), `LIVE_EXPANSION` (`:3129`), `unclosedBracketMap` (`:3149`) and `LOOSE_LITERAL` (`:3162`).
 
-**Population.** `npm run qa-snippets:docscan -- --json` on `develop` reports `blocks: 3452`, `runnableBase: 256`. Only the 256 runnable blocks can lose their verdict, so the over-refusal cost is bounded by that number. Command: `node scripts/qa-snippets-docscan.mjs --json`.
+**Population.** `npm run qa-snippets:docscan -- --json` on `develop` reports `runnableBase: 256` (`blocks` was 3452 when written and 3465 on 2026-11-10 at `cbaaf0e9`; the total drifts, the runnable count did not). Only the 256 runnable blocks can lose their verdict, so the over-refusal cost is bounded by that number. Command: `node scripts/qa-snippets-docscan.mjs --json`.
 
 **Target architecture.** Two layers, in this order:
 
@@ -110,6 +110,7 @@ Files: `docs/tasks/task.294.qa-snippet-classifier-allow-list/` (a decision note 
 
 Files: `shared/resources/tests/qa-execute-snippets.test.mjs`.
 
+- [ ] Take the exact strings from `shared/resources/qa-runnable-prose-detection.md` §2a-ii. Its second shape is elided (`b='['; x="a${b}…"`): complete it so the `$` also arrives by expansion, because a version with a literal `$(cmd)` is already refused today (measured 2026-11-10: `classifyBlock` returns `mutating`). Measured the same day, the first and third shapes classify `runnable`.
 - [ ] Add the three residual shapes to a real-bash table (each shown to write a marker file when run) that must classify `mutating`.
 - [ ] Add a control table of ordinary safe blocks that must stay `runnable`.
 - [ ] Confirm the three shapes are red on today's code (known failure reproduced before the fix).
@@ -137,7 +138,7 @@ Files: `scripts/qa-snippets-differential.mjs`, `shared/resources/qa-runnable-pro
 Files: `shared/resources/tests/qa-execute-snippets.test.mjs`.
 
 - [ ] Make `task.293 a helper call that also names a start-up variable keeps its pinned reason` pass a `helperRoot` and assert the reason string, so it can fail on the ordering it names.
-- [ ] Add a test that `set`, `mapfile`, `readarray`, `getopts`, `trap`, `compgen`, `wait` and `shift` classify `mutating` through the unrecognised-command rule, locking the dependency.
+- [ ] Add a test that `mapfile`, `readarray`, `getopts`, `trap`, `compgen` and `wait` classify `mutating` with reason `unrecognised-command: <name> (fail-closed)`, locking the dependency. `set` and `shift` are recognised commands that classify `runnable` today; pin their verdict for the plain forms (`set -- a`, `shift`) in a separate case, and decide in Phase 3 whether the allow-list changes it (record the decision in the plan).
 - [ ] Mutation-prove both.
 
 ## 7. Files Summary
@@ -246,6 +247,9 @@ Population commands: `git grep -ln "qa-execute-snippets" -- 'skills/*/references
 | Date | Version | Description | Author |
 | --- | --- | --- | --- |
 | 2026-11-10 | 1.0 | Initial draft | create-task |
+| 2026-11-10 | 1.1 | Review passed (8/10) — corrected the Phase 5 `set`/`shift` claim (measured `runnable`), pinned the residual-shape strings to §2a-ii, refreshed the docs-scan figure | review-task |
+| 2026-11-10 |  | Status → ready-for-development | review-task |
+| 2026-11-10 |  | Status → ready-for-review | develop-task |
 <!-- change-log-end -->
 
 ## References

@@ -188,10 +188,37 @@ export const ATOM_SETS = {
     "printf -v a\\[\\$\\(touch\\ out\\)\\] x",
     "test -v a\\[\\$\\(touch\\ out\\)\\]",
     "read a\\[\\$\\(touch\\ out\\)\\] <<< x",
+    // Task 294: the residual shapes the word allow-list closed. A value stored from a substitution,
+    // a dollar sign that arrives by expansion or by adjacent quotes, and the evaluators that read
+    // them. Pieces and whole shapes, so a short block can form either.
+    "x=$(printf 'a[\\044(touch out)]')",
+    "b='['",
+    'x="a${b}${d}(touch out)]"',
+    'read x <<< "a[$""(touch out)]"',
+    'printf -v x %s "a[$""(touch out)]"',
+    "arr[x]=1",
+    "echo $[x]",
+    "b='['; d='$'; x=\"a${b}${d}(touch out)]\"; echo $((x))",
+    "x=$(printf 'a[\\044(touch out)]'); echo $((x))",
     "let x",
     "(( x ))",
     "true",
     ";",
+    ";",
+    "\n",
+    "\n",
+  ],
+  // Task 294's residual shapes only, as whole-shape atoms and separators, so the random run forms them
+  // often (the mixed `indirect` set formed none in 40000 blocks). Calibration: against the engine at
+  // cbaaf0e9 this set must report writes; against the allow-list it must report none.
+  residual: [
+    "x=$(printf 'a[\\044(touch out)]'); echo $((x))",
+    "x=$(printf 'a[\\044(touch out)]'); arr[x]=1",
+    "b='['; d='$'; x=\"a${b}${d}(touch out)]\"; echo $((x))",
+    'read x <<< "a[$""(touch out)]"; echo $((x))',
+    'printf -v x %s "a[$""(touch out)]"; echo $((x))',
+    "echo hi",
+    "true",
     ";",
     "\n",
     "\n",
@@ -253,7 +280,7 @@ export function generateBlocks(atoms, seed, count, bare = false) {
 }
 
 /** Atom sets whose blocks carry no prefix and no appended writer (see generateBlocks). */
-export const BARE_SETS = new Set(["splits", "indirect"]);
+export const BARE_SETS = new Set(["splits", "indirect", "residual"]);
 
 /**
  * Run `bash -c code` in a fresh directory and say whether it left anything there. The directory

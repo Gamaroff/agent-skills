@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Changed
+
+- **The QA snippet classifier runs a block only when every non-literal word is on a closed list (task 294).**
+  Task 293 refused indirect evaluation by listing the shapes it had seen, and three shapes were still
+  `runnable` and wrote to disk under real bash: a value stored from a substitution whose `$` is spelled
+  by an octal escape, a `$` that arrives by expansion, and a `$` split across adjacent quotes
+  (`read x <<< "a[$""(cmd)]"; echo $((x))`). `classifyBlock` now ends with a word allow-list
+  (`not-allow-listed: …`): a parameter, a substitution whose body passes the same check, and a stored
+  value are admitted; a bare name inside `$((…))`, `((…))`, `let` or a `[[` arithmetic test, a `${…}`
+  operator, `$'…'`, `$"…"`, a subscripted assignment and `test -v` are refused. Cost on the repository's
+  own documentation: 5 of 256 runnable blocks are now refused and none became runnable. The
+  differential gains a `residual` atom set that writes against the old engine and not the new one.
+  Two test cleanups ride along: the helper-call/start-up-variable test now passes a real helper root
+  and pins the exact reason, and `mapfile readarray getopts trap compgen wait` are pinned as
+  unrecognised commands.
+
 ### Fixed
 
 - **A compaction no longer removes the pipeline lock.** The PreCompact hook treated every

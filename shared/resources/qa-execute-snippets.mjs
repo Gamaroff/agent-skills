@@ -3327,6 +3327,352 @@ function indirectEvaluationHazard(code) {
   return null;
 }
 
+// task.294 — ALLOW-LIST. Task 293 refused indirect evaluation by listing the shapes it had seen, and
+// each widening lost to the next carrier. This layer inverts the question. A non-literal word is
+// admitted only in a form and a position on a closed list, and every other word is refused, so the next
+// spelling needs no new rule: it is not on the list.
+//
+// FORMS admitted: a plain parameter (`$name`, `${name}`, `$1`, `$?` …) and a command substitution
+// whose body passes this check too. Every other form is refused: `$((…))`, `$[…]`, `${x<op>…}`,
+// `$'…'`, `$"…"`, a `$` before a quote (the adjacent-quote splice), a backslash outside single
+// quotes, process substitution.
+// POSITIONS admitted: a word holding such a form may be an operand of a command in
+// NON_EVALUATING_COMMANDS, the right-hand side of a plain `name=` assignment (parameters only: a
+// substitution is never stored), or an operand of a test that uses no arithmetic operator.
+// Arithmetic contexts (`((`, `let`, a test with `-eq` …) take digits and operators only, because bash
+// evaluates a bare name there. Any other command takes plain literal operands only, because a builtin
+// such as `read`, `unset` or `printf -v` evaluates its operand as a name or subscript.
+//
+// BOUNDED CLAIM: the forms, positions and commands above. A bare name evaluated by a construct this
+// layer does not read as arithmetic is outside it; the differential and the QA gates probe that edge.
+const NON_EVALUATING_COMMANDS = new Set([
+  ...[...SAFE_COMMANDS].filter((w) => w !== "test"),
+  ":",
+  "cd",
+  "git",
+  "popd",
+  "pushd",
+]);
+// `${name}`, `${#name}` and `${name:-lit}` / `-` / `:+` / `+` with a plain literal default. The
+// operators that assign or evaluate (`:=`, `:?`, `:offset`, `/`, `@P`, `!`, a subscript) are not here.
+const ALLOW_PLAIN_PARAM =
+  /\$(?:[A-Za-z_][A-Za-z0-9_]*|\{#?[A-Za-z_][A-Za-z0-9_]*(?::?[-+][A-Za-z0-9_.\/:+@%,~-]*)?\}|[0-9?#@*$!])/y;
+const ALLOW_ARITH_TEXT = /^[0-9+\-*\/%<>=!&|^~?: \t\n,]*$/;
+// Text a builtin may receive as a literal operand. A subscript or an expansion needs `[`, `]`, `$`, a
+// backtick or a backslash, so a literal operand without one cannot be evaluated as a name or a value.
+const ALLOW_PLAIN_TEXT = /^[^[\]$`\\]*$/;
+const TEST_ARITH_OPS = new Set(["-eq", "-ne", "-lt", "-le", "-gt", "-ge"]);
+const TEST_SAFE_OPS = new Set([
+  ...["-n", "-z", "-f", "-d", "-e", "-r", "-w", "-x", "-s", "-L", "-h", "-p"],
+  ...["-S", "-b", "-c", "-g", "-u", "-k", "-O", "-G", "-N", "-t", "-a", "-o"],
+]);
+const ALLOW_SKIP_KEYWORDS = new Set([
+  ...["!", "if", "then", "elif", "else", "fi", "do", "done", "while", "until"],
+  ...["{", "}"],
+]);
+const ALLOW_DATA_KEYWORDS = new Set(["for", "select", "case", "in", "esac"]);
+const DECLARING_COMMANDS = new Set([
+  ...["declare", "typeset", "local", "readonly", "export"],
+]);
+
+/**
+ * The first word class of `code` the allow-list does not admit, or null. A command substitution's
+ * body is judged by the same pass (one tokenization, a stack of command lists); a shape the tokenizer
+ * cannot read throws, and `classifyFailClosed` refuses it.
+ */
+export function allowListViolation(code) {
+  const { tokens } = tokenize(code);
+  const n = code.length;
+  // 0 code | 1 ignored (comment, join, arithmetic command) | 2 single-quoted | 3 substitution |
+  // 4 double-quoted | 5 here-document body | 6 quote mark | 7 plain parameter
+  const k = new Uint8Array(n);
+  const set = (a, b, v) => {
+    for (let i = a; i < b && i < n; i += 1) k[i] = v;
+  };
+  const opens = new Map(); // start of a substitution's opening delimiter -> its length
+  const closes = new Set(); // index of a substitution's closing delimiter
+  const bodies = [];
+  const ops = [];
+  // Validate each token and describe it as a span. Then ONE linear sweep with a stack of the spans
+  // that enclose the position: the innermost one decides what a character is. A substitution's
+  // interior is code again even inside double quotes, and its delimiters are structure, so the
+  // interior is judged by the same word rules below with no second tokenization. Re-marking a
+  // nested interior per token would be quadratic, and a 20000-deep nest must stay linear.
+  const startsAt = new Map();
+  const addSpan = (span) => {
+    const at = startsAt.get(span.start);
+    if (at === undefined) startsAt.set(span.start, [span]);
+    else at.push(span);
+  };
+  let arithEnd = 0; // tokens inside an arithmetic expansion are not read separately
+  const ordered = [...tokens].sort(
+    (a, b) => a.start - b.start || b.end - a.end,
+  );
+  for (const t of ordered) {
+    if (t.start < arithEnd) continue;
+    if (t.kind === "subst") {
+      // `<(cmd)` reads a command's output through a file name, like `$(cmd)` through a word; `>(cmd)`
+      // is a write sink.
+      if (t.form === ">(") return "output process substitution";
+      if (t.form === "$(" && code[t.start + 2] === "(") {
+        // `$((…))`: arithmetic expansion, which the tokenizer reads as a substitution. Bash
+        // evaluates every name in it, so only digits and operators are admitted.
+        if (code.slice(t.end - 2, t.end) !== "))")
+          return "unclosed arithmetic expansion";
+        if (!ALLOW_ARITH_TEXT.test(code.slice(t.start + 3, t.end - 2)))
+          return "arithmetic expansion with a name or an expansion";
+        addSpan({ start: t.start, end: t.end, kind: "arith" });
+        arithEnd = t.end;
+        continue;
+      }
+      const open = t.form === "`" ? 1 : 2;
+      addSpan({ start: t.start, end: t.end, kind: "subst", open });
+      opens.set(t.start, open);
+      closes.add(t.end - 1);
+    } else if (t.kind === "comment" || t.kind === "join")
+      addSpan({ start: t.start, end: t.end, kind: "ignored" });
+    else if (t.kind === "heredoc-body") {
+      bodies.push(t);
+      addSpan({ start: t.start, end: t.end, kind: "body" });
+    } else if (t.kind === "heredoc-op") ops.push(t);
+    else if (t.kind === "quote") {
+      if (t.quote !== "'" && t.quote !== '"') return "ANSI-C or locale quote";
+      addSpan({
+        start: t.start,
+        end: t.end,
+        kind: "quote",
+        double: t.quote === '"',
+      });
+    }
+  }
+  const enclosing = [];
+  for (let i = 0; i < n; i += 1) {
+    while (enclosing.length > 0 && enclosing[enclosing.length - 1].end <= i)
+      enclosing.pop();
+    const born = startsAt.get(i);
+    if (born !== undefined) for (const span of born) enclosing.push(span);
+    const top = enclosing[enclosing.length - 1];
+    if (top === undefined) continue; // 0: code
+    if (top.kind === "subst")
+      k[i] = i < top.start + top.open || i === top.end - 1 ? 3 : 0;
+    else if (top.kind === "quote")
+      k[i] = i === top.start || i === top.end - 1 ? 6 : top.double ? 4 : 2;
+    else k[i] = top.kind === "ignored" ? 1 : top.kind === "body" ? 5 : 9;
+  }
+  // The forms: what is left in code or in double quotes is judged character by character.
+  for (let i = 0; i < n; i += 1) {
+    if (k[i] !== 0 && k[i] !== 4) continue;
+    const ch = code[i];
+    if (ch === "\\") {
+      // The escape and the character it quotes: a literal, never an expansion. It is a non-literal
+      // word all the same (it can spell `a[$(cmd)]`), so the position rule below judges it.
+      k[i] = 8;
+      if (i + 1 < n) k[i + 1] = 10;
+      i += 1;
+      continue;
+    }
+    if (ch === "`") return "unparsed backtick";
+    if (ch === "$") {
+      ALLOW_PLAIN_PARAM.lastIndex = i;
+      const m = ALLOW_PLAIN_PARAM.exec(code);
+      if (m === null) {
+        // A `$` that nothing follows but a blank, a separator, the closing quote of its own string or
+        // the end is a literal dollar sign (`grep 'x$'`, `"a$"`). A `$` before an opening quote is NOT:
+        // that is the adjacent-quote splice.
+        const next = code[i + 1];
+        if (
+          i + 1 >= n ||
+          /[ \t\n)|;&/.,:]/.test(next) ||
+          (k[i] === 4 && k[i + 1] === 6)
+        ) {
+          k[i] = 10;
+          continue;
+        }
+        return `expansion form ${code.slice(i, i + 2)}`;
+      }
+      set(i, i + m[0].length, 7);
+      i += m[0].length - 1;
+    }
+  }
+  // An unquoted here-document expands its body; a quoted delimiter makes it literal. A `$(` or a
+  // backtick the tokenizer parsed is a substitution the word rules judge; anything else is refused.
+  for (const b of bodies) {
+    const op = ops.filter((o) => o.end <= b.start).pop();
+    const delim = op ? code.slice(op.end).trimStart()[0] : "";
+    if (delim === "'" || delim === '"' || delim === "\\") continue;
+    for (let i = b.start; i < b.end; i += 1) {
+      if (k[i] === 3 || k[i] === 7) continue;
+      if (code[i] === "\\" || code[i] === "`")
+        return "escape in an unquoted here-document";
+      if (code[i] !== "$") continue;
+      ALLOW_PLAIN_PARAM.lastIndex = i;
+      if (ALLOW_PLAIN_PARAM.exec(code) === null)
+        return "expansion form in an unquoted here-document";
+    }
+  }
+  // An arithmetic command `((…))` is read here: bash evaluates every name in it.
+  for (let i = 0; i < n - 1; i += 1) {
+    if (k[i] !== 0 || code[i] !== "(" || code[i + 1] !== "(") continue;
+    let depth = 0;
+    let j = i + 2;
+    for (; j < n; j += 1) {
+      if (code[j] === "(") depth += 1;
+      else if (code[j] === ")") {
+        if (depth === 0 && code[j + 1] === ")") break;
+        depth -= 1;
+      }
+    }
+    if (j >= n) return "unclosed arithmetic command";
+    if (
+      !ALLOW_ARITH_TEXT.test(code.slice(i + 2, j)) ||
+      k.slice(i, j).some((v) => v !== 0)
+    )
+      return "arithmetic command with a name or an expansion";
+    set(i, j + 2, 1);
+    i = j + 1;
+  }
+  // Words and simple commands.
+  // A word is {unq, hasSubst, hasParam, hasEscape}: `unq` is its text with quotes removed, a
+  // substitution or a parameter shown as \u0001, an escaped character as itself. A substitution's body
+  // is its own command list, so it gets a fresh segment context and the outer word resumes after it.
+  const segments = [];
+  let seg = [];
+  let word = null;
+  const stack = [];
+  const wordOf = () =>
+    (word ??= { unq: "", hasSubst: false, hasParam: false, hasEscape: false });
+  const endWord = () => {
+    if (word !== null) seg.push(word);
+    word = null;
+  };
+  const endSeg = () => {
+    endWord();
+    if (seg.length > 0) segments.push(seg);
+    seg = [];
+  };
+  for (let i = 0; i < n; i += 1) {
+    const ch = code[i];
+    const v = k[i];
+    if (opens.has(i)) {
+      const w = wordOf();
+      w.hasSubst = true;
+      w.unq += "\u0001";
+      stack.push({ seg, word });
+      seg = [];
+      word = null;
+      i += opens.get(i) - 1;
+    } else if (closes.has(i)) {
+      endSeg();
+      const outer = stack.pop();
+      if (outer === undefined) return "an unbalanced substitution";
+      seg = outer.seg;
+      word = outer.word;
+    } else if (v === 1 || v === 5) endWord();
+    else if (v === 9) wordOf().unq += "0";
+    else if (v === 7) {
+      if (ch === "$") {
+        const w = wordOf();
+        w.hasParam = true;
+        w.unq += "\u0001";
+      }
+    } else if (v === 8) wordOf().hasEscape = true;
+    else if (v === 10) {
+      const w = wordOf();
+      w.hasEscape = true;
+      w.unq += ch;
+    } else if (v === 6) wordOf();
+    else if (v === 0 && ";|()\n".includes(ch)) endSeg();
+    else if (
+      v === 0 &&
+      ch === "&" &&
+      !"<>".includes(code[i - 1] ?? "") &&
+      code[i + 1] !== ">"
+    )
+      endSeg();
+    else if (v === 0 && (ch === " " || ch === "\t")) endWord();
+    else wordOf().unq += ch;
+  }
+  endSeg();
+  if (stack.length > 0) return "an unbalanced substitution";
+  const nonlit = (x) => x.hasSubst || x.hasParam || x.hasEscape;
+  for (let words of segments) {
+    while (words.length > 0 && ALLOW_SKIP_KEYWORDS.has(words[0].unq))
+      words = words.slice(1);
+    if (words.length === 0 || ALLOW_DATA_KEYWORDS.has(words[0].unq)) continue;
+    const assigns = [];
+    while (words.length > 0 && /^[A-Za-z_][A-Za-z0-9_]*\+?=/.test(words[0].unq))
+      assigns.push(words.shift());
+    const targets = [];
+    const rest = [];
+    for (let j = 0; j < words.length; j += 1) {
+      const m = /^\d*(?:<<<|<<-?|<>|>>|>\||>&|<&|&>>?|<|>)/.exec(words[j].unq);
+      if (m === null) rest.push(words[j]);
+      else if (words[j].unq.length > m[0].length || j + 1 >= words.length)
+        targets.push(words[j]);
+      else targets.push(words[(j += 1)]);
+    }
+    // A stored value is admitted, whatever it holds, because every place bash EVALUATES a value is
+    // refused unless its operand is digits and operators (arithmetic, `[[ -eq ]]`, `-v`, a subscript,
+    // a `${…}` operator). Storing is not the hazard; evaluating is.
+    if (rest.length === 0) continue;
+    const [cmd, ...args] = rest;
+    const name = cmd.unq;
+    // An escaped command word (`\ls`) is read as its real text, which the lists judge; a substitution
+    // or a parameter there is a command nobody can name.
+    if (cmd.hasSubst || cmd.hasParam) return "a non-literal command word";
+    const anyNonlit = [...assigns, ...targets, ...rest].some(nonlit);
+    if (name === "let") {
+      if (args.some((a) => !ALLOW_ARITH_TEXT.test(a.unq)))
+        return "let with a name or an expansion";
+      continue;
+    }
+    if (name === "[" || name === "[[" || name === "test") {
+      const operands = args.filter((a) => a.unq !== "]" && a.unq !== "]]");
+      // Measured under real bash and zsh (2026-11-10): `[` and `test` never evaluate an operand, `[[`
+      // evaluates the operands of an arithmetic operator (a bare name, a subscript, `$(` in one).
+      if (name === "[[" && operands.some((a) => TEST_ARITH_OPS.has(a.unq))) {
+        if (
+          operands.some(
+            (a) => !TEST_ARITH_OPS.has(a.unq) && !/^-?[0-9]+$/.test(a.unq),
+          )
+        )
+          return "an arithmetic [[ test with a name or an expansion";
+      }
+      for (const a of operands)
+        if (/^-[A-Za-z]$/.test(a.unq) && !TEST_SAFE_OPS.has(a.unq))
+          return `test operator ${a.unq}`;
+      continue;
+    }
+    // A command word never holds `=`: `arr[x]=1` and `[x]=3` are subscripted assignments bash
+    // evaluates, not commands. (A `case` arm such as `*[!0-9]*)` reaches this check as a word, so a
+    // glob is not refused; `$`, a backtick and a backslash were refused as non-literal above.)
+    if (name.includes("=") || /[$`\\]/.test(name))
+      return "a command word that is not a plain name";
+    if (
+      DECLARING_COMMANDS.has(name) &&
+      args.some((a) => /^-[A-Za-z]*[inI]/.test(a.unq))
+    )
+      return `${name} with an arithmetic or name-reference attribute`;
+    const listed =
+      NON_EVALUATING_COMMANDS.has(name) &&
+      !(name === "printf" && args.some((a) => /^-[A-Za-z]*v/.test(a.unq)));
+    if (listed) continue;
+    if (DECLARING_COMMANDS.has(name)) {
+      // `export NAME=value`: the name is a plain literal, the value is data a stored-value rule judges.
+      const named = args.every(
+        (a) =>
+          /^-[A-Za-z]+$/.test(a.unq) ||
+          /^[A-Za-z_][A-Za-z0-9_]*(?:\+?=|$)/.test(a.unq),
+      );
+      if (named) continue;
+    }
+    if (anyNonlit) return `a non-literal word as an operand of ${name}`;
+    if (args.some((a) => !ALLOW_PLAIN_TEXT.test(a.unq)))
+      return `an operand of ${name} that is not a plain literal`;
+  }
+  return null;
+}
+
 function classifyInternal(
   code,
   bindings = {},
@@ -3339,6 +3685,9 @@ function classifyInternal(
     // their variables are the caller's to judge, and the variable-argument rule is
     // about a block's own text (task.274).
     forwarded = false,
+    // task.294 test hook: `false` skips the word allow-list so the rules before it can be shown to
+    // hold on their own (the defeat-the-first-layer test). Never passed by a caller.
+    allowList = true,
   } = {},
 ) {
   // task.292: bash's blanks are space, tab and newline only. A CR, FF, VT, NBSP or U+2028 is a
@@ -3761,6 +4110,12 @@ function classifyInternal(
   if (unbound.length > 0) {
     return verdict("placeholder", `unbound-variable: ${unbound.join(", ")}`);
   }
+
+  // task.294: the allow-list is the last word. The rules above name what is refused; this layer
+  // admits a block only when every non-literal word is in a form and a position on its list.
+  const notListed = allowList ? allowListViolation(code) : null;
+  if (notListed !== null)
+    return verdict("mutating", `not-allow-listed: ${notListed}`);
 
   return verdict("runnable", null, changesDir);
 }
