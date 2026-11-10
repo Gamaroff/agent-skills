@@ -35,9 +35,9 @@ Replace the snippet classifier's separate regex re-implementations of bash's bla
 | 2. review-task             | ✅ Done | `task.292.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT 9/10, 0 critical, 0 important | —                    | 2026-11-10T04:25Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (no /develop); 4 phases; 350 tests, fast gate green | —                    | 2026-11-10T05:12Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #869 → develop; in-review comment posted; body written from commits (Explore summariser not run) | —                    | 2026-11-10T05:10Z |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.292.qa.{N}.*.md`; `task.292.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.292.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.292.qa.{N}.*.md`; `task.292.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 4 QA cycles; gate 4 CONCERNS 90/100, no open finding | —                    | 2026-11-10T07:08Z |
+| 7. finalise                | ✅ Done | `task.292.dod.{N}.*.md`; task `status: accepted`                       | DoD run 3 ACCEPTED, 13 of 13 | —                    | 2026-11-10T07:32Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Acceptance commit `20f93fd9` pushed; CI 6 of 6 | —                    | 2026-11-10T07:40Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -119,6 +119,14 @@ _Track each QA review/fix cycle._
 - **Found (QA 5a, unscoped safety re-probe):** no finding attributable to this change. Reviewer CR-1 to CR-3 (`printf -v` and kin with a quoted `a[$(cmd)]`; PS4 and `${x@P}`; quoted data re-evaluated as arithmetic) are runnable-and-writing but identical on `develop`, absent from the corpus and outside the task's out-of-scope list, so they are `pre-existing` and routed to gate 3 `recommendations.future` for a follow-up task. Bug 2 verified and closed. The independent reviewer ran in 102 s.
 - **Evidence:** suite 371/371; `arith` differential seed 61 (60000) and all six sets seed 62 (30000 each): 0 writes; docs scan 3446 blocks, 0 newly runnable, 1 newly refused; probe 31 executed, 0 escaped; mutation (`refuseArithSubst` removed) 8 red.
 - **PR Review**: CONCERNS (5c, conformance lens only) — PC-1 trail medium (this section's headings and row, fixed here), PC-2 consistency low (boxes ticked), PC-3 coverage low/low dismissed after measurement (a recursive scan overflows the stack near 7365 frames, so the 20000-deep test goes red for it). No open coverage finding. Report `task.292.pr-review.1.*`.
+
+### QA Cycle 4 — gate CONCERNS (90/100), 0 blocking
+
+**Action**: Proceeding to finalise
+
+- **Found:** one medium (T292-QA4-1, criterion 10 reworded with no approver); closed by the owner's approval. Engine byte-identical to gate 3; suite 379/379; probe 31 executed, 0 reproduced, 0 escaped.
+- **Evidence:** `task.292.qa.4.*`, `task.292.gate.4.*`; consumer-count test and blank-normalisation rows mutation-proven.
+- **PR Review**: CONCERNS (carried from cycle 3's 5c; no code changed since, tests only). No open coverage finding. Report `task.292.pr-review.1.*`.
 
 ---
 
