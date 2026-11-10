@@ -1,0 +1,70 @@
+schema: 2
+task: 'task.293.qa-snippet-classifier-indirect-evaluation'
+task_title: 'QA snippet classifier refuses indirect evaluation'
+gate: FAIL
+status_reason: 'Last permitted gate (5 of 5). Safety re-probe (unscoped, independent reviewer) found one more carrier: a substitution literal split across adjacent quote tokens, so no dollar-paren or backtick text exists in the source. A here-string to read, printf -v, and a mixed-quote split each classify runnable and write under bash 5.3; controls are clean. Cycle 4 default-deny on the loose literal held for every escaped and quoted form it names.'
+reviewer: 'QA Engineer'
+head: 'd9886239821477a00079ba00fc18d6f35cd294d0'
+updated: '2026-11-10T11:24:26Z'
+
+top_issues:
+  - id: 'T293-QA-8'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'A literal split across adjacent quote tokens never holds a dollar-paren or backtick in the source, so neither the quote-literal checks nor the loose-literal check fires. Under bash 5.3 these run touch W and classify runnable: read x <<< "a[$""(touch W)]"; echo $((x)) ; printf -v x "%s" "a[$""(touch W)]"; echo $((x)) ; read x <<< "a[$"(single-quoted open paren)"touch W)]"; echo $((x)). Reproduced by QA by execution; the controls with a plain number in place of the command stay runnable and write nothing. Only a plain assignment of the split text is caught, by the expanded-assignment rule.'
+    suggested_action: 'Detect a dollar at the end of a quote or word immediately followed by a quote that opens with an open paren, backslash-paren or backtick; or stop reasoning about text and refuse any block that has an evaluating word or live expansion together with a dollar next to a quote boundary.'
+    suggested_owner: dev
+    status: open
+    origin: 'code-review CR-1, reproduced by QA'
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 383
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 31
+    boundary: true
+    escaped: 0
+    boundary_signals: ["refused"]
+    notes: 'The classifier is the boundary. 31 corpus cases executed, 0 escaped. The reviewer ran about 60 carrier and sink variants; one family escaped (a literal split across quote tokens) and QA reproduced it under real bash. Findings from cycles 1 to 4 are fixed and held.'
+  performance:
+    status: PASS
+    notes: 'Reviewer timed five growth patterns to N=32000: linear, under 65 ms. Docs scan median +1.3% at the cycle-4 fix.'
+  reliability:
+    status: PASS
+    notes: 'CI green on d98862398214; CI=true npm run ci:fast green at the cycle-4 fix (8346 tests, 0 fail).'
+  maintainability:
+    status: CONCERNS
+    notes: 'Five consecutive gates each found a new route to the same boundary. Text-level detection of a literal has been widened four times; a split literal shows the source text is the wrong place to look.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'The QA budget is spent (5 gates). Decide: waive T293 with the split-literal route recorded as a known residual, or narrow T293 and file the remaining family as a new task with a different design (for example, run only blocks whose every word is a known-safe literal, rather than detecting hazardous text).'
+      refs: ['shared/resources/qa-execute-snippets.mjs', 'shared/resources/qa-runnable-prose-detection.md']
+  future:
+    - action: 'Cleanup still open: EVALUATING_WORD omits set, mapfile, readarray, getopts, trap, compgen, wait and shift, which are refused today by the unrecognised-command rule; add a test that locks the dependency.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'Recorded unseen shapes (printf octal launder, a bracket or dollar arriving by expansion) and advisory over-refusal remain as in the docs.'
+      refs: ['shared/resources/qa-runnable-prose-detection.md']
+      provenance: documented-unseen-shape
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T293-QA-8 closed, or waived by the owner with the residual recorded']
