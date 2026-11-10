@@ -20,7 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. Phase 20 is open (opened 2026-11-09): T289 (accepted), T290, T291.
+chain, a human gate. Phase 20 is open (opened 2026-11-09): T289 (accepted), T290 (merged with an owner waiver), T292, T291.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -90,6 +90,7 @@ accepted, and archive the phase at close.**
 
 - [x] **T289** QA snippet runner allows flags, not just commands · deps: none · touches: test-harness~, bundles~ · /develop-task docs/tasks/task.289.qa-snippet-runner-flag-level-allow-list/task.289.qa-snippet-runner-flag-level-allow-list.md
 - [x] **T290** QA snippet runner reads a # after an escaped space as a comment · deps: none · touches: test-harness~, bundles~ · /develop-task docs/tasks/task.290.qa-snippet-runner-comment-after-escaped-space/task.290.qa-snippet-runner-comment-after-escaped-space.md
+- [ ] **T292** One bash tokenizer for the QA snippet classifier · deps: none · touches: test-harness~, bundles~ · /develop-task docs/tasks/task.292.qa-snippet-classifier-one-bash-tokenizer/task.292.qa-snippet-classifier-one-bash-tokenizer.md
 - [ ] **T291** The context-pressure statusline test leaks a ctx-wrap- temp directory · deps: none · touches: test-harness~ · /develop-task docs/tasks/task.291.context-pressure-statusline-test-leaks-ctx-wrap-directory/task.291.context-pressure-statusline-test-leaks-ctx-wrap-directory.md
 
 ## Deferred / human-gated
@@ -246,3 +247,4 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-11-09 | **Phase 20 opened** with T289 (QA snippet runner flag allow-list, a follow-up to task 274). An override of the registry order: it goes ahead of T275 because the runner decides what a QA gate executes and seven known write gaps stay open until it lands. |
 | 2026-11-09 | **T289 accepted + merged — PR #864** (`5197d44e`); row ticked. **T290 and T291 added to Phase 20**, T290 first (the runner follow-up: a write classifies runnable). T291 (the `ctx-wrap-` temp-directory leak, split out of T289 Phase 5; Low, no dependency). It is not about the snippet runner: it sits here only so the loop picks it up. |
 | 2026-11-10 | **T290 merged — PR #867** (`4699eb0e`) **with an owner waiver, not accepted by the pipeline.** Both named defects fixed; three more HIGH findings in the same classifier fixed across QA cycles 1 to 3. The QA loop stopped as not converging (HIGH 1, 1, 1) and the owner waived the open one, T290-QA-3 (CR, FF, VT and Unicode spaces read as blanks before a `#`; identical on develop, absent from the docs). Gate 3 stays FAIL; 5c, finalise and DoD were skipped by that decision. Row ticked; the task document stays `in-progress`. Follow-up owed: one bash-faithful tokenizer for the snippet classifier. |
+| 2026-11-10 | **T292 added to Phase 20**, ahead of T291: one bash tokenizer for the snippet classifier, carrying the waived T290-QA-3 (a write still classifies runnable). |
