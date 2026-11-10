@@ -267,6 +267,10 @@ reproduce under real bash, and a block holding one is `mutating` with a reason t
   `${v[1+$1]}`; QA cycle 3, third strike), because every list of the places bash evaluates a
   variable is incomplete. No value is tracked. The price is over-refusal of a block that holds such
   a literal and also expands any variable; the docs scan measures it (one block, this task's plan).
+  The **carrier** is default-deny too (QA cycle 4): a list of quote kinds missed the same literal
+  written as backslash-escaped text in an unquoted word (`a\[\$\(cmd\)\]`), so any `$(`, `$\(` or
+  backtick text the tokenizer did not parse as a real substitution counts as a literal, outside
+  comments, whatever carries it.
 - **A subscript built by expansion, and a quoted substitution used as a subscript** (QA cycle 1). An
   assignment whose value holds an expansion inside `name[…]` (`x="a[$y$z]"`, `x="a[${d}(cmd)]"`) is
   refused, because the text that `$((x))`, `read "$x"`, `test -v "$x"` or `[[ $x -eq 1 ]]` later

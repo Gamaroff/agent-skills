@@ -5157,6 +5157,13 @@ const T293_SHAPES = {
   "QA-5 positional offset ${*:$1}": "set -- 'a[ $(touch W)]'; echo ${*:$1}",
   "QA-6 subscript beginning with a digit":
     "set -- 'a[ $(touch W)]'; v=(1); echo ${v[1+$1]}",
+  // QA cycle 4 (T293-QA-7): the literal is backslash-escaped text in an UNQUOTED word.
+  "QA-7 escaped unquoted word in [[ -eq ]]":
+    "[[ a\\[\\$\\(touch\\ W\\)\\] -eq 1 ]]",
+  "QA-7 escaped unquoted word to printf -v":
+    "printf -v a\\[\\$\\(touch\\ W\\)\\] x",
+  "QA-7 escaped unquoted word to test -v": "test -v a\\[\\$\\(touch\\ W\\)\\]",
+  "QA-7 escaped unquoted word to read": "read a\\[\\$\\(touch\\ W\\)\\] <<< x",
   "QA-4 literal piped into read, evaluated by [[ -eq ]]":
     "echo 'a[$(touch W)]' | { read x; [[ $x -eq 1 ]]; }",
 };
@@ -5219,6 +5226,8 @@ const T293_DECIDERS = {
     "set -- 'a[ $(touch W)]'; echo ${@:$1}",
   "digit-led subscript: only a live expansion (default-deny alone)":
     "set -- 'a[ $(touch W)]'; v=(1); echo ${v[1+$1]}",
+  "escaped unquoted word (carrier default-deny alone)":
+    "[[ a\\[\\$\\(touch\\ W\\)\\] -eq 1 ]]",
   "here-document body literal (heredoc loop alone)":
     "cat <<'EOF' | { read x; echo $((x)); }\na[$(touch W)]\nEOF",
   "literal evaluated through a named subscript, no evaluating word":
@@ -5262,6 +5271,10 @@ test("task.293 safe blocks near the class stay runnable", () => {
     "x=a'[5]'; echo $((x))", // QA-3 control: no substitution in the literal
     "echo 'a[5]' | { read x; echo $((x)); }", // QA-4 control
     "echo 'run $(date)'; x=5", // a printed literal, nothing evaluates a value
+    "[[ a\\[5\\] -eq 1 ]]", // QA-7 control: escaped, no substitution
+    "printf -v a\\[5\\] x", // QA-7 control
+    "echo a\\[\\$\\(date\\)\\]", // an escaped literal that is only printed
+    "# note: $(cmd) and `x` in a comment\n[[ 1 -eq 1 ]]", // a comment is not a literal
     "set -- 2; echo ${@:$1}", // QA-5 control: no substitution literal
     "set -- 0; v=(1); echo ${v[$1]}", // QA-6 control: a subscript, no literal
   ]) {

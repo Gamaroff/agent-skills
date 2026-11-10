@@ -221,21 +221,21 @@ Documentation:
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-10
-**Quality Score**: 70/100
+**Quality Score**: 80/100
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.293.qa.3.qa-snippet-classifier-indirect-evaluation.md](./task.293.qa.3.qa-snippet-classifier-indirect-evaluation.md)
-- **Gate File**: [task.293.gate.3.qa-snippet-classifier-indirect-evaluation.yml](./task.293.gate.3.qa-snippet-classifier-indirect-evaluation.yml)
+- **Full Report**: [task.293.qa.4.qa-snippet-classifier-indirect-evaluation.md](./task.293.qa.4.qa-snippet-classifier-indirect-evaluation.md)
+- **Gate File**: [task.293.gate.4.qa-snippet-classifier-indirect-evaluation.yml](./task.293.gate.4.qa-snippet-classifier-indirect-evaluation.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 383 in the suite file; `ci:fast` 8346, 0 fail at the cycle-2 fix commit
+- **Tests Executed**: 383 in the suite file; `ci:fast` 8346, 0 fail at the cycle-3 fix commit
 - **Phases Verified**: 2/3 clean
-- **Critical Issues**: 1 high, 1 medium
+- **Critical Issues**: 1 (high)
 - **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Cycle 2's block-level rule held. The safety re-probe found two more spellings of the same family that the enumerated arithmetic-read detector misses (the offset of a positional expansion, and a subscript starting with a digit); both reproduce under real bash. Third consecutive HIGH in the same file: the detector must be replaced, not extended.
+Cycle 3's default-deny held for every quoted carrier. One more carrier of the substitution literal escapes: backslash-escaped text in an unquoted word handed to a double-bracket test, `printf -v`, `test -v` or `read`. Reproduced under real bash.
 
 ## Change Log
 
@@ -252,6 +252,8 @@ Cycle 2's block-level rule held. The safety re-probe found two more spellings of
 | 2026-11-10 |  | QA findings fixed — 2 high closed (joined word and quoted literal, literal piped into read) with a block-level rule, 2 iterations | qa-fix |
 | 2026-11-10 |  | QA gate FAIL (70/100) — 1 high, 1 medium finding | qa-task |
 | 2026-11-10 |  | QA findings fixed — 1 high, 1 medium closed by replacing the arithmetic-read list with a default-deny test (third strike), 3 iterations | qa-fix |
+| 2026-11-10 |  | QA gate FAIL (80/100) — 1 high finding | qa-task |
+| 2026-11-10 |  | QA finding fixed — 1 high closed by making the literal carrier default-deny, 4 iterations | qa-fix |
 <!-- change-log-end -->
 
 ## References

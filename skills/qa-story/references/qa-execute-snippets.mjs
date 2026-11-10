@@ -3140,6 +3140,9 @@ const LIVE_EXPANSION = /\$(?=[A-Za-z_0-9{(\[@*#?!$-])|[A-Za-z0-9_}\]]\[/g;
 // command output (`x=$(printf 'a[\044(cmd)]')`, task 293 QA-3).
 const EXPANDED_ASSIGNMENT =
   /(?:^|[\s;&|({])[A-Za-z_][A-Za-z0-9_]*\+?=[^\n;&|]{0,300}[A-Za-z0-9_]\[[^\]\n]{0,300}[$`]/;
+// Text that spells a command substitution, whatever carries it: `$(` (not `$((`), an escaped `$\(`,
+// or a backtick. The caller drops the ones the tokenizer parsed as real substitutions.
+const LOOSE_LITERAL = /\$(?:\((?!\()|\\\()|`/g;
 // A literal substitution inside a quoted span, by quote kind. `$'…'` escapes can spell `$(` or a backtick.
 const LITERAL_IN_SINGLE = /\$\(|`/g;
 const LITERAL_IN_DOUBLE = /\\\$\(|\\`/g;
@@ -3184,6 +3187,7 @@ function indirectEvaluationHazard(code) {
   const bodies = []; // here-document bodies
   const substStarts = []; // command substitutions the tokenizer found
   let dead = null; // comment and heredoc body: not code
+  let comment = null; // comment text: never evaluated, never a literal carrier
   let inert = null; // text in which nothing expands: single quotes, comments, quoted here-documents
   let quoted = null; // a quote's interior: its separators are not the shell's
   const marks = () => {
@@ -3191,9 +3195,14 @@ function indirectEvaluationHazard(code) {
     dead = new Int32Array(n + 2);
     quoted = new Int32Array(n + 2);
     inert = new Int32Array(n + 2);
+    comment = new Int32Array(n + 2);
     for (const t of tokenize(code).tokens) {
       if (t.kind === "comment" || t.kind === "heredoc-body") {
         if (t.kind === "heredoc-body") bodies.push(t);
+        else {
+          comment[t.start] += 1;
+          comment[t.end] -= 1;
+        }
         dead[t.start] += 1;
         dead[t.end] -= 1;
         inert[t.start] += 1;
@@ -3214,6 +3223,7 @@ function indirectEvaluationHazard(code) {
       dead[i] += dead[i - 1];
       quoted[i] += quoted[i - 1];
       inert[i] += inert[i - 1];
+      comment[i] += comment[i - 1];
     }
   };
   let lastSep = null; // index of the last live command separator at or before each position
@@ -3284,6 +3294,17 @@ function indirectEvaluationHazard(code) {
     if (substStarts.some((s) => s >= b.start && s < b.end)) continue;
     if (anyIn(literals["'"], b.start, b.end - 1) && blockEvaluates())
       return REFUSED;
+  }
+  // DEFAULT-DENY on the carrier as well (QA cycle 4: an unquoted `a\[\$\(cmd\)\]` word carried the
+  // literal past a list of quote kinds). Any `$(` or backtick text the tokenizer did not parse as a
+  // real substitution is literal text, whatever carries it. `$((` is arithmetic, not a substitution.
+  if (substStarts.length > 0 || hasSubstitution) {
+    const real = new Set(substStarts);
+    for (const m of code.matchAll(LOOSE_LITERAL)) {
+      if (real.has(m.index) || comment[m.index] !== 0) continue;
+      if (blockEvaluates()) return REFUSED;
+      break;
+    }
   }
   return null;
 }

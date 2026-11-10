@@ -21,7 +21,9 @@ All notable changes to this project will be documented in this file. Format foll
   a block that also evaluates a value is refused. QA cycle 3 found two more arithmetic reads the rule
   did not list (`${@:$1}`, `${v[1+$1]}`), the third strike on one mechanism, so the list of
   arithmetic spellings was replaced by a default-deny test: any live expansion or `name[` in a block
-  holding such a literal. The differential gains an `indirect` atom set (10 writes
+  holding such a literal. QA cycle 4 found the literal carried as backslash-escaped text in an
+  unquoted word, so the carrier is default-deny as well: any substitution text the tokenizer did not
+  parse as real counts. The differential gains an `indirect` atom set (10 writes
   on the previous engine, 0 now) and the docs scan finds two blocks newly refused and none newly
   runnable. Known unseen shapes: a value laundered through a command's output, and a `[` or `$`
   that itself arrives by expansion.
