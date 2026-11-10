@@ -73,15 +73,15 @@ cat .agents/skills/develop-bug/SKILL.md
 
 Output: "⚠️ Context recovery — re-reading full skill file before resuming."
 
-**Step 0-lock — Restore the lock if the pause removed it (task.124, obs #123):**
+**Step 0-lock — Restore the lock if a HALT removed it (task.124, obs #123):**
 
-The PreCompact hook and every terminal HALT **remove the lock**. A session that continues in place — this one, if you are reading this after a `🛑 PIPELINE-PAUSE-SIGNAL` or a HALT rather than after a fresh `/develop-bug` invocation — has no step that puts it back: Step 1 is the lock's only ordinary writer and a resume skips it. Without the lock every `advance-pipeline-lock.sh <n>` below is an error (no longer a silent no-op) and the `Stop` hook is inert. When resume contract § Restore the lock (both resume paths) says the restore runs here — and only then — run this **before** any step advances:
+**After a `🛑 PIPELINE-PAUSE-SIGNAL` the lock is kept** (2026-11): the PreCompact hook marks it `paused` instead of removing it, and the paused step's first lock call (`advance-pipeline-lock.sh <N>`, `set-waiting-on.sh`) clears the mark and re-arms the `Stop` hook — a session carrying on after a compaction needs nothing from this paragraph. Every terminal HALT **removes the lock**. A session that continues in place after a HALT — this one, if you are reading this after a HALT rather than after a fresh `/develop-bug` invocation — has no step that puts it back: Step 1 is the lock's only ordinary writer and a resume skips it. Without the lock every `advance-pipeline-lock.sh <n>` below is an error (no longer a silent no-op) and the `Stop` hook is inert. When resume contract § Restore the lock (both resume paths) says the restore runs here — and only then — run this **before** any step advances:
 
 ```bash
 bash .agents/skills/develop-bug/references/advance-pipeline-lock.sh --restore {bug-directory}
 ```
 
-It rebuilds the lock from the halt snapshot (`.claude/state/develop-pipeline.last-halt.json`) or an orphaned `.lock.pausing.<pid>` claim — newest candidate **for this document** wins; one for another document is refused — keeps `current_step` at the halted step, strips the halt/pause fields and any `waiting_on`, and consumes the candidates. **The same call belongs on the re-invocation path**: Phase 0b's "Resume from last completed step" also skips Step 1, so when the detector's `source` is `halt_snapshot` or `orphaned_claim` and resume contract § Restore the lock (both resume paths) says the restore runs there, run `--restore {bug-directory}` before Phase 0b verification (step-0 §0b Shared Resume Logic; task.124 QA cycle 2, CR-2). Which snapshots restore and which wait is that section's to say; this paragraph carries no copy of the rule (task.130). "lock present — nothing to restore" (exit 0) means the lock survived and nothing was needed. Exit 1 with "no halt snapshot … and no orphaned claim" means there is nothing to restore from: treat the run as Phase 0b's fresh-start case. Exit 1 with `legacy-snapshot: …` is a **different** state — a pre-task.123 snapshot with no directory that the helper refuses to guess about; restore it deliberately with `--restore --accept-legacy` or delete it (hooks reference, troubleshooting), never a fresh start.
+It rebuilds the lock from the halt snapshot (`.claude/state/develop-pipeline.last-halt.json`) or an orphaned `.lock.pausing.<pid>` claim — newest candidate **for this document** wins; one for another document is refused — keeps `current_step` at the halted step, strips the halt/pause fields and any `waiting_on`, and consumes the candidates. **The same call belongs on the re-invocation path**: Phase 0b's "Resume from last completed step" also skips Step 1, so when the detector's `source` is `halt_snapshot` or `orphaned_claim` and resume contract § Restore the lock (both resume paths) says the restore runs there, run `--restore {bug-directory}` before Phase 0b verification (step-0 §0b Shared Resume Logic; task.124 QA cycle 2, CR-2). Which snapshots restore and which wait is that section's to say; this paragraph carries no copy of the rule (task.130). "lock present — nothing to restore" (exit 0) means the lock survived and nothing was needed; "lock present and paused — pause cleared in place" (exit 0) means it survived a compaction pause, and the mark is now gone. Exit 1 with "no halt snapshot … and no orphaned claim" means there is nothing to restore from: treat the run as Phase 0b's fresh-start case. Exit 1 with `legacy-snapshot: …` is a **different** state — a pre-task.123 snapshot with no directory that the helper refuses to guess about; restore it deliberately with `--restore --accept-legacy` or delete it (hooks reference, troubleshooting), never a fresh start.
 
 **Step 0a — Dispatch stale-context detector:**
 
@@ -111,14 +111,14 @@ find {bug-directory} -maxdepth 1 \( -name "{bug-prefix}.implementation.*.md" -o 
 
 ### Graceful Pause on Imminent Compaction (CRITICAL — read this second)
 
-This complements the recovery above. **Pre**-compaction graceful pause requires the `PreCompact` hook (see Setup). When the hook fires it appends a "Pipeline Paused" entry to the report, commits, pushes, posts a PR/issue comment (all best-effort), removes the lock, and emits `🛑 PIPELINE-PAUSE-SIGNAL` as a `<system-reminder>`.
+This complements the recovery above. **Pre**-compaction graceful pause requires the `PreCompact` hook (see Setup). When the hook fires it appends a "Pipeline Paused" entry to the report, commits, pushes, posts a PR/issue comment (all best-effort), **keeps** the lock and marks it `paused` (2026-11; the `Stop` hook allows the halt while the mark is set), and emits `🛑 PIPELINE-PAUSE-SIGNAL` as a `<system-reminder>`.
 
 **When you observe `🛑 PIPELINE-PAUSE-SIGNAL`:**
 
 1. **Stop everything.** Do not invoke any sub-skill. Do not edit the report (the hook already did).
 2. **Output the pause banner**: `═══ DEVELOP-BUG PIPELINE: PAUSED — CONTEXT COMPACTION IMMINENT ═══`
 3. **Output the user-facing summary** using the template in the signal's `additionalContext`. Repeat the two comment outcomes the signal reports (`PR comment:` / `Tracker issue comment:`) verbatim — `deferred` means the consumer's `access.tracker` held, `no-credentials` on a Jira issue means the Jira side was not commented on.
-4. **HALT.** On next `/develop-bug <path>`, Phase 0b detects the existing run and resumes cleanly. If instead the session **continues in place** after the compaction, the Context Compression Recovery's Step 0-lock (`advance-pipeline-lock.sh --restore {bug-directory}`) is the first action — the signal's own summary names it.
+4. **HALT.** On next `/develop-bug <path>`, Phase 0b detects the paused run, clears the mark (`--restore {bug-directory}`) and resumes cleanly. If instead the session **continues in place** after the compaction, carry on with the paused step: its first lock call clears the mark — the signal's own summary names `advance-pipeline-lock.sh <N>`.
 
 For the full lock-file format, hook contract, and half-done step recovery semantics, see [`references/develop-pipeline-pause.md`](references/develop-pipeline-pause.md).
 

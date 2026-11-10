@@ -71,15 +71,17 @@ Active lock first:
 cat .claude/state/develop-pipeline.lock
 ```
 
+**A lock that carries `paused` is a compaction pause, not a run in progress elsewhere** (2026-11). The PreCompact hook keeps the lock and marks it `paused: {at, step, reason: "precompact"}` rather than removing it; the next lock write of a session that carried on clears the mark. A lock still marked when this detector runs is the pause this resume is for. Report `source: "lock"` with `LOCK_STEP` = its `current_step`, file `{ "path": ".claude/state/develop-pipeline.lock", "concern": "paused: precompact at step {paused.step} since {paused.at}" }` in `deltas_since_pause`, and surface it as "resume from the compaction pause at step X?". Do **not** treat it as a different, active pipeline — unless its `task_or_story_directory` is another document's: then it is that document's paused run; file `{ "path": ".claude/state/develop-pipeline.lock", "concern": "paused lock for <other dir>" }` and add `"The lock records a paused run of <other dir> — resume it, or abandon it, before starting this one"` to `blocking_issues`. The halt snapshot beside a paused lock is the same pause's copy; the lock is the record.
+
 If the lock is absent, the state — if any — is in one of two places, and **neither may be assumed to be about this document or fresher than the other**:
 
 - the **halt snapshot** `.claude/state/develop-pipeline.last-halt.json`, written by a terminal HALT **or by the PreCompact hook** (an interrupted compaction) — and **never consumed on a successful resume**, so a snapshot from an earlier run, even of another task, persists indefinitely;
-- an **orphaned claim** `.claude/state/develop-pipeline.lock.pausing.<pid>` — the PreCompact hook claims the lock by renaming it *before* it writes the snapshot (task.120), so a hook killed inside that window leaves the pipeline's state **only** under the claimed name: the lock byte for byte, renamed. It is swept only by the *next* successful pause, which by then has claimed a newer lock, so reading it here is never raced.
+- an **orphaned claim** `.claude/state/develop-pipeline.lock.pausing.<pid>` — a PreCompact hook **older than 2026-11** claimed the lock by renaming it *before* it wrote the snapshot (task.120), so a hook killed inside that window left the pipeline's state **only** under the claimed name: the lock byte for byte, renamed. The current hook never renames the lock and writes none, but one left by an older hook can still be on disk. (Its claim is now a directory, `develop-pipeline.precompact-claim.d`, holding only a pid — never a candidate; the `find` below matches files of the `.lock.pausing.*` family only.)
 
 **Choose between them by document, then by age — not by a fixed order** (task.120 bug.5: a fixed snapshot-first order let a stale `last-halt.json` from a previous task shadow a fresher claim for this one, and would have recommended resuming the wrong task):
 
 ```bash
-find .claude/state -maxdepth 1 \( -name "develop-pipeline.last-halt.json" -o -name "develop-pipeline.lock.pausing.*" \) -exec ls -t {} + 2>/dev/null || true
+find .claude/state -maxdepth 1 -type f \( -name "develop-pipeline.last-halt.json" -o -name "develop-pipeline.lock.pausing.*" \) -exec ls -t {} + 2>/dev/null || true
 ```
 
 Every note any step of this prompt files in `deltas_since_pause` is a delta **object** — the shape is stated once, in § Output Schema's `deltas_since_pause` object fields, and governs every site below.
@@ -119,7 +121,7 @@ QA-loop fields (lock or snapshot, both optional — absent on a run that predate
 - `qa_reentry` (object `{from_step, reason, at, gate_head, report_entries}`) → the run re-entered the QA loop after a finalise DoD-gaps halt fixed by code (writer: `reenter-qa-after-finalise.sh`, task.170). Whenever it is present, in the lock or the snapshot, report it in `deltas_since_pause` as `{ "path": null, "concern": "qa_reentry: from_step {from_step}; reason {reason}; gate_head {first 12 of gate_head}; report_entries {report_entries}" }`, so the operator sees a re-entry rather than a loop in progress — and so the resume contract's **Second precedence**, which ignores a terminal 5c verdict while the report holds no more `### QA Cycle` headings than `report_entries`, is visible to whoever reads the resume
 - **Count, do not read.** Any cycle number or entry count you report comes from a command, never from the report's prose: the cycle from `bash .agents/skills/{develop-story|develop-task}/references/qa-cycle.sh "{DOC_DIR}"`, the entry count from `grep -c '^### QA Cycle' "{report_path}"` (task.172: a count read from prose said 5 where both commands said 4)
 
-> A snapshot tagged `pause_reason: "precompact"` was left by the PreCompact hook before it removed the lock — surface it to the user as "resume from the compaction pause at step X?" rather than a hard terminal halt.
+> A snapshot tagged `pause_reason: "precompact"` was left by the PreCompact hook — surface it to the user as "resume from the compaction pause at step X?" rather than a hard terminal halt. With no lock beside it, the lock was lost after the pause (or removed by a hook older than 2026-11, which removed it at every pause).
 
 An orphaned claim carries no `halt_step`, `pause_reason` or `paused_at` — treat it like a `cp`-degraded snapshot, and surface it as "a compaction pause was interrupted before it could save its snapshot; resume from step X?".
 

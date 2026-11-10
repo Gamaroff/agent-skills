@@ -6,6 +6,34 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **A compaction no longer removes the pipeline lock.** The PreCompact hook treated every
+  compaction as the end of the run. It claimed the lock by `mv` and removed it, but Claude Code
+  carries on in the same session after a compaction. That left `set-qa-phase.sh`,
+  `set-waiting-on.sh` and the Stop hook inert until someone ran `advance-pipeline-lock.sh --restore`
+  by hand: three times in one consumer run on 2026-11-10. The hook now keeps the lock and marks it
+  `paused: {at, step, reason: "precompact"}`. It still writes the `last-halt.json` snapshot, the
+  report block, the commit and the comments.
+  - **Clearing the mark.** The session's next lock write clears it: any `advance-pipeline-lock.sh`
+    advance (the no-op re-assert too), `set-qa-phase.sh`, `set-waiting-on.sh`, the new
+    `--clear-pause`, or `--restore <doc-dir>` on the paused lock. Clearing also consumes the pause's
+    snapshot.
+  - **Stop hook.** It allows a stop while the mark is set.
+  - **Repeat pauses.** A pause that finds the lock still marked records nothing new.
+  - **Concurrency claim.** The claim is now an atomic `mkdir` of
+    `develop-pipeline.precompact-claim.d`, holding the hook's pid. A claim left by a dead holder is
+    taken over. A stealer that finds it moved a live claim puts it back, and a run releases only its
+    own claim.
+  - **Push held on dangling links.** The pause commit is still committed locally, but it is not
+    pushed when the report links to a path that is staged but not in the commit. Path-limiting the
+    commit made
+    this possible: a pause at step 7 pushed a report that linked to the PR review report staged for
+    the 6a carry, and the consumer's docs link check went red (tinker-city PR #1223). The signal
+    names the links. The commit that carries them pushes both.
+  - **Collisions.** Step 1 and develop-bug §0b still halt on a paused lock for another document,
+    and now name it.
+  - **Resume detector.** It reports a paused lock as `source: lock` with a `paused:` note.
+  - **Pause comments.** These stay one per step (find-by-marker, edit in place).
+
 - **The QA snippet classifier refuses indirect evaluation** (task 293). A value built harmlessly and
   evaluated later ran a command that the text never showed: `printf -v 'a[$(cmd)]' x`, `read`,
   `test -v`, `[[ -v ]]` and `unset` on a name holding a quoted subscript; `PS4` with `set -x` and

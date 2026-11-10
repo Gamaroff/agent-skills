@@ -35,6 +35,13 @@
 #     A `waiting_on` older than its budget is a step that crashed while waiting,
 #     and the hook re-prompts as it always did — the field protects a wait, not a
 #     stall wearing a wait's label.
+#   • `paused` is set (2026-11): the PreCompact hook keeps the lock and marks it
+#     `paused: {at, step, reason}` instead of removing it, and its signal asks the
+#     agent to halt. Blocking that stop would fight the signal; allowing it is what
+#     the removed lock used to give. The mark lasts only until the session's next lock
+#     write — advance-pipeline-lock.sh (any advance, including a no-op re-assert),
+#     set-qa-phase.sh, set-waiting-on.sh — so a session that carries on is guarded
+#     again from its first pipeline call.
 #
 # The orchestrator's terminal-HALT protocol removes the lock file before
 # stopping, so legitimate halts pass this hook naturally.
@@ -69,6 +76,13 @@ fi
 
 # No lock = no active pipeline = allow stop
 [ -f "$LOCK" ] || emit_allow
+
+# Paused by the PreCompact hook → allow the halt its signal asked for (header).
+PAUSED=$(jq -r 'if type == "object" and (.paused | type) == "object" then "paused at step \(.paused.step // "?") since \(.paused.at // "?")" else "" end' "$LOCK" 2>/dev/null)
+if [ -n "$PAUSED" ]; then
+  echo "on-stop: pipeline $PAUSED (PreCompact) — allowing the stop; the next lock write (advance-pipeline-lock.sh <N>, set-qa-phase.sh, set-waiting-on.sh) clears the mark and re-arms this hook" >&2
+  emit_allow
+fi
 
 CURRENT_STEP=$(jq -r '.current_step // 0' "$LOCK" 2>/dev/null)
 if [ -z "$CURRENT_STEP" ] || [ "$CURRENT_STEP" = "null" ]; then

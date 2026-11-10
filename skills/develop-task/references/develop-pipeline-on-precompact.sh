@@ -5,26 +5,45 @@
 # Runs when Claude Code is about to compact the conversation. If a develop-task
 # or develop-story pipeline is active (lock file present), this hook:
 #   0. Writes a develop-pipeline.last-halt.json resume snapshot (a lock superset,
-#      pause_reason: "precompact") BEFORE any lock removal, so even a hook run killed
+#      pause_reason: "precompact") BEFORE it marks the lock, so even a hook run killed
 #      mid-flow by the harness (SIGTERM/timeout) leaves recoverable resume state for
 #      the Phase 0b resume detector
 #   1. Appends a "Paused — Context Compaction" entry to the implementation report
-#   2. Commits the report and pushes to remote (best-effort)
+#   2. Commits the report and pushes to remote (best-effort) — the push is held when
+#      the report links to a path staged but not in the commit (a 5c carry)
 #   3. Posts a pause comment to the PR (best-effort) — through the access gate
 #      (`tracker_write`), opening with the plain-language lead for the
 #      `pipeline-paused` stage, body carried by --body-file
 #   4. Posts a pause comment to the tracker issue (best-effort) — ONE
 #      tracker-comment.js call, which resolves the tracker itself, renders the
 #      same lead, carries the idempotency marker, and honours the access gate
-#   5. Removes the lock file
+#   5. KEEPS the lock and marks it paused: `paused: {at, step, reason: "precompact"}`
 #   6. Emits a PIPELINE-PAUSE-SIGNAL via additionalContext so the agent halts cleanly
 #
-# The hook CLAIMS the lock before any of that (task.120): an atomic `mv` of the
-# lock to a per-process `.pausing.$$` name, so N concurrent invocations — a host
-# that registered the hook twice, say — produce exactly one of everything, and
-# the losers exit 0 with the empty signal. The PR comment carries the same
-# idempotency marker family as the issue comment and is updated in place on a
-# repeat pause at the same step.
+# The lock is kept, not removed. Claude Code continues the SAME session after a
+# compaction, with a summary, and a removed lock left that session with no lock:
+# set-waiting-on.sh, set-qa-phase.sh and the Stop hook were inert, and the agent had
+# to run `advance-pipeline-lock.sh --restore` by hand — three times in one consumer
+# run on 2026-11-10. The mark is what the removal used to say ("this run paused"),
+# without taking the lock away. Its readers:
+#   • the Stop hook allows a stop while the mark is set, so the halt this signal asks
+#     for is not fought — the same pass-through a removed lock gave;
+#   • every lock writer clears it — advance-pipeline-lock.sh (numeric, --skill,
+#     --restore, --clear-pause), set-qa-phase.sh, set-waiting-on.sh — so the first
+#     pipeline call of a session that carries on re-arms the Stop hook with no
+#     recovery step; clearing also consumes this pause's snapshot;
+#   • a FRESH session reads the lock (the detector's `source: lock`), surfaces the
+#     pause, and `--restore <doc-dir>` clears the mark in place.
+#
+# The hook CLAIMS the pause before any of that (task.120): an atomic `mkdir` of a
+# claim directory beside the lock, so N concurrent invocations — a host that
+# registered the hook twice, say — produce exactly one of everything, and the
+# losers exit 0 with the empty signal. (Until 2026-11 the claim was an `mv` of the
+# lock itself to `.pausing.<pid>`, which is what removed it.) A run that finds the
+# lock ALREADY marked paused records nothing new: no lock writer ran since that
+# pause, so there is no progress to report — it refreshes the snapshot and emits
+# the signal again. The PR comment carries the same idempotency marker family as
+# the issue comment and is updated in place on a repeat pause at the same step.
 #
 # Both tracker writes go through the contract (bug.14). Before that fix they were
 # bare `gh … comment --body "…"` calls: no lead, no marker, and — the part that
@@ -53,7 +72,7 @@ set -uo pipefail
 
 # Lock path — env-overridable for test isolation (mirrors advance-pipeline-lock.sh).
 LOCK="${PIPELINE_LOCK:-.claude/state/develop-pipeline.lock}"
-# Resume snapshot, co-located with the lock. Written BEFORE any lock removal so a
+# Resume snapshot, co-located with the lock. Written BEFORE the lock is marked so a
 # killed/partial hook run always leaves a recoverable artifact (see write_pause_snapshot).
 SNAPSHOT="$(dirname "$LOCK")/develop-pipeline.last-halt.json"
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -71,79 +90,171 @@ emit_empty() {
 # write_pause_snapshot — persist a resume snapshot (a superset of the lock) to
 # $SNAPSHOT. Tagged pause_reason: "precompact" + paused_at, and aliases the lock's
 # current_step to halt_step — the field the Phase 0b resume detector maps to LOCK_STEP.
-# This MUST run before the EXIT trap is armed and before any rm of the lock, so every
-# exit path — success OR harness-kill (SIGTERM/timeout) — leaves a recoverable artifact.
-# Degrades to a verbatim cp when jq is unavailable (current_step is still preserved in
-# the copied lock). Guarded with || true: a snapshot failure must never abort the hook
-# or block compaction.
+# The lock's own `paused` mark is dropped: the snapshot keeps the flat pause fields it
+# always had, and --restore strips both. This runs BEFORE the lock is marked, so a
+# harness kill (SIGTERM/timeout) between the two leaves the snapshot and an unmarked
+# lock — a state the next pause simply redoes. Degrades to a verbatim cp when jq is
+# unavailable (current_step is still preserved in the copied lock). Guarded with
+# || true: a snapshot failure must never abort the hook or block compaction.
 write_pause_snapshot() {
   if command -v jq >/dev/null 2>&1; then
     jq --arg ts "$NOW" \
-       '. + {paused_at: $ts, pause_reason: "precompact", halt_step: .current_step}' \
+       'del(.paused) + {paused_at: $ts, pause_reason: "precompact", halt_step: .current_step}' \
        "$LOCK" > "$SNAPSHOT" 2>/dev/null || cp -f "$LOCK" "$SNAPSHOT" 2>/dev/null || true
   else
     cp -f "$LOCK" "$SNAPSHOT" 2>/dev/null || true
   fi
 }
 
-# The claim. No lock = no active pipeline = noop; but "is there a lock" is not a
-# question two concurrent runs can both be allowed to answer yes to — on task.110
-# a settings file carried this hook under two spellings, the host fired both in
-# parallel, both passed a `[ -f "$LOCK" ]` check, and every side-effect below was
-# produced twice (report block, PR comment, issue comment). `mv` on one
-# filesystem is atomic: of N concurrent runs exactly one renames the lock, and
-# every other run's mv fails ENOENT and takes the same noop path a stray
-# re-fire always took. Claiming BEFORE writing a snapshot or arming the EXIT trap
-# keeps the loser side-effect-free: it neither clobbers an existing snapshot nor
-# touches a lock it does not own (idempotence, now by construction).
-CLAIM="${LOCK}.pausing.$$"
-if ! mv "$LOCK" "$CLAIM" 2>/dev/null; then
-  emit_empty
-fi
-# Only the winner reaches this line, and a loser never owns a claim file — so
-# every OTHER .pausing.* here belongs to a run the harness killed mid-flow. Sweep
-# them now, or .claude/state/ accumulates one per crash forever. Never sweep
-# before the mv: a loser that started a beat later would delete the winner's
-# claim. (No nullglob in bash 3.2: with no match the loop sees the literal
-# pattern, and rm -f of a name that does not exist is a noop.)
+# mark_paused — add `paused: {at, step, reason}` to the lock, through a mktemp file in
+# the lock's own directory and an mv (the advance-pipeline-lock.sh write rule: never a
+# redirect onto a predictable path). Returns 1 when the write did not land.
+mark_paused() {
+  local tmp
+  tmp=$(mktemp "$STATE_DIR/.precompact-mark.XXXXXX" 2>/dev/null) || return 1
+  if jq --arg ts "$NOW" \
+        '.paused = {at: $ts, step: ((.current_step // 0) | (tonumber? // .)), reason: "precompact"}' \
+        "$LOCK" > "$tmp" 2>/dev/null; then
+    mv -f "$tmp" "$LOCK" 2>/dev/null && return 0
+  fi
+  rm -f "$tmp"
+  return 1
+}
+
+# report_dangling_links — print each relative link target in $REPORT that HEAD does not
+# carry but the index does, one per line: a link into a set staged for a later commit
+# (the 5c carry), which a consumer's docs link linter would find dangling on the pushed
+# tree. Requiring the index copy is what makes the hold end: the commit that carries the
+# staged set pushes the pause commit with it. A target in neither — a link quoted inside
+# inline code, or one to a file never written (2 of 477 tinker-city reports) — would
+# hold the push for good, so it does not count. `HEAD:./<path>` and `:./<path>` resolve
+# against the cwd, so the lookup runs from the report's own directory and `..` segments
+# resolve as the link does. Absolute URLs, root-absolute paths and bare anchors are
+# skipped; a `#fragment` is dropped.
+report_dangling_links() {
+  [ -f "$REPORT" ] || return 0
+  (
+    cd "$(dirname "$REPORT")" 2>/dev/null || exit 0
+    grep -oE '\]\([^)[:space:]]+\)' "$(basename "$REPORT")" 2>/dev/null |
+      sed -E 's/^\]\(//; s/\)$//; s/#.*$//' | sort -u |
+      while IFS= read -r t; do
+        case "$t" in '' | *://* | mailto:* | /*) continue ;; esac
+        git cat-file -e "HEAD:./$t" 2>/dev/null && continue
+        git cat-file -e ":./$t" 2>/dev/null && printf '%s\n' "$t"
+      done
+  )
+}
+
+# No lock = no active pipeline = noop, before anything is created on disk.
+[ -f "$LOCK" ] || emit_empty
+
+# The claim. "Is there a lock" is not a question two concurrent runs can both be
+# allowed to answer yes to — on task.110 a settings file carried this hook under two
+# spellings, the host fired both in parallel, both passed a `[ -f "$LOCK" ]` check,
+# and every side-effect below was produced twice (report block, PR comment, issue
+# comment). `mkdir` is atomic: of N concurrent runs exactly one creates the claim
+# directory, and every other run's mkdir fails and takes the same noop path a stray
+# re-fire takes. Claiming BEFORE writing a snapshot keeps the loser side-effect-free.
 #
-# A stale claim can be the only copy of a killed run's state — a kill between
-# THAT run's claim and its snapshot leaves nothing under the lock's name and
-# nothing in last-halt.json (task.120 CR-1 / bug.2). That is why the Phase 0a
-# resume detector reads `.pausing.*` alongside last-halt.json — choosing by
-# document and then by age, since a stale snapshot is never consumed (bug.5) —
-# the claim file is the lock, byte for byte, under another name. Sweeping it
-# HERE is safe because
-# reaching this line means a NEW lock was just claimed — a newer pipeline has
-# started, and this run's own snapshot (written next) is the state that matters.
+# The claim used to be `mv "$LOCK" "$LOCK.pausing.$$"` (task.120) — atomic too, but it
+# took the lock away, which is the defect this revision removes. The directory is named
+# OUTSIDE the `develop-pipeline.lock.pausing.*` family on purpose: the resume detector,
+# `--restore` and `--paused-here` read that family as orphaned lock copies, and the
+# sweep below rm's its members as files.
+#
+# A claim whose holder died (SIGKILL skips the EXIT trap) would make every later pause a
+# silent noop, so the loser checks the holder: a pid file it can read, naming a dead
+# process, is stale; so is a claim with no readable pid older than a minute (the holder
+# was killed between its mkdir and its pid write). A stale claim is stolen by an atomic
+# rename to a unique name and the mkdir is retried ONCE. Two runs can judge the same dead
+# claim stale (task.110's double registration after a SIGKILLed pause): the faster steals
+# and re-claims, and the slower one's rename then takes the FRESH claim. So the stealer
+# checks what it moved — the pid it judged dead, or (no pid) a claim still over a minute
+# old — and on a mismatch puts the claim back and takes the noop path. The EXIT trap
+# releases the claim only while it still holds this run's pid, so a run never frees a
+# claim another run holds.
+CLAIM_DIR="$STATE_DIR/develop-pipeline.precompact-claim.d"
+take_claim() {
+  mkdir "$CLAIM_DIR" 2>/dev/null || return 1
+  printf '%s\n' "$$" > "$CLAIM_DIR/pid" 2>/dev/null || true
+  return 0
+}
+if ! take_claim; then
+  HOLDER=$(cat "$CLAIM_DIR/pid" 2>/dev/null)
+  STALE_CLAIM=false
+  case "$HOLDER" in
+    ''|*[!0-9]*)
+      [ -n "$(find "$CLAIM_DIR" -maxdepth 0 -mmin +1 2>/dev/null)" ] && STALE_CLAIM=true ;;
+    *)
+      kill -0 "$HOLDER" 2>/dev/null || STALE_CLAIM=true ;;
+  esac
+  [ "$STALE_CLAIM" = true ] || emit_empty
+  STOLEN="$CLAIM_DIR.stale.$$"
+  mv "$CLAIM_DIR" "$STOLEN" 2>/dev/null || emit_empty
+  MOVED=$(cat "$STOLEN/pid" 2>/dev/null)
+  if [ -n "$HOLDER" ]; then
+    [ "$MOVED" = "$HOLDER" ] && STILL_STALE=true || STILL_STALE=false
+  else
+    [ -z "$MOVED" ] && [ -n "$(find "$STOLEN" -maxdepth 0 -mmin +1 2>/dev/null)" ] \
+      && STILL_STALE=true || STILL_STALE=false
+  fi
+  if [ "$STILL_STALE" != true ]; then
+    # Another run stole the dead claim first and this rename took its fresh one: put it back.
+    mv "$STOLEN" "$CLAIM_DIR" 2>/dev/null || rm -rf "$STOLEN"
+    emit_empty
+  fi
+  rm -rf "$STOLEN"
+  take_claim || emit_empty
+  echo "on-precompact: took over a stale claim (${HOLDER:-no pid}) left by a killed pause" >&2
+fi
+# Release the claim on every exit path — only while it is still this run's. The lock itself
+# is never removed here.
+release_claim() {
+  [ "$(cat "$CLAIM_DIR/pid" 2>/dev/null)" = "$$" ] && rm -rf "$CLAIM_DIR"
+  return 0
+}
+trap release_claim EXIT
+# The lock may have gone between the first check and the claim (Step 8's --complete).
+[ -f "$LOCK" ] || emit_empty
+
+# Legacy `.pausing.*` claims — the lock, byte for byte, renamed by a hook of the previous
+# revision that was killed mid-flow (task.120 CR-1 / bug.2). This revision never writes
+# one; the resume detector and `--restore` still read them. Sweeping them is safe HERE
+# because a live lock exists: a newer pipeline has started, and its state is the one that
+# matters. (No nullglob in bash 3.2: with no match the loop sees the literal pattern, and
+# rm -f of a name that does not exist is a noop.)
 for stale in "$LOCK".pausing.*; do
-  [ "$stale" = "$CLAIM" ] || rm -f "$stale"
+  rm -f "$stale"
 done
-# Every later read (`jq -r … "$LOCK"`), the degraded-path rm and the EXIT trap
-# now address the claimed copy. SNAPSHOT and STATE_DIR were derived from the
-# original path above, so they still point at the real state directory.
-LOCK="$CLAIM"
 
-# Lock claimed — write the resume snapshot NOW, before the EXIT trap that
-# removes the lock is even armed. This closes the "lock removed, no snapshot" window
-# that a mid-run harness kill would otherwise open.
-write_pause_snapshot
-
-# Always-run cleanup: ensure lock is removed regardless of which exit path is
-# taken (including SIGTERM/timeout from the harness, jq-missing degraded mode,
-# or unexpected errors). A leftover lock would block the next pipeline
-# invocation with a collision halt — so removing it on any exit is safer than
-# leaving it. Safe because write_pause_snapshot already persisted resume state.
-# Idempotent — `rm -f` on success path is a noop.
-trap 'rm -f "$LOCK"' EXIT
-
-# jq is required for safe parsing — degrade gracefully if missing.
-# The EXIT trap will remove the lock; the cp-fallback snapshot above already
-# preserved resume state so the next invocation can recover via Phase 0b.
+# jq is required for safe parsing — degrade gracefully if missing. The lock is kept,
+# UNMARKED (marking needs jq); the cp-fallback snapshot preserves the resume state. The
+# Stop hook needs jq too, so an unmarked lock blocks nothing on such a host.
 if ! command -v jq >/dev/null 2>&1; then
-  echo "on-precompact: jq not found, skipping pause processing (lock removed by EXIT trap; resume snapshot preserved at $SNAPSHOT)" >&2
+  write_pause_snapshot
+  echo "on-precompact: jq not found, skipping pause processing (lock kept, not marked paused; resume snapshot preserved at $SNAPSHOT)" >&2
   emit_empty
 fi
+
+# Already paused: no lock writer has run since that pause (every writer clears the
+# mark), so nothing has happened that a second report entry, commit or comment could
+# record. Refresh the snapshot — a doc-level jq write may have added a field — and
+# repeat the signal. This is also what makes a duplicate hook run that started after
+# the winner finished a noop, which the claim alone cannot see.
+ALREADY_PAUSED=$(jq -r 'if (.paused | type) == "object" then "step \(.paused.step // "?") since \(.paused.at // "?")" else "" end' "$LOCK" 2>/dev/null)
+if [ -n "$ALREADY_PAUSED" ]; then
+  write_pause_snapshot
+  SKILL=$(jq -r '.skill // ""' "$LOCK" 2>/dev/null)
+  SIGNAL=$(printf '🛑 PIPELINE-PAUSE-SIGNAL (repeat)\n\nThe `/%s` pipeline is already paused (%s); no lock helper has run since, so the hook recorded nothing new — no report entry, commit or comment. The lock is kept and still marked paused. Continuing in THIS session: the next lock helper call (`advance-pipeline-lock.sh <N>`, `set-qa-phase.sh`, `set-waiting-on.sh`) clears the mark. Stopping: re-invoke `/%s <path>` to resume.' \
+    "${SKILL:-develop}" "$ALREADY_PAUSED" "${SKILL:-develop}")
+  jq -n --arg msg "$SIGNAL" '{hookSpecificOutput: {hookEventName: "PreCompact", additionalContext: $msg}}'
+  exit 0
+fi
+
+# Snapshot first, then the mark — see write_pause_snapshot for why that order.
+write_pause_snapshot
+MARK_OK=true
+mark_paused || { MARK_OK=false; echo "on-precompact: could not mark the lock paused — the lock is kept unmarked, so the Stop hook will treat the run as live" >&2; }
 
 SKILL=$(jq -r '.skill // ""' "$LOCK" 2>/dev/null)
 REPORT=$(jq -r '.report_path // ""' "$LOCK" 2>/dev/null)
@@ -161,8 +272,7 @@ DOC_DIR=$(jq -r '.task_or_story_directory // ""' "$LOCK" 2>/dev/null)
 
 # Sanity: if we don't even know which skill, bail gracefully
 if [ -z "$SKILL" ]; then
-  echo "on-precompact: lock file missing 'skill' field, skipping" >&2
-  rm -f "$LOCK"
+  echo "on-precompact: lock file missing 'skill' field, skipping (lock kept)" >&2
   emit_empty
 fi
 
@@ -195,7 +305,7 @@ if [ -n "$REPORT" ] && [ -f "$REPORT" ]; then
   # the report, and this hook runs under the pressure that makes a half-written
   # report most likely; task.117's doubled, mid-line-spliced report reached git
   # through a commit nobody read first. A failing lint does NOT abort the pause
-  # (the snapshot and the lock removal below are what resume depends on) — it
+  # (the snapshot and the paused mark above are what resume depends on) — it
   # skips the commit, so the corruption stays in the working tree for a human to
   # repair, and says so on stderr and in the additionalContext summary.
   REPORT_LINT_OK=true
@@ -212,10 +322,22 @@ if [ -n "$REPORT" ] && [ -f "$REPORT" ]; then
   # /finalise 6a to carry into the acceptance commit. A bare `git commit` would sweep them into a
   # "pipeline paused" commit; `--` commits the report alone and leaves the rest of the index
   # staged (task.173).
+  #
+  # Not pushed when the committed report links to a path that is staged but not in the commit. The
+  # path-limited commit is exactly what makes that possible: a QA-cycle entry links to the
+  # PR review report, which 5c staged for 6a to carry, so the pushed head has a dangling
+  # link and the consumer's docs-lint goes red (tinker-city PR #1223, pause commit at
+  # step 7). The commit stays local; the next commit that carries the targets pushes both.
   if [ "$REPORT_LINT_OK" = true ]; then
     git add "$REPORT" 2>/dev/null || true
     git commit -m "docs(${SKILL}): pipeline paused at step ${CURRENT_STEP} — context compaction imminent" -- "$REPORT" >/dev/null 2>&1 || true
-    git push origin HEAD >/dev/null 2>&1 || true
+    DANGLING=$(report_dangling_links)
+    if [ -z "$DANGLING" ]; then
+      git push origin HEAD >/dev/null 2>&1 || true
+    else
+      PUSH_HELD=true
+      echo "on-precompact: pause commit NOT pushed — the report links to paths staged but not in the commit: $(printf '%s' "$DANGLING" | tr '\n' ' ')" >&2
+    fi
   fi
 fi
 
@@ -359,9 +481,11 @@ if [ -n "$TRACKER_ISSUE" ]; then
   fi
 fi
 
-# Remove the claimed lock. A stray re-fire is already a noop: the original name
-# was renamed away at the claim, so there is nothing left for it to claim.
-rm -f "$LOCK"
+# The lock stays. A stray re-fire finds it marked paused and records nothing new.
+LOCK_NOTE="Lock kept and marked paused (\`paused.step\` = ${CURRENT_STEP}) — the Stop hook allows the halt below"
+if [ "$MARK_OK" != true ]; then
+  LOCK_NOTE="Lock kept but NOT marked paused (the mark write failed) — the Stop hook will treat the run as live"
+fi
 
 # Build the agent signal. The lint outcome is reported both to the agent and in the
 # user-facing template — a pause entry that was appended but not committed is a
@@ -371,6 +495,10 @@ REPORT_LINT_SUMMARY=", committed the report, and pushed to remote"
 if [ "${REPORT_LINT_OK:-true}" != true ]; then
   REPORT_LINT_NOTE=" but NOT committed — the report FAILED report-lint.js; repair it by hand, then commit"
   REPORT_LINT_SUMMARY=" (report NOT committed: it failed report-lint.js — repair by hand)"
+elif [ "${PUSH_HELD:-false}" = true ]; then
+  HELD_LIST=$(printf '%s' "$DANGLING" | sed 's/.*/`&`/' | paste -sd ',' - | sed 's/,/, /g')
+  REPORT_LINT_NOTE=", committed, but NOT pushed — it links to ${HELD_LIST}, which are staged but not in this commit (the 5c carry); the commit that carries them pushes both"
+  REPORT_LINT_SUMMARY=", and committed the report (not pushed: it links to files not yet committed)"
 fi
 SIGNAL=$(cat <<EOF
 🛑 PIPELINE-PAUSE-SIGNAL
@@ -381,7 +509,7 @@ The \`/${SKILL}\` pipeline was paused at Step ${CURRENT_STEP} due to imminent co
 - Implementation report appended with pause entry${REPORT_LINT_NOTE}: \`${REPORT}\`
 - PR comment: ${PR_COMMENT_OUTCOME}
 - Tracker issue comment: ${ISSUE_COMMENT_OUTCOME}
-- Lock file removed
+- ${LOCK_NOTE}
 
 **What you must do now:**
 1. STOP all further pipeline work immediately. Do not invoke any more sub-skills, do not update the report, do not run any tools.
@@ -403,8 +531,10 @@ The hook saved state${REPORT_LINT_SUMMARY}.
 PR comment:            ${PR_COMMENT_OUTCOME}
 Tracker issue comment: ${ISSUE_COMMENT_OUTCOME}
 Resume with: /${SKILL} <path>   (choose 'Resume from last completed step' when prompted)
-Continuing in THIS session instead? The lock is gone — restore it FIRST, before any step advances:
-  bash .agents/skills/${SKILL}/references/advance-pipeline-lock.sh --restore ${DOC_DIR:-<doc-dir>}
+Continuing in THIS session instead? The lock is kept, marked paused. Carry on with Step ${CURRENT_STEP}:
+its first lock call clears the mark and re-arms the Stop hook, for example
+  bash .agents/skills/${SKILL}/references/advance-pipeline-lock.sh ${CURRENT_STEP}
+(\`advance-pipeline-lock.sh --restore ${DOC_DIR:-<doc-dir>}\` clears it too.)
 \`\`\`
 EOF
 )

@@ -435,6 +435,27 @@ for skill in develop-task develop-story; do
   fi
 done
 
+# ── The PreCompact `paused` mark (2026-11): allow while set, block once cleared ─
+# The PreCompact hook keeps the lock and marks it paused; its signal asks the agent to
+# halt, so this hook must allow that stop. The mark's first clear — the Stop hook's own
+# re-assert, `advance-pipeline-lock.sh <N>` — must re-arm the block.
+d="$TMPDIR_TEST/paused"
+mklock "$d" '{"skill":"develop-task","current_step":5,"qa_phase":"5a","report_path":"r.md","paused":{"at":"2026-11-10T00:00:00Z","step":5,"reason":"precompact"}}'
+OUT=$(run_hook "$d")
+ERR=$( cd "$d" && printf '{}' | "$BASH_BIN" "$HOOK" 2>&1 >/dev/null )
+if [ -z "$OUT" ] && grep -q 'paused at step 5' <<<"$ERR"; then
+  pass "paused lock at step 5 → stop allowed (empty output), stderr names the pause"
+else
+  fail "paused lock allows the stop" "out=$OUT err=$ERR"
+fi
+( cd "$d" && bash "$(dirname "$HOOK")/advance-pipeline-lock.sh" 5 >/dev/null 2>&1 )
+R=$(reason_of "$(run_hook "$d")")
+if echo "$R" | grep -q "Step 5 (QA REVIEW (qa_phase 5a)) is PENDING"; then
+  pass "after advance-pipeline-lock.sh 5 clears the mark → the stop is blocked again (Step 5 named)"
+else
+  fail "a cleared mark re-arms the block" "reason=$(head -c 200 <<<"$R") lock=$(cat "$d/.claude/state/develop-pipeline.lock")"
+fi
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo ""
 undefined_commands_check || FAIL=$((FAIL + 1))

@@ -899,15 +899,158 @@ run_complete_records() {
   fi
 }
 
+# ── Scenario 16: the PreCompact `paused` mark (2026-11) ──────────────────────
+# The hook keeps the lock and marks it `paused`; the session's next lock write clears the
+# mark and consumes that pause's snapshot. Every clearing mode, the snapshots a clear must
+# NOT consume, and the modes that leave the mark alone.
+run_paused_mark_scenarios() {
+  local SH="$1"
+  local P="$TMPDIR_TEST/paused-$SH"
+  mkdir -p "$P/doc" "$P/other" "$P/state"
+  local L="$P/state/lock" S="$P/state/last-halt.json" OUT ERR RC BEFORE
+  paused_lock() { # $1 = current_step, $2 = doc dir (default $P/doc)
+    printf '{"skill":"develop-task","task_or_story_directory":"%s","branch":"feature/x","current_step":%s,"qa_phase":"5b","paused":{"at":"2026-11-10T00:00:00Z","step":%s,"reason":"precompact"}}\n' \
+      "${2:-$P/doc}" "$1" "$1" > "$L"
+  }
+  pause_snapshot() { # $1 = doc dir (default $P/doc)
+    printf '{"skill":"develop-task","task_or_story_directory":"%s","current_step":5,"paused_at":"2026-11-10T00:00:00Z","pause_reason":"precompact","halt_step":5}\n' "${1:-$P/doc}" > "$S"
+  }
+  kept() { jq -c '[.current_step, .branch, .qa_phase, (has("paused"))]' "$L" 2>/dev/null; }
+
+  # 16a. A numeric re-assert (N == current_step) — the Stop hook's — is a no-op advance, and
+  # still clears the mark and consumes this pause's snapshot. stdout stays empty.
+  paused_lock 5; pause_snapshot
+  OUT=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" 5 2>"$P/err"); RC=$?; ERR=$(cat "$P/err")
+  if [ "$RC" -eq 0 ] && [ "$(kept)" = '[5,"feature/x","5b",false]' ] && [ ! -f "$S" ] && [ -z "$OUT" ] \
+     && grep -q 'paused mark cleared (paused at step 5' <<<"$ERR"; then
+    pass "[$SH] paused: a no-op re-assert (5 on a step-5 lock) clears the mark, consumes the pause snapshot, keeps every other field, stdout empty"
+  else
+    fail "[$SH] paused: no-op re-assert clears the mark" "rc=$RC lock=$(cat "$L") snapshot=$([ -f "$S" ] && echo present || echo gone) out=$OUT err=$ERR"
+  fi
+
+  # 16b. A real advance clears it too.
+  paused_lock 4; pause_snapshot
+  OUT=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" 5 2>/dev/null); RC=$?
+  if [ "$RC" -eq 0 ] && [ "$(kept)" = '[5,"feature/x","5b",false]' ] && [ "$OUT" = "advance-pipeline-lock: step 4 → 5" ] && [ ! -f "$S" ]; then
+    pass "[$SH] paused: a real advance (4 → 5) advances and clears the mark"
+  else
+    fail "[$SH] paused: real advance clears the mark" "rc=$RC lock=$(cat "$L") out=$OUT"
+  fi
+
+  # 16c. A QA-loop sub-skill's self-advance advances nothing but clears the mark.
+  paused_lock 5; rm -f "$S"
+  PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --skill qa-task >/dev/null 2>&1; RC=$?
+  if [ "$RC" -eq 0 ] && [ "$(kept)" = '[5,"feature/x","5b",false]' ]; then
+    pass "[$SH] paused: --skill qa-task clears the mark, current_step untouched"
+  else
+    fail "[$SH] paused: --skill qa-task clears the mark" "rc=$RC lock=$(cat "$L")"
+  fi
+
+  # 16d. The finalise HOLD exit clears it as well; the lock stays at 7.
+  paused_lock 7
+  PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --skill finalise >/dev/null 2>&1; RC=$?
+  if [ "$RC" -eq 0 ] && [ "$(kept)" = '[7,"feature/x","5b",false]' ]; then
+    pass "[$SH] paused: the finalise HOLD (no --dod) keeps the lock at 7 and clears the mark"
+  else
+    fail "[$SH] paused: finalise HOLD clears the mark" "rc=$RC lock=$(cat "$L")"
+  fi
+
+  # 16e. --clear-pause: clears; an unmarked lock is left byte-identical and silent; no lock
+  # is exit 0; a non-object lock is exit 1, untouched.
+  paused_lock 3; pause_snapshot
+  PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --clear-pause >/dev/null 2>&1; RC=$?
+  if [ "$RC" -eq 0 ] && [ "$(kept)" = '[3,"feature/x","5b",false]' ] && [ ! -f "$S" ]; then
+    pass "[$SH] --clear-pause: mark cleared, pause snapshot consumed"
+  else
+    fail "[$SH] --clear-pause clears the mark" "rc=$RC lock=$(cat "$L")"
+  fi
+  BEFORE=$(cat "$L")
+  ERR=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --clear-pause 2>&1); RC=$?
+  if [ "$RC" -eq 0 ] && [ "$(cat "$L")" = "$BEFORE" ] && [ -z "$ERR" ]; then
+    pass "[$SH] --clear-pause on an unmarked lock: byte-identical, silent, exit 0"
+  else
+    fail "[$SH] --clear-pause on an unmarked lock is a silent no-op" "rc=$RC err=$ERR"
+  fi
+  PIPELINE_LOCK="$P/state/absent" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --clear-pause >/dev/null 2>&1; RC=$?
+  [ "$RC" -eq 0 ] && pass "[$SH] --clear-pause with no lock: exit 0" || fail "[$SH] --clear-pause with no lock exits 0" "rc=$RC"
+  printf '[]\n' > "$L"
+  PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --clear-pause >/dev/null 2>&1; RC=$?
+  if [ "$RC" -eq 1 ] && [ "$(cat "$L")" = "[]" ]; then
+    pass "[$SH] --clear-pause on a non-object lock: exit 1, untouched"
+  else
+    fail "[$SH] --clear-pause fails closed on a non-object lock" "rc=$RC lock=$(cat "$L")"
+  fi
+
+  # 16f. A clear consumes ONLY this pause's snapshot: a terminal HALT's snapshot for the same
+  # document, and a PreCompact snapshot for another document, both stay.
+  paused_lock 5
+  printf '{"task_or_story_directory":"%s","current_step":4,"halted_at":"t","halt_reason":"x","halt_step":4}\n' "$P/doc" > "$S"
+  PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --clear-pause >/dev/null 2>&1
+  if [ -f "$S" ] && [ "$(kept)" = '[5,"feature/x","5b",false]' ]; then
+    pass "[$SH] clear keeps a terminal HALT snapshot (not this pause's record)"
+  else
+    fail "[$SH] clear keeps a HALT snapshot" "snapshot=$([ -f "$S" ] && echo kept || echo deleted)"
+  fi
+  paused_lock 5; pause_snapshot "$P/other"
+  PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --clear-pause >/dev/null 2>&1
+  if [ -f "$S" ] && [ "$(kept)" = '[5,"feature/x","5b",false]' ]; then
+    pass "[$SH] clear keeps a PreCompact snapshot for another document"
+  else
+    fail "[$SH] clear keeps another document's snapshot" "snapshot=$([ -f "$S" ] && echo kept || echo deleted)"
+  fi
+
+  # 16g. --restore <doc> on a present paused lock for that document clears it in place.
+  paused_lock 5; pause_snapshot
+  OUT=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$P/doc" 2>/dev/null); RC=$?
+  if [ "$RC" -eq 0 ] && [ "$(kept)" = '[5,"feature/x","5b",false]' ] && [ ! -f "$S" ] \
+     && [ "$OUT" = "advance-pipeline-lock: lock present and paused — pause cleared in place at step 5" ]; then
+    pass "[$SH] --restore on a paused lock for this document: mark cleared in place, snapshot consumed, says so"
+  else
+    fail "[$SH] --restore clears a paused lock in place" "rc=$RC out=$OUT lock=$(cat "$L")"
+  fi
+
+  # 16h. --restore <other> on a paused lock for <doc>: refused, nothing written.
+  paused_lock 5; pause_snapshot; BEFORE=$(cat "$L")
+  ERR=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$P/other" 2>&1 >/dev/null); RC=$?
+  if [ "$RC" -eq 1 ] && [ "$(cat "$L")" = "$BEFORE" ] && [ -f "$S" ] && grep -q 'is paused for' <<<"$ERR"; then
+    pass "[$SH] --restore for another document on a paused lock: exit 1, lock and snapshot untouched"
+  else
+    fail "[$SH] --restore refuses another document's paused lock" "rc=$RC err=$ERR lock=$(cat "$L")"
+  fi
+
+  # 16i. A snapshot that carries `paused` (a HALT snapshotted a still-paused lock) restores
+  # without it.
+  rm -f "$L"
+  printf '{"skill":"develop-task","task_or_story_directory":"%s","branch":"feature/x","current_step":5,"qa_phase":"5b","paused":{"at":"t","step":5,"reason":"precompact"},"halted_at":"t","halt_reason":"x","halt_step":5}\n' "$P/doc" > "$S"
+  PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --restore "$P/doc" >/dev/null 2>&1; RC=$?
+  if [ "$RC" -eq 0 ] && [ "$(kept)" = '[5,"feature/x","5b",false]' ]; then
+    pass "[$SH] --restore from a snapshot carrying paused: the rebuilt lock has no mark"
+  else
+    fail "[$SH] --restore strips paused" "rc=$RC lock=$(cat "$L" 2>/dev/null)"
+  fi
+
+  # 16j. `--skill commit-changes` parses nothing and leaves the mark (documented).
+  paused_lock 5; BEFORE=$(cat "$L")
+  PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" --skill commit-changes >/dev/null 2>&1
+  if [ "$(cat "$L")" = "$BEFORE" ]; then
+    pass "[$SH] --skill commit-changes leaves the mark (it parses nothing)"
+  else
+    fail "[$SH] --skill commit-changes leaves the lock byte-identical" "$(cat "$L")"
+  fi
+  rm -f "$L" "$S"
+}
+
 run_restore_scenarios bash
 run_no_lock_split bash
 run_complete_records bash
+run_paused_mark_scenarios bash
 if command -v zsh >/dev/null 2>&1; then
   run_restore_scenarios zsh
   run_no_lock_split zsh
   run_complete_records zsh
+  run_paused_mark_scenarios zsh
 else
-  echo "  SKIP  zsh interpreter pass for scenarios 13-15 (zsh not on this host)"
+  echo "  SKIP  zsh interpreter pass for scenarios 13-16 (zsh not on this host)"
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────
