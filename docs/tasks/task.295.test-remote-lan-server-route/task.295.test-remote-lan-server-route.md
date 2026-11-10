@@ -364,6 +364,7 @@ The gate-3 findings are fixed. One medium finding remains: the container-name lo
 | 2026-11-10 |         | QA findings fixed after gate 3 (3 findings, 3 fix cycles in all); ready for re-gate | qa-fix |
 | 2026-11-10 |         | Status → ready-for-review | qa-fix |
 | 2026-11-10 |         | QA gate CONCERNS (80/100) — 1 finding | qa-task |
+| 2026-11-10 |         | QA findings fixed after gate 4 (1 finding, 4 fix cycles in all); ready for re-gate | qa-fix |
 <!-- change-log-end -->
 
 ---
