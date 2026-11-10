@@ -11,6 +11,7 @@ created: 2026-11-10
 updated: 2026-11-10
 estimated_effort_hours: 16
 github_issue: 871
+pr_number: 872
 ---
 
 # Technical Task: Run the test suite on the LAN server (test:remote)

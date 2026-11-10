@@ -35,7 +35,7 @@ Add `npm run test:remote`: sync the tree to the LAN server (.249), run root scri
 | 2. review-task             | ✅ Done | `task.295.review.{N}.{name}.md` exists (or skip logged)                | Review 1: 8/10 READY; rsync plan fixed; status → ready-for-development; pre-pass agents run inline (no independent review) | —                    | 2026-11-10T14:45Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (plan + inline surface map); runner, container, guard test, docs; 6 real runs on .249; clean-clone run green (8353 tests, 0 fail) | —                    | 2026-11-10T14:56Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #872 https://github.com/Gamaroff/agent-skills/pull/872; issue #871 commented; PR body written inline (no Explore summariser); foreign uncommitted edits left out | —                    | 2026-11-10T15:10Z |
-| 5–6. qa-task / qa-fix loop | 🔄 In progress (gate 1 CONCERNS 80; fix 1 done; gate 2 next) | `task.295.qa.{N}.*.md`; `task.295.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done (gate 5 CONCERNS 85; fix 5 done; Step 5c PR review CONCERNS, doc-only findings) | `task.295.qa.{N}.*.md`; `task.295.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.295.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
@@ -94,7 +94,8 @@ _Track each QA review/fix cycle._
 - **Fix 4** (`510da7e9`): third gate on this mechanism (QA-4 key, QA-6 order, QA-9 window), so the claim was scoped, not patched again (Step 2.6, scope the claim): the script comment and `testing-remote.md` now call it a best-effort guard with its window; a real lock stays the task's Future Improvements item. Also touch chained as `touch && { inspect || build; }`; two tests added (filter anchored on the run name, failed lock check stops the run), both mutation-proved. The touch-chaining change is not held by a test: the stub fails the whole ssh call, so it cannot tell the two parses apart.
 - **Gate 5** (CONCERNS 85, head `19108b83`, scoped review; the last gate in the 5-gate budget): no code defect. T295-QA-10 (medium, wording): the documented guard window said "a few seconds" where it is the whole sync plus a first-use build, and the `run.sh` comment cited the cross-repository lock item for a same-branch lock.
 - **Fix 5**: wording only, in `run.sh`, `testing-remote.md`, the task's Future Improvements (a per-run lock item added) and one test title. Not re-gated: the budget is spent, so the Step 5c review is the gate that reads it. Two LOW items stay in `recommendations.future` (deferred SIGTERM trap, 9999-minute cap).
-- **Next**: Step 5c `/review-pr`.
+- **PR Review**: CONCERNS (conformance lens only; report `task.295.pr-review.1.test-remote-lan-server-route.md`). No open coverage finding. PC-1 (this table's stale row) and PC-2 (`pr_number: 872` added to the task frontmatter) fixed here; PC-3 (§ 9 checkboxes unticked) is left to `/finalise`, which verifies them.
+- **Next**: Step 7 `/finalise`.
 
 ---
 
