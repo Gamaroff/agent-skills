@@ -2,7 +2,7 @@
 id: task.292.bug.2
 title: "The arithmetic-removal regex erases a command substitution inside $(( )), hiding a write from the classifier"
 type: bug
-status: ready-for-qa
+status: closed
 severity: high
 priority: P0
 created: 2026-11-10
@@ -15,7 +15,7 @@ updated: 2026-11-10
 **Bug ID**: TASK-292-BUG-2
 **Severity**: HIGH
 **Priority**: P0
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 2 refute pass, diff code review CR-1, reproduced by execution)
 **Date Found**: 2026-11-10
 
@@ -82,3 +82,4 @@ Drive arithmetic removal from the tokenizer instead of `[^)]*`, or refuse in the
 | ---------- | ------------ | ---------- | ------------------------------------------ |
 | 2026-11-10 | New          | qa-task    | Found by cycle 2 refute pass, CR-1         |
 | 2026-11-10 | Ready for QA | qa-fix     | Lexer refuses a substitution in `$(( ))`   |
+| 2026-11-10 | Closed | qa-task | Verified by task.292.qa.3.qa-snippet-classifier-one-bash-tokenizer.md |

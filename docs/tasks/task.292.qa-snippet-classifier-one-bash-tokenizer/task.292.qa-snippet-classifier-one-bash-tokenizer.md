@@ -275,24 +275,24 @@ Sign-off is disabled for this repository (`sign-off.enabled` is not set), so no 
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-10
-**Quality Score**: 80/100
-**Gate Decision**: FAIL
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.292.qa.2.qa-snippet-classifier-one-bash-tokenizer.md](./task.292.qa.2.qa-snippet-classifier-one-bash-tokenizer.md)
-- **Gate File**: [task.292.gate.2.qa-snippet-classifier-one-bash-tokenizer.yml](./task.292.gate.2.qa-snippet-classifier-one-bash-tokenizer.yml)
+- **Full Report**: [task.292.qa.3.qa-snippet-classifier-one-bash-tokenizer.md](./task.292.qa.3.qa-snippet-classifier-one-bash-tokenizer.md)
+- **Gate File**: [task.292.gate.3.qa-snippet-classifier-one-bash-tokenizer.yml](./task.292.gate.3.qa-snippet-classifier-one-bash-tokenizer.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 362
+- **Tests Executed**: 371
 - **Phases Verified**: 4/4
-- **Critical Issues**: 1
-- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **Critical Issues**: 0
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle 1's fix holds (bug 1 closed). The refute pass found a second write the classifier calls runnable: the arithmetic-removal regex stops at the first `)`, so `echo $((1+$(touch W)))` classifies runnable while bash writes (bug 2, reproduced by execution). Everything else holds: suite 362/362, 0 writes in two fresh differential runs, 0 newly runnable blocks in the docs scan.
+Both earlier HIGH findings are fixed and verified (bugs 1 and 2 closed). The unscoped safety re-probe found three more shapes the classifier calls runnable while bash writes: quoted `a[$(cmd)]` text re-evaluated by `printf -v` and its kin, PS4 and `${x@P}`, and quoted data re-evaluated as arithmetic. All three give the same verdict on `develop`, appear nowhere in the tracked corpus and sit outside this task's scope (the command-level allow-list, full bash parsing), so they are recorded as pre-existing follow-ups. The task's own lexical class is clean: 0 writes on fresh differential seeds, 0 newly runnable blocks in the docs scan.
 
 <!-- change-log-start -->
 ## Change Log
@@ -307,6 +307,7 @@ Cycle 1's fix holds (bug 1 closed). The refute pass found a second write the cla
 | 2026-11-10 |         | QA findings fixed — T292-QA-1, 1 iteration                                   | qa-fix      |
 | 2026-11-10 |         | QA gate FAIL (80/100) — 1 finding                                            | qa-task     |
 | 2026-11-10 |         | QA findings fixed — T292-QA-2, 1 iteration                                   | qa-fix      |
+| 2026-11-10 |         | QA gate CONCERNS (90/100) — 0 blocking findings, 3 pre-existing follow-ups  | qa-task     |
 <!-- change-log-end -->
 
 ---
