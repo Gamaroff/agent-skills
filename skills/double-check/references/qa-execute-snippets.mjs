@@ -1847,6 +1847,18 @@ function lexBash(code) {
   return { tokens };
 }
 
+/** `text` with every line join (a backslash-newline bash removes) replaced by `filler`. */
+function cutJoins(text, filler) {
+  let out = "";
+  let at = 0;
+  for (const t of tokenize(text).tokens) {
+    if (t.kind !== "join") continue;
+    out += text.slice(at, t.start) + filler;
+    at = t.end;
+  }
+  return out + text.slice(at);
+}
+
 /**
  * `text` with every command substitution, process substitution and backtick
  * replaced by one word, or null when one is unterminated. `commandInvocations`
@@ -1860,100 +1872,28 @@ function lexBash(code) {
  * `$(` for `commandInvocations` to cut again); a process substitution becomes `/dev/fd/0`, the operand
  * it stands for. The commands INSIDE a substitution are judged on their own, in
  * the unmasked reading.
+ *
+ * Read off the tokenizer (task.292): the substitutions are its outermost `subst` tokens, so a
+ * paren or backtick hidden by a quote, an escape or a comment is not one, and nesting costs one
+ * linear pass instead of one re-mask per level. A text it cannot read is null.
  */
-/**
- * Index of the `)` that closes the `(` at `open`, or -1. Quotes, escapes and
- * comments hide a paren from the shell, so they hide it here: `$(echo ")")` ends
- * at the LAST paren, and a scan that counted the quoted one ended early and
- * read the rest of the line as a second command (QA 5).
- */
-function closingParen(text, open) {
-  // An explicit stack, not recursion: a double-quoted `$(` inside a substitution
-  // opens a new frame, so nesting depth is bounded by the heap, not the call
-  // stack (task.290: 20000 nested `"$(` threw RangeError). A "p" frame counts
-  // parens; a "q" frame is an open double quote, which a `)` cannot close.
-  const stack = [{ t: "p", d: 0 }];
-  for (let i = open; i < text.length; i += 1) {
-    const c = text[i];
-    const top = stack[stack.length - 1];
-    if (top.t === "q") {
-      if (c === "\\") i += 1;
-      else if (c === '"') stack.pop();
-      else if (c === "$" && text[i + 1] === "(") {
-        stack.push({ t: "p", d: 1 });
-        i += 1;
-      }
-    } else if (c === "\\") i += 1;
-    else if (c === "'") {
-      const j = text.indexOf("'", i + 1);
-      if (j < 0) return -1;
-      i = j;
-    } else if (c === '"') stack.push({ t: "q" });
-    else if (startsComment(text, i)) {
-      while (i < text.length && text[i] !== "\n") i += 1;
-    } else if (c === "(") top.d += 1;
-    else if (c === ")" && (top.d -= 1) === 0) {
-      stack.pop();
-      if (stack.length === 0) return i;
-    }
-  }
-  return -1;
-}
-
-/**
- * True when the `#` at `text[i]` starts a shell comment: it begins a word, so it
- * is at the start of the text or follows whitespace, `;`, `&`, `|` or `(` that
- * is NOT itself escaped. `a\ #` is one word (the space is a literal), `a#b` and
- * `$#` are mid-word. The one rule every comment scan calls (task.290); the
- * callers track quotes themselves, so a `#` inside quotes never reaches here.
- * Unsure reads as "not a comment": the rest of the line is then scanned as code.
- */
-function startsComment(text, i) {
-  if (text[i] !== "#") return false;
-  // The tokenizer decides (task.292): it knows blanks are space, tab and newline only, so a CR,
-  // FF, VT, NBSP or U+2028 before `#` is a word character and the `#` is not a comment. A text it
-  // cannot read throws, and `classifyFailClosed` reads the throw as mutating.
-  return tokenize(text).tokens.some(
-    (t) => t.kind === "comment" && t.start === i,
-  );
-}
-
 function maskSubstitutions(text) {
-  let out = "";
-  let q = null;
-  for (let i = 0; i < text.length; i += 1) {
-    const c = text[i];
-    if (q === "'") {
-      out += c;
-      if (c === "'") q = null;
-      continue;
-    }
-    if (c === "\\") {
-      out += c + (text[i + 1] ?? "");
-      i += 1;
-      continue;
-    }
-    const two = text.slice(i, i + 2);
-    const proc = q === null && (two === "<(" || two === ">(");
-    if (two === "$(" || proc) {
-      const j = closingParen(text, i + 1);
-      if (j < 0) return null;
-      out += proc ? "/dev/fd/0" : "$__SUBST__";
-      i = j;
-      continue;
-    }
-    if (c === "`") {
-      const j = text.indexOf("`", i + 1);
-      if (j < 0) return null;
-      out += "$__SUBST__";
-      i = j;
-      continue;
-    }
-    if (c === '"') q = q === '"' ? null : '"';
-    else if (c === "'" && q === null) q = "'";
-    out += c;
+  let tokens;
+  try {
+    ({ tokens } = tokenize(text));
+  } catch {
+    return null;
   }
-  return out;
+  let out = "";
+  let at = 0;
+  for (const t of tokens) {
+    if (t.kind !== "subst" || t.start < at) continue; // nested in one already masked
+    out +=
+      text.slice(at, t.start) +
+      (t.form === "<(" || t.form === ">(" ? "/dev/fd/0" : "$__SUBST__");
+    at = t.end;
+  }
+  return out + text.slice(at);
 }
 
 /** Why `name`'s arguments are outside its entry, or null. `rawArgs` keep their quotes. */
@@ -2375,32 +2315,54 @@ function collapseQuotedSpans(text) {
   // Read off the tokenizer (task.292): a quote token is replaced by its bare quote pair, and the
   // text between them is untouched. A text the tokenizer cannot read throws (fail closed).
   const { tokens } = tokenize(text);
+  // Inside DOUBLE quotes `$(…)` and backticks still RUN (single quotes are the only quoting that
+  // makes them text). Dropping them with the rest of the span hid the command from the scan:
+  // `echo "$(touch /tmp/x)"` created the file and classified runnable (task.274, obs #67). Each
+  // outermost substitution in a double-quoted span is kept, its own quotes collapsed like any
+  // others (kept as written, a `|` inside `grep 'a\|b'` would split the command and read `b'` as
+  // one); the surrounding text is dropped.
+  //
+  // One pass with an explicit stack, not recursion: a nest 6000 deep overflowed the call stack.
+  // Each entry is a span we are inside: a quote (its text is dropped) or a kept substitution
+  // (its text flows through). `cursor` is the text accounted for so far.
   let out = "";
-  let at = 0;
+  let cursor = 0;
+  const stack = [];
+  const top = () => stack[stack.length - 1];
+  const emitting = () => stack.length === 0 || top().quote === false;
+  const advance = (pos) => {
+    if (emitting() && pos > cursor) out += text.slice(cursor, pos);
+    if (pos > cursor) cursor = pos;
+  };
+  const closeUntil = (pos) => {
+    while (stack.length > 0 && top().end <= pos) {
+      const e = top();
+      advance(e.end);
+      stack.pop();
+      if (e.quote) out += e.closer;
+    }
+  };
   for (const t of tokens) {
-    if (t.kind !== "quote" || t.start < at) continue; // not a quote, or inside a span already done
-    out += text.slice(at, t.start);
-    at = t.end;
-    if (t.quote !== '"') {
-      out += t.quote === "$'" ? "$''" : "''";
-      continue;
+    if (t.kind !== "quote" && t.kind !== "subst") continue;
+    closeUntil(t.start);
+    if (t.kind === "quote") {
+      if (!emitting()) continue; // inside a span being dropped
+      advance(t.start);
+      out += t.quote === "$'" ? "$'" : t.quote;
+      stack.push({
+        end: t.end,
+        quote: true,
+        q: t.quote,
+        closer: t.quote === '"' ? '"' : "'",
+      });
+    } else if (!emitting() && top().q === '"') {
+      cursor = Math.max(cursor, t.start); // jump over the dropped text to the substitution
+      stack.push({ end: t.end, quote: false });
     }
-    // Inside DOUBLE quotes `$(…)` and backticks still RUN (single quotes are the only quoting that
-    // makes them text). Dropping them with the rest of the span hid the command from the scan:
-    // `echo "$(touch /tmp/x)"` created the file and classified runnable (task.274, obs #67). Each
-    // outermost substitution in the span is kept, its own quotes collapsed like any others (kept as
-    // written, a `|` inside `grep 'a\|b'` would split the command and read `b'` as one); the
-    // surrounding text is dropped.
-    out += '"';
-    let to = t.start;
-    for (const s of tokens) {
-      if (s.kind !== "subst" || s.start < to || s.end > t.end) continue;
-      out += collapseQuotedSpans(text.slice(s.start, s.end));
-      to = s.end;
-    }
-    out += '"';
   }
-  return out + text.slice(at);
+  closeUntil(Infinity);
+  advance(text.length);
+  return out;
 }
 
 /**
@@ -2546,14 +2508,14 @@ export function commandWords(code) {
  * helper rule needs both.
  */
 function commandInvocations(code) {
-  const stripped = stripNonCode(code)
-    // Backslash line-continuations join one command across several lines. Splitting
-    // on the raw newline first makes the continuation's tail look like a fresh
-    // command: `git log ... -- \` + `apps packages` reported `apps` as a command.
-    // Only an ODD run joins: an even run is an escaped backslash followed by a
-    // real newline, which ends the command (task.290 QA 2: `echo a\\` + newline
-    // + `touch out` hid the write).
-    .replace(/(?<!\\)((?:\\\\)*)\\\n/g, "$1 ")
+  // `commandWords` is exported and reads raw text: state the blank class here too (see
+  // classifyInternal), so a CR, FF, VT, NBSP or U+2028 never separates two words.
+  code = code.replace(NOT_A_BASH_BLANK, "\u0001");
+  // Backslash line-continuations join one command across several lines. Splitting on the raw
+  // newline first makes the continuation's tail look like a fresh command: `git log ... -- \` +
+  // `apps packages` reported `apps` as a command. Which backslash-newlines join is the
+  // tokenizer's to say (an even run is an escaped backslash then a real newline, task.290 QA 2).
+  const stripped = cutJoins(stripNonCode(code), " ")
     // Arithmetic expansion is arithmetic, not an invocation. It must go before the
     // `$(` rule below, or `$((N + 1))` becomes a segment whose first token is `N`.
     .replace(/\$\(\([^)]*\)\)/g, " ")
@@ -2694,8 +2656,9 @@ function commandInvocations(code) {
 /** Variables the block reads but never assigns. */
 export function unboundVariables(code, bindings) {
   const stripped = code
+    .replace(NOT_A_BASH_BLANK, "\u0001")
     .split("\n")
-    .filter((l) => !/^\s*#/.test(l))
+    .filter((l) => !/^[ \t]*#/.test(l))
     .join("\n");
 
   const assigned = new Set();
@@ -3140,9 +3103,9 @@ function classifyInternal(
   // MENTIONS `git push` is documentation. Scanning raw text would classify a doc
   // for its own examples and skip a block that is in fact safe to run.
   // A backslash-newline is removed by the shell before it reads a word, so
-  // `-dele\<LF>te` is `-delete` (T274-QA-4). Only an ODD run of backslashes
-  // continues the line; an escaped pair (`\\`) followed by a newline does not.
-  const prose = stripProse(code).replace(/(?<!\\)((?:\\\\)*)\\\r?\n/g, "$1");
+  // `-dele\<LF>te` is `-delete` (T274-QA-4). Which backslash-newlines join is the tokenizer's to
+  // say: an escaped pair (`\\`) followed by a newline does not.
+  const prose = cutJoins(stripProse(code), "");
 
   // Judged twice: as written, and with quotes and backslashes removed, as the
   // command receives them. `find docs "-delete"` and `find docs '-delete'` both run

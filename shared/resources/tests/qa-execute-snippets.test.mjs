@@ -4597,29 +4597,83 @@ test("task.290 the classifier never throws: any exception is a mutating verdict"
   }
 });
 
-test("task.290 every comment scan calls the one rule", () => {
+// task.292: `\s` counts CR, FF, VT, NBSP and U+2028 as blanks and bash does not. Every function of the
+// engine that holds a `\s` is named here with the reason that is safe. A new one fails the run until
+// it is added WITH a reason, and an entry whose function no longer holds a `\s` fails as stale.
+const MARKDOWN = "reads Markdown or a table cell, not bash input";
+const NORMALISED =
+  "reads bash input after NOT_A_BASH_BLANK has turned every non-blank whitespace character into a word character, so `\\s` can only match space, tab or newline";
+const WHITESPACE_ALLOWLIST = {
+  extractBlocks: MARKDOWN,
+  isDelimiterRow: MARKDOWN,
+  looksLikeCommand: MARKDOWN,
+  fenceMask: MARKDOWN,
+  sedWritesFile: NORMALISED,
+  scriptWrites: NORMALISED,
+  sedScan: `${NORMALISED}; sed's own grammar, not bash's`,
+  hasOutputFlagWrite: `${NORMALISED}; the deny-list patterns after it only match MORE than a blank, which is the strict side`,
+  variableArgumentToDenyListed: NORMALISED,
+  assignedVariables: NORMALISED,
+  unsafeAssignment: NORMALISED,
+  flagViolation: NORMALISED,
+  shadowingFunctions: NORMALISED,
+  commandInvocations: NORMALISED,
+  unboundVariables: NORMALISED,
+  assignmentHazard: NORMALISED,
+  shadowsCommand: NORMALISED,
+  prepareHelperText: NORMALISED,
+  addBody: NORMALISED,
+  classifyInternal: NORMALISED,
+};
+test("task.292 every function holding a \\s is on the allowlist, with a reason", () => {
+  const holders = new Set();
+  let fn = "(top level)";
+  for (const line of readFileSync(MODULE, "utf8").split("\n")) {
+    const m = /^(?:export )?(?:async )?function\s+([A-Za-z0-9_]+)/.exec(line);
+    if (m) fn = m[1];
+    const code = line.trim();
+    if (/\\[sS]/.test(line) && !/^(\/\/|\*|\/\*)/.test(code)) holders.add(fn);
+  }
+  const unlisted = [...holders].filter((f) => !(f in WHITESPACE_ALLOWLIST));
+  assert.deepEqual(unlisted, [], `a \\s in a function with no stated reason`);
+  const stale = Object.keys(WHITESPACE_ALLOWLIST).filter(
+    (f) => !holders.has(f),
+  );
+  assert.deepEqual(stale, [], "allowlist entries that hold no \\s any more");
+  assert.ok(holders.size >= 15, "non-vacuity: the scan found the holders");
+  // The normalisation the NORMALISED reason rests on is real, at every entry that reads raw text.
+  assert.equal(commandWords("A=1\recho touch out").join(","), "touch");
+  assert.equal(
+    commandWords("A=1 echo touch out").join(","),
+    "echo",
+    "a real blank still ends the assignment",
+  );
+});
+
+test("task.290 every comment scan reads the one rule (the tokenizer, task.292)", () => {
   const src = readFileSync(MODULE, "utf8");
-  // Each `"#"` literal is either the rule itself, a comment-start scan that calls it,
-  // or one of two sites that are not a shell comment scan (sed's own grammar, and the
-  // command-word list).
+  // Each `"#"` literal is either the tokenizer's word-start rule, or one of two sites that are
+  // not a shell comment scan (sed's own grammar, and the command-word list).
   const hits = [...src.matchAll(/^.*"#".*$/gm)].map((m) => m[0].trim());
   const known = hits.filter(
     (l) =>
       /if \(cmd === "#"\)/.test(l) || // sedScan: sed grammar, a different rule
       /^"#",$/.test(l) || // the command-word list
-      /lines\[k \+ 1\]\.startsWith\("#"\)/.test(l) || // stripProse: refuses a backslash-newline before a # (a line join, not a comment scan)
-      /if \(text\[i\] !== "#"\) return false;/.test(l) || // startsComment itself
-      /^case "#": \{$/.test(l), // the tokenizer: where the word-start rule lives (task.292)
+      /^case "#": \{$/.test(l), // the tokenizer: where the word-start rule lives
   );
   assert.equal(
     hits.length,
     known.length,
-    `a "#" test that is not startsComment: ${hits.filter((l) => !known.includes(l)).join(" | ")}`,
+    `a "#" test that is not the tokenizer's: ${hits.filter((l) => !known.includes(l)).join(" | ")}`,
   );
-  assert.ok(known.length >= 3, "non-vacuity: the three known sites exist");
+  assert.equal(known.length, 3, "non-vacuity: the three known sites exist");
   assert.ok(
-    (src.match(/startsComment\(/g) ?? []).length >= 2,
-    "startsComment is defined and called from closingParen (stripProse reads the tokenizer's comment tokens)",
+    known.some((l) => l === 'case "#": {'),
+    "the tokenizer's rule exists",
+  );
+  assert.ok(
+    !/function startsComment|function closingParen/.test(src),
+    "the regex-era comment scans are gone",
   );
 });
 
@@ -4827,12 +4881,25 @@ test("task.292 tokenizer: a ${…} with its own quotes and expansions is one pie
 
 test("task.292 tokenizer: nesting is bounded by the heap, not the call stack", () => {
   const nest = (n) => 'echo "$(echo '.repeat(n) + "x" + ')"'.repeat(n);
-  // The tokenizer is linear: 20000 levels is milliseconds. (The classifier's other scans are
-  // quadratic in depth until they read the tokens, so it is measured at 1000 here.)
+  // Linear in depth, so 20000 levels is well under a second. The scans before the tokenizer
+  // re-masked every level (quadratic; 6000 levels took 2.6 s), and a recursive collapse overflowed
+  // the stack at 6000.
   let t;
   assert.doesNotThrow(() => (t = tokenize(nest(20000))));
   assert.equal(t.tokens.filter((k) => k.kind === "subst").length, 20000);
-  assert.doesNotThrow(() => classifyBlock(nest(1000)));
+  const started = Date.now();
+  let r;
+  assert.doesNotThrow(() => (r = classifyBlock(nest(20000))));
+  assert.equal(r.klass, "runnable");
+  assert.ok(
+    Date.now() - started < 3000,
+    loadSensitive("a 20000-deep nest is read in linear time"),
+  );
+  // A write at the bottom of the nest is still seen.
+  assert.equal(
+    classifyBlock(nest(5000).replace("echo x", "touch out")).klass,
+    "mutating",
+  );
 });
 
 const T292_CONTROLS = {
