@@ -213,8 +213,6 @@ QA Gate 8 fix summary (qa-fix, inline):
 
 ---
 
-## Completion
-
 ### Step 5c — PR conformance review (2026-11-10)
 
 `/review-pr 870 --no-code`: one low finding (PC-1, gate 9 said "four residual shapes", the docs say three). Fixed in the gate text. Verdict APPROVE. Report: `task.293.pr-review.1.qa-snippet-classifier-indirect-evaluation.md`.
