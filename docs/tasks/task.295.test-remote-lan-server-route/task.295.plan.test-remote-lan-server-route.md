@@ -44,11 +44,15 @@ A bash runner copies the shape of tinker-city's `scripts/remote-test/run.sh`: pr
 
 **Sync list**: use git as the source of truth for what ships.
 
+**Do not use `--files-from` with `--delete`.** Review 1 measured it: stale files in the destination survive (`printf 'a/keep\0' | rsync -a --delete --from0 --files-from=- ./ dst/` leaves `dst/a/stale` and `dst/rootstale`). Build an exclude list from git instead:
+
 ```bash
-git ls-files -z --cached --others --exclude-standard | rsync -a --delete --from0 --files-from=- ./ "$HOST:$RUN_DIR/"
+git ls-files -z --others --ignored --exclude-standard --directory > "$EXCLUDES"   # gitignored paths (null-separated)
+rsync -a --delete --exclude-from=<(tr '\0' '\n' < "$EXCLUDES") \
+  --exclude=node_modules/ --exclude=.home/ --exclude=.lock-hash ./ "$HOST:$RUN_DIR/"
 ```
 
-`--files-from` with `--delete` deletes only inside the listed set's directories, so confirm stale files are removed. If not, use `--delete-excluded` with an explicit exclude list built from `git ls-files --others --ignored --exclude-standard --directory`. Test the choice by deleting a tracked file locally and checking it is gone remotely. Sync `.git` separately (it is not in `git ls-files`): `rsync -a --delete .git/ "$HOST:$RUN_DIR/.git/"`, and guard for the worktree case where `.git` is a file (`[ -d .git ]`).
+Plain `--exclude` (not `--delete-excluded`) protects the remote `node_modules/`, `.home/` and `.lock-hash` from `--delete`. Test it: delete a tracked file locally and confirm it is gone remotely; confirm `node_modules/` survives a second sync. Sync `.git` separately (it is not in `git ls-files`): `rsync -a --delete .git/ "$HOST:$RUN_DIR/.git/"`, and guard for the worktree case where `.git` is a file (`[ -d .git ]`).
 
 **Per-branch dir**: `SLUG=$(git rev-parse --abbrev-ref HEAD | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//' | cut -c1-50)`, `RUN_DIR="agent-skills-test-${SLUG:-detached}"`.
 

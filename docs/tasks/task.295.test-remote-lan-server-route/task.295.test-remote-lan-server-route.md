@@ -5,7 +5,7 @@ type: task
 description: "Add `npm run test:remote`: sync the working tree to the shared LAN server (.249), run the root test scripts there in a container that mirrors test.yml, and exit with their status, so the overheating laptop only syncs files and prints output."
 tags: [infrastructure, testing, developer-tooling, remote-test]
 category: infrastructure
-status: planned
+status: ready-for-development
 priority: Medium
 created: 2026-11-10
 updated: 2026-11-10
@@ -15,7 +15,9 @@ github_issue: 871
 
 # Technical Task: Run the test suite on the LAN server (test:remote)
 
-**Status:** Planned
+**Status:** Ready for Development
+
+**Review**: ✅ All review recommendations from `task.295.review.1.test-remote-lan-server-route.md` implemented 2026-11-10
 
 **GitHub Issue**: [#871](https://github.com/Gamaroff/agent-skills/issues/871)
 
@@ -151,7 +153,7 @@ None. The change adds one script and files beside it. No existing script, test o
 
 **Risk**: High. **Dependencies**: Phase 1.
 
-- [ ] `rsync -a --delete` of the tree as git sees it: tracked plus untracked-not-ignored, excluding gitignored paths and `node_modules/`; keep `.env` and secrets out.
+- [ ] Sync the tree as git sees it: tracked plus untracked-not-ignored, excluding gitignored paths and `node_modules/`; keep `.env` and secrets out. **`--files-from` does not delete stale remote files.** Measured in review 1: with `printf 'a/keep\0' | rsync -a --delete --from0 --files-from=- ./ dst/`, `dst/a/stale` and `dst/rootstale` both survive. So do not use `--files-from` with `--delete`. Use `rsync -a --delete --exclude-from=<list of gitignored paths>`, with plain `--exclude` (never `--delete-excluded`) for `node_modules/`, `.home/` and `.lock-hash`, so the remote install and its cache survive the sync. Prove it with a stale-file case (delete a tracked file locally, confirm it is gone remotely).
 - [ ] Per-branch remote directory `~ci/agent-skills-test-<branch-slug>`. In a linked worktree `.git` is a file, so no exclude may assume a `.git/` directory.
 - [ ] Sync `.git` so the history-backed replay test runs; otherwise state in the output that it skips.
 - [ ] Container image mirroring `test.yml` (`node:22-bookworm` plus `python3-yaml gawk mawk zsh jq git`, and `shellcheck` if Phase 0 finds a script needing it); `--user "$(id -u):$(id -g)"`, `--rm`, `--cpu-shares 128`.
@@ -179,7 +181,7 @@ None. The change adds one script and files beside it. No existing script, test o
 **Risk**: Low. **Dependencies**: Phase 4.
 
 - [ ] A contributor doc under `docs/contributing/` (usage, host rules, troubleshooting), linked from `docs/contributing/README.md`.
-- [ ] One `AGENTS.md` line: test runs go to `test:remote` when .249 is up, `TEST_LOCAL=1` otherwise (owner decision 3).
+- [ ] One `AGENTS.md` line: test runs go to `test:remote` when .249 is up, `TEST_LOCAL=1` otherwise (owner decision 3). `CLAUDE.md` is a symlink to `AGENTS.md`, so edit `AGENTS.md` only. `tests/executable-instructions.test.js` (line 374) checks that `npm run <name>` mentions in documents name a real `package.json` script, so add the `package.json` script before the docs that mention it.
 - [ ] Optional, only if cheap: `--auto` probes the server and falls back to local, for scripted callers. The plain form still fails loudly.
 
 ---
@@ -235,11 +237,13 @@ None.
 
 ### Functional
 
-- [ ] `npm run test:remote` on a clean tree runs `ci:fast` on .249 and exits 0. While it runs, the laptop's `ps` shows no `node --test` or `test.sh` process, only `ssh` and `rsync`.
-- [ ] **A red run is red.** With one assertion broken on a scratch commit, `npm run test:remote` exits non-zero with the failure in its output. The scratch commit is then reverted.
-- [ ] `npm run test:remote -- --run 'x;y'` exits 2 before any `ssh`.
-- [ ] With `TEST_REMOTE_HOST=nobody@192.0.2.1` it exits non-zero, names `TEST_LOCAL=1`, and does not run locally.
-- [ ] The zsh and awk variants run on the server: the output carries no "skipping: zsh missing" or awk-variant skip notice.
+Criteria 1, 2 and 5 need the real server, which CI cannot reach, so they are held by a committed record, not a per-PR test: the QA report's "Acceptance runs" section carries each command, its exit status and the relevant output lines. Criteria 3 and 4 are held by the offline guard test (Phase 4).
+
+- [ ] `npm run test:remote` on a clean tree runs `ci:fast` on .249 and exits 0. While it runs, the laptop's `ps` shows no `node --test` or `test.sh` process, only `ssh` and `rsync`. Evidence: QA report, "Acceptance runs".
+- [ ] **A red run is red.** With one assertion broken on a scratch commit, `npm run test:remote` exits non-zero with the failure in its output. The scratch commit is then reverted. Evidence: QA report, "Acceptance runs".
+- [ ] `npm run test:remote -- --run 'x;y'` exits 2 before any `ssh` (held by the offline guard test).
+- [ ] With `TEST_REMOTE_HOST=nobody@192.0.2.1` it exits non-zero, names `TEST_LOCAL=1`, and does not run locally (held by the offline guard test).
+- [ ] The zsh and awk variants run on the server: the output carries no "skipping: zsh missing" or awk-variant skip notice. Evidence: QA report, "Acceptance runs".
 
 ### Performance
 
@@ -325,6 +329,8 @@ This task does not use sign-off (`sign-off.enabled` is not `true` in `skills-con
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-11-10 | 1.0     | Initial draft | create-task |
+| 2026-11-10 | 1.1     | Review passed (8/10): rsync plan fixed (`--files-from` leaves stale files), evidence location named for server-only criteria, script-before-docs order | review-task |
+| 2026-11-10 |         | Status → ready-for-development | review-task |
 <!-- change-log-end -->
 
 ---

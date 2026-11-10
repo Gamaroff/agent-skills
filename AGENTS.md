@@ -227,6 +227,10 @@ that silently skipped the protocol is discovered at the first boundary instead o
 
 Stories are the unit of work; tasks are standalone. Pipeline reference: [`docs/operations/workflows.md`](./docs/operations/workflows.md). Walkthroughs: [`docs/runbooks/`](./docs/runbooks/README.md). Anti-patterns: [`docs/reference/anti-patterns.md`](./docs/reference/anti-patterns.md). Design rationale: [`docs/reference/faq.md`](./docs/reference/faq.md).
 
+## Running the Tests
+
+Run test suites with `npm run test:remote` when the LAN server (`ci@192.168.1.249`) is up; use `TEST_LOCAL=1 npm run test:remote` only when it is down. The route syncs the tree, runs `ci:fast` (or `--run <script>`) in a CI-parity container and exits with its status — the laptop only runs `ssh` and `rsync`. Usage and host rules: [`docs/contributing/testing-remote.md`](./docs/contributing/testing-remote.md).
+
 ## Evals
 
 Four-layer eval suite (unit → fixture → protocol → end-to-end). Hermetic layers run in CI on every push; live driver modes are opt-in. See [`docs/contributing/evals/README.md`](./docs/contributing/evals/README.md) and `evals/shared/README.md`.
