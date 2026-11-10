@@ -162,6 +162,22 @@ OUT=$(fx_run 2>&1); RC=$?
 [ "$RC" -eq 0 ] && [ -z "$OUT" ] && pass "detached HEAD → noop (no branch to match)" || fail "detached HEAD noops" "rc=$RC out=$OUT"
 rm -f "$FX_LOCK.pausing.4242"
 
+# ── The PreCompact `paused` mark (2026-11): the write clears it ──────────────
+# A session that carries on after a compaction re-arms the Stop hook at its first
+# sub-step, because this script — each sub-step's first action — drops the mark (via
+# advance-pipeline-lock.sh --clear-pause, which also consumes the pause's snapshot).
+PM="$TMPDIR_TEST/paused"; mkdir -p "$PM/doc"
+LOCK_FILE="$PM/lock"
+printf '{"current_step":5,"skill":"develop-task","task_or_story_directory":"%s","paused":{"at":"t","step":5,"reason":"precompact"}}\n' "$PM/doc" > "$LOCK_FILE"
+printf '{"current_step":5,"task_or_story_directory":"%s","pause_reason":"precompact","paused_at":"t","halt_step":5}\n' "$PM/doc" > "$PM/last-halt.json"
+OUT=$(PIPELINE_LOCK="$LOCK_FILE" PIPELINE_HALT_SNAPSHOT="$PM/last-halt.json" bash "$SCRIPT" 5b 2>/dev/null); RC=$?
+if [ "$RC" -eq 0 ] && [ "$(jq -c '[.qa_phase, .current_step, has("paused")]' "$LOCK_FILE")" = '["5b",5,false]' ] \
+   && [ ! -f "$PM/last-halt.json" ] && [ "$OUT" = "set-qa-phase: qa_phase → 5b" ]; then
+  pass "paused lock: qa_phase written, paused mark cleared, the pause snapshot consumed, stdout unchanged"
+else
+  fail "set-qa-phase clears the paused mark" "rc=$RC out=$OUT lock=$(cat "$LOCK_FILE") snapshot=$([ -f "$PM/last-halt.json" ] && echo present || echo gone)"
+fi
+
 echo ""
 undefined_commands_check || FAIL=$((FAIL + 1))
 echo "  set-qa-phase.test.sh: $PASS passed, $FAIL failed."

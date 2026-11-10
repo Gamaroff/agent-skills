@@ -42,7 +42,7 @@ Check for an active pipeline lock (single-path lock, shared across develop-story
 ```
 
 - **Active lock for THIS bug** (`task_or_story_id` matches `{bug-prefix}`) → this is a resume. Enter the Context Compression Recovery path in `SKILL.md` (Phase 0a/0b resume-detector) and continue from the recommended step. Do NOT re-run Phase 0d prompts.
-- **Active lock for a DIFFERENT work item** → **HALT**: another pipeline is active; show the lock and instruct the user to finish/abort it first.
+- **Active lock for a DIFFERENT work item** → **HALT**: another pipeline is active; show the lock and instruct the user to finish/abort it first. A lock carrying `paused` (a compaction pause; since 2026-11 the PreCompact hook keeps the lock and marks it) is the same HALT: name the paused item — `/<its skill> <its task_or_story_directory>` resumes it — rather than treating it as a run in progress.
 - **`last-halt.json` snapshot for this bug, no active lock** → offer "Resume from {halt_step}" or "Start fresh" (fresh deletes the snapshot). See [`references/develop-pipeline-resume-contract.md`](develop-pipeline-resume-contract.md).
 - **No lock, no snapshot** → fresh run; proceed to 0c.
 

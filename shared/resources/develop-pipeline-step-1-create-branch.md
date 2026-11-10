@@ -27,6 +27,18 @@ If the lock file exists: **HALT immediately** — show the lock contents to the 
 
 If the lock exists but its `branch` field does not match any existing local branch (`git branch --list`), it is stale — log a warning and remove it: `rm -f .claude/state/develop-pipeline.lock`. Then proceed.
 
+**A lock that carries `paused`** (2026-11: the PreCompact hook keeps the lock and marks it instead of removing it) is a run stopped by a compaction, not one running now. It still collides — the exception is narrow:
+
+- **This document, and the operator chose "Start fresh"** in Phase 0 — the paused run *is* the one being abandoned. Remove the lock and its pause snapshot, then proceed:
+
+  ```bash
+  rm -f .claude/state/develop-pipeline.lock
+  jq -e '.pause_reason == "precompact"' .claude/state/develop-pipeline.last-halt.json >/dev/null 2>&1 \
+    && rm -f .claude/state/develop-pipeline.last-halt.json
+  ```
+
+- **Another document** — HALT as above, and name the paused run: `/develop-<skill> <its task_or_story_directory>` resumes it, or the operator abandons it by removing the lock. Before 2026-11 the hook removed the lock at every pause, so a paused run of another item did not block a new one; it now does, because the lock is that run's live record.
+
 ---
 
 > **Note (relocated):** the previous "Pre-flight Board Check" section has been removed. Tracker signalling no longer runs in Phase 0 — it now runs **after** branch + lock creation in this step (see "Signal Work Started" below). This avoids leaving the tracker stuck in `In Progress` if branch creation fails.

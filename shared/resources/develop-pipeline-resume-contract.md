@@ -182,8 +182,18 @@ If `blocking_issues` is non-empty: **HALT** — display each issue to the user a
 
 <!-- who-restores: statement -->
 
+**A paused lock first (2026-11).** When `source` is `lock` and the lock carries `paused` (the
+detector files `paused: precompact at step N`), the PreCompact hook kept the lock and marked it
+instead of removing it. The operator chooses Resume → run `advance-pipeline-lock.sh --restore
+{doc-directory}` **here**, before Phase 0b: on a present paused lock for this document it clears
+the mark in place, consumes that pause's snapshot and prints `pause cleared in place at step N`.
+Nothing else below applies — no lock is rebuilt. Without it the run still works (its first lock
+write clears the mark), but the `Stop` hook allows every stop until then. A paused lock for
+another document is a blocking issue the detector raises, never cleared from here.
+
 When `source` is `halt_snapshot` or `orphaned_claim` and the operator chooses Resume, the lock does
-not exist — a HALT or pause removed it, and a resume skips Step 1, its only ordinary writer. **Who
+not exist — a HALT removed it (or a PreCompact pause of a hook older than 2026-11), and a resume
+skips Step 1, its only ordinary writer. **Who
 restores depends on the snapshot's `halt_reason`** (task.124 QA cycle 3, CR-1) **and, for a
 Step 7 halt, on what the fix changed** (task.170):
 
@@ -217,7 +227,9 @@ so the `source` and "chooses Resume" above do not exist for it. Evaluate the bul
 candidate on disk instead: the halt snapshot's own `halt_reason` (or its `pause_reason`), its `halt_step`, and
 the pipeline named by its `skill`. An orphaned `.lock.pausing.<pid>` claim carries neither
 reason and takes the last bullet. When nothing is on disk, there is nothing to restore
-(task.133 QA-4).
+(task.133 QA-4). **After a PreCompact pause the in-place path has nothing to restore**: the lock
+survived, marked `paused`, and the step's first lock write (`advance-pipeline-lock.sh <N>`,
+`set-qa-phase.sh`, `set-waiting-on.sh`) clears the mark; `--restore` on it does the same.
 
 A numeric advance with no lock is an error, so a resume that skips whichever of these applies
 fails at its first transition.
@@ -419,9 +431,10 @@ finished — `/finalise` writes it before its second CI reading and before Step 
 document with an unmerged PR keeps its snapshot (task.124 QA cycle 2, CR-1). A completed run also deletes its own snapshot at Step 8, so a snapshot
 that reaches this point is either this run's live one or a leftover the detector names.
 
-**Restoring the lock — on either resume path.** The PreCompact hook and every terminal HALT
-**remove the lock** and leave a superset of it behind (`last-halt.json`, or an orphaned
-`.lock.pausing.<pid>` claim). Step 1 is the lock's only ordinary writer and *every* resume skips
+**Restoring the lock — on either resume path.** Every terminal HALT **removes the lock** and
+leaves a superset of it behind (`last-halt.json`); so did the PreCompact hook until 2026-11 (it
+also left orphaned `.lock.pausing.<pid>` claims), and it now keeps the lock marked `paused`
+instead. Step 1 is the lock's only ordinary writer and *every* resume skips
 it — a session that continues in place after a pause **and** a re-invocation that chooses Resume
 in Phase 0b — so neither has a step that puts the lock back unless it is stated, and
 `advance-pipeline-lock.sh <n>` with no lock is now an **error naming the fix**, not a silent no-op
@@ -435,7 +448,8 @@ bash .agents/skills/{develop-story|develop-task|develop-bug}/references/advance-
 ```
 
 It rebuilds the lock from the newest candidate for this document, strips the halt/pause fields and
-any `waiting_on`, keeps `current_step` at the halted step, and **consumes** the candidates. `grant-qa-cycles.sh`'s own
+any `waiting_on`, keeps `current_step` at the halted step, and **consumes** the candidates; on a
+present lock marked `paused` for this document it clears the mark in place instead. `grant-qa-cycles.sh`'s own
 restore (task.123) is this same call — one restore path, one document-match rule, one consumption
 policy (the resume contract's **Re-entry after a QA loop escalation**, below, is unchanged from the
 caller's side).

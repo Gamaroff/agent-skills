@@ -29,6 +29,9 @@
 #   • lock not a JSON object → exit 1, lock untouched, no success line
 #   • otherwise              → atomic write via mktemp + mv; `current_step` preserved verbatim;
 #                              prints `set-qa-phase: qa_phase → 5b`
+#   • lock marked `paused`     → the mark is cleared first (advance-pipeline-lock.sh
+#                              --clear-pause): this write is the session carrying on after
+#                              a PreCompact pause (develop-pipeline-pause.md)
 #
 # Reader: develop-pipeline-on-stop.sh names /qa-story|/qa-task, /qa-fix or /review-pr
 # from this field on a step-5 lock; absent → 5a (the loud, re-entrant default).
@@ -75,6 +78,13 @@ if ! jq -e 'type == "object"' "$LOCK" >/dev/null 2>&1; then
   echo "set-qa-phase: lock is not a JSON object — refusing to write" >&2
   exit 1
 fi
+
+# A write is this session carrying on, so the PreCompact hook's `paused` mark goes first —
+# through the lock helper, which also consumes that pause's snapshot (advance-pipeline-lock.sh
+# header, The `paused` mark). Each sub-step's first action is this script, so a session that
+# continues after a compaction re-arms the Stop hook here without a recovery step.
+_advance="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/advance-pipeline-lock.sh"
+[ -f "$_advance" ] && bash "$_advance" --clear-pause
 
 TMP=$(mktemp "$(dirname "$LOCK")/.set-qa-phase.XXXXXX") || {
   echo "set-qa-phase: could not create temp file beside '$LOCK'" >&2

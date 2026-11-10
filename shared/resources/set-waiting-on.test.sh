@@ -158,6 +158,26 @@ OUT=$(fx_run 2>&1); RC=$?
 [ "$RC" -eq 0 ] && [ -z "$OUT" ] && pass "detached HEAD → noop (no branch to match)" || fail "detached HEAD noops" "rc=$RC out=$OUT"
 rm -f "$FX_LOCK.pausing.4242"
 
+# ── The PreCompact `paused` mark (2026-11): both forms clear it ──────────────
+PM="$TMPDIR_TEST/paused"; mkdir -p "$PM"
+LOCK_FILE="$PM/lock"
+for FORM in set clear; do
+  printf '{"current_step":3,"skill":"develop-task","qa_phase":"5b","paused":{"at":"t","step":3,"reason":"precompact"}}\n' > "$LOCK_FILE"
+  if [ "$FORM" = set ]; then
+    SKILLS_CONFIG_FILE="$NOCFG" PIPELINE_LOCK="$LOCK_FILE" bash "$SCRIPT" "step-3 codebase map" >/dev/null 2>&1; RC=$?
+    WANT='[3,"5b",false,true]'
+  else
+    PIPELINE_LOCK="$LOCK_FILE" bash "$SCRIPT" --clear >/dev/null 2>&1; RC=$?
+    WANT='[3,"5b",false,false]'
+  fi
+  GOT=$(jq -c '[.current_step, .qa_phase, has("paused"), has("waiting_on")]' "$LOCK_FILE")
+  if [ "$RC" -eq 0 ] && [ "$GOT" = "$WANT" ]; then
+    pass "paused lock, $FORM form: the paused mark is cleared, nothing else changes"
+  else
+    fail "set-waiting-on ($FORM) clears the paused mark" "rc=$RC got=$GOT want=$WANT"
+  fi
+done
+
 echo ""
 undefined_commands_check || FAIL=$((FAIL + 1))
 echo "  set-waiting-on.test.sh: $PASS passed, $FAIL failed."
