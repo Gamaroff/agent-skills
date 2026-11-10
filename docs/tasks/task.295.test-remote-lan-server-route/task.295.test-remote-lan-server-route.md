@@ -328,21 +328,21 @@ This task does not use sign-off (`sign-off.enabled` is not `true` in `skills-con
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-10
-**Quality Score**: 80/100
+**Quality Score**: 85/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.295.qa.4.test-remote-lan-server-route.md](./task.295.qa.4.test-remote-lan-server-route.md)
-- **Gate File**: [task.295.gate.4.test-remote-lan-server-route.yml](./task.295.gate.4.test-remote-lan-server-route.yml)
+- **Full Report**: [task.295.qa.5.test-remote-lan-server-route.md](./task.295.qa.5.test-remote-lan-server-route.md)
+- **Gate File**: [task.295.gate.5.test-remote-lan-server-route.yml](./task.295.gate.5.test-remote-lan-server-route.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 17
+- **Tests Executed**: 19
 - **Phases Verified**: 6/6
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-The gate-3 findings are fixed. One medium finding remains: the container-name lock covers the run but not the sync and image build before it, and the docs overstate it (T295-QA-9).
+No code defect is open. The guard's documented window is wrong (a few seconds, where it is minutes) and a comment points at the wrong Future Improvements item (T295-QA-10).
 
 <!-- change-log-start -->
 ## Change Log
@@ -365,6 +365,7 @@ The gate-3 findings are fixed. One medium finding remains: the container-name lo
 | 2026-11-10 |         | Status → ready-for-review | qa-fix |
 | 2026-11-10 |         | QA gate CONCERNS (80/100) — 1 finding | qa-task |
 | 2026-11-10 |         | QA findings fixed after gate 4 (1 finding, 4 fix cycles in all); ready for re-gate | qa-fix |
+| 2026-11-10 |         | QA gate CONCERNS (85/100) — 1 finding | qa-task |
 <!-- change-log-end -->
 
 ---

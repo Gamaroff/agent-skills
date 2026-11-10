@@ -1,0 +1,70 @@
+schema: 2
+task: 'task.295.test-remote-lan-server-route'
+task_title: 'Run the test suite on the LAN server (test:remote)'
+gate: CONCERNS
+status_reason: 'No code defect remains open. One medium finding is left in the guard documentation: the stated window ("a few seconds") is wrong, and the pointer to Future Improvements names a different feature.'
+reviewer: 'QA Engineer'
+head: '19108b838392a4e0c1d41c2aa651722f1342b886'
+updated: '2026-11-10T16:23:55Z'
+
+top_issues:
+  - id: 'T295-QA-10'
+    severity: medium
+    file: 'docs/contributing/testing-remote.md'
+    finding: 'The guard documentation states the window wrongly. The window runs from the check until the container exists: the whole rsync of the tree and .git plus a first-use docker build, which is minutes, not "a few seconds". "The second fails on the name" is only true for the run that reaches docker run second; a later run''s rsync --delete can rewrite the tree under the earlier run''s container. The run.sh comment makes the same statement and points at the task''s Future Improvements item, which is a cross-repository lock, not a same-branch run lock. origin: code-review (CR-1 medium/high, CR-2 low/high)'
+    suggested_action: 'Reword both places to say the window lasts until the container exists (minutes on first use), that the run reaching docker run second fails on the name, and that its sync can rewrite the tree under the earlier run; add a Future Improvements line for a per-run lock and cite that, not the cross-repository one'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 85
+
+evidence:
+  tests_reviewed: 19
+  phases_verified: '6/6'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5]
+    phases_with_issues: [4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: ['never']
+    boundary: true
+    notes: 'Unchanged. The --run validation is the boundary and the probe engine corpus does not fit this entry, so it is not credited. Nothing in this cycle touches the validated input.'
+  performance:
+    status: PASS
+    notes: 'CpuShares=128 confirmed in cycle 1; the timeout stops the container (live run on .249).'
+  reliability:
+    status: PASS
+    notes: 'Every reliability finding from gates 2 to 4 is fixed and held by a test that a mutation turns red, except the touch chaining, which the stub cannot distinguish. The guard window is a documented limit, not a defect in code.'
+  maintainability:
+    status: PASS
+    notes: 'shellcheck and lint:shell clean; guard test 19 of 19.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Correct the guard window wording in run.sh and testing-remote.md (T295-QA-10)'
+      refs: ['scripts/remote-test/run.sh', 'docs/contributing/testing-remote.md']
+  future:
+    - action: 'Rename the guard test, which still says "lock check" (CR-3, low)'
+      refs: ['tests/test-remote-runner.test.js']
+    - action: 'A real per-run lock (an atomic mkdir on the run directory before the sync); SIGTERM sent only to run.sh is handled after the foreground ssh returns; the 9999-minute cap'
+      refs: ['scripts/remote-test/run.sh']
+    - action: 'Gate-4 low items not held by a test: the touch chaining (the stub fails the whole ssh call)'
+      refs: ['tests/test-remote-runner.test.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T295-QA-10 reworded']
