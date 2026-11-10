@@ -325,24 +325,24 @@ This task does not use sign-off (`sign-off.enabled` is not `true` in `skills-con
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-10
-**Quality Score**: 65/100
-**Gate Decision**: FAIL
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.295.qa.3.test-remote-lan-server-route.md](./task.295.qa.3.test-remote-lan-server-route.md)
-- **Gate File**: [task.295.gate.3.test-remote-lan-server-route.yml](./task.295.gate.3.test-remote-lan-server-route.yml)
+- **Full Report**: [task.295.qa.4.test-remote-lan-server-route.md](./task.295.qa.4.test-remote-lan-server-route.md)
+- **Gate File**: [task.295.gate.4.test-remote-lan-server-route.yml](./task.295.gate.4.test-remote-lan-server-route.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 13
+- **Tests Executed**: 17
 - **Phases Verified**: 6/6
-- **Critical Issues**: 1
+- **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-The gate-2 findings are fixed. The review of that fix found the container lock is taken after the sync it protects (T295-QA-6), a dropped ssh leaves the container running (T295-QA-7), and a failing `docker ps` lets `--reap` delete a live directory (T295-QA-8).
+The gate-3 findings are fixed. One medium finding remains: the container-name lock covers the run but not the sync and image build before it, and the docs overstate it (T295-QA-9).
 
 <!-- change-log-start -->
 ## Change Log
@@ -363,6 +363,7 @@ The gate-2 findings are fixed. The review of that fix found the container lock i
 | 2026-11-10 |         | Status → in-progress | qa-task |
 | 2026-11-10 |         | QA findings fixed after gate 3 (3 findings, 3 fix cycles in all); ready for re-gate | qa-fix |
 | 2026-11-10 |         | Status → ready-for-review | qa-fix |
+| 2026-11-10 |         | QA gate CONCERNS (80/100) — 1 finding | qa-task |
 <!-- change-log-end -->
 
 ---
