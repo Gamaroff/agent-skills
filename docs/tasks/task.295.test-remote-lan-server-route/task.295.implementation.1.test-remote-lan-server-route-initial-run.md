@@ -3,7 +3,7 @@
 **Task**: `task.295.test-remote-lan-server-route.md`
 **Run Number**: 1
 **Started**: 2026-11-10 14:12
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -36,8 +36,8 @@ Add `npm run test:remote`: sync the tree to the LAN server (.249), run root scri
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (plan + inline surface map); runner, container, guard test, docs; 6 real runs on .249; clean-clone run green (8353 tests, 0 fail) | —                    | 2026-11-10T14:56Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #872 https://github.com/Gamaroff/agent-skills/pull/872; issue #871 commented; PR body written inline (no Explore summariser); foreign uncommitted edits left out | —                    | 2026-11-10T15:10Z |
 | 5–6. qa-task / qa-fix loop | ✅ Done (gate 5 CONCERNS 85; fix 5 done; Step 5c PR review CONCERNS, doc-only findings) | `task.295.qa.{N}.*.md`; `task.295.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.295.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 7. finalise                | ✅ Done | `task.295.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     |       | —                    |                 |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -101,10 +101,10 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-11-10 17:12
+**Final Status**: Completed
 **Branch**: feature/task.295.test-remote-lan-server-route
 **PR**: https://github.com/Gamaroff/agent-skills/pull/872
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**QA Iterations**: 5 gates, 5 fixes (final gate CONCERNS 85/100); Step 5c PR review CONCERNS, doc-only findings fixed
+**DoD Summary**: ACCEPTED, 12 of 12 criteria; `task.295.dod.1.test-remote-lan-server-route.md`. CI reading 1 SUCCESS @ `77fd0b51b78d`, CI reading 2 SUCCESS @ `377959665688` (both tree-equivalent to `13486822061f`). Deviation: a hardcoded spawn timeout in the guard test was found by the first full run on the final tree and fixed in `13486822`, verified inline.
+**Tracker debt**: none. PR canonical comment posted, issue #871 commented and closed, board already Done.
