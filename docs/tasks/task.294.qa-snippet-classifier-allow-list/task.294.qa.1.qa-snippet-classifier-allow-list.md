@@ -148,6 +148,24 @@ The same script against `origin/develop` gave the identical verdicts and the ide
 
 mutation-proven: allow-list call in `classifyInternal` replaced by `null` → 7 committed tests red (`arithmetic expansion is arithmetic, not an invocation`, `BUG-6/verify: a glued arithmetic evaluation is not an invocation`, `task.292 control (T292-QA-2): plain arithmetic stays runnable`, `task.292 differential slice`, `task.293 safe blocks near the class stay runnable…`, `task.294 every residual shape writes under real bash…`, `task.294 each refusal is held on an input where it alone decides`) → covered. Restored; `cmp` against the snapshot printed nothing, and the file then passed 392/392. The other five proofs are development-time (in the implementation report) and are not re-run here, so this report claims one re-proven and five `dev-only`.
 
+The five `dev-only` proofs, copied from the implementation report's Decisions Log (reverted behaviour → red test), are:
+
+- `$((` name check removed → 4 tests red.
+- `[[` arithmetic-operand check removed → 2 tests red.
+- `=` command-word check removed → 3 tests red.
+- Helper rule and start-up rule swapped in order → the Phase 5 helper-call test red.
+- `mapfile` added to the command table → the six-word unrecognised-command test red.
+
+**Documentation blocks newly refused** (docs scan, 256 runnable before, 251 now, 0 newly runnable). The scan reports each file and line with `runnable` before and `mutating` now; it does not print the reason, which the classifier gives per block as `not-allow-listed: <class>`:
+
+| File | Line |
+| --- | --- |
+| `docs/tasks/task.148.structural-move-before-prose-patch/task.148.bug.1.population-misses-hand-authored-references.md` | 17 |
+| `docs/tasks/task.185.review-pr-eval-suite/task.185.plan.review-pr-eval-suite.md` | 28 |
+| `docs/tasks/task.193.scripts-reach-only-skills-that-run-them/task.193.plan.scripts-reach-only-skills-that-run-them.md` | 45 |
+| `docs/tasks/task.36.setup-consumer-statusmap-fix/task.36.plan.setup-consumer-statusmap-fix.md` | 34 |
+| `docs/tasks/task.92.shellcheck-ci-lane/task.92.plan.shellcheck-ci-lane.md` | 47 |
+
 ---
 
 ## Regression Testing

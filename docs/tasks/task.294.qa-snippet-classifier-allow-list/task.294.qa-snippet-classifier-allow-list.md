@@ -11,6 +11,7 @@ created: 2026-11-10
 updated: 2026-11-10
 estimated_effort_hours: 16
 github_issue:
+pr_number: 874
 ---
 
 # Technical Task: QA snippet classifier allow-list
@@ -102,44 +103,44 @@ No API, CLI flag or file-format change.
 
 Files: `docs/tasks/task.294.qa-snippet-classifier-allow-list/` (a decision note inside the QA or plan record), `scripts/qa-snippets-docscan.mjs` (read only).
 
-- [ ] List the distinct word shapes in the 256 runnable docs blocks (command: the docs-scan with a `--words` listing, or a one-off script run from the scratchpad).
-- [ ] For each candidate allow-list (literal-only; literal plus plain `$name`; literal plus a fixed set of safe expansions), count how many of the 256 stay runnable.
-- [ ] Choose one, write the choice and its count into the plan.
+- [x] List the distinct word shapes in the 256 runnable docs blocks (command: the docs-scan with a `--words` listing, or a one-off script run from the scratchpad).
+- [x] For each candidate allow-list (literal-only; literal plus plain `$name`; literal plus a fixed set of safe expansions), count how many of the 256 stay runnable.
+- [x] Choose one, write the choice and its count into the plan.
 
 ### Phase 2: Pin the target behaviour with tests first (risk: Low)
 
 Files: `shared/resources/tests/qa-execute-snippets.test.mjs`.
 
-- [ ] Take the exact strings from `shared/resources/qa-runnable-prose-detection.md` §2a-ii. Its second shape is elided (`b='['; x="a${b}…"`): complete it so the `$` also arrives by expansion, because a version with a literal `$(cmd)` is already refused today (measured 2026-11-10: `classifyBlock` returns `mutating`). Measured the same day, the first and third shapes classify `runnable`.
-- [ ] Add the three residual shapes to a real-bash table (each shown to write a marker file when run) that must classify `mutating`.
-- [ ] Add a control table of ordinary safe blocks that must stay `runnable`.
-- [ ] Confirm the three shapes are red on today's code (known failure reproduced before the fix).
+- [x] Take the exact strings from `shared/resources/qa-runnable-prose-detection.md` §2a-ii. Its second shape is elided (`b='['; x="a${b}…"`): complete it so the `$` also arrives by expansion, because a version with a literal `$(cmd)` is already refused today (measured 2026-11-10: `classifyBlock` returns `mutating`). Measured the same day, the first and third shapes classify `runnable`.
+- [x] Add the three residual shapes to a real-bash table (each shown to write a marker file when run) that must classify `mutating`.
+- [x] Add a control table of ordinary safe blocks that must stay `runnable`.
+- [x] Confirm the three shapes are red on today's code (known failure reproduced before the fix).
 
 ### Phase 3: Implement the allow-list (risk: High)
 
 Files: `shared/resources/qa-execute-snippets.mjs`.
 
-- [ ] Add the word check after tokenizing, before the final `runnable` verdict.
-- [ ] Reason strings `not-allow-listed: <class>`.
-- [ ] A test that defeats the allow-list's check so the existing rules stand alone (obs #154).
-- [ ] Mutation-prove: revert the check, confirm the Phase 2 table goes red.
+- [x] Add the word check after tokenizing, before the final `runnable` verdict.
+- [x] Reason strings `not-allow-listed: <class>`.
+- [x] A test that defeats the allow-list's check so the existing rules stand alone (obs #154).
+- [x] Mutation-prove: revert the check, confirm the Phase 2 table goes red.
 
 ### Phase 4: Measure and document (risk: Low)
 
 Files: `scripts/qa-snippets-differential.mjs`, `shared/resources/qa-runnable-prose-detection.md`, `CHANGELOG.md`, bundled copies.
 
-- [ ] Add differential atoms for the three residuals; run the differential on the `.249` server, count writes (must be 0).
-- [ ] Run the docs scan; list every newly refused block with its reason in a QA report.
-- [ ] Update §2a-ii: the three residuals move from "known unseen shapes" to refused.
-- [ ] `npm run bundle`, then `npm run bundle:check`.
+- [x] Add differential atoms for the three residuals; run the differential on the `.249` server, count writes (must be 0).
+- [x] Run the docs scan; list every newly refused block with its reason in a QA report.
+- [x] Update §2a-ii: the three residuals move from "known unseen shapes" to refused.
+- [x] `npm run bundle`, then `npm run bundle:check`.
 
 ### Phase 5: The two advisory cleanups (risk: Low)
 
 Files: `shared/resources/tests/qa-execute-snippets.test.mjs`.
 
-- [ ] Make `task.293 a helper call that also names a start-up variable keeps its pinned reason` pass a `helperRoot` and assert the reason string, so it can fail on the ordering it names.
-- [ ] Add a test that `mapfile`, `readarray`, `getopts`, `trap`, `compgen` and `wait` classify `mutating` with reason `unrecognised-command: <name> (fail-closed)`, locking the dependency. `set` and `shift` are recognised commands that classify `runnable` today; pin their verdict for the plain forms (`set -- a`, `shift`) in a separate case, and decide in Phase 3 whether the allow-list changes it (record the decision in the plan).
-- [ ] Mutation-prove both.
+- [x] Make `task.293 a helper call that also names a start-up variable keeps its pinned reason` pass a `helperRoot` and assert the reason string, so it can fail on the ordering it names.
+- [x] Add a test that `mapfile`, `readarray`, `getopts`, `trap`, `compgen` and `wait` classify `mutating` with reason `unrecognised-command: <name> (fail-closed)`, locking the dependency. `set` and `shift` are recognised commands that classify `runnable` today; pin their verdict for the plain forms (`set -- a`, `shift`) in a separate case, and decide in Phase 3 whether the allow-list changes it (record the decision in the plan).
+- [x] Mutation-prove both.
 
 ## 7. Files Summary
 
@@ -176,26 +177,26 @@ Population commands: `git grep -ln "qa-execute-snippets" -- 'skills/*/references
 
 **Functional**
 
-- [ ] The three residual shapes from QA report 9 classify `mutating`, each shown first to write a marker file under real bash. Evidence: the real-bash table in `qa-execute-snippets.test.mjs`.
-- [ ] The control table of ordinary safe blocks stays `runnable`.
-- [ ] The differential run writes nothing: 0 writes, with the block count recorded in the QA report.
+- [x] The three residual shapes from QA report 9 classify `mutating`, each shown first to write a marker file under real bash. Evidence: the real-bash table in `qa-execute-snippets.test.mjs`.
+- [x] The control table of ordinary safe blocks stays `runnable`.
+- [x] The differential run writes nothing: 0 writes, with the block count recorded in the QA report.
 
 **Performance**
 
-- [ ] The docs-scan median over five runs is within +10% of the pre-change median, with `uptime` recorded beside each run, in the QA report.
-- [ ] The differential slice median over five runs is under 10 s, recorded in the QA report with load.
+- [x] The docs-scan median over five runs is within +10% of the pre-change median, with `uptime` recorded beside each run, in the QA report.
+- [x] The differential slice median over five runs is under 10 s, recorded in the QA report with load.
 
 **Code quality**
 
-- [ ] `CI=true` suite green; `prettier --check` and lint pass on every changed `.mjs`.
-- [ ] `npm run bundle:check` reports 0 problems.
-- [ ] Every change is mutation-proven: the QA report names the reverted behaviour and the red test for each.
-- [ ] The two gate-9 cleanups are done, each mutation-proven (QA report).
+- [x] `CI=true` suite green; `prettier --check` and lint pass on every changed `.mjs`.
+- [x] `npm run bundle:check` reports 0 problems.
+- [x] Every change is mutation-proven: the QA report names the reverted behaviour and the red test for each.
+- [x] The two gate-9 cleanups are done, each mutation-proven (QA report).
 
 **Migration**
 
-- [ ] `CHANGELOG.md` cites `(task 294)`.
-- [ ] Every documentation block newly refused is listed in the QA report with its reason (the count is stated and the number of newly runnable blocks is 0).
+- [x] `CHANGELOG.md` cites `(task 294)`.
+- [x] Every documentation block newly refused is listed in the QA report with its reason (the count is stated and the number of newly runnable blocks is 0).
 
 ## 10. Risk Assessment
 
@@ -235,11 +236,11 @@ Population commands: `git grep -ln "qa-execute-snippets" -- 'skills/*/references
 
 ## Progress Tracking
 
-- [ ] Phase 1
-- [ ] Phase 2
-- [ ] Phase 3
-- [ ] Phase 4
-- [ ] Phase 5
+- [x] Phase 1
+- [x] Phase 2
+- [x] Phase 3
+- [x] Phase 4
+- [x] Phase 5
 
 ## QA Testing Results
 
