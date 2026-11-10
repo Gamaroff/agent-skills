@@ -1,0 +1,58 @@
+schema: 2
+task: 'task.294.qa-snippet-classifier-allow-list'
+task_title: 'QA snippet classifier allow-list'
+gate: PASS
+status_reason: 'The three task-293 residual shapes now classify mutating (each shown writing under real bash); controls stay runnable; 392/392 tests; 31 boundary probes, 0 escaped. One high review finding (git -c / GIT_* evaluation) reproduces but is identical on the base and outside this task scope, so it is a follow-up, not a gate issue.'
+reviewer: 'QA Engineer'
+head: '291d7750a4db37cc96f8569f28906790041e545d'
+updated: '2026-11-10T21:30:18Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 392
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 31
+    escaped: 0
+    boundary: true
+    boundary_signals: ["refused"]
+    notes: 'isRunnableBlock probed with the shell-exec corpus: 31 executed, 0 reproduced, 0 escaped. The pre-existing git -c / GIT_* evaluation gap is recorded under recommendations.future.'
+  performance:
+    status: PASS
+    notes: 'Docs scan median 1102 ms vs 1160 ms on the base (5 runs each, load about 3.1). Differential slice median 4.38 s, under the 10 s bound.'
+  reliability:
+    status: PASS
+    notes: 'Fail-closed: an unclassifiable word is refused. Linear sweep; a 20000-deep nest takes 155 ms.'
+  maintainability:
+    status: PASS
+    notes: 'One tokenization, one sweep, closed lists in constants; docs section 2a-iii and CHANGELOG added; bundled copies current (bundle:check 0 problems).'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'git can execute a plain-literal string: git -c core.fsmonitor=... status and GIT_TRACE=<path> git log classify runnable and write under bash (GIT_EXTERNAL_DIFF and GIT_CONFIG_COUNT/KEY/VALUE are the same class). Identical verdict on origin/develop, so pre-existing (CR-1 high/high, CR-2 medium/medium). git is also in NON_EVALUATING_COMMANDS, so its operands skip the plain-text check. Give git a subcommand and option allow-list, and refuse GIT_* env prefixes. Measure first: git -c core.quotePath=false diff appears in shipped runnable blocks, so a blanket refusal costs real blocks.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+      provenance: pre-existing
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
