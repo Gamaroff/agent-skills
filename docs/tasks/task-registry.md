@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-11-10
-**Next Available Task Number:** **296**
+**Next Available Task Number:** **297**
 
 ## How to use
 
@@ -410,3 +410,4 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 293 | [QA snippet classifier refuses indirect evaluation](task.293.qa-snippet-classifier-indirect-evaluation/task.293.qa-snippet-classifier-indirect-evaluation.md) | accepted | refactoring | Medium | 2026-11-10 | task.292 | task 292 follow-up: closes T292-CR-1..3 (printf -v and similar subscript operands, PS4 and ${x@P}, quoted data re-evaluated as arithmetic) as one class; the WORD/assignment-regex migration is a separate, optional task |
 | 294 | [QA snippet classifier allow-list](task.294.qa-snippet-classifier-allow-list/task.294.qa-snippet-classifier-allow-list.md) | planned | refactoring | Medium | 2026-11-10 | task.293 | task 293 follow-up: run a block only when every word is a known-safe literal, closing the three documented residuals (printf octal launder, a [ or $ arriving by expansion, a literal split across quote tokens); folds in the two gate-9 test cleanups |
 | 295 | [Run the test suite on the LAN server (test:remote)](task.295.test-remote-lan-server-route/task.295.test-remote-lan-server-route.md) | accepted | infrastructure | Medium | 2026-11-10 | — | — handoff from a tinker-city session: `npm run test:remote` syncs the tree to the .249 LAN server, runs the root scripts there in a CI-parity container, exits with their status; the overheating laptop only syncs and prints · six phases |
+| 296 | [test:remote per-run lock and image-tag prune](task.296.test-remote-per-run-lock-and-image-prune/task.296.test-remote-per-run-lock-and-image-prune.md) | planned | infrastructure | Low | 2026-11-10 | task.295 | follow-up to task 295: an atomic per-run lock replaces the best-effort container-name guard, and `--prune-images` removes old `agent-skills-test` tags · four phases |
