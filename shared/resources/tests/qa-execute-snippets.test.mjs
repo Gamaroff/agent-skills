@@ -43,6 +43,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const MODULE = join(__dirname, "..", "qa-execute-snippets.mjs");
 
 const {
+  allowListViolation,
   COMMAND_RUNNERS,
   DENY_PATTERNS,
   main,
@@ -65,6 +66,13 @@ const {
   unescapeCell,
   zshAvailable,
 } = await import(MODULE);
+
+// task.294: the word allow-list is the LAST layer of `classifyBlock`. A test about an EARLIER layer
+// (the tokenizer, the deny-list, the helper rules) that holds a block the allow-list now refuses
+// asserts through `beforeAllowList`, so it keeps proving what it was written to prove; the
+// allow-list's own verdict on that block is pinned by the task.294 tests below.
+const beforeAllowList = (code, bindings = {}, opts = {}) =>
+  classifyBlock(code, bindings, { ...opts, allowList: false });
 
 const TEMP_DIRS = [];
 function tmp() {
@@ -296,8 +304,16 @@ test("a command substitution's inner command is scanned, not swallowed", () => {
 test("arithmetic expansion is arithmetic, not an invocation", () => {
   // `$((N + 1))` used to become a segment whose first token was `N`, reported as
   // an unrecognised command — so a read-only block was skipped as mutating.
+  const block = 'N=$(ls | wc -l)\nif [ -n "$N" ]; then M=$((N + 1)); fi';
+  assert.equal(beforeAllowList(block).klass, "runnable");
+  // task.294: a bare name inside `$((…))` is evaluated by bash, so the allow-list refuses it. The
+  // same block over digits stays runnable.
+  assert.match(
+    classifyBlock(block).reason,
+    /^not-allow-listed: arithmetic expansion/,
+  );
   assert.equal(
-    classifyBlock('N=$(ls | wc -l)\nif [ -n "$N" ]; then M=$((N + 1)); fi')
+    classifyBlock('N=$(ls | wc -l)\nif [ -n "$N" ]; then M=$((1 + 1)); fi')
       .klass,
     "runnable",
   );
@@ -1690,8 +1706,22 @@ test("BUG-6/verify: a multi-line quoted string is data, not a command position",
 });
 
 test("BUG-6/verify: a glued arithmetic evaluation is not an invocation", () => {
-  assert.equal(classifyBlock("if ((a>b)); then echo hi; fi").klass, "runnable");
-  assert.equal(classifyBlock("echo $((x>>2))").klass, "runnable");
+  assert.equal(classifyBlock("if ((1>2)); then echo hi; fi").klass, "runnable");
+  assert.equal(classifyBlock("echo $((1>>2))").klass, "runnable");
+  // task.294: the same shapes over names are evaluated by bash, so only the earlier layers admit them.
+  assert.equal(
+    beforeAllowList("if ((a>b)); then echo hi; fi").klass,
+    "runnable",
+  );
+  assert.equal(beforeAllowList("echo $((x>>2))").klass, "runnable");
+  assert.match(
+    classifyBlock("if ((a>b)); then echo hi; fi").reason,
+    /^not-allow-listed: arithmetic command/,
+  );
+  assert.match(
+    classifyBlock("echo $((x>>2))").reason,
+    /^not-allow-listed: arithmetic expansion/,
+  );
   // But one carrying a command substitution still reaches the fail-closed path.
   assert.equal(classifyBlock("((a+$(touch /tmp/x)))").klass, "mutating");
 });
@@ -4696,6 +4726,7 @@ test("task.292 the tokenizer's consumers are counted, and each scan still reads 
     "collapseQuotedSpans",
     "stripProse",
     "indirectEvaluationHazard", // task.293: reads quote spans to find a literal substitution
+    "allowListViolation", // task.294: classes every character by its innermost token
   ];
   // Composed consumers: the scan reads the tokenizer through the named direct consumers.
   const COMPOSED = { stripNonCode: ["collapseQuotedSpans", "stripProse"] };
@@ -4914,8 +4945,14 @@ for (const [name, code] of Object.entries(T292_ARITH_SUBST)) {
 test("task.292 control (T292-QA-2): plain arithmetic stays runnable", () => {
   assert.equal(classifyBlock("echo $((1))\n").klass, "runnable");
   assert.equal(classifyBlock("echo $((1+2)) hi\n").klass, "runnable");
-  assert.equal(classifyBlock("n=$((n + 1))\n").klass, "runnable");
   assert.equal(classifyBlock("echo $((1+2)) ; echo done\n").klass, "runnable");
+  // task.294: a bare name in arithmetic is evaluated by bash; the earlier layers admit it, the
+  // allow-list does not.
+  assert.equal(beforeAllowList("n=$((n + 1))\n").klass, "runnable");
+  assert.match(
+    classifyBlock("n=$((n + 1))\n").reason,
+    /^not-allow-listed: arithmetic expansion/,
+  );
 });
 test("task.292 tokenizer refuses a substitution inside $(( ))", () => {
   assert.throws(
@@ -5275,38 +5312,294 @@ test("task.293 each refusal is held on an input where it alone decides", () => {
   }
 });
 
-test("task.293 safe blocks near the class stay runnable", () => {
-  for (const code of [
-    "echo '$(date)'", // a quoted literal that is only printed
-    "x=5; echo $((x + 1))", // arithmetic over a number
-    "n=3; [[ $n -eq 3 ]] && echo ok",
-    "echo PS4", // a mention, not a prompt variable set
-    "grep -n 'PS1' docs/x.md", // a pattern
-    'printf "%s\\n" hello',
-    "a=(1); echo ${a[0]}", // a plain subscript
-    'n=$(wc -l < f); echo "$n"', // built by expansion, never read as arithmetic
-    'x=5; y="$x"; echo hi', // an expanded value with no arithmetic read
-    "[ -f x ] && echo ok", // the test command, not a subscript
-    "x=a'[5]'; echo $((x))", // QA-3 control: no substitution in the literal
-    "echo 'a[5]' | { read x; echo $((x)); }", // QA-4 control
-    "echo 'run $(date)'; x=5", // a printed literal, nothing evaluates a value
-    "a=([0'5']=1); echo hi", // QA-9 control: a subscript quote, no substitution
-    "a=([0+(1)'5']=1); echo hi", // QA-10 control: parens in the subscript, no substitution
-    "a=([';'0'5']=1); echo hi", // QA-11 control: a quoted separator, no substitution
-    "[[ a\\[5\\] -eq 1 ]]", // QA-7 control: escaped, no substitution
-    "printf -v a\\[5\\] x", // QA-7 control
-    "echo a\\[\\$\\(date\\)\\]", // an escaped literal that is only printed
-    "# note: $(cmd) and `x` in a comment\n[[ 1 -eq 1 ]]", // a comment is not a literal
-    "set -- 2; echo ${@:$1}", // QA-5 control: no substitution literal
-    "set -- 0; v=(1); echo ${v[$1]}", // QA-6 control: a subscript, no literal
-  ]) {
-    assert.equal(classifyBlock(code).klass, "runnable", code);
+// task.293's controls hold blocks the EARLIER layers must not refuse (no substitution in the literal,
+// nothing evaluates a value). task.294's allow-list is stricter on purpose: where a block reaches an
+// evaluating context (a name inside arithmetic, a `${…}` operator, a subscripted assignment) it is
+// refused whether or not the value happens to be harmless, because proving that is the thing the
+// allow-list declines to do. Each control therefore states BOTH verdicts.
+const T293_CONTROLS = [
+  // [block, allow-list verdict: null = stays runnable, else the refusal's reason]
+  ["echo '$(date)'", null], // a quoted literal that is only printed
+  ["x=5; echo $((x + 1))", /arithmetic expansion with a name/],
+  ["n=3; [[ $n -eq 3 ]] && echo ok", /arithmetic \[\[ test/],
+  ["echo PS4", null], // a mention, not a prompt variable set
+  ["grep -n 'PS1' docs/x.md", null], // a pattern
+  ['printf "%s\\n" hello', null],
+  ["a=(1); echo ${a[0]}", /expansion form \$\{/], // a plain subscript
+  ['n=$(wc -l < f); echo "$n"', null], // built by expansion, never read as arithmetic
+  ['x=5; y="$x"; echo hi', null], // an expanded value with no arithmetic read
+  ["[ -f x ] && echo ok", null], // the test command, not a subscript
+  ["x=a'[5]'; echo $((x))", /arithmetic expansion with a name/], // QA-3 control
+  [
+    "echo 'a[5]' | { read x; echo $((x)); }",
+    /arithmetic expansion with a name/,
+  ], // QA-4
+  ["echo 'run $(date)'; x=5", null], // a printed literal, nothing evaluates a value
+  ["a=([0'5']=1); echo hi", /command word that is not a plain name/], // QA-9
+  ["a=([0+(1)'5']=1); echo hi", /command word that is not a plain name/], // QA-10
+  ["a=([';'0'5']=1); echo hi", /command word that is not a plain name/], // QA-11
+  ["[[ a\\[5\\] -eq 1 ]]", /arithmetic \[\[ test/], // QA-7 control: escaped, no substitution
+  ["printf -v a\\[5\\] x", /non-literal word as an operand of printf/], // QA-7 control
+  ["echo a\\[\\$\\(date\\)\\]", null], // an escaped literal that is only printed
+  ["# note: $(cmd) and `x` in a comment\n[[ 1 -eq 1 ]]", null], // a comment is not a literal
+  ["set -- 2; echo ${@:$1}", /expansion form \$\{/], // QA-5 control
+  ["set -- 0; v=(1); echo ${v[$1]}", /expansion form \$\{/], // QA-6 control
+];
+test("task.293 safe blocks near the class stay runnable (earlier layers), and task.294 states the allow-list verdict", () => {
+  for (const [code, refusal] of T293_CONTROLS) {
+    assert.equal(beforeAllowList(code).klass, "runnable", code);
+    const now = classifyBlock(code);
+    if (refusal === null) assert.equal(now.klass, "runnable", code);
+    else {
+      assert.equal(now.klass, "mutating", code);
+      assert.match(now.reason, /^not-allow-listed: /, code);
+      assert.match(now.reason, refusal, code);
+    }
   }
 });
 
 test("task.293 a helper call that also names a start-up variable keeps its pinned reason", () => {
   // The direct-use refusal sits after the helper rule, so the `helper call with …` strings other
-  // tests pin are unchanged for a helper call.
-  const v = classifyBlock("export PS4='$(mv a b)'; bash h/read.sh", {}, {});
-  assert.equal(v.klass, "mutating");
+  // tests pin are unchanged for a helper call. task.294 passes a REAL helper root: without one the
+  // `bash` call is not a helper call at all, the helper rule never runs, and the test pinned only
+  // that the block is mutating, which the direct-use refusal alone would also give.
+  const root = helperFixture();
+  const withHelper = classifyBlock(
+    `export PS4='$(mv a b)'; bash ${R}/read.sh x`,
+    {},
+    { helperRoot: root },
+  );
+  assert.equal(withHelper.klass, "mutating");
+  assert.match(
+    withHelper.reason,
+    /^helper call with a shell start-up variable set \(BASH_ENV, ENV, SHELLOPTS, BASHOPTS, PS4\)$/,
+  );
+  // The same assignment with no helper call is the direct-use refusal, a different reason.
+  const direct = classifyBlock(
+    "export PS4='$(mv a b)'; true",
+    {},
+    { helperRoot: root },
+  );
+  assert.match(direct.reason, /^indirect-evaluation: a prompt variable/);
+});
+
+// ── task.294 — the word allow-list ─────────────────────────────────────────────────────────────
+// Task 293 refused indirect evaluation by listing the shapes it had seen, and each widening lost to
+// the next carrier. The allow-list inverts it: a block is `runnable` only when every non-literal word
+// is in a form and a position on a closed list, so the next spelling needs no new rule.
+//
+// The residual shapes below were measured as `runnable` on cbaaf0e9 (the base of this task): each one
+// writes a file under real bash and the classifier admitted it. They are the table the claim is held
+// to. Every row is run under real bash first (a marker file must appear), then held against the
+// classifier with the allow-list OFF (it must be `runnable`, which is what makes the row red on the
+// old code) and ON (it must be refused by the allow-list, not by a rule that was already there).
+const T294_RESIDUALS = {
+  "stored substitution holding an octal-escaped dollar, read as arithmetic":
+    "x=$(printf 'a[\\044(touch W)]'); echo $((x))",
+  "value assembled from variables, the dollar arriving by expansion":
+    "b='['; d='$'; x=\"a${b}${d}(touch W)]\"; echo $((x))",
+  "adjacent quotes splice the dollar away from its parenthesis, via read":
+    'read x <<< "a[$""(touch W)]"; echo $((x))',
+  "adjacent quotes splice the dollar away from its parenthesis, via printf -v":
+    'printf -v x %s "a[$""(touch W)]"; echo $((x))',
+};
+
+// Spellings of the same hole that the earlier layers already refuse (the tokenizer fails closed on
+// `$[`, and a subscripted assignment is not a recognised command). They are run under real bash and
+// pinned `mutating` so the table of residuals is not the only thing standing between them and `runnable`.
+const T294_ALREADY_HELD = {
+  "the same value as an array subscript":
+    "x=$(printf 'a[\\044(touch W)]'); arr[x]=1",
+  "the same value inside the legacy $[ ] arithmetic":
+    "x=$(printf 'a[\\044(touch W)]'); echo $[x]",
+};
+const writesUnderBash = (code) => {
+  const dir = mkdtempSync(join(tmp(), "r-"));
+  spawnSync("bash", ["-c", code.replaceAll("W", "marker")], {
+    cwd: dir,
+    timeout: CLI_BUDGET.timeoutMs,
+  });
+  return existsSync(join(dir, "marker"));
+};
+test("task.294 every residual shape writes under real bash, was admitted before, and is refused now", () => {
+  for (const [name, code] of Object.entries(T294_RESIDUALS)) {
+    assert.ok(
+      writesUnderBash(code),
+      `${name}: bash did not run the substitution, so the row does not reproduce`,
+    );
+    assert.equal(
+      beforeAllowList(code).klass,
+      "runnable",
+      `${name}: an earlier layer already refuses this, so the row does not need the allow-list`,
+    );
+    const v = classifyBlock(code);
+    assert.equal(v.klass, "mutating", name);
+    assert.match(v.reason, /^not-allow-listed: /, name);
+  }
+});
+test("task.294 spellings the earlier layers already hold also write under bash and stay refused", () => {
+  for (const [name, code] of Object.entries(T294_ALREADY_HELD)) {
+    assert.ok(writesUnderBash(code), `${name}: does not reproduce`);
+    assert.equal(classifyBlock(code).klass, "mutating", name);
+  }
+});
+
+test("task.294 control blocks stay runnable", () => {
+  for (const code of [
+    "echo hello",
+    "ls docs | grep -c md",
+    "grep -rn 'needle' docs/",
+    'for f in docs/*.md; do echo "$f"; done',
+    'if [ -f "$1" ]; then cat "$1"; fi',
+    'n=$(wc -l < notes.txt); echo "$n"',
+    'G=$(ls *.yml | sort -n | tail -1); [ "${R:-0}" -ge "$G" ]', // task-77's predicate
+    "echo $((1 + 2 * 3))",
+    "if ((1 > 2)); then echo hi; fi",
+    "\\ls -la",
+    'find docs -name "a$"',
+    'case "$T" in\n  *[!0-9]*) echo branch ;;\n  *) echo number ;;\nesac',
+    "git log --oneline -n 3",
+  ]) {
+    assert.equal(
+      classifyBlock(code, { T: "x", R: "1", G: "1" }).klass,
+      "runnable",
+      code,
+    );
+  }
+});
+
+// What the allow-list refuses, one input each, so a rule deleted from it turns exactly one row red.
+const T294_REFUSALS = {
+  "a name inside $(( ))": [
+    "n=3; echo $((n))",
+    /^arithmetic expansion with a name/,
+  ],
+  "a name inside (( ))": [
+    "if ((a>b)); then echo hi; fi",
+    /^arithmetic command with a name/,
+  ],
+  "a name in a [[ arithmetic test": [
+    "n=3; [[ n -eq 3 ]]",
+    /^an arithmetic \[\[ test with a name/,
+  ],
+  "an expansion operator": ["echo ${v:1}", /^expansion form \$\{/],
+  "a $ before a double quote": ['echo $"x"', /^expansion form \$"/],
+  "ANSI-C quoting": ["echo $'a'", /^ANSI-C or locale quote/],
+  "legacy arithmetic": ["echo $[1+2]", null], // refused by the tokenizer (fail-closed), not by a rule
+  "a subscripted element inside an array assignment": [
+    "a=([1]=2); echo hi",
+    /^a command word that is not a plain name/,
+  ],
+  "test -v": ["[ -v x ]", /^test operator -v/],
+  "a non-literal operand of read": [
+    'read "$x" <<< 1',
+    /^a non-literal word as an operand of read/,
+  ],
+  "a subscript in a literal operand of unset": [
+    "unset 'a[1]'",
+    /^an operand of unset that is not a plain literal/,
+  ],
+};
+test("task.294 each refusal is held on an input where it alone decides", () => {
+  for (const [name, [code, why]] of Object.entries(T294_REFUSALS)) {
+    const bound = { x: "1", c: "echo", v: "1", a: "1", b: "1" };
+    const bare = beforeAllowList(code, bound).klass;
+    const v = classifyBlock(code, bound);
+    assert.equal(v.klass, "mutating", `${name}: ${code}`);
+    if (why === null) continue;
+    assert.equal(
+      bare,
+      "runnable",
+      `${name}: an earlier layer already refuses ${code}`,
+    );
+    assert.match(v.reason, /^not-allow-listed: /, name);
+    assert.match(v.reason.replace(/^not-allow-listed: /, ""), why, name);
+  }
+});
+
+// These rules guard words the first layer already refuses today (`let`, `declare` and a parameter
+// command word are not in the command table, `>(…)` is a write redirection). The allow-list's own
+// rule is held by calling it directly, so a command added to the table later does not arrive with an
+// unproven rule.
+const T294_DIRECT = {
+  "a name handed to let": ["n=3; let n", /^let with a name/],
+  "output process substitution": [
+    "echo x > >(cat)",
+    /^output process substitution/,
+  ],
+  "declare -i": [
+    "declare -i n=1",
+    /^declare with an arithmetic or name-reference attribute/,
+  ],
+  "declare -n": [
+    "declare -n r=x",
+    /^declare with an arithmetic or name-reference attribute/,
+  ],
+  "a command word built from a parameter": [
+    "$c x",
+    /^a non-literal command word/,
+  ],
+};
+test("task.294 rules a first-layer refusal pre-empts are held by calling the allow-list directly", () => {
+  for (const [name, [code, why]] of Object.entries(T294_DIRECT))
+    assert.match(allowListViolation(code), why, name);
+  assert.equal(allowListViolation("let 1+2"), null);
+  assert.equal(allowListViolation("declare x=1"), null);
+});
+
+// The second layer holds without the first. `allowListViolation` is exported so the claim "the
+// allow-list does not depend on task 293's rules" is a test and not a sentence: every residual row is
+// refused by it alone. The boundary is pinned the other way too — a prompt-variable literal is the
+// first layer's, and the allow-list alone admits it.
+test("task.294 defeat the first layer: the allow-list alone refuses every residual shape", () => {
+  // A throw is the tokenizer failing closed, which the classifier turns into `mutating`.
+  const refused = (code) => {
+    try {
+      return allowListViolation(code);
+    } catch {
+      return "tokenizer refused";
+    }
+  };
+  for (const [name, code] of Object.entries({
+    ...T294_RESIDUALS,
+    ...T294_ALREADY_HELD,
+  }))
+    assert.notEqual(refused(code), null, name);
+  assert.equal(
+    allowListViolation("PS4='$(touch W)'; set -x; true"),
+    null,
+    "a quoted literal is data to the allow-list; the prompt-variable rule is the first layer's",
+  );
+  assert.match(
+    beforeAllowList("PS4='$(touch W)'; set -x; true").reason,
+    /^indirect-evaluation: a prompt variable/,
+  );
+});
+
+test("task.294 the first layer holds without the allow-list", () => {
+  for (const [name, code] of Object.entries(T293_SHAPES)) {
+    const v = beforeAllowList(code);
+    assert.equal(v.klass, "mutating", name);
+    assert.match(v.reason, /^indirect-evaluation: /, name);
+  }
+});
+
+// Phase 5 — what task 293's QA left unpinned. `set` and `shift` are in the command table and are
+// runnable in their plain form (measured 2026-11-10); the six below are not in it.
+test("task.294 mapfile readarray getopts trap compgen wait are refused as unrecognised commands", () => {
+  for (const word of [
+    "mapfile",
+    "readarray",
+    "getopts",
+    "trap",
+    "compgen",
+    "wait",
+  ]) {
+    const v = classifyBlock(`${word} x`);
+    assert.equal(v.klass, "mutating", word);
+    assert.match(v.reason, /^unrecognised-command: /, word);
+  }
+});
+test("task.294 set and shift stay runnable in their plain form", () => {
+  assert.equal(classifyBlock("set -- a b; shift; echo done").klass, "runnable");
 });

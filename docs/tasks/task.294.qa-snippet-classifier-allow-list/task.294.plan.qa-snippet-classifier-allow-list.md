@@ -29,6 +29,18 @@ Candidate lists to score against the 256:
 
 Record the count that stays runnable for each, and the choice. Prefer the smallest list whose cost is acceptable, because every admitted class is a place to be wrong.
 
+#### Phase 1 decision (recorded 2026-11-10, develop iteration 1)
+
+**Measurement.** Definition: the 256 blocks `qa-snippets-docscan` reports as `runnableBase` (every fenced `bash` block of every `git ls-files '*.md'` file that `classifyBlock` calls `runnable`). Command: a scratchpad script (not committed) that runs `extractBlocks` and `classifyBlock` over `git ls-files '*.md'`, drops comments, heredoc bodies and single-quoted spans with `tokenize()`, and tests regexes on what is left. Raw-text feature counts over the 256: `$(` 22, `${` 6, `$name` 26, backtick 1, backslash 54, glob chars 83, `[` 37, `$((` 2. Candidate counts that stay runnable: A (literal-only) 97, B (A plus `$name`/`${…}`) 105, C (B plus `$(…)` and `[`) 136. These regexes read raw text, so they overstate the cost (a backslash-newline join and a `[` inside quotes count); the cost that counts is the one the implemented rule gives, measured by the docs scan in Phase 4.
+
+**Rejected: an evaluator-scoped check ("refuse a non-literal word only in a block that holds `read`, `printf -v`, `$((` …").** Scored 236 of 256 staying runnable, but it is a deny-list of evaluating constructs: any evaluator not on it is admitted, which is what task 293 spent nine gates on. Advisor review before coding flagged it for that reason.
+
+**Chosen: allow-list of forms plus allow-list of commands.** A non-literal form is admitted only as (1) a plain parameter (`$name`, `${name}`, `$1`, `$?`, `$#`, `$@`, `$*`, `$$`, `$!`) or (2) a command substitution `$(…)` / backtick whose body is itself checked the same way. Every other form is `not-allow-listed`: `$((…))`, `$[…]`, `${x<operator>…}`, `$'…'`, `$"…"`, a `$` before a quote, a backslash outside single quotes, process substitution. A word holding a non-literal form may appear only as an operand of a command in `NON_EVALUATING_COMMANDS` (the safe table minus `test`, plus `cd` and the safe `git` subcommands), or as the right-hand side of a plain `name=` assignment. `((`, `let`, `$((…))` and the arithmetic operators of `[[` take operands that are digits and operators only, because a bare name in arithmetic position is evaluated. `declare`/`typeset`/`local` with `-i` or `-n` are refused. An unknown construct is refused, not admitted.
+
+**Revised during implementation (2026-11-10).** The first draft also refused every stored command substitution (`x=$(…)`) and every non-digit operand of an arithmetic test. That broke real shipped blocks pinned by task 191 (`REVIEW_N=$(next_numbered …)`) and task 77's predicate, and the docs scan showed 21 of 256 blocks lost. Measured under real bash and zsh: `[` and `test` evaluate no operand and only bash's `[[` does. So storing a value is admitted (storing is not the hazard, evaluating is), the arithmetic-operand rule applies to `[[` only, and a literal operand of a builtin outside the table must hold none of `[`, `]`, `$`, a backtick or a backslash. Added `${name:-lit}`-style defaults, and a rule that a command word never holds `=` (a subscripted assignment is evaluated by bash). Docs-scan cost fell to 5 of 256.
+
+**Bounded claim.** The list covers the forms and commands above. A bare variable name evaluated by a construct this rule does not read as arithmetic is outside it; the differential atoms and the QA gates probe that boundary, and any finding is a row for the table, not a new rule.
+
 ### Phase 2: Tests first
 
 **Files to modify:** `shared/resources/tests/qa-execute-snippets.test.mjs`.
@@ -60,7 +72,7 @@ Defeat-the-first-layer test: call the existing refusal path with the allow-list 
 ### Phase 5: The two cleanups
 
 - In the test at `qa-execute-snippets.test.mjs:5307`, pass a `helperRoot` and assert the exact `helper call with …` reason string. Mutation: swap the order of the helper rule and the start-up rule; the test must go red.
-- Add `task.294 set mapfile readarray getopts trap compgen wait shift are refused as unrecognised commands`, asserting `mutating` with a reason starting `unrecognised-command`. Mutation: add one of the eight to the command table; the test must go red.
+- Add `task.294 mapfile readarray getopts trap compgen wait are refused as unrecognised commands`, asserting `mutating` with a reason starting `unrecognised-command`. Mutation: add one of the six to the command table; the test must go red. `set` and `shift` are in the command table and classify `runnable` today (measured 2026-11-10), so they are not in this test; pin their plain-form verdict in a separate case.
 
 ## Key Patterns and References
 

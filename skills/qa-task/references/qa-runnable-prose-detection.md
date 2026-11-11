@@ -284,20 +284,54 @@ reproduce under real bash, and a block holding one is `mutating` with a reason t
   inside it (a `sed` pattern such as `([0-9]+)`) is not a subscript, which is why the shipped helpers
   that count with `n=$(sed …); $((n + 1))` stay runnable.
 
-The claim is **bounded**, not "any indirect evaluation": the table in `qa-execute-snippets.test.mjs`
-(`task.293 — indirect evaluation`) lists the shapes, and the `indirect` atom set of the differential
-(`npm run qa-snippets:differential -- --atoms indirect`) generates their combinations. **Known
-unseen shapes:** a value laundered through a command's output with the substitution spelled by an
-escape (`x=$(printf 'a[\044(cmd)]'); echo $((x))`; the plain `y=$(echo 'a[$(cmd)]')` form is now
-refused by the block-level rule); the `[` or `$` itself arriving by expansion (`b='['; x="a${b}…"`);
-and a literal **split across adjacent quote tokens**, so that no `$(` or backtick exists in the
-source (`read x <<< "a[$""(cmd)]"; echo $((x))`, the same through `printf -v`; found by the fifth QA
-gate of task 293, which ended the QA budget). All three reproduce under bash and are recorded, not
-closed. Text-level detection of the literal has been widened four times and each widening lost to a
-new carrier, so the remainder is not another patch: it needs an allow-list design (run only blocks
-whose every word is a known-safe literal), filed as its own task. The rule sits after the helper
-rule on purpose, so a helper call that also names a start-up variable keeps its `helper call with …`
-reason. A documentation block that needs one of these shapes is rewritten to avoid the indirection.
+The claim of this section is **bounded**, not "any indirect evaluation": the table in
+`qa-execute-snippets.test.mjs` (`task.293 — indirect evaluation`) lists the shapes, and the `indirect`
+atom set of the differential (`npm run qa-snippets:differential -- --atoms indirect`) generates their
+combinations. Text-level detection of the literal was widened four times and each widening lost to a
+new carrier, so what it could not see (a value laundered through a command's output with the
+substitution spelled by an escape, the `[` or `$` itself arriving by expansion, a literal split
+across adjacent quote tokens; all three reproduced under bash) is closed by the word allow-list in
+§2a-iii, not by a fifth patch. The rule here sits after the helper rule on purpose, so a helper call
+that also names a start-up variable keeps its `helper call with …` reason.
+
+### 2a-iii. Every non-literal word must be on a closed list (task 294)
+
+A block the rules above admit is then checked **word by word**, and it is `runnable` only when every
+non-literal word is in a form and a position on a closed list. Anything else is `mutating` with a reason
+that starts `not-allow-listed:`. The question is inverted on purpose: the rules above name what is
+refused, and each lost to the next spelling; this one names what is admitted, so the next spelling
+needs no new rule, because it is not on the list.
+
+- **Forms admitted.** A plain parameter (`$name`, `${name}`, `${#name}`, `$1`, `$?`, `$@` …), a
+  parameter with a literal default (`${name:-lit}`, `${name:+lit}`), a command substitution or
+  backtick whose body passes the same check, and `<(cmd)`. Refused: `$((…))` over anything but digits
+  and operators, `$[…]`, every other `${…}` operator (`:=`, `:offset`, `/`, `@P`, `!`, a subscript),
+  `$'…'`, `$"…"`, a `$` before a quote, `>(cmd)`.
+- **Positions admitted.** A non-literal word may be an operand of a command in the command table, or
+  the right-hand side of a plain `name=` assignment, **whatever it holds**. Storing is not the hazard;
+  evaluating is. A builtin that is not in the table takes a **literal** operand only, and the operand
+  must hold none of `[`, `]`, `$`, a backtick or a backslash, because a subscript or an expansion needs
+  one of them. A command word never holds `=` (`arr[x]=1` and `[x]=3` are assignments bash evaluates),
+  and is never built from a parameter or a substitution.
+- **Evaluating contexts take digits and operators only.** `$((…))`, `((…))`, `let`, and the operands
+  of `-eq -ne -lt -le -gt -ge` in `[[`. Measured under real bash and zsh on 2026-11-10: `[` and `test`
+  evaluate no operand, so they are not restricted; `[[` evaluates a bare name, a subscript and a `$(`
+  inside one. `test -v` and `[[ -v … ]]` are refused, and `declare`/`typeset`/`local`/`readonly`/`export`
+  with `-i`, `-n` or `-I`.
+
+**Cost, measured on cbaaf0e9 with `npm run qa-snippets:docscan`:** 256 documentation blocks were
+`runnable` before and 251 are now. The five newly refused hold a bare name inside arithmetic (2), a
+`${…}` operator (2) and an ANSI-C quote (1). No block became newly runnable. Cost on the shipped
+helpers: none; `REVIEW_N=$(next_numbered …)` and the task-77 predicate stay runnable.
+
+**Bounded claim.** The allow-list covers the forms, positions and commands above. It does not track a
+value, so a variable that bash itself evaluates (`PS1`–`PS4`, `PROMPT_COMMAND`) is task 293's
+prompt-variable rule, which runs first; the allow-list alone admits `PS4='$(cmd)'` and the test
+`task.294 defeat the first layer` pins that boundary both ways. A bare name evaluated by a construct
+this section does not read as arithmetic is outside it. The `residual` atom set of the differential
+generates the three shapes this section closed and is calibrated against the engine at `cbaaf0e9`
+(writes there, none now). A documentation block that needs a refused shape is rewritten to avoid the
+indirection.
 
 ### 2aa. Helper calls run only when the helper itself would
 
