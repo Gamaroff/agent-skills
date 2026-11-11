@@ -34,10 +34,10 @@ Make `isRunnableBlock` an allow-list so the three residual indirect-evaluation s
 | 1. create-branch           | ✅ Done | Branch `feature/task.294.*` exists in git | Branch created at `cbaaf0e9` | — | 2026-11-10T20:45Z |
 | 2. review-task             | ✅ Done | `task.294.review.1.qa-snippet-classifier-allow-list.md` exists | 8/10, READY. One Important fixed (Phase 5 set/shift claim falsified by running classifyBlock). Pre-pass subagents not dispatched: no independent read of architecture/codebase axes | —                    | 2026-11-10T21:20Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review` | Allow-list implemented inline; fast gate green on .249 (8371 pass, 0 fail); docs-scan 256 → 251, 0 newly runnable | — | 2026-11-10T21:24Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.294.qa.{N}.*.md`; `task.294.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.294.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 4. create-pr               | ✅ Done | PR URL; issue comment posted | PR #874 (`feat(qa-snippets): …`), base develop; no tracker issue linked, so no comment | — | 2026-11-10T21:24Z |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.294.qa.{N}.*.md`; `task.294.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 1 QA cycle, gate PASS 95; PR review CONCERNS, 3 doc-only findings carried and closed (PC-2 did not hold) | —                    | 2026-11-10T21:35Z |
+| 7. finalise                | ✅ Done | `task.294.dod.{N}.*.md`; task `status: accepted`                       | Two DoD runs: run 1 9/11 (two QA-record gaps, closed in `aadcf77e`), run 2 PASS 11/11 scoped; security probe 31 executed, 0 reproduced; accepted on `3e0e47c2`. CI reading 2: `test` FAILURE, overridden by the owner (see Decisions Log) | — | 2026-11-11T04:16Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Scoped commit of the report and finalise outputs | — | 2026-11-11T04:16Z |
 
 ---
 
@@ -65,6 +65,13 @@ Make `isRunnableBlock` an allow-list so the three residual indirect-evaluation s
 - Mutation proofs (each reverted, 0 markers left): allow-list call removed → 3 tests red; `$((` name check removed → 4 red; `[[` arithmetic check removed → 2 red; `=` command-word check removed → 3 red; helper-rule order swapped → the Phase 5 test red; `mapfile` added to the table → the six-word test red.
 - Differential calibration: the mixed `indirect` set formed none of the residuals in 40000 blocks on the OLD engine (instrument blind). Added a `residual` atom set: old engine 10 writes in 5000, new engine 0.
 
+### Step 7 — finalise — 2026-11-10 to 2026-11-11
+
+- **DoD run 1 ended on gaps (9/11), run 2 accepted (11/11).** Both gaps were evidence gaps in the committed QA record (per-run load on the slice timing; red tests named for three mutation proofs). They were closed by re-measuring and re-running the proofs (`aadcf77e`), then run 2 re-judged only the affected criteria. Deviation: run 1 skipped the gaps path's body section, gaps Change Log row and gaps PR comment, because the gaps were closed before any outward step. Run 2 carried compliance, docs and the security checklist from run 1 (code unchanged since `291d7750`) and re-ran the security probe.
+- **`$((` mutation proof measured 8 red, not the 4 recorded at development time.** The measured 8 is the figure of record.
+- **CI reading 2 was not green: decision for you, taken by the owner.** `test` failed on `3e0e47c2` (two attempts) on `concurrent: exactly one report block appended` in `develop-pipeline-on-precompact.test.sh`. It is also red on `develop` (runs 42892322210, 42895792179), the diff since the last green head touches only `docs/`, and it passes locally (5 of 5, and 16 in parallel) and in the CI-parity container on the LAN server. The owner chose to override the HALT, with the failure recorded; filed as bug 21 (not committed on this branch).
+- **Finalise CI poll false green:** `finalise-ci-result.txt` read `SUCCESS ... TREE_EQ=291d7750a4db` for head `3e0e47c2` while the head's own `test` was FAILURE. GitHub's check state was used instead. Recorded in bug 21 as a second defect to confirm.
+
 ---
 
 ## Issues Log
@@ -79,14 +86,28 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-11-10
+**Gate Result**: PASS (95/100)
+**Issues Found**: 0 gate issues. One pre-existing high review finding (git runs a plain-literal `-c` or `GIT_*` string; identical verdict on `origin/develop`, outside this task) routed to the gate's `recommendations.future`.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: CONCERNS — 3 document-only findings (PC-1 criteria boxes unticked, PC-2 plan checkboxes, PC-3 `pr_number` absent), no open code finding
+**Loop exit**: n/a — gate PASS with no open entry
+**Action**: Proceeding to 5c
+
+Doc-only carry applied after the PR review (no gate rerun, no code change): all 34 task-document boxes ticked once the QA report held their evidence (the five newly refused docs blocks and the five development-time mutation proofs were added to the QA report for that); `pr_number: 874` added to the frontmatter. PC-2 did not hold: the plan file has no checkboxes at all (measured, count 0), so there is nothing to tick.
+Slip: one stray `sed -i` against `/dev/null` while building a scratch probe; no file changed.
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
-**Branch**: {populated after Step 1}
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**Finished**: 2026-11-11T04:16Z
+**Final Status**: Completed (CI reading 2 overridden by the owner, see Decisions Log)
+**Branch**: `feature/task.294.qa-snippet-classifier-allow-list`
+**PR**: #874
+**QA Iterations**: 1
+**DoD Summary**: `task.294.dod.2.qa-snippet-classifier-allow-list.md` (ACCEPTED, 11/11)
+**CI reading 1**: SUCCESS @ `291d7750a4db`
+**CI reading 2**: `test` FAILURE @ `3e0e47c21056`, other five checks SUCCESS; overridden (bug 21)
+**Tracker debt**: none (no linked issue)
