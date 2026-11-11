@@ -5702,6 +5702,14 @@ const T304_FORMS = {
   // not have, which stands for the next one it adds.
   "-c behind --attr-source":
     "git --attr-source log -c core.sshCommand=./hook.sh ls-remote ssh://x/y",
+  // T304-QA-10 (cycle 5): a quote inside an operand-taking global flag hid it from one reader of
+  // the line and not the other; git unquotes the flag, takes `log` as its operand and runs `fetch`.
+  "fetch --upload-pack behind a quoted --namespace":
+    'git --names"pace" log fetch --upload-pack=./hook.sh .',
+  "fetch --upload-pack behind a wholly quoted --namespace":
+    'git --"namespace" status fetch --upload-pack=./hook.sh .',
+  "fetch --upload-pack behind a quoted --work-tree":
+    'git --work-"tree" log fetch --upload-pack=./hook.sh .',
   "--upload-pack behind --attr-source":
     "git --attr-source log ls-remote --upload-pack=./hook.sh .",
 };

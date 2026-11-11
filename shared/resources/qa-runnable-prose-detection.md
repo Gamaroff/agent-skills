@@ -359,7 +359,11 @@ operand, and a list of those fails open on every flag it forgets (`git --attr-so
 core.sshCommand=… ls-remote …` read `log` as the subcommand and ran the `-c`). The rule is now the
 reverse: a global flag before the subcommand must be one the scan knows (the operand-taking ones it
 skips, and the zero-operand ones such as `--no-pager`, `-p`, `--bare`, `--literal-pathspecs`), and any
-other flag, including one git adds next year, is refused with `an unknown git global flag`. Cost on the shipped documentation:
+other flag, including one git adds next year, is refused with `an unknown git global flag`. QA cycle 5
+closed the last way two readers could differ: the scan that admits the subcommand and the scan that
+judges the arguments each found it, on different text, and a quote inside an operand-taking flag
+(`git --names"pace" log fetch --upload-pack=…`) made them name `log` and `fetch`. The argument scan
+now returns the subcommand it found, and a line whose two readings disagree is refused. Cost on the shipped documentation:
 0 blocks (`npm run qa-snippets:docscan`: 251 runnable before, 251 now). The `git` atom set of the
 differential forms these shapes and is calibrated against the engine without the rule (writes there,
 none now). A block that needs one of these forms is rewritten without it.

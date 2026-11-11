@@ -259,6 +259,10 @@ export const ATOM_SETS = {
     "git --attr-source log -c core.sshCommand='touch out' ls-remote ssh://x/y",
     "git --attr-source log ls-remote --upload-pack='touch out' .",
     "git --some-future-flag log -c core.sshCommand='touch out' ls-remote ssh://x/y",
+    // Task 304, QA cycle 5: a quote inside an operand-taking global flag hid it from one reader.
+    "git --names\"pace\" log fetch --upload-pack='touch out' .",
+    "git --\"namespace\" status fetch --upload-pack='touch out' .",
+    "git --work-\"tree\" log fetch --upload-pack='touch out' .",
     "git rev-parse HEAD",
     "git log -1",
     "echo hi",

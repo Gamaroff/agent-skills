@@ -2643,7 +2643,13 @@ function hasBraceExpansion(word) {
   }
   return false;
 }
-function gitArgsHazard(rawArgs) {
+// task.304, fifth gate (T304-QA-10): ONE reading of a git command line. This scan and gitSubcommand
+// each found the subcommand, on different text (the unquoted words here, the collapsed words
+// there), and a quote inside an operand-taking flag (`--names"pace" log fetch --upload-pack=x`)
+// made them name different subcommands: the allow-list admitted `git:log`, while git ran `fetch`.
+// So this scan now returns the subcommand it found beside the hazard, and the caller refuses when
+// that is not the one the allow-list admitted. Two readers of one line cannot disagree silently.
+function scanGitArgs(rawArgs) {
   // Per word. The scan splits a word at an escaped space (`--{upload-pack=touch\ W,}` arrives as
   // two tokens), so a token that ends in an odd run of backslashes is joined to the next one;
   // nothing else is, because a `{` in one word never pairs with a `,` in another.
@@ -2657,13 +2663,15 @@ function gitArgsHazard(rawArgs) {
     else words.push(t);
   }
   if (words.some(hasBraceExpansion))
-    return "a brace expansion in a git argument (the shell rewrites the word after the scan)";
+    return refuseGit(
+      "a brace expansion in a git argument (the shell rewrites the word after the scan)",
+    );
   const args = rawArgs.map(unquoteToken);
   for (let i = 0; i < args.length; i += 1) {
     const tok = args[i];
     if (tok === "") continue;
     const flag = gitConfigFlag(tok);
-    if (flag !== null) return flag;
+    if (flag !== null) return refuseGit(flag);
     // `--exec-path` takes its value with `=`; a bare one takes no operand, so the next word is
     // judged as itself (a `-c` after it is a real `-c`).
     if (GIT_FLAGS_WITH_OPERAND.has(tok) && tok !== "--exec-path") {
@@ -2677,7 +2685,9 @@ function gitArgsHazard(rawArgs) {
       // the flags that take an operand fails open on every flag it forgets. The list of what is
       // KNOWN runs the other way: an unknown flag fails closed.
       if (!GIT_KNOWN_GLOBAL_FLAGS.has(tok.split("=")[0]))
-        return "an unknown git global flag (it may take an operand the scan would read as the subcommand)";
+        return refuseGit(
+          "an unknown git global flag (it may take an operand the scan would read as the subcommand)",
+        );
       continue;
     }
     if (tok === "ls-remote") {
@@ -2690,13 +2700,17 @@ function gitArgsHazard(rawArgs) {
           "upload-pack".startsWith(opt) ||
           (opt.length >= 2 && "exec".startsWith(opt))
         )
-          return "ls-remote --upload-pack or --exec (git runs the value)";
+          return refuseGit(
+            "ls-remote --upload-pack or --exec (git runs the value)",
+          );
       }
     }
-    return null; // the subcommand: everything after it is the subcommand's own
+    // the subcommand: everything after it is the subcommand's own
+    return { why: null, sub: tok };
   }
-  return null;
+  return { why: null, sub: null };
 }
+const refuseGit = (why) => ({ why, sub: null });
 // A GIT_ name written anywhere in the text, other than as a read (`$GIT_X`, `${GIT_X}`). Git reads
 // some of these variables as a command, and bash gives a variable a value through many builtins
 // (`export`, `declare -x`, `read`, `printf -v`, a `for` loop, `set -a` with any of them), so the
@@ -2751,8 +2765,14 @@ function gitLiteralExecution(invocations, raw, text) {
       return "git arguments the scan cannot read (fail-closed)";
     const args = raw ? raw[i].args : inv.args;
     if (isGit) {
-      const why = gitArgsHazard(args);
-      if (why !== null) return why;
+      const scan = scanGitArgs(args);
+      if (scan.why !== null) return scan.why;
+      // The allow-list admitted `inv.word` from the collapsed words; the scan above read the
+      // unquoted ones. They must name the same subcommand, or the word that was admitted is not
+      // the one git will run (T304-QA-10).
+      const admitted = inv.word.startsWith("git:") ? inv.word.slice(4) : null;
+      if (scan.sub !== admitted)
+        return "a git subcommand the two readings of the line do not agree on (fail-closed)";
     }
   }
   const named = GIT_NAME.exec(text);

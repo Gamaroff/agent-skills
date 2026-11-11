@@ -409,21 +409,21 @@ None.
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-11
-**Quality Score**: 80/100
+**Quality Score**: 70/100
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.304.qa.4.qa-snippet-classifier-git-literal-execution.md](./task.304.qa.4.qa-snippet-classifier-git-literal-execution.md)
-- **Gate File**: [task.304.gate.4.qa-snippet-classifier-git-literal-execution.yml](./task.304.gate.4.qa-snippet-classifier-git-literal-execution.yml)
+- **Full Report**: [task.304.qa.5.qa-snippet-classifier-git-literal-execution.md](./task.304.qa.5.qa-snippet-classifier-git-literal-execution.md)
+- **Gate File**: [task.304.gate.5.qa-snippet-classifier-git-literal-execution.yml](./task.304.gate.5.qa-snippet-classifier-git-literal-execution.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 403
+- **Tests Executed**: 404
 - **Phases Verified**: 4/4 (one with findings)
 - **Critical Issues**: 1
 - **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-The cycle 3 findings are fixed: every spelling of an exported `GIT_` name the shell assembles is refused at the assignment site. The safety re-probe found a different hole in the same boundary: `git --attr-source log -c core.sshCommand=… ls-remote …` classifies runnable and writes a file under real bash, because the closed list of operand-taking global flags lacks `--attr-source`. The fix is to invert the list (a fail-closed allow-list of global flags), not to add one more spelling.
+The cycle 4 finding is fixed. One HIGH remains (T304-QA-10): the scan reads the git subcommand twice, and a quote inside an operand-taking global flag (`git --names"pace" log fetch --upload-pack=...`) makes the two reads disagree, so a block that runs `fetch --upload-pack` is admitted as `git log`. Reproduced under bash. This is the fifth gate, the last in the budget, so the loop ends and a human decides.
 
 <!-- change-log-start -->
 ## Change Log
@@ -442,4 +442,6 @@ The cycle 3 findings are fixed: every spelling of an exported `GIT_` name the sh
 | 2026-11-11 |  | QA findings fixed — third strike: the `GIT_` name is no longer judged as text; export/declare/typeset/readonly/local operands must name a plain literal identifier (mechanism replaced), brace scan per word, name-assembly atoms and bash-verified rows added; 1 iteration | qa-fix |
 | 2026-11-11 |  | QA gate FAIL (80/100) — 1 finding | qa-task |
 | 2026-11-11 |  | QA findings fixed — fourth strike: the closed list of operand-taking git global flags is replaced by a fail-closed allow-list (an unknown flag before the subcommand is refused); bash-verified rows, differential atoms and a mutation proof added; 1 iteration | qa-fix |
+| 2026-11-11 |  | QA gate FAIL (70/100) — 1 finding; fifth gate, budget spent | qa-task |
+| 2026-11-11 |  | QA findings fixed — the git subcommand is read once: the argument scan returns it and a line whose two readings disagree is refused (quote inside an operand-taking flag); bash-verified rows, differential atoms and a mutation proof added; 1 iteration (budget extended by the owner after the fifth gate) | qa-fix |
 <!-- change-log-end -->
