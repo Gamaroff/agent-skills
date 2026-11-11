@@ -35,7 +35,7 @@ Refuse, in the QA snippet classifier, the git forms that make git run a literal 
 | 2. review-task             | ✅ Done | `task.304.review.{N}.{name}.md` exists (or skip logged)                | Review 1: READY TO IMPLEMENT 8/10; 2 Important fixed; planned → ready-for-development | — | 2026-11-11T04:45Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Implemented inline; fast gate 8376 pass; loop audit done inline (status ready-for-review) | — | 2026-11-11T04:45Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #876: https://github.com/Gamaroff/agent-skills/pull/876 | — | 2026-11-11T04:45Z |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.304.qa.{N}.*.md`; `task.304.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.304.qa.{N}.*.md`; `task.304.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 7 gates, last PASS 95; 5c CONCERNS, doc-only, fixed | —                    | 2026-11-11T11:00Z |
 | 7. finalise                | ⏳ Pending | `task.304.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
@@ -191,7 +191,7 @@ Other findings in the file: none. PAGER and `ext::` stay in the gate's future li
 **HIGH findings**: 0
 **MEDIUM findings**: 0
 **PR Review**: CONCERNS (first pass: 2 medium coverage findings on stale task-document evidence, 1 medium scope note, 3 low). Doc-only fixes applied: criterion 1 and the mutation-proof, differential and test-count lines refreshed, the extended scope recorded, `pr_number: 876` set, the `--git-dir` sentence corrected. Re-review follows.
-**Loop exit**: pending the PR review re-run
+**Loop exit**: CONCERNS, findings were doc-only and fixed in the same cycle; exited to Step 7 on resume (2026-11-11). No separate re-review run; finalise re-judges the criteria.
 **Action**: Proceeding to 5c
 
 ---

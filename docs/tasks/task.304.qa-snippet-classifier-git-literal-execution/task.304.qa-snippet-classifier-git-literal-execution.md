@@ -285,7 +285,7 @@ Each is applied with Edit to a snapshot of the engine, run, then restored from t
 
 - [x] `CI=true` run of `shared/resources/tests/qa-execute-snippets.test.mjs` green (397 pass), and `npm run format:check` clean.
 - [x] `npm run bundle:check` reports 0 problems.
-- [x] Every refusal in § 8 is mutation-proven, the red tests named in the QA report.
+- [x] Every refusal in § 8 is mutation-proven, the red tests named in the QA report, except `-c`: three independent layers hold it (its own refusal, the operand-flag refusal, and the allow-list that rejects the value read as a subcommand), so no single or double revert turns a test red. `-c` is proven by outcome instead: the bash-verified `T304_FORMS` rows assert a write is refused (amendment approved by Lorien Gamaroff, 2026-11-11).
 
 ### Migration
 

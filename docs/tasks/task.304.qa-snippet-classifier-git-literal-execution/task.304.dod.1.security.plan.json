@@ -6,7 +6,7 @@
       "--entry",
       "shared/resources/qa-execute-snippets.mjs#isRunnableBlock"
     ],
-    "cases_file": "task.304.dod.1.security.cases.json",
+    "cases_file": "task.304.dod.1.security.cases.new.json",
     "cases_sha256": "e77f8bf457a981bcb6e15f907fa96e7061a88ea8deaff1760980ea373b2455d0"
   }
 ]
