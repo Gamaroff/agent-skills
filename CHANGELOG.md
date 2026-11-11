@@ -6,6 +6,15 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **The QA snippet classifier refuses the git forms that run a literal string (task 304).** A block
+  whose arguments were plain literals passed every layer, because `git` is non-evaluating and its
+  subcommand is on a closed list, yet git runs some of those strings as commands:
+  `git -c core.fsmonitor=./hook.sh status`, `git ls-remote --upload-pack=…` and `GIT_SSH_COMMAND=…`
+  all wrote a file under real bash. `classifyBlock` now refuses the global `-c` and `--config-env`, a
+  `GIT_*=` assignment in any position, and `ls-remote --upload-pack` / `--exec` (and their unambiguous
+  prefixes) with `not-allow-listed: git …`, by form and not by value. Cost on the repository's own
+  documentation: 0 blocks (251 runnable before and after). The differential gains a `git` atom set that
+  writes against the engine without the rule and not against the new one.
 - **The QA snippet classifier runs a block only when every non-literal word is on a closed list (task 294).**
   Task 293 refused indirect evaluation by listing the shapes it had seen, and three shapes were still
   `runnable` and wrote to disk under real bash: a value stored from a substitution whose `$` is spelled

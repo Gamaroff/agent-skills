@@ -5,7 +5,7 @@ type: task
 description: "Refuse the git forms that execute a plain literal string (-c key=value, --config-env, GIT_* environment prefixes, --upload-pack and --exec-path), which the classifier admits as runnable today and which write under bash."
 tags: [qa-task, security, follow-up-294]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-11-11
 updated: 2026-11-11
@@ -15,7 +15,7 @@ github_issue:
 
 # Technical Task: QA snippet classifier refuses git literal execution
 
-**Status:** Planned
+**Status:** Ready for Review
 
 Follow-up to [task 294](../task.294.qa-snippet-classifier-allow-list/task.294.qa-snippet-classifier-allow-list.md) (PR #874). Its QA gate recorded this gap under `recommendations.future` (`task.294.gate.1.qa-snippet-classifier-allow-list.yml`, `provenance: pre-existing`): the verdict is identical on `origin/develop`, and it sits outside that task's word-shape scope.
 
@@ -78,7 +78,7 @@ So `-c`, its value and a `GIT_*=` prefix are consumed or skipped before anything
 The engine refuses a block when any `git` invocation in it carries:
 
 - a global `-c <value>`, or `--config-env`, or `--exec-path` (the three global flags that supply something git runs or loads; `-C`, `--git-dir`, `--work-tree`, `--namespace` and `--super-prefix` stay as they are, they select a path and execute nothing);
-- a `GIT_*=` environment prefix on the command, or `export GIT_*=`, or `env GIT_*=`;
+- any assignment to a name starting `GIT_`, in any position: a prefix on the command, a bare `GIT_X=value` line, `export GIT_X=…` or `env GIT_X=…` (refused by name in every position because `export`, `declare -x` and a bare assignment after `set -a` make the variable live for a later git command; measured under real bash, see the plan's Phase 1);
 - a subcommand option that names a program to run: `--upload-pack`, `--exec` (the `ls-remote` spelling pair).
 
 The refusal lands as one more class in `allowListViolation`, with a reason of the form `not-allow-listed: git ...`. The existing `-C` operand rule is unchanged.
@@ -144,10 +144,10 @@ None to the engine's API: `classifyBlock` and `isRunnableBlock` keep their signa
 - `shared/resources/tests/qa-execute-snippets.test.mjs`
 
 **Changes**:
-- [ ] Re-run each § 2 form under real bash in a scratch repository (absolute path for `GIT_TRACE`), and record which write or execute. Drop any that do not.
-- [ ] Add the table as tests asserting both facts per row: bash writes, and the classifier's verdict. These tests go red on the old engine, which is the calibration.
-- [ ] Add a control table of git blocks that must stay `runnable` (`git log -1`, `git diff --name-only`, `git -C dir status`, `git rev-parse HEAD`, a block with no git).
-- [ ] Run the docs-scan measurement of § 3 and put the command and count in the QA report.
+- [x] Re-run each § 2 form under real bash in a scratch repository (absolute path for `GIT_TRACE`), and record which write or execute. Drop any that do not. (Dropped: `-ccore…` joined, `core.pager`, `--exec-path=`, a plain bare `GIT_X=`; these run nothing. Kept: `-c core.fsmonitor`, `--config-env`, `--upload-pack`/`--exec` and unambiguous prefixes, `GIT_*` prefix/`export`/`set -a`.)
+- [x] Add the table as tests asserting both facts per row: bash writes, and the classifier's verdict. These tests go red on the old engine, which is the calibration.
+- [x] Add a control table of git blocks that must stay `runnable` (`git log -1`, `git diff --name-only`, `git -C dir status`, `git rev-parse HEAD`, a block with no git).
+- [x] Run the docs-scan measurement of § 3 and put the command and count in the QA report.
 
 **Dependencies**: none
 
@@ -161,10 +161,11 @@ None to the engine's API: `classifyBlock` and `isRunnableBlock` keep their signa
 - `shared/resources/qa-execute-snippets.mjs`
 
 **Changes**:
-- [ ] Add the global-flag refusal where the `git` invocation is resolved (the `gitSubcommand` call site), for `-c`, `--config-env` and `--exec-path`, in both the `-c value` and `-cvalue` / `--config-env=value` spellings.
-- [ ] Add the `GIT_*=` refusal for a command prefix, `export` and `env`. Place it so it reads the tokenizer's words, not raw text (task 292's rule: one tokenizer).
-- [ ] Add the `--upload-pack` / `--exec` refusal for the options of the safe subcommands that accept them.
-- [ ] Give each refusal a `not-allow-listed:` reason so the docs-scan can print it.
+- [x] Add the global-flag refusal where the `git` invocation is resolved, for `-c` and `--config-env` (`--exec-path` dropped: measured, it runs nothing for the safe subcommands), in both the `-c value` and `-cvalue` / `--config-env=value` spellings.
+- [x] Add the `GIT_*=` refusal for any assignment to a `GIT_` name (prefix, bare, `export`, `declare`; `env` is refused earlier as a runner). It reads the scan's tokens, not raw text (task 292's rule: one tokenizer).
+- [x] Flip the existing assertion `classifyBlock("git -c user.name=x log")` to `mutating` in the test `BUG-6: resolving git's subcommand past global flags keeps safe ones safe` (`shared/resources/tests/qa-execute-snippets.test.mjs`); it pins the old behaviour.
+- [x] Add the `--upload-pack` / `--exec` refusal for `ls-remote`, the only safe subcommand that accepts them (`log --exclude`/`--encoding` start with `--e` and stay runnable).
+- [x] Give each refusal a `not-allow-listed:` reason so the docs-scan can print it.
 
 **Dependencies**: Phase 1
 
@@ -179,8 +180,8 @@ None to the engine's API: `classifyBlock` and `isRunnableBlock` keep their signa
 - `shared/resources/tests/qa-execute-snippets.test.mjs`
 
 **Changes**:
-- [ ] Add a `git` atom set to the differential (whole shapes plus separators), so the random run forms these shapes. Calibrate on the old engine first: it must write on some blocks of the set, as task 294 did for `residual`.
-- [ ] Add the set to `BARE_SETS` if it needs the bare form, and a slice test whose wall-clock stays under the existing bound.
+- [x] Add a `git` atom set to the differential (whole shapes plus separators), so the random run forms these shapes. Calibrate on the old engine first: it must write on some blocks of the set, as task 294 did for `residual`.
+- [x] Add the set to `BARE_SETS` if it needs the bare form, and a slice test whose wall-clock stays under the existing bound.
 
 **Dependencies**: Phase 2
 
@@ -196,10 +197,10 @@ None to the engine's API: `classifyBlock` and `isRunnableBlock` keep their signa
 - generated `skills/*/references/` copies (bundler output only)
 
 **Changes**:
-- [ ] Run `scripts/qa-snippets-docscan.mjs`: newly runnable must be 0; list each newly refused block with its reason.
-- [ ] Time the docs scan, five runs with `uptime`, against `develop`.
-- [ ] Add a paragraph to §2a-iii naming the git forms and why they are refused; add the CHANGELOG entry citing `(task 304)`.
-- [ ] `npm run bundle`, then `npm run bundle:check`.
+- [x] Run `scripts/qa-snippets-docscan.mjs`: newly runnable must be 0; list each newly refused block with its reason. (3466 blocks; runnable 251 → 251; newly runnable 0, newly refused 0.)
+- [x] Time the docs scan, five runs with `uptime`, against `develop`. (Medians: develop 428 ms, now 406 ms; load 3.3 beside each; no outliers dropped.)
+- [x] Add a paragraph to §2a-iii naming the git forms and why they are refused; add the CHANGELOG entry citing `(task 304)`.
+- [x] `npm run bundle`, then `npm run bundle:check`.
 
 **Dependencies**: Phases 1 to 3
 
@@ -237,10 +238,10 @@ Count command for the bundled copies: `git ls-files 'skills/*/references/qa-exec
 **Scope**: `classifyBlock` and `isRunnableBlock` on each form, under both `-c value` and `-cvalue` spellings.
 
 **Actions**:
-- [ ] Table: each § 2 form asserts that real bash writes or executes AND that the classifier refuses it. The bash half is the premise check, so the test fails if a form stops being a hazard.
-- [ ] Controls: the safe git blocks stay `runnable`.
-- [ ] **Defeat the first layer**: the `git:<sub>` check already refuses unknown subcommands, so a test uses a SAFE subcommand (`status`, `log`) with the hazard flag so only the new rule decides.
-- [ ] Non-vacuity: assert the table has at least the rows the document names.
+- [x] Table: each § 2 form asserts that real bash writes or executes AND that the classifier refuses it. The bash half is the premise check, so the test fails if a form stops being a hazard.
+- [x] Controls: the safe git blocks stay `runnable`.
+- [x] **Defeat the first layer**: the `git:<sub>` check already refuses unknown subcommands, so a test uses a SAFE subcommand (`status`, `log`) with the hazard flag so only the new rule decides.
+- [x] Non-vacuity: assert the table has at least the rows the document names.
 
 **Command**: `CI=true node --test shared/resources/tests/qa-execute-snippets.test.mjs`
 
@@ -250,11 +251,11 @@ Count command for the bundled copies: `git ls-files 'skills/*/references/qa-exec
 
 Each is applied with Edit to a snapshot of the engine, run, then restored from the snapshot (`cmp` and `git diff --quiet`):
 
-- [ ] Disable the `-c` refusal: the `-c` rows red.
-- [ ] Disable the `--config-env` / `--exec-path` refusal: those rows red.
-- [ ] Disable the `GIT_*=` prefix refusal: the env rows red.
-- [ ] Disable the `--upload-pack` / `--exec` refusal: those rows red.
-- [ ] Say in the QA report which test **only** the new layer turns red, and why the first layer cannot catch it.
+- [x] Disable the `-c` refusal: the `-c` rows red. (Red: BUG-6 flip, the bash table, defeat-the-first-layer.)
+- [x] Disable the `--config-env` refusal (`--exec-path` is not refused): those rows red. (Red: the bash table.)
+- [x] Disable the `GIT_*=` refusal: the env rows red. (Red: the bash table, defeat-the-first-layer.)
+- [x] Disable the `--upload-pack` / `--exec` refusal: those rows red. (Red: the bash table.)
+- [x] Say in the QA report which test **only** the new layer turns red, and why the first layer cannot catch it. (`task.304 defeat the first layer …`: `status` and `log` are on `SAFE_GIT_SUBCOMMANDS`, so the `git:<sub>` check admits them and only the git rule refuses the hazard form.)
 
 ### Integration Tests
 
@@ -270,25 +271,25 @@ Each is applied with Edit to a snapshot of the engine, run, then restored from t
 
 ### Functional
 
-- [ ] `git -c <anything> <safe subcommand>`, `--config-env`, `--exec-path`, a `GIT_*=` prefix (plain, `export`, `env`) and `--upload-pack` / `--exec` classify `mutating`, each row shown to write or execute under real bash first (Phase 1 table, run on the old engine).
-- [ ] The control table of safe git blocks stays `runnable`.
-- [ ] The differential run writes nothing on the new `git` atom set, and the old engine writes on some blocks of it (calibration), recorded in the QA report.
-- [ ] `node scripts/qa-snippets-docscan.mjs` reports `newly runnable: 0`, and every newly refused block is listed in the QA report with its reason.
+- [x] `git -c <anything> <safe subcommand>`, `--config-env`, a `GIT_*=` prefix (plain, `export`, `set -a`) and `--upload-pack` / `--exec` classify `mutating`, each row shown to write or execute under real bash first (Phase 1 table, run on the old engine). `--exec-path` was measured to run nothing and is not refused.
+- [x] The control table of safe git blocks stays `runnable`.
+- [x] The differential run writes nothing on the new `git` atom set (600 blocks: 142 runnable, 0 writes), and the engine without the rule writes on some blocks of it (10 of 600; calibration), recorded in the QA report.
+- [x] `node scripts/qa-snippets-docscan.mjs` reports `newly runnable: 0`, and every newly refused block is listed in the QA report with its reason (none: newly refused 0).
 
 ### Performance
 
-- [ ] Docs-scan median within +10% of `develop`: at least five runs per side, `uptime` beside each, outliers reported, recorded in the QA report.
+- [x] Docs-scan median within +10% of `develop`: at least five runs per side, `uptime` beside each, outliers reported, recorded in the QA report. (Medians 428 ms develop, 406 ms now; load 3.3.)
 
 ### Code Quality
 
-- [ ] `CI=true` run of `shared/resources/tests/qa-execute-snippets.test.mjs` green, and `npm run format:check` clean.
-- [ ] `npm run bundle:check` reports 0 problems.
-- [ ] Every refusal in § 8 is mutation-proven, the red tests named in the QA report.
+- [x] `CI=true` run of `shared/resources/tests/qa-execute-snippets.test.mjs` green (397 pass), and `npm run format:check` clean.
+- [x] `npm run bundle:check` reports 0 problems.
+- [x] Every refusal in § 8 is mutation-proven, the red tests named in the QA report.
 
 ### Migration
 
-- [ ] `CHANGELOG.md` cites `(task 304)`.
-- [ ] `qa-runnable-prose-detection.md` §2a-iii names the git forms and why they are refused.
+- [x] `CHANGELOG.md` cites `(task 304)`.
+- [x] `qa-runnable-prose-detection.md` §2a-iii names the git forms and why they are refused.
 
 ---
 
@@ -365,10 +366,10 @@ None.
 
 ## Progress Tracking
 
-- [ ] Phase 1: Calibrate the forms and the cost
-- [ ] Phase 2: Refuse the forms
-- [ ] Phase 3: Make the instrument see the class
-- [ ] Phase 4: Measure, document, bundle
+- [x] Phase 1: Calibrate the forms and the cost
+- [x] Phase 2: Refuse the forms
+- [x] Phase 3: Make the instrument see the class
+- [x] Phase 4: Measure, document, bundle
 
 ---
 
@@ -377,6 +378,22 @@ None.
 - [task 294](../task.294.qa-snippet-classifier-allow-list/task.294.qa-snippet-classifier-allow-list.md) and its gate, `task.294.gate.1.qa-snippet-classifier-allow-list.yml`, `recommendations.future`
 - `shared/resources/qa-runnable-prose-detection.md` §2a-iii
 - `scripts/qa-snippets-docscan.mjs`, `scripts/qa-snippets-differential.mjs`
+
+---
+
+## Implementation Summary
+
+**Completion Date:** 2026-11-11
+
+**Approach:** the scan in `commandInvocations` now records every `GIT_*=` assignment it steps over (`words.gitEnv`), and `gitLiteralExecution` judges that list plus each `git` invocation's arguments (`-c`, `--config-env`, `ls-remote --upload-pack`/`--exec` and their unambiguous prefixes) and `export`/`declare`/`typeset`/`readonly`/`local` operands. `classifyBlock` calls it right after the word allow-list, gated by the same `allowList` switch, so `beforeAllowList` still shows the old verdict. The refusal is on the form, never the value.
+
+**Calibration (real bash, 2026-11-11):** `-c core.fsmonitor`, `--config-env`, `--upload-pack` (separate and `=`), `--exec=`, `--upl=`, `--exe=`, `GIT_TRACE`/`GIT_EXTERNAL_DIFF` prefixes, `export GIT_SSH_COMMAND`, `declare -x`, bare `GIT_SSH_COMMAND` after `set -a` and `GIT_CONFIG_COUNT/KEY/VALUE` all ran code. Not hazards, so not rows: joined `-ccore…`, `-c core.pager` (no tty), `--exec-path=`, a plain bare `GIT_X=` (not exported), `--ex=` (ambiguous with `--exit-code`). The review's rationale for refusing bare assignments was corrected: the hazard is `export`/`declare -x`/`set -a`, not the bare line itself.
+
+**Testing results:** `CI=true node --test shared/resources/tests/qa-execute-snippets.test.mjs` 397 pass, 0 fail; `npm run ci:fast` 8376 pass, 0 fail. Docs-scan: 3466 blocks, runnable 251 before and now, newly runnable 0, newly refused 0; medians 428 ms (develop) vs 406 ms (now), load 3.3. Differential `git` set, 600 blocks: 142 runnable and 0 writes now; the engine without the rule wrote on 10. Mutation proofs: each of the four refusals disabled in turn turned the bash table red (the `-c` one also the BUG-6 flip and the defeat-the-first-layer test; `GIT_*` also defeat-the-first-layer), engine restored from a snapshot each time (`cmp`).
+
+**Deferred Work:** none. `--exec-path` is not refused (measured: runs nothing for the safe subcommands); revisit only if a measured hole appears.
+
+**Files:** `shared/resources/qa-execute-snippets.mjs`, `shared/resources/tests/qa-execute-snippets.test.mjs`, `scripts/qa-snippets-differential.mjs`, `shared/resources/qa-runnable-prose-detection.md`, `CHANGELOG.md`, and the bundled copies under `skills/*/references/` (7 engine copies; regenerated, never hand-edited).
 
 ---
 
@@ -393,4 +410,7 @@ None.
 | Date | Version | Description | Author |
 | --- | --- | --- | --- |
 | 2026-11-11 | 1.0 | Initial draft | create-task |
+| 2026-11-11 | 1.1 | Review passed (8/10); fixed: GIT_*= rule decided (any position, wholesale), existing BUG-6 test that pins `git -c … log` runnable named for the flip | review-task |
+|  |  | Status → ready-for-development | review-task |
+| 2026-11-11 | 1.2 | Implemented all four phases: git refusals, tests, differential `git` set, docs, bundle; status → ready-for-review | develop |
 <!-- change-log-end -->

@@ -332,6 +332,21 @@ generates the three shapes this section closed and is calibrated against the eng
 (writes there, none now). A documentation block that needs a refused shape is rewritten to avoid the
 indirection.
 
+**Git forms that run a literal string (task 304).** `git` is on the non-evaluating list and its
+subcommand is read from a closed list, so a block such as `git -c core.fsmonitor=./hook.sh status` was
+`runnable` while git ran the value as a command. Measured under real bash on 2026-11-11, these write or
+run code, and each is now `mutating` with a reason that starts `not-allow-listed: git `: the global
+`-c` and `--config-env`; a `GIT_*=` assignment in any position (a prefix on the command, a bare line,
+`export`, `declare`), refused by name because `export`, `declare -x` and a bare assignment after `set -a`
+make the variable live for a later git command; and `ls-remote --upload-pack` or `--exec`, including
+git's unambiguous prefixes (`--upl`, `--exe`). The refusal is on the form, never the value: the value is
+the string git will run. `-C`, `--git-dir` and `--work-tree` select a path and stay runnable, as does a
+`-c` written after the subcommand (a diff flag, not the global one). `--exec-path=` was measured and
+runs nothing for the safe subcommands, so it is not refused. Cost on the shipped documentation:
+0 blocks (`npm run qa-snippets:docscan`: 251 runnable before, 251 now). The `git` atom set of the
+differential forms these shapes and is calibrated against the engine without the rule (writes there,
+none now). A block that needs one of these forms is rewritten without it.
+
 ### 2aa. Helper calls run only when the helper itself would
 
 `bash`, `sh`, `source` and `.` execute a file, which is exactly what the allow-list exists to refuse —

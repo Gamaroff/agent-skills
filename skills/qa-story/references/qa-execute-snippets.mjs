@@ -2551,6 +2551,81 @@ function gitSubcommand(tokensAfterGit) {
   return null;
 }
 
+/**
+ * task.304: the git forms that make git run a literal string as a command, which the word
+ * allow-list admits because `git` is non-evaluating and its subcommand is on a closed list. Each
+ * was run under real bash (cbaaf0e9) and wrote a file:
+ *   - the global `-c <key=value>` and `--config-env` (`core.fsmonitor`, `core.sshCommand` …);
+ *   - a `GIT_*` assignment, in any position (`GIT_EXTERNAL_DIFF`, `GIT_SSH_COMMAND`, `GIT_TRACE` …),
+ *     which `export`, `declare -x` and `set -a` make live for a later git command;
+ *   - `ls-remote --upload-pack` and its alias `--exec`, with git's unambiguous prefixes.
+ * The refusal is on the FORM, never the value: the value is the string git will run.
+ * `--exec-path` was measured and does not run anything for the safe subcommands (they are
+ * builtins), so it is not refused here.
+ * Returns the refused class, or null.
+ */
+const GIT_ASSIGNING_COMMANDS = new Set([
+  "export",
+  "declare",
+  "typeset",
+  "readonly",
+  "local",
+]);
+const unquoteToken = (t) =>
+  t
+    .replace(/\u0001\d+\u0001/g, "")
+    .replace(/\\(.)/g, "$1")
+    .replace(/['"]/g, "");
+function gitArgsHazard(rawArgs) {
+  const args = rawArgs.map(unquoteToken);
+  for (let i = 0; i < args.length; i += 1) {
+    const tok = args[i];
+    if (tok === "") continue;
+    if (tok === "-c" || /^-c./.test(tok)) return "-c (git runs the value)";
+    if (tok === "--config-env" || tok.startsWith("--config-env="))
+      return "--config-env (git runs the value)";
+    if (GIT_FLAGS_WITH_OPERAND.has(tok)) {
+      i += 1; // the operand belongs to the flag
+      continue;
+    }
+    if (tok.startsWith("-")) continue;
+    if (tok === "ls-remote") {
+      for (const a of args.slice(i + 1)) {
+        if (a === "--") break;
+        const m = /^--([^=]+)/.exec(a);
+        if (!m) continue;
+        const opt = m[1];
+        if (
+          "upload-pack".startsWith(opt) ||
+          (opt.length >= 2 && "exec".startsWith(opt))
+        )
+          return "ls-remote --upload-pack or --exec (git runs the value)";
+      }
+    }
+    return null; // the subcommand: everything after it is the subcommand's own
+  }
+  return null;
+}
+function gitLiteralExecution(invocations) {
+  if (invocations.gitEnv && invocations.gitEnv.length > 0)
+    return `${invocations.gitEnv[0]}= (git reads a GIT_ variable as a command or a path to write)`;
+  for (const inv of invocations) {
+    if (inv.keyword) continue;
+    if (inv.word === "git" || inv.word.startsWith("git:")) {
+      const why = gitArgsHazard(inv.args);
+      if (why !== null) return why;
+    }
+    if (GIT_ASSIGNING_COMMANDS.has(inv.word)) {
+      const hit = inv.args
+        .map(unquoteToken)
+        .find((a) => /^GIT_[A-Za-z0-9_]*=/.test(a));
+      if (hit !== undefined)
+        return `${hit.split("=")[0]}= (git reads a GIT_ variable as a command or a path to write)`;
+    }
+  }
+  return null;
+}
+
 /** The leading word of every simple command in the block. */
 export function commandWords(code) {
   return commandInvocations(code)
@@ -2595,6 +2670,11 @@ function commandInvocations(code) {
   // of its own segment, so the closing paren only ever lands on a trailing
   // argument, where it is harmless.
   const words = [];
+  // task.304: every `GIT_*=value` assignment the scan steps over, in any position (a prefix on a
+  // command, a bare line, the operand of `export`/`declare`). Git reads some of those names as a
+  // command to run, so the assignment is judged by name, not by value (`gitLiteralExecution`).
+  // Carried on the returned array so every caller of the one scan sees the same list.
+  words.gitEnv = [];
   // Split on anything that can begin a new simple command.
   // Deliberately NOT split on `{` or `(`: `echo {task-id}` would then yield
   // `task-id}` as a command word, and the fail-closed rule would report a
@@ -2620,7 +2700,10 @@ function commandInvocations(code) {
     for (let ti = 0; ti < toks.length; ti += 1) {
       let tok = toks[ti];
       // Leading `VAR=value` assignments and redirections precede the command.
-      if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(tok)) continue;
+      if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(tok)) {
+        if (/^GIT_/.test(tok)) words.gitEnv.push(tok.split("=")[0]);
+        continue;
+      }
       if (/^[<>]/.test(tok) || /^\d+[<>]/.test(tok)) continue;
       if (tok === "") continue;
       // A `case` arm pattern is the ONE token in command position that is not an
@@ -4117,6 +4200,21 @@ function classifyInternal(
   const notListed = allowList ? allowListViolation(code) : null;
   if (notListed !== null)
     return verdict("mutating", `not-allow-listed: ${notListed}`);
+
+  // task.304: git runs some literal strings as commands. Same layer as the allow-list (it follows
+  // the allow-list's switch), because it is the same kind of refusal: a form git treats as code.
+  // The masked reading below is judged too: a `GIT_X=` written after a closed substitution is an
+  // argument of the substitution's own segment in the unmasked scan.
+  if (allowList) {
+    let gitWhy = gitLiteralExecution(invocations);
+    if (gitWhy === null && /\$\(|`|[<>]\(/.test(prose)) {
+      const masked = maskSubstitutions(prose);
+      if (masked !== null)
+        gitWhy = gitLiteralExecution(commandInvocations(masked));
+    }
+    if (gitWhy !== null)
+      return verdict("mutating", `not-allow-listed: git ${gitWhy}`);
+  }
 
   return verdict("runnable", null, changesDir);
 }

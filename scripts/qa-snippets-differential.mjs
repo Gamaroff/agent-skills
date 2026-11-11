@@ -223,6 +223,25 @@ export const ATOM_SETS = {
     "\n",
     "\n",
   ],
+  // Task 304: git forms that run a literal string, as whole shapes (each writes `out` in an empty
+  // directory under bash, measured 2026-11-11) plus read-only controls and separators. Calibration:
+  // against the engine at the base of task 304 this set must report writes; against the new engine
+  // it must report none.
+  git: [
+    "GIT_TRACE=$PWD/out git rev-parse --show-toplevel",
+    "export GIT_TRACE=$PWD/out; git rev-parse HEAD",
+    "git -c core.sshCommand='touch out' ls-remote ssh://x/y",
+    "git ls-remote --upload-pack='touch out' file:///nonexistent",
+    "git ls-remote --exec='touch out' file:///nonexistent",
+    "GIT_SSH_COMMAND='touch out' git ls-remote ssh://x/y",
+    "GIT_EXTERNAL_DIFF='touch out' git diff --no-index /etc/hostname /etc/hosts",
+    "git rev-parse HEAD",
+    "git log -1",
+    "echo hi",
+    ";",
+    "\n",
+    "\n",
+  ],
   // Arithmetic, where `<<` is a left shift and not a heredoc opener (task 292, QA cycle 1): the
   // `\nz\n` atom is the line a mis-read heredoc would take for its delimiter.
   arith: [
@@ -280,7 +299,7 @@ export function generateBlocks(atoms, seed, count, bare = false) {
 }
 
 /** Atom sets whose blocks carry no prefix and no appended writer (see generateBlocks). */
-export const BARE_SETS = new Set(["splits", "indirect", "residual"]);
+export const BARE_SETS = new Set(["splits", "indirect", "residual", "git"]);
 
 /**
  * Run `bash -c code` in a fresh directory and say whether it left anything there. The directory

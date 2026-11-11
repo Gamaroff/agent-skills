@@ -1558,7 +1558,9 @@ test("BUG-6: widening the write-redirect pre-context spares descriptors and /dev
 
 test("BUG-6: resolving git's subcommand past global flags keeps safe ones safe", () => {
   assert.equal(classifyBlock("git -C /path status").klass, "runnable");
-  assert.equal(classifyBlock("git -c user.name=x log").klass, "runnable");
+  // task.304: the global `-c` runs its value as a command for some keys, so it is refused (the case
+  // moved to the task.304 table below); `-C` and `--git-dir` select a path and stay runnable.
+  assert.equal(classifyBlock("git -c user.name=x log").klass, "mutating");
   assert.equal(classifyBlock("git --git-dir=/p/.git status").klass, "runnable");
   // The route itself: the flag operand must not be mistaken for the subcommand.
   assert.equal(classifyBlock("git -C log push origin main").klass, "mutating");
@@ -5134,6 +5136,24 @@ test("task.292 differential slice: the instrument finds a write when the classif
   );
 });
 
+test("task.304 differential: the git atom set forms writes the engine without the git rule admits", () => {
+  // Calibration on a known failure (task 294's `residual` rule): the git rule sits at the allow-list
+  // layer, so with that layer off the set must produce writes. A set that forms none is blind, and
+  // the slice's green over it (the loop above runs every set, `git` included) would prove nothing.
+  const r = runDifferential({
+    isRunnable: (code) => beforeAllowList(code).klass === "runnable",
+    atoms: ATOM_SETS.git,
+    seed: T292_SLICE.seed,
+    count: 600,
+    bare: BARE_SETS.has("git"),
+  });
+  assert.ok(
+    r.writes > 0,
+    "the git atom set formed no write against the engine without the git rule: the instrument is blind to the class",
+  );
+  assert.ok(BARE_SETS.has("git"), "git blocks carry their own writer");
+});
+
 // ── task.293 — indirect evaluation ─────────────────────────────────────────────────────────────
 // A value is built or stored harmlessly and a later bash feature evaluates it. Each shape is run
 // under REAL bash first (the marker file proves the hole is real, so a test cannot pass by matching
@@ -5602,4 +5622,115 @@ test("task.294 mapfile readarray getopts trap compgen wait are refused as unreco
 });
 test("task.294 set and shift stay runnable in their plain form", () => {
   assert.equal(classifyBlock("set -- a b; shift; echo done").klass, "runnable");
+});
+
+// ── task.304 — git forms that run a literal string ─────────────────────────────────────────────
+// `git` is non-evaluating and its subcommand is on a closed list, so the allow-list admitted every
+// form below. Each row is run under real bash in a scratch repository (a tracked file with an
+// unstaged change, and a `hook.sh` that creates `marker`); the row must write, was `runnable` before
+// task.304 (`beforeAllowList`) and is `mutating` now, from the git rule and not an earlier layer.
+// Measured on 2026-11-11: `-ccore.fsmonitor=…` (joined), `core.pager`, `--exec-path=` and a plain
+// bare `GIT_X=` do not run anything and are not rows; `-c` and `GIT_*` are refused by form anyway.
+const T304_FORMS = {
+  "-c core.fsmonitor": "git -c core.fsmonitor=./hook.sh status",
+  "--config-env": "H=./hook.sh git --config-env=core.fsmonitor=H status",
+  "ls-remote --upload-pack=": "git ls-remote --upload-pack=./hook.sh .",
+  "ls-remote --upload-pack, separate operand":
+    "git ls-remote --upload-pack ./hook.sh .",
+  "ls-remote --exec=": "git ls-remote --exec=./hook.sh .",
+  "ls-remote --upl= (unambiguous prefix)": "git ls-remote --upl=./hook.sh .",
+  "ls-remote --exe= (unambiguous prefix)": "git ls-remote --exe=./hook.sh .",
+  "GIT_TRACE prefix, absolute path": "GIT_TRACE=$PWD/marker git status",
+  "GIT_EXTERNAL_DIFF prefix": "GIT_EXTERNAL_DIFF=./hook.sh git diff",
+  "export GIT_SSH_COMMAND":
+    "export GIT_SSH_COMMAND=./hook.sh\ngit ls-remote ssh://x/y",
+  "bare GIT_SSH_COMMAND after set -a":
+    "set -a\nGIT_SSH_COMMAND=./hook.sh\ngit ls-remote ssh://x/y",
+  "GIT_CONFIG_COUNT/KEY/VALUE":
+    "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.fsmonitor GIT_CONFIG_VALUE_0=./hook.sh git status",
+};
+const gitRunsUnderBash = (code) => {
+  const dir = mkdtempSync(join(tmp(), "g-"));
+  const env = {
+    ...process.env,
+    GIT_CONFIG_GLOBAL: "/dev/null",
+    GIT_CONFIG_SYSTEM: "/dev/null",
+  };
+  const sh = (c) =>
+    spawnSync("bash", ["-c", c], {
+      cwd: dir,
+      env,
+      timeout: CLI_BUDGET.timeoutMs,
+    });
+  sh(
+    "git init -q . && git -c user.name=a -c user.email=a@a commit -q --allow-empty -m i && echo x > f && git add f && git -c user.name=a -c user.email=a@a commit -q -m f && echo y >> f",
+  );
+  writeFileSync(
+    join(dir, "hook.sh"),
+    `#!/bin/sh\ntouch ${dir}/marker\nexit 0\n`,
+  );
+  chmodSync(join(dir, "hook.sh"), 0o755);
+  sh(code);
+  return existsSync(join(dir, "marker"));
+};
+test("task.304 every git literal-execution form runs code under real bash, was admitted, and is refused now", () => {
+  assert.ok(
+    Object.keys(T304_FORMS).length >= 12,
+    "non-vacuity: the table keeps the rows the task names",
+  );
+  for (const [name, code] of Object.entries(T304_FORMS)) {
+    assert.ok(
+      gitRunsUnderBash(code),
+      `${name}: bash did not run it, so the row does not reproduce`,
+    );
+    assert.equal(
+      beforeAllowList(code).klass,
+      "runnable",
+      `${name}: an earlier layer already refuses this, so it does not need the git rule`,
+    );
+    const v = classifyBlock(code);
+    assert.equal(v.klass, "mutating", name);
+    assert.match(v.reason, /^not-allow-listed: git /, name);
+  }
+});
+
+test("task.304 defeat the first layer: a safe subcommand with the hazard form is refused by the git rule alone", () => {
+  // `status` and `log` are on SAFE_GIT_SUBCOMMANDS, so the `git:<sub>` check admits them: only the
+  // new rule can refuse these.
+  for (const code of [
+    "git -c core.fsmonitor=./hook.sh status",
+    "git -c core.pager=x log -1",
+    "GIT_PAGER=x git log -1",
+  ]) {
+    assert.equal(beforeAllowList(code).klass, "runnable", code);
+    assert.equal(classifyBlock(code).klass, "mutating", code);
+  }
+});
+
+test("task.304 spellings other layers already hold also stay refused", () => {
+  for (const code of [
+    "git -c alias.zz=!touch\\ X zz",
+    "declare -x GIT_SSH_COMMAND=./h\ngit status",
+    "env GIT_PAGER=x git log -1",
+    "X=$(true) GIT_TRACE=/tmp/a git status",
+    "git log -1 --output=out.txt",
+  ]) {
+    assert.equal(classifyBlock(code).klass, "mutating", code);
+  }
+});
+
+test("task.304 control git blocks stay runnable", () => {
+  for (const code of [
+    "git log -1",
+    "git diff --name-only",
+    "git -C dir status",
+    "git --git-dir=.git status",
+    "git rev-parse HEAD",
+    "git log --oneline -c", // `-c` after the subcommand is a diff flag, not the global flag
+    "git log --encoding=UTF-8 -1",
+    "git ls-remote --exit-code --heads origin",
+    "echo hello",
+  ]) {
+    assert.equal(classifyBlock(code).klass, "runnable", code);
+  }
 });
