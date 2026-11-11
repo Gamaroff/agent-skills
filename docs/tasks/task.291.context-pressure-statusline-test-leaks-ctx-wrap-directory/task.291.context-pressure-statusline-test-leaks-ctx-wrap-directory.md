@@ -143,7 +143,7 @@ T=$(mktemp -d); for i in $(seq 1 100); do TMPDIR=$T command node --test shared/r
 - [ ] `CI=true npm test` passes with `ctx-wrap` absent from `tests/tmp-leak-ratchet.json`.
 
 ### Performance
-- [ ] The file's run time is no more than 10% above `develop`'s. The QA report records the median of five alternating runs of `time command node --test shared/resources/tests/context-pressure-statusline.test.mjs` on `develop` and on the branch, with `uptime` beside each figure and the head commit named.
+- [ ] The five existing tests' run time is no more than 10% above `develop`'s, and the regression test's deliberate cost (its 150 ms stand-in recorder, about 280 ms for the test) is recorded as its own line, not counted against that bound. The QA report records the median of five alternating runs of `time command node --test shared/resources/tests/context-pressure-statusline.test.mjs` on `develop` and on the branch, with `uptime` beside each figure and the head commit named, and the per-test durations from the same run. (Amended after QA cycle 1, approved by Lorien Gamaroff on 2026-11-11: a 10% bound on the whole file cannot hold while the regression test sleeps long enough to be red on revert.)
 - [ ] No test in the file waits longer than its existing `waitFor` bound (3000 ms, `waitFor`'s default).
 
 ### Code Quality
@@ -222,6 +222,7 @@ The fix holds: 0 leaks in 100 runs, and the new test is red with the wait remove
 | 2026-11-11 |         | Status → ready-for-development                                              | review-task |
 | 2026-11-11 |         | Status → ready-for-review: leak reproduced and cause proven, fixed in the test's cleanup, regression test mutation-proven | develop-task |
 | 2026-11-11 |  | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-11-11 | 1.2     | Performance criterion 1 amended (existing tests bounded at 10%; the regression test's deliberate cost recorded separately), approved by Lorien Gamaroff after QA cycle 1 finding T291-QA-1 | develop-next |
 <!-- change-log-end -->
 
 ---
