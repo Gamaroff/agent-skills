@@ -35,8 +35,9 @@
 #   • a FRESH session reads the lock (the detector's `source: lock`), surfaces the
 #     pause, and `--restore <doc-dir>` clears the mark in place.
 #
-# The hook CLAIMS the pause before any of that (task.120): an atomic `mkdir` of a
-# claim directory beside the lock, so N concurrent invocations — a host that
+# The hook CLAIMS the pause before any of that (task.120): an exclusive claim (an `ln`
+# of the run's pid file into a claim directory beside the lock; bug.21 — `mkdir` is not
+# exclusive on every kernel), so N concurrent invocations — a host that
 # registered the hook twice, say — produce exactly one of everything, and the
 # losers exit 0 with the empty signal. (Until 2026-11 the claim was an `mv` of the
 # lock itself to `.pausing.<pid>`, which is what removed it.) A run that finds the
@@ -152,9 +153,10 @@ report_dangling_links() {
 # allowed to answer yes to — on task.110 a settings file carried this hook under two
 # spellings, the host fired both in parallel, both passed a `[ -f "$LOCK" ]` check,
 # and every side-effect below was produced twice (report block, PR comment, issue
-# comment). `mkdir` is atomic: of N concurrent runs exactly one creates the claim
-# directory, and every other run's mkdir fails and takes the same noop path a stray
-# re-fire takes. Claiming BEFORE writing a snapshot keeps the loser side-effect-free.
+# comment). The claim is exclusive: of N concurrent runs exactly one takes it (by `ln`,
+# see take_claim — `mkdir` is not exclusive on every kernel, bug.21), and every other run
+# fails to take it and takes the same noop path a stray re-fire takes. Claiming BEFORE
+# writing a snapshot keeps the loser side-effect-free.
 #
 # The claim used to be `mv "$LOCK" "$LOCK.pausing.$$"` (task.120) — atomic too, but it
 # took the lock away, which is the defect this revision removes. The directory is named
@@ -173,11 +175,27 @@ report_dangling_links() {
 # old — and on a mismatch puts the claim back and takes the noop path. The EXIT trap
 # releases the claim only while it still holds this run's pid, so a run never frees a
 # claim another run holds.
+#
+# bug.21: the exclusivity is NOT `mkdir`'s. On the LAN server's kernel (WSL2 6.18.33.2,
+# ext4 and tmpfs) two concurrent `mkdir` calls of one name both return 0 — 264 of 300
+# races on ext4 — so a claim taken that way was taken twice and Test went red. `ln` of a
+# file that already holds this run's pid onto `$CLAIM_DIR/pid` is exclusive on every
+# kernel measured (0 of 300 doubles on both filesystems), and it publishes the pid in
+# the same step, so a reader never sees a claimed directory with no pid yet. `mkdir -p`
+# only makes the directory the claim lives in; it may succeed for many runs, and only
+# the one whose `ln` lands owns the claim. The directory and its `pid` file keep the
+# names every reader of the claim already uses.
 CLAIM_DIR="$STATE_DIR/develop-pipeline.precompact-claim.d"
+CLAIM_TMP="$STATE_DIR/develop-pipeline.precompact-claim.pid.$$"
 take_claim() {
-  mkdir "$CLAIM_DIR" 2>/dev/null || return 1
-  printf '%s\n' "$$" > "$CLAIM_DIR/pid" 2>/dev/null || true
-  return 0
+  printf '%s\n' "$$" > "$CLAIM_TMP" 2>/dev/null || return 1
+  mkdir -p "$CLAIM_DIR" 2>/dev/null
+  if ln "$CLAIM_TMP" "$CLAIM_DIR/pid" 2>/dev/null; then
+    rm -f "$CLAIM_TMP"
+    return 0
+  fi
+  rm -f "$CLAIM_TMP"
+  return 1
 }
 if ! take_claim; then
   HOLDER=$(cat "$CLAIM_DIR/pid" 2>/dev/null)
