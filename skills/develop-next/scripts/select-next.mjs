@@ -1565,9 +1565,12 @@ function registryDepBlockers(row, rowIndex, readStatus, warnings) {
       );
       continue;
     }
-    if (status === "cancelled") {
+    // Both are terminal and neither will ever become accepted, so holding the
+    // dependent for them would hold it forever. Superseded work was replaced by
+    // newer work (a human names it in `superseded_by:`), so the dep is moot.
+    if (status === "cancelled" || status === "superseded") {
       warnings.push(
-        `line ${row.line}: ${self} depends on ${ref}, which is cancelled — dep treated as satisfied`,
+        `line ${row.line}: ${self} depends on ${ref}, which is ${status} — dep treated as satisfied`,
       );
       continue;
     }

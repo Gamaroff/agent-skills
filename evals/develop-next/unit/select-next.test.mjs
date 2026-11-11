@@ -2795,6 +2795,26 @@ test("deps: a cancelled dependency is satisfied, with a warning", () => {
   assert.match(f.warnings.join("\n"), /task\.83, which is cancelled/);
 });
 
+test("deps: a superseded dependency is satisfied, with a warning", () => {
+  const rows = [
+    taskRow(83, "base", "superseded", "Medium"),
+    taskRow(84, "dependent", "planned", "High", "task.83"),
+  ];
+  const docs = {
+    "docs/tasks/task.83.base/task.83.base.md": "superseded",
+    "docs/tasks/task.84.dependent/task.84.dependent.md": "planned",
+  };
+  const { opts } = registryOpts({ tasks: taskRegistry(rows), docs });
+  const f = registryFrontier(opts.registries, { evaluateAll: true });
+
+  assert.equal(
+    f.selected.id,
+    "T84",
+    "a superseded dep is replaced work, not pending work: it must not hold the row forever",
+  );
+  assert.match(f.warnings.join("\n"), /task\.83, which is superseded/);
+});
+
 test("deps: a dependency whose document is unreadable is satisfied, with a warning", () => {
   const rows = [
     taskRow(83, "base", "planned", "Medium"),
