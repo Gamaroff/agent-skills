@@ -186,7 +186,7 @@ export const DEFAULT_TASK_REGISTRY = "docs/tasks/task-registry.md";
 // a lifecycle (docs/standards/bug-documents.md says so explicitly):
 //   bug:  new → in-progress → ready-for-qa → closed | reopened
 //   task: draft → planned → ready-for-development → in-progress →
-//         ready-for-review → accepted | cancelled
+//         ready-for-review → accepted | cancelled | superseded
 //
 // **The bug axis keeps a divergence, and task 72 pinned it EXACTLY.** Measured:
 // `develop-bug` proceeds on {new, reopened, in-progress, ready-for-qa} while the
@@ -246,6 +246,10 @@ export const TASK_LIFECYCLE_STATUSES = new Set([
   "ready-for-review",
   "accepted",
   "cancelled",
+  // Terminal: the work was replaced by a newer item (`superseded_by:` names it),
+  // not abandoned. A consumer that files replaced tasks this way had every one
+  // reported as a filing error that "can never be selected".
+  "superseded",
 ]);
 
 // Ordering vocabularies. Lower rank sorts first. An unrecognised value sorts
