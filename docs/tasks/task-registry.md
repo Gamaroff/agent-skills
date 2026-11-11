@@ -1,8 +1,8 @@
 # Task Registry
 
 **Purpose:** Central tracking for all task numbers in this repo.
-**Last Updated:** 2026-11-10
-**Next Available Task Number:** **304**
+**Last Updated:** 2026-11-11
+**Next Available Task Number:** **305**
 
 ## How to use
 
@@ -418,3 +418,4 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 301 | [PreCompact pause comment names the cycle and the pause count](task.301.precompact-pause-comment-names-cycle-and-count/task.301.precompact-pause-comment-names-cycle-and-count.md) | planned | refactoring | Medium | 2026-11-10 | — | follow-up to PR #873: cycle and `pause N` in the step-scoped comment, the Step 1 paused-lock tests, a test for the stateful gh fixture counter · four phases |
 | 302 | [test:remote from a linked worktree](task.302.test-remote-from-a-linked-worktree/task.302.test-remote-from-a-linked-worktree.md) | planned | infrastructure | Low | 2026-11-10 | — | follow-up to task 295: `.git` is a file in a linked worktree and `npm ci`'s prepare hook exits 128 on the server · three phases |
 | 303 | [Pause commits restart CI and block the docs-only shortcut](task.303.pause-commits-restart-ci-and-block-docs-only-shortcut/task.303.pause-commits-restart-ci-and-block-docs-only-shortcut.md) | planned | refactoring | Medium | 2026-11-10 | — | each pipeline pause commit cancels the previous head's CI run, which reads red and forces a full-CI wait at step 8 · three phases |
+| 304 | [QA snippet classifier refuses git literal execution](task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md) | planned | refactoring | Medium | 2026-11-11 | task.294 | task 294 follow-up: refuse the git forms that run a plain literal (`-c`, `--config-env`, `--exec-path`, `GIT_*=` prefixes, `--upload-pack`); measured cost on the tracked docs is 0 blocks · four phases |
