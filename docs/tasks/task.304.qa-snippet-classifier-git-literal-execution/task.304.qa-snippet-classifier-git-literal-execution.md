@@ -5,7 +5,8 @@ type: task
 description: "Refuse the git forms that execute a plain literal string (-c key=value, --config-env, GIT_* environment prefixes, --upload-pack and --exec-path), which the classifier admits as runnable today and which write under bash."
 tags: [qa-task, security, follow-up-294]
 category: refactoring
-status: ready-for-review
+status: accepted
+completed_date: 2026-11-11
 priority: Medium
 created: 2026-11-11
 updated: 2026-11-11
@@ -16,7 +17,7 @@ pr_number: 876
 
 # Technical Task: QA snippet classifier refuses git literal execution
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 Follow-up to [task 294](../task.294.qa-snippet-classifier-allow-list/task.294.qa-snippet-classifier-allow-list.md) (PR #874). Its QA gate recorded this gap under `recommendations.future` (`task.294.gate.1.qa-snippet-classifier-allow-list.yml`, `provenance: pre-existing`): the verdict is identical on `origin/develop`, and it sits outside that task's word-shape scope.
 
@@ -425,12 +426,27 @@ None.
 
 ### Key Findings
 The cycle 6 finding is fixed by deleting the construct: the scan no longer reads git flag operands, and only `-C` with one plain word is kept. No new findings; the safety re-probe found no way left to run a literal string. Accepted cost: other operand-taking global flags are refused. PAGER and the red `test` CI check on develop are pre-existing and carried as future items.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report:** `task.304.qa.7.*.md`. **Gate:** `task.304.gate.7.*.yml`, ✅ PASS, 95/100.
+
+- ✅ **Acceptance criteria:** all 10 met (#1 and #8 reworded with the owner's approval; #6 and #7 graded from CI reading 1).
+- ✅ **Tests and PR:** 405 pass, 0 fail in `qa-execute-snippets.test.mjs`; CI green on head 66eea6e8; PR review CONCERNS, doc-only, fixed.
+- ✅ **Docs:** `CHANGELOG.md` cites (task 304); `qa-runnable-prose-detection.md` § 2a-iii updated.
+- ✅ **Security:** boundary held, 62 probes run, 0 reproduced.
+- ✅ **Compliance:** not applicable.
+
+**Detailed Verification Log:** `task.304.dod.1.qa-snippet-classifier-git-literal-execution.md`.
+
+**Task marked ACCEPTED on:** 2026-11-11
 
 <!-- change-log-start -->
 ## Change Log
 
 | Date | Version | Description | Author |
-| --- | --- | --- | --- |
+|------|---------|-------------|--------|
 | 2026-11-11 | 1.0 | Initial draft | create-task |
 | 2026-11-11 | 1.1 | Review passed (8/10); fixed: GIT_*= rule decided (any position, wholesale), existing BUG-6 test that pins `git -c … log` runnable named for the flip | review-task |
 |  |  | Status → ready-for-development | review-task |
@@ -448,4 +464,6 @@ The cycle 6 finding is fixed by deleting the construct: the scan no longer reads
 | 2026-11-11 |  | QA gate FAIL (70/100) — 1 finding; sixth gate, extended budget spent | qa-task |
 | 2026-11-11 |  | QA findings fixed — the scan no longer reads git flag operands: only `-C` with one plain word is kept, any other operand-taking global flag and any flag spelled with a quote, backslash or expansion is refused; bash-verified rows, differential atoms and two mutation proofs added; 1 iteration (budget extended again by the owner after the sixth gate) | qa-fix |
 | 2026-11-11 |  | QA gate PASS (95/100) — 0 findings | qa-task |
+| 2026-11-11 | 1.1 | DoD verified — accepted (PR #876) | finalise |
 <!-- change-log-end -->
+
