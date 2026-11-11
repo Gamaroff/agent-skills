@@ -191,6 +191,27 @@ Sign-off is disabled for this repository (`sign-off.enabled` is not set), so no 
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-11
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.291.qa.1.context-pressure-statusline-test-leaks-ctx-wrap-directory.md](./task.291.qa.1.context-pressure-statusline-test-leaks-ctx-wrap-directory.md)
+- **Gate File**: [task.291.gate.1.context-pressure-statusline-test-leaks-ctx-wrap-directory.yml](./task.291.gate.1.context-pressure-statusline-test-leaks-ctx-wrap-directory.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 6 in the file; 8392 in the full suite
+- **Phases Verified**: 1/1
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+The fix holds: 0 leaks in 100 runs, and the new test is red with the wait removed. One medium finding: the file runs 22% slower than develop against a 10% criterion, because the regression test sleeps on purpose.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -200,6 +221,7 @@ Sign-off is disabled for this repository (`sign-off.enabled` is not set), so no 
 | 2026-11-11 | 1.1     | Review passed (8/10): 4 Important fixes applied (helper module location, deterministic "before" evidence, negative-content criterion rescoped, performance bound given its command); GitHub issue #882 linked | review-task |
 | 2026-11-11 |         | Status → ready-for-development                                              | review-task |
 | 2026-11-11 |         | Status → ready-for-review: leak reproduced and cause proven, fixed in the test's cleanup, regression test mutation-proven | develop-task |
+| 2026-11-11 |  | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 <!-- change-log-end -->
 
 ---
