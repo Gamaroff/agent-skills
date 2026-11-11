@@ -1,0 +1,67 @@
+schema: 2
+task: 'task.304.qa-snippet-classifier-git-literal-execution'
+task_title: 'QA snippet classifier refuses git literal execution'
+gate: PASS
+status_reason: 'The cycle 6 finding is fixed and re-verified. The scan no longer reads git global-flag operands: the only separate-operand flag kept is -C with one plain word, every other operand-taking flag is refused, and every flag token ahead of the subcommand must be plain text, so no tokenizer has to agree with bash. The safety re-probe (about 250 inputs by the reviewer, 78 executed probes by QA) found no way left to make a block run a literal string or write a file; the escaped-space, quoted-flag, unknown-flag, name-assembly and reader-disagreement forms are all refused and three mutation proofs turn tests red. The accepted cost is that a documented block using another operand-taking global flag is now refused (none exists in the docs corpus).'
+reviewer: 'QA Engineer'
+head: '66d8f3411b47b8ebd598533ec8e9e08dfffd9583'
+updated: '2026-11-11T07:57:17Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 405
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 78
+    escaped: 0
+    boundary: true
+    boundary_signals: ['refused', 'are refused']
+    notes: 'The classifier is a boundary (a false runnable executes a block). 78 probes ran (run record task.304.qa.7...security.run.json, escaped 0): 0 hostile cases reproduced, 77 behaved as required, and 1 legitimate control (`git --namespace ''a b'' log -1`, from cycle 6) is now refused on purpose because the scan no longer reads operand-taking flags other than -C. That overblock is the accepted cost, not a hole.'
+  performance:
+    status: PASS
+    notes: 'Docs scan: 3472 blocks, runnable 251 before and after, newly refused 0. Differential git set on the LAN server with the escaped-space atoms: 0 writes in 20000. Remote fast gate: 8384 pass, 0 fail.'
+  reliability:
+    status: PASS
+    notes: 'Fails closed on every form the task lists plus brace, quote, name-assembly, unknown-flag, reader-disagreement and escaped-space forms.'
+  maintainability:
+    status: PASS
+    notes: 'The fix deletes the operand reading rather than adding a seventh way to split a word, which is what ended seven consecutive gates with a HIGH on this file. Convergence readings 3, 2, 2, 1, 1, 1, 0.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'PAGER (pre-existing, not a GIT_ name, outside the task as written): `PAGER="touch m" git -p log` runs the string when stdout is a terminal. Carried since gate 4; the reviewer confirmed it again. Decide whether to refuse a PAGER assignment or `-p`/`--paginate` beside git.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+      provenance: pre-existing
+    - action: 'CI check `test` red on 66d8f341 and on develop too (run 42959047359): not caused by this branch. Fix on the base.'
+      refs: ['.github/workflows']
+      provenance: pre-existing
+    - action: 'CR-4 (carried): a GIT_ substring in quoted or argument text is refused (`git log --grep="GIT_SSH"`). Fail-closed; docs corpus shows 0 newly refused.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'Accepted cost: any git global flag with a separate operand other than `-C <plain word>` (`--git-dir x`, `--namespace x`) is refused. The `--flag=value` spellings with plain values stay runnable.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'Low-confidence note (carried): `git ls-remote ext::sh ...` classifies runnable. Real git refuses ext:: by default, so it runs nothing unless config enables it. Consider refusing a `::` positional on ls-remote.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

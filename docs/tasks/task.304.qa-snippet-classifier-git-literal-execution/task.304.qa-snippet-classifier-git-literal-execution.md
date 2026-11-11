@@ -5,17 +5,18 @@ type: task
 description: "Refuse the git forms that execute a plain literal string (-c key=value, --config-env, GIT_* environment prefixes, --upload-pack and --exec-path), which the classifier admits as runnable today and which write under bash."
 tags: [qa-task, security, follow-up-294]
 category: refactoring
-status: in-progress
+status: ready-for-review
 priority: Medium
 created: 2026-11-11
 updated: 2026-11-11
 estimated_effort_hours: 8
 github_issue:
+pr_number: 876
 ---
 
 # Technical Task: QA snippet classifier refuses git literal execution
 
-**Status:** In Progress
+**Status:** Ready for Review
 
 Follow-up to [task 294](../task.294.qa-snippet-classifier-allow-list/task.294.qa-snippet-classifier-allow-list.md) (PR #874). Its QA gate recorded this gap under `recommendations.future` (`task.294.gate.1.qa-snippet-classifier-allow-list.yml`, `provenance: pre-existing`): the verdict is identical on `origin/develop`, and it sits outside that task's word-shape scope.
 
@@ -77,7 +78,7 @@ So `-c`, its value and a `GIT_*=` prefix are consumed or skipped before anything
 
 The engine refuses a block when any `git` invocation in it carries:
 
-- a global `-c <value>`, or `--config-env`, or `--exec-path` (the three global flags that supply something git runs or loads; `-C`, `--git-dir`, `--work-tree`, `--namespace` and `--super-prefix` stay as they are, they select a path and execute nothing);
+- a global `-c <value>`, or `--config-env`, or `--exec-path=<dir>` (the three global flags that supply something git runs or loads). Scope extended by the owner across seven QA cycles, accepted cost recorded in QA report 7: an unquoted brace expansion in a git argument, an unknown or quoted flag before the subcommand, and every operand-taking global flag except `-C <one plain word>` (so `--git-dir x` and `--namespace x` are refused; the `=`-joined spellings with plain values stay runnable) are refused, because no tokenizer in the scan can be trusted to agree with bash on where a word ends;
 - any assignment to a name starting `GIT_`, in any position: a prefix on the command, a bare `GIT_X=value` line, `export GIT_X=…` or `env GIT_X=…` (refused by name in every position because `export`, `declare -x` and a bare assignment after `set -a` make the variable live for a later git command; measured under real bash, see the plan's Phase 1);
 - a subcommand option that names a program to run: `--upload-pack`, `--exec` (the `ls-remote` spelling pair).
 
@@ -161,7 +162,7 @@ None to the engine's API: `classifyBlock` and `isRunnableBlock` keep their signa
 - `shared/resources/qa-execute-snippets.mjs`
 
 **Changes**:
-- [x] Add the global-flag refusal where the `git` invocation is resolved, for `-c` and `--config-env` (`--exec-path` dropped: measured, it runs nothing for the safe subcommands), in both the `-c value` and `-cvalue` / `--config-env=value` spellings.
+- [x] Add the global-flag refusal where the `git` invocation is resolved, for `-c` and `--config-env` (`--exec-path` was first dropped as running nothing for the safe subcommands; QA cycle 2 measured that `ls-remote` runs `<dir>/git-upload-pack`, so `--exec-path=<dir>` is refused), in both the `-c value` and `-cvalue` / `--config-env=value` spellings.
 - [x] Add the `GIT_*=` refusal for any assignment to a `GIT_` name (prefix, bare, `export`, `declare`; `env` is refused earlier as a runner). It reads the scan's tokens, not raw text (task 292's rule: one tokenizer).
 - [x] Flip the existing assertion `classifyBlock("git -c user.name=x log")` to `mutating` in the test `BUG-6: resolving git's subcommand past global flags keeps safe ones safe` (`shared/resources/tests/qa-execute-snippets.test.mjs`); it pins the old behaviour.
 - [x] Add the `--upload-pack` / `--exec` refusal for `ls-remote`, the only safe subcommand that accepts them (`log --exclude`/`--encoding` start with `--e` and stay runnable).
@@ -252,7 +253,7 @@ Count command for the bundled copies: `git ls-files 'skills/*/references/qa-exec
 Each is applied with Edit to a snapshot of the engine, run, then restored from the snapshot (`cmp` and `git diff --quiet`):
 
 - [x] Disable the `-c` refusal: the `-c` rows red. (Red: BUG-6 flip, the bash table, defeat-the-first-layer.)
-- [x] Disable the `--config-env` refusal (`--exec-path` is not refused): those rows red. (Red: the bash table.)
+- [x] Disable each refusal in turn (`-c`, `--config-env`, `GIT_` name, `--upload-pack`/`--exec`, `--exec-path=<dir>`, unquoted brace, unknown flag, reader-agreement, operand-flag, plain-flag and the `-C` plain-word check): the rows for that refusal go red. (Red each time; the per-cycle proofs are in QA reports 1-7.)
 - [x] Disable the `GIT_*=` refusal: the env rows red. (Red: the bash table, defeat-the-first-layer.)
 - [x] Disable the `--upload-pack` / `--exec` refusal: those rows red. (Red: the bash table.)
 - [x] Say in the QA report which test **only** the new layer turns red, and why the first layer cannot catch it. (`task.304 defeat the first layer …`: `status` and `log` are on `SAFE_GIT_SUBCOMMANDS`, so the `git:<sub>` check admits them and only the git rule refuses the hazard form.)
@@ -273,7 +274,7 @@ Each is applied with Edit to a snapshot of the engine, run, then restored from t
 
 - [x] `git -c <anything> <safe subcommand>`, `--config-env`, a `GIT_*=` prefix (plain, `export`, `set -a`) and `--upload-pack` / `--exec` classify `mutating`, each row shown to write or execute under real bash first (Phase 1 table, run on the old engine). `--exec-path` was measured to run nothing and is not refused.
 - [x] The control table of safe git blocks stays `runnable`.
-- [x] The differential run writes nothing on the new `git` atom set (600 blocks: 142 runnable, 0 writes), and the engine without the rule writes on some blocks of it (10 of 600; calibration), recorded in the QA report.
+- [x] The differential run writes nothing on the new `git` atom set (20000 blocks on the enlarged atom set at QA cycle 7: 0 writes; the first 600-block run had 142 runnable, 0 writes), and the engine without the rule writes on some blocks of it (10 of 600; calibration), recorded in the QA reports.
 - [x] `node scripts/qa-snippets-docscan.mjs` reports `newly runnable: 0`, and every newly refused block is listed in the QA report with its reason (none: newly refused 0).
 
 ### Performance
@@ -282,7 +283,7 @@ Each is applied with Edit to a snapshot of the engine, run, then restored from t
 
 ### Code Quality
 
-- [x] `CI=true` run of `shared/resources/tests/qa-execute-snippets.test.mjs` green (397 pass), and `npm run format:check` clean.
+- [x] `CI=true` run of `shared/resources/tests/qa-execute-snippets.test.mjs` green (397 pass at first delivery, 405 at QA cycle 7), and `npm run format:check` clean.
 - [x] `npm run bundle:check` reports 0 problems.
 - [x] Every refusal in § 8 is mutation-proven, the red tests named in the QA report.
 
@@ -406,24 +407,24 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-11
-**Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Quality Score**: 95/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.304.qa.6.qa-snippet-classifier-git-literal-execution.md](./task.304.qa.6.qa-snippet-classifier-git-literal-execution.md)
-- **Gate File**: [task.304.gate.6.qa-snippet-classifier-git-literal-execution.yml](./task.304.gate.6.qa-snippet-classifier-git-literal-execution.yml)
+- **Full Report**: [task.304.qa.7.qa-snippet-classifier-git-literal-execution.md](./task.304.qa.7.qa-snippet-classifier-git-literal-execution.md)
+- **Gate File**: [task.304.gate.7.qa-snippet-classifier-git-literal-execution.yml](./task.304.gate.7.qa-snippet-classifier-git-literal-execution.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 404
-- **Phases Verified**: 4/4 (one with findings)
-- **Critical Issues**: 1
-- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **Tests Executed**: 405
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-The cycle 5 finding is fixed. One HIGH remains (T304-QA-11): the line is split on whitespace before either reader sees it, so `git --namespace a\ log fetch --upload-pack=...` reads as `git log` to the scan and as `fetch` to git. Reproduced under bash. Sixth gate on the same file; the owner's extra cycle is spent, so a human decides.
+The cycle 6 finding is fixed by deleting the construct: the scan no longer reads git flag operands, and only `-C` with one plain word is kept. No new findings; the safety re-probe found no way left to run a literal string. Accepted cost: other operand-taking global flags are refused. PAGER and the red `test` CI check on develop are pre-existing and carried as future items.
 
 <!-- change-log-start -->
 ## Change Log
@@ -446,4 +447,5 @@ The cycle 5 finding is fixed. One HIGH remains (T304-QA-11): the line is split o
 | 2026-11-11 |  | QA findings fixed — the git subcommand is read once: the argument scan returns it and a line whose two readings disagree is refused (quote inside an operand-taking flag); bash-verified rows, differential atoms and a mutation proof added; 1 iteration (budget extended by the owner after the fifth gate) | qa-fix |
 | 2026-11-11 |  | QA gate FAIL (70/100) — 1 finding; sixth gate, extended budget spent | qa-task |
 | 2026-11-11 |  | QA findings fixed — the scan no longer reads git flag operands: only `-C` with one plain word is kept, any other operand-taking global flag and any flag spelled with a quote, backslash or expansion is refused; bash-verified rows, differential atoms and two mutation proofs added; 1 iteration (budget extended again by the owner after the sixth gate) | qa-fix |
+| 2026-11-11 |  | QA gate PASS (95/100) — 0 findings | qa-task |
 <!-- change-log-end -->

@@ -341,7 +341,7 @@ run code, and each is now `mutating` with a reason that starts `not-allow-listed
 `export`, `declare`), refused by name because `export`, `declare -x` and a bare assignment after `set -a`
 make the variable live for a later git command; and `ls-remote --upload-pack` or `--exec`, including
 git's unambiguous prefixes (`--upl`, `--exe`). The refusal is on the form, never the value: the value is
-the string git will run. `-C`, `--git-dir` and `--work-tree` select a path and stay runnable, as does a
+the string git will run. `-C <one plain word>` and the `=`-joined `--git-dir=x` / `--work-tree=x` spellings select a path and stay runnable (a separate-operand `--git-dir x` is refused), as does a
 `-c` written after the subcommand (a diff flag, not the global one). `--exec-path=<dir>` is refused too:
 under `ls-remote` it runs `<dir>/git-upload-pack` (QA cycle 2), while a bare `--exec-path` only prints.
 A git argument holding an unquoted brace expansion (`--upload-pa{ck,ck}`, `--config-e{nv,nv}`) is
