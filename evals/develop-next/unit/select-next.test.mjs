@@ -2795,6 +2795,26 @@ test("deps: a cancelled dependency is satisfied, with a warning", () => {
   assert.match(f.warnings.join("\n"), /task\.83, which is cancelled/);
 });
 
+test("deps: a superseded dependency is satisfied, with a warning", () => {
+  const rows = [
+    taskRow(83, "base", "superseded", "Medium"),
+    taskRow(84, "dependent", "planned", "High", "task.83"),
+  ];
+  const docs = {
+    "docs/tasks/task.83.base/task.83.base.md": "superseded",
+    "docs/tasks/task.84.dependent/task.84.dependent.md": "planned",
+  };
+  const { opts } = registryOpts({ tasks: taskRegistry(rows), docs });
+  const f = registryFrontier(opts.registries, { evaluateAll: true });
+
+  assert.equal(
+    f.selected.id,
+    "T84",
+    "a superseded dep is replaced work, not pending work: it must not hold the row forever",
+  );
+  assert.match(f.warnings.join("\n"), /task\.83, which is superseded/);
+});
+
 test("deps: a dependency whose document is unreadable is satisfied, with a warning", () => {
   const rows = [
     taskRow(83, "base", "planned", "Medium"),
@@ -3027,9 +3047,56 @@ test("B8: the task axis gets the same treatment", () => {
   assert.match(row.reason, /not a member of the task lifecycle/i);
   assert.match(
     row.reason,
-    /draft, planned, ready-for-development, in-progress, ready-for-review, accepted, cancelled/,
+    /draft, planned, ready-for-development, in-progress, ready-for-review, accepted, cancelled, superseded/,
   );
   assert.equal(f.warnings.filter((w) => /lifecycle/i.test(w)).length, 1);
+});
+
+test("B8: a superseded task is terminal, not a filing error", () => {
+  // `superseded` is a lifecycle status: replaced by newer work, named in
+  // `superseded_by:`. It used to be read as off-lifecycle, so every replaced
+  // task raised "can never be selected; almost certainly a filing error".
+  const { opts } = registryOpts({
+    tasks: taskRegistry([taskRow(24, "replaced", "superseded")]),
+    docs: { "docs/tasks/task.24.replaced/task.24.replaced.md": "superseded" },
+  });
+  const f = registryFrontier(opts.registries, { evaluateAll: true });
+  const row = f.passedOver.find((p) => p.n === 24);
+  assert.equal(row.offLifecycle, false);
+  assert.doesNotMatch(row.reason, /not a member of the task lifecycle/i);
+  assert.deepEqual(
+    f.warnings.filter((w) => /lifecycle/i.test(w)),
+    [],
+  );
+});
+
+test("B8: the code task lifecycle matches document-status-lifecycle.md", () => {
+  // The task half of the parity test below: TASK_LIFECYCLE_STATUSES names this
+  // file as its source of truth, and nothing compared the two until a status
+  // the doc canon used (`superseded`) was found missing from the code.
+  const doc = readFileSync(
+    path.join(REPO_ROOT, "shared", "resources", "document-status-lifecycle.md"),
+    "utf-8",
+  );
+  const section = doc
+    .split("## Status Reference Table")[1]
+    ?.split(/\n#{2,3} /)[0];
+  assert.ok(
+    section,
+    "document-status-lifecycle.md has no Status Reference Table",
+  );
+  const parsed = section
+    .split("\n")
+    .map((l) => l.match(/^\|\s*`([a-z-]+)`\s*\|/))
+    .filter(Boolean)
+    .map((m) => m[1]);
+  assert.deepEqual(
+    parsed.sort(),
+    [...TASK_LIFECYCLE_STATUSES].sort(),
+    `the documented task lifecycle and TASK_LIFECYCLE_STATUSES disagree.\n` +
+      `  doc:  ${parsed.sort().join(", ")}\n` +
+      `  code: ${[...TASK_LIFECYCLE_STATUSES].sort().join(", ")}`,
+  );
 });
 
 test("B8: selectNext surfaces frontier warnings on the stop path", () => {
