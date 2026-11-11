@@ -1,16 +1,18 @@
 ---
 type: bug
-status: new # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'High'
 created: '2026-11-11'
 related: 'none — cross-cutting (no single owner)'
 description: 'The PreCompact hook claims the pause with mkdir, which is not exclusive on some kernels, so two concurrent runs both append a pause block and CI Test goes red'
+github_issue: 880
 ---
 
 **Bug ID**: bug.21.precompact-claim-mkdir-not-exclusive
+**GitHub**: [#880](https://github.com/Gamaroff/agent-skills/issues/880)
 **Related**: None — cross-cutting bug (no single owner)
-**Status**: 🆕 New
+**Status**: ✅ Ready for QA
 **Priority**: High
 **Severity**: Major
 **Created**: 2026-11-11
@@ -89,25 +91,45 @@ description: 'The PreCompact hook claims the pause with mkdir, which is not excl
 
 #### Investigation (New → In Progress)
 
-**Date**: [Date]
-**Developer**: [Name]
+**Date**: 2026-11-11
+**Developer**: Claude (develop-bug)
 
-[Investigation notes, root cause analysis]
+**Reproduction**: the primitive race, run on the LAN server (`ci@192.168.1.249`, WSL2 6.18.33.2) with `race.sh` (two concurrent claimers, N runs, count of runs where both succeed). `mkdir` doubled in 264 of 300 runs on ext4 and 65 of 300 on tmpfs; a noclobber create and `ln` doubled in 0 of 300 on both. The laptop kernel doubled in 0 of 200 for all three, so the failure is kernel-specific, as the report said.
+
+**Root Cause Analysis**: `take_claim` in `shared/resources/develop-pipeline-on-precompact.sh` took the claim with `mkdir "$CLAIM_DIR" 2>/dev/null || return 1` and relied on `mkdir` returning non-zero for the loser. On the affected kernel it returns 0 for both, so both runs took the claim and ran the whole pause flow. The stale-steal path (`mv` of the claim directory, then `take_claim` once more) calls the same function, so it inherits the fix.
+
+**Proposed Fix**: take the claim with an `ln` of a file holding this run's pid onto `$CLAIM_DIR/pid`, keeping the directory and `pid` names every reader already uses; `mkdir -p` only makes the directory.
 
 #### Fix Implementation (In Progress → Ready for QA)
 
-**Date**: [Date]
+**Date**: 2026-11-11
 
-**Root Cause**: [Explanation]
+**Root Cause**: `mkdir` is not exclusive on some kernels, and the claim's exclusivity came from `mkdir`.
 
-**Fix Description**: [What was changed]
+**Fix Description**:
+
+- `take_claim` writes the run's pid to a per-pid temp file, `mkdir -p`s the claim directory, and `ln`s the temp file to `$CLAIM_DIR/pid`. Only the run whose `ln` lands owns the claim; the pid is published in the same step, so a reader never sees a claimed directory with no pid.
+- The comments in the hook and the four docs that described the `mkdir` claim now describe the `ln` claim. `CHANGELOG.md` has an entry. The bundled copies are regenerated.
+- The restricted-PATH scenario (jq absent) lists the coreutils the hook needs; `ln` is added.
 
 **Files Modified**:
 
-- [file1.ts]
-- [file2.ts]
+- `shared/resources/develop-pipeline-on-precompact.sh` — `take_claim` uses `ln`; comments updated
+- `shared/resources/develop-pipeline-on-precompact.test.sh` — new scenario 12a (a `mkdir` stand-in that succeeds twice); `ln` added to the jq-absent PATH
+- `shared/resources/develop-pipeline-pause.md`, `shared/resources/develop-pipeline-hooks.md`, `docs/reference/pipeline-artifacts.md`, `CHANGELOG.md` — wording
+- `skills/develop-{bug,story,task}/references/*`, `skills/develop/references/develop-pipeline-pause.md` — bundled copies (`npm run bundle`)
 
-**Testing**: [How the fix was tested]
+**Testing**:
+
+- Regression test: scenario 12a. Against the old hook it fails 12 of 12 runs on the affected kernel and 3 of 3 on the laptop (where `mkdir` is exclusive, because the test supplies the broken primitive); against the fix it passes.
+- Mutation: the old hook against the new test gave scenario 12 red 7 of 12 and scenario 12a red 12 of 12 on the affected kernel.
+- After the fix the whole suite (32 tests) ran 0 red in 20 runs on the affected kernel at load average 8.6, and 32/32 three times on the laptop.
+- `npm run bundle:check` is clean.
+
+**Verification Steps for QA**:
+
+1. On the LAN server run `bash shared/resources/develop-pipeline-on-precompact.test.sh` 20 times: expect `32 passed, 0 failed` each time.
+2. Revert `take_claim` to `mkdir "$CLAIM_DIR" 2>/dev/null || return 1` and rerun: scenario 12a must fail.
 
 #### QA Verification (Ready for QA → Closed/Reopened)
 
@@ -127,6 +149,9 @@ description: 'The PreCompact hook claims the pause with mkdir, which is not excl
 | Date       | Status | Changed By | Notes                                   |
 | ---------- | ------ | ---------- | --------------------------------------- |
 | 2026-11-11 | New    | Claude     | Bug created, found during task 304 DoD |
+| 2026-11-11 | New | ensure-bug-github-issue | GitHub issue created (#880) |
+| 2026-11-11 | In Progress | develop-bug | Reproduced on the LAN kernel; investigation started |
+| 2026-11-11 | Ready for QA | develop-bug | Fix implemented + regression test (scenario 12a) |
 
 ---
 
