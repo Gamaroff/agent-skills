@@ -1,0 +1,59 @@
+schema: 2
+task: 'task.291.context-pressure-statusline-test-leaks-ctx-wrap-directory'
+task_title: 'The context-pressure statusline test leaks a ctx-wrap- temp directory'
+gate: PASS
+status_reason: 'T291-QA-1 is resolved: the owner amended Performance criterion 1 (approved by Lorien Gamaroff) and the amended bound holds (five existing tests: branch median 335 ms against develop 421 ms). The refute pass over the whole branch diff found no defect. Code is unchanged since gate 1.'
+reviewer: 'QA Engineer'
+head: '9f9a8939f2006db98248b7f47cdc83cab9d76f88'
+updated: '2026-11-11T19:53:23Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 6
+  phases_verified: '1/1'
+  trace:
+    phases_covered: [1]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    boundary_signals: []
+    notes: 'Test code and a test helper only; no accept-or-reject boundary (boundary: false).'
+  performance:
+    status: PASS
+    notes: 'Seven alternating runs, sum of the five existing tests: develop median 421 ms, branch 335 ms (within noise, load average 0.98 to 1.20). The regression test takes a median of 215 ms, recorded separately as the amended criterion says.'
+  reliability:
+    status: PASS
+    notes: '0 leaked ctx-wrap- directories in 100 unloaded runs (cycle 1). The recorder''s only mkdir precedes its file (context-pressure.mjs:229, writeAtomic at :176), and the prune step after it cannot recreate a removed directory, so the wait is sufficient.'
+  maintainability:
+    status: PASS
+    notes: 'One documented helper; three state-dir tests share stateDir().'
+
+criteria_drift:
+  reason: drift
+  base: review-commit
+  changed:
+    - id: '#4'
+      kind: reworded
+      approved: true
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'The regression test is red on revert only while cleanup() runs before the 150 ms stub ends; on a machine loaded enough to delay it past that, a revert could read green. The fix itself is unaffected.'
+      refs: ['shared/resources/tests/context-pressure-statusline.test.mjs']
+    - action: 'TEST_LOCAL=1 npm run test:remote leaks TEST_LOCAL into the suite and 14 tests in tests/test-remote-runner.test.js fail (19 of 19 pass without it).'
+      refs: ['tests/test-remote-runner.test.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

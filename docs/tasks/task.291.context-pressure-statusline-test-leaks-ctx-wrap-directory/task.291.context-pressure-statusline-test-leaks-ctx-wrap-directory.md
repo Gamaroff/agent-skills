@@ -193,24 +193,24 @@ Sign-off is disabled for this repository (`sign-off.enabled` is not set), so no 
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-11
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.291.qa.1.context-pressure-statusline-test-leaks-ctx-wrap-directory.md](./task.291.qa.1.context-pressure-statusline-test-leaks-ctx-wrap-directory.md)
-- **Gate File**: [task.291.gate.1.context-pressure-statusline-test-leaks-ctx-wrap-directory.yml](./task.291.gate.1.context-pressure-statusline-test-leaks-ctx-wrap-directory.yml)
+- **Full Report**: [task.291.qa.2.context-pressure-statusline-test-leaks-ctx-wrap-directory.md](./task.291.qa.2.context-pressure-statusline-test-leaks-ctx-wrap-directory.md)
+- **Gate File**: [task.291.gate.2.context-pressure-statusline-test-leaks-ctx-wrap-directory.yml](./task.291.gate.2.context-pressure-statusline-test-leaks-ctx-wrap-directory.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 6 in the file; 8392 in the full suite
+- **Tests Executed**: 6 in the file; 8392 in the full suite (cycle 1)
 - **Phases Verified**: 1/1
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-The fix holds: 0 leaks in 100 runs, and the new test is red with the wait removed. One medium finding: the file runs 22% slower than develop against a 10% criterion, because the regression test sleeps on purpose.
+No findings. Cycle 1's performance finding is resolved by the owner's amendment of the criterion, and the amended bound holds. The refute pass found no defect.
 
 <!-- change-log-start -->
 ## Change Log
@@ -223,6 +223,7 @@ The fix holds: 0 leaks in 100 runs, and the new test is red with the wait remove
 | 2026-11-11 |         | Status → ready-for-review: leak reproduced and cause proven, fixed in the test's cleanup, regression test mutation-proven | develop-task |
 | 2026-11-11 |  | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-11-11 | 1.2     | Performance criterion 1 amended (existing tests bounded at 10%; the regression test's deliberate cost recorded separately), approved by Lorien Gamaroff after QA cycle 1 finding T291-QA-1 | develop-next |
+| 2026-11-11 |  | QA gate PASS (100/100) — 0 findings | qa-task |
 <!-- change-log-end -->
 
 ---
