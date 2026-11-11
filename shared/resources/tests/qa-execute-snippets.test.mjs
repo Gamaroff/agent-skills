@@ -5664,6 +5664,21 @@ const T304_FORMS = {
     "printf -v GIT_SSH_COMMAND ./hook.sh\nexport GIT_SSH_COMMAND\ngit ls-remote ssh://x/y",
   "printf -vGIT_SSH_COMMAND joined, then export by name":
     "printf -vGIT_SSH_COMMAND ./hook.sh\nexport GIT_SSH_COMMAND\ngit ls-remote ssh://x/y",
+  // T304-QA-4/5 (cycle 2): brace expansion rebuilds the option after the scan has read the text.
+  "brace splits --upload-pack": "git ls-remote --upload-pa{ck,ck}=./hook.sh .",
+  "brace builds the leading dashes":
+    "git ls-remote --{upload-pack,upload-pack}=./hook.sh .",
+  "brace with an empty alternative":
+    "git ls-remote --upload-pack{,}=./hook.sh .",
+  "brace splits the --exec alias": "git ls-remote --exe{c,c}=./hook.sh .",
+  "brace splits --config-env":
+    "H=./hook.sh git --config-e{nv,nv}=core.fsmonitor=H status",
+  "brace with an empty alternative on --config-env":
+    "H=./hook.sh git --config-env{,}=core.fsmonitor=H status",
+  "brace across an escaped space":
+    "git ls-remote --{upload-pack=./hook.sh\\ x,} .",
+  // T304-QA-6: --exec-path=<dir> makes ls-remote run <dir>/git-upload-pack.
+  "--exec-path=<dir> with ls-remote": "git --exec-path=$PWD ls-remote .",
   // The raw reading cannot line up inside a quoted substitution; a quoted option must still not hide.
   "quoted --upload-pack inside a quoted substitution":
     "echo \"$(git ls-remote '--upload-pack=./hook.sh' .)\"",
@@ -5693,6 +5708,13 @@ const gitRunsUnderBash = (code) => {
     `#!/bin/sh\ntouch ${dir}/marker\nexit 0\n`,
   );
   chmodSync(join(dir, "hook.sh"), 0o755);
+  // `git --exec-path=<dir> ls-remote .` runs `<dir>/git-upload-pack`: the same hook, planted where
+  // that form looks for it.
+  writeFileSync(
+    join(dir, "git-upload-pack"),
+    `#!/bin/sh\ntouch ${dir}/marker\nexit 0\n`,
+  );
+  chmodSync(join(dir, "git-upload-pack"), 0o755);
   sh(code);
   return existsSync(join(dir, "marker"));
 };
@@ -5761,7 +5783,45 @@ test("task.304 control git blocks stay runnable", () => {
     "git log --encoding=UTF-8 -1",
     "git ls-remote --exit-code --heads origin",
     "echo hello",
+    // Words the shell leaves alone: a brace that is quoted, or holds no comma or `..`, is text.
+    "git log -1 --format='{%h,%s}'",
+    'git log -1 --format="{%h,%s}"',
+    "git log -1 --format={%h}",
   ]) {
     assert.equal(classifyBlock(code).klass, "runnable", code);
+  }
+});
+
+test("task.304 brace expansion in a read-only git argument is refused too, a documented cost of refusing by form", () => {
+  // `{a,b}` really expands (`--format={%h,%s}` becomes two words), so the scan cannot read what git
+  // receives. The tracked docs hold none (scripts/qa-snippets-docscan.mjs: newly refused 0).
+  for (const code of [
+    "git log --format={%h,%s} -1",
+    "git diff HEAD~{1,2}",
+    "git log --since={1,2}.days",
+  ]) {
+    assert.equal(classifyBlock(code).klass, "mutating", code);
+  }
+});
+
+test("task.304 the classifier refuses a git argument exactly when bash brace-expands it", () => {
+  // The pair the cycle 2 fix must keep: a word bash expands is refused, a word bash leaves as
+  // written is not. Bash is asked, not assumed.
+  const expands = (w) =>
+    spawnSync("bash", ["-c", `printf '%s\\n' ${w}`], { encoding: "utf8" })
+      .stdout.trim()
+      .split("\n").length > 1;
+  const words = [
+    ...["a{b,c}", "x{1..3}", "{a,b}", "a{,}", "--o{k,k}"].map((w) => [w, true]),
+    ...["'a{b,c}'", '"a{b,c}"', "a\\{b,c}", "{}"].map((w) => [w, false]),
+  ];
+  for (const [w, shouldExpand] of words) {
+    assert.equal(expands(w), shouldExpand, `${w}: bash's own answer`);
+    const v = classifyBlock(`git log -1 --format=${w}`);
+    assert.equal(
+      v.klass,
+      shouldExpand ? "mutating" : "runnable",
+      `${w}: ${v.reason}`,
+    );
   }
 });

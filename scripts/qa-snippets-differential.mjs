@@ -242,6 +242,12 @@ export const ATOM_SETS = {
     "export 'GIT_SSH_COMMAND=touch out'; git ls-remote ssh://x/y",
     "read GIT_SSH_COMMAND <<< 'touch out'; export GIT_SSH_COMMAND; git ls-remote ssh://x/y",
     "printf -v GIT_SSH_COMMAND 'touch out'; export GIT_SSH_COMMAND; git ls-remote ssh://x/y",
+    // T304-QA-4..6 (cycle 2): brace expansion rebuilds an option after the scan, and --exec-path
+    // names a directory ls-remote runs git-upload-pack from.
+    "git ls-remote --upload-pa{ck,ck}='touch out' .",
+    "git ls-remote --exe{c,c}='touch out' .",
+    "X='touch out' git --config-e{nv,nv}=core.sshCommand=X ls-remote ssh://x/y",
+    "git --exec-path=$PWD ls-remote .",
     "git rev-parse HEAD",
     "git log -1",
     "echo hi",

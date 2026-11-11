@@ -11,8 +11,9 @@ All notable changes to this project will be documented in this file. Format foll
   subcommand is on a closed list, yet git runs some of those strings as commands:
   `git -c core.fsmonitor=./hook.sh status`, `git ls-remote --upload-pack=…` and `GIT_SSH_COMMAND=…`
   all wrote a file under real bash. `classifyBlock` now refuses the global `-c` and `--config-env`, a
-  `GIT_*=` assignment in any position, and `ls-remote --upload-pack` / `--exec` (and their unambiguous
-  prefixes) with `not-allow-listed: git …`, by form and not by value. Cost on the repository's own
+  `GIT_*=` assignment in any position, `--exec-path=<dir>`, `ls-remote --upload-pack` / `--exec` (and
+  their unambiguous prefixes), and any git argument holding an unquoted brace expansion, with
+  `not-allow-listed: git …`, by form and not by value. Cost on the repository's own
   documentation: 0 blocks (251 runnable before and after). The differential gains a `git` atom set that
   writes against the engine without the rule and not against the new one.
 - **The QA snippet classifier runs a block only when every non-literal word is on a closed list (task 294).**

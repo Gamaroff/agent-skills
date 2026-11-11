@@ -1,0 +1,82 @@
+schema: 2
+task: 'task.304.qa-snippet-classifier-git-literal-execution'
+task_title: 'QA snippet classifier refuses git literal execution'
+gate: FAIL
+status_reason: 'The three cycle 1 bypasses are fixed and re-verified. The refute pass found the same class in a new spelling: bash brace expansion rebuilds --upload-pack, --exec and --config-env after the classifier has read the text, so six brace spellings classify runnable and write a file under real bash. The matcher compares literal text, which a shell word is not.'
+reviewer: 'QA Engineer'
+head: 'ea72576dfd31d68d53c2ba0f6e63afbc908732fe'
+updated: '2026-11-11T05:33:40Z'
+
+top_issues:
+  - id: 'T304-QA-4'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: "Brace expansion hides the ls-remote option from the literal-text prefix match. `git ls-remote --upload-pa{ck,ck}='touch W' .` classifies runnable and bash writes W. The same holds for `--{upload-pack,upload-pack}=`, `--upload-pack{,}=` and `--exe{c,c}=`. The unbraced spelling is refused (control) and a brace in a read-only format string (`git log --format={%h,%s} -1`) writes nothing and stays runnable (control). The develop engine also classifies all of them runnable, but the task names this class, so it is the task's unfinished work. origin: code-review (CR-1), reproduced by QA."
+    suggested_action: 'Do not match option text on a word the shell can still rewrite. Refuse any argument of a git invocation that holds an unquoted brace (or other unexpanded expansion), instead of adding a spelling per case; the control `git log --format={%h,%s}` needs a quoted-brace allowance or an accepted false refusal that the docs scan measures.'
+    suggested_owner: dev
+    status: open
+  - id: 'T304-QA-5'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: "The same gap defeats --config-env. `X='touch W' git --config-e{nv,nv}=core.sshCommand=X ls-remote ssh://h/x` and `X='touch W' git --config-env{,}=core.sshCommand=X ls-remote ssh://h/x` classify runnable and bash writes W. The X= prefix is not a GIT_ name, so the GIT_NAME rule does not see it. `git --config-env=...` unbraced is refused (control). Reproduced by QA, same result on the develop engine. origin: code-review (CR-2), reproduced by QA."
+    suggested_action: 'The same brace refusal on every git argument covers this, including the -c and --config-env tests.'
+    suggested_owner: dev
+    status: open
+  - id: 'T304-QA-6'
+    severity: medium
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: "The comment above gitArgsHazard says --exec-path runs nothing for the safe subcommands, and that is false for ls-remote: with an executable git-upload-pack in the named directory, `git --exec-path=$PWD ls-remote .` classifies runnable and bash runs it. The block cannot create that file itself, so exposure is low, but the stated measurement is wrong and the form is the task's class. Reproduced by QA. origin: code-review (CR-3, rated low/medium by the reviewer), reproduced by QA under item 5d."
+    suggested_action: 'Refuse a non-empty --exec-path value (or --exec-path on ls-remote), correct the comment, and add the form to T304_FORMS with a planted git-upload-pack as the bash proof.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 398
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 51
+    escaped: 0
+    boundary: true
+    boundary_signals: ['refused', 'are refused']
+    notes: 'The classifier is a boundary (a false runnable executes a block). 51 probes ran: 45 passed; 6 hostile brace spellings were classified runnable and write under real bash (T304-QA-4 and -5). The 3 cycle 1 findings no longer reproduce, and the 3 new controls behave as expected.'
+  performance:
+    status: PASS
+    notes: 'Docs scan is unchanged by the fix: 3467 blocks, runnable 251 before and after, newly refused 0.'
+  reliability:
+    status: PASS
+    notes: 'Fails closed on every form the task lists, plus the quoted and read/printf forms. The open gap is expansion the scan cannot see.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The second consecutive cycle to find a HIGH in one literal-text matcher over a shell word (cycle 1 quoting, cycle 2 braces). Adding a spelling per cycle will not end it; see the recommendation.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Change the shape, not the spelling list: refuse any git argument whose text the shell can still rewrite (unquoted brace, and by the same rule any unquoted expansion the scan does not model), so the decision no longer depends on enumerating spellings. Add brace atoms to the differential git set (CR-4 again: it has none, and 20000 blocks found 0 writes).'
+      refs: ['shared/resources/qa-execute-snippets.mjs', 'scripts/qa-snippets-differential.mjs']
+  future:
+    - action: 'CR-4: a GIT_ substring in quoted or argument text is now refused (`git log --grep="GIT_SSH"`, a URL containing GIT_). Conservative and fail-closed, and the docs corpus shows 0 newly refused. Revisit only if a consumer block is refused.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'The nested -c / --config-env check on a flag operand (CR-5 of cycle 1) has no test: removing it turns nothing red. Add a test or drop the check.'
+      refs: ['shared/resources/qa-execute-snippets.mjs', 'shared/resources/tests/qa-execute-snippets.test.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

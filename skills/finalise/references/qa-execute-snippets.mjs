@@ -2558,10 +2558,15 @@ function gitSubcommand(tokensAfterGit) {
  *   - the global `-c <key=value>` and `--config-env` (`core.fsmonitor`, `core.sshCommand` …);
  *   - a `GIT_*` assignment, in any position (`GIT_EXTERNAL_DIFF`, `GIT_SSH_COMMAND`, `GIT_TRACE` …),
  *     which `export`, `declare -x` and `set -a` make live for a later git command;
- *   - `ls-remote --upload-pack` and its alias `--exec`, with git's unambiguous prefixes.
+ *   - `ls-remote --upload-pack` and its alias `--exec`, with git's unambiguous prefixes;
+ *   - `--exec-path=<dir>`, which makes `ls-remote` run `<dir>/git-upload-pack` (measured under
+ *     bash, QA cycle 2). A bare `--exec-path` prints and exits, so it runs nothing.
  * The refusal is on the FORM, never the value: the value is the string git will run.
- * `--exec-path` was measured and does not run anything for the safe subcommands (they are
- * builtins), so it is not refused here.
+ * A word the shell can still rewrite after the scan is refused too, because the scan then reads
+ * text that is not the argument git receives. Brace expansion is that class here (`--upload-pa{ck,ck}`
+ * is `--upload-pack`, QA cycle 2): the matcher below compares literal text, and a literal is exactly
+ * what an expansion is not. Variable, substitution and `$'…'` forms are refused by the deny-list
+ * layer that runs before this one.
  * Returns the refused class, or null.
  */
 const GIT_ASSIGNING_COMMANDS = new Set([
@@ -2580,23 +2585,52 @@ const gitConfigFlag = (t) => {
   if (t === "-c" || /^-c./.test(t)) return "-c (git runs the value)";
   if (t === "--config-env" || t.startsWith("--config-env="))
     return "--config-env (git runs the value)";
+  if (/^--exec-path=./.test(t))
+    return "--exec-path=<dir> (git runs git-upload-pack from it)";
   return null;
 };
+/**
+ * True when bash would brace-expand `word`: an UNQUOTED `{` followed, unquoted, by a comma or
+ * `..`. `{base}` with neither is literal text, and so is anything inside quotes. Conservative on
+ * nesting (any later unquoted comma counts), which can only refuse more.
+ */
+function hasBraceExpansion(word) {
+  let quote = null;
+  let open = false;
+  for (let k = 0; k < word.length; k += 1) {
+    const ch = word[k];
+    if (quote === "'") {
+      if (ch === "'") quote = null;
+    } else if (quote === '"') {
+      if (ch === "\\") k += 1;
+      else if (ch === '"') quote = null;
+    } else if (ch === "\\") {
+      k += 1;
+    } else if (ch === "'" || ch === '"') {
+      quote = ch;
+    } else if (ch === "{") {
+      open = true;
+    } else if (open && (ch === "," || (ch === "." && word[k + 1] === "."))) {
+      return true;
+    }
+  }
+  return false;
+}
 function gitArgsHazard(rawArgs) {
+  // Over the whole argument list, not per token: the scan splits a word at an escaped space
+  // (`--{upload-pack=touch\ W,}` arrives as two tokens, the brace in one and the comma in the other).
+  if (hasBraceExpansion(rawArgs.join(" ")))
+    return "a brace expansion in a git argument (the shell rewrites the word after the scan)";
   const args = rawArgs.map(unquoteToken);
   for (let i = 0; i < args.length; i += 1) {
     const tok = args[i];
     if (tok === "") continue;
     const flag = gitConfigFlag(tok);
     if (flag !== null) return flag;
-    if (GIT_FLAGS_WITH_OPERAND.has(tok)) {
-      // The operand belongs to the flag, but it is judged too: `--exec-path` takes no separate
-      // operand in git, so `git --exec-path -c k=v status` is a real `-c` (CR-5).
-      if (i + 1 < args.length) {
-        const nested = gitConfigFlag(args[i + 1]);
-        if (nested !== null) return nested;
-      }
-      i += 1;
+    // `--exec-path` takes its value with `=`; a bare one takes no operand, so the next word is
+    // judged as itself (a `-c` after it is a real `-c`).
+    if (GIT_FLAGS_WITH_OPERAND.has(tok) && tok !== "--exec-path") {
+      i += 1; // the operand belongs to the flag
       continue;
     }
     if (tok.startsWith("-")) continue;

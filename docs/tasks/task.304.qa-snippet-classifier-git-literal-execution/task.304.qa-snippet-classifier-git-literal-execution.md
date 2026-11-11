@@ -391,7 +391,7 @@ None.
 
 **Testing results:** `CI=true node --test shared/resources/tests/qa-execute-snippets.test.mjs` 397 pass, 0 fail; `npm run ci:fast` 8376 pass, 0 fail. Docs-scan: 3466 blocks, runnable 251 before and now, newly runnable 0, newly refused 0; medians 428 ms (develop) vs 406 ms (now), load 3.3. Differential `git` set, 600 blocks: 142 runnable and 0 writes now; the engine without the rule wrote on 10. Mutation proofs: each of the four refusals disabled in turn turned the bash table red (the `-c` one also the BUG-6 flip and the defeat-the-first-layer test; `GIT_*` also defeat-the-first-layer), engine restored from a snapshot each time (`cmp`).
 
-**Deferred Work:** none. `--exec-path` is not refused (measured: runs nothing for the safe subcommands); revisit only if a measured hole appears.
+**Deferred Work:** none. `--exec-path=<dir>` is refused after QA cycle 2 measured that `ls-remote` runs `<dir>/git-upload-pack` (the first measurement omitted `ls-remote`).
 
 **Files:** `shared/resources/qa-execute-snippets.mjs`, `shared/resources/tests/qa-execute-snippets.test.mjs`, `scripts/qa-snippets-differential.mjs`, `shared/resources/qa-runnable-prose-detection.md`, `CHANGELOG.md`, and the bundled copies under `skills/*/references/` (7 engine copies; regenerated, never hand-edited).
 
@@ -413,17 +413,17 @@ None.
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.304.qa.1.qa-snippet-classifier-git-literal-execution.md](./task.304.qa.1.qa-snippet-classifier-git-literal-execution.md)
-- **Gate File**: [task.304.gate.1.qa-snippet-classifier-git-literal-execution.yml](./task.304.gate.1.qa-snippet-classifier-git-literal-execution.yml)
+- **Full Report**: [task.304.qa.2.qa-snippet-classifier-git-literal-execution.md](./task.304.qa.2.qa-snippet-classifier-git-literal-execution.md)
+- **Gate File**: [task.304.gate.2.qa-snippet-classifier-git-literal-execution.yml](./task.304.gate.2.qa-snippet-classifier-git-literal-execution.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 397
+- **Tests Executed**: 398
 - **Phases Verified**: 4/4 (two with findings)
-- **Critical Issues**: 3
-- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **Critical Issues**: 2
+- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Three spellings bypass the new refusal and write a file under real bash: a wholly quoted `--upload-pack` / `--exec` word, a quoted `export` operand, and a `GIT_` variable filled by `read` or `printf -v` and exported by name.
+The three cycle 1 bypasses are fixed. The refute pass found brace expansion rebuilding `--upload-pack`, `--exec` and `--config-env` after the classifier has read the text: six spellings classify runnable and write a file under real bash. A seventh form, `--exec-path=<dir>` with `ls-remote`, runs a planted `git-upload-pack` and contradicts a code comment.
 
 <!-- change-log-start -->
 ## Change Log
@@ -436,4 +436,6 @@ Three spellings bypass the new refusal and write a file under real bash: a wholl
 | 2026-11-11 | 1.2 | Implemented all four phases: git refusals, tests, differential `git` set, docs, bundle; status → ready-for-review | develop |
 | 2026-11-11 |  | QA gate FAIL (80/100) — 3 findings | qa-task |
 | 2026-11-11 |  | QA findings fixed — quoted option and export words judged as written, any GIT_ name refused, differential atoms added; 1 iteration | qa-fix |
+| 2026-11-11 |  | QA gate FAIL (80/100) — 3 findings | qa-task |
+| 2026-11-11 |  | QA findings fixed — a git argument holding an unquoted brace is refused whole (shape change, not another spelling), `--exec-path=<dir>` refused, differential brace atoms added; 1 iteration | qa-fix |
 <!-- change-log-end -->
