@@ -5648,6 +5648,29 @@ const T304_FORMS = {
     "set -a\nGIT_SSH_COMMAND=./hook.sh\ngit ls-remote ssh://x/y",
   "GIT_CONFIG_COUNT/KEY/VALUE":
     "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.fsmonitor GIT_CONFIG_VALUE_0=./hook.sh git status",
+  // T304-QA-1: a wholly quoted option word. The collapsed scan reads it as an empty word.
+  "ls-remote '--upload-pack=...' single-quoted":
+    "git ls-remote '--upload-pack=./hook.sh' .",
+  'ls-remote "--exec=..." double-quoted': 'git ls-remote "--exec=./hook.sh" .',
+  // T304-QA-2: a quoted export operand.
+  "export 'GIT_SSH_COMMAND=...' single-quoted":
+    "export 'GIT_SSH_COMMAND=./hook.sh'\ngit ls-remote ssh://x/y",
+  'export "GIT_SSH_COMMAND=..." double-quoted':
+    'export "GIT_SSH_COMMAND=./hook.sh"\ngit ls-remote ssh://x/y',
+  // T304-QA-3: a GIT_ variable given its value by another builtin, then exported by name.
+  "read GIT_SSH_COMMAND, then export by name":
+    "read GIT_SSH_COMMAND <<< ./hook.sh\nexport GIT_SSH_COMMAND\ngit ls-remote ssh://x/y",
+  "printf -v GIT_SSH_COMMAND, then export by name":
+    "printf -v GIT_SSH_COMMAND ./hook.sh\nexport GIT_SSH_COMMAND\ngit ls-remote ssh://x/y",
+  "printf -vGIT_SSH_COMMAND joined, then export by name":
+    "printf -vGIT_SSH_COMMAND ./hook.sh\nexport GIT_SSH_COMMAND\ngit ls-remote ssh://x/y",
+  // The raw reading cannot line up inside a quoted substitution; a quoted option must still not hide.
+  "quoted --upload-pack inside a quoted substitution":
+    "echo \"$(git ls-remote '--upload-pack=./hook.sh' .)\"",
+  "set -a, then read GIT_SSH_COMMAND":
+    "set -a\nread GIT_SSH_COMMAND <<< ./hook.sh\ngit ls-remote ssh://x/y",
+  "set -a, then a for loop over GIT_SSH_COMMAND":
+    "set -a\nfor GIT_SSH_COMMAND in ./hook.sh; do :; done\ngit ls-remote ssh://x/y",
 };
 const gitRunsUnderBash = (code) => {
   const dir = mkdtempSync(join(tmp(), "g-"));
@@ -5673,6 +5696,14 @@ const gitRunsUnderBash = (code) => {
   sh(code);
   return existsSync(join(dir, "marker"));
 };
+test("task.304 a GIT_ name assembled in a variable runs under bash and is refused by the allow-list, not the git rule", () => {
+  const code =
+    "x=GIT_SSH_COMMAND\nread $x <<< ./hook.sh\nexport $x\ngit ls-remote ssh://x/y";
+  assert.ok(gitRunsUnderBash(code), "bash must run it, or the row is moot");
+  const v = classifyBlock(code);
+  assert.equal(v.klass, "mutating");
+  assert.match(v.reason, /non-literal word/);
+});
 test("task.304 every git literal-execution form runs code under real bash, was admitted, and is refused now", () => {
   assert.ok(
     Object.keys(T304_FORMS).length >= 12,

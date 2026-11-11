@@ -2575,16 +2575,27 @@ const unquoteToken = (t) =>
     .replace(/\u0001\d+\u0001/g, "")
     .replace(/\\(.)/g, "$1")
     .replace(/['"]/g, "");
+const gitConfigFlag = (t) => {
+  if (t === "-c" || /^-c./.test(t)) return "-c (git runs the value)";
+  if (t === "--config-env" || t.startsWith("--config-env="))
+    return "--config-env (git runs the value)";
+  return null;
+};
 function gitArgsHazard(rawArgs) {
   const args = rawArgs.map(unquoteToken);
   for (let i = 0; i < args.length; i += 1) {
     const tok = args[i];
     if (tok === "") continue;
-    if (tok === "-c" || /^-c./.test(tok)) return "-c (git runs the value)";
-    if (tok === "--config-env" || tok.startsWith("--config-env="))
-      return "--config-env (git runs the value)";
+    const flag = gitConfigFlag(tok);
+    if (flag !== null) return flag;
     if (GIT_FLAGS_WITH_OPERAND.has(tok)) {
-      i += 1; // the operand belongs to the flag
+      // The operand belongs to the flag, but it is judged too: `--exec-path` takes no separate
+      // operand in git, so `git --exec-path -c k=v status` is a real `-c` (CR-5).
+      if (i + 1 < args.length) {
+        const nested = gitConfigFlag(args[i + 1]);
+        if (nested !== null) return nested;
+      }
+      i += 1;
       continue;
     }
     if (tok.startsWith("-")) continue;
@@ -2605,23 +2616,43 @@ function gitArgsHazard(rawArgs) {
   }
   return null;
 }
-function gitLiteralExecution(invocations) {
+// A GIT_ name written anywhere in the text, other than as a read (`$GIT_X`, `${GIT_X}`). Git reads
+// some of these variables as a command, and bash gives a variable a value through many builtins
+// (`export`, `declare -x`, `read`, `printf -v`, a `for` loop, `set -a` with any of them), so the
+// rule is on the NAME, which is the one spelling every one of them shares. A name assembled at
+// runtime from pieces is outside it: the allow-list does not track values (see §2a-iii).
+const GIT_NAME = /(?<![A-Za-z0-9_$\{])GIT_[A-Za-z0-9_]+/;
+const GIT_REASON =
+  "(git reads a GIT_ variable as a command or a path to write)";
+// `raw` is the same invocations with their quoted spans kept as written (`rawInvocations`). The
+// collapsed scan reads `'--upload-pack=x'` as an empty word, so the arguments are judged from
+// `raw`; a block the two readings cannot line up is refused when it runs git (fail-closed).
+function gitLiteralExecution(invocations, raw, text) {
   if (invocations.gitEnv && invocations.gitEnv.length > 0)
-    return `${invocations.gitEnv[0]}= (git reads a GIT_ variable as a command or a path to write)`;
-  for (const inv of invocations) {
+    return `${invocations.gitEnv[0]}= ${GIT_REASON}`;
+  for (let i = 0; i < invocations.length; i += 1) {
+    const inv = invocations[i];
     if (inv.keyword) continue;
-    if (inv.word === "git" || inv.word.startsWith("git:")) {
-      const why = gitArgsHazard(inv.args);
+    const isGit = inv.word === "git" || inv.word.startsWith("git:");
+    // With no raw reading, a quoted span reads as an empty word. Refuse only when such a word
+    // sits among this git's arguments: that is the one way an option can hide from the scan. A
+    // git whose collapsed arguments hold no empty word has nothing the raw reading would add.
+    if (isGit && !raw && inv.args.some((a) => /""|''/.test(a) || a === ""))
+      return "git arguments the scan cannot read (fail-closed)";
+    const args = raw ? raw[i].args : inv.args;
+    if (isGit) {
+      const why = gitArgsHazard(args);
       if (why !== null) return why;
     }
     if (GIT_ASSIGNING_COMMANDS.has(inv.word)) {
-      const hit = inv.args
+      const hit = args
         .map(unquoteToken)
-        .find((a) => /^GIT_[A-Za-z0-9_]*=/.test(a));
-      if (hit !== undefined)
-        return `${hit.split("=")[0]}= (git reads a GIT_ variable as a command or a path to write)`;
+        .find((a) => /^GIT_[A-Za-z0-9_]*(=|$)/.test(a));
+      if (hit !== undefined) return `${hit.split("=")[0]} ${GIT_REASON}`;
     }
   }
+  const named = GIT_NAME.exec(text);
+  if (named !== null) return `${named[0]} ${GIT_REASON}`;
   return null;
 }
 
@@ -4205,11 +4236,17 @@ function classifyInternal(
   // The masked reading below is judged too: a `GIT_X=` written after a closed substitution is an
   // argument of the substitution's own segment in the unmasked scan.
   if (allowList) {
-    let gitWhy = gitLiteralExecution(invocations);
+    let gitWhy = gitLiteralExecution(invocations, raw, prose);
     if (gitWhy === null && /\$\(|`|[<>]\(/.test(prose)) {
       const masked = maskSubstitutions(prose);
-      if (masked !== null)
-        gitWhy = gitLiteralExecution(commandInvocations(masked));
+      if (masked !== null) {
+        const maskedInv = commandInvocations(masked);
+        gitWhy = gitLiteralExecution(
+          maskedInv,
+          rawInvocations(masked, maskedInv),
+          masked,
+        );
+      }
     }
     if (gitWhy !== null)
       return verdict("mutating", `not-allow-listed: git ${gitWhy}`);

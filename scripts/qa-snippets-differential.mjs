@@ -235,6 +235,13 @@ export const ATOM_SETS = {
     "git ls-remote --exec='touch out' file:///nonexistent",
     "GIT_SSH_COMMAND='touch out' git ls-remote ssh://x/y",
     "GIT_EXTERNAL_DIFF='touch out' git diff --no-index /etc/hostname /etc/hosts",
+    // T304-QA-1..3 (cycle 1): quoted option and export operands, and a GIT_ name filled by
+    // read / printf -v then exported by name. The first set had no atom that could form them.
+    "git ls-remote '--upload-pack=touch out' .",
+    'git ls-remote "--exec=touch out" .',
+    "export 'GIT_SSH_COMMAND=touch out'; git ls-remote ssh://x/y",
+    "read GIT_SSH_COMMAND <<< 'touch out'; export GIT_SSH_COMMAND; git ls-remote ssh://x/y",
+    "printf -v GIT_SSH_COMMAND 'touch out'; export GIT_SSH_COMMAND; git ls-remote ssh://x/y",
     "git rev-parse HEAD",
     "git log -1",
     "echo hi",

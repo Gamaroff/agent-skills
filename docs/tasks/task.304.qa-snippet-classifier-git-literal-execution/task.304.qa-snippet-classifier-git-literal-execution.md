@@ -5,7 +5,7 @@ type: task
 description: "Refuse the git forms that execute a plain literal string (-c key=value, --config-env, GIT_* environment prefixes, --upload-pack and --exec-path), which the classifier admits as runnable today and which write under bash."
 tags: [qa-task, security, follow-up-294]
 category: refactoring
-status: ready-for-review
+status: in-progress
 priority: Medium
 created: 2026-11-11
 updated: 2026-11-11
@@ -15,7 +15,7 @@ github_issue:
 
 # Technical Task: QA snippet classifier refuses git literal execution
 
-**Status:** Ready for Review
+**Status:** In Progress
 
 Follow-up to [task 294](../task.294.qa-snippet-classifier-allow-list/task.294.qa-snippet-classifier-allow-list.md) (PR #874). Its QA gate recorded this gap under `recommendations.future` (`task.294.gate.1.qa-snippet-classifier-allow-list.yml`, `provenance: pre-existing`): the verdict is identical on `origin/develop`, and it sits outside that task's word-shape scope.
 
@@ -404,6 +404,27 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-11
+**Quality Score**: 80/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.304.qa.1.qa-snippet-classifier-git-literal-execution.md](./task.304.qa.1.qa-snippet-classifier-git-literal-execution.md)
+- **Gate File**: [task.304.gate.1.qa-snippet-classifier-git-literal-execution.yml](./task.304.gate.1.qa-snippet-classifier-git-literal-execution.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 397
+- **Phases Verified**: 4/4 (two with findings)
+- **Critical Issues**: 3
+- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+Three spellings bypass the new refusal and write a file under real bash: a wholly quoted `--upload-pack` / `--exec` word, a quoted `export` operand, and a `GIT_` variable filled by `read` or `printf -v` and exported by name.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -413,4 +434,6 @@ None.
 | 2026-11-11 | 1.1 | Review passed (8/10); fixed: GIT_*= rule decided (any position, wholesale), existing BUG-6 test that pins `git -c … log` runnable named for the flip | review-task |
 |  |  | Status → ready-for-development | review-task |
 | 2026-11-11 | 1.2 | Implemented all four phases: git refusals, tests, differential `git` set, docs, bundle; status → ready-for-review | develop |
+| 2026-11-11 |  | QA gate FAIL (80/100) — 3 findings | qa-task |
+| 2026-11-11 |  | QA findings fixed — quoted option and export words judged as written, any GIT_ name refused, differential atoms added; 1 iteration | qa-fix |
 <!-- change-log-end -->
