@@ -6,6 +6,23 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **The QA snippet classifier refuses the git forms that run a literal string (task 304).** A block
+  whose arguments were plain literals passed every layer, because `git` is non-evaluating and its
+  subcommand is on a closed list, yet git runs some of those strings as commands:
+  `git -c core.fsmonitor=./hook.sh status`, `git ls-remote --upload-pack=…` and `GIT_SSH_COMMAND=…`
+  all wrote a file under real bash. `classifyBlock` now refuses the global `-c` and `--config-env`, a
+  `GIT_*=` assignment in any position, `--exec-path=<dir>`, `ls-remote --upload-pack` / `--exec` (and
+  their unambiguous prefixes), any git argument holding an unquoted brace expansion (scanned per
+  word), and an `export` / `declare` / `typeset` / `readonly` / `local` operand whose variable name is
+  not a plain identifier (a brace, quote, backslash or expansion the shell resolves after the scan),
+  and any git global flag the scan does not know before the subcommand (`git --attr-source log -c …`
+  hid the `-c`), and any git line on which the two readings of the subcommand disagree (a quote
+  inside `--namespace` hid `fetch --upload-pack` behind `log`), any git global flag that takes a
+  separate operand other than `-C` with one plain word (an escaped space in the operand split one word
+  into two), and any flag ahead of the subcommand spelled with a quote, backslash or expansion, with
+  `not-allow-listed: git …`, by form and not by value. Cost on the repository's own
+  documentation: 0 blocks (251 runnable before and after). The differential gains a `git` atom set that
+  writes against the engine without the rule and not against the new one.
 - **The QA snippet classifier runs a block only when every non-literal word is on a closed list (task 294).**
   Task 293 refused indirect evaluation by listing the shapes it had seen, and three shapes were still
   `runnable` and wrote to disk under real bash: a value stored from a substitution whose `$` is spelled

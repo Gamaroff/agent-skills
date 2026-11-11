@@ -333,6 +333,48 @@ generates the three shapes this section closed and is calibrated against the eng
 (writes there, none now). A documentation block that needs a refused shape is rewritten to avoid the
 indirection.
 
+**Git forms that run a literal string (task 304).** `git` is on the non-evaluating list and its
+subcommand is read from a closed list, so a block such as `git -c core.fsmonitor=./hook.sh status` was
+`runnable` while git ran the value as a command. Measured under real bash on 2026-11-11, these write or
+run code, and each is now `mutating` with a reason that starts `not-allow-listed: git `: the global
+`-c` and `--config-env`; a `GIT_*=` assignment in any position (a prefix on the command, a bare line,
+`export`, `declare`), refused by name because `export`, `declare -x` and a bare assignment after `set -a`
+make the variable live for a later git command; and `ls-remote --upload-pack` or `--exec`, including
+git's unambiguous prefixes (`--upl`, `--exe`). The refusal is on the form, never the value: the value is
+the string git will run. `-C <one plain word>` and the `=`-joined `--git-dir=x` / `--work-tree=x` spellings select a path and stay runnable (a separate-operand `--git-dir x` is refused), as does a
+`-c` written after the subcommand (a diff flag, not the global one). `--exec-path=<dir>` is refused too:
+under `ls-remote` it runs `<dir>/git-upload-pack` (QA cycle 2), while a bare `--exec-path` only prints.
+A git argument holding an unquoted brace expansion (`--upload-pa{ck,ck}`, `--config-e{nv,nv}`) is
+refused as a whole, because the scan reads text that is not the word git receives; the cost is that
+`git log --format={%h,%s}` is refused as well, and a quoted brace is not. The brace scan is per word (a
+`{` in one word never pairs with a `,` in another, as bash does not expand it); a word is joined to the
+next only across a trailing backslash, which is how the scan splits `--{upload-pack=x\ y,}`. The
+exported name gets the same treatment as the arguments (QA cycle 3, the third strike on this file): a
+mechanism that matched the text of a `GIT_` name was beaten three times, by quoting, by a brace and by
+a name the shell assembles (`export GIT_{SSH_COMMAND,X}=…`, `export GI''T_SSH_COMMAND=…`, `export
+GIT\_SSH_COMMAND=…`). It was replaced, not widened: `export`, `declare`, `typeset`, `readonly` and `local`
+must name each variable as a plain literal identifier whenever the block is judged for git, and a name
+holding a brace, a quote, a backslash or an expansion is refused whatever it spells. The same change of
+shape closed QA cycle 4: the scan finds the subcommand by skipping the global flags that take a separate
+operand, and a list of those fails open on every flag it forgets (`git --attr-source log -c
+core.sshCommand=… ls-remote …` read `log` as the subcommand and ran the `-c`). The rule is now the
+reverse: a global flag before the subcommand must be one the scan knows (the operand-taking ones it
+skips, and the zero-operand ones such as `--no-pager`, `-p`, `--bare`, `--literal-pathspecs`), and any
+other flag, including one git adds next year, is refused with `an unknown git global flag`. QA cycle 5
+closed the last way two readers could differ: the scan that admits the subcommand and the scan that
+judges the arguments each found it, on different text, and a quote inside an operand-taking flag
+(`git --names"pace" log fetch --upload-pack=…`) made them name `log` and `fetch`. The argument scan
+now returns the subcommand it found, and a line whose two readings disagree is refused. QA cycle 6 showed
+that check cannot hold alone: the line reaches both readers already split on whitespace, so an escaped
+space inside a flag operand (`git --namespace a\ log fetch --upload-pack=…`) is two tokens to both and
+one word to bash, and they agree on the wrong subcommand. The scan therefore stops reading flag
+operands. The only global flag with a separate operand that is kept is `-C`, with one plain word (the
+documented form); any other operand-taking flag, a `-C` operand that is not one plain word, and any flag
+token ahead of the subcommand spelled with a quote, backslash or expansion are refused. Cost on the shipped documentation:
+0 blocks (`npm run qa-snippets:docscan`: 251 runnable before, 251 now). The `git` atom set of the
+differential forms these shapes and is calibrated against the engine without the rule (writes there,
+none now). A block that needs one of these forms is rewritten without it.
+
 ### 2aa. Helper calls run only when the helper itself would
 
 `bash`, `sh`, `source` and `.` execute a file, which is exactly what the allow-list exists to refuse —

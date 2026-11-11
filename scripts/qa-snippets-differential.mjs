@@ -223,6 +223,57 @@ export const ATOM_SETS = {
     "\n",
     "\n",
   ],
+  // Task 304: git forms that run a literal string, as whole shapes (each writes `out` in an empty
+  // directory under bash, measured 2026-11-11) plus read-only controls and separators. Calibration:
+  // against the engine at the base of task 304 this set must report writes; against the new engine
+  // it must report none.
+  git: [
+    "GIT_TRACE=$PWD/out git rev-parse --show-toplevel",
+    "export GIT_TRACE=$PWD/out; git rev-parse HEAD",
+    "git -c core.sshCommand='touch out' ls-remote ssh://x/y",
+    "git ls-remote --upload-pack='touch out' file:///nonexistent",
+    "git ls-remote --exec='touch out' file:///nonexistent",
+    "GIT_SSH_COMMAND='touch out' git ls-remote ssh://x/y",
+    "GIT_EXTERNAL_DIFF='touch out' git diff --no-index /etc/hostname /etc/hosts",
+    // T304-QA-1..3 (cycle 1): quoted option and export operands, and a GIT_ name filled by
+    // read / printf -v then exported by name. The first set had no atom that could form them.
+    "git ls-remote '--upload-pack=touch out' .",
+    'git ls-remote "--exec=touch out" .',
+    "export 'GIT_SSH_COMMAND=touch out'; git ls-remote ssh://x/y",
+    "read GIT_SSH_COMMAND <<< 'touch out'; export GIT_SSH_COMMAND; git ls-remote ssh://x/y",
+    "printf -v GIT_SSH_COMMAND 'touch out'; export GIT_SSH_COMMAND; git ls-remote ssh://x/y",
+    // T304-QA-4..6 (cycle 2): brace expansion rebuilds an option after the scan, and --exec-path
+    // names a directory ls-remote runs git-upload-pack from.
+    "git ls-remote --upload-pa{ck,ck}='touch out' .",
+    "git ls-remote --exe{c,c}='touch out' .",
+    "X='touch out' git --config-e{nv,nv}=core.sshCommand=X ls-remote ssh://x/y",
+    "git --exec-path=$PWD ls-remote .",
+    // Task 304, QA cycle 3: the exported NAME is built by the shell after the scan reads it.
+    "export GIT_{SSH_COMMAND,X}='touch out'; git ls-remote ssh://x/y",
+    "export G{IT_SSH_COMMAND,X}='touch out'; git ls-remote ssh://x/y",
+    "export GI''T_SSH_COMMAND='touch out'; git ls-remote ssh://x/y",
+    "export GI\"\"T_SSH_COMMAND='touch out'; git ls-remote ssh://x/y",
+    "export GIT\\_SSH_COMMAND='touch out'; git ls-remote ssh://x/y",
+    // Task 304, QA cycle 4: a global flag the scan does not know takes an operand and hides the
+    // real subcommand (`--attr-source` is real; the second is a flag git does not have yet).
+    "git --attr-source log -c core.sshCommand='touch out' ls-remote ssh://x/y",
+    "git --attr-source log ls-remote --upload-pack='touch out' .",
+    "git --some-future-flag log -c core.sshCommand='touch out' ls-remote ssh://x/y",
+    // Task 304, QA cycle 5: a quote inside an operand-taking global flag hid it from one reader.
+    "git --names\"pace\" log fetch --upload-pack='touch out' .",
+    "git --\"namespace\" status fetch --upload-pack='touch out' .",
+    "git --work-\"tree\" log fetch --upload-pack='touch out' .",
+    // Task 304, QA cycle 6: an escaped space inside a flag operand splits one word into two tokens.
+    "git --namespace a\\ log fetch --upload-pack='touch out' .",
+    "git --namespace=a\\ log fetch --upload-pack='touch out' .",
+    "git --git-dir a\\ log fetch --upload-pack='touch out' .",
+    "git rev-parse HEAD",
+    "git log -1",
+    "echo hi",
+    ";",
+    "\n",
+    "\n",
+  ],
   // Arithmetic, where `<<` is a left shift and not a heredoc opener (task 292, QA cycle 1): the
   // `\nz\n` atom is the line a mis-read heredoc would take for its delimiter.
   arith: [
@@ -280,7 +331,7 @@ export function generateBlocks(atoms, seed, count, bare = false) {
 }
 
 /** Atom sets whose blocks carry no prefix and no appended writer (see generateBlocks). */
-export const BARE_SETS = new Set(["splits", "indirect", "residual"]);
+export const BARE_SETS = new Set(["splits", "indirect", "residual", "git"]);
 
 /**
  * Run `bash -c code` in a fresh directory and say whether it left anything there. The directory

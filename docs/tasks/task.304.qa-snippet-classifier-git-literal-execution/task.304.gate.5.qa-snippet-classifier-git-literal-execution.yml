@@ -1,0 +1,74 @@
+schema: 2
+task: 'task.304.qa-snippet-classifier-git-literal-execution'
+task_title: 'QA snippet classifier refuses git literal execution'
+gate: FAIL
+status_reason: 'The cycle 4 finding is fixed and re-verified: an unknown git global flag before the subcommand is now refused, and switching that refusal off turns 3 tests red. The safety re-probe found a different hole in the same boundary: the scan finds the git subcommand twice, in gitSubcommand (on the raw words) and again in gitArgsHazard (on the unquoted words), and a quote or backslash inside the spelling of an operand-taking global flag makes the two disagree. `git --names"pace" log fetch --upload-pack=''touch M'' .` is admitted as the allow-listed `git:log` while real git unquotes the flag, consumes `log` as its operand and runs `fetch --upload-pack` (writes under bash, git 2.56). This is the fifth gate in the budget, so the loop ends here and the finding goes to a human.'
+reviewer: 'QA Engineer'
+head: '58a018327387172e25fb3c961f35f2bc5b06a270'
+updated: '2026-11-11T07:07:41Z'
+
+top_issues:
+  - id: 'T304-QA-10'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: "gitSubcommand (line 2536) reads the raw words and gitArgsHazard (line 2634) reads the unquoted words, so a quote or backslash inside an operand-taking global flag hides it from the first and not the second. `git --names\"pace\" log fetch --upload-pack='touch M' .`, `git --\"namespace\" status fetch --upload-pack='touch M' .` and `git --work-\"tree\" log fetch --upload-pack='touch M' .` classify runnable as `git:log` / `git:status` (the develop engine too) and bash writes M under git 2.56: git unquotes the flag, takes the next word as its operand and runs `fetch`. gitArgsHazard skips the operand the same way, reaches `fetch`, finds no ls-remote and returns null, because it never compares its subcommand with the one the allow-list admitted. The bare `--namespace log fetch ...` is refused correctly, which shows the quote is what defeats it. Reproduced by QA under bash with a planted marker; the control (bare spelling) and `git log -1` behave."
+    suggested_action: 'Do not unquote in one more place. Parse the git words once: compute the subcommand and the option list from the unquoted tokens in a single function, and make that one result the only input to the allow-list check and to the argument hazards, so the two readers cannot disagree. As a backstop, refuse when the subcommand the hazard scan finds is not the `git:<sub>` word the allow-list admitted. Add bash-verified rows for `--names"pace"`, `--"namespace"` and `--work-"tree"` and `-\C`, with the bare-spelling control.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 404
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 69
+    escaped: 0
+    boundary: true
+    boundary_signals: ['refused', 'are refused']
+    notes: 'The classifier is a boundary (a false runnable executes a block). 69 probes ran (run record task.304.qa.5...security.run.json, escaped 0): 66 behaved as required; 3 hostile cases with a quoted operand-taking global flag were classified runnable and write under real bash. All cycle 4 cases pass.'
+  performance:
+    status: PASS
+    notes: 'Docs scan unchanged by the cycle 4 fix: 3470 blocks, runnable 251 before and after, newly refused 0. Differential git set on the LAN server: 0 writes in 20000 (its atoms do not yet include a quoted flag spelling).'
+  reliability:
+    status: PASS
+    notes: 'Fails closed on the forms the task lists plus brace, quote, read/printf, name-assembly forms and unknown global flags. The open gap is two readers of one command line.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Fifth consecutive gate with a HIGH on shared/resources/qa-execute-snippets.mjs (quoting, braces, name assembly, an enumerated flag list, and now two parses of one git command line). Convergence readings 3, 2, 2, 1, 1: the count is flat, not rising, but the budget of five gates is spent.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Parse the git command line once (see T304-QA-10) so the allow-list and the argument hazards read the same subcommand, add bash-verified rows and a differential atom for a quoted flag spelling, then re-review. The gate budget is spent: this needs a human decision to extend it or to accept the residual.'
+      refs: ['shared/resources/qa-execute-snippets.mjs', 'scripts/qa-snippets-differential.mjs', 'shared/resources/tests/qa-execute-snippets.test.mjs']
+  future:
+    - action: 'PAGER (carried from gate 4, pre-existing): `export PAGER="touch m"; git --paginate log` runs the string when stdout is a terminal. Not a GIT_ name, so outside the task as written. Same on the develop engine.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+      provenance: pre-existing
+    - action: 'CI check `test` red on 58a01832 and on develop too (run 42959047359): not caused by this branch. Fix on the base.'
+      refs: ['.github/workflows']
+      provenance: pre-existing
+    - action: 'CR-4 (carried): a GIT_ substring in quoted or argument text is refused (`git log --grep="GIT_SSH"`). Fail-closed; docs corpus shows 0 newly refused.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'Reviewer low-confidence note: `git ls-remote ext::sh ...` classifies runnable. Real git refuses ext:: by default (protocol.ext.allow=never), so it runs nothing unless config enables it. Consider refusing the ext:: scheme.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

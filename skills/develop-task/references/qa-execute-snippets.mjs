@@ -2551,6 +2551,259 @@ function gitSubcommand(tokensAfterGit) {
   return null;
 }
 
+/**
+ * task.304: the git forms that make git run a literal string as a command, which the word
+ * allow-list admits because `git` is non-evaluating and its subcommand is on a closed list. Each
+ * was run under real bash (cbaaf0e9) and wrote a file:
+ *   - the global `-c <key=value>` and `--config-env` (`core.fsmonitor`, `core.sshCommand` …);
+ *   - a `GIT_*` assignment, in any position (`GIT_EXTERNAL_DIFF`, `GIT_SSH_COMMAND`, `GIT_TRACE` …),
+ *     which `export`, `declare -x` and `set -a` make live for a later git command;
+ *   - `ls-remote --upload-pack` and its alias `--exec`, with git's unambiguous prefixes;
+ *   - `--exec-path=<dir>`, which makes `ls-remote` run `<dir>/git-upload-pack` (measured under
+ *     bash, QA cycle 2). A bare `--exec-path` prints and exits, so it runs nothing.
+ * The refusal is on the FORM, never the value: the value is the string git will run.
+ * A word the shell can still rewrite after the scan is refused too, because the scan then reads
+ * text that is not the argument git receives. Brace expansion is that class here (`--upload-pa{ck,ck}`
+ * is `--upload-pack`, QA cycle 2): the matcher below compares literal text, and a literal is exactly
+ * what an expansion is not. Variable, substitution and `$'…'` forms are refused by the deny-list
+ * layer that runs before this one.
+ * Returns the refused class, or null.
+ */
+const GIT_ASSIGNING_COMMANDS = new Set([
+  "export",
+  "declare",
+  "typeset",
+  "readonly",
+  "local",
+]);
+const unquoteToken = (t) =>
+  t
+    .replace(/\u0001\d+\u0001/g, "")
+    .replace(/\\(.)/g, "$1")
+    .replace(/['"]/g, "");
+// The global flags the scan KNOWS the shape of, measured against `git -h` (git 2.56). The flags
+// that take a separate operand are GIT_FLAGS_WITH_OPERAND (skipped with their operand); these are
+// the ones that take none, or take their value after `=`. `-c`, `--config-env` and `--exec-path=`
+// are known and refused by gitConfigFlag first. Anything else before the subcommand is refused.
+const GIT_KNOWN_GLOBAL_FLAGS = new Set([
+  ...GIT_FLAGS_WITH_OPERAND,
+  "-p",
+  "--paginate",
+  "-P",
+  "--no-pager",
+  "--no-replace-objects",
+  "--no-lazy-fetch",
+  "--no-optional-locks",
+  "--no-advice",
+  "--bare",
+  "--literal-pathspecs",
+  "--glob-pathspecs",
+  "--noglob-pathspecs",
+  "--icase-pathspecs",
+  "--version",
+  "-v",
+  "--help",
+  "-h",
+  "--html-path",
+  "--man-path",
+  "--info-path",
+  "--list-cmds",
+]);
+const gitConfigFlag = (t) => {
+  if (t === "-c" || /^-c./.test(t)) return "-c (git runs the value)";
+  if (t === "--config-env" || t.startsWith("--config-env="))
+    return "--config-env (git runs the value)";
+  if (/^--exec-path=./.test(t))
+    return "--exec-path=<dir> (git runs git-upload-pack from it)";
+  return null;
+};
+/**
+ * True when bash would brace-expand `word`: an UNQUOTED `{` followed, unquoted, by a comma or
+ * `..`. `{base}` with neither is literal text, and so is anything inside quotes. Conservative on
+ * nesting (any later unquoted comma counts), which can only refuse more.
+ */
+function hasBraceExpansion(word) {
+  let quote = null;
+  let open = false;
+  for (let k = 0; k < word.length; k += 1) {
+    const ch = word[k];
+    if (quote === "'") {
+      if (ch === "'") quote = null;
+    } else if (quote === '"') {
+      if (ch === "\\") k += 1;
+      else if (ch === '"') quote = null;
+    } else if (ch === "\\") {
+      k += 1;
+    } else if (ch === "'" || ch === '"') {
+      quote = ch;
+    } else if (ch === "{") {
+      open = true;
+    } else if (open && (ch === "," || (ch === "." && word[k + 1] === "."))) {
+      return true;
+    }
+  }
+  return false;
+}
+// task.304, fifth gate (T304-QA-10): ONE reading of a git command line. This scan and gitSubcommand
+// each found the subcommand, on different text (the unquoted words here, the collapsed words
+// there), and a quote inside an operand-taking flag (`--names"pace" log fetch --upload-pack=x`)
+// made them name different subcommands: the allow-list admitted `git:log`, while git ran `fetch`.
+// So this scan now returns the subcommand it found beside the hazard, and the caller refuses when
+// that is not the one the allow-list admitted. Two readers of one line cannot disagree silently.
+// One plain word: letters, digits and the few path characters, nothing the shell can split, join or
+// rewrite. A flag token ahead of the subcommand is plain text of the same kind, with an `=value`.
+const GIT_PLAIN_WORD = /^[A-Za-z0-9_.\/@+:~-]+$/;
+const GIT_PLAIN_FLAG = /^-[A-Za-z0-9_.\/@+:=~-]*$/;
+function scanGitArgs(rawArgs) {
+  // Per word. The scan splits a word at an escaped space (`--{upload-pack=touch\ W,}` arrives as
+  // two tokens), so a token that ends in an odd run of backslashes is joined to the next one;
+  // nothing else is, because a `{` in one word never pairs with a `,` in another.
+  const words = [];
+  for (const t of rawArgs) {
+    if (
+      words.length > 0 &&
+      /(?:^|[^\\])(?:\\\\)*\\$/.test(words[words.length - 1])
+    )
+      words[words.length - 1] += ` ${t}`;
+    else words.push(t);
+  }
+  if (words.some(hasBraceExpansion))
+    return refuseGit(
+      "a brace expansion in a git argument (the shell rewrites the word after the scan)",
+    );
+  const args = rawArgs.map(unquoteToken);
+  for (let i = 0; i < args.length; i += 1) {
+    const tok = args[i];
+    if (tok === "") continue;
+    const flag = gitConfigFlag(tok);
+    if (flag !== null) return refuseGit(flag);
+    // `--exec-path` takes its value with `=`; a bare one takes no operand, so the next word is
+    // judged as itself (a `-c` after it is a real `-c`).
+    //
+    // task.304, sixth gate (T304-QA-11): the scan does not READ a flag operand any more. Reading one
+    // means deciding where the word ends, and the line reaches this scan already split on
+    // whitespace, so `--namespace a\ log fetch ...` is two tokens here and one word for bash; five
+    // gates each closed one way of splitting it. The construct is refused instead: the only global
+    // flag that takes a separate operand and is kept is `-C`, with one plain word (the documented
+    // form), and every flag token ahead of the subcommand must itself be plain text.
+    if (GIT_FLAGS_WITH_OPERAND.has(tok) && tok !== "--exec-path") {
+      if (tok !== "-C")
+        return refuseGit(
+          "a git global flag that takes an operand (the scan cannot tell where the operand ends, so it does not read one)",
+        );
+      if (!GIT_PLAIN_WORD.test(rawArgs[i + 1] ?? ""))
+        return refuseGit(
+          "a -C operand that is not one plain word (the scan cannot tell where it ends)",
+        );
+      i += 1; // the one plain word belongs to -C
+      continue;
+    }
+    if (tok.startsWith("-")) {
+      if (!GIT_PLAIN_FLAG.test(rawArgs[i]))
+        return refuseGit(
+          "a git global flag spelled with a quote, backslash or expansion (the word may not be the one the scan read)",
+        );
+      // A global flag the scan does not know is refused, never skipped (task.304, QA cycle 4). A
+      // flag that takes a separate operand makes the scan read that operand as the subcommand, and
+      // git adds global flags over time (`--attr-source` was not on the old list), so a list of
+      // the flags that take an operand fails open on every flag it forgets. The list of what is
+      // KNOWN runs the other way: an unknown flag fails closed.
+      if (!GIT_KNOWN_GLOBAL_FLAGS.has(tok.split("=")[0]))
+        return refuseGit(
+          "an unknown git global flag (it may take an operand the scan would read as the subcommand)",
+        );
+      continue;
+    }
+    if (tok === "ls-remote") {
+      for (const a of args.slice(i + 1)) {
+        if (a === "--") break;
+        const m = /^--([^=]+)/.exec(a);
+        if (!m) continue;
+        const opt = m[1];
+        if (
+          "upload-pack".startsWith(opt) ||
+          (opt.length >= 2 && "exec".startsWith(opt))
+        )
+          return refuseGit(
+            "ls-remote --upload-pack or --exec (git runs the value)",
+          );
+      }
+    }
+    // the subcommand: everything after it is the subcommand's own
+    return { why: null, sub: tok };
+  }
+  return { why: null, sub: null };
+}
+const refuseGit = (why) => ({ why, sub: null });
+// A GIT_ name written anywhere in the text, other than as a read (`$GIT_X`, `${GIT_X}`). Git reads
+// some of these variables as a command, and bash gives a variable a value through many builtins
+// (`export`, `declare -x`, `read`, `printf -v`, a `for` loop, `set -a` with any of them), so the
+// rule is on the NAME, which is the one spelling every one of them shares. A name assembled at
+// runtime from pieces is outside it: the allow-list does not track values (see §2a-iii).
+const GIT_NAME = /(?<![A-Za-z0-9_$\{])GIT_[A-Za-z0-9_]+/;
+// task.304, third strike (QA cycle 3): the variable NAME is judged where an assignment reaches the
+// environment, not by matching the text of a word the shell can still rebuild. `export GIT_{A,B}=x`,
+// `export GI''T_X=x` and `export GIT\_X=x` all name GIT_A / GIT_X after the scan has read them, and
+// a pattern over the text can never list every way to spell that. So an assignment-making command
+// (`GIT_ASSIGNING_COMMANDS`) must name every variable as a plain literal identifier, and a name the
+// scan cannot read as one is refused whatever it spells. The GIT_ test above then runs on a name
+// that really is the name. `set -a` needs no rule of its own: every way to give a built name a
+// value without `export` (a bare assignment, `read`, `printf -v`, a `for` variable) is already
+// refused upstream as a non-literal or unbound word, and a plain `GIT_` name is the text rule's.
+// (A rule for allexport was written and mutation-tested; nothing turned red, so it was deleted.)
+// (PLAIN_NAME, the identifier pattern, is declared once further down the module.)
+function assignmentNameHazard(rawArgs) {
+  for (const a of rawArgs) {
+    if (a === "" || a.startsWith("-")) continue;
+    const eq = a.indexOf("=");
+    let name = eq === -1 ? a : a.slice(0, eq);
+    name = name.replace(/^(['"])(.*)\1$/, "$2").replace(/^['"]/, "");
+    if (!PLAIN_NAME.test(name))
+      return "a variable name the shell builds after the scan (brace, quote, backslash or expansion in an export/declare operand)";
+  }
+  return null;
+}
+const GIT_REASON =
+  "(git reads a GIT_ variable as a command or a path to write)";
+// `raw` is the same invocations with their quoted spans kept as written (`rawInvocations`). The
+// collapsed scan reads `'--upload-pack=x'` as an empty word, so the arguments are judged from
+// `raw`; a block the two readings cannot line up is refused when it runs git (fail-closed).
+function gitLiteralExecution(invocations, raw, text) {
+  if (invocations.gitEnv && invocations.gitEnv.length > 0)
+    return `${invocations.gitEnv[0]}= ${GIT_REASON}`;
+  for (let i = 0; i < invocations.length; i += 1) {
+    const inv = invocations[i];
+    // The assignment-site rules run before the keyword skip: `export` and `set` are keywords to
+    // the scan, and a skipped one is exactly where a built name would pass.
+    const siteArgs = raw ? raw[i].args : inv.args;
+    if (GIT_ASSIGNING_COMMANDS.has(inv.word)) {
+      const nameWhy = assignmentNameHazard(siteArgs);
+      if (nameWhy !== null) return nameWhy;
+    }
+    if (inv.keyword) continue;
+    const isGit = inv.word === "git" || inv.word.startsWith("git:");
+    // With no raw reading, a quoted span reads as an empty word. Refuse only when such a word
+    // sits among this git's arguments: that is the one way an option can hide from the scan. A
+    // git whose collapsed arguments hold no empty word has nothing the raw reading would add.
+    if (isGit && !raw && inv.args.some((a) => /""|''/.test(a) || a === ""))
+      return "git arguments the scan cannot read (fail-closed)";
+    const args = raw ? raw[i].args : inv.args;
+    if (isGit) {
+      const scan = scanGitArgs(args);
+      if (scan.why !== null) return scan.why;
+      // The allow-list admitted `inv.word` from the collapsed words; the scan above read the
+      // unquoted ones. They must name the same subcommand, or the word that was admitted is not
+      // the one git will run (T304-QA-10).
+      const admitted = inv.word.startsWith("git:") ? inv.word.slice(4) : null;
+      if (scan.sub !== admitted)
+        return "a git subcommand the two readings of the line do not agree on (fail-closed)";
+    }
+  }
+  const named = GIT_NAME.exec(text);
+  if (named !== null) return `${named[0]} ${GIT_REASON}`;
+  return null;
+}
+
 /** The leading word of every simple command in the block. */
 export function commandWords(code) {
   return commandInvocations(code)
@@ -2595,6 +2848,11 @@ function commandInvocations(code) {
   // of its own segment, so the closing paren only ever lands on a trailing
   // argument, where it is harmless.
   const words = [];
+  // task.304: every `GIT_*=value` assignment the scan steps over, in any position (a prefix on a
+  // command, a bare line, the operand of `export`/`declare`). Git reads some of those names as a
+  // command to run, so the assignment is judged by name, not by value (`gitLiteralExecution`).
+  // Carried on the returned array so every caller of the one scan sees the same list.
+  words.gitEnv = [];
   // Split on anything that can begin a new simple command.
   // Deliberately NOT split on `{` or `(`: `echo {task-id}` would then yield
   // `task-id}` as a command word, and the fail-closed rule would report a
@@ -2620,7 +2878,10 @@ function commandInvocations(code) {
     for (let ti = 0; ti < toks.length; ti += 1) {
       let tok = toks[ti];
       // Leading `VAR=value` assignments and redirections precede the command.
-      if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(tok)) continue;
+      if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(tok)) {
+        if (/^GIT_/.test(tok)) words.gitEnv.push(tok.split("=")[0]);
+        continue;
+      }
       if (/^[<>]/.test(tok) || /^\d+[<>]/.test(tok)) continue;
       if (tok === "") continue;
       // A `case` arm pattern is the ONE token in command position that is not an
@@ -4117,6 +4378,27 @@ function classifyInternal(
   const notListed = allowList ? allowListViolation(code) : null;
   if (notListed !== null)
     return verdict("mutating", `not-allow-listed: ${notListed}`);
+
+  // task.304: git runs some literal strings as commands. Same layer as the allow-list (it follows
+  // the allow-list's switch), because it is the same kind of refusal: a form git treats as code.
+  // The masked reading below is judged too: a `GIT_X=` written after a closed substitution is an
+  // argument of the substitution's own segment in the unmasked scan.
+  if (allowList) {
+    let gitWhy = gitLiteralExecution(invocations, raw, prose);
+    if (gitWhy === null && /\$\(|`|[<>]\(/.test(prose)) {
+      const masked = maskSubstitutions(prose);
+      if (masked !== null) {
+        const maskedInv = commandInvocations(masked);
+        gitWhy = gitLiteralExecution(
+          maskedInv,
+          rawInvocations(masked, maskedInv),
+          masked,
+        );
+      }
+    }
+    if (gitWhy !== null)
+      return verdict("mutating", `not-allow-listed: git ${gitWhy}`);
+  }
 
   return verdict("runnable", null, changesDir);
 }

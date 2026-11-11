@@ -1558,7 +1558,9 @@ test("BUG-6: widening the write-redirect pre-context spares descriptors and /dev
 
 test("BUG-6: resolving git's subcommand past global flags keeps safe ones safe", () => {
   assert.equal(classifyBlock("git -C /path status").klass, "runnable");
-  assert.equal(classifyBlock("git -c user.name=x log").klass, "runnable");
+  // task.304: the global `-c` runs its value as a command for some keys, so it is refused (the case
+  // moved to the task.304 table below); `-C` and `--git-dir` select a path and stay runnable.
+  assert.equal(classifyBlock("git -c user.name=x log").klass, "mutating");
   assert.equal(classifyBlock("git --git-dir=/p/.git status").klass, "runnable");
   // The route itself: the flag operand must not be mistaken for the subcommand.
   assert.equal(classifyBlock("git -C log push origin main").klass, "mutating");
@@ -5134,6 +5136,24 @@ test("task.292 differential slice: the instrument finds a write when the classif
   );
 });
 
+test("task.304 differential: the git atom set forms writes the engine without the git rule admits", () => {
+  // Calibration on a known failure (task 294's `residual` rule): the git rule sits at the allow-list
+  // layer, so with that layer off the set must produce writes. A set that forms none is blind, and
+  // the slice's green over it (the loop above runs every set, `git` included) would prove nothing.
+  const r = runDifferential({
+    isRunnable: (code) => beforeAllowList(code).klass === "runnable",
+    atoms: ATOM_SETS.git,
+    seed: T292_SLICE.seed,
+    count: 600,
+    bare: BARE_SETS.has("git"),
+  });
+  assert.ok(
+    r.writes > 0,
+    "the git atom set formed no write against the engine without the git rule: the instrument is blind to the class",
+  );
+  assert.ok(BARE_SETS.has("git"), "git blocks carry their own writer");
+});
+
 // ── task.293 — indirect evaluation ─────────────────────────────────────────────────────────────
 // A value is built or stored harmlessly and a later bash feature evaluates it. Each shape is run
 // under REAL bash first (the marker file proves the hole is real, so a test cannot pass by matching
@@ -5602,4 +5622,328 @@ test("task.294 mapfile readarray getopts trap compgen wait are refused as unreco
 });
 test("task.294 set and shift stay runnable in their plain form", () => {
   assert.equal(classifyBlock("set -- a b; shift; echo done").klass, "runnable");
+});
+
+// ── task.304 — git forms that run a literal string ─────────────────────────────────────────────
+// `git` is non-evaluating and its subcommand is on a closed list, so the allow-list admitted every
+// form below. Each row is run under real bash in a scratch repository (a tracked file with an
+// unstaged change, and a `hook.sh` that creates `marker`); the row must write, was `runnable` before
+// task.304 (`beforeAllowList`) and is `mutating` now, from the git rule and not an earlier layer.
+// Measured on 2026-11-11: `-ccore.fsmonitor=…` (joined), `core.pager`, `--exec-path=` and a plain
+// bare `GIT_X=` do not run anything and are not rows; `-c` and `GIT_*` are refused by form anyway.
+const T304_FORMS = {
+  "-c core.fsmonitor": "git -c core.fsmonitor=./hook.sh status",
+  "--config-env": "H=./hook.sh git --config-env=core.fsmonitor=H status",
+  "ls-remote --upload-pack=": "git ls-remote --upload-pack=./hook.sh .",
+  "ls-remote --upload-pack, separate operand":
+    "git ls-remote --upload-pack ./hook.sh .",
+  "ls-remote --exec=": "git ls-remote --exec=./hook.sh .",
+  "ls-remote --upl= (unambiguous prefix)": "git ls-remote --upl=./hook.sh .",
+  "ls-remote --exe= (unambiguous prefix)": "git ls-remote --exe=./hook.sh .",
+  "GIT_TRACE prefix, absolute path": "GIT_TRACE=$PWD/marker git status",
+  "GIT_EXTERNAL_DIFF prefix": "GIT_EXTERNAL_DIFF=./hook.sh git diff",
+  "export GIT_SSH_COMMAND":
+    "export GIT_SSH_COMMAND=./hook.sh\ngit ls-remote ssh://x/y",
+  "bare GIT_SSH_COMMAND after set -a":
+    "set -a\nGIT_SSH_COMMAND=./hook.sh\ngit ls-remote ssh://x/y",
+  "GIT_CONFIG_COUNT/KEY/VALUE":
+    "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.fsmonitor GIT_CONFIG_VALUE_0=./hook.sh git status",
+  // T304-QA-1: a wholly quoted option word. The collapsed scan reads it as an empty word.
+  "ls-remote '--upload-pack=...' single-quoted":
+    "git ls-remote '--upload-pack=./hook.sh' .",
+  'ls-remote "--exec=..." double-quoted': 'git ls-remote "--exec=./hook.sh" .',
+  // T304-QA-2: a quoted export operand.
+  "export 'GIT_SSH_COMMAND=...' single-quoted":
+    "export 'GIT_SSH_COMMAND=./hook.sh'\ngit ls-remote ssh://x/y",
+  'export "GIT_SSH_COMMAND=..." double-quoted':
+    'export "GIT_SSH_COMMAND=./hook.sh"\ngit ls-remote ssh://x/y',
+  // T304-QA-3: a GIT_ variable given its value by another builtin, then exported by name.
+  "read GIT_SSH_COMMAND, then export by name":
+    "read GIT_SSH_COMMAND <<< ./hook.sh\nexport GIT_SSH_COMMAND\ngit ls-remote ssh://x/y",
+  "printf -v GIT_SSH_COMMAND, then export by name":
+    "printf -v GIT_SSH_COMMAND ./hook.sh\nexport GIT_SSH_COMMAND\ngit ls-remote ssh://x/y",
+  "printf -vGIT_SSH_COMMAND joined, then export by name":
+    "printf -vGIT_SSH_COMMAND ./hook.sh\nexport GIT_SSH_COMMAND\ngit ls-remote ssh://x/y",
+  // T304-QA-4/5 (cycle 2): brace expansion rebuilds the option after the scan has read the text.
+  "brace splits --upload-pack": "git ls-remote --upload-pa{ck,ck}=./hook.sh .",
+  "brace builds the leading dashes":
+    "git ls-remote --{upload-pack,upload-pack}=./hook.sh .",
+  "brace with an empty alternative":
+    "git ls-remote --upload-pack{,}=./hook.sh .",
+  "brace splits the --exec alias": "git ls-remote --exe{c,c}=./hook.sh .",
+  "brace splits --config-env":
+    "H=./hook.sh git --config-e{nv,nv}=core.fsmonitor=H status",
+  "brace with an empty alternative on --config-env":
+    "H=./hook.sh git --config-env{,}=core.fsmonitor=H status",
+  "brace across an escaped space":
+    "git ls-remote --{upload-pack=./hook.sh\\ x,} .",
+  // T304-QA-6: --exec-path=<dir> makes ls-remote run <dir>/git-upload-pack.
+  "--exec-path=<dir> with ls-remote": "git --exec-path=$PWD ls-remote .",
+  // The raw reading cannot line up inside a quoted substitution; a quoted option must still not hide.
+  "quoted --upload-pack inside a quoted substitution":
+    "echo \"$(git ls-remote '--upload-pack=./hook.sh' .)\"",
+  "set -a, then read GIT_SSH_COMMAND":
+    "set -a\nread GIT_SSH_COMMAND <<< ./hook.sh\ngit ls-remote ssh://x/y",
+  "set -a, then a for loop over GIT_SSH_COMMAND":
+    "set -a\nfor GIT_SSH_COMMAND in ./hook.sh; do :; done\ngit ls-remote ssh://x/y",
+  // T304-QA-7/8 (third strike): bash builds the exported name after the scan has read it.
+  "export GIT_ name built by a brace":
+    "export GIT_{SSH_COMMAND,X}=./hook.sh; git ls-remote ssh://h/x",
+  "export GIT_ name built by a brace after G":
+    "export G{IT_SSH_COMMAND,X}=./hook.sh; git ls-remote ssh://h/x",
+  "export GIT_ name split by empty single quotes":
+    "export GI''T_SSH_COMMAND=./hook.sh; git ls-remote ssh://h/x",
+  "export GIT_ name split by empty double quotes":
+    'export GI""T_SSH_COMMAND=./hook.sh; git ls-remote ssh://h/x',
+  "export GIT_ name split by a backslash":
+    "export GIT\\_SSH_COMMAND=./hook.sh; git ls-remote ssh://h/x",
+  // T304-QA-9 (cycle 4): a global flag that takes an operand and is not on the scan's list hides
+  // the real subcommand. `--attr-source` is real (git 2.40+); the second row is a flag git does
+  // not have, which stands for the next one it adds.
+  "-c behind --attr-source":
+    "git --attr-source log -c core.sshCommand=./hook.sh ls-remote ssh://x/y",
+  // T304-QA-10 (cycle 5): a quote inside an operand-taking global flag hid it from one reader of
+  // the line and not the other; git unquotes the flag, takes `log` as its operand and runs `fetch`.
+  "fetch --upload-pack behind a quoted --namespace":
+    'git --names"pace" log fetch --upload-pack=./hook.sh .',
+  "fetch --upload-pack behind a wholly quoted --namespace":
+    'git --"namespace" status fetch --upload-pack=./hook.sh .',
+  "fetch --upload-pack behind a quoted --work-tree":
+    'git --work-"tree" log fetch --upload-pack=./hook.sh .',
+  // T304-QA-11 (cycle 6): the line is split on whitespace before the scan reads it, so an escaped
+  // space inside a flag's operand is two tokens to the scan and one word to bash.
+  "fetch --upload-pack behind a --namespace operand with an escaped space":
+    "git --namespace a\\ log fetch --upload-pack=./hook.sh .",
+  "fetch --upload-pack behind a --namespace=value with an escaped space":
+    "git --namespace=a\\ log fetch --upload-pack=./hook.sh .",
+  "--upload-pack behind --attr-source":
+    "git --attr-source log ls-remote --upload-pack=./hook.sh .",
+};
+// Global flags git has and the scan knows the shape of: they stay runnable beside a safe subcommand.
+const T304_FLAG_CONTROLS = [
+  "git --no-pager log -1",
+  "git -C . log -1",
+  "git --no-optional-locks status",
+  "git --literal-pathspecs log -1",
+  "git -p log -1",
+];
+// Controls for the assignment-site rule: a plain literal name stays runnable beside git.
+const T304_NAME_CONTROLS = [
+  "export FOO=1; git log -1",
+  "export FOO=1 BAR=2\ngit status",
+  "git log -1",
+];
+const gitRunsUnderBash = (code) => {
+  const dir = mkdtempSync(join(tmp(), "g-"));
+  const env = {
+    ...process.env,
+    GIT_CONFIG_GLOBAL: "/dev/null",
+    GIT_CONFIG_SYSTEM: "/dev/null",
+  };
+  const sh = (c) =>
+    spawnSync("bash", ["-c", c], {
+      cwd: dir,
+      env,
+      timeout: CLI_BUDGET.timeoutMs,
+    });
+  sh(
+    "git init -q . && git -c user.name=a -c user.email=a@a commit -q --allow-empty -m i && echo x > f && git add f && git -c user.name=a -c user.email=a@a commit -q -m f && echo y >> f",
+  );
+  writeFileSync(
+    join(dir, "hook.sh"),
+    `#!/bin/sh\ntouch ${dir}/marker\nexit 0\n`,
+  );
+  chmodSync(join(dir, "hook.sh"), 0o755);
+  // `git --exec-path=<dir> ls-remote .` runs `<dir>/git-upload-pack`: the same hook, planted where
+  // that form looks for it.
+  writeFileSync(
+    join(dir, "git-upload-pack"),
+    `#!/bin/sh\ntouch ${dir}/marker\nexit 0\n`,
+  );
+  chmodSync(join(dir, "git-upload-pack"), 0o755);
+  sh(code);
+  return existsSync(join(dir, "marker"));
+};
+test("task.304 a GIT_ name assembled in a variable runs under bash and is refused by the allow-list, not the git rule", () => {
+  const code =
+    "x=GIT_SSH_COMMAND\nread $x <<< ./hook.sh\nexport $x\ngit ls-remote ssh://x/y";
+  assert.ok(gitRunsUnderBash(code), "bash must run it, or the row is moot");
+  const v = classifyBlock(code);
+  assert.equal(v.klass, "mutating");
+  assert.match(v.reason, /non-literal word/);
+});
+test("task.304 every git literal-execution form runs code under real bash, was admitted, and is refused now", () => {
+  assert.ok(
+    Object.keys(T304_FORMS).length >= 12,
+    "non-vacuity: the table keeps the rows the task names",
+  );
+  for (const [name, code] of Object.entries(T304_FORMS)) {
+    assert.ok(
+      gitRunsUnderBash(code),
+      `${name}: bash did not run it, so the row does not reproduce`,
+    );
+    assert.equal(
+      beforeAllowList(code).klass,
+      "runnable",
+      `${name}: an earlier layer already refuses this, so it does not need the git rule`,
+    );
+    const v = classifyBlock(code);
+    assert.equal(v.klass, "mutating", name);
+    assert.match(v.reason, /^not-allow-listed: git /, name);
+  }
+});
+
+test("task.304 the scan does not read a flag operand: only -C with one plain word is kept", () => {
+  for (const code of [
+    "git -C docs log -1",
+    "git -C . log -1",
+    "git -C ../x status",
+  ])
+    assert.equal(classifyBlock(code).klass, "runnable", code);
+  for (const code of [
+    "git --namespace x log -1",
+    "git --git-dir x log -1",
+    "git --work-tree x log -1",
+    "git --super-prefix x log -1",
+    "git -C a\\ b log -1",
+    "git -C 'a b' log -1",
+    'git -C "$X" log -1',
+    "git -C",
+    "git --git-dir=a\\ b log -1",
+  ]) {
+    const v = classifyBlock(code);
+    assert.equal(v.klass, "mutating", code);
+  }
+});
+test("task.304 git -c is refused on the flag itself, not only through its operand", () => {
+  // The -c value is a key git loads, so the refusal is on the form. These operands read as an
+  // allow-listed subcommand, so if the -c rule and the operand-flag rule were both gone, the scan
+  // would take the operand for the subcommand and call the block runnable.
+  for (const code of [
+    "git -c log status",
+    "git -c log log -1",
+    "git -clog status",
+  ]) {
+    const v = classifyBlock(code);
+    assert.equal(v.klass, "mutating", code);
+    assert.match(v.reason, /^not-allow-listed: git /, code);
+  }
+  assert.equal(classifyBlock("git log -1").klass, "runnable");
+});
+test("task.304 an unknown git global flag is refused, a known one stays runnable", () => {
+  for (const code of T304_FLAG_CONTROLS)
+    assert.equal(classifyBlock(code).klass, "runnable", code);
+  // A flag git does not have (yet): fail closed, never skipped. The reason names the cause.
+  for (const code of [
+    "git --some-future-flag log -c core.sshCommand=./hook.sh ls-remote ssh://x/y",
+    "git --some-future-flag=x log -1",
+    "git -Z log -1",
+  ]) {
+    const v = classifyBlock(code);
+    assert.equal(v.klass, "mutating", code);
+    assert.match(v.reason, /unknown git global flag/, code);
+  }
+});
+test("task.304 the assignment-site rule keeps a plain exported name beside git runnable", () => {
+  for (const code of T304_NAME_CONTROLS)
+    assert.equal(classifyBlock(code).klass, "runnable", code);
+});
+test("task.304 the brace scan is per word: a brace and a comma in different words do not expand", () => {
+  // bash expands only inside one word, so these run as written; a scan over the joined list refused them.
+  for (const code of [
+    "git log -1 -- {x y,z",
+    "git log -1 --grep={x --grep=y,z",
+  ])
+    assert.equal(classifyBlock(code).klass, "runnable", code);
+  // The one place a word is split for the scan is an escaped space, and that stays joined.
+  assert.equal(
+    classifyBlock("git ls-remote --{upload-pack=./hook.sh\\ x,} .").klass,
+    "mutating",
+  );
+});
+test("task.304 allexport with a built name beside git is refused (held by the non-literal-word layers, no rule of its own)", () => {
+  for (const code of [
+    "set -a\nGI''T_SSH_COMMAND=./hook.sh\ngit ls-remote ssh://h/x",
+    "set -o allexport\nGI''T_SSH_COMMAND=./hook.sh\ngit ls-remote ssh://h/x",
+  ]) {
+    assert.equal(classifyBlock(code).klass, "mutating", code);
+  }
+});
+test("task.304 defeat the first layer: a safe subcommand with the hazard form is refused by the git rule alone", () => {
+  // `status` and `log` are on SAFE_GIT_SUBCOMMANDS, so the `git:<sub>` check admits them: only the
+  // new rule can refuse these.
+  for (const code of [
+    "git -c core.fsmonitor=./hook.sh status",
+    "git -c core.pager=x log -1",
+    "GIT_PAGER=x git log -1",
+  ]) {
+    assert.equal(beforeAllowList(code).klass, "runnable", code);
+    assert.equal(classifyBlock(code).klass, "mutating", code);
+  }
+});
+
+test("task.304 spellings other layers already hold also stay refused", () => {
+  for (const code of [
+    "git -c alias.zz=!touch\\ X zz",
+    "declare -x GIT_SSH_COMMAND=./h\ngit status",
+    "env GIT_PAGER=x git log -1",
+    "X=$(true) GIT_TRACE=/tmp/a git status",
+    "git log -1 --output=out.txt",
+  ]) {
+    assert.equal(classifyBlock(code).klass, "mutating", code);
+  }
+});
+
+test("task.304 control git blocks stay runnable", () => {
+  for (const code of [
+    "git log -1",
+    "git diff --name-only",
+    "git -C dir status",
+    "git --git-dir=.git status",
+    "git rev-parse HEAD",
+    "git log --oneline -c", // `-c` after the subcommand is a diff flag, not the global flag
+    "git log --encoding=UTF-8 -1",
+    "git ls-remote --exit-code --heads origin",
+    "echo hello",
+    // Words the shell leaves alone: a brace that is quoted, or holds no comma or `..`, is text.
+    "git log -1 --format='{%h,%s}'",
+    'git log -1 --format="{%h,%s}"',
+    "git log -1 --format={%h}",
+  ]) {
+    assert.equal(classifyBlock(code).klass, "runnable", code);
+  }
+});
+
+test("task.304 brace expansion in a read-only git argument is refused too, a documented cost of refusing by form", () => {
+  // `{a,b}` really expands (`--format={%h,%s}` becomes two words), so the scan cannot read what git
+  // receives. The tracked docs hold none (scripts/qa-snippets-docscan.mjs: newly refused 0).
+  for (const code of [
+    "git log --format={%h,%s} -1",
+    "git diff HEAD~{1,2}",
+    "git log --since={1,2}.days",
+  ]) {
+    assert.equal(classifyBlock(code).klass, "mutating", code);
+  }
+});
+
+test("task.304 the classifier refuses a git argument exactly when bash brace-expands it", () => {
+  // The pair the cycle 2 fix must keep: a word bash expands is refused, a word bash leaves as
+  // written is not. Bash is asked, not assumed.
+  const expands = (w) =>
+    spawnSync("bash", ["-c", `printf '%s\\n' ${w}`], { encoding: "utf8" })
+      .stdout.trim()
+      .split("\n").length > 1;
+  const words = [
+    ...["a{b,c}", "x{1..3}", "{a,b}", "a{,}", "--o{k,k}"].map((w) => [w, true]),
+    ...["'a{b,c}'", '"a{b,c}"', "a\\{b,c}", "{}"].map((w) => [w, false]),
+  ];
+  for (const [w, shouldExpand] of words) {
+    assert.equal(expands(w), shouldExpand, `${w}: bash's own answer`);
+    const v = classifyBlock(`git log -1 --format=${w}`);
+    assert.equal(
+      v.klass,
+      shouldExpand ? "mutating" : "runnable",
+      `${w}: ${v.reason}`,
+    );
+  }
 });
