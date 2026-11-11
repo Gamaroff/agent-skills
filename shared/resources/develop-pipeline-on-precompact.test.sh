@@ -415,8 +415,8 @@ printf '{"skill":"develop-task","current_step":5,"branch":"feature/x","report_pa
   export PATH="$SHIM_BIN:$PATH" GH_LOG="$S12/gh.log" GH_STDIN_DIR="$S12/stdin" \
     PIPELINE_LOCK="$S12/.claude/state/develop-pipeline.lock" \
     TRACKER_ACTIONS_JOURNAL="$S12/.claude/state/tracker-actions.jsonl"
-  "$BASH_BIN" "$HOOK" > "$S12/out.a" 2>/dev/null & A=$!
-  "$BASH_BIN" "$HOOK" > "$S12/out.b" 2>/dev/null & B=$!
+  "$BASH_BIN" "$HOOK" > "$S12/out.a" 2> "$S12/err.a" & A=$!
+  "$BASH_BIN" "$HOOK" > "$S12/out.b" 2> "$S12/err.b" & B=$!
   wait "$A"; echo $? > "$S12/rc.a"
   wait "$B"; echo $? > "$S12/rc.b"
 )
@@ -433,7 +433,9 @@ if [ "$(cat "$S12/rc.a")" != "0" ] || [ "$(cat "$S12/rc.b")" != "0" ]; then
 elif [ "$N_SNAP" != "1" ]; then
   fail "concurrent: exactly one snapshot" "found $N_SNAP"
 elif [ "$N_BLOCK" != "1" ]; then
-  fail "concurrent: exactly one report block appended" "found $N_BLOCK '## Pipeline Paused' headings"
+  # bug.21: this assertion fails on the hosted runner only. Keep what both runs said (stderr,
+  # stdout signals, the lock) so the next red run names the path that let two blocks through.
+  fail "concurrent: exactly one report block appended" "found $N_BLOCK '## Pipeline Paused' headings; stderr.a=[$(cat "$S12/err.a" 2>/dev/null)] stderr.b=[$(cat "$S12/err.b" 2>/dev/null)] signals=$N_SIGNAL empties=$N_EMPTY repeats=$N_REPEAT snapshots=$N_SNAP lock=$(tr -d '\n' < "$S12/.claude/state/develop-pipeline.lock" 2>/dev/null | cut -c1-300)"
 elif [ "$N_PR" != "1" ]; then
   fail "concurrent: exactly one PR-comment call" "found $N_PR in gh.log: $(cat "$S12/gh.log")"
 elif [ "$N_ISSUE" != "1" ]; then
