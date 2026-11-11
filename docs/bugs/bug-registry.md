@@ -1,8 +1,8 @@
 # Bug Registry
 
 **Purpose:** Central tracking for all general (cross-cutting) bug numbers in this repo.
-**Last Updated:** 2026-11-05
-**Next Available Bug Number:** **21**
+**Last Updated:** 2026-11-11
+**Next Available Bug Number:** **22**
 
 ## How to use
 
@@ -47,6 +47,7 @@
 | 18 | [`develop-next` and `develop-batch` hardcode the Phase 0d base branch, overriding `epic-integration`](bug.18.autonomous-runs-hardcode-base-branch/bug.18.autonomous-runs-hardcode-base-branch.md) | closed | Major | High | 2026-10-09 | autonomous orchestrators (`develop-next`, `develop-batch`) |
 | 19 | [`registry-tick` reports `no-row` when `parseRegistry` rejects every row of a plain-title registry](bug.19.registry-tick-malformed-row-reported-as-no-row/bug.19.registry-tick-malformed-row-reported-as-no-row.md) | closed | Major | Medium | 2026-10-14 | registry tick + parser (`registry-tick`, `select-next`) |
 | 20 | [`upsertChangeLog` moves a blank-date continuation row above every dated row on the next write](bug.20.change-log-blank-date-row-floats-to-top/bug.20.change-log-blank-date-row-floats-to-top.md) | closed       | Minor | Low | 2026-11-05 | change log engine (`change-log.js`) |
+| 21 | [Pre-compact concurrent test fails on the hosted runner only](bug.21.precompact-concurrent-test-flake/bug.21.precompact-concurrent-test-flake.md) | new | Major | High | 2026-11-11 | CI, pre-compact hook test (`develop-pipeline-on-precompact.test.sh`) |
 
 ---
 
