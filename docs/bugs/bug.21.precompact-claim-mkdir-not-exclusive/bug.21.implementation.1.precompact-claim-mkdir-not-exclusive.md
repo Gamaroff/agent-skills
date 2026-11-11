@@ -9,8 +9,8 @@ started: '2026-11-11T11:10:00Z'
 # Implementation Report — bug.21
 
 **Started:** 2026-11-11T11:10:00Z
-**Finished:** —
-**Final Status:** In Progress
+**Finished:** 2026-11-11T12:15Z
+**Final Status:** Completed
 **Branch model:** bugfix (base: develop, PR target: develop)
 **Severity / Priority:** Major / High
 **Lite mode:** off
@@ -23,10 +23,10 @@ started: '2026-11-11T11:10:00Z'
 | 1 | create-branch | ✅ Done | `bugfix/bug.21.precompact-claim-mkdir-not-exclusive` off develop, local only; lock written at step 2 | | 2026-11-11T11:12Z |
 | 2 | review-bug | ✅ Done | READY TO FIX 9/10 (`bug.21.review.1.*`); duplicate scans run in-line, no subagent. 2b: branch pushed, issue #880 opened, board In Progress, work-started comment posted | | 2026-11-11T11:25Z |
 | 3 | investigate-fix | ✅ Done | Race reproduced on the LAN kernel (mkdir doubled 264/300); `take_claim` now uses `ln`; scenario 12a red 12/12 on old hook, suite 0 red in 20 runs after; lint:shell clean | | 2026-11-11T12:20Z |
-| 4 | create-pr | ✅ Done | PR #881 → develop, closes #880; two commits (fix, bug records) | | 2026-11-11T12:50Z |
-| 5–6 | verify-fix loop | ✅ Done | Cycle 1 PASS: regression test, suite + lint, /review-code clean (1 comment applied, 2 declined); no fix cycle needed | | 2026-11-11T13:30Z |
-| 7 | finalise-close | ⏳ Pending | | | |
-| 8 | commit-changes | ⏳ Pending | | | |
+| 4 | create-pr | ✅ Done | PR #881 → develop, closes #880; two commits (fix, bug records) | | 2026-11-11T11:46Z |
+| 5–6 | verify-fix loop | ✅ Done | Cycle 1 PASS: regression test, suite + lint, /review-code clean (1 comment applied, 2 declined); no fix cycle needed | | 2026-11-11T11:52Z |
+| 7 | finalise-close | ✅ Done | `/finalise --bug`: DoD `bug.21.dod.1.*` ACCEPTED, CI reading 1 and 2 SUCCESS; issue #880 closed; bug closed, registry row `closed` | | 2026-11-11T12:10Z |
+| 8 | commit-changes | ✅ Done | Final report commit, push, lock removed | | 2026-11-11T12:15Z |
 
 ## Decisions Log
 
@@ -55,6 +55,12 @@ Declined, with reasons:
 
 ## Completion
 
-**Branch:** —
-**PR:** —
-**DoD Summary:** —
+**Branch:** `bugfix/bug.21.precompact-claim-mkdir-not-exclusive`
+**PR:** [#881](https://github.com/Gamaroff/agent-skills/pull/881) → `develop` (open; closes #880 on merge)
+**DoD Summary:** `docs/bugs/bug.21.precompact-claim-mkdir-not-exclusive/bug.21.dod.1.precompact-claim-mkdir-not-exclusive.md`
+
+**CI reading 1:** SUCCESS @ `a17fb2182912` (acceptance decision). **CI reading 2:** SUCCESS @ `dff7e7349412` over 6 checks (the head carrying the DoD file).
+
+**Completion Summary:** the PreCompact hook's pause claim now takes its exclusivity from `ln` rather than `mkdir`, which is not exclusive on the LAN server's kernel. The bug was reproduced there (264 of 300 doubles), fixed with a deterministic regression test (scenario 12a, red 12 of 12 on the old hook) and passed one verify cycle with no fix cycle. The finalise docs check then found two stale lines the first sweep missed (the flow diagram label and a "retried `mkdir`" phrase); they were fixed in `ad731215` and only the docs and fix-evidence agents were re-run, since the change touched no code. Security and compliance first-pass results stand. Two verify-cycle review findings were declined with reasons (QA Iteration History).
+
+**Deviations recorded:** earlier step timestamps in this report were first written from a guess and later corrected to the git commit times. The task.304 pipeline lock was snapshotted at the start of this run (Phase 0b) and is untouched; resume it with `advance-pipeline-lock.sh --restore`.

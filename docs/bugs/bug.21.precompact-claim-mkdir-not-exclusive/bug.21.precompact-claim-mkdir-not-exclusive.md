@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'High'
 created: '2026-11-11'
@@ -12,7 +12,7 @@ github_issue: 880
 **Bug ID**: bug.21.precompact-claim-mkdir-not-exclusive
 **GitHub**: [#880](https://github.com/Gamaroff/agent-skills/issues/880)
 **Related**: None — cross-cutting bug (no single owner)
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Priority**: High
 **Severity**: Major
 **Created**: 2026-11-11
@@ -152,16 +152,15 @@ github_issue: 880
 | 2026-11-11 | New | ensure-bug-github-issue | GitHub issue created (#880) |
 | 2026-11-11 | In Progress | develop-bug | Reproduced on the LAN kernel; investigation started |
 | 2026-11-11 | Ready for QA | develop-bug | Fix implemented + regression test (scenario 12a) |
+| 2026-11-11 | Closed | develop-bug | Fix verified and accepted |
 | 2026-11-11 | Ready for QA | finalise | DoD verified — bug.21.dod.1.precompact-claim-mkdir-not-exclusive.md |
 
 ---
 
 ## Resolution Summary
 
-[Will be completed when bug is closed]
-
-**Final Status**: [Closed status]
-**Total Iterations**: [Number]
-**Time to Resolution**: [Duration]
-**Final Fix Details**: [Summary]
-**Lessons Learned**: [Key takeaways]
+**Final Status**: Closed — Fixed
+**Total Iterations**: 1 (one verify cycle, no fix cycle)
+**Time to Resolution**: same day (filed and fixed 2026-11-11)
+**Final Fix Details**: `take_claim` relied on `mkdir` failing for the second of two concurrent callers, which is false on the WSL2 6.18 kernel, so both hook runs took the claim and appended a pause block. The claim is now an `ln` of a per-pid file onto `$CLAIM_DIR/pid`, which fails for every caller but one on every kernel measured; directory and file names are unchanged, so the steal and the release trap work as before. Scenario 12a supplies a `mkdir` that succeeds twice, so the double claim is red on any kernel.
+**Lessons Learned**: a lock's exclusivity belongs to a primitive the platform guarantees, and a test for it should supply the broken primitive rather than depend on the machine's behaviour. Also: a fix that changes a mechanism needs a sweep of every place that restates it; the flow diagram in `develop-pipeline-pause.md` kept the old wording until the DoD docs check found it.
