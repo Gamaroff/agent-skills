@@ -3,7 +3,7 @@
 **Task**: `task.304.qa-snippet-classifier-git-literal-execution.md`
 **Run Number**: 1
 **Started**: 2026-11-11 00:00
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -36,8 +36,8 @@ Refuse, in the QA snippet classifier, the git forms that make git run a literal 
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Implemented inline; fast gate 8376 pass; loop audit done inline (status ready-for-review) | — | 2026-11-11T04:45Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #876: https://github.com/Gamaroff/agent-skills/pull/876 | — | 2026-11-11T04:45Z |
 | 5–6. qa-task / qa-fix loop | ✅ Done | `task.304.qa.{N}.*.md`; `task.304.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 7 gates, last PASS 95; 5c CONCERNS, doc-only, fixed | —                    | 2026-11-11T11:00Z |
-| 7. finalise                | ⏳ Pending | `task.304.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 7. finalise                | ✅ Done | `task.304.dod.{N}.*.md`; task `status: accepted`                       | DoD 1 accepted; AC 10 of 10; acceptance commit `91e708db` | —                    | 2026-11-11T17:31Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     |       | —                    | 2026-11-11T17:31Z |
 
 ---
 
@@ -198,10 +198,12 @@ Other findings in the file: none. PAGER and `ext::` stay in the gate's future li
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
-**Branch**: {populated after Step 1}
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**Finished**: 2026-11-11T17:31Z
+**Final Status**: Completed
+**Branch**: `feature/task.304.qa-snippet-classifier-git-literal-execution`
+**PR**: https://github.com/Gamaroff/agent-skills/pull/876
+**QA Iterations**: 7
+**DoD Summary**: `task.304.dod.1.qa-snippet-classifier-git-literal-execution.md`
+**Tracker debt**: none (no tracker issue linked)
+
+**Completion Summary**: The QA snippet classifier now refuses the git forms that run a literal string, proven against real bash. It took seven QA gates (the owner extended the budget twice). The run halted at finalise for bug 21, a mkdir lock that was not exclusive on the LAN kernel, and resumed after it merged. Resume decisions: the loop exit was taken on the doc-only PR-review CONCERNS; AC #8 (`-c` has no single-revert red) was amended with the owner's approval; AC #5 was re-measured on the merged head. CI reading 1: SUCCESS @ `66eea6e8`. CI reading 2: SUCCESS (tree-equivalent to `4217703adb30`) @ `91e708db`.
