@@ -5686,7 +5686,24 @@ const T304_FORMS = {
     "set -a\nread GIT_SSH_COMMAND <<< ./hook.sh\ngit ls-remote ssh://x/y",
   "set -a, then a for loop over GIT_SSH_COMMAND":
     "set -a\nfor GIT_SSH_COMMAND in ./hook.sh; do :; done\ngit ls-remote ssh://x/y",
+  // T304-QA-7/8 (third strike): bash builds the exported name after the scan has read it.
+  "export GIT_ name built by a brace":
+    "export GIT_{SSH_COMMAND,X}=./hook.sh; git ls-remote ssh://h/x",
+  "export GIT_ name built by a brace after G":
+    "export G{IT_SSH_COMMAND,X}=./hook.sh; git ls-remote ssh://h/x",
+  "export GIT_ name split by empty single quotes":
+    "export GI''T_SSH_COMMAND=./hook.sh; git ls-remote ssh://h/x",
+  "export GIT_ name split by empty double quotes":
+    'export GI""T_SSH_COMMAND=./hook.sh; git ls-remote ssh://h/x',
+  "export GIT_ name split by a backslash":
+    "export GIT\\_SSH_COMMAND=./hook.sh; git ls-remote ssh://h/x",
 };
+// Controls for the assignment-site rule: a plain literal name stays runnable beside git.
+const T304_NAME_CONTROLS = [
+  "export FOO=1; git log -1",
+  "export FOO=1 BAR=2\ngit status",
+  "git log -1",
+];
 const gitRunsUnderBash = (code) => {
   const dir = mkdtempSync(join(tmp(), "g-"));
   const env = {
@@ -5747,6 +5764,31 @@ test("task.304 every git literal-execution form runs code under real bash, was a
   }
 });
 
+test("task.304 the assignment-site rule keeps a plain exported name beside git runnable", () => {
+  for (const code of T304_NAME_CONTROLS)
+    assert.equal(classifyBlock(code).klass, "runnable", code);
+});
+test("task.304 the brace scan is per word: a brace and a comma in different words do not expand", () => {
+  // bash expands only inside one word, so these run as written; a scan over the joined list refused them.
+  for (const code of [
+    "git log -1 -- {x y,z",
+    "git log -1 --grep={x --grep=y,z",
+  ])
+    assert.equal(classifyBlock(code).klass, "runnable", code);
+  // The one place a word is split for the scan is an escaped space, and that stays joined.
+  assert.equal(
+    classifyBlock("git ls-remote --{upload-pack=./hook.sh\\ x,} .").klass,
+    "mutating",
+  );
+});
+test("task.304 allexport with a built name beside git is refused (held by the non-literal-word layers, no rule of its own)", () => {
+  for (const code of [
+    "set -a\nGI''T_SSH_COMMAND=./hook.sh\ngit ls-remote ssh://h/x",
+    "set -o allexport\nGI''T_SSH_COMMAND=./hook.sh\ngit ls-remote ssh://h/x",
+  ]) {
+    assert.equal(classifyBlock(code).klass, "mutating", code);
+  }
+});
 test("task.304 defeat the first layer: a safe subcommand with the hazard form is refused by the git rule alone", () => {
   // `status` and `log` are on SAFE_GIT_SUBCOMMANDS, so the `git:<sub>` check admits them: only the
   // new rule can refuse these.

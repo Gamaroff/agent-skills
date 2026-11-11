@@ -409,21 +409,21 @@ None.
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-11
-**Quality Score**: 80/100
+**Quality Score**: 70/100
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.304.qa.2.qa-snippet-classifier-git-literal-execution.md](./task.304.qa.2.qa-snippet-classifier-git-literal-execution.md)
-- **Gate File**: [task.304.gate.2.qa-snippet-classifier-git-literal-execution.yml](./task.304.gate.2.qa-snippet-classifier-git-literal-execution.yml)
+- **Full Report**: [task.304.qa.3.qa-snippet-classifier-git-literal-execution.md](./task.304.qa.3.qa-snippet-classifier-git-literal-execution.md)
+- **Gate File**: [task.304.gate.3.qa-snippet-classifier-git-literal-execution.yml](./task.304.gate.3.qa-snippet-classifier-git-literal-execution.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 398
+- **Tests Executed**: 400
 - **Phases Verified**: 4/4 (two with findings)
 - **Critical Issues**: 2
 - **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-The three cycle 1 bypasses are fixed. The refute pass found brace expansion rebuilding `--upload-pack`, `--exec` and `--config-env` after the classifier has read the text: six spellings classify runnable and write a file under real bash. A seventh form, `--exec-path=<dir>` with `ls-remote`, runs a planted `git-upload-pack` and contradicts a code comment.
+The cycle 2 findings are fixed: every brace spelling of `--upload-pack`, `--exec` and `--config-env`, and `--exec-path=<dir>`, is refused. The safety re-probe found the same class one step away: the `GIT_` name is judged as text, so an exported name that bash assembles from braces, empty quotes or a backslash classifies runnable and writes a file under real bash (five spellings reproduced, 0 escapes in 57 probes). This is the third consecutive gate with a HIGH on the same file; the fix should judge the assignment site, not the spelling.
 
 <!-- change-log-start -->
 ## Change Log
@@ -438,4 +438,6 @@ The three cycle 1 bypasses are fixed. The refute pass found brace expansion rebu
 | 2026-11-11 |  | QA findings fixed — quoted option and export words judged as written, any GIT_ name refused, differential atoms added; 1 iteration | qa-fix |
 | 2026-11-11 |  | QA gate FAIL (80/100) — 3 findings | qa-task |
 | 2026-11-11 |  | QA findings fixed — a git argument holding an unquoted brace is refused whole (shape change, not another spelling), `--exec-path=<dir>` refused, differential brace atoms added; 1 iteration | qa-fix |
+| 2026-11-11 |  | QA gate FAIL (70/100) — 2 findings | qa-task |
+| 2026-11-11 |  | QA findings fixed — third strike: the `GIT_` name is no longer judged as text; export/declare/typeset/readonly/local operands must name a plain literal identifier (mechanism replaced), brace scan per word, name-assembly atoms and bash-verified rows added; 1 iteration | qa-fix |
 <!-- change-log-end -->

@@ -1,0 +1,75 @@
+schema: 2
+task: 'task.304.qa-snippet-classifier-git-literal-execution'
+task_title: 'QA snippet classifier refuses git literal execution'
+gate: FAIL
+status_reason: 'The cycle 2 findings are fixed and re-verified: every brace spelling of --upload-pack, --exec and --config-env, and --exec-path=<dir>, is now refused. The safety re-probe found the same class one step away: the GIT_ name is judged as text, so an export operand whose name bash assembles from braces, empty quotes or a backslash classifies runnable and writes a file under real bash. This is the third consecutive cycle with a HIGH in the same file and the same kind of mechanism (a matcher over text a shell word is not).'
+reviewer: 'QA Engineer'
+head: 'ad5d8660eaaa1854be7d0b7748cbb75c021a1233'
+updated: '2026-11-11T05:55:27Z'
+
+top_issues:
+  - id: 'T304-QA-7'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: "Brace expansion hides the GIT_ name in an export operand. `export GIT_{SSH_COMMAND,X}='touch W'; git ls-remote ssh://h/x` and `export G{IT_SSH_COMMAND,X}='touch W'; git ls-remote ssh://h/x` classify runnable and bash writes W. The GIT_NAME rule needs GIT_ followed by a name character, and the export operand check needs ^GIT_..., so neither sees a name that only exists after expansion; hasBraceExpansion is applied to git's own arguments only. Controls: the unbraced `export GIT_SSH_COMMAND=...` is refused, `export FOO=1; git log -1` stays runnable. The develop engine also classifies these runnable, but the task names GIT_ environment forms, so this is its unfinished work. origin: code-review (CR-1), reproduced by QA."
+    suggested_action: 'Do not judge the name as text. In a block that runs git, refuse an export, declare, typeset, readonly or local operand whose name part is not a plain literal identifier (no quote, backslash, brace or dollar), and refuse allexport (set -a, set -o allexport) beside git, since it makes every assignment live; that closes the whole class at the one place an assignment reaches the environment, instead of widening the name pattern.'
+    suggested_owner: dev
+    status: open
+  - id: 'T304-QA-8'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: "A GIT_ name split by quote or backslash fragments is not matched. `export GI''T_SSH_COMMAND='touch W'; git ls-remote ssh://h/x`, `export GI\"\"T_SSH_COMMAND=...` and `export GIT\\_SSH_COMMAND=...` classify runnable and bash writes W. The GIT_NAME regex runs on text, so it never sees the joined name; the export operand check unquotes its operands but is anchored on ^GIT_ with the quote already removed only in some spellings. Controls as for T304-QA-7. Reproduced by QA, same result on the develop engine. origin: code-review (CR-2), reproduced by QA."
+    suggested_action: 'The same refusal covers it: a non-literal variable name on an assignment-making command is refused, whatever it spells.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 400
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 57
+    escaped: 0
+    boundary: true
+    boundary_signals: ['refused', 'are refused']
+    notes: 'The classifier is a boundary (a false runnable executes a block). 57 probes ran (run record task.304.qa.3...security.run.json, escaped 0): 52 behaved as required; 5 hostile GIT_-name spellings were classified runnable and write under real bash (T304-QA-7 and -8). Every cycle 2 case passes, including the six brace spellings; the cycle 2 control for an unquoted brace format string is now refused by design and is replaced by its quoted twin.'
+  performance:
+    status: PASS
+    notes: 'Docs scan unchanged by the cycle 2 fix: 3468 blocks, runnable 251 before and after, newly refused 0.'
+  reliability:
+    status: PASS
+    notes: 'Fails closed on every form the task lists plus the brace, quote and read/printf forms. The open gap is a variable name assembled by the shell.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Third consecutive gate with a HIGH on shared/resources/qa-execute-snippets.mjs, each time a matcher over the text of a shell word (cycle 1 quoting, cycle 2 braces, cycle 3 name assembly). The pipeline will treat this as a third strike; the structural fix is to judge the assignment site, not the spelling.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Move the decision from the text of the GIT_ name to the place an assignment reaches the environment: in a block that runs git, refuse any export/declare/typeset/readonly/local operand with a non-literal name and refuse allexport. Add brace and quote-split GIT_ atoms to the differential git set (CR-4: the set has none for names, and 20000 blocks found 0 writes while these write). Bash-verified rows for each spelling; keep `export FOO=1; git log -1` runnable.'
+      refs: ['shared/resources/qa-execute-snippets.mjs', 'scripts/qa-snippets-differential.mjs', 'shared/resources/tests/qa-execute-snippets.test.mjs']
+  future:
+    - action: 'CR-3 (cleanup, low): hasBraceExpansion is run over the joined argument list, so an unquoted `{` in one word can pair with a `,` or `..` in a later word that bash would not expand together. A false refusal was not confirmed (a placeholder rule fires first on the probe form). Scan per word and join only across a trailing backslash.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'CR-4 (carried): a GIT_ substring in quoted or argument text is refused (`git log --grep="GIT_SSH"`). Fail-closed; docs corpus shows 0 newly refused.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

@@ -345,7 +345,15 @@ the string git will run. `-C`, `--git-dir` and `--work-tree` select a path and s
 under `ls-remote` it runs `<dir>/git-upload-pack` (QA cycle 2), while a bare `--exec-path` only prints.
 A git argument holding an unquoted brace expansion (`--upload-pa{ck,ck}`, `--config-e{nv,nv}`) is
 refused as a whole, because the scan reads text that is not the word git receives; the cost is that
-`git log --format={%h,%s}` is refused as well, and a quoted brace is not. Cost on the shipped documentation:
+`git log --format={%h,%s}` is refused as well, and a quoted brace is not. The brace scan is per word (a
+`{` in one word never pairs with a `,` in another, as bash does not expand it); a word is joined to the
+next only across a trailing backslash, which is how the scan splits `--{upload-pack=x\ y,}`. The
+exported name gets the same treatment as the arguments (QA cycle 3, the third strike on this file): a
+mechanism that matched the text of a `GIT_` name was beaten three times, by quoting, by a brace and by
+a name the shell assembles (`export GIT_{SSH_COMMAND,X}=…`, `export GI''T_SSH_COMMAND=…`, `export
+GIT\_SSH_COMMAND=…`). It was replaced, not widened: `export`, `declare`, `typeset`, `readonly` and `local`
+must name each variable as a plain literal identifier whenever the block is judged for git, and a name
+holding a brace, a quote, a backslash or an expansion is refused whatever it spells. Cost on the shipped documentation:
 0 blocks (`npm run qa-snippets:docscan`: 251 runnable before, 251 now). The `git` atom set of the
 differential forms these shapes and is calibrated against the engine without the rule (writes there,
 none now). A block that needs one of these forms is rewritten without it.

@@ -248,6 +248,12 @@ export const ATOM_SETS = {
     "git ls-remote --exe{c,c}='touch out' .",
     "X='touch out' git --config-e{nv,nv}=core.sshCommand=X ls-remote ssh://x/y",
     "git --exec-path=$PWD ls-remote .",
+    // Task 304, QA cycle 3: the exported NAME is built by the shell after the scan reads it.
+    "export GIT_{SSH_COMMAND,X}='touch out'; git ls-remote ssh://x/y",
+    "export G{IT_SSH_COMMAND,X}='touch out'; git ls-remote ssh://x/y",
+    "export GI''T_SSH_COMMAND='touch out'; git ls-remote ssh://x/y",
+    "export GI\"\"T_SSH_COMMAND='touch out'; git ls-remote ssh://x/y",
+    "export GIT\\_SSH_COMMAND='touch out'; git ls-remote ssh://x/y",
     "git rev-parse HEAD",
     "git log -1",
     "echo hi",

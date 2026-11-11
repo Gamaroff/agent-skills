@@ -2617,9 +2617,19 @@ function hasBraceExpansion(word) {
   return false;
 }
 function gitArgsHazard(rawArgs) {
-  // Over the whole argument list, not per token: the scan splits a word at an escaped space
-  // (`--{upload-pack=touch\ W,}` arrives as two tokens, the brace in one and the comma in the other).
-  if (hasBraceExpansion(rawArgs.join(" ")))
+  // Per word. The scan splits a word at an escaped space (`--{upload-pack=touch\ W,}` arrives as
+  // two tokens), so a token that ends in an odd run of backslashes is joined to the next one;
+  // nothing else is, because a `{` in one word never pairs with a `,` in another.
+  const words = [];
+  for (const t of rawArgs) {
+    if (
+      words.length > 0 &&
+      /(?:^|[^\\])(?:\\\\)*\\$/.test(words[words.length - 1])
+    )
+      words[words.length - 1] += ` ${t}`;
+    else words.push(t);
+  }
+  if (words.some(hasBraceExpansion))
     return "a brace expansion in a git argument (the shell rewrites the word after the scan)";
   const args = rawArgs.map(unquoteToken);
   for (let i = 0; i < args.length; i += 1) {
@@ -2657,6 +2667,28 @@ function gitArgsHazard(rawArgs) {
 // rule is on the NAME, which is the one spelling every one of them shares. A name assembled at
 // runtime from pieces is outside it: the allow-list does not track values (see §2a-iii).
 const GIT_NAME = /(?<![A-Za-z0-9_$\{])GIT_[A-Za-z0-9_]+/;
+// task.304, third strike (QA cycle 3): the variable NAME is judged where an assignment reaches the
+// environment, not by matching the text of a word the shell can still rebuild. `export GIT_{A,B}=x`,
+// `export GI''T_X=x` and `export GIT\_X=x` all name GIT_A / GIT_X after the scan has read them, and
+// a pattern over the text can never list every way to spell that. So an assignment-making command
+// (`GIT_ASSIGNING_COMMANDS`) must name every variable as a plain literal identifier, and a name the
+// scan cannot read as one is refused whatever it spells. The GIT_ test above then runs on a name
+// that really is the name. `set -a` needs no rule of its own: every way to give a built name a
+// value without `export` (a bare assignment, `read`, `printf -v`, a `for` variable) is already
+// refused upstream as a non-literal or unbound word, and a plain `GIT_` name is the text rule's.
+// (A rule for allexport was written and mutation-tested; nothing turned red, so it was deleted.)
+// (PLAIN_NAME, the identifier pattern, is declared once further down the module.)
+function assignmentNameHazard(rawArgs) {
+  for (const a of rawArgs) {
+    if (a === "" || a.startsWith("-")) continue;
+    const eq = a.indexOf("=");
+    let name = eq === -1 ? a : a.slice(0, eq);
+    name = name.replace(/^(['"])(.*)\1$/, "$2").replace(/^['"]/, "");
+    if (!PLAIN_NAME.test(name))
+      return "a variable name the shell builds after the scan (brace, quote, backslash or expansion in an export/declare operand)";
+  }
+  return null;
+}
 const GIT_REASON =
   "(git reads a GIT_ variable as a command or a path to write)";
 // `raw` is the same invocations with their quoted spans kept as written (`rawInvocations`). The
@@ -2667,6 +2699,13 @@ function gitLiteralExecution(invocations, raw, text) {
     return `${invocations.gitEnv[0]}= ${GIT_REASON}`;
   for (let i = 0; i < invocations.length; i += 1) {
     const inv = invocations[i];
+    // The assignment-site rules run before the keyword skip: `export` and `set` are keywords to
+    // the scan, and a skipped one is exactly where a built name would pass.
+    const siteArgs = raw ? raw[i].args : inv.args;
+    if (GIT_ASSIGNING_COMMANDS.has(inv.word)) {
+      const nameWhy = assignmentNameHazard(siteArgs);
+      if (nameWhy !== null) return nameWhy;
+    }
     if (inv.keyword) continue;
     const isGit = inv.word === "git" || inv.word.startsWith("git:");
     // With no raw reading, a quoted span reads as an empty word. Refuse only when such a word
@@ -2678,12 +2717,6 @@ function gitLiteralExecution(invocations, raw, text) {
     if (isGit) {
       const why = gitArgsHazard(args);
       if (why !== null) return why;
-    }
-    if (GIT_ASSIGNING_COMMANDS.has(inv.word)) {
-      const hit = args
-        .map(unquoteToken)
-        .find((a) => /^GIT_[A-Za-z0-9_]*(=|$)/.test(a));
-      if (hit !== undefined) return `${hit.split("=")[0]} ${GIT_REASON}`;
     }
   }
   const named = GIT_NAME.exec(text);
