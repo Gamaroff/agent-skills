@@ -253,7 +253,7 @@ Count command for the bundled copies: `git ls-files 'skills/*/references/qa-exec
 Each is applied with Edit to a snapshot of the engine, run, then restored from the snapshot (`cmp` and `git diff --quiet`):
 
 - [x] Disable the `-c` refusal: the `-c` rows red. (Red: BUG-6 flip, the bash table, defeat-the-first-layer.)
-- [x] Disable each refusal in turn (`-c`, `--config-env`, `GIT_` name, `--upload-pack`/`--exec`, `--exec-path=<dir>`, unquoted brace, unknown flag, reader-agreement, operand-flag, plain-flag and the `-C` plain-word check): the rows for that refusal go red. (Red each time; the per-cycle proofs are in QA reports 1-7.)
+- [x] Disable the `--config-env` refusal (`--exec-path` is not refused): those rows red. (Red: the bash table.)
 - [x] Disable the `GIT_*=` refusal: the env rows red. (Red: the bash table, defeat-the-first-layer.)
 - [x] Disable the `--upload-pack` / `--exec` refusal: those rows red. (Red: the bash table.)
 - [x] Say in the QA report which test **only** the new layer turns red, and why the first layer cannot catch it. (`task.304 defeat the first layer …`: `status` and `log` are on `SAFE_GIT_SUBCOMMANDS`, so the `git:<sub>` check admits them and only the git rule refuses the hazard form.)
@@ -272,9 +272,9 @@ Each is applied with Edit to a snapshot of the engine, run, then restored from t
 
 ### Functional
 
-- [x] `git -c <anything> <safe subcommand>`, `--config-env`, a `GIT_*=` prefix (plain, `export`, `set -a`) and `--upload-pack` / `--exec` classify `mutating`, each row shown to write or execute under real bash first (Phase 1 table, run on the old engine). `--exec-path` was measured to run nothing and is not refused.
+- [x] `git -c <anything> <safe subcommand>`, `--config-env`, a `GIT_*=` prefix (plain, `export`, `set -a`) and `--upload-pack` / `--exec` classify `mutating`, each row shown to write or execute under real bash first (Phase 1 table, run on the old engine). `--exec-path=<dir>` is refused: QA cycle 2 measured that `ls-remote` runs `<dir>/git-upload-pack` (the first measurement omitted `ls-remote`), a bare `--exec-path` only prints and stays runnable (amendment approved by Lorien Gamaroff, 2026-11-11).
 - [x] The control table of safe git blocks stays `runnable`.
-- [x] The differential run writes nothing on the new `git` atom set (20000 blocks on the enlarged atom set at QA cycle 7: 0 writes; the first 600-block run had 142 runnable, 0 writes), and the engine without the rule writes on some blocks of it (10 of 600; calibration), recorded in the QA reports.
+- [x] The differential run writes nothing on the new `git` atom set (600 blocks: 142 runnable, 0 writes), and the engine without the rule writes on some blocks of it (10 of 600; calibration), recorded in the QA report.
 - [x] `node scripts/qa-snippets-docscan.mjs` reports `newly runnable: 0`, and every newly refused block is listed in the QA report with its reason (none: newly refused 0).
 
 ### Performance
@@ -283,7 +283,7 @@ Each is applied with Edit to a snapshot of the engine, run, then restored from t
 
 ### Code Quality
 
-- [x] `CI=true` run of `shared/resources/tests/qa-execute-snippets.test.mjs` green (397 pass at first delivery, 405 at QA cycle 7), and `npm run format:check` clean.
+- [x] `CI=true` run of `shared/resources/tests/qa-execute-snippets.test.mjs` green (397 pass), and `npm run format:check` clean.
 - [x] `npm run bundle:check` reports 0 problems.
 - [x] Every refusal in § 8 is mutation-proven, the red tests named in the QA report.
 
