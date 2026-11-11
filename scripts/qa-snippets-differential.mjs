@@ -263,6 +263,10 @@ export const ATOM_SETS = {
     "git --names\"pace\" log fetch --upload-pack='touch out' .",
     "git --\"namespace\" status fetch --upload-pack='touch out' .",
     "git --work-\"tree\" log fetch --upload-pack='touch out' .",
+    // Task 304, QA cycle 6: an escaped space inside a flag operand splits one word into two tokens.
+    "git --namespace a\\ log fetch --upload-pack='touch out' .",
+    "git --namespace=a\\ log fetch --upload-pack='touch out' .",
+    "git --git-dir a\\ log fetch --upload-pack='touch out' .",
     "git rev-parse HEAD",
     "git log -1",
     "echo hi",

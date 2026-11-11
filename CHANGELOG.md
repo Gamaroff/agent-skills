@@ -17,8 +17,10 @@ All notable changes to this project will be documented in this file. Format foll
   not a plain identifier (a brace, quote, backslash or expansion the shell resolves after the scan),
   and any git global flag the scan does not know before the subcommand (`git --attr-source log -c …`
   hid the `-c`), and any git line on which the two readings of the subcommand disagree (a quote
-  inside `--namespace` hid `fetch --upload-pack` behind `log`), with `not-allow-listed: git …`, by
-  form and not by value. Cost on the repository's own
+  inside `--namespace` hid `fetch --upload-pack` behind `log`), any git global flag that takes a
+  separate operand other than `-C` with one plain word (an escaped space in the operand split one word
+  into two), and any flag ahead of the subcommand spelled with a quote, backslash or expansion, with
+  `not-allow-listed: git …`, by form and not by value. Cost on the repository's own
   documentation: 0 blocks (251 runnable before and after). The differential gains a `git` atom set that
   writes against the engine without the rule and not against the new one.
 - **The QA snippet classifier runs a block only when every non-literal word is on a closed list (task 294).**

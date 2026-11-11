@@ -363,7 +363,13 @@ other flag, including one git adds next year, is refused with `an unknown git gl
 closed the last way two readers could differ: the scan that admits the subcommand and the scan that
 judges the arguments each found it, on different text, and a quote inside an operand-taking flag
 (`git --names"pace" log fetch --upload-pack=…`) made them name `log` and `fetch`. The argument scan
-now returns the subcommand it found, and a line whose two readings disagree is refused. Cost on the shipped documentation:
+now returns the subcommand it found, and a line whose two readings disagree is refused. QA cycle 6 showed
+that check cannot hold alone: the line reaches both readers already split on whitespace, so an escaped
+space inside a flag operand (`git --namespace a\ log fetch --upload-pack=…`) is two tokens to both and
+one word to bash, and they agree on the wrong subcommand. The scan therefore stops reading flag
+operands. The only global flag with a separate operand that is kept is `-C`, with one plain word (the
+documented form); any other operand-taking flag, a `-C` operand that is not one plain word, and any flag
+token ahead of the subcommand spelled with a quote, backslash or expansion are refused. Cost on the shipped documentation:
 0 blocks (`npm run qa-snippets:docscan`: 251 runnable before, 251 now). The `git` atom set of the
 differential forms these shapes and is calibrated against the engine without the rule (writes there,
 none now). A block that needs one of these forms is rewritten without it.

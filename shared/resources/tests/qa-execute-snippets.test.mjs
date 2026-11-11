@@ -5710,6 +5710,12 @@ const T304_FORMS = {
     'git --"namespace" status fetch --upload-pack=./hook.sh .',
   "fetch --upload-pack behind a quoted --work-tree":
     'git --work-"tree" log fetch --upload-pack=./hook.sh .',
+  // T304-QA-11 (cycle 6): the line is split on whitespace before the scan reads it, so an escaped
+  // space inside a flag's operand is two tokens to the scan and one word to bash.
+  "fetch --upload-pack behind a --namespace operand with an escaped space":
+    "git --namespace a\\ log fetch --upload-pack=./hook.sh .",
+  "fetch --upload-pack behind a --namespace=value with an escaped space":
+    "git --namespace=a\\ log fetch --upload-pack=./hook.sh .",
   "--upload-pack behind --attr-source":
     "git --attr-source log ls-remote --upload-pack=./hook.sh .",
 };
@@ -5787,6 +5793,28 @@ test("task.304 every git literal-execution form runs code under real bash, was a
   }
 });
 
+test("task.304 the scan does not read a flag operand: only -C with one plain word is kept", () => {
+  for (const code of [
+    "git -C docs log -1",
+    "git -C . log -1",
+    "git -C ../x status",
+  ])
+    assert.equal(classifyBlock(code).klass, "runnable", code);
+  for (const code of [
+    "git --namespace x log -1",
+    "git --git-dir x log -1",
+    "git --work-tree x log -1",
+    "git --super-prefix x log -1",
+    "git -C a\\ b log -1",
+    "git -C 'a b' log -1",
+    'git -C "$X" log -1',
+    "git -C",
+    "git --git-dir=a\\ b log -1",
+  ]) {
+    const v = classifyBlock(code);
+    assert.equal(v.klass, "mutating", code);
+  }
+});
 test("task.304 an unknown git global flag is refused, a known one stays runnable", () => {
   for (const code of T304_FLAG_CONTROLS)
     assert.equal(classifyBlock(code).klass, "runnable", code);

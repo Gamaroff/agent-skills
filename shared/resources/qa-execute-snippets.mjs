@@ -2649,6 +2649,10 @@ function hasBraceExpansion(word) {
 // made them name different subcommands: the allow-list admitted `git:log`, while git ran `fetch`.
 // So this scan now returns the subcommand it found beside the hazard, and the caller refuses when
 // that is not the one the allow-list admitted. Two readers of one line cannot disagree silently.
+// One plain word: letters, digits and the few path characters, nothing the shell can split, join or
+// rewrite. A flag token ahead of the subcommand is plain text of the same kind, with an `=value`.
+const GIT_PLAIN_WORD = /^[A-Za-z0-9_.\/@+:~-]+$/;
+const GIT_PLAIN_FLAG = /^-[A-Za-z0-9_.\/@+:=~-]*$/;
 function scanGitArgs(rawArgs) {
   // Per word. The scan splits a word at an escaped space (`--{upload-pack=touch\ W,}` arrives as
   // two tokens), so a token that ends in an odd run of backslashes is joined to the next one;
@@ -2674,11 +2678,30 @@ function scanGitArgs(rawArgs) {
     if (flag !== null) return refuseGit(flag);
     // `--exec-path` takes its value with `=`; a bare one takes no operand, so the next word is
     // judged as itself (a `-c` after it is a real `-c`).
+    //
+    // task.304, sixth gate (T304-QA-11): the scan does not READ a flag operand any more. Reading one
+    // means deciding where the word ends, and the line reaches this scan already split on
+    // whitespace, so `--namespace a\ log fetch ...` is two tokens here and one word for bash; five
+    // gates each closed one way of splitting it. The construct is refused instead: the only global
+    // flag that takes a separate operand and is kept is `-C`, with one plain word (the documented
+    // form), and every flag token ahead of the subcommand must itself be plain text.
     if (GIT_FLAGS_WITH_OPERAND.has(tok) && tok !== "--exec-path") {
-      i += 1; // the operand belongs to the flag
+      if (tok !== "-C")
+        return refuseGit(
+          "a git global flag that takes an operand (the scan cannot tell where the operand ends, so it does not read one)",
+        );
+      if (!GIT_PLAIN_WORD.test(rawArgs[i + 1] ?? ""))
+        return refuseGit(
+          "a -C operand that is not one plain word (the scan cannot tell where it ends)",
+        );
+      i += 1; // the one plain word belongs to -C
       continue;
     }
     if (tok.startsWith("-")) {
+      if (!GIT_PLAIN_FLAG.test(rawArgs[i]))
+        return refuseGit(
+          "a git global flag spelled with a quote, backslash or expansion (the word may not be the one the scan read)",
+        );
       // A global flag the scan does not know is refused, never skipped (task.304, QA cycle 4). A
       // flag that takes a separate operand makes the scan read that operand as the subcommand, and
       // git adds global flags over time (`--attr-source` was not on the old list), so a list of
