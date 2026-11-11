@@ -152,6 +152,7 @@ github_issue: 880
 | 2026-11-11 | New | ensure-bug-github-issue | GitHub issue created (#880) |
 | 2026-11-11 | In Progress | develop-bug | Reproduced on the LAN kernel; investigation started |
 | 2026-11-11 | Ready for QA | develop-bug | Fix implemented + regression test (scenario 12a) |
+| 2026-11-11 | Ready for QA | finalise | DoD verified — bug.21.dod.1.precompact-claim-mkdir-not-exclusive.md |
 
 ---
 
