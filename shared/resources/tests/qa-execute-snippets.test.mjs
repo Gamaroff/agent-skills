@@ -5815,6 +5815,21 @@ test("task.304 the scan does not read a flag operand: only -C with one plain wor
     assert.equal(v.klass, "mutating", code);
   }
 });
+test("task.304 git -c is refused on the flag itself, not only through its operand", () => {
+  // The -c value is a key git loads, so the refusal is on the form. These operands read as an
+  // allow-listed subcommand, so if the -c rule and the operand-flag rule were both gone, the scan
+  // would take the operand for the subcommand and call the block runnable.
+  for (const code of [
+    "git -c log status",
+    "git -c log log -1",
+    "git -clog status",
+  ]) {
+    const v = classifyBlock(code);
+    assert.equal(v.klass, "mutating", code);
+    assert.match(v.reason, /^not-allow-listed: git /, code);
+  }
+  assert.equal(classifyBlock("git log -1").klass, "runnable");
+});
 test("task.304 an unknown git global flag is refused, a known one stays runnable", () => {
   for (const code of T304_FLAG_CONTROLS)
     assert.equal(classifyBlock(code).klass, "runnable", code);
