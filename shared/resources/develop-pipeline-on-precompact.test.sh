@@ -459,7 +459,9 @@ fi
 # the affected kernel does. Two hooks race with it on PATH and the same assertions
 # as scenario 12 must hold. Against a claim built on `mkdir` it is red on every run;
 # a claim that takes its exclusivity from `ln` is unaffected, because `mkdir` is
-# only used to make the directory the claim lives in.
+# only used to make the directory the claim lives in. The overlap of the two runs is
+# guaranteed by the `git` stand-in scenario 12 left in SHIM_BIN, which sleeps 1s at
+# `commit`: the first run is still inside its pause flow when the second starts.
 NOEX_BIN="$TMPDIR_TEST/noex-bin"
 mkdir -p "$NOEX_BIN"
 {
