@@ -81,8 +81,9 @@ trap 'rm -rf "$TMPDIR_TEST"' EXIT
 # lock is kept, and left unmarked — marking needs jq.
 NOJQ_BIN="$TMPDIR_TEST/nojq-bin"
 mkdir -p "$NOJQ_BIN"
-# `mkdir` is the claim; `rm` releases it in the EXIT trap.
-for tool in dirname cp date rm cat mkdir mv; do
+# `mkdir` makes the claim directory and `ln` takes the claim (bug.21); `rm` releases it
+# in the EXIT trap.
+for tool in dirname cp date rm cat mkdir mv ln; do
   src=$(command -v "$tool" 2>/dev/null) && [ -n "$src" ] && ln -sf "$src" "$NOJQ_BIN/$tool"
 done
 
@@ -446,6 +447,54 @@ elif [ "$N_CLAIMS" != "0" ]; then
   fail "concurrent: no claim left behind" "$(ls -A "$S12/.claude/state")"
 else
   pass "concurrent (2 runs, 1 lock): one snapshot, one report block, one PR call, one issue call; loser turned away by the claim with the empty signal; lock kept and marked; claim released"
+fi
+
+# ── Scenario 12a (bug.21): the claim must not lean on `mkdir` being exclusive ─
+# On the LAN server's kernel (WSL2 6.18.33.2, ext4 and tmpfs) two concurrent `mkdir`
+# calls of one name BOTH return 0 (264 of 300 races on ext4; `ln` and a noclobber
+# create: 0 of 300), so a claim taken with `mkdir` is taken twice and scenario 12
+# fails on roughly 7 of 12 runs there. A timing race cannot be pinned on a kernel
+# that behaves, so this scenario supplies the broken primitive itself: a `mkdir`
+# stand-in that returns 0 when the directory already exists, which is exactly what
+# the affected kernel does. Two hooks race with it on PATH and the same assertions
+# as scenario 12 must hold. Against a claim built on `mkdir` it is red on every run;
+# a claim that takes its exclusivity from `ln` is unaffected, because `mkdir` is
+# only used to make the directory the claim lives in.
+NOEX_BIN="$TMPDIR_TEST/noex-bin"
+mkdir -p "$NOEX_BIN"
+{
+  printf '#!/usr/bin/env bash\n'
+  printf '# bug.21 stand-in: mkdir that succeeds on an existing directory (the affected kernel).\n'
+  printf 'exec %q -p "$@"\n' "$(command -v mkdir)"
+} > "$NOEX_BIN/mkdir"
+chmod +x "$NOEX_BIN/mkdir"
+S12A="$TMPDIR_TEST/s12a"
+mkdir -p "$S12A/.claude/state" "$S12A/stdin"
+printf '# report\n' > "$S12A/report.md"
+printf '{"skill":"develop-task","current_step":5,"branch":"feature/x","report_path":"report.md","pr_url":"https://github.com/o/r/pull/7","tracker":"github","tracker_issue":"42"}\n' \
+  > "$S12A/.claude/state/develop-pipeline.lock"
+: > "$S12A/gh.log"
+(
+  cd "$S12A" || exit 1
+  export PATH="$NOEX_BIN:$SHIM_BIN:$PATH" GH_LOG="$S12A/gh.log" GH_STDIN_DIR="$S12A/stdin" \
+    PIPELINE_LOCK="$S12A/.claude/state/develop-pipeline.lock" \
+    TRACKER_ACTIONS_JOURNAL="$S12A/.claude/state/tracker-actions.jsonl"
+  "$BASH_BIN" "$HOOK" > "$S12A/out.a" 2>/dev/null & A=$!
+  "$BASH_BIN" "$HOOK" > "$S12A/out.b" 2>/dev/null & B=$!
+  wait "$A"; wait "$B"
+)
+N12A_BLOCK=$(grep -c '^## Pipeline Paused' "$S12A/report.md")
+N12A_SIGNAL=$(cat "$S12A/out.a" "$S12A/out.b" | grep -c 'PIPELINE-PAUSE-SIGNAL')
+N12A_EMPTY=$(cat "$S12A/out.a" "$S12A/out.b" | grep -cF '"additionalContext":""')
+N12A_PR=$(grep -cE '^pr comment ' "$S12A/gh.log")
+if [ "$N12A_BLOCK" != "1" ]; then
+  fail "non-exclusive mkdir stand-in: exactly one report block appended" "found $N12A_BLOCK '## Pipeline Paused' headings"
+elif [ "$N12A_PR" != "1" ]; then
+  fail "non-exclusive mkdir stand-in: exactly one PR-comment call" "found $N12A_PR in gh.log: $(cat "$S12A/gh.log")"
+elif [ "$N12A_SIGNAL" != "1" ] || [ "$N12A_EMPTY" != "1" ]; then
+  fail "non-exclusive mkdir stand-in: one pause signal, one empty signal" "signals=$N12A_SIGNAL empties=$N12A_EMPTY"
+else
+  pass "non-exclusive mkdir stand-in (bug.21): the claim still admits exactly one of two concurrent runs"
 fi
 
 # ── Scenario 12b: the slower of two stealers moves the faster one's FRESH claim ─

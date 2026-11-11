@@ -22,6 +22,14 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The PreCompact claim no longer depends on `mkdir` being exclusive (bug 21).** On the LAN server's
+  kernel (WSL2 6.18.33.2, ext4 and tmpfs) two concurrent `mkdir` calls of one name both succeed, so two
+  concurrent hook runs both took the claim and the Test workflow failed on `concurrent: exactly one
+  report block appended` (7 of 12 runs there). The claim is now an `ln` of the run's pid file into
+  `develop-pipeline.precompact-claim.d/pid`, which is exclusive on every kernel measured (0 of 300
+  doubles on both filesystems) and publishes the pid in the same step. The directory and file names are
+  unchanged. A new scenario supplies a `mkdir` that always succeeds, so the double claim fails on any
+  kernel, and the hook suite ran 0 red in 20 runs on the affected kernel after the fix.
 - **A compaction no longer removes the pipeline lock.** The PreCompact hook treated every
   compaction as the end of the run. It claimed the lock by `mv` and removed it, but Claude Code
   carries on in the same session after a compaction. That left `set-qa-phase.sh`,
