@@ -353,7 +353,13 @@ mechanism that matched the text of a `GIT_` name was beaten three times, by quot
 a name the shell assembles (`export GIT_{SSH_COMMAND,X}=…`, `export GI''T_SSH_COMMAND=…`, `export
 GIT\_SSH_COMMAND=…`). It was replaced, not widened: `export`, `declare`, `typeset`, `readonly` and `local`
 must name each variable as a plain literal identifier whenever the block is judged for git, and a name
-holding a brace, a quote, a backslash or an expansion is refused whatever it spells. Cost on the shipped documentation:
+holding a brace, a quote, a backslash or an expansion is refused whatever it spells. The same change of
+shape closed QA cycle 4: the scan finds the subcommand by skipping the global flags that take a separate
+operand, and a list of those fails open on every flag it forgets (`git --attr-source log -c
+core.sshCommand=… ls-remote …` read `log` as the subcommand and ran the `-c`). The rule is now the
+reverse: a global flag before the subcommand must be one the scan knows (the operand-taking ones it
+skips, and the zero-operand ones such as `--no-pager`, `-p`, `--bare`, `--literal-pathspecs`), and any
+other flag, including one git adds next year, is refused with `an unknown git global flag`. Cost on the shipped documentation:
 0 blocks (`npm run qa-snippets:docscan`: 251 runnable before, 251 now). The `git` atom set of the
 differential forms these shapes and is calibrated against the engine without the rule (writes there,
 none now). A block that needs one of these forms is rewritten without it.

@@ -2581,6 +2581,34 @@ const unquoteToken = (t) =>
     .replace(/\u0001\d+\u0001/g, "")
     .replace(/\\(.)/g, "$1")
     .replace(/['"]/g, "");
+// The global flags the scan KNOWS the shape of, measured against `git -h` (git 2.56). The flags
+// that take a separate operand are GIT_FLAGS_WITH_OPERAND (skipped with their operand); these are
+// the ones that take none, or take their value after `=`. `-c`, `--config-env` and `--exec-path=`
+// are known and refused by gitConfigFlag first. Anything else before the subcommand is refused.
+const GIT_KNOWN_GLOBAL_FLAGS = new Set([
+  ...GIT_FLAGS_WITH_OPERAND,
+  "-p",
+  "--paginate",
+  "-P",
+  "--no-pager",
+  "--no-replace-objects",
+  "--no-lazy-fetch",
+  "--no-optional-locks",
+  "--no-advice",
+  "--bare",
+  "--literal-pathspecs",
+  "--glob-pathspecs",
+  "--noglob-pathspecs",
+  "--icase-pathspecs",
+  "--version",
+  "-v",
+  "--help",
+  "-h",
+  "--html-path",
+  "--man-path",
+  "--info-path",
+  "--list-cmds",
+]);
 const gitConfigFlag = (t) => {
   if (t === "-c" || /^-c./.test(t)) return "-c (git runs the value)";
   if (t === "--config-env" || t.startsWith("--config-env="))
@@ -2643,7 +2671,16 @@ function gitArgsHazard(rawArgs) {
       i += 1; // the operand belongs to the flag
       continue;
     }
-    if (tok.startsWith("-")) continue;
+    if (tok.startsWith("-")) {
+      // A global flag the scan does not know is refused, never skipped (task.304, QA cycle 4). A
+      // flag that takes a separate operand makes the scan read that operand as the subcommand, and
+      // git adds global flags over time (`--attr-source` was not on the old list), so a list of
+      // the flags that take an operand fails open on every flag it forgets. The list of what is
+      // KNOWN runs the other way: an unknown flag fails closed.
+      if (!GIT_KNOWN_GLOBAL_FLAGS.has(tok.split("=")[0]))
+        return "an unknown git global flag (it may take an operand the scan would read as the subcommand)";
+      continue;
+    }
     if (tok === "ls-remote") {
       for (const a of args.slice(i + 1)) {
         if (a === "--") break;

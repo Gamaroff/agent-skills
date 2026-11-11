@@ -15,7 +15,8 @@ All notable changes to this project will be documented in this file. Format foll
   their unambiguous prefixes), any git argument holding an unquoted brace expansion (scanned per
   word), and an `export` / `declare` / `typeset` / `readonly` / `local` operand whose variable name is
   not a plain identifier (a brace, quote, backslash or expansion the shell resolves after the scan),
-  with `not-allow-listed: git …`, by form and not by value. Cost on the repository's own
+  and any git global flag the scan does not know before the subcommand (`git --attr-source log -c …`
+  hid the `-c`), with `not-allow-listed: git …`, by form and not by value. Cost on the repository's own
   documentation: 0 blocks (251 runnable before and after). The differential gains a `git` atom set that
   writes against the engine without the rule and not against the new one.
 - **The QA snippet classifier runs a block only when every non-literal word is on a closed list (task 294).**

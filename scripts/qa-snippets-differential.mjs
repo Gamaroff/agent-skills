@@ -254,6 +254,11 @@ export const ATOM_SETS = {
     "export GI''T_SSH_COMMAND='touch out'; git ls-remote ssh://x/y",
     "export GI\"\"T_SSH_COMMAND='touch out'; git ls-remote ssh://x/y",
     "export GIT\\_SSH_COMMAND='touch out'; git ls-remote ssh://x/y",
+    // Task 304, QA cycle 4: a global flag the scan does not know takes an operand and hides the
+    // real subcommand (`--attr-source` is real; the second is a flag git does not have yet).
+    "git --attr-source log -c core.sshCommand='touch out' ls-remote ssh://x/y",
+    "git --attr-source log ls-remote --upload-pack='touch out' .",
+    "git --some-future-flag log -c core.sshCommand='touch out' ls-remote ssh://x/y",
     "git rev-parse HEAD",
     "git log -1",
     "echo hi",

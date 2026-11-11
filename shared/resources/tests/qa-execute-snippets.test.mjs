@@ -5697,7 +5697,22 @@ const T304_FORMS = {
     'export GI""T_SSH_COMMAND=./hook.sh; git ls-remote ssh://h/x',
   "export GIT_ name split by a backslash":
     "export GIT\\_SSH_COMMAND=./hook.sh; git ls-remote ssh://h/x",
+  // T304-QA-9 (cycle 4): a global flag that takes an operand and is not on the scan's list hides
+  // the real subcommand. `--attr-source` is real (git 2.40+); the second row is a flag git does
+  // not have, which stands for the next one it adds.
+  "-c behind --attr-source":
+    "git --attr-source log -c core.sshCommand=./hook.sh ls-remote ssh://x/y",
+  "--upload-pack behind --attr-source":
+    "git --attr-source log ls-remote --upload-pack=./hook.sh .",
 };
+// Global flags git has and the scan knows the shape of: they stay runnable beside a safe subcommand.
+const T304_FLAG_CONTROLS = [
+  "git --no-pager log -1",
+  "git -C . log -1",
+  "git --no-optional-locks status",
+  "git --literal-pathspecs log -1",
+  "git -p log -1",
+];
 // Controls for the assignment-site rule: a plain literal name stays runnable beside git.
 const T304_NAME_CONTROLS = [
   "export FOO=1; git log -1",
@@ -5764,6 +5779,20 @@ test("task.304 every git literal-execution form runs code under real bash, was a
   }
 });
 
+test("task.304 an unknown git global flag is refused, a known one stays runnable", () => {
+  for (const code of T304_FLAG_CONTROLS)
+    assert.equal(classifyBlock(code).klass, "runnable", code);
+  // A flag git does not have (yet): fail closed, never skipped. The reason names the cause.
+  for (const code of [
+    "git --some-future-flag log -c core.sshCommand=./hook.sh ls-remote ssh://x/y",
+    "git --some-future-flag=x log -1",
+    "git -Z log -1",
+  ]) {
+    const v = classifyBlock(code);
+    assert.equal(v.klass, "mutating", code);
+    assert.match(v.reason, /unknown git global flag/, code);
+  }
+});
 test("task.304 the assignment-site rule keeps a plain exported name beside git runnable", () => {
   for (const code of T304_NAME_CONTROLS)
     assert.equal(classifyBlock(code).klass, "runnable", code);

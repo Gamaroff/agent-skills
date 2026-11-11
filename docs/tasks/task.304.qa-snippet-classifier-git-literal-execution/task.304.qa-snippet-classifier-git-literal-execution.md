@@ -409,21 +409,21 @@ None.
 **QA Status**: FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-11
-**Quality Score**: 70/100
+**Quality Score**: 80/100
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.304.qa.3.qa-snippet-classifier-git-literal-execution.md](./task.304.qa.3.qa-snippet-classifier-git-literal-execution.md)
-- **Gate File**: [task.304.gate.3.qa-snippet-classifier-git-literal-execution.yml](./task.304.gate.3.qa-snippet-classifier-git-literal-execution.yml)
+- **Full Report**: [task.304.qa.4.qa-snippet-classifier-git-literal-execution.md](./task.304.qa.4.qa-snippet-classifier-git-literal-execution.md)
+- **Gate File**: [task.304.gate.4.qa-snippet-classifier-git-literal-execution.yml](./task.304.gate.4.qa-snippet-classifier-git-literal-execution.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 400
-- **Phases Verified**: 4/4 (two with findings)
-- **Critical Issues**: 2
+- **Tests Executed**: 403
+- **Phases Verified**: 4/4 (one with findings)
+- **Critical Issues**: 1
 - **NFR Status**: Security: FAIL, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-The cycle 2 findings are fixed: every brace spelling of `--upload-pack`, `--exec` and `--config-env`, and `--exec-path=<dir>`, is refused. The safety re-probe found the same class one step away: the `GIT_` name is judged as text, so an exported name that bash assembles from braces, empty quotes or a backslash classifies runnable and writes a file under real bash (five spellings reproduced, 0 escapes in 57 probes). This is the third consecutive gate with a HIGH on the same file; the fix should judge the assignment site, not the spelling.
+The cycle 3 findings are fixed: every spelling of an exported `GIT_` name the shell assembles is refused at the assignment site. The safety re-probe found a different hole in the same boundary: `git --attr-source log -c core.sshCommand=… ls-remote …` classifies runnable and writes a file under real bash, because the closed list of operand-taking global flags lacks `--attr-source`. The fix is to invert the list (a fail-closed allow-list of global flags), not to add one more spelling.
 
 <!-- change-log-start -->
 ## Change Log
@@ -440,4 +440,6 @@ The cycle 2 findings are fixed: every brace spelling of `--upload-pack`, `--exec
 | 2026-11-11 |  | QA findings fixed — a git argument holding an unquoted brace is refused whole (shape change, not another spelling), `--exec-path=<dir>` refused, differential brace atoms added; 1 iteration | qa-fix |
 | 2026-11-11 |  | QA gate FAIL (70/100) — 2 findings | qa-task |
 | 2026-11-11 |  | QA findings fixed — third strike: the `GIT_` name is no longer judged as text; export/declare/typeset/readonly/local operands must name a plain literal identifier (mechanism replaced), brace scan per word, name-assembly atoms and bash-verified rows added; 1 iteration | qa-fix |
+| 2026-11-11 |  | QA gate FAIL (80/100) — 1 finding | qa-task |
+| 2026-11-11 |  | QA findings fixed — fourth strike: the closed list of operand-taking git global flags is replaced by a fail-closed allow-list (an unknown flag before the subcommand is refused); bash-verified rows, differential atoms and a mutation proof added; 1 iteration | qa-fix |
 <!-- change-log-end -->
