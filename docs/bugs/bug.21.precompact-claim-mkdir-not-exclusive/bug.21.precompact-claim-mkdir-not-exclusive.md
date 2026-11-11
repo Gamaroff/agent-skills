@@ -133,14 +133,14 @@ github_issue: 880
 
 #### QA Verification (Ready for QA → Closed/Reopened)
 
-**Date**: [Date]
-**QA Engineer**: [Name]
+**Date**: 2026-11-11
+**QA Engineer**: Claude (develop-bug verify cycle 1)
 
-**Verification Result**: ✅ Fixed | ⚠️ Still Failing
+**Verification Result**: ✅ Fixed
 
-**Notes**: [Testing notes]
+**Notes**: regression scenario 12a green (red 12 of 12 on the old hook on the affected kernel); hook suite 32/32 and 0 red in 20 runs on the affected kernel; full suite 8371 pass, 0 fail; `lint:shell` and `bundle:check` clean; `/review-code` returned no blocking finding (one comment applied, two findings declined with reasons in the implementation report).
 
-**Decision**: Closed | Reopened
+**Decision**: Closed
 
 ---
 

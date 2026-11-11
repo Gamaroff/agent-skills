@@ -23,8 +23,8 @@ started: '2026-11-11T11:10:00Z'
 | 1 | create-branch | ✅ Done | `bugfix/bug.21.precompact-claim-mkdir-not-exclusive` off develop, local only; lock written at step 2 | | 2026-11-11T11:12Z |
 | 2 | review-bug | ✅ Done | READY TO FIX 9/10 (`bug.21.review.1.*`); duplicate scans run in-line, no subagent. 2b: branch pushed, issue #880 opened, board In Progress, work-started comment posted | | 2026-11-11T11:25Z |
 | 3 | investigate-fix | ✅ Done | Race reproduced on the LAN kernel (mkdir doubled 264/300); `take_claim` now uses `ln`; scenario 12a red 12/12 on old hook, suite 0 red in 20 runs after; lint:shell clean | | 2026-11-11T12:20Z |
-| 4 | create-pr | ⏳ Pending | | | |
-| 5–6 | verify-fix loop | ⏳ Pending | | | |
+| 4 | create-pr | ✅ Done | PR #881 → develop, closes #880; two commits (fix, bug records) | | 2026-11-11T12:50Z |
+| 5–6 | verify-fix loop | ✅ Done | Cycle 1 PASS: regression test, suite + lint, /review-code clean (1 comment applied, 2 declined); no fix cycle needed | | 2026-11-11T13:30Z |
 | 7 | finalise-close | ⏳ Pending | | | |
 | 8 | commit-changes | ⏳ Pending | | | |
 
@@ -36,6 +36,22 @@ started: '2026-11-11T11:10:00Z'
 - 2026-11-11T11:10Z — Lite mode off: severity Major is never lite.
 
 ## Issues Log
+
+## QA Iteration History
+
+### Verify Cycle 1 — 2026-11-11
+
+**Regression test**: pass (scenario 12a green on the fix; red 12 of 12 on the old hook on the affected kernel, 3 of 3 on the laptop)
+**Suite + lint**: pass (hook suite 32/32; 0 red in 20 runs on the affected kernel; `lint:shell` clean; full suite 8371 pass, 0 fail; `bundle:check` clean)
+**Code review**: clean — 0 blocking findings · Applied non-blocking: 1 (CR-3: comment in scenario 12a naming the `git` stand-in that guarantees the overlap) · Declined: 2
+**Fast gate**: n/a
+**Verdict**: PASS
+**Action**: Proceeding to finalise
+
+Declined, with reasons:
+
+- **CR-1** (a new run linking its pid while the previous holder's `rm -rf` empties the directory; bug, low confidence): `ln` onto `pid` can only succeed after the holder has unlinked its own `pid`, and the holder's `rm -rf` then fails its `rmdir` on the non-empty directory, leaving the new holder's pid intact. The old `mkdir` claim had the same release path.
+- **CR-2** (an orphan `precompact-claim.pid.<pid>` after a SIGKILL between the temp write and the `ln`; cleanup): `take_claim` removes the temp file on both outcomes, a SIGKILL skips any trap, and the window is two syscalls leaving one pid line.
 
 ## Completion
 
