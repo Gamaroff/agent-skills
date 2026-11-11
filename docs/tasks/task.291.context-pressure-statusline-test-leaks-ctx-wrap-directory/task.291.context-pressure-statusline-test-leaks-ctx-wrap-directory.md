@@ -5,16 +5,19 @@ type: task
 description: "Stop shared/resources/tests/context-pressure-statusline.test.mjs leaving a ctx-wrap- directory behind, which trips the post-suite tmp-leak ratchet intermittently and costs a CI re-run."
 tags: [testing, flaky-test, tmp-leak, follow-up-289]
 category: testing
-status: planned
+status: ready-for-review
 priority: Low
 created: 2026-11-09
-updated: 2026-11-09
+updated: 2026-11-11
 estimated_effort_hours: 2
+github_issue: 882
 ---
 
 # Task 291: The context-pressure statusline test leaks a ctx-wrap- temp directory
 
-**Status:** Planned
+**GitHub Issue**: [#882](https://github.com/Gamaroff/agent-skills/issues/882)
+
+**Status:** Ready for Development
 
 ---
 
@@ -93,10 +96,10 @@ None - API stable. The change is confined to a test, or to a background process'
 
 **Files**: `shared/resources/tests/context-pressure-statusline.test.mjs` (and `shared/resources/context-pressure-statusline.sh` only if the cause is there)
 
-- [ ] Reproduce: run the file repeatedly under load and count the `ctx-wrap-*` directories left in a private `TMPDIR`.
-- [ ] Prove the cause: make the `:85` test's recorder slow (an engine that sleeps before it writes) and show the directory survives.
-- [ ] Fix it so no recorder outlives its directory.
-- [ ] Add the regression test (the slow-recorder case) and mutation-prove it.
+- [x] Reproduce: run the file repeatedly under load and count the `ctx-wrap-*` directories left in a private `TMPDIR`. (Before: 1 in 100 unloaded, 3 in 100 loaded.)
+- [x] Prove the cause: make the `:85` test's recorder slow (an engine that sleeps before it writes) and show the directory survives. (A 500 ms stand-in left `ctx-wrap-X/s/wrap-1.json` behind.)
+- [x] Fix it so no recorder outlives its directory.
+- [x] Add the regression test (the slow-recorder case) and mutation-prove it.
 
 **Dependencies**: none.
 
@@ -105,7 +108,8 @@ None - API stable. The change is confined to a test, or to a background process'
 ## 7. Files Summary
 
 Core implementation:
-1. ✅ `shared/resources/tests/context-pressure-statusline.test.mjs` - the leaking test
+1. ✅ `shared/resources/tests/context-pressure-statusline.test.mjs` - the leaking test, and the regression test
+2. ✅ `shared/resources/tests/lib/tmp-state-cleanup.mjs` - new helper: the cleanup the `after` hook calls (wait for every recorded state directory's file, bounded, then remove). It lives in `tests/lib/` (beside `executed-prose.mjs` and `rm-invocation.mjs`), not in the test file, because a `*.test.mjs` file cannot be imported without registering its tests; the runner's glob `shared/resources/tests/*.test.mjs` does not match `lib/`, so the helper is never run as a test, and the regression test imports it. Its temp directory is removed by the helper's own `finally`.
 
 Possibly:
 2. ✅ `shared/resources/context-pressure-statusline.sh` - only if the fix belongs in the wrapper
@@ -134,16 +138,16 @@ T=$(mktemp -d); for i in $(seq 1 100); do TMPDIR=$T command node --test shared/r
 ## 9. Success Criteria
 
 ### Functional
-- [ ] The reproduction command prints 0 after the fix, and a number above 0 before it (both recorded in the QA report).
-- [ ] The regression test fails with the fix reverted.
+- [ ] The reproduction command prints 0 after the fix (recorded in the QA report). The "before" figure is the count the same command gives with the slow-recorder stub from Phase 1 step 2 applied to the unfixed test: the leak is intermittent, so an unloaded 100-run count of 0 does not falsify the cause, and the stub makes the "before" deterministic. Record both the unloaded count and the stubbed count.
+- [ ] The regression test (`shared/resources/tests/context-pressure-statusline.test.mjs`, case "no ctx-wrap- directory survives a slow recorder") fails with the fix reverted: the QA report names the red test and the revert.
 - [ ] `CI=true npm test` passes with `ctx-wrap` absent from `tests/tmp-leak-ratchet.json`.
 
 ### Performance
-- [ ] The file's run time against `develop` is recorded in the QA report as the median of five alternating runs with the load noted, and rises by no more than 10%.
-- [ ] No test in the file waits longer than its existing `waitFor` bound.
+- [ ] The file's run time is no more than 10% above `develop`'s. The QA report records the median of five alternating runs of `time command node --test shared/resources/tests/context-pressure-statusline.test.mjs` on `develop` and on the branch, with `uptime` beside each figure and the head commit named.
+- [ ] No test in the file waits longer than its existing `waitFor` bound (3000 ms, `waitFor`'s default).
 
 ### Code Quality
-- [ ] No test in the file starts a background recorder without waiting for it or for the end of the process.
+- [ ] Every test in the file that passes `CONTEXT_PRESSURE_STATE_DIR` to the wrapper either waits for the recorder's file with `waitFor` or has its state directory settled by the cleanup helper; the QA report lists each such test with the line of its wait or its settle call (a documentation criterion: held by that list, not by a scan).
 - [ ] Lint and prettier pass on the changed files.
 
 ### Migration
@@ -193,6 +197,9 @@ Sign-off is disabled for this repository (`sign-off.enabled` is not set), so no 
 | Date       | Version | Description                                                                 | Author      |
 | ---------- | ------- | --------------------------------------------------------------------------- | ----------- |
 | 2026-11-09 | 1.0     | Initial draft, from task.289 Phase 5 (the optional leak fix, split out)    | create-task |
+| 2026-11-11 | 1.1     | Review passed (8/10): 4 Important fixes applied (helper module location, deterministic "before" evidence, negative-content criterion rescoped, performance bound given its command); GitHub issue #882 linked | review-task |
+| 2026-11-11 |         | Status → ready-for-development                                              | review-task |
+| 2026-11-11 |         | Status → ready-for-review: leak reproduced and cause proven, fixed in the test's cleanup, regression test mutation-proven | develop-task |
 <!-- change-log-end -->
 
 ---
@@ -200,10 +207,11 @@ Sign-off is disabled for this repository (`sign-off.enabled` is not set), so no 
 ## Progress Tracking
 
 ### Phase 1
-- [ ] Reproduce and count
-- [ ] Prove the cause
-- [ ] Fix and add the regression test
-- [ ] Mutation proof, full suite, CHANGELOG
+- [x] Reproduce and count
+- [x] Prove the cause
+- [x] Fix and add the regression test
+- [x] Mutation proof, CHANGELOG
+- [x] Fast gate (`CI=true npm run test:remote` → `ci:fast` on the LAN server): 8389 pass, 0 fail, tmp-leak ratchet ok; the QA step records the full suite
 
 ---
 
@@ -223,6 +231,6 @@ The cause above is a hypothesis read from the code, not a measurement. Phase 1 s
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review
 
 **Next Steps**: run `/develop-task` on this task.

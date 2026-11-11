@@ -39,6 +39,14 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The context-pressure statusline test no longer leaks a `ctx-wrap-` temp directory (task 291).**
+  `context-pressure-statusline.test.mjs` ended some tests while the wrapper's detached recorder was
+  still running; the recorder's `mkdirSync(..., { recursive: true })` then recreated the directory the
+  `after` hook had just removed, and the post-suite tmp-leak ratchet failed on the unlisted prefix
+  (1 run in 100 unloaded, 3 in 100 under load; 0 in 100 on both after the fix). The hook now waits,
+  bounded by 3 s, for each recorder's file before it removes anything
+  (`shared/resources/tests/lib/tmp-state-cleanup.mjs`), and a new test runs a deliberately slow
+  recorder and is red with the wait removed. `ctx-wrap-` is not added to the ratchet.
 - **The PreCompact claim no longer depends on `mkdir` being exclusive (bug 21).** On the LAN server's
   kernel (WSL2 6.18.33.2, ext4 and tmpfs) two concurrent `mkdir` calls of one name both succeed, so two
   concurrent hook runs both took the claim and the Test workflow failed on `concurrent: exactly one
