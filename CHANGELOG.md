@@ -6,6 +6,15 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **A pause commit at step 8 is no longer pushed (task 303).** Each PreCompact pause at step 8 pushed
+  a docs-only commit, which cancelled the previous head's CI run; the cancelled run can read red to
+  the docs-only tree-equivalence walk (the template's `ci-ok` aggregator exits 1 when a job it needs
+  was cancelled, so the run's rollup is `FAILURE` and the walk stops there), so the finalise and
+  merge waits needed full CI, about 50 minutes at worst on a consumer. The hook now commits the pause
+  entry and holds the push at step 8; step 8's own commit carries it and pushes once. The engine is
+  unchanged on purpose: telling a cancel-caused `ci-ok` failure from a real one by conclusion alone
+  could green a red run. Scenarios 17f and 17g hold it (a step-8 pause is committed and not pushed;
+  the same report at step 7 is pushed).
 - **The PreCompact pause comment names the QA cycle and the pause count (task 301).** The one pause
   comment per step, edited in place on a repeat, now ends with `Latest pause: pause 2 at Step 5, QA
   cycle 2.` The count lives in a new top-level lock field `pause_counts` (keyed by step), not in the
