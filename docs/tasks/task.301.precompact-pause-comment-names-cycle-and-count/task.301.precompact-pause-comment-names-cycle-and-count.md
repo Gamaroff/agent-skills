@@ -5,16 +5,18 @@ type: task
 description: "Follow-up to the PreCompact keep-the-lock fix (PR 873): the step-scoped pause comment gains the QA cycle and a pause count, the Step 1 paused-lock block is pinned by tests, and the stateful gh fixture's counter gets a test that goes red without it."
 tags: [pipeline, precompact, hooks, tests]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-11-10
 updated: 2026-11-12
+completed_date: 2026-11-12
+pr_number: 886
 estimated_effort_hours: 4
 ---
 
 # Technical Task: PreCompact pause comment names the cycle and the pause count
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.301.review.1.precompact-pause-comment-names-cycle-and-count.md` implemented 2026-11-12
 
 Follow-up to PR #873 (`fix/precompact-keep-lock`, merged as `5e491e3a`). The decisions below come from the other agent's handoff written after that work.
@@ -95,6 +97,9 @@ None. The comment marker is unchanged; only the body gains text.
 4. ✅ `shared/resources/develop-pipeline-step-1-create-branch.md` (the HALT lifted into the fenced block) and the new `shared/resources/tests/step-1-paused-lock.test.mjs` (`git grep -n 'pause_reason == "precompact"'` found no existing Step 1 test)
 5. ✅ `shared/resources/develop-pipeline-pause.md` (the `pause_counts` row)
 6. ✅ bundled `references/` copies, `CHANGELOG.md`
+7. ✅ `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` (added in QA cycle 1, T301-CR-1: Phase 0b says who fills `{start-fresh}`)
+
+**What grew during review and QA** (recorded here so sections 6 and 9 are read against what shipped): the Step 1 test file holds 12 tests, not three (the three cases plus A2, B2, D, E, the non-vacuity guard and F to F4 for the placeholder guard); the comment body reads `pause 2 at Step 5, QA cycle 2`; and the hook has a fourth scenario, 23, for a failed count write (QA cycle 2, T301-CR-2).
 
 ## 8. Testing Strategy
 
@@ -104,21 +109,21 @@ Behaviour, not source text: drive the hook with the stateful `gh` stub and asser
 
 **Functional**
 
-- [ ] Two pauses at one step in different cycles leave one PR comment naming the second cycle and `pause 2`, and one issue comment. Held by a test.
-- [ ] The three Step 1 cases each have a test.
-- [ ] A pause at two steps leaves two kept comments and two `pr comment` lines; the `echo 0` mutation turns that test red. The red run is recorded in the QA report.
+- [x] Two pauses at one step in different cycles leave one PR comment naming the second cycle and `pause 2`, and one issue comment. Held by a test.
+- [x] The three Step 1 cases each have a test.
+- [x] A pause at two steps leaves two kept comments and two `pr comment` lines; the `echo 0` mutation turns that test red. The red run is recorded in the QA report.
 
 **Performance**
 
-- [ ] The hook makes no additional network calls: a scenario asserts the exact number of `gh` calls one pause makes (the count read from the stub's `$GH_LOG` on the unchanged hook, kept in the test as a constant), so an added call turns it red.
+- [x] The hook makes no additional network calls: a scenario asserts the exact number of `gh` calls one pause makes (the count read from the stub's `$GH_LOG` on the unchanged hook, kept in the test as a constant), so an added call turns it red.
 
 **Code quality**
 
-- [ ] `npm run bundle:check`, `lint:shell` and `ci:fast` pass; the latter via `npm run test:remote`.
+- [x] `npm run bundle:check`, `lint:shell` and `ci:fast` pass; the latter via `npm run test:remote`.
 
 **Migration**
 
-- [ ] `CHANGELOG.md` entry.
+- [x] `CHANGELOG.md` entry.
 
 ## 10. Risk Assessment
 
@@ -151,12 +156,27 @@ Revert the commit and re-run `npm run bundle`. Triggers: a hook that fails to po
 ### Key Findings
 Both earlier findings (T301-CR-1, T301-CR-2) are fixed and held by committed tests. No new correctness bug; low-severity cleanups are listed in the gate.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Gate**: `task.301.gate.3.precompact-pause-comment-names-cycle-and-count.yml` — PASS, 100/100
+**PR review (Step 5c)**: `task.301.pr-review.1.precompact-pause-comment-names-cycle-and-count.md` — APPROVE
+
+✅ **Acceptance Criteria:** all 6 met (hook scenarios 20 to 22, `step-1-paused-lock.test.mjs`, `CHANGELOG.md`; CI-state criterion graded from CI reading 1)
+✅ **Tests and CI:** CI SUCCESS on the head over 6 checks
+✅ **Documentation:** CHANGELOG entry and the pause reference updated; bundled copies re-bundled
+✅ **Security Review:** PASS — Step 1 block probed, 24 candidates executed, 0 reproduced
+✅ **Compliance Review:** NOT_APPLICABLE (internal pipeline tooling)
+
+**Detailed Verification Log:** See `task.301.dod.1.precompact-pause-comment-names-cycle-and-count.md` for complete verification evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-11-12
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
-
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-10 | 1.0     | Initial draft | create-task |
 | 2026-11-12 | 1.1     | Review found the count cannot live in `paused` (cleared by every lock writer), the lock has no `qa_cycle`, and the Step 1 HALT is prose; plan corrected (top-level `pause_counts`, cycle from gate files, HALT lifted into a fenced block, lock-schema row, call-count criterion) | review-task |
 | 2026-11-12 |         | Status → ready-for-development | review-task |
@@ -166,7 +186,7 @@ Both earlier findings (T301-CR-1, T301-CR-2) are fixed and held by committed tes
 | 2026-11-12 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-11-12 |         | QA findings fixed — 1 finding (stale pause count after a failed write), 2 iterations | qa-fix |
 | 2026-11-12 |         | QA gate PASS (100/100) — 0 findings | qa-task |
-
+| 2026-11-12 | 1.2 | DoD passed — accepted (PR #886) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking

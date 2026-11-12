@@ -57,9 +57,9 @@ First review: all findings below are new.
 
 | Phase | Status | Test Result | Notes |
 | --- | --- | --- | --- |
-| 1: comment body (`pause_counts`, cycle, text) | PASS | Verified | Scenarios 20-21; hook now calls `qa-cycle.sh` |
+| 1: comment body (`pause_counts`, cycle, text) | PASS | Verified | Scenarios 20 and 22; hook now calls `qa-cycle.sh` |
 | 2: Step 1 block + test | CONCERNS | Verified | 8 cases pass; placeholder gap, T301-CR-1 |
-| 3: fixture counter | PASS | Verified | Scenario 22; `next_n` → `echo 0` goes red |
+| 3: fixture counter | PASS | Verified | Scenario 21; `next_n` → `echo 0` goes red |
 | 4: bundle and docs | PASS | Verified | `bundle:check` clean; `pause_counts` row; CHANGELOG cites task 301 |
 
 **Overall Phase Completion**: 3/4 clean, 1 with a finding.
@@ -70,9 +70,9 @@ First review: all findings below are new.
 
 | Criterion | Evidence | Status |
 | --- | --- | --- |
-| Two pauses at one step name the second cycle and `pause 2`; one issue comment | Scenario 21 | PASS |
+| Two pauses at one step name the second cycle and `pause 2`; one issue comment | Scenario 20 | PASS |
 | The three Step 1 cases each have a test | `step-1-paused-lock.test.mjs` A, B/B2, C (plus A2, D, E) | PASS |
-| Two steps leave two kept comments and two `pr comment` lines; `echo 0` goes red | Scenario 22; re-run in the develop step: red | PASS |
+| Two steps leave two kept comments and two `pr comment` lines; `echo 0` goes red | Scenario 21; re-run in the develop step: red | PASS |
 | No added network call: exact `gh` count held | Scenario 22 constant, 6 | PASS |
 | `bundle:check`, `lint:shell`, `ci:fast` pass | all run, green | PASS |
 | CHANGELOG entry | present, cites (task 301) | PASS |

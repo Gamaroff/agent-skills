@@ -67,9 +67,9 @@ Step 4b: not re-run. The changed block is exercised by `step-1-paused-lock.test.
 
 | Phase | Status | Test Result | Notes |
 | --- | --- | --- | --- |
-| 1: comment body (`pause_counts`, cycle, text) | CONCERNS | Verified | Scenarios 20-21; stale count on a failed bump (T301-CR-2) |
+| 1: comment body (`pause_counts`, cycle, text) | CONCERNS | Verified | Scenarios 20 and 22; stale count on a failed bump (T301-CR-2) |
 | 2: Step 1 block and tests | PASS | Verified | 12 tests, cycle 1 fix included |
-| 3: fixture counter | PASS | Verified | Scenario 22 |
+| 3: fixture counter | PASS | Verified | Scenario 21 |
 | 4: bundle and docs | PASS | Verified | `bundle:check` clean; CHANGELOG entry; `pause_counts` row |
 
 **Overall Phase Completion**: 3/4 passed, 1 with a concern.

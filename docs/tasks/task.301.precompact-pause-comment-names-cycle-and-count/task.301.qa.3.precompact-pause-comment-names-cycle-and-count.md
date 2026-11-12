@@ -65,9 +65,9 @@ None. Searched the files changed since gate 2: the hook count path (`BUMP_OK`, `
 
 | Phase | Status | Test Result | Notes |
 | --- | --- | --- | --- |
-| 1: comment body (`pause_counts`, cycle, text) | PASS | Verified | Scenarios 20, 21, 23 |
+| 1: comment body (`pause_counts`, cycle, text) | PASS | Verified | Scenarios 20, 22, 23 |
 | 2: Step 1 block and tests | PASS | Verified | 12 tests |
-| 3: fixture counter | PASS | Verified | Scenario 22 |
+| 3: fixture counter | PASS | Verified | Scenario 21 |
 | 4: bundle and docs | PASS | Verified | `bundle:check` clean; CHANGELOG entry; `pause_counts` row |
 
 **Overall Phase Completion**: 4/4
