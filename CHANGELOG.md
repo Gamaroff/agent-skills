@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **`npm run test:remote` now works from a linked git worktree (task 302).** From a linked worktree
+  `.git` is a file, so nothing was synced under that name and the server's `npm ci` ran `prepare`
+  (`git config core.hooksPath`) in a tree with no `.git`, which exits 128 (`fatal: not in a git
+  directory`); the route warned about it and then failed anyway. The route now syncs the repository's
+  common git directory as `.git` and lays the worktree's own `HEAD` and `index` over it, leaving out
+  `worktrees/`. The common directory's own `HEAD` and `index` are the main checkout's, so a plain copy
+  would have run the history-backed tests against the wrong commit. A normal checkout syncs its `.git`
+  exactly as before. A bare main repository is not handled. Two offline tests hold it with the real
+  `rsync` into a local stand-in for the server: one reads the synced `HEAD` back and fails when the
+  worktree's is not the one that travels.
 - **A pause commit at step 8 is no longer pushed (task 303).** Each PreCompact pause at step 8 pushed
   a docs-only commit, which cancelled the previous head's CI run; the cancelled run can read red to
   the docs-only tree-equivalence walk (the template's `ci-ok` aggregator exits 1 when a job it needs

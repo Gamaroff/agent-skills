@@ -180,15 +180,49 @@ rsync -a --delete --exclude-from="$EXCLUDES" \
   exit 1
 }
 
-# .git travels separately, so the history-backed replay test runs. In a linked worktree .git is a
-# file pointing outside the tree, so it cannot be synced.
+# .git travels separately, so the history-backed replay test runs.
 if [ -d "$REPO_ROOT/.git" ]; then
   rsync -a --delete "$REPO_ROOT/.git/" "$HOST:$RUN_DIR/.git/" || {
     echo "✗ rsync of .git failed" >&2
     exit 1
   }
+elif [ -f "$REPO_ROOT/.git" ]; then
+  # A linked worktree: .git is a file ("gitdir: <common>/worktrees/<name>"), so there is nothing to
+  # sync under that name, and the server's `npm ci` then ran `prepare` (`git config core.hooksPath`)
+  # in a tree with no .git, which exits 128. The server gets a real .git instead: the repository's
+  # common git directory, which holds the objects and refs, with the two files that are per worktree
+  # laid over it. The common directory's own HEAD and index belong to the main checkout, so a copy
+  # of it alone would read the wrong commit. `worktrees/` is left out: it is the other worktrees'
+  # administrative state, and nothing on the server needs it.
+  WT_GIT_DIR=$(git -C "$REPO_ROOT" rev-parse --absolute-git-dir 2>/dev/null) || WT_GIT_DIR=""
+  COMMON_REL=$(git -C "$REPO_ROOT" rev-parse --git-common-dir 2>/dev/null) || COMMON_REL=""
+  # --git-common-dir prints a path relative to the directory git ran in when it is not absolute.
+  GIT_COMMON=""
+  if [ -n "$COMMON_REL" ]; then
+    case "$COMMON_REL" in
+      /*) GIT_COMMON=$(cd "$COMMON_REL" 2>/dev/null && pwd -P) ;;
+      *) GIT_COMMON=$(cd "$REPO_ROOT/$COMMON_REL" 2>/dev/null && pwd -P) ;;
+    esac
+  fi
+  if [ -z "$WT_GIT_DIR" ] || [ ! -f "$WT_GIT_DIR/HEAD" ] || [ -z "$GIT_COMMON" ] || [ ! -d "$GIT_COMMON/objects" ]; then
+    echo "✗ $REPO_ROOT/.git is a file (a linked worktree) but its git directories could not be resolved; not syncing" >&2
+    exit 1
+  fi
+  rsync -a --delete --exclude=/worktrees/ --exclude=/HEAD --exclude=/index \
+    "$GIT_COMMON/" "$HOST:$RUN_DIR/.git/" || {
+    echo "✗ rsync of the common git directory failed" >&2
+    exit 1
+  }
+  # A new worktree has an index once its checkout finishes; a half-made one has none yet.
+  WT_FILES=("$WT_GIT_DIR/HEAD")
+  [ -f "$WT_GIT_DIR/index" ] && WT_FILES+=("$WT_GIT_DIR/index")
+  rsync -a "${WT_FILES[@]}" "$HOST:$RUN_DIR/.git/" || {
+    echo "✗ rsync of the worktree's HEAD and index failed" >&2
+    exit 1
+  }
+  echo "▶ linked worktree: synced the common git directory with this worktree's HEAD and index"
 else
-  echo "⚠ .git is not a directory here (linked worktree): history is not synced, so history-backed tests may fail or skip remotely."
+  echo "⚠ $REPO_ROOT has no .git: history is not synced, so history-backed tests may fail or skip remotely."
 fi
 
 # --- image: built on the server on first use, tagged by a hash of the Dockerfile --------------
