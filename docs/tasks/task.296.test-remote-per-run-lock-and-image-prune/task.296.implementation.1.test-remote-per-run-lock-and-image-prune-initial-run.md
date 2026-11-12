@@ -35,7 +35,7 @@ Run T296 from the roadmap via /develop-next: an atomic per-run lock on the serve
 | 2. review-task             | ✅ Done | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               | READY TO IMPLEMENT 9/10; 12 Important fixed; status → ready-for-development | —                    | 2026-11-12T14:45Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (plan names every hunk); fast gate green on server: 8428 pass; 7+3+2 mutations red | —                    | 2026-11-12T16:55Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #891 (no tracker issue, so no comment) | —                    | 2026-11-12T17:10Z |
-| 5–6. qa-task / qa-fix loop | ⏳ In progress (cycle 4 gate PASS 95; Step 5c CONCERNS with one open coverage finding, PC-3; fixing) | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ⏳ In progress (cycle 5 gate PASS 96; Step 5c pending) | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
@@ -116,6 +116,16 @@ _Track each QA review/fix cycle._
 **Action**: Proceeding to 5c (PR conformance review)
 
 **Fix cycle 4** (qa-fix, entered from the Step 5c `CONCERNS`; review report `task.296.pr-review.1…md`, one open `coverage` finding): PC-3 (coverage) — closed with the evidence the criterion asks for, not by editing it: a real two-run overlap on the server, run B started the moment run A's lock appeared (Issues Log above): B refused with exit 1 naming A, A green, lock released, load recorded. The criterion also asks for it in the QA report, so the QA cycle 5 pass is asked to record it there. PC-1 — the Pipeline Progress row now names cycle 4 and the 5c verdict. PC-2 — this entry's Action, PR Review and Loop exit rows now use the spec's wording; the first wording was this orchestrator's, not the reviewer's misreading. Not changed here, and why: PC-4 (success criteria unticked) and PC-5 (`pr_number:` absent) are `consistency` findings that never route, and both are written by `/finalise` (it verifies the criteria and writes `pr_number:`), which is outside qa-fix's authorised sections. No code changed, so no new tests and no mutation proof apply; the shipped files are byte-identical to 2f9f1db9. Step 2.5 did not apply (no third strike). Step 2.6: repeat subject no, Move: patch (distinct trail and coverage gaps, not a rule restated). Step 3.5 `Probe:` the Issues Log's "left to the QA live run" sentence restated the gap: `git grep -n -F -e "QA live run" -- docs/tasks/task.296.test-remote-per-run-lock-and-image-prune`, population 1 (the Issues Log line, updated to point at the live overlap entry); the plan does not restate it.
+
+### QA Cycle 5 — 2026-11-12
+**Gate Result**: PASS
+**Issues Found**: 0 (the open coverage finding PC-3 is closed by the live overlap, now recorded in QA report 5; advisory CR-3 to CR-6 stay in the gate)
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: pending — 5c not yet run
+**Action**: Proceeding to 5c (PR conformance review)
+
+Cycle 5 is the last gate in the budget. The change since gate 4 was documentation only, so the review was a docs-only claim check done inline: no reviewer was dispatched, and independent review did not run. CI on the head was pending when the gate was written.
 
 ---
 

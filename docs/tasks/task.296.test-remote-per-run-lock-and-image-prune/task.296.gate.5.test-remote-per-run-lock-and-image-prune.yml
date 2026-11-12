@@ -1,0 +1,70 @@
+schema: 2
+task: 'task.296.test-remote-per-run-lock-and-image-prune'
+task_title: 'test:remote per-run lock and image-tag prune'
+gate: PASS
+status_reason: 'The shipped code is byte-identical to the head gate 4 judged. The one open coverage finding from the Step 5c review (PC-3, the live two-run overlap) is closed: a real overlap on the server was run and checked against its logs, and is recorded in the QA report. Trail rows corrected. No open findings. CI on the new head was pending when this gate was written.'
+reviewer: 'QA Engineer'
+head: '891786345c16899cbb52e1d6be491ac6641a31c1'
+updated: '2026-11-12T17:54:26Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 96
+
+evidence:
+  tests_reviewed: 48
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 20
+    escaped: 0
+    boundary: true
+    boundary_signals: ['never']
+    notes: 'No code changed since gate 4, so its probe record stands: task.296.qa.4.security.run.json, 20 executed, 0 reproduced, 0 escaped, on the take margin argument (shell-argv, bash and zsh, hostile-only: the control has no legitimate half). The run directory validator is covered by task.296.qa.1.security.run.json (38 executed, 0 escaped).'
+  performance:
+    status: PASS
+    notes: 'One extra ssh round trip per run, unchanged. The live overlap run left the server at load 0.56 after, from 0.26.'
+  reliability:
+    status: CONCERNS
+    notes: 'Advisory only, not reproduced: a signal during the take ssh can leak a lock until it goes stale (CR-6); prune refuses while any branch holds a lock (CR-3). Recorded for follow-up.'
+  maintainability:
+    status: PASS
+    notes: 'One server-side file, shellcheck clean, documented, one rule for every digit validator.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Prune could ignore locks lockctl reports stale, or name the lock to clear; and check the exit status of find. (CR-3, cycle 1, not reproduced)'
+      refs: ['scripts/remote-test/lockctl.sh']
+    - action: 'Arm the INT and TERM trap before the take, since release is token-checked. (CR-6, cycle 1, low confidence)'
+      refs: ['scripts/remote-test/run.sh']
+    - action: 'Unlock and release re-check ownership after the stale test and before rm. (CR-4, cycle 1, low)'
+      refs: ['scripts/remote-test/lockctl.sh']
+    - action: 'Prune counts only running containers as in use; a stopped container refusing docker rmi reads as a failed prune (exit 42). (CR-5, cycle 1, low)'
+      refs: ['scripts/remote-test/lockctl.sh']
+
+bug_resolution:
+  bugs_fixed: 5
+  bugs_remaining: 0
+  fix_date: '2026-11-12'
+  total_iterations: 4
+  verification_method: 'PC-3 (open coverage finding from the Step 5c review) closed by execution: two runs of the same command on one branch, the second started when the first lock appeared, refused with exit 1 naming the first, the first green. Checked against the saved logs in this cycle. Code identical to gate 4 (git diff 2f9f1db9..HEAD over scripts and tests is empty); 48 of 48 offline tests pass under CI=true, shellcheck clean.'
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: ['CI green on the final head']

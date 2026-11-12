@@ -217,12 +217,12 @@ Not required for this task.
 **QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-12
-**Quality Score**: 95/100
+**Quality Score**: 96/100
 **Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.296.qa.4.test-remote-per-run-lock-and-image-prune.md](./task.296.qa.4.test-remote-per-run-lock-and-image-prune.md)
-- **Gate File**: [task.296.gate.4.test-remote-per-run-lock-and-image-prune.yml](./task.296.gate.4.test-remote-per-run-lock-and-image-prune.yml)
+- **Full Report**: [task.296.qa.5.test-remote-per-run-lock-and-image-prune.md](./task.296.qa.5.test-remote-per-run-lock-and-image-prune.md)
+- **Gate File**: [task.296.gate.5.test-remote-per-run-lock-and-image-prune.yml](./task.296.gate.5.test-remote-per-run-lock-and-image-prune.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 48
@@ -231,7 +231,7 @@ Not required for this task.
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS (advisory only), Maintainability: PASS
 
 ### Key Findings
-Cycle 3's one finding (a digits check that let through a leading zero and 22 digits) is fixed and re-proved by mutation and by the probe engine. No open findings. Four advisory reliability items from cycle 1 are recorded for follow-up.
+The shipped code is unchanged since the previous gate. The one open coverage finding from the PR review, the live two-run overlap on the server, was run and is recorded in the report: the second run was refused naming the first, the first finished green, and no lock was left. Four advisory reliability items stay recorded for follow-up.
 
 ## Change Log
 
@@ -251,6 +251,7 @@ Cycle 3's one finding (a digits check that let through a leading zero and 22 dig
 | 2026-11-12 |         | QA findings fixed — lockctl digits checks capped at 4 digits and every staleness and age read made decimal (T296-QA-5), 1 iteration; ready for QA re-review | qa-fix |
 | 2026-11-12 |         | QA gate PASS (95/100) — 0 findings | qa-task |
 | 2026-11-12 |         | QA findings fixed — live two-run overlap run and recorded for the open coverage finding (PC-3), trail rows corrected (PC-1, PC-2), 1 iteration; ready for QA re-review | qa-fix |
+| 2026-11-12 |         | QA gate PASS (96/100) — 0 findings | qa-task |
 
 <!-- change-log-end -->
 
