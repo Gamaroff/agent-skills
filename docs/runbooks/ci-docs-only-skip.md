@@ -137,6 +137,16 @@ re-run of `before` still grant one. Two quick pushes in a row (code, then docs) 
 (the code push) never finished. Then the docs push finds no evidence and runs in full. That is the
 safe direction.
 
+**A superseded run reads red on purpose; do not "fix" `ci-ok` with `if: !cancelled()`.** When a
+newer push cancels a run, the `if: always()` aggregator fails on the cancelled job, so that run
+reads red and the head's docs-only shortcut waits for a full run. That is a wall-clock cost, and it
+is the price of failing closed. `!cancelled()` would skip `ci-ok` on a cancelled run, and GitHub
+counts a skipped required check as passing, so a run cancelled by hand or stopped by
+`timeout-minutes` would satisfy branch protection with no tests run. A job cannot tell a superseded
+cancel from a manual one, so no condition inside `ci-ok` keeps both properties. Avoid the cost at
+its source instead: do not push commits that supersede a run you still need. agent-skills' own
+pipeline does this by holding the PreCompact pause-commit push at step 8 (task 303).
+
 On the base branch the classifier asks for no evidence: a docs-only `before..after` push skips
 whether or not `before` went green. With `cancel-in-progress: true` on every event, a docs-only
 merge landing while a code merge's run is in flight would cancel that run and then skip its own.
