@@ -35,7 +35,7 @@ Run T296 from the roadmap via /develop-next: an atomic per-run lock on the serve
 | 2. review-task             | ✅ Done | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               | READY TO IMPLEMENT 9/10; 12 Important fixed; status → ready-for-development | —                    | 2026-11-12T14:45Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (plan names every hunk); fast gate green on server: 8428 pass; 7+3+2 mutations red | —                    | 2026-11-12T16:55Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #891 (no tracker issue, so no comment) | —                    | 2026-11-12T17:10Z |
-| 5–6. qa-task / qa-fix loop | ⏳ In progress (cycle 5 gate PASS 96; Step 5c pending) | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done (5 gates, cycle 5 PASS 96; Step 5c APPROVE) | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
@@ -122,10 +122,10 @@ _Track each QA review/fix cycle._
 **Issues Found**: 0 (the open coverage finding PC-3 is closed by the live overlap, now recorded in QA report 5; advisory CR-3 to CR-6 stay in the gate)
 **HIGH findings**: 0
 **MEDIUM findings**: 0
-**PR Review**: pending — 5c not yet run
+**PR Review**: APPROVE
 **Action**: Proceeding to 5c (PR conformance review)
 
-Cycle 5 is the last gate in the budget. The change since gate 4 was documentation only, so the review was a docs-only claim check done inline: no reviewer was dispatched, and independent review did not run. CI on the head was pending when the gate was written.
+Cycle 5 is the last gate in the budget. The change since gate 4 was documentation only, so the review was a docs-only claim check done inline: no reviewer was dispatched, and independent review did not run. CI on the head was pending when the gate was written; at 5c it read all green (5 checks). The 5c conformance lens ran 18 seconds with four tool calls, so it was shallow, and I checked its one open question inline (the live prune is in QA report 1). Verdict APPROVE with two low findings, both `/finalise` writes (`pr_number:`, the success-criteria tick).
 
 ---
 
