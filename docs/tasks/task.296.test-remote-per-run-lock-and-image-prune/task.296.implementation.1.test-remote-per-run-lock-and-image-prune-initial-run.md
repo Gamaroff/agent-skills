@@ -105,6 +105,15 @@ _Track each QA review/fix cycle._
 
 **Fix cycle 3** (qa-fix): T296-QA-5 — in `lockctl.sh` the timeout and both margins (`take`, `unlock`) are now `^[0-9]{1,4}$`, the cap `run.sh` already applies, and the staleness sum reads every operand with `10#`, with `start` and the owner file's timeout bounded to 12 and 9 digits so it cannot wrap. A leading zero is therefore decimal: margin `08` is the number 8 and takes the lock; it is no longer an arithmetic error. 22 digits and 5 digits are refused with exit 2 and nothing written. One new test covers refusal on all three sites, the zero-padded margin and a zero-padded owner timeout. Mutation-proven, each on its own line: dropping `10#` and each of the three `{1,4}` caps turned that test red; all restored byte-identical. 48/48 pass, also under `CI=true`; shellcheck and prettier clean. Re-running the cycle 3 margin probe: 22 digits no longer accepted and no lock written for it; `08` still shows as "reproduced" only because that case file expected a refusal, and `08` is now deliberately valid. My first edit capped `start` at 9 digits, which would have made every real lock `unknown` (epoch seconds are 10 digits); caught before running by re-reading it. Step 2.5 did not apply (no third strike). Step 2.6: repeat subject no (a different defect in a different cycle); Move: patch. Step 3.5 `Probe:` `git grep -n -e '\[0-9\]+\$' scripts/remote-test` over `scripts/remote-test` and `tests`. Population: the only digit-only validators are the three now capped plus `run.sh`'s own, already capped. The probe in step 3.5 also found the `age_s` line in `describe` reading the owner file's `start` in arithmetic with no check, the same class: now bounded and read with `10#`, with a zero-padded start added to the test and a fifth mutation (the age line back to the old form) turning it red. Again `sed -i` was used for the mutations.
 
+### QA Cycle 4 — 2026-11-12
+**Gate Result**: PASS
+**Issues Found**: 0 (T296-QA-5 fixed and re-proved; advisory CR-3 to CR-6 recorded in the gate)
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: pending — Step 5c next
+**Loop exit**: pending — the exit is Step 5c (`/review-pr`), not this gate
+**Action**: Running /review-pr (the loop's exit gate)
+
 ---
 
 ## Completion

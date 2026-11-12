@@ -214,24 +214,24 @@ Not required for this task.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-12
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 95/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.296.qa.3.test-remote-per-run-lock-and-image-prune.md](./task.296.qa.3.test-remote-per-run-lock-and-image-prune.md)
-- **Gate File**: [task.296.gate.3.test-remote-per-run-lock-and-image-prune.yml](./task.296.gate.3.test-remote-per-run-lock-and-image-prune.yml)
+- **Full Report**: [task.296.qa.4.test-remote-per-run-lock-and-image-prune.md](./task.296.qa.4.test-remote-per-run-lock-and-image-prune.md)
+- **Gate File**: [task.296.gate.4.test-remote-per-run-lock-and-image-prune.yml](./task.296.gate.4.test-remote-per-run-lock-and-image-prune.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 47
+- **Tests Executed**: 48
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS (advisory only), Maintainability: PASS
 
 ### Key Findings
-Cycle 2's fixes hold and were re-proved by mutation. The probe engine found that the new margin check accepts a leading zero and a 22-digit value, which the arithmetic then misreads. Only a caller other than the runner can send either, so it is low severity, and it goes to the fix loop.
+Cycle 3's one finding (a digits check that let through a leading zero and 22 digits) is fixed and re-proved by mutation and by the probe engine. No open findings. Four advisory reliability items from cycle 1 are recorded for follow-up.
 
 ## Change Log
 
@@ -249,6 +249,7 @@ Cycle 2's fixes hold and were re-proved by mutation. The probe engine found that
 | 2026-11-12 |         | QA findings fixed — take now honours the configured lock margin (T296-QA-3), report link fixed (T296-QA-4), 1 iteration; ready for QA re-review | qa-fix |
 | 2026-11-12 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-11-12 |         | QA findings fixed — lockctl digits checks capped at 4 digits and every staleness and age read made decimal (T296-QA-5), 1 iteration; ready for QA re-review | qa-fix |
+| 2026-11-12 |         | QA gate PASS (95/100) — 0 findings | qa-task |
 
 <!-- change-log-end -->
 
