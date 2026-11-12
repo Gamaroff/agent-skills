@@ -5,16 +5,18 @@ type: task
 description: "Stop each pipeline pause commit from cancelling the previous head's CI run and forcing a full-CI wait at step 8."
 tags: [pipeline, precompact, ci, finalise]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-11-10
 updated: 2026-11-12
+completed_date: 2026-11-12
+pr_number: 889
 estimated_effort_hours: 4
 ---
 
 # Technical Task: Pause commits restart CI and block the docs-only shortcut
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.303.review.1.pause-commits-restart-ci.md` implemented 2026-11-12
 
 Cut from the handoff `handoff-precompact-keep-lock.md`, "Also found" item 1.
@@ -101,7 +103,7 @@ Fixture-driven: a cancelled run, built from the check shapes the API returns, mu
 
 ## 10. Risk Assessment
 
-**High:** treating a cancelled run as not red could hide a real failure. Mitigation: only when its own successor, on the same branch, is green; the control test. **Medium:** option (b) delays visibility of the pause commit. **Low:** wording.
+**High (option (a), not taken):** treating a cancelled run as not red could hide a real failure; this is why option (b) was chosen. **Medium (option (b), taken):** a held step-8 pause commit is not on the remote until Step 8's own commit pushes it; scenario 17g keeps every other step pushing. **Low:** wording.
 
 ## 11. Rollback Plan
 
@@ -130,18 +132,32 @@ Revert the commit and re-run `npm run bundle`. Triggers: a red tree accepted as 
 ### Key Findings
 No critical issues identified. One low item: section 10 still describes option (a).
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report**: `task.303.qa.1.pause-commits-restart-ci.md`; **Gate**: ✅ PASS (95/100)
+
+✅ **Success criteria:** all met; the step-8 hold is held by scenario 17f, the step-7 control by 17g (mutation-proved)
+✅ **PR review:** APPROVE (`task.303.pr-review.1.pause-commits-restart-ci.md`)
+✅ **CI:** SUCCESS on `c9992146c64d` (6 checks)
+✅ **Documentation:** CHANGELOG cites task 303; hooks and pause docs updated
+✅ **Security / compliance:** not applicable (no boundary, no regulated surface)
+
+**Detailed Verification Log:** See `task.303.dod.1.pause-commits-restart-ci.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-12
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
-
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-10 | 1.0     | Initial draft | create-task |
 | 2026-11-12 | 1.1     | Review passed (8/10): option (a) re-aimed at `reduceChecks` (the walk already skips cancelled ancestors); criteria name their holding tests and the call-count bound | review-task |
 | 2026-11-12 |         | Status → ready-for-development | review-task |
 |            |         | Implemented option (b): PreCompact hook holds the pause-commit push at step 8; scenarios 17f/17g; one fixture in step-8-completion-checklist updated; docs, CHANGELOG, bundles | develop |
 | 2026-11-12 |         | QA gate PASS (95/100) — 0 findings | qa-task |
-
+| 2026-11-12 | 1.2 | DoD passed — accepted (PR #889) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
