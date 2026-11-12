@@ -122,6 +122,8 @@ Claim checked: the doc says the previous cycle's commit message contains `qa-fix
 
 mutation-proven: dropped the `edited.has(f)` clause in `repeatSubjects` → `control: a shared file the previous fix did not edit is one unfixed finding, not a repeat` and `CLI control: the same gates with a fix that touched another file print an empty list, exit 0` went red (8 pass, 2 fail) → covered. The file was restored from the committed copy and the suite re-ran 10/10.
 
+mutation-proven (recorded at `/finalise`, 2026-11-12, on head `e0a964b3`): changed the `*)` arm of the `--command` case in `shared/resources/fast-gate-outcome.sh` so an unset key printed `GATE_OUTCOME=run` instead of the skip line → `--command: an unset, empty or blank command is skipped, a set one is run — one line each` and `5b step 0a's --command block, as written, skips on an unset key and runs on a set one` went red (28 pass, 2 fail) in `qa-loop-fast-gate-outcomes.test.mjs` → covered. The file was restored from a snapshot (`git diff` clean) and the suite re-ran 30/30. Command: `node --test evals/shared/tests/qa-loop-fast-gate-outcomes.test.mjs`.
+
 ---
 
 ## Regression Testing
