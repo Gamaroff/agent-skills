@@ -5,10 +5,12 @@ type: task
 description: "Stop shared/resources/tests/context-pressure-statusline.test.mjs leaving a ctx-wrap- directory behind, which trips the post-suite tmp-leak ratchet intermittently and costs a CI re-run."
 tags: [testing, flaky-test, tmp-leak, follow-up-289]
 category: testing
-status: ready-for-review
+status: accepted
 priority: Low
 created: 2026-11-09
-updated: 2026-11-11
+updated: 2026-11-12
+completed_date: 2026-11-12
+pr_number: 883
 estimated_effort_hours: 2
 github_issue: 882
 ---
@@ -17,7 +19,7 @@ github_issue: 882
 
 **GitHub Issue**: [#882](https://github.com/Gamaroff/agent-skills/issues/882)
 
-**Status:** Ready for Development
+**Status:** Accepted
 
 ---
 
@@ -212,6 +214,14 @@ Sign-off is disabled for this repository (`sign-off.enabled` is not set), so no 
 ### Key Findings
 No findings. Cycle 1's performance finding is resolved by the owner's amendment of the criterion, and the amended bound holds. The refute pass found no defect.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+All nine success criteria are met (evidence per criterion in the DoD file). QA gate PASS (100/100) after two cycles, 5c PR review APPROVE, CI success on the final code. Security and compliance are not applicable (test code only).
+
+**Detailed Verification Log:** See `task.291.dod.1.context-pressure-statusline-test-leaks-ctx-wrap-directory.md`.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -224,6 +234,7 @@ No findings. Cycle 1's performance finding is resolved by the owner's amendment 
 | 2026-11-11 |  | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-11-11 | 1.2     | Performance criterion 1 amended (existing tests bounded at 10%; the regression test's deliberate cost recorded separately), approved by Lorien Gamaroff after QA cycle 1 finding T291-QA-1 | develop-next |
 | 2026-11-11 |  | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-11-12 | 1.3     | DoD passed — accepted (PR #883) | finalise |
 <!-- change-log-end -->
 
 ---
