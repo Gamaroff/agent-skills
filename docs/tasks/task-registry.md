@@ -1,8 +1,8 @@
 # Task Registry
 
 **Purpose:** Central tracking for all task numbers in this repo.
-**Last Updated:** 2026-11-11
-**Next Available Task Number:** **306**
+**Last Updated:** 2026-11-12
+**Next Available Task Number:** **307**
 
 ## How to use
 
@@ -420,3 +420,4 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 303 | [Pause commits restart CI and block the docs-only shortcut](task.303.pause-commits-restart-ci-and-block-docs-only-shortcut/task.303.pause-commits-restart-ci-and-block-docs-only-shortcut.md) | accepted | refactoring | Medium | 2026-11-10 | — | each pipeline pause commit cancels the previous head's CI run, which reads red and forces a full-CI wait at step 8 · three phases |
 | 304 | [QA snippet classifier refuses git literal execution](task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md) | accepted | refactoring | Medium | 2026-11-11 | task.294 | task 294 follow-up: refuse the git forms that run a plain literal (`-c`, `--config-env`, `--exec-path`, `GIT_*=` prefixes, `--upload-pack`); measured cost on the tracked docs is 0 blocks · four phases |
 | 305 | [Jira sync maps the superseded status](task.305.jira-sync-maps-superseded-status/task.305.jira-sync-maps-superseded-status.md) | planned | other | Medium | 2026-11-11 | — | PR 878 follow-up: `superseded` has no key in `DEFAULT_STATUS_MAP` or the terminal sets, so Jira finds no transition for it; owner picks the landing state (recommend the cancelled family) · four phases |
+| 306 | [Probe sandbox HOME shared across cases](task.306.probe-sandbox-home-shared-across-cases/task.306.probe-sandbox-home-shared-across-cases.md) | planned | testing | Low | 2026-11-12 | — | task 296 finding: the `/finalise` probe shares one `HOME` across cases and shells, so a legitimate case on a state-changing control reads as refused and escaped; one `HOME` per (case, shell) |
