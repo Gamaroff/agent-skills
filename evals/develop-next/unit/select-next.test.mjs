@@ -378,6 +378,23 @@ test("CLI: emits JSON and exit 0 on selection", () => {
   assert.equal(r.item.id, "5.1a");
 });
 
+test("CLI: --dry-run is accepted and answers exactly as the plain run does", () => {
+  // SKILL.md, develop-batch and several task documents name `select-next.mjs --dry-run` as a
+  // read-only selection preview. The script rejected it (`unknown argument --dry-run`, exit 1)
+  // although a plain run already only selects, so the documented invocation could not be run.
+  const roadmap = path.join(__dirname, "fixtures", "01-first-item.md");
+  const plain = execFileSync(process.execPath, [SCRIPT, "--roadmap", roadmap], {
+    encoding: "utf-8",
+  });
+  const dry = execFileSync(
+    process.execPath,
+    [SCRIPT, "--dry-run", "--roadmap", roadmap],
+    { encoding: "utf-8" },
+  );
+  assert.equal(dry, plain);
+  assert.equal(JSON.parse(dry).status, "selected");
+});
+
 test("CLI: runs when invoked through a symlinked path", () => {
   // Consumer projects symlink `.claude/skills` -> `.agents/skills`, so argv[1]
   // arrives symlinked while import.meta.url is already real. Comparing them

@@ -16,6 +16,7 @@
  *
  * Usage:
  *   select-next.mjs [--roadmap <path>]                      # selection (default)
+ *   select-next.mjs --dry-run [--roadmap <path>]            # same as above (read-only preview alias)
  *   select-next.mjs --batch [--roadmap <path>]              # parallel worktree batch
  *   select-next.mjs --batch --require-touches [...]         # defer un-annotated rows
  *   select-next.mjs --batch --worktree-root <dir> [...]     # worktree parent (default .worktrees)
@@ -2106,6 +2107,11 @@ function parseArgs(argv) {
         break;
       case "--lint":
         args.lint = true;
+        break;
+      case "--dry-run":
+        // A no-op alias: the selector only ever selects and writes nothing. SKILL.md and
+        // develop-batch document `select-next.mjs --dry-run` as the read-only preview, so the
+        // flag must be accepted rather than fail as an unknown argument.
         break;
       case "--batch":
         args.batch = true;
