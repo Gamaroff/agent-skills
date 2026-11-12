@@ -1,0 +1,84 @@
+{
+  "sink": "filename",
+  "entry": "shell-argv:scripts/remote-test/lockctl.sh",
+  "name": "take run dir",
+  "call_site": null,
+  "verdict": "unverifiable",
+  "reason": "no-legitimate-evidence",
+  "executed": 6,
+  "passed": 6,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 10,
+  "declined_cases": [
+    {
+      "id": "rd.up@bash",
+      "reason": "case-errored",
+      "detail": "fixture: name carries a path separator"
+    },
+    {
+      "id": "rd.up@zsh",
+      "reason": "case-errored",
+      "detail": "fixture: name carries a path separator"
+    },
+    {
+      "id": "rd.mid@bash",
+      "reason": "case-errored",
+      "detail": "fixture: name carries a path separator"
+    },
+    {
+      "id": "rd.mid@zsh",
+      "reason": "case-errored",
+      "detail": "fixture: name carries a path separator"
+    },
+    {
+      "id": "rd.abs@bash",
+      "reason": "case-errored",
+      "detail": "fixture: name carries a path separator"
+    },
+    {
+      "id": "rd.abs@zsh",
+      "reason": "case-errored",
+      "detail": "fixture: name carries a path separator"
+    },
+    {
+      "id": "rd.sub@bash",
+      "reason": "case-errored",
+      "detail": "case's `expected` compares nothing — it needs at least one of stdout, exit, stderr"
+    },
+    {
+      "id": "rd.sub@zsh",
+      "reason": "case-errored",
+      "detail": "case's `expected` compares nothing — it needs at least one of stdout, exit, stderr"
+    },
+    {
+      "id": "rd.empty@bash",
+      "reason": "case-errored",
+      "detail": "fixture: EISDIR: illegal operation on a directory, open '/tmp/security-probe-6USc0t/work/fixture-yxgFvk/'"
+    },
+    {
+      "id": "rd.empty@zsh",
+      "reason": "case-errored",
+      "detail": "fixture: EISDIR: illegal operation on a directory, open '/tmp/security-probe-6USc0t/work/fixture-LTJQo9/'"
+    }
+  ],
+  "escaped": 0,
+  "shells": [
+    "bash",
+    "zsh"
+  ],
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": [
+    "take",
+    "{input}",
+    "tok",
+    "30",
+    "me"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "fixture_copy": null,
+  "ran_at": "2026-11-12T19:10:34.451Z"
+}

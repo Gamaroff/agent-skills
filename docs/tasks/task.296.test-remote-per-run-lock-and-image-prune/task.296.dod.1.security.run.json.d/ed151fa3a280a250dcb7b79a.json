@@ -1,0 +1,52 @@
+{
+  "sink": "filename",
+  "entry": "shell-argv:scripts/remote-test/lockctl.sh",
+  "name": "unlock margin",
+  "call_site": null,
+  "verdict": "unverifiable",
+  "reason": "no-legitimate-evidence",
+  "executed": 6,
+  "passed": 6,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 4,
+  "declined_cases": [
+    {
+      "id": "um.sub@bash",
+      "reason": "case-errored",
+      "detail": "case's `expected` compares nothing — it needs at least one of stdout, exit, stderr"
+    },
+    {
+      "id": "um.sub@zsh",
+      "reason": "case-errored",
+      "detail": "case's `expected` compares nothing — it needs at least one of stdout, exit, stderr"
+    },
+    {
+      "id": "um.empty@bash",
+      "reason": "case-errored",
+      "detail": "fixture: EISDIR: illegal operation on a directory, open '/tmp/security-probe-Ohuty5/work/fixture-inE8NY/'"
+    },
+    {
+      "id": "um.empty@zsh",
+      "reason": "case-errored",
+      "detail": "fixture: EISDIR: illegal operation on a directory, open '/tmp/security-probe-Ohuty5/work/fixture-Um2Ocy/'"
+    }
+  ],
+  "escaped": 0,
+  "shells": [
+    "bash",
+    "zsh"
+  ],
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": [
+    "unlock",
+    "agent-skills-test-m",
+    "{input}"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "fixture_copy": null,
+  "ran_at": "2026-11-12T19:10:34.916Z"
+}

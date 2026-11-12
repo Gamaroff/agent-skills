@@ -1,0 +1,54 @@
+{
+  "sink": "filename",
+  "entry": "shell-argv:scripts/remote-test/lockctl.sh",
+  "name": "take timeout",
+  "call_site": null,
+  "verdict": "unverifiable",
+  "reason": "no-legitimate-evidence",
+  "executed": 6,
+  "passed": 6,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 4,
+  "declined_cases": [
+    {
+      "id": "tm.sub@bash",
+      "reason": "case-errored",
+      "detail": "case's `expected` compares nothing — it needs at least one of stdout, exit, stderr"
+    },
+    {
+      "id": "tm.sub@zsh",
+      "reason": "case-errored",
+      "detail": "case's `expected` compares nothing — it needs at least one of stdout, exit, stderr"
+    },
+    {
+      "id": "tm.empty@bash",
+      "reason": "case-errored",
+      "detail": "fixture: EISDIR: illegal operation on a directory, open '/tmp/security-probe-tIAAzE/work/fixture-oMR1Uw/'"
+    },
+    {
+      "id": "tm.empty@zsh",
+      "reason": "case-errored",
+      "detail": "fixture: EISDIR: illegal operation on a directory, open '/tmp/security-probe-tIAAzE/work/fixture-lYVm5F/'"
+    }
+  ],
+  "escaped": 0,
+  "shells": [
+    "bash",
+    "zsh"
+  ],
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": [
+    "take",
+    "agent-skills-test-m",
+    "tok",
+    "{input}",
+    "me"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "fixture_copy": null,
+  "ran_at": "2026-11-12T19:10:34.760Z"
+}

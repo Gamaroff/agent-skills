@@ -1,0 +1,43 @@
+[
+  {
+    "id": "pi.sub",
+    "sink": "filename",
+    "input": "agent-skills-test:$(touch PWNED)",
+    "why": "substitution in a tag",
+    "correct": "refused, exit 2",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.296.test-remote-per-run-lock-and-image-prune/task.296.test-remote-per-run-lock-and-image-prune.md:57",
+    "expected": {
+      "absent": [
+        "PWNED"
+      ]
+    }
+  },
+  {
+    "id": "pi.other",
+    "sink": "filename",
+    "input": "other:tag",
+    "why": "image outside agent-skills-test",
+    "correct": "refused",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.296.test-remote-per-run-lock-and-image-prune/task.296.test-remote-per-run-lock-and-image-prune.md:57"
+  },
+  {
+    "id": "pi.flag",
+    "sink": "filename",
+    "input": "-f",
+    "why": "option-shaped name",
+    "correct": "refused",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.296.test-remote-per-run-lock-and-image-prune/task.296.test-remote-per-run-lock-and-image-prune.md:57"
+  },
+  {
+    "id": "pi.nl",
+    "sink": "filename",
+    "input": "agent-skills-test:a\nb",
+    "why": "newline smuggles a second name",
+    "correct": "refused",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.296.test-remote-per-run-lock-and-image-prune/task.296.test-remote-per-run-lock-and-image-prune.md:57"
+  }
+]

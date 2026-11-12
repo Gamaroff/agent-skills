@@ -1,0 +1,324 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "filename",
+      "entry": "shell-argv:scripts/remote-test/lockctl.sh",
+      "name": "take run dir",
+      "call_site": null,
+      "verdict": "unverifiable",
+      "reason": "no-legitimate-evidence",
+      "executed": 6,
+      "passed": 6,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 10,
+      "declined_cases": [
+        {
+          "id": "rd.up@bash",
+          "reason": "case-errored",
+          "detail": "fixture: name carries a path separator"
+        },
+        {
+          "id": "rd.up@zsh",
+          "reason": "case-errored",
+          "detail": "fixture: name carries a path separator"
+        },
+        {
+          "id": "rd.mid@bash",
+          "reason": "case-errored",
+          "detail": "fixture: name carries a path separator"
+        },
+        {
+          "id": "rd.mid@zsh",
+          "reason": "case-errored",
+          "detail": "fixture: name carries a path separator"
+        },
+        {
+          "id": "rd.abs@bash",
+          "reason": "case-errored",
+          "detail": "fixture: name carries a path separator"
+        },
+        {
+          "id": "rd.abs@zsh",
+          "reason": "case-errored",
+          "detail": "fixture: name carries a path separator"
+        },
+        {
+          "id": "rd.sub@bash",
+          "reason": "case-errored",
+          "detail": "case's `expected` compares nothing — it needs at least one of stdout, exit, stderr"
+        },
+        {
+          "id": "rd.sub@zsh",
+          "reason": "case-errored",
+          "detail": "case's `expected` compares nothing — it needs at least one of stdout, exit, stderr"
+        },
+        {
+          "id": "rd.empty@bash",
+          "reason": "case-errored",
+          "detail": "fixture: EISDIR: illegal operation on a directory, open '/tmp/security-probe-6USc0t/work/fixture-yxgFvk/'"
+        },
+        {
+          "id": "rd.empty@zsh",
+          "reason": "case-errored",
+          "detail": "fixture: EISDIR: illegal operation on a directory, open '/tmp/security-probe-6USc0t/work/fixture-LTJQo9/'"
+        }
+      ],
+      "escaped": 0,
+      "shells": [
+        "bash",
+        "zsh"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "take",
+        "{input}",
+        "tok",
+        "30",
+        "me"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "fixture_copy": null,
+      "ran_at": "2026-11-12T19:10:34.451Z"
+    },
+    {
+      "sink": "filename",
+      "entry": "shell-argv:scripts/remote-test/lockctl.sh",
+      "name": "release run dir",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 4,
+      "passed": 4,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 10,
+      "declined_cases": [
+        {
+          "id": "rd.up@bash",
+          "reason": "case-errored",
+          "detail": "fixture: name carries a path separator"
+        },
+        {
+          "id": "rd.up@zsh",
+          "reason": "case-errored",
+          "detail": "fixture: name carries a path separator"
+        },
+        {
+          "id": "rd.mid@bash",
+          "reason": "case-errored",
+          "detail": "fixture: name carries a path separator"
+        },
+        {
+          "id": "rd.mid@zsh",
+          "reason": "case-errored",
+          "detail": "fixture: name carries a path separator"
+        },
+        {
+          "id": "rd.abs@bash",
+          "reason": "case-errored",
+          "detail": "fixture: name carries a path separator"
+        },
+        {
+          "id": "rd.abs@zsh",
+          "reason": "case-errored",
+          "detail": "fixture: name carries a path separator"
+        },
+        {
+          "id": "rd.sub@bash",
+          "reason": "case-errored",
+          "detail": "case's `expected` compares nothing — it needs at least one of stdout, exit, stderr"
+        },
+        {
+          "id": "rd.sub@zsh",
+          "reason": "case-errored",
+          "detail": "case's `expected` compares nothing — it needs at least one of stdout, exit, stderr"
+        },
+        {
+          "id": "rd.empty@bash",
+          "reason": "case-errored",
+          "detail": "fixture: EISDIR: illegal operation on a directory, open '/tmp/security-probe-20CU44/work/fixture-7XkE0B/'"
+        },
+        {
+          "id": "rd.empty@zsh",
+          "reason": "case-errored",
+          "detail": "fixture: EISDIR: illegal operation on a directory, open '/tmp/security-probe-20CU44/work/fixture-yNM8UE/'"
+        }
+      ],
+      "escaped": 0,
+      "shells": [
+        "bash",
+        "zsh"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "release",
+        "{input}",
+        "tok"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "fixture_copy": null,
+      "ran_at": "2026-11-12T19:10:34.603Z"
+    },
+    {
+      "sink": "filename",
+      "entry": "shell-argv:scripts/remote-test/lockctl.sh",
+      "name": "prune image",
+      "call_site": null,
+      "verdict": "unverifiable",
+      "reason": "no-legitimate-evidence",
+      "executed": 6,
+      "passed": 6,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 2,
+      "declined_cases": [
+        {
+          "id": "pi.sub@bash",
+          "reason": "case-errored",
+          "detail": "case's `expected` compares nothing — it needs at least one of stdout, exit, stderr"
+        },
+        {
+          "id": "pi.sub@zsh",
+          "reason": "case-errored",
+          "detail": "case's `expected` compares nothing — it needs at least one of stdout, exit, stderr"
+        }
+      ],
+      "escaped": 0,
+      "shells": [
+        "bash",
+        "zsh"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "prune",
+        "{input}"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "fixture_copy": null,
+      "ran_at": "2026-11-12T19:10:35.075Z"
+    },
+    {
+      "sink": "filename",
+      "entry": "shell-argv:scripts/remote-test/lockctl.sh",
+      "name": "take timeout",
+      "call_site": null,
+      "verdict": "unverifiable",
+      "reason": "no-legitimate-evidence",
+      "executed": 6,
+      "passed": 6,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 4,
+      "declined_cases": [
+        {
+          "id": "tm.sub@bash",
+          "reason": "case-errored",
+          "detail": "case's `expected` compares nothing — it needs at least one of stdout, exit, stderr"
+        },
+        {
+          "id": "tm.sub@zsh",
+          "reason": "case-errored",
+          "detail": "case's `expected` compares nothing — it needs at least one of stdout, exit, stderr"
+        },
+        {
+          "id": "tm.empty@bash",
+          "reason": "case-errored",
+          "detail": "fixture: EISDIR: illegal operation on a directory, open '/tmp/security-probe-tIAAzE/work/fixture-oMR1Uw/'"
+        },
+        {
+          "id": "tm.empty@zsh",
+          "reason": "case-errored",
+          "detail": "fixture: EISDIR: illegal operation on a directory, open '/tmp/security-probe-tIAAzE/work/fixture-lYVm5F/'"
+        }
+      ],
+      "escaped": 0,
+      "shells": [
+        "bash",
+        "zsh"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "take",
+        "agent-skills-test-m",
+        "tok",
+        "{input}",
+        "me"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "fixture_copy": null,
+      "ran_at": "2026-11-12T19:10:34.760Z"
+    },
+    {
+      "sink": "filename",
+      "entry": "shell-argv:scripts/remote-test/lockctl.sh",
+      "name": "unlock margin",
+      "call_site": null,
+      "verdict": "unverifiable",
+      "reason": "no-legitimate-evidence",
+      "executed": 6,
+      "passed": 6,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 4,
+      "declined_cases": [
+        {
+          "id": "um.sub@bash",
+          "reason": "case-errored",
+          "detail": "case's `expected` compares nothing — it needs at least one of stdout, exit, stderr"
+        },
+        {
+          "id": "um.sub@zsh",
+          "reason": "case-errored",
+          "detail": "case's `expected` compares nothing — it needs at least one of stdout, exit, stderr"
+        },
+        {
+          "id": "um.empty@bash",
+          "reason": "case-errored",
+          "detail": "fixture: EISDIR: illegal operation on a directory, open '/tmp/security-probe-Ohuty5/work/fixture-inE8NY/'"
+        },
+        {
+          "id": "um.empty@zsh",
+          "reason": "case-errored",
+          "detail": "fixture: EISDIR: illegal operation on a directory, open '/tmp/security-probe-Ohuty5/work/fixture-Um2Ocy/'"
+        }
+      ],
+      "escaped": 0,
+      "shells": [
+        "bash",
+        "zsh"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "unlock",
+        "agent-skills-test-m",
+        "{input}"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "fixture_copy": null,
+      "ran_at": "2026-11-12T19:10:34.916Z"
+    }
+  ],
+  "totals": {
+    "executed": 28,
+    "reproduced": 0,
+    "escaped": 0
+  },
+  "updated_at": "2026-11-12T19:10:35.075Z"
+}

@@ -1,0 +1,70 @@
+schema: 2
+task: 'task.296.test-remote-per-run-lock-and-image-prune'
+task_title: 'test:remote per-run lock and image-tag prune'
+gate: PASS
+status_reason: 'T296-QA-5 fixed and re-proved: the timeout and margins are capped at four digits and every staleness and age read is decimal. Probe re-run on the margin argument: 20 executed, 0 reproduced, 0 escaped. No open findings. Advisory items from cycle 1 stay in recommendations.future. CI on the new head was pending when this gate was written.'
+reviewer: 'QA Engineer'
+head: '2f9f1db90a7ac5af21422d7dec3a0fdc316cf703'
+updated: '2026-11-12T17:48:19Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 48
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 20
+    escaped: 0
+    boundary: true
+    boundary_signals: ['never']
+    notes: 'Cycle 4 re-probes the take margin argument (shell-argv, bash and zsh, hostile-only: the control has no legitimate half, so its verdict reads unverifiable): 10 cases, 20 executed, 0 reproduced, 0 escaped. Includes the cases that reproduced in cycle 3 (22 digits) and two new ones (five digits, a long run of zeros). A leading zero such as 08 is now valid decimal and is not a hostile case.'
+  performance:
+    status: PASS
+    notes: 'One extra ssh round trip per run, unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'Advisory only: a signal during the take ssh can leak a lock until it goes stale (CR-6); prune refuses while any branch holds a lock (CR-3). Not reproduced, recorded for follow-up.'
+  maintainability:
+    status: PASS
+    notes: 'One server-side file, shellcheck clean, documented; every digit validator now has one rule.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Prune could ignore locks lockctl reports stale, or name the lock to clear; and check the exit status of find. (CR-3, cycle 1, not reproduced)'
+      refs: ['scripts/remote-test/lockctl.sh']
+    - action: 'Arm the INT and TERM trap before the take, since release is token-checked. (CR-6, cycle 1, low confidence)'
+      refs: ['scripts/remote-test/run.sh']
+    - action: 'Unlock and release re-check ownership after the stale test and before rm. (CR-4, cycle 1, low)'
+      refs: ['scripts/remote-test/lockctl.sh']
+    - action: 'Prune counts only running containers as in use; a stopped container refusing docker rmi reads as a failed prune (exit 42). (CR-5, cycle 1, low)'
+      refs: ['scripts/remote-test/lockctl.sh']
+
+bug_resolution:
+  bugs_fixed: 5
+  bugs_remaining: 0
+  fix_date: '2026-11-12'
+  total_iterations: 3
+  verification_method: 'T296-QA-5 re-proved by mutation (each of the three four-digit caps, the 10# in the staleness sum and the 10# in the age line each turn the new test red; all restored byte-identical) and by the probe engine (22 digits and five digits refused with exit 2, no lock written). Server ci:fast on the fixed tree: 8431 pass, 0 fail.'
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: ['CI green on the final head']

@@ -1,0 +1,79 @@
+schema: 2
+task: 'task.296.test-remote-per-run-lock-and-image-prune'
+task_title: 'test:remote per-run lock and image-tag prune'
+gate: CONCERNS
+status_reason: 'Behaviour verified (45/45 tests, ci:fast green on the server, live acceptance, validator probed 38 cases). Two guarding tests are weaker than they read: one assertion cannot fail and the staleness margin is held by no test. Both reproduced by mutation.'
+reviewer: 'QA Engineer'
+head: 'fd8fbccd94590dae3c1533f4994885c28c5bd8f2'
+updated: '2026-11-12T15:02:42Z'
+
+top_issues:
+  - id: 'T296-QA-1'
+    severity: medium
+    file: 'tests/test-remote-runner.test.js'
+    finding: 'The held-lock case asserts doesNotMatch /--unlock\b.*Clear it/ (line 707). In the stale message "Clear it" comes before "--unlock", and the live message says "then --unlock clears it", so the pattern matches neither and the assertion cannot fail. Reproduced: adding "Clear it with: npm run test:remote -- --unlock" to the live message leaves 45/45 green. origin: code-review, reproduced by QA (control: the stale-state case does assert the "Clear it with" line).'
+    suggested_action: 'Assert the live-lock output does not match /Clear it with/ and does match /Wait for it to finish/.'
+    suggested_owner: dev
+    status: open
+  - id: 'T296-QA-2'
+    severity: medium
+    file: 'tests/test-remote-runner.test.js'
+    finding: 'The unlock staleness test never exercises the margin or the strict inequality: its live and stale cases (50 min against 60+5 and 30+5) land on the same side with or without the margin, and every later case passes margin 0. Reproduced: replacing (tmo + $2) with (tmo + 0) in lockctl.sh line 42 leaves 45/45 green. origin: code-review, reproduced by QA (control: removing the owner timeout does turn the existing case red).'
+    suggested_action: 'Add boundary cases: timeout 30, margin 5, start 34 minutes ago is live and 36 minutes ago is stale; and one case that a lock exactly at the boundary is live.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 45
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 38
+    escaped: 0
+    boundary: true
+    boundary_signals: ['never']
+    notes: 'The run-directory validator (valid_run_dir) was probed through shell-argv on take and release with a cases file: 18 hostile names (dotdot, newline, command and backtick substitution, space, leading dash, glob, uppercase, missing or empty slug) all exit 2 under bash and zsh, the legitimate shape is accepted. Two path-separator names are declined by the fixture builder and covered by the committed lockctl test. An earlier take run with a legitimate case reported one sandbox write: that is the designed lock under the shared HOME, so the take control was re-run hostile-only.'
+  performance:
+    status: PASS
+    notes: 'One extra ssh round trip per run (the release); the take replaces the old mkdir call.'
+  reliability:
+    status: CONCERNS
+    notes: 'The cleanup traps are armed after the take returns, so a signal during the take ssh can leak a lock until it goes stale (advisory CR-6). Prune refuses while any branch holds a lock and gives no pointer to clear another branch lock (advisory CR-3).'
+  maintainability:
+    status: PASS
+    notes: 'One server-side file, shellcheck clean, documented.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T296-QA-1 and T296-QA-2 (tests only).'
+      refs: ['tests/test-remote-runner.test.js']
+  future:
+    - action: 'Prune could ignore locks lockctl reports stale, or name the lock to clear; and check the exit status of find. (CR-3, reviewer confidence medium, not reproduced)'
+      refs: ['scripts/remote-test/lockctl.sh']
+    - action: 'Arm the INT and TERM trap before the take, since release is token-checked. (CR-6, low confidence)'
+      refs: ['scripts/remote-test/run.sh']
+    - action: 'Unlock and release re-check ownership after the stale test and before rm; a rename-then-check would shrink the window. (CR-4, low)'
+      refs: ['scripts/remote-test/lockctl.sh']
+    - action: 'Prune counts only running containers as in use; a stopped container refusing docker rmi reads as a failed prune (exit 42). (CR-5, low)'
+      refs: ['scripts/remote-test/lockctl.sh']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T296-QA-1 and T296-QA-2 fixed']

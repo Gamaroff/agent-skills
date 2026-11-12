@@ -1,0 +1,79 @@
+schema: 2
+task: 'task.296.test-remote-per-run-lock-and-image-prune'
+task_title: 'test:remote per-run lock and image-tag prune'
+gate: CONCERNS
+status_reason: 'Cycle 2 fixes verified and re-proved by mutation (margin now reaches take). The probe engine found the new margin validator accepts two inputs it should refuse: a leading zero (octal crash) and a 22-digit value (silent wrap). Low impact, since run.sh caps and normalises the margin, but reproduced in both shells.'
+reviewer: 'QA Engineer'
+head: '793abc01c0246aeb7559f0c8d890780d3abbae3a'
+updated: '2026-11-12T17:28:39Z'
+
+top_issues:
+  - id: 'T296-QA-5'
+    severity: low
+    file: 'scripts/remote-test/lockctl.sh'
+    finding: 'The numeric check on a margin (and the older ones on the timeout and on unlock''s margin) is ^[0-9]+$, which accepts a leading zero and any length, and the staleness arithmetic then reads the value as bash octal or wraps it. Reproduced by the probe engine (task.296.qa.3.security.run.json, 18 executed, 4 reproduced in bash and zsh, 1 escaped): take with margin 08 prints "value too great for base" and no state, exit 10; take with margin 9999999999999999999999 wraps and reports state=live. The one escape is the lock take writes under the sandbox HOME once it accepts the input, so it should disappear when both are refused. Control: the other 7 hostile margins (-1, 1;touch, a substitution, 5 6, 1.5, 0x10, 1e3) are rejected with exit 2. Only a caller other than run.sh can send either value (run.sh caps at 4 digits and normalises with 10#), hence low. origin: QA probe, reproduced.'
+    suggested_action: 'In lockctl.sh validate timeout and margin as ^[0-9]{1,4}$ (the cap run.sh already applies), read them with 10# in the arithmetic, apply the same check to the unlock margin, and add a committed test that take refuses 08 and a 22-digit margin and writes nothing.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 47
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 18
+    escaped: 1
+    boundary: true
+    boundary_signals: ['never']
+    notes: 'Cycle 3 probes the new margin argument (take, shell-argv, hostile-only: the take control has no legitimate half, as in cycle 1). 9 cases, bash and zsh: 14 passed, 4 reproduced (leading zero, 22 digits), 1 escaped (the lock written once the input is accepted). Cycle 1 record (task.296.qa.1.security.run.json, 38 probes on the run directory validator, 0 escaped) still describes valid_run_dir, which this cycle did not change.'
+  performance:
+    status: PASS
+    notes: 'One extra ssh round trip per run, unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'A signal during the take ssh can leak a lock until it goes stale (advisory CR-6); prune refuses while any branch holds a lock (advisory CR-3). Unchanged since cycle 1.'
+  maintainability:
+    status: PASS
+    notes: 'One server-side file, shellcheck clean, documented.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T296-QA-5 (a digits check that matches what the arithmetic can read).'
+      refs: ['scripts/remote-test/lockctl.sh', 'tests/test-remote-runner.test.js']
+  future:
+    - action: 'Prune could ignore locks lockctl reports stale, or name the lock to clear; and check the exit status of find. (CR-3, cycle 1, not reproduced)'
+      refs: ['scripts/remote-test/lockctl.sh']
+    - action: 'Arm the INT and TERM trap before the take, since release is token-checked. (CR-6, cycle 1, low confidence)'
+      refs: ['scripts/remote-test/run.sh']
+    - action: 'Unlock and release re-check ownership after the stale test and before rm. (CR-4, cycle 1, low)'
+      refs: ['scripts/remote-test/lockctl.sh']
+    - action: 'Prune counts only running containers as in use; a stopped container refusing docker rmi reads as a failed prune (exit 42). (CR-5, cycle 1, low)'
+      refs: ['scripts/remote-test/lockctl.sh']
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-11-12'
+  total_iterations: 2
+  verification_method: 'T296-QA-3 (take ignored the margin) re-proved by mutation this cycle: run.sh not sending the margin turns the argv test red, take ignoring its margin turns the new behaviour test red, and removing the margin check turns the same test red; all restored byte-identical. T296-QA-4 (link-check) cleared in the report; CI on the new head was pending when this gate was written.'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T296-QA-5 fixed', 'CI green on the final head']
