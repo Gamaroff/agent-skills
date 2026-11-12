@@ -1170,6 +1170,65 @@ test("lockctl take on a held lock judges staleness by the margin it is given, as
   assert.ok(!fs.existsSync(c.lockDir));
 });
 
+test("lockctl refuses a number the staleness arithmetic would misread, and takes nothing (T296-QA-5)", (t) => {
+  const c = makeCtl(t);
+  // 22 digits wrap the staleness sum, and five digits are past the cap run.sh applies. Both used to pass.
+  for (const bad of ["9999999999999999999999", "12345"]) {
+    const take = c.ctl(["take", RD, "tok", "30", "me", bad]);
+    assert.equal(take.status, 2, `take margin ${bad}: ${take.stdout}`);
+    assert.ok(!fs.existsSync(c.lockDir), `no lock for margin ${bad}`);
+    const tmo = c.ctl(["take", RD, "tok", bad, "me"]);
+    assert.equal(tmo.status, 2, `take timeout ${bad}: ${tmo.stdout}`);
+    assert.ok(!fs.existsSync(c.lockDir), `no lock for timeout ${bad}`);
+  }
+  c.writeOwner({
+    start: nowS() - 90 * 60,
+    timeout_min: 30,
+    token: "t",
+    owner: "o",
+  });
+  for (const bad of ["9999999999999999999999", "12345"]) {
+    const un = c.ctl(["unlock", RD, bad]);
+    assert.equal(un.status, 2, `unlock margin ${bad}: ${un.stdout}`);
+    assert.ok(fs.existsSync(c.lockDir), "a refused unlock removes nothing");
+  }
+  // A leading zero is decimal, never octal. 08 used to stop the sum with "value too great for base",
+  // print no state and still exit 10. Timeout 30, 36 minutes old: a margin of 08 gives a 38 minute
+  // window (live), 05 gives 35 (stale), so the zero is read as a number and not as a mistake.
+  c.writeOwner({
+    start: nowS() - 36 * 60,
+    timeout_min: 30,
+    token: "t",
+    owner: "o",
+  });
+  const eight = c.ctl(["take", RD, "tok", "30", "me", "08"]);
+  assert.equal(eight.status, 10, eight.stdout + eight.stderr);
+  assert.match(eight.stdout, /state=live/);
+  assert.doesNotMatch(eight.stderr, /too great for base/);
+  const five = c.ctl(["take", RD, "tok", "30", "me", "05"]);
+  assert.match(five.stdout, /state=stale/);
+  // The same holds for a zero-padded timeout in the owner file.
+  c.writeOwner({
+    start: nowS() - 36 * 60,
+    timeout_min: "030",
+    token: "t",
+    owner: "o",
+  });
+  const padded = c.ctl(["take", RD, "tok", "30", "me", "5"]);
+  assert.match(padded.stdout, /state=stale/);
+  assert.doesNotMatch(padded.stderr, /too great for base/);
+  // And for a zero-padded start, which the age line reads too: it prints an age and no arithmetic error.
+  c.writeOwner({
+    start: "0" + (nowS() - 36 * 60),
+    timeout_min: 30,
+    token: "t",
+    owner: "o",
+  });
+  const aged = c.ctl(["take", RD, "tok", "30", "me", "5"]);
+  assert.match(aged.stdout, /^age_s=\d+$/m);
+  assert.doesNotMatch(aged.stderr, /too great for base|syntax error/);
+});
+
 test("lockctl never calls a lock stale while a container of the run's name exists, or when the owner or docker is unreadable", (t) => {
   const c = makeCtl(t);
   const old = {

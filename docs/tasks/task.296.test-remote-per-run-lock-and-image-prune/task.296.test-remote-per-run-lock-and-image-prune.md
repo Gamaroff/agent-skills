@@ -221,17 +221,17 @@ Not required for this task.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.296.qa.2.test-remote-per-run-lock-and-image-prune.md](./task.296.qa.2.test-remote-per-run-lock-and-image-prune.md)
-- **Gate File**: [task.296.gate.2.test-remote-per-run-lock-and-image-prune.yml](./task.296.gate.2.test-remote-per-run-lock-and-image-prune.yml)
+- **Full Report**: [task.296.qa.3.test-remote-per-run-lock-and-image-prune.md](./task.296.qa.3.test-remote-per-run-lock-and-image-prune.md)
+- **Gate File**: [task.296.gate.3.test-remote-per-run-lock-and-image-prune.yml](./task.296.gate.3.test-remote-per-run-lock-and-image-prune.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 46
+- **Tests Executed**: 47
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Cycle 1's two test findings are fixed and re-proved by mutation. Cycle 2 found that `take` ignores the configured lock margin (reproduced against the real script) and that CI `link-check` is red on a bare host-at-address string in the implementation report. Both go to the fix loop.
+Cycle 2's fixes hold and were re-proved by mutation. The probe engine found that the new margin check accepts a leading zero and a 22-digit value, which the arithmetic then misreads. Only a caller other than the runner can send either, so it is low severity, and it goes to the fix loop.
 
 ## Change Log
 
@@ -247,6 +247,8 @@ Cycle 1's two test findings are fixed and re-proved by mutation. Cycle 2 found t
 | 2026-11-12 |         | QA findings fixed — 2 test fixes (T296-QA-1, T296-QA-2), 1 iteration; ready for QA re-review | qa-fix |
 | 2026-11-12 |         | QA gate CONCERNS (90/100) — 2 findings | qa-task |
 | 2026-11-12 |         | QA findings fixed — take now honours the configured lock margin (T296-QA-3), report link fixed (T296-QA-4), 1 iteration; ready for QA re-review | qa-fix |
+| 2026-11-12 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-11-12 |         | QA findings fixed — lockctl digits checks capped at 4 digits and every staleness and age read made decimal (T296-QA-5), 1 iteration; ready for QA re-review | qa-fix |
 
 <!-- change-log-end -->
 

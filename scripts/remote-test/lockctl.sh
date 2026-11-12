@@ -34,12 +34,14 @@ lock_state() {
   f="$(lock_dir "$1")/owner"
   start=$(owner_field "$f" start)
   tmo=$(owner_field "$f" timeout_min)
-  case "$start" in '' | *[!0-9]*) echo unknown; return ;; esac
-  case "$tmo" in '' | *[!0-9]*) echo unknown; return ;; esac
+  # Bounded digit counts, so the sum below cannot wrap (a clock reading is 10 digits today); 10# so a
+  # leading zero is decimal, never octal.
+  [[ "$start" =~ ^[0-9]{1,12}$ ]] || { echo unknown; return; }
+  [[ "$tmo" =~ ^[0-9]{1,9}$ ]] || { echo unknown; return; }
   # A failed docker call cannot tell a live run from a dead one, so it is not "stale".
   c=$(docker ps -a -q --filter "name=^/$1\$") || { echo unknown; return; }
   [ -n "$c" ] && { echo live; return; }
-  if [ "$(now)" -gt $((start + (tmo + $2) * 60)) ]; then echo stale; else echo live; fi
+  if [ "$(now)" -gt $((10#$start + (10#$tmo + 10#$2) * 60)) ]; then echo stale; else echo live; fi
 }
 
 # describe RUN_DIR MARGIN_MIN: the owner file, the age and the state, one key=value per line.
@@ -48,7 +50,7 @@ describe() {
   d=$(lock_dir "$1")
   if [ -r "$d/owner" ]; then cat "$d/owner"; else echo "owner=(no owner file)"; fi
   start=$(owner_field "$d/owner" start)
-  case "$start" in '' | *[!0-9]*) ;; *) echo "age_s=$(($(now) - start))" ;; esac
+  [[ "$start" =~ ^[0-9]{1,12}$ ]] && echo "age_s=$(($(now) - 10#$start))"
   echo "state=$(lock_state "$1" "$2")"
 }
 
@@ -58,8 +60,8 @@ case "$op" in
   take)
     run_dir=${2:-}; token=${3:-}; tmo=${4:-}; desc=${5:-}; margin=${6:-10}
     valid_run_dir "$run_dir" || { echo "bad run directory name '$run_dir'" >&2; exit 2; }
-    [[ "$tmo" =~ ^[0-9]+$ ]] || { echo "bad timeout '$tmo'" >&2; exit 2; }
-    [[ "$margin" =~ ^[0-9]+$ ]] || { echo "bad margin '$margin'" >&2; exit 2; }
+    [[ "$tmo" =~ ^[0-9]{1,4}$ ]] || { echo "bad timeout '$tmo'" >&2; exit 2; }
+    [[ "$margin" =~ ^[0-9]{1,4}$ ]] || { echo "bad margin '$margin'" >&2; exit 2; }
     mkdir -p "$HOME/$run_dir" || exit 12
     d=$(lock_dir "$run_dir")
     if mkdir "$d" 2>/dev/null; then
@@ -89,7 +91,7 @@ case "$op" in
   unlock)
     run_dir=${2:-}; margin=${3:-}
     valid_run_dir "$run_dir" || { echo "bad run directory name '$run_dir'" >&2; exit 2; }
-    [[ "$margin" =~ ^[0-9]+$ ]] || { echo "bad margin '$margin'" >&2; exit 2; }
+    [[ "$margin" =~ ^[0-9]{1,4}$ ]] || { echo "bad margin '$margin'" >&2; exit 2; }
     d=$(lock_dir "$run_dir")
     [ -d "$d" ] || { echo "no lock at $d"; exit 30; }
     state=$(lock_state "$run_dir" "$margin")
