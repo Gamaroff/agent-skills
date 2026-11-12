@@ -50,11 +50,18 @@ function makeStubs(t) {
     `#!/usr/bin/env bash
 printf 'ssh %s\\n' "$*" >>"${log}"
 case "$*" in
+  *"bash -s -- take "*) cat >/dev/null; printf '%s' "\${STUB_LOCK_OUT:-}"; exit "\${STUB_LOCK_STATUS:-0}" ;;
+  *"bash -s -- release "*) cat >/dev/null; exit "\${STUB_RELEASE_STATUS:-0}" ;;
+  *"bash -s -- unlock "*) cat >/dev/null; printf '%s' "\${STUB_UNLOCK_OUT:-}"; exit "\${STUB_UNLOCK_STATUS:-0}" ;;
+  *"bash -s -- prune "*) cat >/dev/null; exit "\${STUB_PRUNE_STATUS:-0}" ;;
   *"bash -s"*) cat >"${dir}/reap.sh"; exit 0 ;;
   *"docker ps -a"*) [ "\${STUB_CHECK_FAIL:-}" = "1" ] && exit 255; [ -n "\${STUB_CONTAINER:-}" ] && echo "\${STUB_CONTAINER}"; exit 0 ;;
   *"touch "*"docker image inspect"*) [ "\${STUB_TOUCH_FAIL:-}" = "1" ] && exit 1; exit 0 ;;
   *"docker version"*) [ "\${STUB_PROBE_FAIL:-}" = "1" ] && exit 255; exit 0 ;;
-  *container.sh*) exit "\${STUB_RUN_STATUS:-0}" ;;
+  *container.sh*)
+    # STUB_SIGINT=1 sends Ctrl-C to the runner (this stub's grandparent: runner -> timeout -> ssh).
+    if [ "\${STUB_SIGINT:-}" = "1" ]; then kill -INT "$(ps -o ppid= -p "$PPID" | tr -d ' ')"; sleep 1; fi
+    exit "\${STUB_RUN_STATUS:-0}" ;;
 esac
 exit 0
 `,
@@ -676,4 +683,521 @@ test("a normal checkout still syncs its own .git directory, exactly as before", 
   );
   assert.match(gitSyncs[0], /^rsync -a --delete \S+\/\.git\/ /);
   assert.doesNotMatch(res.stdout, /linked worktree/);
+});
+
+// --- task.296: the per-run lock, --unlock and --prune-images ------------------------------------
+
+const LOCKCTL = path.join(REPO_ROOT, "scripts", "remote-test", "lockctl.sh");
+const sshCalls = (r, op) =>
+  r.calls.filter((c) => c.startsWith("ssh") && c.includes(`bash -s -- ${op} `));
+const HELD_OUT = (state) =>
+  `start=1\ntimeout_min=30\ntoken=other\nowner=otherhost pid 99\nage_s=600\nstate=${state}\n`;
+
+test("a held lock stops the run before any sync, names the owner, and never releases the holder's lock", (t) => {
+  // No container is present (STUB_CONTAINER unset), so the container-name layer cannot be what stops
+  // this run: the lock alone does.
+  const r = run(t, [], {
+    STUB_LOCK_STATUS: "10",
+    STUB_LOCK_OUT: HELD_OUT("live"),
+  });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /another run holds the lock ~\/agent-skills-test-/);
+  assert.match(r.stderr, /otherhost pid 99/);
+  assert.match(r.stderr, /10m/);
+  assert.doesNotMatch(r.stderr, /--unlock\b.*Clear it/);
+  assert.ok(!r.calls.some((c) => c.startsWith("rsync")), "no sync may run");
+  assert.ok(!r.calls.some((c) => c.includes("container.sh")), "no container");
+  assert.equal(
+    sshCalls(r, "release").length,
+    0,
+    "a refused run must not release the lock it does not own",
+  );
+});
+
+test("a stale lock is refused by a run, which names --unlock and does not clear it itself", (t) => {
+  const r = run(t, [], {
+    STUB_LOCK_STATUS: "10",
+    STUB_LOCK_OUT: HELD_OUT("stale"),
+  });
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /Clear it with: npm run test:remote -- --unlock/);
+  assert.equal(sshCalls(r, "unlock").length, 0);
+  assert.equal(sshCalls(r, "release").length, 0);
+  assert.ok(!r.calls.some((c) => c.startsWith("rsync")));
+});
+
+test("a failed take is not read as held, and an owner-write or create failure says so", (t) => {
+  const dropped = run(t, [], { STUB_LOCK_STATUS: "255" });
+  assert.equal(dropped.status, 1);
+  assert.match(dropped.stderr, /could not take the lock/);
+  assert.doesNotMatch(dropped.stderr, /another run holds/);
+  const noOwner = run(t, [], { STUB_LOCK_STATUS: "11" });
+  assert.equal(noOwner.status, 1);
+  assert.match(noOwner.stderr, /could not write its owner file/);
+  const noDir = run(t, [], { STUB_LOCK_STATUS: "12" });
+  assert.equal(noDir.status, 1);
+  assert.match(noDir.stderr, /could not create ~\/agent-skills-test-/);
+  for (const r of [dropped, noOwner, noDir]) {
+    assert.ok(!r.calls.some((c) => c.startsWith("rsync")));
+    assert.equal(sshCalls(r, "release").length, 0, "no lock was taken");
+  }
+});
+
+test("a free lock is taken before the sync and released after the run, adding one ssh call to a run", (t) => {
+  const r = run(t, []);
+  assert.equal(r.status, 0, r.stderr);
+  const takeAt = r.calls.findIndex((c) => c.includes("bash -s -- take "));
+  const rsyncAt = r.calls.findIndex((c) => c.startsWith("rsync"));
+  const runAt = r.calls.findIndex((c) => c.includes("container.sh"));
+  const releaseAt = r.calls.findIndex((c) => c.includes("bash -s -- release "));
+  assert.ok(
+    takeAt >= 0 && takeAt < rsyncAt && rsyncAt < runAt && runAt < releaseAt,
+    `take, sync, run, release in order; calls: ${r.calls.join(" | ")}`,
+  );
+  const tokenOf = (c) => c.match(/-- (?:take|release) \S+ (\S+)/)[1];
+  assert.equal(
+    tokenOf(r.calls[releaseAt]),
+    tokenOf(r.calls[takeAt]),
+    "the release carries the token the take wrote",
+  );
+  // task.295's route made 6 ssh calls (probe, container check, load, mkdir, image, run). The take
+  // replaces the mkdir, so the lock adds exactly one call: the release.
+  assert.equal(
+    r.calls.filter((c) => c.startsWith("ssh")).length,
+    7,
+    r.calls.join(" | "),
+  );
+  assert.ok(
+    !r.calls.some((c) => c.startsWith("ssh") && /mkdir -p/.test(c)),
+    "the take creates the run directory; there is no separate mkdir call",
+  );
+});
+
+test("the take carries the run's own timeout, and every argument is one word", (t) => {
+  const r = run(t, ["--timeout-min", "8"]);
+  // ssh joins its arguments with spaces and the server's shell splits them again, so an argument
+  // with a space in it (the owner description) arrives as several and shifts the ones after it.
+  // The anchored pattern is exactly: take RUN_DIR TOKEN TIMEOUT OWNER, five words and nothing else.
+  assert.match(
+    r.calls.find((c) => c.includes("bash -s -- take ")),
+    /-- take agent-skills-test-\S+ \S+ 8 \S+$/,
+  );
+});
+
+test("the lock is released on a failing run, on a timeout and on Ctrl-C, and the exit status is the run's", (t) => {
+  for (const status of ["1", "124"]) {
+    const r = run(t, [], { STUB_RUN_STATUS: status });
+    assert.equal(r.status, Number(status));
+    assert.equal(sshCalls(r, "release").length, 1, `status ${status}`);
+  }
+  const sig = run(t, [], { STUB_SIGINT: "1" });
+  assert.equal(sig.status, 130, sig.stderr);
+  assert.equal(sshCalls(sig, "release").length, 1, "released on Ctrl-C");
+  assert.ok(
+    sig.calls.some((c) => c.includes("docker kill agent-skills-test-")),
+    "the merged trap still kills the named container",
+  );
+});
+
+test("the exclude file is still removed on the Ctrl-C path (the traps were merged, not replaced)", (t) => {
+  const stubs = makeStubs(t);
+  const kept = path.join(stubs.dir, "exclude-path");
+  fs.writeFileSync(
+    path.join(stubs.dir, "rsync"),
+    `#!/usr/bin/env bash
+printf 'rsync %s\\n' "$*" >>"${stubs.log}"
+for a in "$@"; do case "$a" in --exclude-from=*) printf '%s' "\${a#--exclude-from=}" >"${kept}" ;; esac; done
+exit 0
+`,
+    { mode: 0o755 },
+  );
+  const res = spawnSync("bash", [RUNNER], {
+    cwd: REPO_ROOT,
+    encoding: "utf8",
+    timeout: budget.timeoutMs,
+    env: {
+      ...baseEnv(),
+      PATH: `${stubs.dir}:${process.env.PATH}`,
+      STUB_SIGINT: "1",
+    },
+  });
+  assert.equal(res.status, 130, res.stderr);
+  const excludes = fs.readFileSync(kept, "utf8");
+  assert.ok(excludes.length > 0);
+  assert.ok(!fs.existsSync(excludes), "the exclude file must be gone");
+});
+
+test("a failed release warns, names the lock and --unlock, and leaves the run's exit status alone", (t) => {
+  const green = run(t, [], { STUB_RELEASE_STATUS: "1" });
+  assert.equal(green.status, 0, "a leaked lock must not turn a green run red");
+  assert.match(
+    green.stderr,
+    /could not release the lock ~\/agent-skills-test-/,
+  );
+  assert.match(green.stderr, /--unlock/);
+  const red = run(t, [], { STUB_RELEASE_STATUS: "1", STUB_RUN_STATUS: "3" });
+  assert.equal(red.status, 3);
+  assert.match(red.stderr, /could not release the lock/);
+});
+
+test("a container left behind stops the run before it takes any lock", (t) => {
+  const r = run(t, [], { STUB_CONTAINER: "abc123" });
+  assert.equal(r.status, 1);
+  assert.equal(sshCalls(r, "take").length, 0);
+  assert.equal(sshCalls(r, "release").length, 0);
+});
+
+test("--help prints the whole header, including the new options", (t) => {
+  const r = run(t, ["--help"]);
+  assert.equal(r.status, 0);
+  assert.deepEqual(r.calls, []);
+  for (const needle of [
+    "--unlock",
+    "--prune-images",
+    "--reap DAYS",
+    "TEST_REMOTE_LOCK_MARGIN_MIN",
+  ]) {
+    assert.ok(r.stdout.includes(needle), `--help must name ${needle}`);
+  }
+  assert.match(r.stdout, /STATUS is captured on the line after the ssh call/);
+  assert.doesNotMatch(r.stdout, /set -uo pipefail/);
+});
+
+test("--unlock and --prune-images stand alone, and --reap with --run is as it was", (t) => {
+  for (const args of [
+    ["--unlock", "--prune-images"],
+    ["--unlock", "--reap", "3"],
+    ["--prune-images", "--reap", "3"],
+    ["--unlock", "--run", "ci:fast"],
+    ["--prune-images", "--run", "ci:fast"],
+  ]) {
+    const r = run(t, args);
+    assert.equal(r.status, 2, args.join(" "));
+    assert.deepEqual(r.calls, [], `no ssh for ${args.join(" ")}`);
+  }
+  const reap = run(t, ["--reap", "3", "--run", "ci:fast"]);
+  assert.equal(reap.status, 0, reap.stderr);
+  assert.ok(reap.calls.some((c) => c.includes("bash -s")));
+  const bad = run(t, [], { TEST_REMOTE_LOCK_MARGIN_MIN: "abc" });
+  assert.equal(bad.status, 2);
+  assert.deepEqual(bad.calls, []);
+});
+
+test("--unlock sends one unlock with the margin, passes lockctl's status through, and never syncs", (t) => {
+  const r = run(t, ["--unlock"], { TEST_REMOTE_LOCK_MARGIN_MIN: "3" });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(
+    sshCalls(r, "unlock")[0],
+    /unlock agent-skills-test-\S+ 3$/,
+    "the margin reaches the server",
+  );
+  assert.ok(!r.calls.some((c) => c.startsWith("rsync")));
+  assert.equal(sshCalls(r, "take").length, 0);
+  const live = run(t, ["--unlock"], { STUB_UNLOCK_STATUS: "32" });
+  assert.equal(live.status, 32);
+  assert.match(live.stderr, /not removed/);
+  const none = run(t, ["--unlock"], { STUB_UNLOCK_STATUS: "30" });
+  assert.equal(none.status, 30);
+});
+
+test("--prune-images sends the current Dockerfile's tag, passes the status through, and never syncs or locks", (t) => {
+  const r = run(t, ["--prune-images"]);
+  assert.equal(r.status, 0, r.stderr);
+  const dockerfile = fs.readFileSync(
+    path.join(REPO_ROOT, "scripts", "remote-test", "Dockerfile"),
+  );
+  const tag = require("crypto")
+    .createHash("sha256")
+    .update(dockerfile)
+    .digest("hex")
+    .slice(0, 12);
+  assert.ok(
+    sshCalls(r, "prune")[0].endsWith(`prune agent-skills-test:${tag}`),
+    sshCalls(r, "prune")[0],
+  );
+  assert.ok(!r.calls.some((c) => c.startsWith("rsync")));
+  assert.equal(sshCalls(r, "take").length, 0);
+  const refused = run(t, ["--prune-images"], { STUB_PRUNE_STATUS: "40" });
+  assert.equal(refused.status, 40);
+});
+
+test("--reap never removes a *.lock directory", (t) => {
+  const r = run(t, ["--reap", "3"]);
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "remote-runner-home-"));
+  t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+  const old = new Date(Date.now() - 40 * 86400 * 1000);
+  for (const d of ["agent-skills-test-stale", "agent-skills-test-stale.lock"]) {
+    fs.mkdirSync(path.join(home, d));
+    fs.utimesSync(path.join(home, d), old, old);
+  }
+  fs.writeFileSync(
+    path.join(r.stubDir, "docker"),
+    "#!/usr/bin/env bash\nexit 0\n",
+    { mode: 0o755 },
+  );
+  const res = spawnSync("bash", [path.join(r.stubDir, "reap.sh"), "3"], {
+    encoding: "utf8",
+    timeout: budget.timeoutMs,
+    env: {
+      ...process.env,
+      HOME: home,
+      PATH: `${r.stubDir}:${process.env.PATH}`,
+    },
+  });
+  assert.equal(res.status, 0, res.stderr);
+  assert.deepEqual(fs.readdirSync(home), ["agent-skills-test-stale.lock"]);
+});
+
+// --- lockctl.sh itself, run for real against a temp HOME and a fake docker ----------------------
+
+const RD = "agent-skills-test-feature-x-abcd1234";
+
+function makeCtl(t) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "remote-lockctl-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const home = path.join(dir, "home");
+  const bin = path.join(dir, "bin");
+  fs.mkdirSync(home);
+  fs.mkdirSync(bin);
+  const dlog = path.join(dir, "docker.log");
+  fs.writeFileSync(dlog, "");
+  fs.writeFileSync(
+    path.join(bin, "docker"),
+    `#!/usr/bin/env bash
+printf '%s\\n' "$*" >>"$FAKE_DOCKER_LOG"
+case "$1" in
+  ps)
+    [ "\${FAKE_PS_FAIL:-}" = "1" ] && exit 1
+    if [ "$2" = "-a" ]; then printf '%s' "\${FAKE_CONTAINER:-}"; else printf '%s\\n' "\${FAKE_RUNNING_IMAGES:-}"; fi
+    exit 0 ;;
+  images) [ "\${FAKE_IMAGES_FAIL:-}" = "1" ] && exit 1; printf '%s\\n' "\${FAKE_IMAGES:-}"; exit 0 ;;
+  rmi) [ "\${FAKE_RMI_FAIL:-}" = "$2" ] && exit 1; exit 0 ;;
+esac
+exit 0
+`,
+    { mode: 0o755 },
+  );
+  const ctl = (args, env = {}) =>
+    spawnSync("bash", [LOCKCTL, ...args], {
+      encoding: "utf8",
+      timeout: budget.timeoutMs,
+      env: {
+        ...baseEnv(),
+        HOME: home,
+        PATH: `${bin}:${process.env.PATH}`,
+        FAKE_DOCKER_LOG: dlog,
+        ...env,
+      },
+    });
+  const lockDir = path.join(home, `${RD}.lock`);
+  const dockerCalls = () =>
+    fs.readFileSync(dlog, "utf8").split("\n").filter(Boolean);
+  const writeOwner = (fields) => {
+    fs.mkdirSync(lockDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(lockDir, "owner"),
+      Object.entries(fields)
+        .map(([k, v]) => `${k}=${v}\n`)
+        .join(""),
+    );
+  };
+  return { home, ctl, lockDir, dockerCalls, writeOwner };
+}
+
+const nowS = () => Math.floor(Date.now() / 1000);
+
+test("lockctl take writes the owner (server clock, own timeout, token) and a second take is held", (t) => {
+  const c = makeCtl(t);
+  const before = nowS();
+  const first = c.ctl(["take", RD, "tok-1", "30", "laptop pid 7"]);
+  assert.equal(first.status, 0, first.stderr);
+  assert.ok(fs.existsSync(path.join(c.home, RD)), "the run directory exists");
+  const owner = fs.readFileSync(path.join(c.lockDir, "owner"), "utf8");
+  assert.match(owner, /^timeout_min=30$/m);
+  assert.match(owner, /^token=tok-1$/m);
+  assert.match(owner, /^owner=laptop pid 7$/m);
+  const start = Number(owner.match(/^start=(\d+)$/m)[1]);
+  assert.ok(
+    start >= before && start <= nowS() + 1,
+    "start is the server's now",
+  );
+  const second = c.ctl(["take", RD, "tok-2", "30", "other pid 8"]);
+  assert.equal(second.status, 10);
+  assert.match(second.stdout, /^owner=laptop pid 7$/m);
+  assert.match(second.stdout, /^age_s=\d+$/m);
+  assert.match(second.stdout, /^state=live$/m);
+  assert.match(
+    fs.readFileSync(path.join(c.lockDir, "owner"), "utf8"),
+    /token=tok-1/,
+    "the holder's owner file is untouched",
+  );
+});
+
+test("lockctl take is atomic: of eight simultaneous takes exactly one wins", (t) => {
+  const c = makeCtl(t);
+  const out = path.join(c.home, "..", "statuses");
+  const script = `for i in 1 2 3 4 5 6 7 8; do (bash "${LOCKCTL}" take ${RD} tok$i 30 d$i >/dev/null 2>&1; echo $? >>"${out}") & done; wait`;
+  const res = spawnSync("bash", ["-c", script], {
+    encoding: "utf8",
+    timeout: budget.timeoutMs,
+    env: { ...baseEnv(), HOME: c.home, PATH: process.env.PATH },
+  });
+  assert.equal(res.status, 0, res.stderr);
+  const statuses = fs.readFileSync(out, "utf8").trim().split("\n").sort();
+  assert.deepEqual(statuses, ["0", "10", "10", "10", "10", "10", "10", "10"]);
+});
+
+test("lockctl refuses a run directory name it did not make, and writes nothing", (t) => {
+  const c = makeCtl(t);
+  for (const bad of [
+    "../evil",
+    "agent-skills-test-",
+    "agent-skills-test-x/../y",
+    "x",
+  ]) {
+    const r = c.ctl(["take", bad, "tok", "30", "d"]);
+    assert.equal(r.status, 2, bad);
+  }
+  assert.deepEqual(fs.readdirSync(c.home), []);
+});
+
+test("lockctl release removes the lock only for the owner's token", (t) => {
+  const c = makeCtl(t);
+  assert.equal(c.ctl(["take", RD, "tok-1", "30", "d"]).status, 0);
+  const wrong = c.ctl(["release", RD, "someone-else"]);
+  assert.equal(wrong.status, 20);
+  assert.ok(
+    fs.existsSync(c.lockDir),
+    "another owner's release leaves the lock",
+  );
+  assert.equal(c.ctl(["release", RD, "tok-1"]).status, 0);
+  assert.ok(!fs.existsSync(c.lockDir));
+  assert.equal(
+    c.ctl(["release", RD, "tok-1"]).status,
+    0,
+    "already gone is fine",
+  );
+});
+
+test("lockctl unlock removes only a stale lock: it judges by the owner's own timeout, the server clock and the container", (t) => {
+  const c = makeCtl(t);
+  const minutesAgo = (m) => nowS() - m * 60;
+  // Owner's timeout 60m, started 50m ago, margin 5: 55m window not yet passed -> live.
+  c.writeOwner({
+    start: minutesAgo(50),
+    timeout_min: 60,
+    token: "t",
+    owner: "o",
+  });
+  const live = c.ctl(["unlock", RD, "5"]);
+  assert.equal(live.status, 32, live.stdout);
+  assert.match(live.stdout, /state=live/);
+  assert.ok(fs.existsSync(c.lockDir), "a live lock is not removed");
+  // Same start, owner's timeout 30m: 35m window passed -> stale, removed, owner printed.
+  c.writeOwner({
+    start: minutesAgo(50),
+    timeout_min: 30,
+    token: "t",
+    owner: "crashed pid 4",
+  });
+  const stale = c.ctl(["unlock", RD, "5"]);
+  assert.equal(stale.status, 0, stale.stdout + stale.stderr);
+  assert.match(stale.stdout, /owner=crashed pid 4/);
+  assert.match(stale.stdout, /removed the stale lock/);
+  assert.ok(!fs.existsSync(c.lockDir));
+  assert.equal(c.ctl(["unlock", RD, "5"]).status, 30, "nothing to unlock");
+});
+
+test("lockctl never calls a lock stale while a container of the run's name exists, or when the owner or docker is unreadable", (t) => {
+  const c = makeCtl(t);
+  const old = {
+    start: nowS() - 600 * 60,
+    timeout_min: 1,
+    token: "t",
+    owner: "o",
+  };
+  c.writeOwner(old);
+  const running = c.ctl(["unlock", RD, "0"], { FAKE_CONTAINER: "abc123" });
+  assert.equal(running.status, 32);
+  assert.ok(fs.existsSync(c.lockDir), "a container means a run is using it");
+  const blind = c.ctl(["unlock", RD, "0"], { FAKE_PS_FAIL: "1" });
+  assert.equal(blind.status, 32, "a failed docker call is not 'no container'");
+  assert.ok(fs.existsSync(c.lockDir));
+  fs.rmSync(path.join(c.lockDir, "owner"));
+  const noOwner = c.ctl(["unlock", RD, "0"]);
+  assert.equal(noOwner.status, 32, "a lock with no owner file is never stale");
+  assert.match(noOwner.stdout, /state=unknown/);
+  fs.writeFileSync(path.join(c.lockDir, "owner"), "start=abc\ntimeout_min=\n");
+  assert.equal(
+    c.ctl(["unlock", RD, "0"]).status,
+    32,
+    "garbled fields are never stale",
+  );
+  assert.ok(fs.existsSync(c.lockDir));
+});
+
+const IMAGES = [
+  "agent-skills-test:aaaaaaaaaaaa",
+  "agent-skills-test:bbbbbbbbbbbb",
+  "agent-skills-test:cccccccccccc",
+  "agent-skills-test:<none>",
+].join("\n");
+
+test("lockctl prune removes only old agent-skills-test tags, by explicit name, never forcing or pruning globally", (t) => {
+  const c = makeCtl(t);
+  const r = c.ctl(["prune", "agent-skills-test:cccccccccccc"], {
+    FAKE_IMAGES: IMAGES,
+    FAKE_RUNNING_IMAGES: "agent-skills-test:bbbbbbbbbbbb",
+  });
+  assert.equal(r.status, 0, r.stderr);
+  const calls = c.dockerCalls();
+  assert.deepEqual(
+    calls.filter((x) => x.startsWith("rmi")),
+    ["rmi agent-skills-test:aaaaaaaaaaaa"],
+    "only the old, unused tag is removed",
+  );
+  assert.ok(
+    calls.every((x) => !/prune|\s-f\b|--force/.test(x)),
+    calls.join(" | "),
+  );
+  assert.match(r.stdout, /kept \(current\): agent-skills-test:cccccccccccc/);
+  assert.match(r.stdout, /kept \(in use\): agent-skills-test:bbbbbbbbbbbb/);
+  assert.match(r.stdout, /skipped \(untagged\)/);
+});
+
+test("lockctl prune removes nothing while any run holds a lock, or when docker cannot be read", (t) => {
+  const c = makeCtl(t);
+  const env = { FAKE_IMAGES: IMAGES };
+  fs.mkdirSync(path.join(c.home, "agent-skills-test-other-1234abcd.lock"));
+  const locked = c.ctl(["prune", "agent-skills-test:cccccccccccc"], env);
+  assert.equal(locked.status, 40);
+  assert.match(locked.stdout, /agent-skills-test-other-1234abcd\.lock/);
+  fs.rmSync(path.join(c.home, "agent-skills-test-other-1234abcd.lock"), {
+    recursive: true,
+  });
+  const noPs = c.ctl(["prune", "agent-skills-test:cccccccccccc"], {
+    ...env,
+    FAKE_PS_FAIL: "1",
+  });
+  assert.equal(noPs.status, 41);
+  const noImages = c.ctl(["prune", "agent-skills-test:cccccccccccc"], {
+    ...env,
+    FAKE_IMAGES_FAIL: "1",
+  });
+  assert.equal(noImages.status, 41);
+  assert.deepEqual(
+    c.dockerCalls().filter((x) => x.startsWith("rmi")),
+    [],
+    "a refused prune removes nothing",
+  );
+  const fail = c.ctl(["prune", "agent-skills-test:cccccccccccc"], {
+    ...env,
+    FAKE_RMI_FAIL: "agent-skills-test:aaaaaaaaaaaa",
+  });
+  assert.equal(
+    fail.status,
+    42,
+    "a tag that could not be removed is reported, not swallowed",
+  );
+  assert.match(fail.stderr, /could not remove: agent-skills-test:aaaaaaaaaaaa/);
 });

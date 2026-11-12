@@ -5,16 +5,17 @@ type: task
 description: "Replace the best-effort container-name guard in test:remote with an atomic per-run lock on the server, and add a bounded prune of old agent-skills-test image tags."
 tags: [infrastructure, testing, developer-tooling, remote-test]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: Low
 created: 2026-11-10
-updated: 2026-11-10
+updated: 2026-11-12
 estimated_effort_hours: 4
 ---
 
 # Technical Task: test:remote per-run lock and image-tag prune
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.296.review.1.test-remote-per-run-lock-and-image-prune.md` implemented 2026-11-12
 
 Follow-up to task.295 (PR #872). Both items are listed in task.295's Future Improvements and in `docs/contributing/testing-remote.md`.
 
@@ -50,9 +51,11 @@ Two small hardening items for `npm run test:remote`:
 
 **Target:**
 
-- **Lock.** `mkdir "$HOME/$RUN_DIR.lock"` over ssh is atomic: it fails if the directory exists. The lock holds a small file with the local host name, the pid and a start time, so a stale lock can be read, not guessed. It is released by an exit trap on the local side, and by the same `ssh` that runs the container when the run ends. The lock is taken **before the sync**, so it covers the whole window. The container-name check stays as a second layer (it also catches a container left behind).
-- **A stale lock.** A crashed run, a killed laptop or a lost network leaves the lock behind, which would block that branch forever. The rule: a lock is stale when its container is absent **and** it is older than the run's timeout limit plus a margin; `--unlock` removes one by hand and names what it removed. This is the part that needs care: a lock that cannot be cleared is worse than no lock.
-- **Prune.** `--prune-images` lists `agent-skills-test` images, keeps the tag the current Dockerfile names and any tag a running container uses, and removes the rest with `docker rmi` by explicit tag. It never calls `docker image prune` or `docker system prune`.
+- **Lock.** `mkdir "$HOME/$RUN_DIR.lock"` over ssh is atomic: it fails if the directory exists. The lock holds an `owner` file with the local host name, the pid, the start time (`date +%s` read **on the server**) and the run's `--timeout-min`, so a stale lock can be read, not guessed. It is released by one local `cleanup` function, installed once and called from the EXIT, INT and TERM traps; it does the lock release, the `$EXCLUDES` removal and the container kill that the two existing traps do today (a second `trap` for the same signal would replace the first). The trap is armed **only after the take succeeded**, and the release checks the owner token the run wrote, so a run refused because the lock is held can never release the holder's lock. The lock is taken **before the sync**, so it covers the whole window. The container-name check stays as a second layer (it also catches a container left behind).
+- **The take returns its own verdict, in one ssh call.** The take replaces the existing run-directory `mkdir -p` call and creates the directory itself (net zero extra round trips); the container-name check stays a separate, earlier call. The remote command exits 0 when it took the lock, 10 when it is held (the owner file on stdout), 11 when it took the directory but could not write the owner file (it removes the directory first). An ssh status of 255, or any other code, is "could not take the lock", a different message from "held". Do not look for the directory in a second call.
+- **A stale lock.** A crashed run, a killed laptop or a lost network leaves the lock behind, which would block that branch forever. The rule: a lock is stale when no container of the run's name exists **and** the server's `date +%s` is later than the owner's start time plus the **owner's** recorded timeout plus a margin (default 10 minutes, `TEST_REMOTE_LOCK_MARGIN_MIN` overrides it so the live acceptance need not wait 40 minutes). An owner file that is missing or unreadable (a take interrupted between `mkdir` and the write) is "held, owner unknown", never stale. **A run never clears a stale lock itself**: it refuses, says the lock is stale and names `--unlock`. `--unlock` removes a lock **only when it is stale**; on a live lock it exits non-zero and says when the lock becomes stale. Either way it prints the owner file's contents. This is the part that needs care: a lock that cannot be cleared is worse than no lock.
+- **Prune.** `--prune-images` lists `agent-skills-test` images, keeps the tag the current Dockerfile names and any tag a running container uses, skips the `<none>` tag, and removes the rest with `docker rmi <repo:tag>` by explicit tag, never with `-f`. It never calls `docker image prune` or `docker system prune`. It refuses (exit 1, nothing removed) while any `~/agent-skills-test-*.lock` exists, because a run that has built its image but not yet started its container is in neither keep set; and it refuses when `docker ps` or `docker images` fails.
+- **Where the options sit in `run.sh`.** `--unlock` and `--prune-images` run after `server_ready` and, for `--unlock`, after `RUN_DIR` is computed; `--prune-images` needs the current tag, so the Dockerfile hash is computed above the sync. Each is mutually exclusive with `--run`, `--reap` and the other, and each exits without syncing. The usage text and the `--help` header name both. The `--help` output is a hard-coded line range today (`sed -n '2,19p'`), so the range must follow the header, and a test holds that `--help` names both options. `--reap` skips `*.lock` directories.
 
 ## 4. Scope
 
@@ -81,11 +84,12 @@ None. The route's arguments stay valid. Two options are added (`--unlock`, `--pr
 
 **Files:** `scripts/remote-test/run.sh`, `scripts/remote-test/server-lib.sh`
 
-- [ ] Take `mkdir "$HOME/$RUN_DIR.lock"` over ssh before the sync; on failure read the owner file and exit non-zero, naming owner and age.
-- [ ] Write the owner file (host, pid, start time) into the lock directory.
-- [ ] Release on every local exit path with a trap, and verify the release failure is reported, not swallowed.
-- [ ] Staleness rule and `--unlock`.
-- [ ] Keep the container-name check as the second layer.
+- [x] Take `mkdir "$HOME/$RUN_DIR.lock"` over ssh before the sync, replacing the run-directory `mkdir` call, with the exit-status verdict (0 taken, 10 held, 11 owner write failed); on held, exit non-zero naming owner and age.
+- [x] Write the owner file (host, pid, server-side start time, `--timeout-min`) into the lock directory.
+- [x] One `cleanup` function for the EXIT, INT and TERM traps (lock release, `$EXCLUDES`, container kill), armed only after the take succeeded; a failed release prints a warning naming the lock and `--unlock` and does **not** change the run's exit status (a green run is not turned red by a leaked lock; staleness covers it).
+- [x] Staleness rule (server clock, owner's timeout, margin) and `--unlock` (stale locks only; a run never clears one itself).
+- [x] Keep the container-name check as the second layer. The server-side lock logic is one file, `scripts/remote-test/lockctl.sh` (sent over ssh stdin, so it is testable apart from `run.sh`), rather than functions in `server-lib.sh`.
+- [x] `--reap` skips `*.lock` directories; `--help` range follows the header.
 
 **Dependencies:** none.
 
@@ -93,9 +97,10 @@ None. The route's arguments stay valid. Two options are added (`--unlock`, `--pr
 
 **Files:** `scripts/remote-test/run.sh`
 
-- [ ] `--prune-images`: list tags of the `agent-skills-test` repository only.
-- [ ] Keep the current tag and any tag a running container uses; remove the rest with `docker rmi <repo:tag>`.
-- [ ] Refuse and exit non-zero when `docker ps` fails, as `--reap` does.
+- [x] `--prune-images`: list tags of the `agent-skills-test` repository only.
+- [x] Keep the current tag and any tag a running container uses; skip `<none>`; remove the rest with `docker rmi <repo:tag>`, never `-f`.
+- [x] Refuse and exit non-zero when `docker ps` or `docker images` fails, as `--reap` does, and while any `~/agent-skills-test-*.lock` exists.
+- [x] Hoist the Dockerfile-hash computation above the sync so the option can use it.
 
 **Dependencies:** none (independent of Phase 1).
 
@@ -103,7 +108,7 @@ None. The route's arguments stay valid. Two options are added (`--unlock`, `--pr
 
 **Files:** `tests/test-remote-runner.test.js`
 
-- [ ] Offline tests for each new behaviour, each mutation-proved.
+- [x] Offline tests for each new behaviour, each mutation-proved.
 - [ ] A live two-run overlap on the server, and a live prune, both recorded in the QA report.
 
 **Dependencies:** Phases 1 and 2.
@@ -112,8 +117,8 @@ None. The route's arguments stay valid. Two options are added (`--unlock`, `--pr
 
 **Files:** `docs/contributing/testing-remote.md`, `CHANGELOG.md`
 
-- [ ] Replace the "best-effort guard" wording with what the lock holds and what it does not.
-- [ ] Document `--unlock` and `--prune-images`.
+- [x] Replace the "best-effort guard" wording with what the lock holds and what it does not.
+- [x] Document `--unlock` and `--prune-images`.
 
 **Dependencies:** Phases 1 and 2.
 
@@ -122,7 +127,7 @@ None. The route's arguments stay valid. Two options are added (`--unlock`, `--pr
 **Core implementation:**
 
 1. ✅ `scripts/remote-test/run.sh` — lock, `--unlock`, `--prune-images`
-2. ✅ `scripts/remote-test/server-lib.sh` — lock helpers if they belong beside `server_ready`
+2. ✅ `scripts/remote-test/lockctl.sh` (new) — the server-side take, release, unlock and prune, sent over ssh stdin; `server-lib.sh` is unchanged
 
 **Tests:**
 
@@ -137,9 +142,14 @@ None. The route's arguments stay valid. Two options are added (`--unlock`, `--pr
 
 **Unit (offline, stubbed `ssh` and `rsync`):**
 
-- A held lock stops the run before any `rsync`, names the owner and exits non-zero.
-- A free lock is taken, written with an owner and released on a normal exit, on a failing run and on SIGINT.
-- A stale lock is refused by a run and removed by `--unlock`; a live lock is not removed by a run.
+- The stub `ssh` gets the new arms **first**, matched on text no existing arm shares (`*".lock"*`): its existing arms match `docker ps -a` and `touch … docker image inspect`, and a lock command containing either would be eaten by the wrong arm. Lock tests assert the call log, not only the exit code.
+- A held lock stops the run before any `rsync`, names the owner and exits non-zero. A refused run issues **no release** (it must not release the holder's lock).
+- A free lock is taken, written with an owner and released on a normal exit, on a failing run and on SIGINT; the `$EXCLUDES` file is still removed and the container still killed on the INT path (the traps were merged).
+- An ssh failure on the take (255) is a different message and exit from "held"; an owner-write failure (11) leaves no directory.
+- A stale lock is refused by a run, naming `--unlock`, and removed by `--unlock`; a live lock (no container yet, inside the limit) is refused by `--unlock` and not removed; a lock with a missing owner file is never stale. Staleness reads the server's clock.
+- A failed release warns, names the lock and `--unlock`, and leaves the run's exit status unchanged.
+- `--reap` skips a `*.lock` directory. `--help` names `--unlock` and `--prune-images`. `--unlock`, `--prune-images`, `--reap` and `--run` are mutually exclusive.
+- `--prune-images` refuses while a lock exists and when `docker ps` or `docker images` fails, removing nothing, and skips `<none>`.
 - `--prune-images` issues `docker rmi` only for `agent-skills-test` tags other than the current one and those in use, and never `prune`.
 - Every test that spawns takes its timeout from `spawnBudget` and removes its temp directory (`scripts/test-tmpdir.mjs` rejects a leaking prefix).
 
@@ -154,16 +164,16 @@ None. The route's arguments stay valid. Two options are added (`--unlock`, `--pr
 - [ ] Two overlapping runs on one branch: the second exits non-zero before its sync, names the first run, and the first run is not disturbed. The overlap run is recorded in the QA report.
 - [ ] A crashed run's lock is cleared by `--unlock`, and a live run's lock is not removed by it. Recorded in the QA report.
 - [ ] `--prune-images` removes an old `agent-skills-test` tag and keeps the current tag and any in use; it never calls a global prune. Recorded in the QA report.
-- [ ] No existing option's behaviour changes.
+- [ ] No existing option's behaviour changes. Held by the existing cases in `tests/test-remote-runner.test.js` (arguments, exit status, timeout, linked worktree, reap), which run unchanged.
 
 **Performance**
 
-- [ ] The lock adds at most one ssh round trip to a run. The extra round trips are counted from the stub's call log in a test, not timed.
+- [ ] The lock adds at most one ssh round trip to a run: the take replaces the existing run-directory `mkdir` call, the release is the one extra call. The calls are counted from the stub's call log in a test, not timed.
 - [ ] Load on both hosts is recorded before and after the live runs in the QA report (`uptime`).
 
 **Code quality**
 
-- [ ] `npm run lint:shell` and `format:check` pass on the changed files.
+- [ ] `npm run lint:shell` passes on the changed shell files, and `format:check` on the changed test file (`.prettierignore` excludes Markdown, and prettier does not read shell).
 - [ ] The offline guard passes under `CI=true`.
 - [ ] `npm run ci:fast` is green on the final tree, run via `npm run test:remote`.
 
@@ -190,7 +200,7 @@ None. The route's arguments stay valid. Two options are added (`--unlock`, `--pr
 
 **Immediate (under 1 hour):** revert the commit. The lock is a directory under `$HOME` on the server; remove any `agent-skills-test-*.lock` directories by hand.
 
-**Partial:** the lock and the prune are independent phases; either can be reverted alone.
+**Partial:** the lock and the prune are independent phases; either can be reverted alone. (The prune's refusal while a lock exists reads the lock phase's directories; reverting the lock leaves that check harmless, since no lock then exists.)
 
 **Forward fix:** a refusal message that is wrong or a staleness margin that is too tight is fixed forward.
 
@@ -209,15 +219,18 @@ Not required for this task.
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-11-10 | 1.0     | Initial draft | create-task |
+| 2026-11-12 | 1.1     | Review passed (9/10) — 12 Important findings fixed: merged traps, take-then-arm release, one-call take verdict, stale-only `--unlock`, server clock and owner timeout, `--help` range, reap vs `.lock`, prune refuses while locked, option placement, stub arm order, criteria wording | review-task |
+| 2026-11-12 |         | Status → ready-for-development | review-task |
+| 2026-11-12 |         | Implemented: lockctl.sh, lock/unlock/prune in run.sh, 22 offline tests (mutation-proved), docs and CHANGELOG; `ci:fast` green on the server (8428 pass); status → ready-for-review | develop |
 
 <!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 1: The lock
-- [ ] Phase 2: The image prune
-- [ ] Phase 3: Tests and acceptance
-- [ ] Phase 4: Docs
+- [x] Phase 1: The lock
+- [x] Phase 2: The image prune
+- [ ] Phase 3: Tests and acceptance (offline tests done and mutation-proved; the live runs on the server are recorded in the QA report)
+- [x] Phase 4: Docs
 
 ## References
 

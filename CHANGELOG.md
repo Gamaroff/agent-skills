@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **`npm run test:remote` takes a per-run lock, and gains `--unlock` and `--prune-images` (task 296).**
+  The container-name check stopped a second run on a branch only after the first's container
+  existed, so a run started during the sync or the first image build could rewrite the tree under it.
+  A run now takes an atomic `mkdir` lock on the server (`~/<run dir>.lock`) in the call that creates
+  the run directory, before the sync, and releases it on success, failure, the timeout and Ctrl-C
+  through one cleanup that also keeps the old exclude-file removal and container kill. A held lock
+  exits 1 before any sync and names the owner and its age; a run refused that way never releases the
+  holder's lock. The container-name check stays as a second layer. A lock whose run died is stale
+  once no container exists and the server's clock is past the owner's start plus the owner's own
+  timeout plus 10 minutes (`TEST_REMOTE_LOCK_MARGIN_MIN`); a run refuses and names `--unlock`, which
+  removes only a stale lock. `--prune-images` removes old `agent-skills-test:*` tags by explicit name,
+  keeping the current Dockerfile's tag and any in use, and refuses while any lock exists or when
+  docker cannot be read. `--reap` now skips `*.lock` directories and `--help` prints the whole
+  header instead of a fixed line range. The server-side logic is one file, `lockctl.sh`, sent over
+  ssh stdin and run for real in the tests against a fake `docker`.
+
 ### Changed
 
 - **`npm run test:remote` now works from a linked git worktree (task 302).** From a linked worktree
