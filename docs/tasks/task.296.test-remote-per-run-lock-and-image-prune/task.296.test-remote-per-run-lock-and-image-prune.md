@@ -250,6 +250,7 @@ Cycle 3's one finding (a digits check that let through a leading zero and 22 dig
 | 2026-11-12 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-11-12 |         | QA findings fixed — lockctl digits checks capped at 4 digits and every staleness and age read made decimal (T296-QA-5), 1 iteration; ready for QA re-review | qa-fix |
 | 2026-11-12 |         | QA gate PASS (95/100) — 0 findings | qa-task |
+| 2026-11-12 |         | QA findings fixed — live two-run overlap run and recorded for the open coverage finding (PC-3), trail rows corrected (PC-1, PC-2), 1 iteration; ready for QA re-review | qa-fix |
 
 <!-- change-log-end -->
 

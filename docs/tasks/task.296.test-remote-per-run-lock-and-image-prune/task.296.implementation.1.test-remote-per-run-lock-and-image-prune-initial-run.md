@@ -35,7 +35,7 @@ Run T296 from the roadmap via /develop-next: an atomic per-run lock on the serve
 | 2. review-task             | ✅ Done | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               | READY TO IMPLEMENT 9/10; 12 Important fixed; status → ready-for-development | —                    | 2026-11-12T14:45Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (plan names every hunk); fast gate green on server: 8428 pass; 7+3+2 mutations red | —                    | 2026-11-12T16:55Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #891 (no tracker issue, so no comment) | —                    | 2026-11-12T17:10Z |
-| 5–6. qa-task / qa-fix loop | ⏳ In progress (cycle 1 gate CONCERNS 90; fixing) | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ⏳ In progress (cycle 4 gate PASS 95; Step 5c CONCERNS with one open coverage finding, PC-3; fixing) | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
@@ -64,7 +64,8 @@ _Problems encountered and how they were resolved or escalated._
 
 - **Found by the first live use, invisible offline:** `ssh` joins its arguments and the server's shell splits them again, so the owner description `host pid N` arrived as three words and only the host was recorded. Fixed to one word (`host/pid-N`); a test now anchors the take's argv to five single words and was mutation-proved (old form red).
 - **Live acceptance on `ci@192.168.1.249` (2026-11-12, server load 0.22 before, 0.86 after; laptop 0.77 before, 1.10 after):** (1) a lock held with no container: a run exited 1 before any sync, naming `manual/pid-1`; (2) `--unlock` on that live lock exited 32 and removed nothing; (3) owner start forced to 1: a run still refused and named `--unlock`, then `--unlock` exited 0 and removed it; (4) `--prune-images` with a spare tag exited 0, kept the current tag and removed the four others; (5) a lock taken by a real run was released after it (no `*.lock` left), and `ci:fast` ran green under it. A real two-run overlap during the sync window was not reproduced: the second run reached the container layer first. The lock layer was proved by holding the lock directly.
-- Live observation: a second `npm run test:remote` started while the first was in its container phase was refused by the container-name layer (the lock was also held). The lock overlap during the sync window is left to the QA live run.
+- **Live two-run overlap, lock layer (2026-11-12, after PR review 1, PC-3):** run A (`npm run test:remote -- --run lint:shell`) was started in the background; the moment its lock appeared on the server (about 1 s) run B, the same command, was started. At that moment no `agent-skills-test` container existed, so the container-name layer could not have caught it. Run B exited 1 before its sync with `another run holds the lock … owner tachyon-/pid-3110783, age 0m` and `Wait for it to finish`; run A exited 0 undisturbed (`shellcheck: clean`); no `*.lock` remained afterwards. Server load 0.26 before and 0.56 after; laptop 2.87 before and 2.74 after. This is the overlap the first live attempt could not reproduce, and it is for QA cycle 5 to record in its report, which is where the criterion asks for it.
+- Live observation: a second `npm run test:remote` started while the first was in its container phase was refused by the container-name layer (the lock was also held). The lock overlap during the sync window was reproduced later, in the entry above (PC-3).
 
 ---
 
@@ -110,9 +111,11 @@ _Track each QA review/fix cycle._
 **Issues Found**: 0 (T296-QA-5 fixed and re-proved; advisory CR-3 to CR-6 recorded in the gate)
 **HIGH findings**: 0
 **MEDIUM findings**: 0
-**PR Review**: pending — Step 5c next
-**Loop exit**: pending — the exit is Step 5c (`/review-pr`), not this gate
-**Action**: Running /review-pr (the loop's exit gate)
+**PR Review**: CONCERNS
+**Loop exit**: n/a — this exit not taken (CONCERNS with an open coverage finding, PC-3: back to 5b)
+**Action**: Proceeding to 5c (PR conformance review)
+
+**Fix cycle 4** (qa-fix, entered from the Step 5c `CONCERNS`; review report `task.296.pr-review.1…md`, one open `coverage` finding): PC-3 (coverage) — closed with the evidence the criterion asks for, not by editing it: a real two-run overlap on the server, run B started the moment run A's lock appeared (Issues Log above): B refused with exit 1 naming A, A green, lock released, load recorded. The criterion also asks for it in the QA report, so the QA cycle 5 pass is asked to record it there. PC-1 — the Pipeline Progress row now names cycle 4 and the 5c verdict. PC-2 — this entry's Action, PR Review and Loop exit rows now use the spec's wording; the first wording was this orchestrator's, not the reviewer's misreading. Not changed here, and why: PC-4 (success criteria unticked) and PC-5 (`pr_number:` absent) are `consistency` findings that never route, and both are written by `/finalise` (it verifies the criteria and writes `pr_number:`), which is outside qa-fix's authorised sections. No code changed, so no new tests and no mutation proof apply; the shipped files are byte-identical to 2f9f1db9. Step 2.5 did not apply (no third strike). Step 2.6: repeat subject no, Move: patch (distinct trail and coverage gaps, not a rule restated). Step 3.5 `Probe:` the Issues Log's "left to the QA live run" sentence restated the gap: `git grep -n -F -e "QA live run" -- docs/tasks/task.296.test-remote-per-run-lock-and-image-prune`, population 1 (the Issues Log line, updated to point at the live overlap entry); the plan does not restate it.
 
 ---
 
