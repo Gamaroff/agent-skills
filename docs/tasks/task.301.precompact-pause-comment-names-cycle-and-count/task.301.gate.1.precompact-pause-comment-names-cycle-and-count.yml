@@ -1,0 +1,63 @@
+schema: 2
+task: 'task.301.precompact-pause-comment-names-cycle-and-count'
+task_title: 'PreCompact pause comment names the cycle and the pause count'
+gate: CONCERNS
+status_reason: 'All four phases and every success criterion are met and held by committed tests (fast gate 8401 passed). One medium finding: the new Step 1 collision block reads a {start-fresh} placeholder nobody is told to substitute, so Start fresh on a paused lock for this document would HALT.'
+reviewer: 'QA Engineer'
+head: '75a2020fd7d030eef327841feaa2d363de5fd1fb'
+updated: '2026-11-12T07:01:26Z'
+
+top_issues:
+  - id: 'T301-CR-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-1-create-branch.md'
+    finding: 'The Step 1 collision block reads START_FRESH="{start-fresh}" but no document tells the orchestrator to substitute {start-fresh} (Phase 0b only asks the Start fresh question). Run as delivered the value is the literal text, never "yes", so a paused lock for THIS document always HALTs with exit 1 even after the operator chose Start fresh. origin: code-review.'
+    suggested_action: 'State in Phase 0b (and beside the block) that the orchestrator substitutes {start-fresh} with yes or no, and make the block refuse an unsubstituted {doc-directory} or {start-fresh} placeholder instead of reading it as "no".'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 8401
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    boundary_signals: []
+    notes: 'The new Step 1 block is a state guard (it refuses on repository state), read as a boundary. boundary: internal: its decision depends only on the pipeline lock and snapshot the pipeline writes, and the substituted doc-directory is compared for equality, never parsed; no corpus sink models a lock-collision guard. The probe engine was run with the filename corpus anyway (26 candidates, 0 escaped) and read absent, because that corpus expects a printed gate number, not this contract; no result from it is credited. The behaviour is held by the committed step-1-paused-lock test (8 cases, mutation-proven) instead.'
+  performance:
+    status: PASS
+    notes: 'One pause makes exactly 6 gh calls, the same as the unchanged hook; the count is held by a test constant.'
+  reliability:
+    status: PASS
+    notes: 'Bump failure is reported on stderr and the comment omits the count (CR-2 notes a stale count can still show in that rare case).'
+  maintainability:
+    status: PASS
+    notes: 'The cycle comes from the one definition, qa-cycle.sh; pause_counts is documented in the lock-schema table.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T301-CR-1: state who substitutes {start-fresh} and refuse an unsubstituted placeholder.'
+      refs: ['shared/resources/develop-pipeline-step-1-create-branch.md', 'shared/resources/develop-pipeline-step-0-resolve-and-prepare.md']
+  future:
+    - action: 'CR-2 (low, medium confidence, not reproduced): when bump_pause_count fails, PAUSE_COUNT still reads a count left from an earlier pause at the same step; leave it empty when the bump did not land.'
+      refs: ['shared/resources/develop-pipeline-on-precompact.sh']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T301-CR-1 fixed']

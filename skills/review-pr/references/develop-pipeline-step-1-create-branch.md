@@ -24,6 +24,15 @@ LOCK=.claude/state/develop-pipeline.lock
 SNAP=.claude/state/develop-pipeline.last-halt.json
 DOC_DIR="{doc-directory}"
 START_FRESH="{start-fresh}"
+# An unsubstituted placeholder is a HALT, never a quiet "no": read as "no", a Start fresh the
+# operator chose would be refused as a collision, and the run would not say why.
+case "$DOC_DIR" in
+  ""|*"{"*) echo "HALT: {doc-directory} was not substituted into this block (got '$DOC_DIR')"; exit 1 ;;
+esac
+case "$START_FRESH" in
+  yes|no) ;;
+  *) echo "HALT: {start-fresh} must be substituted with yes or no — the answer to Phase 0b's \"Start fresh\" question (got '$START_FRESH')"; exit 1 ;;
+esac
 if [ -f "$LOCK" ]; then
   LOCK_BRANCH=$(jq -r '.branch // ""' "$LOCK" 2>/dev/null)
   LOCK_DIR=$(jq -r '.task_or_story_directory // ""' "$LOCK" 2>/dev/null)
@@ -53,6 +62,8 @@ if [ -f "$LOCK" ]; then
   fi
 fi
 ```
+
+Substitute both placeholders before running it: `{doc-directory}` is this run's task or story directory, and `{start-fresh}` is the answer kept from Phase 0b's previous-run question (`yes` only for "Start fresh"; `no` for a resume or when there was no previous run). The block refuses either one left unsubstituted.
 
 If the block exits 1: **HALT immediately** — show the user its output and do NOT proceed to branch creation. A lock whose `branch` names no existing local branch is stale; the block warns and removes it, and the run proceeds.
 

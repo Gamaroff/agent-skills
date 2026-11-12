@@ -12,7 +12,8 @@ All notable changes to this project will be documented in this file. Format foll
   `paused` record, because every lock writer deletes that record; the cycle is read from the highest
   gate file, since the lock has no cycle field. The Step 1 lock-collision check is now an executable
   block that exits 1 on a collision and prints both the resume and the abandon command for a paused
-  run of another item, and a new test holds it (Start fresh on one document never releases another's
+  run of another item (it also refuses a `{start-fresh}` or `{doc-directory}` left unsubstituted, and
+  Phase 0b now says who fills them), and a new test holds it (Start fresh on one document never releases another's
   lock; the snapshot is removed only when its reason is `precompact`). A new scenario pins the stateful
   `gh` stand-in's counter: replacing `next_n` with `echo 0` now turns the suite red.
 - **`finalise-ci-poll.sh` says why it wrote `UNDECIDED` (observation 166).** A poll started with a

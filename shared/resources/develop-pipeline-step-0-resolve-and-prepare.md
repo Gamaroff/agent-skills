@@ -349,7 +349,7 @@ gh pr list --head "feature/{story-stem}.*" --json number,url,state 2>/dev/null
 find {story-directory} -maxdepth 1 -name "{story-stem}.implementation.*.md" 2>/dev/null
 ```
 
-**If a previous run is detected**: ask "A previous pipeline run exists for this story. What would you like to do?" Options: "Resume from last completed step" (Recommended) / "Start fresh".
+**If a previous run is detected**: ask "A previous pipeline run exists for this story. What would you like to do?" Options: "Resume from last completed step" (Recommended) / "Start fresh". Keep the answer: Step 1's lock-collision block takes it as `{start-fresh}`, `yes` only when "Start fresh" was chosen and `no` otherwise (a resume, or no previous run). The block refuses a value that is not one of the two.
 
 #### develop-task
 
@@ -359,7 +359,7 @@ gh pr list --head "feature/task.{id}.*" --json number,url,state 2>/dev/null
 find {task-directory} -maxdepth 1 -name "task.{id}.implementation.*.md" 2>/dev/null
 ```
 
-**If a previous run is detected**: ask "A previous pipeline run exists for this task. What would you like to do?" Options: "Resume from last completed step" (Recommended) / "Start fresh".
+**If a previous run is detected**: ask "A previous pipeline run exists for this task. What would you like to do?" Options: "Resume from last completed step" (Recommended) / "Start fresh". Keep the answer: Step 1's lock-collision block takes it as `{start-fresh}`, `yes` only when "Start fresh" was chosen and `no` otherwise (a resume, or no previous run). The block refuses a value that is not one of the two.
 
 ### Shared Resume Logic
 

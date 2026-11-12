@@ -130,6 +130,27 @@ Revert the commit and re-run `npm run bundle`. Triggers: a hook that fails to po
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-12
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.301.qa.1.precompact-pause-comment-names-cycle-and-count.md](./task.301.qa.1.precompact-pause-comment-names-cycle-and-count.md)
+- **Gate File**: [task.301.gate.1.precompact-pause-comment-names-cycle-and-count.yml](./task.301.gate.1.precompact-pause-comment-names-cycle-and-count.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 8401
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+One medium finding: the Step 1 collision block reads a `{start-fresh}` placeholder no document tells the orchestrator to substitute (T301-CR-1).
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -140,6 +161,8 @@ Revert the commit and re-run `npm run bundle`. Triggers: a hook that fails to po
 | 2026-11-12 | 1.1     | Review found the count cannot live in `paused` (cleared by every lock writer), the lock has no `qa_cycle`, and the Step 1 HALT is prose; plan corrected (top-level `pause_counts`, cycle from gate files, HALT lifted into a fenced block, lock-schema row, call-count criterion) | review-task |
 | 2026-11-12 |         | Status → ready-for-development | review-task |
 | 2026-11-12 |         | Implemented — 8 source/doc files plus bundled copies, 11 new tests (3 hook scenarios, 8 Step 1 cases) | develop |
+| 2026-11-12 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-11-12 |         | QA findings fixed — 1 finding (Step 1 placeholder guard), 1 iteration | qa-fix |
 
 <!-- change-log-end -->
 

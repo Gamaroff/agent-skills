@@ -194,6 +194,50 @@ test("D: the same document's paused lock without Start fresh still collides", ()
   assert.equal(r.lockKept, true);
 });
 
+test("F: an unsubstituted {start-fresh} is a HALT that names it, even with no lock, and removes nothing", () => {
+  // The placeholder left as delivered. Read as "no" this would refuse a Start fresh the operator
+  // chose without saying why (task.301 QA cycle 1, CR-1).
+  const withLock = run({ lock: paused(MINE), startFresh: "{start-fresh}" });
+  assert.equal(withLock.status, 1, withLock.out);
+  assert.match(
+    withLock.out,
+    /\{start-fresh\} must be substituted/,
+    withLock.out,
+  );
+  assert.equal(withLock.lockKept, true, "a refused input removes nothing");
+  const noLock = run({ startFresh: "{start-fresh}" });
+  assert.equal(noLock.status, 1, noLock.out);
+  assert.match(noLock.out, /\{start-fresh\} must be substituted/, noLock.out);
+});
+
+test("F2: a start-fresh value other than yes or no is refused", () => {
+  for (const v of ["maybe", "YES", ""]) {
+    const r = run({ lock: paused(MINE), startFresh: v });
+    assert.equal(r.status, 1, `value '${v}': ${r.out}`);
+    // The guard's own refusal, not the collision HALT that would also exit 1 here.
+    assert.match(
+      r.out,
+      /must be substituted with yes or no/,
+      `value '${v}': ${r.out}`,
+    );
+    assert.equal(r.lockKept, true, `value '${v}' must remove nothing`);
+  }
+});
+
+test("F3: an unsubstituted {doc-directory} is a HALT that names it", () => {
+  const r = run({ lock: paused(MINE), docDir: "{doc-directory}" });
+  assert.equal(r.status, 1, r.out);
+  assert.match(r.out, /\{doc-directory\} was not substituted/, r.out);
+  assert.equal(r.lockKept, true);
+});
+
+test("F4: a proper yes or no with no lock proceeds (the refusal is not over-broad)", () => {
+  for (const v of ["yes", "no"]) {
+    const r = run({ startFresh: v });
+    assert.equal(r.status, 0, `value '${v}': ${r.out}`);
+  }
+});
+
 test("E: a stale lock (its branch is gone) is removed and the run proceeds", () => {
   const r = run({ lock: paused(OTHER, { branch: "feature/gone" }) });
   assert.equal(r.status, 0, r.out);
