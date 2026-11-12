@@ -117,9 +117,10 @@ merge rebases. **Tick each row `[x]` when its task is accepted, and archive the 
 An **override**: without it the registry fallback selects the lowest-numbered planned task, which is
 T275 or older work, ahead of these. Each task was cut from observations #161 to #165 logged while
 finishing task 295, and each starts with a premise check, because two of the observations were
-partly wrong when read against the code (T297, T300). The four are independent; they edit different
+partly wrong when read against the code (T297, T300). T297 to T300 are independent; they edit different
 skills, but all regenerate bundled copies (`bundles~`), so whichever merges later runs
-`npm run bundle` again. **Tick each row `[x]` when its task is accepted, and archive the phase at
+`npm run bundle` again. T306 is a fifth row, cut from a task.296 finding rather than these
+observations: it runs last (`deps: T300`) because it edits the same engine as T300. **Tick each row `[x]` when its task is accepted, and archive the phase at
 close.**
 
 - [ ] **T297** QA loop fast gate and an earlier structural move · deps: none · touches: pipeline-steps~, qa-skills~, bundles~ · /develop-task docs/tasks/task.297.qa-loop-fast-gate-and-earlier-structural-move/task.297.qa-loop-fast-gate-and-earlier-structural-move.md
