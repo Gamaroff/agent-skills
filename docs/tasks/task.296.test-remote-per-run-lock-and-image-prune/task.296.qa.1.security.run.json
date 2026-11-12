@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "filename",
+      "entry": "shell-argv:scripts/remote-test/lockctl.sh",
+      "name": null,
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 20,
+      "passed": 20,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 4,
+      "declined_cases": [
+        {
+          "id": "rd.dotdot@bash",
+          "reason": "case-errored",
+          "detail": "fixture: name carries a path separator"
+        },
+        {
+          "id": "rd.dotdot@zsh",
+          "reason": "case-errored",
+          "detail": "fixture: name carries a path separator"
+        },
+        {
+          "id": "rd.embedded-dotdot@bash",
+          "reason": "case-errored",
+          "detail": "fixture: name carries a path separator"
+        },
+        {
+          "id": "rd.embedded-dotdot@zsh",
+          "reason": "case-errored",
+          "detail": "fixture: name carries a path separator"
+        }
+      ],
+      "escaped": 0,
+      "shells": [
+        "bash",
+        "zsh"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "release",
+        "{input}",
+        "tok"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "fixture_copy": null,
+      "ran_at": "2026-11-12T15:01:50.967Z"
+    },
+    {
+      "sink": "filename",
+      "entry": "shell-argv:scripts/remote-test/lockctl.sh",
+      "name": null,
+      "call_site": null,
+      "verdict": "unverifiable",
+      "reason": "no-legitimate-evidence",
+      "executed": 18,
+      "passed": 18,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 4,
+      "declined_cases": [
+        {
+          "id": "rd.dotdot@bash",
+          "reason": "case-errored",
+          "detail": "fixture: name carries a path separator"
+        },
+        {
+          "id": "rd.dotdot@zsh",
+          "reason": "case-errored",
+          "detail": "fixture: name carries a path separator"
+        },
+        {
+          "id": "rd.embedded-dotdot@bash",
+          "reason": "case-errored",
+          "detail": "fixture: name carries a path separator"
+        },
+        {
+          "id": "rd.embedded-dotdot@zsh",
+          "reason": "case-errored",
+          "detail": "fixture: name carries a path separator"
+        }
+      ],
+      "escaped": 0,
+      "shells": [
+        "bash",
+        "zsh"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "take",
+        "{input}",
+        "tok",
+        "30",
+        "d"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "fixture_copy": null,
+      "ran_at": "2026-11-12T15:02:36.302Z"
+    }
+  ],
+  "totals": {
+    "executed": 38,
+    "reproduced": 0,
+    "escaped": 0
+  },
+  "updated_at": "2026-11-12T15:02:36.302Z"
+}

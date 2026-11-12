@@ -704,7 +704,10 @@ test("a held lock stops the run before any sync, names the owner, and never rele
   assert.match(r.stderr, /another run holds the lock ~\/agent-skills-test-/);
   assert.match(r.stderr, /otherhost pid 99/);
   assert.match(r.stderr, /10m/);
-  assert.doesNotMatch(r.stderr, /--unlock\b.*Clear it/);
+  // A live lock says wait; only a stale one says "Clear it with". (The pattern this replaced matched
+  // neither message, so it could not fail: T296-QA-1.)
+  assert.match(r.stderr, /Wait for it to finish/);
+  assert.doesNotMatch(r.stderr, /Clear it with/);
   assert.ok(!r.calls.some((c) => c.startsWith("rsync")), "no sync may run");
   assert.ok(!r.calls.some((c) => c.includes("container.sh")), "no container");
   assert.equal(
@@ -1106,6 +1109,33 @@ test("lockctl unlock removes only a stale lock: it judges by the owner's own tim
   assert.match(stale.stdout, /removed the stale lock/);
   assert.ok(!fs.existsSync(c.lockDir));
   assert.equal(c.ctl(["unlock", RD, "5"]).status, 30, "nothing to unlock");
+});
+
+test("lockctl unlock counts the margin: a lock inside timeout plus margin is live, one past it is stale (T296-QA-2)", (t) => {
+  const c = makeCtl(t);
+  const minutesAgo = (m) => nowS() - m * 60;
+  const owner = (m) =>
+    c.writeOwner({
+      start: minutesAgo(m),
+      timeout_min: 30,
+      token: "t",
+      owner: "o",
+    });
+  // Window is 30 + 5 = 35 minutes. Without the margin 34 minutes would already be stale.
+  owner(34);
+  const inside = c.ctl(["unlock", RD, "5"]);
+  assert.equal(inside.status, 32, inside.stdout);
+  assert.match(inside.stdout, /state=live/);
+  assert.ok(fs.existsSync(c.lockDir));
+  // The same age with a smaller margin is stale: the margin is what moved the answer.
+  const noMargin = c.ctl(["unlock", RD, "0"]);
+  assert.equal(noMargin.status, 0, noMargin.stdout);
+  assert.ok(!fs.existsSync(c.lockDir));
+  // One minute past the window is stale.
+  owner(36);
+  const past = c.ctl(["unlock", RD, "5"]);
+  assert.equal(past.status, 0, past.stdout);
+  assert.match(past.stdout, /state=stale/);
 });
 
 test("lockctl never calls a lock stale while a container of the run's name exists, or when the owner or docker is unreadable", (t) => {

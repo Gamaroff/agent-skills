@@ -34,8 +34,8 @@ Run T296 from the roadmap via /develop-next: an atomic per-run lock on the serve
 | 1. create-branch           | ✅ Done | Branch `feature/task.{id}.*` exists in git                             | Branch created at `2173a9e1` | —                    | 2026-11-12T00:00Z |
 | 2. review-task             | ✅ Done | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               | READY TO IMPLEMENT 9/10; 12 Important fixed; status → ready-for-development | —                    | 2026-11-12T14:45Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (plan names every hunk); fast gate green on server: 8428 pass; 7+3+2 mutations red | —                    | 2026-11-12T16:55Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
+| 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #891 (no tracker issue, so no comment) | —                    | 2026-11-12T17:10Z |
+| 5–6. qa-task / qa-fix loop | ⏳ In progress (cycle 1 gate CONCERNS 90; fixing) | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
@@ -63,6 +63,7 @@ Run T296 from the roadmap via /develop-next: an atomic per-run lock on the serve
 _Problems encountered and how they were resolved or escalated._
 
 - **Found by the first live use, invisible offline:** `ssh` joins its arguments and the server's shell splits them again, so the owner description `host pid N` arrived as three words and only the host was recorded. Fixed to one word (`host/pid-N`); a test now anchors the take's argv to five single words and was mutation-proved (old form red).
+- **Live acceptance on ci@192.168.1.249 (2026-11-12, server load 0.22 before, 0.86 after; laptop 0.77 before, 1.10 after):** (1) a lock held with no container: a run exited 1 before any sync, naming `manual/pid-1`; (2) `--unlock` on that live lock exited 32 and removed nothing; (3) owner start forced to 1: a run still refused and named `--unlock`, then `--unlock` exited 0 and removed it; (4) `--prune-images` with a spare tag exited 0, kept the current tag and removed the four others; (5) a lock taken by a real run was released after it (no `*.lock` left), and `ci:fast` ran green under it. A real two-run overlap during the sync window was not reproduced: the second run reached the container layer first. The lock layer was proved by holding the lock directly.
 - Live observation: a second `npm run test:remote` started while the first was in its container phase was refused by the container-name layer (the lock was also held). The lock overlap during the sync window is left to the QA live run.
 
 ---
@@ -71,6 +72,17 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-11-12
+**Gate Result**: CONCERNS
+**Issues Found**: 2 (T296-QA-1: an assertion that cannot fail; T296-QA-2: the staleness margin is held by no test), both tests only
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+
+**Fix cycle 1** (qa-fix): T296-QA-1 — the held-lock case now asserts the live message says "Wait for it to finish" and does not say "Clear it with". T296-QA-2 — a new boundary test (30 minute timeout, margin 5: 34 minutes ago live, the same age with margin 0 stale, 36 minutes ago stale). Tests only; no shipped behaviour changed. Mutation-proven: margin removed, margin doubled, and a live message carrying "Clear it with" each turn exactly the guarding test red; all restored byte-identical. 46/46 pass. Step 2.5 and 2.6 did not apply (first fix cycle, two distinct test defects, no repeat subject). Step 3.5 probes not applicable (no emission, lifecycle, identity or documentation change). Advisory items CR-3 to CR-6 stay in the gate's `recommendations.future`.
+
 ---
 
 ## Completion
@@ -78,7 +90,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: feature/task.296.test-remote-per-run-lock-and-image-prune
-**PR**: {populated after Step 4}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/891
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}

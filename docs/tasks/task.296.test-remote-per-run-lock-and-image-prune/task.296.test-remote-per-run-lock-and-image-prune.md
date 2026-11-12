@@ -212,6 +212,27 @@ None. The route's arguments stay valid. Two options are added (`--unlock`, `--pr
 
 Not required for this task.
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-12
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.296.qa.1.test-remote-per-run-lock-and-image-prune.md](./task.296.qa.1.test-remote-per-run-lock-and-image-prune.md)
+- **Gate File**: [task.296.gate.1.test-remote-per-run-lock-and-image-prune.yml](./task.296.gate.1.test-remote-per-run-lock-and-image-prune.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 45
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+Two tests guard less than they read (an assertion that cannot fail, and the staleness margin held by no test); both reproduced by mutation and sent to the fix loop. Four advisory review items are recorded in the gate.
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -222,6 +243,8 @@ Not required for this task.
 | 2026-11-12 | 1.1     | Review passed (9/10) — 12 Important findings fixed: merged traps, take-then-arm release, one-call take verdict, stale-only `--unlock`, server clock and owner timeout, `--help` range, reap vs `.lock`, prune refuses while locked, option placement, stub arm order, criteria wording | review-task |
 | 2026-11-12 |         | Status → ready-for-development | review-task |
 | 2026-11-12 |         | Implemented: lockctl.sh, lock/unlock/prune in run.sh, 22 offline tests (mutation-proved), docs and CHANGELOG; `ci:fast` green on the server (8428 pass); status → ready-for-review | develop |
+| 2026-11-12 |         | QA gate CONCERNS (90/100) — 2 findings | qa-task |
+| 2026-11-12 |         | QA findings fixed — 2 test fixes (T296-QA-1, T296-QA-2), 1 iteration; ready for QA re-review | qa-fix |
 
 <!-- change-log-end -->
 
