@@ -381,6 +381,67 @@ test("--reap removes a stale directory but skips one with a running container", 
   ]);
 });
 
+test("the exclude list drops a root-level ignored directory and keeps a tracked fixture of the same name deeper down", (t) => {
+  // An unanchored `.claude/state/` in rsync's exclude list matches at ANY depth, so it also dropped
+  // the git-tracked eval fixture evals/**/replay/.claude/state/ from the synced tree, and the
+  // 01-create-branch replay went red on the server only. Behaviour is asserted with the real rsync
+  // (a list-only dry run) against the exclude file the runner wrote, not from the file's text.
+  const { repo, git } = makeRepo(t);
+  const write = (rel, body) => {
+    const p = path.join(repo, rel);
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(p, body);
+  };
+  write(".gitignore", ".claude/state/\n");
+  write("evals/x/replay/.claude/state/lock", "fixture\n");
+  git("add", "-A");
+  git("add", "-f", "evals/x/replay/.claude/state/lock");
+  git("commit", "-q", "-m", "fixture");
+  write(".claude/state/scratch", "ignored\n");
+
+  const stubs = makeStubs(t);
+  const kept = path.join(stubs.dir, "exclude-copy");
+  // The runner deletes its exclude file on exit; the stub keeps a copy of it.
+  fs.writeFileSync(
+    path.join(stubs.dir, "rsync"),
+    `#!/usr/bin/env bash
+printf 'rsync %s\\n' "$*" >>"${stubs.log}"
+for a in "$@"; do case "$a" in --exclude-from=*) cp "\${a#--exclude-from=}" "${kept}" ;; esac; done
+exit 0
+`,
+    { mode: 0o755 },
+  );
+  spawnSync("bash", [path.join(repo, "scripts/remote-test/run.sh")], {
+    cwd: repo,
+    encoding: "utf8",
+    env: { ...baseEnv(), PATH: `${stubs.dir}:${process.env.PATH}` },
+  });
+  assert.ok(fs.existsSync(kept), "the runner must hand rsync an exclude file");
+
+  const real = spawnSync(
+    "rsync",
+    [
+      "-an",
+      "--list-only",
+      `--exclude-from=${kept}`,
+      `${repo}/`,
+      "/nonexistent/",
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(real.status, 0, real.stderr);
+  assert.match(
+    real.stdout,
+    /evals\/x\/replay\/\.claude\/state\/lock/,
+    "the tracked fixture must travel",
+  );
+  assert.doesNotMatch(
+    real.stdout,
+    / \.claude\/state\/scratch/,
+    "the root-level ignored directory must not travel",
+  );
+});
+
 test("a container already holding the run's name stops the run before any sync", (t) => {
   const r = run(t, [], { STUB_CONTAINER: "abc123" });
   assert.equal(r.status, 1);
