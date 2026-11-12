@@ -1139,16 +1139,23 @@ test("a PreCompact pause inside Step 8 looks finished to git but leaves a record
       env: { PIPELINE_LOCK: LOCK },
     });
     assert.equal(r.status, 0, `hook: ${r.stdout}\n${r.stderr}`);
-    // Git cannot tell this from a finished Step 8: the report is committed and pushed.
+    // Git's working tree cannot tell this from a finished Step 8: the report is committed. Since
+    // task.303 the push is held at Step 8 (a pushed pause commit supersedes the head's CI run), so
+    // the commit is one ahead of the upstream, and Step 8's own commit pushes it.
     assert.equal(
       git(fx.work, "status", "--porcelain", "--", WORK_ITEM).trim(),
       "",
       "report left dirty",
     );
-    assert.equal(
+    assert.notEqual(
       git(fx.work, "rev-parse", "HEAD").trim(),
       git(fx.work, "rev-parse", "@{u}").trim(),
-      "hook did not push — the fixture no longer models the case",
+      "hook pushed at Step 8 — the pause commit must be held for Step 8's own commit",
+    );
+    assert.equal(
+      git(fx.work, "rev-list", "--count", "@{u}..HEAD").trim(),
+      "1",
+      "the held pause commit is exactly one commit ahead of the upstream",
     );
     assert.match(
       fs.readFileSync(path.join(fx.work, REPORT), "utf8"),

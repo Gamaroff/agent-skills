@@ -399,8 +399,23 @@ if [ -n "$REPORT" ] && [ -f "$REPORT" ]; then
   if [ "$REPORT_LINT_OK" = true ]; then
     git add "$REPORT" 2>/dev/null || true
     git commit -m "docs(${SKILL}): pipeline paused at step ${CURRENT_STEP} — context compaction imminent" -- "$REPORT" >/dev/null 2>&1 || true
-    DANGLING=$(report_dangling_links)
-    if [ -z "$DANGLING" ]; then
+    # At step 8 the push is held whatever the report links to (task.303). A push makes a new head, a
+    # new head supersedes the previous head's CI run (cancel-in-progress), and a superseded run can
+    # read red to a docs-only walk (a template `ci-ok` aggregator exits 1 on a cancelled job). Every
+    # pause at step 8 did that to the run before it, and the finalise and merge waits then needed a
+    # full CI run instead of the docs-only shortcut. Step 8's own commit carries this one and pushes
+    # once. Held before the dangling-link probe: that probe has nothing left to decide.
+    PUSH_HOLD_REASON=""
+    DANGLING=""
+    if [ "$CURRENT_STEP" = "8" ]; then
+      PUSH_HOLD_REASON=step8
+    else
+      DANGLING=$(report_dangling_links)
+    fi
+    if [ "$PUSH_HOLD_REASON" = step8 ]; then
+      PUSH_HELD=true
+      echo "on-precompact: pause commit NOT pushed — at Step 8 a push would supersede the head's CI run; Step 8's own commit carries it" >&2
+    elif [ -z "$DANGLING" ]; then
       git push origin HEAD >/dev/null 2>&1 || true
     else
       PUSH_HELD=true
@@ -566,6 +581,9 @@ REPORT_LINT_SUMMARY=", committed the report, and pushed to remote"
 if [ "${REPORT_LINT_OK:-true}" != true ]; then
   REPORT_LINT_NOTE=" but NOT committed — the report FAILED report-lint.js; repair it by hand, then commit"
   REPORT_LINT_SUMMARY=" (report NOT committed: it failed report-lint.js — repair by hand)"
+elif [ "${PUSH_HELD:-false}" = true ] && [ "${PUSH_HOLD_REASON:-}" = step8 ]; then
+  REPORT_LINT_NOTE=", committed, but NOT pushed — at Step 8 a push would supersede the head's CI run; Step 8's own commit carries it and pushes once"
+  REPORT_LINT_SUMMARY=", and committed the report (not pushed: at Step 8 Step 8's own commit pushes it)"
 elif [ "${PUSH_HELD:-false}" = true ]; then
   HELD_LIST=$(printf '%s' "$DANGLING" | sed 's/.*/`&`/' | paste -sd ',' - | sed 's/,/, /g')
   REPORT_LINT_NOTE=", committed, but NOT pushed — it links to ${HELD_LIST}, which are staged but not in this commit (the 5c carry); the commit that carries them pushes both"

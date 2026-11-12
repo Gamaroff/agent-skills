@@ -714,7 +714,7 @@ run_precompact_in_repo() { # $1 = dir, $2 = report body file, $3 = optional sibl
     printf 'staged by 5c\n' > "$dir/$3"
     ( cd "$dir" && git add -- "$3" ) >/dev/null 2>&1
   fi
-  printf '{"skill":"develop-task","current_step":5,"branch":"feature/x","report_path":"%s","task_or_story_directory":"docs/tasks/task.42.x","pr_url":"","tracker":"","tracker_issue":""}\n' "$rp" \
+  printf '{"skill":"develop-task","current_step":%s,"branch":"feature/x","report_path":"%s","task_or_story_directory":"docs/tasks/task.42.x","pr_url":"","tracker":"","tracker_issue":""}\n' "${HOOK_TEST_STEP:-5}" "$rp" \
     > "$dir/.claude/state/develop-pipeline.lock"
   (cd "$dir" && PATH="$SHIM_BIN:$PATH" GH_LOG="$dir/gh.log" GH_STDIN_DIR="$dir/stdin" \
      PIPELINE_LOCK="$dir/.claude/state/develop-pipeline.lock" \
@@ -803,6 +803,33 @@ if [ "$(cd "$S17C" && git rev-list --count HEAD)" = "2" ] \
   pass "control: a report whose links are all in the commit is committed AND pushed"
 else
   fail "control: links all carried → pushed" "commits=$(cd "$S17C" && git rev-list --count HEAD) local=$(cd "$S17C" && git rev-parse HEAD) origin=$(origin_tip "$S17C") stderr=$(head -3 "$S17C/stderr.log")"
+fi
+
+# 17f (task.303): at step 8 the pause commit is held even when every link is carried. A push at
+# step 8 supersedes the head's CI run, and a superseded run can read red to the docs-only walk, so
+# the finalise and merge waits needed full CI. 17g is the control: the same report at step 7 is
+# pushed, so 17f's hold is the step-8 rule and not a broken remote.
+S17F="$TMPDIR_TEST/s17f"
+OUT=$(HOOK_TEST_REMOTE=1 HOOK_TEST_STEP=8 run_precompact_in_repo "$S17F" "$SELF_LINKED")
+S17F_LOCAL=$(cd "$S17F" && git rev-parse HEAD)
+S17F_REMOTE=$(origin_tip "$S17F")
+if [ "$(cd "$S17F" && git rev-list --count HEAD)" != "2" ]; then
+  fail "step 8: the pause is still committed locally" "commits=$(cd "$S17F" && git rev-list --count HEAD) stderr=$(head -3 "$S17F/stderr.log")"
+elif [ -z "$S17F_REMOTE" ] || [ "$S17F_LOCAL" = "$S17F_REMOTE" ]; then
+  fail "step 8: the pause commit is NOT pushed" "local=$S17F_LOCAL upstream=${S17F_REMOTE:-none}"
+elif ! grep -qF 'NOT pushed' <<<"$OUT" || ! grep -qF "Step 8" <<<"$OUT" || ! grep -qF 'NOT pushed' "$S17F/stderr.log"; then
+  fail "step 8: signal and stderr say the push was held and name step 8" "signal=$(echo "$OUT" | grep -o 'Implementation report appended[^\\]*' | head -1)"
+else
+  pass "step 8: pause committed locally, NOT pushed, even with every link carried; signal and stderr name step 8"
+fi
+S17G="$TMPDIR_TEST/s17g"
+OUT=$(HOOK_TEST_REMOTE=1 HOOK_TEST_STEP=7 run_precompact_in_repo "$S17G" "$SELF_LINKED")
+if [ "$(cd "$S17G" && git rev-list --count HEAD)" = "2" ] \
+   && [ "$(cd "$S17G" && git rev-parse HEAD)" = "$(origin_tip "$S17G")" ] \
+   && ! grep -qF 'NOT pushed' <<<"$OUT"; then
+  pass "control: the same report at step 7 is committed AND pushed"
+else
+  fail "control: step 7 → pushed" "commits=$(cd "$S17G" && git rev-list --count HEAD) local=$(cd "$S17G" && git rev-parse HEAD) origin=$(origin_tip "$S17G") stderr=$(head -3 "$S17G/stderr.log")"
 fi
 
 # 17e: a link whose target is in neither HEAD nor the index — quoted inside inline code,
