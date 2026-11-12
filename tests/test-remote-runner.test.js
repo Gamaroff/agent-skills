@@ -545,3 +545,135 @@ test("the sync deletes stale files and never uses --files-from", (t) => {
   );
   assert.match(sync, /--exclude=node_modules\//);
 });
+
+/**
+ * A linked worktree beside its main checkout, the main checkout one commit ahead, so the common
+ * git directory's HEAD and the worktree's HEAD name different commits. Both are removed with the
+ * test, and the worktree's administrative entry goes with the repository that owns it.
+ */
+function makeLinkedWorktree(t) {
+  const { repo, git } = makeRepo(t);
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), "remote-runner-wt-"));
+  t.after(() => fs.rmSync(parent, { recursive: true, force: true }));
+  const wt = path.join(parent, "wt");
+  const first = git("rev-parse", "HEAD").stdout.trim();
+  git("commit", "-q", "--allow-empty", "-m", "main moves on");
+  const added = git("worktree", "add", "-q", "--detach", wt, first);
+  assert.equal(added.status, 0, added.stderr);
+  assert.ok(
+    fs.statSync(path.join(wt, ".git")).isFile(),
+    "fixture: .git is a file",
+  );
+  return { repo, wt, first, second: git("rev-parse", "HEAD").stdout.trim() };
+}
+
+/**
+ * ssh stays a stub; rsync is the real one with a "remote" directory standing in for the server's
+ * home, so what the runner syncs can be read back from disk instead of inferred from argv.
+ */
+function makeRealRsyncStubs(t) {
+  const stubs = makeStubs(t);
+  const remote = path.join(stubs.dir, "remote-home");
+  fs.mkdirSync(remote);
+  const realRsync = spawnSync("sh", ["-c", "command -v rsync"], {
+    encoding: "utf8",
+  }).stdout.trim();
+  assert.ok(realRsync, "the real rsync is needed to read the sync back");
+  fs.writeFileSync(
+    path.join(stubs.dir, "rsync"),
+    `#!/usr/bin/env bash
+printf 'rsync %s\\n' "$*" >>"${stubs.log}"
+args=("$@")
+last=$((\${#args[@]} - 1))
+dest="\${args[$last]}"
+local="${remote}/\${dest#*:}"
+mkdir -p "$local"
+args[$last]="$local"
+exec "${realRsync}" "\${args[@]}"
+`,
+    { mode: 0o755 },
+  );
+  return { ...stubs, remote };
+}
+
+test("from a linked worktree the server gets the common git dir with this worktree's HEAD and index", (t) => {
+  const { wt, first, second } = makeLinkedWorktree(t);
+  assert.notEqual(first, second, "fixture: the two HEADs must differ");
+  const stubs = makeRealRsyncStubs(t);
+  const res = spawnSync("bash", [path.join(wt, "scripts/remote-test/run.sh")], {
+    cwd: wt,
+    encoding: "utf8",
+    timeout: budget.timeoutMs,
+    env: { ...baseEnv(), PATH: `${stubs.dir}:${process.env.PATH}` },
+  });
+  assert.equal(
+    res.status,
+    0,
+    `status ${res.status}: ${res.stderr}${res.stdout}`,
+  );
+  assert.doesNotMatch(
+    res.stdout,
+    /is not a directory/,
+    "the old warning-then-fail path must not run",
+  );
+  const runDirs = fs
+    .readdirSync(stubs.remote)
+    .filter((d) => d.startsWith("agent-skills-test-"));
+  assert.equal(runDirs.length, 1, `one run directory expected: ${runDirs}`);
+  const gitDir = path.join(stubs.remote, runDirs[0], ".git");
+  assert.ok(
+    fs.statSync(gitDir).isDirectory(),
+    ".git on the server is a directory",
+  );
+  assert.ok(
+    fs.existsSync(path.join(gitDir, "objects")),
+    "the common directory's objects travel",
+  );
+  assert.equal(
+    fs.readFileSync(path.join(gitDir, "HEAD"), "utf8").trim(),
+    first,
+    "the server's HEAD is the worktree's, not the main checkout's",
+  );
+  assert.ok(
+    fs.existsSync(path.join(gitDir, "index")),
+    "the worktree's index travels",
+  );
+  assert.ok(
+    !fs.existsSync(path.join(gitDir, "worktrees")),
+    "other worktrees' administrative state must not travel",
+  );
+  // The synced directory is a working repository at the worktree's commit, as the container sees it.
+  const head = spawnSync(
+    "git",
+    ["-C", path.join(stubs.remote, runDirs[0]), "rev-parse", "HEAD"],
+    {
+      encoding: "utf8",
+    },
+  );
+  assert.equal(head.stdout.trim(), first, head.stderr);
+});
+
+test("a normal checkout still syncs its own .git directory, exactly as before", (t) => {
+  const { repo } = makeRepo(t);
+  const stubs = makeStubs(t);
+  const res = spawnSync(
+    "bash",
+    [path.join(repo, "scripts/remote-test/run.sh")],
+    {
+      cwd: repo,
+      encoding: "utf8",
+      timeout: budget.timeoutMs,
+      env: { ...baseEnv(), PATH: `${stubs.dir}:${process.env.PATH}` },
+    },
+  );
+  assert.equal(res.status, 0, res.stderr);
+  const calls = fs.readFileSync(stubs.log, "utf8").split("\n").filter(Boolean);
+  const gitSyncs = calls.filter((c) => /\/\.git\/ \S+:\S+\/\.git\/$/.test(c));
+  assert.equal(
+    gitSyncs.length,
+    1,
+    `one .git sync expected: ${calls.join(" | ")}`,
+  );
+  assert.match(gitSyncs[0], /^rsync -a --delete \S+\/\.git\/ /);
+  assert.doesNotMatch(res.stdout, /linked worktree/);
+});
