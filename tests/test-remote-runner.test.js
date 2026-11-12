@@ -73,12 +73,22 @@ exit 0
   return { dir, log };
 }
 
+/**
+ * The environment a runner spawn starts from: this process's, without TEST_LOCAL. The runner reads
+ * TEST_LOCAL to skip ssh, so a TEST_LOCAL=1 npm run test:remote leaked it into every spawn below
+ * and failed the tests that expect the ssh path (14 of 19). A test that wants it passes it in `env`.
+ */
+function baseEnv() {
+  const { TEST_LOCAL: _dropped, ...rest } = process.env;
+  return rest;
+}
+
 function run(t, args, env = {}) {
   const stubs = makeStubs(t);
   const res = spawnSync("bash", [RUNNER, ...args], {
     cwd: REPO_ROOT,
     encoding: "utf8",
-    env: { ...process.env, PATH: `${stubs.dir}:${process.env.PATH}`, ...env },
+    env: { ...baseEnv(), PATH: `${stubs.dir}:${process.env.PATH}`, ...env },
   });
   const calls = fs.readFileSync(stubs.log, "utf8").split("\n").filter(Boolean);
   return { ...res, calls, stubDir: stubs.dir };
@@ -122,7 +132,7 @@ function runName(t, repo, env = {}) {
     {
       cwd: repo,
       encoding: "utf8",
-      env: { ...process.env, PATH: `${stubs.dir}:${process.env.PATH}`, ...env },
+      env: { ...baseEnv(), PATH: `${stubs.dir}:${process.env.PATH}`, ...env },
     },
   );
   const calls = fs.readFileSync(stubs.log, "utf8").split("\n").filter(Boolean);
@@ -169,7 +179,7 @@ test("--host and --timeout-min with no value exit 2 instead of hanging", (t) => 
       cwd: REPO_ROOT,
       encoding: "utf8",
       timeout: budget.timeoutMs,
-      env: { ...process.env, PATH: `${stubs.dir}:${process.env.PATH}` },
+      env: { ...baseEnv(), PATH: `${stubs.dir}:${process.env.PATH}` },
     });
     assert.equal(
       r.status,
@@ -197,6 +207,29 @@ test("an unreachable server fails loudly, names TEST_LOCAL=1 and does not run lo
     r.calls.filter((c) => c.startsWith("rsync")).length,
     0,
     "no sync after a failed probe",
+  );
+});
+
+test("a TEST_LOCAL set in the caller's environment does not reach the runner", (t) => {
+  // npm run test:remote with TEST_LOCAL=1 put it in this process's env; a spawn that copied
+  // process.env then ran the local path and skipped ssh. Set it here so a plain run proves it.
+  const had = Object.prototype.hasOwnProperty.call(process.env, "TEST_LOCAL");
+  const prior = process.env.TEST_LOCAL;
+  process.env.TEST_LOCAL = "1";
+  t.after(() => {
+    if (had) process.env.TEST_LOCAL = prior;
+    else delete process.env.TEST_LOCAL;
+  });
+  const r = run(t, ["--run", "a"]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(
+    r.calls.filter((c) => c.startsWith("npm ")).length,
+    0,
+    "TEST_LOCAL leaked from the caller: the runner took the local path",
+  );
+  assert.ok(
+    r.calls.some((c) => c.startsWith("ssh")),
+    "the runner must take the ssh path",
   );
 });
 
