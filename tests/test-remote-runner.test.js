@@ -780,10 +780,18 @@ test("the take carries the run's own timeout, and every argument is one word", (
   const r = run(t, ["--timeout-min", "8"]);
   // ssh joins its arguments with spaces and the server's shell splits them again, so an argument
   // with a space in it (the owner description) arrives as several and shifts the ones after it.
-  // The anchored pattern is exactly: take RUN_DIR TOKEN TIMEOUT OWNER, five words and nothing else.
+  // The anchored pattern is exactly: take RUN_DIR TOKEN TIMEOUT OWNER MARGIN, six words and nothing else.
   assert.match(
     r.calls.find((c) => c.includes("bash -s -- take ")),
-    /-- take agent-skills-test-\S+ \S+ 8 \S+$/,
+    /-- take agent-skills-test-\S+ \S+ 8 \S+ 10$/,
+  );
+  // The margin is the configured one, not a default the server picks (T296-QA-3).
+  const m = run(t, ["--timeout-min", "8"], {
+    TEST_REMOTE_LOCK_MARGIN_MIN: "3",
+  });
+  assert.match(
+    m.calls.find((c) => c.includes("bash -s -- take ")),
+    /-- take agent-skills-test-\S+ \S+ 8 \S+ 3$/,
   );
 });
 
@@ -1136,6 +1144,30 @@ test("lockctl unlock counts the margin: a lock inside timeout plus margin is liv
   const past = c.ctl(["unlock", RD, "5"]);
   assert.equal(past.status, 0, past.stdout);
   assert.match(past.stdout, /state=stale/);
+});
+
+test("lockctl take on a held lock judges staleness by the margin it is given, as unlock does (T296-QA-3)", (t) => {
+  const c = makeCtl(t);
+  // Timeout 30, started 36 minutes ago: live at the default margin of 10 (40m window), stale at 0.
+  c.writeOwner({
+    start: nowS() - 36 * 60,
+    timeout_min: 30,
+    token: "t",
+    owner: "o",
+  });
+  const dflt = c.ctl(["take", RD, "tok", "30", "me"]);
+  assert.equal(dflt.status, 10, dflt.stdout);
+  assert.match(dflt.stdout, /state=live/);
+  const zero = c.ctl(["take", RD, "tok", "30", "me", "0"]);
+  assert.equal(zero.status, 10, zero.stdout);
+  assert.match(zero.stdout, /state=stale/);
+  // The same margin, the same answer from unlock.
+  assert.equal(c.ctl(["unlock", RD, "0"]).status, 0);
+  assert.ok(!fs.existsSync(c.lockDir));
+  // A margin that is not a whole number is refused before anything is written.
+  const bad = c.ctl(["take", RD, "tok", "30", "me", "1;x"]);
+  assert.equal(bad.status, 2, bad.stdout + bad.stderr);
+  assert.ok(!fs.existsSync(c.lockDir));
 });
 
 test("lockctl never calls a lock stale while a container of the run's name exists, or when the owner or docker is unreadable", (t) => {

@@ -1,0 +1,86 @@
+schema: 2
+task: 'task.296.test-remote-per-run-lock-and-image-prune'
+task_title: 'test:remote per-run lock and image-tag prune'
+gate: CONCERNS
+status_reason: 'Cycle 1 findings fixed and re-proved by mutation. The refute pass found one real defect: take ignores TEST_REMOTE_LOCK_MARGIN_MIN, so a refused run reports a different lock state than --unlock. CI link-check is red on the head: a bare host-at-address string in the implementation report autolinks as a mailto.'
+reviewer: 'QA Engineer'
+head: '2c9fe694f76cd204fe459779cecf3e20740253c8'
+updated: '2026-11-12T17:01:06Z'
+
+top_issues:
+  - id: 'T296-QA-3'
+    severity: medium
+    file: 'scripts/remote-test/run.sh'
+    finding: 'The take call (run.sh line 258) does not pass the margin, so lockctl.sh describe falls back to its own default of 10 (lockctl.sh line 72) while --unlock does pass it. Reproduced against the real lockctl.sh: owner timeout 30, started 36 minutes ago, margin 0: take on the held lock prints state=live, unlock with margin 0 prints state=stale and removes it. Control: both agree at the default margin of 10, so the defect appears only when TEST_REMOTE_LOCK_MARGIN_MIN is set. The held message then names the wrong state and the wrong next step. origin: code-review, reproduced by QA (reviewer rated it low severity, medium confidence; QA rates it medium because a documented setting is ignored by one of its two consumers).'
+    suggested_action: 'Pass LOCK_MARGIN_MIN to take as a sixth word (or in the remote command), read it in lockctl.sh take, and add a test: a held take with a non-default margin reports the state that margin gives. Update the anchored argv test in step.'
+    suggested_owner: dev
+    status: open
+  - id: 'T296-QA-4'
+    severity: medium
+    file: 'docs/tasks/task.296.test-remote-per-run-lock-and-image-prune/task.296.implementation.1.test-remote-per-run-lock-and-image-prune-initial-run.md'
+    finding: 'CI check link-check failed on 2c9fe694f76c (run 43264563618): the Issues Log line "Live acceptance on" followed by the host-at-address string autolinks as mailto:ci@192.168.1.249 and returns status 400. link-check is green on develop (run 43234081388), so the red is this branch''s.'
+    suggested_action: 'Put the host-at-address string in backticks in the implementation report (and check the QA reports for the same shape), then confirm link-check green on the next head.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 46
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 38
+    escaped: 0
+    boundary: true
+    boundary_signals: ['never']
+    notes: 'The probe record is cycle 1 (task.296.qa.1.security.run.json, 38 probes, 0 escaped). scripts/remote-test/lockctl.sh is byte-identical between the cycle-1 head fd8fbccd9459 and this head (git diff empty), so the record still describes the code. Not re-run this cycle.'
+  performance:
+    status: PASS
+    notes: 'One extra ssh round trip per run, unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'T296-QA-3: the held-lock state ignores the configured margin. Advisory CR-3 to CR-6 from cycle 1 stand.'
+  maintainability:
+    status: PASS
+    notes: 'One server-side file, shellcheck clean, documented.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T296-QA-3 and T296-QA-4.'
+      refs: ['scripts/remote-test/run.sh', 'scripts/remote-test/lockctl.sh', 'tests/test-remote-runner.test.js']
+  future:
+    - action: 'Prune could ignore locks lockctl reports stale, or name the lock to clear; and check the exit status of find. (CR-3, cycle 1, not reproduced)'
+      refs: ['scripts/remote-test/lockctl.sh']
+    - action: 'Arm the INT and TERM trap before the take, since release is token-checked. (CR-6, cycle 1, low confidence)'
+      refs: ['scripts/remote-test/run.sh']
+    - action: 'Unlock and release re-check ownership after the stale test and before rm. (CR-4, cycle 1, low)'
+      refs: ['scripts/remote-test/lockctl.sh']
+    - action: 'Prune counts only running containers as in use; a stopped container refusing docker rmi reads as a failed prune (exit 42). (CR-5, cycle 1, low)'
+      refs: ['scripts/remote-test/lockctl.sh']
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-11-12'
+  total_iterations: 1
+  verification_method: 'Both cycle 1 findings (T296-QA-1, T296-QA-2) re-proved by mutation this cycle: margin removed turns the T296-QA-2 test red, a live message saying Clear it with turns the held-lock test red; both restored byte-identical.'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T296-QA-3 and T296-QA-4 fixed']

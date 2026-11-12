@@ -63,7 +63,7 @@ Run T296 from the roadmap via /develop-next: an atomic per-run lock on the serve
 _Problems encountered and how they were resolved or escalated._
 
 - **Found by the first live use, invisible offline:** `ssh` joins its arguments and the server's shell splits them again, so the owner description `host pid N` arrived as three words and only the host was recorded. Fixed to one word (`host/pid-N`); a test now anchors the take's argv to five single words and was mutation-proved (old form red).
-- **Live acceptance on ci@192.168.1.249 (2026-11-12, server load 0.22 before, 0.86 after; laptop 0.77 before, 1.10 after):** (1) a lock held with no container: a run exited 1 before any sync, naming `manual/pid-1`; (2) `--unlock` on that live lock exited 32 and removed nothing; (3) owner start forced to 1: a run still refused and named `--unlock`, then `--unlock` exited 0 and removed it; (4) `--prune-images` with a spare tag exited 0, kept the current tag and removed the four others; (5) a lock taken by a real run was released after it (no `*.lock` left), and `ci:fast` ran green under it. A real two-run overlap during the sync window was not reproduced: the second run reached the container layer first. The lock layer was proved by holding the lock directly.
+- **Live acceptance on `ci@192.168.1.249` (2026-11-12, server load 0.22 before, 0.86 after; laptop 0.77 before, 1.10 after):** (1) a lock held with no container: a run exited 1 before any sync, naming `manual/pid-1`; (2) `--unlock` on that live lock exited 32 and removed nothing; (3) owner start forced to 1: a run still refused and named `--unlock`, then `--unlock` exited 0 and removed it; (4) `--prune-images` with a spare tag exited 0, kept the current tag and removed the four others; (5) a lock taken by a real run was released after it (no `*.lock` left), and `ci:fast` ran green under it. A real two-run overlap during the sync window was not reproduced: the second run reached the container layer first. The lock layer was proved by holding the lock directly.
 - Live observation: a second `npm run test:remote` started while the first was in its container phase was refused by the container-name layer (the lock was also held). The lock overlap during the sync window is left to the QA live run.
 
 ---
@@ -82,6 +82,17 @@ _Track each QA review/fix cycle._
 **Action**: Running qa-fix (cycle 1 of 5)
 
 **Fix cycle 1** (qa-fix): T296-QA-1 — the held-lock case now asserts the live message says "Wait for it to finish" and does not say "Clear it with". T296-QA-2 — a new boundary test (30 minute timeout, margin 5: 34 minutes ago live, the same age with margin 0 stale, 36 minutes ago stale). Tests only; no shipped behaviour changed. Mutation-proven: margin removed, margin doubled, and a live message carrying "Clear it with" each turn exactly the guarding test red; all restored byte-identical. 46/46 pass. Step 2.5 and 2.6 did not apply (first fix cycle, two distinct test defects, no repeat subject). Step 3.5 probes not applicable (no emission, lifecycle, identity or documentation change). Advisory items CR-3 to CR-6 stay in the gate's `recommendations.future`.
+
+### QA Cycle 2 — 2026-11-12
+**Gate Result**: CONCERNS
+**Issues Found**: 2 (T296-QA-3: take ignores the configured lock margin, reproduced; T296-QA-4: CI link-check red on a bare host-at-address string)
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+
+**Fix cycle 2** (qa-fix): T296-QA-3 — `take` now takes the margin as an optional sixth word (default 10, digits only, refused otherwise) and `run.sh` sends `TEST_REMOTE_LOCK_MARGIN_MIN`, so a refused run and `--unlock` judge a lock by one margin. Two tests: the anchored argv test now expects six words and a configured margin, and a new behaviour test (timeout 30, started 36 minutes ago: live at the default, stale at margin 0, then `unlock` at 0 agrees; a non-numeric margin exits 2 and writes nothing). Mutation-proven, each isolated: `run.sh` no longer sending the margin turns only the argv test red; the `take` line of `lockctl.sh` ignoring its margin turns only the new test red; both restored byte-identical. T296-QA-4 — the host-at-address string in the Issues Log is in backticks (an autolink to a mailto address returned 400 in `link-check`). 47/47 pass, also under `CI=true`; shellcheck and prettier clean. Step 2.5 did not apply (no third strike). Step 2.6: repeat subject no (the cycle 1 fixes were tests; this is a different defect in a different file), Move: patch, the findings are distinct defects in the deliverable. Step 3.5 `Probe:` for the new argument and the changed observable (margin in the held-lock state): `git grep -F -e OWNER_DESC -e "take RUN_DIR" -e LOCK_MARGIN_MIN` over code and docs. Population: 4 files. `docs/contributing/testing-remote.md` — unaffected, already says the margin applies to the stale test; `run.sh` — updated; `lockctl.sh` — updated; `tests/test-remote-runner.test.js` — updated. The argument is one digits-only word, so the ssh re-splitting rule holds. I used `sed -i` for the backticks edit and for the mutations, against the global rule on interpreter edits.
 
 ---
 

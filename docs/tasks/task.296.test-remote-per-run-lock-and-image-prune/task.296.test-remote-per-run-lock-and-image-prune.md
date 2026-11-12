@@ -221,17 +221,17 @@ Not required for this task.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.296.qa.1.test-remote-per-run-lock-and-image-prune.md](./task.296.qa.1.test-remote-per-run-lock-and-image-prune.md)
-- **Gate File**: [task.296.gate.1.test-remote-per-run-lock-and-image-prune.yml](./task.296.gate.1.test-remote-per-run-lock-and-image-prune.yml)
+- **Full Report**: [task.296.qa.2.test-remote-per-run-lock-and-image-prune.md](./task.296.qa.2.test-remote-per-run-lock-and-image-prune.md)
+- **Gate File**: [task.296.gate.2.test-remote-per-run-lock-and-image-prune.yml](./task.296.gate.2.test-remote-per-run-lock-and-image-prune.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 45
+- **Tests Executed**: 46
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Two tests guard less than they read (an assertion that cannot fail, and the staleness margin held by no test); both reproduced by mutation and sent to the fix loop. Four advisory review items are recorded in the gate.
+Cycle 1's two test findings are fixed and re-proved by mutation. Cycle 2 found that `take` ignores the configured lock margin (reproduced against the real script) and that CI `link-check` is red on a bare host-at-address string in the implementation report. Both go to the fix loop.
 
 ## Change Log
 
@@ -245,6 +245,8 @@ Two tests guard less than they read (an assertion that cannot fail, and the stal
 | 2026-11-12 |         | Implemented: lockctl.sh, lock/unlock/prune in run.sh, 22 offline tests (mutation-proved), docs and CHANGELOG; `ci:fast` green on the server (8428 pass); status → ready-for-review | develop |
 | 2026-11-12 |         | QA gate CONCERNS (90/100) — 2 findings | qa-task |
 | 2026-11-12 |         | QA findings fixed — 2 test fixes (T296-QA-1, T296-QA-2), 1 iteration; ready for QA re-review | qa-fix |
+| 2026-11-12 |         | QA gate CONCERNS (90/100) — 2 findings | qa-task |
+| 2026-11-12 |         | QA findings fixed — take now honours the configured lock margin (T296-QA-3), report link fixed (T296-QA-4), 1 iteration; ready for QA re-review | qa-fix |
 
 <!-- change-log-end -->
 

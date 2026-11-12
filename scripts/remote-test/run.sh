@@ -255,7 +255,7 @@ cleanup() {
 
 # Every argument is one word: ssh joins its arguments with spaces and the server's shell splits them
 # again, so a space in the owner description would shift the arguments after it.
-LOCK_OUT=$(ssh -o BatchMode=yes "$HOST" bash -s -- take "$RUN_DIR" "$LOCK_TOKEN" "$TIMEOUT_MIN" "$(hostname -s 2>/dev/null | tr -c 'A-Za-z0-9._-' '-')/pid-$$" <"$LOCKCTL")
+LOCK_OUT=$(ssh -o BatchMode=yes "$HOST" bash -s -- take "$RUN_DIR" "$LOCK_TOKEN" "$TIMEOUT_MIN" "$(hostname -s 2>/dev/null | tr -c 'A-Za-z0-9._-' '-')/pid-$$" "$LOCK_MARGIN_MIN" <"$LOCKCTL")
 LOCK_STATUS=$?
 case "$LOCK_STATUS" in
   0) ;;

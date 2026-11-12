@@ -3,7 +3,7 @@
 # never installed there. One file, so the staleness rule exists once and is testable here with a
 # fake `docker` on PATH.
 #
-#   take    RUN_DIR TOKEN TIMEOUT_MIN OWNER_DESC   mkdir the run directory and its lock, write the owner file
+#   take    RUN_DIR TOKEN TIMEOUT_MIN OWNER_DESC [MARGIN_MIN]   mkdir the run directory and its lock, write the owner file
 #   release RUN_DIR TOKEN                          remove the lock, only if the owner file holds TOKEN
 #   unlock  RUN_DIR MARGIN_MIN                     remove the lock, only if it is stale
 #   prune   CURRENT_IMAGE                          remove old agent-skills-test image tags by explicit name
@@ -56,9 +56,10 @@ valid_run_dir() { [[ "$1" =~ ^agent-skills-test-[a-z0-9-]+$ ]]; }
 
 case "$op" in
   take)
-    run_dir=${2:-}; token=${3:-}; tmo=${4:-}; desc=${5:-}
+    run_dir=${2:-}; token=${3:-}; tmo=${4:-}; desc=${5:-}; margin=${6:-10}
     valid_run_dir "$run_dir" || { echo "bad run directory name '$run_dir'" >&2; exit 2; }
     [[ "$tmo" =~ ^[0-9]+$ ]] || { echo "bad timeout '$tmo'" >&2; exit 2; }
+    [[ "$margin" =~ ^[0-9]+$ ]] || { echo "bad margin '$margin'" >&2; exit 2; }
     mkdir -p "$HOME/$run_dir" || exit 12
     d=$(lock_dir "$run_dir")
     if mkdir "$d" 2>/dev/null; then
@@ -69,7 +70,7 @@ case "$op" in
       exit 0
     fi
     [ -d "$d" ] || exit 12
-    describe "$run_dir" "${LOCK_MARGIN_MIN:-10}"
+    describe "$run_dir" "$margin"
     exit 10
     ;;
   release)
