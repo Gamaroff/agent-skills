@@ -3,7 +3,7 @@
 **Task**: `task.296.test-remote-per-run-lock-and-image-prune.md`
 **Run Number**: 1
 **Started**: 2026-11-12 00:00
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -36,8 +36,8 @@ Run T296 from the roadmap via /develop-next: an atomic per-run lock on the serve
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline (plan names every hunk); fast gate green on server: 8428 pass; 7+3+2 mutations red | —                    | 2026-11-12T16:55Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #891 (no tracker issue, so no comment) | —                    | 2026-11-12T17:10Z |
 | 5–6. qa-task / qa-fix loop | ✅ Done (5 gates, cycle 5 PASS 96; Step 5c APPROVE) | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 7. finalise                | ✅ Done | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      | DoD 10/10, security PASS (28 probes, 0 reproduced), docs PASS; registry ticked; acceptance commit `301272f7` | —                    | 2026-11-12T19:23Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Final report commit and push | —                    | 2026-11-12T19:25Z |
 
 ---
 
@@ -129,12 +129,23 @@ Cycle 5 is the last gate in the budget. The change since gate 4 was documentatio
 
 ---
 
+## Step 7 Record — finalise (2026-11-12)
+
+- **CI reading 1:** SUCCESS @ `6bee71806f38` over 5 checks. It first read PENDING (`test` still running), so the decision waited for the lane to finish.
+- **CI reading 2:** SUCCESS (tree-equivalent to `9d49c58e0936`) @ `301272f75566`, the acceptance head. The head's own 5 of 5 checks then completed SUCCESS.
+- **Security probe, two runs:** the first run read 2 "reproduced" and 2 "escaped" from the plan's two legitimate `take` cases, which mutate state in a shared bash-then-zsh sandbox (the zsh run saw the bash run's lock as held; a `take` lock under the sandbox `HOME` counts as a write). A fresh `HOME` under zsh takes the lock (exit 0), so the code was right and the plan was wrong. Both `take` entries were made hostile-only with `jq` and re-run: 28 executed, 0 reproduced, 0 escaped. This was my correction of a plan shape, not an independent re-grade. The first plan and result are in the session scratchpad.
+- **Independence:** review-task, the loop audit and QA cycles 2 to 5 were read or run inline; the Step 5c lens was shallow. See the Decisions Log and QA Iteration History.
+- Advisory CR-3 to CR-6 stay unfixed in the gate's `recommendations.future`.
+- No tracker issue is linked, so there was no tracker comment, close or board move.
+
+---
+
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-11-12T19:25Z
+**Final Status**: Completed (accepted; merge is `/develop-next` Step 3)
 **Branch**: feature/task.296.test-remote-per-run-lock-and-image-prune
 **PR**: https://github.com/Gamaroff/agent-skills/pull/891
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**QA Iterations**: 5 gates (4 fix cycles); final gate PASS 96/100; Step 5c APPROVE
+**DoD Summary**: `task.296.dod.1.test-remote-per-run-lock-and-image-prune.md` — ✅ ACCEPTED
+**Tracker debt**: none (no tracker issue linked)
