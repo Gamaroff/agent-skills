@@ -140,8 +140,9 @@ else
   elif [ "$(jq -r '.paused.step' "$LOCK_FILE")" != "4" ] || [ "$(jq -r '.paused.reason' "$LOCK_FILE")" != "precompact" ] \
        || [ "$(jq -r '.paused.at' "$LOCK_FILE")" != "$PAUSED_AT" ]; then
     fail "success path marks the lock paused {at, step: 4, reason: precompact}" "paused=$MARK"
-  elif [ "$(jq -c 'del(.paused)' "$LOCK_FILE")" != "$(jq -c . <<<'{"skill":"develop-task","current_step":4,"branch":"feature/x","report_path":"","pr_url":"","tracker":"","tracker_issue":""}')" ]; then
-    fail "success path: the mark is the only change to the lock" "$(cat "$LOCK_FILE")"
+  elif [ "$(jq -c 'del(.paused, .pause_counts)' "$LOCK_FILE")" != "$(jq -c . <<<'{"skill":"develop-task","current_step":4,"branch":"feature/x","report_path":"","pr_url":"","tracker":"","tracker_issue":""}')" ] \
+       || [ "$(jq -c '.pause_counts' "$LOCK_FILE")" != '{"4":1}' ]; then
+    fail "success path: the mark and pause_counts {\"4\":1} are the only changes to the lock (task.301)" "$(cat "$LOCK_FILE")"
   elif ! grep -qF "PIPELINE-PAUSE-SIGNAL" <<<"$OUT"; then
     fail "success path emits PIPELINE-PAUSE-SIGNAL" "signal absent from stdout (rc=$RC)"
   elif ! grep -qF 'Lock kept and marked paused' <<<"$OUT" || grep -qF 'Lock file removed' <<<"$OUT"; then
@@ -915,6 +916,81 @@ elif [ "$(jq -r '.paused.step' "$L19")" != "5" ]; then
   fail "second pause marks the lock again" "$(cat "$L19")"
 else
   pass "pause → in-session clear → pause at the same step: one PR comment (then edited in place), one issue comment (then 'already'); the lock is marked again"
+fi
+
+# ── Scenario 20 (task.301): two pauses at Step 5 in different QA cycles ──────
+# The comment is one per step, edited in place, and its body names the LATEST pause: the
+# QA cycle (read from the highest gate file beside the document — the lock has no cycle
+# field) and a per-step pause count kept in the lock's top-level `pause_counts`, which the
+# lock write between the two pauses (it clears the `paused` mark) must not erase.
+S20="$TMPDIR_TEST/s20"
+DOC20="$S20/docs/tasks/task.42.x"
+mkdir -p "$DOC20"
+: > "$DOC20/task.42.gate.1.x.yml"
+export GH_STATE="$S20/gh-state"
+SHIM_SAVED="$SHIM_BIN"; SHIM_BIN="$SHIM3_BIN"
+OUT=$(HOOK_TEST_STEP=5 HOOK_TEST_DOC_DIR=docs/tasks/task.42.x run_hook_in_consumer "$S20" "")
+SHIM_BIN="$SHIM_SAVED"
+L20="$S20/.claude/state/develop-pipeline.lock"
+BODY20="$S20/.claude/state/precompact-pr-comment.step-5.md"
+BODY20_1=$(cat "$BODY20" 2>/dev/null)
+PIPELINE_LOCK="$L20" bash "$ADVANCE_SH" 5 >/dev/null 2>&1
+COUNT_AFTER_CLEAR=$(jq -c '.pause_counts' "$L20" 2>/dev/null)
+: > "$DOC20/task.42.gate.2.x.yml"
+: > "$S20/gh.log"
+OUT2=$(cd "$S20" && PATH="$SHIM3_BIN:$PATH" GH_LOG="$S20/gh.log" GH_STDIN_DIR="$S20/stdin" PIPELINE_LOCK="$L20" \
+  TRACKER_ACTIONS_JOURNAL="$S20/.claude/state/tracker-actions.jsonl" "$BASH_BIN" "$HOOK" 2>/dev/null)
+unset GH_STATE
+BODY20_2=$(cat "$BODY20" 2>/dev/null)
+N_PATCH20=$(grep -cE '^api -X PATCH /repos/o/r/issues/comments/1 ' "$S20/gh.log")
+N_PRC20=$(grep -cE '^pr comment ' "$S20/gh.log")
+if ! grep -qF 'pause 1 at Step 5, QA cycle 1' <<<"$BODY20_1"; then
+  fail "first pause at Step 5 names pause 1 and QA cycle 1" "$BODY20_1"
+elif [ "$COUNT_AFTER_CLEAR" != '{"5":1}' ]; then
+  fail "the lock write that clears the paused mark keeps pause_counts" "pause_counts=$COUNT_AFTER_CLEAR"
+elif ! grep -qF 'pause 2 at Step 5, QA cycle 2' <<<"$BODY20_2" || grep -qF 'QA cycle 1' <<<"$BODY20_2"; then
+  fail "second pause (cycle 2) names pause 2 and QA cycle 2, not cycle 1" "$BODY20_2"
+elif [ "$(grep -cF 'agent-skills-comment:pipeline-paused-5' <<<"$BODY20_2")" != "1" ] || [ "$N_PATCH20" != "1" ] || [ "$N_PRC20" != "0" ]; then
+  fail "the second pause edits the one PR comment in place (one PATCH, no new comment)" "patch=$N_PATCH20 pr comment=$N_PRC20"
+elif [ "$(find "$S20/gh-state" -name 'pr-*.md' | wc -l | tr -d ' ')" != "1" ] || [ "$(find "$S20/gh-state" -name 'issue-*.md' | wc -l | tr -d ' ')" != "1" ]; then
+  fail "two pauses at one step leave one PR comment and one issue comment" "$(ls "$S20/gh-state")"
+else
+  pass "two pauses at Step 5 in different QA cycles: one PR comment edited in place naming cycle 2 and pause 2; one issue comment; the count survives the lock write"
+fi
+
+# ── Scenario 21 (task.301): pauses at two DIFFERENT steps keep two comments ───
+# Pins precompact-gh-stateful.sh's counter: with `next_n` returning 0 every posted comment
+# would overwrite pr-1.md and one comment would vanish from the kept state. A lock write
+# between the pauses clears the mark, else the second pause is the "already paused" repeat.
+S21="$TMPDIR_TEST/s21"
+export GH_STATE="$S21/gh-state"
+SHIM_SAVED="$SHIM_BIN"; SHIM_BIN="$SHIM3_BIN"
+OUT=$(HOOK_TEST_STEP=4 HOOK_TEST_DOC_DIR=docs/tasks/task.42.x run_hook_in_consumer "$S21" "")
+SHIM_BIN="$SHIM_SAVED"
+L21="$S21/.claude/state/develop-pipeline.lock"
+N_CALLS_ONE_PAUSE=$(grep -c '' "$S21/gh.log")
+PIPELINE_LOCK="$L21" bash "$ADVANCE_SH" 6 >/dev/null 2>&1
+OUT2=$(cd "$S21" && PATH="$SHIM3_BIN:$PATH" GH_LOG="$S21/gh.log" GH_STDIN_DIR="$S21/stdin" PIPELINE_LOCK="$L21" \
+  TRACKER_ACTIONS_JOURNAL="$S21/.claude/state/tracker-actions.jsonl" "$BASH_BIN" "$HOOK" 2>/dev/null)
+unset GH_STATE
+N_PR21=$(grep -cE '^pr comment ' "$S21/gh.log")
+N_FILES21=$(find "$S21/gh-state" -name 'pr-*.md' | wc -l | tr -d ' ')
+if [ "$N_PR21" != "2" ]; then
+  fail "pauses at two different steps run two 'pr comment' calls" "pr comment=$N_PR21; gh.log: $(cat "$S21/gh.log")"
+elif [ "$N_FILES21" != "2" ] || ! grep -qF 'pipeline-paused-4' "$S21/gh-state/pr-1.md" 2>/dev/null || ! grep -qF 'pipeline-paused-6' "$S21/gh-state/pr-2.md" 2>/dev/null; then
+  fail "the stateful gh stand-in keeps both comments (pr-1 for step 4, pr-2 for step 6)" "files=$N_FILES21 $(ls "$S21/gh-state")"
+else
+  pass "pauses at two different steps: two kept PR comments (pr-1, pr-2) and two 'pr comment' argv lines — the stand-in's counter is held"
+fi
+
+# ── Scenario 22 (task.301): a pause makes exactly the gh calls it made before ─
+# The cycle and count add text to a body, never a call. The number is what one pause at Step 4
+# with a PR and a tracker issue made on the unchanged hook; an added call turns this red.
+EXPECTED_GH_CALLS_PER_PAUSE=6   # measured on the hook as of HEAD before task.301 (run scenario 21 against `git show HEAD:…`)
+if [ "$N_CALLS_ONE_PAUSE" != "$EXPECTED_GH_CALLS_PER_PAUSE" ]; then
+  fail "one pause makes exactly $EXPECTED_GH_CALLS_PER_PAUSE gh calls (no added network call)" "calls=$N_CALLS_ONE_PAUSE"
+else
+  pass "one pause (PR + issue) makes exactly $EXPECTED_GH_CALLS_PER_PAUSE gh calls — the cycle and count add no network call"
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────

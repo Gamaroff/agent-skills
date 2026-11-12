@@ -6,6 +6,15 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **The PreCompact pause comment names the QA cycle and the pause count (task 301).** The one pause
+  comment per step, edited in place on a repeat, now ends with `Latest pause: pause 2 at Step 5, QA
+  cycle 2.` The count lives in a new top-level lock field `pause_counts` (keyed by step), not in the
+  `paused` record, because every lock writer deletes that record; the cycle is read from the highest
+  gate file, since the lock has no cycle field. The Step 1 lock-collision check is now an executable
+  block that exits 1 on a collision and prints both the resume and the abandon command for a paused
+  run of another item, and a new test holds it (Start fresh on one document never releases another's
+  lock; the snapshot is removed only when its reason is `precompact`). A new scenario pins the stateful
+  `gh` stand-in's counter: replacing `next_n` with `echo 0` now turns the suite red.
 - **`finalise-ci-poll.sh` says why it wrote `UNDECIDED` (observation 166).** A poll started with a
   check-count floor above the checks the head had started, for example a floor copied from another
   PR when path-filtered workflows start fewer checks on a small diff, ran out its whole budget and
