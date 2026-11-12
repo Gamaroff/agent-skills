@@ -163,7 +163,10 @@ ssh -o BatchMode=yes "$HOST" 'uptime; docker ps --format "  {{.Names}} {{.Status
 # protects the remote node_modules and its lockfile hash from --delete.
 EXCLUDES=$(mktemp)
 trap 'rm -f "$EXCLUDES"' EXIT
-git -C "$REPO_ROOT" ls-files -z --others --ignored --exclude-standard --directory | tr '\0' '\n' >"$EXCLUDES"
+# Each path is anchored with a leading `/`: git prints paths relative to the root, and an unanchored
+# rsync pattern matches at ANY depth, so `.claude/state/` also dropped the tracked eval fixture
+# evals/**/replay/.claude/state/ and the 01-create-branch replay went red on the server only.
+git -C "$REPO_ROOT" ls-files -z --others --ignored --exclude-standard --directory | tr '\0' '\n' | sed 's#^#/#' >"$EXCLUDES"
 
 ssh -o BatchMode=yes "$HOST" "mkdir -p \"\$HOME/$RUN_DIR\"" || {
   echo "✗ could not create ~/$RUN_DIR on $HOST" >&2
