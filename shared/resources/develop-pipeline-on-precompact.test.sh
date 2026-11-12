@@ -993,6 +993,42 @@ else
   pass "one pause (PR + issue) makes exactly $EXPECTED_GH_CALLS_PER_PAUSE gh calls — the cycle and count add no network call"
 fi
 
+# ── Scenario 23 (task.301 QA cycle 2, CR-2): a failed count write shows no stale count ─────────
+# After a first pause the lock holds pause_counts {"4":1}. When the second pause's bump cannot
+# land, the lock still holds that 1; re-reading it would name "pause 1" as the latest pause while
+# the hook's own stderr says the count is omitted. The bump's temp file is the only mktemp call
+# whose template names `.precompact-count`, so a mktemp stand-in that refuses exactly that one
+# fails the bump and nothing else.
+S23="$TMPDIR_TEST/s23"
+REAL_MKTEMP=$(command -v mktemp)
+MK23_BIN="$S23-mkbin"
+mkdir -p "$MK23_BIN"
+printf '%s\n' '#!/bin/sh' 'case "$*" in *precompact-count*) exit 1 ;; esac' "exec $REAL_MKTEMP \"\$@\"" > "$MK23_BIN/mktemp"
+chmod +x "$MK23_BIN/mktemp"
+export GH_STATE="$S23/gh-state"
+SHIM_SAVED="$SHIM_BIN"; SHIM_BIN="$SHIM3_BIN"
+OUT=$(HOOK_TEST_STEP=4 HOOK_TEST_DOC_DIR=docs/tasks/task.42.x run_hook_in_consumer "$S23" "")
+SHIM_BIN="$SHIM_SAVED"
+L23="$S23/.claude/state/develop-pipeline.lock"
+BODY23="$S23/.claude/state/precompact-pr-comment.step-4.md"
+BODY23_1=$(cat "$BODY23" 2>/dev/null)
+PIPELINE_LOCK="$L23" bash "$ADVANCE_SH" 4 >/dev/null 2>&1
+ERR23=$(cd "$S23" && PATH="$MK23_BIN:$SHIM3_BIN:$PATH" GH_LOG="$S23/gh.log" GH_STDIN_DIR="$S23/stdin" PIPELINE_LOCK="$L23" \
+  TRACKER_ACTIONS_JOURNAL="$S23/.claude/state/tracker-actions.jsonl" "$BASH_BIN" "$HOOK" 2>&1 >/dev/null)
+unset GH_STATE
+BODY23_2=$(cat "$BODY23" 2>/dev/null)
+if ! grep -qF 'pause 1 at Step 4' <<<"$BODY23_1"; then
+  fail "scenario 23 set-up: the first pause at Step 4 names pause 1" "$BODY23_1"
+elif ! grep -qF 'could not record the pause count' <<<"$ERR23"; then
+  fail "scenario 23 set-up: the stand-in made the second pause's count write fail" "stderr=$ERR23"
+elif grep -qE 'pause [0-9]+ at Step' <<<"$BODY23_2"; then
+  fail "a failed count write leaves no stale count in the comment (no 'pause N at Step')" "$BODY23_2"
+elif ! grep -qF 'agent-skills-comment:pipeline-paused-4' <<<"$BODY23_2"; then
+  fail "the comment is still written when the count write fails" "$BODY23_2"
+else
+  pass "a failed pause-count write omits the count: the comment shows no stale 'pause 1'"
+fi
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo ""
 undefined_commands_check || FAIL=$((FAIL + 1))

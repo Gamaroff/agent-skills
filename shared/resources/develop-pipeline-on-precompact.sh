@@ -290,7 +290,8 @@ bump_pause_count() {
 }
 
 # Snapshot first, then the mark — see write_pause_snapshot for why that order.
-bump_pause_count || echo "on-precompact: could not record the pause count — the comment will omit it" >&2
+BUMP_OK=true
+bump_pause_count || { BUMP_OK=false; echo "on-precompact: could not record the pause count — the comment will omit it" >&2; }
 write_pause_snapshot
 MARK_OK=true
 mark_paused || { MARK_OK=false; echo "on-precompact: could not mark the lock paused — the lock is kept unmarked, so the Stop hook will treat the run as live" >&2; }
@@ -307,7 +308,12 @@ LOCK_TRACKER=$(jq -r '.tracker // ""' "$LOCK" 2>/dev/null)
 TRACKER_ISSUE=$(jq -r '.tracker_issue // ""' "$LOCK" 2>/dev/null)
 CURRENT_STEP=$(jq -r '.current_step // 0' "$LOCK" 2>/dev/null)
 DOC_DIR=$(jq -r '.task_or_story_directory // ""' "$LOCK" 2>/dev/null)
-PAUSE_COUNT=$(jq -r '.pause_counts[(.current_step // 0 | tostring)] // ""' "$LOCK" 2>/dev/null)
+# Read only when this pause's bump landed: after a failed bump the lock still holds the PREVIOUS
+# pause's count, and showing it would name pause N-1 as the latest (task.301 QA cycle 2, CR-2).
+PAUSE_COUNT=""
+if [ "$BUMP_OK" = true ]; then
+  PAUSE_COUNT=$(jq -r '.pause_counts[(.current_step // 0 | tostring)] // ""' "$LOCK" 2>/dev/null)
+fi
 # The QA cycle, while the run is in the QA loop (step 5): the highest gate number beside the
 # document. The lock carries no cycle field — its QA fields are qa_phase, qa_max_cycles,
 # extra_cycles_granted and convergence_from_cycle — so the gate files on disk are the source,
