@@ -66,6 +66,7 @@
 #   shared/resources/tracker-comment.js         (issue comment, marker, lead, gate)
 #   shared/resources/stakeholder-summary-cli.js (the lead for the PR comment)
 #   shared/resources/defer-mutation.js          (the deferred record, via both)
+#   shared/resources/qa-cycle.sh                (the QA cycle the pause comment names)
 #
 # Always exits 0. Failures are logged to stderr and never block compaction.
 
@@ -269,7 +270,29 @@ if [ -n "$ALREADY_PAUSED" ]; then
   exit 0
 fi
 
+# bump_pause_count — add one to `pause_counts[<current_step>]`, a TOP-LEVEL lock field keyed by
+# step (task.301). It cannot live in the `paused` record or the snapshot: every lock writer
+# clears the record (`clear_pause`, `jq 'del(.paused)'`) and consumes the snapshot, so a count
+# kept in either is gone before the next pause at the same step. Lock writers rewrite the lock
+# with jq and `--restore` deletes only the named halt/pause fields, so this one survives.
+# Runs BEFORE the snapshot copy, so a `--restore` rebuilds the current count. Same write rule
+# as mark_paused: mktemp in the lock's own directory, then mv. Returns 1 when it did not land;
+# the comment then simply omits the count.
+bump_pause_count() {
+  local tmp
+  tmp=$(mktemp "$STATE_DIR/.precompact-count.XXXXXX" 2>/dev/null) || return 1
+  if jq '((.current_step // 0) | tostring) as $s
+         | .pause_counts = ((.pause_counts // {}) | .[$s] = ((.[$s] // 0) + 1))' \
+        "$LOCK" > "$tmp" 2>/dev/null; then
+    mv -f "$tmp" "$LOCK" 2>/dev/null && return 0
+  fi
+  rm -f "$tmp"
+  return 1
+}
+
 # Snapshot first, then the mark — see write_pause_snapshot for why that order.
+BUMP_OK=true
+bump_pause_count || { BUMP_OK=false; echo "on-precompact: could not record the pause count — the comment will omit it" >&2; }
 write_pause_snapshot
 MARK_OK=true
 mark_paused || { MARK_OK=false; echo "on-precompact: could not mark the lock paused — the lock is kept unmarked, so the Stop hook will treat the run as live" >&2; }
@@ -286,6 +309,33 @@ LOCK_TRACKER=$(jq -r '.tracker // ""' "$LOCK" 2>/dev/null)
 TRACKER_ISSUE=$(jq -r '.tracker_issue // ""' "$LOCK" 2>/dev/null)
 CURRENT_STEP=$(jq -r '.current_step // 0' "$LOCK" 2>/dev/null)
 DOC_DIR=$(jq -r '.task_or_story_directory // ""' "$LOCK" 2>/dev/null)
+# Read only when this pause's bump landed: after a failed bump the lock still holds the PREVIOUS
+# pause's count, and showing it would name pause N-1 as the latest (task.301 QA cycle 2, CR-2).
+PAUSE_COUNT=""
+if [ "$BUMP_OK" = true ]; then
+  PAUSE_COUNT=$(jq -r '.pause_counts[(.current_step // 0 | tostring)] // ""' "$LOCK" 2>/dev/null)
+fi
+# The QA cycle, while the run is in the QA loop (step 5): the highest gate number beside the
+# document. The lock carries no cycle field — its QA fields are qa_phase, qa_max_cycles,
+# extra_cycles_granted and convergence_from_cycle — so the gate files on disk are the source,
+# as grant-qa-cycles.sh reads them. Omitted at any other step, and when no gate exists yet.
+QA_CYCLE=""
+if [ "$CURRENT_STEP" = "5" ] && [ -n "$DOC_DIR" ] && [ -d "$DOC_DIR" ]; then
+  # One definition of the cycle, the sibling qa-cycle.sh (tests/qa-cycle.test.js fails on a second
+  # gate-number derivation in any other shell helper). It refuses with rc 1 and an empty stdout when
+  # there is no numbered gate, which leaves the cycle out of the comment.
+  if [ -f "$HOOK_DIR/qa-cycle.sh" ]; then
+    QA_CYCLE=$(bash "$HOOK_DIR/qa-cycle.sh" "$DOC_DIR" 2>/dev/null) || QA_CYCLE=""
+  fi
+fi
+PAUSE_NOTE=""
+case "$PAUSE_COUNT" in
+  ''|*[!0-9]*) ;;
+  *) PAUSE_NOTE="pause ${PAUSE_COUNT} at Step ${CURRENT_STEP}" ;;
+esac
+if [ -n "$QA_CYCLE" ]; then
+  PAUSE_NOTE="${PAUSE_NOTE:+$PAUSE_NOTE, }QA cycle ${QA_CYCLE}"
+fi
 # NOW is set once near the top (used by both write_pause_snapshot and the report entry).
 
 # Sanity: if we don't even know which skill, bail gracefully
@@ -393,6 +443,9 @@ if [ -n "$PR_URL" ]; then
       if [ -n "$LEAD" ]; then
         PR_BODY=$(printf '⏸️ **Pipeline paused — context compaction imminent**\n\nThe `/%s` orchestrator paused at Step %s because Claude'\''s context window approached its limit.\n\n**State saved in**: `%s`\n\n**To resume**: re-invoke `/%s <path>` (same path) and choose **Resume from last completed step** when prompted.' \
           "$SKILL" "$CURRENT_STEP" "$REPORT" "$SKILL")
+        # The latest pause's count and QA cycle: the comment is one per step and edited in
+        # place, so the body always shows the newest pause and how many there were (task.301).
+        [ -n "$PAUSE_NOTE" ] && PR_BODY=$(printf '%s\n\n**Latest pause**: %s.' "$PR_BODY" "$PAUSE_NOTE")
         # Step-suffixed, and the step is in the intent too. A deferred record's
         # id is derived from intent + argv + target + stdin; with one body path
         # and no step, a pause at Step 3 and a pause at Step 6 produced two

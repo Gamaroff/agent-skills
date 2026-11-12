@@ -1,0 +1,64 @@
+schema: 2
+task: 'task.301.precompact-pause-comment-names-cycle-and-count'
+task_title: 'PreCompact pause comment names the cycle and the pause count'
+gate: PASS
+status_reason: 'Cycle 2 finding T301-CR-2 is fixed and held by scenario 23 (mutation-proven in the fix cycle). The cycle 3 review of the fix found no correctness bug, only low-severity cleanups. Fast gate 8405 passed and CI is green on the head.'
+reviewer: 'QA Engineer'
+head: '03412a0f00aef4edb08b05856dab9ab7fb8fdc18'
+updated: '2026-11-12T07:46:10Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 8405
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    boundary_signals: []
+    notes: 'The Step 1 block is a state guard that refuses on repository state; boundary: internal, since its inputs are the pipeline lock and snapshot plus two placeholders compared for equality and no corpus sink models it. The behaviour is held by the committed step-1-paused-lock test (12 cases, mutation-proven in the cycle 1 fix). This cycle changed only the hook count path, which parses no input. No probe-engine run is credited.'
+  performance:
+    status: PASS
+    notes: 'One pause makes exactly 6 gh calls, the same as the unchanged hook; held by a test constant.'
+  reliability:
+    status: PASS
+    notes: 'A failed pause-count write now omits the count (scenario 23); no other path carries a stale count (reviewer traced the PR body, the issue comment and the already-paused branch).'
+  maintainability:
+    status: PASS
+    notes: 'The cycle comes from the one definition, qa-cycle.sh; pause_counts is documented in the lock-schema table.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Cycle 3 cleanup (low): scenario 23 reads the second body from the file the first pause wrote, so its "comment is still written" assertion can pass on the leftover file; delete the first body before the second pause. Also assert pause_counts still equals {"4":1} after the failed bump.'
+      refs: ['shared/resources/develop-pipeline-on-precompact.test.sh']
+    - action: 'Cycle 3 cleanup (low): the count is read with its own current_step expression after the bump; have bump_pause_count print the count it wrote.'
+      refs: ['shared/resources/develop-pipeline-on-precompact.sh']
+    - action: 'CR-3 (low, medium confidence): the Start-fresh identity check compares directories as raw strings, so a trailing slash or ./ spelling reads as another document. Normalise both sides.'
+      refs: ['shared/resources/develop-pipeline-step-1-create-branch.md']
+    - action: 'CR-4 (low, medium confidence): the {doc-directory} guard refuses any "{", so a real directory with a brace gets a misleading HALT. Test for the exact literal placeholder.'
+      refs: ['shared/resources/develop-pipeline-step-1-create-branch.md']
+    - action: 'develop-bug runs the same Step 1 block and its bug-substitutions list does not name {doc-directory} or {start-fresh}; the shared step doc says both must be substituted and the block refuses otherwise. Add the two names to the list.'
+      refs: ['skills/develop-bug/SKILL.md']
+    - action: 'F4 covers only flat paths with no lock; add a trailing-slash and a brace case. The stale-branch path removes the lock but not a precompact snapshot.'
+      refs: ['shared/resources/tests/step-1-paused-lock.test.mjs', 'shared/resources/develop-pipeline-step-1-create-branch.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
