@@ -3,7 +3,7 @@
 **Task**: `task.303.pause-commits-restart-ci-and-block-docs-only-shortcut.md`
 **Run Number**: 1
 **Started**: 2026-11-12 00:00
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -34,10 +34,10 @@ Stop a superseded (cancelled) CI run from blocking the docs-only tree-equivalenc
 | 1. create-branch           | ✅ Done | Branch `feature/task.{id}.*` exists in git                             | Branch created at `3025f7b2` | —                    | 2026-11-12T10:48Z |
 | 2. review-task             | ✅ Done | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               | READY TO IMPLEMENT 8/10; 3 Important fixed in the task doc | —                    | 2026-11-12T11:05Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | 1 iteration; fast gate 8404 pass / 0 fail on iter 2 | —                    | 2026-11-12T11:45Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #889: https://github.com/Gamaroff/agent-skills/pull/889 (no issue linked) | —                    | 2026-11-12T12:05Z |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 1 cycle: gate PASS (95), 5c APPROVE; one LOW doc finding fixed in the acceptance commit | —                    | 2026-11-12T11:40Z |
+| 7. finalise                | ✅ Done | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      | DoD 1 accepted; acceptance commit `19154563` | —                    | 2026-11-12T12:10Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | report committed and pushed | —                    | 2026-11-12T12:16Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -78,6 +78,14 @@ Stop a superseded (cancelled) CI run from blocking the docs-only tree-equivalenc
 - Mutation proof: changing the hold's step from 8 to 99 turned 17f red (37 pass / 1 fail); restored, 38 / 0.
 - First `ci:fast` run (iter 1) failed one test: `step-8-completion-checklist.test.mjs` "a PreCompact pause inside Step 8 …" asserted the hook pushes at step 8. Updated to assert the commit is held (one ahead of upstream); that test still holds its point (the record at step 8). Iter 2: 8404 pass, 0 fail.
 - Docs: `develop-pipeline-hooks.md`, `develop-pipeline-pause.md` (sources) and `CHANGELOG.md`; `npm run bundle` refreshed 12 copies; `bundle:check` 0 problems; `lint:shell` clean; prettier clean.
+### Step 4 — create-pr
+
+- Staging scope (7): the work-item dir, `CHANGELOG.md`, `shared/resources`, `shared/resources/tests` (covered by the prior), and `skills/{develop,develop-bug,develop-story,develop-task}/references`. No untracked file outside scope; leak check clean.
+- Commit `e37f625f` (via /commit-changes with --scope), pushed; PR #889 opened against `develop`, state OPEN. The pre-commit hook re-ran the bundle and left the tree clean.
+- No tracker issue linked: no PR-opened comment, no board move.
+
+### Step 3 notes (continued)
+
 - Not done, out of scope: the template's `ci-ok` still exits 1 on a cancelled job. Candidate observation for the next review.
 
 ---
@@ -92,14 +100,25 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-11-12
+**Gate Result**: PASS
+**Issues Found**: none (one LOW item recorded under `recommendations.future`: task section 10 still describes option (a))
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: APPROVE
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
-**Branch**: {populated after Step 1}
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**Finished**: 2026-11-12 12:16
+**Final Status**: Completed
+**Branch**: feature/task.303.pause-commits-restart-ci-and-block-docs-only-shortcut
+**PR**: https://github.com/Gamaroff/agent-skills/pull/889
+**QA Iterations**: 1 (gate PASS 95/100; 5c APPROVE)
+**DoD Summary**: Accepted. `task.303.dod.1.pause-commits-restart-ci.md`. CI reading 1: SUCCESS @ `c9992146c64d`. CI reading 2: SUCCESS (tree-equivalent to `e37f625f471f`) @ `19154563ee4c`. Security and compliance not applicable.
+**Tracker debt**: none (no tracker issue linked)
+
+**Completion Summary**: Implemented option (b). The PreCompact hook now holds the pause-commit push at step 8, so a pause no longer cancels the previous head's CI run; Step 8's own commit pushes it. Scenarios 17f and 17g, mutation-proved; engine untouched. One QA cycle, no findings above LOW. Independent review did not run for the QA diff review, the 5c review or the DoD checks (all inline). Candidate follow-up: the template `ci-ok` aggregator exits 1 on a cancelled job.
