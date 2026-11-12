@@ -1,0 +1,79 @@
+[
+  {
+    "id": "rd.up",
+    "sink": "filename",
+    "input": "../escape",
+    "why": "traversal out of HOME",
+    "correct": "refused, exit 2",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.296.test-remote-per-run-lock-and-image-prune/task.296.test-remote-per-run-lock-and-image-prune.md:46"
+  },
+  {
+    "id": "rd.mid",
+    "sink": "filename",
+    "input": "agent-skills-test-a/../../b",
+    "why": "embedded traversal",
+    "correct": "refused",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.296.test-remote-per-run-lock-and-image-prune/task.296.test-remote-per-run-lock-and-image-prune.md:46"
+  },
+  {
+    "id": "rd.abs",
+    "sink": "filename",
+    "input": "/etc/agent-skills-test-x",
+    "why": "absolute path",
+    "correct": "refused",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.296.test-remote-per-run-lock-and-image-prune/task.296.test-remote-per-run-lock-and-image-prune.md:46"
+  },
+  {
+    "id": "rd.sub",
+    "sink": "filename",
+    "input": "agent-skills-test-$(touch PWNED)",
+    "why": "command substitution",
+    "correct": "refused",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.296.test-remote-per-run-lock-and-image-prune/task.296.test-remote-per-run-lock-and-image-prune.md:46",
+    "expected": {
+      "absent": [
+        "PWNED"
+      ]
+    }
+  },
+  {
+    "id": "rd.nl",
+    "sink": "filename",
+    "input": "agent-skills-test-a\nb",
+    "why": "trailing-anchor newline bypass",
+    "correct": "refused",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.296.test-remote-per-run-lock-and-image-prune/task.296.test-remote-per-run-lock-and-image-prune.md:46"
+  },
+  {
+    "id": "rd.upper",
+    "sink": "filename",
+    "input": "agent-skills-test-ABC",
+    "why": "outside [a-z0-9-]",
+    "correct": "refused",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.296.test-remote-per-run-lock-and-image-prune/task.296.test-remote-per-run-lock-and-image-prune.md:46"
+  },
+  {
+    "id": "rd.prefix",
+    "sink": "filename",
+    "input": "other-dir",
+    "why": "wrong prefix",
+    "correct": "refused",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.296.test-remote-per-run-lock-and-image-prune/task.296.test-remote-per-run-lock-and-image-prune.md:46"
+  },
+  {
+    "id": "rd.empty",
+    "sink": "filename",
+    "input": "",
+    "why": "empty",
+    "correct": "refused",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.296.test-remote-per-run-lock-and-image-prune/task.296.test-remote-per-run-lock-and-image-prune.md:46"
+  }
+]

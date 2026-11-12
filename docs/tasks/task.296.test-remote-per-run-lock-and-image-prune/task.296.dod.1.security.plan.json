@@ -1,0 +1,72 @@
+[
+  {
+    "argv": [
+      "--sink",
+      "filename",
+      "--entry",
+      "shell-argv:scripts/remote-test/lockctl.sh",
+      "--argv",
+      "[\"take\",\"{input}\",\"tok\",\"30\",\"me\"]",
+      "--name",
+      "take run dir"
+    ],
+    "cases_file": "task.296.dod.1.security.cases.1.json",
+    "cases_sha256": "9c4edf950bf996abd268382ff98fc43562921caca5c5096ae9785828ba1a9a80"
+  },
+  {
+    "argv": [
+      "--sink",
+      "filename",
+      "--entry",
+      "shell-argv:scripts/remote-test/lockctl.sh",
+      "--argv",
+      "[\"release\",\"{input}\",\"tok\"]",
+      "--name",
+      "release run dir"
+    ],
+    "cases_file": "task.296.dod.1.security.cases.2.json",
+    "cases_sha256": "6011bfd632c28ec52a8e133fb5f4b03c826a8645588da93b68007c3c2c170e25"
+  },
+  {
+    "argv": [
+      "--sink",
+      "filename",
+      "--entry",
+      "shell-argv:scripts/remote-test/lockctl.sh",
+      "--argv",
+      "[\"take\",\"agent-skills-test-m\",\"tok\",\"{input}\",\"me\"]",
+      "--name",
+      "take timeout"
+    ],
+    "cases_file": "task.296.dod.1.security.cases.3.json",
+    "cases_sha256": "57ba19721d425dbcaec74150c876621ca3d58e15c355aec89175670c6b484aa6"
+  },
+  {
+    "argv": [
+      "--sink",
+      "filename",
+      "--entry",
+      "shell-argv:scripts/remote-test/lockctl.sh",
+      "--argv",
+      "[\"unlock\",\"agent-skills-test-m\",\"{input}\"]",
+      "--name",
+      "unlock margin"
+    ],
+    "cases_file": "task.296.dod.1.security.cases.4.json",
+    "cases_sha256": "f561c8862b6f215fef27869d1e15c638c6bf367a04db328cea95c38254b60bf6"
+  },
+  {
+    "argv": [
+      "--sink",
+      "filename",
+      "--entry",
+      "shell-argv:scripts/remote-test/lockctl.sh",
+      "--argv",
+      "[\"prune\",\"{input}\"]",
+      "--name",
+      "prune image"
+    ],
+    "cases_file": "task.296.dod.1.security.cases.5.json",
+    "cases_sha256": "8f8a5193ef2f2919cc4d0b5f52bb17897501c7843f835fc675e38dee279a81ad"
+  }
+]

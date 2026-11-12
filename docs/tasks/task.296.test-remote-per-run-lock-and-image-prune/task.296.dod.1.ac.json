@@ -1,0 +1,146 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "6bee71806f3841b49f80f9ff426ab6bbf5698d70",
+  "dirty_paths": [],
+  "document": "docs/tasks/task.296.test-remote-per-run-lock-and-image-prune/task.296.test-remote-per-run-lock-and-image-prune.md",
+  "result": {
+    "bytes": 8111,
+    "sha256": "9f42513f94457d6c1a67b273a73546754df06fc63b72f0ad63d4be15f406d2da",
+    "verified": true
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 10,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "786957b12a9e62083ffc21a0bbd8c4092031b6182056a9f019d05ebc17b11feb",
+      "status": "PASS",
+      "description": "Overlapping runs: second exits non-zero before sync, names first; first undisturbed; recorded in QA",
+      "code_citation": "scripts/remote-test/run.sh:270",
+      "test_citation": "tests/test-remote-runner.test.js:696",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Offline test holds the lock with no container present, asserts exit 1, owner named, no rsync, no release. Lane: tests/*.test.js is in test:suite, run by test.yml on every pull_request. Live overlap recorded in task.296.qa.5 (lines 51-56): run B exit 1 before sync naming owner tachyon-/pid-3110783, run A exit 0, container count 0 at that moment, load recorded. Atomic take pinned by test at line 1047 (8 simultaneous takes, one wins)."
+    },
+    {
+      "id": "#2",
+      "text_hash": "3760e0d0baa8fbfc969027c0821f68c00daddeee5c1e1b00edf17218de5840de",
+      "status": "PASS",
+      "description": "--unlock clears a crashed run's stale lock; never removes a live run's lock; recorded in QA",
+      "code_citation": "scripts/remote-test/lockctl.sh:98",
+      "test_citation": "tests/test-remote-runner.test.js:1093",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Test asserts a live lock gives exit 32 and is not removed, and a stale lock is removed. Staleness margin is held by the test at line 1122, and a stale lock is refused by a run naming --unlock at line 720. Live record in task.296.qa.1:55 (--unlock on a live lock exit 32, removed nothing; start forced old, run refused naming --unlock, --unlock exit 0)."
+    },
+    {
+      "id": "#3",
+      "text_hash": "aea2c3b80763d1df138c4a7421d8f63610492681fb666991c87482c7d280de02",
+      "status": "PASS",
+      "description": "--prune-images removes old tag, keeps current and in-use tags, never global prune; recorded in QA",
+      "code_citation": "scripts/remote-test/lockctl.sh:116",
+      "test_citation": "tests/test-remote-runner.test.js:1267",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Test asserts only the old unused tag gets docker rmi, no prune/-f/--force, and current and in-use tags are kept. Refusal while a lock exists, and on a docker failure, is at line 1289. Live record in task.296.qa.1:56 (five tags, current kept, four removed, exit 0)."
+    },
+    {
+      "id": "#4",
+      "text_hash": "0f16ab81cc38d589a736ba56f396a6fbbc8e0060ed23b8e270bde6cf279feee1",
+      "status": "PASS",
+      "description": "No existing option's behaviour changes; held by existing cases run unchanged",
+      "code_citation": "scripts/remote-test/run.sh:151",
+      "test_citation": "tests/test-remote-runner.test.js:243",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Diff shows no pre-existing test case removed or reworded. Only one stub-ssh arm line was altered, and the 23 pre-existing tests pass (task.296.qa.1:58). The only changed existing behaviour is --reap skipping *.lock directories, which is covered by the new test at line 935. The --reap and --run mix is as before (test at line 877). Tests run per-PR via test.yml."
+    },
+    {
+      "id": "#5",
+      "text_hash": "697f4815407fe2c500264a74c083259336d7305a2002fb7233041f5780161368",
+      "status": "PASS",
+      "description": "Lock adds at most one ssh round trip, counted from the stub call log",
+      "code_citation": "scripts/remote-test/run.sh:216",
+      "test_citation": "tests/test-remote-runner.test.js:749",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Test counts ssh calls from the stub log, asserts 7 (the old route made 6), and asserts no separate mkdir -p call, so the take replaces the mkdir and the release is the one extra call. Counted, not timed."
+    },
+    {
+      "id": "#6",
+      "text_hash": "76573c1bd3c7f93abd61ebf0ce858460c4b420ce37d4f5fefed0638ac62878d7",
+      "status": "PASS",
+      "description": "Load (uptime) on both hosts recorded before and after the live runs in the QA report",
+      "code_citation": "docs/tasks/task.296.test-remote-per-run-lock-and-image-prune/task.296.qa.5.test-remote-per-run-lock-and-image-prune.md:56",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Treated as a documentation criterion: the deliverable is a QA-report record. qa.5:56 states server 0.26 before and 0.56 after, laptop 2.87 before and 2.74 after, for the overlap run. task.296.qa.1:59 records server 0.22 then 0.86 and laptop 0.77 then 1.10 for the prune and --unlock live runs. Both are committed QA reports, read."
+    },
+    {
+      "id": "#7",
+      "text_hash": "5bea9413f0bcc68397aa7c7d1490f7d036a3fd3a4940c94df148215cab28ae4f",
+      "status": "PASS",
+      "description": "lint:shell passes on changed shell files; format:check on changed test file",
+      "code_citation": ".github/workflows/shellcheck.yml:21",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 6bee71806f3841b49f80f9ff426ab6bbf5698d70 — Asks that lint:shell and format:check pass. CI runs both per PR (shellcheck.yml; test.yml 'Formatting' step), so /finalise Step 6 grades it from CI reading 1. QA reports record 'shellcheck: clean' and prettier clean (qa.1:60, qa.5:54) as supporting evidence, not as the grade.",
+      "ci_reading": "CI reading 1: SUCCESS @ 6bee71806f3841b49f80f9ff426ab6bbf5698d70"
+    },
+    {
+      "id": "#8",
+      "text_hash": "ca4f5ca13566c5cd2bea18dd655e3a2debd31e6d41c6d72589e2e1336dc968f8",
+      "status": "PASS",
+      "description": "The offline guard (tests/test-remote-runner.test.js) passes under CI=true",
+      "code_citation": "scripts/remote-test/run.sh:216",
+      "test_citation": "tests/test-remote-runner.test.js:696",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The offline guard is the 48-case tests/test-remote-runner.test.js, picked up by 'tests/*.test.js' in test:suite and run by test.yml on pull_request (GitHub sets CI=true). task.296.qa.5:68 and qa.4:49 record 48/48 pass under CI=true, with no code change since gate 4. If the reader wants the CI run itself as the grade, it is covered by #9's deferral."
+    },
+    {
+      "id": "#9",
+      "text_hash": "3aedccc29cec2e751c2229174a6dee35096654be78cb2236ad91ad8a8c9b08e4",
+      "status": "PASS",
+      "description": "npm run ci:fast green on the final tree, run via npm run test:remote",
+      "code_citation": ".github/workflows/test.yml:1",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 6bee71806f3841b49f80f9ff426ab6bbf5698d70 — Asks that ci:fast (format:check plus npm test, the same steps test.yml runs per PR) be green on the final tree. QA reports record the server run green: 8431 pass, 0 fail on code identical to the head (qa.4:117, qa.5:68). CI on the PR head was pending in qa.5, so /finalise Step 6 grades it from CI reading 1.",
+      "ci_reading": "CI reading 1: SUCCESS @ 6bee71806f3841b49f80f9ff426ab6bbf5698d70"
+    },
+    {
+      "id": "#10",
+      "text_hash": "47a95083e367d5b4643ffabd0e8ec09a04f669e53dc3c49fa2410e4d396f13b1",
+      "status": "PASS",
+      "description": "testing-remote.md states lock contents and staleness rule, drops 'best-effort'; CHANGELOG cites task 296",
+      "code_citation": "docs/contributing/testing-remote.md:45",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Documentation criterion; text read. testing-remote.md:45 states the stale rule (no container of the run's name, server clock past start plus the owner's timeout plus 10 min, TEST_REMOTE_LOCK_MARGIN_MIN), what a lock without an owner file does, and that it is per branch. Lines 25-27 and 54 document --unlock, --prune-images and the margin. grep finds no 'best-effort' in the file. CHANGELOG.md:9 is the entry 'takes a per-run lock, and gains --unlock and --prune-images (task 296)'. No changelog-corpus guard was identified or run here. criteria-drift exit 0, reason clean, no unapproved amendment."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#4",
+      "note": "The diff alters one line of the stub ssh arm in tests/test-remote-runner.test.js (container.sh exit arm) from the old form to the new. This is test scaffolding, not a test case, but 'run unchanged' is not literally true of the file. Low impact."
+    },
+    {
+      "ac_id": "#9",
+      "note": "The server ci:fast figure (8431 pass) was taken on the code at 2f9f1db9. The later delta to head is documentation only per qa.5 (git diff over scripts and tests is empty), but finalise-delta.js was not run here."
+    },
+    {
+      "ac_id": "#1",
+      "note": "Gate 5 and qa.5 record CI on head 891786345c16 as pending. PR state is OPEN with an empty reviewDecision."
+    }
+  ]
+}

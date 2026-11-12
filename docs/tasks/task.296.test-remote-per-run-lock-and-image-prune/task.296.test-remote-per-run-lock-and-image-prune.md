@@ -5,16 +5,18 @@ type: task
 description: "Replace the best-effort container-name guard in test:remote with an atomic per-run lock on the server, and add a bounded prune of old agent-skills-test image tags."
 tags: [infrastructure, testing, developer-tooling, remote-test]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Low
 created: 2026-11-10
 updated: 2026-11-12
+completed_date: 2026-11-12
+pr_number: 891
 estimated_effort_hours: 4
 ---
 
 # Technical Task: test:remote per-run lock and image-tag prune
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.296.review.1.test-remote-per-run-lock-and-image-prune.md` implemented 2026-11-12
 
 Follow-up to task.295 (PR #872). Both items are listed in task.295's Future Improvements and in `docs/contributing/testing-remote.md`.
@@ -109,7 +111,7 @@ None. The route's arguments stay valid. Two options are added (`--unlock`, `--pr
 **Files:** `tests/test-remote-runner.test.js`
 
 - [x] Offline tests for each new behaviour, each mutation-proved.
-- [ ] A live two-run overlap on the server, and a live prune, both recorded in the QA report.
+- [x] A live two-run overlap on the server, and a live prune, both recorded in the QA report.
 
 **Dependencies:** Phases 1 and 2.
 
@@ -161,25 +163,25 @@ None. The route's arguments stay valid. Two options are added (`--unlock`, `--pr
 
 **Functional**
 
-- [ ] Two overlapping runs on one branch: the second exits non-zero before its sync, names the first run, and the first run is not disturbed. The overlap run is recorded in the QA report.
-- [ ] A crashed run's lock is cleared by `--unlock`, and a live run's lock is not removed by it. Recorded in the QA report.
-- [ ] `--prune-images` removes an old `agent-skills-test` tag and keeps the current tag and any in use; it never calls a global prune. Recorded in the QA report.
-- [ ] No existing option's behaviour changes. Held by the existing cases in `tests/test-remote-runner.test.js` (arguments, exit status, timeout, linked worktree, reap), which run unchanged.
+- [x] Two overlapping runs on one branch: the second exits non-zero before its sync, names the first run, and the first run is not disturbed. The overlap run is recorded in the QA report.
+- [x] A crashed run's lock is cleared by `--unlock`, and a live run's lock is not removed by it. Recorded in the QA report.
+- [x] `--prune-images` removes an old `agent-skills-test` tag and keeps the current tag and any in use; it never calls a global prune. Recorded in the QA report.
+- [x] No existing option's behaviour changes. Held by the existing cases in `tests/test-remote-runner.test.js` (arguments, exit status, timeout, linked worktree, reap), which run unchanged.
 
 **Performance**
 
-- [ ] The lock adds at most one ssh round trip to a run: the take replaces the existing run-directory `mkdir` call, the release is the one extra call. The calls are counted from the stub's call log in a test, not timed.
-- [ ] Load on both hosts is recorded before and after the live runs in the QA report (`uptime`).
+- [x] The lock adds at most one ssh round trip to a run: the take replaces the existing run-directory `mkdir` call, the release is the one extra call. The calls are counted from the stub's call log in a test, not timed.
+- [x] Load on both hosts is recorded before and after the live runs in the QA report (`uptime`).
 
 **Code quality**
 
-- [ ] `npm run lint:shell` passes on the changed shell files, and `format:check` on the changed test file (`.prettierignore` excludes Markdown, and prettier does not read shell).
-- [ ] The offline guard passes under `CI=true`.
-- [ ] `npm run ci:fast` is green on the final tree, run via `npm run test:remote`.
+- [x] `npm run lint:shell` passes on the changed shell files, and `format:check` on the changed test file (`.prettierignore` excludes Markdown, and prettier does not read shell).
+- [x] The offline guard passes under `CI=true`.
+- [x] `npm run ci:fast` is green on the final tree, run via `npm run test:remote`.
 
 **Migration**
 
-- [ ] `docs/contributing/testing-remote.md` states what the lock holds and its staleness rule, and no longer calls the guard best-effort. `CHANGELOG.md` has an entry citing task 296.
+- [x] `docs/contributing/testing-remote.md` states what the lock holds and its staleness rule, and no longer calls the guard best-effort. `CHANGELOG.md` has an entry citing task 296.
 
 ## 10. Risk Assessment
 
@@ -233,6 +235,23 @@ Not required for this task.
 ### Key Findings
 The shipped code is unchanged since the previous gate. The one open coverage finding from the PR review, the live two-run overlap on the server, was run and is recorded in the report: the second run was refused naming the first, the first finished green, and no lock was left. Four advisory reliability items stay recorded for follow-up.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+All Definition of Done criteria have been verified (run 1):
+
+✅ **Acceptance Criteria:** all 10 success criteria met, with code and test citations; the live overlap, `--unlock`, prune and load records are in QA reports 1 and 5
+✅ **QA Gate:** PASS 96/100 (`task.296.gate.5.test-remote-per-run-lock-and-image-prune.yml`); Step 5c PR review APPROVE
+✅ **Tests:** 48 offline cases under `CI=true`; `ci:fast` green on the server; CI green on PR #891 (5 of 5 checks)
+✅ **Documentation:** `docs/contributing/testing-remote.md` and `CHANGELOG.md` (task 296)
+✅ **Security Review:** PASS, with a boundary probe of 28 candidates (0 reproduced, 0 escaped)
+✅ **Compliance Review:** not applicable (developer tooling)
+
+**Detailed Verification Log:** See `task.296.dod.1.test-remote-per-run-lock-and-image-prune.md` for the evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-11-12
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -252,6 +271,7 @@ The shipped code is unchanged since the previous gate. The one open coverage fin
 | 2026-11-12 |         | QA gate PASS (95/100) — 0 findings | qa-task |
 | 2026-11-12 |         | QA findings fixed — live two-run overlap run and recorded for the open coverage finding (PC-3), trail rows corrected (PC-1, PC-2), 1 iteration; ready for QA re-review | qa-fix |
 | 2026-11-12 |         | QA gate PASS (96/100) — 0 findings | qa-task |
+| 2026-11-12 | 1.2     | DoD passed — accepted (PR #891) | finalise |
 
 <!-- change-log-end -->
 
@@ -259,7 +279,7 @@ The shipped code is unchanged since the previous gate. The one open coverage fin
 
 - [x] Phase 1: The lock
 - [x] Phase 2: The image prune
-- [ ] Phase 3: Tests and acceptance (offline tests done and mutation-proved; the live runs on the server are recorded in the QA report)
+- [x] Phase 3: Tests and acceptance (offline tests done and mutation-proved; the live runs on the server are recorded in the QA report)
 - [x] Phase 4: Docs
 
 ## References
