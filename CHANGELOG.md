@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **`finalise-ci-poll.sh` says why it wrote `UNDECIDED` (observation 166).** A poll started with a
+  check-count floor above the checks the head had started, for example a floor copied from another
+  PR when path-filtered workflows start fewer checks on a small diff, ran out its whole budget and
+  wrote `UNDECIDED` with no reason. It now prints `floor 5, saw 3` (or the changing-count case) on
+  stderr. The result line is unchanged, so readers are unaffected.
 - **The QA snippet classifier refuses the git forms that run a literal string (task 304).** A block
   whose arguments were plain literals passed every layer, because `git` is non-evaluating and its
   subcommand is on a closed list, yet git runs some of those strings as commands:

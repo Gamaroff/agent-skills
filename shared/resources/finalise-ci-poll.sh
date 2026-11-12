@@ -102,6 +102,17 @@ done
 # NOT a green reading: printed as sampled, the reader accepted a rollup that stayed partial for the
 # whole wait, which is the case the floor exists to refuse (obs #4). UNDECIDED makes the reader HALT.
 if [ "$DECIDED" -eq 0 ] && [ "$STATE" = SUCCESS ]; then
-  decided || STATE=UNDECIDED
+  if ! decided; then
+    STATE=UNDECIDED
+    # Say WHY on stderr; the result line stays as it was, because readers parse it. The floor is a
+    # measurement from reading 1 on this PR, never a figure carried over from another PR: a floor
+    # above the checks this head has started (path-filtered workflows start fewer on a small diff)
+    # can never be met, and without this line that reads as a CI that hung (obs #166).
+    if [ "$CHECKS" -lt "$EXPECTED_CHECKS" ]; then
+      echo "UNDECIDED: the rollup is SUCCESS but has ${CHECKS} check(s) and the floor is ${EXPECTED_CHECKS} (floor ${EXPECTED_CHECKS}, saw ${CHECKS}). Take the floor from reading 1 on this PR, or 0 when there is none; workflows with a paths: filter start fewer checks on a small diff." >&2
+    else
+      echo "UNDECIDED: the rollup is SUCCESS but the check count was still changing (${PREV_CHECKS} then ${CHECKS}), or the head moved." >&2
+    fi
+  fi
 fi
 printf '%s %s %s %ss TREE_EQ=%s\n' "$STATE" "$(sampled_head)" "$CHECKS" "$WAITED" "$TREE_EQ" > "$RESULT"
