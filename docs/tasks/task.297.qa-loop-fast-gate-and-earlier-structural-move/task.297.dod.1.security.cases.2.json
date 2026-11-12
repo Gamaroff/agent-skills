@@ -1,0 +1,43 @@
+[
+  {
+    "id": "rs-both-changed-and-commit",
+    "sink": "path",
+    "input": "HEAD",
+    "why": "Giving both --changed and --fix-commit is ambiguous; the script must refuse as a usage error before reading anything.",
+    "correct": "Exits 2 and prints nothing on stdout.",
+    "direction": "hostile",
+    "spec_ref": "shared/resources/repeat-subject.mjs:15",
+    "fixture": {
+      "files": {
+        "cur.yml": "top_issues:\n  - id: 1\n    file: src/a.ts\n    status: open\nnext: x\n",
+        "prev.yml": "top_issues:\n  - id: 1\n    file: src/a.ts\n"
+      }
+    },
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    }
+  },
+  {
+    "id": "rs-commit-option-shaped",
+    "sink": "path",
+    "input": "--output=pwned.txt",
+    "why": "Both --changed and --fix-commit given, so the usage error must win before the value ever reaches git.",
+    "correct": "Exits 2, prints nothing, and creates no pwned.txt.",
+    "direction": "hostile",
+    "spec_ref": "shared/resources/repeat-subject.mjs:15",
+    "fixture": {
+      "files": {
+        "cur.yml": "top_issues:\n  - id: 1\n    file: src/a.ts\n    status: open\nnext: x\n",
+        "prev.yml": "top_issues:\n  - id: 1\n    file: src/a.ts\n"
+      }
+    },
+    "expected": {
+      "stdout": "",
+      "exit": 2,
+      "absent": [
+        "pwned.txt"
+      ]
+    }
+  }
+]

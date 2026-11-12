@@ -1,0 +1,173 @@
+[
+  {
+    "id": "rs-shared-edited",
+    "sink": "path",
+    "input": "src/a.ts",
+    "why": "A file named by an open finding at both gates and edited by the fix is a repeat subject; refusing it over-blocks the offer.",
+    "correct": "Prints {\"reason\":\"ok\",\"subjects\":[\"src/a.ts\"]} and exits 0.",
+    "direction": "legitimate",
+    "spec_ref": "docs/tasks/task.297.qa-loop-fast-gate-and-earlier-structural-move/task.297.qa-loop-fast-gate-and-earlier-structural-move.md:114",
+    "fixture": {
+      "files": {
+        "cur.yml": "top_issues:\n  - id: 1\n    file: src/a.ts\n    status: open\nnext: x\n",
+        "prev.yml": "top_issues:\n  - id: 1\n    file: src/a.ts\n"
+      }
+    },
+    "expected": {
+      "stdout": "{\"reason\":\"ok\",\"subjects\":[\"src/a.ts\"]}\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "rs-dot-slash-spelling",
+    "sink": "path",
+    "input": "./src/a.ts",
+    "why": "An alternative spelling of an edited shared file must still match.",
+    "correct": "Normalises the leading ./ and reports src/a.ts.",
+    "direction": "legitimate",
+    "spec_ref": "docs/tasks/task.297.qa-loop-fast-gate-and-earlier-structural-move/task.297.qa-loop-fast-gate-and-earlier-structural-move.md:114",
+    "fixture": {
+      "files": {
+        "cur.yml": "top_issues:\n  - id: 1\n    file: src/a.ts\n    status: open\nnext: x\n",
+        "prev.yml": "top_issues:\n  - id: 1\n    file: src/a.ts\n"
+      }
+    },
+    "expected": {
+      "stdout": "{\"reason\":\"ok\",\"subjects\":[\"src/a.ts\"]}\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "rs-shared-unedited",
+    "sink": "path",
+    "input": "src/other.ts",
+    "why": "A shared file the fix did not edit is one unfixed finding, not a repeat subject; offering would be a false trigger.",
+    "correct": "Prints an empty subjects list.",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.297.qa-loop-fast-gate-and-earlier-structural-move/task.297.qa-loop-fast-gate-and-earlier-structural-move.md:114",
+    "fixture": {
+      "files": {
+        "cur.yml": "top_issues:\n  - id: 1\n    file: src/a.ts\n    status: open\nnext: x\n",
+        "prev.yml": "top_issues:\n  - id: 1\n    file: src/a.ts\n"
+      }
+    },
+    "expected": {
+      "stdout": "{\"reason\":\"ok\",\"subjects\":[]}\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "rs-different-files",
+    "sink": "path",
+    "input": "src/b.ts",
+    "why": "Two gates naming different files are not a repeat, even when the second file was edited.",
+    "correct": "Prints an empty subjects list.",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.297.qa-loop-fast-gate-and-earlier-structural-move/task.297.qa-loop-fast-gate-and-earlier-structural-move.md:114",
+    "fixture": {
+      "files": {
+        "cur.yml": "top_issues:\n  - id: 1\n    file: src/b.ts\n    status: open\nnext: x\n",
+        "prev.yml": "top_issues:\n  - id: 1\n    file: src/a.ts\n"
+      }
+    },
+    "expected": {
+      "stdout": "{\"reason\":\"ok\",\"subjects\":[]}\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "rs-resolved-finding",
+    "sink": "path",
+    "input": "src/a.ts",
+    "why": "A finding already resolved in the current gate is not open and must not trigger the offer.",
+    "correct": "Prints an empty subjects list.",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.297.qa-loop-fast-gate-and-earlier-structural-move/task.297.qa-loop-fast-gate-and-earlier-structural-move.md:114",
+    "fixture": {
+      "files": {
+        "cur.yml": "top_issues:\n  - id: 1\n    file: src/a.ts\n    status: resolved\nnext: x\n",
+        "prev.yml": "top_issues:\n  - id: 1\n    file: src/a.ts\n"
+      }
+    },
+    "expected": {
+      "stdout": "{\"reason\":\"ok\",\"subjects\":[]}\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "rs-path-prefix",
+    "sink": "path",
+    "input": "src/a.t",
+    "why": "A prefix or substring of the gate's file must not match; matching is on the whole path.",
+    "correct": "Prints an empty subjects list.",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.297.qa-loop-fast-gate-and-earlier-structural-move/task.297.qa-loop-fast-gate-and-earlier-structural-move.md:114",
+    "fixture": {
+      "files": {
+        "cur.yml": "top_issues:\n  - id: 1\n    file: src/a.ts\n    status: open\nnext: x\n",
+        "prev.yml": "top_issues:\n  - id: 1\n    file: src/a.ts\n"
+      }
+    },
+    "expected": {
+      "stdout": "{\"reason\":\"ok\",\"subjects\":[]}\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "rs-parent-dir",
+    "sink": "path",
+    "input": "src",
+    "why": "A parent directory of the gate's file is not the file; the fix editing a directory name must not match.",
+    "correct": "Prints an empty subjects list.",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.297.qa-loop-fast-gate-and-earlier-structural-move/task.297.qa-loop-fast-gate-and-earlier-structural-move.md:114",
+    "fixture": {
+      "files": {
+        "cur.yml": "top_issues:\n  - id: 1\n    file: src/a.ts\n    status: open\nnext: x\n",
+        "prev.yml": "top_issues:\n  - id: 1\n    file: src/a.ts\n"
+      }
+    },
+    "expected": {
+      "stdout": "{\"reason\":\"ok\",\"subjects\":[]}\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "rs-current-no-top-issues",
+    "sink": "path",
+    "input": "src/a.ts",
+    "why": "A gate with no top_issues block must fail closed (exit 1, no subject list), not read as a quiet empty result.",
+    "correct": "Exits 1 and prints nothing on stdout.",
+    "direction": "hostile",
+    "spec_ref": "shared/resources/repeat-subject.mjs:11",
+    "fixture": {
+      "files": {
+        "cur.yml": "verdict: PASS\n",
+        "prev.yml": "top_issues:\n  - id: 1\n    file: src/a.ts\n"
+      }
+    },
+    "expected": {
+      "stdout": "",
+      "exit": 1
+    }
+  },
+  {
+    "id": "rs-previous-no-top-issues",
+    "sink": "path",
+    "input": "src/a.ts",
+    "why": "Same fail-closed rule for the previous gate.",
+    "correct": "Exits 1 and prints nothing on stdout.",
+    "direction": "hostile",
+    "spec_ref": "shared/resources/repeat-subject.mjs:11",
+    "fixture": {
+      "files": {
+        "cur.yml": "top_issues:\n  - id: 1\n    file: src/a.ts\n    status: open\nnext: x\n",
+        "prev.yml": "verdict: PASS\n"
+      }
+    },
+    "expected": {
+      "stdout": "",
+      "exit": 1
+    }
+  }
+]

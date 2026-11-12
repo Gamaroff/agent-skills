@@ -5,10 +5,12 @@ type: task
 description: "Find why task.295's QA loop never ran the full fast suite after a fix, and make the loop's fast gate and its structural-move offer fire when they should."
 tags: [develop-task, qa-task, qa-fix, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-11-10
 updated: 2026-11-13
+completed_date: 2026-11-13
+pr_number: 895
 estimated_effort_hours: 4
 ---
 
@@ -172,18 +174,41 @@ Written at develop (2026-11-13) from task.295's implementation report, its five 
 ### Key Findings
 No critical issues. Two LOW cleanups are recorded in the gate's future recommendations.
 
-## Change Log
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.297.qa.1.qa-loop-fast-gate-and-earlier-structural-move.md`
+**Gate File**: `task.297.gate.1.qa-loop-fast-gate-and-earlier-structural-move.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** all 7 met, with code and test evidence cited for each
+✅ **Tests and CI:** `ci:fast` 8445 pass on the LAN server; CI reading 1 SUCCESS across 6 checks on `cd794da4`
+✅ **PR Review:** PR #895; the 5c conformance review is CONCERNS with one medium finding (the missing `pr_number`), cleared by this acceptance
+✅ **Documentation:** the QA-loop step document, `skills/qa-fix/SKILL.md` and the bundled copies updated
+✅ **Security Review:** ✅ PASS. The probe plan executed 27 cases against `repeat-subject.mjs` and `fast-gate-outcome.sh --command`; none reproduced. Two low recommendations for the owner (a Unicode-blank command, and a leading-dash `--fix-commit` value) are in the DoD file.
+⚠️ **Compliance Review:** not applicable (internal tooling, no data, payment, UI or health features)
+
+**Detailed Verification Log:** See `task.297.dod.1.qa-loop-fast-gate-and-earlier-structural-move.md` for the full evidence.
+
+**Task marked as ACCEPTED on:** 2026-11-13
 
 <!-- change-log-start -->
+## Change Log
 
-| Date       | Version | Description                                  | Author      |
-| ---------- | ------- | -------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-10 | 1.0     | Initial draft — cut from observations #161, #162 | create-task |
 | 2026-11-13 | 1.1     | Review passed (8/10) — decided trace not HALT, gave both rules a script home, listed the four tests that read step 0a, moved the diagnosis into this document | review-task |
 | 2026-11-13 |         | Status → ready-for-development | review-task |
 | 2026-11-13 | 1.2     | Implemented: `--command` mode in `fast-gate-outcome.sh` and step 0a trace; `repeat-subject.mjs` and qa-fix trigger (b); tests mutation-proved; Diagnosis added; status → ready-for-review | develop |
 | 2026-11-13 |         | QA gate PASS (100/100) — 0 findings, 2 LOW cleanups | qa-task |
-
+| 2026-11-13 | 1.3 | DoD passed — accepted (PR #895) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
