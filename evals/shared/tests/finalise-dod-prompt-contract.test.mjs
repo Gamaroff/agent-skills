@@ -999,6 +999,43 @@ test("the probe render's control tokens balance", () => {
   );
 });
 
+test("the probe render prints what the run could not observe, only when the plan reported limits, and never inside the zero-executed branch", () => {
+  // task.300: a clean count describes the observable sink only, so the Probe Results block
+  // carries the limits beside it. The line must be guarded by its own {if}, so an absent
+  // list renders nothing, and must follow the candidates-executed line it qualifies.
+  const { block } = probeRenderTokens();
+  const guardAt = block.indexOf(
+    "{if security_result.observation_limits is non-empty:}",
+  );
+  assert.ok(
+    guardAt !== -1,
+    "skills/finalise/SKILL.md: the observation_limits guard is missing from the Probe Results block",
+  );
+  const lineAt = block.indexOf("**Not observed by this run:**", guardAt);
+  const endAt = block.indexOf("{endif}", guardAt);
+  assert.ok(
+    lineAt !== -1 && lineAt < endAt,
+    "skills/finalise/SKILL.md: the `Not observed by this run` line must sit inside its own {if observation_limits} guard",
+  );
+  const executedAt = block.indexOf("**Candidates executed:**");
+  assert.ok(
+    executedAt !== -1 && executedAt < guardAt,
+    "skills/finalise/SKILL.md: the limits line must follow the Candidates executed line it qualifies",
+  );
+  const zeroAt = block.indexOf("❌");
+  const elseIfAt = block.indexOf("{else if");
+  assert.ok(
+    zeroAt === -1 || elseIfAt === -1 || guardAt > elseIfAt || guardAt < zeroAt,
+    "skills/finalise/SKILL.md: the limits line must not sit inside the zero-executed branch",
+  );
+  // The source of the sentences is the plan's output, copied by Step 3b.1.
+  assert.match(
+    skill(),
+    /SECURITY_RESULT\.observation_limits/,
+    "skills/finalise/SKILL.md: Step 3b.1 no longer copies observation_limits from the plan output",
+  );
+});
+
 test("the probe render sits inside the Security section, before the agent summary", () => {
   const probeAt = skill().indexOf("### Probe Results");
   const generalAt = skill().indexOf("### General Security");

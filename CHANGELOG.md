@@ -6,6 +6,18 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **A clean security-probe count names what the run could not observe (task 300).** "N candidates,
+  0 reproduced" was a true claim about refusal, but the limits that bound it (an accepted value's
+  effects are not observed; for a `fence:` entry, a write to an absolute path outside the sandbox is
+  not observed) lived only in source comments and `probe-boundary-rule.md` §5, so a DoD reader saw
+  the number without them. The engine now states the limits once (`OBSERVATION_LIMITS` in
+  `security-probe.mjs`), stores their ids per record entry, and prints the sentences in the
+  `security_review:` block and in `security-probe-plan.mjs`'s output. `/finalise` copies them into
+  `security_result.observation_limits` and the Probe Results block prints them beside the count.
+  The field is additive: a record written before it derives the same limits from its entry form.
+  Phase 1 found the filed premise wrong in part (a validator that accepts a hostile value is already
+  counted as reproduced), so this is a reporting change, not a new observable sink.
+
 - **The QA loop records a skipped fast gate, and qa-fix's structural-move offer fires at the second
   repeat (task 297).** An unset or empty `develop.fastGateCommand` was a silent skip in step 0a:
   nothing ran and nothing was recorded, so a reader of the QA history could not tell a green gate

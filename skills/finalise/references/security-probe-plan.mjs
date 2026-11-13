@@ -58,6 +58,10 @@
  *   probes_executed: the record's totals.executed, read through the engine's own readRecord()
  *                    (the entry files, never the human snapshot) — copied, never composed; 0
  *                    when no entry reached the record (empty plan, every entry refused),
+ *   observation_limits: the sentences naming what the run could not observe, from the engine's
+ *                    OBSERVATION_LIMITS by the recorded entry forms (task.300); [] when no
+ *                    entry reached the record. A clean count describes what was observable,
+ *                    not what a target does with an accepted value,
  *   escapes:         every case the engine saw write outside its sandbox: {index, entry, id,
  *                    path}. Non-empty is a finding whatever the verdict — the engine exits 1 on
  *                    an escape even when the control engages,
@@ -310,8 +314,15 @@ async function readExecuted(record, engine) {
         error: "entries ran, but the record has no entry directory",
       };
     const n = rec.totals && rec.totals.executed;
+    // The limits come from the engine too, as the count does: one definition of what a run
+    // cannot observe (task.300). An engine without the export reads as none, never a throw.
+    const { observationLimitTexts } = await import(path.resolve(engine));
+    const limits =
+      typeof observationLimitTexts === "function"
+        ? observationLimitTexts(rec)
+        : [];
     return Number.isInteger(n) && n >= 0
-      ? { ok: true, executed: n }
+      ? { ok: true, executed: n, limits }
       : { ok: false, error: "the record carries no totals.executed" };
   } catch (e) {
     return { ok: false, error: String((e && e.message) || e) };
@@ -340,6 +351,7 @@ export async function runPlan(options) {
     reason: plan.length === 0 ? "empty-plan" : "ran",
     record: opts.record,
     probes_executed: 0,
+    observation_limits: [],
     probes: [],
     escapes: [],
     refusals: [],
@@ -577,8 +589,10 @@ export async function runPlan(options) {
   }
   if (out.runs.length > 0) {
     const r = await readExecuted(opts.record, opts.engine);
-    if (r.ok) out.probes_executed = r.executed;
-    else {
+    if (r.ok) {
+      out.probes_executed = r.executed;
+      out.observation_limits = r.limits;
+    } else {
       out.reason = "record-unreadable";
       out.error = r.error;
     }

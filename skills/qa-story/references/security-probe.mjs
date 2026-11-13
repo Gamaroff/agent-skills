@@ -4165,6 +4165,58 @@ function runFenceCase(
 
 export const RECORD_VERSION = 1;
 
+/**
+ * What a run of this engine cannot see, stated ONCE here (task.300). A clean
+ * count ("N candidates, 0 reproduced") is a claim about what the runner can
+ * observe, and these are the stated limits that bound it. Before this, they
+ * lived in source comments and probe-boundary-rule.md §5 only, so a DoD reader
+ * saw the number without them. The record stores the IDS (an entry's limits are
+ * decided by its entry FORM, the one input the runner has), and every rendering
+ * — the `security_review:` block, the plan output, the DoD line — maps an id to
+ * this text. Not to be confused with the corpus `--sink` (an input class).
+ */
+export const OBSERVATION_LIMITS = Object.freeze({
+  "effects-after-accept":
+    "what a target does with an accepted value (a remote shell, a spawned process) is not observed: an accepted hostile case counts as reproduced, a refused one as held",
+  "outside-sandbox-write":
+    "a write to an absolute path outside the sandbox (an injected `$(touch /abs/x)`) is not observed",
+});
+
+/**
+ * The limit ids that bound an entry's result, in `OBSERVATION_LIMITS` order.
+ * Decided by the entry form alone: every form carries `effects-after-accept`,
+ * and the `fence:` form, whose block runs as source with the input substituted
+ * in, also carries `outside-sandbox-write` (TASK-180-016).
+ */
+export function observationLimitsFor(entry) {
+  const ids = ["effects-after-accept"];
+  if (typeof entry === "string" && entry.startsWith("fence:")) {
+    ids.push("outside-sandbox-write");
+  }
+  return ids;
+}
+
+/**
+ * The run-level limit ids of a record: the union over its controls, in
+ * `OBSERVATION_LIMITS` order. A control written before this field existed
+ * derives its ids from its entry, so an old record reads the same as a new one.
+ */
+export function observationLimitIds(record) {
+  const seen = new Set();
+  for (const c of record?.controls ?? []) {
+    const ids = Array.isArray(c.observation_limits)
+      ? c.observation_limits
+      : observationLimitsFor(c.entry);
+    for (const id of ids) seen.add(id);
+  }
+  return Object.keys(OBSERVATION_LIMITS).filter((id) => seen.has(id));
+}
+
+/** The run-level limit sentences of a record, for a reader. */
+export function observationLimitTexts(record) {
+  return observationLimitIds(record).map((id) => OBSERVATION_LIMITS[id]);
+}
+
 /** Severity the review prompt assigns each verdict — stated once, here. */
 export const SEVERITY_BY_VERDICT = Object.freeze({
   engages: "none",
@@ -4293,6 +4345,9 @@ export function toRecordEntry(result, { name, callSite } = {}) {
       }),
     ),
     escaped: result.escapes?.length ?? 0,
+    // The stated limits that bound this entry's result (task.300) — ids, decided by
+    // the entry form; see OBSERVATION_LIMITS. Additive: every reader reads counts.
+    observation_limits: observationLimitsFor(result.entry),
     // Which shells each case ran under (shell form), or null. The count is
     // cases × shells, and a reader must not have to divide (cycle 2, CR-5).
     shells: Array.isArray(result.shells) ? [...result.shells] : null,
@@ -4622,6 +4677,14 @@ export function emitBlock(record, { mode = "diff" } = {}) {
     `  escaped: ${totals.escaped}`,
     `  evidence: ${evidence}    # computed by security-probe.mjs from the run record`,
   );
+  // What this run could not observe (task.300): a clean count describes the
+  // observable sink only. Absent on a record with no controls — nothing ran.
+  if (record.controls.length > 0) {
+    lines.push("  observation_limits:");
+    for (const t of observationLimitTexts(record)) {
+      lines.push(`    - ${yamlStr(t)}`);
+    }
+  }
   if (record.controls.length === 0) {
     lines.push("  controls: []");
   } else {

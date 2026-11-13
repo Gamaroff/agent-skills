@@ -58,6 +58,10 @@ import {
   isPythonCrash,
   main,
   namesGh,
+  OBSERVATION_LIMITS,
+  observationLimitIds,
+  observationLimitsFor,
+  observationLimitTexts,
   ghFreePath,
   parseArgvTemplate,
   pathAssertionProblem,
@@ -9655,6 +9659,160 @@ test("uniform failure: through security-probe-plan.mjs there are no probes and n
     assert.equal(out.runs[0].verdict, "unverifiable", child.stdout);
     const text = readFileSync(record, "utf8");
     assert.equal(text.includes("_failure"), false, text);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ── task.300: a clean count names what the run could not observe ────────────
+
+const LIMIT_EFFECTS = OBSERVATION_LIMITS["effects-after-accept"];
+const LIMIT_OUTSIDE = OBSERVATION_LIMITS["outside-sandbox-write"];
+
+/** A record holding one control per entry string, shaped as the engine writes it. */
+function limitsRecord(entries, { withField }) {
+  return {
+    version: 1,
+    controls: entries.map((entry, i) => {
+      const e = toRecordEntry(
+        {
+          sink: "filename",
+          entry,
+          verdict: "engages",
+          reason: "x",
+          executed: 3,
+        },
+        { name: `c${i}` },
+      );
+      if (!withField) delete e.observation_limits;
+      return e;
+    }),
+  };
+}
+
+test("observation limits: every entry form carries the after-accept limit, and only fence: adds the outside-sandbox write", () => {
+  for (const entry of [
+    "lib/validate.mjs#validate",
+    "shell:scripts/run.sh",
+    "shell-fn:scripts/run.sh#check",
+    "cli:scripts/tool.mjs",
+    "shell-argv:scripts/run.sh",
+  ]) {
+    assert.deepEqual(
+      observationLimitsFor(entry),
+      ["effects-after-accept"],
+      entry,
+    );
+  }
+  assert.deepEqual(observationLimitsFor("fence:docs/x.md#Run it"), [
+    "effects-after-accept",
+    "outside-sandbox-write",
+  ]);
+  // A malformed entry never throws, and carries the universal limit.
+  assert.deepEqual(observationLimitsFor(null), ["effects-after-accept"]);
+});
+
+test("observation limits: the record entry stores ids and the security_review block prints the sentences once, at run level", () => {
+  const rec = limitsRecord(["shell:scripts/run.sh", "fence:docs/x.md#Run it"], {
+    withField: true,
+  });
+  assert.deepEqual(rec.controls[0].observation_limits, [
+    "effects-after-accept",
+  ]);
+  assert.deepEqual(rec.controls[1].observation_limits, [
+    "effects-after-accept",
+    "outside-sandbox-write",
+  ]);
+  assert.deepEqual(observationLimitIds(rec), [
+    "effects-after-accept",
+    "outside-sandbox-write",
+  ]);
+  const block = emitBlock(rec);
+  assert.match(block, /^ {2}observation_limits:$/m);
+  assert.equal(block.split(LIMIT_EFFECTS.slice(0, 40)).length - 1, 1, block);
+  assert.ok(block.includes(LIMIT_OUTSIDE.slice(0, 40)), block);
+  // Only shell forms: the outside-sandbox sentence is absent.
+  const shellOnly = emitBlock(
+    limitsRecord(["shell:scripts/run.sh"], { withField: true }),
+  );
+  assert.ok(shellOnly.includes(LIMIT_EFFECTS.slice(0, 40)), shellOnly);
+  assert.equal(
+    shellOnly.includes(LIMIT_OUTSIDE.slice(0, 40)),
+    false,
+    shellOnly,
+  );
+});
+
+test("observation limits: a record written before the field existed reads the same as one written after (readers tolerate it)", () => {
+  const entries = ["shell:scripts/run.sh", "fence:docs/x.md#Run it"];
+  const legacy = limitsRecord(entries, { withField: false });
+  const current = limitsRecord(entries, { withField: true });
+  assert.deepEqual(
+    observationLimitTexts(legacy),
+    observationLimitTexts(current),
+  );
+  // The counts a gate reads do not move because the field is present.
+  const strip = (b) =>
+    b.replace(/^ {2}observation_limits:\n(?: {4}- .*\n)+/m, "");
+  assert.equal(strip(emitBlock(legacy)), strip(emitBlock(current)));
+  assert.match(emitBlock(current), /^ {2}probes_executed: 6$/m);
+  assert.match(emitBlock(legacy), /^ {2}probes_executed: 6$/m);
+  // No control, nothing ran: no limits are claimed.
+  assert.doesNotMatch(
+    emitBlock({ version: 1, controls: [] }),
+    /observation_limits/,
+  );
+  assert.doesNotMatch(emitBlock(null), /observation_limits/);
+});
+
+test("observation limits: through security-probe-plan.mjs the output carries the sentences beside probes_executed, with the same count as without them", () => {
+  const dir = mkdtempSync(join(tmpdir(), "probe-limits-plan-"));
+  try {
+    const plan = join(dir, "plan.json");
+    const record = join(dir, "x.dod.1.security.run.json");
+    writeFileSync(
+      plan,
+      JSON.stringify([
+        {
+          argv: [
+            "--sink",
+            "filename",
+            "--entry",
+            `shell:${FIXTURES}/uniform-usage.sh`,
+          ],
+        },
+      ]),
+    );
+    const child = spawnSync(
+      process.execPath,
+      [
+        join(REPO_ROOT, "shared/resources/security-probe-plan.mjs"),
+        "--plan",
+        plan,
+        "--record",
+        record,
+        "--cases-base",
+        join(dir, "x.dod.1.security.cases"),
+        "--repo-root",
+        REPO_ROOT,
+        "--json",
+      ],
+      { cwd: REPO_ROOT, encoding: "utf8" },
+    );
+    const out = JSON.parse(child.stdout);
+    assert.deepEqual(out.observation_limits, [LIMIT_EFFECTS], child.stdout);
+    assert.equal(out.probes_executed, 0, child.stdout);
+    // The same record with the field stripped from its entry files reads the same count and sentence.
+    const entriesDir = recordEntriesDir(record);
+    for (const f of readdirSync(entriesDir)) {
+      const p = join(entriesDir, f);
+      const e = JSON.parse(readFileSync(p, "utf8"));
+      delete e.observation_limits;
+      writeFileSync(p, JSON.stringify(e));
+    }
+    const rec = readRecord(record);
+    assert.equal(rec.totals.executed, out.probes_executed);
+    assert.deepEqual(observationLimitTexts(rec), [LIMIT_EFFECTS]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
