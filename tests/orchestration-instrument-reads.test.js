@@ -58,7 +58,10 @@ function maskQuoted(line) {
       if (ch === quote) quote = null;
       out += ";&|>".includes(ch) ? "_" : ch;
     } else {
-      if (ch === '"' || ch === "'") quote = ch;
+      // A single quote opens only at a word boundary (start, whitespace, or an operator or `=`
+      // before it). An apostrophe inside a word (`Don't`, `it's`) is prose, not a quote (gate 3).
+      const boundary = out === "" || /[\s=;&|(>]$/.test(out);
+      if (ch === '"' || (ch === "'" && boundary)) quote = ch;
       out += ch;
     }
   }
@@ -141,6 +144,8 @@ test("fixtures — the scan flags each wrapped-status shape and passes the corre
     'cmd; echo "rc=$?" 2>&1', // 2>&1 sends the status to the notification's own stream
     'cmd & echo "rc=$?"', // a single & operator
     'cmd | echo "rc=$?"', // a single | operator
+    'Don\'t write cmd; echo "rc=$?"', // an apostrophe in prose does not open a quote
+    'it\'s cmd; echo "rc=$?"',
   ];
   for (const l of flagged) {
     assert.ok(
@@ -159,6 +164,7 @@ test("fixtures — the scan flags each wrapped-status shape and passes the corre
     'cmd > "$LOG" 2>&1; echo "TEST_EXIT=$?" >> "$LOG"', // the shipped background form
     'cmd; echo "a > b" "$rc"', // a quoted `>` with no status read
     'cmd; echo "rc=$?" >&2', // to stderr, a redirect
+    'Don\'t write cmd; echo "rc=$?" >> "$LOG"', // an apostrophe in prose, a real redirect after it
   ];
   for (const l of passed) {
     assert.deepEqual(
