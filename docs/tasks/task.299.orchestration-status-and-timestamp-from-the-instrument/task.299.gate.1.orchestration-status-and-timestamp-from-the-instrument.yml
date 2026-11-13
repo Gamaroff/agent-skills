@@ -1,0 +1,87 @@
+schema: 2
+task: 'task.299.orchestration-status-and-timestamp-from-the-instrument'
+task_title: 'Orchestration reads status and time from the instrument'
+gate: CONCERNS
+status_reason: 'Prose fixes and bundling are sound and ci:fast is green, but the guard test misses shapes its header claims (quoted bare $?, space-separated name, && / || wrappers) and its status rule has no non-vacuity floor on shipped text.'
+reviewer: 'QA Engineer'
+head: '5cf248b4a0db4c6ae46ed2b86e75cedb708bff59'
+updated: '2026-11-13T10:58:15Z'
+
+top_issues:
+  - id: 'T299-QA-1'
+    severity: medium
+    file: 'tests/orchestration-instrument-reads.test.js'
+    finding: 'WRAPPED_STATUS misses shapes the header claims or implies: quoted bare `; echo "$?"`, `; echo "exit $?"`, `; echo "EXIT=$?".`, `; echo "rc=$?"; true`, and a trailing comment. Reproduced by running the regex; the control `cmd; echo "rc=$?"` is flagged.'
+    suggested_action: 'Allow optional quotes around bare $?, accept [=: ] after the name, and replace the (`|)|$) tail with a check that no redirect follows the echo.'
+    suggested_owner: dev
+    origin: 'code-review CR-1'
+    status: open
+  - id: 'T299-QA-2'
+    severity: medium
+    file: 'tests/orchestration-instrument-reads.test.js'
+    finding: 'The status rule needs a literal `;` before the echo, so `cmd && echo "rc=$?"` and `cmd || echo "rc=$?"` are not flagged. Reproduced by execution (control flagged); reviewer confidence medium, promoted under 5d.'
+    suggested_action: 'Widen the leading operator to (;|&&|\|\|), or name the restriction in the header list of unseen shapes.'
+    suggested_owner: dev
+    origin: 'code-review CR-2, reproduced by QA'
+    status: open
+  - id: 'T299-QA-3'
+    severity: medium
+    file: 'tests/orchestration-instrument-reads.test.js'
+    finding: 'No non-vacuity floor for the status rule on shipped text: the only shipped-text status assertion expects zero hits, so a broken WRAPPED_STATUS or a population with no echo stays green. The time rule has a strip-and-rescan; the status rule has none.'
+    suggested_action: 'Take the step-3 doc, strip the `>> "$TEST_LOG"` redirect, and assert scan() returns a status hit.'
+    suggested_owner: dev
+    origin: 'code-review CR-3'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 4
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary_reason: ''
+    notes: 'No input boundary: the change is prose plus a read-only scanning test. boundary: false (a scan that reports, never accepts or rejects an action).'
+  performance:
+    status: PASS
+    notes: 'Guard test median 357 ms of five runs (245, 370, 269, 357, 406 ms; load 4.56 beside each), against a 3 s bound.'
+  reliability:
+    status: CONCERNS
+    notes: 'The guard can read clean on shapes it was written to catch (T299-QA-1..3).'
+  maintainability:
+    status: PASS
+    notes: 'Population derived, allowlist carries a reason per entry, bundled copies regenerated and in sync.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T299-QA-1..3 in the guard and add fixtures for each missed shape.'
+      refs: ['tests/orchestration-instrument-reads.test.js']
+  future:
+    - action: 'CR-4: time rule is paired per file, not per placeholder (disclosed in the test header).'
+      refs: ['tests/orchestration-instrument-reads.test.js']
+    - action: 'CR-5: population uses git ls-files, so an untracked new source is unscanned until staged.'
+      refs: ['tests/orchestration-instrument-reads.test.js']
+    - action: 'CR-6: an HTML comment inside the markdown template fence in nestjs-debug is copied into every generated log; move it out of the fence.'
+      refs: ['skills/nestjs-debug/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['Fix T299-QA-1..3']

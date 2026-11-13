@@ -34,7 +34,7 @@ Find where pipeline prose teaches a wrapped-command exit code or a hand-typed ti
 | 1. create-branch           | ✅ Done | Branch `feature/task.{id}.*` exists in git                             | Branch created at `74a9b87b` |       —                    | 2026-11-13T10:35Z |
 | 2. review-task             | ✅ Done | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               | 8/10, 6 Important fixed, status → ready-for-development | —                    | 2026-11-13T10:36Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline; remote `ci:fast` 8461 pass / 0 fail; bundle:check, format:check, lint:shell clean | —                    | 2026-11-13T10:56Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
+| 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #899; no tracker issue linked | —                    | 2026-11-13T10:57Z |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
@@ -78,7 +78,12 @@ _Problems encountered and how they were resolved or escalated._
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### QA Cycle 1 — CONCERNS (70/100), 3 medium findings, all in `tests/orchestration-instrument-reads.test.js`
+
+- T299-QA-1/2: the status matcher was one regex needing `;` and a closing-quote or end-of-line tail, so it missed quoted bare `"$?"`, `"exit $?"`, `; true`, a trailing comment, braced `${?}`, and `&&` / `||` wrappers. Replaced by `wrappedStatus()`: an `echo` after `;`, `&&` or `||` whose arguments read `$?` or `${?}` and carry no `>`. Nine new flagged fixtures, three new passing ones.
+- T299-QA-3: added a status non-vacuity assertion (strip `>> "$TEST_LOG"` from the step-3 doc; the scan must flag it).
+- Mutation proofs: `&&`/`||` removed from the operator set → fixture test red (`must flag: cmd && echo "rc=$?"`); matcher forced to return false → fixture and non-vacuity tests red. Both reverted.
+- Population test still clean (no new hit in shipped sources). Struck mechanism / narrowing residue: none (first fix cycle, one subject only). Advisory, not fixed: CR-4 (file-level pairing, disclosed), CR-5 (untracked sources; now named in the header), CR-6 (HTML comment inside the nestjs-debug template fence, a cleanup).
 
 ---
 
@@ -87,7 +92,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: feature/task.299.orchestration-status-and-timestamp-from-the-instrument
-**PR**: {populated after Step 4}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/899
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}

@@ -9,16 +9,19 @@
  * files drifted from the real time. This test fails on a new shape of either.
  *
  * CLAIM, stated as a bounded set (obs #13). It catches exactly:
- *   (a) STATUS — a line that ends in `; echo "<name>=$?"` (or `; echo $?`) whose name
- *       holds exit, rc, status or code, and which does NOT redirect the echo into a file
- *       (`>>` or `>`): the echo's own exit status is what a background notification
- *       reports, so the value reaches the reader only as prose.
+ *   (a) STATUS — an `echo` after `;`, `&&` or `||` whose arguments read `$?` or `${?}`
+ *       (quoted or not, any name or none, followed or not by `; true` or a comment), and
+ *       which does NOT redirect the echo (`>`, `>>`, `2>&1`): the echo's own exit status is
+ *       what a background notification reports, so the value reaches the reader only as
+ *       prose.
  *   (b) TIME — a time-of-day placeholder (`{… HH:MM …}`, `{timestamp}`, `{ISO-8601}`,
  *       `<ISO-8601>`, `HH:MMZ`) in a file that never names `date -u`, the instrument.
  * It knowingly does NOT see: a date-only placeholder (`{today}`, `{YYYY-MM-DD}`: the date
  * is in the session context); a time placeholder in a file that names `date -u` for a
  * different placeholder (file-level pairing, not line-level); a status wrapped in a form
- * other than `echo` (`printf`, `tee`); and any file outside the population below.
+ * other than `echo` (`printf`, `tee`); an echo on a line of its own, away from the command;
+ * an echo whose output is redirected to stderr (`2>&1`), which counts as redirected; and any
+ * file outside the population below, including a new source not yet tracked by git.
  *
  * POPULATION is derived, never listed: tracked `shared/resources/*.md` and
  * `skills/*\/SKILL.md`. The bundled copies under `skills/*\/references/` are excluded —
@@ -36,9 +39,16 @@ const ROOT = path.join(__dirname, "..");
 
 // ── The two shapes ────────────────────────────────────────────────────────
 
-// (a) `; echo "NAME=$?"` / `; echo $?` at the end of a line, with no redirect after the echo.
-const WRAPPED_STATUS =
-  /;\s*echo\s+(?:"?[A-Za-z_]*(?:exit|rc|status|code)[A-Za-z_]*=\$\?"?|\$\?)\s*(?:`|\)|$)/i;
+// (a) an `echo` after `;`, `&&` or `||` whose arguments read `$?` (or `${?}`), with no `>` redirect
+// among them. The arguments run to the next `;`, `&` or `|`, so a trailing `; true` or a trailing
+// comment does not hide the echo, and the name before `=` is irrelevant.
+const ECHO_AFTER_OPERATOR = /(?:;|&&|\|\|)\s*echo\s+([^;&|\n]*)/gi;
+function wrappedStatus(line) {
+  for (const m of line.matchAll(ECHO_AFTER_OPERATOR)) {
+    if (/\$\{?\?\}?/.test(m[1]) && !m[1].includes(">")) return true;
+  }
+  return false;
+}
 // (b) a time-of-day placeholder.
 const TIME_PLACEHOLDER =
   /\{[^}\n]*(?:HH:MM|HH:mm|ISO-8601|timestamp)[^}\n]*\}|<ISO-8601>|HH:MMZ/;
@@ -49,7 +59,7 @@ function scan(text) {
   const out = [];
   const lines = text.split("\n");
   lines.forEach((l, i) => {
-    if (WRAPPED_STATUS.test(l))
+    if (wrappedStatus(l))
       out.push({ line: i + 1, rule: "status", text: l.trim() });
   });
   if (!INSTRUMENT.test(text)) {
@@ -90,6 +100,15 @@ test("fixtures — the scan flags each wrapped-status shape and passes the corre
     'run it; echo "status=$?"',
     "npm test; echo $?",
     '`cmd; echo "exit_code=$?"`',
+    'cmd; echo "$?"', // quoted bare
+    'cmd; echo "exit $?"', // space, not `=`
+    'cmd; echo "EXIT=$?".', // a character after the closing quote
+    'cmd; echo "rc=$?"; true', // a following command
+    'cmd; echo "rc=$?" # note', // a trailing comment
+    'cmd; echo "rc=${?}"', // braced
+    'cmd && echo "rc=$?"', // && wrapper
+    'cmd || echo "rc=$?"', // || wrapper
+    'cmd; echo "done=$?"', // a name outside exit/rc/status/code
   ];
   for (const l of flagged) {
     assert.ok(
@@ -102,6 +121,9 @@ test("fixtures — the scan flags each wrapped-status shape and passes the corre
     "cmd > out.log 2>&1; echo $? > status.txt",
     "TEST_EXIT=$?",
     'echo "rc=$rc"',
+    'cmd && echo "rc=$?" >> "$LOG"', // && form with the status redirected
+    'cmd || echo "rc=$?" > status.txt',
+    "cmd; echo done", // an echo that reads no status
   ];
   for (const l of passed) {
     assert.deepEqual(
@@ -175,6 +197,12 @@ test("non-vacuity — the population is large and the scan sees the shapes it ex
   assert.deepEqual(
     scan(s3).filter((f) => f.rule === "status"),
     [],
+  );
+  // The same for the status rule: strip the redirect that makes the shipped form correct and the
+  // scan must flag it, so a broken status matcher cannot read the population as clean.
+  assert.ok(
+    scan(s3.replace(/ >> "\$TEST_LOG"/g, "")).some((f) => f.rule === "status"),
+    "with the redirect removed the step-3 doc must be flagged",
   );
   for (const k of Object.keys(ALLOW))
     assert.ok(ALLOW[k].length > 10, `${k} needs a real reason`);
