@@ -1,0 +1,64 @@
+schema: 2
+task: 'task.298.review-task-runs-plan-command-and-ci-parity'
+task_title: "review-task runs a plan's command and checks CI parity"
+gate: CONCERNS
+status_reason: 'Both rules are stated at their sites and the suite is green, but the new test asserts its check is the highest-numbered in the list, so the next check added to review-task turns it red with nothing broken (reproduced on a scratch copy).'
+reviewer: 'QA Engineer'
+head: '8ee45815e19caa903b54aa3f6b74aceedcf79879'
+updated: '2026-11-13T07:56:08Z'
+
+top_issues:
+  - id: 'T298-QA-1'
+    severity: medium
+    file: 'tests/review-run-and-parity-checks.test.js'
+    finding: 'The test "the new check exists and is the last item of the Step 3 list" asserts item.number equals the highest number in the Step 3 list. Appending a check 32 to a scratch copy of review-task/SKILL.md (REVIEW_RUN_PARITY_ROOT) turns it red (6 pass, 1 fail); the real tree is green (7 pass). The next task to add a review-task check would fail CI on a test that has nothing to do with its change. Origin: code-review, reproduced by QA.'
+    suggested_action: 'Keep the existence assertion and drop the "highest" equality: assert item.number is at least 31 and does not exceed the highest number, so a later check does not break it. Rename the test to match.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 7
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: false
+    boundary_signals: []
+    notes: 'The diff is two Markdown rules and a presence test. No predicate accepts or rejects input, and the criteria carry no boundary signal (probe-boundary-signals.mjs returned an empty list). The new check tells a reviewer to run a plan command only in a dry-run or scratch form and never to improvise a flag; that text is held by the test.'
+  performance:
+    status: PASS
+    notes: 'No runtime code. The test reads two files and runs in about 0.1 s.'
+  reliability:
+    status: CONCERNS
+    notes: 'The test goes red on a benign future change (T298-QA-1).'
+  maintainability:
+    status: PASS
+    notes: 'The check follows the shape of checks 20 to 30; its number is derived in the test rather than typed in.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'The new check tells a reviewer to run a plan command in a scratch form. For a transfer such as scp there is no dry-run flag, so the scratch target is a remote path the reviewer must create; the text does not say who cleans it up. Consider one sentence on removing the scratch target.'
+      refs: ['skills/review-task/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['Fix T298-QA-1 (one assertion in the new test)']

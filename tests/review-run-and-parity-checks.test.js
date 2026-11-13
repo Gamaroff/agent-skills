@@ -4,8 +4,8 @@
  * Review: a plan's own command is run once, and a new CI environment gets a parity line
  * (task.298; obs #163).
  *
- * review-task Step 3 states the new check (the highest-numbered item of its list, derived here, never
- * typed in), and lists it in the three places that list checks by number or shape. create-task § 3.5
+ * review-task Step 3 states the new check (found by name, its number derived here and never typed in;
+ * a later check may follow it), and lists it in the three places that list checks by number or shape. create-task § 3.5
  * "Should Add" carries the matching environment-parity item.
  *
  * What this holds is PRESENCE, as its siblings do (tests/review-plan-shape-checks.test.js): that each
@@ -72,12 +72,15 @@ test("review-task Step 3 is found, and its numbered list is not vacuous", () => 
   );
 });
 
-test("the new check exists and is the last item of the Step 3 list", () => {
+test("the new check exists in the Step 3 list, and a later check does not break this", () => {
   assert.ok(item, `check "${NAME}" missing from ${RT} Step 3`);
-  assert.equal(
-    item.number,
-    highestNumber(step3),
-    "the new check is the highest-numbered item (derived, not typed)",
+  assert.ok(
+    item.number >= 31,
+    "the new check follows check 30 (it was added as 31)",
+  );
+  assert.ok(
+    item.number <= highestNumber(step3),
+    "the list reaches at least the new check; a later check may exceed it",
   );
 });
 
