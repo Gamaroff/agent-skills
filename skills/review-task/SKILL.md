@@ -1266,6 +1266,24 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
     - Worked example: task.198's SC-5 ran `prettier --check` on Markdown; `.prettierignore` excludes
       `*.md`, `*.yml`, `*.yaml` and `*.json`, and the criterion passed in three QA cycles
     - Flag as **Important** a criterion whose tool the ignore file excludes from its files
+31. **A plan's own command is run once, in a safe form** (obs #163):
+    - Trigger: the plan names a command that moves or builds something — a transfer (`rsync`, `scp`),
+      a build (`docker build`, `make`), an install or deploy script — and a phase or a criterion
+      depends on what that command does
+    - Run it once and record the command and its output in the review. A plan states what a command
+      will do; running it shows what it does. The safe form is a **dry-run** flag (`rsync --dry-run`,
+      `make -n`) or a **scratch** target (a temporary directory, a throwaway container), never the
+      real target
+    - A command with neither a dry-run flag nor a scratch target (a deploy script, a build that
+      writes in place) is **not run**: record `unrun — no safe form`. Never improvise a flag the
+      command does not have
+    - Worked example: task.295's plan named an `rsync` transfer and no review ran it. Its container
+      also differed from CI (user, image base, shell and awk variants). Both came out only in later
+      QA cycles and in the acceptance runs, each costing a gate
+    - Flag as **Important** a command that was run and did not do what the plan says; as **Optional**
+      a command left unrun for want of a safe form. This is not check 11, which runs a property of an
+      *existing function* on new inputs; this runs *the plan's own command*. `create-task` § 3.5 asks
+      the author for the matching environment-parity line
 
 **Common Hallucination Patterns to Detect**:
 
@@ -1293,12 +1311,13 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 - ❌ A read of asynchronous state that fires before the state typically settles (check 27)
 - ❌ A planned temp directory with no removal (check 28)
 - ❌ A new write into a directory whose other readers the plan does not name (check 29)
+- ❌ A command the plan names that moves or builds something, never run once in a dry-run or scratch form (check 31)
 
 **Issues to Flag**:
 
 - **Critical**: Invented libraries/APIs, incorrect paths, wrong patterns, a falsified invariant (check 11)
-- **Important**: Unverified technical claims, inconsistent approaches, and the plan shapes of checks 15–20 (an unsearched removed literal, an unnamed writer in a replaced region, a pattern identity key, an unreached test file, unlisted reconstruction states, a site list without its search), and of checks 23–29 (a parity claim without a guard list, a self-rewriting writer's refusal not applied to its output, an enumerated class's tests unnamed, a fixture literal the banned-name guard matches, an early asynchronous read, a temp directory without removal, a directory reader unnamed)
-- **Optional**: Could be more specific or cite sources
+- **Important**: Unverified technical claims, inconsistent approaches, and the plan shapes of checks 15–20 (an unsearched removed literal, an unnamed writer in a replaced region, a pattern identity key, an unreached test file, unlisted reconstruction states, a site list without its search), and of checks 23–29 (a parity claim without a guard list, a self-rewriting writer's refusal not applied to its output, an enumerated class's tests unnamed, a fixture literal the banned-name guard matches, an early asynchronous read, a temp directory without removal, a directory reader unnamed), and of check 31 (a plan's own command that was run once in a dry-run or scratch form and did not do what the plan says)
+- **Optional**: Could be more specific or cite sources; a plan's command left unrun for want of a safe form (check 31)
 
 **Output**: Technical accuracy report with hallucinations identified
 
@@ -2474,6 +2493,7 @@ This skill implements rigorous safeguards to DETECT hallucinations:
 12. **Test-Reach Verification**: A new test file MUST be reached by the project's test runner configuration, or the plan MUST list the runner edit (Step 3 check 18)
 13. **Reconstruction-State Verification**: A changed resume or reconstruction rule MUST list the states it must hold in (Step 3 check 19)
 14. **Site-List Verification**: A hand-written site list MUST carry the search that defines it (Step 3 check 20)
+15. **Command Verification**: A command the plan names that moves or builds something MUST be run once, with a dry-run flag or against a scratch target, and left unrun with `unrun — no safe form` when it has neither (Step 3 check 31)
 
 ### Reporting Hallucinations
 
