@@ -5,17 +5,18 @@ type: task
 description: "A legitimate case on a state-changing control reads as a defect in the /finalise security probe, because every case and shell shares one sandbox HOME."
 tags: [finalise, security-probe, shell, sandbox]
 category: testing
-status: ready-for-review
+status: accepted
 priority: Low
 created: 2026-11-12
 updated: 2026-11-13
+completed_date: 2026-11-13
 pr_number: 900
 estimated_effort_hours: 4
 ---
 
 # Technical Task: Probe sandbox HOME shared across cases
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 ---
 
@@ -220,7 +221,7 @@ Not applicable. A per-run `mkdir` pair is negligible; the QA report states the s
 
 ### Performance
 
-- [ ] The probe suite's wall time stays at or below 1.10 times its prior median: five runs of `command node --test shared/resources/tests/security-probe.test.mjs` before and after, `uptime` recorded beside each, outliers reported, both medians and the ratio recorded in the QA report.
+- [ ] The probe suite's wall time stays at or below 1.10 times its prior median, judged as the median of five interleaved paired ratios (branch over develop): five runs of `command node --test shared/resources/tests/security-probe.test.mjs` on each side, alternating, `uptime` recorded beside each, outliers reported, both medians and the ratio recorded in the QA report. Amended at /finalise from "ratio of the two medians" because the shared host's load swamps a ratio of medians; approved by the repository owner, 2026-11-13.
 
 ### Code Quality
 
@@ -305,8 +306,8 @@ None.
 **Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.306.qa.1.probe-sandbox-home-shared-across-cases.md](./task.306.qa.1.probe-sandbox-home-shared-across-cases.md)
-- **Gate File**: [task.306.gate.1.probe-sandbox-home-shared-across-cases.yml](./task.306.gate.1.probe-sandbox-home-shared-across-cases.yml)
+- **Full Report**: [task.306.qa.2.probe-sandbox-home-shared-across-cases.md](./task.306.qa.2.probe-sandbox-home-shared-across-cases.md)
+- **Gate File**: [task.306.gate.2.probe-sandbox-home-shared-across-cases.yml](./task.306.gate.2.probe-sandbox-home-shared-across-cases.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 319 in the probe suite (7 new); remote ci:fast 8468 pass
@@ -315,13 +316,29 @@ None.
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-No blocking issues. Two low advisory notes (escape-path suffix, hidden directories visible to a cwd listing). The live re-run of task.296's plan is left to the DoD probe run.
+No blocking issues. Cycle 2 re-reviewed the documentation-only fixes for the PR review's three findings; all closed. Two low advisory notes remain (escape-path suffix, hidden directories visible to a cwd listing). The live re-run of task.296's plan is left to the DoD probe run.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+Run 1 found one gap: criterion 6, the wall-time bound, read 1.22 as a ratio of medians on a shared, noisy host. The owner amended the criterion to the median of five interleaved paired ratios (measured 1.07), and run 2 carried every other verdict from run 1.
+
+✅ **Acceptance criteria:** 12 of 12 met (criterion 6 as amended: paired-ratio median 1.07)
+✅ **QA:** gates 1 and 2 PASS (95); PR review APPROVE, 0 findings
+✅ **CI:** SUCCESS on the PR head before acceptance
+✅ **Security:** PASS, `boundary: false`; task.296 plan re-run 32 executed, 0 reproduced, 0 escaped
+✅ **Docs:** `CHANGELOG.md` cites task 306; traps entry rewritten. Compliance: not applicable
+
+**Detailed Verification Log:** See `task.306.dod.2.probe-sandbox-home-shared-across-cases.md` (run 1, `task.306.dod.1…md`, is historical: it records the gap).
+
+**Task marked as ACCEPTED on:** 2026-11-13
 
 ## Change Log
 
 <!-- change-log-start -->
 | Date | Version | Description | Author |
 | --- | --- | --- | --- |
+
 | 2026-11-12 | 1.0 | Initial draft | create-task |
 | 2026-11-13 | 1.1 | Review passed (8/10) — fixed anchors, named the hostile-report mechanism and `.probe-home` placement, kept `--fixture-setup` on the run-wide HOME, numeric wall-time bound, inline fixture, prompt edit made conditional | review-task |
 | 2026-11-13 |  | Status → ready-for-development | review-task |
@@ -329,6 +346,10 @@ No blocking issues. Two low advisory notes (escape-path suffix, hidden directori
 | 2026-11-13 |  | Status → ready-for-review | develop-task |
 | 2026-11-13 |  | QA gate PASS (95/100) — 0 blocking findings, 2 low advisory | qa-task |
 | 2026-11-13 |  | QA findings fixed — PR review CONCERNS (3 findings: pr_number added, deviation recorded, report fields filled), 1 iteration | qa-fix |
+| 2026-11-13 |  | QA gate PASS (95/100) — 0 findings, cycle 2 re-review of the doc-only fixes | qa-task |
+| 2026-11-13 |  | DoD incomplete — 1 gap identified (criterion 6, wall-time ratio) | finalise |
+| 2026-11-13 |  | Criterion 6 amended by the owner: ratio of medians → median of five interleaved paired ratios (approved by the repository owner) | finalise |
+| 2026-11-13 | 1.2 | DoD passed — accepted (PR #900) | finalise |
 <!-- change-log-end -->
 
 ---
