@@ -1,0 +1,113 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "cd794da44f7c192999e4800a5f63c8a85d104fa7",
+  "dirty_paths": [
+    "docs/tasks/task.297.qa-loop-fast-gate-and-earlier-structural-move/task.297.implementation.1.qa-loop-fast-gate-and-earlier-structural-move-initial-run.md",
+    "docs/tasks/task.297.qa-loop-fast-gate-and-earlier-structural-move/task.297.pr-review.1.qa-loop-fast-gate-and-earlier-structural-move.md"
+  ],
+  "document": "docs/tasks/task.297.qa-loop-fast-gate-and-earlier-structural-move/task.297.qa-loop-fast-gate-and-earlier-structural-move.md",
+  "result": {
+    "bytes": 5599,
+    "sha256": "fc70c8bb06fbe34b55bccb18c6c9116debb215e095e6be21955a3fac8b69a22d",
+    "verified": true
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 7,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "cfc8ccb920d5e1204328afed97226b2a9370443a67c2eb48b14feaf2f365c5fa",
+      "status": "PASS",
+      "description": "Unset fastGateCommand records 'Fast gate: skipped' in step 0a, never passes silently",
+      "code_citation": "shared/resources/fast-gate-outcome.sh:39",
+      "test_citation": "evals/shared/tests/qa-loop-fast-gate-outcomes.test.mjs:513",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The --command arm prints GATE_OUTCOME=skipped (develop.fastGateCommand unset) for empty or blank input. Test :544 runs step 0a's own block, and :573 pins the trace-as-history-line wording and the no-HALT decision. The file is in evals/shared/tests, which test:suite selects, and CI test.yml runs npm test on pull_request. QA report line 125 records the mutation red, 28 pass and 2 fail."
+    },
+    {
+      "id": "#2",
+      "text_hash": "064e55a6ab986b8b3747610378138a6d1dbfd3c69e56051877670c884ac5c576",
+      "status": "PASS",
+      "description": "Repeat-subject offer fires only for a shared file the previous fix edited",
+      "code_citation": "shared/resources/repeat-subject.mjs:1",
+      "test_citation": "evals/shared/tests/repeat-subject.test.mjs:48",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Fires test at :48. Controls at :57 (different file) and :68 (shared file the fix did not edit), plus CLI controls at :124 and :139. evals/shared/tests is selected by test:suite and run by CI npm test."
+    },
+    {
+      "id": "#3",
+      "text_hash": "fd334122716d29a359c72c868038bf87c10dfed65ddf01c98d5bc1b02dc12841",
+      "status": "PASS",
+      "description": "task.295 diagnosis recorded in the ## Diagnosis section of this task document",
+      "code_citation": "docs/tasks/task.297.qa-loop-fast-gate-and-earlier-structural-move/task.297.qa-loop-fast-gate-and-earlier-structural-move.md:144",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Read the section. It has one paragraph per question: whether the gate ran (the key was unset), whether the offer fired before the cycle that took it, and the decision on the setting. That meets the criterion. No test pins it."
+    },
+    {
+      "id": "#4",
+      "text_hash": "f681c201df00a22cb9041f2cd8150020f57b7496d6c640786b49bbc789412b90",
+      "status": "PASS",
+      "description": "No extra gate runs on a configured repository; checked by call count",
+      "code_citation": "shared/resources/fast-gate-outcome.sh:39",
+      "test_citation": "evals/shared/tests/qa-loop-fast-gate-outcomes.test.mjs:544",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The test binds step 0a's block with a set command and asserts stdout is exactly one line, GATE_OUTCOME=run, exit 0. The presence call only prints, so it runs no gate; the exact one-line stdout is the count. Also asserted at :513 for three set commands. There is no literal call-counter, so this is weaker than the wording but behaviourally sound."
+    },
+    {
+      "id": "#5",
+      "text_hash": "f90dc956db49dd6aa3f8d2cea1e180fe85c78261e1155206c67a8e394cf5059e",
+      "status": "PASS",
+      "description": "bundle:check and ci:fast pass via test:remote",
+      "code_citation": ".github/workflows/test.yml:58",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ cd794da44f7c192999e4800a5f63c8a85d104fa7 — The criterion asks that the project's own gates (bundle:check, ci:fast) pass. CI runs format:check and npm test on every PR. The QA report records the local result, but /finalise Step 6 grades it from CI reading 1.",
+      "ci_reading": "CI reading 1: SUCCESS @ cd794da44f7c192999e4800a5f63c8a85d104fa7"
+    },
+    {
+      "id": "#6",
+      "text_hash": "489de891e8f6d607c44e658c4d19eaf5b7442b3887e802f16332de08852d350f",
+      "status": "PASS",
+      "description": "Each fix is mutation-proved",
+      "code_citation": "docs/tasks/task.297.qa-loop-fast-gate-and-earlier-structural-move/task.297.qa.1.qa-loop-fast-gate-and-earlier-structural-move.md:123",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "repeat-subject.mjs changed-files intersection fix",
+          "evidence": "task.297.qa.1.qa-loop-fast-gate-and-earlier-structural-move.md:123 (dropped the edited.has(f) clause; the control shared-file test and the CLI control went red, 8 pass and 2 fail; restored, 10/10)",
+          "status": "PASS"
+        },
+        {
+          "member": "fast-gate-outcome.sh --command empty-command skip fix",
+          "evidence": "task.297.qa.1.qa-loop-fast-gate-and-earlier-structural-move.md:125 (changed the *) arm so an unset key printed GATE_OUTCOME=run; the --command test and the 5b step-0a block test went red, 28 pass and 2 fail; restored with git diff clean, 30/30; command named)",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "The task's Testing Strategy names two fixes and requires a revert of each. Both are recorded in the committed QA report with the revert, the named red tests and the restore. Line 125 is in commit cd794da4. Both lines were read."
+    },
+    {
+      "id": "#7",
+      "text_hash": "106ba4956351cbbaf1aa20f85582e9c76fbc52b1502504564b34c95ff41cdf80",
+      "status": "PASS",
+      "description": "CHANGELOG states an unset fastGateCommand is still a skip, now recorded",
+      "code_citation": "CHANGELOG.md:10",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Read the entry. It says an unset or empty key was a silent skip, that step 0a now records 'Fast gate: skipped (develop.fastGateCommand unset)', and that it is still a skip, not a HALT. It cites task 297. The QA report records changelog-cites.sh reporting 'cites (task 297)'. I did not run that guard here."
+    }
+  ],
+  "advisories": []
+}

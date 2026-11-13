@@ -42,16 +42,24 @@ Both scripts are byte-identical across `develop-story` and `develop-task` instal
 
 **Purpose**: durably checkpoint the running pipeline so it can be cleanly resumed after compaction.
 
-**Trigger condition** (inside the hook): `.claude/state/develop-pipeline.lock` exists **and this invocation claims it** — the hook's first act is an atomic `mv` of the lock to `develop-pipeline.lock.pausing.<pid>`. With no lock = no active pipeline = noop; with a lock another concurrent invocation has already claimed = the same noop. So a hook registered twice (task.110: one `settings.json`, two path spellings of the same command) still produces one pause, not two. The winner sweeps any stale `.pausing.*` a killed run left behind.
+**Trigger condition** (inside the hook): `.claude/state/develop-pipeline.lock` exists **and this invocation claims the pause** — the hook's first act is an exclusive `ln` of its pid file to `.claude/state/develop-pipeline.precompact-claim.d/pid` (`mkdir` is not exclusive on every kernel, bug.21), released on exit. With no lock = no active pipeline = noop; with a claim another live invocation holds = the same noop. So a hook registered twice (task.110: one `settings.json`, two path spellings of the same command) still produces one pause, not two. A claim whose holder is dead (a SIGKILLed hook skips its EXIT trap) — or one with no pid, older than a minute — is taken over, so a killed pause never silences the next one. The claim directory is deliberately outside the `develop-pipeline.lock.pausing.*` family: until 2026-11 the claim was an `mv` of the lock to `.lock.pausing.<pid>`, which is what removed the lock, and readers still treat a `.pausing.*` file as an orphaned lock copy. The winner sweeps any such legacy file.
+
+**The lock is kept, marked paused (2026-11).** Claude Code continues the same session after a compaction, and a removed lock left that session with `set-qa-phase.sh`, `set-waiting-on.sh` and this file's Stop hook inert until someone ran `--restore` by hand (three times in one consumer run on 2026-11-10). The hook now adds `paused: {at, step, reason: "precompact"}` to the lock instead. The mark:
+
+- **lets the Stop hook allow the halt** the pause signal asks for (an escape valve, below) — the pass-through a removed lock used to give;
+- **is cleared by the session's next lock write** — `advance-pipeline-lock.sh` (a numeric or `--skill` advance, including the idempotent no-op re-assert and the finalise hold), `set-qa-phase.sh`, `set-waiting-on.sh`, `--clear-pause`, or `--restore <doc-dir>` — with no recovery step, which also consumes this pause's snapshot;
+- **makes a repeat pause a no-op**: a lock still marked means no writer ran since the last pause, so a second compaction (or a duplicate hook run that started after the winner finished) refreshes the snapshot, repeats the signal, and records nothing — no report block, no commit, no comment.
 
 **Side effects** (best-effort, all wrapped in `... || true`):
 
-0. **Write a resume snapshot first** — `develop-pipeline.last-halt.json` (co-located with the lock) as a **superset of the lock** plus `paused_at`, `pause_reason: "precompact"`, and `halt_step` (aliasing the lock's `current_step`). This is written **before the EXIT trap is armed and before any `rm`**, so even a hook run killed mid-flow (SIGTERM/timeout) leaves recoverable resume state. Degrades to a verbatim `cp` of the lock when `jq` is unavailable (`current_step` is still preserved). The Phase 0b resume detector reads this snapshot when no active lock is present.
-1. Append a `## Pipeline Paused — {timestamp}` block to the implementation report named in the lock
-2. `git add <report> && git commit -m "docs(<skill>): pipeline paused at step <N> — context compaction imminent" -- <report> && git push origin HEAD` — path-limited to the report, so a 5c set staged for `/finalise` 6a to carry stays staged (task.173)
+0. **Write a resume snapshot first, then mark the lock** — `develop-pipeline.last-halt.json` (co-located with the lock) as a **superset of the lock** plus `paused_at`, `pause_reason: "precompact"`, and `halt_step` (aliasing the lock's `current_step`), without the lock's own `paused` field; then the `paused` mark on the lock (mktemp + `mv`). A hook killed between the two leaves the snapshot and an unmarked lock, which the next pause redoes. Degrades to a verbatim `cp` of the lock when `jq` is unavailable (`current_step` is still preserved), and the lock is then kept unmarked. The snapshot is the record a lost lock resumes from; while the lock survives, the lock is the record.
+1. Append a `## Pipeline Paused — {timestamp}` block (the hook takes `{timestamp}` from `date -u`) to the implementation report named in the lock
+2. `git add <report> && git commit -m "docs(<skill>): pipeline paused at step <N> — context compaction imminent" -- <report> && git push origin HEAD` — path-limited to the report, so a 5c set staged for `/finalise` 6a to carry stays staged (task.173). The push is **held** (commit kept local, named in the signal) when the report links to a path that is staged but not in the commit, such as that staged PR review report: pushing it alone put a dangling link on the remote head and turned a consumer's docs link check red (tinker-city PR #1223). **At step 8 the push is always held** (task.303): a pushed pause commit supersedes the previous head's CI run, and that superseded run can read red to the docs-only walk, so the finalise and merge waits needed a full CI run; step 8's own commit carries the pause commit and pushes once
 3. PR comment, if `pr_url` is set and both `gh` and `node` are on PATH — `tracker_write gh pr comment <pr_url> --body-file .claude/state/precompact-pr-comment.step-<N>.md`, the body opening with the `pipeline-paused` plain-language lead from `stakeholder-summary-cli.js`. Sourcing `resolve-platform.sh` beside the hook is what supplies `tracker_write`; under any `access.tracker` other than `full` the comment is **recorded, not posted**, and if the resolver or the lead cannot be loaded the arm **fails closed** (nothing posted, outcome named in the signal).
 4. Tracker-issue comment, if `tracker_issue` is set — one `tracker-comment.js --issue <tracker_issue> --stage pipeline-paused-<step> --body-file …` call. The engine resolves the tracker itself (GitHub, or Jira when `JIRA_*` credentials are in the hook's environment), renders the same lead, adds the idempotency marker (scoped by the step, so a second pause at a later step is a second comment) and applies the access gate. `node` or the engine missing → skipped, never posted bare.
-5. `rm -f .claude/state/develop-pipeline.lock`
+5. Nothing is removed. The lock stays, marked paused (step 0), and the claim directory is released.
+
+> **Comments are one per step, not one per pause.** A second pause at the same step — a later QA cycle, or the same cycle after an in-session clear — posts nothing new: the PR arm finds its `pipeline-paused-<N>` marker and edits that comment in place, and the issue arm's engine reports `already`. That is what a consumer observed on 2026-11-10 (pauses at Steps 2, 5 and 5: one PR comment, two issue comments). Keying the marker by cycle as well would *add* comments inside the QA loop, and needs a stage-grammar change in `tracker-comment.js` and `stakeholder-summary.js`; it was not made.
 
 > Both comment arms were bare `gh … comment --body "…"` calls until bug.14 — no lead, no marker, and no access gate, so a consumer with `access.tracker: read-only` still got a write from the one caller that runs with no prose step behind it. `tests/mutation-call-site-coverage.test.js` now scans tracked shell sources as well as Markdown, so the bare form cannot come back unnoticed.
 
@@ -63,12 +71,12 @@ Both scripts are byte-identical across `develop-story` and `develop-task` instal
 ```
 The orchestrator sees the signal in its next turn, emits the user-facing pause banner, and halts cleanly. Compaction then proceeds on a known-good state.
 
-**Resume**: re-invoke `/develop-{story,task} <path>`. Phase 0b artifact verification skips completed steps and re-runs the paused step from scratch — sub-skills are required to be re-run-safe (see the pause doc's "Re-run-safety contract").
+**Resume**: re-invoke `/develop-{story,task} <path>`. The detector finds the lock (`source: lock`) and reports its `paused` mark; Phase 0b runs `advance-pipeline-lock.sh --restore <doc-dir>`, which clears the mark in place, then artifact verification skips completed steps and re-runs the paused step from scratch — sub-skills are required to be re-run-safe (see the pause doc's "Re-run-safety contract"). **Continuing in the same session** needs no recovery step: the step's first lock call (the signal names `advance-pipeline-lock.sh <N>`) clears the mark.
 
 **Escape valves**:
 - No lock file → exit 0 with empty `additionalContext` (and a pre-existing snapshot is left untouched — the snapshot write is skipped before the lock-existence check)
-- `jq` missing → exit 0 with empty `additionalContext` (degrades to no-pause), but the cp-fallback resume snapshot is still written first, so resume works via Phase 0b
-- Hook timeout / SIGTERM → `trap 'rm -f "$LOCK"' EXIT` ensures the lock is removed regardless. The snapshot is written **before** this trap is armed, so a kill can never leave the pipeline both unlocked **and** un-resumable.
+- `jq` missing → exit 0 with empty `additionalContext` (degrades to no-pause); the cp-fallback resume snapshot is still written and the lock is kept, unmarked
+- Hook timeout / SIGTERM → the EXIT trap releases the claim; the lock is never touched by it. A SIGKILL skips the trap and leaves the claim, which the next pause takes over (its holder is dead). The lock keeps its full state either way, so a kill can never leave the pipeline unlocked.
 
 **Jira**: the issue comment goes through `tracker-comment.js`, which posts to Jira over REST when `JIRA_URL` / `JIRA_API_TOKEN` / `JIRA_USER_EMAIL` are in the hook's environment (or a `.env` the engine reads). Without them the engine reports `no-credentials` and the Jira side stays silent; the signal carries that outcome and the orchestrator repeats it in the user-facing summary. There is no MCP path from a shell hook.
 
@@ -104,6 +112,7 @@ The reason is injected as a system reminder in the next assistant turn, forcing 
 | `current_step < 1` or `null` | Lock is malformed; bail gracefully |
 | `jq` missing | Degraded mode — refuse to parse, allow stop |
 | `waiting_on` set and `since + budget_minutes` is still in the future | The step is **waiting**, not stalled — it dispatched a background agent or task and yielded the turn to let it run (task.124, obs #89). See "waiting_on" below |
+| `paused` set (the PreCompact hook's mark) | The pause signal asked the agent to halt; blocking would fight it. Lasts only until the session's next lock write (any `advance-pipeline-lock.sh` advance, `set-qa-phase.sh`, `set-waiting-on.sh`), which clears the mark and re-arms the block. Until 2026-11 the hook removed the lock, and the no-lock row gave this pass-through |
 | Orchestrator removes the lock | Legitimate terminal HALT path in SKILL.md (commit report → snapshot to `develop-pipeline.last-halt.json` → `rm lock`) — next stop attempt sails through |
 
 **Loop protection in practice**: Claude Code passes `stop_hook_active: true` to the hook on the second consecutive block within a single stop attempt. The hook honours this and exits 0. If the orchestrator genuinely cannot continue, the documented terminal-HALT protocol removes the lock, satisfying the hook permanently.
@@ -179,15 +188,18 @@ bash .agents/skills/{develop-story|develop-task|develop-bug}/references/set-wait
 │ Claude Code: PreCompact     │     │ Claude Code: Stop           │
 │   → on-precompact.sh        │     │   → on-stop.sh              │
 │   → commits report, posts   │     │   → returns decision:"block"│
-│     comments, REMOVES lock  │     │     with continuation steps │
-│   → emits PAUSE-SIGNAL      │     │   → lock unchanged          │
+│     comments, MARKS lock    │     │     with continuation steps │
+│     paused (keeps it)       │     │     (allows the stop while  │
+│   → emits PAUSE-SIGNAL      │     │     the lock is paused)     │
 └─────────────────────────────┘     └─────────────────────────────┘
                 │                                  │
                 ▼                                  ▼
    Orchestrator halts cleanly;        Orchestrator resumes in
    user re-invokes /develop-* to      same turn — Bash lock-update,
    resume from Phase 0b artifact      Edit report row, banner,
-   verification.                      next /skill.
+   verification — or the session      next /skill.
+   carries on, and its first lock
+   write clears the mark.
 ```
 
 **Mutual exclusivity in practice**: PreCompact only fires when Claude Code initiates compaction (token-pressure path). Stop fires when the assistant tries to end its turn (yield-to-user path). They never fire in the same turn.
@@ -203,7 +215,11 @@ bash .agents/skills/{develop-story|develop-task|develop-bug}/references/set-wait
 | Stop hook seems to loop forever | `stop_hook_active` not honoured | Update to latest `on-stop.sh` (must read stdin and check the flag) |
 | Stop hook re-prompts to advance while a background agent or task is running | The wait was not marked on the lock, or it outlived `budget_minutes` | Mark it: `set-waiting-on.sh "<label>"` at the dispatch, `--clear` when the result is read (see "`waiting_on`" under the Stop hook section). A re-prompt on a marked wait means the budget elapsed — check whether the dispatch actually died |
 | Stop hook re-prompts several times during one long step (no background work) | Each mid-step yield is a fresh stop attempt; `stop_hook_active` does not persist across stops | Hold the step until its work and gates have completed, then do the Bash → Edit → banner → invoke transition once |
-| `advance-pipeline-lock.sh <n>` exits 1 with "no lock … --restore" | The lock was removed by a PreCompact pause or a HALT and this session is continuing in place | `bash .agents/skills/<skill>/references/advance-pipeline-lock.sh --restore <doc-dir>` first — it rebuilds the lock from the halt snapshot or orphaned claim and consumes it (task.124) |
+| `advance-pipeline-lock.sh <n>` exits 1 with "no lock … --restore" | The lock was removed by a HALT (or by a PreCompact pause of a hook older than 2026-11) and this session is continuing in place | `bash .agents/skills/<skill>/references/advance-pipeline-lock.sh --restore <doc-dir>` first — it rebuilds the lock from the halt snapshot or orphaned claim and consumes it (task.124) |
+| Stop hook lets the orchestrator stop mid-pipeline, stderr says `paused at step N (PreCompact)` | The lock still carries the PreCompact hook's `paused` mark: no lock write has run since the compaction | Intended right after a pause. If the session carried on, its next lock write clears it; to clear it at once, `advance-pipeline-lock.sh <N>` (an idempotent re-assert) or `--clear-pause` |
+| Step 1 halts with a lock collision whose lock carries `paused` | A run paused by compaction is still recorded on the lock | Resume it (`/<skill> <its path>`), or abandon it as the collision message says; its state is also in `last-halt.json` |
+| Signal says the report was committed `but NOT pushed — it links to …` | The report links to files that are staged but not in the path-limited pause commit — the 5c carry staged for `/finalise` 6a | Intended. The next commit that carries them (6a's) pushes both. To push sooner, commit the named files and push |
+| PreCompact stderr says `took over a stale claim` | An earlier pause was SIGKILLed and left `.claude/state/develop-pipeline.precompact-claim.d` | Nothing to do — the hook took it over. If no hook is running, the directory can be removed by hand |
 | `--restore` exits 1 with `legacy-snapshot: … carries no task_or_story_directory` | The snapshot predates task.123 and could belong to any document (task.130) | `--restore --accept-legacy <doc-dir>` once if it is this run's, or delete it. The rebuilt lock is stamped with `<doc-dir>`, so every snapshot derived from it is a matched candidate from then on — the flag is needed once, not on every resume (task.130 5c CR-1). **Do it now**: Step 8 of the next completed run of *any* document removes a sole legacy snapshot (it carries no directory, so no run can claim it), and the recovery window closes with it |
 | The grant refused a `k` the snapshot's `qa_max_cycles` would allow | A newer `.lock.pausing.<pid>` claim carries a higher budget; the guard reads the candidate `--restore --which` names, not the snapshot (task.130) | Run `advance-pipeline-lock.sh --restore --which <doc-dir>` to see which file is live, and grant against its budget |
 | Hook never fires | Not registered in settings.json | Run `bash .agents/skills/develop-story/scripts/install-hooks.sh` |
@@ -218,7 +234,7 @@ bash .agents/skills/{develop-story|develop-task|develop-bug}/references/set-wait
 | Hook crashes future pipeline runs | Stale lock file left over | `rm -f .claude/state/develop-pipeline.lock` |
 | Installer refuses to write | Existing `settings.json` is invalid JSON | Fix or back up, re-run installer |
 | Hook fails with `No such file or directory` though the script exists | Legacy bare-relative `command` from a pre-`${CLAUDE_PROJECT_DIR}` install — resolved against the shell's cwd at hook-fire time, which breaks after any `cd` into a subdirectory | Re-run `bash .agents/skills/develop-story/scripts/install-hooks.sh` — it migrates the old entry to the cwd-independent `${CLAUDE_PROJECT_DIR}` form automatically |
-| Pause block appended twice, PR/issue commented twice | `settings.json` carries the same hook under two spellings (`.claude/skills/…` and `.agents/skills/…`), so the host fires it twice in parallel | Re-run the installer — it heals duplicate spellings to one entry per event. The hook itself now claims the lock atomically, so even a doubled registration pauses once |
+| Pause block appended twice, PR/issue commented twice | `settings.json` carries the same hook under two spellings (`.claude/skills/…` and `.agents/skills/…`), so the host fires it twice in parallel | Re-run the installer — it heals duplicate spellings to one entry per event. The hook itself now claims the pause atomically (and a lock already marked paused records nothing new), so even a doubled registration pauses once |
 
 ---
 

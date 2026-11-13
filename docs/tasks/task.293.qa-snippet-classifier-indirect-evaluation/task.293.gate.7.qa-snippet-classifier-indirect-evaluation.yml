@@ -1,0 +1,72 @@
+schema: 2
+task: 'task.293.qa-snippet-classifier-indirect-evaluation'
+task_title: 'QA snippet classifier refuses indirect evaluation'
+gate: FAIL
+status_reason: 'Gate 7 (second owner-granted extra cycle, scoped to routes that keep the substitution text in the source). The reviewer found a direct neighbour of the gate-6 fix: the new word-scoped bracket scan stops at an open or close paren, so a paren inside the subscript hides the bracket. QA reproduced it under bash 5.3 with a clean control.'
+reviewer: 'QA Engineer'
+head: '069892fa22e31ba93a0ad6a5e5b18283b21fdc08'
+updated: '2026-11-10T11:49:36Z'
+
+top_issues:
+  - id: 'T293-QA-10'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'inSubscriptWord stops its backward scan at the first paren, so a paren inside the subscript hides the opening bracket. a=([0+(1) then a single-quoted dollar-paren touch W close-paren, close-bracket]=1); echo hi, and a=([(0)+ then the same quote, run touch W under bash 5.3 and classify runnable. Reproduced by QA by execution; the control with a plain number in the quotes stays runnable and writes nothing.'
+    suggested_action: 'Do not stop the scan at a paren: track bracket depth backwards, or refuse a quoted substitution literal that has an unclosed open bracket earlier in the same segment. Add both shapes to the real-bash and decider tables.'
+    suggested_owner: dev
+    status: open
+    origin: 'code-review CR-1, reproduced by QA'
+
+waiver:
+  active: false
+
+quality_score: 85
+
+evidence:
+  tests_reviewed: 383
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 31
+    boundary: true
+    escaped: 0
+    boundary_signals: ["refused"]
+    notes: 'The classifier is the boundary. 31 corpus cases executed, 0 escaped. About 20 reviewer probes; one neighbour of the gate-6 fix escaped and QA reproduced it.'
+  performance:
+    status: PASS
+    notes: 'The new scan is bounded to 512 characters; docs scan median +1.0% at the gate-6 fix.'
+  reliability:
+    status: PASS
+    notes: 'ci:fast green at the gate-6 fix (8346 tests, 0 fail); CI on the head pending at the read.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Seven gates, seven routes. The last two are narrow rule gaps in the subscript logic, found one after the other in the same function.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Owner decision: a further extra cycle for T293-QA-10 (a depth-tracking scan), or accept it as a documented residual and file it with the allow-list task.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+  future:
+    - action: 'Cleanup: the test "a helper call that also names a start-up variable keeps its pinned reason" asserts only mutating; pass a helperRoot and assert the reason string.'
+      refs: ['shared/resources/tests/qa-execute-snippets.test.mjs']
+    - action: 'Cleanup: EVALUATING_WORD omits set, mapfile, readarray, getopts, trap, compgen, wait and shift; they are refused today only by the unrecognised-command rule.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'Documented residuals: printf octal launder, a bracket or dollar arriving by expansion, a literal split across quote tokens.'
+      refs: ['shared/resources/qa-runnable-prose-detection.md']
+      provenance: documented-unseen-shape
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T293-QA-10 closed, or accepted by the owner as a documented residual']

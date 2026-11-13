@@ -1,0 +1,41 @@
+{
+  "sink": "filename",
+  "entry": "shell-argv:scripts/remote-test/lockctl.sh",
+  "name": "prune image",
+  "call_site": null,
+  "verdict": "unverifiable",
+  "reason": "no-legitimate-evidence",
+  "executed": 6,
+  "passed": 6,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 2,
+  "declined_cases": [
+    {
+      "id": "pi.sub@bash",
+      "reason": "case-errored",
+      "detail": "case's `expected` compares nothing — it needs at least one of stdout, exit, stderr"
+    },
+    {
+      "id": "pi.sub@zsh",
+      "reason": "case-errored",
+      "detail": "case's `expected` compares nothing — it needs at least one of stdout, exit, stderr"
+    }
+  ],
+  "escaped": 0,
+  "shells": [
+    "bash",
+    "zsh"
+  ],
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": [
+    "prune",
+    "{input}"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "fixture_copy": null,
+  "ran_at": "2026-11-12T19:10:35.075Z"
+}

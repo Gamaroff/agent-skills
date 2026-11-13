@@ -2411,6 +2411,11 @@ test("obs #4: MAX_WAIT on a SUCCESS still below the floor writes UNDECIDED, not 
     });
     assert.equal(r.line, `UNDECIDED ${head} 3 90s TREE_EQ=`, r.stderr);
     assert.match(
+      r.stderr,
+      /floor 5, saw 3/,
+      "obs #166: an UNDECIDED from a floor above the visible checks names the floor and the count",
+    );
+    assert.match(
       finalise,
       /\| `UNDECIDED` +\| \*\*HALT `ci-not-green-on-acceptance-head`\.\*\*/,
       "the 6c reader table must HALT on UNDECIDED",

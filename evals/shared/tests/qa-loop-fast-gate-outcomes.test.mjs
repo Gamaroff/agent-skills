@@ -458,9 +458,11 @@ for (const [rel, skill] of [
   [BUG_LOOP, "develop-bug"],
 ]) {
   test(`${path.basename(rel)} classifies with fast-gate-outcome.sh, and the block runs`, () => {
+    // Anchored on the classify call's own `--log` argument: step 0a also calls the script with
+    // `--command` (task.297), so the script's name alone matches two blocks.
     const code = blockBy(
       readDoc(rel),
-      "fast-gate-outcome.sh",
+      '--log "{the gate log}"',
       "the fast-gate outcome call",
     );
     const fx = repoWithBase(A_FAILS);
@@ -496,4 +498,84 @@ test("5b step 0a names two outcomes for a red, each with its action and its hist
     assert.doesNotMatch(text, /Fast gate: red, pre-existing on/, rel);
     assert.doesNotMatch(text, /GATE_OUTCOME=[a-z|-]*pre-existing/, rel);
   }
+});
+
+// ── 4. An unset fast-gate command is a skip with a trace, never a silent pass (task.297) ─────────
+
+function commandOutcome(value) {
+  const r = spawnSync("bash", [SCRIPT, "--command", value], {
+    encoding: "utf8",
+  });
+  assert.equal(r.status, 0, `exit ${r.status}: ${r.stdout}${r.stderr}`);
+  return r.stdout;
+}
+
+test("--command: an unset, empty or blank command is skipped, a set one is run — one line each", () => {
+  for (const unset of ["", "   ", "\t\n"]) {
+    assert.equal(
+      commandOutcome(unset),
+      "GATE_OUTCOME=skipped (develop.fastGateCommand unset)\n",
+      JSON.stringify(unset),
+    );
+  }
+  for (const set of ["npm run ci:fast", "make test", "sh ./fake-gate.sh"]) {
+    assert.equal(commandOutcome(set), "GATE_OUTCOME=run\n", set);
+  }
+});
+
+test("--command is exclusive of --log and --exit, and the classify path is unchanged", () => {
+  for (const args of [
+    ["--command", "x", "--log", "y"],
+    ["--command", "x", "--exit", "1"],
+    ["--log", "y", "--command", "x", "--exit", "0"],
+  ]) {
+    const r = spawnSync("bash", [SCRIPT, ...args], { encoding: "utf8" });
+    assert.equal(r.status, 2, `${args.join(" ")}: ${r.stdout}${r.stderr}`);
+    assert.doesNotMatch(r.stdout, /GATE_OUTCOME=/);
+    assert.match(r.stderr, /--command cannot be combined/);
+  }
+  // Control: the pre-existing classification still answers, so the new branch did not swallow it.
+  const green = spawnSync("bash", [SCRIPT, "--log", "x", "--exit", "0"], {
+    encoding: "utf8",
+  });
+  assert.equal(green.stdout, "GATE_OUTCOME=green\n");
+});
+
+test("5b step 0a's --command block, as written, skips on an unset key and runs on a set one", () => {
+  const code = blockBy(
+    readDoc(QA_LOOP),
+    '--command "<fastGateCommand>"',
+    "the fast-gate presence call",
+  );
+  const at = (value) =>
+    bind(code, {
+      ".agents/skills/{develop-story|develop-task}/references/fast-gate-outcome.sh":
+        SCRIPT,
+      "<fastGateCommand>": value,
+    });
+  const run = (bound) =>
+    spawnSync("bash", ["-c", bound], { cwd: ROOT, encoding: "utf8" });
+  const unset = run(at(""));
+  assert.equal(unset.status, 0, unset.stderr);
+  assert.equal(
+    unset.stdout,
+    "GATE_OUTCOME=skipped (develop.fastGateCommand unset)\n",
+  );
+  const set = run(at("npm run ci:fast"));
+  assert.equal(set.status, 0, set.stderr);
+  assert.equal(set.stdout, "GATE_OUTCOME=run\n");
+});
+
+test("5b step 0a records the skip as its history line and says a per-file run is not the gate", () => {
+  const doc = readDoc(QA_LOOP);
+  assert.match(
+    doc,
+    /`Fast gate: skipped \(develop\.fastGateCommand unset\)` as this cycle's QA Iteration History line/,
+  );
+  assert.match(doc, /\*\*A per-file run is not the gate\.\*\*/);
+  assert.doesNotMatch(
+    doc,
+    /a HALT on an unset key|unset key is a HALT/i,
+    "the decision is trace, not HALT",
+  );
 });

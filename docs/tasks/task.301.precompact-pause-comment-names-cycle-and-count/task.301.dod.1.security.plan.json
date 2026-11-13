@@ -1,0 +1,16 @@
+[
+  {
+    "argv": [
+      "--sink",
+      "filename",
+      "--entry",
+      "fence:shared/resources/develop-pipeline-step-1-create-branch.md#Pipeline Lock Collision Check (mandatory — refuse to start if another pipeline active)",
+      "--slot",
+      "DOC_DIR=\"{doc-directory}\"\nSTART_FRESH=\"{start-fresh}\"",
+      "--name",
+      "step-1 lock-collision block"
+    ],
+    "cases_file": "task.301.dod.1.security.cases.json",
+    "cases_sha256": "2f980898e3b8eaf65e89974d91460ec813773aab064a3f6b1f7346972d6b6f7f"
+  }
+]

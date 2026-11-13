@@ -58,6 +58,10 @@ import {
   isPythonCrash,
   main,
   namesGh,
+  OBSERVATION_LIMITS,
+  observationLimitIds,
+  observationLimitsFor,
+  observationLimitTexts,
   ghFreePath,
   parseArgvTemplate,
   pathAssertionProblem,
@@ -5114,7 +5118,9 @@ test("fence entry: the slot is script source — a $(…) input runs, in the cas
       "",
       "```bash",
       ': "<slot>"',
+      "echo REFUSED",
       ': > "$HOME/leak"',
+      "exit 1",
       "```",
       "",
     ].join("\n"),
@@ -5141,15 +5147,21 @@ test("fence entry: the slot is script source — a $(…) input runs, in the cas
     );
     assert.deepEqual(sub.escapes, []);
     assert.equal(existsSync(join(root, "PWNED")), false);
-    // HOME is the sandbox's, outside the work dir: a write there IS an escape.
+    // A HOSTILE run's write to its own HOME is still an escape (task.306: the
+    // HOME is per run, inside the case directory, and watched for a hostile run;
+    // it used to be the shared sandbox HOME, `home/leak`).
     const home = runProbeSpec({
       entry: "fence:doc.md#Home",
       slot: "<slot>",
-      cases: [fenceCase("f.home", "legitimate", "x")],
+      cases: [
+        fenceCase("f.home", "hostile", "x", {
+          expected: { exit: 1, stdout: "REFUSED\n" },
+        }),
+      ],
       repoRoot: root,
     });
     assert.ok(
-      home.escapes.some((e) => e.path === "home/leak"),
+      home.escapes.some((e) => /leak$/.test(e.path)),
       JSON.stringify(home.escapes),
     );
   } finally {
@@ -6685,6 +6697,216 @@ test("shell-argv entry: the proof run — reenter-qa-after-finalise.sh is reache
     );
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ── task.306: one HOME and TMPDIR per (case, shell) ──────────────────────────
+//
+// Every (case, shell) run gets its own HOME and TMPDIR, inside its own case
+// directory, so a legitimate case on a state-changing control leaves nothing for
+// the next shell to find. A HOME inside the case directory is outside both
+// escape watches, so a HOSTILE run's writes to it are watched on purpose.
+
+// A state-changing control: takes a named lock under $HOME, refuses a second
+// take of the same name (exit 10). Exit 7 is a usage error no case expects.
+const TAKE_SH = [
+  "#!/usr/bin/env bash",
+  '[ "$#" -eq 1 ] || exit 7',
+  'mkdir -p "$HOME/locks" || exit 7',
+  'mkdir "$HOME/locks/$1" 2>/dev/null || exit 10',
+  "exit 0",
+  "",
+].join("\n");
+
+test("task.306: a legitimate take on a state-changing control is accepted under every shell, with no escape (shell-argv:)", () => {
+  const root = saRoot({ "take.sh": TAKE_SH });
+  try {
+    const r = runProbeSpec({
+      entry: "shell-argv:take.sh",
+      argv: ["{input}"],
+      cases: [saCase("take.ok", "legitimate", "alpha")],
+      repoRoot: root,
+    });
+    assert.deepEqual(r.declined, [], JSON.stringify(r.declined));
+    assert.deepEqual(r.escapes, [], JSON.stringify(r.escapes));
+    for (const shell of probeShells()) {
+      const c = r.cases.find((x) => x.shell === shell);
+      assert.equal(c?.outcome, "accepted", `${shell}: ${JSON.stringify(c)}`);
+      assert.equal(c?.exit, 0, `${shell}: ${JSON.stringify(c)}`);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("task.306: the same take is accepted under every shell on the shell: arm, which builds its own env", () => {
+  const root = saRoot({
+    "take-dir.sh": [
+      "#!/usr/bin/env bash",
+      'mkdir -p "$HOME/locks" || exit 7',
+      'mkdir "$HOME/locks/one" 2>/dev/null || exit 10',
+      "exit 0",
+      "",
+    ].join("\n"),
+  });
+  try {
+    const r = runProbeSpec({
+      sink: "filename",
+      entry: "shell:take-dir.sh",
+      cases: [
+        {
+          id: "take.shell",
+          input: "alpha",
+          why: "state-changing control",
+          correct: "admitted",
+          direction: "legitimate",
+          expected: { exit: 0 },
+        },
+      ],
+      repoRoot: root,
+    });
+    assert.deepEqual(r.declined, [], JSON.stringify(r.declined));
+    assert.deepEqual(r.escapes, [], JSON.stringify(r.escapes));
+    for (const shell of probeShells()) {
+      const c = r.cases.find((x) => x.shell === shell);
+      assert.equal(c?.outcome, "accepted", `${shell}: ${JSON.stringify(c)}`);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("task.306: a HOSTILE write under its own HOME is still an escape, named with its case and shell", () => {
+  const root = saRoot({
+    "stray.sh": '#!/usr/bin/env bash\ntouch "$HOME/stray"\nexit 1\n',
+  });
+  try {
+    const r = runProbeSpec({
+      entry: "shell-argv:stray.sh",
+      argv: ["{input}"],
+      cases: [saCase("stray.h", "hostile", "x", { expected: { exit: 1 } })],
+      repoRoot: root,
+    });
+    assert.ok(r.escapes.length >= probeShells().length, JSON.stringify(r));
+    for (const shell of probeShells()) {
+      assert.ok(
+        r.escapes.some(
+          (e) => e.id === `stray.h@${shell}` && /stray/.test(e.path),
+        ),
+        `${shell}: ${JSON.stringify(r.escapes)}`,
+      );
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("task.306: a write outside the case's HOME and outside the work dir is still an escape", () => {
+  const root = saRoot({
+    // HOME is <sandbox>/<work>/<case>/.probe-home: three levels up is the sandbox root.
+    "out.sh": '#!/usr/bin/env bash\ntouch "$HOME/../../../out306"\nexit 1\n',
+  });
+  try {
+    const r = runProbeSpec({
+      entry: "shell-argv:out.sh",
+      argv: ["{input}"],
+      cases: [saCase("out.l", "legitimate", "x")],
+      repoRoot: root,
+    });
+    for (const shell of probeShells()) {
+      assert.ok(
+        r.escapes.some(
+          (e) => e.id === `out.l@${shell}` && /out306/.test(e.path),
+        ),
+        `${shell}: ${JSON.stringify(r.escapes)}`,
+      );
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("task.306: a fence: block that takes a lock under HOME is accepted under every shell", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "# Fixture doc",
+      "",
+      "### Take",
+      "",
+      "```bash",
+      'mkdir -p "$HOME/locks" || exit 7',
+      'mkdir "$HOME/locks/<slot>" 2>/dev/null || exit 10',
+      "```",
+      "",
+    ].join("\n"),
+  });
+  try {
+    const r = runProbeSpec({
+      entry: "fence:doc.md#Take",
+      slot: "<slot>",
+      cases: [fenceCase("f.take", "legitimate", "alpha")],
+      repoRoot: root,
+    });
+    assert.deepEqual(r.declined, [], JSON.stringify(r.declined));
+    assert.deepEqual(r.escapes, [], JSON.stringify(r.escapes));
+    for (const shell of probeShells()) {
+      const c = r.cases.find((x) => x.shell === shell);
+      assert.equal(c?.outcome, "accepted", `${shell}: ${JSON.stringify(c)}`);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("task.306: a LEGITIMATE write under its own HOME is not an escape, and each run starts from an empty HOME", () => {
+  const root = saRoot({
+    "fresh.sh": [
+      "#!/usr/bin/env bash",
+      '[ -z "$(ls -A "$HOME")" ] || exit 11',
+      'touch "$HOME/state"',
+      "exit 0",
+      "",
+    ].join("\n"),
+  });
+  try {
+    const r = runProbeSpec({
+      entry: "shell-argv:fresh.sh",
+      argv: ["{input}"],
+      cases: [
+        saCase("fresh.a", "legitimate", "x"),
+        saCase("fresh.b", "legitimate", "y"),
+      ],
+      repoRoot: root,
+    });
+    assert.deepEqual(r.escapes, [], JSON.stringify(r.escapes));
+    for (const c of r.cases) {
+      assert.equal(c.outcome, "accepted", JSON.stringify(c));
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("task.306: a shell-argv setup still runs under the run-wide HOME, so a stray write there errors the run", () => {
+  const root = saRoot({
+    "ok.sh": "#!/usr/bin/env bash\nexit 0\n",
+    "setup-home.sh": '#!/usr/bin/env bash\ntouch "$HOME/stray"\n',
+  });
+  try {
+    const r = runProbeSpec({
+      entry: "shell-argv:ok.sh",
+      argv: ["{input}"],
+      fixtureSetup: "setup-home.sh",
+      cases: [saCase("setup.h", "legitimate", "x")],
+      repoRoot: root,
+    });
+    assert.equal(r.executed, 0, JSON.stringify(r.cases));
+    for (const c of r.cases) {
+      assert.equal(c.outcome, "errored", JSON.stringify(c));
+      assert.match(c.detail, /fixture setup wrote outside the case directory/);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 
@@ -9655,6 +9877,160 @@ test("uniform failure: through security-probe-plan.mjs there are no probes and n
     assert.equal(out.runs[0].verdict, "unverifiable", child.stdout);
     const text = readFileSync(record, "utf8");
     assert.equal(text.includes("_failure"), false, text);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ── task.300: a clean count names what the run could not observe ────────────
+
+const LIMIT_EFFECTS = OBSERVATION_LIMITS["effects-after-accept"];
+const LIMIT_OUTSIDE = OBSERVATION_LIMITS["outside-sandbox-write"];
+
+/** A record holding one control per entry string, shaped as the engine writes it. */
+function limitsRecord(entries, { withField }) {
+  return {
+    version: 1,
+    controls: entries.map((entry, i) => {
+      const e = toRecordEntry(
+        {
+          sink: "filename",
+          entry,
+          verdict: "engages",
+          reason: "x",
+          executed: 3,
+        },
+        { name: `c${i}` },
+      );
+      if (!withField) delete e.observation_limits;
+      return e;
+    }),
+  };
+}
+
+test("observation limits: every entry form carries the after-accept limit, and only fence: adds the outside-sandbox write", () => {
+  for (const entry of [
+    "lib/validate.mjs#validate",
+    "shell:scripts/run.sh",
+    "shell-fn:scripts/run.sh#check",
+    "cli:scripts/tool.mjs",
+    "shell-argv:scripts/run.sh",
+  ]) {
+    assert.deepEqual(
+      observationLimitsFor(entry),
+      ["effects-after-accept"],
+      entry,
+    );
+  }
+  assert.deepEqual(observationLimitsFor("fence:docs/x.md#Run it"), [
+    "effects-after-accept",
+    "outside-sandbox-write",
+  ]);
+  // A malformed entry never throws, and carries the universal limit.
+  assert.deepEqual(observationLimitsFor(null), ["effects-after-accept"]);
+});
+
+test("observation limits: the record entry stores ids and the security_review block prints the sentences once, at run level", () => {
+  const rec = limitsRecord(["shell:scripts/run.sh", "fence:docs/x.md#Run it"], {
+    withField: true,
+  });
+  assert.deepEqual(rec.controls[0].observation_limits, [
+    "effects-after-accept",
+  ]);
+  assert.deepEqual(rec.controls[1].observation_limits, [
+    "effects-after-accept",
+    "outside-sandbox-write",
+  ]);
+  assert.deepEqual(observationLimitIds(rec), [
+    "effects-after-accept",
+    "outside-sandbox-write",
+  ]);
+  const block = emitBlock(rec);
+  assert.match(block, /^ {2}observation_limits:$/m);
+  assert.equal(block.split(LIMIT_EFFECTS.slice(0, 40)).length - 1, 1, block);
+  assert.ok(block.includes(LIMIT_OUTSIDE.slice(0, 40)), block);
+  // Only shell forms: the outside-sandbox sentence is absent.
+  const shellOnly = emitBlock(
+    limitsRecord(["shell:scripts/run.sh"], { withField: true }),
+  );
+  assert.ok(shellOnly.includes(LIMIT_EFFECTS.slice(0, 40)), shellOnly);
+  assert.equal(
+    shellOnly.includes(LIMIT_OUTSIDE.slice(0, 40)),
+    false,
+    shellOnly,
+  );
+});
+
+test("observation limits: a record written before the field existed reads the same as one written after (readers tolerate it)", () => {
+  const entries = ["shell:scripts/run.sh", "fence:docs/x.md#Run it"];
+  const legacy = limitsRecord(entries, { withField: false });
+  const current = limitsRecord(entries, { withField: true });
+  assert.deepEqual(
+    observationLimitTexts(legacy),
+    observationLimitTexts(current),
+  );
+  // The counts a gate reads do not move because the field is present.
+  const strip = (b) =>
+    b.replace(/^ {2}observation_limits:\n(?: {4}- .*\n)+/m, "");
+  assert.equal(strip(emitBlock(legacy)), strip(emitBlock(current)));
+  assert.match(emitBlock(current), /^ {2}probes_executed: 6$/m);
+  assert.match(emitBlock(legacy), /^ {2}probes_executed: 6$/m);
+  // No control, nothing ran: no limits are claimed.
+  assert.doesNotMatch(
+    emitBlock({ version: 1, controls: [] }),
+    /observation_limits/,
+  );
+  assert.doesNotMatch(emitBlock(null), /observation_limits/);
+});
+
+test("observation limits: through security-probe-plan.mjs the output carries the sentences beside probes_executed, with the same count as without them", () => {
+  const dir = mkdtempSync(join(tmpdir(), "probe-limits-plan-"));
+  try {
+    const plan = join(dir, "plan.json");
+    const record = join(dir, "x.dod.1.security.run.json");
+    writeFileSync(
+      plan,
+      JSON.stringify([
+        {
+          argv: [
+            "--sink",
+            "filename",
+            "--entry",
+            `shell:${FIXTURES}/uniform-usage.sh`,
+          ],
+        },
+      ]),
+    );
+    const child = spawnSync(
+      process.execPath,
+      [
+        join(REPO_ROOT, "shared/resources/security-probe-plan.mjs"),
+        "--plan",
+        plan,
+        "--record",
+        record,
+        "--cases-base",
+        join(dir, "x.dod.1.security.cases"),
+        "--repo-root",
+        REPO_ROOT,
+        "--json",
+      ],
+      { cwd: REPO_ROOT, encoding: "utf8" },
+    );
+    const out = JSON.parse(child.stdout);
+    assert.deepEqual(out.observation_limits, [LIMIT_EFFECTS], child.stdout);
+    assert.equal(out.probes_executed, 0, child.stdout);
+    // The same record with the field stripped from its entry files reads the same count and sentence.
+    const entriesDir = recordEntriesDir(record);
+    for (const f of readdirSync(entriesDir)) {
+      const p = join(entriesDir, f);
+      const e = JSON.parse(readFileSync(p, "utf8"));
+      delete e.observation_limits;
+      writeFileSync(p, JSON.stringify(e));
+    }
+    const rec = readRecord(record);
+    assert.equal(rec.totals.executed, out.probes_executed);
+    assert.deepEqual(observationLimitTexts(rec), [LIMIT_EFFECTS]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

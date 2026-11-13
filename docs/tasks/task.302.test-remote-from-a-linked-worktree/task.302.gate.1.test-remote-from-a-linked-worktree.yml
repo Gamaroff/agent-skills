@@ -1,0 +1,51 @@
+schema: 2
+task: 'task.302.test-remote-from-a-linked-worktree'
+task_title: 'test:remote from a linked worktree'
+gate: PASS
+status_reason: 'The linked-worktree path syncs the common git dir with the worktree HEAD and index; 23 offline tests pass, the new one goes red on the old run.sh, and a live run from a real worktree exited 0 (8407 tests, 0 failed). One residual: the side-by-side main-checkout run was not done; the PR CI test job is its counterpart and was still pending.'
+reviewer: 'QA Engineer'
+head: 'eba242d2cb4c366dfa24ca7b011fff471e47de42'
+updated: '2026-11-12T13:40:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 23
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    boundary_signals: []
+    boundary: false
+    boundary_reason: 'run.sh is a sync script, not an accept/reject predicate; it refuses only when git directories cannot be resolved, and that refusal is exercised by the offline test setup.'
+    notes: 'Nothing is written to the server C: drive; the .git sync target is the existing run dir. No credentials touched.'
+  performance:
+    status: PASS
+    notes: 'The sync copies the common git dir once, the same order of data as a normal checkout. Load recorded before and after the live run in the implementation report.'
+  reliability:
+    status: PASS
+    notes: 'Unresolvable git dirs fail closed with a message; a missing index is tolerated; the no-.git case keeps its warning.'
+  maintainability:
+    status: PASS
+    notes: 'One block, commented with the reason for the HEAD and index overlay; docs and CHANGELOG updated.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Confirm the PR CI test job (the main-checkout counterpart of the live run) is green; /finalise gates on CI.'
+      refs: ['tests/test-remote-runner.test.js']

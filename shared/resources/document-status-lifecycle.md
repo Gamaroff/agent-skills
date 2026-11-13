@@ -15,7 +15,9 @@ This is the single source of truth for document status values across all story a
 Draft → Planned → Ready for Development → In Progress → Ready for Review → Accepted
 ```
 
-`Cancelled` is reachable from any non-terminal state. Terminal states are **Accepted** and **Cancelled**.
+`Cancelled` and `Superseded` are reachable from any non-terminal state. Terminal states are **Accepted**, **Cancelled** and **Superseded**.
+
+`Cancelled` means the work was abandoned. `Superseded` means newer work replaced it: the document names that work in `superseded_by:` and carries a "Superseded by X" banner. Neither is ever selected for development.
 
 The QA loop introduces a backward edge: `Ready for Review → In Progress` (QA FAIL → qa-fix → re-submit).
 
@@ -40,8 +42,15 @@ stateDiagram-v2
     InProgress --> Cancelled
     ReadyForReview --> Cancelled
 
+    Draft --> Superseded
+    Planned --> Superseded
+    ReadyForDevelopment --> Superseded
+    InProgress --> Superseded
+    ReadyForReview --> Superseded
+
     Accepted --> [*]
     Cancelled --> [*]
+    Superseded --> [*]
 
     ReadyForDevelopment : Ready for Development
     InProgress : In Progress
@@ -61,6 +70,7 @@ stateDiagram-v2
 | `ready-for-review`      | `Ready for Review`      | `develop` (completion)        | All implementation plan phases / tasks checked off           |
 | `accepted`              | `Accepted`              | `finalise`                    | DoD checklist passed, QA gate PASS or WAIVED                 |
 | `cancelled`             | `Cancelled`             | Any skill / human             | Manual decision — no automated transition                    |
+| `superseded`            | `Superseded`            | Human                         | Newer work replaces it; `superseded_by:` names that work     |
 
 ### Deprecated synonyms (do not use in new skills)
 
@@ -148,6 +158,7 @@ Both lines change in the same commit.
 | `ready-for-review`      | `develop`                     | `qa-task`, `qa-story`, `finalise`                           |
 | `accepted`              | `finalise`                    | `scrum-master`, reporting tools                             |
 | `cancelled`             | Human / any skill             | All skills (treat as terminal — no further transitions)     |
+| `superseded`            | Human                         | All skills (treat as terminal — no further transitions)     |
 
 ---
 

@@ -25,7 +25,27 @@
 #   advance-pipeline-lock.sh --skill finalise --dod <dod-path>
 #                                                   # finalise advances only on an ACCEPTED DoD (task 222)
 #   advance-pipeline-lock.sh --restore <doc-dir>    # rebuild the lock from the halt snapshot or an
-#                                                   # orphaned PreCompact claim (task.124, Phase 4)
+#                                                   # orphaned PreCompact claim (task.124, Phase 4);
+#                                                   # on a present lock the PreCompact hook marked
+#                                                   # paused, clear the mark in place
+#   advance-pipeline-lock.sh --clear-pause          # drop the PreCompact `paused` mark, if any
+#
+# The `paused` mark (2026-11). The PreCompact hook no longer removes the lock: it marks it
+# `paused: {at, step, reason: "precompact"}` and leaves a snapshot. Claude Code carries the
+# same session on after a compaction, and the removed lock left that session with every
+# helper and the Stop hook inert until someone ran --restore by hand (obs #123, #275; three
+# times in one consumer run on 2026-11-10). The mark is cleared by the next lock write of
+# the session that carries on — automatically, because agents do not run recovery steps:
+#   • a numeric advance and a `--skill` advance, INCLUDING the idempotent no-op and the
+#     finalise HOLD (the Stop hook's re-assert is a no-op advance, and it is the most likely
+#     first call after a compaction), and the qa-story|qa-task|qa-fix|review-pr no-ops;
+#   • `--clear-pause`, which set-qa-phase.sh and set-waiting-on.sh call before their writes;
+#   • `--restore <doc-dir>` on a present paused lock for that document.
+# Clearing also CONSUMES this pause's snapshot (last-halt.json with pause_reason
+# "precompact" for the lock's own document): the lock is the record again, and a snapshot
+# that outlives its run is offered as a resume for merged work (obs #88). Read-only modes
+# (--paused-here, --hold-state, --restore --which) and `--skill commit-changes` (which
+# parses nothing) leave the mark alone. While the mark is set the Stop hook allows a stop.
 #
 # Behaviour:
 #   • No lock file  → depends on the mode, and the split is deliberate (task.124):
@@ -75,15 +95,22 @@
 #                     --complete, after Step 8's Completion Checklist, is the one terminal remover
 #
 # --restore <doc-dir> (task.124, Phase 4). The ONE restore path — grant-qa-cycles.sh
-# used to carry its own (task.123) and now calls this. A terminal HALT and the
-# PreCompact hook both REMOVE the lock and leave a superset of it behind:
+# used to carry its own (task.123) and now calls this. A terminal HALT REMOVES the lock
+# and leaves a superset of it behind; so did the PreCompact hook until 2026-11 (it now
+# keeps the lock, marked `paused`, see above), and its leftovers can still be on disk:
 #   • .claude/state/develop-pipeline.last-halt.json — written by a terminal HALT
 #     (halted_at / halt_reason / halt_step) or by the PreCompact hook
 #     (paused_at / pause_reason), and, before this task, never consumed;
 #   • .claude/state/develop-pipeline.lock.pausing.<pid> — an orphaned claim, the lock
-#     byte for byte, left by a PreCompact hook killed between its rename and its snapshot.
-# A session that CONTINUES IN PLACE after a pause — rather than re-invoking the skill,
+#     byte for byte, left by a PreCompact hook of the previous revision killed between
+#     its rename and its snapshot. The current hook writes none.
+# A session that CONTINUES IN PLACE after a HALT — rather than re-invoking the skill,
 # whose Step 1 is the lock's only ordinary writer — had no step that put the lock back.
+#   • lock present and marked `paused` for <doc-dir> → the mark is cleared in place and
+#                                       this pause's snapshot consumed; exit 0, prints
+#                                       `advance-pipeline-lock: lock present and paused — pause
+#                                       cleared in place at step N`. A paused lock for ANOTHER
+#                                       document → exit 1, nothing written.
 #   • lock present                    → exit 0, noop ("lock present — nothing to restore")
 #   • no candidate at either path     → exit 1, names both paths
 #   • every candidate is for another document (its task_or_story_directory, canonicalised,
@@ -109,6 +136,7 @@
 #     candidate outranks a legacy one whatever their mtimes, and the --accept-legacy advice
 #     prints only when nothing restores. Step 8 deletes such a snapshot when it is the sole
 #     candidate on disk.
+#   • the rebuilt lock drops `paused` too: a HALT snapshot taken from a paused lock carries it.
 #   • --restore --which <doc-dir>: print the path --restore WOULD consume and exit 0, with
 #     no writes and nothing consumed; exit 1 (same stderr) when nothing is usable. This is
 #     the same selection function, not a re-derivation — grant-qa-cycles.sh reads its
@@ -146,6 +174,7 @@ Usage:
   $0 --skill finalise --dod <dod-path>
                             # advance to 8 only when the DoD reads **Final Status:** ✅ ACCEPTED
   $0 --paused-here          # print a halt snapshot / claim for the current branch, if any
+  $0 --clear-pause          # drop the PreCompact hook's paused mark from the lock, if any
   $0 --restore [--which] [--accept-legacy] <doc-dir>
                             # rebuild the lock from the halt snapshot / orphaned claim
                             #   --which: print the candidate --restore would consume; no writes
@@ -234,6 +263,7 @@ if [ ! -f "$LOCK" ]; then
       fi
       exit 0 ;;
     --complete) exit 0 ;;               # clearable lock
+    --clear-pause) exit 0 ;;            # no lock, no mark
     --help|-h) usage ;;
     *)
       echo "advance-pipeline-lock: no lock at '$LOCK' — nothing to advance to step '$1'. If this session is continuing after a PreCompact pause or a HALT, rebuild the lock first: advance-pipeline-lock.sh --restore <doc-dir>" >&2
@@ -379,8 +409,23 @@ choose_candidate() {
 }
 
 restore_lock() {
-  local doc_dir="$1" chosen step tmp
+  local doc_dir="$1" chosen step tmp lock_dir
   if [ -f "$LOCK" ]; then
+    # A lock the PreCompact hook marked paused is the resume record itself: clear the mark
+    # in place (a fresh session's Resume and an in-session --restore both land here). The
+    # document check is --restore's own rule — a paused lock for another document is that
+    # run's, and clearing it would re-arm the Stop hook on a run nobody resumed.
+    if jq -e 'type == "object" and (.paused | type) == "object"' "$LOCK" >/dev/null 2>&1; then
+      [ -d "$doc_dir" ] || { echo "advance-pipeline-lock: --restore needs an existing <doc-dir>, got '$doc_dir'" >&2; exit 1; }
+      lock_dir=$(jq -r '.task_or_story_directory // ""' "$LOCK")
+      if [ -n "$lock_dir" ] && [ "$(canon "$lock_dir")" != "$(canon "$doc_dir")" ]; then
+        echo "advance-pipeline-lock: the lock at '$LOCK' is paused for '$lock_dir', not '$doc_dir' — nothing cleared" >&2
+        exit 1
+      fi
+      clear_pause || exit 1
+      echo "advance-pipeline-lock: lock present and paused — pause cleared in place at step $(jq -r '.current_step // "?"' "$LOCK")"
+      exit 0
+    fi
     echo "advance-pipeline-lock: lock present at '$LOCK' — nothing to restore"
     exit 0
   fi
@@ -409,7 +454,7 @@ restore_lock() {
   if ! jq --arg dir "$doc_dir" \
           '(.current_step = ((.halt_step // .current_step) | (tonumber? // .)))
            | .task_or_story_directory = ((.task_or_story_directory // "") | if . == "" then $dir else . end)
-           | del(.halted_at, .halt_reason, .halt_step, .paused_at, .pause_reason, .waiting_on)' "$chosen" > "$tmp"; then
+           | del(.halted_at, .halt_reason, .halt_step, .paused_at, .pause_reason, .paused, .waiting_on)' "$chosen" > "$tmp"; then
     rm -f "$tmp"
     echo "advance-pipeline-lock: could not rebuild the lock from '$chosen'" >&2
     exit 1
@@ -483,6 +528,38 @@ require_parsable_lock() {
   fi
 }
 
+# clear_pause — drop the PreCompact hook's `paused` mark from a present, parsable lock and
+# consume that pause's snapshot (header: The `paused` mark). Silent and exit 0 when there is
+# no mark. The snapshot is consumed only when it is a PreCompact one (`pause_reason:
+# "precompact"`) for the lock's own document: a terminal HALT's snapshot, or one for another
+# document, is not this pause's record. The notice goes to stderr, so a caller that reads
+# stdout (a numeric advance's `step X → Y`) sees what it always saw.
+clear_pause() {
+  local tmp at step lock_dir snap_dir consumed=""
+  jq -e '(.paused | type) == "object"' "$LOCK" >/dev/null 2>&1 || return 0
+  at=$(jq -r '.paused.at // "?"' "$LOCK" 2>/dev/null)
+  step=$(jq -r '.paused.step // "?"' "$LOCK" 2>/dev/null)
+  tmp=$(mktemp "$(dirname "$LOCK")/.advance-pipeline-lock.XXXXXX") || {
+    echo "advance-pipeline-lock: could not create temp file beside '$LOCK' — paused mark NOT cleared" >&2
+    return 1
+  }
+  if ! jq 'del(.paused)' "$LOCK" > "$tmp"; then
+    rm -f "$tmp"
+    echo "advance-pipeline-lock: jq write failed — paused mark NOT cleared" >&2
+    return 1
+  fi
+  mv "$tmp" "$LOCK"
+  if [ -f "$SNAPSHOT" ] && jq -e 'type == "object" and .pause_reason == "precompact"' "$SNAPSHOT" >/dev/null 2>&1; then
+    lock_dir=$(jq -r '.task_or_story_directory // ""' "$LOCK")
+    snap_dir=$(jq -r '.task_or_story_directory // ""' "$SNAPSHOT")
+    if [ -n "$lock_dir" ] && [ "$(canon "$snap_dir")" = "$(canon "$lock_dir")" ]; then
+      rm -f "$SNAPSHOT" && consumed="; its snapshot $SNAPSHOT consumed"
+    fi
+  fi
+  echo "advance-pipeline-lock: paused mark cleared (paused at step $step, $at)$consumed — the Stop hook guards this run again" >&2
+  return 0
+}
+
 NEXT=""
 DOD_ARG=""
 DOD_FLAG=""
@@ -517,6 +594,12 @@ case "$1" in
     fi
     restore_lock "$1"
     ;;
+  --clear-pause)
+    [ $# -eq 1 ] || usage
+    require_parsable_lock
+    clear_pause || exit 1
+    exit 0
+    ;;
   --skill)
     [ $# -ge 2 ] || usage
     SKILL_NAME="$2"
@@ -530,8 +613,12 @@ case "$1" in
       # review-pr is Step 5c, the QA loop's exit gate. It is listed explicitly
       # rather than left to the `*)` catch-all below: both arms exit 0, so this
       # is a documentation and testability change, not a behavioural one.
+      # The loop's sub-skills advance nothing, but one returning IS this session carrying on,
+      # so a paused mark goes (header: The `paused` mark). A non-object lock is left alone and
+      # still exits 0: this arm never failed on a corrupt lock.
       qa-story|qa-task|qa-fix|review-pr)
-                                  exit 0 ;;  # iterative loop, orchestrator manages
+        jq -e 'type == "object"' "$LOCK" >/dev/null 2>&1 && clear_pause
+        exit 0 ;;  # iterative loop, orchestrator manages
       finalise)                   NEXT=8 ;;
       *)
         # Unknown skill = not a pipeline sub-skill = silent noop
@@ -557,6 +644,9 @@ case "$NEXT" in
 esac
 
 require_parsable_lock
+# Before the idempotency and finalise-hold exits, not after: the Stop hook's re-assert is a
+# no-op advance, and it must still clear a pause (header: The `paused` mark).
+clear_pause
 CURRENT=$(jq -r '.current_step // 0' "$LOCK" 2>/dev/null)
 if [ -z "$CURRENT" ] || [ "$CURRENT" = "null" ]; then
   CURRENT=0

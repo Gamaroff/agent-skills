@@ -1,0 +1,86 @@
+schema: 2
+task: 'task.295.test-remote-lan-server-route'
+task_title: 'Run the test suite on the LAN server (test:remote)'
+gate: FAIL
+status_reason: 'Gate-2 findings are fixed and held by tests, but the fix itself has gaps: the per-directory lock is taken after the sync it was meant to protect (the docs claim the opposite), a dropped ssh leaves the container running, and a failing docker ps lets --reap delete a directory with a live run.'
+reviewer: 'QA Engineer'
+head: '12578cea0f47e884c85859c0ab4a7556b798d21b'
+updated: '2026-11-10T16:17:30Z'
+
+top_issues:
+  - id: 'T295-QA-6'
+    severity: high
+    file: 'scripts/remote-test/run.sh'
+    finding: 'The container-name lock is taken by `docker run`, which is the last step. The `rsync --delete` of the tree and of .git, and the image build, run before it, so a second run on the same branch rewrites and deletes files under a live run and only then fails on the name (exit 125). The docs (step 4) and the comment above REMOTE_CMD say the second run fails instead of syncing over a tree in use. Confirmed by reading: the first rsync is at run.sh:154 and `docker run` at :187. origin: code-review (CR-1, high/high), reproduced by QA by line order'
+    suggested_action: 'Refuse before the first rsync when a container named $RUN_DIR exists (running or stale), with a message that names it and the command to remove it; keep the --name conflict as the atomic backstop; add a test that no rsync call precedes the refusal'
+    suggested_owner: dev
+    status: open
+  - id: 'T295-QA-7'
+    severity: medium
+    file: 'scripts/remote-test/run.sh'
+    finding: 'Only exit 124 or 137 kills the named container. A dropped ssh session (255) leaves it running for up to the full timeout, and a container left created or exited by a daemon or WSL restart blocks every later run on that directory with a bare docker name-conflict error. origin: code-review (CR-2, medium/high)'
+    suggested_action: 'Kill the named container on 255 as well (not on 125, which means another run owns the name), and let the pre-run lock check name a stale container'
+    suggested_owner: dev
+    status: open
+  - id: 'T295-QA-8'
+    severity: medium
+    file: 'scripts/remote-test/run.sh'
+    finding: 'In the reap script a failing `docker ps` leaves `running` empty, the same value as "nothing is running", so --reap deletes directories that have live runs. Reproduced: with a docker stub that exits 1, a 40-day-old directory was removed; with a working docker that lists its name it is kept (gate-2 test). Separately, the directory is touched only by REMOTE_CMD, after the image build, so a reap during a first-use build can still read it as old. origin: code-review (CR-5), reproduced by QA'
+    suggested_action: 'Abort the reap when docker ps exits non-zero; touch the directory right after the sync, before the image build; add a test for docker ps failing'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 65
+
+evidence:
+  tests_reviewed: 13
+  phases_verified: '6/6'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: ['never']
+    boundary: true
+    notes: 'Unchanged. The --run validation is the boundary; the probe engine corpus does not fit this entry and is not credited. The new code splices only a sanitised slug, a hex hash and a validated integer into the remote command; the reap script receives its one argument as a validated integer.'
+  performance:
+    status: PASS
+    notes: 'CpuShares=128 confirmed in cycle 1; the timeout now stops the container (live run on .249, exit 124 after 80 s, 0 containers left).'
+  reliability:
+    status: CONCERNS
+    notes: 'T295-QA-6, T295-QA-7, T295-QA-8: the lock and cleanup paths from the gate-2 fix still have gaps.'
+  maintainability:
+    status: PASS
+    notes: 'shellcheck and lint:shell clean; guard test 13 of 13, six mutations proved; docs aligned except for the lock claim in T295-QA-6.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T295-QA-6, T295-QA-7 and T295-QA-8'
+      refs: ['scripts/remote-test/run.sh', 'tests/test-remote-runner.test.js', 'docs/contributing/testing-remote.md']
+  future:
+    - action: 'SIGTERM sent only to run.sh is handled after the foreground ssh returns (bash defers the trap), and the trap kills the container by name even if this run never created it; run the ssh in the background and wait on it (code-review CR-3, medium/medium, not reproduced)'
+      refs: ['scripts/remote-test/run.sh']
+    - action: 'Exit 124 and 137 are reached from different states (inner timeout, local backstop, a script that exits 137 itself) yet print the same message; word it as the limit or a kill (CR-4)'
+      refs: ['scripts/remote-test/run.sh']
+    - action: 'The 9999-minute cap is not a meaningful ceiling; choose one and state it in the docs and usage (CR-7)'
+      refs: ['scripts/remote-test/run.sh', 'docs/contributing/testing-remote.md']
+    - action: 'Tests cover the status-to-kill branch only, not the backstop, the trap, a 255 drop, a stale container, the lock order, or docker ps failing (CR-6)'
+      refs: ['tests/test-remote-runner.test.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T295-QA-6 fixed', 'T295-QA-7 fixed', 'T295-QA-8 fixed']

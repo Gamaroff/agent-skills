@@ -1456,6 +1456,465 @@ function sedScan(s, markForbidden) {
   }
 }
 
+// ── The lexical layer: one tokenizer (task.292) ───────────────────────────────
+
+/**
+ * How bash reads a block into words, quotes, escapes, comments, substitutions and heredocs —
+ * once. Every scan that needs a lexical fact reads it from here instead of re-deriving it.
+ *
+ * Bash's rules, as encoded:
+ * - Blanks are space, tab and newline. Nothing else separates words: CR, FF, VT, NBSP and every
+ *   Unicode space are word characters (T290-QA-3 was a scan that thought they were blanks).
+ * - Outside quotes a backslash quotes the next character, and backslash-newline is a line join.
+ *   Reading left to right is what makes an even run of backslashes (escaped backslashes) differ
+ *   from an odd one: no parity is counted anywhere.
+ * - Inside double quotes a backslash escapes the next character (only `$`, backtick, `"`, `\` and
+ *   newline are special there, and every other escaped character is inert either way). Inside
+ *   single quotes nothing is special.
+ * - A `#` starts a comment only at the start of a word: at the start of the text, or after a
+ *   blank, newline, `;`, `&`, `|` or `(`. After any other operator the scan reads the `#` as a
+ *   word character, which leaves the rest of the line to be scanned as code (the safe side).
+ * - `$(`, `<(`, `>(` and backtick open a substitution whose body is code again; they nest on an
+ *   explicit stack, so a deep nest is bounded by the heap and not the call stack.
+ * - `<<WORD` and `<<-WORD` start a heredoc whose body is data, from the next line to the line
+ *   that is the terminator.
+ *
+ * A shape this does not model throws `Error("tokenize: …")`, and `classifyFailClosed` reads a
+ * throw as `mutating`: an unterminated quote, substitution or `${…}`, a single quote inside a
+ * double-quoted `${…}`, a heredoc form other than a plain word, a heredoc inside a substitution,
+ * and a nest deeper than `MAX_TOKEN_DEPTH`.
+ *
+ * `${…}` has a frame of its own (its body is read for quotes, escapes and nested expansions, so
+ * `${n#"${n%%[!0]*}"}` is one piece). An unquoted heredoc body is read as a double-quoted string
+ * (bash expands it), so a `$(…)` in it is a `subst` token, whose commands the scans judge.
+ *
+ * Tokens (all spans are `[start, end)` into the text; sorted by `start`):
+ * - `comment`: the `#` to the end of the line, newline excluded.
+ * - `join`: a backslash-newline that bash removes before it reads a word.
+ * - `quote`: a single- or double-quoted span, quotes included; `quote` is the quote character.
+ * - `subst`: a substitution, `form` one of `"$("`, `"<("`, `">("` or "`"; `depth` is the number of
+ *   substitutions around it (0: outermost) and `inDouble` whether a double quote directly
+ *   encloses it.
+ * - `heredoc-op`: the `<<` or `<<-`.
+ * - `heredoc-body`: the body lines and the terminator line, with the newline that ends it.
+ */
+export const MAX_TOKEN_DEPTH = 100000;
+
+const TOKEN_CACHE = new Map();
+const TOKEN_CACHE_MAX = 64;
+
+/** The tokens of `code`, or a thrown refusal. Memoised: the scans ask about the same text repeatedly. */
+export function tokenize(code) {
+  const cached = TOKEN_CACHE.get(code);
+  if (cached) return cached;
+  const result = lexBash(code);
+  if (TOKEN_CACHE.size >= TOKEN_CACHE_MAX)
+    TOKEN_CACHE.delete(TOKEN_CACHE.keys().next().value);
+  TOKEN_CACHE.set(code, result);
+  return result;
+}
+
+// Frame kinds: the top level, a `$(`/`<(`/`>(` body, a backtick body, a double-quoted span, a `${…}` body.
+const F_CODE = 0;
+const F_PAREN = 1;
+const F_TICK = 2;
+const F_DQ = 3;
+const F_PARAM = 4;
+
+function lexBash(code) {
+  const n = code.length;
+  const tokens = [];
+  const stack = [{ t: F_CODE, tok: null, d: 0 }];
+  const refuse = (why) => {
+    throw new Error(`tokenize: ${why}`);
+  };
+  // An escaped quote outside quotes is a literal in bash and the tokenizer reads it as one, but
+  // reading it makes the block `task.83.bug.1…md:102` runnable where the scan refused it before
+  // (task.290 docs scan), and a lexical refactor may not widen what QA executes. So it is refused
+  // here, on purpose; widening it is a separate, reviewed decision.
+  const refuseEscapedQuote = (next) => {
+    if (next === "'" || next === '"') refuse("escaped quote outside quotes");
+  };
+  const push = (t, tok, d = 0) => {
+    if (stack.length >= MAX_TOKEN_DEPTH) refuse("nesting too deep");
+    stack.push({ t, tok, d });
+  };
+  // Substitutions around the current position: the depth a new `subst` token carries.
+  let substDepth = 0;
+  // Heredocs opened on the current line, whose bodies start at its newline.
+  let pending = [];
+  // True when the next character would begin a word.
+  let wordStart = true;
+  // Inside an arithmetic command `(( … ))` (code frame only): `<<` is a left shift there.
+  // `arithInner` counts the single parentheses opened inside it.
+  let arith = 0;
+  let arithInner = 0;
+  let i = 0;
+
+  // `$((` opens arithmetic expansion, where a `$(` or a backtick still runs a command. The command
+  // scan removes an arithmetic expansion with a pattern that ends at the first `)`, which erased a
+  // nested substitution with it: `echo $((1+$(touch W)))` read as runnable while bash wrote
+  // (task 292, QA cycle 2). Arithmetic is not modelled, so a body that holds either is refused here,
+  // where every caller sees it. The scan stops at the first hit, so a run of `$((` is not quadratic.
+  const refuseArithSubst = (at) => {
+    let depth = 0;
+    for (let j = at + 2; j < n; j += 1) {
+      const ch = code[j];
+      if (ch === "(") depth += 1;
+      else if (ch === ")") {
+        depth -= 1;
+        if (depth === 0) return;
+      } else if (ch === "`" || (ch === "$" && code[j + 1] === "(")) {
+        refuse("command substitution inside $(( ))");
+      }
+    }
+  };
+
+  const openSubst = (form, at, width) => {
+    if (form === "$(" && code[at + 2] === "(") refuseArithSubst(at);
+    const f = stack[stack.length - 1];
+    const tok = {
+      kind: "subst",
+      form,
+      start: at,
+      end: -1,
+      depth: substDepth,
+      inDouble: f.t === F_DQ || (f.t === F_PARAM && f.inDq === true),
+    };
+    tokens.push(tok);
+    push(form === "`" ? F_TICK : F_PAREN, tok, 1);
+    substDepth += 1;
+    i = at + width;
+    wordStart = true; // the body is a fresh command list
+  };
+
+  const closeFrame = (end) => {
+    const f = stack.pop();
+    if (f.tok) f.tok.end = end;
+    if (f.t === F_PAREN || f.t === F_TICK) substDepth -= 1;
+  };
+
+  // `${…}` opens a frame of its own: its body is read for quotes, escapes and nested expansions,
+  // and ends at the `}` that is not hidden by them. It makes no token (no scan asks about it).
+  const openParam = (at) => {
+    const f = stack[stack.length - 1];
+    if (stack.length >= MAX_TOKEN_DEPTH) refuse("nesting too deep");
+    stack.push({
+      t: F_PARAM,
+      tok: null,
+      d: 0,
+      inDq: f.t === F_DQ || (f.t === F_PARAM && f.inDq === true),
+    });
+    i = at + 2;
+  };
+
+  const readHeredocOpener = (at) => {
+    let p = at + 2;
+    const strip = code[p] === "-";
+    if (strip) p += 1;
+    while (code[p] === " " || code[p] === "\t") p += 1;
+    const escaped = code[p] === "\\";
+    if (escaped) p += 1;
+    const q = code[p] === "'" || code[p] === '"' ? code[p++] : "";
+    const m = /^[A-Za-z_][A-Za-z0-9_]*/.exec(code.slice(p, p + 256));
+    if (!m) refuse("heredoc delimiter is not a plain word");
+    p += m[0].length;
+    if (q !== "") {
+      if (code[p] !== q) refuse("heredoc delimiter quote does not close");
+      p += 1;
+    }
+    tokens.push({
+      kind: "heredoc-op",
+      start: at,
+      end: at + 2 + (strip ? 1 : 0),
+    });
+    // Escaping or quoting any part of the delimiter makes the body literal.
+    pending.push({ delim: m[0], quoted: q !== "" || escaped });
+    return p;
+  };
+
+  const readHeredocBodies = (from) => {
+    let p = from;
+    for (const h of pending) {
+      const bodyStart = p;
+      let textEnd = p; // the end of the body proper, terminator line excluded
+      // No terminator before the end of the text: the body runs to the end, as bash reads it.
+      while (p < n) {
+        const eol = code.indexOf("\n", p);
+        const line = code.slice(p, eol < 0 ? n : eol);
+        const lineStart = p;
+        p = eol < 0 ? n : eol + 1;
+        if (line.trim() === h.delim) {
+          textEnd = lineStart;
+          break;
+        }
+        textEnd = p;
+      }
+      tokens.push({ kind: "heredoc-body", start: bodyStart, end: p });
+      if (!h.quoted && textEnd > bodyStart) {
+        // An unquoted body is expanded like a double-quoted string: `$(…)`, backticks and `${…}`
+        // in it run. Read it as one, with its `"` neutralised (a quote is a literal there), and
+        // keep only the substitutions it holds.
+        const body = code.slice(bodyStart, textEnd).replace(/"/g, "x");
+        for (const t of lexBash(`"${body}"`).tokens)
+          if (t.kind === "subst" || t.kind === "join")
+            tokens.push({
+              ...t,
+              start: t.start + bodyStart - 1,
+              end: t.end + bodyStart - 1,
+            });
+      }
+    }
+    pending = [];
+    return p;
+  };
+
+  while (i < n) {
+    const f = stack[stack.length - 1];
+    const c = code[i];
+
+    if (f.t === F_DQ) {
+      if (c === "\\") {
+        if (i + 1 >= n) refuse("unterminated double quote");
+        if (code[i + 1] === "\n")
+          tokens.push({ kind: "join", start: i, end: i + 2 });
+        i += 2;
+      } else if (c === '"') {
+        closeFrame(i + 1);
+        i += 1;
+        wordStart = false;
+      } else if (c === "$" && code[i + 1] === "(") {
+        openSubst("$(", i, 2);
+      } else if (c === "$" && code[i + 1] === "{") {
+        openParam(i);
+      } else if (c === "`") {
+        openSubst("`", i, 1);
+      } else i += 1;
+      continue;
+    }
+
+    if (f.t === F_PARAM) {
+      if (c === "\\") {
+        if (i + 1 >= n) refuse("unterminated ${");
+        if (!f.inDq) refuseEscapedQuote(code[i + 1]);
+        i += 2;
+      } else if (c === "}") {
+        closeFrame(i + 1);
+        i += 1;
+        wordStart = false;
+      } else if (c === "$" && code[i + 1] === "(") {
+        openSubst("$(", i, 2);
+      } else if (c === "$" && code[i + 1] === "{") {
+        openParam(i);
+      } else if (c === "`") {
+        openSubst("`", i, 1);
+      } else if (c === '"') {
+        const tok = { kind: "quote", quote: '"', start: i, end: -1 };
+        tokens.push(tok);
+        push(F_DQ, tok);
+        i += 1;
+      } else if (c === "'") {
+        // Inside a double-quoted `${…}` a single quote is a literal in some operators and a quote
+        // in others; the scan does not guess.
+        if (f.inDq)
+          refuse("single quote inside a double-quoted parameter expansion");
+        const j = code.indexOf("'", i + 1);
+        if (j < 0) refuse("unterminated single quote");
+        tokens.push({ kind: "quote", quote: "'", start: i, end: j + 1 });
+        i = j + 1;
+      } else i += 1;
+      continue;
+    }
+
+    // Code: the top level, or the body of a substitution.
+    switch (c) {
+      case "\\": {
+        if (code[i + 1] === "\n") {
+          // The join leaves `wordStart` as it was: `a\<LF>#` is one word, `a \<LF>#` a comment.
+          tokens.push({ kind: "join", start: i, end: i + 2 });
+          i += 2;
+        } else {
+          refuseEscapedQuote(code[i + 1]);
+          i += i + 1 < n ? 2 : 1;
+          wordStart = false;
+        }
+        break;
+      }
+      case "'": {
+        const j = code.indexOf("'", i + 1);
+        if (j < 0) refuse("unterminated single quote");
+        tokens.push({ kind: "quote", quote: "'", start: i, end: j + 1 });
+        i = j + 1;
+        wordStart = false;
+        break;
+      }
+      case '"': {
+        const tok = { kind: "quote", quote: '"', start: i, end: -1 };
+        tokens.push(tok);
+        push(F_DQ, tok);
+        i += 1;
+        wordStart = false;
+        break;
+      }
+      case "`": {
+        if (f.t === F_TICK) {
+          closeFrame(i + 1);
+          i += 1;
+          wordStart = false;
+        } else openSubst("`", i, 1);
+        break;
+      }
+      case "$": {
+        const next = code[i + 1];
+        if (next === "(") openSubst("$(", i, 2);
+        else if (next === "[") {
+          // The legacy arithmetic form `$[ … ]`. Arithmetic is not modelled, and inside it `<<` is
+          // a left shift, not a heredoc opener: reading it as one hid the lines up to the delimiter
+          // from every scan while bash ran them (task 292, QA cycle 1). Refuse, never guess.
+          refuse("legacy arithmetic $[");
+        } else if (next === "{") {
+          openParam(i);
+          wordStart = false;
+        } else if (next === "'") {
+          // $'…': a single-quoted span in which a backslash escapes the next character.
+          let j = i + 2;
+          while (j < n && code[j] !== "'") j += code[j] === "\\" ? 2 : 1;
+          if (j >= n) refuse("unterminated $'");
+          tokens.push({ kind: "quote", quote: "$'", start: i, end: j + 1 });
+          i = j + 1;
+          wordStart = false;
+        } else {
+          i += 1;
+          wordStart = false;
+        }
+        break;
+      }
+      case "(": {
+        // `((` is bash's arithmetic command, where `<<` is a left shift, not a heredoc opener.
+        // A subshell inside a subshell is written `( (`, so two adjacent parentheses in code are
+        // arithmetic and are not modelled (task 292, QA cycle 1: the differential found
+        // `((` + `$()$()<<z` + `))` hiding a writer behind a mis-read heredoc).
+        if (f.t === F_CODE && arith > 0) {
+          arithInner += 1;
+        } else if (f.t === F_CODE && code[i + 1] === "(") {
+          arith = 1;
+          arithInner = 0;
+          i += 2;
+          wordStart = true;
+          break;
+        }
+        if (f.t === F_PAREN) f.d += 1;
+        i += 1;
+        wordStart = true;
+        break;
+      }
+      case ")": {
+        if (f.t === F_CODE && arith > 0) {
+          if (arithInner > 0) arithInner -= 1;
+          else if (code[i + 1] === ")") {
+            arith = 0;
+            i += 1; // the second `)` is consumed below
+          }
+        }
+        if (f.t === F_PAREN && (f.d -= 1) === 0) {
+          closeFrame(i + 1);
+          wordStart = false;
+        } else wordStart = false;
+        i += 1;
+        break;
+      }
+      case "<": {
+        if (code[i + 1] === "<") {
+          if (code[i + 2] === "<") {
+            i += 3; // here-string
+            wordStart = false;
+          } else {
+            if (f.t !== F_CODE) refuse("heredoc inside a substitution");
+            if (arith > 0) refuse("<< inside an arithmetic command");
+            // `name[1<<z]=…`: inside an assignment subscript `<<` is a left shift too. A `[` that
+            // opens the current word and is not yet closed means the word may be a subscript.
+            let w = i;
+            while (w > 0 && !/[ \t\n;&|()<>`]/.test(code[w - 1])) w -= 1;
+            const word = code.slice(w, i);
+            if (word.lastIndexOf("[") > word.lastIndexOf("]"))
+              refuse("<< inside a subscript");
+            i = readHeredocOpener(i);
+            wordStart = false;
+          }
+        } else if (code[i + 1] === "(") openSubst("<(", i, 2);
+        else {
+          i += 1;
+          wordStart = false;
+        }
+        break;
+      }
+      case ">": {
+        if (code[i + 1] === "(") openSubst(">(", i, 2);
+        else {
+          i += 1;
+          wordStart = false;
+        }
+        break;
+      }
+      case ";":
+      case "&":
+      case "|":
+      case " ":
+      case "\t": {
+        i += 1;
+        wordStart = true;
+        break;
+      }
+      case "\n": {
+        i += 1;
+        wordStart = true;
+        if (pending.length > 0) {
+          if (f.t !== F_CODE) refuse("heredoc inside a substitution");
+          i = readHeredocBodies(i);
+        }
+        break;
+      }
+      case "#": {
+        if (wordStart) {
+          const eol = code.indexOf("\n", i);
+          const end = eol < 0 ? n : eol;
+          tokens.push({ kind: "comment", start: i, end });
+          i = end;
+        } else i += 1;
+        break;
+      }
+      default: {
+        i += 1;
+        wordStart = false;
+      }
+    }
+  }
+
+  if (stack.length > 1) {
+    const open = stack[stack.length - 1];
+    refuse(
+      open.t === F_DQ
+        ? "unterminated double quote"
+        : "unterminated command substitution",
+    );
+  }
+  // A heredoc opened on the last line (no newline after it) has an empty body.
+  tokens.sort((a, b) => a.start - b.start);
+  return { tokens };
+}
+
+/** `text` with every line join (a backslash-newline bash removes) replaced by `filler`. */
+function cutJoins(text, filler) {
+  let out = "";
+  let at = 0;
+  for (const t of tokenize(text).tokens) {
+    if (t.kind !== "join") continue;
+    out += text.slice(at, t.start) + filler;
+    at = t.end;
+  }
+  return out + text.slice(at);
+}
+
 /**
  * `text` with every command substitution, process substitution and backtick
  * replaced by one word, or null when one is unterminated. `commandInvocations`
@@ -1469,76 +1928,28 @@ function sedScan(s, markForbidden) {
  * `$(` for `commandInvocations` to cut again); a process substitution becomes `/dev/fd/0`, the operand
  * it stands for. The commands INSIDE a substitution are judged on their own, in
  * the unmasked reading.
+ *
+ * Read off the tokenizer (task.292): the substitutions are its outermost `subst` tokens, so a
+ * paren or backtick hidden by a quote, an escape or a comment is not one, and nesting costs one
+ * linear pass instead of one re-mask per level. A text it cannot read is null.
  */
-/**
- * Index of the `)` that closes the `(` at `open`, or -1. Quotes, escapes and
- * comments hide a paren from the shell, so they hide it here: `$(echo ")")` ends
- * at the LAST paren, and a scan that counted the quoted one ended early and
- * read the rest of the line as a second command (QA 5).
- */
-function closingParen(text, open) {
-  let d = 0;
-  for (let i = open; i < text.length; i += 1) {
-    const c = text[i];
-    if (c === "\\") i += 1;
-    else if (c === "'") {
-      const j = text.indexOf("'", i + 1);
-      if (j < 0) return -1;
-      i = j;
-    } else if (c === '"') {
-      for (i += 1; i < text.length && text[i] !== '"'; i += 1) {
-        if (text[i] === "\\") i += 1;
-        else if (text[i] === "$" && text[i + 1] === "(") {
-          const j = closingParen(text, i + 1);
-          if (j < 0) return -1;
-          i = j;
-        }
-      }
-      if (i >= text.length) return -1;
-    } else if (c === "#" && (i === 0 || /[\s;&|(]/.test(text[i - 1]))) {
-      while (i < text.length && text[i] !== "\n") i += 1;
-    } else if (c === "(") d += 1;
-    else if (c === ")" && (d -= 1) === 0) return i;
-  }
-  return -1;
-}
-
 function maskSubstitutions(text) {
-  let out = "";
-  let q = null;
-  for (let i = 0; i < text.length; i += 1) {
-    const c = text[i];
-    if (q === "'") {
-      out += c;
-      if (c === "'") q = null;
-      continue;
-    }
-    if (c === "\\") {
-      out += c + (text[i + 1] ?? "");
-      i += 1;
-      continue;
-    }
-    const two = text.slice(i, i + 2);
-    const proc = q === null && (two === "<(" || two === ">(");
-    if (two === "$(" || proc) {
-      const j = closingParen(text, i + 1);
-      if (j < 0) return null;
-      out += proc ? "/dev/fd/0" : "$__SUBST__";
-      i = j;
-      continue;
-    }
-    if (c === "`") {
-      const j = text.indexOf("`", i + 1);
-      if (j < 0) return null;
-      out += "$__SUBST__";
-      i = j;
-      continue;
-    }
-    if (c === '"') q = q === '"' ? null : '"';
-    else if (c === "'" && q === null) q = "'";
-    out += c;
+  let tokens;
+  try {
+    ({ tokens } = tokenize(text));
+  } catch {
+    return null;
   }
-  return out;
+  let out = "";
+  let at = 0;
+  for (const t of tokens) {
+    if (t.kind !== "subst" || t.start < at) continue; // nested in one already masked
+    out +=
+      text.slice(at, t.start) +
+      (t.form === "<(" || t.form === ">(" ? "/dev/fd/0" : "$__SUBST__");
+    at = t.end;
+  }
+  return out + text.slice(at);
 }
 
 /** Why `name`'s arguments are outside its entry, or null. `rawArgs` keep their quotes. */
@@ -1938,102 +2349,11 @@ const IMPLICIT_VARS = new Set([
 ]);
 
 /**
- * Remove a `#` comment from one line, respecting quoting.
- *
- * Walks the line tracking single- and double-quote state so a `#` inside a string
- * is data, not a comment. `${#var}` is preserved because a `#` only opens a
- * comment at the start of a word (start of line or after whitespace).
- */
-function stripCommentQuoteAware(line) {
-  let single = false;
-  let double = false;
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
-    if (c === "\\" && double) {
-      i++;
-      continue;
-    }
-    if (c === "'" && !double) {
-      single = !single;
-      continue;
-    }
-    if (c === '"' && !single) {
-      double = !double;
-      continue;
-    }
-    if (
-      c === "#" &&
-      !single &&
-      !double &&
-      (i === 0 || /\s/.test(line[i - 1]))
-    ) {
-      return line.slice(0, i);
-    }
-  }
-  return line;
-}
-
-/**
  * Drop comments and heredoc bodies. Quoted spans are KEPT — a placeholder is
  * very often written inside quotes (`--issue "{TRACKER_ISSUE}"`), so blanking
  * quotes before placeholder detection would classify a templated block as
  * runnable and then execute it.
  */
-/**
- * Blank the CONTENTS of every quoted span on one line, preserving the quote
- * characters, the line's length and its newlines.
- *
- * BUG-6 root cause C — the two `.replace()` calls this replaces ran in sequence
- * and neither knew about the other's quote type. `'[^']*'` was applied first, so
- * in `echo "it's fine"; touch /tmp/x; echo "don't"` the two apostrophes — each
- * of them literal text inside a double-quoted string — paired with each other
- * and erased `; touch /tmp/x; echo "` from the scan while bash still executed it.
- * Walking the line once, tracking which quote is open, is the only way to get
- * this right: inside single quotes nothing escapes, inside double quotes a
- * backslash does.
- */
-function blankQuotedSpans(text) {
-  let out = "";
-  let quote = null;
-  // Where the currently-open quote started, so an unterminated one can be undone.
-  let openedAt = -1;
-  for (let i = 0; i < text.length; i += 1) {
-    const ch = text[i];
-    if (quote === null) {
-      if (ch === "'" || ch === '"') {
-        quote = ch;
-        openedAt = i;
-        out += ch;
-      } else if (ch === "\\" && i + 1 < text.length) {
-        // A backslash outside quotes escapes the next character, including a
-        // quote — `\'` opens nothing.
-        out += ch + text[i + 1];
-        i += 1;
-      } else {
-        out += ch;
-      }
-    } else if (quote === '"' && ch === "\\" && i + 1 < text.length) {
-      out += "  ";
-      i += 1;
-    } else if (ch === quote) {
-      quote = null;
-      openedAt = -1;
-      out += ch;
-    } else {
-      out += ch === "\n" ? "\n" : " ";
-    }
-  }
-  // An unterminated quote must blank NOTHING. `echo don't` followed by a
-  // `touch /tmp/x` on the next line has one apostrophe and no closer; blanking
-  // from it to the end of the block would hide the `touch` from the command scan
-  // while bash still ran it — a fail-open route of exactly the kind this function
-  // exists to close. Leaving the span intact keeps the scanner fail-closed: it
-  // sees more text, never less. (The regex pair this replaced got this right by
-  // accident, because `'[^']*'` simply did not match without a closer.)
-  if (quote !== null) return out.slice(0, openedAt) + text.slice(openedAt);
-  return out;
-}
-
 /**
  * Like `blankQuotedSpans`, but COLLAPSES each quoted span to its bare quote pair
  * instead of preserving its length.
@@ -2048,142 +2368,103 @@ function blankQuotedSpans(text) {
  * mutual-awareness defect the regex pair had.
  */
 function collapseQuotedSpans(text) {
+  // Read off the tokenizer (task.292): a quote token is replaced by its bare quote pair, and the
+  // text between them is untouched. A text the tokenizer cannot read throws (fail closed).
+  const { tokens } = tokenize(text);
+  // Inside DOUBLE quotes `$(…)` and backticks still RUN (single quotes are the only quoting that
+  // makes them text). Dropping them with the rest of the span hid the command from the scan:
+  // `echo "$(touch /tmp/x)"` created the file and classified runnable (task.274, obs #67). Each
+  // outermost substitution in a double-quoted span is kept, its own quotes collapsed like any
+  // others (kept as written, a `|` inside `grep 'a\|b'` would split the command and read `b'` as
+  // one); the surrounding text is dropped.
+  //
+  // One pass with an explicit stack, not recursion: a nest 6000 deep overflowed the call stack.
+  // Each entry is a span we are inside: a quote (its text is dropped) or a kept substitution
+  // (its text flows through). `cursor` is the text accounted for so far.
   let out = "";
-  let quote = null;
-  let openedAt = -1;
-  let outAtOpen = 0;
-  for (let i = 0; i < text.length; i += 1) {
-    const ch = text[i];
-    if (quote === null) {
-      if (ch === "'" || ch === '"') {
-        quote = ch;
-        openedAt = i;
-        outAtOpen = out.length;
-        out += ch;
-      } else if (ch === "\\" && i + 1 < text.length) {
-        out += ch + text[i + 1];
-        i += 1;
-      } else {
-        out += ch;
-      }
-    } else if (quote === '"' && ch === "\\" && i + 1 < text.length) {
-      i += 1; // escaped char inside double quotes is content — dropped
-    } else if (ch === quote) {
-      quote = null;
-      openedAt = -1;
-      out += ch;
-    } else if (
-      quote === '"' &&
-      (ch === "`" || (ch === "$" && text[i + 1] === "("))
-    ) {
-      // Inside DOUBLE quotes `$(…)` and backticks still RUN (single quotes are the
-      // only quoting that makes them text). Dropping them with the rest of the span
-      // hid the command from the scan: `echo "$(touch /tmp/x)"` created the file and
-      // classified runnable (task.274, obs #67). Kept verbatim, so the invocation
-      // scan reads the inner command; the surrounding text is still dropped.
-      const end = substitutionEnd(text, i);
-      // Its own quotes collapse like any others: kept as written, a `|` inside
-      // `grep 'a\|b'` would split the command and read `b'` as one.
-      out += collapseQuotedSpans(text.slice(i, end));
-      i = end - 1;
+  let cursor = 0;
+  const stack = [];
+  const top = () => stack[stack.length - 1];
+  const emitting = () => stack.length === 0 || top().quote === false;
+  const advance = (pos) => {
+    if (emitting() && pos > cursor) out += text.slice(cursor, pos);
+    if (pos > cursor) cursor = pos;
+  };
+  const closeUntil = (pos) => {
+    while (stack.length > 0 && top().end <= pos) {
+      const e = top();
+      advance(e.end);
+      stack.pop();
+      if (e.quote) out += e.closer;
     }
-    // else: content of a quoted span — dropped
+  };
+  for (const t of tokens) {
+    if (t.kind !== "quote" && t.kind !== "subst") continue;
+    closeUntil(t.start);
+    if (t.kind === "quote") {
+      if (!emitting()) continue; // inside a span being dropped
+      advance(t.start);
+      out += t.quote === "$'" ? "$'" : t.quote;
+      stack.push({
+        end: t.end,
+        quote: true,
+        q: t.quote,
+        closer: t.quote === '"' ? '"' : "'",
+      });
+    } else if (!emitting() && top().q === '"') {
+      cursor = Math.max(cursor, t.start); // jump over the dropped text to the substitution
+      stack.push({ end: t.end, quote: false });
+    }
   }
-  // Same fail-closed rule as blankQuotedSpans: an unterminated quote hides nothing.
-  if (quote !== null) return out.slice(0, outAtOpen) + text.slice(openedAt);
+  closeUntil(Infinity);
+  advance(text.length);
   return out;
 }
 
 /**
- * The index just past the command substitution that starts at `text[start]`
- * (`$(` to its matching `)`, or a backtick to the next unescaped backtick). An
- * unclosed one runs to the end of the text: reading more is the fail-closed side.
- * Parentheses inside the substitution's own quotes are counted too, which can only
- * lengthen the span — again the safe side.
+ * `code` without its comments and heredoc bodies, read off the tokenizer (task.292): a comment
+ * token is cut, a heredoc body is cut, and the heredoc OPERATOR is neutralised to ` HEREDOC: `.
+ * Nothing here re-derives where a quote, escape or heredoc starts, so a `<<` inside a quote is
+ * not a heredoc and a `#` after a CR is not a comment — the tokenizer already said so. A text it
+ * cannot read throws, which `classifyFailClosed` reads as mutating.
+ *
+ * - The opener LINE is kept whole: `cat <<EOF > /tmp/pwned` must still show its `>` redirection.
+ * - The operator is neutralised (task.274, obs #67) so that stripping the output again changes
+ *   nothing: `commandInvocations` re-strips text `stripNonCode` already stripped, and a surviving
+ *   `<<EOF` made that second pass read the next line as a body that never closed.
+ * - An UNQUOTED heredoc body is expanded by bash, so a `$(…)` or backtick in it runs. The body is
+ *   cut, but each outermost substitution in it is kept on a line of its own for the invocation
+ *   scan to judge.
  */
-function substitutionEnd(text, start) {
-  if (text[start] === "`") {
-    for (let i = start + 1; i < text.length; i += 1) {
-      if (text[i] === "\\") i += 1;
-      else if (text[i] === "`") return i + 1;
-    }
-    return text.length;
-  }
-  let depth = 0;
-  for (let i = start + 1; i < text.length; i += 1) {
-    if (text[i] === "\\") i += 1;
-    else if (text[i] === "(") depth += 1;
-    else if (text[i] === ")") {
-      depth -= 1;
-      if (depth === 0) return i + 1;
-    }
-  }
-  return text.length;
-}
-
 function stripProse(code) {
-  const out = [];
-  const lines = code.split("\n");
-  let heredocTerminator = null;
-
-  for (const raw of lines) {
-    if (heredocTerminator !== null) {
-      if (raw.trim() === heredocTerminator) heredocTerminator = null;
-      continue; // heredoc body is data
-    }
-    // A REAL heredoc: `<<` or `<<-`, never `<<<` (here-string) and never the
-    // second `<` of one. `grep -q x <<<"DATA"` used to swallow every following
-    // line as heredoc body, hiding a trailing `rm -rf` from both scans.
-    // BUG-6 root cause C — run the detector over a quote-blanked copy of the
-    // line. `echo "example: cat <<EOF"` is documentation ABOUT a heredoc, not a
-    // heredoc; treating it as one set a terminator that never arrived, so every
-    // following line was discarded as heredoc body and a trailing `touch /tmp/x`
-    // was hidden from both scans while bash still ran it.
-    // The opener must be matched against the RAW line: in `cat <<'EOF'` the quotes
-    // around the terminator are heredoc SYNTAX, and blanking them first erases the
-    // terminator name and loses the body-shielding that the quoted form exists
-    // for. So match raw, then consult the blanked copy — same length, so offsets
-    // line up — purely to ask whether the `<<` itself sat inside a quoted span.
-    const scan = blankQuotedSpans(raw);
-    let here = null;
-    for (const m of raw.matchAll(
-      /(?<!<)<<-?(?!<)\s*\\?(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/g,
-    )) {
-      if (scan[m.index] === raw[m.index]) {
-        here = m; // real shell syntax, not text inside a string
-        break;
-      }
-    }
-    if (here) {
-      heredocTerminator = here[2];
-      // Keep the WHOLE opener line, not just the part before `<<`. Truncating it
-      // threw away any redirection that followed — `cat <<EOF > /tmp/pwned` had
-      // its `> /tmp/pwned` removed before the write-redirect check ever saw it,
-      // and classified runnable.
-      //
-      // The kept line has its heredoc OPERATOR neutralised (task.274, obs #67).
-      // `commandInvocations` strips text `stripNonCode` already stripped, and a
-      // surviving `<<EOF` made that second pass read the line after the opener as
-      // a body that never closed: `cat <<EOF` / `hello` / `EOF` / `touch /tmp/x`
-      // lost its `touch`. With the operator gone the output holds no heredoc, so
-      // stripping it again changes nothing (idempotent). The terminator word and
-      // everything else on the line stay, so the redirections still show.
-      const op = here[0].match(/^<<-?/)[0];
-      out.push(
-        raw.slice(0, here.index) +
-          " HEREDOC: " +
-          raw.slice(here.index + op.length),
+  const { tokens } = tokenize(code);
+  let out = "";
+  let at = 0;
+  for (const t of tokens) {
+    if (t.start < at) continue; // inside a span already cut
+    if (t.kind === "comment") {
+      out += code.slice(at, t.start);
+      at = t.end;
+    } else if (t.kind === "heredoc-op") {
+      out += code.slice(at, t.start) + " HEREDOC: ";
+      at = t.end;
+    } else if (t.kind === "heredoc-body") {
+      out += code.slice(at, t.start);
+      at = t.end;
+      const kept = tokens.filter(
+        (s) =>
+          s.kind === "subst" &&
+          s.depth === 0 &&
+          s.start >= t.start &&
+          s.end <= t.end,
       );
-      continue;
+      for (const s of kept) out += code.slice(s.start, s.end) + "\n";
+      // The terminator was the last line: no newline follows the cut.
+      if (kept.length === 0 && t.end === code.length && out.endsWith("\n"))
+        out = out.slice(0, -1);
     }
-    // Drop `# comment` — but ONLY outside quoted spans. A line regex fired on a
-    // `#` inside a string, deleting the rest of the line from both scans while
-    // execution still used the original code: `echo "note # here"; rm -rf /tmp/x`
-    // classified runnable and the `rm -rf` ran.
-    let line = stripCommentQuoteAware(raw);
-    out.push(line);
   }
-  return out.join("\n");
+  return out + code.slice(at);
 }
 
 /**
@@ -2269,6 +2550,259 @@ function gitSubcommand(tokensAfterGit) {
   return null;
 }
 
+/**
+ * task.304: the git forms that make git run a literal string as a command, which the word
+ * allow-list admits because `git` is non-evaluating and its subcommand is on a closed list. Each
+ * was run under real bash (cbaaf0e9) and wrote a file:
+ *   - the global `-c <key=value>` and `--config-env` (`core.fsmonitor`, `core.sshCommand` …);
+ *   - a `GIT_*` assignment, in any position (`GIT_EXTERNAL_DIFF`, `GIT_SSH_COMMAND`, `GIT_TRACE` …),
+ *     which `export`, `declare -x` and `set -a` make live for a later git command;
+ *   - `ls-remote --upload-pack` and its alias `--exec`, with git's unambiguous prefixes;
+ *   - `--exec-path=<dir>`, which makes `ls-remote` run `<dir>/git-upload-pack` (measured under
+ *     bash, QA cycle 2). A bare `--exec-path` prints and exits, so it runs nothing.
+ * The refusal is on the FORM, never the value: the value is the string git will run.
+ * A word the shell can still rewrite after the scan is refused too, because the scan then reads
+ * text that is not the argument git receives. Brace expansion is that class here (`--upload-pa{ck,ck}`
+ * is `--upload-pack`, QA cycle 2): the matcher below compares literal text, and a literal is exactly
+ * what an expansion is not. Variable, substitution and `$'…'` forms are refused by the deny-list
+ * layer that runs before this one.
+ * Returns the refused class, or null.
+ */
+const GIT_ASSIGNING_COMMANDS = new Set([
+  "export",
+  "declare",
+  "typeset",
+  "readonly",
+  "local",
+]);
+const unquoteToken = (t) =>
+  t
+    .replace(/\u0001\d+\u0001/g, "")
+    .replace(/\\(.)/g, "$1")
+    .replace(/['"]/g, "");
+// The global flags the scan KNOWS the shape of, measured against `git -h` (git 2.56). The flags
+// that take a separate operand are GIT_FLAGS_WITH_OPERAND (skipped with their operand); these are
+// the ones that take none, or take their value after `=`. `-c`, `--config-env` and `--exec-path=`
+// are known and refused by gitConfigFlag first. Anything else before the subcommand is refused.
+const GIT_KNOWN_GLOBAL_FLAGS = new Set([
+  ...GIT_FLAGS_WITH_OPERAND,
+  "-p",
+  "--paginate",
+  "-P",
+  "--no-pager",
+  "--no-replace-objects",
+  "--no-lazy-fetch",
+  "--no-optional-locks",
+  "--no-advice",
+  "--bare",
+  "--literal-pathspecs",
+  "--glob-pathspecs",
+  "--noglob-pathspecs",
+  "--icase-pathspecs",
+  "--version",
+  "-v",
+  "--help",
+  "-h",
+  "--html-path",
+  "--man-path",
+  "--info-path",
+  "--list-cmds",
+]);
+const gitConfigFlag = (t) => {
+  if (t === "-c" || /^-c./.test(t)) return "-c (git runs the value)";
+  if (t === "--config-env" || t.startsWith("--config-env="))
+    return "--config-env (git runs the value)";
+  if (/^--exec-path=./.test(t))
+    return "--exec-path=<dir> (git runs git-upload-pack from it)";
+  return null;
+};
+/**
+ * True when bash would brace-expand `word`: an UNQUOTED `{` followed, unquoted, by a comma or
+ * `..`. `{base}` with neither is literal text, and so is anything inside quotes. Conservative on
+ * nesting (any later unquoted comma counts), which can only refuse more.
+ */
+function hasBraceExpansion(word) {
+  let quote = null;
+  let open = false;
+  for (let k = 0; k < word.length; k += 1) {
+    const ch = word[k];
+    if (quote === "'") {
+      if (ch === "'") quote = null;
+    } else if (quote === '"') {
+      if (ch === "\\") k += 1;
+      else if (ch === '"') quote = null;
+    } else if (ch === "\\") {
+      k += 1;
+    } else if (ch === "'" || ch === '"') {
+      quote = ch;
+    } else if (ch === "{") {
+      open = true;
+    } else if (open && (ch === "," || (ch === "." && word[k + 1] === "."))) {
+      return true;
+    }
+  }
+  return false;
+}
+// task.304, fifth gate (T304-QA-10): ONE reading of a git command line. This scan and gitSubcommand
+// each found the subcommand, on different text (the unquoted words here, the collapsed words
+// there), and a quote inside an operand-taking flag (`--names"pace" log fetch --upload-pack=x`)
+// made them name different subcommands: the allow-list admitted `git:log`, while git ran `fetch`.
+// So this scan now returns the subcommand it found beside the hazard, and the caller refuses when
+// that is not the one the allow-list admitted. Two readers of one line cannot disagree silently.
+// One plain word: letters, digits and the few path characters, nothing the shell can split, join or
+// rewrite. A flag token ahead of the subcommand is plain text of the same kind, with an `=value`.
+const GIT_PLAIN_WORD = /^[A-Za-z0-9_.\/@+:~-]+$/;
+const GIT_PLAIN_FLAG = /^-[A-Za-z0-9_.\/@+:=~-]*$/;
+function scanGitArgs(rawArgs) {
+  // Per word. The scan splits a word at an escaped space (`--{upload-pack=touch\ W,}` arrives as
+  // two tokens), so a token that ends in an odd run of backslashes is joined to the next one;
+  // nothing else is, because a `{` in one word never pairs with a `,` in another.
+  const words = [];
+  for (const t of rawArgs) {
+    if (
+      words.length > 0 &&
+      /(?:^|[^\\])(?:\\\\)*\\$/.test(words[words.length - 1])
+    )
+      words[words.length - 1] += ` ${t}`;
+    else words.push(t);
+  }
+  if (words.some(hasBraceExpansion))
+    return refuseGit(
+      "a brace expansion in a git argument (the shell rewrites the word after the scan)",
+    );
+  const args = rawArgs.map(unquoteToken);
+  for (let i = 0; i < args.length; i += 1) {
+    const tok = args[i];
+    if (tok === "") continue;
+    const flag = gitConfigFlag(tok);
+    if (flag !== null) return refuseGit(flag);
+    // `--exec-path` takes its value with `=`; a bare one takes no operand, so the next word is
+    // judged as itself (a `-c` after it is a real `-c`).
+    //
+    // task.304, sixth gate (T304-QA-11): the scan does not READ a flag operand any more. Reading one
+    // means deciding where the word ends, and the line reaches this scan already split on
+    // whitespace, so `--namespace a\ log fetch ...` is two tokens here and one word for bash; five
+    // gates each closed one way of splitting it. The construct is refused instead: the only global
+    // flag that takes a separate operand and is kept is `-C`, with one plain word (the documented
+    // form), and every flag token ahead of the subcommand must itself be plain text.
+    if (GIT_FLAGS_WITH_OPERAND.has(tok) && tok !== "--exec-path") {
+      if (tok !== "-C")
+        return refuseGit(
+          "a git global flag that takes an operand (the scan cannot tell where the operand ends, so it does not read one)",
+        );
+      if (!GIT_PLAIN_WORD.test(rawArgs[i + 1] ?? ""))
+        return refuseGit(
+          "a -C operand that is not one plain word (the scan cannot tell where it ends)",
+        );
+      i += 1; // the one plain word belongs to -C
+      continue;
+    }
+    if (tok.startsWith("-")) {
+      if (!GIT_PLAIN_FLAG.test(rawArgs[i]))
+        return refuseGit(
+          "a git global flag spelled with a quote, backslash or expansion (the word may not be the one the scan read)",
+        );
+      // A global flag the scan does not know is refused, never skipped (task.304, QA cycle 4). A
+      // flag that takes a separate operand makes the scan read that operand as the subcommand, and
+      // git adds global flags over time (`--attr-source` was not on the old list), so a list of
+      // the flags that take an operand fails open on every flag it forgets. The list of what is
+      // KNOWN runs the other way: an unknown flag fails closed.
+      if (!GIT_KNOWN_GLOBAL_FLAGS.has(tok.split("=")[0]))
+        return refuseGit(
+          "an unknown git global flag (it may take an operand the scan would read as the subcommand)",
+        );
+      continue;
+    }
+    if (tok === "ls-remote") {
+      for (const a of args.slice(i + 1)) {
+        if (a === "--") break;
+        const m = /^--([^=]+)/.exec(a);
+        if (!m) continue;
+        const opt = m[1];
+        if (
+          "upload-pack".startsWith(opt) ||
+          (opt.length >= 2 && "exec".startsWith(opt))
+        )
+          return refuseGit(
+            "ls-remote --upload-pack or --exec (git runs the value)",
+          );
+      }
+    }
+    // the subcommand: everything after it is the subcommand's own
+    return { why: null, sub: tok };
+  }
+  return { why: null, sub: null };
+}
+const refuseGit = (why) => ({ why, sub: null });
+// A GIT_ name written anywhere in the text, other than as a read (`$GIT_X`, `${GIT_X}`). Git reads
+// some of these variables as a command, and bash gives a variable a value through many builtins
+// (`export`, `declare -x`, `read`, `printf -v`, a `for` loop, `set -a` with any of them), so the
+// rule is on the NAME, which is the one spelling every one of them shares. A name assembled at
+// runtime from pieces is outside it: the allow-list does not track values (see §2a-iii).
+const GIT_NAME = /(?<![A-Za-z0-9_$\{])GIT_[A-Za-z0-9_]+/;
+// task.304, third strike (QA cycle 3): the variable NAME is judged where an assignment reaches the
+// environment, not by matching the text of a word the shell can still rebuild. `export GIT_{A,B}=x`,
+// `export GI''T_X=x` and `export GIT\_X=x` all name GIT_A / GIT_X after the scan has read them, and
+// a pattern over the text can never list every way to spell that. So an assignment-making command
+// (`GIT_ASSIGNING_COMMANDS`) must name every variable as a plain literal identifier, and a name the
+// scan cannot read as one is refused whatever it spells. The GIT_ test above then runs on a name
+// that really is the name. `set -a` needs no rule of its own: every way to give a built name a
+// value without `export` (a bare assignment, `read`, `printf -v`, a `for` variable) is already
+// refused upstream as a non-literal or unbound word, and a plain `GIT_` name is the text rule's.
+// (A rule for allexport was written and mutation-tested; nothing turned red, so it was deleted.)
+// (PLAIN_NAME, the identifier pattern, is declared once further down the module.)
+function assignmentNameHazard(rawArgs) {
+  for (const a of rawArgs) {
+    if (a === "" || a.startsWith("-")) continue;
+    const eq = a.indexOf("=");
+    let name = eq === -1 ? a : a.slice(0, eq);
+    name = name.replace(/^(['"])(.*)\1$/, "$2").replace(/^['"]/, "");
+    if (!PLAIN_NAME.test(name))
+      return "a variable name the shell builds after the scan (brace, quote, backslash or expansion in an export/declare operand)";
+  }
+  return null;
+}
+const GIT_REASON =
+  "(git reads a GIT_ variable as a command or a path to write)";
+// `raw` is the same invocations with their quoted spans kept as written (`rawInvocations`). The
+// collapsed scan reads `'--upload-pack=x'` as an empty word, so the arguments are judged from
+// `raw`; a block the two readings cannot line up is refused when it runs git (fail-closed).
+function gitLiteralExecution(invocations, raw, text) {
+  if (invocations.gitEnv && invocations.gitEnv.length > 0)
+    return `${invocations.gitEnv[0]}= ${GIT_REASON}`;
+  for (let i = 0; i < invocations.length; i += 1) {
+    const inv = invocations[i];
+    // The assignment-site rules run before the keyword skip: `export` and `set` are keywords to
+    // the scan, and a skipped one is exactly where a built name would pass.
+    const siteArgs = raw ? raw[i].args : inv.args;
+    if (GIT_ASSIGNING_COMMANDS.has(inv.word)) {
+      const nameWhy = assignmentNameHazard(siteArgs);
+      if (nameWhy !== null) return nameWhy;
+    }
+    if (inv.keyword) continue;
+    const isGit = inv.word === "git" || inv.word.startsWith("git:");
+    // With no raw reading, a quoted span reads as an empty word. Refuse only when such a word
+    // sits among this git's arguments: that is the one way an option can hide from the scan. A
+    // git whose collapsed arguments hold no empty word has nothing the raw reading would add.
+    if (isGit && !raw && inv.args.some((a) => /""|''/.test(a) || a === ""))
+      return "git arguments the scan cannot read (fail-closed)";
+    const args = raw ? raw[i].args : inv.args;
+    if (isGit) {
+      const scan = scanGitArgs(args);
+      if (scan.why !== null) return scan.why;
+      // The allow-list admitted `inv.word` from the collapsed words; the scan above read the
+      // unquoted ones. They must name the same subcommand, or the word that was admitted is not
+      // the one git will run (T304-QA-10).
+      const admitted = inv.word.startsWith("git:") ? inv.word.slice(4) : null;
+      if (scan.sub !== admitted)
+        return "a git subcommand the two readings of the line do not agree on (fail-closed)";
+    }
+  }
+  const named = GIT_NAME.exec(text);
+  if (named !== null) return `${named[0]} ${GIT_REASON}`;
+  return null;
+}
+
 /** The leading word of every simple command in the block. */
 export function commandWords(code) {
   return commandInvocations(code)
@@ -2283,11 +2817,14 @@ export function commandWords(code) {
  * helper rule needs both.
  */
 function commandInvocations(code) {
-  const stripped = stripNonCode(code)
-    // Backslash line-continuations join one command across several lines. Splitting
-    // on the raw newline first makes the continuation's tail look like a fresh
-    // command: `git log ... -- \` + `apps packages` reported `apps` as a command.
-    .replace(/\\\n/g, " ")
+  // `commandWords` is exported and reads raw text: state the blank class here too (see
+  // classifyInternal), so a CR, FF, VT, NBSP or U+2028 never separates two words.
+  code = code.replace(NOT_A_BASH_BLANK, "\u0001");
+  // Backslash line-continuations join one command across several lines. Splitting on the raw
+  // newline first makes the continuation's tail look like a fresh command: `git log ... -- \` +
+  // `apps packages` reported `apps` as a command. Which backslash-newlines join is the
+  // tokenizer's to say (an even run is an escaped backslash then a real newline, task.290 QA 2).
+  const stripped = cutJoins(stripNonCode(code), " ")
     // Arithmetic expansion is arithmetic, not an invocation. It must go before the
     // `$(` rule below, or `$((N + 1))` becomes a segment whose first token is `N`.
     .replace(/\$\(\([^)]*\)\)/g, " ")
@@ -2310,6 +2847,11 @@ function commandInvocations(code) {
   // of its own segment, so the closing paren only ever lands on a trailing
   // argument, where it is harmless.
   const words = [];
+  // task.304: every `GIT_*=value` assignment the scan steps over, in any position (a prefix on a
+  // command, a bare line, the operand of `export`/`declare`). Git reads some of those names as a
+  // command to run, so the assignment is judged by name, not by value (`gitLiteralExecution`).
+  // Carried on the returned array so every caller of the one scan sees the same list.
+  words.gitEnv = [];
   // Split on anything that can begin a new simple command.
   // Deliberately NOT split on `{` or `(`: `echo {task-id}` would then yield
   // `task-id}` as a command word, and the fail-closed rule would report a
@@ -2335,7 +2877,10 @@ function commandInvocations(code) {
     for (let ti = 0; ti < toks.length; ti += 1) {
       let tok = toks[ti];
       // Leading `VAR=value` assignments and redirections precede the command.
-      if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(tok)) continue;
+      if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(tok)) {
+        if (/^GIT_/.test(tok)) words.gitEnv.push(tok.split("=")[0]);
+        continue;
+      }
       if (/^[<>]/.test(tok) || /^\d+[<>]/.test(tok)) continue;
       if (tok === "") continue;
       // A `case` arm pattern is the ONE token in command position that is not an
@@ -2428,8 +2973,9 @@ function commandInvocations(code) {
 /** Variables the block reads but never assigns. */
 export function unboundVariables(code, bindings) {
   const stripped = code
+    .replace(NOT_A_BASH_BLANK, "\u0001")
     .split("\n")
-    .filter((l) => !/^\s*#/.test(l))
+    .filter((l) => !/^[ \t]*#/.test(l))
     .join("\n");
 
   const assigned = new Set();
@@ -2758,8 +3304,24 @@ function resolveHelperCall(inv, { helperRoot, depth, bindings, inherited }) {
  * `helperMode` are this function's own recursion state.
  */
 export function classifyBlock(code, bindings = {}, opts = {}) {
-  const { klass, reason } = classifyInternal(code, bindings, opts);
+  const { klass, reason } = classifyFailClosed(code, bindings, opts);
   return { klass, reason };
+}
+
+/**
+ * `classifyInternal` that never throws: an input the classifier cannot read is
+ * refused, not an exception (task.290). A thrown error would reach the caller as
+ * a crash, and a caller that treated "no verdict" as "no objection" would run it.
+ */
+function classifyFailClosed(code, bindings, opts) {
+  try {
+    return classifyInternal(code, bindings, opts);
+  } catch {
+    return {
+      klass: "mutating",
+      reason: "unrecognised-command: <unparseable> (fail-closed)",
+    };
+  }
 }
 
 /**
@@ -2768,7 +3330,7 @@ export function classifyBlock(code, bindings = {}, opts = {}) {
  * hostile corpus can be run against it (task.191 QA-2).
  */
 export function isRunnableBlock(code, bindings = {}, opts = {}) {
-  return classifyInternal(code, bindings, opts).klass === "runnable";
+  return classifyFailClosed(code, bindings, opts).klass === "runnable";
 }
 
 /**
@@ -2791,6 +3353,587 @@ function addBody(table, name, body) {
   table.set(name, bodies);
 }
 
+/** Every character `\s` matches that bash does not treat as a blank (see classifyInternal). */
+const NOT_A_BASH_BLANK = /[^\S \t\n]/g;
+
+// task.293 — INDIRECT EVALUATION. A value is built or stored harmlessly, and a later bash feature
+// evaluates it: a prompt variable (`PS4`, `PS0`, `PS1`, `PS2`) or `${x@P}` expands prompt escapes,
+// which include command substitution, and a name or operand bash reads as arithmetic (`printf -v`,
+// `read`, `test -v`, `unset`, `$((x))`, `[[ $x -eq 1 ]]`, `${v:0:$x}`, `${!x}`) evaluates the
+// subscript `a[$(cmd)]` it holds. The scans above judge each command for what it does directly and
+// cannot see the later evaluation. So the class is refused where its source can be seen: a quoted
+// literal that holds a substitution, where it is assigned or handed to a builtin that evaluates its
+// operand. That covers the variable used later without tracking it (the assignment is the refusal).
+//
+// BOUNDED CLAIM, not "any indirect evaluation": the shapes this refuses are the table in
+// qa-execute-snippets.test.mjs ("task.293 — indirect evaluation"). Known unseen shape: a value
+// laundered through a command's OUTPUT (`y=$(echo 'a[$(cmd)]'); echo $((y))`).
+// Set or declared, not merely mentioned: `echo PS4` and `echo "$PS1"` run nothing a prompt expands.
+const PROMPT_VARIABLE_AT = /\bPS[0124]\b/g;
+const PROMPT_TRANSFORM = /@P\s*\}/;
+// Words that declare or set a variable, and words that make a later quoted literal an operand bash
+// evaluates (or assigns): the segment before the literal is searched for any of them, so
+// `read -r x <<< '…'` and `[[ '…' -eq 1 ]]` count. Lookbehind, not a consumed separator, so that
+// every match of the global scan is found once, in one linear pass.
+const DECLARING_WORD =
+  /(?<![^\s;&|({])(?:export|declare|typeset|local|readonly|read|printf|mapfile|readarray|getopts|for|select|let)(?=[\s;&|)]|$)/g;
+const EVALUATING_WORD =
+  /(?<![^\s;&|({])(?:printf|read|test|unset|declare|typeset|local|export|readonly|let|eval|for|select|case|\[\[?|\(\()(?=[\s;&|)]|$)/g;
+const ESCAPED_SUBSTITUTION_ASSIGNMENT =
+  /(?:^|[\s;&|({])[A-Za-z_][A-Za-z0-9_]*(?:\[[^\]\s]*\])?\+?=\S*\\[$`]/;
+// DEFAULT-DENY, not a list of arithmetic spellings (task 293, third strike). Three cycles in a row
+// found one more place where bash reads a variable as arithmetic (`$((x))`, then `${@:$1}`, then
+// `${v[1+$1]}`), because every listing of those places is incomplete. So any live parameter
+// expansion (`$name`, `${…}`, `$((…))`, `$[…]`, `$1`, `$@`) or a name followed by `[` (a subscript,
+// `a[x]=1`) counts, wherever it is, unless it sits in inert text (single quotes, a comment, a
+// quoted-delimiter here-document). `$'…'` is not an expansion.
+const LIVE_EXPANSION = /\$(?=[A-Za-z_0-9{(\[@*#?!$-])|[A-Za-z0-9_}\]]\[/g;
+// An assignment whose value is built by expansion into a subscript (`x="a[$y$z]"`). The text that a
+// later `$((x))`, `read "$x"`, `test -v "$x"`, `unset "$x"`, `[[ $x -eq 1 ]]`, `${v:0:$x}` or `${!x}`
+// evaluates is not in the block, so it cannot be judged, and the build is refused instead of
+// tracking the variable to every place it is read (found by the random differential: the first
+// version also required an arithmetic read, and `read "$x"` slipped past it).
+// Only a value with an expansion INSIDE a `name[...]` is refused: bash reads a variable as a
+// subscript only through `name[expr]`, and `n=$(sed 's/([0-9]+)/\1/'); echo $((n + 1))` is what the
+// shipped helpers do (the `[` there follows a `(`, and no expansion sits inside the brackets).
+// Known unseen shapes: the `[` or `$` arriving by expansion (`b='['`), and a value laundered through
+// command output (`x=$(printf 'a[\044(cmd)]')`, task 293 QA-3).
+const EXPANDED_ASSIGNMENT =
+  /(?:^|[\s;&|({])[A-Za-z_][A-Za-z0-9_]*\+?=[^\n;&|]{0,300}[A-Za-z0-9_]\[[^\]\n]{0,300}[$`]/;
+// For every position, whether a `[` opened earlier in the block has not been closed yet, so a quote
+// there may sit inside a subscript (`${a['$(cmd)']}`, `a=([0'$(cmd)']=1)`, `a=([0+(1)'$(cmd)']=1)`,
+// `a=([';'0'$(cmd)']=1)`). Depth over the whole block, never reset: not "the character before the
+// quote" (task 293 QA gate 6), not "the same word" (gate 7: a paren hid the `[`), and not "the same
+// segment" (gate 8: a quoted `;` reset the depth). Every reset was a place to lose the bracket, so
+// there is none. One forward pass, so the cost is linear with no length cap. It reads brackets in
+// quoted text too; that can only over-refuse, which is the price of having no reset to defeat.
+function unclosedBracketMap(code) {
+  const open = new Uint8Array(code.length + 1);
+  let depth = 0;
+  for (let i = 0; i < code.length; i += 1) {
+    const c = code[i];
+    if (c === "[") depth += 1;
+    else if (c === "]") depth = depth > 0 ? depth - 1 : 0;
+    open[i] = depth > 0 ? 1 : 0;
+  }
+  return open;
+}
+// Text that spells a command substitution, whatever carries it: `$(` (not `$((`), an escaped `$\(`,
+// or a backtick. The caller drops the ones the tokenizer parsed as real substitutions.
+const LOOSE_LITERAL = /\$(?:\((?!\()|\\\()|`/g;
+// A literal substitution inside a quoted span, by quote kind. `$'…'` escapes can spell `$(` or a backtick.
+const LITERAL_IN_SINGLE = /\$\(|`/g;
+const LITERAL_IN_DOUBLE = /\\\$\(|\\`/g;
+const LITERAL_IN_ANSI_C = /\$\(|`|\\[xuU0-7]/g;
+
+/** Start index of every match of the global `re` in `text`, ascending. */
+function matchStarts(re, text) {
+  const out = [];
+  for (const m of text.matchAll(re)) out.push(m.index);
+  return out;
+}
+
+/** Whether the ascending `starts` holds a value in `[lo, hi]`. */
+function anyIn(starts, lo, hi) {
+  let a = 0;
+  let b = starts.length;
+  while (a < b) {
+    const mid = (a + b) >> 1;
+    if (starts[mid] < lo) a = mid + 1;
+    else b = mid;
+  }
+  return a < starts.length && starts[a] <= hi;
+}
+
+/**
+ * Why `code` builds a value that a later bash feature would evaluate as code, or null.
+ *
+ * Linear in the text: the spans of the tokenizer are marked with a difference array and every
+ * search is a global scan with a binary search over its hits, never a rescan per quote (a 20000-deep
+ * nest of 20000 quotes made the first version quadratic; task.292's nesting test caught it).
+ */
+function indirectEvaluationHazard(code) {
+  const n = code.length;
+  // Each check below runs only when its trigger text is present: the docs scan classifies thousands
+  // of blocks and almost none of them hold any of these (task 293's 10% cost bound).
+  const hasPrompt = /PS[0124]/.test(code);
+  const hasSubstitution = code.includes("$(") || /[`\\]/.test(code);
+  const hasSubscript = code.includes("[") && /[$`]/.test(code);
+  if (!hasPrompt && !hasSubstitution && !hasSubscript && !code.includes("@P"))
+    return null;
+  const quotes = [];
+  const bodies = []; // here-document bodies
+  const substStarts = []; // command substitutions the tokenizer found
+  let dead = null; // comment and heredoc body: not code
+  let comment = null; // comment text: never evaluated, never a literal carrier
+  let inert = null; // text in which nothing expands: single quotes, comments, quoted here-documents
+  let quoted = null; // a quote's interior: its separators are not the shell's
+  const marks = () => {
+    if (dead !== null) return;
+    dead = new Int32Array(n + 2);
+    quoted = new Int32Array(n + 2);
+    inert = new Int32Array(n + 2);
+    comment = new Int32Array(n + 2);
+    for (const t of tokenize(code).tokens) {
+      if (t.kind === "comment" || t.kind === "heredoc-body") {
+        if (t.kind === "heredoc-body") bodies.push(t);
+        else {
+          comment[t.start] += 1;
+          comment[t.end] -= 1;
+        }
+        dead[t.start] += 1;
+        dead[t.end] -= 1;
+        inert[t.start] += 1;
+        inert[t.end] -= 1;
+      } else if (t.kind === "subst") {
+        substStarts.push(t.start);
+      } else if (t.kind === "quote") {
+        quotes.push(t);
+        quoted[t.start + 1] += 1;
+        quoted[t.end - 1] -= 1;
+        if (t.quote === "'" || t.quote === "$'") {
+          inert[t.start] += 1; // nothing inside single quotes expands
+          inert[t.end] -= 1;
+        }
+      }
+    }
+    for (let i = 1; i <= n; i += 1) {
+      dead[i] += dead[i - 1];
+      quoted[i] += quoted[i - 1];
+      inert[i] += inert[i - 1];
+      comment[i] += comment[i - 1];
+    }
+  };
+  let lastSep = null; // index of the last live command separator at or before each position
+  const segmentStart = (at) => {
+    if (lastSep === null) {
+      marks();
+      lastSep = new Int32Array(n);
+      let cur = -1;
+      for (let i = 0; i < n; i += 1) {
+        if (dead[i] === 0 && quoted[i] === 0 && ";&|\n({`".includes(code[i]))
+          cur = i;
+        lastSep[i] = cur;
+      }
+    }
+    return at <= 0 ? 0 : lastSep[at - 1] + 1;
+  };
+
+  // A prompt variable set or declared (not merely mentioned), and the `@P` transform.
+  if (hasPrompt) {
+    marks();
+    const declaring = matchStarts(DECLARING_WORD, code);
+    for (const m of code.matchAll(PROMPT_VARIABLE_AT)) {
+      if (dead[m.index] !== 0) continue;
+      const after = code.slice(m.index + 3, m.index + 5);
+      if (after[0] === "=" || after === "+=")
+        return "a prompt variable (PS0, PS1, PS2, PS4), whose value bash expands as a prompt string";
+      if (anyIn(declaring, segmentStart(m.index), m.index - 1))
+        return "a prompt variable (PS0, PS1, PS2, PS4), whose value bash expands as a prompt string";
+    }
+  }
+  const prose = stripProse(code);
+  if (PROMPT_TRANSFORM.test(prose)) return "a ${…@P} prompt-escape expansion";
+  if (code.includes("\\") && ESCAPED_SUBSTITUTION_ASSIGNMENT.test(prose))
+    return "a variable assigned an escaped substitution that a later expansion evaluates";
+  if (hasSubscript && EXPANDED_ASSIGNMENT.test(prose))
+    return "a variable built by expansion into a subscript, which a later read evaluates as arithmetic";
+  if (!hasSubstitution) return null;
+
+  // A quoted literal that holds a substitution, in a block that also evaluates something.
+  marks();
+  const literals = {
+    "'": matchStarts(LITERAL_IN_SINGLE, code),
+    '"': matchStarts(LITERAL_IN_DOUBLE, code),
+    "$'": matchStarts(LITERAL_IN_ANSI_C, code),
+  };
+  // BLOCK-level, not per segment: the literal can reach the evaluation through a pipe, a joined
+  // word (`x=a'[$(cmd)]'`), a variable or a here-string, and a segment boundary or the character
+  // before the quote cannot follow it (task 293 QA cycle 2: two more spellings of the same family
+  // after cycle 1's two). The cost is over-refusal, measured by the docs scan.
+  let evaluates = null; // computed on the first literal only: most blocks hold none
+  const blockEvaluates = () =>
+    (evaluates ??=
+      matchStarts(EVALUATING_WORD, code).some((i) => dead[i] === 0) ||
+      matchStarts(LIVE_EXPANSION, code).some((i) => inert[i] === 0));
+  const REFUSED =
+    "a quoted substitution in a block that also evaluates a value as code or arithmetic";
+  let openBrackets = null; // built on the first literal only
+  for (const q of quotes) {
+    const hits = literals[q.quote];
+    if (!hits || !anyIn(hits, q.start + q.quote.length, q.end - 2)) continue;
+    if ((openBrackets ??= unclosedBracketMap(code))[q.start] === 1)
+      return "a quoted substitution used as a subscript, which bash evaluates as arithmetic";
+    if (blockEvaluates()) return REFUSED;
+  }
+  // A quoted-delimiter here-document body is a literal too: `read x <<'EOF'` then `$((x))`.
+  for (const b of bodies) {
+    // An unquoted here-document expands its own `$(…)` (a `subst` token inside the body), which the
+    // substitution rules already judge; only a body with none is literal text.
+    if (substStarts.some((s) => s >= b.start && s < b.end)) continue;
+    if (anyIn(literals["'"], b.start, b.end - 1) && blockEvaluates())
+      return REFUSED;
+  }
+  // DEFAULT-DENY on the carrier as well (QA cycle 4: an unquoted `a\[\$\(cmd\)\]` word carried the
+  // literal past a list of quote kinds). Any `$(` or backtick text the tokenizer did not parse as a
+  // real substitution is literal text, whatever carries it. `$((` is arithmetic, not a substitution.
+  if (substStarts.length > 0 || hasSubstitution) {
+    const real = new Set(substStarts);
+    for (const m of code.matchAll(LOOSE_LITERAL)) {
+      if (real.has(m.index) || comment[m.index] !== 0) continue;
+      if (blockEvaluates()) return REFUSED;
+      break;
+    }
+  }
+  return null;
+}
+
+// task.294 — ALLOW-LIST. Task 293 refused indirect evaluation by listing the shapes it had seen, and
+// each widening lost to the next carrier. This layer inverts the question. A non-literal word is
+// admitted only in a form and a position on a closed list, and every other word is refused, so the next
+// spelling needs no new rule: it is not on the list.
+//
+// FORMS admitted: a plain parameter (`$name`, `${name}`, `$1`, `$?` …) and a command substitution
+// whose body passes this check too. Every other form is refused: `$((…))`, `$[…]`, `${x<op>…}`,
+// `$'…'`, `$"…"`, a `$` before a quote (the adjacent-quote splice), a backslash outside single
+// quotes, process substitution.
+// POSITIONS admitted: a word holding such a form may be an operand of a command in
+// NON_EVALUATING_COMMANDS, the right-hand side of a plain `name=` assignment (parameters only: a
+// substitution is never stored), or an operand of a test that uses no arithmetic operator.
+// Arithmetic contexts (`((`, `let`, a test with `-eq` …) take digits and operators only, because bash
+// evaluates a bare name there. Any other command takes plain literal operands only, because a builtin
+// such as `read`, `unset` or `printf -v` evaluates its operand as a name or subscript.
+//
+// BOUNDED CLAIM: the forms, positions and commands above. A bare name evaluated by a construct this
+// layer does not read as arithmetic is outside it; the differential and the QA gates probe that edge.
+const NON_EVALUATING_COMMANDS = new Set([
+  ...[...SAFE_COMMANDS].filter((w) => w !== "test"),
+  ":",
+  "cd",
+  "git",
+  "popd",
+  "pushd",
+]);
+// `${name}`, `${#name}` and `${name:-lit}` / `-` / `:+` / `+` with a plain literal default. The
+// operators that assign or evaluate (`:=`, `:?`, `:offset`, `/`, `@P`, `!`, a subscript) are not here.
+const ALLOW_PLAIN_PARAM =
+  /\$(?:[A-Za-z_][A-Za-z0-9_]*|\{#?[A-Za-z_][A-Za-z0-9_]*(?::?[-+][A-Za-z0-9_.\/:+@%,~-]*)?\}|[0-9?#@*$!])/y;
+const ALLOW_ARITH_TEXT = /^[0-9+\-*\/%<>=!&|^~?: \t\n,]*$/;
+// Text a builtin may receive as a literal operand. A subscript or an expansion needs `[`, `]`, `$`, a
+// backtick or a backslash, so a literal operand without one cannot be evaluated as a name or a value.
+const ALLOW_PLAIN_TEXT = /^[^[\]$`\\]*$/;
+const TEST_ARITH_OPS = new Set(["-eq", "-ne", "-lt", "-le", "-gt", "-ge"]);
+const TEST_SAFE_OPS = new Set([
+  ...["-n", "-z", "-f", "-d", "-e", "-r", "-w", "-x", "-s", "-L", "-h", "-p"],
+  ...["-S", "-b", "-c", "-g", "-u", "-k", "-O", "-G", "-N", "-t", "-a", "-o"],
+]);
+const ALLOW_SKIP_KEYWORDS = new Set([
+  ...["!", "if", "then", "elif", "else", "fi", "do", "done", "while", "until"],
+  ...["{", "}"],
+]);
+const ALLOW_DATA_KEYWORDS = new Set(["for", "select", "case", "in", "esac"]);
+const DECLARING_COMMANDS = new Set([
+  ...["declare", "typeset", "local", "readonly", "export"],
+]);
+
+/**
+ * The first word class of `code` the allow-list does not admit, or null. A command substitution's
+ * body is judged by the same pass (one tokenization, a stack of command lists); a shape the tokenizer
+ * cannot read throws, and `classifyFailClosed` refuses it.
+ */
+export function allowListViolation(code) {
+  const { tokens } = tokenize(code);
+  const n = code.length;
+  // 0 code | 1 ignored (comment, join, arithmetic command) | 2 single-quoted | 3 substitution |
+  // 4 double-quoted | 5 here-document body | 6 quote mark | 7 plain parameter
+  const k = new Uint8Array(n);
+  const set = (a, b, v) => {
+    for (let i = a; i < b && i < n; i += 1) k[i] = v;
+  };
+  const opens = new Map(); // start of a substitution's opening delimiter -> its length
+  const closes = new Set(); // index of a substitution's closing delimiter
+  const bodies = [];
+  const ops = [];
+  // Validate each token and describe it as a span. Then ONE linear sweep with a stack of the spans
+  // that enclose the position: the innermost one decides what a character is. A substitution's
+  // interior is code again even inside double quotes, and its delimiters are structure, so the
+  // interior is judged by the same word rules below with no second tokenization. Re-marking a
+  // nested interior per token would be quadratic, and a 20000-deep nest must stay linear.
+  const startsAt = new Map();
+  const addSpan = (span) => {
+    const at = startsAt.get(span.start);
+    if (at === undefined) startsAt.set(span.start, [span]);
+    else at.push(span);
+  };
+  let arithEnd = 0; // tokens inside an arithmetic expansion are not read separately
+  const ordered = [...tokens].sort(
+    (a, b) => a.start - b.start || b.end - a.end,
+  );
+  for (const t of ordered) {
+    if (t.start < arithEnd) continue;
+    if (t.kind === "subst") {
+      // `<(cmd)` reads a command's output through a file name, like `$(cmd)` through a word; `>(cmd)`
+      // is a write sink.
+      if (t.form === ">(") return "output process substitution";
+      if (t.form === "$(" && code[t.start + 2] === "(") {
+        // `$((…))`: arithmetic expansion, which the tokenizer reads as a substitution. Bash
+        // evaluates every name in it, so only digits and operators are admitted.
+        if (code.slice(t.end - 2, t.end) !== "))")
+          return "unclosed arithmetic expansion";
+        if (!ALLOW_ARITH_TEXT.test(code.slice(t.start + 3, t.end - 2)))
+          return "arithmetic expansion with a name or an expansion";
+        addSpan({ start: t.start, end: t.end, kind: "arith" });
+        arithEnd = t.end;
+        continue;
+      }
+      const open = t.form === "`" ? 1 : 2;
+      addSpan({ start: t.start, end: t.end, kind: "subst", open });
+      opens.set(t.start, open);
+      closes.add(t.end - 1);
+    } else if (t.kind === "comment" || t.kind === "join")
+      addSpan({ start: t.start, end: t.end, kind: "ignored" });
+    else if (t.kind === "heredoc-body") {
+      bodies.push(t);
+      addSpan({ start: t.start, end: t.end, kind: "body" });
+    } else if (t.kind === "heredoc-op") ops.push(t);
+    else if (t.kind === "quote") {
+      if (t.quote !== "'" && t.quote !== '"') return "ANSI-C or locale quote";
+      addSpan({
+        start: t.start,
+        end: t.end,
+        kind: "quote",
+        double: t.quote === '"',
+      });
+    }
+  }
+  const enclosing = [];
+  for (let i = 0; i < n; i += 1) {
+    while (enclosing.length > 0 && enclosing[enclosing.length - 1].end <= i)
+      enclosing.pop();
+    const born = startsAt.get(i);
+    if (born !== undefined) for (const span of born) enclosing.push(span);
+    const top = enclosing[enclosing.length - 1];
+    if (top === undefined) continue; // 0: code
+    if (top.kind === "subst")
+      k[i] = i < top.start + top.open || i === top.end - 1 ? 3 : 0;
+    else if (top.kind === "quote")
+      k[i] = i === top.start || i === top.end - 1 ? 6 : top.double ? 4 : 2;
+    else k[i] = top.kind === "ignored" ? 1 : top.kind === "body" ? 5 : 9;
+  }
+  // The forms: what is left in code or in double quotes is judged character by character.
+  for (let i = 0; i < n; i += 1) {
+    if (k[i] !== 0 && k[i] !== 4) continue;
+    const ch = code[i];
+    if (ch === "\\") {
+      // The escape and the character it quotes: a literal, never an expansion. It is a non-literal
+      // word all the same (it can spell `a[$(cmd)]`), so the position rule below judges it.
+      k[i] = 8;
+      if (i + 1 < n) k[i + 1] = 10;
+      i += 1;
+      continue;
+    }
+    if (ch === "`") return "unparsed backtick";
+    if (ch === "$") {
+      ALLOW_PLAIN_PARAM.lastIndex = i;
+      const m = ALLOW_PLAIN_PARAM.exec(code);
+      if (m === null) {
+        // A `$` that nothing follows but a blank, a separator, the closing quote of its own string or
+        // the end is a literal dollar sign (`grep 'x$'`, `"a$"`). A `$` before an opening quote is NOT:
+        // that is the adjacent-quote splice.
+        const next = code[i + 1];
+        if (
+          i + 1 >= n ||
+          /[ \t\n)|;&/.,:]/.test(next) ||
+          (k[i] === 4 && k[i + 1] === 6)
+        ) {
+          k[i] = 10;
+          continue;
+        }
+        return `expansion form ${code.slice(i, i + 2)}`;
+      }
+      set(i, i + m[0].length, 7);
+      i += m[0].length - 1;
+    }
+  }
+  // An unquoted here-document expands its body; a quoted delimiter makes it literal. A `$(` or a
+  // backtick the tokenizer parsed is a substitution the word rules judge; anything else is refused.
+  for (const b of bodies) {
+    const op = ops.filter((o) => o.end <= b.start).pop();
+    const delim = op ? code.slice(op.end).trimStart()[0] : "";
+    if (delim === "'" || delim === '"' || delim === "\\") continue;
+    for (let i = b.start; i < b.end; i += 1) {
+      if (k[i] === 3 || k[i] === 7) continue;
+      if (code[i] === "\\" || code[i] === "`")
+        return "escape in an unquoted here-document";
+      if (code[i] !== "$") continue;
+      ALLOW_PLAIN_PARAM.lastIndex = i;
+      if (ALLOW_PLAIN_PARAM.exec(code) === null)
+        return "expansion form in an unquoted here-document";
+    }
+  }
+  // An arithmetic command `((…))` is read here: bash evaluates every name in it.
+  for (let i = 0; i < n - 1; i += 1) {
+    if (k[i] !== 0 || code[i] !== "(" || code[i + 1] !== "(") continue;
+    let depth = 0;
+    let j = i + 2;
+    for (; j < n; j += 1) {
+      if (code[j] === "(") depth += 1;
+      else if (code[j] === ")") {
+        if (depth === 0 && code[j + 1] === ")") break;
+        depth -= 1;
+      }
+    }
+    if (j >= n) return "unclosed arithmetic command";
+    if (
+      !ALLOW_ARITH_TEXT.test(code.slice(i + 2, j)) ||
+      k.slice(i, j).some((v) => v !== 0)
+    )
+      return "arithmetic command with a name or an expansion";
+    set(i, j + 2, 1);
+    i = j + 1;
+  }
+  // Words and simple commands.
+  // A word is {unq, hasSubst, hasParam, hasEscape}: `unq` is its text with quotes removed, a
+  // substitution or a parameter shown as \u0001, an escaped character as itself. A substitution's body
+  // is its own command list, so it gets a fresh segment context and the outer word resumes after it.
+  const segments = [];
+  let seg = [];
+  let word = null;
+  const stack = [];
+  const wordOf = () =>
+    (word ??= { unq: "", hasSubst: false, hasParam: false, hasEscape: false });
+  const endWord = () => {
+    if (word !== null) seg.push(word);
+    word = null;
+  };
+  const endSeg = () => {
+    endWord();
+    if (seg.length > 0) segments.push(seg);
+    seg = [];
+  };
+  for (let i = 0; i < n; i += 1) {
+    const ch = code[i];
+    const v = k[i];
+    if (opens.has(i)) {
+      const w = wordOf();
+      w.hasSubst = true;
+      w.unq += "\u0001";
+      stack.push({ seg, word });
+      seg = [];
+      word = null;
+      i += opens.get(i) - 1;
+    } else if (closes.has(i)) {
+      endSeg();
+      const outer = stack.pop();
+      if (outer === undefined) return "an unbalanced substitution";
+      seg = outer.seg;
+      word = outer.word;
+    } else if (v === 1 || v === 5) endWord();
+    else if (v === 9) wordOf().unq += "0";
+    else if (v === 7) {
+      if (ch === "$") {
+        const w = wordOf();
+        w.hasParam = true;
+        w.unq += "\u0001";
+      }
+    } else if (v === 8) wordOf().hasEscape = true;
+    else if (v === 10) {
+      const w = wordOf();
+      w.hasEscape = true;
+      w.unq += ch;
+    } else if (v === 6) wordOf();
+    else if (v === 0 && ";|()\n".includes(ch)) endSeg();
+    else if (
+      v === 0 &&
+      ch === "&" &&
+      !"<>".includes(code[i - 1] ?? "") &&
+      code[i + 1] !== ">"
+    )
+      endSeg();
+    else if (v === 0 && (ch === " " || ch === "\t")) endWord();
+    else wordOf().unq += ch;
+  }
+  endSeg();
+  if (stack.length > 0) return "an unbalanced substitution";
+  const nonlit = (x) => x.hasSubst || x.hasParam || x.hasEscape;
+  for (let words of segments) {
+    while (words.length > 0 && ALLOW_SKIP_KEYWORDS.has(words[0].unq))
+      words = words.slice(1);
+    if (words.length === 0 || ALLOW_DATA_KEYWORDS.has(words[0].unq)) continue;
+    const assigns = [];
+    while (words.length > 0 && /^[A-Za-z_][A-Za-z0-9_]*\+?=/.test(words[0].unq))
+      assigns.push(words.shift());
+    const targets = [];
+    const rest = [];
+    for (let j = 0; j < words.length; j += 1) {
+      const m = /^\d*(?:<<<|<<-?|<>|>>|>\||>&|<&|&>>?|<|>)/.exec(words[j].unq);
+      if (m === null) rest.push(words[j]);
+      else if (words[j].unq.length > m[0].length || j + 1 >= words.length)
+        targets.push(words[j]);
+      else targets.push(words[(j += 1)]);
+    }
+    // A stored value is admitted, whatever it holds, because every place bash EVALUATES a value is
+    // refused unless its operand is digits and operators (arithmetic, `[[ -eq ]]`, `-v`, a subscript,
+    // a `${…}` operator). Storing is not the hazard; evaluating is.
+    if (rest.length === 0) continue;
+    const [cmd, ...args] = rest;
+    const name = cmd.unq;
+    // An escaped command word (`\ls`) is read as its real text, which the lists judge; a substitution
+    // or a parameter there is a command nobody can name.
+    if (cmd.hasSubst || cmd.hasParam) return "a non-literal command word";
+    const anyNonlit = [...assigns, ...targets, ...rest].some(nonlit);
+    if (name === "let") {
+      if (args.some((a) => !ALLOW_ARITH_TEXT.test(a.unq)))
+        return "let with a name or an expansion";
+      continue;
+    }
+    if (name === "[" || name === "[[" || name === "test") {
+      const operands = args.filter((a) => a.unq !== "]" && a.unq !== "]]");
+      // Measured under real bash and zsh (2026-11-10): `[` and `test` never evaluate an operand, `[[`
+      // evaluates the operands of an arithmetic operator (a bare name, a subscript, `$(` in one).
+      if (name === "[[" && operands.some((a) => TEST_ARITH_OPS.has(a.unq))) {
+        if (
+          operands.some(
+            (a) => !TEST_ARITH_OPS.has(a.unq) && !/^-?[0-9]+$/.test(a.unq),
+          )
+        )
+          return "an arithmetic [[ test with a name or an expansion";
+      }
+      for (const a of operands)
+        if (/^-[A-Za-z]$/.test(a.unq) && !TEST_SAFE_OPS.has(a.unq))
+          return `test operator ${a.unq}`;
+      continue;
+    }
+    // A command word never holds `=`: `arr[x]=1` and `[x]=3` are subscripted assignments bash
+    // evaluates, not commands. (A `case` arm such as `*[!0-9]*)` reaches this check as a word, so a
+    // glob is not refused; `$`, a backtick and a backslash were refused as non-literal above.)
+    if (name.includes("=") || /[$`\\]/.test(name))
+      return "a command word that is not a plain name";
+    if (
+      DECLARING_COMMANDS.has(name) &&
+      args.some((a) => /^-[A-Za-z]*[inI]/.test(a.unq))
+    )
+      return `${name} with an arithmetic or name-reference attribute`;
+    const listed =
+      NON_EVALUATING_COMMANDS.has(name) &&
+      !(name === "printf" && args.some((a) => /^-[A-Za-z]*v/.test(a.unq)));
+    if (listed) continue;
+    if (DECLARING_COMMANDS.has(name)) {
+      // `export NAME=value`: the name is a plain literal, the value is data a stored-value rule judges.
+      const named = args.every(
+        (a) =>
+          /^-[A-Za-z]+$/.test(a.unq) ||
+          /^[A-Za-z_][A-Za-z0-9_]*(?:\+?=|$)/.test(a.unq),
+      );
+      if (named) continue;
+    }
+    if (anyNonlit) return `a non-literal word as an operand of ${name}`;
+    if (args.some((a) => !ALLOW_PLAIN_TEXT.test(a.unq)))
+      return `an operand of ${name} that is not a plain literal`;
+  }
+  return null;
+}
+
 function classifyInternal(
   code,
   bindings = {},
@@ -2803,8 +3946,17 @@ function classifyInternal(
     // their variables are the caller's to judge, and the variable-argument rule is
     // about a block's own text (task.274).
     forwarded = false,
+    // task.294 test hook: `false` skips the word allow-list so the rules before it can be shown to
+    // hold on their own (the defeat-the-first-layer test). Never passed by a caller.
+    allowList = true,
   } = {},
 ) {
+  // task.292: bash's blanks are space, tab and newline only. A CR, FF, VT, NBSP or U+2028 is a
+  // character OF a word, but every scan below splits and matches with `\s`, which counts them as
+  // blanks: `A=1<CR>echo touch out` read as the command `echo` when bash runs `touch`. Stated once,
+  // here: those characters become one word character before any scan reads the text, so no `\s`
+  // below can see a blank that bash does not. The text is only ever classified, never executed.
+  code = code.replace(NOT_A_BASH_BLANK, "\u0001");
   // `defines`: every function this text defines, its own and those of the helpers
   // it sources — what a caller sourcing it inherits. `trusted`: the subset that
   // may stand as a known word (`shadowsCommand`). `forwardsTo`: for each defined
@@ -2849,9 +4001,9 @@ function classifyInternal(
   // MENTIONS `git push` is documentation. Scanning raw text would classify a doc
   // for its own examples and skip a block that is in fact safe to run.
   // A backslash-newline is removed by the shell before it reads a word, so
-  // `-dele\<LF>te` is `-delete` (T274-QA-4). Only an ODD run of backslashes
-  // continues the line; an escaped pair (`\\`) followed by a newline does not.
-  const prose = stripProse(code).replace(/(?<!\\)((?:\\\\)*)\\\r?\n/g, "$1");
+  // `-dele\<LF>te` is `-delete` (T274-QA-4). Which backslash-newlines join is the tokenizer's to
+  // say: an escaped pair (`\\`) followed by a newline does not.
+  const prose = cutJoins(stripProse(code), "");
 
   // Judged twice: as written, and with quotes and backslashes removed, as the
   // command receives them. `find docs "-delete"` and `find docs '-delete'` both run
@@ -3084,6 +4236,13 @@ function classifyInternal(
       return verdict("mutating", "helper call with PATH changed");
   }
 
+  // task.293: a value built harmlessly and evaluated later (prompt escapes, arithmetic operands).
+  // After the helper rule on purpose: a helper call that also names a start-up variable keeps the
+  // `helper call with …` reason its tests pin; a direct use, which that rule never reaches, lands here.
+  const indirect = indirectEvaluationHazard(code);
+  if (indirect !== null)
+    return verdict("mutating", `indirect-evaluation: ${indirect}`);
+
   // A call to a helper-defined function is only as permissive as its arguments
   // would be if written to each command it reaches: `newest_numbered docs dod
   // -delete` forwards `-delete` to `find` (task.191 CR-1). Read off the scan's
@@ -3211,6 +4370,33 @@ function classifyInternal(
   const unbound = unboundVariables(code, bindings);
   if (unbound.length > 0) {
     return verdict("placeholder", `unbound-variable: ${unbound.join(", ")}`);
+  }
+
+  // task.294: the allow-list is the last word. The rules above name what is refused; this layer
+  // admits a block only when every non-literal word is in a form and a position on its list.
+  const notListed = allowList ? allowListViolation(code) : null;
+  if (notListed !== null)
+    return verdict("mutating", `not-allow-listed: ${notListed}`);
+
+  // task.304: git runs some literal strings as commands. Same layer as the allow-list (it follows
+  // the allow-list's switch), because it is the same kind of refusal: a form git treats as code.
+  // The masked reading below is judged too: a `GIT_X=` written after a closed substitution is an
+  // argument of the substitution's own segment in the unmasked scan.
+  if (allowList) {
+    let gitWhy = gitLiteralExecution(invocations, raw, prose);
+    if (gitWhy === null && /\$\(|`|[<>]\(/.test(prose)) {
+      const masked = maskSubstitutions(prose);
+      if (masked !== null) {
+        const maskedInv = commandInvocations(masked);
+        gitWhy = gitLiteralExecution(
+          maskedInv,
+          rawInvocations(masked, maskedInv),
+          masked,
+        );
+      }
+    }
+    if (gitWhy !== null)
+      return verdict("mutating", `not-allow-listed: git ${gitWhy}`);
   }
 
   return verdict("runnable", null, changesDir);

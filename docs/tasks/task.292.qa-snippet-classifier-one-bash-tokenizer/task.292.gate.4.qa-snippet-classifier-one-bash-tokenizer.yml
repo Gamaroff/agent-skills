@@ -1,0 +1,84 @@
+schema: 2
+task: 'task.292.qa-snippet-classifier-one-bash-tokenizer'
+task_title: 'One bash tokenizer for the QA snippet classifier'
+gate: CONCERNS
+status_reason: 'The engine is byte-identical to the commit gate 3 judged; only the test file changed (75 lines, 8 new tests). Both new proofs hold: deleting the classifyInternal blank normalisation turns 6 committed tests red, and an unlisted tokenize consumer turns the consumer-count test red. Suite 379/379 under CI=true, security probe 31 executed, 0 reproduced, 0 escaped. One medium finding: criterion 10 was reworded after review with no approver. Security stays CONCERNS because T292-CR-1..3 stay open exactly as on develop.'
+reviewer: 'QA Engineer'
+head: 'e32c06c3d6914c0b769b914d66711fefc12539d0'
+updated: '2026-11-10T07:08:37Z'
+
+top_issues:
+  - id: 'T292-QA4-1'
+    severity: medium
+    file: 'docs/tasks/task.292.qa-snippet-classifier-one-bash-tokenizer/task.292.qa-snippet-classifier-one-bash-tokenizer.md'
+    finding: 'Success criterion 10 was reworded after review: "(QA 4)" was appended to "...with the red test named in the QA report". criteria-drift.js reports it as reworded and unapproved. The edit adds a pointer and does not relax the bound, but an unapproved criterion edit is not the criterion that was reviewed.'
+    suggested_action: 'Owner approves the wording (add "approved by <name>" to the criterion) or restores the reviewed text. QA does not edit the criterion.'
+    suggested_owner: po
+    status: closed
+    fixed_date: '2026-11-10'
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 379
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 31
+    escaped: 0
+    boundary_signals: ["never"]
+    boundary: true
+    notes: 'shell-exec probe on isRunnableBlock: 31 executed, 0 reproduced, 0 escaped (record task.292.qa.4.security.run.json). The engine is byte-identical to gate 3 head 7ec74b57 (cmp), so the three known indirect-evaluation holes (T292-CR-1..3, identical on develop) are unchanged and stay in recommendations.future. No new surface: this cycle changed tests only.'
+  performance:
+    status: PASS
+    notes: 'Engine unchanged since gate 3. Docs scan median 384 ms against 543 ms on develop; fixed-seed slice median 3368 ms against a 10 s bound (QA 4, five runs each, load recorded).'
+  reliability:
+    status: PASS
+    notes: 'Suite 379/379 under CI=true. classifyFailClosed behaviour unchanged.'
+  maintainability:
+    status: PASS
+    notes: 'The blank normalisation is now held by 6 committed rows plus a control, and the one-tokenizer rule by a consumer-count test.'
+
+criteria_drift:
+  reason: drift
+  base: reviewed-blob
+  changed:
+    - id: '#10'
+      kind: reworded
+      approved: true
+      relaxes: false
+      relaxes_reason: 'A pointer to the QA report was appended; the bound (every change mutation-proven, red test named) is unchanged'
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  notes: 'task.292.bug.1 and bug.2 stay closed (gate 3). No new bug file this cycle: T292-QA4-1 is a document finding for the owner.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'T292-CR-1 (pre-existing): quoted a[$(cmd)] subscript operand of printf -v, read, test -v, [[ -v ]], unset, [[ -eq ]] is runnable while bash runs the command. Identical on develop. Own follow-up task.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+      provenance: pre-existing
+    - action: 'T292-CR-2 (pre-existing): PS4 and ${x@P} prompt-escape expansion. Identical on develop.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+      provenance: pre-existing
+    - action: 'T292-CR-3 (pre-existing): quoted data later re-evaluated as arithmetic. Identical on develop. CR-1..3 share one cause (indirect evaluation); one task should sweep the class.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+      provenance: pre-existing
+    - action: 'Decide whether to move the WORD and assignment regexes onto tokens (follow-up task).'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CI green on e32c06c3 (pending at review time)', 'Owner accepts that T292-CR-1..3 stay open as on develop and files the follow-up task']

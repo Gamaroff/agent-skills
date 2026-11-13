@@ -1,0 +1,72 @@
+schema: 2
+task: 'task.293.qa-snippet-classifier-indirect-evaluation'
+task_title: 'QA snippet classifier refuses indirect evaluation'
+gate: FAIL
+status_reason: 'Gate 6 (one owner-granted extra cycle, scoped to routes that keep the substitution text in the source; the three documented residuals were excluded). The independent reviewer found one in-scope route: a quoted substitution inside an indexed-array compound-assignment subscript, where the quote follows a character after the bracket and the bracket follows an open paren, so the quote-after-bracket rule and the live-expansion rule both miss it. QA reproduced it under bash 5.3 with a clean control.'
+reviewer: 'QA Engineer'
+head: '6add0f42ac31b7cc4bd53b2cee1393e45d3374ee'
+updated: '2026-11-10T11:35:21Z'
+
+top_issues:
+  - id: 'T293-QA-9'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'A quoted substitution in a compound array assignment subscript runs under bash 5.3 and classifies runnable: a=([0 then a single-quoted dollar-paren touch W close-paren, close-bracket]=1); echo hi creates W. The backtick form and a letter in place of the digit behave the same. The quote follows the digit, not the bracket, so the quote-after-bracket rule misses it; the block has no evaluating word and no live expansion or name-bracket, because the bracket follows an open paren. The control with a plain number in the quotes stays runnable and writes nothing.'
+    suggested_action: 'Refuse any substitution literal inside an unclosed bracket in a compound array assignment (name=( or name+=( ), and add the shape to the real-bash table and the decider table.'
+    suggested_owner: dev
+    status: open
+    origin: 'code-review CR-1, reproduced by QA'
+
+waiver:
+  active: false
+
+quality_score: 85
+
+evidence:
+  tests_reviewed: 383
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 31
+    boundary: true
+    escaped: 0
+    boundary_signals: ["refused"]
+    notes: 'The classifier is the boundary. 31 corpus cases executed, 0 escaped. About 100 reviewer probes; one in-scope route escaped (array compound assignment) and QA reproduced it. Earlier findings are fixed and held.'
+  performance:
+    status: PASS
+    notes: 'Linear to N=32000 (gate 5 timing); no engine change since.'
+  reliability:
+    status: PASS
+    notes: 'ci:fast green at the cycle-4 fix; CI on the head pending at the read.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Six gates, six routes. This one is narrower than the earlier families: a gap in the quote-after-bracket rule, not a new carrier.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Owner decision: one more extra cycle for T293-QA-9 (a small fix to the bracket rule), or accept it as a documented residual and file it with the allow-list task.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+  future:
+    - action: 'Cleanup: the test "a helper call that also names a start-up variable keeps its pinned reason" asserts only mutating, so it cannot fail on the ordering it names; pass a helperRoot and assert the reason string.'
+      refs: ['shared/resources/tests/qa-execute-snippets.test.mjs']
+    - action: 'Cleanup still open: EVALUATING_WORD omits set, mapfile, readarray, getopts, trap, compgen, wait and shift; they are refused today only by the unrecognised-command rule.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'Documented residuals: printf octal launder, a bracket or dollar arriving by expansion, a literal split across quote tokens.'
+      refs: ['shared/resources/qa-runnable-prose-detection.md']
+      provenance: documented-unseen-shape
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T293-QA-9 closed, or accepted by the owner as a documented residual']

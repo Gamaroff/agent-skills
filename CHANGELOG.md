@@ -4,6 +4,266 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.67.0] - 2026-11-13
+
+### Fixed
+
+- **The `/finalise` security probe gives every (case, shell) run its own `HOME` and `TMPDIR` (task 306).**
+  One `HOME` was shared by every case and shell, so a legitimate case on a state-changing control
+  (task.296's `lockctl.sh take`) left its state for the zsh run, which read the case as refused and
+  the write as an escape. The `shell:`, `shell-fn:`, `shell-argv:` and `fence:` arms now create the pair
+  inside the case directory. A hostile run's write to its own `HOME` is still reported as an escape; the
+  `cli:` arm and `--fixture-setup` keep the run-wide `HOME`. Held by seven tests in
+  `shared/resources/tests/security-probe.test.mjs`, mutation-proved both ways.
+
+### Added
+
+- **Pipeline prose reads a step's status and the time from the instrument (task 299).** On task.295 a
+  background command written `cmd; echo exit=$?` reported the exit code of the whole compound, so a
+  notification said "exit 0" for a run whose real step had failed, and `updated:` values typed into
+  gate files drifted from the real time. The fast-gate background form in the develop loop and the QA
+  loop already wrote the status into the log; both now also say the notification's own exit code is the
+  `echo`'s and must not be read. Every time placeholder in the implementation-report template, the
+  subagent-summary schema and its two writers, the wall-clock log line, the pause docs and
+  `nestjs-debug` now names `date -u` as the source. Held by
+  `tests/orchestration-instrument-reads.test.js`, which states its claim as a bounded set (a wrapped
+  `echo "…=$?"` with no redirect; a time placeholder in a file that never names `date -u`), names what
+  it does not see (date-only placeholders, file-level pairing), and is mutation-proved.
+
+- **`review-task` runs a plan's own command once, and `create-task` asks for an environment-parity
+  line (task 298).** Task.295 was reviewed without anyone running the `rsync` its plan named, and
+  its container differed from CI (user, image base, shell and awk variants); both surfaced only in
+  later QA cycles and the acceptance runs. `review-task` Step 3 gains check 31: when the plan names
+  a command that moves or builds something, run it once with a dry-run flag or against a scratch
+  target and record the result. A command with neither is not run and is recorded as
+  `unrun — no safe form` (Optional); a flag is never improvised. `create-task` § 3.5 "Should Add"
+  gains the matching item: a task that runs CI scripts in a new environment carries a parity line
+  against the CI workflow (user, base image, shells, awk variants, tool versions). Held by
+  `tests/review-run-and-parity-checks.test.js`, which reads both skills' own text and is
+  mutation-proved three ways. It holds that each rule is stated at its site; whether a reviewer
+  applies it is not something a CI layer can run.
+
+- **A clean security-probe count names what the run could not observe (task 300).** "N candidates,
+  0 reproduced" was a true claim about refusal, but the limits that bound it (an accepted value's
+  effects are not observed; for a `fence:` entry, a write to an absolute path outside the sandbox is
+  not observed) lived only in source comments and `probe-boundary-rule.md` §5, so a DoD reader saw
+  the number without them. The engine now states the limits once (`OBSERVATION_LIMITS` in
+  `security-probe.mjs`), stores their ids per record entry, and prints the sentences in the
+  `security_review:` block and in `security-probe-plan.mjs`'s output. `/finalise` copies them into
+  `security_result.observation_limits` and the Probe Results block prints them beside the count.
+  The field is additive: a record written before it derives the same limits from its entry form.
+  Phase 1 found the filed premise wrong in part (a validator that accepts a hostile value is already
+  counted as reproduced), so this is a reporting change, not a new observable sink.
+
+- **The QA loop records a skipped fast gate, and qa-fix's structural-move offer fires at the second
+  repeat (task 297).** An unset or empty `develop.fastGateCommand` was a silent skip in step 0a:
+  nothing ran and nothing was recorded, so a reader of the QA history could not tell a green gate
+  from no gate. `fast-gate-outcome.sh` gains `--command`, and step 0a now records
+  `Fast gate: skipped (develop.fastGateCommand unset)` as the cycle's QA Iteration History line and
+  in the fix summary. **It is still a skip, not a HALT**, so a consumer that never set the key
+  behaves as before, and the step now says a per-file run is not the gate. Trigger (b) of the
+  structural-move offer in `skills/qa-fix/SKILL.md` was the author's judgement; it is now
+  `repeat-subject.mjs`: a file is a repeat subject when an open finding in this gate names it, the
+  previous gate named it, and the previous cycle's fix commit changed it. Replayed over task.295's
+  five gates it fires at gates 2, 3 and 4, not only at the third: every finding there names
+  `scripts/remote-test/run.sh`, and a file is a coarse subject for a work item that is mostly one
+  file. The offer stays advisory, so an early offer costs a paragraph, not a halt.
+
+- **`npm run test:remote` takes a per-run lock, and gains `--unlock` and `--prune-images` (task 296).**
+  The container-name check stopped a second run on a branch only after the first's container
+  existed, so a run started during the sync or the first image build could rewrite the tree under it.
+  A run now takes an atomic `mkdir` lock on the server (`~/<run dir>.lock`) in the call that creates
+  the run directory, before the sync, and releases it on success, failure, the timeout and Ctrl-C
+  through one cleanup that also keeps the old exclude-file removal and container kill. A held lock
+  exits 1 before any sync and names the owner and its age; a run refused that way never releases the
+  holder's lock. The container-name check stays as a second layer. A lock whose run died is stale
+  once no container exists and the server's clock is past the owner's start plus the owner's own
+  timeout plus 10 minutes (`TEST_REMOTE_LOCK_MARGIN_MIN`); a run refuses and names `--unlock`, which
+  removes only a stale lock. `--prune-images` removes old `agent-skills-test:*` tags by explicit name,
+  keeping the current Dockerfile's tag and any in use, and refuses while any lock exists or when
+  docker cannot be read. `--reap` now skips `*.lock` directories and `--help` prints the whole
+  header instead of a fixed line range. The server-side logic is one file, `lockctl.sh`, sent over
+  ssh stdin and run for real in the tests against a fake `docker`.
+
+### Changed
+
+- **`npm run test:remote` now works from a linked git worktree (task 302).** From a linked worktree
+  `.git` is a file, so nothing was synced under that name and the server's `npm ci` ran `prepare`
+  (`git config core.hooksPath`) in a tree with no `.git`, which exits 128 (`fatal: not in a git
+  directory`); the route warned about it and then failed anyway. The route now syncs the repository's
+  common git directory as `.git` and lays the worktree's own `HEAD` and `index` over it, leaving out
+  `worktrees/`. The common directory's own `HEAD` and `index` are the main checkout's, so a plain copy
+  would have run the history-backed tests against the wrong commit. A normal checkout syncs its `.git`
+  exactly as before. A bare main repository is not handled. Two offline tests hold it with the real
+  `rsync` into a local stand-in for the server: one reads the synced `HEAD` back and fails when the
+  worktree's is not the one that travels.
+- **A pause commit at step 8 is no longer pushed (task 303).** Each PreCompact pause at step 8 pushed
+  a docs-only commit, which cancelled the previous head's CI run; the cancelled run can read red to
+  the docs-only tree-equivalence walk (the template's `ci-ok` aggregator exits 1 when a job it needs
+  was cancelled, so the run's rollup is `FAILURE` and the walk stops there), so the finalise and
+  merge waits needed full CI, about 50 minutes at worst on a consumer. The hook now commits the pause
+  entry and holds the push at step 8; step 8's own commit carries it and pushes once. The engine is
+  unchanged on purpose: telling a cancel-caused `ci-ok` failure from a real one by conclusion alone
+  could green a red run. Scenarios 17f and 17g hold it (a step-8 pause is committed and not pushed;
+  the same report at step 7 is pushed).
+- **The PreCompact pause comment names the QA cycle and the pause count (task 301).** The one pause
+  comment per step, edited in place on a repeat, now ends with `Latest pause: pause 2 at Step 5, QA
+  cycle 2.` The count lives in a new top-level lock field `pause_counts` (keyed by step), not in the
+  `paused` record, because every lock writer deletes that record; the cycle is read from the highest
+  gate file, since the lock has no cycle field. The Step 1 lock-collision check is now an executable
+  block that exits 1 on a collision and prints both the resume and the abandon command for a paused
+  run of another item (it also refuses a `{start-fresh}` or `{doc-directory}` left unsubstituted, and
+  Phase 0b now says who fills them), and a new test holds it (Start fresh on one document never releases another's
+  lock; the snapshot is removed only when its reason is `precompact`). A new scenario pins the stateful
+  `gh` stand-in's counter: replacing `next_n` with `echo 0` now turns the suite red.
+- **`finalise-ci-poll.sh` says why it wrote `UNDECIDED` (observation 166).** A poll started with a
+  check-count floor above the checks the head had started, for example a floor copied from another
+  PR when path-filtered workflows start fewer checks on a small diff, ran out its whole budget and
+  wrote `UNDECIDED` with no reason. It now prints `floor 5, saw 3` (or the changing-count case) on
+  stderr. The result line is unchanged, so readers are unaffected.
+- **The QA snippet classifier refuses the git forms that run a literal string (task 304).** A block
+  whose arguments were plain literals passed every layer, because `git` is non-evaluating and its
+  subcommand is on a closed list, yet git runs some of those strings as commands:
+  `git -c core.fsmonitor=./hook.sh status`, `git ls-remote --upload-pack=…` and `GIT_SSH_COMMAND=…`
+  all wrote a file under real bash. `classifyBlock` now refuses the global `-c` and `--config-env`, a
+  `GIT_*=` assignment in any position, `--exec-path=<dir>`, `ls-remote --upload-pack` / `--exec` (and
+  their unambiguous prefixes), any git argument holding an unquoted brace expansion (scanned per
+  word), and an `export` / `declare` / `typeset` / `readonly` / `local` operand whose variable name is
+  not a plain identifier (a brace, quote, backslash or expansion the shell resolves after the scan),
+  and any git global flag the scan does not know before the subcommand (`git --attr-source log -c …`
+  hid the `-c`), and any git line on which the two readings of the subcommand disagree (a quote
+  inside `--namespace` hid `fetch --upload-pack` behind `log`), any git global flag that takes a
+  separate operand other than `-C` with one plain word (an escaped space in the operand split one word
+  into two), and any flag ahead of the subcommand spelled with a quote, backslash or expansion, with
+  `not-allow-listed: git …`, by form and not by value. Cost on the repository's own
+  documentation: 0 blocks (251 runnable before and after). The differential gains a `git` atom set that
+  writes against the engine without the rule and not against the new one.
+- **The QA snippet classifier runs a block only when every non-literal word is on a closed list (task 294).**
+  Task 293 refused indirect evaluation by listing the shapes it had seen, and three shapes were still
+  `runnable` and wrote to disk under real bash: a value stored from a substitution whose `$` is spelled
+  by an octal escape, a `$` that arrives by expansion, and a `$` split across adjacent quotes
+  (`read x <<< "a[$""(cmd)]"; echo $((x))`). `classifyBlock` now ends with a word allow-list
+  (`not-allow-listed: …`): a parameter, a substitution whose body passes the same check, and a stored
+  value are admitted; a bare name inside `$((…))`, `((…))`, `let` or a `[[` arithmetic test, a `${…}`
+  operator, `$'…'`, `$"…"`, a subscripted assignment and `test -v` are refused. Cost on the repository's
+  own documentation: 5 of 256 runnable blocks are now refused and none became runnable. The
+  differential gains a `residual` atom set that writes against the old engine and not the new one.
+  Two test cleanups ride along: the helper-call/start-up-variable test now passes a real helper root
+  and pins the exact reason, and `mapfile readarray getopts trap compgen wait` are pinned as
+  unrecognised commands.
+
+### Fixed
+
+- **The context-pressure statusline test no longer leaks a `ctx-wrap-` temp directory (task 291).**
+  `context-pressure-statusline.test.mjs` ended some tests while the wrapper's detached recorder was
+  still running; the recorder's `mkdirSync(..., { recursive: true })` then recreated the directory the
+  `after` hook had just removed, and the post-suite tmp-leak ratchet failed on the unlisted prefix
+  (1 run in 100 unloaded, 3 in 100 under load; 0 in 100 on both after the fix). The hook now waits,
+  bounded by 3 s, for each recorder's file before it removes anything
+  (`shared/resources/tests/lib/tmp-state-cleanup.mjs`), and a new test runs a deliberately slow
+  recorder and is red with the wait removed. `ctx-wrap-` is not added to the ratchet.
+- **The PreCompact claim no longer depends on `mkdir` being exclusive (bug 21).** On the LAN server's
+  kernel (WSL2 6.18.33.2, ext4 and tmpfs) two concurrent `mkdir` calls of one name both succeed, so two
+  concurrent hook runs both took the claim and the Test workflow failed on `concurrent: exactly one
+  report block appended` (7 of 12 runs there). The claim is now an `ln` of the run's pid file into
+  `develop-pipeline.precompact-claim.d/pid`, which is exclusive on every kernel measured (0 of 300
+  doubles on both filesystems) and publishes the pid in the same step. The directory and file names are
+  unchanged. A new scenario supplies a `mkdir` that always succeeds, so the double claim fails on any
+  kernel, and the hook suite ran 0 red in 20 runs on the affected kernel after the fix.
+- **A compaction no longer removes the pipeline lock.** The PreCompact hook treated every
+  compaction as the end of the run. It claimed the lock by `mv` and removed it, but Claude Code
+  carries on in the same session after a compaction. That left `set-qa-phase.sh`,
+  `set-waiting-on.sh` and the Stop hook inert until someone ran `advance-pipeline-lock.sh --restore`
+  by hand: three times in one consumer run on 2026-11-10. The hook now keeps the lock and marks it
+  `paused: {at, step, reason: "precompact"}`. It still writes the `last-halt.json` snapshot, the
+  report block, the commit and the comments.
+  - **Clearing the mark.** The session's next lock write clears it: any `advance-pipeline-lock.sh`
+    advance (the no-op re-assert too), `set-qa-phase.sh`, `set-waiting-on.sh`, the new
+    `--clear-pause`, or `--restore <doc-dir>` on the paused lock. Clearing also consumes the pause's
+    snapshot.
+  - **Stop hook.** It allows a stop while the mark is set.
+  - **Repeat pauses.** A pause that finds the lock still marked records nothing new.
+  - **Concurrency claim.** The claim is now an atomic `mkdir` of
+    `develop-pipeline.precompact-claim.d`, holding the hook's pid. A claim left by a dead holder is
+    taken over. A stealer that finds it moved a live claim puts it back, and a run releases only its
+    own claim.
+  - **Push held on dangling links.** The pause commit is still committed locally, but it is not
+    pushed when the report links to a path that is staged but not in the commit. Path-limiting the
+    commit made
+    this possible: a pause at step 7 pushed a report that linked to the PR review report staged for
+    the 6a carry, and the consumer's docs link check went red (tinker-city PR #1223). The signal
+    names the links. The commit that carries them pushes both.
+  - **Collisions.** Step 1 and develop-bug §0b still halt on a paused lock for another document,
+    and now name it.
+  - **Resume detector.** It reports a paused lock as `source: lock` with a `paused:` note.
+  - **Pause comments.** These stay one per step (find-by-marker, edit in place).
+
+- **The QA snippet classifier refuses indirect evaluation** (task 293). A value built harmlessly and
+  evaluated later ran a command that the text never showed: `printf -v 'a[$(cmd)]' x`, `read`,
+  `test -v`, `[[ -v ]]` and `unset` on a name holding a quoted subscript; `PS4` with `set -x` and
+  `${x@P}`, which expand prompt escapes; and a quoted substitution kept in a variable and then read
+  as arithmetic (`$((x))`, `[[ $x -eq 1 ]]`, `${y:0:$x}`, `${!x}`). All classified `runnable` and wrote
+  a file under bash. They are now `mutating`, with the reason `indirect-evaluation: …`, by refusing
+  the build (a quoted literal holding `$(` or a backtick, where it is assigned or handed to an
+  evaluating builtin; a prompt variable set; `@P`) instead of tracking the value. A value built by
+  expansion into a subscript (`x="a[$y$z]"`) and a quoted substitution directly after a `[`
+  (`${a['$(cmd)']}`) are refused too: both were found by QA, and the first by the random
+  differential on a `read "$x"` spelling. QA cycle 2 found a joined word (`x=a'[$(cmd)]'`) and a
+  literal piped into `read`, so the quoted-literal rule is now block-level: a quoted substitution in
+  a block that also evaluates a value is refused. QA cycle 3 found two more arithmetic reads the rule
+  did not list (`${@:$1}`, `${v[1+$1]}`), the third strike on one mechanism, so the list of
+  arithmetic spellings was replaced by a default-deny test: any live expansion or `name[` in a block
+  holding such a literal. QA cycle 4 found the literal carried as backslash-escaped text in an
+  unquoted word, so the carrier is default-deny as well: any substitution text the tokenizer did not
+  parse as real counts. QA gate 6 found a quoted substitution later in a compound-assignment
+  subscript (`a=([0'$(cmd)']=1)`), so the bracket rule no longer looks only at the character before
+  the quote, and gate 7 found a paren inside the subscript (`a=([0+(1)'$(cmd)']=1)`) hiding the
+  bracket from a same-word scan, so brackets were counted by depth over the command segment; gate 8 found a
+  quoted `;` resetting that depth (`a=([';'0'$(cmd)']=1)`), so the depth is now never reset. The differential gains an `indirect` atom set (10 writes
+  on the previous engine, 0 now) and the docs scan finds two blocks newly refused and none newly
+  runnable. Known unseen shapes: a value laundered through a command's output, a `[` or `$`
+  that itself arrives by expansion, and a literal split across adjacent quote tokens
+  (`"a[$""(cmd)]"`, found by the fifth and last QA gate). The owner narrowed the task there: these
+  are recorded, and the remainder needs an allow-list design as its own task.
+
+- **The QA snippet classifier reads bash's lexical rules once** (task 292). A carriage return, form
+  feed, vertical tab, no-break space or line separator before a `#` was taken for a blank, so
+  `echo a`, then one of them, then `# ; touch out` classified `runnable` and created `out` under
+  bash; the same defect one scan over let `A=1`, a CR, `echo touch out` through, because bash
+  glues the CR onto the word and runs `touch`. A single `tokenize` now says what is a blank (space,
+  tab and newline only), what an escape hides, where a comment starts, what a substitution or a
+  heredoc body holds, and where a line joins; `stripProse`, the quote collapse, the substitution
+  mask and both line-join passes read it instead of five regex copies of those rules, and the
+  classifier turns every other whitespace character into a word character before any scan splits
+  on `\s`. A substitution inside an unquoted heredoc body runs in bash and is now judged. Deep
+  nests are linear (6000 levels: 36 ms, from 2.6 s) and no longer overflow the stack. The random
+  differential and the docs scan are committed as `npm run qa-snippets:differential` and
+  `npm run qa-snippets:docscan`. Over the tracked docs no block changes verdict. An escaped quote
+  outside quotes is still refused, on purpose: reading it correctly makes one documentation block
+  newly runnable.
+
+- **The QA snippet runner reads a `#` after an escaped space as part of the word** (task 290).
+  `echo a\ # ; touch out` classified `runnable` and created `out` under bash, because the comment
+  scans took the escaped space for whitespace. One rule, `startsComment`, now serves `stripNonCode`
+  and `closingParen`: a `#` opens a comment only at the start of a word, after whitespace, `;`, `&`,
+  `|` or `(` that no backslash escapes. `closingParen` no longer recurses per nested double-quoted
+  `$(` (20000 of them threw `RangeError`), and the classifier turns any exception into a `mutating`
+  verdict. A differential test runs every block the classifier calls `runnable` under real bash and
+  fails if the directory changes. Over the tracked docs no block changes verdict. A backslash before
+  a quote outside quotes, and a backslash-newline before a line that starts with `#`, are refused
+  (`echo \'a' # ; touch out' ; touch out2` and `echo a\` then `# ; touch out` both classified
+  `runnable` and wrote under bash). Only an odd run of backslashes before a newline joins the next
+  line; `echo a\\` then `touch out` hid the write behind an even run. Skipping the escaped character instead would have made one
+  documentation block newly runnable.
+
+### Added
+
+- **`npm run test:remote` runs the test suite on the LAN server** (task 295). It syncs the working
+  tree to `ci@192.168.1.249`, runs `ci:fast` (or `--run <script>`) in a container that mirrors the CI
+  workflow, and exits with the run's own status; the laptop only runs `ssh` and `rsync`. An
+  unreachable server exits 1 and names `TEST_LOCAL=1`, the one local escape. Usage and host rules:
+  `docs/contributing/testing-remote.md`.
+
 ## [v0.66.0] - 2026-11-09
 
 ### Added

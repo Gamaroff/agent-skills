@@ -1,0 +1,72 @@
+schema: 2
+task: 'task.304.qa-snippet-classifier-git-literal-execution'
+task_title: 'QA snippet classifier refuses git literal execution'
+gate: FAIL
+status_reason: 'The cycle 3 findings are fixed and re-verified: every spelling of an exported GIT_ name the shell assembles (brace, empty quotes, backslash) is now refused at the assignment site, and the name-rule mutation turns a test red. The safety re-probe found a different hole in the same boundary: git has global flags that take a separate operand, the operand table lists only eight of them, and an unlisted one (--attr-source) makes the scan read the next word as the subcommand, so `-c` and `ls-remote --upload-pack` behind it classify runnable and write a file under real bash.'
+reviewer: 'QA Engineer'
+head: 'f13b57a8d32cf71d2ebcabea092f440c83717c4a'
+updated: '2026-11-11T06:47:21Z'
+
+top_issues:
+  - id: 'T304-QA-9'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: "An unlisted git global flag that takes an operand hides the subcommand from the scan. `git --attr-source log -c core.sshCommand='touch M' ls-remote ssh://x/y` and `git --attr-source log ls-remote --upload-pack='touch M' .` classify runnable (the develop engine too) and bash writes M under git 2.56. GIT_FLAGS_WITH_OPERAND lists -C, -c, --git-dir, --work-tree, --namespace, --exec-path, --config-env and --super-prefix; --attr-source is not there, so the scan reads `log` (the operand) as the subcommand and returns before it sees the real one. Reproduced by QA under bash; control `git log -1` stays runnable. Probe engine: 3 reproduced of 63, 0 escaped (c4-attr-source-c, c4-attr-source-upload-pack, c4-attr-source-unknown-flag). Reviewer finding CR-1, high/high, reproduced by QA."
+    suggested_action: 'Do not add --attr-source to the list: git adds global flags over time (this is the fourth cycle on one closed list of spellings). Invert it. Before the subcommand, accept only an allow-list of known global flags (the zero-operand ones such as --no-pager, -p, --paginate, --bare, --no-optional-locks, --literal-pathspecs, and the operand ones the engine already knows), and refuse a git whose pre-subcommand words include any other word that starts with a dash. Bash-verified rows for --attr-source and an invented flag, a differential atom, and a mutation proof.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 403
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 63
+    escaped: 0
+    boundary: true
+    boundary_signals: ['refused', 'are refused']
+    notes: 'The classifier is a boundary (a false runnable executes a block). 63 probes ran (run record task.304.qa.4...security.run.json, escaped 0): 60 behaved as required; 3 hostile cases hiding the subcommand behind an unlisted global flag were classified runnable and 2 of them write under real bash (the third is the invented-flag form of the same hole). All cycle 3 cases pass.'
+  performance:
+    status: PASS
+    notes: 'Docs scan unchanged by the cycle 3 fix: 3469 blocks, runnable 251 before and after, newly refused 0. Differential git set on the LAN server: 0 writes in 20000.'
+  reliability:
+    status: PASS
+    notes: 'Fails closed on every form the task lists plus brace, quote, read/printf and name-assembly forms. The open gap is the closed list of operand-taking global flags.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Fourth consecutive gate with a HIGH on shared/resources/qa-execute-snippets.mjs (quoting, braces, name assembly, and now an enumerated flag list). Each fix closed its finding and the next probe found the neighbouring spelling. The convergence readings are 3, 2, 2, 1, so the loop is converging, but the third-strike rule fires again on the file.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Replace the enumerated operand-flag list with a fail-closed allow-list of global flags before the subcommand (see T304-QA-9). Add bash-verified rows, a differential atom and a mutation proof.'
+      refs: ['shared/resources/qa-execute-snippets.mjs', 'scripts/qa-snippets-differential.mjs', 'shared/resources/tests/qa-execute-snippets.test.mjs']
+  future:
+    - action: 'CR-2 (reviewer low/medium; QA reproduced under a pty): `export PAGER="touch m"; git --paginate log` and `PAGER="touch m" git -p log` classify runnable, and git runs the PAGER string when stdout is a terminal (reproduced with script(1); not under a pipe). Same on the develop engine, and PAGER is not a GIT_ name, so it is outside the task as written (it names GIT_* forms). Decide whether a follow-up task should refuse string-executing variables (PAGER, LESSOPEN, EDITOR) beside git, or refuse git -p / --paginate.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+      provenance: pre-existing
+    - action: 'CI check `test` red on f13b57a8 and on develop too (run 42959047359): not caused by this branch. Fix on the base.'
+      refs: ['.github/workflows']
+      provenance: pre-existing
+    - action: 'CR-4 (carried): a GIT_ substring in quoted or argument text is refused (`git log --grep="GIT_SSH"`). Fail-closed; docs corpus shows 0 newly refused.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

@@ -1,0 +1,56 @@
+schema: 2
+task: 'task.300.security-probe-names-the-sink-it-observes'
+task_title: 'security-probe names the sink it observes'
+gate: PASS
+status_reason: 'All four phases delivered and held by committed tests; a fence mapping mutation turns two tests red; 356 tests green under TMPDIR=/tmp; no code-review findings.'
+reviewer: 'QA Engineer'
+head: '0bc3fe88353fa68af91583d79f53331e7158f708'
+updated: '2026-11-13T05:39:49Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 356
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    notes: 'No boundary delivered: the change adds a reporting field and prose, no accept-or-reject predicate.'
+  performance:
+    status: PASS
+    notes: 'One extra dynamic import of an already-loaded module in the plan CLI; no extra probe executions.'
+  reliability:
+    status: PASS
+    notes: 'An engine without the export reads as no limits, never a throw; records written before the field derive the same limits.'
+  maintainability:
+    status: PASS
+    notes: 'Limit text defined once in OBSERVATION_LIMITS; four bundled copies regenerated and bundle:check clean.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Other stated limits (gh-path bypass in shell forms, usage echoing the input) are candidates for OBSERVATION_LIMITS; not added in this task.'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

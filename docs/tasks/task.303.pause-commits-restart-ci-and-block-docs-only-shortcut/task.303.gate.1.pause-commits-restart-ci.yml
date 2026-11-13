@@ -1,0 +1,59 @@
+schema: 2
+task: 'task.303.pause-commits-restart-ci-and-block-docs-only-shortcut'
+task_title: 'Pause commits restart CI and block the docs-only shortcut'
+gate: PASS
+status_reason: 'Option (b) holds the step-8 pause-commit push; scenarios 17f/17g pass, a QA mutation turns 17f red, the engine is untouched, and ci:fast was 8404 pass / 0 fail. One stale risk paragraph in the task is recorded as future work.'
+reviewer: 'QA Engineer'
+head: 'e37f625f471febc4a1ca97452fb084a59b890f12'
+updated: '2026-11-12T11:22:04Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 3
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary_reason: 'The change is a push-or-hold branch on the lock current_step; it accepts or rejects no caller-supplied input, so no corpus sink models it.'
+    notes: 'No new input surface. The hold only withholds a git push.'
+  performance:
+    status: PASS
+    notes: 'No poll or API call changed; ci-tree-equivalence.js is byte-identical to develop.'
+  reliability:
+    status: PASS
+    notes: 'A held step-8 pause stays committed locally and Step 8 commit-changes pushes it. Scenario 17g shows step 7 still pushes.'
+  maintainability:
+    status: PASS
+    notes: 'The hold reuses the PUSH_HELD seam with a PUSH_HOLD_REASON; docs, CHANGELOG and bundled copies are in step.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Task 303 section 10 (Risk Assessment) still describes option (a) mitigation ("only when its own successor is green"); reword it for option (b) when the document is next edited.'
+      refs: ['docs/tasks/task.303.pause-commits-restart-ci-and-block-docs-only-shortcut/task.303.pause-commits-restart-ci-and-block-docs-only-shortcut.md']
+    - action: 'The template ci-ok aggregator exits 1 on a cancelled job, so a superseded run still reads FAILURE to the docs-only walk. Consider if: !cancelled() in docs/examples/ci/github-actions/changes-job.yml as a separate task.'
+      refs: ['docs/examples/ci/github-actions/changes-job.yml']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

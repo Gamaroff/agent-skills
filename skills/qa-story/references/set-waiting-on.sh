@@ -46,6 +46,9 @@
 #                                prints `set-waiting-on: cleared`; a lock that has no field
 #                                is left semantically unchanged (rewritten through jq, so
 #                                its formatting may normalise) and still prints `cleared`
+#   • lock marked `paused`     → either form clears the mark first (advance-pipeline-lock.sh
+#                                --clear-pause): it is the session carrying on after a
+#                                PreCompact pause (develop-pipeline-pause.md)
 #
 # Reader: develop-pipeline-on-stop.sh allows the stop while the budget has not
 # elapsed and prints `waiting on <label> since <since>`.
@@ -116,6 +119,11 @@ if ! jq -e 'type == "object"' "$LOCK" >/dev/null 2>&1; then
   echo "set-waiting-on: lock is not a JSON object — refusing to write" >&2
   exit 1
 fi
+
+# Either form is this session carrying on, so the PreCompact hook's `paused` mark goes
+# first — through the lock helper, which also consumes that pause's snapshot
+# (advance-pipeline-lock.sh header, The `paused` mark).
+[ -f "$_here/advance-pipeline-lock.sh" ] && bash "$_here/advance-pipeline-lock.sh" --clear-pause
 
 TMP=$(mktemp "$(dirname "$LOCK")/.set-waiting-on.XXXXXX") || {
   echo "set-waiting-on: could not create temp file beside '$LOCK'" >&2

@@ -1,0 +1,70 @@
+schema: 2
+task: 'task.293.qa-snippet-classifier-indirect-evaluation'
+task_title: 'QA snippet classifier refuses indirect evaluation'
+gate: FAIL
+status_reason: 'Safety re-probe (unscoped, independent reviewer) found one more carrier of the substitution literal: backslash-escaped text in an unquoted word (bracket, escaped dollar, escaped paren) handed to a double-bracket test, printf -v, test -v or read classifies runnable and writes under bash 5.3; controls are clean. The cycle-3 default-deny held for every quoted carrier.'
+reviewer: 'QA Engineer'
+head: '6cb6569732bfc1ee24ed9c99a53d3074c35e8188'
+updated: '2026-11-10T11:09:50Z'
+
+top_issues:
+  - id: 'T293-QA-7'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'The literal check recognises a substitution only in a quote token or a quoted here-document body, so the same literal written as backslash-escaped text in an unquoted word escapes it: a double-bracket test, printf -v, test -v and read, each given the word a, escaped bracket, escaped dollar, escaped paren, touch, escaped space W, escaped paren, escaped bracket, classify runnable and create W under bash 5.3. Reproduced by QA by execution for all four forms; the controls with a plain number in place of the substitution stay runnable and write nothing.'
+    suggested_action: 'Make the carrier default-deny as well: any dollar-paren or backtick text the tokenizer did not parse as a real substitution is a literal, whatever carries it.'
+    suggested_owner: dev
+    status: open
+    origin: 'code-review CR-1, reproduced by QA'
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 383
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 31
+    boundary: true
+    escaped: 0
+    boundary_signals: ["refused"]
+    notes: 'The classifier is the boundary. 31 corpus cases executed, 0 escaped. The reviewer tried about 12 carriers; one escaped (an unquoted escaped word) and QA reproduced it under real bash. The cycle 1 to 3 findings are fixed and held.'
+  performance:
+    status: PASS
+    notes: 'Docs scan median +2.0% over 7 runs at the cycle-3 fix; the reviewer did not time linearity this cycle.'
+  reliability:
+    status: PASS
+    notes: 'CI=true npm run ci:fast green at the cycle-3 fix commit (8346 tests, 0 fail). Mutation spot check by QA this cycle: see the report.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Four cycles in a row each found a new route to the same boundary. The cycle-3 default-deny removed the list of evaluation sites; the carrier of the literal was still a list of quote kinds.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Close T293-QA-7 by making the carrier default-deny, then extend the table, decider rows and differential atoms.'
+      refs: ['shared/resources/qa-execute-snippets.mjs', 'shared/resources/tests/qa-execute-snippets.test.mjs', 'scripts/qa-snippets-differential.mjs']
+  future:
+    - action: 'Cycle 3 cleanup still open: EVALUATING_WORD omits set, mapfile, readarray, getopts, trap, compgen, wait and shift, which are refused today by the unrecognised-command rule; add a test that locks the dependency.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'Recorded unseen shapes (printf octal launder, a bracket or dollar arriving by expansion) and advisory over-refusal remain as in the docs.'
+      refs: ['shared/resources/qa-runnable-prose-detection.md']
+      provenance: documented-unseen-shape
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T293-QA-7 closed and re-reviewed']

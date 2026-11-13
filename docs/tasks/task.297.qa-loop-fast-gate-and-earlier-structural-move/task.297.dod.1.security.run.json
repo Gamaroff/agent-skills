@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "path",
+      "entry": "cli:shared/resources/repeat-subject.mjs",
+      "name": "repeat-subject mutual-exclusion and malformed gate",
+      "call_site": null,
+      "verdict": "unverifiable",
+      "reason": "no-legitimate-evidence",
+      "executed": 2,
+      "passed": 2,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "--current",
+        "cur.yml",
+        "--previous",
+        "prev.yml",
+        "--changed",
+        "src/a.ts",
+        "--fix-commit",
+        "{input}"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "fixture_copy": null,
+      "ran_at": "2026-11-12T22:39:44.743Z"
+    },
+    {
+      "sink": "path",
+      "entry": "cli:shared/resources/repeat-subject.mjs",
+      "name": "repeat-subject --changed (repeat-subject rule)",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 9,
+      "passed": 9,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "--current",
+        "cur.yml",
+        "--previous",
+        "prev.yml",
+        "--changed",
+        "{input}"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "fixture_copy": null,
+      "ran_at": "2026-11-12T22:39:44.534Z"
+    },
+    {
+      "sink": "filename",
+      "entry": "shell-argv:shared/resources/fast-gate-outcome.sh",
+      "name": "fast-gate-outcome --command",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 16,
+      "passed": 16,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 2,
+      "declined_cases": [
+        {
+          "id": "fg-empty@bash",
+          "reason": "case-errored",
+          "detail": "fixture: EISDIR: illegal operation on a directory, open '/tmp/security-probe-YtaYwp/work/fixture-9ntSoJ/'"
+        },
+        {
+          "id": "fg-empty@zsh",
+          "reason": "case-errored",
+          "detail": "fixture: EISDIR: illegal operation on a directory, open '/tmp/security-probe-YtaYwp/work/fixture-76m9p9/'"
+        }
+      ],
+      "escaped": 0,
+      "shells": [
+        "bash",
+        "zsh"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "--command",
+        "{input}"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "fixture_copy": null,
+      "ran_at": "2026-11-12T22:39:45.210Z"
+    }
+  ],
+  "totals": {
+    "executed": 27,
+    "reproduced": 0,
+    "escaped": 0
+  },
+  "updated_at": "2026-11-12T22:39:45.210Z"
+}

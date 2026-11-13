@@ -1226,8 +1226,31 @@ After fixes are applied:
    no-op.
 
 0a. **Run the fast gate before committing.** Only reached when step 0 found changes — there is
-   nothing to gate otherwise, and step 0's no-change path HALTs before this point. Capture to a log
-   rather than streaming:
+   nothing to gate otherwise, and step 0's no-change path HALTs before this point.
+
+   **First, ask whether there is a gate to run.** `develop.fastGateCommand` can be unset or empty,
+   and an unset key used to be a silent skip: nothing ran and nothing was recorded, so a reader of the
+   QA history could not tell "gate green" from "no gate configured" (task.297, obs #161). Substitute
+   the configured value, or an empty string when the key is unset:
+
+   ```bash
+   bash .agents/skills/{develop-story|develop-task}/references/fast-gate-outcome.sh \
+     --command "<fastGateCommand>"
+   ```
+
+   It prints exactly one line and exits 0. `GATE_OUTCOME=run` → run the gate as below.
+   `GATE_OUTCOME=skipped (develop.fastGateCommand unset)` → **do not run a gate.** Record
+   `Fast gate: skipped (develop.fastGateCommand unset)` as this cycle's QA Iteration History line and
+   in the fix summary, and go straight to step 1. It is a skip with a trace, not a HALT: the develop
+   loop's own rule is that extracting nothing means skip, never fail, and a HALT would break every
+   consumer that never set the key. The suggested value is `npm run ci:fast`.
+
+   **A per-file run is not the gate.** Running the one test file you just changed, or `prettier` on
+   one path, does not stand in for `<fastGateCommand>`: on task.295 the first full run on the final
+   tree came during `/finalise`, and it found a hardcoded spawn timeout that QA fix 1 had added and a
+   repo-wide guard rejects (obs #161). Only the whole command counts as this cycle's gate.
+
+   When there is a gate, capture its output to a log rather than streaming it:
 
    ```bash
    FIX_LOG=".claude/state/qa-fix-gate-${QA_CYCLE}-$(date +%s).log"
@@ -1238,7 +1261,9 @@ After fixes are applied:
    ```
 
    **When the gate can outlive the tool timeout, start it with `run_in_background`** and let the log
-   carry the exit code: `<fastGateCommand> > "$FIX_LOG" 2>&1; echo "GATE_EXIT=$?" >> "$FIX_LOG"`.
+   carry the exit code: `<fastGateCommand> > "$FIX_LOG" 2>&1; echo "GATE_EXIT=$?" >> "$FIX_LOG"`. The
+   notification's own exit code belongs to the whole compound and is the `echo`'s (0), so it says "exit 0"
+   for a red gate: read the `GATE_EXIT=` line in the log, never the notification.
    Mark the wait before yielding —
    `bash .agents/skills/{develop-story|develop-task}/references/set-waiting-on.sh "5b fast gate cycle {N}" --kind task --budget-minutes {M}`
    (`develop-pipeline-hooks.md` §"waiting_on") — and on the notification `--clear` it and read the

@@ -1,0 +1,65 @@
+schema: 2
+task: 'task.290.qa-snippet-runner-comment-after-escaped-space'
+task_title: 'QA snippet runner reads a # after an escaped space as a comment'
+gate: FAIL
+status_reason: 'The named defect and the 20000-deep crash are fixed, but the same class still reproduces: a backslash outside quotes (an escaped quote, a backslash-newline) makes the comment scan disagree with bash, and two blocks classify runnable and write under real bash.'
+reviewer: 'QA Engineer'
+head: 'e750f678c849cfe43db1838773b7a44ada2fa5d0'
+updated: '2026-11-09T20:14:30Z'
+
+top_issues:
+  - id: 'T290-QA-1'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'stripCommentQuoteAware does not read a backslash outside quotes, so the comment scan still disagrees with bash. (a) `echo \''a'' # ; touch out'' ; touch out2` has an escaped quote that bash treats as a literal, but the scan opens a single quote there, closes it at the next quote, then strips `# ; touch out'' ; touch out2` as a comment: classifies runnable, bash creates out2. (b) `echo a\<newline># ; touch out`: bash joins the lines, so `a#` is mid-word and `touch out` runs; the per-line scan sees a `#` at column 0 and strips it: classifies runnable, bash creates out. Both are identical on develop. The task lists "Handle a backslash outside quotes in stripNonCode" in scope; the implementation dropped it because a plain skip made one doc block newly runnable, and the differential generator has no escaped-quote or continuation context so it cannot see either.'
+    suggested_action: 'Fail closed instead of skipping: when the scan meets a backslash outside quotes that is followed by a quote character or a newline, refuse the line or block (mutating, unparseable) rather than guess. Add both reproductions as gap rows, add escaped-quote and backslash-newline contexts to the differential generator, and re-run the docs scan against develop (must stay 0 newly runnable; a newly refused block must be listed).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 316
+  phases_verified: '1/1'
+  trace:
+    phases_covered: [1]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 31
+    escaped: 0
+    boundary_signals: []
+    notes: 'Probe engine (shell-exec sink, isRunnableBlock) executed 31 cases, 0 escaped, all scored as required. The classifier is a boundary (it decides what QA executes). Hand reproduction found T290-QA-1, which the corpus does not cover.'
+  performance:
+    status: PASS
+    notes: 'startsComment is a constant-time test called from existing loops; the quadratic cost of nested-substitution re-masking is pre-existing and recorded in the implementation report. The docs-scan timing criterion was not re-measured this cycle.'
+  reliability:
+    status: PASS
+    notes: 'closingParen is iterative and the classifier turns any exception into a mutating verdict. The iterative form is not held by a test (the catch hides a revert), as the implementation report states.'
+  maintainability:
+    status: PASS
+    notes: 'One startsComment rule serves the stripper and closingParen; a test counts the call sites. sedScan is a known non-shell site.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T290-QA-1: refuse a backslash-before-quote or backslash-newline outside quotes, add gap rows and differential contexts, re-run the docs scan.'
+      refs: ['shared/resources/qa-execute-snippets.mjs', 'shared/resources/tests/qa-execute-snippets.test.mjs']
+  future:
+    - action: 'Hold the iterative closingParen with a test that fails if it is reverted (the fail-closed catch currently masks a revert).'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T290-QA-1 fixed and re-reviewed']

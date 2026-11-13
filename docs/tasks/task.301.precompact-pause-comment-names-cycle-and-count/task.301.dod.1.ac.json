@@ -1,0 +1,120 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "d1f69b1a7cfdb28ad7c213f7d9bb2b81dcbb76f2",
+  "dirty_paths": [
+    "docs/tasks/task.301.precompact-pause-comment-names-cycle-and-count/task.301.implementation.1.precompact-pause-comment-names-cycle-and-count-initial-run.md",
+    "docs/tasks/task.301.precompact-pause-comment-names-cycle-and-count/task.301.pr-review.1.precompact-pause-comment-names-cycle-and-count.md",
+    "docs/tasks/task.301.precompact-pause-comment-names-cycle-and-count/task.301.precompact-pause-comment-names-cycle-and-count.md",
+    "docs/tasks/task.301.precompact-pause-comment-names-cycle-and-count/task.301.qa.1.precompact-pause-comment-names-cycle-and-count.md",
+    "docs/tasks/task.301.precompact-pause-comment-names-cycle-and-count/task.301.qa.2.precompact-pause-comment-names-cycle-and-count.md",
+    "docs/tasks/task.301.precompact-pause-comment-names-cycle-and-count/task.301.qa.3.precompact-pause-comment-names-cycle-and-count.md"
+  ],
+  "document": "docs/tasks/task.301.precompact-pause-comment-names-cycle-and-count/task.301.precompact-pause-comment-names-cycle-and-count.md",
+  "result": {
+    "bytes": 6690,
+    "sha256": "04c6e33eebb8f2fa7db0413c626dc8b1e3267cd84e27288655e52116c84e2829",
+    "verified": true
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 6,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "b5123358e13898495862a7fec99ccac14372c9bc13090e3ae89eb2e47f8e4af4",
+      "status": "PASS",
+      "description": "Two pauses at one step in different cycles leave one PR comment naming cycle 2, pause 2",
+      "code_citation": "shared/resources/develop-pipeline-on-precompact.sh:447",
+      "test_citation": "shared/resources/develop-pipeline-on-precompact.test.sh:951",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Scenario 20 pauses twice at Step 5 across gate.1 and gate.2. It asserts pause 2 at Step 5, QA cycle 2, with no 'QA cycle 1' left. It also asserts one PATCH and no new pr comment, and one PR file and one issue file in the stub's kept state. The hook appends the 'Latest pause' line at :447. The count comes from pause_counts, bumped at :284. Lane: test.yml runs on pull_request with no paths filter and runs npm test, which runs test:suite. That includes develop-pipeline-on-precompact.test.sh."
+    },
+    {
+      "id": "#2",
+      "text_hash": "c0ed64e9f8d59c5fa0f0fa0ed3a65a18540babdc41759fcfec45adf5bcf2ad81",
+      "status": "PASS",
+      "description": "The three Step 1 cases each have a test",
+      "code_citation": "shared/resources/develop-pipeline-step-1-create-branch.md:51",
+      "test_citation": "shared/resources/tests/step-1-paused-lock.test.mjs:129",
+      "members": [
+        {
+          "member": "case A: another document's paused lock exits 1, prints both commands, lock stays",
+          "evidence": "shared/resources/tests/step-1-paused-lock.test.mjs:129",
+          "status": "PASS"
+        },
+        {
+          "member": "case B: the same document with Start fresh removes the lock and the precompact snapshot",
+          "evidence": "shared/resources/tests/step-1-paused-lock.test.mjs:156",
+          "status": "PASS"
+        },
+        {
+          "member": "case C: an unpaused lock for another document still exits 1, names no resume command",
+          "evidence": "shared/resources/tests/step-1-paused-lock.test.mjs:182",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "The cases A, A2, B, B2, C, D, E and F to F4 are all in the file. The file sits under shared/resources/tests/*.test.mjs, which is in the test:suite glob that test.yml runs per PR. Amendment rule: criteria-drift.js returned reason clean with no changes, exit 0."
+    },
+    {
+      "id": "#3",
+      "text_hash": "892ef03b87a250333615624de42911484e70b3516375f136c584dd652ec85f77",
+      "status": "PASS",
+      "description": "Two-step pauses leave two kept comments, two pr comment lines; echo 0 mutation turns test red",
+      "code_citation": "shared/resources/develop-pipeline-on-precompact.test.sh:961",
+      "test_citation": "shared/resources/develop-pipeline-on-precompact.test.sh:975",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Scenario 21 pauses at Step 4, runs advance-pipeline-lock to 6, then pauses again. It asserts N_PR21=2, two pr-*.md files, pipeline-paused-4 in pr-1.md and pipeline-paused-6 in pr-2.md. The mutation record is committed: task.301.qa.1 line 62 ('Scenario 21; next_n -> echo 0 goes red') and line 75 ('re-run in the develop step: red'). That wording is terse. Implementation-report Decisions Log also lists the echo 0 mutation as red. Lane: test:suite, run per PR."
+    },
+    {
+      "id": "#4",
+      "text_hash": "349865e059bdb2a4b8f7c00055d578e0dfc1a7effdffaeefba3c2a4c23284b89",
+      "status": "PASS",
+      "description": "No added network call; exact gh call count asserted",
+      "code_citation": "shared/resources/develop-pipeline-on-precompact.sh:447",
+      "test_citation": "shared/resources/develop-pipeline-on-precompact.test.sh:989",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Scenario 22 asserts the gh.log line count of one Step 4 pause (PR plus issue) equals EXPECTED_GH_CALLS_PER_PAUSE=6. The constant is the count measured on the unchanged HEAD hook, and the comment in the test says so. The hook change at :447 only appends text to the body, so an added call turns it red. Lane: test:suite, run per PR."
+    },
+    {
+      "id": "#5",
+      "text_hash": "6c2eebb16627d00e1902123e87853d063748a3875eb4af227811e07affc4c738",
+      "status": "PASS",
+      "description": "npm run bundle:check, lint:shell, ci:fast pass",
+      "code_citation": ".github/workflows/test.yml:1",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ d1f69b1a7cfdb28ad7c213f7d9bb2b81dcbb76f2 — The whole evidence is the state of the checks on the PR head: the Test workflow (format:check and npm test, i.e. ci:fast) and shellcheck.yml (the CI twin of lint:shell). Ungraded here for /finalise Step 6 to grade from CI reading 1. The local runs are in the QA record: qa.1 line 33 (test:remote, 8401 tests, 0 failed) and line 77 (all three green). qa.1 to qa.3 also record bundle:check clean, and the implementation report records the cycle 1 and 2 fast gate at 8405 tests with 0 failures. Only qa.1 line 33 gives a test count and command, and the others do not name the lint:shell command output. Non-gating observation: the local lint:shell and bundle:check runs are recorded only as 'green' or 'clean'.",
+      "ci_reading": "CI reading 1: SUCCESS @ d1f69b1a7cfdb28ad7c213f7d9bb2b81dcbb76f2"
+    },
+    {
+      "id": "#6",
+      "text_hash": "d27034f525bca990089ff57bb22c3e91f8b67575ed7261ca6f43f1aa1e32725c",
+      "status": "PASS",
+      "description": "CHANGELOG.md entry",
+      "code_citation": "CHANGELOG.md:9",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "I read CHANGELOG.md:9-19. The [Unreleased] > Changed entry is headed 'The PreCompact pause comment names the QA cycle and the pause count (task 301)'. It states the Latest pause line, the pause_counts field, the Step 1 collision block and test, and the echo 0 pin. It cites the work item. A repository changelog corpus guard was not located in this check, so there is no named guard, and the criterion is judged as a documentation criterion."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#3",
+      "note": "The mutation record for echo 0 in qa.1 is one clause ('goes red') and never names the test or case that went red. The Decisions Log in the implementation report is not a committed citation at this check. It is adequate for PASS, since the criterion asks that the red run be recorded, but a QA report line naming the failing scenario would be stronger."
+    },
+    {
+      "ac_id": "#5",
+      "note": "The PR has reviewDecision empty and state OPEN. The criteria-drift run, the diff and the test file runs were read statically. The tests themselves were not executed in this read-only check."
+    }
+  ]
+}

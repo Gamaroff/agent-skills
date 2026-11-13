@@ -1,0 +1,52 @@
+[
+  {
+    "id": "tm.sub",
+    "sink": "filename",
+    "input": "$(touch PWNED)",
+    "why": "command substitution in a numeric slot",
+    "correct": "refused, exit 2, nothing created",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.296.test-remote-per-run-lock-and-image-prune/task.296.test-remote-per-run-lock-and-image-prune.md:54",
+    "expected": {
+      "absent": [
+        "PWNED"
+      ]
+    }
+  },
+  {
+    "id": "tm.neg",
+    "sink": "filename",
+    "input": "-1",
+    "why": "sign defeats the digit rule",
+    "correct": "refused",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.296.test-remote-per-run-lock-and-image-prune/task.296.test-remote-per-run-lock-and-image-prune.md:54"
+  },
+  {
+    "id": "tm.big",
+    "sink": "filename",
+    "input": "99999",
+    "why": "five digits exceed the bound",
+    "correct": "refused",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.296.test-remote-per-run-lock-and-image-prune/task.296.test-remote-per-run-lock-and-image-prune.md:54"
+  },
+  {
+    "id": "tm.nl",
+    "sink": "filename",
+    "input": "1\n2",
+    "why": "newline composes two values",
+    "correct": "refused",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.296.test-remote-per-run-lock-and-image-prune/task.296.test-remote-per-run-lock-and-image-prune.md:54"
+  },
+  {
+    "id": "tm.empty",
+    "sink": "filename",
+    "input": "",
+    "why": "empty value",
+    "correct": "refused",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.296.test-remote-per-run-lock-and-image-prune/task.296.test-remote-per-run-lock-and-image-prune.md:54"
+  }
+]

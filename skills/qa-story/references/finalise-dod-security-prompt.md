@@ -401,9 +401,11 @@ security_review:
     - input: "the input, verbatim"
       spec_ref: "path/to/work-item.md:NN" # the line that allows it
       risk: "why the owner may want to forbid it"
-  # The two fields below are FILLED BY /finalise Step 3b.1 from the run record — do not emit them.
+  # The fields below are FILLED BY /finalise Step 3b.1 from the run record — do not emit them.
   probes_executed: 0 # totals.executed from the run record: every candidate actually run,
     # including the legitimate inputs of step 5 — copied, never composed by hand.
+  observation_limits: [] # sentences naming what the run could not observe (task.300) — copied from
+    # the plan output, never composed; the DoD's Probe Results prints them beside the count.
   probes: # only candidates that REPRODUCED a defect; [] is correct and good when none did
     - input: "svc deploy --target prod" # the candidate, verbatim and re-runnable
       expected: "denied"

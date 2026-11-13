@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "filename",
+      "entry": "shell-argv:scripts/remote-test/run.sh",
+      "name": "run.sh --host validation",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 10,
+      "passed": 10,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "shells": [
+        "bash",
+        "zsh"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "--run",
+        "ci:fast",
+        "--host",
+        "{input}"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "fixture_copy": null,
+      "ran_at": "2026-11-10T16:27:59.773Z"
+    },
+    {
+      "sink": "filename",
+      "entry": "shell-argv:scripts/remote-test/run.sh",
+      "name": "run.sh --run script-name validation",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 24,
+      "passed": 24,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 2,
+      "declined_cases": [
+        {
+          "id": "run-empty@bash",
+          "reason": "case-errored",
+          "detail": "fixture: EISDIR: illegal operation on a directory, open '/tmp/security-probe-2hsjxU/work/fixture-mbdGPv/'"
+        },
+        {
+          "id": "run-empty@zsh",
+          "reason": "case-errored",
+          "detail": "fixture: EISDIR: illegal operation on a directory, open '/tmp/security-probe-2hsjxU/work/fixture-UVnXdZ/'"
+        }
+      ],
+      "escaped": 0,
+      "shells": [
+        "bash",
+        "zsh"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "--run",
+        "{input}",
+        "--host",
+        "probe@127.0.0.1"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "fixture_copy": null,
+      "ran_at": "2026-11-10T16:27:59.651Z"
+    }
+  ],
+  "totals": {
+    "executed": 34,
+    "reproduced": 0,
+    "escaped": 0
+  },
+  "updated_at": "2026-11-10T16:27:59.773Z"
+}

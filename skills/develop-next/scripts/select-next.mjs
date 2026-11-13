@@ -16,6 +16,7 @@
  *
  * Usage:
  *   select-next.mjs [--roadmap <path>]                      # selection (default)
+ *   select-next.mjs --dry-run [--roadmap <path>]            # same as above (read-only preview alias)
  *   select-next.mjs --batch [--roadmap <path>]              # parallel worktree batch
  *   select-next.mjs --batch --require-touches [...]         # defer un-annotated rows
  *   select-next.mjs --batch --worktree-root <dir> [...]     # worktree parent (default .worktrees)
@@ -186,7 +187,7 @@ export const DEFAULT_TASK_REGISTRY = "docs/tasks/task-registry.md";
 // a lifecycle (docs/standards/bug-documents.md says so explicitly):
 //   bug:  new → in-progress → ready-for-qa → closed | reopened
 //   task: draft → planned → ready-for-development → in-progress →
-//         ready-for-review → accepted | cancelled
+//         ready-for-review → accepted | cancelled | superseded
 //
 // **The bug axis keeps a divergence, and task 72 pinned it EXACTLY.** Measured:
 // `develop-bug` proceeds on {new, reopened, in-progress, ready-for-qa} while the
@@ -246,6 +247,10 @@ export const TASK_LIFECYCLE_STATUSES = new Set([
   "ready-for-review",
   "accepted",
   "cancelled",
+  // Terminal: the work was replaced by a newer item (`superseded_by:` names it),
+  // not abandoned. A consumer that files replaced tasks this way had every one
+  // reported as a filing error that "can never be selected".
+  "superseded",
 ]);
 
 // Ordering vocabularies. Lower rank sorts first. An unrecognised value sorts
@@ -1561,9 +1566,12 @@ function registryDepBlockers(row, rowIndex, readStatus, warnings) {
       );
       continue;
     }
-    if (status === "cancelled") {
+    // Both are terminal and neither will ever become accepted, so holding the
+    // dependent for them would hold it forever. Superseded work was replaced by
+    // newer work (a human names it in `superseded_by:`), so the dep is moot.
+    if (status === "cancelled" || status === "superseded") {
       warnings.push(
-        `line ${row.line}: ${self} depends on ${ref}, which is cancelled — dep treated as satisfied`,
+        `line ${row.line}: ${self} depends on ${ref}, which is ${status} — dep treated as satisfied`,
       );
       continue;
     }
@@ -2099,6 +2107,11 @@ function parseArgs(argv) {
         break;
       case "--lint":
         args.lint = true;
+        break;
+      case "--dry-run":
+        // A no-op alias: the selector only ever selects and writes nothing. SKILL.md and
+        // develop-batch document `select-next.mjs --dry-run` as the read-only preview, so the
+        // flag must be accepted rather than fail as an unknown argument.
         break;
       case "--batch":
         args.batch = true;

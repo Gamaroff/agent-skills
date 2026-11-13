@@ -65,7 +65,7 @@ After the subagent returns, the dispatching step extracts the marked block from 
 args="traceability_matrix={STORY_DIR}/.summaries/qa-traceability-matrix.md"
 ```
 
-Write a subagent summary JSON artifact to `{story-directory}/.summaries/step-5-traceability-mapper.json` using the schema from `references/subagent-summary-artifact.md`:
+Write a subagent summary JSON artifact to `{story-directory}/.summaries/step-5-traceability-mapper.json` using the schema from `references/subagent-summary-artifact.md`. Take both timestamps from `date -u +%Y-%m-%dT%H:%M:%SZ`, run once when you start and once when you write the file, never typed:
 
 ```json
 {

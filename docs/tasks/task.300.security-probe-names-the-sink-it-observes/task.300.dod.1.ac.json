@@ -1,0 +1,140 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "8ade31e393c2bf65a4ed11f2029c9c711d8d30ef",
+  "dirty_paths": [
+    "docs/tasks/task.300.security-probe-names-the-sink-it-observes/task.300.implementation.1.security-probe-names-the-sink-it-observes-initial-run.md"
+  ],
+  "document": "docs/tasks/task.300.security-probe-names-the-sink-it-observes/task.300.security-probe-names-the-sink-it-observes.md",
+  "result": {
+    "bytes": 8019,
+    "sha256": "ab38212a8a26066ba3a9bf1afd6800074964ae62ea6dc4ef2a4a3f8624f557ee",
+    "verified": true
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 6,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "22fe88c880441c94acca0b5ad5633bb78ca693b810f0165d5baec8dc599ca2b6",
+      "status": "PASS",
+      "description": "Phase 1's finding on the premise is recorded in the QA report.",
+      "code_citation": "docs/tasks/task.300.security-probe-names-the-sink-it-observes/task.300.qa.1.security-probe-names-the-sink-it-observes.md:18",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "A documentation criterion. The cited section 'Phase 1 finding (premise)' (qa.1 lines 18-20) states that the filed premise was wrong in part (a validator that accepts a hostile value is already counted as reproduced) and records the design choice. Line 41 of the same report repeats it as 'Premise finding recorded | PASS'. No test pins the QA report text."
+    },
+    {
+      "id": "#2",
+      "text_hash": "e21669c6fb2e8dd313c1989d0ad88f3b2d85776ece7a80162393bff06850d7bc",
+      "status": "PASS",
+      "description": "Entry form with a stated limit yields observation_limits in record and DoD Probe Results line.",
+      "code_citation": "shared/resources/security-probe.mjs:4349 (record entry); shared/resources/security-probe.mjs:4682 (block print); shared/resources/security-probe-plan.mjs:593 (plan output); skills/finalise/SKILL.md:1125-1126 (Probe Results line)",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:9715 (record entry and block); shared/resources/tests/security-probe.test.mjs:9768 (plan output); evals/shared/tests/finalise-dod-prompt-contract.test.mjs:1002 (probe render)",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Lane: shared/resources/tests/*.test.mjs and evals/shared/tests/*.test.mjs are both globbed by test:suite, which runs under `npm test` in .github/workflows/test.yml:58 on the PR. Test 9715 asserts the ids on each control and the sentences once in the security_review block. Test 9768 asserts the plan output carries observation_limits. The finalise pin at :1002 covers the DoD line."
+    },
+    {
+      "id": "#3",
+      "text_hash": "e8873a5ae356bcf7aa7a55bae63b2a8c666c2b658c556d614aa2ec12c55fe549",
+      "status": "PASS",
+      "description": "Every form carries the universal limit; only fence: adds the form-specific one; counts unchanged.",
+      "code_citation": "shared/resources/security-probe.mjs:4190-4197 (observationLimitsFor)",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:9693 (forms); shared/resources/tests/security-probe.test.mjs:9746 (counts unchanged)",
+      "members": [
+        {
+          "member": "js form (lib/validate.mjs#validate)",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:9693",
+          "status": "PASS"
+        },
+        {
+          "member": "shell:",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:9693",
+          "status": "PASS"
+        },
+        {
+          "member": "shell-fn:",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:9693",
+          "status": "PASS"
+        },
+        {
+          "member": "cli:",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:9693",
+          "status": "PASS"
+        },
+        {
+          "member": "shell-argv:",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:9693",
+          "status": "PASS"
+        },
+        {
+          "member": "fence:",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:9693",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Runs in the same `npm test` lane as #2. Test 9693 covers 5 non-fence forms (each returns only effects-after-accept), fence: (adds outside-sandbox-write) and a null entry (still carries the universal limit). Test 9746 strips the field and asserts the emitted block and probes_executed: 6 are identical. All entry forms listed in the test are mapped."
+    },
+    {
+      "id": "#4",
+      "text_hash": "f090cd061b861e23450e1f4d00d7b493c9297042697861005d6ae06ed0e8206a",
+      "status": "PASS",
+      "description": "No extra probe executions: the test counts the runs.",
+      "code_citation": "shared/resources/security-probe.mjs:4349 (the field is derived from the entry string only; no execution path is added)",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:9768",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Test 9768 asserts out.probes_executed equals rec.totals.executed after the field is stripped, and test 9746 asserts probes_executed: 6 with and without the field. Both run per-PR under `npm test`. The assertion compares the count with and without the field; it is not an absolute run counter. Combined with the diff (observationLimitsFor takes only the entry string) it supports the criterion, so I judged it PASS."
+    },
+    {
+      "id": "#5",
+      "text_hash": "43d3c24e6cac14bca2dfc825da1c3f39f8a888d3e643fc2bb56458eadc13616d",
+      "status": "PASS",
+      "description": "bundle:check, format:check and ci:fast pass.",
+      "code_citation": "docs/tasks/task.300.security-probe-names-the-sink-it-observes/task.300.qa.1.security-probe-names-the-sink-it-observes.md:45; docs/tasks/task.300.security-probe-names-the-sink-it-observes/task.300.qa.2.security-probe-names-the-sink-it-observes.md:85",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "develop: ci:fast and bundle:check",
+          "evidence": "docs/tasks/task.300.security-probe-names-the-sink-it-observes/task.300.qa.1.security-probe-names-the-sink-it-observes.md:45",
+          "status": "PASS"
+        },
+        {
+          "member": "qa-fix: ci:fast and bundle:check",
+          "evidence": "docs/tasks/task.300.security-probe-names-the-sink-it-observes/task.300.qa.2.security-probe-names-the-sink-it-observes.md:85",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Process-style criterion: it names three commands the work must pass, and its evidence is the committed QA records, not only CI state. qa.1:45 records ci:fast TEST_EXIT=0 on the LAN server at develop and bundle:check at 129 skills, 0 problems. qa.2:85 records the remote ci:fast at qa-fix (TEST_EXIT=0, 8450 pass, 0 fail, on the tree that became 88ddf934), and its commands section lists `npm run bundle:check` with 129 skills, 0 problems. pr-review.2:36 repeats this. ci:fast is `npm run format:check && npm test` (package.json:25), so the format:check half is covered by it. Units are the two phases (develop, qa-fix); both have a recorded result naming the command and the outcome."
+    },
+    {
+      "id": "#6",
+      "text_hash": "00965dda50391443f721bb9db1976c0a5957d9921f1cb17d2e0b50a550701a32",
+      "status": "PASS",
+      "description": "CHANGELOG.md entry; readers of the record tolerate the new field.",
+      "code_citation": "CHANGELOG.md:9-20",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:9746",
+      "members": [],
+      "non_member_fail": null,
+      "note": "CHANGELOG half (documentation criterion): lines 9-20, read, are an [Unreleased] 'Added' entry that cites (task 300) and describes the observation_limits field and says it is additive. evals/shared/tests/changelog-entry-drift.test.mjs guards that each accepted task is cited under [Unreleased]; it runs in the evals/shared/tests/*.test.mjs glob of `npm test`. Tolerance half (behaviour): test 9746 reads a record written before the field existed and asserts the same limit texts, the same counts and an identical block once the field is stripped. It runs per-PR under `npm test` (.github/workflows/test.yml:58)."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#3",
+      "note": "The criterion text in the task file carries an appended note ('every form but fence:' and 'Held by the same test'). criteria-drift.js returned reason: clean, changed: [], exit 0, so no amendment is unapproved."
+    },
+    {
+      "ac_id": "#4",
+      "note": "No test asserts an absolute run count or that the new code adds no execution; the evidence is equality of probes_executed with and without the field plus the diff. Consider a stricter assertion if the criterion is tightened."
+    }
+  ]
+}

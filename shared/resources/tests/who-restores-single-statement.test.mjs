@@ -83,7 +83,7 @@ function sites() {
   for (const rel of SKILLS) {
     out[`${rel} § Step 0-lock`] = slice(
       read(rel),
-      /\*\*Step 0-lock — Restore the lock if the pause removed it/,
+      /\*\*Step 0-lock — Restore the lock if a HALT removed it/,
       /\*\*Step 0a — Dispatch stale-context detector/,
       `${rel} Step 0-lock`,
     );

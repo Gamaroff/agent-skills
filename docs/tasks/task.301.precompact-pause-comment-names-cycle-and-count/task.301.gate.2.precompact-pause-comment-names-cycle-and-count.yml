@@ -1,0 +1,71 @@
+schema: 2
+task: 'task.301.precompact-pause-comment-names-cycle-and-count'
+task_title: 'PreCompact pause comment names the cycle and the pause count'
+gate: CONCERNS
+status_reason: 'Cycle 1 finding T301-CR-1 is fixed and held by tests F to F4 (mutation-proven; fast gate 8405 passed on the same tree). The cycle 2 refute pass found one real defect in the hook: when the pause-count write fails, the comment still shows the previous pause count as the latest.'
+reviewer: 'QA Engineer'
+head: 'b8a0b6a3fde9d6298430c2562b5fea9146916360'
+updated: '2026-11-12T07:19:11Z'
+
+top_issues:
+  - id: 'T301-CR-2'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-on-precompact.sh'
+    finding: 'When bump_pause_count fails (line 293, "the comment will omit it"), PAUSE_COUNT is still read from the lock at line 310, so after the first pause at a step the comment states the previous pause number (pause N-1) as the latest pause. The stderr message claims the count is omitted, which is false after the first pause. origin: code-review (high confidence), found on the cycle 2 refute pass; same defect as cycle 1 advisory CR-2, now confirmed by reading the code path.'
+    suggested_action: 'Have bump_pause_count report success (a BUMP_OK flag) and build PAUSE_NOTE from the count only when the bump landed, so a failed bump omits the count. Add a hook scenario that makes the bump fail after an earlier pause and asserts the comment names no stale count; mutation-prove it.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 8405
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    boundary_signals: []
+    notes: 'The Step 1 block is a state guard that refuses on repository state and now also refuses an unsubstituted or invalid placeholder. boundary: internal: its inputs are the pipeline lock and snapshot the pipeline writes, plus two substituted placeholders compared for equality; no corpus sink models a lock-collision guard. The behaviour is held by the committed step-1-paused-lock test (12 cases, mutation-proven in the cycle 1 fix: accept-any-value turns F and F2 red, dropping the doc-directory guard turns F3 red). No probe-engine run is credited.'
+  performance:
+    status: PASS
+    notes: 'One pause makes exactly 6 gh calls, the same as the unchanged hook; held by a test constant.'
+  reliability:
+    status: CONCERNS
+    notes: 'T301-CR-2: a failed count write leaves a stale count in the comment.'
+  maintainability:
+    status: PASS
+    notes: 'The cycle comes from the one definition, qa-cycle.sh; pause_counts is documented in the lock-schema table.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T301-CR-2: a failed pause-count write must not leave a stale count in the comment.'
+      refs: ['shared/resources/develop-pipeline-on-precompact.sh', 'shared/resources/develop-pipeline-on-precompact.test.sh']
+  future:
+    - action: 'CR-3 (low, medium confidence): the Start-fresh identity check compares the lock directory and the substituted directory as raw strings, so a trailing slash or ./ spelling of the same directory reads as another document. Normalise both sides.'
+      refs: ['shared/resources/develop-pipeline-step-1-create-branch.md']
+    - action: 'CR-4 (low, medium confidence): the {doc-directory} guard refuses any "{" in the path, so a real directory with a brace gets a misleading "not substituted" HALT. Test for the exact literal placeholder.'
+      refs: ['shared/resources/develop-pipeline-step-1-create-branch.md']
+    - action: 'CR-2 of the review (medium confidence, not reproduced): develop-bug runs the same Step 1 block and its bug-substitutions list does not name {doc-directory} or {start-fresh}. The shared step doc now says both must be substituted, so the block refuses rather than guesses; add the two names to the develop-bug list.'
+      refs: ['skills/develop-bug/SKILL.md']
+    - action: 'CR-5 (cleanup): F4 only covers flat paths with no lock; add a trailing-slash and a brace case.'
+      refs: ['shared/resources/tests/step-1-paused-lock.test.mjs']
+    - action: 'CR-6 (cleanup, low confidence): the stale-branch path removes the lock but not a precompact snapshot.'
+      refs: ['shared/resources/develop-pipeline-step-1-create-branch.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T301-CR-2 fixed']

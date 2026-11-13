@@ -260,3 +260,52 @@ share one list of trigger words, held by a test.
 it. Task 257's criterion named the QA report, one was committed, and the record was missing from it.
 So Step 3a's confirm step still means opening each listed artifact and looking, before dispatching.
 If you skip it, the DoD pass is where you find out.
+
+### `ssh` re-splits its arguments on the server — a stub `ssh` hides it
+
+`ssh host cmd a "b c"` joins its remote arguments with spaces and hands one string to the server's
+shell, which splits it again. `"b c"` arrives as two words. On task.296 (2026-11-12) the lock's owner
+description `host pid N` was meant as one argument; the server saw three, and only the host was
+recorded. The offline stub `ssh` in `tests/test-remote-runner.test.js` passes its arguments through
+untouched, so every offline test was green. The first live run showed it.
+
+**Send each value through `ssh` as one token** (`host/pid-N`), or quote it deliberately for the remote
+shell. **A test that stubs `ssh` proves the arguments you built, not the ones the server receives**, so
+anchor the argv in a test (task.296 anchors the take's argv to five single words) and run one live
+call before trusting the route.
+
+### A validated "digits" string is not safe for bash arithmetic
+
+`[[ $v =~ ^[0-9]+$ ]]` accepts `08`, and `$(( 08 + 1 ))` is an error: a leading zero makes bash read
+octal. It also accepts a string long enough to wrap at 64 bits, which turns a staleness sum negative
+and reads a live lock as stale. Task.296 had both, in `scripts/remote-test/lockctl.sh` (QA-5,
+2026-11-12; a clock reading is 10 digits today, so neither shows in ordinary use).
+
+**Cap the length in the validator, and force base 10 at every use**: `^[0-9]{1,12}$` and
+`$(( 10#$v ))`. `lockctl.sh` shows both. A test needs a leading-zero value and an over-long one; a
+"normal" value passes either way. This trap is about values the script reads, not only ones the user
+types: a number parsed out of a file or a command's output has the same two failures.
+
+### A bare host-at-address string in Markdown becomes a `mailto:` link, and `link-check` fails
+
+Text like `user@192.168.1.249` outside backticks is autolinked as `mailto:user@192.168.1.249`, which
+returns status 400 to the link checker. CI's `link-check` went red on task.296's implementation report
+for this (run 43264563618, 2026-11-12) while the same check was green on `develop`, so the red was the
+branch's own.
+
+**Put every host-at-address string in backticks.** Look at the failing line in the CI log before
+suspecting the code: the report names the exact URL.
+
+### The `/finalise` probe's `shell:`, `shell-fn:`, `shell-argv:` and `fence:` runs each get their own `HOME`
+
+Task 306 (2026-11-13) gave every (case, shell) run its own `HOME` and `TMPDIR`, inside its case
+directory (`makeRunHome` in `shared/resources/security-probe.mjs`). Before it, one `HOME` was shared by
+every case and shell, so a legitimate case on a control that *changes state* (task.296's `lockctl.sh
+take` creates a lock) left that state for the next shell: zsh read bash's lock as held (exit 10) and the
+case as refused, and the write counted as an escape. Legitimate state-changing cases can now be probed.
+
+Two things still hold. A **hostile** run's write to its own `HOME` or `TMPDIR` is still reported as an
+escape (a legitimate run's is not), and the `cli:` arm and every `--fixture-setup` keep the run-wide
+`HOME`, so a setup that writes there still errors the run. A probe record written before task 306 may
+carry a "reproduced" or an escape on a legitimate state-changing case that was this fault: re-run it
+before reading it as a code defect.

@@ -1,0 +1,184 @@
+[
+  {
+    "id": "t301.unsubstituted-start-fresh",
+    "sink": "filename",
+    "input": "DOC_DIR=\"docs/a\"\nSTART_FRESH=\"{start-fresh}\"",
+    "direction": "hostile",
+    "why": "the {start-fresh} placeholder was left unsubstituted",
+    "correct": "HALT with exit 1; never read as no",
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: {start-fresh} must be substituted with yes or no — the answer to Phase 0b's \"Start fresh\" question (got '{start-fresh}')\n"
+    },
+    "spec_ref": "shared/resources/develop-pipeline-step-1-create-branch.md:26"
+  },
+  {
+    "id": "t301.start-fresh-maybe",
+    "sink": "filename",
+    "input": "DOC_DIR=\"docs/a\"\nSTART_FRESH=\"maybe\"",
+    "direction": "hostile",
+    "why": "a value that is neither yes nor no",
+    "correct": "HALT with exit 1",
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: {start-fresh} must be substituted with yes or no — the answer to Phase 0b's \"Start fresh\" question (got 'maybe')\n"
+    },
+    "spec_ref": "shared/resources/develop-pipeline-step-1-create-branch.md:65"
+  },
+  {
+    "id": "t301.start-fresh-uppercase",
+    "sink": "filename",
+    "input": "DOC_DIR=\"docs/a\"\nSTART_FRESH=\"YES\"",
+    "direction": "hostile",
+    "why": "uppercase spelling of yes",
+    "correct": "HALT with exit 1; only the lowercase yes|no pair is accepted",
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: {start-fresh} must be substituted with yes or no — the answer to Phase 0b's \"Start fresh\" question (got 'YES')\n"
+    },
+    "spec_ref": "shared/resources/develop-pipeline-step-1-create-branch.md:65"
+  },
+  {
+    "id": "t301.start-fresh-empty",
+    "sink": "filename",
+    "input": "DOC_DIR=\"docs/a\"\nSTART_FRESH=\"\"",
+    "direction": "hostile",
+    "why": "an empty answer",
+    "correct": "HALT with exit 1",
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: {start-fresh} must be substituted with yes or no — the answer to Phase 0b's \"Start fresh\" question (got '')\n"
+    },
+    "spec_ref": "shared/resources/develop-pipeline-step-1-create-branch.md:65"
+  },
+  {
+    "id": "t301.doc-dir-empty",
+    "sink": "filename",
+    "input": "DOC_DIR=\"\"\nSTART_FRESH=\"no\"",
+    "direction": "hostile",
+    "why": "an empty document directory",
+    "correct": "HALT with exit 1",
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: {doc-directory} was not substituted into this block (got '')\n"
+    },
+    "spec_ref": "shared/resources/develop-pipeline-step-1-create-branch.md:24"
+  },
+  {
+    "id": "t301.doc-dir-unsubstituted",
+    "sink": "filename",
+    "input": "DOC_DIR=\"{doc-directory}\"\nSTART_FRESH=\"no\"",
+    "direction": "hostile",
+    "why": "the {doc-directory} placeholder was left unsubstituted",
+    "correct": "HALT with exit 1",
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: {doc-directory} was not substituted into this block (got '{doc-directory}')\n"
+    },
+    "spec_ref": "shared/resources/develop-pipeline-step-1-create-branch.md:24"
+  },
+  {
+    "id": "t301.live-lock-other-doc-start-fresh",
+    "sink": "filename",
+    "input": "DOC_DIR=\"docs/b\"\nSTART_FRESH=\"yes\"",
+    "direction": "hostile",
+    "why": "a live, unpaused lock held by another run, with Start fresh claimed",
+    "correct": "collision HALT, exit 1; the lock is kept",
+    "fixture": {
+      "files": {
+        ".claude/state/develop-pipeline.lock": "{\"skill\":\"develop-task\",\"task_or_story_directory\":\"docs/a\"}\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "❌ Pipeline lock collision: another /develop-story or /develop-task pipeline is already active in this repo:\n{\"skill\":\"develop-task\",\"task_or_story_directory\":\"docs/a\"}\nResolve by completing or aborting the other run (and removing the lock) before continuing.\n"
+    },
+    "spec_ref": "shared/resources/develop-pipeline-step-1-create-branch.md:14"
+  },
+  {
+    "id": "t301.paused-lock-other-doc-start-fresh",
+    "sink": "filename",
+    "input": "DOC_DIR=\"docs/b\"\nSTART_FRESH=\"yes\"",
+    "direction": "hostile",
+    "why": "Start fresh for document B must not abandon document A's paused run",
+    "correct": "collision HALT naming the paused run, exit 1; the lock is kept",
+    "fixture": {
+      "files": {
+        ".claude/state/develop-pipeline.lock": "{\"skill\":\"develop-task\",\"task_or_story_directory\":\"docs/a\",\"paused\":{\"reason\":\"precompact\"}}\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "❌ Pipeline lock collision: another /develop-story or /develop-task pipeline is already active in this repo:\n{\"skill\":\"develop-task\",\"task_or_story_directory\":\"docs/a\",\"paused\":{\"reason\":\"precompact\"}}\nThat run is PAUSED (a context compaction stopped it); its lock is its live record.\n  Resume it:   /develop-task docs/a\n  Abandon it:  rm -f .claude/state/develop-pipeline.lock\n",
+      "removed": []
+    },
+    "spec_ref": "shared/resources/develop-pipeline-step-1-create-branch.md:63"
+  },
+  {
+    "id": "t301.paused-lock-same-doc-resume",
+    "sink": "filename",
+    "input": "DOC_DIR=\"docs/a\"\nSTART_FRESH=\"no\"",
+    "direction": "hostile",
+    "why": "the operator chose resume, so the paused lock must not be silently removed",
+    "correct": "collision HALT naming the resume command, exit 1",
+    "fixture": {
+      "files": {
+        ".claude/state/develop-pipeline.lock": "{\"skill\":\"develop-task\",\"task_or_story_directory\":\"docs/a\",\"paused\":{\"reason\":\"precompact\"}}\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "❌ Pipeline lock collision: another /develop-story or /develop-task pipeline is already active in this repo:\n{\"skill\":\"develop-task\",\"task_or_story_directory\":\"docs/a\",\"paused\":{\"reason\":\"precompact\"}}\nThat run is PAUSED (a context compaction stopped it); its lock is its live record.\n  Resume it:   /develop-task docs/a\n  Abandon it:  rm -f .claude/state/develop-pipeline.lock\n"
+    },
+    "spec_ref": "shared/resources/develop-pipeline-step-1-create-branch.md:62"
+  },
+  {
+    "id": "t301.legit-no-lock",
+    "sink": "filename",
+    "input": "DOC_DIR=\"docs/a\"\nSTART_FRESH=\"no\"",
+    "direction": "legitimate",
+    "why": "no lock exists, so there is no collision",
+    "correct": "exit 0; the run proceeds",
+    "spec_ref": "shared/resources/develop-pipeline-step-1-create-branch.md:65"
+  },
+  {
+    "id": "t301.legit-paused-same-doc-start-fresh",
+    "sink": "filename",
+    "input": "DOC_DIR=\"docs/a\"\nSTART_FRESH=\"yes\"",
+    "direction": "legitimate",
+    "why": "Start fresh on the same document's paused run is the one allowed exception",
+    "correct": "exit 0; the lock is removed",
+    "fixture": {
+      "files": {
+        ".claude/state/develop-pipeline.lock": "{\"skill\":\"develop-task\",\"task_or_story_directory\":\"docs/a\",\"paused\":{\"reason\":\"precompact\"}}\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "removed": [
+        ".claude/state/develop-pipeline.lock"
+      ]
+    },
+    "spec_ref": "shared/resources/develop-pipeline-step-1-create-branch.md:62"
+  },
+  {
+    "id": "t301.legit-stale-lock",
+    "sink": "filename",
+    "input": "DOC_DIR=\"docs/b\"\nSTART_FRESH=\"no\"",
+    "direction": "legitimate",
+    "why": "a lock whose branch does not exist locally is stale",
+    "correct": "exit 0; the stale lock is removed",
+    "fixture": {
+      "files": {
+        ".claude/state/develop-pipeline.lock": "{\"skill\":\"develop-task\",\"task_or_story_directory\":\"docs/a\",\"branch\":\"no-such-branch-t301\"}\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "removed": [
+        ".claude/state/develop-pipeline.lock"
+      ]
+    },
+    "spec_ref": "shared/resources/develop-pipeline-step-1-create-branch.md:63"
+  }
+]

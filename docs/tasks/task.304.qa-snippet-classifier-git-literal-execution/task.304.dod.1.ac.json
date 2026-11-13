@@ -1,0 +1,218 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "66eea6e865ea526fc97dd5e70c22b5990df09842",
+  "dirty_paths": [],
+  "document": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md",
+  "result": {
+    "bytes": 10142,
+    "sha256": "025c25575eccfa8821ec4303ef8cde0333fce5a754cd86b68cf455556c66e45d",
+    "verified": true
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 10,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "b82720672c716abe6502199ba4e92d855754037a23c3a7384a30050498ed7e13",
+      "status": "PASS",
+      "description": "git -c, --config-env, GIT_*=, --upload-pack/--exec, --exec-path=<dir> classify mutating, each bash-verified",
+      "code_citation": "shared/resources/qa-execute-snippets.mjs:2613",
+      "test_citation": "shared/resources/tests/qa-execute-snippets.test.mjs:5634",
+      "members": [
+        {
+          "member": "-c <key=value> before a safe subcommand",
+          "evidence": "shared/resources/tests/qa-execute-snippets.test.mjs:5635",
+          "status": "PASS"
+        },
+        {
+          "member": "--config-env",
+          "evidence": "shared/resources/tests/qa-execute-snippets.test.mjs:5636",
+          "status": "PASS"
+        },
+        {
+          "member": "GIT_* prefix / export / set -a",
+          "evidence": "shared/resources/tests/qa-execute-snippets.test.mjs:5642",
+          "status": "PASS"
+        },
+        {
+          "member": "--upload-pack / --exec (and unambiguous prefixes)",
+          "evidence": "shared/resources/tests/qa-execute-snippets.test.mjs:5637",
+          "status": "PASS"
+        },
+        {
+          "member": "--exec-path=<dir> refused (ls-remote runs git-upload-pack), bare --exec-path runnable",
+          "evidence": "shared/resources/tests/qa-execute-snippets.test.mjs:5680",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Criterion was reworded (--exec-path); criteria-drift.js reports #1 reworded, approved: true (Lorien Gamaroff, 2026-11-11), so the amendment rule does not fail it. The cited tests live in shared/resources/tests/*.test.mjs, which npm test:suite selects and test.yml runs on every pull_request (no paths-ignore)."
+    },
+    {
+      "id": "#2",
+      "text_hash": "880b3a915109180dafbf710398193ca09f36b14593a7889be526aed370b99575",
+      "status": "PASS",
+      "description": "Control table of safe git blocks stays runnable",
+      "code_citation": "shared/resources/qa-execute-snippets.mjs:531",
+      "test_citation": "shared/resources/tests/qa-execute-snippets.test.mjs:5897",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Test 'task.304 control git blocks stay runnable' asserts klass runnable for git log, diff, -C, --git-dir=, rev-parse and more; T304_FLAG_CONTROLS and T304_NAME_CONTROLS (5723, 5731) add more."
+    },
+    {
+      "id": "#3",
+      "text_hash": "e0e946880f32f26a09f7d40acf94bbc0bb94a3677c350786ed48cb8ed1d5a462",
+      "status": "PASS",
+      "description": "Differential writes nothing on the new git atom set; engine without the rule writes (calibration)",
+      "code_citation": "scripts/qa-snippets-differential.mjs",
+      "test_citation": "shared/resources/tests/qa-execute-snippets.test.mjs:5139",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The calibration test at :5139 asserts the engine without the git rule produces writes. The slice at :5101 runs every atom set, git included, per PR. The 600-block figure (142 runnable, 0 writes; old engine writes 10 of 600) is recorded in task.304.qa.1.*.md:67. Later cycles ran 0 writes in 20000 (qa.3.*.md:87)."
+    },
+    {
+      "id": "#4",
+      "text_hash": "c73c554488df9e10374d23b0bbefffd2425117a06552e94dfd37c0adf5c5665d",
+      "status": "PASS",
+      "description": "docscan reports newly runnable 0; every newly refused block listed in QA report",
+      "code_citation": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa.7.qa-snippet-classifier-git-literal-execution.md:66",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Bound is a count of 0, with no per-PR test asserting it. The committed QA 7 report says 'Docs scan: 3472 blocks, runnable 251 before and after, newly refused 0'. The DoD records newly runnable 0, newly refused 0 on 3473 blocks, ten runs. Newly refused is 0, so there is nothing to list. The command is named in the criterion (node scripts/qa-snippets-docscan.mjs)."
+    },
+    {
+      "id": "#5",
+      "text_hash": "b403e18c19d8836ef1b43bd5219f750bc74ef6dfaa5177f98f3f370637d1bfe3",
+      "status": "PASS",
+      "description": "Docs-scan median within +10% of develop, five runs per side, uptime recorded",
+      "code_citation": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.dod.1.qa-snippet-classifier-git-literal-execution.md (bullet '#5 re-measured on head 4217703a')",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Bound +10%. Measured on 4217703a, ten runs per side (develop median 875 ms, now median 826 ms, 5.5% faster), command `node scripts/qa-snippets-docscan.mjs --time`, load 2.6 to 3.4 beside each run. Measured on M=4217703a, tree-equivalent to head: finalise-delta.js docs-only --base 4217703a --head HEAD returned reason tree-equivalent (6 docs-only paths). The record is in the DoD file, an accepted committed artifact."
+    },
+    {
+      "id": "#6",
+      "text_hash": "e7f4ac78fb9a69b4adb201ca4109e213d9705a08803f0e9093bd84089d58b47d",
+      "status": "PASS",
+      "description": "CI=true qa-execute-snippets test green; format:check clean",
+      "code_citation": ".github/workflows/test.yml:1",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 66eea6e8 — The criterion asks CI to show the qa-execute-snippets test file green and `npm run format:check` clean. test.yml runs format:check and npm test on pull_request. Graded from the CI reading. The DoD records a local 405 pass, 0 fail.",
+      "ci_reading": "CI reading 1: SUCCESS @ 66eea6e8"
+    },
+    {
+      "id": "#7",
+      "text_hash": "bb86fa63779aeb81f504727c49e00ec3008cd9d4c4a45687eb508efefc13550c",
+      "status": "PASS",
+      "description": "npm run bundle:check reports 0 problems",
+      "code_citation": ".github/workflows/test.yml:1",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 66eea6e8 — A state check by the `npm run bundle:check` command. The `ci` script runs it, and the DoD records '129 skill(s) checked, 0 problems' locally. Graded from the CI reading. test.yml runs the hermetic suite and replay evals, and bundle:check is in `npm run ci`.",
+      "ci_reading": "CI reading 1: SUCCESS @ 66eea6e8"
+    },
+    {
+      "id": "#8",
+      "text_hash": "ddd863da071ec6b0b6c8705e49145654e977da4737ac308871fe70226709e84c",
+      "status": "PASS",
+      "description": "Every refusal mutation-proven with named red tests, except -c, which is proven by outcome rows",
+      "code_citation": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.dod.1.qa-snippet-classifier-git-literal-execution.md (bullet '#8 per-refusal mutation proofs')",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "--config-env refusal",
+          "evidence": "DoD file, '#8 per-refusal mutation proofs': off -> red, AssertionError: --config-env",
+          "status": "PASS"
+        },
+        {
+          "member": "--upload-pack / --exec refusal",
+          "evidence": "DoD file, '#8 per-refusal mutation proofs': off -> 2 fail, ls-remote --upload-pack= rows",
+          "status": "PASS"
+        },
+        {
+          "member": "GIT_* name refusal",
+          "evidence": "task.304.qa.2.*.md:169 (rows and differential red) and task.304.qa.4.*.md:153 (exported-name rule, table test red)",
+          "status": "PASS"
+        },
+        {
+          "member": "--exec-path=<dir> refusal",
+          "evidence": "task.304.qa.3.*.md:161 (rule off, the --exec-path=<dir> with ls-remote row red)",
+          "status": "PASS"
+        },
+        {
+          "member": "brace-expansion refusal",
+          "evidence": "task.304.qa.3.*.md:160 (4 tests red)",
+          "status": "PASS"
+        },
+        {
+          "member": "unknown-flag refusal",
+          "evidence": "task.304.qa.5.*.md:107 (3 tests red)",
+          "status": "PASS"
+        },
+        {
+          "member": "reader-agreement check",
+          "evidence": "task.304.qa.6.*.md:105 (quoted --n... rows red)",
+          "status": "PASS"
+        },
+        {
+          "member": "operand-flag, plain-flag and -C plain-word refusals",
+          "evidence": "task.304.qa.7.*.md:91-93 (each switched off -> named row red)",
+          "status": "PASS"
+        },
+        {
+          "member": "-c refusal (exception, proven by outcome)",
+          "evidence": "shared/resources/tests/qa-execute-snippets.test.mjs:5635 (T304_FORMS '-c core.fsmonitor' bash-verified row asserts the write is refused); DoD records that no single or double revert turns a test red",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Judged as amended: criteria-drift.js reports #8 reworded, approved: true (Lorien Gamaroff, 2026-11-11). The -c exception and its proof by T304_FORMS outcome rows are what the criterion now says. Every other refusal has a committed revert and named red test."
+    },
+    {
+      "id": "#9",
+      "text_hash": "d902afc130fefed37c55de3efdc3536badb88917065929bf20f15bf30142bb7e",
+      "status": "PASS",
+      "description": "CHANGELOG.md cites (task 304)",
+      "code_citation": "CHANGELOG.md:9",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Line 9 is the entry '**The QA snippet classifier refuses the git forms that run a literal string (task 304).**'. It names the work item. A changelog corpus guard exists in the repo but I did not locate and name it, so no test is cited."
+    },
+    {
+      "id": "#10",
+      "text_hash": "550f8a1e6db740590ea1359accc2160896e20d3bf3b8888bd64834209e3db913",
+      "status": "PASS",
+      "description": "qa-runnable-prose-detection.md section 2a-iii names the git forms and why refused",
+      "code_citation": "shared/resources/qa-runnable-prose-detection.md:336",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Lines 336-362 under 2a-iii name `-c` and `--config-env`, GIT_* assignments, and ls-remote `--upload-pack` / `--exec` with unambiguous prefixes. They also give the reason: the refusal is on the form, never the value, because the value is the string git will run. Bundled copies are regenerated, and the DoD records bundle:check clean."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#5",
+      "note": "The criterion text still carries the first-delivery parenthetical (428 ms develop, 406 ms now, load 3.3), which differs from the re-measured figures in the DoD (875 / 826 ms). It is informational and does not change the bound. The DoD gives the load as a range (2.6 to 3.4) beside each run, not a per-run list. Listing it per run would be stricter."
+    },
+    {
+      "ac_id": "#9",
+      "note": "Cited text read at CHANGELOG.md:9. No changelog corpus guard was named."
+    },
+    {
+      "ac_id": "#6",
+      "note": "The criterion text says 397 pass. The DoD records 405 pass, 0 fail, because tests were added after the first delivery. Informational."
+    }
+  ]
+}

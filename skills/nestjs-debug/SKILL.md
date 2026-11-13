@@ -130,7 +130,7 @@ description: Autonomous NestJS debugging for any NestJS application. Systematica
    └─ If still failing: Loop back to Step 1
 
 7. DOCUMENTATION (When Loop Completes)
-   ├─ Log debug session: `.ai/debug-sessions/{app_name}-{timestamp}.md`
+   ├─ Log debug session: `.ai/debug-sessions/{app_name}-{timestamp}.md` (`{timestamp}` = `date -u +%Y%m%dT%H%M%SZ`, never typed)
    ├─ Record error pattern for future reference
    └─ Update common-errors catalog if new pattern found
 ```
@@ -935,7 +935,7 @@ npx nx reset
 **Use this format to show your thinking:**
 
 ```markdown
-## Debug Session: {app_name} - {timestamp}
+## Debug Session: {app_name} - {timestamp}  <!-- same `date -u` value as the file name -->
 
 ### Iteration 1
 

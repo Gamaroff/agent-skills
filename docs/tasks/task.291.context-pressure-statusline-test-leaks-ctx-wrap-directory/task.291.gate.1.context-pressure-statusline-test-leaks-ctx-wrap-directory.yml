@@ -1,0 +1,63 @@
+schema: 2
+task: 'task.291.context-pressure-statusline-test-leaks-ctx-wrap-directory'
+task_title: 'The context-pressure statusline test leaks a ctx-wrap- temp directory'
+gate: CONCERNS
+status_reason: 'The fix works and is mutation-proven (0 leaks in 100 runs; new test red with the wait removed; CI green). One success criterion is unmet as written: the file runs about 22% slower than develop (bound 10%) because the regression test sleeps 150 ms on purpose.'
+reviewer: 'QA Engineer'
+head: 'cf682896489bd82101ce5f91ee17271d9e533fa4'
+updated: '2026-11-11T19:41:09Z'
+
+top_issues:
+  - id: 'T291-QA-1'
+    severity: medium
+    file: 'docs/tasks/task.291.context-pressure-statusline-test-leaks-ctx-wrap-directory/task.291.context-pressure-statusline-test-leaks-ctx-wrap-directory.md'
+    finding: 'Performance criterion 1 (file run time no more than 10% above develop) is not met as written. Median of five alternating runs of `time command node --test shared/resources/tests/context-pressure-statusline.test.mjs`: develop (ec14f2ec) 658 ms, branch (cf682896) 807 ms, +22%; load average 1.45 to 1.65 before and after. The added time is the new regression test (280 ms, of which the stand-in recorder sleeps 150 ms); the five existing tests are unchanged (develop 5 tests; branch same five at 26 to 185 ms each).'
+    suggested_action: 'The bound cannot hold while the regression test sleeps long enough to make the revert red. Amend the criterion with an approver (bound the five existing tests at 10% and name the regression test''s deliberate 150 ms as its own line), or accept the finding. Do not shorten the stub below the cleanup latency: that would let a revert go green.'
+    suggested_owner: po
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 6
+  phases_verified: '1/1'
+  trace:
+    phases_covered: [1]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    boundary_signals: []
+    notes: 'Test code and a test helper only; no accept-or-reject boundary (boundary: false). No input reaches a shell or path from outside the test.'
+  performance:
+    status: CONCERNS
+    notes: 'File run time +22% against a 10% criterion (T291-QA-1). No test waits longer than 3000 ms (longest 306 ms).'
+  reliability:
+    status: PASS
+    notes: '0 leaked ctx-wrap- directories in 100 unloaded runs (before: 1 in 100 unloaded, 3 in 100 loaded); cleanup waits are bounded at 3000 ms in total.'
+  maintainability:
+    status: PASS
+    notes: 'One helper in tests/lib with a header explaining the mechanism; three state-dir tests share stateDir().'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'The regression test is red on revert only while cleanup runs before the 150 ms stub finishes; on a machine loaded enough to delay cleanup past that, a revert could read green. The fix itself is unaffected.'
+      refs: ['shared/resources/tests/context-pressure-statusline.test.mjs']
+    - action: 'TEST_LOCAL=1 npm run test:remote leaks TEST_LOCAL into the suite and 14 tests in tests/test-remote-runner.test.js fail (19 of 19 pass without it). Worth an observation or a task.'
+      refs: ['tests/test-remote-runner.test.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

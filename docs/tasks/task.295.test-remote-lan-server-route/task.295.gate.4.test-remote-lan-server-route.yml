@@ -1,0 +1,70 @@
+schema: 2
+task: 'task.295.test-remote-lan-server-route'
+task_title: 'Run the test suite on the LAN server (test:remote)'
+gate: CONCERNS
+status_reason: 'The gate-3 findings are fixed and mutation-proved, and no high or reproduced defect remains. One medium finding is left: the container-name lock covers the run, not the sync and image build before it, so the docs and comments overstate it.'
+reviewer: 'QA Engineer'
+head: 'd602cdea1d064d2d305da55e681b001d7354680a'
+updated: '2026-11-10T16:21:13Z'
+
+top_issues:
+  - id: 'T295-QA-9'
+    severity: medium
+    file: 'scripts/remote-test/run.sh'
+    finding: 'The lock is a container name, and the container is created only after the rsync --delete and the image build. A run still syncing or building holds no lock, so a second run on the same branch passes the check and syncs over it; the `docker run --name` backstop fires only after that. The comments and docs call it a lock and an atomic backstop without this limit. origin: code-review (CR-1, medium/high)'
+    suggested_action: 'Scope the claim rather than add a mechanism: describe the check as a best-effort guard that covers the running container, state the window before it, and point at the Future Improvements cross-repository lock for a real one. This is the third gate on the lock, so no further patching of it'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 17
+  phases_verified: '6/6'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5]
+    phases_with_issues: [1, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: ['never']
+    boundary: true
+    notes: 'Unchanged. The --run validation is the boundary and the probe engine corpus does not fit this entry, so it is not credited. The new docker filter splices only the sanitised run directory name.'
+  performance:
+    status: PASS
+    notes: 'CpuShares=128 confirmed in cycle 1; the timeout stops the container (live run on .249).'
+  reliability:
+    status: CONCERNS
+    notes: 'T295-QA-9: the lock window. Everything the earlier gates found is fixed and held by a test that a mutation turns red.'
+  maintainability:
+    status: PASS
+    notes: 'shellcheck and lint:shell clean; guard test 17 of 17.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Scope the lock claim in run.sh and testing-remote.md (T295-QA-9)'
+      refs: ['scripts/remote-test/run.sh', 'docs/contributing/testing-remote.md']
+  future:
+    - action: 'The touch is chained as (touch && inspect) || build, so a failing touch falls through to a needless build and is reported as a build failure; run it as its own step (CR-2, low)'
+      refs: ['scripts/remote-test/run.sh']
+    - action: 'The ssh stub ignores the docker filter, so no test checks the anchored name filter or the lock-check ssh failing; the touch-order test only matches substrings (CR-3, CR-4, low)'
+      refs: ['tests/test-remote-runner.test.js']
+    - action: 'SIGTERM sent only to run.sh is handled after the foreground ssh returns, and the 9999-minute cap (from gate 3)'
+      refs: ['scripts/remote-test/run.sh']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T295-QA-9 scoped']

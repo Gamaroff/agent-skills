@@ -1,0 +1,66 @@
+schema: 2
+task: 'task.298.review-task-runs-plan-command-and-ci-parity'
+task_title: "review-task runs a plan's command and checks CI parity"
+gate: PASS
+status_reason: 'T298-QA-1 is fixed and proven both ways (a check 32 no longer breaks the test; removing check 31 still turns four tests red). Full-diff refute pass found one advisory cleanup. CI is green on the head.'
+reviewer: 'QA Engineer'
+head: '0074a888a6fc6f7a7c21fed25d80791164d55e87'
+updated: '2026-11-13T08:11:13Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 7
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: false
+    boundary_signals: []
+    notes: 'Two Markdown rules and a presence test; no accept/reject predicate. The criteria carry no boundary signal.'
+  performance:
+    status: PASS
+    notes: 'No runtime code; the test runs in about 0.1 s.'
+  reliability:
+    status: PASS
+    notes: 'The test no longer breaks when a later check is added (T298-QA-1 closed).'
+  maintainability:
+    status: PASS
+    notes: 'One dead assertion remains, recorded under recommendations.future.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-11-13'
+  total_iterations: 1
+  verification_method: 'Scratch-copy mutants (check 32 added: 7/7; check 31 renamed: 4 red), ci:fast on the LAN server (exit 0), CI green on the head'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'The assertion item.number <= highestNumber(step3) in the "exists in the Step 3 list" test can never fail, because the item is part of that list. Delete it, or replace it with an assertion that can fail.'
+      refs: ['tests/review-run-and-parity-checks.test.js']
+    - action: 'The new check tells a reviewer to run a plan command in a scratch form. For a transfer such as scp there is no dry-run flag, so the scratch target is a remote path the reviewer must create; the text does not say who removes it. Consider one sentence on removing the scratch target.'
+      refs: ['skills/review-task/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

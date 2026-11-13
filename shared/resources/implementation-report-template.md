@@ -21,6 +21,13 @@ in the fence — the header block, table shapes, placeholder text — is authori
 is not linted. A report may carry sections this file does not name (the PreCompact hook appends a
 `## Pipeline Paused — …` section, for one); those are ignored by the order and count checks.
 
+**Every time placeholder in the variants below is filled from the clock, never typed.** That covers
+`{YYYY-MM-DD HH:MM}`, `{YYYY-MM-DDTHH:MM:SSZ}` and `{timestamp}`. The value is the output of `date -u`
+(`date -u '+%Y-%m-%d %H:%M'` for a story or task `Started`, `date -u +%Y-%m-%dT%H:%M:%SZ` for the bug
+variant's `started`, `date -u +%Y-%m-%dT%H:%MZ` for a log line), run in the same block that writes the
+report, and always UTC. A time typed from memory drifts, or mixes local time with UTC, and nothing
+fails when it does (obs #164).
+
 **`## Tracker Actions Required` is optional by contract**, not by accident: the template's own text
 says to omit the section entirely when the tracker-actions journal is empty, because an empty
 heading reads as "nothing was deferred" in the same shape it would read as "the renderer broke".

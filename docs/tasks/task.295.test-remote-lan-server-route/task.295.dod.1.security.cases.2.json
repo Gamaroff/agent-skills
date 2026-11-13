@@ -1,0 +1,66 @@
+[
+  {
+    "id": "host-semicolon",
+    "input": "ci@h;touch PWNED",
+    "direction": "hostile",
+    "why": "The host is spliced into ssh and rsync argv and the failure-path ssh commands.",
+    "correct": "Refused with exit 2 and nothing created.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "PWNED"
+      ]
+    },
+    "spec_ref": "docs/tasks/task.295.test-remote-lan-server-route/task.295.test-remote-lan-server-route.md:149"
+  },
+  {
+    "id": "host-ssh-option",
+    "input": "-oProxyCommand=touch PWNED",
+    "direction": "hostile",
+    "why": "A host starting with '-' is parsed by ssh as an option and can run a command (ProxyCommand).",
+    "correct": "Refused with exit 2 and nothing created.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "PWNED"
+      ]
+    },
+    "spec_ref": "docs/tasks/task.295.test-remote-lan-server-route/task.295.test-remote-lan-server-route.md:149"
+  },
+  {
+    "id": "host-cmd-subst",
+    "input": "$(touch PWNED)@h",
+    "direction": "hostile",
+    "why": "Command substitution in the host.",
+    "correct": "Refused with exit 2 and nothing created.",
+    "expected": {
+      "exit": 2,
+      "absent": [
+        "PWNED"
+      ]
+    },
+    "spec_ref": "docs/tasks/task.295.test-remote-lan-server-route/task.295.test-remote-lan-server-route.md:149"
+  },
+  {
+    "id": "host-space",
+    "input": "ci@h -oProxyCommand=x",
+    "direction": "hostile",
+    "why": "A space injects an extra ssh option word.",
+    "correct": "Refused with exit 2.",
+    "expected": {
+      "exit": 2
+    },
+    "spec_ref": "docs/tasks/task.295.test-remote-lan-server-route/task.295.test-remote-lan-server-route.md:149"
+  },
+  {
+    "id": "host-legit",
+    "input": "probe@127.0.0.1",
+    "direction": "legitimate",
+    "why": "A plain USER@HOST must pass validation.",
+    "correct": "Passes validation; exit 1 at the unreachable server.",
+    "expected": {
+      "exit": 1
+    },
+    "spec_ref": "docs/tasks/task.295.test-remote-lan-server-route/task.295.test-remote-lan-server-route.md:150"
+  }
+]

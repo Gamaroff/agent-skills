@@ -1,0 +1,560 @@
+[
+  {
+    "id": "pager-c",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "git --no-pager -c core.sshCommand='touch W' ls-remote ssh://h/x",
+    "why": "-c/--config-env/--exec-path variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:81"
+  },
+  {
+    "id": "P-c",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "git -P -c core.fsmonitor=./hook.sh status",
+    "why": "-c/--config-env/--exec-path variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:81"
+  },
+  {
+    "id": "bare-c",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "git --bare -c core.fsmonitor=./hook.sh status",
+    "why": "-c/--config-env/--exec-path variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:81"
+  },
+  {
+    "id": "cont-c",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "git \\\n  -c core.fsmonitor=./hook.sh status",
+    "why": "-c/--config-env/--exec-path variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:81"
+  },
+  {
+    "id": "sudo-c",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "sudo git -c core.fsmonitor=./hook.sh status",
+    "why": "-c/--config-env/--exec-path variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:81"
+  },
+  {
+    "id": "abs-c",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "/usr/bin/git -c core.fsmonitor=./hook.sh status",
+    "why": "-c/--config-env/--exec-path variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:81"
+  },
+  {
+    "id": "bslash-c",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "\\git -c core.fsmonitor=./hook.sh status",
+    "why": "-c/--config-env/--exec-path variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:81"
+  },
+  {
+    "id": "qgit-c",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "\"git\" -c core.fsmonitor=./hook.sh status",
+    "why": "-c/--config-env/--exec-path variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:81"
+  },
+  {
+    "id": "time-c",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "time git -c core.fsmonitor=./hook.sh status",
+    "why": "-c/--config-env/--exec-path variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:81"
+  },
+  {
+    "id": "amp-c",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "git status & git -c core.fsmonitor=./hook.sh status",
+    "why": "-c/--config-env/--exec-path variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:81"
+  },
+  {
+    "id": "pipeamp-c",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "git status |& git -c core.fsmonitor=./hook.sh status",
+    "why": "-c/--config-env/--exec-path variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:81"
+  },
+  {
+    "id": "procsub-c",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "cat <(git -c core.fsmonitor=./hook.sh status)",
+    "why": "-c/--config-env/--exec-path variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:81"
+  },
+  {
+    "id": "backtick-c",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "echo `git -c core.fsmonitor=./hook.sh status`",
+    "why": "-c/--config-env/--exec-path variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:81"
+  },
+  {
+    "id": "brace-c",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "{ git -c core.fsmonitor=./hook.sh status; }",
+    "why": "-c/--config-env/--exec-path variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:81"
+  },
+  {
+    "id": "bang-c",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "! git -c core.fsmonitor=./hook.sh status",
+    "why": "-c/--config-env/--exec-path variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:81"
+  },
+  {
+    "id": "case-c",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "case x in x) git -c core.fsmonitor=./hook.sh status;; esac",
+    "why": "-c/--config-env/--exec-path variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:81"
+  },
+  {
+    "id": "dq-c",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "git -c \"core.sshCommand=touch W\" ls-remote ssh://h/x",
+    "why": "-c/--config-env/--exec-path variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:81"
+  },
+  {
+    "id": "ansic-c",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "git -c $'core.sshCommand=touch W' ls-remote ssh://h/x",
+    "why": "-c/--config-env/--exec-path variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:81"
+  },
+  {
+    "id": "heredoc-c",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "cat <<'EOF' >/dev/null\nx\nEOF\ngit -c core.fsmonitor=./hook.sh status",
+    "why": "-c/--config-env/--exec-path variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:81"
+  },
+  {
+    "id": "bashheredoc-c",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "bash <<EOF\ngit -c core.fsmonitor=./hook.sh status\nEOF",
+    "why": "-c/--config-env/--exec-path variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:81"
+  },
+  {
+    "id": "eval-c",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "eval \"git -c core.fsmonitor=./hook.sh status\"",
+    "why": "-c/--config-env/--exec-path variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:81"
+  },
+  {
+    "id": "fn-shadow-c",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "git() { command git -c core.fsmonitor=./hook.sh \"$@\"; }; git status",
+    "why": "-c/--config-env/--exec-path variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:81"
+  },
+  {
+    "id": "alias-c",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "shopt -s expand_aliases\nalias git='git -c core.fsmonitor=./hook.sh'\ngit status",
+    "why": "-c/--config-env/--exec-path variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:81"
+  },
+  {
+    "id": "var-cfgenv",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "X='touch W'; git --config-env=core.sshCommand=X ls-remote ssh://h/x",
+    "why": "-c/--config-env/--exec-path variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:81"
+  },
+  {
+    "id": "exec-path",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "git --exec-path=/tmp/x ls-remote .",
+    "why": "-c/--config-env/--exec-path variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:81"
+  },
+  {
+    "id": "qexec-path",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "git '--exec-path=/tmp/x' ls-remote .",
+    "why": "-c/--config-env/--exec-path variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:81"
+  },
+  {
+    "id": "up-after-repo",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "git ls-remote origin --upload-pack 'touch W' .",
+    "why": "--upload-pack/--exec variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:83"
+  },
+  {
+    "id": "up-u",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "git ls-remote --u='touch W' .",
+    "why": "--upload-pack/--exec variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:83"
+  },
+  {
+    "id": "up-ex",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "git ls-remote --ex='touch W' .",
+    "why": "--upload-pack/--exec variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:83"
+  },
+  {
+    "id": "exec-sep",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "git ls-remote --exec 'touch W' .",
+    "why": "--upload-pack/--exec variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:83"
+  },
+  {
+    "id": "cond-up",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "[[ -d . ]] && git ls-remote --upload-pack='touch W' .",
+    "why": "--upload-pack/--exec variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:83"
+  },
+  {
+    "id": "ansic-up",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "git ls-remote --upload-pack=$'touch W' .",
+    "why": "--upload-pack/--exec variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:83"
+  },
+  {
+    "id": "splitq-up",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "git ls-remote \"--upload\"-pack='touch W' .",
+    "why": "--upload-pack/--exec variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:83"
+  },
+  {
+    "id": "comment-up",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "git ls-remote --upload-pack='touch W' . # git log -1",
+    "why": "--upload-pack/--exec variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:83"
+  },
+  {
+    "id": "xargs-up",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "echo . | xargs git ls-remote --upload-pack='touch W'",
+    "why": "--upload-pack/--exec variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:83"
+  },
+  {
+    "id": "fn-env",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "f() { GIT_SSH_COMMAND='touch W' git ls-remote ssh://h/x; }; f",
+    "why": "GIT_ assignment variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:82"
+  },
+  {
+    "id": "default-assign",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": ": ${GIT_SSH_COMMAND:='touch W'}; export GIT_SSH_COMMAND; git ls-remote ssh://h/x",
+    "why": "GIT_ assignment variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:82"
+  },
+  {
+    "id": "typeset",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "typeset -x GIT_SSH_COMMAND='touch W'; git ls-remote ssh://h/x",
+    "why": "GIT_ assignment variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:82"
+  },
+  {
+    "id": "readonly",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "readonly GIT_SSH_COMMAND='touch W'; export GIT_SSH_COMMAND; git ls-remote ssh://h/x",
+    "why": "GIT_ assignment variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:82"
+  },
+  {
+    "id": "for-var",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "for GIT_SSH_COMMAND in 'touch W'; do export GIT_SSH_COMMAND; git ls-remote ssh://h/x; done",
+    "why": "GIT_ assignment variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:82"
+  },
+  {
+    "id": "env-cmd",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "env GIT_SSH_COMMAND='touch W' git ls-remote ssh://h/x",
+    "why": "GIT_ assignment variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:82"
+  },
+  {
+    "id": "cmd-env",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "GIT_SSH_COMMAND='touch W' command git ls-remote ssh://h/x",
+    "why": "GIT_ assignment variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:82"
+  },
+  {
+    "id": "decl-then-assign",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "declare -x GIT_SSH_COMMAND; GIT_SSH_COMMAND='touch W'; git ls-remote ssh://h/x",
+    "why": "GIT_ assignment variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:82"
+  },
+  {
+    "id": "cfg-params",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "GIT_CONFIG_PARAMETERS=\"'core.sshcommand=touch W'\" git ls-remote ssh://h/x",
+    "why": "GIT_ assignment variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:82"
+  },
+  {
+    "id": "cfg-global",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "GIT_CONFIG_GLOBAL=./evil.cfg git status",
+    "why": "GIT_ assignment variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:82"
+  },
+  {
+    "id": "arith",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "let GIT_X=1; git status",
+    "why": "GIT_ assignment variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:82"
+  },
+  {
+    "id": "mapfile",
+    "sink": "shell-exec",
+    "direction": "hostile",
+    "input": "mapfile GIT_SSH_COMMAND <<< 'touch W'; export GIT_SSH_COMMAND; git ls-remote ssh://h/x",
+    "why": "GIT_ assignment variant",
+    "correct": "Refuse.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:82"
+  },
+  {
+    "id": "exit-code",
+    "sink": "shell-exec",
+    "direction": "legitimate",
+    "input": "git ls-remote --exit-code .",
+    "why": "Read-only.",
+    "correct": "Accept.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:150"
+  },
+  {
+    "id": "heads",
+    "sink": "shell-exec",
+    "direction": "legitimate",
+    "input": "git ls-remote --heads origin",
+    "why": "Read-only.",
+    "correct": "Accept.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:150"
+  },
+  {
+    "id": "symref",
+    "sink": "shell-exec",
+    "direction": "legitimate",
+    "input": "git ls-remote --symref . HEAD",
+    "why": "Read-only.",
+    "correct": "Accept.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:150"
+  },
+  {
+    "id": "grep-exec",
+    "sink": "shell-exec",
+    "direction": "legitimate",
+    "input": "git log --grep=exec -1",
+    "why": "Read-only.",
+    "correct": "Accept.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:150"
+  },
+  {
+    "id": "dashdash-c",
+    "sink": "shell-exec",
+    "direction": "legitimate",
+    "input": "git log -1 --format=%H -- -c",
+    "why": "Read-only.",
+    "correct": "Accept.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:150"
+  },
+  {
+    "id": "C-stat",
+    "sink": "shell-exec",
+    "direction": "legitimate",
+    "input": "git -C . diff --stat",
+    "why": "Read-only.",
+    "correct": "Accept.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:150"
+  },
+  {
+    "id": "show",
+    "sink": "shell-exec",
+    "direction": "legitimate",
+    "input": "git show HEAD:README.md",
+    "why": "Read-only.",
+    "correct": "Accept.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:150"
+  },
+  {
+    "id": "describe",
+    "sink": "shell-exec",
+    "direction": "legitimate",
+    "input": "git describe --tags --abbrev=0",
+    "why": "Read-only.",
+    "correct": "Accept.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:150"
+  },
+  {
+    "id": "lstree",
+    "sink": "shell-exec",
+    "direction": "legitimate",
+    "input": "git ls-tree -r HEAD",
+    "why": "Read-only.",
+    "correct": "Accept.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:150"
+  },
+  {
+    "id": "revlist",
+    "sink": "shell-exec",
+    "direction": "legitimate",
+    "input": "git rev-list --count HEAD",
+    "why": "Read-only.",
+    "correct": "Accept.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:150"
+  },
+  {
+    "id": "catfile",
+    "sink": "shell-exec",
+    "direction": "legitimate",
+    "input": "git cat-file -p HEAD",
+    "why": "Read-only.",
+    "correct": "Accept.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:150"
+  },
+  {
+    "id": "var",
+    "sink": "shell-exec",
+    "direction": "legitimate",
+    "input": "x=1; echo $x; git log -1",
+    "why": "Read-only.",
+    "correct": "Accept.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:150"
+  },
+  {
+    "id": "pipe",
+    "sink": "shell-exec",
+    "direction": "legitimate",
+    "input": "git ls-remote --tags . | head -3",
+    "why": "Read-only.",
+    "correct": "Accept.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:150"
+  },
+  {
+    "id": "combined",
+    "sink": "shell-exec",
+    "direction": "legitimate",
+    "input": "git diff -c --stat",
+    "why": "Read-only.",
+    "correct": "Accept.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:150"
+  },
+  {
+    "id": "echo",
+    "sink": "shell-exec",
+    "direction": "legitimate",
+    "input": "echo \"git -c is refused\"",
+    "why": "Read-only.",
+    "correct": "Accept.",
+    "spec_ref": "docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md:150"
+  }
+]

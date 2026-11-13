@@ -160,7 +160,7 @@ script sed itself would reject (a command followed by more text) runs nothing. A
 `:a e echo x` runs `e`: only a separator or the end of the script may follow a label, and anything else
 is a script the scan does not read, which is refused. A sed `#` comment ends at the first newline: a
 backslash before it is not a continuation, so `#c\<newline>e echo x` is a comment and then an `e`
-command. A command substitution, process substitution or backtick cuts the arguments the scan reads for a command (`sort <(echo a) -oout` reaches the table as `sort`, and so does everything after a prefix assignment holding one: `X=$(echo a) uniq in out`). So the block is read a second time with each substitution masked as one word (`$__SUBST__`, an expansion of unknown value, refused where a flag may stand; `/dev/fd/0` for a process substitution), and every governed command, and every command the first reading never saw, is judged in that text. The commands inside a substitution are judged on their own. The end of a substitution is found the way the shell finds it: a paren inside quotes, after a backslash or in a comment does not close it (`X=$(echo ")") touch out` ends at the last paren). A block whose substitution cannot be read to its end is refused whatever it runs: a refusal that depends on finding a governed word is a refusal the unreadable word can hide from. Every `${…}` is an
+command. A command substitution, process substitution or backtick cuts the arguments the scan reads for a command (`sort <(echo a) -oout` reaches the table as `sort`, and so does everything after a prefix assignment holding one: `X=$(echo a) uniq in out`). So the block is read a second time with each substitution masked as one word (`$__SUBST__`, an expansion of unknown value, refused where a flag may stand; `/dev/fd/0` for a process substitution), and every governed command, and every command the first reading never saw, is judged in that text. The commands inside a substitution are judged on their own. The end of a substitution is found the way the shell finds it: a paren inside quotes, after a backslash or in a comment does not close it (`X=$(echo ")") touch out` ends at the last paren). A `#` starts a comment only at the start of a word: after unquoted whitespace, `;`, `&`, `|` or `(` that no backslash escapes, so `echo a\ # ; touch out` is one word followed by a write, and `a#b` and `$#` are not comments; every scan that skips a comment asks the same rule. A backslash before a quote outside quotes, and a backslash-newline before a line that starts with `#`, are refused: the scan cannot read where bash puts the quote or the word. Only an odd run of backslashes before a newline joins the next line to the command; an even run is an escaped backslash and the command ends there. A scan that throws on input it cannot read is refused, not crashed. A block whose substitution cannot be read to its end is refused whatever it runs: a refusal that depends on finding a governed word is a refusal the unreadable word can hide from. Every `${…}` is an
 expansion whatever it holds (`${1}`, `${!X}`, `${#A}`, `${@:1}`), not only `${NAME}`, and a command that
 counts operands (`uniq`: the second is an output file) refuses an unquoted brace, glob or unnamed
 expansion in an operand (`uniq {in,out}`, `uniq *.txt`), because the word may become several. The same pass refuses
@@ -211,6 +211,168 @@ Three further rules fall out of the same principle, each added after a review fo
   The **one** token in command position that is genuinely not an invocation is a `case` arm pattern,
   recognised by its trailing `)`. That is why the scanner no longer erases bare parentheses — without
   the `)` there is nothing to distinguish `*://*/pull/*)` from `/usr/bin/[t]ouch`.
+
+### 2a-i. The lexical layer: one tokenizer (task 292)
+
+Every question of the form "where does this quote, comment, substitution, heredoc or line join start
+and end" is answered by one function, `tokenize(code)` in `qa-execute-snippets.mjs`, not by a regex of
+each scan's own. `stripProse` (comments, heredoc bodies and the heredoc operator), the quote collapse,
+the substitution mask and both line-join passes read its tokens. What it encodes, once:
+
+- **Blanks are space, tab and newline.** A carriage return, form feed, vertical tab, no-break space or
+  line separator is a character of a word. `classifyInternal` (and the exported `commandWords` and
+  `unboundVariables`) turn each of those into one word character before any scan splits on `\s`, so a
+  `\s` below that point can only match a real blank. A test fails on a `\s` in a function that is not
+  on its allowlist with a reason.
+- **Escapes are read left to right**, so an even run of backslashes (an escaped backslash) differs from
+  an odd one without counting parity anywhere. Inside double quotes a backslash escapes the next
+  character; inside single quotes nothing is special.
+- **A `#` starts a comment only at the start of a word**, never after an escaped blank, a CR or mid-word.
+- **Substitutions** (`$(`, backtick, `<(`, `>(`) and `${…}` nest on an explicit stack, so a deep nest
+  costs linear time and cannot overflow the call stack.
+- **An unquoted heredoc body is expanded by bash**, so a substitution in it is judged as a command; a
+  quoted heredoc body is data.
+
+A shape the tokenizer does not model throws, and the classifier reads a throw as `mutating`: an
+unterminated quote, substitution or `${`, a single quote inside a double-quoted `${…}`, a heredoc whose
+delimiter is not a plain word, a heredoc inside a substitution, and an escaped quote outside quotes
+(read correctly it would make one documentation block newly runnable, and a lexical refactor does not
+widen what QA executes). The random differential (`npm run qa-snippets:differential`) and the docs
+scan (`npm run qa-snippets:docscan`) hold it: the first runs every block the classifier calls
+`runnable` under real bash and fails if the directory changes, the second fails if a change makes a
+documentation block newly runnable.
+
+### 2a-ii. Indirect evaluation is refused where it is built (task 293)
+
+Some shapes build a value harmlessly and let a later bash feature evaluate it. Judged command by
+command, every part looks safe, because the command that runs is not in the text. Three families
+reproduce under real bash, and a block holding one is `mutating` with a reason that starts
+`indirect-evaluation:`:
+
+- **Prompt expansion.** Setting `PS0`, `PS1`, `PS2` or `PS4` (assignment, `export`, `declare`, `read`,
+  `printf -v` and the like), or using `${x@P}`. Bash expands prompt escapes, and those include command
+  substitution, so `PS4=…` then `set -x`, or `${x@P}` on a value read from elsewhere, runs it. Merely
+  mentioning the name (`echo PS4`) is not refused.
+- **A quoted literal that holds a substitution, in a block that also evaluates something**
+  (`x='a[$(cmd)]'`, `x="a[\$(cmd)]"`, `x=$'a[\x24(cmd)]'`, a joined word such as `x=a'[$(cmd)]'`, an
+  unquoted escaped form, a literal piped into `read`, a quoted-delimiter here-document body). "Evaluates something" is any live
+  `printf`, `read`, `test`, `unset`, `declare`, `typeset`, `local`, `export`, `readonly`, `let`, `eval`,
+  `for`, `select`, `case`, `[`, `[[` or `((` in the block, **or any live parameter expansion or
+  `name[`** (`$x`, `${…}`, `$((…))`, `$1`, `$@`, `a[x]=1`) outside single quotes, comments and
+  quoted here-documents. Bash evaluates the subscript `a[$(cmd)]` as arithmetic when it reads the
+  name, so the substitution runs. The rule is **block-level and default-deny on purpose**: the
+  per-segment and character-before-the-quote versions each lost to one more spelling (QA cycle 2),
+  and a list of the arithmetic spellings lost three times (`$((x))`, then `${@:$1}`, then
+  `${v[1+$1]}`; QA cycle 3, third strike), because every list of the places bash evaluates a
+  variable is incomplete. No value is tracked. The price is over-refusal of a block that holds such
+  a literal and also expands any variable; the docs scan measures it (one block, this task's plan).
+  The **carrier** is default-deny too (QA cycle 4): a list of quote kinds missed the same literal
+  written as backslash-escaped text in an unquoted word (`a\[\$\(cmd\)\]`), so any `$(`, `$\(` or
+  backtick text the tokenizer did not parse as a real substitution counts as a literal, outside
+  comments, whatever carries it.
+- **A subscript built by expansion, and a quoted substitution used as a subscript** (QA cycle 1). An
+  assignment whose value holds an expansion inside `name[…]` (`x="a[$y$z]"`, `x="a[${d}(cmd)]"`) is
+  refused, because the text that `$((x))`, `read "$x"`, `test -v "$x"` or `[[ $x -eq 1 ]]` later
+  evaluates is not in the block. A quoted literal substitution inside a `[` that is still open in
+  the block (`${a['$(cmd)']}`, `a['$(cmd)']=1`, and, since QA gates 6 to 8, `a=([0'$(cmd)']=1)`,
+  `a=([0+(1)'$(cmd)']=1)` and `a=([';'0'$(cmd)']=1)`) is refused too. Brackets are counted by depth
+  over the whole block and the depth is never reset: a character-before-the-quote test, a same-word
+  scan and a per-segment count each lost to one more spelling (a paren, then a quoted `;`), and
+  every reset was a place to lose the bracket. The price is over-refusal: an unbalanced `[` in
+  earlier text (a lone `echo '['`) refuses a later quoted substitution literal. A `[` that follows a `(` or has no expansion
+  inside it (a `sed` pattern such as `([0-9]+)`) is not a subscript, which is why the shipped helpers
+  that count with `n=$(sed …); $((n + 1))` stay runnable.
+
+The claim of this section is **bounded**, not "any indirect evaluation": the table in
+`qa-execute-snippets.test.mjs` (`task.293 — indirect evaluation`) lists the shapes, and the `indirect`
+atom set of the differential (`npm run qa-snippets:differential -- --atoms indirect`) generates their
+combinations. Text-level detection of the literal was widened four times and each widening lost to a
+new carrier, so what it could not see (a value laundered through a command's output with the
+substitution spelled by an escape, the `[` or `$` itself arriving by expansion, a literal split
+across adjacent quote tokens; all three reproduced under bash) is closed by the word allow-list in
+§2a-iii, not by a fifth patch. The rule here sits after the helper rule on purpose, so a helper call
+that also names a start-up variable keeps its `helper call with …` reason.
+
+### 2a-iii. Every non-literal word must be on a closed list (task 294)
+
+A block the rules above admit is then checked **word by word**, and it is `runnable` only when every
+non-literal word is in a form and a position on a closed list. Anything else is `mutating` with a reason
+that starts `not-allow-listed:`. The question is inverted on purpose: the rules above name what is
+refused, and each lost to the next spelling; this one names what is admitted, so the next spelling
+needs no new rule, because it is not on the list.
+
+- **Forms admitted.** A plain parameter (`$name`, `${name}`, `${#name}`, `$1`, `$?`, `$@` …), a
+  parameter with a literal default (`${name:-lit}`, `${name:+lit}`), a command substitution or
+  backtick whose body passes the same check, and `<(cmd)`. Refused: `$((…))` over anything but digits
+  and operators, `$[…]`, every other `${…}` operator (`:=`, `:offset`, `/`, `@P`, `!`, a subscript),
+  `$'…'`, `$"…"`, a `$` before a quote, `>(cmd)`.
+- **Positions admitted.** A non-literal word may be an operand of a command in the command table, or
+  the right-hand side of a plain `name=` assignment, **whatever it holds**. Storing is not the hazard;
+  evaluating is. A builtin that is not in the table takes a **literal** operand only, and the operand
+  must hold none of `[`, `]`, `$`, a backtick or a backslash, because a subscript or an expansion needs
+  one of them. A command word never holds `=` (`arr[x]=1` and `[x]=3` are assignments bash evaluates),
+  and is never built from a parameter or a substitution.
+- **Evaluating contexts take digits and operators only.** `$((…))`, `((…))`, `let`, and the operands
+  of `-eq -ne -lt -le -gt -ge` in `[[`. Measured under real bash and zsh on 2026-11-10: `[` and `test`
+  evaluate no operand, so they are not restricted; `[[` evaluates a bare name, a subscript and a `$(`
+  inside one. `test -v` and `[[ -v … ]]` are refused, and `declare`/`typeset`/`local`/`readonly`/`export`
+  with `-i`, `-n` or `-I`.
+
+**Cost, measured on cbaaf0e9 with `npm run qa-snippets:docscan`:** 256 documentation blocks were
+`runnable` before and 251 are now. The five newly refused hold a bare name inside arithmetic (2), a
+`${…}` operator (2) and an ANSI-C quote (1). No block became newly runnable. Cost on the shipped
+helpers: none; `REVIEW_N=$(next_numbered …)` and the task-77 predicate stay runnable.
+
+**Bounded claim.** The allow-list covers the forms, positions and commands above. It does not track a
+value, so a variable that bash itself evaluates (`PS1`–`PS4`, `PROMPT_COMMAND`) is task 293's
+prompt-variable rule, which runs first; the allow-list alone admits `PS4='$(cmd)'` and the test
+`task.294 defeat the first layer` pins that boundary both ways. A bare name evaluated by a construct
+this section does not read as arithmetic is outside it. The `residual` atom set of the differential
+generates the three shapes this section closed and is calibrated against the engine at `cbaaf0e9`
+(writes there, none now). A documentation block that needs a refused shape is rewritten to avoid the
+indirection.
+
+**Git forms that run a literal string (task 304).** `git` is on the non-evaluating list and its
+subcommand is read from a closed list, so a block such as `git -c core.fsmonitor=./hook.sh status` was
+`runnable` while git ran the value as a command. Measured under real bash on 2026-11-11, these write or
+run code, and each is now `mutating` with a reason that starts `not-allow-listed: git `: the global
+`-c` and `--config-env`; a `GIT_*=` assignment in any position (a prefix on the command, a bare line,
+`export`, `declare`), refused by name because `export`, `declare -x` and a bare assignment after `set -a`
+make the variable live for a later git command; and `ls-remote --upload-pack` or `--exec`, including
+git's unambiguous prefixes (`--upl`, `--exe`). The refusal is on the form, never the value: the value is
+the string git will run. `-C <one plain word>` and the `=`-joined `--git-dir=x` / `--work-tree=x` spellings select a path and stay runnable (a separate-operand `--git-dir x` is refused), as does a
+`-c` written after the subcommand (a diff flag, not the global one). `--exec-path=<dir>` is refused too:
+under `ls-remote` it runs `<dir>/git-upload-pack` (QA cycle 2), while a bare `--exec-path` only prints.
+A git argument holding an unquoted brace expansion (`--upload-pa{ck,ck}`, `--config-e{nv,nv}`) is
+refused as a whole, because the scan reads text that is not the word git receives; the cost is that
+`git log --format={%h,%s}` is refused as well, and a quoted brace is not. The brace scan is per word (a
+`{` in one word never pairs with a `,` in another, as bash does not expand it); a word is joined to the
+next only across a trailing backslash, which is how the scan splits `--{upload-pack=x\ y,}`. The
+exported name gets the same treatment as the arguments (QA cycle 3, the third strike on this file): a
+mechanism that matched the text of a `GIT_` name was beaten three times, by quoting, by a brace and by
+a name the shell assembles (`export GIT_{SSH_COMMAND,X}=…`, `export GI''T_SSH_COMMAND=…`, `export
+GIT\_SSH_COMMAND=…`). It was replaced, not widened: `export`, `declare`, `typeset`, `readonly` and `local`
+must name each variable as a plain literal identifier whenever the block is judged for git, and a name
+holding a brace, a quote, a backslash or an expansion is refused whatever it spells. The same change of
+shape closed QA cycle 4: the scan finds the subcommand by skipping the global flags that take a separate
+operand, and a list of those fails open on every flag it forgets (`git --attr-source log -c
+core.sshCommand=… ls-remote …` read `log` as the subcommand and ran the `-c`). The rule is now the
+reverse: a global flag before the subcommand must be one the scan knows (the operand-taking ones it
+skips, and the zero-operand ones such as `--no-pager`, `-p`, `--bare`, `--literal-pathspecs`), and any
+other flag, including one git adds next year, is refused with `an unknown git global flag`. QA cycle 5
+closed the last way two readers could differ: the scan that admits the subcommand and the scan that
+judges the arguments each found it, on different text, and a quote inside an operand-taking flag
+(`git --names"pace" log fetch --upload-pack=…`) made them name `log` and `fetch`. The argument scan
+now returns the subcommand it found, and a line whose two readings disagree is refused. QA cycle 6 showed
+that check cannot hold alone: the line reaches both readers already split on whitespace, so an escaped
+space inside a flag operand (`git --namespace a\ log fetch --upload-pack=…`) is two tokens to both and
+one word to bash, and they agree on the wrong subcommand. The scan therefore stops reading flag
+operands. The only global flag with a separate operand that is kept is `-C`, with one plain word (the
+documented form); any other operand-taking flag, a `-C` operand that is not one plain word, and any flag
+token ahead of the subcommand spelled with a quote, backslash or expansion are refused. Cost on the shipped documentation:
+0 blocks (`npm run qa-snippets:docscan`: 251 runnable before, 251 now). The `git` atom set of the
+differential forms these shapes and is calibrated against the engine without the rule (writes there,
+none now). A block that needs one of these forms is rewritten without it.
 
 ### 2aa. Helper calls run only when the helper itself would
 

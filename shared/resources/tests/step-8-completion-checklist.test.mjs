@@ -1139,39 +1139,59 @@ test("a PreCompact pause inside Step 8 looks finished to git but leaves a record
       env: { PIPELINE_LOCK: LOCK },
     });
     assert.equal(r.status, 0, `hook: ${r.stdout}\n${r.stderr}`);
-    // Git cannot tell this from a finished Step 8: the report is committed and pushed.
+    // Git's working tree cannot tell this from a finished Step 8: the report is committed. Since
+    // task.303 the push is held at Step 8 (a pushed pause commit supersedes the head's CI run), so
+    // the commit is one ahead of the upstream, and Step 8's own commit pushes it.
     assert.equal(
       git(fx.work, "status", "--porcelain", "--", WORK_ITEM).trim(),
       "",
       "report left dirty",
     );
-    assert.equal(
+    assert.notEqual(
       git(fx.work, "rev-parse", "HEAD").trim(),
       git(fx.work, "rev-parse", "@{u}").trim(),
-      "hook did not push — the fixture no longer models the case",
+      "hook pushed at Step 8 — the pause commit must be held for Step 8's own commit",
+    );
+    assert.equal(
+      git(fx.work, "rev-list", "--count", "@{u}..HEAD").trim(),
+      "1",
+      "the held pause commit is exactly one commit ahead of the upstream",
     );
     assert.match(
       fs.readFileSync(path.join(fx.work, REPORT), "utf8"),
       /^## Pipeline Paused — /m,
     );
-    // The record can: the lock is gone and a snapshot names step 8 for this work item.
-    assert.equal(
-      fs.existsSync(path.join(fx.work, LOCK)),
-      false,
-      "hook left the lock",
+    // The record can: the lock is KEPT at step 8, marked paused (2026-11 — the hook no longer
+    // removes it), and a snapshot names step 8 for this work item.
+    const paused = JSON.parse(
+      fs.readFileSync(path.join(fx.work, LOCK), "utf8"),
     );
+    assert.equal(
+      String(paused.current_step),
+      "8",
+      "hook moved the lock off step 8",
+    );
+    assert.equal(
+      paused.paused?.reason,
+      "precompact",
+      "hook did not mark the lock paused",
+    );
+    assert.equal(String(paused.paused?.step), "8");
     const snap = JSON.parse(
       fs.readFileSync(path.join(fx.work, SNAPSHOT), "utf8"),
     );
     assert.equal(String(snap.halt_step), "8");
     assert.equal(snap.task_or_story_directory, WORK_ITEM);
-    // And a resume restores it to a lock at step 8 — the value the resume contract reads.
+    // And a resume clears the mark in place, leaving a lock at step 8 — the value the resume
+    // contract reads.
     const rr = run("bash", `bash "${RESTORE}" --restore "${WORK_ITEM}"`, {
       cwd: fx.work,
     });
     assert.equal(rr.status, 0, `restore: ${rr.stdout}\n${rr.stderr}`);
+    assert.match(rr.stdout, /pause cleared in place at step 8/);
     const lock = JSON.parse(fs.readFileSync(path.join(fx.work, LOCK), "utf8"));
     assert.equal(String(lock.current_step), "8");
+    assert.equal(lock.paused, undefined, "restore left the paused mark");
   } finally {
     cleanup(fx.dir);
   }

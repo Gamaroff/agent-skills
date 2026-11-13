@@ -1,0 +1,78 @@
+schema: 2
+task: 'task.293.qa-snippet-classifier-indirect-evaluation'
+task_title: 'QA snippet classifier refuses indirect evaluation'
+gate: FAIL
+status_reason: 'Safety re-probe (unscoped, independent reviewer) found two more spellings of the same family that reach an arithmetic read the enumerated detector does not list: the offset of positional-parameter expansion, and a subscript starting with a digit. Both classify runnable and write under bash 5.3; controls are clean. The cycle-2 fix held.'
+reviewer: 'QA Engineer'
+head: 'b74ca09a7c79e412d88e677c6679703ded12741d'
+updated: '2026-11-10T10:58:16Z'
+
+top_issues:
+  - id: 'T293-QA-5'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'ARITHMETIC_READ lists arithmetic spellings and misses the offset of a positional expansion: set with a quoted literal a[ then a substitution touch W then ], followed by echo of at-sign-colon-dollar-1 in braces, classifies runnable and creates W under bash 5.3 (the star form too). set is not an evaluating word. Reproduced by QA; the control with a plain number stays runnable and writes nothing.'
+    suggested_action: 'Do not add a spelling. Replace the enumerated arithmetic-read detector with a default-deny test: a quoted or here-document substitution literal is refused in any block that holds a live parameter expansion or a name followed by a bracket.'
+    suggested_owner: dev
+    status: open
+    origin: 'code-review CR-1, reproduced by QA'
+  - id: 'T293-QA-6'
+    severity: medium
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'A subscript is seen only when the bracket is followed by a letter, underscore or dollar sign, so set with the same literal, an array v=(1), and echo of a v subscript beginning with 1 plus dollar-1 classifies runnable and creates W under bash 5.3. Reproduced by QA; the same shape with a plain number stays runnable and writes nothing.'
+    suggested_action: 'Same replacement as T293-QA-5: any live expansion or name-bracket in a block that holds a substitution literal.'
+    suggested_owner: dev
+    status: open
+    origin: 'code-review CR-2, reproduced by QA'
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 383
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 31
+    boundary: true
+    escaped: 0
+    boundary_signals: ["refused"]
+    notes: 'The classifier is the boundary. 31 corpus cases executed, 0 escaped. The reviewer enumerated about 100 evaluation routes; two reached an arithmetic read the detector does not list, and QA reproduced both under real bash. Cycle 1 and 2 findings are fixed.'
+  performance:
+    status: PASS
+    notes: 'Docs scan median +0.5% over 7 runs at the cycle-2 fix; the reviewer did not time linearity this cycle, the cycle-2 reviewer timed x=a[ at 1e5 repeats as linear.'
+  reliability:
+    status: PASS
+    notes: 'CI=true npm run ci:fast green at the cycle-2 fix commit (8346 tests, 0 fail). QA re-ran the block-rule mutation: both task.293 shape and decider tests went red; the engine was restored byte-identical.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Three cycles in a row each found a new spelling of the same family: the enumerated arithmetic-read detector is the struck mechanism and needs a default-deny replacement, not a fourth spelling.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Replace the arithmetic-read enumeration (third strike) with a default-deny rule, then extend the table, decider rows and differential atoms.'
+      refs: ['shared/resources/qa-execute-snippets.mjs', 'shared/resources/tests/qa-execute-snippets.test.mjs', 'scripts/qa-snippets-differential.mjs']
+  future:
+    - action: 'CR-3 cleanup: EVALUATING_WORD omits set, mapfile, readarray, getopts, trap, compgen, wait and shift; they are refused today only by the unrecognised-command rule, so the indirect check depends on that rule staying strict. Add a test that locks the dependency.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'Recorded unseen shapes (printf octal launder, a bracket or dollar arriving by expansion) and advisory over-refusal remain as in the docs.'
+      refs: ['shared/resources/qa-runnable-prose-detection.md']
+      provenance: documented-unseen-shape
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T293-QA-5 and T293-QA-6 closed by replacing the detector, and re-reviewed']

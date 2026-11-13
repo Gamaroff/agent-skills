@@ -17,16 +17,60 @@ Loaded by `/develop-story` and `/develop-task` during Step 1. Story/task variant
 Only one `/develop-story` or `/develop-task` pipeline may run per repo at a time (single-path lock). Run this _before_ any branch-creation work — collision after `/create-branch` would orphan a branch.
 
 ```bash
-if [ -f .claude/state/develop-pipeline.lock ]; then
-  echo "❌ Pipeline lock collision: another /develop-story or /develop-task pipeline is already active in this repo:"
-  cat .claude/state/develop-pipeline.lock
-  echo "Resolve by completing or aborting the other run (and removing the lock) before continuing."
+# INPUTS, substituted into THIS block: {doc-directory} — this run's task or story directory;
+# {start-fresh} — "yes" only when the operator chose "Start fresh" in Phase 0b for THIS
+# document, otherwise "no". The block exits 1 on a collision: it is the HALT, not a hint at one.
+LOCK=.claude/state/develop-pipeline.lock
+SNAP=.claude/state/develop-pipeline.last-halt.json
+DOC_DIR="{doc-directory}"
+START_FRESH="{start-fresh}"
+# An unsubstituted placeholder is a HALT, never a quiet "no": read as "no", a Start fresh the
+# operator chose would be refused as a collision, and the run would not say why.
+case "$DOC_DIR" in
+  ""|*"{"*) echo "HALT: {doc-directory} was not substituted into this block (got '$DOC_DIR')"; exit 1 ;;
+esac
+case "$START_FRESH" in
+  yes|no) ;;
+  *) echo "HALT: {start-fresh} must be substituted with yes or no — the answer to Phase 0b's \"Start fresh\" question (got '$START_FRESH')"; exit 1 ;;
+esac
+if [ -f "$LOCK" ]; then
+  LOCK_BRANCH=$(jq -r '.branch // ""' "$LOCK" 2>/dev/null)
+  LOCK_DIR=$(jq -r '.task_or_story_directory // ""' "$LOCK" 2>/dev/null)
+  LOCK_SKILL=$(jq -r '.skill // "develop-task"' "$LOCK" 2>/dev/null)
+  LOCK_PAUSED=no
+  jq -e '(.paused | type) == "object"' "$LOCK" >/dev/null 2>&1 && LOCK_PAUSED=yes
+  if [ -n "$LOCK_BRANCH" ] && ! git show-ref --verify --quiet "refs/heads/$LOCK_BRANCH"; then
+    echo "⚠️  stale pipeline lock: its branch '$LOCK_BRANCH' does not exist locally — removing it"
+    rm -f "$LOCK"
+  elif [ "$LOCK_PAUSED" = yes ] && [ "$LOCK_DIR" = "$DOC_DIR" ] && [ "$START_FRESH" = yes ]; then
+    echo "the paused run for this document is being abandoned (Start fresh) — removing its lock and pause snapshot"
+    rm -f "$LOCK"
+    # An `if`, not `jq … && rm`: a snapshot with another reason would leave the block's exit
+    # status at 1, and a caller reading that as the HALT would refuse a Start fresh that worked.
+    if jq -e '.pause_reason == "precompact"' "$SNAP" >/dev/null 2>&1; then rm -f "$SNAP"; fi
+  else
+    echo "❌ Pipeline lock collision: another /develop-story or /develop-task pipeline is already active in this repo:"
+    cat "$LOCK"
+    if [ "$LOCK_PAUSED" = yes ]; then
+      echo "That run is PAUSED (a context compaction stopped it); its lock is its live record."
+      echo "  Resume it:   /$LOCK_SKILL $LOCK_DIR"
+      echo "  Abandon it:  rm -f $LOCK"
+    else
+      echo "Resolve by completing or aborting the other run (and removing the lock) before continuing."
+    fi
+    exit 1
+  fi
 fi
 ```
 
-If the lock file exists: **HALT immediately** — show the lock contents to the user and instruct them to resolve by completing or aborting the other pipeline run, then removing `.claude/state/develop-pipeline.lock`. Do NOT proceed to branch creation.
+Substitute both placeholders before running it: `{doc-directory}` is this run's task or story directory, and `{start-fresh}` is the answer kept from Phase 0b's previous-run question (`yes` only for "Start fresh"; `no` for a resume or when there was no previous run). The block refuses either one left unsubstituted.
 
-If the lock exists but its `branch` field does not match any existing local branch (`git branch --list`), it is stale — log a warning and remove it: `rm -f .claude/state/develop-pipeline.lock`. Then proceed.
+If the block exits 1: **HALT immediately** — show the user its output and do NOT proceed to branch creation. A lock whose `branch` names no existing local branch is stale; the block warns and removes it, and the run proceeds.
+
+**A lock that carries `paused`** (2026-11: the PreCompact hook keeps the lock and marks it instead of removing it) is a run stopped by a compaction, not one running now. It still collides — the exception is narrow, and the block above holds it:
+
+- **This document, and the operator chose "Start fresh"** in Phase 0 — the paused run *is* the one being abandoned. The block removes the lock, and its pause snapshot only when that snapshot's `pause_reason` is `precompact`, then the run proceeds.
+- **Another document** — the block HALTs and names the paused run: `/develop-<skill> <its task_or_story_directory>` resumes it, or the operator abandons it by removing the lock. Before 2026-11 the hook removed the lock at every pause, so a paused run of another item did not block a new one; it now does, because the lock is that run's live record.
 
 ---
 

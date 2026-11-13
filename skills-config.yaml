@@ -30,6 +30,12 @@ loopSupervisor:
   # There is deliberately no dashboardToken key — this file is committed. The
   # token comes from --dashboard-token or $LOOP_SUPERVISOR_DASHBOARD_TOKEN.
 
+# The fast gate the develop loop and each qa-fix cycle run before committing. Left unset it is
+# skipped silently, which is how task.295 gated five cycles without a full-suite run (task.297).
+# `npm run test:remote` is the same script on the LAN server, for when the laptop should not run it.
+develop:
+  fastGateCommand: npm run ci:fast
+
 qa: # the QA loop's diminishing-returns exit — schema: docs/reference/configuration.md
   # Test machinery in THIS repository: the eval suites, the per-skill test dirs and
   # the top-level tests/. Findings whose file: matches only these can take the

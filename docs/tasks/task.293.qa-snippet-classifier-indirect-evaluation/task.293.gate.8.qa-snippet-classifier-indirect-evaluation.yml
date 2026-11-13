@@ -1,0 +1,72 @@
+schema: 2
+task: 'task.293.qa-snippet-classifier-indirect-evaluation'
+task_title: 'QA snippet classifier refuses indirect evaluation'
+gate: FAIL
+status_reason: 'Gate 8 (third owner-granted extra cycle, scoped to routes that keep the substitution text in the source). The reviewer found a neighbour of the gate-7 fix: the bracket depth is reset at a separator character even when that character sits inside a quoted span in the subscript, so a quoted semicolon before the literal loses the open bracket. QA reproduced it under bash 5.3 with a clean control.'
+reviewer: 'QA Engineer'
+head: '5c905cd4021576e03a15876a5cee9aacb13be301'
+updated: '2026-11-10T12:03:50Z'
+
+top_issues:
+  - id: 'T293-QA-11'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: 'unclosedBracketMap resets depth at any semicolon, ampersand, pipe or newline, including one inside a quoted span in the subscript. a=([ then a single-quoted semicolon, 0, then a single-quoted dollar-paren touch W close-paren, close-bracket]=1); echo hi, and the double-quoted-index variant, run touch W under bash 5.3 and classify runnable. Reproduced by QA by execution; the control with a plain number in the quotes stays runnable and writes nothing.'
+    suggested_action: 'Never reset the depth: an unclosed bracket anywhere earlier in the block refuses a quoted substitution literal. It over-refuses a little and has no reset left to hide behind. Add both shapes to the real-bash and decider tables.'
+    suggested_owner: dev
+    status: open
+    origin: 'code-review CR-1, reproduced by QA'
+
+waiver:
+  active: false
+
+quality_score: 85
+
+evidence:
+  tests_reviewed: 383
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 31
+    boundary: true
+    escaped: 0
+    boundary_signals: ["refused"]
+    notes: 'The classifier is the boundary. 31 corpus cases executed, 0 escaped. About 35 reviewer probes; one neighbour of the gate-7 fix escaped and QA reproduced it.'
+  performance:
+    status: PASS
+    notes: 'The bracket map is one linear pass; docs scan median +2.3% at the gate-7 fix (machine under load).'
+  reliability:
+    status: PASS
+    notes: 'ci:fast green at the gate-7 fix (8346 tests, 0 fail); CI on the head pending at the read.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Eight gates. The last three each found a gap in the subscript scan in turn: one character, one word, then a depth count with a reset. The remaining reset is the last piece of that logic that can lose the bracket.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Owner decision: a further extra cycle that removes the depth reset entirely, or accept T293-QA-11 as a documented residual with the allow-list task.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+  future:
+    - action: 'Cleanup: the test "a helper call that also names a start-up variable keeps its pinned reason" asserts only mutating; pass a helperRoot and assert the reason string.'
+      refs: ['shared/resources/tests/qa-execute-snippets.test.mjs']
+    - action: 'Cleanup: EVALUATING_WORD omits set, mapfile, readarray, getopts, trap, compgen, wait and shift; they are refused today only by the unrecognised-command rule.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'Documented residuals: printf octal launder, a bracket or dollar arriving by expansion, a literal split across quote tokens.'
+      refs: ['shared/resources/qa-runnable-prose-detection.md']
+      provenance: documented-unseen-shape
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T293-QA-11 closed, or accepted by the owner as a documented residual']

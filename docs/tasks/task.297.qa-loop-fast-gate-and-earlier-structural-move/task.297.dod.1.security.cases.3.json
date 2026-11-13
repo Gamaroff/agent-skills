@@ -1,0 +1,122 @@
+[
+  {
+    "id": "fg-empty",
+    "sink": "filename",
+    "input": "",
+    "why": "An unset develop.fastGateCommand must be recorded as skipped, never run and never silently passed.",
+    "correct": "Prints GATE_OUTCOME=skipped (develop.fastGateCommand unset), exit 0.",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.297.qa-loop-fast-gate-and-earlier-structural-move/task.297.qa-loop-fast-gate-and-earlier-structural-move.md:113",
+    "expected": {
+      "stdout": "GATE_OUTCOME=skipped (develop.fastGateCommand unset)\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "fg-spaces",
+    "sink": "filename",
+    "input": "   ",
+    "why": "A whitespace-only command is not a gate.",
+    "correct": "Prints the skipped line.",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.297.qa-loop-fast-gate-and-earlier-structural-move/task.297.qa-loop-fast-gate-and-earlier-structural-move.md:113",
+    "expected": {
+      "stdout": "GATE_OUTCOME=skipped (develop.fastGateCommand unset)\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "fg-tab",
+    "sink": "filename",
+    "input": "\t",
+    "why": "Tab-only is whitespace.",
+    "correct": "Prints the skipped line.",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.297.qa-loop-fast-gate-and-earlier-structural-move/task.297.qa-loop-fast-gate-and-earlier-structural-move.md:113",
+    "expected": {
+      "stdout": "GATE_OUTCOME=skipped (develop.fastGateCommand unset)\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "fg-newlines",
+    "sink": "filename",
+    "input": "\n\n",
+    "why": "Newline-only is whitespace.",
+    "correct": "Prints the skipped line.",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.297.qa-loop-fast-gate-and-earlier-structural-move/task.297.qa-loop-fast-gate-and-earlier-structural-move.md:113",
+    "expected": {
+      "stdout": "GATE_OUTCOME=skipped (develop.fastGateCommand unset)\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "fg-cr-ff-vt",
+    "sink": "filename",
+    "input": "\r\f\u000b",
+    "why": "CR, form feed and vertical tab are whitespace.",
+    "correct": "Prints the skipped line.",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.297.qa-loop-fast-gate-and-earlier-structural-move/task.297.qa-loop-fast-gate-and-earlier-structural-move.md:113",
+    "expected": {
+      "stdout": "GATE_OUTCOME=skipped (develop.fastGateCommand unset)\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "fg-set",
+    "sink": "filename",
+    "input": "npm run ci:fast",
+    "why": "A configured command must be reported run; an over-strict classifier that skips it drops the gate.",
+    "correct": "Prints GATE_OUTCOME=run.",
+    "direction": "legitimate",
+    "spec_ref": "docs/tasks/task.297.qa-loop-fast-gate-and-earlier-structural-move/task.297.qa-loop-fast-gate-and-earlier-structural-move.md:113",
+    "expected": {
+      "stdout": "GATE_OUTCOME=run\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "fg-padded",
+    "sink": "filename",
+    "input": "  npm test  ",
+    "why": "A command with surrounding whitespace is still set.",
+    "correct": "Prints GATE_OUTCOME=run.",
+    "direction": "legitimate",
+    "spec_ref": "docs/tasks/task.297.qa-loop-fast-gate-and-earlier-structural-move/task.297.qa-loop-fast-gate-and-earlier-structural-move.md:113",
+    "expected": {
+      "stdout": "GATE_OUTCOME=run\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "fg-flag-shaped",
+    "sink": "filename",
+    "input": "--log",
+    "why": "A command value shaped like a flag must be taken as the --command value, not reparsed as an option.",
+    "correct": "Prints GATE_OUTCOME=run.",
+    "direction": "legitimate",
+    "spec_ref": "docs/tasks/task.297.qa-loop-fast-gate-and-earlier-structural-move/task.297.qa-loop-fast-gate-and-earlier-structural-move.md:113",
+    "expected": {
+      "stdout": "GATE_OUTCOME=run\n",
+      "exit": 0
+    }
+  },
+  {
+    "id": "fg-metachar-not-executed",
+    "sink": "filename",
+    "input": "$(touch pwned.txt)",
+    "why": "The command text must be classified, never evaluated.",
+    "correct": "Prints GATE_OUTCOME=run and creates no pwned.txt.",
+    "direction": "legitimate",
+    "spec_ref": "docs/tasks/task.297.qa-loop-fast-gate-and-earlier-structural-move/task.297.qa-loop-fast-gate-and-earlier-structural-move.md:113",
+    "expected": {
+      "stdout": "GATE_OUTCOME=run\n",
+      "exit": 0,
+      "absent": [
+        "pwned.txt"
+      ]
+    }
+  }
+]

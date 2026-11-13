@@ -1,0 +1,74 @@
+schema: 2
+task: 'task.304.qa-snippet-classifier-git-literal-execution'
+task_title: 'QA snippet classifier refuses git literal execution'
+gate: FAIL
+status_reason: 'The cycle 5 finding is fixed and re-verified: a git line whose two readings of the subcommand disagree is refused, and switching that check off turns the quoted --namespace row red. The safety re-probe found one more way into the same boundary. The scan splits a command line on whitespace before either reader sees it, so a backslash-escaped space inside the operand of a global flag (`git --namespace a\ log fetch --upload-pack=./hook.sh .`) becomes two tokens. Both readers skip the first as the operand and read `log` as the subcommand, so they agree, and the agreement check passes. Real git takes `a log` as the operand and runs `fetch --upload-pack`, which writes under bash (git 2.56). This is the sixth gate; the budget was extended once by the owner and is spent again.'
+reviewer: 'QA Engineer'
+head: 'b18ea7e479db30b0bb5d58485d152711024612c9'
+updated: '2026-11-11T07:34:49Z'
+
+top_issues:
+  - id: 'T304-QA-11'
+    severity: high
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: "commandInvocations splits the git line on whitespace before gitSubcommand and scanGitArgs read it, so `a\\ log` (a backslash-escaped space) is two tokens for both readers and one word for bash. `git --namespace a\\ log fetch --upload-pack=./hook.sh .` classifies runnable as `git:log` (the develop engine too) and bash writes the marker under git 2.56: git takes `a log` as the --namespace operand and runs `fetch`. Reviewer also lists `--git-dir`, `--work-tree` and `-C` forms (`-C`/`--super-prefix` need an existing directory or error before running, so no write was measured for them) and `status clone -u`, `show submodule foreach`, `rebase --exec` behind the same split. Reproduced by QA under bash with a planted hook; controls (`git --namespace 'a b' log -1`, `git log -1`) behave."
+    suggested_action: 'Stop reading an operand at all. A global flag that takes a separate operand is the one construct that makes the subcommand depend on how a word is split, and every cycle since the fourth has been a new way to split it. Refuse any git line that has an operand-taking global flag before the subcommand, except `-C` with one plain word (the form the documentation uses), and keep a bash-verified row for each of --namespace, --git-dir, --work-tree, --super-prefix with an escaped space. Refusing the construct needs no tokenizer to agree with bash.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 404
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 72
+    escaped: 0
+    boundary: true
+    boundary_signals: ['refused', 'are refused']
+    notes: 'The classifier is a boundary (a false runnable executes a block). 72 probes ran (run record task.304.qa.6...security.run.json, escaped 0): 70 behaved as required; 2 hostile cases with an escaped-space operand classified runnable and one of them writes under real bash (the other errors in git before running anything). All cycle 5 cases pass.'
+  performance:
+    status: PASS
+    notes: 'Docs scan unchanged by the cycle 5 fix: 3471 blocks, runnable 251 before and after, newly refused 0. Differential git set on the LAN server: 0 writes in 20000 (its atoms do not include an escaped-space operand).'
+  reliability:
+    status: PASS
+    notes: 'Fails closed on the forms the task lists plus brace, quote, name-assembly, unknown-flag and reader-disagreement forms. The open gap is that both readers see a pre-split line.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Sixth consecutive gate with a HIGH on shared/resources/qa-execute-snippets.mjs. Each fix closes its finding and the next probe finds a neighbouring way to make the scan and bash read one line differently. Convergence readings 3, 2, 2, 1, 1, 1: flat, not rising.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Refuse operand-taking global flags before the subcommand (except `-C <plain word>`) instead of reading their operand (see T304-QA-11), with bash-verified rows and a differential atom, then re-review. The gate budget is spent twice over: a human decides whether to continue or to accept the residual.'
+      refs: ['shared/resources/qa-execute-snippets.mjs', 'scripts/qa-snippets-differential.mjs', 'shared/resources/tests/qa-execute-snippets.test.mjs']
+  future:
+    - action: 'PAGER (carried, pre-existing; the reviewer rated it medium again): `PAGER="touch m" git -p log` runs the string when stdout is a terminal. Not a GIT_ name, so outside the task as written. Same on the develop engine.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+      provenance: pre-existing
+    - action: 'CI check `test` red on b18ea7e4 and on develop too (run 42959047359): not caused by this branch. Fix on the base.'
+      refs: ['.github/workflows']
+      provenance: pre-existing
+    - action: 'CR-4 (carried): a GIT_ substring in quoted or argument text is refused (`git log --grep="GIT_SSH"`). Fail-closed; docs corpus shows 0 newly refused.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'Reviewer low-confidence note (carried): `git ls-remote ext::sh ...` classifies runnable. Real git refuses ext:: by default, so it runs nothing unless config enables it. Consider refusing a `::` positional on ls-remote.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: []

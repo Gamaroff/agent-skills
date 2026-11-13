@@ -33,11 +33,17 @@ import { loadSensitive, neverRan, spawnBudget } from "../spawn-budget.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  ATOM_SETS,
+  BARE_SETS,
+  runDifferential,
+} from "../../../scripts/qa-snippets-differential.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MODULE = join(__dirname, "..", "qa-execute-snippets.mjs");
 
 const {
+  allowListViolation,
   COMMAND_RUNNERS,
   DENY_PATTERNS,
   main,
@@ -55,10 +61,18 @@ const {
   sandboxEnv,
   snapshotTree,
   splitTableRow,
+  tokenize,
   unboundVariables,
   unescapeCell,
   zshAvailable,
 } = await import(MODULE);
+
+// task.294: the word allow-list is the LAST layer of `classifyBlock`. A test about an EARLIER layer
+// (the tokenizer, the deny-list, the helper rules) that holds a block the allow-list now refuses
+// asserts through `beforeAllowList`, so it keeps proving what it was written to prove; the
+// allow-list's own verdict on that block is pinned by the task.294 tests below.
+const beforeAllowList = (code, bindings = {}, opts = {}) =>
+  classifyBlock(code, bindings, { ...opts, allowList: false });
 
 const TEMP_DIRS = [];
 function tmp() {
@@ -290,8 +304,16 @@ test("a command substitution's inner command is scanned, not swallowed", () => {
 test("arithmetic expansion is arithmetic, not an invocation", () => {
   // `$((N + 1))` used to become a segment whose first token was `N`, reported as
   // an unrecognised command — so a read-only block was skipped as mutating.
+  const block = 'N=$(ls | wc -l)\nif [ -n "$N" ]; then M=$((N + 1)); fi';
+  assert.equal(beforeAllowList(block).klass, "runnable");
+  // task.294: a bare name inside `$((…))` is evaluated by bash, so the allow-list refuses it. The
+  // same block over digits stays runnable.
+  assert.match(
+    classifyBlock(block).reason,
+    /^not-allow-listed: arithmetic expansion/,
+  );
   assert.equal(
-    classifyBlock('N=$(ls | wc -l)\nif [ -n "$N" ]; then M=$((N + 1)); fi')
+    classifyBlock('N=$(ls | wc -l)\nif [ -n "$N" ]; then M=$((1 + 1)); fi')
       .klass,
     "runnable",
   );
@@ -1536,7 +1558,9 @@ test("BUG-6: widening the write-redirect pre-context spares descriptors and /dev
 
 test("BUG-6: resolving git's subcommand past global flags keeps safe ones safe", () => {
   assert.equal(classifyBlock("git -C /path status").klass, "runnable");
-  assert.equal(classifyBlock("git -c user.name=x log").klass, "runnable");
+  // task.304: the global `-c` runs its value as a command for some keys, so it is refused (the case
+  // moved to the task.304 table below); `-C` and `--git-dir` select a path and stay runnable.
+  assert.equal(classifyBlock("git -c user.name=x log").klass, "mutating");
   assert.equal(classifyBlock("git --git-dir=/p/.git status").klass, "runnable");
   // The route itself: the flag operand must not be mistaken for the subcommand.
   assert.equal(classifyBlock("git -C log push origin main").klass, "mutating");
@@ -1684,8 +1708,22 @@ test("BUG-6/verify: a multi-line quoted string is data, not a command position",
 });
 
 test("BUG-6/verify: a glued arithmetic evaluation is not an invocation", () => {
-  assert.equal(classifyBlock("if ((a>b)); then echo hi; fi").klass, "runnable");
-  assert.equal(classifyBlock("echo $((x>>2))").klass, "runnable");
+  assert.equal(classifyBlock("if ((1>2)); then echo hi; fi").klass, "runnable");
+  assert.equal(classifyBlock("echo $((1>>2))").klass, "runnable");
+  // task.294: the same shapes over names are evaluated by bash, so only the earlier layers admit them.
+  assert.equal(
+    beforeAllowList("if ((a>b)); then echo hi; fi").klass,
+    "runnable",
+  );
+  assert.equal(beforeAllowList("echo $((x>>2))").klass, "runnable");
+  assert.match(
+    classifyBlock("if ((a>b)); then echo hi; fi").reason,
+    /^not-allow-listed: arithmetic command/,
+  );
+  assert.match(
+    classifyBlock("echo $((x>>2))").reason,
+    /^not-allow-listed: arithmetic expansion/,
+  );
   // But one carrying a command substitution still reaches the fail-closed path.
   assert.equal(classifyBlock("((a+$(touch /tmp/x)))").klass, "mutating");
 });
@@ -4507,4 +4545,1405 @@ test("task.289 controls paired with each gap: the look-alike that writes nothing
     classifyBlock("zz_helper() { echo hi; }; zz_helper").reason ?? "",
     /^function-shadows-command/,
   );
+});
+
+// task.290: one reading of `#`, an iterative closingParen, no exception path.
+const T290_GAPS = {
+  "a # after an escaped space is part of the word": "echo a\\ # ; touch out",
+  "the same, nested in a substitution": "echo $(echo a\\ #\n) ; touch out",
+  "the same, in a substitution closed on the next line":
+    "echo $(echo a\\ #) ; touch out\n)",
+  "an escaped semicolon does not start a word": "echo a\\;# ; touch out",
+  "an escaped tab does not start a word": "echo a\\\t# ; touch out",
+  "an escaped space inside a case arm":
+    "case x in x) echo a\\ # ; touch out ;; esac",
+  // task.290 QA 1 (T290-QA-1): a backslash outside quotes.
+  "an escaped quote does not open a quote":
+    "echo \\'a' # ; touch out' ; touch out2",
+  "an escaped double quote does not open a quote":
+    'echo \\"a" # ; touch out" ; touch out2',
+  "a backslash-newline joins a # at column 0 to the word":
+    "echo a\\\n# ; touch out",
+  // T290-QA-2: an even run of backslashes is an escaped backslash, not a join.
+  "an escaped backslash then a newline ends the command":
+    "echo a\\\\\ntouch out",
+  "four backslashes then a newline ends the command":
+    "echo a\\\\\\\\\ntouch out",
+  "an even run, then a write after a blank line": "echo a\\\\\n\ntouch out",
+};
+for (const [name, code] of Object.entries(T290_GAPS)) {
+  test(`task.290 gap: ${name} is refused as mutating`, () => {
+    assert.equal(classifyBlock(code).klass, "mutating", code);
+  });
+}
+
+const T290_CONTROLS = {
+  "a real comment hides the rest of the line": "echo a # ; touch out",
+  "a # inside a word is not a comment": "echo a#b",
+  "$# is the argument count": "echo $#",
+  "an escaped backslash leaves the space unescaped": "echo a\\\\ # ; touch out",
+  "a comment after a semicolon": "echo a;# touch out",
+  "a # in quotes is data": 'echo "a # b" && echo ok',
+  "a continuation then an indented comment is a comment":
+    "echo a\\\n  # ; touch out",
+  "a continuation with no comment": "echo a \\\n  b",
+  "an odd run joins the next line into the command": "echo a\\\nb",
+  "three backslashes then a newline still join": "echo a\\\\\\\nb",
+  "an escaped backslash then a newline is not a continuation":
+    "echo a\\\\\n# ok",
+};
+for (const [name, code] of Object.entries(T290_CONTROLS)) {
+  test(`task.290 control: ${name} stays runnable`, () => {
+    assert.equal(classifyBlock(code).klass, "runnable", code);
+  });
+}
+
+test("task.290 closingParen: deep nesting is refused, not thrown", () => {
+  // The task's shape: `"$(` x N then `")` x N. Unbalanced as bash reads it, so refused at every depth.
+  const shape = (n) => "echo " + '"$('.repeat(n) + '")'.repeat(n);
+  for (const n of [1000, 20000]) {
+    let r;
+    assert.doesNotThrow(() => (r = classifyBlock(shape(n))), `depth ${n}`);
+    assert.equal(r.klass, "mutating", `depth ${n}`);
+  }
+  // A well-formed nest is read to its end. (The scan re-masks each level, so cost grows
+  // with the square of the depth: 1000 is ~0.1s, 3000 is ~0.7s.)
+  const nested = (n) => 'echo "$(echo '.repeat(n) + "x" + ')"'.repeat(n);
+  let r;
+  assert.doesNotThrow(() => (r = classifyBlock(nested(1000))));
+  assert.equal(r.klass, "runnable");
+  // And a substitution that nests a write is still refused at depth.
+  assert.equal(
+    classifyBlock('echo "$(echo "$(echo "$(touch out)")")"').klass,
+    "mutating",
+  );
+});
+
+test("task.290 the classifier never throws: any exception is a mutating verdict", () => {
+  // A non-string reaches the scanners as an input they cannot read.
+  for (const bad of [null, undefined, 42, {}]) {
+    let r;
+    assert.doesNotThrow(() => (r = classifyBlock(bad)), String(bad));
+    assert.equal(r.klass, "mutating", String(bad));
+    assert.match(r.reason, /fail-closed/, String(bad));
+  }
+});
+
+// task.292: `\s` counts CR, FF, VT, NBSP and U+2028 as blanks and bash does not. Every function of the
+// engine that holds a `\s` is named here with the reason that is safe. A new one fails the run until
+// it is added WITH a reason, and an entry whose function no longer holds a `\s` fails as stale.
+const MARKDOWN = "reads Markdown or a table cell, not bash input";
+const NORMALISED =
+  "reads bash input after NOT_A_BASH_BLANK has turned every non-blank whitespace character into a word character, so `\\s` can only match space, tab or newline";
+const WHITESPACE_ALLOWLIST = {
+  extractBlocks: MARKDOWN,
+  isDelimiterRow: MARKDOWN,
+  looksLikeCommand: MARKDOWN,
+  fenceMask: MARKDOWN,
+  sedWritesFile: NORMALISED,
+  scriptWrites: NORMALISED,
+  sedScan: `${NORMALISED}; sed's own grammar, not bash's`,
+  hasOutputFlagWrite: `${NORMALISED}; the deny-list patterns after it only match MORE than a blank, which is the strict side`,
+  variableArgumentToDenyListed: NORMALISED,
+  assignedVariables: NORMALISED,
+  unsafeAssignment: NORMALISED,
+  flagViolation: NORMALISED,
+  shadowingFunctions: NORMALISED,
+  commandInvocations: NORMALISED,
+  unboundVariables: NORMALISED,
+  assignmentHazard: NORMALISED,
+  shadowsCommand: NORMALISED,
+  prepareHelperText: NORMALISED,
+  addBody: NORMALISED,
+  classifyInternal: NORMALISED,
+};
+test("task.292 every function holding a \\s is on the allowlist, with a reason", () => {
+  const holders = new Set();
+  let fn = "(top level)";
+  for (const line of readFileSync(MODULE, "utf8").split("\n")) {
+    const m = /^(?:export )?(?:async )?function\s+([A-Za-z0-9_]+)/.exec(line);
+    if (m) fn = m[1];
+    const code = line.trim();
+    if (/\\[sS]/.test(line) && !/^(\/\/|\*|\/\*)/.test(code)) holders.add(fn);
+  }
+  const unlisted = [...holders].filter((f) => !(f in WHITESPACE_ALLOWLIST));
+  assert.deepEqual(unlisted, [], `a \\s in a function with no stated reason`);
+  const stale = Object.keys(WHITESPACE_ALLOWLIST).filter(
+    (f) => !holders.has(f),
+  );
+  assert.deepEqual(stale, [], "allowlist entries that hold no \\s any more");
+  assert.ok(holders.size >= 15, "non-vacuity: the scan found the holders");
+  // The normalisation the NORMALISED reason rests on is real, at every entry that reads raw text.
+  assert.equal(commandWords("A=1\recho touch out").join(","), "touch");
+  assert.equal(
+    commandWords("A=1 echo touch out").join(","),
+    "echo",
+    "a real blank still ends the assignment",
+  );
+});
+
+test("task.290 every comment scan reads the one rule (the tokenizer, task.292)", () => {
+  const src = readFileSync(MODULE, "utf8");
+  // Each `"#"` literal is either the tokenizer's word-start rule, or one of two sites that are
+  // not a shell comment scan (sed's own grammar, and the command-word list).
+  const hits = [...src.matchAll(/^.*"#".*$/gm)].map((m) => m[0].trim());
+  const known = hits.filter(
+    (l) =>
+      /if \(cmd === "#"\)/.test(l) || // sedScan: sed grammar, a different rule
+      /^"#",$/.test(l) || // the command-word list
+      /^case "#": \{$/.test(l), // the tokenizer: where the word-start rule lives
+  );
+  assert.equal(
+    hits.length,
+    known.length,
+    `a "#" test that is not the tokenizer's: ${hits.filter((l) => !known.includes(l)).join(" | ")}`,
+  );
+  assert.equal(known.length, 3, "non-vacuity: the three known sites exist");
+  assert.ok(
+    known.some((l) => l === 'case "#": {'),
+    "the tokenizer's rule exists",
+  );
+  assert.ok(
+    !/function startsComment|function closingParen/.test(src),
+    "the regex-era comment scans are gone",
+  );
+});
+
+// task.292 criterion 7: the call-site test COUNTS the consumers of the one lexer. A scan that reads
+// lexical facts (comment starts, quotes, substitutions, joins) from `tokenize` is listed here; a new
+// `tokenize(` call site fails the count until it is listed, and a listed scan that stops calling the
+// tokenizer (directly, or through the scan it composes) fails its own row.
+test("task.292 the tokenizer's consumers are counted, and each scan still reads it", () => {
+  const src = readFileSync(MODULE, "utf8");
+  const bodyOf = (name) => {
+    const at = src.indexOf(`function ${name}(`);
+    assert.ok(at >= 0, `${name} exists`);
+    const end = src.indexOf("\n}\n", at);
+    return src.slice(at, end);
+  };
+  // Direct consumers: the function body calls `tokenize(`.
+  const DIRECT = [
+    "cutJoins",
+    "maskSubstitutions",
+    "collapseQuotedSpans",
+    "stripProse",
+    "indirectEvaluationHazard", // task.293: reads quote spans to find a literal substitution
+    "allowListViolation", // task.294: classes every character by its innermost token
+  ];
+  // Composed consumers: the scan reads the tokenizer through the named direct consumers.
+  const COMPOSED = { stripNonCode: ["collapseQuotedSpans", "stripProse"] };
+  const callSites = [...src.matchAll(/\btokenize\(/g)].length - 1; // minus the definition
+  assert.equal(
+    callSites,
+    DIRECT.length,
+    "a `tokenize(` call site that is not in DIRECT: list the new consumer or remove the call",
+  );
+  for (const name of DIRECT) {
+    assert.match(bodyOf(name), /\btokenize\(/, `${name} reads the tokenizer`);
+  }
+  for (const [name, via] of Object.entries(COMPOSED)) {
+    for (const v of via) {
+      assert.match(
+        bodyOf(name),
+        new RegExp(`\\b${v}\\(`),
+        `${name} reads it through ${v}`,
+      );
+    }
+  }
+  // The prose pass of the classifier reads joins and comments from the same consumers.
+  assert.match(
+    src,
+    /const prose = cutJoins\(stripProse\(code\), ""\);/,
+    "the prose pass reads cutJoins and stripProse",
+  );
+  // A scan that re-derives a comment start with its own regex is not a consumer. These are the
+  // shapes the regex-era scans used; none may reappear.
+  assert.ok(
+    !/\/\^\\s\*#|\[\^\\s\]\*#|\(\?:\^\|\\s\)#/.test(src),
+    "no regex re-derives a comment start",
+  );
+});
+
+// The differential test: what the classifier calls runnable, run under real bash.
+const WRITERS = [
+  "touch out",
+  "tee out",
+  "cp in out",
+  "rm in",
+  "sort -o out in",
+  "uniq in out",
+];
+const CONTEXTS = [
+  "echo a\\ # ; W",
+  "echo a # ; W",
+  "echo a#b ; W",
+  "echo $# # ; W",
+  "echo $# ; W",
+  "echo a\\\\ # ; W",
+  "echo a\\;# ; W",
+  "echo a;# ; W",
+  "echo a\\\t# ; W",
+  "echo $(echo a\\ #\n) ; W",
+  "echo $(echo a\\ #) ; W\n)",
+  "echo $(echo a # \n) ; W",
+  'echo "$(echo a\\ #)" ; W',
+  "true; W",
+  "true && W",
+  "true || W",
+  "true | W",
+  "false || W",
+  "X=1 W",
+  "(W)",
+  "{ W; }",
+  'echo "$(W)"',
+  "echo `W`",
+  "cat in # W",
+  "cat in #W",
+  "cat in; # W",
+  "cat in ;#W",
+  "if true; then W; fi",
+  "for i in 1; do W; done",
+  "case x in x) W ;; esac",
+  "case x in x) echo a\\ # ; W ;; esac",
+  "echo a\\ # x\nW",
+  "echo \\' ; W ; echo \\' # x",
+  "echo 'a # b' ; W",
+  'echo "a # b" ; W',
+  "echo a \\\n# ; W",
+  "echo a | cat # ; W",
+  "echo ${#PATH} ; W",
+  // task.290 QA 1: a backslash outside quotes.
+  "echo \\'a' # ; touch x' ; W",
+  'echo \\"a" # ; touch x" ; W',
+  "echo a\\\n# ; W",
+  "echo a\\\\\n# ; W",
+  "echo a\\\n  # ; W",
+  // T290-QA-2: even and odd backslash runs before a newline.
+  "echo a\\\\\nW",
+  "echo a\\\\\\\\\nW",
+  "echo a\\\\\n\nW",
+  "echo a\\\\\\\nW",
+  "echo 'a'\\\\\nW",
+];
+
+test("task.290 differential: nothing the classifier calls runnable writes under real bash", () => {
+  const base = tmp();
+  let generated = 0;
+  let executed = 0;
+  for (const w of WRITERS) {
+    for (const ctx of CONTEXTS) {
+      const code = ctx.replaceAll("W", w);
+      generated += 1;
+      if (classifyBlock(code).klass !== "runnable") continue;
+      const dir = mkdtempSync(join(base, "d-"));
+      try {
+        writeFileSync(join(dir, "in"), "b\na\n");
+        const before = readdirSync(dir).sort();
+        spawnSync("bash", ["-c", code], {
+          cwd: dir,
+          timeout: CLI_BUDGET.timeoutMs,
+        });
+        executed += 1;
+        assert.deepEqual(
+          readdirSync(dir).sort(),
+          before,
+          `classified runnable, but bash changed the directory: ${JSON.stringify(code)}`,
+        );
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  }
+  assert.ok(generated >= 200, `generated ${generated} blocks, floor 200`);
+  assert.ok(executed >= 1, `executed ${executed} runnable blocks, floor 1`);
+});
+
+// task.292: the instruments are committed, so a regression fails a run and not a later QA gate.
+const T292_GAPS = {
+  "a CR before a # is part of the word": "echo a\r# ; touch out",
+  "a form feed before a # is part of the word": "echo a\f# ; touch out",
+  "a vertical tab before a # is part of the word": "echo a\v# ; touch out",
+  "a no-break space before a # is part of the word": "echo a # ; touch out",
+  "a line separator before a # is part of the word": "echo a # ; touch out",
+};
+for (const [name, code] of Object.entries(T292_GAPS)) {
+  test(`task.292 gap (T290-QA-3): ${name} is refused as mutating`, () => {
+    assert.equal(classifyBlock(code).klass, "mutating", JSON.stringify(code));
+  });
+}
+
+// QA gate 3 / finalise (criterion 10): the blank normalisation at the top of `classifyInternal` was
+// absorbed by the suite and by 24000 differential blocks, so a revert turned nothing red. These rows
+// hold it. `command` followed by a character bash does not treat as a blank is ONE unknown word, and
+// without the normalisation the `command\s+` strip reads it as the `command` builtin and calls the
+// block runnable (found by comparing verdicts with the line removed).
+const T292_COMMAND_BLANKS = [
+  "command\recho hi",
+  "command\fecho hi",
+  "command echo hi",
+  "command echo hi",
+  "echo a; command\vecho hi",
+  "command\r-v echo",
+];
+for (const code of T292_COMMAND_BLANKS) {
+  test(`task.292 classifyInternal normalises blanks: ${JSON.stringify(code)} is refused`, () => {
+    assert.equal(classifyBlock(code).klass, "mutating", JSON.stringify(code));
+  });
+}
+test("task.292 classifyInternal normalises blanks: a real blank after `command` still runs", () => {
+  assert.equal(classifyBlock("command echo hi").klass, "runnable");
+});
+
+// QA cycle 1 (T292-QA-1): inside `$[ ]` and `(( ))` bash reads `<<` as a left shift, so the lines
+// up to a line equal to the word are NOT a heredoc body; bash runs the writer. Each of these writes
+// under bash; the control is a real heredoc, which must stay runnable.
+const T292_SHIFTS = {
+  "$[ ] shift": "echo $[1<<z]\ntouch out\nz\n",
+  "$[ ] shift with blanks": "echo $[ 1 << z ]\ntouch out\nz\n",
+  "$[ ] inside double quotes": 'echo "$[1<<z]"\ntouch out\nz\n',
+  "$[ ] inside a substitution": "echo $(echo $[1<<z])\ntouch out\nz\n",
+  "$(( )) shift": "echo $((1<<z))\ntouch out\nz\n",
+  "(( )) shift": "((1<<z))\ntouch out\nz\n",
+  "(( )) assignment shift": "((x=1<<z))\ntouch out\nz\n",
+  // Found by the seeded differential (arith set, seed 11) after the first fix.
+  "(( )) with empty substitutions": "echo ;(($()$()<<z))\ntouch out",
+  "an assignment subscript": "a[1<<z]=1\ntouch out\nz\n",
+};
+for (const [name, code] of Object.entries(T292_SHIFTS)) {
+  test(`task.292 gap (T292-QA-1): ${name} is refused as mutating`, () => {
+    assert.equal(classifyBlock(code).klass, "mutating", JSON.stringify(code));
+  });
+}
+test("task.292 control (T292-QA-1): a real heredoc and a quoted $[ stay runnable", () => {
+  assert.equal(classifyBlock("cat <<z\nhi\nz\n").klass, "runnable");
+  assert.equal(classifyBlock("echo '$[1<<z]'\n").klass, "runnable");
+  assert.equal(classifyBlock("( cat <<z\nhi\nz\n)").klass, "runnable");
+  assert.equal(classifyBlock("cat x[1]<<z\nhi\nz\n").klass, "runnable");
+});
+test("task.292 tokenizer refuses (( and a << inside a subscript", () => {
+  assert.throws(
+    () => tokenize("((1<<z))\nz\n"),
+    /tokenize: .*arithmetic command/,
+  );
+  assert.throws(() => tokenize("a[1<<z]=1\nz\n"), /tokenize: .*subscript/);
+  assert.doesNotThrow(() => tokenize("( (echo a) )"));
+});
+// QA cycle 2 (T292-QA-2): the command scan removed `$(( … ))` with a pattern that ended at the
+// first `)`, so a substitution inside the arithmetic went with it. Each writes under bash.
+const T292_ARITH_SUBST = {
+  "a plain expansion": "echo $((1+$(touch out)))\n",
+  "an assignment": "x=$((1+$(touch out)))\n",
+  "a backtick": "echo $((1+`touch out`))\n",
+  "double quotes": 'echo "$((1+$(touch out)))"\n',
+  "an unquoted heredoc body": "cat <<z\n$((1+$(touch out)))\nz\n",
+  "a parameter default": "echo ${x:-$((1+$(touch out)))}\n",
+  "a nested expansion": "echo $((1+$((2+$(touch out)))))\n",
+};
+for (const [name, code] of Object.entries(T292_ARITH_SUBST)) {
+  test(`task.292 gap (T292-QA-2): ${name} holding a command substitution is mutating`, () => {
+    assert.equal(classifyBlock(code).klass, "mutating", JSON.stringify(code));
+  });
+}
+test("task.292 control (T292-QA-2): plain arithmetic stays runnable", () => {
+  assert.equal(classifyBlock("echo $((1))\n").klass, "runnable");
+  assert.equal(classifyBlock("echo $((1+2)) hi\n").klass, "runnable");
+  assert.equal(classifyBlock("echo $((1+2)) ; echo done\n").klass, "runnable");
+  // task.294: a bare name in arithmetic is evaluated by bash; the earlier layers admit it, the
+  // allow-list does not.
+  assert.equal(beforeAllowList("n=$((n + 1))\n").klass, "runnable");
+  assert.match(
+    classifyBlock("n=$((n + 1))\n").reason,
+    /^not-allow-listed: arithmetic expansion/,
+  );
+});
+test("task.292 tokenizer refuses a substitution inside $(( ))", () => {
+  assert.throws(
+    () => tokenize("echo $((1+$(date)))"),
+    /tokenize: .*inside \$\(\( \)\)/,
+  );
+  assert.throws(() => tokenize("echo $((1+`date`))"), /tokenize: .*inside/);
+  assert.doesNotThrow(() => tokenize("echo $((1+2)) $(date)"));
+});
+test("task.292 tokenizer refuses the legacy arithmetic form $[", () => {
+  assert.throws(() => tokenize("echo $[1+1]"), /tokenize: .*arithmetic/);
+});
+
+// The same blank-class defect one scan over: a word split on `\s` hides the command bash runs.
+// bash reads `A=1<X>echo touch out` as the assignment `A="1<X>echo"` and then runs `touch out`.
+const T292_SPLITS = {
+  "a CR": "\r",
+  "a form feed": "\f",
+  "a vertical tab": "\v",
+  "a no-break space": " ",
+  "a line separator": " ",
+};
+for (const [name, ch] of Object.entries(T292_SPLITS)) {
+  test(`task.292 gap: ${name} after an assignment glues the next word on`, () => {
+    const code = `A=1${ch}echo touch out`;
+    assert.equal(classifyBlock(code).klass, "mutating", JSON.stringify(code));
+  });
+}
+
+test("task.292 control: a space after an assignment is a blank (the command is echo)", () => {
+  assert.equal(classifyBlock("A=1 echo touch out").klass, "runnable");
+});
+
+// The tokenizer itself: the lexical facts every scan reads (task.292).
+const kinds = (code) =>
+  tokenize(code).tokens.map((t) => `${t.kind}@${t.start}`);
+test("task.292 tokenizer: a # starts a comment only at the start of a word", () => {
+  assert.deepEqual(kinds("echo a # x"), ["comment@7"]);
+  assert.deepEqual(kinds("echo a\t# x"), ["comment@7"]);
+  assert.deepEqual(
+    kinds("echo a\\ # x"),
+    [],
+    "an escaped blank joins the word",
+  );
+  assert.deepEqual(kinds("echo a#b"), [], "mid-word");
+  assert.deepEqual(kinds("echo ${#x}"), [], "a ${#x} length is not a comment");
+  assert.deepEqual(kinds("echo a\r# x"), [], "CR is a word character");
+});
+
+test("task.292 tokenizer: a backslash-newline joins a line, and an even run does not", () => {
+  assert.deepEqual(
+    kinds("echo a\\\n# x"),
+    ["join@6"],
+    "a join keeps the word going",
+  );
+  assert.deepEqual(kinds("echo a \\\n# x"), ["join@7", "comment@9"]);
+  assert.deepEqual(
+    kinds("echo a\\\\\n# x"),
+    ["comment@9"],
+    "escaped backslash, then a real newline",
+  );
+});
+
+test("task.292 tokenizer: quotes hide a # and a heredoc operator", () => {
+  assert.deepEqual(
+    kinds("echo 'a # b' # c").filter((k) => k.startsWith("comment")),
+    ["comment@13"],
+  );
+  assert.ok(!kinds("echo '<<EOF'").some((k) => k.startsWith("heredoc")));
+  assert.ok(
+    kinds("cat <<EOF\nx\nEOF\n").some((k) => k.startsWith("heredoc-body")),
+  );
+});
+
+test("task.292 tokenizer: substitutions in an unquoted heredoc body are read, in a quoted one are not", () => {
+  assert.ok(
+    kinds("cat <<EOF\n$(touch out)\nEOF").some((k) => k.startsWith("subst")),
+  );
+  assert.ok(
+    !kinds("cat <<'EOF'\n$(touch out)\nEOF").some((k) => k.startsWith("subst")),
+  );
+  assert.equal(classifyBlock("cat <<EOF\n$(touch out)\nEOF").klass, "mutating");
+  assert.equal(
+    classifyBlock("cat <<'EOF'\n$(touch out)\nEOF").klass,
+    "runnable",
+  );
+});
+
+test("task.292 tokenizer: a shape it does not model is refused, not guessed", () => {
+  for (const code of [
+    "echo 'unterminated",
+    'echo "unterminated',
+    "echo $(unterminated",
+    "echo ${unterminated",
+    "echo \\'x",
+    "echo \"${x:-'a'}\"",
+  ])
+    assert.throws(() => tokenize(code), /^Error: tokenize:/, code);
+});
+
+test("task.292 tokenizer: a ${…} with its own quotes and expansions is one piece", () => {
+  assert.deepEqual(
+    kinds('echo ${n#"${n%%[!0]*}"} # c').filter((k) => k.startsWith("comment")),
+    ["comment@24"],
+  );
+});
+
+test("task.292 tokenizer: nesting is bounded by the heap, not the call stack", () => {
+  const nest = (n) => 'echo "$(echo '.repeat(n) + "x" + ')"'.repeat(n);
+  // Linear in depth, so 20000 levels is well under a second. The scans before the tokenizer
+  // re-masked every level (quadratic; 6000 levels took 2.6 s), and a recursive collapse overflowed
+  // the stack at 6000.
+  let t;
+  assert.doesNotThrow(() => (t = tokenize(nest(20000))));
+  assert.equal(t.tokens.filter((k) => k.kind === "subst").length, 20000);
+  const started = Date.now();
+  let r;
+  assert.doesNotThrow(() => (r = classifyBlock(nest(20000))));
+  assert.equal(r.klass, "runnable");
+  assert.ok(
+    Date.now() - started < 3000,
+    loadSensitive("a 20000-deep nest is read in linear time"),
+  );
+  // A write at the bottom of the nest is still seen.
+  assert.equal(
+    classifyBlock(nest(5000).replace("echo x", "touch out")).klass,
+    "mutating",
+  );
+});
+
+const T292_CONTROLS = {
+  "a space before a # is a comment": "echo a # ; touch out",
+  "a tab before a # is a comment": "echo a\t# ; touch out",
+};
+for (const [name, code] of Object.entries(T292_CONTROLS)) {
+  test(`task.292 control: ${name} stays runnable`, () => {
+    assert.equal(classifyBlock(code).klass, "runnable", JSON.stringify(code));
+  });
+}
+
+// The fixed-seed slice of the random differential (scripts/qa-snippets-differential.mjs). The full
+// run (>= 200000 blocks) is a by-hand Phase 4 deliverable; this slice is sized to the 10 s bound.
+const T292_SLICE = { seed: 1, count: 4000 };
+test("task.292 differential slice: nothing the classifier calls runnable writes under real bash", () => {
+  let runnable = 0;
+  for (const [name, atoms] of Object.entries(ATOM_SETS)) {
+    const r = runDifferential({
+      isRunnable: (code) => isRunnableBlock(code),
+      atoms,
+      seed: T292_SLICE.seed,
+      count: T292_SLICE.count,
+      bare: BARE_SETS.has(name),
+    });
+    assert.equal(
+      r.writes,
+      0,
+      `${name}: classified runnable, but bash wrote: ${JSON.stringify(r.first)}`,
+    );
+    runnable += r.runnable;
+  }
+  assert.ok(
+    runnable >= 100,
+    `slice executed ${runnable} runnable blocks, floor 100`,
+  );
+});
+
+test("task.292 differential slice: the instrument finds a write when the classifier is blind", () => {
+  // Calibration on a known failure: a classifier that calls everything runnable must be caught
+  // by the same generator, or the slice's green above proves nothing.
+  const r = runDifferential({
+    isRunnable: () => true,
+    atoms: ATOM_SETS.blanks,
+    seed: T292_SLICE.seed,
+    count: 200,
+  });
+  assert.ok(
+    r.writes > 0,
+    "a blind classifier produced no write: the instrument is dead",
+  );
+});
+
+test("task.304 differential: the git atom set forms writes the engine without the git rule admits", () => {
+  // Calibration on a known failure (task 294's `residual` rule): the git rule sits at the allow-list
+  // layer, so with that layer off the set must produce writes. A set that forms none is blind, and
+  // the slice's green over it (the loop above runs every set, `git` included) would prove nothing.
+  const r = runDifferential({
+    isRunnable: (code) => beforeAllowList(code).klass === "runnable",
+    atoms: ATOM_SETS.git,
+    seed: T292_SLICE.seed,
+    count: 600,
+    bare: BARE_SETS.has("git"),
+  });
+  assert.ok(
+    r.writes > 0,
+    "the git atom set formed no write against the engine without the git rule: the instrument is blind to the class",
+  );
+  assert.ok(BARE_SETS.has("git"), "git blocks carry their own writer");
+});
+
+// ── task.293 — indirect evaluation ─────────────────────────────────────────────────────────────
+// A value is built or stored harmlessly and a later bash feature evaluates it. Each shape is run
+// under REAL bash first (the marker file proves the hole is real, so a test cannot pass by matching
+// the classifier's own idea of the block), then classified. The table is the claim's bound: a fourth
+// spelling is a failing row here, not a new finding. State a spelling needs is declared in the block
+// (`y=abcdef`, `a=(1)`): without it bash does not evaluate the subscript and nothing reproduces.
+const T293_SHAPES = {
+  "CR-1 printf -v with a quoted subscript": "printf -v 'a[$(touch W)]' x",
+  "CR-1 read into a name holding a subscript":
+    "x='a[$(touch W)]'; read -r \"$x\" <<< 1",
+  "CR-1 test -v on a name holding a subscript":
+    "x='a[$(touch W)]'; test -v \"$x\"",
+  "CR-1 [[ -v ]] with a quoted subscript": "[[ -v 'a[$(touch W)]' ]]",
+  "CR-1 unset of a name holding a subscript":
+    "a=(1); x='a[$(touch W)]'; unset \"$x\"",
+  "CR-1 unset -v of a name holding a subscript":
+    "a=(1); x='a[$(touch W)]'; unset -v \"$x\"",
+  "CR-1 [[ -eq ]] with a quoted subscript": "[[ 'a[$(touch W)]' -eq 1 ]]",
+  "CR-2 PS4 with set -x": "PS4='$(touch W)'; set -x; true",
+  "CR-2 ${x@P}": "x='$(touch W)'; echo ${x@P}",
+  "CR-3 $((x))": "x='a[$(touch W)]'; echo $((x))",
+  "CR-3 [[ $x -eq 1 ]]": "x='a[$(touch W)]'; [[ $x -eq 1 ]]",
+  "CR-3 ${y:0:$x}": "y=abcdef; x='a[$(touch W)]'; echo ${y:0:$x}",
+  "CR-3 ${!x}": "a=(1); x='a[$(touch W)]'; echo ${!x}",
+  // The class, in spellings this document does not name: a different builtin and quoting.
+  "control: let on a double-quoted escaped substitution":
+    'x="a[\\$(touch W)]"; let x',
+  "control: declare then (( ))": "declare y='a[$(touch W)]'; (( y ))",
+  "control: ANSI-C quoted spelling of $(":
+    "x=$'a[\\x24(touch W)]'; echo $((x))",
+  "control: escaped, unquoted assignment":
+    "x=a\\[\\$\\(touch\\ W\\)\\]; echo $((x))",
+  // QA cycle 1 (T293-QA-1, T293-QA-2): the value is assembled by expansion, or the quoted
+  // substitution sits in a subscript inside a parameter expansion.
+  "QA-1 value assembled from two variables":
+    "y='$'; z='(touch W)'; x=\"a[$y$z]\"; echo $((x))",
+  "QA-1 value assembled with ${d} and read by [[ -eq ]]":
+    "d='$'; x=\"a[${d}(touch W)]\"; [[ $x -eq 1 ]]",
+  "QA-1 value assembled from a nested substitution":
+    "x=\"a[$(printf '$')(touch W)]\"; echo $((x))",
+  "QA-1 value assembled, then read by read (found by the random differential)":
+    "y='$'; z='(touch W)'; x=\"a[$y$z]\"; read -r \"$x\" <<< 1",
+  "QA-2 quoted substitution as a subscript in ${a[...]}":
+    "a=(1); echo ${a['$(touch W)']}",
+  // QA cycle 2 (T293-QA-3, T293-QA-4): the literal reaches the evaluation through a joined word or
+  // a pipe, which the character before the quote and the command segment cannot follow.
+  "QA-3 bare word joined to a quoted literal": "x=a'[$(touch W)]'; echo $((x))",
+  "QA-3 double-quoted prefix joined to a quoted literal":
+    "x=\"pre\"'[$(touch W)]'; echo $((x))",
+  "QA-4 literal piped into a later read":
+    "echo 'a[$(touch W)]' | { read x; echo $((x)); }",
+  "QA-4 quoted here-document body read into a variable (found by QA's own probe)":
+    "read x <<'EOF'\na[$(touch W)]\nEOF\necho $((x))",
+  "QA-4 quoted here-document piped into read":
+    "cat <<'EOF' | { read x; echo $((x)); }\na[$(touch W)]\nEOF",
+  // QA cycle 3 (T293-QA-5, T293-QA-6): arithmetic reads the cycle-2 detector did not list.
+  "QA-5 positional offset ${@:$1}": "set -- 'a[ $(touch W)]'; echo ${@:$1}",
+  "QA-5 positional offset ${*:$1}": "set -- 'a[ $(touch W)]'; echo ${*:$1}",
+  "QA-6 subscript beginning with a digit":
+    "set -- 'a[ $(touch W)]'; v=(1); echo ${v[1+$1]}",
+  // QA cycle 4 (T293-QA-7): the literal is backslash-escaped text in an UNQUOTED word.
+  "QA-7 escaped unquoted word in [[ -eq ]]":
+    "[[ a\\[\\$\\(touch\\ W\\)\\] -eq 1 ]]",
+  "QA-7 escaped unquoted word to printf -v":
+    "printf -v a\\[\\$\\(touch\\ W\\)\\] x",
+  "QA-7 escaped unquoted word to test -v": "test -v a\\[\\$\\(touch\\ W\\)\\]",
+  "QA-7 escaped unquoted word to read": "read a\\[\\$\\(touch\\ W\\)\\] <<< x",
+  // QA gate 6 (T293-QA-9): the quote sits later in the subscript word, after a bracket and an open paren.
+  "QA-9 compound array subscript, digit then quote":
+    "a=([0'$(touch W)']=1); echo hi",
+  "QA-9 compound array subscript, backtick": "a=([0'`touch W`']=1); echo hi",
+  "QA-9 compound array subscript, letter": "a=([x'$(touch W)']=1); echo hi",
+  // QA gate 7 (T293-QA-10): a paren inside the subscript hid the bracket from a word scan.
+  "QA-10 paren after the index": "a=([0+(1)'$(touch W)']=1); echo hi",
+  "QA-10 paren before the operator": "a=([(0)+'$(touch W)']=1); echo hi",
+  "QA-10 nested parens": "a=([((0))+(1)'$(touch W)']=1); echo hi",
+  // QA gate 8 (T293-QA-11): a separator inside a quoted span reset the bracket depth.
+  "QA-11 quoted semicolon in the index": "a=([';'0'$(touch W)']=1); echo hi",
+  "QA-11 double-quoted semicolon": `a=(["0;"'$(touch W)']=1); echo hi`,
+  "QA-11 quoted ampersand and pipe": "a=([' & | '0'$(touch W)']=1); echo hi",
+  "QA-4 literal piped into read, evaluated by [[ -eq ]]":
+    "echo 'a[$(touch W)]' | { read x; [[ $x -eq 1 ]]; }",
+};
+
+// Bash's own behaviour, calibrated where it is known to run the marker: the instrument is dead if a
+// shape that must reproduce does not.
+const T293_REPRODUCES = new Set(Object.keys(T293_SHAPES));
+
+test("task.293 every indirect-evaluation shape writes under real bash, and the classifier refuses it", () => {
+  const base = tmp();
+  let reproduced = 0;
+  for (const [name, code] of Object.entries(T293_SHAPES)) {
+    const dir = mkdtempSync(join(base, "s-"));
+    try {
+      spawnSync("bash", ["-c", code.replaceAll("W", "marker")], {
+        cwd: dir,
+        timeout: CLI_BUDGET.timeoutMs,
+      });
+      const wrote = existsSync(join(dir, "marker"));
+      assert.ok(
+        wrote,
+        `${name}: bash did not run the substitution — the shape does not reproduce, drop it from the table or declare the state it needs`,
+      );
+      reproduced += 1;
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+    const v = classifyBlock(code);
+    assert.equal(v.klass, "mutating", `${name}: ${code}`);
+    assert.match(v.reason, /^indirect-evaluation: /, name);
+  }
+  assert.equal(reproduced, T293_REPRODUCES.size, "every row reproduced");
+});
+
+// Each refusal is held on an input where IT ALONE decides. A table whose every row is also caught by
+// the quoted-literal rule would stay green with a prompt-variable refusal deleted (found by the
+// mutation proof: the first PS4 row passed with that term removed).
+const T293_DECIDERS = {
+  "prompt variable: a value read from a file":
+    "read -r v < payload; PS4=$v; set -x; true",
+  "prompt variable: read into it from a file":
+    "read -r PS4 < payload; set -x; true",
+  "prompt-escape transform: a value read from a file":
+    "read -r v < payload; echo ${v@P}",
+  "escaped substitution assigned without a quote":
+    "x=a\\[\\$\\(touch\\ W\\)\\]; echo $((x))",
+  "quoted substitution assigned, no evaluating word":
+    "x='a[$(touch W)]'; echo $((x))",
+  "quoted substitution handed to a builtin, not assigned":
+    "printf -v 'a[$(touch W)]' x",
+  "value built by expansion, read as arithmetic (no quoted substitution)":
+    "y='$'; z='(touch W)'; x=\"a[$y$z]\"; echo $((x))",
+  "quoted substitution as a subscript (no assignment, no builtin)":
+    "a=(1); echo ${a['$(touch W)']}",
+  "joined word, evaluated far from the literal (block rule alone)":
+    "x=a'[$(touch W)]'; echo $((x))",
+  "literal in another pipeline stage than the read (block rule alone)":
+    "echo 'a[$(touch W)]' | { read x; echo $((x)); }",
+  "positional offset: no evaluating word, only a live expansion (default-deny alone)":
+    "set -- 'a[ $(touch W)]'; echo ${@:$1}",
+  "digit-led subscript: only a live expansion (default-deny alone)":
+    "set -- 'a[ $(touch W)]'; v=(1); echo ${v[1+$1]}",
+  "quote later in a subscript word (bracket-depth rule alone)":
+    "a=([0'$(touch W)']=1); echo hi",
+  "paren inside the subscript (bracket-depth rule alone)":
+    "a=([0+(1)'$(touch W)']=1); echo hi",
+  "quoted separator in the subscript (never-reset depth alone)":
+    "a=([';'0'$(touch W)']=1); echo hi",
+  "escaped unquoted word (carrier default-deny alone)":
+    "[[ a\\[\\$\\(touch\\ W\\)\\] -eq 1 ]]",
+  "here-document body literal (heredoc loop alone)":
+    "cat <<'EOF' | { read x; echo $((x)); }\na[$(touch W)]\nEOF",
+  "literal evaluated through a named subscript, no evaluating word":
+    "x='a[$(touch W)]'; a=(1); echo ${a[x]}",
+};
+
+test("task.293 each refusal is held on an input where it alone decides", () => {
+  const base = tmp();
+  for (const [name, code] of Object.entries(T293_DECIDERS)) {
+    const dir = mkdtempSync(join(base, "d-"));
+    try {
+      writeFileSync(join(dir, "payload"), "$(touch marker)\n");
+      spawnSync("bash", ["-c", code.replaceAll("W", "marker")], {
+        cwd: dir,
+        timeout: CLI_BUDGET.timeoutMs,
+      });
+      assert.ok(
+        existsSync(join(dir, "marker")),
+        `${name}: bash did not run the payload`,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+    assert.equal(classifyBlock(code).klass, "mutating", name);
+    assert.match(classifyBlock(code).reason, /^indirect-evaluation: /, name);
+  }
+});
+
+// task.293's controls hold blocks the EARLIER layers must not refuse (no substitution in the literal,
+// nothing evaluates a value). task.294's allow-list is stricter on purpose: where a block reaches an
+// evaluating context (a name inside arithmetic, a `${…}` operator, a subscripted assignment) it is
+// refused whether or not the value happens to be harmless, because proving that is the thing the
+// allow-list declines to do. Each control therefore states BOTH verdicts.
+const T293_CONTROLS = [
+  // [block, allow-list verdict: null = stays runnable, else the refusal's reason]
+  ["echo '$(date)'", null], // a quoted literal that is only printed
+  ["x=5; echo $((x + 1))", /arithmetic expansion with a name/],
+  ["n=3; [[ $n -eq 3 ]] && echo ok", /arithmetic \[\[ test/],
+  ["echo PS4", null], // a mention, not a prompt variable set
+  ["grep -n 'PS1' docs/x.md", null], // a pattern
+  ['printf "%s\\n" hello', null],
+  ["a=(1); echo ${a[0]}", /expansion form \$\{/], // a plain subscript
+  ['n=$(wc -l < f); echo "$n"', null], // built by expansion, never read as arithmetic
+  ['x=5; y="$x"; echo hi', null], // an expanded value with no arithmetic read
+  ["[ -f x ] && echo ok", null], // the test command, not a subscript
+  ["x=a'[5]'; echo $((x))", /arithmetic expansion with a name/], // QA-3 control
+  [
+    "echo 'a[5]' | { read x; echo $((x)); }",
+    /arithmetic expansion with a name/,
+  ], // QA-4
+  ["echo 'run $(date)'; x=5", null], // a printed literal, nothing evaluates a value
+  ["a=([0'5']=1); echo hi", /command word that is not a plain name/], // QA-9
+  ["a=([0+(1)'5']=1); echo hi", /command word that is not a plain name/], // QA-10
+  ["a=([';'0'5']=1); echo hi", /command word that is not a plain name/], // QA-11
+  ["[[ a\\[5\\] -eq 1 ]]", /arithmetic \[\[ test/], // QA-7 control: escaped, no substitution
+  ["printf -v a\\[5\\] x", /non-literal word as an operand of printf/], // QA-7 control
+  ["echo a\\[\\$\\(date\\)\\]", null], // an escaped literal that is only printed
+  ["# note: $(cmd) and `x` in a comment\n[[ 1 -eq 1 ]]", null], // a comment is not a literal
+  ["set -- 2; echo ${@:$1}", /expansion form \$\{/], // QA-5 control
+  ["set -- 0; v=(1); echo ${v[$1]}", /expansion form \$\{/], // QA-6 control
+];
+test("task.293 safe blocks near the class stay runnable (earlier layers), and task.294 states the allow-list verdict", () => {
+  for (const [code, refusal] of T293_CONTROLS) {
+    assert.equal(beforeAllowList(code).klass, "runnable", code);
+    const now = classifyBlock(code);
+    if (refusal === null) assert.equal(now.klass, "runnable", code);
+    else {
+      assert.equal(now.klass, "mutating", code);
+      assert.match(now.reason, /^not-allow-listed: /, code);
+      assert.match(now.reason, refusal, code);
+    }
+  }
+});
+
+test("task.293 a helper call that also names a start-up variable keeps its pinned reason", () => {
+  // The direct-use refusal sits after the helper rule, so the `helper call with …` strings other
+  // tests pin are unchanged for a helper call. task.294 passes a REAL helper root: without one the
+  // `bash` call is not a helper call at all, the helper rule never runs, and the test pinned only
+  // that the block is mutating, which the direct-use refusal alone would also give.
+  const root = helperFixture();
+  const withHelper = classifyBlock(
+    `export PS4='$(mv a b)'; bash ${R}/read.sh x`,
+    {},
+    { helperRoot: root },
+  );
+  assert.equal(withHelper.klass, "mutating");
+  assert.match(
+    withHelper.reason,
+    /^helper call with a shell start-up variable set \(BASH_ENV, ENV, SHELLOPTS, BASHOPTS, PS4\)$/,
+  );
+  // The same assignment with no helper call is the direct-use refusal, a different reason.
+  const direct = classifyBlock(
+    "export PS4='$(mv a b)'; true",
+    {},
+    { helperRoot: root },
+  );
+  assert.match(direct.reason, /^indirect-evaluation: a prompt variable/);
+});
+
+// ── task.294 — the word allow-list ─────────────────────────────────────────────────────────────
+// Task 293 refused indirect evaluation by listing the shapes it had seen, and each widening lost to
+// the next carrier. The allow-list inverts it: a block is `runnable` only when every non-literal word
+// is in a form and a position on a closed list, so the next spelling needs no new rule.
+//
+// The residual shapes below were measured as `runnable` on cbaaf0e9 (the base of this task): each one
+// writes a file under real bash and the classifier admitted it. They are the table the claim is held
+// to. Every row is run under real bash first (a marker file must appear), then held against the
+// classifier with the allow-list OFF (it must be `runnable`, which is what makes the row red on the
+// old code) and ON (it must be refused by the allow-list, not by a rule that was already there).
+const T294_RESIDUALS = {
+  "stored substitution holding an octal-escaped dollar, read as arithmetic":
+    "x=$(printf 'a[\\044(touch W)]'); echo $((x))",
+  "value assembled from variables, the dollar arriving by expansion":
+    "b='['; d='$'; x=\"a${b}${d}(touch W)]\"; echo $((x))",
+  "adjacent quotes splice the dollar away from its parenthesis, via read":
+    'read x <<< "a[$""(touch W)]"; echo $((x))',
+  "adjacent quotes splice the dollar away from its parenthesis, via printf -v":
+    'printf -v x %s "a[$""(touch W)]"; echo $((x))',
+};
+
+// Spellings of the same hole that the earlier layers already refuse (the tokenizer fails closed on
+// `$[`, and a subscripted assignment is not a recognised command). They are run under real bash and
+// pinned `mutating` so the table of residuals is not the only thing standing between them and `runnable`.
+const T294_ALREADY_HELD = {
+  "the same value as an array subscript":
+    "x=$(printf 'a[\\044(touch W)]'); arr[x]=1",
+  "the same value inside the legacy $[ ] arithmetic":
+    "x=$(printf 'a[\\044(touch W)]'); echo $[x]",
+};
+const writesUnderBash = (code) => {
+  const dir = mkdtempSync(join(tmp(), "r-"));
+  spawnSync("bash", ["-c", code.replaceAll("W", "marker")], {
+    cwd: dir,
+    timeout: CLI_BUDGET.timeoutMs,
+  });
+  return existsSync(join(dir, "marker"));
+};
+test("task.294 every residual shape writes under real bash, was admitted before, and is refused now", () => {
+  for (const [name, code] of Object.entries(T294_RESIDUALS)) {
+    assert.ok(
+      writesUnderBash(code),
+      `${name}: bash did not run the substitution, so the row does not reproduce`,
+    );
+    assert.equal(
+      beforeAllowList(code).klass,
+      "runnable",
+      `${name}: an earlier layer already refuses this, so the row does not need the allow-list`,
+    );
+    const v = classifyBlock(code);
+    assert.equal(v.klass, "mutating", name);
+    assert.match(v.reason, /^not-allow-listed: /, name);
+  }
+});
+test("task.294 spellings the earlier layers already hold also write under bash and stay refused", () => {
+  for (const [name, code] of Object.entries(T294_ALREADY_HELD)) {
+    assert.ok(writesUnderBash(code), `${name}: does not reproduce`);
+    assert.equal(classifyBlock(code).klass, "mutating", name);
+  }
+});
+
+test("task.294 control blocks stay runnable", () => {
+  for (const code of [
+    "echo hello",
+    "ls docs | grep -c md",
+    "grep -rn 'needle' docs/",
+    'for f in docs/*.md; do echo "$f"; done',
+    'if [ -f "$1" ]; then cat "$1"; fi',
+    'n=$(wc -l < notes.txt); echo "$n"',
+    'G=$(ls *.yml | sort -n | tail -1); [ "${R:-0}" -ge "$G" ]', // task-77's predicate
+    "echo $((1 + 2 * 3))",
+    "if ((1 > 2)); then echo hi; fi",
+    "\\ls -la",
+    'find docs -name "a$"',
+    'case "$T" in\n  *[!0-9]*) echo branch ;;\n  *) echo number ;;\nesac',
+    "git log --oneline -n 3",
+  ]) {
+    assert.equal(
+      classifyBlock(code, { T: "x", R: "1", G: "1" }).klass,
+      "runnable",
+      code,
+    );
+  }
+});
+
+// What the allow-list refuses, one input each, so a rule deleted from it turns exactly one row red.
+const T294_REFUSALS = {
+  "a name inside $(( ))": [
+    "n=3; echo $((n))",
+    /^arithmetic expansion with a name/,
+  ],
+  "a name inside (( ))": [
+    "if ((a>b)); then echo hi; fi",
+    /^arithmetic command with a name/,
+  ],
+  "a name in a [[ arithmetic test": [
+    "n=3; [[ n -eq 3 ]]",
+    /^an arithmetic \[\[ test with a name/,
+  ],
+  "an expansion operator": ["echo ${v:1}", /^expansion form \$\{/],
+  "a $ before a double quote": ['echo $"x"', /^expansion form \$"/],
+  "ANSI-C quoting": ["echo $'a'", /^ANSI-C or locale quote/],
+  "legacy arithmetic": ["echo $[1+2]", null], // refused by the tokenizer (fail-closed), not by a rule
+  "a subscripted element inside an array assignment": [
+    "a=([1]=2); echo hi",
+    /^a command word that is not a plain name/,
+  ],
+  "test -v": ["[ -v x ]", /^test operator -v/],
+  "a non-literal operand of read": [
+    'read "$x" <<< 1',
+    /^a non-literal word as an operand of read/,
+  ],
+  "a subscript in a literal operand of unset": [
+    "unset 'a[1]'",
+    /^an operand of unset that is not a plain literal/,
+  ],
+};
+test("task.294 each refusal is held on an input where it alone decides", () => {
+  for (const [name, [code, why]] of Object.entries(T294_REFUSALS)) {
+    const bound = { x: "1", c: "echo", v: "1", a: "1", b: "1" };
+    const bare = beforeAllowList(code, bound).klass;
+    const v = classifyBlock(code, bound);
+    assert.equal(v.klass, "mutating", `${name}: ${code}`);
+    if (why === null) continue;
+    assert.equal(
+      bare,
+      "runnable",
+      `${name}: an earlier layer already refuses ${code}`,
+    );
+    assert.match(v.reason, /^not-allow-listed: /, name);
+    assert.match(v.reason.replace(/^not-allow-listed: /, ""), why, name);
+  }
+});
+
+// These rules guard words the first layer already refuses today (`let`, `declare` and a parameter
+// command word are not in the command table, `>(…)` is a write redirection). The allow-list's own
+// rule is held by calling it directly, so a command added to the table later does not arrive with an
+// unproven rule.
+const T294_DIRECT = {
+  "a name handed to let": ["n=3; let n", /^let with a name/],
+  "output process substitution": [
+    "echo x > >(cat)",
+    /^output process substitution/,
+  ],
+  "declare -i": [
+    "declare -i n=1",
+    /^declare with an arithmetic or name-reference attribute/,
+  ],
+  "declare -n": [
+    "declare -n r=x",
+    /^declare with an arithmetic or name-reference attribute/,
+  ],
+  "a command word built from a parameter": [
+    "$c x",
+    /^a non-literal command word/,
+  ],
+};
+test("task.294 rules a first-layer refusal pre-empts are held by calling the allow-list directly", () => {
+  for (const [name, [code, why]] of Object.entries(T294_DIRECT))
+    assert.match(allowListViolation(code), why, name);
+  assert.equal(allowListViolation("let 1+2"), null);
+  assert.equal(allowListViolation("declare x=1"), null);
+});
+
+// The second layer holds without the first. `allowListViolation` is exported so the claim "the
+// allow-list does not depend on task 293's rules" is a test and not a sentence: every residual row is
+// refused by it alone. The boundary is pinned the other way too — a prompt-variable literal is the
+// first layer's, and the allow-list alone admits it.
+test("task.294 defeat the first layer: the allow-list alone refuses every residual shape", () => {
+  // A throw is the tokenizer failing closed, which the classifier turns into `mutating`.
+  const refused = (code) => {
+    try {
+      return allowListViolation(code);
+    } catch {
+      return "tokenizer refused";
+    }
+  };
+  for (const [name, code] of Object.entries({
+    ...T294_RESIDUALS,
+    ...T294_ALREADY_HELD,
+  }))
+    assert.notEqual(refused(code), null, name);
+  assert.equal(
+    allowListViolation("PS4='$(touch W)'; set -x; true"),
+    null,
+    "a quoted literal is data to the allow-list; the prompt-variable rule is the first layer's",
+  );
+  assert.match(
+    beforeAllowList("PS4='$(touch W)'; set -x; true").reason,
+    /^indirect-evaluation: a prompt variable/,
+  );
+});
+
+test("task.294 the first layer holds without the allow-list", () => {
+  for (const [name, code] of Object.entries(T293_SHAPES)) {
+    const v = beforeAllowList(code);
+    assert.equal(v.klass, "mutating", name);
+    assert.match(v.reason, /^indirect-evaluation: /, name);
+  }
+});
+
+// Phase 5 — what task 293's QA left unpinned. `set` and `shift` are in the command table and are
+// runnable in their plain form (measured 2026-11-10); the six below are not in it.
+test("task.294 mapfile readarray getopts trap compgen wait are refused as unrecognised commands", () => {
+  for (const word of [
+    "mapfile",
+    "readarray",
+    "getopts",
+    "trap",
+    "compgen",
+    "wait",
+  ]) {
+    const v = classifyBlock(`${word} x`);
+    assert.equal(v.klass, "mutating", word);
+    assert.match(v.reason, /^unrecognised-command: /, word);
+  }
+});
+test("task.294 set and shift stay runnable in their plain form", () => {
+  assert.equal(classifyBlock("set -- a b; shift; echo done").klass, "runnable");
+});
+
+// ── task.304 — git forms that run a literal string ─────────────────────────────────────────────
+// `git` is non-evaluating and its subcommand is on a closed list, so the allow-list admitted every
+// form below. Each row is run under real bash in a scratch repository (a tracked file with an
+// unstaged change, and a `hook.sh` that creates `marker`); the row must write, was `runnable` before
+// task.304 (`beforeAllowList`) and is `mutating` now, from the git rule and not an earlier layer.
+// Measured on 2026-11-11: `-ccore.fsmonitor=…` (joined), `core.pager`, `--exec-path=` and a plain
+// bare `GIT_X=` do not run anything and are not rows; `-c` and `GIT_*` are refused by form anyway.
+const T304_FORMS = {
+  "-c core.fsmonitor": "git -c core.fsmonitor=./hook.sh status",
+  "--config-env": "H=./hook.sh git --config-env=core.fsmonitor=H status",
+  "ls-remote --upload-pack=": "git ls-remote --upload-pack=./hook.sh .",
+  "ls-remote --upload-pack, separate operand":
+    "git ls-remote --upload-pack ./hook.sh .",
+  "ls-remote --exec=": "git ls-remote --exec=./hook.sh .",
+  "ls-remote --upl= (unambiguous prefix)": "git ls-remote --upl=./hook.sh .",
+  "ls-remote --exe= (unambiguous prefix)": "git ls-remote --exe=./hook.sh .",
+  "GIT_TRACE prefix, absolute path": "GIT_TRACE=$PWD/marker git status",
+  "GIT_EXTERNAL_DIFF prefix": "GIT_EXTERNAL_DIFF=./hook.sh git diff",
+  "export GIT_SSH_COMMAND":
+    "export GIT_SSH_COMMAND=./hook.sh\ngit ls-remote ssh://x/y",
+  "bare GIT_SSH_COMMAND after set -a":
+    "set -a\nGIT_SSH_COMMAND=./hook.sh\ngit ls-remote ssh://x/y",
+  "GIT_CONFIG_COUNT/KEY/VALUE":
+    "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.fsmonitor GIT_CONFIG_VALUE_0=./hook.sh git status",
+  // T304-QA-1: a wholly quoted option word. The collapsed scan reads it as an empty word.
+  "ls-remote '--upload-pack=...' single-quoted":
+    "git ls-remote '--upload-pack=./hook.sh' .",
+  'ls-remote "--exec=..." double-quoted': 'git ls-remote "--exec=./hook.sh" .',
+  // T304-QA-2: a quoted export operand.
+  "export 'GIT_SSH_COMMAND=...' single-quoted":
+    "export 'GIT_SSH_COMMAND=./hook.sh'\ngit ls-remote ssh://x/y",
+  'export "GIT_SSH_COMMAND=..." double-quoted':
+    'export "GIT_SSH_COMMAND=./hook.sh"\ngit ls-remote ssh://x/y',
+  // T304-QA-3: a GIT_ variable given its value by another builtin, then exported by name.
+  "read GIT_SSH_COMMAND, then export by name":
+    "read GIT_SSH_COMMAND <<< ./hook.sh\nexport GIT_SSH_COMMAND\ngit ls-remote ssh://x/y",
+  "printf -v GIT_SSH_COMMAND, then export by name":
+    "printf -v GIT_SSH_COMMAND ./hook.sh\nexport GIT_SSH_COMMAND\ngit ls-remote ssh://x/y",
+  "printf -vGIT_SSH_COMMAND joined, then export by name":
+    "printf -vGIT_SSH_COMMAND ./hook.sh\nexport GIT_SSH_COMMAND\ngit ls-remote ssh://x/y",
+  // T304-QA-4/5 (cycle 2): brace expansion rebuilds the option after the scan has read the text.
+  "brace splits --upload-pack": "git ls-remote --upload-pa{ck,ck}=./hook.sh .",
+  "brace builds the leading dashes":
+    "git ls-remote --{upload-pack,upload-pack}=./hook.sh .",
+  "brace with an empty alternative":
+    "git ls-remote --upload-pack{,}=./hook.sh .",
+  "brace splits the --exec alias": "git ls-remote --exe{c,c}=./hook.sh .",
+  "brace splits --config-env":
+    "H=./hook.sh git --config-e{nv,nv}=core.fsmonitor=H status",
+  "brace with an empty alternative on --config-env":
+    "H=./hook.sh git --config-env{,}=core.fsmonitor=H status",
+  "brace across an escaped space":
+    "git ls-remote --{upload-pack=./hook.sh\\ x,} .",
+  // T304-QA-6: --exec-path=<dir> makes ls-remote run <dir>/git-upload-pack.
+  "--exec-path=<dir> with ls-remote": "git --exec-path=$PWD ls-remote .",
+  // The raw reading cannot line up inside a quoted substitution; a quoted option must still not hide.
+  "quoted --upload-pack inside a quoted substitution":
+    "echo \"$(git ls-remote '--upload-pack=./hook.sh' .)\"",
+  "set -a, then read GIT_SSH_COMMAND":
+    "set -a\nread GIT_SSH_COMMAND <<< ./hook.sh\ngit ls-remote ssh://x/y",
+  "set -a, then a for loop over GIT_SSH_COMMAND":
+    "set -a\nfor GIT_SSH_COMMAND in ./hook.sh; do :; done\ngit ls-remote ssh://x/y",
+  // T304-QA-7/8 (third strike): bash builds the exported name after the scan has read it.
+  "export GIT_ name built by a brace":
+    "export GIT_{SSH_COMMAND,X}=./hook.sh; git ls-remote ssh://h/x",
+  "export GIT_ name built by a brace after G":
+    "export G{IT_SSH_COMMAND,X}=./hook.sh; git ls-remote ssh://h/x",
+  "export GIT_ name split by empty single quotes":
+    "export GI''T_SSH_COMMAND=./hook.sh; git ls-remote ssh://h/x",
+  "export GIT_ name split by empty double quotes":
+    'export GI""T_SSH_COMMAND=./hook.sh; git ls-remote ssh://h/x',
+  "export GIT_ name split by a backslash":
+    "export GIT\\_SSH_COMMAND=./hook.sh; git ls-remote ssh://h/x",
+  // T304-QA-9 (cycle 4): a global flag that takes an operand and is not on the scan's list hides
+  // the real subcommand. `--attr-source` is real (git 2.40+); the second row is a flag git does
+  // not have, which stands for the next one it adds.
+  "-c behind --attr-source":
+    "git --attr-source log -c core.sshCommand=./hook.sh ls-remote ssh://x/y",
+  // T304-QA-10 (cycle 5): a quote inside an operand-taking global flag hid it from one reader of
+  // the line and not the other; git unquotes the flag, takes `log` as its operand and runs `fetch`.
+  "fetch --upload-pack behind a quoted --namespace":
+    'git --names"pace" log fetch --upload-pack=./hook.sh .',
+  "fetch --upload-pack behind a wholly quoted --namespace":
+    'git --"namespace" status fetch --upload-pack=./hook.sh .',
+  "fetch --upload-pack behind a quoted --work-tree":
+    'git --work-"tree" log fetch --upload-pack=./hook.sh .',
+  // T304-QA-11 (cycle 6): the line is split on whitespace before the scan reads it, so an escaped
+  // space inside a flag's operand is two tokens to the scan and one word to bash.
+  "fetch --upload-pack behind a --namespace operand with an escaped space":
+    "git --namespace a\\ log fetch --upload-pack=./hook.sh .",
+  "fetch --upload-pack behind a --namespace=value with an escaped space":
+    "git --namespace=a\\ log fetch --upload-pack=./hook.sh .",
+  "--upload-pack behind --attr-source":
+    "git --attr-source log ls-remote --upload-pack=./hook.sh .",
+};
+// Global flags git has and the scan knows the shape of: they stay runnable beside a safe subcommand.
+const T304_FLAG_CONTROLS = [
+  "git --no-pager log -1",
+  "git -C . log -1",
+  "git --no-optional-locks status",
+  "git --literal-pathspecs log -1",
+  "git -p log -1",
+];
+// Controls for the assignment-site rule: a plain literal name stays runnable beside git.
+const T304_NAME_CONTROLS = [
+  "export FOO=1; git log -1",
+  "export FOO=1 BAR=2\ngit status",
+  "git log -1",
+];
+const gitRunsUnderBash = (code) => {
+  const dir = mkdtempSync(join(tmp(), "g-"));
+  const env = {
+    ...process.env,
+    GIT_CONFIG_GLOBAL: "/dev/null",
+    GIT_CONFIG_SYSTEM: "/dev/null",
+  };
+  const sh = (c) =>
+    spawnSync("bash", ["-c", c], {
+      cwd: dir,
+      env,
+      timeout: CLI_BUDGET.timeoutMs,
+    });
+  sh(
+    "git init -q . && git -c user.name=a -c user.email=a@a commit -q --allow-empty -m i && echo x > f && git add f && git -c user.name=a -c user.email=a@a commit -q -m f && echo y >> f",
+  );
+  writeFileSync(
+    join(dir, "hook.sh"),
+    `#!/bin/sh\ntouch ${dir}/marker\nexit 0\n`,
+  );
+  chmodSync(join(dir, "hook.sh"), 0o755);
+  // `git --exec-path=<dir> ls-remote .` runs `<dir>/git-upload-pack`: the same hook, planted where
+  // that form looks for it.
+  writeFileSync(
+    join(dir, "git-upload-pack"),
+    `#!/bin/sh\ntouch ${dir}/marker\nexit 0\n`,
+  );
+  chmodSync(join(dir, "git-upload-pack"), 0o755);
+  sh(code);
+  return existsSync(join(dir, "marker"));
+};
+test("task.304 a GIT_ name assembled in a variable runs under bash and is refused by the allow-list, not the git rule", () => {
+  const code =
+    "x=GIT_SSH_COMMAND\nread $x <<< ./hook.sh\nexport $x\ngit ls-remote ssh://x/y";
+  assert.ok(gitRunsUnderBash(code), "bash must run it, or the row is moot");
+  const v = classifyBlock(code);
+  assert.equal(v.klass, "mutating");
+  assert.match(v.reason, /non-literal word/);
+});
+test("task.304 every git literal-execution form runs code under real bash, was admitted, and is refused now", () => {
+  assert.ok(
+    Object.keys(T304_FORMS).length >= 12,
+    "non-vacuity: the table keeps the rows the task names",
+  );
+  for (const [name, code] of Object.entries(T304_FORMS)) {
+    assert.ok(
+      gitRunsUnderBash(code),
+      `${name}: bash did not run it, so the row does not reproduce`,
+    );
+    assert.equal(
+      beforeAllowList(code).klass,
+      "runnable",
+      `${name}: an earlier layer already refuses this, so it does not need the git rule`,
+    );
+    const v = classifyBlock(code);
+    assert.equal(v.klass, "mutating", name);
+    assert.match(v.reason, /^not-allow-listed: git /, name);
+  }
+});
+
+test("task.304 the scan does not read a flag operand: only -C with one plain word is kept", () => {
+  for (const code of [
+    "git -C docs log -1",
+    "git -C . log -1",
+    "git -C ../x status",
+  ])
+    assert.equal(classifyBlock(code).klass, "runnable", code);
+  for (const code of [
+    "git --namespace x log -1",
+    "git --git-dir x log -1",
+    "git --work-tree x log -1",
+    "git --super-prefix x log -1",
+    "git -C a\\ b log -1",
+    "git -C 'a b' log -1",
+    'git -C "$X" log -1',
+    "git -C",
+    "git --git-dir=a\\ b log -1",
+  ]) {
+    const v = classifyBlock(code);
+    assert.equal(v.klass, "mutating", code);
+  }
+});
+test("task.304 git -c is refused on the flag itself, not only through its operand", () => {
+  // The -c value is a key git loads, so the refusal is on the form. These operands read as an
+  // allow-listed subcommand, so if the -c rule and the operand-flag rule were both gone, the scan
+  // would take the operand for the subcommand and call the block runnable.
+  for (const code of [
+    "git -c log status",
+    "git -c log log -1",
+    "git -clog status",
+  ]) {
+    const v = classifyBlock(code);
+    assert.equal(v.klass, "mutating", code);
+    assert.match(v.reason, /^not-allow-listed: git /, code);
+  }
+  assert.equal(classifyBlock("git log -1").klass, "runnable");
+});
+test("task.304 an unknown git global flag is refused, a known one stays runnable", () => {
+  for (const code of T304_FLAG_CONTROLS)
+    assert.equal(classifyBlock(code).klass, "runnable", code);
+  // A flag git does not have (yet): fail closed, never skipped. The reason names the cause.
+  for (const code of [
+    "git --some-future-flag log -c core.sshCommand=./hook.sh ls-remote ssh://x/y",
+    "git --some-future-flag=x log -1",
+    "git -Z log -1",
+  ]) {
+    const v = classifyBlock(code);
+    assert.equal(v.klass, "mutating", code);
+    assert.match(v.reason, /unknown git global flag/, code);
+  }
+});
+test("task.304 the assignment-site rule keeps a plain exported name beside git runnable", () => {
+  for (const code of T304_NAME_CONTROLS)
+    assert.equal(classifyBlock(code).klass, "runnable", code);
+});
+test("task.304 the brace scan is per word: a brace and a comma in different words do not expand", () => {
+  // bash expands only inside one word, so these run as written; a scan over the joined list refused them.
+  for (const code of [
+    "git log -1 -- {x y,z",
+    "git log -1 --grep={x --grep=y,z",
+  ])
+    assert.equal(classifyBlock(code).klass, "runnable", code);
+  // The one place a word is split for the scan is an escaped space, and that stays joined.
+  assert.equal(
+    classifyBlock("git ls-remote --{upload-pack=./hook.sh\\ x,} .").klass,
+    "mutating",
+  );
+});
+test("task.304 allexport with a built name beside git is refused (held by the non-literal-word layers, no rule of its own)", () => {
+  for (const code of [
+    "set -a\nGI''T_SSH_COMMAND=./hook.sh\ngit ls-remote ssh://h/x",
+    "set -o allexport\nGI''T_SSH_COMMAND=./hook.sh\ngit ls-remote ssh://h/x",
+  ]) {
+    assert.equal(classifyBlock(code).klass, "mutating", code);
+  }
+});
+test("task.304 defeat the first layer: a safe subcommand with the hazard form is refused by the git rule alone", () => {
+  // `status` and `log` are on SAFE_GIT_SUBCOMMANDS, so the `git:<sub>` check admits them: only the
+  // new rule can refuse these.
+  for (const code of [
+    "git -c core.fsmonitor=./hook.sh status",
+    "git -c core.pager=x log -1",
+    "GIT_PAGER=x git log -1",
+  ]) {
+    assert.equal(beforeAllowList(code).klass, "runnable", code);
+    assert.equal(classifyBlock(code).klass, "mutating", code);
+  }
+});
+
+test("task.304 spellings other layers already hold also stay refused", () => {
+  for (const code of [
+    "git -c alias.zz=!touch\\ X zz",
+    "declare -x GIT_SSH_COMMAND=./h\ngit status",
+    "env GIT_PAGER=x git log -1",
+    "X=$(true) GIT_TRACE=/tmp/a git status",
+    "git log -1 --output=out.txt",
+  ]) {
+    assert.equal(classifyBlock(code).klass, "mutating", code);
+  }
+});
+
+test("task.304 control git blocks stay runnable", () => {
+  for (const code of [
+    "git log -1",
+    "git diff --name-only",
+    "git -C dir status",
+    "git --git-dir=.git status",
+    "git rev-parse HEAD",
+    "git log --oneline -c", // `-c` after the subcommand is a diff flag, not the global flag
+    "git log --encoding=UTF-8 -1",
+    "git ls-remote --exit-code --heads origin",
+    "echo hello",
+    // Words the shell leaves alone: a brace that is quoted, or holds no comma or `..`, is text.
+    "git log -1 --format='{%h,%s}'",
+    'git log -1 --format="{%h,%s}"',
+    "git log -1 --format={%h}",
+  ]) {
+    assert.equal(classifyBlock(code).klass, "runnable", code);
+  }
+});
+
+test("task.304 brace expansion in a read-only git argument is refused too, a documented cost of refusing by form", () => {
+  // `{a,b}` really expands (`--format={%h,%s}` becomes two words), so the scan cannot read what git
+  // receives. The tracked docs hold none (scripts/qa-snippets-docscan.mjs: newly refused 0).
+  for (const code of [
+    "git log --format={%h,%s} -1",
+    "git diff HEAD~{1,2}",
+    "git log --since={1,2}.days",
+  ]) {
+    assert.equal(classifyBlock(code).klass, "mutating", code);
+  }
+});
+
+test("task.304 the classifier refuses a git argument exactly when bash brace-expands it", () => {
+  // The pair the cycle 2 fix must keep: a word bash expands is refused, a word bash leaves as
+  // written is not. Bash is asked, not assumed.
+  const expands = (w) =>
+    spawnSync("bash", ["-c", `printf '%s\\n' ${w}`], { encoding: "utf8" })
+      .stdout.trim()
+      .split("\n").length > 1;
+  const words = [
+    ...["a{b,c}", "x{1..3}", "{a,b}", "a{,}", "--o{k,k}"].map((w) => [w, true]),
+    ...["'a{b,c}'", '"a{b,c}"', "a\\{b,c}", "{}"].map((w) => [w, false]),
+  ];
+  for (const [w, shouldExpand] of words) {
+    assert.equal(expands(w), shouldExpand, `${w}: bash's own answer`);
+    const v = classifyBlock(`git log -1 --format=${w}`);
+    assert.equal(
+      v.klass,
+      shouldExpand ? "mutating" : "runnable",
+      `${w}: ${v.reason}`,
+    );
+  }
 });
