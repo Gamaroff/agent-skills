@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.67.0] - 2026-11-13
+
 ### Fixed
 
 - **The `/finalise` security probe gives every (case, shell) run its own `HOME` and `TMPDIR` (task 306).**
