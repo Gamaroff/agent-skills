@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **The `/finalise` security probe gives every (case, shell) run its own `HOME` and `TMPDIR` (task 306).**
+  One `HOME` was shared by every case and shell, so a legitimate case on a state-changing control
+  (task.296's `lockctl.sh take`) left its state for the zsh run, which read the case as refused and
+  the write as an escape. The `shell:`, `shell-fn:`, `shell-argv:` and `fence:` arms now create the pair
+  inside the case directory. A hostile run's write to its own `HOME` is still reported as an escape; the
+  `cli:` arm and `--fixture-setup` keep the run-wide `HOME`. Held by seven tests in
+  `shared/resources/tests/security-probe.test.mjs`, mutation-proved both ways.
+
 ### Added
 
 - **Pipeline prose reads a step's status and the time from the instrument (task 299).** On task.295 a

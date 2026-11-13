@@ -296,16 +296,16 @@ branch's own.
 **Put every host-at-address string in backticks.** Look at the failing line in the CI log before
 suspecting the code: the report names the exact URL.
 
-### A legitimate case on a state-changing control reads as a defect in the `/finalise` probe
+### The `/finalise` probe's `shell:`, `shell-fn:`, `shell-argv:` and `fence:` runs each get their own `HOME`
 
-The security probe runs each case under bash and then zsh in one sandbox. A legitimate case on a
-control that *changes state* (task.296's `lockctl.sh take` creates a lock) leaves that state behind: the
-zsh run sees the bash run's lock as held (exit 10) and reads "rejected", and the lock written under the
-sandbox `HOME` is counted as an escape. The first DoD probe run on task.296 (2026-11-12) read 2
-reproduced and 2 escaped for that reason alone. A fresh `HOME` under zsh takes the lock (exit 0), so the
-code was right and the plan was wrong.
+Task 306 (2026-11-13) gave every (case, shell) run its own `HOME` and `TMPDIR`, inside its case
+directory (`makeRunHome` in `shared/resources/security-probe.mjs`). Before it, one `HOME` was shared by
+every case and shell, so a legitimate case on a control that *changes state* (task.296's `lockctl.sh
+take` creates a lock) left that state for the next shell: zsh read bash's lock as held (exit 10) and the
+case as refused, and the write counted as an escape. Legitimate state-changing cases can now be probed.
 
-**The cause is one `HOME` per run**, shared by every case and shell (`shared/resources/security-probe.mjs:2123`); task 306 gives each run its own. **Until it lands, plan state-changing controls hostile-only**, as task.296's QA
-cycle 4 and the corrected DoD run did, and say in the DoD that legitimate input for them is held by
-offline tests. Do not read a "reproduced" on a legitimate case of such a control as a code defect before
-checking whether the earlier shell's state caused it.
+Two things still hold. A **hostile** run's write to its own `HOME` or `TMPDIR` is still reported as an
+escape (a legitimate run's is not), and the `cli:` arm and every `--fixture-setup` keep the run-wide
+`HOME`, so a setup that writes there still errors the run. A probe record written before task 306 may
+carry a "reproduced" or an escape on a legitimate state-changing case that was this fault: re-run it
+before reading it as a code defect.

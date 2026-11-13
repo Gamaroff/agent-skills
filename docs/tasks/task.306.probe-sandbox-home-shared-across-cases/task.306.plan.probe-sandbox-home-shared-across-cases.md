@@ -18,9 +18,9 @@ Give each (case, shell) run its own `HOME` and `TMPDIR` under its fixture direct
 ### Phase 1: Measure and decide
 
 **Files to read:**
-- `shared/resources/security-probe.mjs` — `sandboxHome` is made once at `:2123`; `caseShellEnv` at `:3297` passes it; `runShellArgvCase` at `:3468` builds a fresh fixture dir per (case, shell) at `:3540`; `snapshotTree(sandboxRoot, workDirName)` at `:2230`, `:2255`, `:2652`, `:2670`.
+- `shared/resources/security-probe.mjs` — `sandboxHome` is made once at `:2122`; `caseShellEnv` at `:3296` passes it; `runShellArgvCase` at `:3468` builds a fresh fixture dir per (case, shell) at `:3540`; `snapshotTree(sandboxRoot, workDirName)` at `:2230`, `:2255`, `:2652`, `:2670`.
 
-**Reproduction fixture** (a small script committed under `shared/resources/tests/fixtures/security-probe/`):
+**Reproduction fixture** (an inline script string in the test, like `setup-home.sh` at `security-probe.test.mjs:8856`, so no new tracked `.sh` joins the `lint:shell` population; reproduce first in a scratch dir outside the repo):
 - `take-lock.sh` takes one argument, a lock name. It runs `mkdir "$HOME/locks/$1"` (after `mkdir -p "$HOME/locks"`) and exits 10 when the directory already exists, 0 otherwise.
 - Run it as one legitimate case with `--entry shell:<path>`. Expected today: bash exits 0, zsh exits 10, so the case reads as refused, and `$HOME/locks` is reported as an escape.
 
