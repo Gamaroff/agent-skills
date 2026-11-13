@@ -5118,7 +5118,9 @@ test("fence entry: the slot is script source — a $(…) input runs, in the cas
       "",
       "```bash",
       ': "<slot>"',
+      "echo REFUSED",
       ': > "$HOME/leak"',
+      "exit 1",
       "```",
       "",
     ].join("\n"),
@@ -5145,15 +5147,21 @@ test("fence entry: the slot is script source — a $(…) input runs, in the cas
     );
     assert.deepEqual(sub.escapes, []);
     assert.equal(existsSync(join(root, "PWNED")), false);
-    // HOME is the sandbox's, outside the work dir: a write there IS an escape.
+    // A HOSTILE run's write to its own HOME is still an escape (task.306: the
+    // HOME is per run, inside the case directory, and watched for a hostile run;
+    // it used to be the shared sandbox HOME, `home/leak`).
     const home = runProbeSpec({
       entry: "fence:doc.md#Home",
       slot: "<slot>",
-      cases: [fenceCase("f.home", "legitimate", "x")],
+      cases: [
+        fenceCase("f.home", "hostile", "x", {
+          expected: { exit: 1, stdout: "REFUSED\n" },
+        }),
+      ],
       repoRoot: root,
     });
     assert.ok(
-      home.escapes.some((e) => e.path === "home/leak"),
+      home.escapes.some((e) => /leak$/.test(e.path)),
       JSON.stringify(home.escapes),
     );
   } finally {
@@ -6689,6 +6697,216 @@ test("shell-argv entry: the proof run — reenter-qa-after-finalise.sh is reache
     );
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ── task.306: one HOME and TMPDIR per (case, shell) ──────────────────────────
+//
+// Every (case, shell) run gets its own HOME and TMPDIR, inside its own case
+// directory, so a legitimate case on a state-changing control leaves nothing for
+// the next shell to find. A HOME inside the case directory is outside both
+// escape watches, so a HOSTILE run's writes to it are watched on purpose.
+
+// A state-changing control: takes a named lock under $HOME, refuses a second
+// take of the same name (exit 10). Exit 7 is a usage error no case expects.
+const TAKE_SH = [
+  "#!/usr/bin/env bash",
+  '[ "$#" -eq 1 ] || exit 7',
+  'mkdir -p "$HOME/locks" || exit 7',
+  'mkdir "$HOME/locks/$1" 2>/dev/null || exit 10',
+  "exit 0",
+  "",
+].join("\n");
+
+test("task.306: a legitimate take on a state-changing control is accepted under every shell, with no escape (shell-argv:)", () => {
+  const root = saRoot({ "take.sh": TAKE_SH });
+  try {
+    const r = runProbeSpec({
+      entry: "shell-argv:take.sh",
+      argv: ["{input}"],
+      cases: [saCase("take.ok", "legitimate", "alpha")],
+      repoRoot: root,
+    });
+    assert.deepEqual(r.declined, [], JSON.stringify(r.declined));
+    assert.deepEqual(r.escapes, [], JSON.stringify(r.escapes));
+    for (const shell of probeShells()) {
+      const c = r.cases.find((x) => x.shell === shell);
+      assert.equal(c?.outcome, "accepted", `${shell}: ${JSON.stringify(c)}`);
+      assert.equal(c?.exit, 0, `${shell}: ${JSON.stringify(c)}`);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("task.306: the same take is accepted under every shell on the shell: arm, which builds its own env", () => {
+  const root = saRoot({
+    "take-dir.sh": [
+      "#!/usr/bin/env bash",
+      'mkdir -p "$HOME/locks" || exit 7',
+      'mkdir "$HOME/locks/one" 2>/dev/null || exit 10',
+      "exit 0",
+      "",
+    ].join("\n"),
+  });
+  try {
+    const r = runProbeSpec({
+      sink: "filename",
+      entry: "shell:take-dir.sh",
+      cases: [
+        {
+          id: "take.shell",
+          input: "alpha",
+          why: "state-changing control",
+          correct: "admitted",
+          direction: "legitimate",
+          expected: { exit: 0 },
+        },
+      ],
+      repoRoot: root,
+    });
+    assert.deepEqual(r.declined, [], JSON.stringify(r.declined));
+    assert.deepEqual(r.escapes, [], JSON.stringify(r.escapes));
+    for (const shell of probeShells()) {
+      const c = r.cases.find((x) => x.shell === shell);
+      assert.equal(c?.outcome, "accepted", `${shell}: ${JSON.stringify(c)}`);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("task.306: a HOSTILE write under its own HOME is still an escape, named with its case and shell", () => {
+  const root = saRoot({
+    "stray.sh": '#!/usr/bin/env bash\ntouch "$HOME/stray"\nexit 1\n',
+  });
+  try {
+    const r = runProbeSpec({
+      entry: "shell-argv:stray.sh",
+      argv: ["{input}"],
+      cases: [saCase("stray.h", "hostile", "x", { expected: { exit: 1 } })],
+      repoRoot: root,
+    });
+    assert.ok(r.escapes.length >= probeShells().length, JSON.stringify(r));
+    for (const shell of probeShells()) {
+      assert.ok(
+        r.escapes.some(
+          (e) => e.id === `stray.h@${shell}` && /stray/.test(e.path),
+        ),
+        `${shell}: ${JSON.stringify(r.escapes)}`,
+      );
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("task.306: a write outside the case's HOME and outside the work dir is still an escape", () => {
+  const root = saRoot({
+    // HOME is <sandbox>/<work>/<case>/.probe-home: three levels up is the sandbox root.
+    "out.sh": '#!/usr/bin/env bash\ntouch "$HOME/../../../out306"\nexit 1\n',
+  });
+  try {
+    const r = runProbeSpec({
+      entry: "shell-argv:out.sh",
+      argv: ["{input}"],
+      cases: [saCase("out.l", "legitimate", "x")],
+      repoRoot: root,
+    });
+    for (const shell of probeShells()) {
+      assert.ok(
+        r.escapes.some(
+          (e) => e.id === `out.l@${shell}` && /out306/.test(e.path),
+        ),
+        `${shell}: ${JSON.stringify(r.escapes)}`,
+      );
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("task.306: a fence: block that takes a lock under HOME is accepted under every shell", () => {
+  const root = fenceRoot({
+    "doc.md": [
+      "# Fixture doc",
+      "",
+      "### Take",
+      "",
+      "```bash",
+      'mkdir -p "$HOME/locks" || exit 7',
+      'mkdir "$HOME/locks/<slot>" 2>/dev/null || exit 10',
+      "```",
+      "",
+    ].join("\n"),
+  });
+  try {
+    const r = runProbeSpec({
+      entry: "fence:doc.md#Take",
+      slot: "<slot>",
+      cases: [fenceCase("f.take", "legitimate", "alpha")],
+      repoRoot: root,
+    });
+    assert.deepEqual(r.declined, [], JSON.stringify(r.declined));
+    assert.deepEqual(r.escapes, [], JSON.stringify(r.escapes));
+    for (const shell of probeShells()) {
+      const c = r.cases.find((x) => x.shell === shell);
+      assert.equal(c?.outcome, "accepted", `${shell}: ${JSON.stringify(c)}`);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("task.306: a LEGITIMATE write under its own HOME is not an escape, and each run starts from an empty HOME", () => {
+  const root = saRoot({
+    "fresh.sh": [
+      "#!/usr/bin/env bash",
+      '[ -z "$(ls -A "$HOME")" ] || exit 11',
+      'touch "$HOME/state"',
+      "exit 0",
+      "",
+    ].join("\n"),
+  });
+  try {
+    const r = runProbeSpec({
+      entry: "shell-argv:fresh.sh",
+      argv: ["{input}"],
+      cases: [
+        saCase("fresh.a", "legitimate", "x"),
+        saCase("fresh.b", "legitimate", "y"),
+      ],
+      repoRoot: root,
+    });
+    assert.deepEqual(r.escapes, [], JSON.stringify(r.escapes));
+    for (const c of r.cases) {
+      assert.equal(c.outcome, "accepted", JSON.stringify(c));
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("task.306: a shell-argv setup still runs under the run-wide HOME, so a stray write there errors the run", () => {
+  const root = saRoot({
+    "ok.sh": "#!/usr/bin/env bash\nexit 0\n",
+    "setup-home.sh": '#!/usr/bin/env bash\ntouch "$HOME/stray"\n',
+  });
+  try {
+    const r = runProbeSpec({
+      entry: "shell-argv:ok.sh",
+      argv: ["{input}"],
+      fixtureSetup: "setup-home.sh",
+      cases: [saCase("setup.h", "legitimate", "x")],
+      repoRoot: root,
+    });
+    assert.equal(r.executed, 0, JSON.stringify(r.cases));
+    for (const c of r.cases) {
+      assert.equal(c.outcome, "errored", JSON.stringify(c));
+      assert.match(c.detail, /fixture setup wrote outside the case directory/);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 

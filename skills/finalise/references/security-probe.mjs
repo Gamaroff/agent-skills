@@ -2636,20 +2636,62 @@ function caseEnv({ fixtureDir, sandboxHome, sandboxTmp }) {
 }
 
 /**
+ * One HOME and one TMPDIR for ONE (case, shell) run, inside the run's own case
+ * directory (task.306). The shell arms used to share the run-wide pair, so a
+ * legitimate case on a control that changes state (a lock, a marker) left that
+ * state for the next shell to find: zsh then read bash's lock as held and the
+ * case as refused, and the write counted as an escape. The pair is created
+ * after the case's files and its `--fixture-setup`, so neither sees it, and it
+ * goes away with the case directory. Not used by the cli: arm, which keeps the
+ * run-wide pair (one run per case, no shell to carry state across).
+ */
+function makeRunHome(caseDir) {
+  // mkdtemp, not a fixed name: a hostile input or fixture file named
+  // `.probe-home` is a file in this directory, and mkdir over it would throw.
+  const home = mkdtempSync(join(caseDir, ".probe-home-"));
+  const tmp = mkdtempSync(join(caseDir, ".probe-tmp-"));
+  return { home, tmp };
+}
+
+/**
+ * The per-run HOME and TMPDIR a HOSTILE run is watched in. A HOME inside the
+ * case directory is outside both escape watches (the sandbox snapshot skips the
+ * work dir, and the work-dir snapshot skips the case directory), and a hostile
+ * input that writes there is exactly what the watch exists to catch. A
+ * legitimate run writes there on purpose (that is its state) and is not watched.
+ */
+function runHomeWatch(c, runHome) {
+  return c.direction === "hostile" ? [runHome.home, runHome.tmp] : [];
+}
+
+/**
  * Spawn one per-case child with its escape sentinels around it: the sandbox
  * root (minus the work dir) and, non-recursively, the target's OWN directory —
  * a `cd "$(dirname "$0")"` idiom, or a Node CLI resolving paths from
  * `import.meta.url`, writes its side effect there, in the real tree, where
  * neither the fixture check nor the sandbox sentinel looks (BUG-12). ARGV, never
  * a string; stdin empty. Shared by the shell and cli: arms (task.144).
+ * `homeDirs` (task.306): per-run directories to snapshot around the run too,
+ * each change reported as an escape — the watch for a hostile run's own HOME.
  */
 function watchedSpawn(
   command,
   argv,
   { cwd, env, timeoutMs, extraFds = 0 },
-  { sandboxRoot, workDirName, scriptDir, escapes, escapeId, shell = null },
+  {
+    sandboxRoot,
+    workDirName,
+    scriptDir,
+    escapes,
+    escapeId,
+    shell = null,
+    homeDirs = [],
+  },
 ) {
   const before = snapshotTree(sandboxRoot, workDirName);
+  // snapshotTree, files only, as the sandbox watch it stands in for: an empty
+  // directory (npm's `~/.npm`) was never an escape there and is not one here.
+  const homeBefore = homeDirs.map((d) => snapshotTree(d, null));
   const scriptDirBefore = listDirStamps(scriptDir);
   // extraFds: further pipes after stderr, read back as child.output[3…].
   const leash = leashed(command, argv, { env, cwd, extraFds });
@@ -2672,6 +2714,15 @@ function watchedSpawn(
     if (before.get(path) !== stamp)
       escapes.push({ id: escapeId, ...tag, path });
   }
+  homeDirs.forEach((d, i) => {
+    const homeAfter = snapshotTree(d, null);
+    const paths = new Set([...homeBefore[i].keys(), ...homeAfter.keys()]);
+    for (const path of paths) {
+      if (homeBefore[i].get(path) !== homeAfter.get(path)) {
+        escapes.push({ id: escapeId, ...tag, path: `${basename(d)}/${path}` });
+      }
+    }
+  });
   for (const [name, stamp] of listDirStamps(scriptDir)) {
     if (scriptDirBefore.get(name) !== stamp) {
       escapes.push({ id: escapeId, ...tag, path: join(scriptDir, name) });
@@ -2707,8 +2758,6 @@ function runShellCase(
     harnessDir,
     shells,
     sandboxRoot,
-    sandboxHome,
-    sandboxTmp,
     workDir,
     workDirName,
     timeoutMs,
@@ -2819,7 +2868,13 @@ function runShellCase(
             fnName,
             c.input,
           ];
-    const env = caseEnv({ fixtureDir, sandboxHome, sandboxTmp });
+    // This (case, shell)'s own HOME and TMPDIR (task.306).
+    const runHome = makeRunHome(fixtureDir);
+    const env = caseEnv({
+      fixtureDir,
+      sandboxHome: runHome.home,
+      sandboxTmp: runHome.tmp,
+    });
     if (fakeGhDir !== null) {
       // First on PATH, and armed: the fixture's `gh` refuses to run without
       // FAKE_GH=1, so a stray invocation from any other context exits 2.
@@ -2848,6 +2903,7 @@ function runShellCase(
         escapes,
         escapeId: `${c.id}@${shell}`,
         shell,
+        homeDirs: runHomeWatch(c, runHome),
       },
     );
 
@@ -3346,6 +3402,7 @@ function caseWatchedSpawn(
     escapes,
     escapeId,
     shell,
+    homeDirs = [],
   },
 ) {
   const caseName = basename(cwd);
@@ -3359,7 +3416,7 @@ function caseWatchedSpawn(
     command,
     argv,
     { cwd, env, timeoutMs },
-    { sandboxRoot, workDirName, scriptDir, escapes, escapeId, shell },
+    { sandboxRoot, workDirName, scriptDir, escapes, escapeId, shell, homeDirs },
   );
   // Both ways: a path that appeared or changed, and a path that is gone.
   const workAfter = workDirStamps(workDir, caseName);
@@ -3548,14 +3605,6 @@ function runShellArgvCase(
       errored(shell, `fixture: ${e.message}`);
       continue;
     }
-    // The same isolation as fence: — one definition (caseShellEnv).
-    const env = caseShellEnv(c.fixture, {
-      caseDir: fixtureDir,
-      sandboxHome,
-      sandboxTmp,
-      harnessDir,
-      fakeGhDir,
-    });
     const watch = {
       sandboxRoot,
       workDir,
@@ -3566,10 +3615,19 @@ function runShellArgvCase(
     };
 
     if (setupPath !== null) {
+      // The setup keeps the run-wide HOME and TMPDIR (task.306): it builds "$1"
+      // and nothing else, so a stray write to either errors the run, as before.
+      const setupEnv = caseShellEnv(c.fixture, {
+        caseDir: fixtureDir,
+        sandboxHome,
+        sandboxTmp,
+        harnessDir,
+        fakeGhDir,
+      });
       const setup = runCaseSetup({
         setupPath,
         fixtureDir,
-        env,
+        env: setupEnv,
         timeoutMs,
         watch,
       });
@@ -3578,6 +3636,18 @@ function runShellArgvCase(
         continue;
       }
     }
+
+    // This (case, shell)'s own HOME and TMPDIR (task.306), made after the setup
+    // so the setup never sees them. The same isolation as fence: — one
+    // definition (caseShellEnv).
+    const runHome = makeRunHome(fixtureDir);
+    const env = caseShellEnv(c.fixture, {
+      caseDir: fixtureDir,
+      sandboxHome: runHome.home,
+      sandboxTmp: runHome.tmp,
+      harnessDir,
+      fakeGhDir,
+    });
 
     // Whole-element substitution only — parseArgvTemplate refused any element
     // that merely CONTAINS a slot, so nothing here builds a string from input.
@@ -3590,7 +3660,12 @@ function runShellArgvCase(
       shell,
       shellArgvSpawnArgs(shell, entryPath, args),
       { cwd: fixtureDir, env, timeoutMs },
-      { ...watch, scriptDir: dirname(entryPath), escapes },
+      {
+        ...watch,
+        scriptDir: dirname(entryPath),
+        escapes,
+        homeDirs: runHomeWatch(c, runHome),
+      },
     );
 
     let outcome;
@@ -3982,8 +4057,6 @@ function runFenceCase(
     harnessDir,
     shells,
     sandboxRoot,
-    sandboxHome,
-    sandboxTmp,
     workDir,
     workDirName,
     timeoutMs,
@@ -4078,11 +4151,13 @@ function runFenceCase(
     const scriptPath = join(harnessDir, `fence-${++harnessSeq}.sh`);
     writeFileSync(scriptPath, script);
 
-    // The per-case isolation shared with shell-argv: (caseShellEnv).
+    // The per-case isolation shared with shell-argv: (caseShellEnv), with this
+    // (case, shell)'s own HOME and TMPDIR (task.306).
+    const runHome = makeRunHome(caseDir);
     const env = caseShellEnv(c.fixture, {
       caseDir,
-      sandboxHome,
-      sandboxTmp,
+      sandboxHome: runHome.home,
+      sandboxTmp: runHome.tmp,
       harnessDir,
       fakeGhDir,
     });
@@ -4106,6 +4181,7 @@ function runFenceCase(
         escapes,
         escapeId: `${c.id}@${shell}`,
         shell,
+        homeDirs: runHomeWatch(c, runHome),
       },
     );
 
