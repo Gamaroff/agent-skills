@@ -1,0 +1,93 @@
+# Implementation Report: Orchestration reads status and time from the instrument
+
+**Task**: `task.299.orchestration-status-and-timestamp-from-the-instrument.md`
+**Run Number**: 1
+**Started**: 2026-11-13 12:34
+**Status**: In Progress
+
+---
+
+## Summary
+
+Find where pipeline prose teaches a wrapped-command exit code or a hand-typed timestamp, fix each hit, and add a guard test.
+
+---
+
+## Pipeline Configuration
+
+| Setting             | Value                                                                      |
+| ------------------- | -------------------------------------------------------------------------- |
+| Feature branch base | develop                                                                    |
+| PR target           | develop                                                                    |
+| qa-planning gate    | skipped (auto)                                                             |
+| Task risk level     | not set                                                                    |
+| Pipeline mode       | standard                                                                   |
+| Always-load files   | defaults (resolved in Step 3)                                              |
+| Board status        | N/A (no issue linked)                                                      |
+
+---
+
+## Pipeline Progress
+
+| Step                       | Status     | Required Artifacts                                                     | Notes | Subagent summary ref | Completed (UTC) |
+| -------------------------- | ---------- | ---------------------------------------------------------------------- | ----- | -------------------- | --------------- |
+| 1. create-branch           | ✅ Done | Branch `feature/task.{id}.*` exists in git                             | Branch created at `74a9b87b` |       —                    | 2026-11-13T10:35Z |
+| 2. review-task             | ✅ Done | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               | 8/10, 6 Important fixed, status → ready-for-development | —                    | 2026-11-13T10:36Z |
+| 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline; remote `ci:fast` 8461 pass / 0 fail; bundle:check, format:check, lint:shell clean | —                    | 2026-11-13T10:56Z |
+| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
+| 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
+| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+
+> The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
+>
+> `Completed (UTC)` is the moment the step's row went `✅` — `date -u +%Y-%m-%dT%H:%MZ` — written once by the Step Transition Protocol and never overwritten on resume (task.201). Leave it empty for a step that has not finished.
+
+---
+
+## Decisions Log
+
+### Pipeline Startup — 2026-11-13
+
+- Feature branch base: develop — source: recommended (`--defaults`)
+- PR target branch: develop — source: recommended (`--defaults`)
+- qa-planning gate: skipped (auto — no prompt)
+- Mode: standard — source: detector (risk absent, 3 phases, so not lite)
+- Phase 0 fan-out: run inline, not as subagents; the path, tracker (no `github_issue`/`jira_key`) and lite-mode inputs were read directly from the document.
+- Always-load files: resolved in Step 3.
+
+### Step 2 — Review
+
+- review-task: 8/10, 6 Important findings, all fixed in the document; status → ready-for-development. Pre-pass subagents run inline (independent review did not run). Review report: `task.299.review.1.orchestration-status-and-timestamp-from-the-instrument.md`.
+- review-task output: Comprehensive report; Step 8.5 and Step 9 auto-answered per the pipeline (apply all critical + important fixes; fixes complete).
+
+### Step 3 — Develop
+
+- Step 3 inline — /develop not invoked: the plan file (`task.299.plan.*.md`) and a surface map were both in hand and the work is a handful of prose edits plus one test. Surface map: 9 shared sources, 1 skill source, 1 new test, bundles, CHANGELOG.
+- Phase 1 measurement (command → count): `git grep -nE 'echo[ ]+"?[A-Za-z_]*(exit|rc|status|code)[A-Za-z_]*=\$\?'` over skills, shared, scripts, docs → 7 hits, all exclusions (2 lines of one docs counter-example in `bug.4`, 5 foreground test fixtures in `shared/resources/tests/`: `changelog-cites.test.mjs:83` and four in `setup-consumer-skill-profiles.test.mjs`); the background forms in the step-3 and step-5-6 docs write the status into the log, already correct, and gained a sentence that the notification's exit code is the `echo`'s. Time placeholders: `git grep -nE 'HH:MM|\{timestamp\}|ISO-8601'` over shared sources and SKILL.md → 12 hits fixed (report template ×5, autonomous-defaults, traceability-mapper prompt, triage prompt, summary schema ×2, hooks.md, pause.md, nestjs-debug ×4 across 2 sentences) and 0 left. A wider typed-date grep (`{today}`, `{YYYY-MM-DD}`, `[Date]`, `{{date}}`) found 70 date-only placeholders across 27 files: named as an unseen shape, an exclusion, because the date is in the session context and the observation was about time of day.
+- Guard `tests/orchestration-instrument-reads.test.js`: 4 tests, red on 6 real hits before the fixes, mutation-proved on the status shape (reintroduced `run it; echo "exit=$?"` → red, reverted).
+- Anomaly found in this very run: Step 0e's `**Started**` was typed in local time (12:34) while the Step 1 row used UTC (10:35Z): the class the task targets. The template note now says UTC from `date -u`.
+
+---
+
+## Issues Log
+
+_Problems encountered and how they were resolved or escalated._
+
+---
+
+## QA Iteration History
+
+_Track each QA review/fix cycle._
+
+---
+
+## Completion
+
+**Finished**: {populated at end}
+**Final Status**: {Completed / Failed / Escalated}
+**Branch**: feature/task.299.orchestration-status-and-timestamp-from-the-instrument
+**PR**: {populated after Step 4}
+**QA Iterations**: {populated at end}
+**DoD Summary**: {populated after Step 7}
+**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}

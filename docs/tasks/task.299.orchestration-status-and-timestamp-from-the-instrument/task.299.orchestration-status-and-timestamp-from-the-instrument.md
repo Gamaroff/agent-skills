@@ -5,16 +5,18 @@ type: task
 description: "Stop pipeline prose that reads a background step's exit code from a wrapped command or types a timestamp by hand."
 tags: [develop-task, qa-task, observation]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Low
 created: 2026-11-10
-updated: 2026-11-10
+updated: 2026-11-13
 estimated_effort_hours: 4
 ---
 
 # Technical Task: Orchestration reads status and time from the instrument
 
-**Status:** Planned
+**Status:** Ready for Review
+
+**Review**: ✅ All review recommendations from `task.299.review.1.orchestration-status-and-timestamp-from-the-instrument.md` implemented 2026-11-13
 
 Cut from observation #164.
 
@@ -38,7 +40,7 @@ A status or a time that comes from the line that wraps it, or from memory, is wr
 
 **In scope:** ✅ the measurement ✅ the fixes in shipped prose and scripts ✅ a guard test over the measured population.
 
-**Out of scope:** ❌ changing how the harness reports exit codes ❌ files outside the skills and shared resources.
+**Out of scope:** ❌ changing how the harness reports exit codes ❌ fixing files outside the skills and shared resources. Phase 1 still measures `docs/`, so a hit there is seen and classed: a counter-example kept to show the wrong form (for example `docs/bugs/bug.4.snippet-engine-symlink-noop`) is an exclusion with its reason, not a fix. Test fixtures under `shared/resources/tests/` and `skills/*/tests/` that run `cmd; echo "rc=$?"` in the foreground to read the command's own status are exclusions: the status of the command directly before the `echo` is the intended reading.
 
 ## 5. Breaking Changes
 
@@ -48,20 +50,22 @@ None.
 
 ### Phase 1: Measure — Risk: Low
 
-- [ ] Record the two grep commands, their counts and each hit as `path:line`, each classed as a fix or an exclusion with its witness.
+- [x] Record the two grep commands, their counts and each hit as `path:line`, each classed as a fix or an exclusion with its witness. Starting definitions, to be refined and then frozen as the guard's own: (a) `git grep -nE 'echo[ ]+"?[A-Za-z_]*(exit|rc|status)[A-Za-z_]*=\$\?'` over `skills/`, `shared/resources/` and `docs/`, keeping only hits whose block runs in the background (`run_in_background`, a trailing `&`, or prose that says "background"); (b) `git grep -niE '(write|type|fill in|record)[^.]{0,40}(timestamp|current (date|time))'` over the same roots, keeping hits that tell the author to produce the value by hand rather than run `date -u`. A bundled copy under `skills/*/references/` counts once, with its `shared/resources/` source; the source is what is fixed. The first pass found the `updated:` sentence in `shared/resources/qa-re-review-scope.md:189` and in `skills/qa-task/SKILL.md:248,481`, which already teach the instrument: classify them as exclusions with that witness.
+- [x] State the guard's claim as a bounded set: a fixture table of the shapes the scan catches (`; echo exit=$?`, `; echo "rc=$?"`, `; echo status=$?`, and the typed-timestamp phrasings), with the shapes it knowingly does not see named. "Any wrapped status" is an unbounded claim.
 
 ### Phase 2: Fix — Risk: Medium
 
-- [ ] For each background-status hit, write the step's own status to a file and read it. For each timestamp hit, take it from `date -u` in the same block.
-- [ ] Edit sources under `shared/resources/` and `skills/`, then `npm run bundle`.
+- [x] For each background-status hit, write the step's own status to a file and read it. For each timestamp hit, take it from `date -u` in the same block.
+- [x] Edit sources under `shared/resources/` and `skills/`, then `npm run bundle`.
 
 ### Phase 3: Guard — Risk: Low
 
-- [ ] A test that scans the same population with the recorded definition and fails on a new hit, with a non-vacuity floor so a broken scan cannot read as clean.
+- [x] A test, `tests/orchestration-instrument-reads.test.js` (style of `tests/doc-id-chokepoint.test.js`), that scans the same population with the recorded definition and fails on a new hit, with a non-vacuity floor so a broken scan cannot read as clean. Confirm `npm test` reaches it: `tests/test-runner-reach.test.js` is the backstop, and the Files Summary lists any `package.json` edit it needs.
+- [x] Mutation-proof: reintroduce one hit in a shipped source, confirm the guard goes red, revert (with the Edit tool).
 
 ## 7. Files Summary
 
-The list comes from Phase 1's measurement, not from recall: record the command and its count here when Phase 1 is done. Fixed files are `shared/resources/*.md`, `skills/*/SKILL.md` and their bundled copies; the guard is a new test.
+The list comes from Phase 1's measurement, not from recall: record the command and its count here when Phase 1 is done. Fixed files are `shared/resources/*.md`, `skills/*/SKILL.md` and their bundled copies; the guard is a new test, `tests/orchestration-instrument-reads.test.js`. Reuse the scan helpers `tests/doc-id-chokepoint.test.js` already uses rather than writing a second walker.
 
 ## 8. Testing Strategy
 
@@ -71,13 +75,13 @@ Assert behaviour: a fixture block containing `cmd; echo exit=$?` is flagged and 
 
 **Functional**
 
-- [ ] Phase 1's measurement (commands, counts, every hit classed) is recorded in the QA report.
-- [ ] No unclassed hit remains; each is fixed or excluded with a reason.
-- [ ] The guard flags a fixture hit and passes the fixed form.
+- [ ] Phase 1's measurement (commands, counts, every hit classed) is recorded in the QA report's Findings table.
+- [ ] No unclassed hit remains; each is fixed or excluded with a reason. Held by `tests/orchestration-instrument-reads.test.js`: its allowlist carries a reason per entry and its non-vacuity floor fails on an empty scan.
+- [ ] The guard flags a fixture hit and passes the fixed form. Held by the same test's fixture table (a flagged and a passing case per shape).
 
 **Performance**
 
-- [ ] The guard adds under a few seconds to `ci:fast`: median of five runs with `uptime` beside each, outliers reported.
+- [ ] The guard adds at most 3 seconds to `ci:fast`: median of five runs of `command node --test tests/orchestration-instrument-reads.test.js`, with `uptime` beside each, outliers reported, recorded in the QA report.
 
 **Code quality**
 
@@ -85,7 +89,7 @@ Assert behaviour: a fixture block containing `cmd; echo exit=$?` is flagged and 
 
 **Migration**
 
-- [ ] `CHANGELOG.md` entry.
+- [x] `CHANGELOG.md` entry.
 
 ## 10. Risk Assessment
 
@@ -104,12 +108,15 @@ Revert the commit and re-run `npm run bundle`. Triggers: a guard that fails on u
 | Date       | Version | Description                              | Author      |
 | ---------- | ------- | ---------------------------------------- | ----------- |
 | 2026-11-10 | 1.0     | Initial draft — cut from observation #164 | create-task |
+| 2026-11-13 | 1.1     | Review passed (8/10) — 6 Important fixes applied: named guard test and runner reach, numeric performance bound, docs/ measurement vs fix scope, bounded-set guard claim, starting grep definitions | review-task |
+| 2026-11-13 |         | Status → ready-for-development                                                                                                                        | review-task |
+| 2026-11-13 |         | Implemented: bounded guard test, `date -u` named at every time placeholder, background-status reading rule; status → ready-for-review                   | develop     |
 
 <!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phases 1 to 3
+- [x] Phases 1 to 3
 
 ## References
 
