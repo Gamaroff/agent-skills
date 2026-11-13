@@ -808,7 +808,9 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
    why): add a `probe record unreadable — {error}` FAIL check with no `severity`, and never read the
    0 it reports as nothing executed.
 3. **Fill the result from the record.** Set `SECURITY_RESULT.probes_executed` to the output's
-   `probes_executed` — the record's `totals.executed`, copied, never composed. Set `probes[]` to
+   `probes_executed` — the record's `totals.executed`, copied, never composed — and
+   `SECURITY_RESULT.observation_limits` to the output's `observation_limits`, copied the same way (the
+   sentences naming what the run could not observe; task.300). Set `probes[]` to
    the output's `probes`: each is a hostile case the control accepted or a legitimate case it
    refused, with its input verbatim. A probe built here carries **no `severity`**, so Step 8a reads
    it as not-low and halts. **When `probes[]` is non-empty, grade it:** re-dispatch the security
@@ -1119,6 +1121,10 @@ decision, not the zero-guard: no corpus sink models this input.
 {endif}
 {else:}
 **Candidates executed:** {security_result.probes_executed, or "not reported" if absent} — **reproduced:** {count of security_result.probes where reproduced == true}
+
+{if security_result.observation_limits is non-empty:}
+**Not observed by this run:** {each sentence of security_result.observation_limits, joined with "; "}. A clean count describes what the runner could see, not what a target does with a value it accepted.
+{endif}
 
 {if any probe in security_result.probes has reproduced == true:}
 {for each probe in security_result.probes where probe.reproduced:}
