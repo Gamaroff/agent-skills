@@ -70,6 +70,20 @@ mutation-proven: removed the word-boundary rule → guard fixture test red → d
 
 ---
 
+## Findings Table: Phase 1 Measurement and Guard Cost
+
+Recorded at `/finalise` (2026-11-13) so the measurement sits in a committed QA report. The commands and counts come from the implementation report's Decisions Log (Step 3).
+
+| Shape | Command (over skills, shared, scripts, docs) | Hits | Class |
+| --- | --- | --- | --- |
+| Wrapped status | `git grep -nE 'echo[ ]+"?[A-Za-z_]*(exit\|rc\|status\|code)[A-Za-z_]*=\$\?'` | 7 | All exclusions: 2 lines of one counter-example in `docs/bugs/bug.4`, 5 foreground test fixtures (`shared/resources/tests/changelog-cites.test.mjs:83`, four in `setup-consumer-skill-profiles.test.mjs`) where the command directly before the `echo` is the one being read |
+| Typed time placeholder | `git grep -nE 'HH:MM\|\{timestamp\}\|ISO-8601'` over shared sources and `SKILL.md` | 12 | All fixed: report template ×5, autonomous-defaults, traceability-mapper prompt, triage prompt, summary schema ×2, hooks.md, pause.md, nestjs-debug ×4 (2 sentences). 0 left |
+| Date-only placeholder | `{today}`, `{YYYY-MM-DD}`, `[Date]`, `{{date}}` | 70 across 27 files | Named exclusion (unseen shape): the date is in the session context; the observation was about time of day |
+
+Guard cost, measured on head `a2ebf108`: `command node --test tests/orchestration-instrument-reads.test.js`, five runs, `uptime` read before each (1-minute load average in brackets): 978 ms [1.90], 1093 ms [1.90], 1181 ms [1.90], 970 ms [1.90], 1206 ms [1.91]. Median 1093 ms against the 3000 ms bound. Each run includes Node start-up. Outliers: none. This replaces the cycle-1 figure (357 ms on `5cf248b4`), which predates the matcher changes of cycles 2 to 4.
+
+---
+
 ## Final Assessment
 
 **Gate Status**: PASS
