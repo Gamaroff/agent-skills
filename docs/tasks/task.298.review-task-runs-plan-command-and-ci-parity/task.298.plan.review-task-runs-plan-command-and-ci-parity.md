@@ -25,7 +25,7 @@ Add one bullet to the "Should Add" list in `skills/create-task/SKILL.md` § 3.5,
 
 ### Phase 3: tests
 
-Find the test that holds the review-task check list (grep an existing check's name under `tests/` and `evals/`) and extend it with a fixture.
+Add `tests/review-run-and-parity-checks.test.js`, modelled on `tests/review-plan-shape-checks.test.js` (which is not extended: its check-by-site loop also requires `review-story`). It reads the new review-task item and the new create-task bullet from the skills' own text and asserts trigger, safe form, no-safe-form fallback, worked example and severity. Mutation-prove each.
 
 ## Key Patterns and References
 

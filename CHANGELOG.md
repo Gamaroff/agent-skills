@@ -6,6 +6,19 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`review-task` runs a plan's own command once, and `create-task` asks for an environment-parity
+  line (task 298).** Task.295 was reviewed without anyone running the `rsync` its plan named, and
+  its container differed from CI (user, image base, shell and awk variants); both surfaced only in
+  later QA cycles and the acceptance runs. `review-task` Step 3 gains check 31: when the plan names
+  a command that moves or builds something, run it once with a dry-run flag or against a scratch
+  target and record the result. A command with neither is not run and is recorded as
+  `unrun — no safe form` (Optional); a flag is never improvised. `create-task` § 3.5 "Should Add"
+  gains the matching item: a task that runs CI scripts in a new environment carries a parity line
+  against the CI workflow (user, base image, shells, awk variants, tool versions). Held by
+  `tests/review-run-and-parity-checks.test.js`, which reads both skills' own text and is
+  mutation-proved three ways. It holds that each rule is stated at its site; whether a reviewer
+  applies it is not something a CI layer can run.
+
 - **A clean security-probe count names what the run could not observe (task 300).** "N candidates,
   0 reproduced" was a true claim about refusal, but the limits that bound it (an accepted value's
   effects are not observed; for a `fence:` entry, a write to an absolute path outside the sandbox is
