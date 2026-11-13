@@ -6,6 +6,7 @@ description: "Make a clean security-probe result say which sink class it could o
 tags: [finalise, security-probe, observation]
 category: refactoring
 status: ready-for-review
+pr_number: 896
 priority: Low
 created: 2026-11-10
 updated: 2026-11-13
@@ -147,6 +148,7 @@ No critical issues identified.
 | 2026-11-13 |         | Status → ready-for-development | review-task |
 | 2026-11-13 |         | Implemented: `OBSERVATION_LIMITS` in the runner, plan output and DoD Probe Results line; status → ready-for-review | develop-task |
 | 2026-11-13 |         | QA gate PASS (95/100) — 0 findings | qa-task |
+| 2026-11-13 |         | 5c PR review CONCERNS fixed — 3 findings, 1 iteration | qa-fix |
 
 <!-- change-log-end -->
 

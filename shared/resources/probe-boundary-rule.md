@@ -658,7 +658,9 @@ takes it.
   that holds the case directories, so is a deletion or a new directory. **A write
   to an absolute path outside the sandbox is not observed** (an injected
   `$(touch /abs/x)`): it is a stated limit, pinned by a test, and `expected.absent`
-  cannot name such a path. With no `--fake-gh`, the `gh` text check below runs over
+  cannot name such a path. The engine's `OBSERVATION_LIMITS` (in `security-probe.mjs`)
+  is where the limit's text lives; the run record carries its id and the DoD's Probe
+  Results line prints it (task.300). With no `--fake-gh`, the `gh` text check below runs over
   the extracted block and every case's input and fixture `env` / `files` (never the
   whole document), so a block
   that resolves `gh` to a path is declined `needs-fake-gh` before anything runs. That
