@@ -9,6 +9,7 @@ status: ready-for-review
 priority: Low
 created: 2026-11-12
 updated: 2026-11-13
+pr_number: 900
 estimated_effort_hours: 4
 ---
 
@@ -327,6 +328,7 @@ No blocking issues. Two low advisory notes (escape-path suffix, hidden directori
 | 2026-11-13 |  | Phase 1 decision: a legitimate run's write under its own HOME/TMPDIR is not an escape (it is that run's state); a hostile run's write there is reported as an escape, because a HOME inside the case dir is outside both existing watches and a hostile input writing there is what the watch exists to catch. Implemented per-run HOME/TMPDIR in the shell:, shell-fn:, shell-argv: and fence: arms; cli: and --fixture-setup keep the run-wide HOME. | develop-task |
 | 2026-11-13 |  | Status → ready-for-review | develop-task |
 | 2026-11-13 |  | QA gate PASS (95/100) — 0 blocking findings, 2 low advisory | qa-task |
+| 2026-11-13 |  | QA findings fixed — PR review CONCERNS (3 findings: pr_number added, deviation recorded, report fields filled), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---
