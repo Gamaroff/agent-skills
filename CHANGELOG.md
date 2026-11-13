@@ -6,6 +6,18 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **Pipeline prose reads a step's status and the time from the instrument (task 299).** On task.295 a
+  background command written `cmd; echo exit=$?` reported the exit code of the whole compound, so a
+  notification said "exit 0" for a run whose real step had failed, and `updated:` values typed into
+  gate files drifted from the real time. The fast-gate background form in the develop loop and the QA
+  loop already wrote the status into the log; both now also say the notification's own exit code is the
+  `echo`'s and must not be read. Every time placeholder in the implementation-report template, the
+  subagent-summary schema and its two writers, the wall-clock log line, the pause docs and
+  `nestjs-debug` now names `date -u` as the source. Held by
+  `tests/orchestration-instrument-reads.test.js`, which states its claim as a bounded set (a wrapped
+  `echo "…=$?"` with no redirect; a time placeholder in a file that never names `date -u`), names what
+  it does not see (date-only placeholders, file-level pairing), and is mutation-proved.
+
 - **`review-task` runs a plan's own command once, and `create-task` asks for an environment-parity
   line (task 298).** Task.295 was reviewed without anyone running the `rsync` its plan named, and
   its container differed from CI (user, image base, shell and awk variants); both surfaced only in

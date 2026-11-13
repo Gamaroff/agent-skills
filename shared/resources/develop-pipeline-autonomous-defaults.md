@@ -59,6 +59,7 @@ does not come back the way it expected. Three states, and they are not the same 
 treat an empty result as `10`); the QA diff reviewer's Step 3b post-condition and the pre-develop
 surface map both wait against this number. Start the clock at dispatch and record it in the
 Decisions Log with the outcome: `dispatched HH:MMZ → returned HH:MMZ` or `→ killed at N minutes`.
+Take each `HH:MMZ` from `date -u +%H:%MZ` run at that moment, never from memory.
 
 **Arm the deadline at dispatch.** Beside the dispatch, start a background `sleep $((BUDGET*60))`;
 its completion notification is the deadline event. When it fires and the agent has not returned,

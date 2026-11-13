@@ -296,7 +296,9 @@ echo "TEST_EXIT=$TEST_EXIT TEST_LOG=$TEST_LOG"
 ```
 
 **When the gate can outlive the tool timeout, start it with `run_in_background`** and let the log
-carry the exit code: `<fastGateCommand> > "$TEST_LOG" 2>&1; echo "TEST_EXIT=$?" >> "$TEST_LOG"`.
+carry the exit code: `<fastGateCommand> > "$TEST_LOG" 2>&1; echo "TEST_EXIT=$?" >> "$TEST_LOG"`. The
+notification's own exit code belongs to the whole compound and is the `echo`'s (0), so it says "exit 0"
+for a red gate: read the `TEST_EXIT=` line in the log, never the notification.
 Mark the wait before yielding —
 `bash .agents/skills/{develop-story|develop-task}/references/set-waiting-on.sh "step-3 fast gate iter $ITER" --kind task --budget-minutes {M}`
 (`develop-pipeline-hooks.md` §"waiting_on") — and on the notification `--clear` it and read the

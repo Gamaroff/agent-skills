@@ -43,8 +43,8 @@ docs/tasks/task.26.foo/.summaries/step-3-iteration-audit.json
 | `schema_version` | integer | yes | Currently `1`. Bump on breaking change. Readers MUST check this field before parsing. |
 | `step` | integer | yes | Pipeline step number that dispatched the subagent. |
 | `agent` | string | yes | Stable identifier for the subagent role. Kebab-case. |
-| `dispatched_at` | ISO-8601 string | yes | UTC timestamp when subagent started. |
-| `completed_at` | ISO-8601 string | yes | UTC timestamp when summary was written. |
+| `dispatched_at` | ISO-8601 string | yes | UTC timestamp when subagent started. Read from `date -u +%Y-%m-%dT%H:%M:%SZ`, never typed. |
+| `completed_at` | ISO-8601 string | yes | UTC timestamp when summary was written. Read from `date -u +%Y-%m-%dT%H:%M:%SZ`, never typed. |
 | `summary` | object | yes | Agent-specific structured payload. Shape is defined per-agent. |
 | `raw_artifact_paths` | array of strings | yes (may be `[]`) | Optional pointers to raw files the subagent read or produced (logs, diffs, generated reports). Relative to repo root. |
 

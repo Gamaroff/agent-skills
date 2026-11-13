@@ -49,6 +49,8 @@ After the Explore subagent returns, persist the triage result as a subagent summ
 
 Path: `<story-or-task-dir>/.summaries/step-3-test-triage-<ITER>.json`
 
+Take `dispatched_at` and `completed_at` from `date -u +%Y-%m-%dT%H:%M:%SZ`, run before the dispatch and when the file is written, never typed.
+
 ```json
 {
   "schema_version": 1,
