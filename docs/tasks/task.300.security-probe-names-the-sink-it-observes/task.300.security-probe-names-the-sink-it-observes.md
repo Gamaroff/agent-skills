@@ -89,13 +89,13 @@ Behaviour fixtures over the runner's output, mutation-proved; the whole suite th
 
 **Functional**
 
-- [ ] Phase 1's finding on the premise is recorded in the QA report.
+- [x] Phase 1's finding on the premise is recorded in the QA report.
 - [x] A run through an entry form that carries a stated limit yields `observation_limits` in the record and on the DoD Probe Results line. Held by the Phase 4 fixture test.
 - [x] Every form carries the universal after-accept limit, so no form is limit-free; a form without the form-specific limit (every form but `fence:`) does not carry it, and the counts a gate reads are unchanged by the field. Held by the same test (Phase 1 decision, develop: a fixed run-level list keyed by entry form).
 
 **Performance**
 
-- [ ] No extra probe executions: the test counts the runs.
+- [x] No extra probe executions: the test counts the runs.
 
 **Code quality**
 
@@ -115,6 +115,27 @@ Revert the commit and re-run `npm run bundle`. Triggers: a reader of the record 
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-13
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.300.qa.1.security-probe-names-the-sink-it-observes.md](./task.300.qa.1.security-probe-names-the-sink-it-observes.md)
+- **Gate File**: [task.300.gate.1.security-probe-names-the-sink-it-observes.yml](./task.300.gate.1.security-probe-names-the-sink-it-observes.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 356
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues identified.
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -125,6 +146,7 @@ Revert the commit and re-run `npm run bundle`. Triggers: a reader of the record 
 | 2026-11-13 | 1.1     | Review passed (8/10) — 5 Important fixed: deciding input named, `sink` name collision avoided, source and readers named, pinned tests named, temp-dir removal | review-task |
 | 2026-11-13 |         | Status → ready-for-development | review-task |
 | 2026-11-13 |         | Implemented: `OBSERVATION_LIMITS` in the runner, plan output and DoD Probe Results line; status → ready-for-review | develop-task |
+| 2026-11-13 |         | QA gate PASS (95/100) — 0 findings | qa-task |
 
 <!-- change-log-end -->
 
