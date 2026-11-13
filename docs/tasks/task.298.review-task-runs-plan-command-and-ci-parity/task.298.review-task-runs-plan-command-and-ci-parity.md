@@ -5,16 +5,18 @@ type: task
 description: "Make review-task run a plan's own transfer or build command once, and make create-task ask for a container-versus-CI parity line when a task runs CI scripts in a new place."
 tags: [review-task, create-task, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Low
 created: 2026-11-10
 updated: 2026-11-13
+completed_date: 2026-11-13
+pr_number: 897
 estimated_effort_hours: 4
 ---
 
 # Technical Task: review-task runs a plan's command and checks CI parity
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 Cut from observation #163.
 
@@ -134,12 +136,28 @@ Revert the commit and re-run `npm run bundle`. Triggers: a check that fires on e
 ### Key Findings
 No blocking findings. Cycle 1's finding is fixed and proven. One advisory cleanup: an assertion that cannot fail.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Gate**: ✅ PASS 100/100 (`task.298.gate.2.review-task-runs-plan-command-and-ci-parity.yml`)
+**PR Review**: APPROVE (`task.298.pr-review.1.review-task-runs-plan-command-and-ci-parity.md`)
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** all 5 met (check 31, create-task parity item, safe-form rule, bundle/format/ci:fast, CHANGELOG)
+✅ **Tests:** 7 tests in `tests/review-run-and-parity-checks.test.js`, mutation-proved; PR #897 CI green on `909bdcc34cb0`
+✅ **Documentation:** CHANGELOG cites task 298 under `[Unreleased]`
+⚠️ **Security / Compliance:** not applicable (skill prose and a test file)
+
+**Task marked as ACCEPTED on:** 2026-11-13
+
+**Detailed Verification Log:** See `task.298.dod.1.review-task-runs-plan-command-and-ci-parity.md` for evidence and timestamps.
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
-
-| Date       | Version | Description                              | Author      |
-| ---------- | ------- | ---------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-10 | 1.0     | Initial draft — cut from observation #163 | create-task |
 | 2026-11-13 | 1.1     | Review passed (8/10) — named the test file and why `review-plan-shape-checks.test.js` is not extended, added the no-safe-form fallback, reworded two criteria to what a test can hold, added the three list sites | review-task |
 | 2026-11-13 |         | Status → ready-for-development | review-task |
@@ -147,7 +165,7 @@ No blocking findings. Cycle 1's finding is fixed and proven. One advisory cleanu
 | 2026-11-13 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-11-13 |         | QA findings fixed — cycle 1, 1 finding | qa-fix |
 | 2026-11-13 |         | QA gate PASS (100/100) — 0 findings | qa-task |
-
+| 2026-11-13 | 1.2 | DoD passed — accepted (PR #897) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
