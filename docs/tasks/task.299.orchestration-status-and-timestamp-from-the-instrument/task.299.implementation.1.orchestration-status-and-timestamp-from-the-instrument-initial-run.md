@@ -83,7 +83,15 @@ _Problems encountered and how they were resolved or escalated._
 - T299-QA-1/2: the status matcher was one regex needing `;` and a closing-quote or end-of-line tail, so it missed quoted bare `"$?"`, `"exit $?"`, `; true`, a trailing comment, braced `${?}`, and `&&` / `||` wrappers. Replaced by `wrappedStatus()`: an `echo` after `;`, `&&` or `||` whose arguments read `$?` or `${?}` and carry no `>`. Nine new flagged fixtures, three new passing ones.
 - T299-QA-3: added a status non-vacuity assertion (strip `>> "$TEST_LOG"` from the step-3 doc; the scan must flag it).
 - Mutation proofs: `&&`/`||` removed from the operator set → fixture test red (`must flag: cmd && echo "rc=$?"`); matcher forced to return false → fixture and non-vacuity tests red. Both reverted.
-- Population test still clean (no new hit in shipped sources). Struck mechanism / narrowing residue: none (first fix cycle, one subject only). Advisory, not fixed: CR-4 (file-level pairing, disclosed), CR-5 (untracked sources; now named in the header), CR-6 (HTML comment inside the nestjs-debug template fence, a cleanup).
+- Population test still clean (no new hit in shipped sources). Struck mechanism / narrowing residue: none (first fix cycle, one subject only).
+
+### QA Cycle 2 — CONCERNS (80/100), 2 medium findings, same file
+
+- T299-QA-4/5 (refute pass, reproduced by execution): a `>` inside a quoted string read as a redirect; the capture split on `;`, `&`, `|` inside quotes; a single `&` or `|` operator was absent.
+- Narrowing residue: tests/orchestration-instrument-reads.test.js (trigger: repeat subject, `repeat-subject.mjs` named it)
+- Move: consolidate — quoted text is handled in one place, `maskQuoted()`, before the operator split and the redirect test, so the two cannot disagree about quotes; patching each edge separately would have been a third regex fix. Also anchored the instrument pairing (`\bdate -u\b`, CR-4) and named the brace-group false positive (CR-3) in the header as an unseen shape.
+- Fixtures: 7 new flagged (quoted `>`, quoted `||`, quoted `&`, single-quote mask, `2>&1`, single `&`, single `|`), 3 new passing (shipped background form, quoted `>` with no status, `>&2`).
+- Mutation proofs: masking skipped → fixture test red; single `&`/`|` operators dropped → fixture test red; both reverted. Advisory, not fixed: CR-4 (file-level pairing, disclosed), CR-5 (untracked sources; now named in the header), CR-6 (HTML comment inside the nestjs-debug template fence, a cleanup).
 
 ---
 

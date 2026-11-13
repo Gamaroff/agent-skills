@@ -106,12 +106,12 @@ Revert the commit and re-run `npm run bundle`. Triggers: a guard that fails on u
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-13
-**Quality Score**: 70/100
+**Quality Score**: 80/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.299.qa.1.orchestration-status-and-timestamp-from-the-instrument.md](./task.299.qa.1.orchestration-status-and-timestamp-from-the-instrument.md)
-- **Gate File**: [task.299.gate.1.orchestration-status-and-timestamp-from-the-instrument.yml](./task.299.gate.1.orchestration-status-and-timestamp-from-the-instrument.yml)
+- **Full Report**: [task.299.qa.2.orchestration-status-and-timestamp-from-the-instrument.md](./task.299.qa.2.orchestration-status-and-timestamp-from-the-instrument.md)
+- **Gate File**: [task.299.gate.2.orchestration-status-and-timestamp-from-the-instrument.yml](./task.299.gate.2.orchestration-status-and-timestamp-from-the-instrument.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 4
@@ -120,7 +120,7 @@ Revert the commit and re-run `npm run bundle`. Triggers: a guard that fails on u
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Three medium findings, all in the guard test: it misses quoted bare `$?`, `&&` / `||` wrappers and a few spacing shapes, and its status rule has no non-vacuity floor on shipped text.
+Cycle 1's three findings are fixed. Two new mediums, both in the guard's status matcher: a `>` inside a quoted string reads as a redirect, and the argument capture splits on `;`, `&` and `|` inside quotes.
 
 ## Change Log
 
@@ -134,6 +134,8 @@ Three medium findings, all in the guard test: it misses quoted bare `$?`, `&&` /
 | 2026-11-13 |         | Implemented: bounded guard test, `date -u` named at every time placeholder, background-status reading rule; status → ready-for-review                   | develop     |
 | 2026-11-13 |         | QA gate CONCERNS (70/100) — 3 findings                                                                                                                | qa-task     |
 | 2026-11-13 |         | QA findings fixed — guard status rule widened (`&&`, `||`, quoted, braced), non-vacuity floor added, 1 iteration                                       | qa-fix      |
+| 2026-11-13 |         | QA gate CONCERNS (80/100) — 2 findings                                                                                                                | qa-task     |
+| 2026-11-13 |         | QA findings fixed — quoted content masked once before parsing, single `&` / `|` operators, 2 iterations                                                | qa-fix      |
 
 <!-- change-log-end -->
 

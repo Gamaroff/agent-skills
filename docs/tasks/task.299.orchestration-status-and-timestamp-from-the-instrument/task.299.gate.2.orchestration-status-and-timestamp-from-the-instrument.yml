@@ -1,0 +1,84 @@
+schema: 2
+task: 'task.299.orchestration-status-and-timestamp-from-the-instrument'
+task_title: 'Orchestration reads status and time from the instrument'
+gate: CONCERNS
+status_reason: 'Cycle 1 findings are fixed. The refute pass found two more edge classes in the status matcher: it treats a `>` inside a quoted string as a redirect, and it splits on `;`, `&` and `|` inside quotes.'
+reviewer: 'QA Engineer'
+head: '07a9b8a189dc51baf5150636479d67951ca7d8e7'
+updated: '2026-11-13T11:22:23Z'
+
+top_issues:
+  - id: 'T299-QA-4'
+    severity: medium
+    file: 'tests/orchestration-instrument-reads.test.js'
+    finding: 'The redirect test is a bare includes(">") over the echo arguments, so `cmd; echo "a > b $?"` passes as redirected. Reproduced by execution; control `cmd; echo "rc=$?"` is flagged and `cmd > l 2>&1; echo "TEST_EXIT=$?" >> l` passes.'
+    suggested_action: 'Blank the content of quoted strings before parsing, and treat only a real redirect token as a redirect.'
+    suggested_owner: dev
+    origin: 'code-review CR-1, reproduced by QA'
+    status: open
+  - id: 'T299-QA-5'
+    severity: medium
+    file: 'tests/orchestration-instrument-reads.test.js'
+    finding: 'The argument capture stops at the first `;`, `&` or `|` even inside quotes, so `cmd; echo "a || b $?"` and `cmd; echo "x & $?"` lose the `$?`; a single `&` or `|` before the echo is not an operator in the set (`cmd & echo "rc=$?"`). Reproduced by execution.'
+    suggested_action: 'Blank quoted content first (same step as T299-QA-4) and widen the leading operator to a single or double `&` or `|`, with a fixture for each.'
+    suggested_owner: dev
+    origin: 'code-review CR-2, reproduced by QA'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 4
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary_reason: ''
+    notes: 'boundary: false. A read-only scanning test; it reports and never accepts or rejects an action. Matcher timed linear to N=1e6 by the reviewer (worst 71 ms).'
+  performance:
+    status: PASS
+    notes: 'Guard test about 0.4 s; cycle 1 median 357 ms against a 3 s bound.'
+  reliability:
+    status: CONCERNS
+    notes: 'The guard can still read clean on quoted-string shapes (T299-QA-4, T299-QA-5).'
+  maintainability:
+    status: PASS
+    notes: 'Population derived, reasons on the allowlist, bundled copies in sync.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 2
+  fix_date: '2026-11-13'
+  total_iterations: 1
+  verification_method: 'Guard test 4/4, remote ci:fast exit 0, two mutation proofs'
+
+recommendations:
+  immediate:
+    - action: 'Fix T299-QA-4 and T299-QA-5 together by blanking quoted content before parsing.'
+      refs: ['tests/orchestration-instrument-reads.test.js']
+  future:
+    - action: 'CR-3: the time regex matches any brace group holding the word timestamp (a bash group in the step-8 doc); require a standalone placeholder token with no `;` or quote.'
+      refs: ['tests/orchestration-instrument-reads.test.js']
+    - action: 'CR-4: the instrument pairing is file-level and unanchored (`candidate -u` matches); anchor with a word boundary and pair per placeholder.'
+      refs: ['tests/orchestration-instrument-reads.test.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['Fix T299-QA-4 and T299-QA-5']

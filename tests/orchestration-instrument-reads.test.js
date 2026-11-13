@@ -9,19 +9,21 @@
  * files drifted from the real time. This test fails on a new shape of either.
  *
  * CLAIM, stated as a bounded set (obs #13). It catches exactly:
- *   (a) STATUS — an `echo` after `;`, `&&` or `||` whose arguments read `$?` or `${?}`
- *       (quoted or not, any name or none, followed or not by `; true` or a comment), and
- *       which does NOT redirect the echo (`>`, `>>`, `2>&1`): the echo's own exit status is
- *       what a background notification reports, so the value reaches the reader only as
- *       prose.
+ *   (a) STATUS — an `echo` after `;`, `&`, `&&`, `|` or `||` whose arguments read `$?` or
+ *       `${?}` (quoted or not, any name or none, followed or not by `; true` or a comment),
+ *       and which does NOT redirect the echo to a file or stream (`>`, `>>`, `>&2`; a `2>&1`
+ *       is not a redirect for this purpose): the echo's own exit status is what a background
+ *       notification reports, so the value reaches the reader only as prose. Quoted text is
+ *       masked first, so a `>`, `;`, `&` or `|` inside a string is text.
  *   (b) TIME — a time-of-day placeholder (`{… HH:MM …}`, `{timestamp}`, `{ISO-8601}`,
  *       `<ISO-8601>`, `HH:MMZ`) in a file that never names `date -u`, the instrument.
  * It knowingly does NOT see: a date-only placeholder (`{today}`, `{YYYY-MM-DD}`: the date
  * is in the session context); a time placeholder in a file that names `date -u` for a
  * different placeholder (file-level pairing, not line-level); a status wrapped in a form
  * other than `echo` (`printf`, `tee`); an echo on a line of its own, away from the command;
- * an echo whose output is redirected to stderr (`2>&1`), which counts as redirected; and any
- * file outside the population below, including a new source not yet tracked by git.
+ * a line that escapes a quote or nests quoting; a time placeholder that is really a shell brace
+ * group holding the word timestamp, which the scan would flag; and any file outside the
+ * population below, including a new source not yet tracked by git.
  *
  * POPULATION is derived, never listed: tracked `shared/resources/*.md` and
  * `skills/*\/SKILL.md`. The bundled copies under `skills/*\/references/` are excluded —
@@ -39,20 +41,43 @@ const ROOT = path.join(__dirname, "..");
 
 // ── The two shapes ────────────────────────────────────────────────────────
 
-// (a) an `echo` after `;`, `&&` or `||` whose arguments read `$?` (or `${?}`), with no `>` redirect
-// among them. The arguments run to the next `;`, `&` or `|`, so a trailing `; true` or a trailing
+// (a) an `echo` after `;`, `&`, `&&`, `|` or `||` whose arguments read `$?` (or `${?}`), with no
+// real redirect. The arguments run to the next operator, so a trailing `; true` or a trailing
 // comment does not hide the echo, and the name before `=` is irrelevant.
-const ECHO_AFTER_OPERATOR = /(?:;|&&|\|\|)\s*echo\s+([^;&|\n]*)/gi;
+//
+// One masking step comes first (task.299 gate 2): inside a quoted string the shell metacharacters
+// `;`, `&`, `|` and `>` are text, so they are replaced with `_` before anything is parsed. That is
+// the single place quotes are handled, so the operator split and the redirect test cannot disagree
+// about them. `$?` is left visible: reading it inside quotes is the shape this guard exists for.
+// Escapes (`\"`) and nested quoting are not tracked; a line that uses them is a named unseen shape.
+function maskQuoted(line) {
+  let quote = null;
+  let out = "";
+  for (const ch of line) {
+    if (quote) {
+      if (ch === quote) quote = null;
+      out += ";&|>".includes(ch) ? "_" : ch;
+    } else {
+      if (ch === '"' || ch === "'") quote = ch;
+      out += ch;
+    }
+  }
+  return out;
+}
+const ECHO_AFTER_OPERATOR = /(?:;|&&?|\|\|?)\s*echo\s+([^;&|\n]*)/gi;
+// A redirect to a file or stream: `>` or `>>` not preceded by a digit or `&`, so `2>&1` (which
+// sends the status to the same place the notification reads) is not one.
+const REDIRECT = /(^|[^0-9&])>/;
 function wrappedStatus(line) {
-  for (const m of line.matchAll(ECHO_AFTER_OPERATOR)) {
-    if (/\$\{?\?\}?/.test(m[1]) && !m[1].includes(">")) return true;
+  for (const m of maskQuoted(line).matchAll(ECHO_AFTER_OPERATOR)) {
+    if (/\$\{?\?\}?/.test(m[1]) && !REDIRECT.test(m[1])) return true;
   }
   return false;
 }
 // (b) a time-of-day placeholder.
 const TIME_PLACEHOLDER =
   /\{[^}\n]*(?:HH:MM|HH:mm|ISO-8601|timestamp)[^}\n]*\}|<ISO-8601>|HH:MMZ/;
-const INSTRUMENT = /date -u/;
+const INSTRUMENT = /\bdate -u\b/;
 
 /** Findings for one file's text: [{ line, rule, text }]. Pure, so fixtures can drive it. */
 function scan(text) {
@@ -109,6 +134,13 @@ test("fixtures — the scan flags each wrapped-status shape and passes the corre
     'cmd && echo "rc=$?"', // && wrapper
     'cmd || echo "rc=$?"', // || wrapper
     'cmd; echo "done=$?"', // a name outside exit/rc/status/code
+    'cmd; echo "a > b $?"', // a `>` inside quotes is text, not a redirect
+    'cmd; echo "a || b $?"', // an operator inside quotes does not cut the capture
+    'cmd; echo "x & $?"',
+    "cmd; echo 'a; b' \"$?\"", // single quotes mask too
+    'cmd; echo "rc=$?" 2>&1', // 2>&1 sends the status to the notification's own stream
+    'cmd & echo "rc=$?"', // a single & operator
+    'cmd | echo "rc=$?"', // a single | operator
   ];
   for (const l of flagged) {
     assert.ok(
@@ -124,6 +156,9 @@ test("fixtures — the scan flags each wrapped-status shape and passes the corre
     'cmd && echo "rc=$?" >> "$LOG"', // && form with the status redirected
     'cmd || echo "rc=$?" > status.txt',
     "cmd; echo done", // an echo that reads no status
+    'cmd > "$LOG" 2>&1; echo "TEST_EXIT=$?" >> "$LOG"', // the shipped background form
+    'cmd; echo "a > b" "$rc"', // a quoted `>` with no status read
+    'cmd; echo "rc=$?" >&2', // to stderr, a redirect
   ];
   for (const l of passed) {
     assert.deepEqual(
