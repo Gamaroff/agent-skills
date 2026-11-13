@@ -1,0 +1,74 @@
+schema: 2
+task: 'task.299.orchestration-status-and-timestamp-from-the-instrument'
+task_title: 'Orchestration reads status and time from the instrument'
+gate: PASS
+status_reason: 'Cycle 3 finding is fixed and the real population still scans clean. One low-severity edge remains (a single quote glued to a preceding word is not masked); it does not change the gate.'
+reviewer: 'QA Engineer'
+head: 'ee9e294bca86a860ba67f2938e7c17d1192b48fc'
+updated: '2026-11-13T11:53:42Z'
+
+top_issues:
+  - id: 'T299-QA-7'
+    severity: low
+    file: 'tests/orchestration-instrument-reads.test.js'
+    finding: 'A single quote opens only after whitespace or `=;&|(>`, so a quote glued to the previous word is not masked: `cmd; echo foo''bar; baz'' $?` and `cmd; echo "a"''s; b'' $?` are missed. Reproduced by execution; control `cmd; echo foo ''bar; baz'' $?` is flagged. Rare shell syntax; the real population (192 files) has none.'
+    suggested_action: 'Treat a closing quote as a boundary too, or add concatenated and mid-word quoting to the header''s unseen-shapes list.'
+    suggested_owner: dev
+    origin: 'code-review CR-1, reproduced by QA'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 4
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary_reason: ''
+    notes: 'boundary: false. A read-only scanning test; it reports and never accepts or rejects an action.'
+  performance:
+    status: PASS
+    notes: 'Guard test about 0.4 s against a 3 s bound; matcher timed linear in gate 2.'
+  reliability:
+    status: PASS
+    notes: 'The guard flags every shape it claims, and the unseen shapes are named in its header.'
+  maintainability:
+    status: PASS
+    notes: 'Quotes are handled in one place; real population scans clean.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+bug_resolution:
+  bugs_fixed: 6
+  bugs_remaining: 1
+  fix_date: '2026-11-13'
+  total_iterations: 3
+  verification_method: 'Guard test 4/4, remote ci:fast exit 0 (8461 pass), three mutation-proof sets, reviewer population scan'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'T299-QA-7: treat a closing quote as a boundary, or name concatenated quoting as an unseen shape.'
+      refs: ['tests/orchestration-instrument-reads.test.js']
+    - action: 'CR-2: REDIRECT drops `&>` and `1>`, and flags a captured status `x=$(cmd; echo $?)`.'
+      refs: ['tests/orchestration-instrument-reads.test.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
