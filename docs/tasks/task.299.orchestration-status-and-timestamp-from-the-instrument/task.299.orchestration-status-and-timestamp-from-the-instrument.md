@@ -5,16 +5,18 @@ type: task
 description: "Stop pipeline prose that reads a background step's exit code from a wrapped command or types a timestamp by hand."
 tags: [develop-task, qa-task, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Low
 created: 2026-11-10
 updated: 2026-11-13
+completed_date: 2026-11-13
+pr_number: 899
 estimated_effort_hours: 4
 ---
 
 # Technical Task: Orchestration reads status and time from the instrument
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.299.review.1.orchestration-status-and-timestamp-from-the-instrument.md` implemented 2026-11-13
 
@@ -75,17 +77,17 @@ Assert behaviour: a fixture block containing `cmd; echo exit=$?` is flagged and 
 
 **Functional**
 
-- [ ] Phase 1's measurement (commands, counts, every hit classed) is recorded in the QA report's Findings table.
-- [ ] No unclassed hit remains; each is fixed or excluded with a reason. Held by `tests/orchestration-instrument-reads.test.js`: its allowlist carries a reason per entry and its non-vacuity floor fails on an empty scan.
-- [ ] The guard flags a fixture hit and passes the fixed form. Held by the same test's fixture table (a flagged and a passing case per shape).
+- [x] Phase 1's measurement (commands, counts, every hit classed) is recorded in the QA report's Findings table.
+- [x] No unclassed hit remains; each is fixed or excluded with a reason. Held by `tests/orchestration-instrument-reads.test.js`: its allowlist carries a reason per entry and its non-vacuity floor fails on an empty scan.
+- [x] The guard flags a fixture hit and passes the fixed form. Held by the same test's fixture table (a flagged and a passing case per shape).
 
 **Performance**
 
-- [ ] The guard adds at most 3 seconds to `ci:fast`: median of five runs of `command node --test tests/orchestration-instrument-reads.test.js`, with `uptime` beside each, outliers reported, recorded in the QA report.
+- [x] The guard adds at most 3 seconds to `ci:fast`: median of five runs of `command node --test tests/orchestration-instrument-reads.test.js`, with `uptime` beside each, outliers reported, recorded in the QA report.
 
 **Code quality**
 
-- [ ] `npm run bundle:check`, `format:check`, `lint:shell` and `ci:fast` pass.
+- [x] `npm run bundle:check`, `format:check`, `lint:shell` and `ci:fast` pass.
 
 **Migration**
 
@@ -121,13 +123,34 @@ Revert the commit and re-run `npm run bundle`. Triggers: a guard that fails on u
 
 ### Key Findings
 Cycle 3's finding is fixed and the real population scans clean. One low-severity edge remains: a single quote glued to the preceding word is not masked.
+## Definition of Done - PASSED ✅
 
-## Change Log
+**Status:** ACCEPTED
+
+**QA Report**: `task.299.qa.4.orchestration-status-and-timestamp-from-the-instrument.md`
+**Gate File**: `task.299.gate.4.orchestration-status-and-timestamp-from-the-instrument.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** all 6 success criteria met. Two (the Phase 1 findings table and the guard-cost measurement) failed a first pass on missing records, and were recorded and committed in `2cb8b097` before the decision.
+✅ **PR and CI:** PR #899; CI green on `2cb8b097` over 6 checks; remote `ci:fast` 8461 pass, 0 fail.
+✅ **Documentation:** `CHANGELOG.md:9` cites `(task 299)`; pipeline prose and bundled copies updated.
+✅ **Security Review:** PASS; no boundary deliverable, no secrets, no unsafe exec.
+✅ **Compliance Review:** not applicable.
+
+Open low items, carried as future work and not blocking: T299-QA-7 (a glued single quote is not masked) and CR-2 (`&>` and `1>` redirects).
+
+**Task marked as ACCEPTED on:** 2026-11-13
+
+**Detailed Verification Log:** See `task.299.dod.1.orchestration-status-and-timestamp-from-the-instrument.md` for the evidence and timestamps.
 
 <!-- change-log-start -->
+## Change Log
 
-| Date       | Version | Description                              | Author      |
-| ---------- | ------- | ---------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-10 | 1.0     | Initial draft — cut from observation #164 | create-task |
 | 2026-11-13 | 1.1     | Review passed (8/10) — 6 Important fixes applied: named guard test and runner reach, numeric performance bound, docs/ measurement vs fix scope, bounded-set guard claim, starting grep definitions | review-task |
 | 2026-11-13 |         | Status → ready-for-development                                                                                                                        | review-task |
@@ -139,7 +162,7 @@ Cycle 3's finding is fixed and the real population scans clean. One low-severity
 | 2026-11-13 |         | QA gate CONCERNS (90/100) — 1 finding                                                                                                                 | qa-task     |
 | 2026-11-13 |         | QA findings fixed — apostrophe in prose no longer opens a quote, 3 iterations                                                                         | qa-fix      |
 | 2026-11-13 |         | QA gate PASS (95/100) — 1 low finding                                                                                                                 | qa-task     |
-
+| 2026-11-13 | 1.2 | DoD passed — accepted (PR #899) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
