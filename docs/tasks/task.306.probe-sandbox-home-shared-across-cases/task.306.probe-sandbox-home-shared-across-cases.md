@@ -5,7 +5,7 @@ type: task
 description: "A legitimate case on a state-changing control reads as a defect in the /finalise security probe, because every case and shell shares one sandbox HOME."
 tags: [finalise, security-probe, shell, sandbox]
 category: testing
-status: ready-for-development
+status: ready-for-review
 priority: Low
 created: 2026-11-12
 updated: 2026-11-13
@@ -14,7 +14,7 @@ estimated_effort_hours: 4
 
 # Technical Task: Probe sandbox HOME shared across cases
 
-**Status:** Ready for Development
+**Status:** Ready for Review
 
 ---
 
@@ -295,6 +295,27 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-13
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.306.qa.1.probe-sandbox-home-shared-across-cases.md](./task.306.qa.1.probe-sandbox-home-shared-across-cases.md)
+- **Gate File**: [task.306.gate.1.probe-sandbox-home-shared-across-cases.yml](./task.306.gate.1.probe-sandbox-home-shared-across-cases.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 319 in the probe suite (7 new); remote ci:fast 8468 pass
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No blocking issues. Two low advisory notes (escape-path suffix, hidden directories visible to a cwd listing). The live re-run of task.296's plan is left to the DoD probe run.
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -304,6 +325,8 @@ None.
 | 2026-11-13 | 1.1 | Review passed (8/10) — fixed anchors, named the hostile-report mechanism and `.probe-home` placement, kept `--fixture-setup` on the run-wide HOME, numeric wall-time bound, inline fixture, prompt edit made conditional | review-task |
 | 2026-11-13 |  | Status → ready-for-development | review-task |
 | 2026-11-13 |  | Phase 1 decision: a legitimate run's write under its own HOME/TMPDIR is not an escape (it is that run's state); a hostile run's write there is reported as an escape, because a HOME inside the case dir is outside both existing watches and a hostile input writing there is what the watch exists to catch. Implemented per-run HOME/TMPDIR in the shell:, shell-fn:, shell-argv: and fence: arms; cli: and --fixture-setup keep the run-wide HOME. | develop-task |
+| 2026-11-13 |  | Status → ready-for-review | develop-task |
+| 2026-11-13 |  | QA gate PASS (95/100) — 0 blocking findings, 2 low advisory | qa-task |
 <!-- change-log-end -->
 
 ---

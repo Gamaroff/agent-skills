@@ -1,0 +1,59 @@
+schema: 2
+task: 'task.306.probe-sandbox-home-shared-across-cases'
+task_title: 'Probe sandbox HOME shared across cases'
+gate: PASS
+status_reason: 'Per-run HOME/TMPDIR in the four shell arms; 7 new tests mutation-proved both ways; suite 319 pass and remote ci:fast 8468 pass 0 fail; CPU ratio 1.016 against the 1.10 bound. Two low findings are advisory.'
+reviewer: 'QA Engineer'
+head: 'e089dbe06bcd9e41ece4b52758b8a82a49e387c2'
+updated: '2026-11-13T15:37:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 7
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: ["refuses"]
+    boundary_reason: 'The criteria word "refuses" describes the fixture script (a second take is refused), not an input gate this change adds. The change moves where the escape watch looks; runHomeWatch returns a list of directories, not an accept/reject decision.'
+    notes: 'The hostile-run watch on the per-run HOME/TMPDIR is held by two committed tests and was mutation-proved. No new accept/reject function was added, so no corpus probe applies.'
+  performance:
+    status: PASS
+    notes: 'Probe suite CPU time (user+sys), 3 runs each, develop tip vs this branch: median 74.0s vs 75.2s, ratio 1.016, bound 1.10. The branch suite also runs 7 more tests. Wall time was too load-noisy to use (laptop load 4 to 22).'
+  reliability:
+    status: PASS
+    notes: 'A run-wide HOME is kept for the shell-argv setup and the cli: arm, so a stray setup write still errors the run (test held).'
+  maintainability:
+    status: PASS
+    notes: 'One makeRunHome and one runHomeWatch serve all four arms; the snapshot lives in watchedSpawn, shared by every arm.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Escape paths for a per-run HOME carry mkdtemp suffixes (.probe-home-XXXXXX/...), so a recorded escape path differs between runs. Report a stable prefix if anything ever compares records across runs.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'A legitimate case that lists its cwd (ls -A, find .) sees the hidden .probe-home-* and .probe-tmp-* directories. None of the current cases do; revisit if one does.'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
