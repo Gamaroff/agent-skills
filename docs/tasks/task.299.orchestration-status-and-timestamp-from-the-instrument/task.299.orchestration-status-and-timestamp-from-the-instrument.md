@@ -106,12 +106,12 @@ Revert the commit and re-run `npm run bundle`. Triggers: a guard that fails on u
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-13
-**Quality Score**: 80/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.299.qa.2.orchestration-status-and-timestamp-from-the-instrument.md](./task.299.qa.2.orchestration-status-and-timestamp-from-the-instrument.md)
-- **Gate File**: [task.299.gate.2.orchestration-status-and-timestamp-from-the-instrument.yml](./task.299.gate.2.orchestration-status-and-timestamp-from-the-instrument.yml)
+- **Full Report**: [task.299.qa.3.orchestration-status-and-timestamp-from-the-instrument.md](./task.299.qa.3.orchestration-status-and-timestamp-from-the-instrument.md)
+- **Gate File**: [task.299.gate.3.orchestration-status-and-timestamp-from-the-instrument.yml](./task.299.gate.3.orchestration-status-and-timestamp-from-the-instrument.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 4
@@ -120,7 +120,7 @@ Revert the commit and re-run `npm run bundle`. Triggers: a guard that fails on u
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Cycle 1's three findings are fixed. Two new mediums, both in the guard's status matcher: a `>` inside a quoted string reads as a redirect, and the argument capture splits on `;`, `&` and `|` inside quotes.
+Cycle 2's findings are fixed and the real population scans clean. One new medium: an apostrophe in prose is read as a quote opener, so a wrapped echo after it passes.
 
 ## Change Log
 
@@ -136,6 +136,7 @@ Cycle 1's three findings are fixed. Two new mediums, both in the guard's status 
 | 2026-11-13 |         | QA findings fixed — guard status rule widened (`&&`, `||`, quoted, braced), non-vacuity floor added, 1 iteration                                       | qa-fix      |
 | 2026-11-13 |         | QA gate CONCERNS (80/100) — 2 findings                                                                                                                | qa-task     |
 | 2026-11-13 |         | QA findings fixed — quoted content masked once before parsing, single `&` / `|` operators, 2 iterations                                                | qa-fix      |
+| 2026-11-13 |         | QA gate CONCERNS (90/100) — 1 finding                                                                                                                 | qa-task     |
 
 <!-- change-log-end -->
 

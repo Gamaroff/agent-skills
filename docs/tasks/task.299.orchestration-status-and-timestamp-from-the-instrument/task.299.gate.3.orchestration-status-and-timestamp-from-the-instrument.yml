@@ -1,0 +1,74 @@
+schema: 2
+task: 'task.299.orchestration-status-and-timestamp-from-the-instrument'
+task_title: 'Orchestration reads status and time from the instrument'
+gate: CONCERNS
+status_reason: 'Cycle 2 findings are fixed and the real population scans clean. One new medium: the quote masker treats an apostrophe in prose as a quote opener, which masks the `;` before a wrapped echo.'
+reviewer: 'QA Engineer'
+head: 'cf073f6682432bd9566828bb2c307b5f1074a9a6'
+updated: '2026-11-13T11:37:40Z'
+
+top_issues:
+  - id: 'T299-QA-6'
+    severity: medium
+    file: 'tests/orchestration-instrument-reads.test.js'
+    finding: 'maskQuoted opens a quote on every apostrophe, so prose like `Don''t write cmd; echo "rc=$?"` masks the `;` and the scan passes the shape it exists to catch. Reproduced by execution: `Do not write cmd; echo "rc=$?"` is flagged, `Don''t write cmd; echo "rc=$?"` and `it''s cmd; echo "rc=$?"` are not; the shipped background form still passes.'
+    suggested_action: 'Open a single quote only at a word boundary (start of line, whitespace or an operator before it), and add apostrophe-in-prose fixtures in both directions.'
+    suggested_owner: dev
+    origin: 'code-review CR-1, reproduced by QA'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 4
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary_reason: ''
+    notes: 'boundary: false. A read-only scanning test; it reports and never accepts or rejects an action.'
+  performance:
+    status: PASS
+    notes: 'Guard test about 0.4 s against a 3 s bound; the matcher was timed linear in gate 2.'
+  reliability:
+    status: CONCERNS
+    notes: 'The guard can read clean on a prose line holding an apostrophe (T299-QA-6).'
+  maintainability:
+    status: PASS
+    notes: 'Quotes are handled in one place; the real population (192 files) scans clean.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+bug_resolution:
+  bugs_fixed: 5
+  bugs_remaining: 1
+  fix_date: '2026-11-13'
+  total_iterations: 2
+  verification_method: 'Guard test 4/4, remote ci:fast exit 0, mutation proofs, reviewer population scan'
+
+recommendations:
+  immediate:
+    - action: 'Fix T299-QA-6 and add the apostrophe fixtures.'
+      refs: ['tests/orchestration-instrument-reads.test.js']
+  future:
+    - action: 'CR-2: REDIRECT drops `&>` and `1>` redirects, and flags a captured status `x=$(cmd; echo $?)`; exclude only `2>` and `N>&M`, and name the capture as an unseen shape.'
+      refs: ['tests/orchestration-instrument-reads.test.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['Fix T299-QA-6']
