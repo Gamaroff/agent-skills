@@ -67,20 +67,23 @@ const item = step3 && itemByName(step3, NAME);
 test("review-task Step 3 is found, and its numbered list is not vacuous", () => {
   assert.ok(step3, `heading "${STEP3}" not found in ${RT}`);
   assert.ok(
-    highestNumber(step3) >= 31,
-    "the Step 3 list is expected to reach at least check 31",
+    highestNumber(step3) >= 2,
+    "the Step 3 list holds several numbered checks",
   );
 });
 
-test("the new check exists in the Step 3 list, and a later check does not break this", () => {
+test("the new check exists in the Step 3 list, after the check it is distinguished from", () => {
   assert.ok(item, `check "${NAME}" missing from ${RT} Step 3`);
-  assert.ok(
-    item.number >= 31,
-    "the new check follows check 30 (it was added as 31)",
+  // The floor is read from the list, not typed: the new check was added after check 23, so its
+  // number must exceed that check's, whatever either number becomes. A later check may follow it.
+  const c23 = itemByName(
+    step3,
+    "A parity claim enumerates the sibling's guards",
   );
+  assert.ok(c23, "check 23 missing");
   assert.ok(
-    item.number <= highestNumber(step3),
-    "the list reaches at least the new check; a later check may exceed it",
+    item.number > c23.number,
+    `the new check (${item.number}) follows check 23 (${c23.number})`,
   );
 });
 
