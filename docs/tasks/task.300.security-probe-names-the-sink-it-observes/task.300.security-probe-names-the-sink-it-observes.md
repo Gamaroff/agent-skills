@@ -5,17 +5,18 @@ type: task
 description: "Make a clean security-probe result say which sink class it could observe, so a command-line-flag boundary reaching a remote shell is not read as fully probed."
 tags: [finalise, security-probe, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 pr_number: 896
 priority: Low
 created: 2026-11-10
 updated: 2026-11-13
+completed_date: 2026-11-13
 estimated_effort_hours: 4
 ---
 
 # Technical Task: security-probe names the sink it observes
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 Cut from observation #165.
 
@@ -136,13 +137,35 @@ Revert the commit and re-run `npm run bundle`. Triggers: a reader of the record 
 
 ### Key Findings
 No critical issues identified. Cycle 1's three PR-review findings are fixed.
+## Definition of Done - PASSED ✅
 
-## Change Log
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.300.qa.2.security-probe-names-the-sink-it-observes.md`
+**Gate File**: `task.300.gate.2.security-probe-names-the-sink-it-observes.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 96/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** all 6 met (Phase 1 premise finding recorded; `observation_limits` in the record and on the Probe Results line; form-to-limit mapping; no extra executions; `bundle:check`, `format:check` and `ci:fast` pass; CHANGELOG entry and read-back tolerance)
+✅ **PR Review:** PR #896; the 5c review `pr-review.2` is APPROVE against gate 2
+✅ **CI:** reading 1 SUCCESS across 6 checks on the pre-acceptance head
+✅ **Documentation:** CHANGELOG entry (task 300), `skills/finalise/SKILL.md`, `probe-boundary-rule.md` and the bundled copies
+✅ **Security Review:** PASS (not a boundary deliverable)
+⚠️ **Compliance Review:** not applicable
+
+**Detailed Verification Log:** See `task.300.dod.1.security-probe-names-the-sink-it-observes.md` for complete verification evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-11-13
 
 <!-- change-log-start -->
+## Change Log
 
-| Date       | Version | Description                              | Author      |
-| ---------- | ------- | ---------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-10 | 1.0     | Initial draft — cut from observation #165 | create-task |
 | 2026-11-13 | 1.1     | Review passed (8/10) — 5 Important fixed: deciding input named, `sink` name collision avoided, source and readers named, pinned tests named, temp-dir removal | review-task |
 | 2026-11-13 |         | Status → ready-for-development | review-task |
@@ -150,7 +173,7 @@ No critical issues identified. Cycle 1's three PR-review findings are fixed.
 | 2026-11-13 |         | QA gate PASS (95/100) — 0 findings | qa-task |
 | 2026-11-13 |         | 5c PR review CONCERNS fixed — 3 findings, 1 iteration | qa-fix |
 | 2026-11-13 |         | QA gate PASS (96/100) — 0 findings | qa-task |
-
+| 2026-11-13 | 1.2 | DoD passed — accepted (PR #896) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
