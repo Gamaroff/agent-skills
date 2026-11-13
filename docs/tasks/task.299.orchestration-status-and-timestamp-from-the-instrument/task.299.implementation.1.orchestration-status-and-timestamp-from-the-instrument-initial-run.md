@@ -35,7 +35,7 @@ Find where pipeline prose teaches a wrapped-command exit code or a hand-typed ti
 | 2. review-task             | ✅ Done | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               | 8/10, 6 Important fixed, status → ready-for-development | —                    | 2026-11-13T10:36Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline; remote `ci:fast` 8461 pass / 0 fail; bundle:check, format:check, lint:shell clean | —                    | 2026-11-13T10:56Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #899; no tracker issue linked | —                    | 2026-11-13T10:57Z |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 4 gates, 3 fixes; gate 4 PASS 95; PR review CONCERNS, no coverage finding | —                    | 2026-11-13T11:55Z |
 | 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
@@ -92,6 +92,21 @@ _Problems encountered and how they were resolved or escalated._
 - Move: consolidate — quoted text is handled in one place, `maskQuoted()`, before the operator split and the redirect test, so the two cannot disagree about quotes; patching each edge separately would have been a third regex fix. Also anchored the instrument pairing (`\bdate -u\b`, CR-4) and named the brace-group false positive (CR-3) in the header as an unseen shape.
 - Fixtures: 7 new flagged (quoted `>`, quoted `||`, quoted `&`, single-quote mask, `2>&1`, single `&`, single `|`), 3 new passing (shipped background form, quoted `>` with no status, `>&2`).
 - Mutation proofs: masking skipped → fixture test red; single `&`/`|` operators dropped → fixture test red; both reverted. Advisory, not fixed: CR-4 (file-level pairing, disclosed), CR-5 (untracked sources; now named in the header), CR-6 (HTML comment inside the nestjs-debug template fence, a cleanup).
+
+### QA Cycle 3 — CONCERNS (90/100), 1 medium finding, same file
+
+- T299-QA-6 (reproduced by execution): `maskQuoted()` opened a quote on every apostrophe, so `Don't write cmd; echo "rc=$?"` masked the `;` and passed.
+- Narrowing residue: tests/orchestration-instrument-reads.test.js (trigger: repeat subject, `repeat-subject.mjs` named it; third fix cycle on the same subject).
+- Move: narrow the claim at the source — a single quote opens only at a word boundary (start, whitespace, or an operator or `=` before it). The header already names escaped and nested quoting as unseen shapes.
+- Fixtures: 2 new flagged (`Don't …`, `it's …`), 1 new passing (apostrophe prose with a real `>>` redirect).
+- Mutation proof: boundary rule removed → fixture test red; reverted. Remote `ci:fast` 8461 pass, 0 fail (exit 0, read from the rc file).
+
+### QA Cycle 4 — PASS (95/100), 1 low finding (advisory)
+
+- T299-QA-7 (reproduced by execution, low): a single quote glued to the previous word (`foo'bar; baz' $?`) is not masked. Rare shell syntax, absent from the real population (192 files scan clean). Left open: low severity does not move the gate. Recorded in the gate's `recommendations.future` with CR-2 (`&>` / `1>` redirects).
+- **Action**: Proceeding to 5c
+- **PR Review**: CONCERNS — 1 medium trail finding (PC-1: this report lacked the cycle 3 and 4 entries; fixed here, doc-only) and 1 low consistency finding (PC-2: no `pr_number`; `/finalise` writes it). No open coverage finding, so Step 7 opens. Report: `task.299.pr-review.1.*.md`; comment posted to PR #899.
+- Loop budget: 4 gates, 3 fixes (limit 5 and 4).
 
 ---
 
