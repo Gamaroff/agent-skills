@@ -1,0 +1,58 @@
+schema: 2
+task: 'task.300.security-probe-names-the-sink-it-observes'
+task_title: 'security-probe names the sink it observes'
+gate: PASS
+status_reason: 'Cycle 1 PR-review findings PC-1, PC-2, PC-3 fixed in 88ddf934; the new limits-line pin goes red when the line is renamed; 374 targeted tests green under TMPDIR=/tmp; bundle:check and validate clean; refute pass found no defect.'
+reviewer: 'QA Engineer'
+head: '88ddf9348134c662bf331f2d61a6f70c032dcfa2'
+updated: '2026-11-13T06:07:30Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 96
+
+evidence:
+  tests_reviewed: 374
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    notes: 'No boundary delivered: a reporting field, prose and a test. No accept-or-reject predicate was added or changed.'
+  performance:
+    status: PASS
+    notes: 'One extra dynamic import of an already-loaded module in the plan CLI; no extra probe executions.'
+  reliability:
+    status: PASS
+    notes: 'An engine without the export reads as no limits, never a throw; records written before the field derive the same limits.'
+  maintainability:
+    status: PASS
+    notes: 'Limit text defined once in OBSERVATION_LIMITS; probe-boundary-rule.md section 5 now cites it; bundled copies regenerated and bundle:check clean.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Other stated limits (gh-path bypass in shell forms, usage echoing the input) are candidates for OBSERVATION_LIMITS; not added in this task.'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'security-probe-plan.mjs imports the engine twice in readExecuted (readRecord, then observationLimitTexts); one destructuring would do. Cosmetic.'
+      refs: ['shared/resources/security-probe-plan.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
