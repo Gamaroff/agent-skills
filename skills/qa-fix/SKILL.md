@@ -634,10 +634,25 @@ it — before the third patch, not after it.
 
 - **(a) the pipeline offer** — the invocation carries a block opening `Narrowing residue — …`. The QA loop
   sends it when every MEDIUM on the last two gates names one `file:` at HIGH 0.
-- **(b) a repeat subject** — the Findings Summary shows a finding whose subject the previous cycle's
-  fix edited: a bug that cites the prior bug's fix, or a gate entry on the same function, section or
-  rule. This is your judgement, and it is allowed here because this step only *offers*; it exits
-  nothing and forbids nothing.
+- **(b) a repeat subject** — a rule over the gate files, not a judgement (task.297, obs #162). A
+  subject is a finding's `file:` field; it repeats when an **open** finding in this cycle's gate names
+  a file that the previous gate also named **and** the previous cycle's fix commit changed. Run it from
+  the repository root, from the second cycle on (cycle 1 has no previous gate):
+
+  ```bash
+  command node .agents/skills/qa-fix/references/repeat-subject.mjs \
+    --current "{this cycle's gate file}" --previous "{the previous cycle's gate file}" \
+    --fix-commit "{the previous cycle's qa-fix commit}"
+  ```
+
+  It prints one JSON line, `{"reason":"ok","subjects":[…]}`. A non-empty `subjects` means trigger (b)
+  holds, and the offer fires at the second consecutive gate naming one subject, not at the third. An
+  empty list means it does not; it exits non-zero only on an unreadable or block-less gate or an
+  unknown commit, and then prints nothing, so a failed read is never taken for "no repeat". The
+  previous cycle's qa-fix commit is the one its `fix(task.{id}): qa-fix cycle {N-1}` (or
+  `fix(story.…)`) message names; `git log -1 --format=%H --grep='qa-fix cycle {N-1}'` finds it. The
+  rule is only the trigger: it exits nothing and forbids nothing, and what you offer is still the
+  move below.
 
 **The six moves.** Choose one, and record it in the fix plan:
 

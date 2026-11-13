@@ -1,0 +1,60 @@
+schema: 2
+task: 'task.297.qa-loop-fast-gate-and-earlier-structural-move'
+task_title: 'QA loop fast gate and an earlier structural move'
+gate: PASS
+status_reason: 'Both rules have an executable home with committed tests, each mutation-proved (QA re-proved the repeat-subject edit clause: 2 tests red). 40/40 targeted tests, full ci:fast green on the LAN server (8445 pass). No HIGH or MEDIUM finding; two LOW cleanups recorded for later.'
+reviewer: 'QA Engineer'
+head: '0d7415e8afca62ebc53b728758a94c58e0decc53'
+updated: '2026-11-12T22:34:12Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 40
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: ["never"]
+    boundary: false
+    boundary_reason: 'The criteria word "never" describes the unset-key skip (never passes silently), not an input gate. fast-gate-outcome.sh --command is a presence check on a config value the consumer already executes as the gate command; repeat-subject.mjs reads only gate files this pipeline writes and fails closed (exit 1, nothing on stdout) on an unreadable or block-less gate.'
+    notes: 'No new trust boundary. The one shell-quoting point (fastGateCommand substituted into a double-quoted argument) adds no exposure: the same value is executed as the gate command.'
+  performance:
+    status: PASS
+    notes: 'No extra gate runs on a configured repository; the --command check is one process with no gate run.'
+  reliability:
+    status: PASS
+    notes: 'Unset key is a recorded skip, not a HALT, so consumers that never set it are unaffected. repeat-subject.mjs exits 1 with nothing on stdout for unreadable input, so a failed read is never taken for no repeat.'
+  maintainability:
+    status: PASS
+    notes: 'Each rule is one script with one definition, bundled by npm run bundle; bundle:check clean.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Scope the previous-fix lookup in qa-fix trigger (b) to this work item: git log --grep matches any qa-fix cycle N-1 commit in history, so a missing own commit could pick another task''s. Use --grep with the fix(task.{id}): prefix.'
+      refs: ['skills/qa-fix/SKILL.md']
+    - action: 'Single-quote the fastGateCommand substitution in step 0a (or pass only emptiness) so a command containing double quotes or dollar signs cannot reshape the argument list.'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

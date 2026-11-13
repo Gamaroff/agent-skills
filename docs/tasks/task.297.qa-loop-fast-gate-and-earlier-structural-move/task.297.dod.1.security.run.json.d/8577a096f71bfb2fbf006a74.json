@@ -1,0 +1,33 @@
+{
+  "sink": "path",
+  "entry": "cli:shared/resources/repeat-subject.mjs",
+  "name": "repeat-subject mutual-exclusion and malformed gate",
+  "call_site": null,
+  "verdict": "unverifiable",
+  "reason": "no-legitimate-evidence",
+  "executed": 2,
+  "passed": 2,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": [
+    "--current",
+    "cur.yml",
+    "--previous",
+    "prev.yml",
+    "--changed",
+    "src/a.ts",
+    "--fix-commit",
+    "{input}"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "fixture_copy": null,
+  "ran_at": "2026-11-12T22:39:44.743Z"
+}

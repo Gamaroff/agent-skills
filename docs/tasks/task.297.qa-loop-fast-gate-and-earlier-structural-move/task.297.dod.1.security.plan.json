@@ -1,0 +1,44 @@
+[
+  {
+    "argv": [
+      "--sink",
+      "path",
+      "--entry",
+      "cli:shared/resources/repeat-subject.mjs",
+      "--argv",
+      "[\"--current\",\"cur.yml\",\"--previous\",\"prev.yml\",\"--changed\",\"{input}\"]",
+      "--name",
+      "repeat-subject --changed (repeat-subject rule)"
+    ],
+    "cases_file": "task.297.dod.1.security.cases.1.json",
+    "cases_sha256": "ef494275c0b2cf5efef1e416b50ab67b19126514598c4d50865a68629b4893ef"
+  },
+  {
+    "argv": [
+      "--sink",
+      "path",
+      "--entry",
+      "cli:shared/resources/repeat-subject.mjs",
+      "--argv",
+      "[\"--current\",\"cur.yml\",\"--previous\",\"prev.yml\",\"--changed\",\"src/a.ts\",\"--fix-commit\",\"{input}\"]",
+      "--name",
+      "repeat-subject mutual-exclusion and malformed gate"
+    ],
+    "cases_file": "task.297.dod.1.security.cases.2.json",
+    "cases_sha256": "35868eb8ad9a25d1be87e35301f4f757b9c99a1b03401730e75f0f58e009a191"
+  },
+  {
+    "argv": [
+      "--sink",
+      "filename",
+      "--entry",
+      "shell-argv:shared/resources/fast-gate-outcome.sh",
+      "--argv",
+      "[\"--command\",\"{input}\"]",
+      "--name",
+      "fast-gate-outcome --command"
+    ],
+    "cases_file": "task.297.dod.1.security.cases.3.json",
+    "cases_sha256": "f1ec6b7f84353946940482359c022bd506fccf9130f7db56f0128cb324ce54c0"
+  }
+]

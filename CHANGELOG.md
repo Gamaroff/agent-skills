@@ -6,6 +6,20 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **The QA loop records a skipped fast gate, and qa-fix's structural-move offer fires at the second
+  repeat (task 297).** An unset or empty `develop.fastGateCommand` was a silent skip in step 0a:
+  nothing ran and nothing was recorded, so a reader of the QA history could not tell a green gate
+  from no gate. `fast-gate-outcome.sh` gains `--command`, and step 0a now records
+  `Fast gate: skipped (develop.fastGateCommand unset)` as the cycle's QA Iteration History line and
+  in the fix summary. **It is still a skip, not a HALT**, so a consumer that never set the key
+  behaves as before, and the step now says a per-file run is not the gate. Trigger (b) of the
+  structural-move offer in `skills/qa-fix/SKILL.md` was the author's judgement; it is now
+  `repeat-subject.mjs`: a file is a repeat subject when an open finding in this gate names it, the
+  previous gate named it, and the previous cycle's fix commit changed it. Replayed over task.295's
+  five gates it fires at gates 2, 3 and 4, not only at the third: every finding there names
+  `scripts/remote-test/run.sh`, and a file is a coarse subject for a work item that is mostly one
+  file. The offer stays advisory, so an early offer costs a paragraph, not a halt.
+
 - **`npm run test:remote` takes a per-run lock, and gains `--unlock` and `--prune-images` (task 296).**
   The container-name check stopped a second run on a branch only after the first's container
   existed, so a run started during the sync or the first image build could rewrite the tree under it.
