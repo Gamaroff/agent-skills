@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`qa-next`'s `excludedPrds` now excludes a PRD named by its own folder in a domain-grouped tree (bug 22).**
+  `scanStories` tested only the first path segment under the stories root, which in
+  `docs/prd/<domain>/prd.{P}.{slug}/…` is the domain, so an entry such as `prd.1.multi-game-web-portal`
+  never excluded anything and its stories showed as uncovered in `--coverage`. A segment that doc-id
+  reads as a PRD folder (`prd.{P}.{slug}`, or the legacy `prd.{slug}`) now matches too; the first-segment
+  match is kept, so flat trees and a domain-name entry behave as before. Held by a domain-grouped
+  fixture in `evals/qa-next/unit/uat-status.test.mjs`, mutation-proved.
+
 - **The instrument-read guard masks a glued single quote and treats `&>` and `1>` as redirects (task 307).**
   Task 299's guard missed `cmd; echo foo'bar; baz' $?` (a single quote glued to a word or a closing
   quote never opened a quote, so the `;` inside it split the echo) and flagged `cmd; echo "rc=$?" &> log`
