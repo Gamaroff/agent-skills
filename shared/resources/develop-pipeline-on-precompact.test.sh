@@ -807,8 +807,10 @@ fi
 
 # 17f (task.303): at step 8 the pause commit is held even when every link is carried. A push at
 # step 8 supersedes the head's CI run, and a superseded run can read red to the docs-only walk, so
-# the finalise and merge waits needed full CI. 17g is the control: the same report at step 7 is
-# pushed, so 17f's hold is the step-8 rule and not a broken remote.
+# the finalise and merge waits needed full CI. 17g is the control: the same report at step 5 (the QA
+# loop; the lock never reads 6, task.308) is pushed, so the hold is the step-7/8 rule and not a
+# broken remote. 17h/17i (task.308): step 7 is held too, because /finalise polls CI on the
+# acceptance head for the whole of step 7, and finalise's own commit then carries the held one.
 S17F="$TMPDIR_TEST/s17f"
 OUT=$(HOOK_TEST_REMOTE=1 HOOK_TEST_STEP=8 run_precompact_in_repo "$S17F" "$SELF_LINKED")
 S17F_LOCAL=$(cd "$S17F" && git rev-parse HEAD)
@@ -823,13 +825,38 @@ else
   pass "step 8: pause committed locally, NOT pushed, even with every link carried; signal and stderr name step 8"
 fi
 S17G="$TMPDIR_TEST/s17g"
-OUT=$(HOOK_TEST_REMOTE=1 HOOK_TEST_STEP=7 run_precompact_in_repo "$S17G" "$SELF_LINKED")
+OUT=$(HOOK_TEST_REMOTE=1 HOOK_TEST_STEP=5 run_precompact_in_repo "$S17G" "$SELF_LINKED")
 if [ "$(cd "$S17G" && git rev-list --count HEAD)" = "2" ] \
    && [ "$(cd "$S17G" && git rev-parse HEAD)" = "$(origin_tip "$S17G")" ] \
    && ! grep -qF 'NOT pushed' <<<"$OUT"; then
-  pass "control: the same report at step 7 is committed AND pushed"
+  pass "control: the same report at step 5 (the QA loop) is committed AND pushed"
 else
-  fail "control: step 7 → pushed" "commits=$(cd "$S17G" && git rev-list --count HEAD) local=$(cd "$S17G" && git rev-parse HEAD) origin=$(origin_tip "$S17G") stderr=$(head -3 "$S17G/stderr.log")"
+  fail "control: step 5 → pushed" "commits=$(cd "$S17G" && git rev-list --count HEAD) local=$(cd "$S17G" && git rev-parse HEAD) origin=$(origin_tip "$S17G") stderr=$(head -3 "$S17G/stderr.log")"
+fi
+# 17h (task.308): at step 7 the pause commit is held, so the PR head — and the CI run /finalise is
+# polling on it — does not move. The signal and stderr name step 7.
+S17H="$TMPDIR_TEST/s17h"
+OUT=$(HOOK_TEST_REMOTE=1 HOOK_TEST_STEP=7 run_precompact_in_repo "$S17H" "$SELF_LINKED")
+S17H_LOCAL=$(cd "$S17H" && git rev-parse HEAD)
+S17H_REMOTE=$(origin_tip "$S17H")
+if [ "$(cd "$S17H" && git rev-list --count HEAD)" != "2" ]; then
+  fail "step 7: the pause is still committed locally" "commits=$(cd "$S17H" && git rev-list --count HEAD) stderr=$(head -3 "$S17H/stderr.log")"
+elif [ -z "$S17H_REMOTE" ] || [ "$S17H_LOCAL" = "$S17H_REMOTE" ]; then
+  fail "step 7: the pause commit is NOT pushed (the remote head is unchanged)" "local=$S17H_LOCAL upstream=${S17H_REMOTE:-none}"
+elif ! grep -qF 'NOT pushed' <<<"$OUT" || ! grep -qF "Step 7" <<<"$OUT" || ! grep -qF "Step 7" "$S17H/stderr.log"; then
+  fail "step 7: signal and stderr say the push was held and name step 7" "signal=$(echo "$OUT" | grep -o 'Implementation report appended[^\\]*' | head -1)"
+else
+  pass "step 7: pause committed locally, NOT pushed, remote head unchanged; signal and stderr name step 7"
+fi
+# 17i (task.308): every step-7 exit commits and pushes, so the held pause commit leaves with it. The
+# acceptance commit /finalise 6a makes after the pause carries the held commit: the remote head is
+# local HEAD and the pause commit is among the pushed commits.
+( cd "$S17H" && git commit -q --allow-empty -m "acceptance" && git push -q origin HEAD ) >/dev/null 2>&1
+if [ "$(cd "$S17H" && git rev-parse HEAD)" = "$(origin_tip "$S17H")" ] \
+   && ( cd "$S17H" && git merge-base --is-ancestor "$S17H_LOCAL" "$(origin_tip "$S17H")" ); then
+  pass "step 7: finalise's own commit and push carry the held pause commit (remote head = local HEAD)"
+else
+  fail "step 7: held pause commit leaves with finalise's push" "local=$(cd "$S17H" && git rev-parse HEAD) origin=$(origin_tip "$S17H")"
 fi
 
 # 17e: a link whose target is in neither HEAD nor the index — quoted inside inline code,

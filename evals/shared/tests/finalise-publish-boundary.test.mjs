@@ -540,9 +540,76 @@ test("6c head-binds the second reading: the poll records the sampled PR head and
   );
   assert.ok(
     codeLines(sixC).some((l) =>
-      /CI_HEAD_2=\$\{CI_HEAD_2:-\$\(git rev-parse HEAD\)\}/.test(l),
+      /CI_HEAD_2=\$\{CI_HEAD_2:-\$\(cat \.claude\/state\/finalise-ci-head-2\.txt 2>\/dev\/null\)\}/.test(
+        l,
+      ),
     ),
-    "the later-turn read must re-derive CI_HEAD_2 — a fresh shell has no earlier variable",
+    "the later-turn read must re-derive CI_HEAD_2 from the head the poll recorded — a fresh shell has no earlier variable",
+  );
+});
+
+// task.308: a PreCompact pause during the 6c wait commits the report and holds the push, so local
+// HEAD is one commit ahead of the PR head the poll sampled. The later turn must take the acceptance
+// head from what the poll block recorded, never from local HEAD. This runs the shipped lines.
+function laterTurnHeadLines() {
+  const sixC = between(
+    finalise,
+    "6c. **Second CI reading",
+    "6d. **CHANGELOG citation check",
+    FINALISE,
+  );
+  const lines = sixC.split("\n");
+  const start = lines.findIndex((l) => /^\s*CI_HEAD_2=\$\{CI_HEAD_2:-/.test(l));
+  assert.ok(start >= 0, "the later-turn CI_HEAD_2 line exists in 6c");
+  // the assignment line plus the unset guard that follows it (two physical lines + its HALT line)
+  return lines
+    .slice(start, start + 3)
+    .map((l) => l.replace(/^\s+/, ""))
+    .join("\n");
+}
+
+function runLaterTurn({ recorded }) {
+  const dir = mkdtempSync(path.join(tmpdir(), "t308-head-"));
+  try {
+    const sh = (cmd) =>
+      spawnSync("bash", ["-c", cmd], { cwd: dir, encoding: "utf8" });
+    sh(
+      "git init -q . && git config user.email t@t && git config user.name t && git commit -q --allow-empty -m acceptance && mkdir -p .claude/state",
+    );
+    const accepted = sh("git rev-parse HEAD").stdout.trim();
+    // the held pause commit: local HEAD moves, the PR head (recorded) does not
+    sh("git commit -q --allow-empty -m held-pause");
+    const local = sh("git rev-parse HEAD").stdout.trim();
+    if (recorded)
+      sh(`printf '%s\\n' ${accepted} > .claude/state/finalise-ci-head-2.txt`);
+    const r = spawnSync(
+      "bash",
+      ["-c", `${laterTurnHeadLines()}\nprintf 'HEAD2=%s\\n' "$CI_HEAD_2"`],
+      { cwd: dir, encoding: "utf8" },
+    );
+    return { accepted, local, ...r };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("6c later turn: with a held pause commit ahead of the PR head, CI_HEAD_2 is the recorded acceptance head, not local HEAD", () => {
+  const r = runLaterTurn({ recorded: true });
+  assert.equal(r.status, 0, `later-turn lines exited ${r.status}: ${r.stderr}`);
+  assert.notEqual(r.accepted, r.local, "the fixture must put local HEAD ahead");
+  assert.equal(
+    /HEAD2=(\w+)/.exec(r.stdout)?.[1],
+    r.accepted,
+    "CI_HEAD_2 must be the head the poll was started on",
+  );
+});
+
+test("6c later turn: no recorded head is a HALT, never a fall back to local HEAD", () => {
+  const r = runLaterTurn({ recorded: false });
+  assert.notEqual(r.status, 0, "an unrecorded acceptance head must not pass");
+  assert.match(
+    r.stdout + r.stderr,
+    /HALT: the acceptance head this poll was started on is not recorded/,
   );
 });
 

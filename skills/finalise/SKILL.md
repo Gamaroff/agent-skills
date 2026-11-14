@@ -2267,6 +2267,11 @@ standalone.
    RESULT=.claude/state/finalise-ci-result.txt
    PIDFILE=.claude/state/finalise-ci-poll.pid
    rm -f "$RESULT" "$PIDFILE"
+   # Record the acceptance head this poll runs on, for the later turn that reads $RESULT. A later
+   # turn is a fresh shell, and local HEAD is not a safe source for it: a PreCompact pause during
+   # the wait commits the report and holds the push (task.308), which leaves local HEAD one commit
+   # ahead of the PR head the poll samples.
+   printf '%s\n' "$CI_HEAD_2" > .claude/state/finalise-ci-head-2.txt
    # CI_CHECKS_1 is the check count reading 1 was green over (Step 6 records it beside CI_ROLLUP).
    nohup bash "$POLL" "$PR_NUMBER" "$CI_HEAD_2" "${FINALISE_CI_MAX_WAIT:-1500}" "$RESULT" "${CI_CHECKS_1:-0}" \
      .agents/skills/finalise/references/ci-tree-equivalence.js \
@@ -2285,10 +2290,13 @@ standalone.
    ```bash
    RESULT=.claude/state/finalise-ci-result.txt
    PIDFILE=.claude/state/finalise-ci-poll.pid
-   # A later turn is a fresh shell: CI_HEAD_2 from 6a is gone. HEAD has not moved since the
-   # acceptance push (nothing between 6a and here commits), so re-derive it rather than compare
-   # against an empty string.
-   CI_HEAD_2=${CI_HEAD_2:-$(git rev-parse HEAD)}
+   # A later turn is a fresh shell: CI_HEAD_2 from 6a is gone. Read the head the poll was started
+   # on from the file the poll block recorded. Never `git rev-parse HEAD`: a pause commit held
+   # since the push (task.308) puts local HEAD ahead of the PR head, and the comparison below
+   # would HALT on a commit CI never saw.
+   CI_HEAD_2=${CI_HEAD_2:-$(cat .claude/state/finalise-ci-head-2.txt 2>/dev/null)}
+   [ -n "$CI_HEAD_2" ] \
+     || { echo "HALT: the acceptance head this poll was started on is not recorded (.claude/state/finalise-ci-head-2.txt) — re-run 6c"; exit 1; }
    if [ ! -f "$RESULT" ]; then
      # No result yet. "Still polling" is only true while the poll is alive — a dead poll with no
      # result (killed, never started, log will say) must HALT, not report progress forever.

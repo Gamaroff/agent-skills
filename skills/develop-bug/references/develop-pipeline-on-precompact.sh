@@ -405,16 +405,26 @@ if [ -n "$REPORT" ] && [ -f "$REPORT" ]; then
     # pause at step 8 did that to the run before it, and the finalise and merge waits then needed a
     # full CI run instead of the docs-only shortcut. Step 8's own commit carries this one and pushes
     # once. Held before the dangling-link probe: that probe has nothing left to decide.
+    #
+    # The same hold applies at step 7 (task.308). /finalise polls CI on the acceptance head for the
+    # whole of step 7 (its reading-2 poll runs with the lock at 7, which advances to 8 only when
+    # /finalise ends), so a pushed pause commit there superseded the very run it was waiting on and
+    # cost a second full CI run. /finalise's own commit (the acceptance commit, or a gaps commit)
+    # carries the held one and pushes once. Held, local HEAD is ahead of the PR head, so /finalise
+    # reads the acceptance head from the file its poll block records, never from local HEAD.
     PUSH_HOLD_REASON=""
     DANGLING=""
-    if [ "$CURRENT_STEP" = "8" ]; then
-      PUSH_HOLD_REASON=step8
-    else
-      DANGLING=$(report_dangling_links)
-    fi
+    case "$CURRENT_STEP" in
+      7) PUSH_HOLD_REASON=step7 ;;
+      8) PUSH_HOLD_REASON=step8 ;;
+      *) DANGLING=$(report_dangling_links) ;;
+    esac
     if [ "$PUSH_HOLD_REASON" = step8 ]; then
       PUSH_HELD=true
       echo "on-precompact: pause commit NOT pushed — at Step 8 a push would supersede the head's CI run; Step 8's own commit carries it" >&2
+    elif [ "$PUSH_HOLD_REASON" = step7 ]; then
+      PUSH_HELD=true
+      echo "on-precompact: pause commit NOT pushed — at Step 7 a push would supersede the CI run /finalise is waiting on; /finalise's own commit carries it" >&2
     elif [ -z "$DANGLING" ]; then
       git push origin HEAD >/dev/null 2>&1 || true
     else
@@ -584,6 +594,9 @@ if [ "${REPORT_LINT_OK:-true}" != true ]; then
 elif [ "${PUSH_HELD:-false}" = true ] && [ "${PUSH_HOLD_REASON:-}" = step8 ]; then
   REPORT_LINT_NOTE=", committed, but NOT pushed — at Step 8 a push would supersede the head's CI run; Step 8's own commit carries it and pushes once"
   REPORT_LINT_SUMMARY=", and committed the report (not pushed: at Step 8 Step 8's own commit pushes it)"
+elif [ "${PUSH_HELD:-false}" = true ] && [ "${PUSH_HOLD_REASON:-}" = step7 ]; then
+  REPORT_LINT_NOTE=", committed, but NOT pushed — at Step 7 a push would supersede the CI run /finalise is waiting on; /finalise's own commit carries it and pushes once"
+  REPORT_LINT_SUMMARY=", and committed the report (not pushed: at Step 7 /finalise's own commit pushes it)"
 elif [ "${PUSH_HELD:-false}" = true ]; then
   HELD_LIST=$(printf '%s' "$DANGLING" | sed 's/.*/`&`/' | paste -sd ',' - | sed 's/,/, /g')
   REPORT_LINT_NOTE=", committed, but NOT pushed — it links to ${HELD_LIST}, which are staged but not in this commit (the 5c carry); the commit that carries them pushes both"
