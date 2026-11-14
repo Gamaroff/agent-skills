@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **The instrument-read guard masks a glued single quote and treats `&>` and `1>` as redirects (task 307).**
+  Task 299's guard missed `cmd; echo foo'bar; baz' $?` (a single quote glued to a word or a closing
+  quote never opened a quote, so the `;` inside it split the echo) and flagged `cmd; echo "rc=$?" &> log`
+  and `1> log`, the corrected form it exists to teach. A glued single quote now opens when a partner `'`
+  follows on the line, so an apostrophe in prose still does not; two apostrophes on one line pair up, a
+  shape the header names. `&>`, `&>>`, `1>` and `1>>` are redirects; `2>&1` is not. A status captured in
+  `$( … )` stays flagged, recorded as a choice. Held by fixtures in
+  `tests/orchestration-instrument-reads.test.js`, mutation-proved per fix.
+
 ## [v0.67.0] - 2026-11-13
 
 ### Fixed

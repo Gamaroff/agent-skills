@@ -5,16 +5,16 @@ type: task
 description: "Close the two edge cases task 299 left open in its guard: a single quote glued to the previous word is not masked, and an echo redirected with &> or 1> is flagged as a wrapped status."
 tags: [develop-task, qa-task, test-harness]
 category: testing
-status: planned
+status: ready-for-review
 priority: Low
 created: 2026-11-13
-updated: 2026-11-13
+updated: 2026-11-14
 estimated_effort_hours: 2
 ---
 
 # Technical Task: Instrument-read guard quote and redirect edges
 
-**Status:** Planned
+**Status:** Ready for Review
 
 Follow-up to task 299. Source: task.299 gate 4 `recommendations.future` (T299-QA-7 and CR-2); not from the observation log.
 
@@ -30,7 +30,7 @@ Key deliverables: the guard fix, flagged and passing fixtures per shape, a mutat
 
 **Current problems** (each run on the matcher at `tests/orchestration-instrument-reads.test.js:74` on 2026-11-13):
 
-- **A miss (T299-QA-7).** `cmd; echo foo'bar; baz' $?` and `cmd; echo "a"'s; b' $?` return `false`. The single quote opens only after whitespace or an operator (`tests/orchestration-instrument-reads.test.js:64`), so the glued quote is not masked, the `;` inside it splits the echo, and the `$?` is never seen. The control with a space before the quote, `cmd; echo foo 'bar; baz' $?`, returns `true`.
+- **A miss (T299-QA-7).** `cmd; echo foo'bar; baz' $?` and `cmd; echo "a"'s; b' $?` return `false`. The single quote opens only after whitespace or an operator (`tests/orchestration-instrument-reads.test.js:63`), so the glued quote is not masked, the `;` inside it splits the echo, and the `$?` is never seen. The control with a space before the quote, `cmd; echo foo 'bar; baz' $?`, returns `true`.
 - **A false positive (CR-2, redirects).** `cmd; echo "rc=$?" &> log` and `cmd; echo "rc=$?" 1> log` return `true` (`1>>` already returns `false`, because the second `>` follows a `>`). `REDIRECT` (`tests/orchestration-instrument-reads.test.js:73`) skips a `>` that follows a digit or `&`, so `2>&1` is not a redirect, and that also makes `&>` and `1>` read as non-redirects. The echo in both lines goes to a file, which is the corrected form the guard exists to teach.
 - **A false positive, or a stated choice (CR-2, capture).** `x=$(cmd; echo $?)` returns `true`. The `echo` there is captured into a variable, not the step's last command, so the notification's code is not the wrapper's. Whether the guard should flag it is a decision, not an obvious bug.
 
@@ -40,7 +40,7 @@ Key deliverables: the guard fix, flagged and passing fixtures per shape, a mutat
 
 **Current state** (each name below was found with `grep -n` on 2026-11-13):
 
-- `maskQuoted(line)` — `tests/orchestration-instrument-reads.test.js:53`. Masks `;`, `&`, `|`, `>` inside quotes with `_`, so quoted text is parsed once. A double quote opens anywhere; a single quote opens only at a word boundary (`:64`), added in task 299 cycle 3 so an apostrophe in prose (`Don't`) does not open one.
+- `maskQuoted(line)` — `tests/orchestration-instrument-reads.test.js:53`. Masks `;`, `&`, `|`, `>` inside quotes with `_`, so quoted text is parsed once. A double quote opens anywhere; a single quote opens only at a word boundary (`:63`), added in task 299 cycle 3 so an apostrophe in prose (`Don't`) does not open one.
 - `ECHO_AFTER_OPERATOR` — `:70`. An `echo` after `;`, `&`, `&&`, `|` or `||`, capturing its arguments up to the next operator.
 - `REDIRECT` — `:73`, `/(^|[^0-9&])>/`. A `>` not preceded by a digit or `&`.
 - `wrappedStatus(line)` — `:74`. True when an echo's arguments read `$?` or `${?}` and carry no redirect.
@@ -140,6 +140,8 @@ Revert the commit. The change is one test file and a changelog line, so there is
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-11-13 | 1.0     | Initial draft | create-task |
+| 2026-11-14 | 1.1     | Review passed (8/10): empty plan file written, line anchor `:64` corrected to `:63` | review-task |
+| 2026-11-14 |         | Status → ready-for-development | review-task |
 
 <!-- change-log-end -->
 
