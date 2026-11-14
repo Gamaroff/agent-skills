@@ -5,7 +5,9 @@ type: task
 description: "Close the two edge cases task 299 left open in its guard: a single quote glued to the previous word is not masked, and an echo redirected with &> or 1> is flagged as a wrapped status."
 tags: [develop-task, qa-task, test-harness]
 category: testing
-status: ready-for-review
+status: accepted
+completed_date: 2026-11-14
+pr_number: 902
 priority: Low
 created: 2026-11-13
 updated: 2026-11-14
@@ -14,7 +16,7 @@ estimated_effort_hours: 2
 
 # Technical Task: Instrument-read guard quote and redirect edges
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 Follow-up to task 299. Source: task.299 gate 4 `recommendations.future` (T299-QA-7 and CR-2); not from the observation log.
 
@@ -72,21 +74,21 @@ None. A guard test change; no shipped behaviour moves.
 
 ### Phase 1: Quote edge — Risk: Medium
 
-- [ ] Choose option 1, 2 or 3 from § 3 and record the choice and the evidence in the QA report.
-- [ ] If 1 or 2: change `maskQuoted`; add flagged fixtures for both T299-QA-7 shapes and keep every task 299 cycle 3 apostrophe fixture passing.
-- [ ] If 3: add the glued-quote shapes to the header's unseen list.
+- [x] Choose option 1, 2 or 3 from § 3 and record the choice and the evidence in the QA report.
+- [x] If 1 or 2: change `maskQuoted`; add flagged fixtures for both T299-QA-7 shapes and keep every task 299 cycle 3 apostrophe fixture passing.
+- [x] If 3: add the glued-quote shapes to the header's unseen list. (Not applicable: option 2 chosen.)
 
 ### Phase 2: Redirect and capture edges — Risk: Low
 
-- [ ] Make `&>`, `&>>`, `1>` and `1>>` count as redirects, keeping `2>&1` not a redirect. Fixtures: each form passing, each unredirected form flagged.
-- [ ] Decide the captured-status shape (`x=$(cmd; echo $?)`), record the decision, and either skip it with a fixture or name it as an unseen shape.
+- [x] Make `&>`, `&>>`, `1>` and `1>>` count as redirects, keeping `2>&1` not a redirect. Fixtures: each form passing, each unredirected form flagged.
+- [x] Decide the captured-status shape (`x=$(cmd; echo $?)`), record the decision, and either skip it with a fixture or name it as an unseen shape.
 
 ### Phase 3: Prove and record — Risk: Low
 
-- [ ] Mutation-prove each fix: revert the behaviour, confirm a named fixture goes red, restore with the Edit tool.
-- [ ] Confirm the shipped population still scans clean.
-- [ ] Update the header's unseen-shapes list to match what the guard does after this task.
-- [ ] `CHANGELOG.md` entry citing `(task 307)`.
+- [x] Mutation-prove each fix: revert the behaviour, confirm a named fixture goes red, restore with the Edit tool.
+- [x] Confirm the shipped population still scans clean.
+- [x] Update the header's unseen-shapes list to match what the guard does after this task.
+- [x] `CHANGELOG.md` entry citing `(task 307)`.
 
 ## 7. Files Summary
 
@@ -104,24 +106,24 @@ The apostrophe cases from task 299 cycle 3 (`Don't write cmd; echo "rc=$?"`, `it
 
 **Functional**
 
-- [ ] Both T299-QA-7 shapes are flagged, or both are named in the header as unseen with the reason (the option chosen in Phase 1 decides which).
-- [ ] `&>`, `&>>`, `1>` and `1>>` are treated as redirects: the redirected echo passes and the unredirected form is flagged.
-- [ ] Every task 299 cycle 3 apostrophe fixture still behaves as before.
-- [ ] The captured-status shape has a recorded decision and a fixture or a header entry.
+- [x] Both T299-QA-7 shapes are flagged, or both are named in the header as unseen with the reason (the option chosen in Phase 1 decides which).
+- [x] `&>`, `&>>`, `1>` and `1>>` are treated as redirects: the redirected echo passes and the unredirected form is flagged.
+- [x] Every task 299 cycle 3 apostrophe fixture still behaves as before.
+- [x] The captured-status shape has a recorded decision and a fixture or a header entry.
 
 **Performance**
 
-- [ ] The guard adds at most 3 seconds to `ci:fast`: median of five runs of `command node --test tests/orchestration-instrument-reads.test.js`, with `uptime` beside each, outliers reported, recorded in the QA report.
+- [x] The guard adds at most 3 seconds to `ci:fast`: median of five runs of `command node --test tests/orchestration-instrument-reads.test.js`, with `uptime` beside each, outliers reported, recorded in the QA report.
 
 **Code quality**
 
-- [ ] Each fix is mutation-proven: the QA report names the reverted behaviour and the fixture that went red.
-- [ ] The shipped population scans clean.
-- [ ] `npm run bundle:check`, `format:check`, `lint:shell` and `ci:fast` pass.
+- [x] Each fix is mutation-proven: the QA report names the reverted behaviour and the fixture that went red.
+- [x] The shipped population scans clean.
+- [x] `npm run bundle:check`, `format:check`, `lint:shell` and `ci:fast` pass.
 
 **Migration**
 
-- [ ] `CHANGELOG.md` entry citing `(task 307)`.
+- [x] `CHANGELOG.md` entry citing `(task 307)`.
 
 ## 10. Risk Assessment
 
@@ -154,6 +156,17 @@ Revert the commit. The change is one test file and a changelog line, so there is
 ### Key Findings
 No critical issues identified.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+✅ **Acceptance criteria:** all 9 met (QA gate PASS 95/100; four mutation proofs, each red on a named fixture)
+✅ **PR:** #902, PR review APPROVE; CI green on the head before acceptance
+✅ **Documentation:** guard header and `CHANGELOG.md` entry citing `(task 307)`
+✅ **Security / Compliance:** not applicable (test-only change)
+
+**Detailed Verification Log:** see `task.307.dod.1.instrument-read-guard-quote-and-redirect-edges.md`.
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -164,14 +177,15 @@ No critical issues identified.
 | 2026-11-14 | 1.1     | Review passed (8/10): empty plan file written, line anchor `:64` corrected to `:63` | review-task |
 | 2026-11-14 |         | Status → ready-for-development | review-task |
 | 2026-11-14 |         | QA gate PASS (95/100) — 0 findings | qa-task |
+| 2026-11-14 | 1.2     | DoD verified — accepted (PR #902) | finalise |
 
 <!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 1
-- [ ] Phase 2
-- [ ] Phase 3
+- [x] Phase 1
+- [x] Phase 2
+- [x] Phase 3
 
 ## References
 

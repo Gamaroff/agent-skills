@@ -40,7 +40,7 @@ Captured status `x=$(cmd; echo $?)`: left flagged, named in the header as a deli
 | `&>`, `&>>`, `1>`, `1>>` redirects; twins flagged | passed list and `2>`/plain twins; mutation-proven | PASS |
 | Task 299 cycle 3 apostrophe fixtures unchanged | still in both lists; test green | PASS |
 | Captured-status decision recorded | this report, header, flagged fixture | PASS |
-| Performance: at most 3 s added to `ci:fast` | median of five runs 0.955 s (0.84, 0.95, 1.00, 1.02, 1.03) at load average 3.6-3.7 (`uptime`); no outlier removed; the test took 1.15 s before the change | PASS |
+| Performance: at most 3 s added to `ci:fast` | median of five runs 1.07 s, re-measured at finalise with the load average read from `/proc/loadavg` (the source `uptime` prints) beside each: 1.15 s (load 2.42), 1.11 s (2.42), 1.04 s (2.38), 0.87 s (2.38), 1.07 s (2.38); no outlier removed. An earlier batch at load 3.6-3.7 gave a median of 0.955 s. The test took 1.15 s in a single run before the change | PASS |
 | Each fix mutation-proven | see Code Review | PASS |
 | Shipped population scans clean | the population test passes (5 of 5 tests); the guard reports its own count | PASS |
 | `bundle:check`, `format:check`, `lint:shell`, `ci:fast` | bundle:check 129 skills 0 problems; lint:shell clean; prettier clean; remote `ci:fast` 8469 pass, 0 fail, 3 skipped | PASS |
