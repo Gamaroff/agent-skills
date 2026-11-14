@@ -21,7 +21,7 @@ started: '2026-11-14T07:14:00Z'
 | Step | Skill | Status | Notes | Subagent summary ref | Completed (UTC) |
 |------|-------|--------|-------|----------------------|-----------------|
 | 1 | create-branch | ✅ Done | Branch created at `49eaa522` (bugfix/bug.22.excluded-prds-misses-domain-grouped-tree, via git directly) | | 2026-11-14T07:14Z |
-| 2 | review-bug | ✅ Done | READY TO FIX 9/10; issue #903 opened (2b) | | |
+| 2 | review-bug | ✅ Done | READY TO FIX 9/10; issue #903 opened (2b) | | 2026-11-14T07:15Z |
 | 3 | investigate-fix | ✅ Done | Regression test red→green, mutation-proven; `isExcluded`/`isPrdFolder` in uat-status.mjs | | 2026-11-14T07:32Z |
 | 4 | create-pr | ✅ Done | PR #904 → develop; commit and push by git directly | | 2026-11-14T07:32Z |
 | 5–6 | verify-fix loop | ✅ Done | Cycle 1 PASS (lite: signals 1+2) | | 2026-11-14T07:33Z |
