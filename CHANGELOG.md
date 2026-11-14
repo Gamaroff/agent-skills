@@ -10,12 +10,12 @@ All notable changes to this project will be documented in this file. Format foll
   head for the whole of step 7, and a PreCompact pause during that wait pushed a docs-only commit,
   which made a new PR head and cancelled the run finalise was waiting on (a consumer using
   `cancel-in-progress` lost about an hour of CI, then needed a second full run). The hook now holds
-  the push at steps 7 and 8; `/finalise`'s acceptance or gaps commit carries the held pause commit
-  and pushes once. A held commit leaves local `HEAD` ahead of the PR head, so `/finalise` 6c now
+  the push at steps 7 and 8; the next commit pushed carries the held pause commit (`/finalise`'s
+  acceptance or gaps commit for a pause before 6a, Step 8's commit for one during the CI wait). A held commit leaves local `HEAD` ahead of the PR head, so `/finalise` 6c now
   records the head its poll was started on in `.claude/state/finalise-ci-head-2.txt` and reads it
   back on the later turn, where it used to re-derive it from `git rev-parse HEAD` (a HALT when the
   file is missing, never a fall back to local `HEAD`). Scenarios 17h and 17i hold the hook side (a
-  step-7 pause is committed and not pushed; finalise's own push carries it), 17g is now the control
+  step-7 pause is committed and not pushed; the next push carries it), 17g is now the control
   at step 5 (the lock never reads 6), and two `finalise-publish-boundary` tests run the shipped
   later-turn lines against a repository whose local `HEAD` is ahead of the recorded head.
 - **`qa-next`'s `excludedPrds` now excludes a PRD named by its own folder in a domain-grouped tree (bug 22).**

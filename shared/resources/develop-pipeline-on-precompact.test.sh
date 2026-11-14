@@ -810,7 +810,8 @@ fi
 # the finalise and merge waits needed full CI. 17g is the control: the same report at step 5 (the QA
 # loop; the lock never reads 6, task.308) is pushed, so the hold is the step-7/8 rule and not a
 # broken remote. 17h/17i (task.308): step 7 is held too, because /finalise polls CI on the
-# acceptance head for the whole of step 7, and finalise's own commit then carries the held one.
+# acceptance head for the whole of step 7, and the next commit then carries the held one (finalise's
+# for a pause before 6a, Step 8's for a pause during the 6c wait).
 S17F="$TMPDIR_TEST/s17f"
 OUT=$(HOOK_TEST_REMOTE=1 HOOK_TEST_STEP=8 run_precompact_in_repo "$S17F" "$SELF_LINKED")
 S17F_LOCAL=$(cd "$S17F" && git rev-parse HEAD)
@@ -848,15 +849,16 @@ elif ! grep -qF 'NOT pushed' <<<"$OUT" || ! grep -qF "Step 7" <<<"$OUT" || ! gre
 else
   pass "step 7: pause committed locally, NOT pushed, remote head unchanged; signal and stderr name step 7"
 fi
-# 17i (task.308): every step-7 exit commits and pushes, so the held pause commit leaves with it. The
-# acceptance commit /finalise 6a makes after the pause carries the held commit: the remote head is
-# local HEAD and the pause commit is among the pushed commits.
+# 17i (task.308): the held pause commit leaves with the next commit that is pushed. For a pause before
+# /finalise 6a that is the acceptance commit; for a pause during the 6c wait (after the acceptance
+# push) it is Step 8's commit. Both are a plain commit then push, so this one stands for either: the
+# remote head is local HEAD and the pause commit is among the pushed commits.
 ( cd "$S17H" && git commit -q --allow-empty -m "acceptance" && git push -q origin HEAD ) >/dev/null 2>&1
 if [ "$(cd "$S17H" && git rev-parse HEAD)" = "$(origin_tip "$S17H")" ] \
    && ( cd "$S17H" && git merge-base --is-ancestor "$S17H_LOCAL" "$(origin_tip "$S17H")" ); then
-  pass "step 7: finalise's own commit and push carry the held pause commit (remote head = local HEAD)"
+  pass "step 7: the next commit and push (finalise's, or Step 8's) carry the held pause commit (remote head = local HEAD)"
 else
-  fail "step 7: held pause commit leaves with finalise's push" "local=$(cd "$S17H" && git rev-parse HEAD) origin=$(origin_tip "$S17H")"
+  fail "step 7: held pause commit leaves with the next push" "local=$(cd "$S17H" && git rev-parse HEAD) origin=$(origin_tip "$S17H")"
 fi
 
 # 17e: a link whose target is in neither HEAD nor the index — quoted inside inline code,

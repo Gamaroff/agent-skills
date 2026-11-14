@@ -613,6 +613,50 @@ test("6c later turn: no recorded head is a HALT, never a fall back to local HEAD
   );
 });
 
+// task.308 QA-1: the writer is what the later turn reads. The two tests above write the file
+// themselves, so without this one the writer line can be deleted with every test green. It runs the
+// shipped line (the one the poll block carries), in a scratch repository with no state directory
+// content, and asserts the file holds the head the poll was started on.
+test("6c poll block records the acceptance head it starts on, for the later turn to read", () => {
+  const sixC = between(
+    finalise,
+    "6c. **Second CI reading",
+    "6d. **CHANGELOG citation check",
+    FINALISE,
+  );
+  const writers = codeLines(sixC).filter((l) =>
+    /^\s*printf '%s\\n' "\$CI_HEAD_2" > \.claude\/state\/finalise-ci-head-2\.txt\s*$/.test(
+      l,
+    ),
+  );
+  assert.equal(
+    writers.length,
+    1,
+    "the 6c poll block must carry exactly one line that records CI_HEAD_2 to finalise-ci-head-2.txt",
+  );
+  const dir = mkdtempSync(path.join(tmpdir(), "t308-writer-"));
+  try {
+    mkdirSync(path.join(dir, ".claude", "state"), { recursive: true });
+    const head = "0123456789abcdef0123456789abcdef01234567";
+    const r = spawnSync(
+      "bash",
+      ["-c", `CI_HEAD_2=${head}\n${writers[0].trim()}`],
+      { cwd: dir, encoding: "utf8" },
+    );
+    assert.equal(r.status, 0, `writer exited ${r.status}: ${r.stderr}`);
+    assert.equal(
+      readFileSync(
+        path.join(dir, ".claude", "state", "finalise-ci-head-2.txt"),
+        "utf8",
+      ).trim(),
+      head,
+      "the file must hold the head the poll was started on",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 // ---------------------------------------------------------------------------
 // 4. The CHANGELOG box has a mechanism (obs #59)
 

@@ -124,6 +124,27 @@ Decision: option (a), hold at `7|8`. Option (b) keys on the free-text `waiting_o
 ## 9. Risks
 
 **Medium:** a held commit is invisible to a step that polls local `HEAD`. Phase 1 exists to find that, and the review already found one (`CI_HEAD_2` re-derivation). **Low:** stale wording that names only step 8. **Rollback:** revert the `7|8` arm; a held pause commit is never lost, because every `/finalise` exit commits and pushes, and a HALT leaves it local for the next push.
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-14
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.308.qa.1.pause-commits-cancel-the-step-7-ci-poll.md](./task.308.qa.1.pause-commits-cancel-the-step-7-ci-poll.md)
+- **Gate File**: [task.308.gate.1.pause-commits-cancel-the-step-7-ci-poll.yml](./task.308.gate.1.pause-commits-cancel-the-step-7-ci-poll.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 3992 (fast gate) plus 40 hook scenarios
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+Two medium findings: the new 6c head writer is held by no test, and the docs name the wrong commit as carrier for a pause made during the 6c wait.
 <!-- change-log-start -->
 ## Change Log
 
@@ -134,4 +155,7 @@ Decision: option (a), hold at `7|8`. Option (b) keys on the free-text `waiting_o
 | 2026-11-14 | 0.2 | Review passed (8/10): control moved from step 6 (never a lock value) to step 5; confirmed local-HEAD source in finalise made concrete; tests and Phase 1 record location named | review-task |
 | 2026-11-14 |  | Status → ready-for-development | review-task |
 | 2026-11-14 |  | Implemented — 9 files, 3 tests | develop |
+| 2026-11-14 |  | QA gate CONCERNS (80/100) — 2 findings | qa-task |
+| 2026-11-14 |  | QA findings fixed — 2 findings, 1 iteration | qa-fix |
 <!-- change-log-end -->
+
