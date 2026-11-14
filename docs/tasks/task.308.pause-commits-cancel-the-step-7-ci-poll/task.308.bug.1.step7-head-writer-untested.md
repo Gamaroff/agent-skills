@@ -4,7 +4,7 @@
 **Bug ID**: TASK-308-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-11-14
 
@@ -47,3 +47,4 @@ Add a test that extracts the 6c poll block lines, runs them with `CI_HEAD_2` set
 | Date | Status | Changed By | Notes |
 | --- | --- | --- | --- |
 | 2026-11-14 | Ready for QA | qa-fix | Fixed in QA fix cycle 1 |
+| 2026-11-14 | Closed | qa-task | Verified by task.308.qa.2.pause-commits-cancel-the-step-7-ci-poll.md |

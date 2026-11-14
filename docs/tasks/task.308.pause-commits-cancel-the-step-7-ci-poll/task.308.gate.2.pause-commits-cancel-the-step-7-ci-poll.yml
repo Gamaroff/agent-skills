@@ -1,0 +1,64 @@
+schema: 2
+task: 'task.308.pause-commits-cancel-the-step-7-ci-poll'
+task_title: 'Pause commits cancel the step 7 CI poll'
+gate: PASS
+status_reason: 'Both gate-1 findings are fixed at 7c088725 and verified by a refute pass over the whole branch diff: the 6c writer is now held by a committed test (deleting the line turns it red), and every claim about which commit carries a held step-7 pause is true against the 6a/6c/Step 8 order. Two low-confidence cleanups are advisory.'
+reviewer: 'QA Engineer'
+head: '7c088725b133777bb15e6e57e9c197e2ac986bd7'
+updated: '2026-11-14T22:20:24Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 5
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    boundary_signals: []
+    boundary_reason: ''
+    notes: 'No input boundary: a hold/push decision in a hook and a state-file read. boundary: false (no accept/reject predicate over untrusted input; the HALT on a missing recorded head is a presence check on a file this skill writes).'
+  performance:
+    status: PASS
+    notes: 'Saves a cancelled CI run per step-7 pause; no added work.'
+  reliability:
+    status: PASS
+    notes: 'A missing recorded head HALTs rather than falling back to local HEAD; the writer overwrites the file on every poll launch.'
+  maintainability:
+    status: PASS
+    notes: 'Writer and reader are both held by committed tests; the carrier wording is consistent across the hook, its tests, the hooks and pause docs and the CHANGELOG.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-11-14'
+  total_iterations: 1
+  verification_method: 'Mutation proof (writer line deleted, new test red, restored green) plus population grep and refute-pass diff review'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (low/low): pin that the 6c writer line sits before the nohup launch in the same fence and run the extracted line under every shell in SHELLS. Not a defect today: the later turn reads the file after the poll, and the writer runs in bash.'
+      refs: ['evals/shared/tests/finalise-publish-boundary.test.mjs']
+    - action: 'CR-2 (low/low): remove finalise-ci-head-2.txt in the same rm -f as the result and pid files. Not a defect today: the writer overwrites it before every launch, and the PR_HEAD comparison at the top of the block HALTs before an empty CI_HEAD_2 can be written.'
+      refs: ['skills/finalise/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

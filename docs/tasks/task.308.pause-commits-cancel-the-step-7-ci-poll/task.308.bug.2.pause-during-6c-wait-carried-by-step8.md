@@ -4,7 +4,7 @@
 **Bug ID**: TASK-308-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-11-14
 
@@ -47,3 +47,4 @@ Say a pause before 6a is carried by finalise's commit and one during the 6c wait
 | Date | Status | Changed By | Notes |
 | --- | --- | --- | --- |
 | 2026-11-14 | Ready for QA | qa-fix | Fixed in QA fix cycle 1 |
+| 2026-11-14 | Closed | qa-task | Verified by task.308.qa.2.pause-commits-cancel-the-step-7-ci-poll.md |
