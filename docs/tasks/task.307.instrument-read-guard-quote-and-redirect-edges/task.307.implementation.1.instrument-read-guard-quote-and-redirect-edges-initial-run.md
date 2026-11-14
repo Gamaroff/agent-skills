@@ -35,7 +35,7 @@ Close the two guard edges task 299 left open (glued single quote; `&>`/`1>` redi
 | 2. review-task             | ✅ Done | `task.307.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT 8/10; review run inline, no pre-pass subagents; plan file written, anchor fixed; status → ready-for-development | —                    | 2026-11-13T23:55Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Option 2 (balance) chosen; fix in guard + fixtures + header + CHANGELOG; 3 mutation proofs (glued rule: 2 red; REDIRECT revert: red on `&>`; capture revert: red on `&>`); remote ci:fast 8469 pass 0 fail; bundle:check, lint:shell clean; guard test median 0.95s of 5 (load 3.6-3.7) | —                    | 2026-11-14T00:16Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #902; no issue linked, no comment | —                    | 2026-11-14T00:16Z |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.307.qa.{N}.*.md`; `task.307.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.307.qa.{N}.*.md`; `task.307.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 1 cycle: gate PASS 95; 5c APPROVE | —                    | 2026-11-14T00:18Z |
 | 7. finalise                | ⏳ Pending | `task.307.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
@@ -72,7 +72,8 @@ _Track each QA review/fix cycle._
 - **Diff review**: done inline by the orchestrating session; no independent subagent ran
 - **Mutation proofs**: four, each red on a named fixture
 - **CI at gate time**: pending on `31869138391c`
-- **PR Review**: pending (Step 5c)
+- **Action**: Proceeding to 5c
+- **PR Review**: APPROVE — `task.307.pr-review.1.*.md`; one low consistency finding (unticked checkboxes), carried to finalise; conformance lens run inline, not by an independent subagent
 
 ---
 
