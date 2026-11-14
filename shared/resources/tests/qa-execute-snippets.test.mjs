@@ -5064,9 +5064,10 @@ test("task.292 tokenizer: a ${…} with its own quotes and expansions is one pie
 
 test("task.292 tokenizer: nesting is bounded by the heap, not the call stack", () => {
   const nest = (n) => 'echo "$(echo '.repeat(n) + "x" + ')"'.repeat(n);
-  // Linear in depth, so 20000 levels is well under a second. The scans before the tokenizer
-  // re-masked every level (quadratic; 6000 levels took 2.6 s), and a recursive collapse overflowed
-  // the stack at 6000.
+  // Linear in depth, so 20000 levels is well under a second alone (0.7 s) and 3.4 s on a loaded
+  // CI server. The scans before the tokenizer re-masked every level (quadratic; 6000 levels took
+  // 2.6 s, so 20000 would take about 29 s), and a recursive collapse overflowed the stack at 6000.
+  // The ceiling is 10 s: above the loaded reading, and still a third of the quadratic one.
   let t;
   assert.doesNotThrow(() => (t = tokenize(nest(20000))));
   assert.equal(t.tokens.filter((k) => k.kind === "subst").length, 20000);
@@ -5075,7 +5076,7 @@ test("task.292 tokenizer: nesting is bounded by the heap, not the call stack", (
   assert.doesNotThrow(() => (r = classifyBlock(nest(20000))));
   assert.equal(r.klass, "runnable");
   assert.ok(
-    Date.now() - started < 3000,
+    Date.now() - started < 10000,
     loadSensitive("a 20000-deep nest is read in linear time"),
   );
   // A write at the bottom of the nest is still seen.
