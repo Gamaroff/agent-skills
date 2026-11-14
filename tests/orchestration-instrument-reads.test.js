@@ -11,8 +11,9 @@
  * CLAIM, stated as a bounded set (obs #13). It catches exactly:
  *   (a) STATUS — an `echo` after `;`, `&`, `&&`, `|` or `||` whose arguments read `$?` or
  *       `${?}` (quoted or not, any name or none, followed or not by `; true` or a comment),
- *       and which does NOT redirect the echo to a file or stream (`>`, `>>`, `>&2`; a `2>&1`
- *       is not a redirect for this purpose): the echo's own exit status is what a background
+ *       and which does NOT redirect the echo to a file or stream (`>`, `>>`, `&>`, `&>>`, `1>`,
+ *       `1>>`, `>&2`; a `2>&1` or a `2>` is not a redirect for this purpose): the echo's own
+ *       exit status is what a background
  *       notification reports, so the value reaches the reader only as prose. Quoted text is
  *       masked first, so a `>`, `;`, `&` or `|` inside a string is text.
  *   (b) TIME — a time-of-day placeholder (`{… HH:MM …}`, `{timestamp}`, `{ISO-8601}`,
@@ -21,7 +22,11 @@
  * is in the session context); a time placeholder in a file that names `date -u` for a
  * different placeholder (file-level pairing, not line-level); a status wrapped in a form
  * other than `echo` (`printf`, `tee`); an echo on a line of its own, away from the command;
- * a line that escapes a quote or nests quoting; a time placeholder that is really a shell brace
+ * a line that escapes a quote or nests quoting; a line with two apostrophes in prose (a glued
+ * single quote opens when a partner `'` follows, so `it's … don't` pairs them and masks the text
+ * between); a status captured inside `$( … )` (`x=$(cmd; echo $?)`), which the scan flags although
+ * the echo is not the step's last command, a deliberate choice since the shape is rare and
+ * flagging it teaches nothing wrong; a time placeholder that is really a shell brace
  * group holding the word timestamp, which the scan would flag; and any file outside the
  * population below, including a new source not yet tracked by git.
  *
@@ -53,24 +58,32 @@ const ROOT = path.join(__dirname, "..");
 function maskQuoted(line) {
   let quote = null;
   let out = "";
-  for (const ch of line) {
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
     if (quote) {
       if (ch === quote) quote = null;
       out += ";&|>".includes(ch) ? "_" : ch;
     } else {
-      // A single quote opens only at a word boundary (start, whitespace, or an operator or `=`
-      // before it). An apostrophe inside a word (`Don't`, `it's`) is prose, not a quote (gate 3).
+      // A single quote opens at a word boundary (start, whitespace, or an operator or `=` before
+      // it). Glued to a word or a closing quote (`foo'bar; baz'`, `"a"'s; b'`) it opens only when a
+      // partner `'` follows on the line (task 307): an apostrophe in prose (`Don't`, `it's`) has no
+      // partner and stays prose (task 299 gate 3). Two apostrophes on one line pair up and mask the
+      // text between them: a named unseen shape.
       const boundary = out === "" || /[\s=;&|(>]$/.test(out);
-      if (ch === '"' || (ch === "'" && boundary)) quote = ch;
+      const glued = ch === "'" && !boundary && line.indexOf("'", i + 1) !== -1;
+      if (ch === '"' || (ch === "'" && (boundary || glued))) quote = ch;
       out += ch;
     }
   }
   return out;
 }
-const ECHO_AFTER_OPERATOR = /(?:;|&&?|\|\|?)\s*echo\s+([^;&|\n]*)/gi;
-// A redirect to a file or stream: `>` or `>>` not preceded by a digit or `&`, so `2>&1` (which
-// sends the status to the same place the notification reads) is not one.
-const REDIRECT = /(^|[^0-9&])>/;
+// The arguments run to the next operator; a `&` that starts `&>` or `&>>` is a redirect, not an
+// operator, so it stays inside the capture (task 307).
+const ECHO_AFTER_OPERATOR = /(?:;|&&?|\|\|?)\s*echo\s+((?:[^;&|\n]|&(?=>))*)/gi;
+// A redirect to a file or stream: `>` or `>>` (also `&>`, `&>>`, `1>`, `1>>`, `>&2`), but not one
+// preceded by another digit, so `2>&1` (which sends the status to the same place the notification
+// reads) is not one, and `0>` is not an output redirect (task 307).
+const REDIRECT = /(^|[^02-9])>/;
 function wrappedStatus(line) {
   for (const m of maskQuoted(line).matchAll(ECHO_AFTER_OPERATOR)) {
     if (/\$\{?\?\}?/.test(m[1]) && !REDIRECT.test(m[1])) return true;
@@ -146,6 +159,11 @@ test("fixtures — the scan flags each wrapped-status shape and passes the corre
     'cmd | echo "rc=$?"', // a single | operator
     'Don\'t write cmd; echo "rc=$?"', // an apostrophe in prose does not open a quote
     'it\'s cmd; echo "rc=$?"',
+    "cmd; echo foo'bar; baz' $?", // task 307: a single quote glued to a word, with a partner
+    "cmd; echo \"a\"'s; b' $?", // task 307: a single quote glued to a closing quote
+    "cmd; echo foo 'bar; baz' $?", // control: the boundary form
+    'cmd; echo "rc=$?" 2> log', // task 307: stderr only, the status still reaches the notification
+    "x=$(cmd; echo $?)", // task 307: a captured status is flagged, a named choice (see header)
   ];
   for (const l of flagged) {
     assert.ok(
@@ -165,6 +183,11 @@ test("fixtures — the scan flags each wrapped-status shape and passes the corre
     'cmd; echo "a > b" "$rc"', // a quoted `>` with no status read
     'cmd; echo "rc=$?" >&2', // to stderr, a redirect
     'Don\'t write cmd; echo "rc=$?" >> "$LOG"', // an apostrophe in prose, a real redirect after it
+    'cmd; echo "rc=$?" &> log', // task 307: &> is a redirect
+    'cmd; echo "rc=$?" &>> log', // task 307
+    'cmd; echo "rc=$?" 1> log', // task 307: 1> is a redirect
+    'cmd; echo "rc=$?" 1>> log', // task 307
+    "cmd; echo foo'bar; baz' \"$rc\"", // task 307: a glued quote, no status read
   ];
   for (const l of passed) {
     assert.deepEqual(
@@ -173,6 +196,14 @@ test("fixtures — the scan flags each wrapped-status shape and passes the corre
       `must pass: ${l}`,
     );
   }
+});
+
+test("fixtures — two apostrophes on one line pair up: a named unseen shape (task 307)", () => {
+  // `'s cmd; echo "rc=$?"; don'` is masked as one quoted string, so the echo is not seen. The cost
+  // of reading a glued quote at all; the header names it.
+  assert.equal(wrappedStatus("it's cmd; echo \"rc=$?\"; don't"), false);
+  // An apostrophe with no partner stays prose and the echo is seen.
+  assert.equal(wrappedStatus('it\'s cmd; echo "rc=$?"'), true);
 });
 
 test("fixtures — the scan flags a time placeholder with no instrument and passes it with one", () => {

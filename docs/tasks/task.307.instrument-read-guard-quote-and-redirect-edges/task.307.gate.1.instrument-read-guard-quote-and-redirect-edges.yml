@@ -1,0 +1,53 @@
+schema: 2
+task: 'task.307.instrument-read-guard-quote-and-redirect-edges'
+task_title: 'Instrument-read guard quote and redirect edges'
+gate: PASS
+status_reason: 'Both edges closed and every fixture held; three mutation proofs plus a separate 1> proof each go red on a named fixture; remote ci:fast 8469 pass, 0 fail. No findings.'
+reviewer: 'QA Engineer'
+head: '31869138391c2f91822decf72f2642bfbe0038ab'
+updated: '2026-11-14T00:16:54Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 5
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    boundary: false
+    boundary_signals: []
+    notes: 'Test-file change only. The matcher is a test-internal predicate, not shipped code, and no criterion carries a boundary signal.'
+  performance:
+    status: PASS
+    notes: 'Guard test median 0.955s of five runs (0.84 to 1.03s) at load 3.6-3.7; before the change a single run took 1.15s. No added time.'
+  reliability:
+    status: PASS
+    notes: 'Task 299 apostrophe controls still behave as before; the two-apostrophe pairing is a named, fixtured unseen shape.'
+  maintainability:
+    status: PASS
+    notes: 'Header lists what the guard does and does not see after the change; CHANGELOG entry cites task 307.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future: []
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
