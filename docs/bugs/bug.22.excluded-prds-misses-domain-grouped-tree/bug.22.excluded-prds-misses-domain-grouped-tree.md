@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Minor'
 priority: 'Medium'
 created: '2026-11-11'
@@ -11,7 +11,7 @@ description: 'qa-next excludedPrds matches only the first folder under docs/prd/
 
 **Bug ID**: bug.22.excluded-prds-misses-domain-grouped-tree
 **Related**: None — cross-cutting bug (no single owner)
-**Status**: 🔍 Ready for QA
+**Status**: ✅ Closed
 **GitHub**: [#903](https://github.com/Gamaroff/agent-skills/issues/903)
 **Priority**: Medium
 **Severity**: Minor
@@ -131,15 +131,14 @@ skills/qa-next/scripts/uat-status.mjs:244:    const prd = relative(base, file).s
 | 2026-11-14 | Ready for QA | develop-bug | Fix and regression test implemented |
 | 2026-11-14 | Ready for QA | develop-bug | Fix verified — bug scenario gone |
 | 2026-11-14 | Ready for QA | finalise | DoD verified — bug.22.dod.1.excluded-prds-domain-tree.md |
+| 2026-11-14 | Closed | develop-bug | Fix verified and accepted |
 
 ---
 
 ## Resolution Summary
 
-[Will be completed when bug is closed]
-
-**Final Status**: [Closed status]
-**Total Iterations**: [Number]
-**Time to Resolution**: [Duration]
-**Final Fix Details**: [Summary]
-**Lessons Learned**: [Key takeaways]
+**Final Status**: Closed — Fixed
+**Total Iterations**: 1
+**Time to Resolution**: 3 days (created 2026-11-11, closed 2026-11-14)
+**Final Fix Details**: `scanStories` now excludes a story when an `excludedPrds` entry names its first path segment (a flat tree, or a domain) or any path segment that doc-id reads as a PRD folder (`prd.{P}.{slug}` or the legacy `prd.{slug}`), so a PRD-folder entry works in a domain-grouped tree and a sibling PRD in the same domain is kept. Fixed in PR #904; DoD in `bug.22.dod.1.excluded-prds-domain-tree.md`.
+**Lessons Learned**: a config key that matches nothing says nothing. `excludedPrds` still gives no warning for an entry that matches no folder; a follow-up could add one so a mistyped entry is not silent.
