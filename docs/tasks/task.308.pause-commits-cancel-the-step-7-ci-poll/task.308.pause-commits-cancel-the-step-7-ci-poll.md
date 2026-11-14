@@ -5,17 +5,19 @@ type: task
 description: "Hold the PreCompact pause-commit push at step 7, as task.303 does at step 8, so a pause no longer cancels the CI run finalise is waiting on."
 tags: [pipeline, precompact, ci, finalise]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-11-14
 updated: 2026-11-14
+completed_date: 2026-11-14
 estimated_effort_hours: 3
 github_issue: 906
+pr_number: 907
 ---
 
 # Technical Task: Pause commits cancel the step 7 CI poll
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.308.review.1.pause-commits-cancel-the-step-7-ci-poll.md` implemented 2026-11-14
 
@@ -145,6 +147,31 @@ Decision: option (a), hold at `7|8`. Option (b) keys on the free-text `waiting_o
 
 ### Key Findings
 Both cycle-1 findings are fixed and verified by a refute pass over the whole branch diff. Two low-confidence cleanups are recorded as advisory.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.308.qa.2.pause-commits-cancel-the-step-7-ci-poll.md`
+**Gate File**: `task.308.gate.2.pause-commits-cancel-the-step-7-ci-poll.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Review**: `task.308.pr-review.1.pause-commits-cancel-the-step-7-ci-poll.md` — APPROVE, 0 findings
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** all 6 met (a step 7 pause is held, a step 5 pause still pushes, a step 8 pause is still held, every step 7 exit pushes the held commit, the later-turn head comes from the recorded file, the Phase 1 table is in this document)
+✅ **Tests:** hook scenarios 17f–17i (40/40) and the three recorded-head tests in `evals/shared/tests/finalise-publish-boundary.test.mjs`, each mutation-proved; fast gate 8178 ok, 0 not ok
+✅ **PR Review:** PR #907, CI green on the head (6 checks)
+✅ **Documentation:** `develop-pipeline-pause.md`, `develop-pipeline-hooks.md`, `CHANGELOG.md`, bundled copies
+✅ **Security Review:** no secrets or unsafe patterns; one boundary question on the 6c recorded-head guard closed by a recorded owner override (no engine probe ran; see the DoD file)
+✅ **Compliance Review:** not applicable (internal pipeline tooling)
+
+**Task marked as ACCEPTED on:** 2026-11-14
+
+**Detailed Verification Log:** See `task.308.dod.1.pause-commits-cancel-the-step-7-ci-poll.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
@@ -158,5 +185,6 @@ Both cycle-1 findings are fixed and verified by a refute pass over the whole bra
 | 2026-11-14 |  | QA gate CONCERNS (80/100) — 2 findings | qa-task |
 | 2026-11-14 |  | QA findings fixed — 2 findings, 1 iteration | qa-fix |
 | 2026-11-14 |  | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-11-14 | 0.3 | DoD passed — accepted (PR #907) | finalise |
 <!-- change-log-end -->
 
