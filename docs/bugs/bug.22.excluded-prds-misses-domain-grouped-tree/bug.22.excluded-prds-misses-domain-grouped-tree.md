@@ -1,16 +1,18 @@
 ---
 type: bug
-status: new # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Minor'
 priority: 'Medium'
 created: '2026-11-11'
 related: 'none — cross-cutting (no single owner)'
+github_issue: 903
 description: 'qa-next excludedPrds matches only the first folder under docs/prd/, which is the domain in a domain-grouped tree, so a PRD-folder entry never excludes anything'
 ---
 
 **Bug ID**: bug.22.excluded-prds-misses-domain-grouped-tree
 **Related**: None — cross-cutting bug (no single owner)
-**Status**: 🆕 New
+**Status**: ✅ Closed
+**GitHub**: [#903](https://github.com/Gamaroff/agent-skills/issues/903)
 **Priority**: Medium
 **Severity**: Minor
 **Created**: 2026-11-11
@@ -84,36 +86,38 @@ skills/qa-next/scripts/uat-status.mjs:244:    const prd = relative(base, file).s
 
 #### Investigation (New → In Progress)
 
-**Date**: [Date]
-**Developer**: [Name]
+**Date**: 2026-11-14
+**Developer**: Claude (develop-bug)
 
-[Investigation notes, root cause analysis]
+**Reproduction**: a domain-grouped fixture (`docs/prd/portal/prd.1.…` and `prd.2.…`, a story each) with `excludedPrds: ["prd.1.multi-game-web-portal"]`. `scanStories` still returned PRD 1's story.
+
+**Root Cause Analysis**: `scanStories` in `skills/qa-next/scripts/uat-status.mjs` tested `relative(base, file).split("/")[0]` against the set, and in a domain-grouped tree that first segment is the domain. `grep -n 'excludedPrds' skills/qa-next/scripts/*.mjs` shows no other matcher.
 
 #### Fix Implementation (In Progress → Ready for QA)
 
-**Date**: [Date]
+**Date**: 2026-11-14
 
-**Root Cause**: [Explanation]
+**Root Cause**: the first-segment rule assumes a flat tree.
 
-**Fix Description**: [What was changed]
+**Fix Description**: `isExcluded` keeps the first-segment match (a flat tree, or a domain name) and also matches any directory segment that `isPrdFolder` recognises. `isPrdFolder` reads `prd.{P}.{slug}` through `doc-id.parse` and the legacy `prd.{slug}` through `doc-id.parseLegacy`, so there is no hand-written id regex.
 
 **Files Modified**:
 
-- [file1.ts]
-- [file2.ts]
+- `skills/qa-next/scripts/uat-status.mjs`
+- `evals/qa-next/unit/uat-status.test.mjs`
 
-**Testing**: [How the fix was tested]
+**Testing**: new test `scanStories excludes a PRD named by its own folder in a domain-grouped tree…` covers the PRD-folder entry (sibling in the same domain kept), a domain-name entry, a flat-tree entry and no entry. Mutation: with the match reverted to first-segment only, it fails on the PRD-folder assertion; with the fix restored it passes. `node --test evals/qa-next/unit/uat-status.test.mjs tests/doc-id-chokepoint.test.js`: 99 pass, 0 fail.
 
 #### QA Verification (Ready for QA → Closed/Reopened)
 
-**Date**: [Date]
-**QA Engineer**: [Name]
+**Date**: 2026-11-14
+**Verified by**: develop-bug
 
-**Verification Result**: ✅ Fixed | ⚠️ Still Failing
+**Verification Result**: ✅ Fixed
 
-**Notes**: [Testing notes]
+**Notes**: Regression test `scanStories excludes a PRD named by its own folder in a domain-grouped tree…` passes and failed with the match reverted to first-segment only. `npm run test:remote` (`ci:fast`) is green. Lite mode: the diff code review was skipped. The reported failure no longer reproduces.
 
-**Decision**: Closed | Reopened
+**Decision**: Closed (finalised in Step 7)
 
 ---
 
@@ -122,15 +126,19 @@ skills/qa-next/scripts/uat-status.mjs:244:    const prd = relative(base, file).s
 | Date       | Status | Changed By | Notes                                 |
 | ---------- | ------ | ---------- | ------------------------------------- |
 | 2026-11-11 | New    | Claude     | Bug created from a tinker-city handoff |
+| 2026-11-14 | New | ensure-bug-github-issue | GitHub issue created (#903) |
+| 2026-11-14 | In Progress | develop-bug | Reproduced with a domain-grouped fixture; investigation started |
+| 2026-11-14 | Ready for QA | develop-bug | Fix and regression test implemented |
+| 2026-11-14 | Ready for QA | develop-bug | Fix verified — bug scenario gone |
+| 2026-11-14 | Ready for QA | finalise | DoD verified — bug.22.dod.1.excluded-prds-domain-tree.md |
+| 2026-11-14 | Closed | develop-bug | Fix verified and accepted |
 
 ---
 
 ## Resolution Summary
 
-[Will be completed when bug is closed]
-
-**Final Status**: [Closed status]
-**Total Iterations**: [Number]
-**Time to Resolution**: [Duration]
-**Final Fix Details**: [Summary]
-**Lessons Learned**: [Key takeaways]
+**Final Status**: Closed — Fixed
+**Total Iterations**: 1
+**Time to Resolution**: 3 days (created 2026-11-11, closed 2026-11-14)
+**Final Fix Details**: `scanStories` now excludes a story when an `excludedPrds` entry names its first path segment (a flat tree, or a domain) or any path segment that doc-id reads as a PRD folder (`prd.{P}.{slug}` or the legacy `prd.{slug}`), so a PRD-folder entry works in a domain-grouped tree and a sibling PRD in the same domain is kept. Fixed in PR #904; DoD in `bug.22.dod.1.excluded-prds-domain-tree.md`.
+**Lessons Learned**: a config key that matches nothing says nothing. `excludedPrds` still gives no warning for an entry that matches no folder; a follow-up could add one so a mistyped entry is not silent.
