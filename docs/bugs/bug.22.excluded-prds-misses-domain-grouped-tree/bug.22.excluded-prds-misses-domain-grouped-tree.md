@@ -110,14 +110,14 @@ skills/qa-next/scripts/uat-status.mjs:244:    const prd = relative(base, file).s
 
 #### QA Verification (Ready for QA → Closed/Reopened)
 
-**Date**: [Date]
-**QA Engineer**: [Name]
+**Date**: 2026-11-14
+**Verified by**: develop-bug
 
-**Verification Result**: ✅ Fixed | ⚠️ Still Failing
+**Verification Result**: ✅ Fixed
 
-**Notes**: [Testing notes]
+**Notes**: Regression test `scanStories excludes a PRD named by its own folder in a domain-grouped tree…` passes and failed with the match reverted to first-segment only. `npm run test:remote` (`ci:fast`) is green. Lite mode: the diff code review was skipped. The reported failure no longer reproduces.
 
-**Decision**: Closed | Reopened
+**Decision**: Closed (finalised in Step 7)
 
 ---
 
@@ -129,6 +129,8 @@ skills/qa-next/scripts/uat-status.mjs:244:    const prd = relative(base, file).s
 | 2026-11-14 | New | ensure-bug-github-issue | GitHub issue created (#903) |
 | 2026-11-14 | In Progress | develop-bug | Reproduced with a domain-grouped fixture; investigation started |
 | 2026-11-14 | Ready for QA | develop-bug | Fix and regression test implemented |
+| 2026-11-14 | Ready for QA | develop-bug | Fix verified — bug scenario gone |
+| 2026-11-14 | Ready for QA | finalise | DoD verified — bug.22.dod.1.excluded-prds-domain-tree.md |
 
 ---
 
