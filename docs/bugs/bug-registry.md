@@ -48,7 +48,7 @@
 | 19 | [`registry-tick` reports `no-row` when `parseRegistry` rejects every row of a plain-title registry](bug.19.registry-tick-malformed-row-reported-as-no-row/bug.19.registry-tick-malformed-row-reported-as-no-row.md) | closed | Major | Medium | 2026-10-14 | registry tick + parser (`registry-tick`, `select-next`) |
 | 20 | [`upsertChangeLog` moves a blank-date continuation row above every dated row on the next write](bug.20.change-log-blank-date-row-floats-to-top/bug.20.change-log-blank-date-row-floats-to-top.md) | closed       | Minor | Low | 2026-11-05 | change log engine (`change-log.js`) |
 | 21 | [The PreCompact hook claims the pause with `mkdir`, which is not exclusive on some kernels, so two runs both append a pause block and CI Test is red](bug.21.precompact-claim-mkdir-not-exclusive/bug.21.precompact-claim-mkdir-not-exclusive.md) | closed       | Major | High | 2026-11-11 | pause hook (`develop-pipeline-on-precompact.sh`) |
-| 22 | [`excludedPrds` matches only the first folder under `docs/prd/`, the domain in a domain-grouped tree, so a PRD-folder entry never excludes anything](bug.22.excluded-prds-misses-domain-grouped-tree/bug.22.excluded-prds-misses-domain-grouped-tree.md) | new | Minor | Medium | 2026-11-11 | UAT registry (`qa-next/scripts/uat-status.mjs`) |
+| 22 | [`excludedPrds` matches only the first folder under `docs/prd/`, the domain in a domain-grouped tree, so a PRD-folder entry never excludes anything](bug.22.excluded-prds-misses-domain-grouped-tree/bug.22.excluded-prds-misses-domain-grouped-tree.md) | ready-for-qa | Minor | Medium | 2026-11-11 | UAT registry (`qa-next/scripts/uat-status.mjs`) |
 
 ---
 
