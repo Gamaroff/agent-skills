@@ -10,11 +10,14 @@ priority: Medium
 created: 2026-11-14
 updated: 2026-11-14
 estimated_effort_hours: 3
+github_issue: 906
 ---
 
 # Technical Task: Pause commits cancel the step 7 CI poll
 
 **Status:** Draft
+
+**GitHub Issue**: [#906](https://github.com/Gamaroff/agent-skills/issues/906)
 
 Follow-up to [task.303](../task.303.pause-commits-restart-ci-and-block-docs-only-shortcut/task.303.pause-commits-restart-ci-and-block-docs-only-shortcut.md), which held the pause-commit push at step 8 only. Raised from a consumer run (tinker-city bug.144, PR #1257, 2026-11-14).
 
@@ -100,3 +103,4 @@ None. A held pause commit reaches the remote with finalise's next commit instead
 | Date | Version | Description | Author |
 | ---------- | ------- | ----------- | ------ |
 | 2026-11-14 | 0.1 | Drafted from tinker-city bug.144 (PR #1257): a step 7 pause cancelled finalise's CI run | Claude |
+| 2026-11-14 |  | GitHub issue created (#906) | sync-github-task |
