@@ -1,0 +1,60 @@
+schema: 2
+task: 'task.309.pin-6c-head-writer-position-and-clear-stale-head-file'
+task_title: 'Pin the 6c head writer position and clear the stale head file'
+gate: PASS
+status_reason: 'Both changes verified: the 6c rm line now clears the head file ahead of the writer, and two committed tests pin the order and the clear. Both mutations (writer below launch; head file dropped from rm) turn a committed test red and revert clean. No blocking finding; one pre-existing observation and one cleanup are advisory.'
+reviewer: 'QA Engineer'
+head: '8679ee21504f5f4025e7746896f6772353f20b0c'
+updated: '2026-11-15T08:05:30Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 48
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary_reason: ''
+    notes: 'boundary: false. The change adds one path to an existing rm -f in a fenced step-doc block and two tests. Candidates named: the rm line (clears a file; a state clear, not a refusal), the head writer line (a writer, which the boundary rule names as a non-boundary), the order assertion (a test). None accepts or rejects an input. The criteria carry no boundary signal (probe-boundary-signals.mjs matched nothing).'
+  performance:
+    status: PASS
+    notes: 'No timing criterion; one extra path on an existing rm -f.'
+  reliability:
+    status: PASS
+    notes: 'A run that aborts between the rm and the writer now leaves no head file, so the later turn HALTs "not recorded" instead of reading a previous run head. The later-turn reader is unchanged.'
+  maintainability:
+    status: PASS
+    notes: 'The comment above the writer states what the rm guards. The order test finds each line by its own pattern and asserts it is present, so a renamed line fails loudly instead of passing on an empty match.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (pre-existing, not introduced here): the 6c poll block reads CI_HEAD_2 and PR_NUMBER with no assignment inside the block; both are bound in earlier fenced blocks of the same procedure. Identical on the PR base (origin/develop skills/finalise/SKILL.md carries the same writer and nohup lines). Consider binding or guarding them in the block, as a separate task.'
+      refs: ['skills/finalise/SKILL.md']
+      provenance: pre-existing
+    - action: 'CR-2 (cleanup, low): in the clear test the second half (rm then writer) passes with or without the rm, because the writer overwrites the same file; only the first half (rm alone removes a stale file) tests the new behaviour. Mutation 2 shows the test as a whole is red without the rm, so it is held; trimming the redundant half is optional.'
+      refs: ['evals/shared/tests/finalise-publish-boundary.test.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

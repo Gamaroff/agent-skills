@@ -5,17 +5,19 @@ type: task
 description: "Follow-up to task.308: a test pins where the 6c recorded-head writer sits relative to the poll launch, and 6c clears the head file beside the result and pid files so a later turn cannot read a previous run's head."
 tags: [finalise, ci, tests, pipeline]
 category: testing
-status: planned
+status: accepted
 priority: Low
 created: 2026-11-15
 updated: 2026-11-15
+completed_date: 2026-11-15
 estimated_effort_hours: 2
 github_issue: 908
+pr_number: 909
 ---
 
 # Technical Task: Pin the 6c head writer position and clear the stale head file
 
-**Status:** Planned
+**Status:** Accepted
 
 **GitHub Issue**: [#908](https://github.com/Gamaroff/agent-skills/issues/908)
 
@@ -107,8 +109,8 @@ None - API stable. The change is internal pipeline prose and one test.
 - `evals/shared/tests/finalise-publish-boundary.test.mjs`
 
 **Changes**:
-- [ ] Extend the writer test to find the `nohup bash "$POLL"` line and the `rm -f` line in `codeLines(sixC)` and assert rm index < writer index < launch index.
-- [ ] Mutation-prove it: move the writer below the launch in a scratch copy and confirm the test is red.
+- [x] Extend the writer test to find the `nohup bash "$POLL"` line and the `rm -f` line in `codeLines(sixC)` and assert rm index < writer index < launch index.
+- [x] Mutation-prove it: move the writer below the launch in the working file (Edit, then Edit back) and confirm the test is red. Red: "must clear (line 11), then record the head (line 15), then launch the poll (line 12)".
 
 **Dependencies**: none
 
@@ -123,9 +125,9 @@ None - API stable. The change is internal pipeline prose and one test.
 - `evals/shared/tests/finalise-publish-boundary.test.mjs`
 
 **Changes**:
-- [ ] Add `.claude/state/finalise-ci-head-2.txt` to the `rm -f "$RESULT" "$PIDFILE"` line (above the writer) and say so in the comment above the writer.
-- [ ] Add a test that runs the shipped `rm` line in a scratch repository holding a stale head file and asserts it is gone and the writer line then records the new head.
-- [ ] Mutation-prove it: drop the head file from the `rm` and confirm the test is red.
+- [x] Add `.claude/state/finalise-ci-head-2.txt` to the `rm -f "$RESULT" "$PIDFILE"` line (above the writer) and say so in the comment above the writer.
+- [x] Add a test that runs the shipped `rm` line in a scratch repository holding a stale head file and asserts it is gone and the writer line then records the new head.
+- [x] Mutation-prove it: drop the head file from the `rm` and confirm the test is red (done: 1 fail, 47 pass; reverted, 48 pass).
 
 **Dependencies**: Phase 1 (the order assertion names the `rm` line this phase edits).
 
@@ -140,9 +142,9 @@ None - API stable. The change is internal pipeline prose and one test.
 - `CHANGELOG.md`
 
 **Changes**:
-- [ ] Run `npm run bundle` and `npm run bundle:check`; commit any regenerated copies.
-- [ ] Add the CHANGELOG line citing `(task 309)`.
-- [ ] Run the finalise tests and the fast gate (`npm run test:remote`).
+- [x] Run `npm run bundle` and `npm run bundle:check`; commit any regenerated copies (three `develop-*` hooks-doc copies regenerated).
+- [x] Add the CHANGELOG line citing `(task 309)`.
+- [x] Run the finalise tests and the fast gate (`npm run test:remote`): 8477 tests, 8474 pass, 0 fail, 3 skipped.
 
 **Dependencies**: Phases 1 and 2.
 
@@ -161,10 +163,11 @@ None - API stable. The change is internal pipeline prose and one test.
 ### Files to Modify (Documentation)
 
 3. ✅ `CHANGELOG.md` - one line under `[Unreleased]` › Fixed
+4. ✅ `shared/resources/develop-pipeline-hooks.md` - one clause on line 56: 6c clears the head file at the start of a run (source; the three `develop-*` copies are generated)
 
 ### Generated
 
-4. ✅ Bundled copies under `skills/*/references/`, only if `npm run bundle` changes any (measure with `git status` after the run; `git grep -l finalise-ci-head-2 -- skills` lists the carriers)
+5. ✅ Bundled copies under `skills/*/references/`, only if `npm run bundle` changes any (measure with `git status` after the run; `git grep -l finalise-ci-head-2 -- skills` lists the carriers)
 
 ### Files to Delete
 
@@ -179,17 +182,17 @@ None.
 **Scope**: the two tests in `evals/shared/tests/finalise-publish-boundary.test.mjs`, both running the shipped lines.
 
 **Actions**:
-- [ ] The order test: rm < writer < launch by line index.
-- [ ] The clear test: a stale head file is removed by the shipped `rm` line; the writer then records the new head.
-- [ ] The existing writer and reader tests stay green.
+- [x] The order test: rm < writer < launch by line index.
+- [x] The clear test: a stale head file is removed by the shipped `rm` line; the writer then records the new head.
+- [x] The existing writer and reader tests stay green.
 
 **Command**: `command node --test evals/shared/tests/finalise-publish-boundary.test.mjs`
 
 ### Mutation Proof
 
-- [ ] Move the writer below the launch: the order test is red.
-- [ ] Drop the head file from the `rm` line: the clear test is red.
-- [ ] Each mutation is reverted and the tests re-run green.
+- [x] Move the writer below the launch: the order test is red.
+- [x] Drop the head file from the `rm` line: the clear test is red.
+- [x] Each mutation is reverted and the tests re-run green.
 
 ### Integration Tests
 
@@ -201,24 +204,24 @@ None.
 
 ### Functional
 
-- [ ] Moving the writer line below the `nohup bash "$POLL"` line turns the order test red.
-- [ ] A stale `finalise-ci-head-2.txt` present before 6c runs is gone after the shipped `rm` line.
-- [ ] The later-turn reader is unchanged and its three existing tests stay green.
+- [x] Moving the writer line below the `nohup bash "$POLL"` line turns the order test red.
+- [x] A stale `finalise-ci-head-2.txt` present before 6c runs is gone after the shipped `rm` line.
+- [x] The later-turn reader is unchanged and its three existing tests stay green.
 
 ### Performance
 
-- [ ] No timing criterion. The change adds one path to an existing `rm -f`.
+- [x] No timing criterion. The change adds one path to an existing `rm -f`.
 
 ### Code Quality
 
-- [ ] `npm run bundle:check` is clean.
-- [ ] The fast gate passes with 0 not ok; the figure is recorded in the QA report.
-- [ ] `npm run validate -- skills/finalise/` passes (`SKILL.md` changes).
+- [x] `npm run bundle:check` is clean.
+- [x] The fast gate passes with 0 not ok; the figure is recorded in the QA report.
+- [x] `npm run validate -- skills/finalise/` passes (`SKILL.md` changes).
 
 ### Migration
 
-- [ ] `CHANGELOG.md` cites `(task 309)`.
-- [ ] No consumer change is needed.
+- [x] `CHANGELOG.md` cites `(task 309)`.
+- [x] No consumer change is needed.
 
 ---
 
@@ -268,21 +271,65 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-15
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.309.qa.1.pin-6c-head-writer-position-and-clear-stale-head-file.md](./task.309.qa.1.pin-6c-head-writer-position-and-clear-stale-head-file.md)
+- **Gate File**: [task.309.gate.1.pin-6c-head-writer-position-and-clear-stale-head-file.yml](./task.309.gate.1.pin-6c-head-writer-position-and-clear-stale-head-file.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 48 (finalise-publish-boundary); fast gate 8477 at the develop step
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No blocking issues. Both mutations (writer below the launch; head file dropped from the `rm`) turn a committed test red. Two advisory items: a pre-existing unbound-variable shape in the 6c block (CR-1, routed to future work) and a redundant half in the clear test (CR-2).
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report**: `task.309.qa.1.pin-6c-head-writer-position-and-clear-stale-head-file.md`
+**Gate File**: `task.309.gate.1.pin-6c-head-writer-position-and-clear-stale-head-file.yml`
+**Gate Status**: ✅ PASS — 100/100
+
+✅ **Acceptance Criteria:** 9/9 met, each with a code and a per-PR test citation (or its measured/documentation record)
+✅ **Tests & PR:** PR #909; `finalise-publish-boundary.test.mjs` 48 pass; fast gate 8477 tests, 0 fail; 5c PR review CONCERNS with no open coverage finding
+✅ **Documentation:** CHANGELOG cites `(task 309)`; `develop-pipeline-hooks.md` and three bundled copies regenerated
+✅ **Security Review:** ✅ PASS — `boundary: false`, no probe fired
+⚠️ **Compliance Review:** NOT_APPLICABLE — no user data, payments, UI or health data
+✅ **CI reading 1:** SUCCESS @ `9e73cf9e67d8`
+
+**Detailed Verification Log:** See `task.309.dod.1.pin-6c-head-writer-position-and-clear-stale-head-file.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-15
 <!-- change-log-start -->
 ## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-11-15 | 1.0 | Initial draft — task.308's two advisory cleanups | create-task |
+| 2026-11-15 | 1.1 | Review passed (9/10) — two Optional plan clarifications applied (mutation proof on the working file; hooks doc line added to Phase 3) | review-task |
+|  |  | Status → ready-for-development | review-task |
+| 2026-11-15 | 1.2 | Implemented: order assertion + stale-head clear in 6c, both mutation-proved; hooks doc clause, CHANGELOG; status → ready-for-review | develop |
+| 2026-11-15 |  | QA gate PASS (100/100) — 0 findings in the gate, 2 advisory | qa-task |
+| 2026-11-15 | 1.3 | DoD passed — accepted (PR #909) | finalise |
 <!-- change-log-end -->
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1: Pin the writer position
-- [ ] Phase 2: Clear the stale head file
-- [ ] Phase 3: Bundle, docs and gate
+- [x] Phase 1: Pin the writer position
+- [x] Phase 2: Clear the stale head file
+- [x] Phase 3: Bundle, docs and gate
 
 ## References
 

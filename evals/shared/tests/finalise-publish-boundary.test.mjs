@@ -634,6 +634,30 @@ test("6c poll block records the acceptance head it starts on, for the later turn
     1,
     "the 6c poll block must carry exactly one line that records CI_HEAD_2 to finalise-ci-head-2.txt",
   );
+  // task.309: where the writer sits. A poll that is running with no head recorded is a window in
+  // which a later turn HALTs "not recorded" on a run that is in fact healthy, so the order is
+  // clear, then record, then launch. Each line is found by its own pattern, and a missing one is
+  // named, so a rename reads as a missing line rather than as a wrong order.
+  const lines = codeLines(sixC);
+  const at = (re) => lines.findIndex((l) => re.test(l));
+  const rmAt = at(/^\s*rm -f "\$RESULT" "\$PIDFILE"/);
+  const writeAt = at(
+    /^\s*printf '%s\\n' "\$CI_HEAD_2" > \.claude\/state\/finalise-ci-head-2\.txt\s*$/,
+  );
+  const launchAt = at(/^\s*nohup bash "\$POLL"/);
+  assert.ok(
+    rmAt >= 0,
+    '6c poll block: the `rm -f "$RESULT" "$PIDFILE"` line is missing',
+  );
+  assert.ok(writeAt >= 0, "6c poll block: the head writer line is missing");
+  assert.ok(
+    launchAt >= 0,
+    '6c poll block: the `nohup bash "$POLL"` line is missing',
+  );
+  assert.ok(
+    rmAt < writeAt && writeAt < launchAt,
+    `6c poll block must clear (line ${rmAt}), then record the head (line ${writeAt}), then launch the poll (line ${launchAt})`,
+  );
   const dir = mkdtempSync(path.join(tmpdir(), "t308-writer-"));
   try {
     mkdirSync(path.join(dir, ".claude", "state"), { recursive: true });
@@ -652,6 +676,69 @@ test("6c poll block records the acceptance head it starts on, for the later turn
       head,
       "the file must hold the head the poll was started on",
     );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// task.309: a head file left by a previous run must not survive into this one. It runs the shipped
+// `rm` line over a stale file, then the shipped writer line, so it holds the clear and the record
+// together: a stale file that survives the clear would still read as the new head's predecessor.
+test("6c poll block clears a previous run's head file, then records the new head", () => {
+  const sixC = between(
+    finalise,
+    "6c. **Second CI reading",
+    "6d. **CHANGELOG citation check",
+    FINALISE,
+  );
+  const lines = codeLines(sixC);
+  const rmLine = lines.find((l) => /^\s*rm -f "\$RESULT" "\$PIDFILE"/.test(l));
+  const writeLine = lines.find((l) =>
+    /^\s*printf '%s\\n' "\$CI_HEAD_2" > \.claude\/state\/finalise-ci-head-2\.txt\s*$/.test(
+      l,
+    ),
+  );
+  assert.ok(rmLine, "6c poll block: the rm line is missing");
+  assert.ok(writeLine, "6c poll block: the head writer line is missing");
+  const dir = mkdtempSync(path.join(tmpdir(), "t309-clear-"));
+  try {
+    const state = path.join(dir, ".claude", "state");
+    mkdirSync(state, { recursive: true });
+    const headFile = path.join(state, "finalise-ci-head-2.txt");
+    const stale = "ffffffffffffffffffffffffffffffffffffffff";
+    writeFileSync(headFile, `${stale}\n`);
+    writeFileSync(path.join(state, "finalise-ci-result.txt"), "old result\n");
+    writeFileSync(path.join(state, "finalise-ci-poll.pid"), "1\n");
+    const shell = (script) =>
+      spawnSync("bash", ["-c", script], { cwd: dir, encoding: "utf8" });
+    const vars =
+      "RESULT=.claude/state/finalise-ci-result.txt\nPIDFILE=.claude/state/finalise-ci-poll.pid\n";
+
+    // The clear alone: the run aborts before the writer, so no head is recorded.
+    const cleared = shell(`${vars}${rmLine.trim()}`);
+    assert.equal(
+      cleared.status,
+      0,
+      `rm line exited ${cleared.status}: ${cleared.stderr}`,
+    );
+    assert.equal(
+      existsSync(headFile),
+      false,
+      "a previous run's head file must be gone after the clear",
+    );
+
+    // The clear, then the writer: the file holds the new head and not the stale one.
+    writeFileSync(headFile, `${stale}\n`);
+    const head = "0123456789abcdef0123456789abcdef01234567";
+    const rerun = shell(
+      `${vars}CI_HEAD_2=${head}\n${rmLine.trim()}\n${writeLine.trim()}`,
+    );
+    assert.equal(
+      rerun.status,
+      0,
+      `clear + writer exited ${rerun.status}: ${rerun.stderr}`,
+    );
+    assert.equal(readFileSync(headFile, "utf8").trim(), head);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

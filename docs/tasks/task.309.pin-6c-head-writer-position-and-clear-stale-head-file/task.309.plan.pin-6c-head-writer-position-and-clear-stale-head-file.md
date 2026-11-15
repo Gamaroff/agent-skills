@@ -36,7 +36,7 @@ assert.ok(rmAt < writeAt && writeAt < launchAt, "clear, then record the head, th
 
 Keep the existing "exactly one writer" assertion. Note `codeLines` strips only whole-line comments and trailing ` # …`, and the `rm` line's trailing text is unchanged in Phase 2, so the pattern matches before and after.
 
-**Mutation proof:** in a scratch copy of the tree (never the working file), move the writer line below `nohup … &`; run the test; expect red with the order message. Restore and re-run green.
+**Mutation proof:** the test reads `skills/finalise/SKILL.md` by a fixed path, so a scratch copy would not feed it. With the Edit tool, move the writer line below `nohup … &` in the working file; run the test; expect red with the order message. Edit it back and re-run green.
 
 ### Phase 2: Clear the stale head file
 
@@ -51,6 +51,7 @@ Keep the existing "exactly one writer" assertion. Note `codeLines` strips only w
 ### Phase 3: Bundle, docs and gate
 
 - `npm run bundle`, then `npm run bundle:check`; `git status` shows any regenerated copy (carriers: `git grep -l finalise-ci-head-2 -- skills`); commit them with the change.
+- `shared/resources/develop-pipeline-hooks.md` line 56 (a source; `npm run bundle` regenerates the three `develop-*` copies): add one clause that 6c clears the head file with the result and pid files at the start of a run.
 - `CHANGELOG.md`: under `[Unreleased]` › Fixed, one line citing `(task 309)`.
 - `npm run validate -- skills/finalise/`; `command node --test evals/shared/tests/finalise-publish-boundary.test.mjs`; the fast gate via `npm run test:remote`; the touched suite once with `CI=true` before pushing.
 
