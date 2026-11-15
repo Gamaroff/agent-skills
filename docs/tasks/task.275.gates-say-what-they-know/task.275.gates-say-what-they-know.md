@@ -273,6 +273,27 @@ None identified.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-15
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.275.qa.1.gates-say-what-they-know.md](./task.275.qa.1.gates-say-what-they-know.md)
+- **Gate File**: [task.275.gate.1.gates-say-what-they-know.yml](./task.275.gate.1.gates-say-what-they-know.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 26 across the three affected suites, plus `ci:fast` on the LAN server
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+One low point open: the wall-time criterion was bounded (0.4 s of added tests against a 685 s run), not measured by five alternating runs.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -281,6 +302,7 @@ None identified.
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #84, #86    | create-task |
 | 2026-11-15 | 1.1     | Review passed (8/10) — count redefined as open entries via one helper, five call sites listed, `qa-gate` added as a third schema writer, feed guard and `NUMERIC_SLOTS` added, `qa-cycle` fed at its one site | review-task |
 | 2026-11-15 |         | Status → ready-for-development                    | review-task |
+| 2026-11-15 |         | QA gate PASS (95/100) — 1 finding                 | qa-task |
 <!-- change-log-end -->
 
 ---

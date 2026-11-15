@@ -31,10 +31,10 @@ Add an open-points count slot to the `qa-gate` / `qa-cycle` plain-language leads
 
 | Step                       | Status     | Required Artifacts                                                     | Notes | Subagent summary ref | Completed (UTC) |
 | -------------------------- | ---------- | ---------------------------------------------------------------------- | ----- | -------------------- | --------------- |
-| 1. create-branch           | ✅ Done    | Branch `feature/task.275.*` exists in git                              | Branch created at `2537e35a6` from develop | —                    | 2026-11-15T16:30Z |
-| 2. review-task             | ✅ Done    | `task.275.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT 8/10; 0 critical, 7 important (all fixed), 2 optional | —                    | 2026-11-15T16:55Z |
-| 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Count slot, helper, 5 sites, remedy schema; ci:fast green on .249 | —                    | 2026-11-15T18:10Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
+| 1. create-branch           | ✅ Done    | Branch `feature/task.275.*` exists in git                              | Branch created at `2537e35a6` from develop | —                    | 2026-11-15T16:24Z |
+| 2. review-task             | ✅ Done    | `task.275.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT 8/10; 0 critical, 7 important (all fixed), 2 optional | —                    | 2026-11-15T16:28Z |
+| 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Count slot, helper, 5 sites, remedy schema; ci:fast green on .249 | —                    | 2026-11-15T16:49Z |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #911 opened; no tracker issue to comment on | —                    | 2026-11-15T16:49Z |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.275.qa.{N}.*.md`; `task.275.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.275.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
@@ -66,6 +66,7 @@ Add an open-points count slot to the `qa-gate` / `qa-cycle` plain-language leads
 - Fast gate: first run red on prettier (4 files), fixed with `prettier --write`; second run `ci:fast` on .249 exit 0 (`CI=true`).
 - Mutation proof: with the count branch disabled (`&& false`) the PASS-with-count test went red (1 fail of 60); restored, 86/86 green across the three suites.
 - Feed guard (Guard D) added to `comment-slot-coverage.test.mjs`, with a non-vacuity floor of 5 sites and a synthetic control that must fail and pass.
+- Correction: the Completed (UTC) cells for steps 1-4 were first written from memory (two were local time); re-set from the review report mtime, the branch reflog and the PR creation time.
 - Open: the wall-time criterion (five alternating runs, within 10% of `develop`) is not measured; it goes to QA.
 
 ### Step 2 — review-task
@@ -89,6 +90,15 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-11-15
+**Gate Result**: PASS
+**Issues Found**: 1 — T275-QA-1 (low): the wall-time criterion was bounded (0.4 s of added tests against a 685 s run), not measured as five alternating runs
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+
 ---
 
 ## Completion
@@ -96,7 +106,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: {populated after Step 1}
-**PR**: {populated after Step 4}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/911
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
