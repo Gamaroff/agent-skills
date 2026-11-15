@@ -71,6 +71,9 @@ printf '%s\n' '| Step | Status | Artifact |' '|---|---|---|' '| 3. develop | ✅
 check "step 3 reading ✅: already complete" 1 "already complete: 3" "$NOLOCK" "$D" 3
 check "step 4 reading ⏳: proceed" 0 "proceed: 4" "$NOLOCK" "$D" 4
 check "step 5 (the QA loop row 5–6) reading ⏳: proceed" 0 "proceed: 5" "$NOLOCK" "$D" 5
+# The en dash is multibyte: under LC_ALL=C the row must still be found (T276-QA-4).
+out=$(LC_ALL=C PIPELINE_LOCK="$NOLOCK" bash "$SCRIPT" "$D" 5 2>&1); rc=$?
+if [ "$rc" -eq 0 ] && [ "${out#proceed: 5}" != "$out" ]; then pass "step 5 row found under LC_ALL=C"; else fail "step 5 row found under LC_ALL=C" "rc=$rc out='$out'"; fi
 check "step 7 reading ⏭️ Skipped: already complete" 1 "already complete: 7" "$NOLOCK" "$D" 7
 check "a step with no row: cannot tell" 3 "cannot tell" "$NOLOCK" "$D" 8
 
@@ -80,6 +83,15 @@ printf '{"current_step":7}\n' > "$T/lock7.json"
 check "a lock at step 7 makes a step-5 prompt stale, whatever the artefacts say" 1 "already complete: 5b 1" "$T/lock7.json" "$D" 5b 1
 printf '{"current_step":5}\n' > "$T/lock5.json"
 check "a lock at step 5 leaves a step-5 prompt to the artefacts" 0 "proceed: 5b 1" "$T/lock5.json" "$D" 5b 1
+# A lock for ANOTHER document is that run's record, not this one's (T276-QA-1). The same step-7 lock
+# with this document's directory stays authoritative; with another's it is ignored.
+printf '{"current_step":7,"task_or_story_directory":"%s"}\n' "$D" > "$T/lock7own.json"
+check "a step-7 lock for THIS document makes a step-5 prompt stale" 1 "already complete: 5b 1" "$T/lock7own.json" "$D" 5b 1
+printf '{"current_step":7,"task_or_story_directory":"%s"}\n' "$T/some-other-task" > "$T/lock7foreign.json"
+check "a step-7 lock for ANOTHER document is ignored: the artefacts decide" 0 "proceed: 5b 1" "$T/lock7foreign.json" "$D" 5b 1
+mkdir -p "$T/link-target"; ln -s "$D" "$T/link-to-d"
+printf '{"current_step":7,"task_or_story_directory":"%s"}\n' "$T/link-to-d" > "$T/lock7link.json"
+check "a lock naming this document through a symlink is still this document's" 1 "already complete: 5b 1" "$T/lock7link.json" "$D" 5b 1
 printf 'not json' > "$T/lockbad.json"
 check "an unparseable lock: cannot tell, never a guess" 3 "cannot tell" "$T/lockbad.json" "$D" 5b 1
 

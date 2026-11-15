@@ -313,6 +313,27 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-15
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.276.qa.1.halts-and-re-entries-leave-and-read-true-state.md](./task.276.qa.1.halts-and-re-entries-leave-and-read-true-state.md)
+- **Gate File**: [task.276.gate.1.halts-and-re-entries-leave-and-read-true-state.yml](./task.276.gate.1.halts-and-re-entries-leave-and-read-true-state.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 8504
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+Three medium findings: `resume-prompt-check.sh` reads a lock for another document, no CHANGELOG entry cites task 276, and the wall-time success criterion is unmeasured. One low finding: the step-5 row pattern fails under `LC_ALL=C`.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -322,6 +343,8 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 | 2026-11-15 | 1.1     | Review passed (8/10 after fixes) — guard re-keyed on halt_step 7 + DoD GAPS (no writer emits `finalise-dod-gaps`); `--allow-dod-gaps` bypass for the re-entry script; HALT sites and resume-prompt check made executable | review-task |
 | 2026-11-15 |         | Status → ready-for-development                                       | review-task |
 | 2026-11-15 |         | Status → ready-for-review (develop complete; remote CI-parity suite green) |             |
+| 2026-11-15 |         | QA gate CONCERNS (80/100) — 4 findings                               | qa-task     |
+| 2026-11-15 |         | QA findings fixed, iteration 1 — 3 of 4 closed; wall-time criterion left open | qa-fix      |
 <!-- change-log-end -->
 
 ---

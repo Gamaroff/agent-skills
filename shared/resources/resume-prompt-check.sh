@@ -72,12 +72,23 @@ command -v jq >/dev/null 2>&1 || cannot "jq not found"
 [ -f "$QA_CYCLE_SH" ] || cannot "qa-cycle.sh not found beside this script ($QA_CYCLE_SH) — re-bundle the skill"
 
 # The run's own record first: a lock past the named step makes the prompt stale whatever else is on disk.
+canon() { (cd -P -- "$1" 2>/dev/null && pwd -P) || printf '%s' "$1"; }
 if [ -f "$LOCK" ]; then
   jq -e 'type == "object"' "$LOCK" >/dev/null 2>&1 || cannot "the lock at '$LOCK' is not a JSON object"
-  LOCK_STEP=$(jq -r '.current_step // empty | tostring' "$LOCK")
-  case "$LOCK_STEP" in ''|*[!0-9]*) cannot "the lock at '$LOCK' has no numeric current_step" ;; esac
-  case "$STEP" in 5a|5b|5c) NAMED_STEP=5 ;; *) NAMED_STEP="$STEP" ;; esac
-  [ "$LOCK_STEP" -gt "$NAMED_STEP" ] && complete
+  # A lock for ANOTHER document says nothing about this one (T276-QA-1): its step is that run's step.
+  # A lock with no directory field (the pre-task.123 shape) is read as before.
+  LOCK_DIR=$(jq -r '.task_or_story_directory // empty' "$LOCK")
+  if [ -n "$LOCK_DIR" ] && [ "$(canon "$LOCK_DIR")" != "$(canon "$DOC_DIR")" ]; then
+    LOCK_IS_OURS=""
+  else
+    LOCK_IS_OURS=1
+  fi
+  if [ -n "$LOCK_IS_OURS" ]; then
+    LOCK_STEP=$(jq -r '.current_step // empty | tostring' "$LOCK")
+    case "$LOCK_STEP" in ''|*[!0-9]*) cannot "the lock at '$LOCK' has no numeric current_step" ;; esac
+    case "$STEP" in 5a|5b|5c) NAMED_STEP=5 ;; *) NAMED_STEP="$STEP" ;; esac
+    [ "$LOCK_STEP" -gt "$NAMED_STEP" ] && complete
+  fi
 fi
 
 find_report() { # the newest implementation report in the document directory
@@ -118,7 +129,9 @@ case "$STEP" in
   *)
     [ -n "$REPORT" ] || REPORT=$(find_report)
     [ -n "$REPORT" ] && [ -f "$REPORT" ] || cannot "no implementation report in '$DOC_DIR'"
-    case "$STEP" in 5) PATTERN='^\| *5[–-]6\.' ;; *) PATTERN="^\\| *$STEP\\." ;; esac
+    # An alternation, not a bracket: the en dash is three bytes, and under LC_ALL=C a bracket class
+    # matches single bytes, so the row was never found (T276-QA-4).
+    case "$STEP" in 5) PATTERN='^\| *5(–|-)6\.' ;; *) PATTERN="^\\| *$STEP\\." ;; esac
     ROW=$(grep -E "$PATTERN" "$REPORT" | head -1)
     [ -n "$ROW" ] || cannot "no Pipeline Progress row for step $STEP in '$REPORT'"
     STATUS=$(printf '%s' "$ROW" | awk -F'|' '{ gsub(/^ +| +$/, "", $3); print $3 }')

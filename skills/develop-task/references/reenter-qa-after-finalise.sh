@@ -5,8 +5,9 @@
 #
 # Sibling of grant-qa-cycles.sh. A /finalise run that finds Definition of Done gaps HALTs the
 # develop pipeline at Step 7 and leaves a halt snapshot with halt_step 7. When the gaps are closed
-# by a CODE change, the plain resume (`advance-pipeline-lock.sh --restore`) brings the lock back at
-# step 7 and /finalise re-runs over a head no QA gate has read — and the obvious backward move,
+# by a CODE change, a plain resume (`advance-pipeline-lock.sh --restore`) would bring the lock back at
+# step 7 and /finalise would re-run over a head no QA gate has read, so --restore now REFUSES that
+# halt (task.276); this script is the door, and calls it with --allow-dod-gaps. The obvious backward move,
 # `advance-pipeline-lock.sh 5`, is a silent no-op on a step-7 lock (that helper is monotonic, and
 # stays so). This script is the ONE writer that may lower current_step, and only on this path:
 #
