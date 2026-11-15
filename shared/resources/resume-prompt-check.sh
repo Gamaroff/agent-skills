@@ -72,12 +72,26 @@ command -v jq >/dev/null 2>&1 || cannot "jq not found"
 [ -f "$QA_CYCLE_SH" ] || cannot "qa-cycle.sh not found beside this script ($QA_CYCLE_SH) — re-bundle the skill"
 
 # The run's own record first: a lock past the named step makes the prompt stale whatever else is on disk.
-canon() { (cd -P -- "$1" 2>/dev/null && pwd -P) || printf '%s' "$1"; }
+# The same normalisation advance-pipeline-lock.sh's canon() applies: strip a leading ./ and trailing slashes,
+# then resolve physically. A path that does not resolve prints itself.
+canon() {
+  local stripped
+  stripped=$(printf '%s' "$1" | sed -E 's#^\./##; s#/+$##')
+  (cd -P -- "$stripped" 2>/dev/null && pwd -P) || printf '%s' "$stripped"
+}
 if [ -f "$LOCK" ]; then
   jq -e 'type == "object"' "$LOCK" >/dev/null 2>&1 || cannot "the lock at '$LOCK' is not a JSON object"
   # A lock for ANOTHER document says nothing about this one (T276-QA-1): its step is that run's step.
   # A lock with no directory field (the pre-task.123 shape) is read as before.
   LOCK_DIR=$(jq -r '.task_or_story_directory // empty' "$LOCK")
+  # A RELATIVE lock directory that does not resolve from this cwd cannot be compared: reading it as another
+  # document's would let a step the run is past answer "proceed" (T276-QA-5). An absolute one that does not
+  # exist cannot be this document's directory, which exists, so it is another's.
+  case "$LOCK_DIR" in
+    ''|/*) ;;
+    *) (cd -P -- "$(printf '%s' "$LOCK_DIR" | sed -E 's#^\./##; s#/+$##')" 2>/dev/null) \
+         || cannot "the lock names the relative directory '$LOCK_DIR', which does not resolve from '$(pwd)' — run this from the repository root" ;;
+  esac
   if [ -n "$LOCK_DIR" ] && [ "$(canon "$LOCK_DIR")" != "$(canon "$DOC_DIR")" ]; then
     LOCK_IS_OURS=""
   else

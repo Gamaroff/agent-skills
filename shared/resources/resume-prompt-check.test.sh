@@ -92,6 +92,14 @@ check "a step-7 lock for ANOTHER document is ignored: the artefacts decide" 0 "p
 mkdir -p "$T/link-target"; ln -s "$D" "$T/link-to-d"
 printf '{"current_step":7,"task_or_story_directory":"%s"}\n' "$T/link-to-d" > "$T/lock7link.json"
 check "a lock naming this document through a symlink is still this document's" 1 "already complete: 5b 1" "$T/lock7link.json" "$D" 5b 1
+# A relative lock directory (T276-QA-5): `./x/` and `x` are the same place; from another cwd it cannot be
+# resolved, so the answer is "cannot tell", never "proceed".
+REL=$(mktemp -d "$T/rel.XXXXXX"); mkdir -p "$REL/docs/t"; mkdoc "$REL/docs/t" 1
+printf '{"current_step":7,"task_or_story_directory":"./docs/t/"}\n' > "$T/lock7rel.json"
+out=$(cd "$REL" && PIPELINE_LOCK="$T/lock7rel.json" bash "$SCRIPT" docs/t 5b 1 2>&1); rc=$?
+if [ "$rc" -eq 1 ] && [ "${out#already complete: 5b 1}" != "$out" ]; then pass "a ./relative/ lock directory matches the same document from the repository root"; else fail "relative lock directory from the repository root" "rc=$rc out='$out'"; fi
+out=$(cd / && PIPELINE_LOCK="$T/lock7rel.json" bash "$SCRIPT" "$REL/docs/t" 5b 1 2>&1); rc=$?
+if [ "$rc" -eq 3 ] && [ "${out#cannot tell}" != "$out" ]; then pass "a relative lock directory that does not resolve from this cwd: cannot tell"; else fail "relative lock directory from another cwd" "rc=$rc out='$out'"; fi
 printf 'not json' > "$T/lockbad.json"
 check "an unparseable lock: cannot tell, never a guess" 3 "cannot tell" "$T/lockbad.json" "$D" 5b 1
 

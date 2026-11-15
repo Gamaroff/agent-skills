@@ -318,12 +318,12 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-15
-**Quality Score**: 80/100
+**Quality Score**: 85/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.276.qa.1.halts-and-re-entries-leave-and-read-true-state.md](./task.276.qa.1.halts-and-re-entries-leave-and-read-true-state.md)
-- **Gate File**: [task.276.gate.1.halts-and-re-entries-leave-and-read-true-state.yml](./task.276.gate.1.halts-and-re-entries-leave-and-read-true-state.yml)
+- **Full Report**: [task.276.qa.2.halts-and-re-entries-leave-and-read-true-state.md](./task.276.qa.2.halts-and-re-entries-leave-and-read-true-state.md)
+- **Gate File**: [task.276.gate.2.halts-and-re-entries-leave-and-read-true-state.yml](./task.276.gate.2.halts-and-re-entries-leave-and-read-true-state.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 8504
@@ -332,7 +332,7 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 - **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Three medium findings: `resume-prompt-check.sh` reads a lock for another document, no CHANGELOG entry cites task 276, and the wall-time success criterion is unmeasured. One low finding: the step-5 row pattern fails under `LC_ALL=C`.
+Cycle-1 findings T276-QA-1, QA-2 and QA-4 are fixed. Open: the wall-time success criterion is unmeasured (medium, needs a decision), and the new lock-directory comparison misreads a relative lock directory from another cwd (low).
 
 <!-- change-log-start -->
 ## Change Log
@@ -345,6 +345,8 @@ Three medium findings: `resume-prompt-check.sh` reads a lock for another documen
 | 2026-11-15 |         | Status → ready-for-review (develop complete; remote CI-parity suite green) |             |
 | 2026-11-15 |         | QA gate CONCERNS (80/100) — 4 findings                               | qa-task     |
 | 2026-11-15 |         | QA findings fixed, iteration 1 — 3 of 4 closed; wall-time criterion left open | qa-fix      |
+| 2026-11-15 |         | QA gate CONCERNS (85/100) — 2 findings                               | qa-task     |
+| 2026-11-15 |         | QA findings fixed, iteration 2 — T276-QA-5 closed; wall-time criterion left open | qa-fix      |
 <!-- change-log-end -->
 
 ---
