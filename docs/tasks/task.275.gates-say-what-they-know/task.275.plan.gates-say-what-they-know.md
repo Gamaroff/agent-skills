@@ -18,7 +18,8 @@ Edit `shared/resources/stakeholder-summary.js`, its tests and the QA skills with
 ### Phase 1: The count slot
 
 - `stakeholder-summary.js:115` and `:125`: read `open_count` in the `qa-gate` and `qa-cycle` templates. Add a helper next to `GATE_MEANING` that, for `PASS` and a positive integer count, returns "The checks passed, with N minor points recorded below." (singular for 1); otherwise the existing sentence. Keep the no-slot rendering valid.
-- Call sites: `grep -n "qa-gate\|qa-cycle" skills/qa-task/SKILL.md skills/qa-story/SKILL.md` finds each `--slot` list; add `--slot open_count=$(…)` computed from the gate's `top_issues` length. Measure the count source with a command the plan names (for example `grep -c '^  - id:' <gate>` under `top_issues:`, or a small node read); do not type the number.
+- Call sites (the five in the task document § 3; re-derive them with `call-sites.js --engine tracker-comment.js` and `--engine stakeholder-summary-cli.js`): add `--slot open_count="$(helper <gate>)"`. The count is the **open** entries of the `top_issues:` block (status absent or `open`), from one helper under `shared/resources/`, not `grep -c '^  - id:'`, which counts closed entries too (it returns 2 on task 213's gate 2, whose two entries are closed). Capture the helper's output the way `BLOCKING_COUNT` does (`|| true`, then a default), so a `grep -c` that prints `0` and exits 1 cannot double the value.
+- Register `open_count` in `NUMERIC_SLOTS`; update `shared/resources/stakeholder-summary.md` (the PASS wording at `:149`, `:156`, `:170`).
 - Tests: extend `stakeholder-summary.test.mjs` per the task doc § 8; run `comment-slot-coverage.test.mjs`, which derives expectations from the templates.
 
 ### Phase 2: The remedy status
