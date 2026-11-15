@@ -5,10 +5,12 @@ type: task
 description: "Follow-up to task.309 (CR-1): the /finalise step 6c poll block reads CI_HEAD_2 and PR_NUMBER without binding them, so a fresh shell runs it on empty values; the block opens with a named-HALT guard and a test runs the shipped guard with each input unbound."
 tags: [finalise, ci, tests, pipeline]
 category: testing
-status: ready-for-review
+status: accepted
 priority: Low
 created: 2026-11-15
 updated: 2026-11-15
+completed_date: 2026-11-15
+pr_number: 910
 estimated_effort_hours: 2
 ---
 
@@ -309,16 +311,38 @@ None.
 ### Key Findings
 No critical issues identified. Two advisory items: other unguarded `PR_NUMBER` reads in `skills/finalise/SKILL.md`, and the open-PR case of `gh pr view ""` was not run.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.310.qa.1.finalise-6c-poll-block-guards-its-inputs.md`
+**Gate File**: `task.310.gate.1.finalise-6c-poll-block-guards-its-inputs.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100
+
+✅ **Success criteria:** 11/11 met, each with a code and test or tooling citation
+✅ **Tests:** 49 pass in `finalise-publish-boundary.test.mjs`; the guard test went red under mutation
+✅ **PR review:** `task.310.pr-review.1…md`, APPROVE, 0 open coverage
+✅ **Documentation:** CHANGELOG cites `(task 310)`
+⚠️ **Security / Compliance:** not applicable (a bound-variable guard in pipeline prose)
+✅ **CI:** reading 1 SUCCESS on `554bda3d758b`
+
+**Detailed Verification Log:** See `task.310.dod.1.finalise-6c-poll-block-guards-its-inputs.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-15
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
 | Date | Version | Description | Author |
-| ---- | ------- | ----------- | ------ |
+|------|---------|-------------|--------|
 | 2026-11-15 | 1.0 | Initial draft | create-task |
 | 2026-11-15 | 1.1 | Review passed (9/10) — recorded the measured `gh pr view ""` fallback in Current Problems; no critical or important findings | review-task |
 | 2026-11-15 |  | Status → ready-for-development | review-task |
 | 2026-11-15 | 1.2 | Implemented: 6c guard, behaviour test, order assertion, CHANGELOG; status → ready-for-review | develop-task |
 | 2026-11-15 |  | QA gate PASS (95/100) — 0 findings | qa-task |
+| 2026-11-15 | 1.3 | DoD passed — accepted (PR #910) | finalise |
 <!-- change-log-end -->
 
 ---

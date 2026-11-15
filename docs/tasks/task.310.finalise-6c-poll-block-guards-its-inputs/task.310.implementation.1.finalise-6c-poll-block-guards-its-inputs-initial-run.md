@@ -35,7 +35,7 @@ Guard the `/finalise` step 6c poll block's two inputs (`CI_HEAD_2`, `PR_NUMBER`)
 | 2. review-task             | ✅ Done | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               | READY TO IMPLEMENT 9/10, 0 critical, 0 important; promoted to ready-for-development | —                    | 2026-11-15T15:05Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline; remote `ci:fast` 8475 pass, 0 fail | —                    | 2026-11-15T15:40Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #910: https://github.com/Gamaroff/agent-skills/pull/910 (no tracker issue linked) | —                    | 2026-11-15T15:55Z |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 1 cycle: gate PASS 95, 5c APPROVE; fast-gate figure 8475 pass, 0 fail | —                    | 2026-11-15T16:05Z |
 | 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
@@ -79,7 +79,7 @@ _Track each QA review/fix cycle._
 **Issues Found**: none (two advisory future items: other unguarded `PR_NUMBER` reads; open-PR `gh pr view ""` case not run)
 **HIGH findings**: 0
 **MEDIUM findings**: 0
-**PR Review**: pending — 5c not yet run
+**PR Review**: APPROVE (task.310.pr-review.1; one low consistency note, registry row ticks at /finalise; 0 open coverage)
 **Loop exit**: n/a — this exit not taken
 **Action**: Proceeding to 5c (PR conformance review)
 
