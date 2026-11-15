@@ -160,7 +160,8 @@ The `{verdict}` slot never renders the raw token. It is mapped through a fixed t
 | `WAIVED`   | Some checks were deliberately skipped, and the reason is recorded below.                         |
 
 **`{open_count}` is the number of still-open entries in the gate's `top_issues:` block** (an entry
-whose `status:` is absent or `open`), counted by `gate-open-count.js` — never the block's length, which
+whose `status:` is absent or is anything but `resolved`, `fixed`, `closed`, `waived` or `deferred`),
+counted by `gate-open-count.js` — never the block's length, which
 includes closed entries, and never a grep over the file. Only a `PASS` reads it: a `PASS` gate can still
 carry open low-severity entries, and the bare sentence would tell a reader who cannot see the gate below
 the `---` that there is nothing to look at (obs #84). `1` reads "1 minor point". A count of `0` is

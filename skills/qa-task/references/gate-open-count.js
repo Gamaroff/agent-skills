@@ -13,10 +13,16 @@
  * block's end, so a `recommendations:` list below it is never counted.
  *
  * OPEN means the entry's own `status:` is absent, or is anything other than
- * `resolved`, `fixed`, `closed`, `waived` or `deferred` — the definition the
- * develop-next merge gate already uses for the same list. An unfamiliar status
+ * `resolved`, `fixed`, `closed`, `waived` or `deferred`. An unfamiliar status
  * word therefore counts as open: the lead this feeds must never claim "no
  * problems" because a word was not recognised.
+ *
+ * This is NOT the develop-next merge gate's definition, which it resembles. That
+ * gate counts only an absent or `open` status as open, treats `deferred` as
+ * closed only with a named owner, and exempts the entries of an active WAIVED
+ * gate. None of those is read here, because only a PASS lead reads this count
+ * and a PASS gate has no waiver; the one visible difference is an unfamiliar
+ * word, which this helper counts as open and that gate does not.
  *
  * It refuses rather than guesses. A gate with no `top_issues:` key, or a
  * non-empty flow-style list this scanner does not read, exits 1 with nothing on
