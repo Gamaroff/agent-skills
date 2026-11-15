@@ -195,6 +195,87 @@ test("an unknown verdict does not assert that nothing was wrong", () => {
   }
 });
 
+test("a PASS lead counts open minor points instead of saying there are no problems (task 275, obs #84)", () => {
+  for (const stage of ["qa-gate", "qa-cycle"]) {
+    for (const open_count of ["2", 2]) {
+      const lead = renderLead(stage, { verdict: "PASS", open_count });
+      assert.ok(
+        lead.includes("The checks passed, with 2 minor points recorded below."),
+        `${stage}: PASS with open_count ${JSON.stringify(open_count)} did not count them: ${lead}`,
+      );
+      assert.ok(
+        !lead.includes("no problems"),
+        `${stage}: a PASS with open points still said "no problems": ${lead}`,
+      );
+    }
+    assert.ok(
+      renderLead(stage, { verdict: "PASS", open_count: "1" }).includes(
+        "with 1 minor point recorded below.",
+      ),
+      `${stage}: one open point must read singular`,
+    );
+  }
+});
+
+test("a PASS lead keeps the bare sentence for a count of zero or no count (the no-slot rendering is unchanged)", () => {
+  // The numeric coercion drops 0, negatives, fractions and non-numbers, so each
+  // reads as "no count". That is why every shipped site must feed the slot:
+  // here the bare sentence is the contract, there it is a measured zero.
+  for (const stage of ["qa-gate", "qa-cycle"]) {
+    const bare = renderLead(stage, { verdict: "PASS" });
+    assert.ok(bare.includes(GATE_MEANING.PASS));
+    for (const open_count of [
+      "0",
+      0,
+      "-1",
+      "1.5",
+      "abc",
+      "",
+      null,
+      undefined,
+    ]) {
+      assert.equal(
+        renderLead(stage, { verdict: "PASS", open_count }),
+        bare,
+        `${stage}: open_count ${JSON.stringify(open_count)} changed the rendering`,
+      );
+    }
+  }
+});
+
+test("only a PASS reads the count: CONCERNS, FAIL, WAIVED and an unknown verdict render as before", () => {
+  // The control for the test above: the branch is keyed on PASS, so a count on
+  // any other verdict must leave the lead byte-identical, and an unknown verdict
+  // must still not read as reassurance or carry a number.
+  for (const stage of ["qa-gate", "qa-cycle"]) {
+    for (const verdict of ["CONCERNS", "FAIL", "WAIVED", "WAT", undefined]) {
+      assert.equal(
+        renderLead(stage, { verdict, open_count: "3" }),
+        renderLead(stage, { verdict }),
+        `${stage}: open_count changed the lead for verdict ${JSON.stringify(verdict)}`,
+      );
+    }
+  }
+  assert.ok(
+    !renderLead("qa-gate", { verdict: "WAT", open_count: "3" }).includes(
+      "3 minor",
+    ),
+  );
+});
+
+test("open_count is classified numeric and read by no other stage", () => {
+  assert.ok(NUMERIC_SLOTS.includes("open_count"));
+  for (const stage of LEAD_STAGES.filter(
+    (s) => s !== "qa-gate" && s !== "qa-cycle",
+  )) {
+    assert.equal(
+      renderLead(stage, { open_count: "3" }),
+      renderLead(stage, {}),
+      `${stage} must not read open_count`,
+    );
+  }
+});
+
 test("the catalogue is frozen and its stage list matches its keys", () => {
   assert.ok(Object.isFrozen(LEAD_TEMPLATES));
   assert.ok(Object.isFrozen(GATE_MEANING));

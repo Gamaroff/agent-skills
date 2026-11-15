@@ -2141,7 +2141,17 @@ recommendations:
   future: # Can be addressed later
     - action: 'Consider caching'
       refs: ['services/data.ts']
+      remedy: unverified # verified | unverified — see the note below the schema
+      # verified_by: '{the command or test that showed the remedy working}' # required when remedy: verified
 ````
+
+> **`remedy:` on a `recommendations.future` action says whether its fix was run** (task 275, obs #86).
+> `verified` means someone ran it and it worked, and `verified_by:` names the command or test that
+> showed it — a `verified` with no `verified_by:` reads as `unverified`. `unverified` (also what an
+> entry with no `remedy:` reads as) means the action is a claim: a task cut from this gate runs the
+> remedy before the plan builds on it (`create-task` § 3.5). Mark an action `verified` only when this
+> run executed it; never because it looks right. Task.224's CR-1 prescribed "drop the cache entry and
+> resolve once more", and on Node v26.8.2 that fix failed.
 
 > **`file:` is required on every `top_issues[]` entry**, and it must be a repo-relative path that
 > appears in the change set — not a description, not a module name, not `unknown`. The develop-story
@@ -2538,8 +2548,14 @@ QA_CYCLE=$(bash .agents/skills/qa-story/references/qa-cycle.sh "$STORY_DIR"); rc
 # it must not wear a refusal's clothes — that is how BUG-4 hid for a cycle.
 [ "$rc" -le 1 ] || { echo "⚠️  qa-cycle.sh not runnable (rc=$rc) — check the path" >&2; exit 1; }
 if [ -n "$QA_CYCLE" ]; then
+  # open_count: the gate's OPEN top_issues entries, so a PASS lead never says "no problems"
+  # beside open lows (task 275, obs #84). Read from the gate this cycle wrote, by the one
+  # helper the issue-comment arm below also calls — never a grep over the file, which counts
+  # closed entries too. A gate it cannot read stops here: no count must never render as zero.
+  THIS_GATE=$(bash .agents/skills/qa-story/references/qa-cycle.sh "$STORY_DIR" --path gate) || exit 1
+  OPEN_COUNT=$(node .agents/skills/qa-story/references/gate-open-count.js "$THIS_GATE") || exit 1
   LEAD=$(node .agents/skills/qa-story/references/stakeholder-summary-cli.js --stage "qa-gate-${QA_CYCLE}" \
-    --slot verdict="$GATE_DECISION") || exit 1
+    --slot verdict="$GATE_DECISION" --slot open_count="$OPEN_COUNT") || exit 1
   printf '%s\n\n---\n\n%s\n' "$LEAD" "$(cat "$BODY_FILE")" > "${BODY_FILE}.tmp" \
     && mv "${BODY_FILE}.tmp" "$BODY_FILE"
 else
@@ -2637,11 +2653,16 @@ if [ -n "$QA_ISSUE" ]; then
   BLOCKING_COUNT=${BLOCKING_COUNT:-0}
 
   if [ -n "$QA_CYCLE" ]; then
+    # open_count — the open top_issues entries, from the one helper (task 275). Unlike
+    # BLOCKING_COUNT above there is no `|| true` default: a gate the helper cannot read
+    # stops the post, because a defaulted 0 renders "no problems".
+    OPEN_COUNT=$(node .agents/skills/qa-story/references/gate-open-count.js "$THIS_GATE") || exit 1
     node .agents/skills/qa-story/references/tracker-comment.js \
       --issue "$QA_ISSUE" --body-file .claude/state/comment-body.md \
       --stage "qa-gate-${QA_CYCLE}" \
       --slot verdict="$GATE_DECISION" \
       --slot blocking_count="$BLOCKING_COUNT" \
+      --slot open_count="$OPEN_COUNT" \
       --json \
       || echo "⚠️  Tracker issue comment failed — continuing"
   else

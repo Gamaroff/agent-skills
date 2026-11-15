@@ -1,0 +1,66 @@
+schema: 2
+task: 'task.275.gates-say-what-they-know'
+task_title: 'Gates say what they know'
+gate: PASS
+status_reason: 'Count slot, helper, five call sites, feed guard and remedy schema all verified by execution and by mutation; one low point open: the wall-time criterion was bounded, not measured by its specified method.'
+reviewer: 'QA Engineer'
+head: '33c58de0c3e8d0775e766c2d04ea5d5567b1afef'
+updated: '2026-11-15T16:53:21Z'
+
+top_issues:
+  - id: 'T275-QA-1'
+    severity: low
+    file: 'docs/tasks/task.275.gates-say-what-they-know/task.275.gates-say-what-they-know.md'
+    finding: 'Performance criterion (five alternating CI=true npm test runs within 10% of develop) was not run as specified. Bounded instead: the added tests take 0.4 s (node --test, three files) against a 685 s ci:fast run, 0.06%, far inside 10%.'
+    suggested_action: 'Accept the bound, or run the five alternating runs on the LAN server if the criterion is to stand as written.'
+    suggested_owner: po
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 26
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: internal
+    boundary_signals: ['never']
+    boundary_reason: 'The criteria word "never" governs rendered lead text, not an input gate. gate-open-count.js reads only a gate file this pipeline writes and refuses an unreadable one; no corpus sink models a QA gate (boundary: internal).'
+    notes: 'No new input surface. The helper reads one local path argument and executes nothing.'
+  performance:
+    status: PASS
+    notes: 'Added tests 0.4 s; helper is one linear pass over a gate file.'
+  reliability:
+    status: PASS
+    notes: 'Unreadable or unrecognised gates exit 1 with no stdout, and the call sites stop on it; no path defaults a count to 0.'
+  maintainability:
+    status: PASS
+    notes: 'One definition of open (helper), one definition of which stages read the count (templates); the feed guard derives its stages from the templates.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Qa-planning also writes gates and may want the remedy field; the task scoped it out.'
+      refs: ['skills/qa-planning/SKILL.md']
+      remedy: unverified
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

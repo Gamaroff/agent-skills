@@ -6,6 +6,13 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **A PASS gate comment no longer says "found no problems" beside open minor points (task 275).**
+  The plain-language lead for `qa-gate` and `qa-cycle` takes an `open_count` slot, counted from the
+  gate's open `top_issues:` entries by the new `gate-open-count.js` (never a grep, which counts
+  closed entries), and reads "The checks passed, with N minor points recorded below." A test fails
+  on any shipped site that does not feed the count. Gate `recommendations.future` actions now carry
+  `remedy: verified | unverified` (with `verified_by:`), and `create-task` treats an unverified one
+  as a claim to run before the plan builds on it.
 - **`/finalise` 6c halts by name when `CI_HEAD_2` or `PR_NUMBER` is not bound (task 310).** The poll
   block opens with a `${VAR:?}` guard, so a fresh shell that carries neither value stops before the
   block compares, records or launches anything, and the message says which step binds it. A test runs
