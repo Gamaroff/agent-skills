@@ -216,6 +216,7 @@ recommendations:
       refs: ["api/auth/login.ts"]
   future: # Can be addressed later
     - action: "Consider caching"
+      remedy: unverified # verified | unverified — `verified` needs a `verified_by:` naming the command or test that showed the fix working; absent reads as unverified (task 275, obs #86)
       refs: ["services/data.ts"]
 
 # Optional: Audit trail
@@ -550,6 +551,7 @@ recommendations:
   future:
     - action: ""
       refs: []
+      remedy: unverified # verified | unverified; `verified` needs `verified_by:` (the command or test that showed it working)
 
 history:
   - at: "{ISO-8601 timestamp}"

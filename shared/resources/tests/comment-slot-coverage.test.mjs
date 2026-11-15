@@ -577,3 +577,80 @@ test("Guard C — a pull-request stage is never passed to the tracker engine", (
   );
   assert.deepEqual(offenders, [], offenders.join("\n"));
 });
+
+/**
+ * Guard D — a gate lead's count is FED, not merely accepted (task 275, obs #84).
+ *
+ * Guard B fails on a site that passes a slot its stage does not read. It cannot
+ * fail on a site that OMITS one, and omission is the defect here: a `qa-gate` or
+ * `qa-cycle` site that passes no `open_count` renders the bare "found no problems"
+ * sentence over a gate that may hold open lows. The stages are read off the
+ * templates (every stage whose template reads `open_count`), never listed here.
+ */
+function sitesMissingOpenCount(sites) {
+  const owners = new Set(
+    Object.keys(LEAD_TEMPLATES).filter((st) =>
+      slotsReadBy(st).has("open_count"),
+    ),
+  );
+  return sites
+    .filter((s) => s.stage && owners.has(baseStage(s.stage)))
+    .filter((s) => !s.slots.includes("open_count"))
+    .map(
+      (s) =>
+        `${s.file}:${s.line} — --stage ${s.stage} does not pass --slot open_count=; ` +
+        `the PASS lead would say "found no problems" without a measured zero.`,
+    );
+}
+
+test("Guard D — every shipped qa-gate / qa-cycle site feeds open_count", () => {
+  const missing = sitesMissingOpenCount([...SITES, ...PR_SITES]);
+  assert.deepEqual(
+    missing,
+    [],
+    `Gate-lead call sites that omit the count:\n${missing.join("\n")}\n\n` +
+      `Feed it from gate-open-count.js (a gate), or the cycle's declined ` +
+      `non-blocking count (the develop-bug verify loop, which has no gate file).`,
+  );
+});
+
+test("Guard D — non-vacuity: the walk reaches the sites the guard exists for, and the guard fires", () => {
+  const owners = Object.keys(LEAD_TEMPLATES).filter((st) =>
+    slotsReadBy(st).has("open_count"),
+  );
+  assert.deepEqual(
+    owners.sort(),
+    ["qa-cycle", "qa-gate"],
+    "exactly the two gate-lead templates read open_count",
+  );
+  const reached = [...SITES, ...PR_SITES].filter(
+    (s) => s.stage && owners.includes(baseStage(s.stage)),
+  );
+  // qa-task and qa-story each post a PR lead and an issue comment (4), plus
+  // develop-bug's verify loop (1). A floor below that means the collector lost one.
+  assert.ok(
+    reached.length >= 5,
+    `only ${reached.length} qa-gate / qa-cycle sites found — the walk lost some: ` +
+      reached.map((s) => `${s.file}:${s.line}`).join(", "),
+  );
+  // The control: a site shaped like the shipped ones but without the count must
+  // be flagged, and one with it must not.
+  const synthetic = (slots) => ({
+    file: "fixture.md",
+    line: 1,
+    stage: "qa-gate-2",
+    slots,
+  });
+  assert.equal(
+    sitesMissingOpenCount([synthetic(["verdict", "blocking_count"])]).length,
+    1,
+    "a qa-gate site without open_count must be flagged",
+  );
+  assert.equal(
+    sitesMissingOpenCount([
+      synthetic(["verdict", "blocking_count", "open_count"]),
+    ]).length,
+    0,
+    "a qa-gate site that feeds open_count must pass",
+  );
+});

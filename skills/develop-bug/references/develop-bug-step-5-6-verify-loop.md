@@ -97,13 +97,21 @@ node .agents/skills/develop-bug/references/tracker-comment.js \
   --stage qa-cycle-{N} \
   --slot verdict="{PASS / FAIL}" \
   --slot cycle="{N}" \
+  --slot open_count="{the cycle's Declined count from the entry above — 0 when none}" \
   --json
 ```
 
-> **`qa-cycle` reads `verdict` and `cycle`, and nothing else.** `verdict` is mapped by the engine
-> rather than printed — `PASS` and `FAIL` become plain sentences — so pass the raw token here. A
-> verdict the catalogue does not recognise renders "The results are recorded below" rather than
-> defaulting to reassurance, which is the safe direction for a bug's verification comment.
+> **`qa-cycle` reads `verdict`, `cycle` and `open_count`, and nothing else.** `verdict` is mapped by
+> the engine rather than printed — `PASS` and `FAIL` become plain sentences — so pass the raw token
+> here. A verdict the catalogue does not recognise renders "The results are recorded below" rather
+> than defaulting to reassurance, which is the safe direction for a bug's verification comment.
+>
+> **`open_count` is the number of non-blocking findings this cycle declined to fix** — the `Declined`
+> figure already on the cycle's report line, since a verify loop writes no gate file to count from
+> (task 275, obs #84). On a `PASS` with a positive count the lead says the checks passed with that
+> many minor points recorded below, instead of "found no problems"; on `FAIL`, or with 0, it renders
+> as before. Always pass it, including `0`: the site must feed the slot or the bare sentence is an
+> unmeasured claim.
 
 Non-blocking. Read `reason` per [`shared/resources/tracker-comment-contract.md`](tracker-comment-contract.md).
 

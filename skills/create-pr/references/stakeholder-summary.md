@@ -145,7 +145,7 @@ Slots: `{pr}`.
 
 ### `qa-gate`
 
-Slots: `{verdict}`, `{blocking_count}`.
+Slots: `{verdict}`, `{blocking_count}`, `{open_count}`.
 
 > The finished work has been through testing, and the results are in. The checks found no problems.
 > The detail below records what was tested and what was found.
@@ -154,10 +154,20 @@ The `{verdict}` slot never renders the raw token. It is mapped through a fixed t
 
 | Verdict    | Renders as                                                                                      |
 | :--------- | :---------------------------------------------------------------------------------------------- |
-| `PASS`     | The checks found no problems.                                                                   |
+| `PASS`     | The checks found no problems. — or, with `{open_count}` above 0: The checks passed, with N minor points recorded below. |
 | `CONCERNS` | The checks found some problems worth knowing about, but none that stop the work.                 |
 | `FAIL`     | The checks found problems serious enough that the work is not finished.                          |
 | `WAIVED`   | Some checks were deliberately skipped, and the reason is recorded below.                         |
+
+**`{open_count}` is the number of still-open entries in the gate's `top_issues:` block** (an entry
+whose `status:` is absent or `open`), counted by `gate-open-count.js` — never the block's length, which
+includes closed entries, and never a grep over the file. Only a `PASS` reads it: a `PASS` gate can still
+carry open low-severity entries, and the bare sentence would tell a reader who cannot see the gate below
+the `---` that there is nothing to look at (obs #84). `1` reads "1 minor point". A count of `0` is
+dropped by the numeric coercion and renders the bare sentence, so **every shipped `qa-gate` and
+`qa-cycle` call site passes it, including a measured `0`** — the bare sentence is a true statement only
+when the caller measured a zero, and `comment-slot-coverage.test.mjs` fails on a site that omits the
+slot.
 
 Posted by `qa-task` / `qa-story` Step 13b once per QA cycle, so the stage is cycle-scoped: a stage of
 the form `qa-gate-3` resolves to this template the same way `qa-cycle-3` does, and the suffix is what
@@ -166,7 +176,8 @@ keeps cycle 3's marker distinct from cycle 1's. Passed bare, every gate after th
 
 ### `qa-cycle`
 
-Slots: `{verdict}`, `{cycle}`.
+Slots: `{verdict}`, `{cycle}`, `{open_count}` (read exactly as under `qa-gate`; `develop-bug`'s verify
+loop, the one `qa-cycle` site, has no gate file and passes the cycle's declined non-blocking count).
 
 > The work has been through another round of testing. The checks found no problems. If anything needs
 > fixing it will be fixed and tested again before this item is finished.

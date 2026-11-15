@@ -49,6 +49,30 @@ function verdictSentence(verdict) {
 }
 
 /**
+ * The sentence a gate lead opens with. A PASS verdict says "no problems" only
+ * while nothing is left open: a PASS gate may still carry open low-severity
+ * entries, and the reader of this paragraph cannot see the gate below the `---`
+ * (obs #84, task 275). So a positive `open_count` replaces the bare sentence
+ * with one that counts them. A count of 0 or no count at all renders the bare
+ * sentence, which is why every shipped qa-gate / qa-cycle call site must feed
+ * the slot (held by comment-slot-coverage.test.mjs): the bare sentence is only
+ * a true statement when the caller measured a zero.
+ *
+ * Only PASS reads the count. A CONCERNS, FAIL or WAIVED lead already says
+ * there is something to read below, and a count would add a number to a
+ * sentence that makes no claim of its own about how many.
+ */
+function gateSentence(verdict, openCount) {
+  const key = typeof verdict === "string" ? verdict.trim().toUpperCase() : "";
+  if (key === "PASS" && openCount) {
+    return `The checks passed, with ${openCount} minor ${
+      openCount === 1 ? "point" : "points"
+    } recorded below.`;
+  }
+  return verdictSentence(verdict);
+}
+
+/**
  * Every template must return a complete, grammatical paragraph when called with `{}`.
  * That is the path that ships first — this task supplies no slots at any call site —
  * and a template that only reads well when fully populated would go live in its worst
@@ -115,7 +139,7 @@ const LEAD_TEMPLATES = Object.freeze({
 
   "qa-gate": (s) =>
     `The finished work has been through testing, and the results are in. ` +
-    `${verdictSentence(s.verdict)} ` +
+    `${gateSentence(s.verdict, s.open_count)} ` +
     `${
       s.blocking_count
         ? `${s.blocking_count} of them must be dealt with before this item can be finished. `
@@ -125,7 +149,7 @@ const LEAD_TEMPLATES = Object.freeze({
 
   "qa-cycle": (s) =>
     `The work has been through another round of testing${s.cycle ? ` (round ${s.cycle})` : ""}. ` +
-    `${verdictSentence(s.verdict)} ` +
+    `${gateSentence(s.verdict, s.open_count)} ` +
     `If anything needs fixing it will be fixed and tested again before this item is finished.`,
 
   "qa-fix": (s) =>
@@ -205,6 +229,7 @@ const BOOLEAN_SLOTS = Object.freeze(["blocking"]);
 const NUMERIC_SLOTS = Object.freeze([
   "count",
   "blocking_count",
+  "open_count",
   "cycle",
   "degraded",
 ]);
