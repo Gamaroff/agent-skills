@@ -138,7 +138,7 @@ block reads `CI_HEAD_2` and `PR_NUMBER` without binding them), and the owner ask
 It edits the block task 309 just changed, so it carries `deps: T309` (merged). **Tick the row `[x]`
 when T310 is accepted, and archive the phase at close.**
 
-- [ ] **T310** The finalise 6c poll block guards its inputs · deps: T309 · touches: finalise~, test-harness~, bundles~ · /develop-task docs/tasks/task.310.finalise-6c-poll-block-guards-its-inputs/task.310.finalise-6c-poll-block-guards-its-inputs.md
+- [x] **T310** The finalise 6c poll block guards its inputs · deps: T309 · touches: finalise~, test-harness~, bundles~ · /develop-task docs/tasks/task.310.finalise-6c-poll-block-guards-its-inputs/task.310.finalise-6c-poll-block-guards-its-inputs.md
 
 ## Deferred / human-gated
 
@@ -321,3 +321,4 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-11-13 | **T306 accepted + merged — PR #900** (`4cbfcf98`); row ticked. Each (case, shell) run of the `/finalise` security probe now gets its own `HOME` and `TMPDIR` (`shell:`, `shell-fn:`, `shell-argv:`, `fence:` arms), so a legitimate case on a state-changing control is no longer read as a defect; a hostile run's write under its own home is still an escape. The task.296 plan with legitimate `take` entries reads 32 executed, 0 reproduced, 0 escaped. QA gates PASS 95 twice, PR review APPROVE. The wall-time criterion was amended by the owner to a paired-ratio bound (measured 1.07). |
 | 2026-11-14 | **T307 accepted + merged — PR #902** (`b57bf050`); row ticked. The instrument-read guard now masks a single quote glued to a word or closing quote when a partner quote follows, and treats `&>`, `&>>`, `1>` and `1>>` as redirects; a status captured in `$( … )` stays flagged by choice and is named in the header, as is two apostrophes on one line pairing up. Four mutation proofs, each red on a named fixture; QA gate PASS 95, PR review APPROVE; remote `ci` gate 8469 pass, 0 fail. |
 | 2026-11-15 | **T310 added** as Phase 23 (task 310, filed from the task 309 5c review, finding CR-1): the `/finalise` 6c poll block reads `CI_HEAD_2` and `PR_NUMBER` without binding them. Low priority, `deps: T309` (merged), touches `skills/finalise/SKILL.md` and `finalise-publish-boundary.test.mjs`. |
+| 2026-11-15 | **T310 accepted + merged — PR #910** (`9658a797`); row ticked. The first `/finalise` 6c poll block now halts by name when `CI_HEAD_2` or `PR_NUMBER` is unbound, and a behaviour test runs the shipped guard line with each input unbound. Mutation proof: weakening the guard turned two tests red. QA gate PASS 95, PR review APPROVE; remote `ci` gate green. |
