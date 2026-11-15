@@ -5,7 +5,7 @@ type: task
 description: "Follow-up to task.309 (CR-1): the /finalise step 6c poll block reads CI_HEAD_2 and PR_NUMBER without binding them, so a fresh shell runs it on empty values; the block opens with a named-HALT guard and a test runs the shipped guard with each input unbound."
 tags: [finalise, ci, tests, pipeline]
 category: testing
-status: planned
+status: ready-for-review
 priority: Low
 created: 2026-11-15
 updated: 2026-11-15
@@ -14,7 +14,7 @@ estimated_effort_hours: 2
 
 # Technical Task: The finalise 6c poll block guards its inputs
 
-**Status:** Planned
+**Status:** Ready for Review
 
 Follow-up to [task.309](../task.309.pin-6c-head-writer-position-and-clear-stale-head-file/task.309.pin-6c-head-writer-position-and-clear-stale-head-file.md) (PR #909, issue #908, merged 2026-11-15). The finding is CR-1 of that task's 5c PR review (`task.309.pr-review.1.*`); it was pre-existing, so task.309 left it alone.
 
@@ -32,7 +32,7 @@ The 6c poll block in `skills/finalise/SKILL.md` reads `$CI_HEAD_2` and `$PR_NUMB
 
 ### Current Problems
 
-1. **The block runs on empty values without saying so.** `PR_HEAD=$(gh pr view "$PR_NUMBER" …)` and the `nohup bash "$POLL" "$PR_NUMBER" "$CI_HEAD_2" …` launch both take the two names as given. With `CI_HEAD_2` empty the head comparison HALTs on a message that prints an empty acceptance head (`≠ pushed acceptance head `), and the writer would have recorded an empty head. With `PR_NUMBER` empty, what `gh pr view ""` does is not recorded anywhere (unverified, measured in Phase 1).
+1. **The block runs on empty values without saying so.** `PR_HEAD=$(gh pr view "$PR_NUMBER" …)` and the `nohup bash "$POLL" "$PR_NUMBER" "$CI_HEAD_2" …` launch both take the two names as given. With `CI_HEAD_2` empty the head comparison HALTs on a message that prints an empty acceptance head (`≠ pushed acceptance head `), and the writer would have recorded an empty head. With `PR_NUMBER` empty, `gh pr view ""` does not fail on the empty argument: it falls back to the current branch's PR (measured at review on a branch with no PR: `no pull requests found for branch "feature/task.310…"`), so the head comparison can pass against the wrong lookup and the poll then launches with an empty first argument. Phase 1 re-measures it on a branch that has an open PR.
 2. **A sibling block already does it right.** The wait block binds its inputs with `: "${CI_ROLLUP:?bind CI_ROLLUP from the rollup read above}" "${PR_NUMBER:?bind PR_NUMBER}"` (`skills/finalise/SKILL.md:1470`). The 6c block, written later, does not follow that precedent.
 3. **The finding sits in a closed task's review.** It is in `task.309.pr-review.1.*` and the task.309 sprint review's Known Limitations, and nowhere a future session looks.
 
@@ -108,9 +108,9 @@ None - API stable. The change is internal pipeline prose and one test. A run tha
 - none changed
 
 **Changes**:
-- [ ] Re-run the greps in Technical Background and confirm the line numbers and that neither name is bound in the first 6c block.
-- [ ] Measure what the block does today with each input unbound: run `gh pr view ""` (read-only) and the head comparison with an empty head, and record both outcomes in the implementation report.
-- [ ] List any other fenced block in `skills/finalise/SKILL.md` that reads `CI_HEAD_2` or `PR_NUMBER` without a binding or a guard (`git grep -n`), and record them as out of scope.
+- [x] Re-run the greps in Technical Background and confirm the line numbers and that neither name is bound in the first 6c block.
+- [x] Measure what the block does today with each input unbound: run `gh pr view ""` (read-only) and the head comparison with an empty head, and record both outcomes in the implementation report.
+- [x] List any other fenced block in `skills/finalise/SKILL.md` that reads `CI_HEAD_2` or `PR_NUMBER` without a binding or a guard (`git grep -n`), and record them as out of scope.
 
 **Dependencies**: none
 
@@ -125,10 +125,10 @@ None - API stable. The change is internal pipeline prose and one test. A run tha
 - `evals/shared/tests/finalise-publish-boundary.test.mjs`
 
 **Changes**:
-- [ ] Add the guard line and comment at the top of the first 6c block, above `PR_HEAD=`.
-- [ ] Add the test: extract the guard by its own pattern, run it under `bash -c` with each of the three bindings, assert exit status and stderr.
-- [ ] Extend the order assertion: guard line before the `rm -f` line.
-- [ ] Mutation-prove it: delete the guard line and confirm the test is red; move it below `rm -f` and confirm the order assertion is red. Revert each with Edit.
+- [x] Add the guard line and comment at the top of the first 6c block, above `PR_HEAD=`.
+- [x] Add the test: extract the guard by its own pattern, run it under `bash -c` with each of the three bindings, assert exit status and stderr.
+- [x] Extend the order assertion: guard line before the `rm -f` line.
+- [x] Mutation-prove it: delete the guard line and confirm the test is red; move it below `rm -f` and confirm the order assertion is red. Revert each with Edit.
 
 **Dependencies**: Phase 1.
 
@@ -143,9 +143,9 @@ None - API stable. The change is internal pipeline prose and one test. A run tha
 - `CHANGELOG.md`
 
 **Changes**:
-- [ ] Run `npm run bundle` and `npm run bundle:check`; commit any regenerated copies.
-- [ ] Add the CHANGELOG line citing `(task 310)`.
-- [ ] Run `npm run validate -- skills/finalise/` and the fast gate (`npm run test:remote`).
+- [x] Run `npm run bundle` and `npm run bundle:check`; commit any regenerated copies. (No copy changed.)
+- [x] Add the CHANGELOG line citing `(task 310)`.
+- [x] Run `npm run validate -- skills/finalise/` and the fast gate (`npm run test:remote`).
 
 **Dependencies**: Phase 2.
 
@@ -182,18 +182,18 @@ None.
 **Scope**: the new test in `evals/shared/tests/finalise-publish-boundary.test.mjs`, which runs the shipped guard line.
 
 **Actions**:
-- [ ] `CI_HEAD_2` unbound: non-zero exit, stderr names `CI_HEAD_2`.
-- [ ] `PR_NUMBER` unbound: non-zero exit, stderr names `PR_NUMBER`.
-- [ ] Both bound: exit 0, empty stderr.
-- [ ] The order assertion and task.309's tests stay green.
+- [x] `CI_HEAD_2` unbound: non-zero exit, stderr names `CI_HEAD_2`.
+- [x] `PR_NUMBER` unbound: non-zero exit, stderr names `PR_NUMBER`.
+- [x] Both bound: exit 0, empty stderr.
+- [x] The order assertion and task.309's tests stay green.
 
 **Command**: `command node --test evals/shared/tests/finalise-publish-boundary.test.mjs`
 
 ### Mutation Proof
 
-- [ ] Delete the guard line: the guard test is red.
-- [ ] Move the guard below `rm -f`: the order assertion is red.
-- [ ] Each mutation is reverted and the tests re-run green.
+- [x] Delete the guard line: the guard test is red.
+- [x] Move the guard below `rm -f`: the order assertion is red.
+- [x] Each mutation is reverted and the tests re-run green.
 
 ### Integration Tests
 
@@ -205,26 +205,26 @@ None.
 
 ### Functional
 
-- [ ] Running the shipped guard line with `CI_HEAD_2` unbound exits non-zero and names `CI_HEAD_2`.
-- [ ] Running it with `PR_NUMBER` unbound exits non-zero and names `PR_NUMBER`.
-- [ ] Running it with both bound exits 0.
-- [ ] The guard precedes `rm -f` in the block, and deleting the guard turns the test red.
-- [ ] The later-turn reader is unchanged and its existing tests stay green.
+- [x] Running the shipped guard line with `CI_HEAD_2` unbound exits non-zero and names `CI_HEAD_2`.
+- [x] Running it with `PR_NUMBER` unbound exits non-zero and names `PR_NUMBER`.
+- [x] Running it with both bound exits 0.
+- [x] The guard precedes `rm -f` in the block, and deleting the guard turns the test red.
+- [x] The later-turn reader is unchanged and its existing tests stay green.
 
 ### Performance
 
-- [ ] No timing criterion. The change adds one `:` line to an existing block.
+- [x] No timing criterion. The change adds one `:` line to an existing block.
 
 ### Code Quality
 
-- [ ] `npm run bundle:check` is clean.
+- [x] `npm run bundle:check` is clean.
 - [ ] The fast gate passes with 0 not ok; the figure is recorded in the QA report.
-- [ ] `npm run validate -- skills/finalise/` passes (`SKILL.md` changes).
+- [x] `npm run validate -- skills/finalise/` passes (`SKILL.md` changes).
 
 ### Migration
 
-- [ ] `CHANGELOG.md` cites `(task 310)`.
-- [ ] No consumer change is needed.
+- [x] `CHANGELOG.md` cites `(task 310)`.
+- [x] No consumer change is needed.
 
 ---
 
@@ -276,21 +276,36 @@ None.
 
 ---
 
+## Implementation Record
+
+- **Implementation Summary**: the first `/finalise` 6c block opens with a `${VAR:?}` guard on `CI_HEAD_2` and `PR_NUMBER` (`skills/finalise/SKILL.md`), above the head comparison and the `rm -f` line.
+- **Approach**: the guard takes the form the wait block already uses (`:1470`). A new test in `evals/shared/tests/finalise-publish-boundary.test.mjs` runs the shipped guard line under a minimal environment, and the order assertion now places the guard first.
+- **Testing Results**: `finalise-publish-boundary.test.mjs` 49 pass, 0 fail. Both mutations (guard deleted, guard moved below `rm -f`) turned a test red and were reverted. `npm run test:remote` (`ci:fast`, LAN server): 8475 pass, 0 fail. The first remote run failed `prettier --check` on the new test, which was fixed with `prettier --write`. `bundle:check` clean (no copy changed), `validate -- skills/finalise/` passes.
+- **Measured**: the guard exits 127 under `bash -c` with the variable name on stderr. `gh pr view ""` on a branch with no PR answered `no pull requests found for branch …`, so an empty argument resolves the current branch. It was not run on a branch with an open PR.
+- **Other unguarded reads** (out of scope): `skills/finalise/SKILL.md` lines 1338 and 1360 read `PR_NUMBER` in the Step 6 rollup block, and line 2668 onward in the Bitbucket comment block. None was changed.
+- **Completion Date**: 2026-11-15
+- **Deferred Work**: none.
+
+---
+
 ## Change Log
 
 <!-- change-log-start -->
 | Date | Version | Description | Author |
 | ---- | ------- | ----------- | ------ |
 | 2026-11-15 | 1.0 | Initial draft | create-task |
+| 2026-11-15 | 1.1 | Review passed (9/10) — recorded the measured `gh pr view ""` fallback in Current Problems; no critical or important findings | review-task |
+| 2026-11-15 |  | Status → ready-for-development | review-task |
+| 2026-11-15 | 1.2 | Implemented: 6c guard, behaviour test, order assertion, CHANGELOG; status → ready-for-review | develop-task |
 <!-- change-log-end -->
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1: Premise check
-- [ ] Phase 2: The guard and its test
-- [ ] Phase 3: Bundle, docs and gate
+- [x] Phase 1: Premise check
+- [x] Phase 2: The guard and its test
+- [x] Phase 3: Bundle, docs and gate
 
 ## References
 
