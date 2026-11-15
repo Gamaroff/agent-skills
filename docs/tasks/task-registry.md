@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-11-14
-**Next Available Task Number:** **309**
+**Next Available Task Number:** **310**
 
 ## How to use
 
@@ -423,3 +423,4 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 306 | [Probe sandbox HOME shared across cases](task.306.probe-sandbox-home-shared-across-cases/task.306.probe-sandbox-home-shared-across-cases.md) | accepted | testing | Low | 2026-11-12 | — | task 296 finding: the `/finalise` probe shares one `HOME` across cases and shells, so a legitimate case on a state-changing control reads as refused and escaped; one `HOME` per (case, shell) |
 | 307 | [Instrument-read guard quote and redirect edges](task.307.instrument-read-guard-quote-and-redirect-edges/task.307.instrument-read-guard-quote-and-redirect-edges.md) | accepted | testing | Low | 2026-11-13 | — | follow-up to task 299 (T299-QA-7, CR-2): the guard misses a quote glued to a word and flags `&>` / `1>` redirects |
 | 308 | [Pause commits cancel the step 7 CI poll](task.308.pause-commits-cancel-the-step-7-ci-poll/task.308.pause-commits-cancel-the-step-7-ci-poll.md) | accepted | refactoring | Medium | 2026-11-14 | — | follow-up to task 303: the PreCompact hook still pushes its pause commit at step 7, which cancels the CI run finalise is polling (tinker-city bug.144, PR #1257) · three phases |
+| 309 | [Pin the 6c head writer position and clear the stale head file](task.309.pin-6c-head-writer-position-and-clear-stale-head-file/task.309.pin-6c-head-writer-position-and-clear-stale-head-file.md) | planned | testing | Low | 2026-11-15 | — | task 308 advisory follow-up: a test pins the 6c head writer before the poll launch, and 6c clears the head file beside the result and pid files · three phases |
