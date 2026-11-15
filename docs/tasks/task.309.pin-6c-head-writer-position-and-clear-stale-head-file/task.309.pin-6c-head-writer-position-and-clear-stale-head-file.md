@@ -5,17 +5,19 @@ type: task
 description: "Follow-up to task.308: a test pins where the 6c recorded-head writer sits relative to the poll launch, and 6c clears the head file beside the result and pid files so a later turn cannot read a previous run's head."
 tags: [finalise, ci, tests, pipeline]
 category: testing
-status: ready-for-review
+status: accepted
 priority: Low
 created: 2026-11-15
 updated: 2026-11-15
+completed_date: 2026-11-15
 estimated_effort_hours: 2
 github_issue: 908
+pr_number: 909
 ---
 
 # Technical Task: Pin the 6c head writer position and clear the stale head file
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **GitHub Issue**: [#908](https://github.com/Gamaroff/agent-skills/issues/908)
 
@@ -290,6 +292,24 @@ None.
 ### Key Findings
 No blocking issues. Both mutations (writer below the launch; head file dropped from the `rm`) turn a committed test red. Two advisory items: a pre-existing unbound-variable shape in the 6c block (CR-1, routed to future work) and a redundant half in the clear test (CR-2).
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report**: `task.309.qa.1.pin-6c-head-writer-position-and-clear-stale-head-file.md`
+**Gate File**: `task.309.gate.1.pin-6c-head-writer-position-and-clear-stale-head-file.yml`
+**Gate Status**: ✅ PASS — 100/100
+
+✅ **Acceptance Criteria:** 9/9 met, each with a code and a per-PR test citation (or its measured/documentation record)
+✅ **Tests & PR:** PR #909; `finalise-publish-boundary.test.mjs` 48 pass; fast gate 8477 tests, 0 fail; 5c PR review CONCERNS with no open coverage finding
+✅ **Documentation:** CHANGELOG cites `(task 309)`; `develop-pipeline-hooks.md` and three bundled copies regenerated
+✅ **Security Review:** ✅ PASS — `boundary: false`, no probe fired
+⚠️ **Compliance Review:** NOT_APPLICABLE — no user data, payments, UI or health data
+✅ **CI reading 1:** SUCCESS @ `9e73cf9e67d8`
+
+**Detailed Verification Log:** See `task.309.dod.1.pin-6c-head-writer-position-and-clear-stale-head-file.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-15
 <!-- change-log-start -->
 ## Change Log
 
@@ -300,6 +320,7 @@ No blocking issues. Both mutations (writer below the launch; head file dropped f
 |  |  | Status → ready-for-development | review-task |
 | 2026-11-15 | 1.2 | Implemented: order assertion + stale-head clear in 6c, both mutation-proved; hooks doc clause, CHANGELOG; status → ready-for-review | develop |
 | 2026-11-15 |  | QA gate PASS (100/100) — 0 findings in the gate, 2 advisory | qa-task |
+| 2026-11-15 | 1.3 | DoD passed — accepted (PR #909) | finalise |
 <!-- change-log-end -->
 
 ---

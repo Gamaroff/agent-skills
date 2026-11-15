@@ -1,0 +1,128 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "9e73cf9e67d8385f4611829dcbd40f21d3a5b676",
+  "dirty_paths": [
+    "docs/tasks/task.309.pin-6c-head-writer-position-and-clear-stale-head-file/task.309.implementation.1.pin-6c-head-writer-position-and-clear-stale-head-file-initial-run.md",
+    "docs/tasks/task.309.pin-6c-head-writer-position-and-clear-stale-head-file/task.309.pr-review.1.pin-6c-head-writer-position-and-clear-stale-head-file.md"
+  ],
+  "document": "docs/tasks/task.309.pin-6c-head-writer-position-and-clear-stale-head-file/task.309.pin-6c-head-writer-position-and-clear-stale-head-file.md",
+  "result": {
+    "bytes": 5764,
+    "sha256": "74d772239fa57140297172fc4c4077a3ca622716ba028bb2b7ea41cbe1e644ef",
+    "verified": true
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 9,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "7930819f36fe89c1db59d088449fefe6fbda9ab86dfd1f6d184bdbb7dbeb24f0",
+      "status": "PASS",
+      "description": "Writer line moved below the poll launch turns the order test red",
+      "code_citation": "skills/finalise/SKILL.md:2277",
+      "test_citation": "evals/shared/tests/finalise-publish-boundary.test.mjs:637",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Test asserts rmAt < writeAt < launchAt on codeLines(sixC). Task doc Phase 1 records the mutation proof (red: must clear (line 11), then record the head (line 15), then launch the poll (line 12)). The file is under evals/shared/tests, which .github/workflows/test.yml runs per-PR via npm test."
+    },
+    {
+      "id": "#2",
+      "text_hash": "29259145df146b61f9246d8416ad1de3e4b7c17b2368a20d0da1a3c71783c973",
+      "status": "PASS",
+      "description": "Stale finalise-ci-head-2.txt is gone after the shipped rm line",
+      "code_citation": "skills/finalise/SKILL.md:2269",
+      "test_citation": "evals/shared/tests/finalise-publish-boundary.test.mjs:687",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Test extracts the shipped rm line, runs it over a scratch state dir holding a stale head file, and asserts the file is gone (existsSync false). It then runs the clear followed by the writer and asserts the new head. Phase 2 records the mutation proof (1 fail, 47 pass, then reverted)."
+    },
+    {
+      "id": "#3",
+      "text_hash": "09b76a3136b21a99129babb548dbb0c39adb3d1485db6279d965ced7d4e38811",
+      "status": "PASS",
+      "description": "Later-turn reader unchanged; its three existing tests stay green",
+      "code_citation": "skills/finalise/SKILL.md:2300",
+      "test_citation": "evals/shared/tests/finalise-publish-boundary.test.mjs:596",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The SKILL.md diff touches only the rm line and a comment at 2269-2272. The reader (:2300) and HALT (:2302) are unchanged. The reader tests at :505, :596 and :607 are untouched in the diff. QA report records finalise-publish-boundary.test.mjs at 48 pass, 0 fail."
+    },
+    {
+      "id": "#4",
+      "text_hash": "539acf0d524e01d480f49c13cbdd0609aa6133ac4fce9ce25e0945898d54f142",
+      "status": "PASS",
+      "description": "No timing criterion; change adds one path to an existing rm -f",
+      "code_citation": "skills/finalise/SKILL.md:2269",
+      "test_citation": "evals/shared/tests/finalise-publish-boundary.test.mjs:687",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The diff changes the one rm -f line by adding one path. It adds no timing bound and no new command or loop."
+    },
+    {
+      "id": "#5",
+      "text_hash": "f9146bd74a939fa2c7ca823c6fc33c4869b92300f6c7f791f37064edf7c12e64",
+      "status": "PASS",
+      "description": "npm run bundle:check is clean",
+      "code_citation": "docs/tasks/task.309.pin-6c-head-writer-position-and-clear-stale-head-file/task.309.qa.1.pin-6c-head-writer-position-and-clear-stale-head-file.md:91",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The committed QA report records `npm run bundle:check` as 129 skills, 0 problems; command at :177. The bound is clean/0 problems. The three develop-* hooks-doc copies are in the diff."
+    },
+    {
+      "id": "#6",
+      "text_hash": "3b833f7301300d97da412a72a4e0c07d990ecafb48670e84cb97b754f0401939",
+      "status": "PASS",
+      "description": "Fast gate passes with 0 not ok; figure recorded in QA report",
+      "code_citation": "docs/tasks/task.309.pin-6c-head-writer-position-and-clear-stale-head-file/task.309.qa.1.pin-6c-head-writer-position-and-clear-stale-head-file.md:83",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "QA report line 83 records `npm run test:remote`: 8477 tests, 8474 pass, 0 fail, 3 skipped. The bound is 0 not ok and the command is named. It is a count, not a wall-clock bound."
+    },
+    {
+      "id": "#7",
+      "text_hash": "6d4d1a948b9e7942ccbd4f5844eb55e09ec4db6a0cd249ead15eaec7554a5d5f",
+      "status": "PASS",
+      "description": "npm run validate -- skills/finalise/ passes",
+      "code_citation": "docs/tasks/task.309.pin-6c-head-writer-position-and-clear-stale-head-file/task.309.qa.1.pin-6c-head-writer-position-and-clear-stale-head-file.md:92",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "QA report line 92 records the command and a pass result, and :176 lists it. The bound is pass/fail. validate.yml also runs per-PR."
+    },
+    {
+      "id": "#8",
+      "text_hash": "3d42c94f43f8931be0df555482626cb8872096de706577a4a890c42b2196c24d",
+      "status": "PASS",
+      "description": "CHANGELOG.md cites (task 309)",
+      "code_citation": "CHANGELOG.md:10",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "I read the line. Under [Unreleased] / Fixed it says 6c clears the previous run's head file and a test pins the order, and it ends '(task 309).'"
+    },
+    {
+      "id": "#9",
+      "text_hash": "a660b927a591939033939388ddeecc4489c3db7fa9008bfde61a5c9caf550228",
+      "status": "PASS",
+      "description": "No consumer change is needed",
+      "code_citation": "skills/finalise/SKILL.md:2300",
+      "test_citation": "evals/shared/tests/finalise-publish-boundary.test.mjs:607",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The diff touches no reader or poll script (shared/resources/finalise-ci-poll.sh is absent from the diff). The only consumer files that changed are the regenerated develop-* hooks-doc copies, which bundle:check covers. The no-recorded-head HALT test at :607 stays green."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#1",
+      "note": "criteria-drift.js exited 0 with reason 'clean' against review commit 8679ee21, so no unapproved amendment. The working tree has uncommitted edits to the implementation report and PR-review report only; neither affects the evidence cited above."
+    }
+  ]
+}
