@@ -213,7 +213,7 @@ None.
 ### Code Quality
 
 - [x] `npm run bundle:check` is clean.
-- [ ] The fast gate passes with 0 not ok; the figure is recorded in the QA report.
+- [x] The fast gate passes with 0 not ok; the figure is recorded in the QA report.
 - [x] `npm run validate -- skills/finalise/` passes (`SKILL.md` changes).
 
 ### Migration
@@ -269,6 +269,27 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-15
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.309.qa.1.pin-6c-head-writer-position-and-clear-stale-head-file.md](./task.309.qa.1.pin-6c-head-writer-position-and-clear-stale-head-file.md)
+- **Gate File**: [task.309.gate.1.pin-6c-head-writer-position-and-clear-stale-head-file.yml](./task.309.gate.1.pin-6c-head-writer-position-and-clear-stale-head-file.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 48 (finalise-publish-boundary); fast gate 8477 at the develop step
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No blocking issues. Both mutations (writer below the launch; head file dropped from the `rm`) turn a committed test red. Two advisory items: a pre-existing unbound-variable shape in the 6c block (CR-1, routed to future work) and a redundant half in the clear test (CR-2).
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -278,6 +299,7 @@ None.
 | 2026-11-15 | 1.1 | Review passed (9/10) — two Optional plan clarifications applied (mutation proof on the working file; hooks doc line added to Phase 3) | review-task |
 |  |  | Status → ready-for-development | review-task |
 | 2026-11-15 | 1.2 | Implemented: order assertion + stale-head clear in 6c, both mutation-proved; hooks doc clause, CHANGELOG; status → ready-for-review | develop |
+| 2026-11-15 |  | QA gate PASS (100/100) — 0 findings in the gate, 2 advisory | qa-task |
 <!-- change-log-end -->
 
 ---
