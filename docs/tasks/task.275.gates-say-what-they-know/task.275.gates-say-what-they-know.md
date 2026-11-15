@@ -5,16 +5,18 @@ type: task
 description: "Make a PASS gate's plain-language lead count its open minor points instead of saying no problems, and mark each recommendation's remedy as verified or unverified, so a reader is not told something the gate does not support."
 tags: [qa-task, qa-story, create-task, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-15
+completed_date: 2026-11-15
+pr_number: 911
 estimated_effort_hours: 4
 ---
 
 # Task 275: Gates say what they know
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.275.review.1.gates-say-what-they-know.md` implemented 2026-11-15
 
 ---
@@ -191,7 +193,7 @@ None - the new slot and field are optional; a gate without `remedy:` reads as `u
 
 ### Performance
 
-- [ ] `CI=true command npm test` wall time is within 10% of `develop`, as the median of five alternating runs with `uptime` beside each, recorded in the QA report.
+- [x] The added test time is a negligible share of the suite: about 0.4 s of added tests against a 685 s `ci:fast`, and five alternating develop/branch pairs of the touched test files show a median difference of +31 ms, recorded in the QA report (`task.275.qa.2.gates-say-what-they-know.md`, Re-Review Context). Amended from "median of five alternating full `CI=true npm test` runs within 10% of `develop`" — approved by Lorien Gamaroff, 2026-11-15, because ten full-suite runs (about two hours on the shared LAN server) would measure noise larger than the change.
 
 ### Code Quality
 
@@ -296,7 +298,17 @@ One low point open: the wall-time criterion's method (five runs of the full suit
 
 ## Deferred Work
 
-- **T275-QA-1** (LOW) — carried to gate 2 `recommendations.future` (route 2b, cycle 2): the wall-time criterion was bounded and measured on the touched test files, not run as five alternating full-suite runs
+- **T275-QA-1** (LOW) — carried to gate 2 `recommendations.future` (route 2b, cycle 2): the wall-time criterion was bounded and measured on the touched test files, not run as five alternating full-suite runs. Resolved at `/finalise`: the criterion was amended, approved by Lorien Gamaroff.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+QA gate 2 PASS (95/100); PR review APPROVE; CI green on `519d8cf0c`. All acceptance criteria are ticked, the wall-time one by an owner-approved amendment (see its line). The three affected suites pass (86/86) and the bundle check reports 0 problems.
+
+**Detailed Verification Log:** See `task.275.dod.1.gates-say-what-they-know.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-15
 
 <!-- change-log-start -->
 ## Change Log
@@ -309,6 +321,7 @@ One low point open: the wall-time criterion's method (five runs of the full suit
 | 2026-11-15 |         | QA gate PASS (95/100) — 1 finding                 | qa-task |
 | 2026-11-15 |         | QA findings addressed — wall-time evidence measured, criterion left open, 1 iteration | qa-fix |
 | 2026-11-15 |         | QA gate PASS (95/100) — 1 finding                 | qa-task |
+| 2026-11-15 | 1.2     | DoD passed — accepted (PR #911); wall-time criterion amended, approved by Lorien Gamaroff | finalise |
 <!-- change-log-end -->
 
 ---
@@ -345,4 +358,4 @@ None.
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
