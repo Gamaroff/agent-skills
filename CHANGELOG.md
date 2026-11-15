@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`/finalise` 6c halts by name when `CI_HEAD_2` or `PR_NUMBER` is not bound (task 310).** The poll
+  block opens with a `${VAR:?}` guard, so a fresh shell that carries neither value stops before the
+  block compares, records or launches anything, and the message says which step binds it. A test runs
+  the shipped guard line with each name unbound and with both bound, and the order assertion now
+  places the guard before the clear.
 - **`/finalise` 6c clears the previous run's recorded head, and a test holds where it is written
   (task 309).** The poll block now removes `.claude/state/finalise-ci-head-2.txt` with the result and
   pid files before it records the new head, so a run that aborts in between leaves none and the later

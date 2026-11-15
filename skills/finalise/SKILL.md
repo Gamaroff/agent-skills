@@ -2239,6 +2239,11 @@ standalone.
    whatever it staged.
 
    ```bash
+   # INPUTS, bound in an earlier step and not in this block: CI_HEAD_2 is 6a's `git rev-parse HEAD`
+   # after the push, PR_NUMBER is Step 3a's resolver result. A fresh shell has neither, and an empty
+   # value here would run the comparison, the writer and the poll launch on nothing (task.310).
+   : "${CI_HEAD_2:?HALT: bind CI_HEAD_2 from 6a (the commit just pushed) — never git rev-parse HEAD here}" "${PR_NUMBER:?HALT: bind PR_NUMBER from Step 3a}"
+
    # Confirm the PR head IS the commit just pushed — never gate one commit and read another.
    PR_HEAD=$(gh pr view "$PR_NUMBER" --json headRefOid -q '.headRefOid' 2>/dev/null)   # Bitbucket: .source.commit.hash
    [ "${PR_HEAD:0:12}" = "${CI_HEAD_2:0:12}" ] \

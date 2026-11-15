@@ -640,11 +640,16 @@ test("6c poll block records the acceptance head it starts on, for the later turn
   // named, so a rename reads as a missing line rather than as a wrong order.
   const lines = codeLines(sixC);
   const at = (re) => lines.findIndex((l) => re.test(l));
+  const guardAt = at(/^\s*: "\$\{CI_HEAD_2:\?/);
   const rmAt = at(/^\s*rm -f "\$RESULT" "\$PIDFILE"/);
   const writeAt = at(
     /^\s*printf '%s\\n' "\$CI_HEAD_2" > \.claude\/state\/finalise-ci-head-2\.txt\s*$/,
   );
   const launchAt = at(/^\s*nohup bash "\$POLL"/);
+  assert.ok(
+    guardAt >= 0,
+    "6c poll block: the CI_HEAD_2 / PR_NUMBER guard line is missing",
+  );
   assert.ok(
     rmAt >= 0,
     '6c poll block: the `rm -f "$RESULT" "$PIDFILE"` line is missing',
@@ -655,8 +660,8 @@ test("6c poll block records the acceptance head it starts on, for the later turn
     '6c poll block: the `nohup bash "$POLL"` line is missing',
   );
   assert.ok(
-    rmAt < writeAt && writeAt < launchAt,
-    `6c poll block must clear (line ${rmAt}), then record the head (line ${writeAt}), then launch the poll (line ${launchAt})`,
+    guardAt < rmAt && rmAt < writeAt && writeAt < launchAt,
+    `6c poll block must guard its inputs (line ${guardAt}), clear (line ${rmAt}), then record the head (line ${writeAt}), then launch the poll (line ${launchAt})`,
   );
   const dir = mkdtempSync(path.join(tmpdir(), "t308-writer-"));
   try {
@@ -742,6 +747,49 @@ test("6c poll block clears a previous run's head file, then records the new head
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// task.310: the 6c poll block reads CI_HEAD_2 and PR_NUMBER, which earlier steps bind and a fresh
+// shell does not carry. The block opens with a named HALT instead of running on empty values. It
+// runs the shipped guard line under a minimal environment, so a value exported in the developer's
+// own shell cannot make an unbound case pass.
+test("6c poll block guards CI_HEAD_2 and PR_NUMBER with a named HALT", () => {
+  const sixC = between(
+    finalise,
+    "6c. **Second CI reading",
+    "6d. **CHANGELOG citation check",
+    FINALISE,
+  );
+  const guards = codeLines(sixC).filter((l) =>
+    /^\s*: "\$\{CI_HEAD_2:\?/.test(l),
+  );
+  assert.equal(
+    guards.length,
+    1,
+    "6c poll block: exactly one CI_HEAD_2 / PR_NUMBER guard line is required",
+  );
+  const run = (env) =>
+    spawnSync("bash", ["-c", guards[0].trim()], {
+      encoding: "utf8",
+      env: { PATH: process.env.PATH, ...env },
+    });
+  const head = "0123456789abcdef0123456789abcdef01234567";
+
+  const noHead = run({ PR_NUMBER: "909" });
+  assert.notEqual(noHead.status, 0, "CI_HEAD_2 unbound must not exit 0");
+  assert.match(noHead.stderr, /CI_HEAD_2/, "the HALT must name CI_HEAD_2");
+
+  const noPr = run({ CI_HEAD_2: head });
+  assert.notEqual(noPr.status, 0, "PR_NUMBER unbound must not exit 0");
+  assert.match(noPr.stderr, /PR_NUMBER/, "the HALT must name PR_NUMBER");
+
+  const both = run({ CI_HEAD_2: head, PR_NUMBER: "909" });
+  assert.equal(
+    both.status,
+    0,
+    `both bound exited ${both.status}: ${both.stderr}`,
+  );
+  assert.equal(both.stderr, "", "both bound must print nothing");
 });
 
 // ---------------------------------------------------------------------------
