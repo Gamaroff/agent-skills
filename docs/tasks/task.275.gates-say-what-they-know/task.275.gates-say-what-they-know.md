@@ -282,17 +282,21 @@ None identified.
 **Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.275.qa.1.gates-say-what-they-know.md](./task.275.qa.1.gates-say-what-they-know.md)
-- **Gate File**: [task.275.gate.1.gates-say-what-they-know.yml](./task.275.gate.1.gates-say-what-they-know.yml)
+- **Full Report**: [task.275.qa.2.gates-say-what-they-know.md](./task.275.qa.2.gates-say-what-they-know.md)
+- **Gate File**: [task.275.gate.2.gates-say-what-they-know.yml](./task.275.gate.2.gates-say-what-they-know.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 26 across the three affected suites, plus `ci:fast` on the LAN server
+- **Tests Executed**: 26 across the three affected suites (86 with their neighbours), plus `ci:fast` on the LAN server at the cycle 1 head
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-One low point open: the wall-time criterion was bounded (0.4 s of added tests against a 685 s run), not measured by five alternating runs.
+One low point open: the wall-time criterion's method (five runs of the full suite) was not run; a five-pair measurement of the touched test files and the bound are recorded. One overclaim in the helper header was found and fixed.
+
+## Deferred Work
+
+- **T275-QA-1** (LOW) — carried to gate 2 `recommendations.future` (route 2b, cycle 2): the wall-time criterion was bounded and measured on the touched test files, not run as five alternating full-suite runs
 
 <!-- change-log-start -->
 ## Change Log
@@ -304,6 +308,7 @@ One low point open: the wall-time criterion was bounded (0.4 s of added tests ag
 | 2026-11-15 |         | Status → ready-for-development                    | review-task |
 | 2026-11-15 |         | QA gate PASS (95/100) — 1 finding                 | qa-task |
 | 2026-11-15 |         | QA findings addressed — wall-time evidence measured, criterion left open, 1 iteration | qa-fix |
+| 2026-11-15 |         | QA gate PASS (95/100) — 1 finding                 | qa-task |
 <!-- change-log-end -->
 
 ---

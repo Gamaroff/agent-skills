@@ -106,6 +106,15 @@ _Track each QA review/fix cycle._
 **Loop exit**: n/a — this exit not taken
 **Action**: Running qa-fix (cycle 1 of 5)
 
+### QA Cycle 2 — 2026-11-15
+**Gate Result**: PASS
+**Issues Found**: 1 open low — T275-QA-1 (wall-time criterion method); one overclaim in the helper header found by qa-fix's adversarial pass and fixed in 9181242e7
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**PR Review**: pending — 5c not yet run
+**Loop exit**: Cosmetic-residue exit taken — PASS gate at cycle 2 with HIGH 0 for cycles 1 and 2; all 1 open findings are LOW and are carried to the gate's recommendations.future by id (T275-QA-1). This is a CLEAN exit, not a stall: nothing is blocked and nothing is being accepted over; a full qa-fix cycle for cosmetic findings is what this route exists to avoid.
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
