@@ -218,7 +218,7 @@ None.
 ### Code Quality
 
 - [x] `npm run bundle:check` is clean.
-- [ ] The fast gate passes with 0 not ok; the figure is recorded in the QA report.
+- [x] The fast gate passes with 0 not ok; the figure is recorded in the QA report.
 - [x] `npm run validate -- skills/finalise/` passes (`SKILL.md` changes).
 
 ### Migration
@@ -288,6 +288,27 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-15
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.310.qa.1.finalise-6c-poll-block-guards-its-inputs.md](./task.310.qa.1.finalise-6c-poll-block-guards-its-inputs.md)
+- **Gate File**: [task.310.gate.1.finalise-6c-poll-block-guards-its-inputs.yml](./task.310.gate.1.finalise-6c-poll-block-guards-its-inputs.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 49 in the changed file; fast gate 8475 pass, 0 fail
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues identified. Two advisory items: other unguarded `PR_NUMBER` reads in `skills/finalise/SKILL.md`, and the open-PR case of `gh pr view ""` was not run.
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -297,6 +318,7 @@ None.
 | 2026-11-15 | 1.1 | Review passed (9/10) — recorded the measured `gh pr view ""` fallback in Current Problems; no critical or important findings | review-task |
 | 2026-11-15 |  | Status → ready-for-development | review-task |
 | 2026-11-15 | 1.2 | Implemented: 6c guard, behaviour test, order assertion, CHANGELOG; status → ready-for-review | develop-task |
+| 2026-11-15 |  | QA gate PASS (95/100) — 0 findings | qa-task |
 <!-- change-log-end -->
 
 ---
