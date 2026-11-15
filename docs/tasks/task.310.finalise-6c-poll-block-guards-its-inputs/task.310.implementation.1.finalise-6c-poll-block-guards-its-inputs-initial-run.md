@@ -3,7 +3,7 @@
 **Task**: `task.310.finalise-6c-poll-block-guards-its-inputs.md`
 **Run Number**: 1
 **Started**: 2026-11-15 10:30
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -36,8 +36,8 @@ Guard the `/finalise` step 6c poll block's two inputs (`CI_HEAD_2`, `PR_NUMBER`)
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline; remote `ci:fast` 8475 pass, 0 fail | —                    | 2026-11-15T15:40Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #910: https://github.com/Gamaroff/agent-skills/pull/910 (no tracker issue linked) | —                    | 2026-11-15T15:55Z |
 | 5–6. qa-task / qa-fix loop | ✅ Done | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 1 cycle: gate PASS 95, 5c APPROVE; fast-gate figure 8475 pass, 0 fail | —                    | 2026-11-15T16:05Z |
-| 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 7. finalise                | ✅ Done | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      | DoD 1 ACCEPTED, 11/11; CI reading 1 SUCCESS @ 554bda3d758b; CI reading 2 SUCCESS (tree-equivalent to 2ad26946a37e) @ 02f560042cdf; checks ran inline, independent review did not run | —                    | 2026-11-15T15:50Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Report committed and pushed | —                    | 2026-11-15T15:52Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -87,10 +87,10 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
-**Branch**: {populated after Step 1}
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**Finished**: 2026-11-15
+**Final Status**: Completed
+**Branch**: feature/task.310.finalise-6c-poll-block-guards-its-inputs
+**PR**: https://github.com/Gamaroff/agent-skills/pull/910
+**QA Iterations**: 1
+**DoD Summary**: task.310.dod.1.finalise-6c-poll-block-guards-its-inputs.md
+**Tracker debt**: none (no tracker issue linked)
