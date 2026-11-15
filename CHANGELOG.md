@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`/finalise` 6c clears the previous run's recorded head, and a test holds where it is written
+  (task 309).** The poll block now removes `.claude/state/finalise-ci-head-2.txt` with the result and
+  pid files before it records the new head, so a run that aborts in between leaves none and the later
+  turn HALTs "not recorded" instead of reading a previous run's head. A test pins the order: clear,
+  record, then launch the poll.
 - **A pause commit at step 7 is no longer pushed (task 308).** `/finalise` polls CI on the acceptance
   head for the whole of step 7, and a PreCompact pause during that wait pushed a docs-only commit,
   which made a new PR head and cancelled the run finalise was waiting on (a consumer using

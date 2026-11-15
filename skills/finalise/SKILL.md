@@ -2266,7 +2266,10 @@ standalone.
    [ -f "$POLL" ] || { echo "HALT: $POLL is missing — re-run the bundler (npm run bundle)"; exit 1; }
    RESULT=.claude/state/finalise-ci-result.txt
    PIDFILE=.claude/state/finalise-ci-poll.pid
-   rm -f "$RESULT" "$PIDFILE"
+   rm -f "$RESULT" "$PIDFILE" .claude/state/finalise-ci-head-2.txt
+   # The head file is cleared with the result and pid files, so a run that aborts before the writer
+   # below leaves none: the later turn then HALTs "not recorded" instead of reading a previous run's
+   # head (task.309).
    # Record the acceptance head this poll runs on, for the later turn that reads $RESULT. A later
    # turn is a fresh shell, and local HEAD is not a safe source for it: a PreCompact pause during
    # the wait commits the report and holds the push (task.308), which leaves local HEAD one commit
