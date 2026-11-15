@@ -1,0 +1,111 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "dc9f34b43cc8736ef150eae9ed9e0af602efd43b",
+  "dirty_paths": [
+    "docs/tasks/task.308.pause-commits-cancel-the-step-7-ci-poll/task.308.implementation.1.pause-commits-cancel-the-step-7-ci-poll-initial-run.md",
+    "docs/tasks/task.308.pause-commits-cancel-the-step-7-ci-poll/task.308.pr-review.1.pause-commits-cancel-the-step-7-ci-poll.md"
+  ],
+  "document": "docs/tasks/task.308.pause-commits-cancel-the-step-7-ci-poll/task.308.pause-commits-cancel-the-step-7-ci-poll.md",
+  "result": {
+    "bytes": 5725,
+    "sha256": "91c5cc640351c95aaafdfd59dcc8bddf165cfba840d34e98cb70fb7188326e5b",
+    "verified": true
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 6,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "SC-1",
+      "text_hash": null,
+      "status": "PASS",
+      "description": "Pause at step 7 commits the report, leaves remote head unchanged (mutation-proved)",
+      "code_citation": "shared/resources/develop-pipeline-on-precompact.sh:419",
+      "test_citation": "shared/resources/develop-pipeline-on-precompact.test.sh:839",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Scenario 17h (lines 839-851) asserts 2 commits, local != remote head, and 'NOT pushed'/'Step 7' in signal and stderr. Mutation proof committed in task.308.qa.1 (line 74: remove the 7) hold arm, 17h red). Lane: test:suite, run by npm test in .github/workflows/test.yml on every pull_request; no paths-ignore."
+    },
+    {
+      "id": "SC-2",
+      "text_hash": null,
+      "status": "PASS",
+      "description": "Pause at step 5 still pushes (moved control)",
+      "code_citation": "shared/resources/develop-pipeline-on-precompact.sh:421",
+      "test_citation": "shared/resources/develop-pipeline-on-precompact.test.sh:828",
+      "members": [],
+      "non_member_fail": null,
+      "note": "17g was moved from step 7 to step 5 and asserts commit count 2, local HEAD equal to origin tip, and no 'NOT pushed'. The code citation is the default arm, which still pushes. Same npm test lane."
+    },
+    {
+      "id": "SC-3",
+      "text_hash": null,
+      "status": "PASS",
+      "description": "Pause at step 8 is still held (17f)",
+      "code_citation": "shared/resources/develop-pipeline-on-precompact.sh:420",
+      "test_citation": "shared/resources/develop-pipeline-on-precompact.test.sh:815",
+      "members": [],
+      "non_member_fail": null,
+      "note": "17f is unchanged (lines 815-827) and still passes; the step-8 message keeps 'NOT pushed' and 'Step 8'. QA.2 records 40/40 hook scenarios green. Same npm test lane."
+    },
+    {
+      "id": "SC-4",
+      "text_hash": null,
+      "status": "PASS",
+      "description": "Every step 7 exit pushes held commit; acceptance push leaves remote head equal to local HEAD",
+      "code_citation": "docs/tasks/task.308.pause-commits-cancel-the-step-7-ci-poll/task.308.pause-commits-cancel-the-step-7-ci-poll.md:93",
+      "test_citation": "shared/resources/develop-pipeline-on-precompact.test.sh:852",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Scenario 17i (lines 852-861) commits and pushes after the held pause, then asserts remote head equals local HEAD and the pause commit is an ancestor of it. The Phase 1 record names every step 7 exit (accepted 6a, gaps 8.x, HALT) and says none loses a held commit. 17i exercises a plain commit then push and does not call finalise; the test comment states that deliberately. It is the named scenario the criterion asks for. Same npm test lane."
+    },
+    {
+      "id": "SC-5",
+      "text_hash": null,
+      "status": "PASS",
+      "description": "Held pause commit: later-turn reading-2 head equals PR head, not local HEAD (mutation-proved)",
+      "code_citation": "skills/finalise/SKILL.md:2297",
+      "test_citation": "evals/shared/tests/finalise-publish-boundary.test.mjs:596",
+      "members": [
+        {
+          "member": "later-turn reader (SKILL.md:2297)",
+          "evidence": "evals/shared/tests/finalise-publish-boundary.test.mjs:596",
+          "status": "PASS"
+        },
+        {
+          "member": "unrecorded-head HALT (SKILL.md:2299)",
+          "evidence": "evals/shared/tests/finalise-publish-boundary.test.mjs:607",
+          "status": "PASS"
+        },
+        {
+          "member": "poll-block writer (SKILL.md:2274)",
+          "evidence": "evals/shared/tests/finalise-publish-boundary.test.mjs:620",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "SKILL.md:2274 writes finalise-ci-head-2.txt; :2297 reads it and :2299 HALTs when it is missing. Tests at :596 (recorded head is used, not local HEAD), :607 (no record HALTs) and :620 (the writer line). These run the shipped lines in a scratch repo. QA.1 (lines 72-74) and QA.2 (line 115) record mutations: reader reverted to rev-parse HEAD turned three tests red, and the writer line deleted turned the :620 test red. Lane: evals/shared/tests/*.test.mjs is in the test:suite glob, run by npm test on every pull_request."
+    },
+    {
+      "id": "SC-6",
+      "text_hash": null,
+      "status": "PASS",
+      "description": "Phase 1 SHA-source table with a disposition per source is in the task document",
+      "code_citation": "docs/tasks/task.308.pause-commits-cancel-the-step-7-ci-poll/task.308.pause-commits-cancel-the-step-7-ci-poll.md:79",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The table at lines 79-90 sits in the Phase 1 section and lists eight SHA sources, each with a disposition (not a CI read, safe because the push carries it, fixed, or correct as is). I read the text. It has no CI-state or code behaviour to run. The table has no corpus guard."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "SC-4",
+      "note": "17i does not drive /finalise. It models the next commit with `git commit --allow-empty` then push, so the claim that finalise's exits push is carried by the Phase 1 prose record and not by a test. The QA.2 code review also records, as advisory only, that the head file is not removed beside the result and pid files (skills/finalise/SKILL.md around line 2274)."
+    }
+  ]
+}
