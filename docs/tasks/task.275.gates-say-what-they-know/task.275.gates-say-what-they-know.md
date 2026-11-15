@@ -303,6 +303,7 @@ One low point open: the wall-time criterion was bounded (0.4 s of added tests ag
 | 2026-11-15 | 1.1     | Review passed (8/10) — count redefined as open entries via one helper, five call sites listed, `qa-gate` added as a third schema writer, feed guard and `NUMERIC_SLOTS` added, `qa-cycle` fed at its one site | review-task |
 | 2026-11-15 |         | Status → ready-for-development                    | review-task |
 | 2026-11-15 |         | QA gate PASS (95/100) — 1 finding                 | qa-task |
+| 2026-11-15 |         | QA findings addressed — wall-time evidence measured, criterion left open, 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

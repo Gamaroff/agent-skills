@@ -84,6 +84,13 @@ Add an open-points count slot to the `qa-gate` / `qa-cycle` plain-language leads
 
 _Problems encountered and how they were resolved or escalated._
 
+### QA cycle 1 — T275-QA-1 (wall-time criterion): measured on the changed surface, finding left open
+
+- **What was measured.** Five alternating pairs of `CI=true node --test` over the test files this task touches, `develop` (a detached worktree of `origin/develop`) against this branch, laptop, `date +%s%N` around each run, load average read beside each (`/proc/loadavg`). The branch side also runs the new `gate-open-count.test.mjs`, which `develop` does not have.
+- **Result (ms, develop → branch, load):** 1948 → 2293 (18.89); 2106 → 2137 (19.78); 2656 → 1620 (22.36); 942 → 705 (22.36); 672 → 723 (21.69). Medians: develop 1948, branch 1620. Per-pair differences: +345, +31, −1036, −237, +51; median +31 ms.
+- **How to read it.** The laptop was loaded (load average 19 to 22), so the spread is larger than the difference: the measurement cannot tell the two sides apart, which is the claim (no measurable cost), but it is not the criterion's own measurement. The full `CI=true npm test` was not run five times per side: that is about two hours on the shared LAN server for a change whose added tests run in about 0.4 s of a 685 s suite.
+- **Status.** The criterion's bound (within 10%) is met by every available measure; its method (five alternating runs of the full suite, `uptime` beside each) is not. Per qa-fix's rule the criterion text is not edited. T275-QA-1 stays open in the gate for QA to re-read, and an owner may amend the criterion with `approved by <name>` or ask for the full runs.
+
 ---
 
 ## QA Iteration History
