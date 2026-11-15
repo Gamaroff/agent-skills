@@ -330,17 +330,13 @@ If a situation arises that is not in the shared defaults table and the stakes ar
 - **The implementation report is the primary recovery tool.** Always include its path in halt messages.
 - **Snapshot then remove the lock file before every terminal HALT.** After committing the report (per the rule above), copy the active lock to a halt snapshot and then remove the active lock + transient logs:
 
+  Run **one call** — it writes the snapshot, removes the lock and the transient test logs, and is idempotent. Run it **before** the HALT message, never after (a HALT that only printed its message left the lock in place with no snapshot on three runs, obs #49). `--step` defaults to the lock's `current_step`; a non-zero exit means nothing was halted:
+
   ```bash
-  if [ -f .claude/state/develop-pipeline.lock ]; then
-    jq --arg reason "{halt_reason}" --arg step "{halt_step}" --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-       '. + {halted_at: $ts, halt_reason: $reason, halt_step: $step}' \
-       .claude/state/develop-pipeline.lock > .claude/state/develop-pipeline.last-halt.json
-  fi
-  rm -f .claude/state/develop-pipeline.lock
-  find .claude/state -maxdepth 1 -name 'test-output-*.log' -delete 2>/dev/null || true
+  bash .agents/skills/develop-story/references/advance-pipeline-lock.sh --halt --reason "{halt_reason}" --step {halt_step} {story-directory}
   ```
 
-  **Two commands, not one `rm` argv.** The lock is a path that must be removed; the logs are a glob that may match nothing. Under zsh — the default shell on every macOS host — an unmatched glob is `nomatch`, which aborts the whole command **before `rm` runs**, so the one-argv form left the lock in place on every HALT that had no test logs to sweep (obs #111). `find -delete` is the glob-free spelling and is a noop on an empty match in every shell. The rule: [`docs/reference/anti-patterns.md`](../../docs/reference/anti-patterns.md) § "Never put a must-succeed path and a glob in one `rm` argv".
+  The script owns the glob-free log sweep (`find -delete`, never an `rm` with a glob: an unmatched glob aborts the whole command under zsh, obs #111). The rule: [`docs/reference/anti-patterns.md`](../../docs/reference/anti-patterns.md) § "Never put a must-succeed path and a glob in one `rm` argv".
 
   Removing the active lock prevents a future PreCompact firing in this same session from re-running the pause flow, and stops accumulation of transient Step 3 test logs. The **halt snapshot** (`develop-pipeline.last-halt.json`) preserves resume context so the next `/develop-story` invocation can re-enter Phase 0b artifact verification: the resume detector subagent reads the snapshot when no active lock is present, surfaces it to the user, and offers "Resume from {halt_step}" or "Start fresh" (latter deletes the snapshot). The graceful-pause hook also removes the active lock itself if it runs — this rule covers the non-hook halt paths.
 

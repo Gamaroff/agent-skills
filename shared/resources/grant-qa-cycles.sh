@@ -105,6 +105,11 @@ ADVANCE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/advance-pipeline-lock.sh"
 # earlier in the same procedure, read cycle 8.
 # bundle-dependency: shared/resources/qa-cycle.sh
 QA_CYCLE_SH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/qa-cycle.sh"
+# The report's cycle count has ONE definition too, qa-report-cycles.sh: the `grep -c` this script
+# carried counted the Decisions Log's `### QA Cycle` headings and the QA Iteration History's, so four
+# cycles read as eight (task.276, obs #135).
+# bundle-dependency: shared/resources/qa-report-cycles.sh
+QA_REPORT_CYCLES_SH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/qa-report-cycles.sh"
 # The re-entry phase reads whether code moved since the latest gate, and that has ONE definition
 # too (task.244): the sibling code-moved-since-gate.sh, also called by qa-task Phase 0.
 # bundle-dependency: shared/resources/code-moved-since-gate.sh
@@ -140,6 +145,11 @@ if [ ! -f "$QA_CYCLE_SH" ]; then
   echo "grant-qa-cycles: qa-cycle.sh not found beside this script ($QA_CYCLE_SH) — re-bundle the skill" >&2
   exit 1
 fi
+# A missing sibling must not read as "the report records no cycle" — that silently lowers the base.
+if [ ! -f "$QA_REPORT_CYCLES_SH" ]; then
+  echo "grant-qa-cycles: qa-report-cycles.sh not found beside this script ($QA_REPORT_CYCLES_SH) — re-bundle the skill" >&2
+  exit 1
+fi
 # The helper's stderr is kept, not discarded: its rc 1 covers both "no gate file" and "gate
 # files with no usable cycle number", and only its message tells them apart (task.158 QA
 # cycle 2, QA2-CR-1).
@@ -157,11 +167,10 @@ if [ -z "$QA_CYCLE" ]; then
   echo "grant-qa-cycles: nothing to grant against — $QA_CYCLE_WHY" >&2
   exit 1
 fi
-# The report's entry count is the other half of the reconstruction. `|| true`, not
-# `|| echo 0`: grep -c prints 0 AND exits 1 on no match, so the latter yields "0\n0".
+# The report's distinct cycle count is the other half of the reconstruction (qa-report-cycles.sh).
 if [ -n "$REPORT" ]; then
-  COMPLETED=$(grep -c '^### QA Cycle' "$REPORT" 2>/dev/null || true)
-  COMPLETED=${COMPLETED:-0}
+  COMPLETED=$(bash "$QA_REPORT_CYCLES_SH" "$REPORT" 2>/dev/null) || COMPLETED=0
+  case "$COMPLETED" in ''|*[!0-9]*) COMPLETED=0 ;; esac
   if [ "$COMPLETED" -gt "$QA_CYCLE" ] 2>/dev/null; then
     echo "grant-qa-cycles: report has $COMPLETED QA Cycle entries, disk has gate.$QA_CYCLE — base is the report's count" >&2
     QA_CYCLE="$COMPLETED"

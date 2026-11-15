@@ -1704,9 +1704,15 @@ describe("executed against fixtures", { concurrency: true }, () => {
         const halt = bind(
           blockBy(
             readDoc("skills/develop-task/SKILL.md"),
-            'jq --arg reason "{halt_reason}"',
+            "advance-pipeline-lock.sh --halt",
           ),
-          { "{halt_reason}": "checklist refused", "{halt_step}": "8" },
+          {
+            "{halt_reason}": "checklist refused",
+            "{halt_step}": "8",
+            "{task-directory}": WORK_ITEM,
+            ".agents/skills/develop-task/references/advance-pipeline-lock.sh":
+              LOCK_HELPER,
+          },
         );
         const h = await runAsync(sh, halt, { cwd: fx.work });
         assert.equal(h.status, 0, `halt: ${h.stdout}\n${h.stderr}`);

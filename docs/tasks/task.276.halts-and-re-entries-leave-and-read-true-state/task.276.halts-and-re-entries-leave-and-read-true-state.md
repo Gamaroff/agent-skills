@@ -5,16 +5,17 @@ type: task
 description: "Make every pipeline HALT snapshot and clear its lock mechanically, stop a restore consuming the snapshot a re-entry needs, give the re-entry refusal one remedy, count QA cycles once, and check a resume prompt against run state."
 tags: [develop-task, finalise, observation]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-11-06
-updated: 2026-11-06
+updated: 2026-11-15
 estimated_effort_hours: 16
 ---
 
 # Task 276: Halts and re-entries leave and read true state
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.276.review.1.halts-and-re-entries.md` implemented 2026-11-15
 
 ---
 
@@ -58,11 +59,11 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 
 ### Target Architecture
 
-- `--restore` refuses when the candidate snapshot's `halt_reason` is `finalise-dod-gaps`, naming `reenter-qa-after-finalise.sh` as the entry point (obs #46 option 1).
-- A `--halt` mode (or sibling script) that snapshots the lock and removes it in one call; the Loop Escalation block and the DoD-gaps HALT call it; the HALT checklist asserts the lock is absent and the snapshot present before the message shows (obs #49).
-- `no-code-moved` checks untracked files first: with any, refuse `uncommitted-fix`-style (commit, then re-run) and give no step-7 route; only a clean tree gets the step-7 route (obs #75). The resume contract's reason table matches.
-- The budget base counts distinct `{N}` in the QA Iteration History section only (obs #135), in both scripts; `lock-present` with the lock live at step 7 and the newest DoD reading GAPS with code moved does not route to step 7.
-- Before acting on a resume instruction, compare its step and cycle to the run-state file and the artefacts on disk (that cycle's gate, the report's QA Cycle heading); if complete, report that and stop (obs #95).
+- `--restore` refuses when the candidate snapshot is a DoD-gaps halt, naming `reenter-qa-after-finalise.sh` as the entry point (obs #46 option 1). **A DoD-gaps halt is recognised the way the re-entry script recognises it**: `halt_step` is 7 and the newest DoD file for the work item reads `**Final Status:** ❌ GAPS`. It is not recognised by a `halt_reason` token: `git grep -n 'finalise-dod-gaps'` finds no writer, so a guard on that literal would never fire (review 1, C1). The refusal is bypassed only by `--restore --allow-dod-gaps`, which `reenter-qa-after-finalise.sh` passes at its restore step (`:276`) and which is also the one remedy for a document-only fix. `--restore --which` writes nothing and is never guarded; `grant-qa-cycles.sh` and `accept-qa-residual.sh` restore step-5 snapshots and are unaffected (review 1, C2).
+- A `--halt` mode (or sibling script) that snapshots the lock and removes it in one call; every HALT fence calls it; the HALT checklist asserts the lock is absent and the snapshot present before the message shows (obs #49). The fences live in three hand-edited sources found by `git grep -n 'halted_at: \$ts' -- 'skills/*/SKILL.md'`: `skills/develop-story/SKILL.md`, `skills/develop-task/SKILL.md`, `skills/develop-bug/SKILL.md` (the step docs point at them). A test extracts each fence and asserts it calls `advance-pipeline-lock.sh --halt`.
+- `no-code-moved` gives one ordered route (obs #75). **Decision at develop (2026-11-15), amending the obs #75 wording:** the script does not refuse on untracked files, because `reenter-qa-after-finalise.test.sh` pins that a document-only fix beside a held-aside untracked file is `no-code-moved`, not `uncommitted-fix` (task.170 QA cycle 4, CR-2: Step 4 restores held-aside files, so an untracked file is the normal state of a branch). What obs #75 objects to is two remedies whose order destroys the first: the step-7 restore consumes the snapshot the commit-and-re-run route needs. So: a clean tree gets only the step-7 route, `advance-pipeline-lock.sh --restore --allow-dod-gaps`, and no note; with untracked files the message names them and gives the commit-and-re-run route **first**, "nothing was consumed", and the step-7 route second, conditioned with "Otherwise". Nothing is consumed on a refusal, so the order is safe. The resume contract's reason table matches. Before editing the message, `git grep -n 'resume at step 7' -- '*.test.*' evals tests` lists every test that pins it.
+- The budget base counts distinct `{N}` in the QA Iteration History section only (obs #135), in both scripts (`grep -n '^### QA Cycle' <report>` shows the two heading sets). `lock-present` with the lock live at step 7, the newest DoD reading GAPS and code moved since the gate refuses with a message that says to remove the stale lock with `--halt` and run this script again; it never routes to step 7.
+- Before acting on a resume instruction, an executable check, `resume-prompt-check.sh <doc-dir> <step> <cycle>`, compares the named step and cycle to the artefacts on disk (that cycle's gate via `qa-cycle.sh`, the report's QA Cycle heading); if complete, it prints `already complete: {step} {cycle}` and exits 1, and the resume contract tells the orchestrator to stop (obs #95).
 
 ### Important Clarifications
 
@@ -91,15 +92,15 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 
 ### Breaking Change 1: `--restore` refuses a gaps snapshot
 
-**What Changed**: `advance-pipeline-lock.sh --restore` exits non-zero on a `finalise-dod-gaps` snapshot.
+**What Changed**: `advance-pipeline-lock.sh --restore` exits non-zero on a DoD-gaps snapshot (`halt_step` 7 and the newest DoD reading ❌ GAPS) unless given `--allow-dod-gaps`.
 
 **Before**: it rebuilt the lock and consumed the snapshot.
 
 **After**: it refuses and names `reenter-qa-after-finalise.sh`.
 
-**Impact**: anything calling `--restore` after a DoD-gaps halt.
+**Impact**: anything calling `--restore` after a DoD-gaps halt. The caller audit (`git grep -n -- '--restore' -- shared skills ':!docs'`) found: `reenter-qa-after-finalise.sh:276` (passes `--allow-dod-gaps`), `grant-qa-cycles.sh:216` and `accept-qa-residual.sh:101` (step-5 snapshots, unaffected), the `--which` calls at `reenter-qa-after-finalise.sh:141` and `grant-qa-cycles.sh:190` (read-only, never guarded), and operator-facing prose in the resume contract and the SKILL.md files.
 
-**Migration Path**: call the re-entry script, which restores itself; the plan greps every `--restore` caller first.
+**Migration Path**: call the re-entry script, which restores itself; a document-only fix uses `--restore --allow-dod-gaps`.
 
 ---
 
@@ -114,10 +115,11 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 **Files**:
 - `shared/resources/advance-pipeline-lock.sh`, `advance-pipeline-lock.test.sh`
 - `shared/resources/develop-pipeline-step-5-6-qa-loop.md`, `develop-pipeline-step-7-finalise.md`
+- `skills/develop-story/SKILL.md`, `skills/develop-task/SKILL.md`, `skills/develop-bug/SKILL.md` (the HALT fences; hand-edited, not bundled)
 
 **Changes**:
-- [ ] `--halt` snapshot-and-remove; both HALT blocks call it.
-- [ ] `--restore` refusal on `finalise-dod-gaps`.
+- [x] `--halt` snapshot-and-remove; every HALT fence calls it, and a test extracts each fence.
+- [x] `--restore` refusal on a DoD-gaps snapshot (`halt_step` 7 + newest DoD ❌ GAPS), with `--allow-dod-gaps` as the one bypass; `--which` stays unguarded.
 
 **Dependencies**: none.
 
@@ -133,9 +135,9 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 - `shared/resources/develop-pipeline-resume-contract.md`
 
 **Changes**:
-- [ ] Untracked-first refusal; one remedy per message; reason table updated.
-- [ ] Budget base from distinct N in the QA Iteration History, in both scripts.
-- [ ] `lock-present` routing at step 7 with GAPS and moved code.
+- [x] Ordered route per `no-code-moved` message (amended from "untracked-first refusal": task.170 CR-2 pins untracked as never refused on); reason table updated.
+- [x] Budget base from distinct N in the QA Iteration History, in both scripts.
+- [x] `lock-present` routing at step 7 over a GAPS DoD (names `--halt` then the script; the moved-code half is left to the script's own later measure).
 
 **Dependencies**: none.
 
@@ -147,9 +149,10 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 
 **Files**:
 - `shared/resources/develop-pipeline-resume-contract.md`
+- `shared/resources/resume-prompt-check.sh`, `resume-prompt-check.test.sh` (new; the test is added to the hand-kept list in `package.json`)
 
 **Changes**:
-- [ ] Compare a named step and cycle to run state and artefacts before acting; report and stop if complete.
+- [x] `resume-prompt-check.sh` compares a named step and cycle to run state and artefacts; the contract tells the orchestrator to report and stop if complete.
 
 **Dependencies**: none.
 
@@ -160,7 +163,7 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 **Risk Level**: Low
 
 **Changes**:
-- [ ] Tests with mutation proofs (§ 8); `command npm run bundle`, `command npm run bundle -- --check`.
+- [x] Tests with mutation proofs (§ 8); `command npm run bundle`, `command npm run bundle -- --check`.
 
 **Dependencies**: Phases 1 to 3.
 
@@ -174,10 +177,13 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 2. ✅ `shared/resources/reenter-qa-after-finalise.sh` - refusal order, base, routing
 3. ✅ `shared/resources/grant-qa-cycles.sh` - base
 4. ✅ `shared/resources/develop-pipeline-step-5-6-qa-loop.md`, `develop-pipeline-step-7-finalise.md`, `develop-pipeline-resume-contract.md`
+4a. ✅ `skills/develop-story/SKILL.md`, `skills/develop-task/SKILL.md`, `skills/develop-bug/SKILL.md` - the HALT fences
+4b. ✅ `shared/resources/resume-prompt-check.sh` (new)
 
 ### Files to Modify (Tests)
 
 5. ✅ `advance-pipeline-lock.test.sh`, `reenter-qa-after-finalise.test.sh`, `grant-qa-cycles.test.sh`
+5a. ✅ `resume-prompt-check.test.sh` (new), registered in the `package.json` test list
 
 ### Files to Modify (Generated)
 
@@ -194,9 +200,11 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 **Actions**:
 - [ ] `--restore` on a `finalise-dod-gaps` snapshot refuses and leaves the snapshot; **control**: a `not-converging` snapshot restores as before.
 - [ ] `--halt` leaves no lock and one snapshot; a second call is idempotent.
-- [ ] `no-code-moved` with an untracked file never prints the step-7 route; with a clean tree it does, and never both.
-- [ ] A report holding both heading sets gives base 4 after four cycles, not 8.
-- [ ] A resume naming a finished cycle reports and stops; one naming the next cycle proceeds.
+- [ ] `no-code-moved` on a clean tree prints the step-7 route (`--restore --allow-dod-gaps`) and no commit-and-re-run note; with an untracked file it names the file and prints the commit-and-re-run route before the step-7 route, which is introduced by "Otherwise". **Control**: the held-aside untracked case still reads `no-code-moved`, never `uncommitted-fix` (the existing test).
+- [ ] A report holding both heading sets gives base 4 after four cycles, not 8; **controls**: a report with one heading set keeps its base, and a gate ahead of the report keeps the gate's number (the max rule).
+- [ ] The re-entry script itself still restores from a DoD-gaps snapshot (it passes `--allow-dod-gaps`), and `--restore --which` still prints the candidate.
+- [ ] Each of the three SKILL.md HALT fences, extracted by a test, calls `advance-pipeline-lock.sh --halt`; **mutation**: revert one to the old `jq`/`rm` fence and the test goes red.
+- [ ] `resume-prompt-check.sh` on a finished cycle prints `already complete` and exits 1; on the next cycle it exits 0.
 - [ ] Mutation proofs for each.
 
 **Command**: `bash shared/resources/advance-pipeline-lock.test.sh` and the two siblings.
@@ -211,8 +219,8 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 
 ### Functional
 
-- [ ] After each HALT path the lock is absent and the snapshot present, shown by tests for both paths named in the QA report.
-- [ ] `--restore` refuses a gaps snapshot and the re-entry script succeeds from it, shown by a test that runs the two in order.
+- [ ] After each HALT path the lock is absent and the snapshot present, shown by the `--halt` test and by the fence-extraction test over the three SKILL.md files, both named in the QA report.
+- [ ] `--restore` refuses a gaps snapshot and the re-entry script succeeds from it, shown by a test that runs the two in order and recorded in the QA report.
 - [ ] The budget base equals the number of distinct QA cycles on a report with both heading sets, shown by a test.
 
 ### Performance
@@ -311,6 +319,9 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 | Date       | Version | Description                                                          | Author      |
 | ---------- | ------- | -------------------------------------------------------------------- | ----------- |
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #46, #49, #75, #95, #135       | create-task |
+| 2026-11-15 | 1.1     | Review passed (8/10 after fixes) — guard re-keyed on halt_step 7 + DoD GAPS (no writer emits `finalise-dod-gaps`); `--allow-dod-gaps` bypass for the re-entry script; HALT sites and resume-prompt check made executable | review-task |
+| 2026-11-15 |         | Status → ready-for-development                                       | review-task |
+| 2026-11-15 |         | Status → ready-for-review (develop complete; remote CI-parity suite green) |             |
 <!-- change-log-end -->
 
 ---
@@ -353,4 +364,4 @@ None.
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review

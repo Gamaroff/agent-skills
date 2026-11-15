@@ -1040,15 +1040,119 @@ run_paused_mark_scenarios() {
   rm -f "$L" "$S"
 }
 
+# ── 17. task.276 — the DoD-gaps restore guard, --halt, --newest-dod ─────────
+# 17a. --restore REFUSES a /finalise DoD-gaps snapshot (halt_step 7 + newest DoD ❌ GAPS) and leaves
+#      the snapshot and the lock state untouched (obs #46); --allow-dod-gaps is the one bypass;
+#      --restore --which stays unguarded (read-only callers).
+# 17b. the guard keys on facts, not on a halt_reason token no writer emits: any reason text refuses.
+# 17c. a halt_step 7 snapshot whose newest DoD is not GAPS, and a GAPS DoD under another halt_step,
+#      both restore plainly — the guard is the conjunction, never either half.
+# 17d. --halt writes the snapshot, removes the lock and the transient test logs, is idempotent, and
+#      refuses another document's lock; the snapshot it writes round-trips through --restore.
+# 17e. --newest-dod is stem-keyed: a co-located bug's higher-numbered DoD is not the task's.
+run_task276_scenarios() {
+  local SH="$1" D L S DOC RC OUT
+  D="$TMPDIR_TEST/t276-$SH"; mkdir -p "$D/state"
+  L="$D/state/lock.json"; S="$D/state/snap.json"
+  DOC="$D/task.9.x"; mkdir -p "$DOC"
+  adv() { PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" "$SH" "$SCRIPT" "$@"; }
+  printf '**Final Status:** ❌ GAPS\n' > "$DOC/task.9.dod.1.n.md" 2>/dev/null
+  # The directory name task.9.x continues the stem "task.9" — the DoD stem the directory name continues.
+  printf '{"current_step":7,"task_or_story_directory":"%s","halted_at":"t","halt_reason":"any text at all","halt_step":"7"}\n' "$DOC" > "$S"
+
+  # 17a
+  OUT=$(adv --restore "$DOC" 2>&1); RC=$?
+  if [ "$RC" -eq 1 ] && [ ! -f "$L" ] && [ -f "$S" ] && echo "$OUT" | grep -q 'reenter-qa-after-finalise.sh' && echo "$OUT" | grep -q -- '--allow-dod-gaps'; then
+    pass "[$SH] --restore refuses a DoD-gaps snapshot: exit 1, snapshot kept, no lock, both routes named"
+  else
+    fail "[$SH] --restore refuses a DoD-gaps snapshot" "rc=$RC lock=$([ -f "$L" ] && echo y || echo n) snap=$([ -f "$S" ] && echo y || echo n) out=$OUT"
+  fi
+  OUT=$(adv --restore --which "$DOC" 2>&1); RC=$?
+  if [ "$RC" -eq 0 ] && [ "$OUT" = "$S" ]; then
+    pass "[$SH] --restore --which stays unguarded on a DoD-gaps snapshot (read-only callers)"
+  else
+    fail "[$SH] --restore --which unguarded" "rc=$RC out=$OUT"
+  fi
+  OUT=$(adv --restore --allow-dod-gaps "$DOC" 2>&1); RC=$?
+  if [ "$RC" -eq 0 ] && [ "$(jq -r .current_step "$L")" = "7" ] && [ ! -f "$S" ]; then
+    pass "[$SH] --restore --allow-dod-gaps restores at step 7 and consumes the snapshot (the document-only route)"
+  else
+    fail "[$SH] --allow-dod-gaps restores" "rc=$RC out=$OUT"
+  fi
+  rm -f "$L" "$S"
+
+  # 17c — the guard is a conjunction
+  printf '**Final Status:** ✅ PASS\n' > "$DOC/task.9.dod.2.n.md"
+  printf '{"current_step":7,"task_or_story_directory":"%s","halt_reason":"r","halt_step":"7"}\n' "$DOC" > "$S"
+  OUT=$(adv --restore "$DOC" 2>&1); RC=$?
+  [ "$RC" -eq 0 ] && [ -f "$L" ] && pass "[$SH] halt_step 7 with a newest DoD that is not GAPS restores plainly" \
+    || fail "[$SH] halt_step 7, DoD not GAPS" "rc=$RC out=$OUT"
+  rm -f "$L" "$S" "$DOC/task.9.dod.2.n.md"
+  printf '{"current_step":5,"task_or_story_directory":"%s","halt_reason":"r","halt_step":"5"}\n' "$DOC" > "$S"
+  OUT=$(adv --restore "$DOC" 2>&1); RC=$?
+  [ "$RC" -eq 0 ] && [ -f "$L" ] && pass "[$SH] a GAPS DoD under halt_step 5 restores plainly (step-5 snapshots are unaffected)" \
+    || fail "[$SH] halt_step 5 with a GAPS DoD" "rc=$RC out=$OUT"
+  rm -f "$L" "$S"
+
+  # 17d — --halt
+  printf '{"current_step":6,"skill":"develop-task","task_or_story_directory":"%s"}\n' "$DOC" > "$L"
+  : > "$D/state/test-output-a.log"
+  OUT=$(adv --halt --reason "escalated: loop limit" "$DOC" 2>&1); RC=$?
+  if [ "$RC" -eq 0 ] && [ ! -f "$L" ] && [ ! -f "$D/state/test-output-a.log" ] \
+     && [ "$(jq -r .halt_reason "$S")" = "escalated: loop limit" ] && [ "$(jq -r .halt_step "$S")" = "6" ] \
+     && [ "$(jq -r .skill "$S")" = "develop-task" ]; then
+    pass "[$SH] --halt writes the snapshot (reason, step from the lock, lock fields kept), removes the lock and the test logs"
+  else
+    fail "[$SH] --halt" "rc=$RC out=$OUT"
+  fi
+  OUT=$(adv --halt --reason "again" "$DOC" 2>&1); RC=$?
+  if [ "$RC" -eq 0 ] && [ "$(jq -r .halt_reason "$S")" = "escalated: loop limit" ] && echo "$OUT" | grep -q 'already halted'; then
+    pass "[$SH] --halt is idempotent: the second call exits 0 and leaves the first snapshot alone"
+  else
+    fail "[$SH] --halt idempotent" "rc=$RC out=$OUT"
+  fi
+  OUT=$(adv --restore "$DOC" 2>&1); RC=$?
+  if [ "$RC" -eq 0 ] && [ "$(jq -r .current_step "$L")" = "6" ] && [ "$(jq -r 'has("halt_reason")' "$L")" = "false" ]; then
+    pass "[$SH] the snapshot --halt writes round-trips through --restore (step 6, halt fields stripped)"
+  else
+    fail "[$SH] --halt snapshot round-trips" "rc=$RC out=$OUT $(cat "$L" 2>/dev/null)"
+  fi
+  rm -f "$L" "$S"
+  printf '{"current_step":4,"task_or_story_directory":"%s/other"}\n' "$D" > "$L"
+  OUT=$(adv --halt --reason r "$DOC" 2>&1); RC=$?
+  if [ "$RC" -eq 1 ] && [ -f "$L" ] && [ ! -f "$S" ]; then
+    pass "[$SH] --halt refuses another document's lock: nothing halted, lock kept, no snapshot"
+  else
+    fail "[$SH] --halt other document" "rc=$RC out=$OUT"
+  fi
+  rm -f "$L" "$S"
+  OUT=$(adv --halt --reason r "$DOC" 2>&1); RC=$?
+  [ "$RC" -eq 1 ] && pass "[$SH] --halt with no lock and no snapshot exits 1 (nothing to halt)" || fail "[$SH] --halt nothing" "rc=$RC out=$OUT"
+  adv --halt "$DOC" >/dev/null 2>&1; RC=$?
+  [ "$RC" -eq 1 ] && pass "[$SH] --halt without --reason is a usage error (exit 1, this script's usage code)" || fail "[$SH] --halt no reason" "rc=$RC"
+  adv --halt --reason r --step 9 "$DOC" >/dev/null 2>&1; RC=$?
+  [ "$RC" -eq 1 ] && pass "[$SH] --halt --step 9 is refused" || fail "[$SH] --halt bad step" "rc=$RC"
+
+  # 17e — --newest-dod is stem-keyed
+  local E="$D/task.42.y"; mkdir -p "$E"
+  : > "$E/task.42.dod.1.a.md"; : > "$E/task.42.dod.2.b.md"; : > "$E/task.42.bug.1.dod.9.c.md"; : > "$E/task.420.dod.7.d.md"
+  OUT=$(adv --newest-dod "$E")
+  [ "$OUT" = "$E/task.42.dod.2.b.md" ] && pass "[$SH] --newest-dod: the task's own newest DoD, not a co-located bug's or task.420's" \
+    || fail "[$SH] --newest-dod stem" "got $OUT"
+  OUT=$(adv --newest-dod "$D/does-not-exist"); [ -z "$OUT" ] && pass "[$SH] --newest-dod on a missing directory prints nothing" || fail "[$SH] --newest-dod missing" "got $OUT"
+}
+
 run_restore_scenarios bash
 run_no_lock_split bash
 run_complete_records bash
 run_paused_mark_scenarios bash
+run_task276_scenarios bash
 if command -v zsh >/dev/null 2>&1; then
   run_restore_scenarios zsh
   run_no_lock_split zsh
   run_complete_records zsh
   run_paused_mark_scenarios zsh
+  run_task276_scenarios zsh
 else
   echo "  SKIP  zsh interpreter pass for scenarios 13-16 (zsh not on this host)"
 fi

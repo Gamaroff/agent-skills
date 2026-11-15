@@ -347,17 +347,13 @@ If a situation arises that is not in this table or the shared defaults table and
 - **The implementation report is the primary recovery tool.** Always include its path in halt messages.
 - **Snapshot then remove the lock file before every terminal HALT** (same protocol as develop-task):
 
+  Run **one call** — it writes the snapshot, removes the lock and the transient test logs, and is idempotent. Run it **before** the HALT message, never after (a HALT that only printed its message left the lock in place with no snapshot on three runs, obs #49). `--step` defaults to the lock's `current_step`; a non-zero exit means nothing was halted:
+
   ```bash
-  if [ -f .claude/state/develop-pipeline.lock ]; then
-    jq --arg reason "{halt_reason}" --arg step "{halt_step}" --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-       '. + {halted_at: $ts, halt_reason: $reason, halt_step: $step}' \
-       .claude/state/develop-pipeline.lock > .claude/state/develop-pipeline.last-halt.json
-  fi
-  rm -f .claude/state/develop-pipeline.lock
-  find .claude/state -maxdepth 1 -name 'test-output-*.log' -delete 2>/dev/null || true
+  bash .agents/skills/develop-bug/references/advance-pipeline-lock.sh --halt --reason "{halt_reason}" --step {halt_step} {bug-directory}
   ```
 
-  **Two commands, not one `rm` argv.** The lock is a path that must be removed; the logs are a glob that may match nothing. Under zsh — the default shell on every macOS host — an unmatched glob is `nomatch`, which aborts the whole command **before `rm` runs**, so the one-argv form left the lock in place on every HALT that had no test logs to sweep (obs #111). `find -delete` is the glob-free spelling and is a noop on an empty match in every shell. The rule: [`docs/reference/anti-patterns.md`](../../docs/reference/anti-patterns.md) § "Never put a must-succeed path and a glob in one `rm` argv".
+  The script owns the glob-free log sweep (`find -delete`, never an `rm` with a glob: an unmatched glob aborts the whole command under zsh, obs #111). The rule: [`docs/reference/anti-patterns.md`](../../docs/reference/anti-patterns.md) § "Never put a must-succeed path and a glob in one `rm` argv".
 
 - **Signal `blocked` on a terminal HALT** (when `TRACKER=jira`, `TRACKER_ISSUE` is set **and the halt comes after Step 2b**). After the snapshot above, before surfacing the HALT:
 
