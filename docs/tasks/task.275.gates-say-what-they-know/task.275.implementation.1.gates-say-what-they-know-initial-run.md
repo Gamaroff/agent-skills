@@ -3,7 +3,7 @@
 **Task**: `task.275.gates-say-what-they-know.md`
 **Run Number**: 1
 **Started**: 2026-11-15 16:24
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -35,9 +35,9 @@ Add an open-points count slot to the `qa-gate` / `qa-cycle` plain-language leads
 | 2. review-task             | ✅ Done    | `task.275.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT 8/10; 0 critical, 7 important (all fixed), 2 optional | —                    | 2026-11-15T16:28Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Count slot, helper, 5 sites, remedy schema; ci:fast green on .249 | —                    | 2026-11-15T16:49Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #911 opened; no tracker issue to comment on | —                    | 2026-11-15T16:49Z |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.275.qa.{N}.*.md`; `task.275.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.275.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.275.qa.{N}.*.md`; `task.275.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 2 gates PASS 95/100, 1 fix cycle; route 2b exit; 5c APPROVE | —                    | 2026-11-15T17:00Z |
+| 7. finalise                | ✅ Done | `task.275.dod.{N}.*.md`; task `status: accepted`                       | DoD 1 ACCEPTED; wall-time criterion amended (owner-approved); CI reading 2 SUCCESS (tree-equivalent to 519d8cf0c) | —                    | 2026-11-15T17:18Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Report committed with Step 8 | —                    | 2026-11-15T17:19Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -111,7 +111,7 @@ _Track each QA review/fix cycle._
 **Issues Found**: 1 open low — T275-QA-1 (wall-time criterion method); one overclaim in the helper header found by qa-fix's adversarial pass and fixed in 9181242e7
 **HIGH findings**: 0
 **MEDIUM findings**: 0
-**PR Review**: pending — 5c not yet run
+**PR Review**: APPROVE — 1 low coverage finding (PC-1, the wall-time criterion, already carried as T275-QA-1); recorded, not fixed (a criterion is never edited to meet its evidence)
 **Loop exit**: Cosmetic-residue exit taken — PASS gate at cycle 2 with HIGH 0 for cycles 1 and 2; all 1 open findings are LOW and are carried to the gate's recommendations.future by id (T275-QA-1). This is a CLEAN exit, not a stall: nothing is blocked and nothing is being accepted over; a full qa-fix cycle for cosmetic findings is what this route exists to avoid.
 **Action**: Proceeding to 5c (PR conformance review)
 
@@ -119,10 +119,10 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-11-15T17:19Z
+**Final Status**: Completed
 **Branch**: {populated after Step 1}
 **PR**: https://github.com/Gamaroff/agent-skills/pull/911
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 2 gates (PASS 95 each), 1 fix cycle; 5c APPROVE
+**DoD Summary**: ACCEPTED — `task.275.dod.1.gates-say-what-they-know.md`. CI reading 1 SUCCESS @ 519d8cf0c; CI reading 2 SUCCESS (tree-equivalent to 519d8cf0c) @ c030beb47.
+**Tracker debt**: none (no tracker issue linked)
