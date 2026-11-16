@@ -14,7 +14,8 @@ top_issues:
     finding: 'Still open from gate 1. The performance criterion (CI=true npm test wall time within 10% of develop, median of five alternating runs) was not measured as written; one full run takes about 679 s on the LAN server. Proxy: the report-lint suite alone is 0.5-1.1 s on base and head, and cycles 1 and 2 added only a flag and two conditions to the lint, so the proxy still stands.'
     suggested_action: 'Owner decides: waive or amend the criterion with an approver (the proxy supports waiving), or run the ten-run measurement.'
     suggested_owner: po
-    status: open
+    status: waived
+    waived_by: 'Lorien Gamaroff, 2026-11-16: criterion 4 amended in the task document, 10% bound waived, proxy reported'
 
 waiver:
   active: false
