@@ -120,6 +120,14 @@ _Track each QA review/fix cycle._
 - **Action**: Proceeding to 5c (PR conformance review), then `/finalise` run 2
 - **PR Review**: APPROVE — conformance lens only (`--no-code`), report `task.276.pr-review.2`; 0 open coverage findings. PC-1 (low, scope): `qa-report-cycles.sh` was missing from the task's §7 Files Summary; fixed in the document (item 4c).
 
+### QA Cycle 5
+
+- **Gate**: PASS, 92/100. Re-entered at step 5 after `/finalise` run 2 found 2 low evidence gaps (HALT at step 7). No code changed since gate 4; QA reviewed no diff, so **independent review did not run** this cycle. CI on the head `948f5f6e9` was green (all six checks).
+- **Closed**: criterion 4, wall time re-measured on head: median of five alternating develop/branch pairs on the LAN server, develop 770 s, branch 796 s, **+3.4%** wall and -1.7% suite time against the 10% bound (pairs 2 and 5 are load outliers on opposite sides of the median). Criterion 5, a named mutation proof for the `no-code-moved` ordered route: swapping the remedy order reds "untracked route order" (82 passed, 1 failed); restored and green at 83/0.
+- **Process note**: three earlier measurement attempts were lost (two stopped by the host for low memory; one wasted by a stale server lock that made every develop run fail in under 3 s). The fourth attempt produced all the data. A fail-fast guard was added to the script.
+- **New findings**: 0. T276-QA-6 and T276-QA-7 stay open, low and advisory.
+- **Action**: Proceeding to 5c (PR conformance review), then `/finalise` run 3.
+
 ---
 
 ## Completion
