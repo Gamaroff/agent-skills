@@ -1,0 +1,25 @@
+schema: 1
+task: "task.SYNTH.medium-code-and-test"
+gate: CONCERNS
+status_reason: "Two MEDIUMs, one on a production file and one on its own differential-test generator. One mechanism, two files (obs #120)."
+reviewer: "QA Engineer"
+updated: "2026-11-16T12:00:00Z"
+
+top_issues:
+  - id: "CT-001"
+    severity: medium
+    file: "shared/resources/open-coverage.js"
+    finding: "The deny-list misses one shape."
+    suggested_owner: dev
+    status: open
+  - id: "CT-002"
+    severity: medium
+    file: "shared/resources/tests/open-coverage-differential.test.mjs"
+    finding: "The differential generator does not produce that shape."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80

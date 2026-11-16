@@ -50,6 +50,14 @@ const t143 = (n) => fx(`task143-gate-${n}.yml`);
 const t117 = (n) => fx(`task117-gate-${n}.yml`);
 const zeros = (n) => Array.from({ length: n }, () => 0);
 
+// This repository's own `qa.testArtifactGlobs` (skills-config.yaml).
+const TEST_GLOBS = [
+  "evals/**",
+  "tests/**",
+  "skills/*/tests/**",
+  "shared/resources/tests/**",
+];
+
 const UAT = "skills/qa-next/scripts/uat-status.mjs";
 const QA_NEXT_SKILL = "skills/qa-next/SKILL.md";
 
@@ -233,6 +241,59 @@ const ROWS = [
     },
     signal: false,
     reason: "cycle-missing",
+  },
+  // ── task.278 (obs #120): a production file and its own test are one subject ──
+  {
+    label:
+      "row 17 — a production file and its differential-test generator (globs set): fires on the production file",
+    input: {
+      cycle: 2,
+      highCounts: zeros(2),
+      previousGateContent: fx("medium-code-and-test.yml"),
+      latestGateContent: fx("medium-code-and-test.yml"),
+      testArtifactGlobs: TEST_GLOBS,
+    },
+    signal: true,
+    reason: "narrowing-residue",
+    file: "shared/resources/open-coverage.js",
+  },
+  {
+    label:
+      "row 18 — control: the same pair with no globs configured keeps medium-files-differ (an unconfigured consumer folds nothing)",
+    input: {
+      cycle: 2,
+      highCounts: zeros(2),
+      previousGateContent: fx("medium-code-and-test.yml"),
+      latestGateContent: fx("medium-code-and-test.yml"),
+    },
+    signal: false,
+    reason: "medium-files-differ",
+  },
+  {
+    label:
+      "row 19 — control: two unrelated production files still read medium-files-differ with globs set",
+    input: {
+      cycle: 2,
+      highCounts: zeros(2),
+      previousGateContent: fx("medium-two-files.yml"),
+      latestGateContent: fx("medium-two-files.yml"),
+      testArtifactGlobs: TEST_GLOBS,
+    },
+    signal: false,
+    reason: "medium-files-differ",
+  },
+  {
+    label:
+      "row 20 — control: a test file whose production file is not among the MEDIUMs is not folded into another file",
+    input: {
+      cycle: 2,
+      highCounts: zeros(2),
+      previousGateContent: fx("medium-test-and-other.yml"),
+      latestGateContent: fx("medium-test-and-other.yml"),
+      testArtifactGlobs: TEST_GLOBS,
+    },
+    signal: false,
+    reason: "medium-files-differ",
   },
   {
     label: "row 15 — highCounts shorter than the cycle: high-counts-missing",
