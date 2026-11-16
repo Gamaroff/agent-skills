@@ -299,17 +299,17 @@ None identified.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.278.qa.1.qa-loop-readers-read-the-right-thing.md](./task.278.qa.1.qa-loop-readers-read-the-right-thing.md)
-- **Gate File**: [task.278.gate.1.qa-loop-readers-read-the-right-thing.yml](./task.278.gate.1.qa-loop-readers-read-the-right-thing.yml)
+- **Full Report**: [task.278.qa.2.qa-loop-readers-read-the-right-thing.md](./task.278.qa.2.qa-loop-readers-read-the-right-thing.md)
+- **Gate File**: [task.278.gate.2.qa-loop-readers-read-the-right-thing.yml](./task.278.gate.2.qa-loop-readers-read-the-right-thing.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 8531
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Four MEDIUM gaps: no CHANGELOG entry, one existing consumer fixture changed against criterion 3, the globs wiring has no committed test, and the `fix_path` boundary has no engine probe.
+Cycle 1's findings QA-1, QA-3 and QA-4 are closed. Three MEDIUM findings remain: the criterion-3 deviation awaits an approver, a `./` or trailing-slash work-item directory drops a legitimate `fix_path`, and a dash-prefix test stem folds onto an unrelated production file.
 
 <!-- change-log-start -->
 ## Change Log
@@ -322,6 +322,8 @@ Four MEDIUM gaps: no CHANGELOG entry, one existing consumer fixture changed agai
 | 2026-11-16 | 1.2     | Implemented: gate reader keys at key position, residue fold, `fix_path` carry | develop     |
 | 2026-11-16 |         | QA gate CONCERNS (90/100) — 4 MEDIUM findings            | qa-task     |
 | 2026-11-16 |         | QA findings fixed — 3 of 4 closed, T278-QA-2 escalated (1 iteration) | qa-fix      |
+| 2026-11-16 |         | QA gate CONCERNS (90/100) — 3 MEDIUM findings            | qa-task     |
+| 2026-11-16 |         | QA findings fixed — QA-5 and QA-6 closed, T278-QA-2 still needs an approver (2 iterations) | qa-fix      |
 <!-- change-log-end -->
 
 ---

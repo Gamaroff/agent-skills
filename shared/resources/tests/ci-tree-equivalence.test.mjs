@@ -3511,3 +3511,22 @@ test("fixPathTarget: the probe corpus's hostile cases answer null and its legiti
     assert.equal(eng.fixPathTarget(v, dir, globs), null);
   }
 });
+
+// T278-QA-5: the work-item directory is normalised like the file, so one directory spelled four ways
+// still matches its own file, and a different directory still does not (both directions).
+test("fixPathTarget: every spelling of the work-item directory matches its own file, and only its own", () => {
+  const globs = eng.DEFAULT_PATTERNS;
+  const file = "docs/tasks/t/a.md";
+  for (const dir of [
+    "docs/tasks/t",
+    "./docs/tasks/t",
+    "docs/tasks//t",
+    "docs/tasks/t/",
+    "docs/tasks/x/../t",
+  ]) {
+    assert.equal(eng.fixPathTarget(file, dir, globs), file, dir);
+  }
+  for (const dir of ["docs/tasks/u", "docs/tasks", "docs/tasks/t/sub", "."]) {
+    assert.equal(eng.fixPathTarget(file, dir, globs), null, dir);
+  }
+});

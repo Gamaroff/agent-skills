@@ -296,6 +296,19 @@ const ROWS = [
     reason: "medium-files-differ",
   },
   {
+    label:
+      "row 21 — control (T278-QA-6): a test whose name only shares a dash-prefix with a production file (`user-service` vs `user`) is a second subject",
+    input: {
+      cycle: 2,
+      highCounts: zeros(2),
+      previousGateContent: fx("medium-code-and-prefix-test.yml"),
+      latestGateContent: fx("medium-code-and-prefix-test.yml"),
+      testArtifactGlobs: TEST_GLOBS,
+    },
+    signal: false,
+    reason: "medium-files-differ",
+  },
+  {
     label: "row 15 — highCounts shorter than the cycle: high-counts-missing",
     input: {
       cycle: 3,

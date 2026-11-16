@@ -748,9 +748,28 @@ const NARROWING_WINDOW = 2; // gates compared: cycle N's and cycle N-1's (task.1
 // it (an unconfigured consumer folds nothing, as the diminishing-returns exit
 // stays off); it is `<dir>/tests/<stem>.test.<ext>`; and a production file that
 // matches no glob sits at `<dir>/<stem'>` (any extension) among the SAME
-// MEDIUMs, where `<stem'>` is `<stem>` or `<stem>` cut back at a `-`. The
-// longest such stem wins. A test whose production file is not among the MEDIUMs
-// stays as it is, so the fold never hides a second, different subject.
+// MEDIUMs, where `<stem'>` is `<stem>` or `<stem>` with trailing `-<kind>`
+// segments removed, each `<kind>` one of TEST_KIND_SUFFIXES. The longest such
+// stem wins. A test whose production file is not among the MEDIUMs stays as it
+// is, so the fold never hides a second, different subject.
+//
+// The suffix list is an allow-list on purpose (T278-QA-6). A cut at ANY dash
+// folded `src/tests/user-service.test.ts` onto `src/user.ts`, two subjects, into
+// a false "one mechanism" offer. A name alone cannot tell `open-coverage` +
+// `-differential` (a test kind) from `user` + `-service` (another module), so
+// only a named kind is cut and everything else stays a separate subject.
+const TEST_KIND_SUFFIXES = new Set([
+  "differential",
+  "property",
+  "fuzz",
+  "integration",
+  "unit",
+  "e2e",
+  "regression",
+  "contract",
+  "snapshot",
+]);
+
 function foldTestFilesIntoSubjects(files, globs) {
   if (!Array.isArray(globs) || globs.length === 0) return files;
   const noExt = (p) => p.replace(/\.[^./]+$/, "");
@@ -769,7 +788,7 @@ function foldTestFilesIntoSubjects(files, globs) {
       const hit = production.get(dir + stem);
       if (hit) return hit;
       const cut = stem.lastIndexOf("-");
-      if (cut <= 0) return f;
+      if (cut <= 0 || !TEST_KIND_SUFFIXES.has(stem.slice(cut + 1))) return f;
       stem = stem.slice(0, cut);
     }
   });

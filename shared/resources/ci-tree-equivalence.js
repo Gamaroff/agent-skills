@@ -176,8 +176,12 @@ function isDocsPath(file, globs) {
 function fixPathTarget(raw, workItemDir, globs) {
   if (typeof raw !== "string" || typeof workItemDir !== "string") return null;
   const f = path.posix.normalize(raw.replace(/^["']|["']$/g, ""));
+  // Both sides are normalised: `./docs/tasks/t`, `docs/tasks//t` and `docs/tasks/t/` name the same
+  // directory as `docs/tasks/t`, and comparing one spelling to another dropped a legitimate
+  // fix_path (T278-QA-5). `normalize` keeps a trailing slash, so it is removed.
+  const dir = path.posix.normalize(workItemDir).replace(/\/+$/, "");
   return f.endsWith(".md") &&
-    path.posix.dirname(f) === workItemDir &&
+    path.posix.dirname(f) === dir &&
     isDocsPath(f, globs)
     ? f
     : null;

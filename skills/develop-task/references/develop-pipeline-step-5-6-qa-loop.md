@@ -1079,7 +1079,7 @@ its row before running the block:
 | `$HIGH_SEQUENCE_JSON` | the `**HIGH findings**` rows of the `### QA Cycle {N}` entries in QA Iteration History, oldest first, as a JSON array — the same value the Diminishing-returns exit reads; do **not** recount it from the gates |
 | `$GATE_N` | cycle `N`'s gate — the path **Finding the Latest Gate File** resolves (`…gate.{N}.{name}.yml`); the same path the Diminishing-returns exit's table names `$LATEST_GATE` |
 | `$GATE_N1` | cycle `N-1`'s gate (`…gate.{N-1}.{name}.yml`, same directory). **Empty at cycle 1**, which the engine reads as `below-cycle-floor` — do not substitute another gate |
-| `$TEST_ARTIFACT_GLOBS_JSON` | `qa.testArtifactGlobs` as a JSON array, the same value the Diminishing-returns exit reads (**absent ⇒ `[]`**). It lets the engine count a production file and its own test (`<dir>/tests/<stem>.test.<ext>`) as one subject, so a MEDIUM on each is one mechanism, not two files; with `[]` nothing folds and the check reads exactly as before (task.278, obs #120) |
+| `$TEST_ARTIFACT_GLOBS_JSON` | `qa.testArtifactGlobs` as a JSON array, the same value the Diminishing-returns exit reads (**absent ⇒ `[]`**). It lets the engine count a production file and its own test (`<dir>/tests/<stem>.test.<ext>`, or `<stem>-<kind>.test.<ext>` for a named kind such as `differential`, `property` or `fuzz`) as one subject, so a MEDIUM on each is one mechanism, not two files; with `[]` nothing folds and the check reads exactly as before (task.278, obs #120) |
 
 ```bash
 NARROWING_JSON=$(command node -e '
