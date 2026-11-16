@@ -118,6 +118,7 @@ _Track each QA review/fix cycle._
 - **New findings**: 0. T276-QA-6 and T276-QA-7 stay open, low and advisory, carried in the gate's `recommendations.future`.
 - **HIGH findings**: 0
 - **Action**: Proceeding to 5c (PR conformance review), then `/finalise` run 2
+- **PR Review**: APPROVE — conformance lens only (`--no-code`), report `task.276.pr-review.2`; 0 open coverage findings. PC-1 (low, scope): `qa-report-cycles.sh` was missing from the task's §7 Files Summary; fixed in the document (item 4c).
 
 ---
 

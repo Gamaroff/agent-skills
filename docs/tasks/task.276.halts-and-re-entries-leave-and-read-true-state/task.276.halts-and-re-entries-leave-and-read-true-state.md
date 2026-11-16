@@ -179,6 +179,7 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 4. ✅ `shared/resources/develop-pipeline-step-5-6-qa-loop.md`, `develop-pipeline-step-7-finalise.md`, `develop-pipeline-resume-contract.md`
 4a. ✅ `skills/develop-story/SKILL.md`, `skills/develop-task/SKILL.md`, `skills/develop-bug/SKILL.md` - the HALT fences
 4b. ✅ `shared/resources/resume-prompt-check.sh` (new)
+4c. ✅ `shared/resources/qa-report-cycles.sh` (new) and its test - the one distinct-cycle count that `reenter-qa-after-finalise.sh`, `grant-qa-cycles.sh` and the resume detector prompt now share
 
 ### Files to Modify (Tests)
 
