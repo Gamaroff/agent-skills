@@ -626,3 +626,40 @@ test("G — traceability is read only on cycle entries in QA Iteration History, 
   assert.deepEqual(codes(r), ["traceability-missing"]);
   assert.match(r.problems[0].detail, /QA Cycle 2/);
 });
+
+test("G — the suffix rule reads only QA Iteration History: a suffixed Decisions Log note in a marked report is not flagged (T277-5)", () => {
+  const note = (text) =>
+    cycleReport(cycle(1)).replace(
+      "## Decisions Log\n\nbody\n",
+      `## Decisions Log\n\n${text}\n\nbody\n`,
+    );
+  const withNote = note("### QA Cycle 2 — qa-fix choice");
+  assert.notEqual(withNote, cycleReport(cycle(1)), "the note was added");
+  // Must now leave alone: the note sits under the Decisions Log.
+  assert.deepEqual(codes(lintReport(withNote, { sections: SECTIONS })), []);
+  // Must still catch: the same suffixed heading as a real history entry.
+  assert.deepEqual(
+    codes(
+      lintReport(cycleReport(`${cycle(1)}\n### QA Cycle 2 — qa-fix choice\n`), {
+        sections: SECTIONS,
+      }),
+    ),
+    ["qa-cycle-heading-suffix", "traceability-missing"],
+  );
+});
+
+test("G — the marker counts only in the header block: one after the first `## ` heading marks nothing (T277-6)", () => {
+  const suffixed = "### QA Cycle 1 — qa-fix (5b)\n";
+  const late = cycleReport(suffixed, { marked: false }).replace(
+    "\n## Decisions Log",
+    "\n**Report format**: 2\n\n## Decisions Log",
+  );
+  assert.match(late, /^\*\*Report format\*\*: 2$/m, "the marker is present");
+  // Unmarked in effect: the report lints as before, with neither marker-gated code.
+  assert.deepEqual(codes(lintReport(late, { sections: SECTIONS })), []);
+  // Control: the same marker in the header block applies both rules.
+  assert.deepEqual(
+    codes(lintReport(cycleReport(suffixed), { sections: SECTIONS })),
+    ["qa-cycle-heading-suffix", "traceability-missing"],
+  );
+});

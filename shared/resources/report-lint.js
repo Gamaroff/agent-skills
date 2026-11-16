@@ -34,7 +34,8 @@
  *   section-out-of-order     a template section appears before one the template places earlier
  *                            (one per report — the first offending heading)
  *   qa-cycle-duplicated      the same `### QA Cycle N` heading appears more than once
- *   qa-cycle-heading-suffix  in a MARKED report, an H3 `### QA Cycle N` heading whose remainder names
+ *   qa-cycle-heading-suffix  in a MARKED report, an H3 `### QA Cycle N` heading under
+ *                            `## QA Iteration History` whose remainder names
  *                            a qa-fix record or a step marker (`qa-fix`, `(5a|5b|5c)`). A qa-fix
  *                            record is an H4 under its cycle's H3 (task.277, obs #92). The claim is
  *                            bounded: a suffixed H3 and a repeated N are caught; H4 content is not
@@ -214,6 +215,7 @@ function lintReport(text, opts = {}) {
   const cycleEntries = []; // { n, idx } — each `### QA Cycle N` heading inside `## QA Iteration History`, in order
   let marked = false; // the report carries `**Report format**: 2`
   let inHistory = false; // the last `## ` heading read was `## QA Iteration History`
+  let seenH2 = false; // a `## ` heading has been read: the header block is over
   let maxIdx = -1;
   let outOfOrderReported = false;
   let lastSectionFirstLine = null;
@@ -256,7 +258,9 @@ function lintReport(text, opts = {}) {
       continue;
     }
     if (REPORT_FORMAT_MARKER.test(l)) {
-      marked = true;
+      // The marker is a header-block line: one after the first `## ` heading marks nothing, so the
+      // rules that need it see one value however the report was edited (task.277 QA cycle 2, T277-6).
+      if (!seenH2) marked = true;
       continue;
     }
     const qa = /^### QA Cycle (\d+)\b/.exec(l);
@@ -266,8 +270,10 @@ function lintReport(text, opts = {}) {
       // Decisions Log is a decision note and carries no Traceability row (task.277 QA cycle 1, T277-3).
       if (inHistory) cycleEntries.push({ n, idx: i });
       // A report written before the marker lints as before, so the heading rule needs the marker too
-      // (task.277 QA cycle 1, T277-2: the accepted task.2 report gained a problem without it).
-      if (marked && QA_HEADING_SUFFIX.test(l.slice(qa[0].length)))
+      // (task.277 QA cycle 1, T277-2: the accepted task.2 report gained a problem without it), and a
+      // note under another section is not a cycle entry, so it needs the history section as well
+      // (QA cycle 2, T277-5).
+      if (marked && inHistory && QA_HEADING_SUFFIX.test(l.slice(qa[0].length)))
         problems.push({
           code: "qa-cycle-heading-suffix",
           line: ln,
@@ -287,6 +293,7 @@ function lintReport(text, opts = {}) {
     const h2 = /^## (.+?)\s*$/.exec(l);
     if (!h2) continue;
     const name = h2[1].trim();
+    seenH2 = true;
     inHistory = name === "QA Iteration History";
     if (!order.has(name)) continue; // not a template section — ignored by every check
     const idx = order.get(name);

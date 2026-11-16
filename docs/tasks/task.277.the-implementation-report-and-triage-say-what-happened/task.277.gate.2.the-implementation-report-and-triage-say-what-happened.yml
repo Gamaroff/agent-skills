@@ -1,0 +1,85 @@
+schema: 2
+task: 'task.277.the-implementation-report-and-triage-say-what-happened'
+task_title: 'The implementation report and triage say what happened'
+gate: PASS
+status_reason: 'Cycle 1 fixes verified: CHANGELOG cites task 277, the suffix rule needs the marker, traceability reads only QA Iteration History; problem counts match develop (72 in 23 reports). The refute pass found two low scope gaps in the same lint (a Decisions Log cycle heading still reaches the suffix check; the marker is read mid-pass) and the performance criterion is still unmeasured as written.'
+reviewer: 'QA Engineer'
+head: 'd8c9f1d435b2035f1ca5eed4ed754b24bf561067'
+updated: '2026-11-16T15:21:30Z'
+
+top_issues:
+  - id: 'T277-5'
+    severity: low
+    file: 'shared/resources/report-lint.js'
+    finding: 'origin: code-review, reproduced by QA (reviewer confidence medium, recorded unchanged). The qa-cycle-heading-suffix check runs on every `### QA Cycle N` heading, not only those under `## QA Iteration History`, so in a marked report a Decisions Log note `### QA Cycle 2 — qa-fix choice` gets a false qa-cycle-heading-suffix (reproduced on a copy of the task.118 fixture with the history body replaced). Control: the same report without the note lints clean, and the same note in an unmarked report lints clean. The same note headed `### QA Cycle 1` beside the real entry gives qa-cycle-duplicated, but that code predates this change, so it is recorded as pre-existing and not a finding.'
+    suggested_action: 'Gate the suffix check on `inHistory` as the traceability collection is, and add a test with a marked report that has a Decisions Log `### QA Cycle N — qa-fix` heading.'
+    suggested_owner: dev
+    status: open
+  - id: 'T277-6'
+    severity: low
+    file: 'shared/resources/report-lint.js'
+    finding: 'origin: code-review, reproduced by QA (reviewer confidence low, recorded unchanged). `marked` is read during the single pass, so a marker line placed after the first cycle headings enables the traceability check and not the suffix check: a suffixed H3 with a late marker gives only traceability-missing (reproduced). Control: with the marker in the header block both rules apply. The template writes the marker in the header block only, so this needs a hand-edited report.'
+    suggested_action: 'Read the marker only before the first `## ` heading (the header block), or detect it in a pre-pass, so both rules use one value.'
+    suggested_owner: dev
+    status: open
+  - id: 'T277-4'
+    severity: low
+    file: 'docs/tasks/task.277.the-implementation-report-and-triage-say-what-happened/task.277.the-implementation-report-and-triage-say-what-happened.md'
+    finding: 'Still open from gate 1. The performance criterion (CI=true npm test wall time within 10% of develop, median of five alternating runs) was not measured as written; one full run takes about 679 s on the LAN server. Proxy: the report-lint suite alone is 0.5-1.1 s on base and head. Cycle 1 added no code outside the lint and its test, so the proxy still stands.'
+    suggested_action: 'Owner decides: waive or amend the criterion with an approver (the proxy supports waiving), or run the ten-run measurement.'
+    suggested_owner: po
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 21
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 15
+    escaped: 0
+    boundary: true
+    boundary_signals: []
+    notes: 'The probe run record from cycle 1 stands: lintReport was probed with the markdown-structure corpus (15 cases, 0 escaped). Cycle 1 changed only which headings two rules read, with no new input path; re-probed by the refute reviewer reading, not executing, so this is not a new measurement.'
+  performance:
+    status: PASS
+    notes: 'Proxy only; see T277-4.'
+  reliability:
+    status: PASS
+    notes: 'The lint never writes or repairs. Full ci:fast on the fixed tree (LAN server, CI=true): 8512 tests, 0 failed, 3 skipped. CI on the PR head d8c9f1d43 was pending when read, so it changes nothing here.'
+  maintainability:
+    status: PASS
+    notes: 'One definition of each code; bundle --check reports 0 problems over 129 skills. T277-5 and T277-6 are scope gaps in the lint, both low.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Step 4b reports file-level findings on develop-pipeline-step-3-develop-loop.md (1) and develop-pipeline-resume-contract.md (2) in blocks this change did not touch; look at them in a separate pass.'
+      refs: ['shared/resources/develop-pipeline-step-3-develop-loop.md', 'shared/resources/develop-pipeline-resume-contract.md']
+      remedy: unverified
+      provenance: pre-existing
+    - action: 'qa-cycle-duplicated fires on a `### QA Cycle N` heading outside QA Iteration History (a Decisions Log note repeating an N). The code is older than this change; scope it to the history section in a follow-up.'
+      refs: ['shared/resources/report-lint.js']
+      remedy: unverified
+      provenance: pre-existing
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions:
+    - 'T277-4 (performance criterion) needs an owner decision before acceptance'
