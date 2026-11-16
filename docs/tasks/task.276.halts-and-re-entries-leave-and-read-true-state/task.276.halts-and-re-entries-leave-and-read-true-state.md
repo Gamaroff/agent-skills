@@ -8,7 +8,7 @@ category: refactoring
 status: ready-for-review
 priority: Medium
 created: 2026-11-06
-updated: 2026-11-15
+updated: 2026-11-16
 estimated_effort_hours: 16
 ---
 
@@ -315,24 +315,29 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
-**Testing Date**: 2026-11-15
-**Quality Score**: 85/100
-**Gate Decision**: CONCERNS
+**Testing Date**: 2026-11-16
+**Quality Score**: 92/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.276.qa.2.halts-and-re-entries-leave-and-read-true-state.md](./task.276.qa.2.halts-and-re-entries-leave-and-read-true-state.md)
-- **Gate File**: [task.276.gate.2.halts-and-re-entries-leave-and-read-true-state.yml](./task.276.gate.2.halts-and-re-entries-leave-and-read-true-state.yml)
+- **Full Report**: [task.276.qa.3.halts-and-re-entries-leave-and-read-true-state.md](./task.276.qa.3.halts-and-re-entries-leave-and-read-true-state.md)
+- **Gate File**: [task.276.gate.3.halts-and-re-entries-leave-and-read-true-state.yml](./task.276.gate.3.halts-and-re-entries-leave-and-read-true-state.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 8504
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle-1 findings T276-QA-1, QA-2 and QA-4 are fixed. Open: the wall-time success criterion is unmeasured (medium, needs a decision), and the new lock-directory comparison misreads a relative lock directory from another cwd (low).
+T276-QA-5 is fixed and mutation-proven, and the wall-time criterion is measured at +0.8% (median of five alternating pairs, bound 10%). Two low edge cases in the new relative-lock guard are open and advisory; no writer in the pipeline produces the lock values that trigger them.
+
+## Deferred Work
+
+- **T276-QA-6** (LOW) — carried to gate 3 `recommendations.future` (route 2b, cycle 3): a `./` lock directory is called unresolvable by the relative-lock guard in `resume-prompt-check.sh`; no writer emits it
+- **T276-QA-7** (LOW) — carried to gate 3 `recommendations.future` (route 2b, cycle 3): a stale relative lock directory answers `cannot tell` with a message that blames the cwd; the strip expression is written twice
 
 <!-- change-log-start -->
 ## Change Log
@@ -347,6 +352,7 @@ Cycle-1 findings T276-QA-1, QA-2 and QA-4 are fixed. Open: the wall-time success
 | 2026-11-15 |         | QA findings fixed, iteration 1 — 3 of 4 closed; wall-time criterion left open | qa-fix      |
 | 2026-11-15 |         | QA gate CONCERNS (85/100) — 2 findings                               | qa-task     |
 | 2026-11-15 |         | QA findings fixed, iteration 2 — T276-QA-5 closed; wall-time criterion left open | qa-fix      |
+| 2026-11-16 |         | QA gate PASS (92/100) — 2 findings; wall-time criterion measured, +0.8% | qa-task     |
 <!-- change-log-end -->
 
 ---
