@@ -35,7 +35,7 @@ First automated run of task 276 (develop-next, `--defaults`): HALT helper and re
 | 2. review-task             | ✅ Done | `task.276.review.{N}.{name}.md` exists (or skip logged)                | review.1: 2 Critical + 6 Important fixed; 8/10; guard re-keyed (no writer emits `finalise-dod-gaps`) | —                    | 2026-11-15T17:55Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | 4 phases built inline; remote CI-parity suite 8497 pass / 0 fail; mutation proofs: guard, distinct base, --halt | —                    | 2026-11-15T19:24Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #913 → develop (no tracker issue, so no issue comment) | —                    | 2026-11-15T19:40Z |
-| 5–6. qa-task / qa-fix loop | ✅ Done | `task.276.qa.{N}.*.md`; `task.276.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 3 gates: CONCERNS 80, CONCERNS 85, PASS 92; 5c CONCERNS, 0 open coverage; wall time +0.8% | —                    | 2026-11-16T06:17Z |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.276.qa.{N}.*.md`; `task.276.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 4 gates: CONCERNS 80, CONCERNS 85, PASS 92, PASS 92 (cycle 4 re-entered after DoD run 1 gaps); 5c CONCERNS at cycle 3, 0 open coverage; wall time +0.8% | —                    | 2026-11-16T06:17Z |
 | 7. finalise                | 🛑 Halted | `task.276.dod.{N}.*.md`; task `status: accepted`                       | dod.1: GAPS — 5 gaps (criteria 2, 5, 7, 8 and one stale behaviour-doc line); security 44 probes / 0 reproduced; head CI test job still running | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
@@ -110,6 +110,14 @@ _Track each QA review/fix cycle._
 - **Action**: Proceeding to 5c (PR conformance review)
 - **Loop exit**: Cosmetic-residue exit taken — PASS gate at cycle 3 with HIGH 0 for cycles 2 and 3; all 2 open findings are LOW and are carried to the gate's recommendations.future by id (T276-QA-6, T276-QA-7). This is a CLEAN exit, not a stall: nothing is blocked and nothing is being accepted over; a full qa-fix cycle for cosmetic findings is what this route exists to avoid.
 - **PR Review**: CONCERNS — conformance lens only (`--no-code`), report `task.276.pr-review.1`; 0 open coverage findings. PC-2 (medium): no `pr_number` in the task frontmatter, which `/finalise` writes at acceptance. PC-1 and PC-3 (low): unticked checkboxes and an unfilled Completion line, both finalise's. Nothing sent back to 5b; nothing fixed in the carry (no doc-only finding names one clean tracked file).
+
+### QA Cycle 4
+
+- **Gate**: PASS, 92/100. Re-entered at step 5 after `/finalise` run 1 found 5 gaps (HALT at step 7). Scoped to the files changed since gate 3; QA read the 18-line delta inline, so **independent review did not run** this cycle. CI on the head `5abb1c99c` was green.
+- **Closed**: all 5 DoD gaps, with committed evidence: the ordered refusal-then-re-entry test (criterion 2), four mutation proofs that each red a committed test (criterion 5), `lint:shell` clean on 145 scripts on the LAN server (criterion 7), the re-measured caller list (criterion 8), three corrected behaviour docs.
+- **New findings**: 0. T276-QA-6 and T276-QA-7 stay open, low and advisory, carried in the gate's `recommendations.future`.
+- **HIGH findings**: 0
+- **Action**: Proceeding to 5c (PR conformance review), then `/finalise` run 2
 
 ---
 

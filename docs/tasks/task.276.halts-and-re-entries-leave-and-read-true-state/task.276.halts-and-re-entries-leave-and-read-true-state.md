@@ -322,17 +322,17 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 **Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.276.qa.3.halts-and-re-entries-leave-and-read-true-state.md](./task.276.qa.3.halts-and-re-entries-leave-and-read-true-state.md)
-- **Gate File**: [task.276.gate.3.halts-and-re-entries-leave-and-read-true-state.yml](./task.276.gate.3.halts-and-re-entries-leave-and-read-true-state.yml)
+- **Full Report**: [task.276.qa.4.halts-and-re-entries-leave-and-read-true-state.md](./task.276.qa.4.halts-and-re-entries-leave-and-read-true-state.md)
+- **Gate File**: [task.276.gate.4.halts-and-re-entries-leave-and-read-true-state.yml](./task.276.gate.4.halts-and-re-entries-leave-and-read-true-state.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 8504
+- **Tests Executed**: 8506
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-T276-QA-5 is fixed and mutation-proven, and the wall-time criterion is measured at +0.8% (median of five alternating pairs, bound 10%). Two low edge cases in the new relative-lock guard are open and advisory; no writer in the pipeline produces the lock values that trigger them.
+The five gaps from the first `/finalise` run are closed with committed evidence: an ordered refusal-then-re-entry test, four mutation proofs that each red a committed test, a clean shell lint on 145 scripts, a re-measured caller list and three corrected behaviour docs. No new finding. Two low edge cases from gate 3 stay open and advisory.
 
 ## Deferred Work
 
@@ -379,6 +379,7 @@ QA gate 3 is PASS (92/100) and the security probes held (44 executed, 0 reproduc
 | 2026-11-15 |         | QA findings fixed, iteration 2 — T276-QA-5 closed; wall-time criterion left open | qa-fix      |
 | 2026-11-16 |         | QA gate PASS (92/100) — 2 findings; wall-time criterion measured, +0.8% | qa-task     |
 | 2026-11-16 |  | DoD incomplete — 5 gaps identified | finalise |
+| 2026-11-16 |  | QA gate PASS (92/100) — 0 findings; the 5 DoD gaps closed with committed evidence | qa-task |
 <!-- change-log-end -->
 
 ---
