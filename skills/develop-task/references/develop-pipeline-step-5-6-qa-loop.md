@@ -490,6 +490,7 @@ Log the result in the QA Iteration History section:
 **Issues Found**: {count and brief descriptions, or "none"}
 **HIGH findings**: {HIGH_N}
 **MEDIUM findings**: {MEDIUM_N}
+**Traceability**: {mapped / skipped ({reason})}
 **PR Review**: {pending — 5c not yet run / APPROVE / CONCERNS / REQUEST CHANGES / review failed / not reached — gate did not exit the loop}
 **Loop exit**: {n/a — this exit not taken / the `describeLoopRoute()` message verbatim / residual accepted by {approver} on {date} (accept-qa-residual)}
 **Action**: {Proceeding to 5c (PR conformance review) / Running qa-fix (cycle N of {QA_MAX_CYCLES}) / Escalating — loop not converging / Escalating — loop limit reached}
@@ -504,6 +505,16 @@ The `**HIGH findings**` line is not decoration: it is the persisted sequence the
 check** below compares across cycles, and the only place a resumed run can read the earlier counts
 back from. Write it on every cycle, including one that found none (`0`). `**MEDIUM findings**` is
 the engine's count (`countRaised()`, Convergence check step 2), written every cycle, `0` included.
+
+`**Traceability**` records what the pre-step above did, and it is written on **every** cycle of a
+report carrying `**Report format**: 2`, whatever the mode: `mapped` when the mapper's matrix was
+written, otherwise `skipped (reason)` — `skipped (lite mode)`, `skipped (no Acceptance Criteria
+section)`, `skipped (two or fewer ACs)`, `skipped (no Success Criteria table)`, `skipped (mapper
+failed)`, or `skipped (run outside the loop)` for an entry a script or a resume back-fills. On cycle
+2 and later the mapper is not re-run; write `mapped` only when this cycle's pre-step produced a matrix,
+else `skipped (not re-run — cycle {N})`. `report-lint.js` reports `traceability-missing` and
+`traceability-reason-missing` on a marked report (task.277, obs #124): on task.242 cycles 1 to 5 ran
+without the mapper while both dispatch conditions held, and nothing in the report said so.
 
 `**PR Review**` follows the same rule for the same reason, but note **who writes it and when**: 5a
 writes the row when it writes the entry, and at that moment no 5c verdict exists. On any gate that
@@ -928,6 +939,15 @@ Log in Decisions Log, once per cycle: "QA Cycle {N} — changes-requested: {land
 #### Invoke qa-fix
 
 Invoke the `/qa-fix` skill with the path to the most recent **gate file** (the `.yml` file located using the sort command above). The gate file is the authoritative source of issues for qa-fix.
+
+**A qa-fix record is an H4 under its cycle's H3 — never a second H3 and never a suffix on the cycle's
+heading (obs #92).** When this cycle's fix result goes into QA Iteration History, write it as
+`#### qa-fix (5b)` directly under that cycle's `### QA Cycle {N} — {YYYY-MM-DD}` entry. On task.230
+each qa-fix pass was logged as `### QA Cycle {N} — qa-fix (5b)`, and
+`grep -cE '^### (QA|Verify) Cycle'` returned 7 for four cycles; it returned 4 once they were H4s.
+Finalise's PR comment and the resume contract both count the H3 cycle headings, so the number of
+`### QA Cycle` headings must equal the number of cycles run. `report-lint.js` reports a suffixed H3
+(`qa-cycle-heading-suffix`) and a repeated N (`qa-cycle-duplicated`); it does not read the H4's text.
 
 #### Third-strike rule — replace, do not patch again
 

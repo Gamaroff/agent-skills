@@ -645,7 +645,7 @@ This convention ensures the cycle budget is respected across resumes.
    entry to QA Iteration History, in cycle order, so the Convergence check and the route classifier
    read a complete sequence: the gate verdict, `**HIGH findings**` (the Convergence check's awk over
    that gate), `**MEDIUM findings**` (`countRaised`), `**PR Review**: not reached — gate did not
-   exit the loop`, `**Loop exit**: n/a — this exit not taken`, `**Action**` from the gate's queue by
+   exit the loop`, `**Traceability**: skipped (run outside the loop)`, `**Loop exit**: n/a — this exit not taken`, `**Action**` from the gate's queue by
    the Outcome branching's arms, and — directly under the heading — `**Origin**: run outside the
    loop (operator)`. The back-filled entry is a record of a cycle that ran, not a claim that the
    pipeline ran it.
