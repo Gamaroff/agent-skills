@@ -78,6 +78,13 @@ reading, composed rather than read (obs #230). The same session's gate timestamp
 same way and emptied the next cycle's scope; a reviewer time feeds no program today, but a report
 that states times nobody measured teaches the reader to trust the ones that do.
 
+**The rule covers every time the report states, not only subagent dispatches (obs #6).** A time in a
+Pipeline Progress Notes cell, a Decisions Log entry, an Issues Log entry or a QA Iteration History
+line comes from `date -u` read in a tool call at that moment, or from a completion notice's
+`duration_ms`; with neither, write `(not measured)`. Recalled step times written into Notes cells and
+Decisions Log entries read earlier than the next measured `date -u` on task.201's run (obs #6). The
+Step Transition Protocol's action 2 states the same rule where the `Completed (UTC)` cell is filled.
+
 **Output-file size is not a liveness signal.** A subagent's output file is a transcript that grows in
 bursts; a small file is consistent with an agent that is reading, thinking, or blocked on a tool, and
 a stale size reading is consistent with a working agent whose last write has not flushed. Deciding

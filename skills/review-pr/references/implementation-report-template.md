@@ -29,6 +29,14 @@ variant's `started`, `date -u +%Y-%m-%dT%H:%MZ` for a log line), run in the same
 report, and always UTC. A time typed from memory drifts, or mixes local time with UTC, and nothing
 fails when it does (obs #164).
 
+**`**Report format**: 2` is the marker that opts a report into the traceability checks** (task.277).
+The task and story variants write it in the header block; the bug variant does not, because it has no
+mapper. `report-lint.js` requires a `**Traceability**: mapped | skipped (reason)` row on every
+`### QA Cycle {N}` entry of a report that carries the marker, and checks nothing of the kind on one
+that does not — so a report written before this marker lints exactly as it did. The row's own
+template is the cycle-entry block in `develop-pipeline-step-5-6-qa-loop.md`. Task and story reports
+have no frontmatter, which is why the marker is a header line.
+
 **`## Tracker Actions Required` is optional by contract**, not by accident: the template's own text
 says to omit the section entirely when the tracker-actions journal is empty, because an empty
 heading reads as "nothing was deferred" in the same shape it would read as "the renderer broke".
@@ -47,6 +55,7 @@ Created as `story.{P}.{E}.{S}.implementation.{N}.{descriptive-name}.md` in the s
 **Run Number**: {N}
 **Started**: {YYYY-MM-DD HH:MM}
 **Status**: In Progress
+**Report format**: 2
 
 ---
 
@@ -145,6 +154,7 @@ Created as `task.{id}.implementation.{N}.{descriptive-name}.md` in the task dire
 **Run Number**: {N}
 **Started**: {YYYY-MM-DD HH:MM}
 **Status**: In Progress
+**Report format**: 2
 
 ---
 

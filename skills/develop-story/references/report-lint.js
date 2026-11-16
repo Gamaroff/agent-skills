@@ -35,11 +35,28 @@
  *   section-out-of-order     a template section appears before one the template places earlier
  *                            (one per report — the first offending heading)
  *   qa-cycle-duplicated      the same `### QA Cycle N` heading appears more than once
+ *   qa-cycle-heading-suffix  in a MARKED report, an H3 `### QA Cycle N` heading under
+ *                            `## QA Iteration History` whose remainder names
+ *                            a qa-fix record or a step marker (`qa-fix`, `(5a|5b|5c)`). A qa-fix
+ *                            record is an H4 under its cycle's H3 (task.277, obs #92). The claim is
+ *                            bounded: a suffixed H3 and a repeated N are caught; H4 content is not
+ *                            judged
+ *   traceability-missing     a cycle entry (a `### QA Cycle N` under `## QA Iteration History`) of a
+ *                            MARKED report carries no `**Traceability**:` row, or one whose value is
+ *                            neither `mapped` nor `skipped (reason)` (obs #124)
+ *   traceability-reason-missing  `**Traceability**: skipped` with no parenthesised reason
  *   header-block-duplicated  a second `**Task**:` / `**Story**:` header line — the spliced-copy signature
  *   trailing-duplicate-body  after the FIRST occurrence of the template's last section, a template
  *                            section or header block reappears (one per report)
  *   variant-undetected       the report matches no variant: no `**Task**:` / `**Story**:` line and
  *                            no bug-report frontmatter — nothing to lint it against
+ *
+ * The two traceability codes and `qa-cycle-heading-suffix` apply only to a report carrying the marker line
+ * `**Report format**: 2` in its header block (the task and story variants of the template write
+ * it; task.277). Task and story reports have no frontmatter, so the marker is a header line, and a
+ * report written before it lints exactly as before. The row is required on every cycle of a marked
+ * report whatever the pipeline mode: lite mode and the mapper's other bypasses write
+ * `skipped (reason)`.
  *
  * Sections the template does not name are ignored by every check: the PreCompact
  * hook appends `## Pipeline Paused — …` after Completion by design, and a run may
@@ -64,6 +81,11 @@ const path = require("path");
 const { fencedRanges } = require("./change-log.js");
 
 const VARIANTS = Object.freeze(["story", "task", "bug"]);
+// The header line that opts a report into the traceability checks (task.277).
+const REPORT_FORMAT_MARKER = /^\*\*Report format\*\*:\s*2\s*$/;
+// A qa-fix record or step marker in an H3 cycle heading: it belongs in an H4 under the cycle.
+const QA_HEADING_SUFFIX = /qa-fix|\(5[abc]\)/i;
+const TRACEABILITY_ROW = /^\*\*Traceability\*\*:\s*(.*?)\s*$/;
 const DEFAULT_TEMPLATE = path.join(
   __dirname,
   "implementation-report-template.md",
@@ -191,6 +213,10 @@ function lintReport(text, opts = {}) {
   let headerBlocks = 0;
   const seen = new Map(); // section name → [line numbers]
   const qaCycles = new Map(); // cycle number → [line numbers]
+  const cycleEntries = []; // { n, idx } — each `### QA Cycle N` heading inside `## QA Iteration History`, in order
+  let marked = false; // the report carries `**Report format**: 2`
+  let inHistory = false; // the last `## ` heading read was `## QA Iteration History`
+  let seenH2 = false; // a `## ` heading has been read: the header block is over
   let maxIdx = -1;
   let outOfOrderReported = false;
   let lastSectionFirstLine = null;
@@ -232,9 +258,28 @@ function lintReport(text, opts = {}) {
       }
       continue;
     }
+    if (REPORT_FORMAT_MARKER.test(l)) {
+      // The marker is a header-block line: one after the first `## ` heading marks nothing, so the
+      // rules that need it see one value however the report was edited (task.277 QA cycle 2, T277-6).
+      if (!seenH2) marked = true;
+      continue;
+    }
     const qa = /^### QA Cycle (\d+)\b/.exec(l);
     if (qa) {
       const n = qa[1];
+      // Only a heading in QA Iteration History is a cycle entry: a `### QA Cycle N` under the
+      // Decisions Log is a decision note and carries no Traceability row (task.277 QA cycle 1, T277-3).
+      if (inHistory) cycleEntries.push({ n, idx: i });
+      // A report written before the marker lints as before, so the heading rule needs the marker too
+      // (task.277 QA cycle 1, T277-2: the accepted task.2 report gained a problem without it), and a
+      // note under another section is not a cycle entry, so it needs the history section as well
+      // (QA cycle 2, T277-5).
+      if (marked && inHistory && QA_HEADING_SUFFIX.test(l.slice(qa[0].length)))
+        problems.push({
+          code: "qa-cycle-heading-suffix",
+          line: ln,
+          detail: `${l.trim()} — a qa-fix record is an H4 under its cycle's H3, not a suffix on the H3`,
+        });
       const prev = qaCycles.get(n) || [];
       prev.push(ln);
       qaCycles.set(n, prev);
@@ -249,6 +294,8 @@ function lintReport(text, opts = {}) {
     const h2 = /^## (.+?)\s*$/.exec(l);
     if (!h2) continue;
     const name = h2[1].trim();
+    seenH2 = true;
+    inHistory = name === "QA Iteration History";
     if (!order.has(name)) continue; // not a template section — ignored by every check
     const idx = order.get(name);
     const prev = seen.get(name) || [];
@@ -284,6 +331,43 @@ function lintReport(text, opts = {}) {
         detail: `\`## ${name}\` reappears after \`## ${lastName}\` (line ${lastSectionFirstLine})`,
       });
       trailingReported = true;
+    }
+  }
+
+  if (marked) {
+    for (const { n, idx } of cycleEntries) {
+      // The entry's body runs to the next H1–H3 heading; an H4 (a qa-fix record) stays inside it.
+      let value = null;
+      for (let j = idx + 1; j < lines.length; j++) {
+        if (isFencedLine(j)) continue;
+        if (/^#{1,3} /.test(lines[j])) break;
+        const t = TRACEABILITY_ROW.exec(lines[j]);
+        if (t) {
+          value = t[1];
+          break;
+        }
+      }
+      const ln = idx + 1;
+      if (value === null) {
+        problems.push({
+          code: "traceability-missing",
+          line: ln,
+          detail: `### QA Cycle ${n} has no \`**Traceability**:\` row (mapped | skipped (reason))`,
+        });
+      } else if (/^skipped\b/i.test(value)) {
+        if (!/^skipped\s*\(\s*[^)\s][^)]*\)/i.test(value))
+          problems.push({
+            code: "traceability-reason-missing",
+            line: ln,
+            detail: `### QA Cycle ${n}: \`**Traceability**: ${value}\` names no reason — write skipped (reason)`,
+          });
+      } else if (!/^mapped\b/i.test(value)) {
+        problems.push({
+          code: "traceability-missing",
+          line: ln,
+          detail: `### QA Cycle ${n}: \`**Traceability**: ${value}\` is neither mapped nor skipped (reason)`,
+        });
+      }
     }
   }
 

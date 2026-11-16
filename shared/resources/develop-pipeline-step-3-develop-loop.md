@@ -321,6 +321,20 @@ Dispatch the Agent tool with `subagent_type="Explore"` using the prompt from `sh
 
 Main reads only the triage summary (counts + ≤10 failure bullets + `next_file` hint). Never read `$TEST_LOG` directly.
 
+### A guard's allow-list is not the fix for new code (obs #5)
+
+When the triage result is a guard test failing on code **this change added** (an unbound-read guard, a
+banned-name scan, a population test) and the cheapest fix is to add a name, path or pattern to the
+guard's allow-list, that is a design question about the new code, not a triage outcome. Fix the code.
+On task.201 (PR #632) triage greened `tests/unbound-default-reads.test.js` by adding two names to its
+INPUTS allow-list, and QA cycle 1 then found the reads genuinely unbound (gate 1, QA-1, high); task.188
+did it again (`skills/develop-next/SKILL.md#VCS`).
+
+Extend a guard's allow-list **only** when the entry's justification names the line, or the
+`{placeholder}`, that binds the value in that same block. If such a binder exists the guard would not
+have fired, so an entry with no binder to name is the guard working. Record the justification beside
+the entry (the guard's own comment convention) and in the implementation report's Decisions Log.
+
 ### Log Cleanup
 
 The cleanup is the last statement of each block above — `[ "$TEST_EXIT" -eq 0 ] && rm -f "$TEST_LOG"`
