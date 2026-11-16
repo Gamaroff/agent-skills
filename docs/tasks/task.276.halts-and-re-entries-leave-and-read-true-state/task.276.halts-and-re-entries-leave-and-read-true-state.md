@@ -98,7 +98,7 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 
 **After**: it refuses and names `reenter-qa-after-finalise.sh`.
 
-**Impact**: anything calling `--restore` after a DoD-gaps halt. The caller audit (`git grep -n -- '--restore' -- shared skills ':!docs'`) found: `reenter-qa-after-finalise.sh:276` (passes `--allow-dod-gaps`), `grant-qa-cycles.sh:216` and `accept-qa-residual.sh:101` (step-5 snapshots, unaffected), the `--which` calls at `reenter-qa-after-finalise.sh:141` and `grant-qa-cycles.sh:190` (read-only, never guarded), and operator-facing prose in the resume contract and the SKILL.md files.
+**Impact**: anything calling `--restore` after a DoD-gaps halt. The caller audit (`git grep -n -- '--restore' -- shared skills ':!docs'`) found (line numbers re-measured at the head on 2026-11-16): `reenter-qa-after-finalise.sh:291` (passes `--allow-dod-gaps`), `grant-qa-cycles.sh:225` and `accept-qa-residual.sh:101` (step-5 snapshots, unaffected), the `--which` calls at `reenter-qa-after-finalise.sh:152` and `grant-qa-cycles.sh:199` (read-only, never guarded), and operator-facing prose in the resume contract and the SKILL.md files. Three message sites tell an operator to run a plain `--restore`: `set-qa-phase.sh:62` and `set-waiting-on.sh:103` (no lock, but a halt snapshot exists; the message now says that after a `/finalise` DoD-gaps halt the restore refuses and names `reenter-qa-after-finalise.sh`, which is the route then) and `develop-pipeline-on-precompact.sh:640` (a pause, where the lock survives, so the guard never applies and no change is needed).
 
 **Migration Path**: call the re-entry script, which restores itself; a document-only fix uses `--restore --allow-dod-gaps`.
 

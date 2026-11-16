@@ -191,6 +191,19 @@ WANT_MAX=5; accept "the named remedy works: --halt on the stale step-7 lock, the
 [ "$(jq -r '.qa_reentry.gate_head' "$L")" = "$(git -C "$R" rev-parse HEAD~2)" ] && pass "qa_reentry.gate_head is the gate's head" || fail "gate_head recorded" "$(jq -c .qa_reentry "$L")"
 [ "$(jq -r '.branch' "$L")" = "feature/x" ] && pass "pipeline fields carried over from the snapshot" || fail "fields carried" "$(cat "$L")"
 
+# task.276 criterion 2 (obs #46): the two in order, on ONE snapshot. The plain --restore a resume
+# reaches for first is refused and leaves the snapshot where it was; the re-entry then succeeds from
+# that same snapshot. Run apart, each half passes while the pair can still be broken: a refusal that
+# consumed the snapshot first would pass the refusal test and fail the re-entry's (task.203).
+mkrepo ordered; codefix
+ROUT=$(cd "$R" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$(dirname "$SCRIPT")/advance-pipeline-lock.sh" --restore "$DOC" 2>&1); RRC=$?
+SNAP_BEFORE=$(cat "$S" 2>/dev/null)
+if [ "$RRC" -ne 0 ] && [ -f "$S" ] && [ ! -f "$L" ] && printf '%s' "$ROUT" | grep -q 'reenter-qa-after-finalise.sh'; then
+  pass "ordered 1/2: a plain --restore of the gaps snapshot is refused, names the re-entry script, writes no lock, keeps the snapshot"
+else fail "ordered 1/2: refusal" "rc=$RRC lock=$([ -f "$L" ] && echo yes || echo no) snapshot=$([ -f "$S" ] && echo yes || echo no) out=$ROUT"; fi
+WANT_MAX=5; accept "ordered 2/2: the re-entry then succeeds from the snapshot the refusal left"
+[ -n "$SNAP_BEFORE" ] && [ "$(jq -r '.halt_step' <<<"$SNAP_BEFORE")" = "7" ] && pass "ordered: the snapshot the refusal left is the untouched step-7 halt" || fail "ordered: snapshot intact" "$SNAP_BEFORE"
+
 # ── Observation #44: documentation OUTSIDE the work item is not movement ──────
 # A DoD gap closed by a CHANGELOG entry or a standards page is a document-only fix. "Documentation"
 # is ci.docsOnly.patterns, read by ci-tree-equivalence.js at HEAD; with no skills-config.yaml the
