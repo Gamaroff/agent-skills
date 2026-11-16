@@ -339,11 +339,36 @@ T276-QA-5 is fixed and mutation-proven, and the wall-time criterion is measured 
 - **T276-QA-6** (LOW) — carried to gate 3 `recommendations.future` (route 2b, cycle 3): a `./` lock directory is called unresolvable by the relative-lock guard in `resume-prompt-check.sh`; no writer emits it
 - **T276-QA-7** (LOW) — carried to gate 3 `recommendations.future` (route 2b, cycle 3): a stale relative lock directory answers `cannot tell` with a message that blames the cwd; the strip expression is written twice
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+QA gate 3 is PASS (92/100) and the security probes held (44 executed, 0 reproduced). The gaps below are evidence and documentation gaps; behaviour is not in doubt.
+
+### Missing Criteria:
+
+- [ ] Criterion 2: no single test runs the `--restore` refusal and the re-entry in order, and no QA report names one
+- [ ] Criterion 5: no named mutation proof in a QA report for `--halt`, `--newest-dod`, the HALT fences or the step-8 checklist test change
+- [ ] Criterion 7: shellcheck was not run on the cycle 2 and 3 edits to `resume-prompt-check.sh`
+- [ ] Criterion 8: the `--restore` caller list has stale line numbers and omits three message sites (`set-qa-phase.sh`, `set-waiting-on.sh`, `develop-pipeline-on-precompact.sh`)
+- [ ] Docs: `pipeline-resume-detector-prompt.md:121` still counts cycles with `grep -c '^### QA Cycle'`; `develop-pipeline-pause.md:84` and `develop-pipeline-hooks.md:115` describe the old restore and HALT behaviour
+
+### Next Steps:
+
+- [ ] Add the ordered refusal-then-re-entry test (code change, so it re-enters QA)
+- [ ] Run the mutation proofs and record them in a QA report
+- [ ] Run `command npm run lint:shell` in the CI-parity container and record the result
+- [ ] Fix the caller list and the three behaviour-doc lines
+
+**Estimated Effort:** Small to Medium (about 2 to 3 hours)
+
+**Detailed Verification Log:** See `task.276.dod.1.halts-and-re-entries-leave-and-read-true-state.md`.
+
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                                          | Author      |
-| ---------- | ------- | -------------------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #46, #49, #75, #95, #135       | create-task |
 | 2026-11-15 | 1.1     | Review passed (8/10 after fixes) — guard re-keyed on halt_step 7 + DoD GAPS (no writer emits `finalise-dod-gaps`); `--allow-dod-gaps` bypass for the re-entry script; HALT sites and resume-prompt check made executable | review-task |
 | 2026-11-15 |         | Status → ready-for-development                                       | review-task |
@@ -353,6 +378,7 @@ T276-QA-5 is fixed and mutation-proven, and the wall-time criterion is measured 
 | 2026-11-15 |         | QA gate CONCERNS (85/100) — 2 findings                               | qa-task     |
 | 2026-11-15 |         | QA findings fixed, iteration 2 — T276-QA-5 closed; wall-time criterion left open | qa-fix      |
 | 2026-11-16 |         | QA gate PASS (92/100) — 2 findings; wall-time criterion measured, +0.8% | qa-task     |
+| 2026-11-16 |  | DoD incomplete — 5 gaps identified | finalise |
 <!-- change-log-end -->
 
 ---
