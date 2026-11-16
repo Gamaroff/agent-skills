@@ -6,6 +6,15 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The implementation report and triage say what happened (task 277).** A guard's allow-list entry
+  is no longer taken as the fix for new code unless a binder line or `{placeholder}` justifies it,
+  and every time the report states comes from `date -u` or a completion notice's `duration_ms`, else
+  `(not measured)`. A qa-fix record is an H4 under its cycle, and each QA Cycle entry carries a
+  `**Traceability**: mapped | skipped (reason)` row. `report-lint.js` gains `qa-cycle-heading-suffix`,
+  `traceability-missing` and `traceability-reason-missing`, applied only to a report carrying the new
+  `**Report format**: 2` header line, so reports written earlier lint as before (the problem counts
+  over the 320 tracked reports are identical before and after). Resolves observations #5, #6, #92
+  and #124.
 - **Halts and re-entries leave and read true state (task 276).** A HALT is now one call,
   `advance-pipeline-lock.sh --halt`, which writes the snapshot before it removes the lock and checks
   the result, instead of a fence of separate steps. `--restore` refuses a step-7 halt over a DoD that

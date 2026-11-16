@@ -946,7 +946,9 @@ each qa-fix pass was logged as `### QA Cycle {N} — qa-fix (5b)`, and
 `grep -cE '^### (QA|Verify) Cycle'` returned 7 for four cycles; it returned 4 once they were H4s.
 Finalise's PR comment and the resume contract both count the H3 cycle headings, so the number of
 `### QA Cycle` headings must equal the number of cycles run. `report-lint.js` reports a suffixed H3
-(`qa-cycle-heading-suffix`) and a repeated N (`qa-cycle-duplicated`); it does not read the H4's text.
+(`qa-cycle-heading-suffix`, on a report carrying the `**Report format**: 2` marker, so a report
+written before it lints as before) and a repeated N (`qa-cycle-duplicated`, on any report); it does
+not read the H4's text.
 
 #### Third-strike rule — replace, do not patch again
 

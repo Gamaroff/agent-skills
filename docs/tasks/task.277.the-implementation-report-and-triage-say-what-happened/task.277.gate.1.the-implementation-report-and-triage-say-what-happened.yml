@@ -1,0 +1,90 @@
+schema: 2
+task: 'task.277.the-implementation-report-and-triage-say-what-happened'
+task_title: 'The implementation report and triage say what happened'
+gate: CONCERNS
+status_reason: 'The four fixes work and are mutation-proven, but the CHANGELOG has no entry citing task 277, and qa-cycle-heading-suffix applies to unmarked legacy reports (task.2 gains a problem), against criteria 8 and 9.'
+reviewer: 'QA Engineer'
+head: 'c0cf9b8a655af2f462abc08952cd11769162aa5d'
+updated: '2026-11-16T14:44:59Z'
+
+top_issues:
+  - id: 'T277-1'
+    severity: medium
+    file: 'CHANGELOG.md'
+    finding: 'No [Unreleased] entry cites task 277; changelog-cites.sh answers "missing (task 277)" and /finalise 6d halts on it.'
+    suggested_action: 'Add a Fixed (or Changed) entry under [Unreleased] ending "(task 277)", naming the triage rule, measured times, H4 rule, the Traceability row and the three lint codes.'
+    suggested_owner: dev
+    status: open
+  - id: 'T277-2'
+    severity: medium
+    file: 'shared/resources/report-lint.js'
+    finding: 'qa-cycle-heading-suffix fires on every report, marked or not. The accepted task.2 report now carries an extra problem (qa-cycle-heading-suffix at line 94, beside its existing qa-cycle-duplicated at 101) that the base lint does not give it. Criterion 9 says a report written before the change lints as before, and criterion 8 says no new problem; the 23-before/23-after count hid this because it counts reports, not problems.'
+    suggested_action: 'Gate the heading-suffix check on the report-format marker like the traceability checks, add a control test that an unmarked report with a qa-fix H3 suffix lints as before, and record problem counts (not report counts) before and after.'
+    suggested_owner: dev
+    status: open
+  - id: 'T277-3'
+    severity: low
+    file: 'shared/resources/report-lint.js'
+    finding: 'origin: code-review, reproduced by QA (reviewer confidence low, recorded unchanged). The traceability loop reads every `### QA Cycle N` heading in the file, so a marked report with a `### QA Cycle 11` heading under the Decisions Log gets a false traceability-missing at that line (reproduced on a copy of the task.118 fixture: line 49 flagged). Control: the same report without that heading flags only the history cycles. Not pre-existing: the base lint has no such code.'
+    suggested_action: 'Scope the traceability loop to cycle headings inside `## QA Iteration History`, as qa-report-cycles.sh does, and add a test with a Decisions Log cycle heading in a marked report.'
+    suggested_owner: dev
+    status: open
+  - id: 'T277-4'
+    severity: low
+    file: 'docs/tasks/task.277.the-implementation-report-and-triage-say-what-happened/task.277.the-implementation-report-and-triage-say-what-happened.md'
+    finding: 'Performance criterion (CI=true npm test wall time within 10% of develop, median of five alternating runs) was not measured as written; one full run takes about 679 s on the LAN server, so ten runs would hold it for hours. A proxy was measured instead: the report-lint suite alone runs in 0.5-1.1 s on both base and head, which bounds the added cost at well under 0.1% of a full run.'
+    suggested_action: 'Owner decides: waive or amend the criterion with an approver (the proxy supports waiving), or run the ten-run measurement.'
+    suggested_owner: po
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 19
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 15
+    escaped: 0
+    boundary: true
+    boundary_signals: []
+    notes: 'lintReport probed with the markdown-structure corpus (15 cases, 9 rejected, 6 accepted, 0 escaped; verdict engages: hostile rejected, legitimate accepted). Run record committed beside the gate.'
+  performance:
+    status: PASS
+    notes: 'Proxy only; see T277-4. The added work is one marker test per line and a bounded scan per cycle.'
+  reliability:
+    status: PASS
+    notes: 'The lint never writes or repairs; the new codes fail closed on a missing or unreadable row. Full CI run green (8510 tests, 0 failed).'
+  maintainability:
+    status: PASS
+    notes: 'One definition of each code; bundled copies regenerated and bundle --check reports 0 problems. See T277-2 and T277-3 for scope gaps in the lint.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T277-1 to T277-3 in one qa-fix cycle; T277-4 needs an owner decision.'
+      refs: ['CHANGELOG.md', 'shared/resources/report-lint.js']
+  future:
+    - action: 'Step 4b reports file-level findings on develop-pipeline-step-3-develop-loop.md (1) and develop-pipeline-resume-contract.md (2) in blocks this change did not touch; look at them in a separate pass.'
+      refs: ['shared/resources/develop-pipeline-step-3-develop-loop.md', 'shared/resources/develop-pipeline-resume-contract.md']
+      remedy: unverified
+      provenance: pre-existing
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'T277-1 and T277-2 fixed and re-reviewed'

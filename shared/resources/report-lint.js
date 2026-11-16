@@ -34,12 +34,14 @@
  *   section-out-of-order     a template section appears before one the template places earlier
  *                            (one per report — the first offending heading)
  *   qa-cycle-duplicated      the same `### QA Cycle N` heading appears more than once
- *   qa-cycle-heading-suffix  an H3 `### QA Cycle N` heading whose remainder names a qa-fix record or
- *                            a step marker (`qa-fix`, `(5a|5b|5c)`). A qa-fix record is an H4 under
- *                            its cycle's H3 (task.277, obs #92). The claim is bounded: a suffixed H3
- *                            and a repeated N are caught; H4 content is not judged
- *   traceability-missing     a cycle entry of a MARKED report carries no `**Traceability**:` row, or
- *                            one whose value is neither `mapped` nor `skipped (reason)` (obs #124)
+ *   qa-cycle-heading-suffix  in a MARKED report, an H3 `### QA Cycle N` heading whose remainder names
+ *                            a qa-fix record or a step marker (`qa-fix`, `(5a|5b|5c)`). A qa-fix
+ *                            record is an H4 under its cycle's H3 (task.277, obs #92). The claim is
+ *                            bounded: a suffixed H3 and a repeated N are caught; H4 content is not
+ *                            judged
+ *   traceability-missing     a cycle entry (a `### QA Cycle N` under `## QA Iteration History`) of a
+ *                            MARKED report carries no `**Traceability**:` row, or one whose value is
+ *                            neither `mapped` nor `skipped (reason)` (obs #124)
  *   traceability-reason-missing  `**Traceability**: skipped` with no parenthesised reason
  *   header-block-duplicated  a second `**Task**:` / `**Story**:` header line — the spliced-copy signature
  *   trailing-duplicate-body  after the FIRST occurrence of the template's last section, a template
@@ -47,7 +49,7 @@
  *   variant-undetected       the report matches no variant: no `**Task**:` / `**Story**:` line and
  *                            no bug-report frontmatter — nothing to lint it against
  *
- * The two traceability codes apply only to a report carrying the marker line
+ * The two traceability codes and `qa-cycle-heading-suffix` apply only to a report carrying the marker line
  * `**Report format**: 2` in its header block (the task and story variants of the template write
  * it; task.277). Task and story reports have no frontmatter, so the marker is a header line, and a
  * report written before it lints exactly as before. The row is required on every cycle of a marked
@@ -209,8 +211,9 @@ function lintReport(text, opts = {}) {
   let headerBlocks = 0;
   const seen = new Map(); // section name → [line numbers]
   const qaCycles = new Map(); // cycle number → [line numbers]
-  const cycleEntries = []; // { n, idx } — each `### QA Cycle N` heading, in order
+  const cycleEntries = []; // { n, idx } — each `### QA Cycle N` heading inside `## QA Iteration History`, in order
   let marked = false; // the report carries `**Report format**: 2`
+  let inHistory = false; // the last `## ` heading read was `## QA Iteration History`
   let maxIdx = -1;
   let outOfOrderReported = false;
   let lastSectionFirstLine = null;
@@ -259,8 +262,12 @@ function lintReport(text, opts = {}) {
     const qa = /^### QA Cycle (\d+)\b/.exec(l);
     if (qa) {
       const n = qa[1];
-      cycleEntries.push({ n, idx: i });
-      if (QA_HEADING_SUFFIX.test(l.slice(qa[0].length)))
+      // Only a heading in QA Iteration History is a cycle entry: a `### QA Cycle N` under the
+      // Decisions Log is a decision note and carries no Traceability row (task.277 QA cycle 1, T277-3).
+      if (inHistory) cycleEntries.push({ n, idx: i });
+      // A report written before the marker lints as before, so the heading rule needs the marker too
+      // (task.277 QA cycle 1, T277-2: the accepted task.2 report gained a problem without it).
+      if (marked && QA_HEADING_SUFFIX.test(l.slice(qa[0].length)))
         problems.push({
           code: "qa-cycle-heading-suffix",
           line: ln,
@@ -280,6 +287,7 @@ function lintReport(text, opts = {}) {
     const h2 = /^## (.+?)\s*$/.exec(l);
     if (!h2) continue;
     const name = h2[1].trim();
+    inHistory = name === "QA Iteration History";
     if (!order.has(name)) continue; // not a template section — ignored by every check
     const idx = order.get(name);
     const prev = seen.get(name) || [];

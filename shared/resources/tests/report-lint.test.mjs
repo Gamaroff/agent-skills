@@ -579,3 +579,50 @@ test("G — the template writes the marker in the task and story header blocks, 
     "traceability-missing",
   ]);
 });
+
+test("G — qa-cycle-heading-suffix needs the marker: an UNMARKED report with a suffixed H3 lints as before (T277-2)", () => {
+  const suffixed = "### QA Cycle 3 — qa-fix (5b)\n**Gate Result**: PASS\n";
+  // Marked: flagged (the must-still-catch side).
+  assert.deepEqual(
+    codes(lintReport(cycleReport(suffixed), { sections: SECTIONS })),
+    ["qa-cycle-heading-suffix", "traceability-missing"],
+  );
+  // Unmarked: a report written before the marker gains no problem (the must-leave-alone side).
+  assert.deepEqual(
+    codes(
+      lintReport(cycleReport(suffixed, { marked: false }), {
+        sections: SECTIONS,
+      }),
+    ),
+    [],
+  );
+  // The older duplicate-N code still fires on an unmarked report: only the new code is gated.
+  const reused = cycleReport(`${cycle(2)}\n### QA Cycle 2 — qa-fix (5b)\n`, {
+    marked: false,
+  });
+  assert.deepEqual(codes(lintReport(reused, { sections: SECTIONS })), [
+    "qa-cycle-duplicated",
+  ]);
+});
+
+test("G — traceability is read only on cycle entries in QA Iteration History, not on a Decisions Log heading (T277-3)", () => {
+  const withNote = (history) =>
+    cycleReport(history).replace(
+      "## Decisions Log\n\nbody\n",
+      "## Decisions Log\n\n### QA Cycle 11 — a decision note\n\nbody\n",
+    );
+  const good = withNote(cycle(1));
+  assert.notEqual(
+    good,
+    cycleReport(cycle(1)),
+    "the Decisions Log note was added",
+  );
+  // The note carries no Traceability row and is not flagged.
+  assert.deepEqual(codes(lintReport(good, { sections: SECTIONS })), []);
+  // Control: a real history entry with no row is still flagged, and only that one.
+  const r = lintReport(withNote(`${cycle(1)}\n### QA Cycle 2 — 2026-01-02\n`), {
+    sections: SECTIONS,
+  });
+  assert.deepEqual(codes(r), ["traceability-missing"]);
+  assert.match(r.problems[0].detail, /QA Cycle 2/);
+});
