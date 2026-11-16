@@ -60,7 +60,7 @@ if [ ! -f "$LOCK" ]; then
   PAUSED=""
   [ -f "$ADVANCE" ] && PAUSED=$(bash "$ADVANCE" --paused-here 2>/dev/null)
   if [ -n "$PAUSED" ]; then
-    echo "set-qa-phase: no lock, but '$PAUSED' records a paused or halted pipeline on this branch. Rebuild the lock first: advance-pipeline-lock.sh --restore <doc-dir>. If that run is finished, delete the snapshot." >&2
+    echo "set-qa-phase: no lock, but '$PAUSED' records a paused or halted pipeline on this branch. Rebuild the lock first: advance-pipeline-lock.sh --restore <doc-dir> (after a /finalise DoD-gaps halt that refuses and names reenter-qa-after-finalise.sh, which is the route then). If that run is finished, delete the snapshot." >&2
     exit 1
   fi
   exit 0

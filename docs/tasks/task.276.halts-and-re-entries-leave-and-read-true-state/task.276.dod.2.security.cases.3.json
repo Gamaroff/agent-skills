@@ -1,0 +1,61 @@
+[
+  {
+    "id": "reenter.fixed-gaps-halt",
+    "sink": "path",
+    "input": "docs/tasks/task.42.example",
+    "direction": "legitimate",
+    "why": "A DoD-gaps halt fixed by a code commit is the one case the script exists to re-enter.",
+    "correct": "Restore, re-enter at step 5, exit 0.",
+    "spec_ref": "shared/resources/reenter-qa-after-finalise.sh:6"
+  },
+  {
+    "id": "reenter.other-doc",
+    "sink": "path",
+    "input": "docs/tasks/task.99.other",
+    "direction": "hostile",
+    "why": "The halt snapshot is for task.42, so a re-entry for another document must refuse (no-snapshot).",
+    "correct": "Refuse, consume nothing.",
+    "spec_ref": "shared/resources/reenter-qa-after-finalise.sh:15"
+  },
+  {
+    "id": "reenter.command-substitution-dir",
+    "sink": "path",
+    "input": "docs/tasks/$(touch PWNED)",
+    "direction": "hostile",
+    "why": "A command-substitution directory name must not execute.",
+    "correct": "Refuse and create no PWNED file.",
+    "spec_ref": "shared/resources/reenter-qa-after-finalise.sh:15",
+    "expected": {
+      "absent": [
+        "PWNED"
+      ]
+    }
+  },
+  {
+    "id": "reenter.space-dir",
+    "sink": "path",
+    "input": "docs/tasks/a b",
+    "direction": "hostile",
+    "why": "A word-split name.",
+    "correct": "Refuse as no-snapshot.",
+    "spec_ref": "shared/resources/reenter-qa-after-finalise.sh:15"
+  },
+  {
+    "id": "reenter.leading-dash-dir",
+    "sink": "path",
+    "input": "-n",
+    "direction": "hostile",
+    "why": "A leading-dash directory name.",
+    "correct": "Refuse.",
+    "spec_ref": "shared/resources/reenter-qa-after-finalise.sh:15"
+  },
+  {
+    "id": "reenter.absent-dir",
+    "sink": "path",
+    "input": "docs/tasks/nope",
+    "direction": "hostile",
+    "why": "An absent directory.",
+    "correct": "Refuse.",
+    "spec_ref": "shared/resources/reenter-qa-after-finalise.sh:15"
+  }
+]

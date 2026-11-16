@@ -174,11 +174,20 @@ Usage:
                             # advance to 8 only when the DoD reads **Final Status:** ✅ ACCEPTED
   $0 --paused-here          # print a halt snapshot / claim for the current branch, if any
   $0 --clear-pause          # drop the PreCompact hook's paused mark from the lock, if any
-  $0 --restore [--which] [--accept-legacy] <doc-dir>
+  $0 --restore [--which] [--accept-legacy] [--allow-dod-gaps] <doc-dir>
                             # rebuild the lock from the halt snapshot / orphaned claim
                             #   --which: print the candidate --restore would consume; no writes
                             #   --accept-legacy: accept a snapshot with no task_or_story_directory
+                            #   --allow-dod-gaps: restore a /finalise DoD-gaps halt (halt_step 7,
+                            #     newest DoD ❌ GAPS), which is otherwise refused: the re-entry
+                            #     script is the door for a CODE fix; this flag is the document-only
+                            #     route to step 7 (task.276)
                             #   (flags go BEFORE <doc-dir>; exactly one <doc-dir>)
+  $0 --halt --reason <text> [--step <n>] <doc-dir>
+                            # a terminal HALT in one call: write the halt snapshot, remove the lock
+                            #   and the transient test logs. Idempotent: a second call finds the
+                            #   snapshot and the absent lock and exits 0 (task.276)
+  $0 --newest-dod <doc-dir> # print the work item's newest DoD file (read-only; empty when none)
 USAGE
   exit 1
 }
@@ -235,6 +244,38 @@ if [ "$1" = "--hold-state" ]; then
   exit 0
 fi
 
+# newest_dod DOC_DIR → the path of the work item's newest DoD file, empty (exit 1) when it has none.
+# The ONE derivation of "the work item's DoD": --restore's DoD-gaps guard and
+# reenter-qa-after-finalise.sh (through --newest-dod) both read it, so the guard and the re-entry
+# cannot disagree about which halt is a DoD-gaps halt (task.276; the re-entry script's own copy of
+# this was the first definition, task.170 QA cycles 1-3).
+# Keyed on the work item's own STEM, never the directory: a co-located bug writes its own
+# {bug-prefix}.dod.{N}.*.md beside the parent's, and a directory-wide pattern read a higher-numbered
+# bug DoD as the task's verdict. The stem is READ from the DoD files themselves rather than parsed
+# from the directory name (a regex over the name has to know every numbering shape): a DoD's stem is
+# the text before its first .dod.; it is the work item's when the directory name continues it with a
+# "." — so task.42 never matches task.420.*, and a co-located bug's stem (task.42.bug.3) is never one
+# the parent's directory name continues. The longest such stem wins.
+newest_dod() {
+  local doc_dir="${1%/}" stem f b p
+  [ -d "$doc_dir" ] || return 1
+  stem=$(find "$doc_dir" -maxdepth 1 -type f -name '*.dod.*.md' 2>/dev/null | while IFS= read -r f; do
+    b=${f##*/}; p=${b%%.dod.*}
+    # The leading ( is load-bearing: bash 3.2 (macOS /bin/bash) cannot parse an unparenthesised
+    # case pattern inside $(...) and fails at ";;" (task.170 finalise, DoD gap 1).
+    case "$(basename "$doc_dir")." in ("$p".*) printf '%s\n' "$p" ;; esac
+  done | awk '{ print length, $0 }' | sort -rn | head -1 | cut -d' ' -f2-)
+  [ -n "$stem" ] || return 1
+  find "$doc_dir" -maxdepth 1 -type f -name "${stem}.dod.*.md" 2>/dev/null \
+    | sed -nE 's/^(.*\.dod\.)([0-9]+)(\..*)$/\2 \1\2\3/p' | sort -n | tail -1 | cut -d' ' -f2-
+}
+
+if [ "$1" = "--newest-dod" ]; then
+  [ $# -eq 2 ] || usage
+  newest_dod "$2"
+  exit 0
+fi
+
 if [ "$1" = "--complete" ]; then
   STATE_DIR=$(dirname "$LOCK")
   rm -f "$STATE_DIR/step4-scope-paths.txt" "$STATE_DIR/5c-carry-eligible.txt" "$STATE_DIR/5c-carry-classified.txt"
@@ -252,6 +293,7 @@ fi
 if [ ! -f "$LOCK" ]; then
   case "$1" in
     --restore) ;;                       # the one mode that exists FOR a missing lock
+    --halt) ;;                          # idempotent: a second call finds no lock and a snapshot (task.276)
     --skill)
       # Exit 0 either way: a standalone sub-skill run has no lock and must not fail. But a
       # halt snapshot or an orphaned claim on disk means a pipeline WAS running and a pause
@@ -278,6 +320,12 @@ fi
 # `--skill commit-changes` removes nothing at any step, so it needs neither jq nor a parsable
 # lock; running it through the parse made a no-op call exit 1 on a corrupt lock (CR-3).
 case "$1" in
+  --halt)
+    # Unlike every other mode, a missing jq is an ERROR here, not a silent exit 0: this mode's whole
+    # job is a snapshot nobody can rebuild by hand, and a "halted" the caller believes while no
+    # snapshot exists is the defect it was written to end (task.276, obs #49).
+    command -v jq >/dev/null 2>&1 || { echo "advance-pipeline-lock: --halt needs jq to write the snapshot; the lock was NOT removed" >&2; exit 1; }
+    ;;
   --complete)
     rm -f "$LOCK"
     echo "advance-pipeline-lock: pipeline complete, lock removed"
@@ -340,7 +388,22 @@ mtime_of() {
 # Raised ONLY by the --accept-legacy flag — never seeded from the environment, so a stray
 # exported ACCEPT_LEGACY cannot make every restore accept legacy snapshots (task.130 CR-6).
 ACCEPT_LEGACY=0
+# Raised ONLY by --allow-dod-gaps, for the same reason: never seeded from the environment.
+ALLOW_DOD_GAPS=0
 CHOSEN=""; MINE=()
+
+# is_dod_gaps_halt SNAPSHOT DOC_DIR → 0 when SNAPSHOT records a /finalise DoD-gaps halt: its
+# halt_step is 7 (a string when the HALT snippet wrote it through `jq --arg`, so compared as text)
+# and the work item's newest DoD reads `**Final Status:** ❌ GAPS`. Keyed on the facts the
+# re-entry script keys on, never on a `halt_reason` token: no writer emits one for this halt
+# (`git grep finalise-dod-gaps` finds none), so a guard on a token would never fire (task.276).
+is_dod_gaps_halt() {
+  local snap="$1" doc_dir="$2" step dod
+  step=$(jq -r '.halt_step // empty | tostring' "$snap" 2>/dev/null)
+  [ "$step" = "7" ] || return 1
+  dod=$(newest_dod "$doc_dir") || return 1
+  [ -n "$dod" ] && [ -f "$dod" ] && grep -q '^\*\*Final Status:\*\* ❌ GAPS' "$dod"
+}
 choose_candidate() {
   local doc_dir="$1" want candidates=() c c_dir m legacy_paths=()
   [ -d "$doc_dir" ] || { echo "advance-pipeline-lock: --restore needs an existing <doc-dir>, got '$doc_dir'" >&2; exit 1; }
@@ -430,6 +493,15 @@ restore_lock() {
   fi
   choose_candidate "$doc_dir"
   chosen="$CHOSEN"
+  # A /finalise DoD-gaps halt is entered through reenter-qa-after-finalise.sh, which decides between
+  # re-entering the QA loop (a CODE fix) and step 7 (a document-only fix). A plain --restore here
+  # consumed the snapshot that script reads and left a step-7 lock over a head no gate had read
+  # (task.203, obs #46). Refused BEFORE any write, so the snapshot is untouched; --allow-dod-gaps is
+  # the one bypass, passed by that script and named as the document-only route to step 7.
+  if [ "$ALLOW_DOD_GAPS" != 1 ] && is_dod_gaps_halt "$chosen" "$doc_dir"; then
+    echo "advance-pipeline-lock: '$chosen' is a /finalise DoD-gaps halt (halt_step 7, the newest DoD reads ❌ GAPS) — nothing restored, snapshot kept. If the gaps were closed by a CODE change, run reenter-qa-after-finalise.sh '$doc_dir' (it restores for itself and re-enters the QA loop). If the fix is document-only, resume at step 7 with: advance-pipeline-lock.sh --restore --allow-dod-gaps '$doc_dir'" >&2
+    exit 1
+  fi
   mkdir -p "$(dirname "$LOCK")"
   tmp=$(mktemp "$(dirname "$LOCK")/.advance-pipeline-lock.XXXXXX") || {
     echo "advance-pipeline-lock: could not create temp file beside '$LOCK'" >&2
@@ -559,10 +631,85 @@ clear_pause() {
   return 0
 }
 
+# halt_lock DOC_DIR REASON STEP — the --halt mode: a terminal HALT in one call (task.276, obs #49).
+# The HALT used to be a copied `jq`/`rm` fence in three SKILL.md files and the QA-loop escalation
+# block, and a HALT that ran only the message left the lock in place with no snapshot — three runs
+# (task.205, task.238, task.242), each recovered by a snapshot written by hand. One writer, so the
+# state a HALT leaves is a property of this code and not of whichever fence a session followed.
+# Order: the snapshot is written first (mktemp + mv, atomic) and the lock removed only after it
+# exists, so a failure between the two leaves a lock and a snapshot, never neither. STEP defaults to
+# the lock's own current_step; it is stored as a string, as the old fence's `jq --arg` did, and
+# --restore reads it back with tonumber.
+halt_lock() {
+  local doc_dir="$1" reason="$2" step="$3" tmp lock_dir snap_dir ts
+  [ -d "$doc_dir" ] || { echo "advance-pipeline-lock: --halt needs an existing <doc-dir>, got '$doc_dir'" >&2; exit 1; }
+  if [ ! -f "$LOCK" ]; then
+    # Idempotent: a second call finds the first call's result — no lock, a snapshot for this document.
+    if [ -f "$SNAPSHOT" ] && jq -e 'type == "object" and (.halt_reason | type) == "string"' "$SNAPSHOT" >/dev/null 2>&1; then
+      snap_dir=$(jq -r '.task_or_story_directory // ""' "$SNAPSHOT")
+      if [ -z "$snap_dir" ] || [ "$(canon "$snap_dir")" = "$(canon "$doc_dir")" ]; then
+        echo "advance-pipeline-lock: already halted — no lock, snapshot $SNAPSHOT present (halt_step $(jq -r '.halt_step // "?"' "$SNAPSHOT"))"
+        exit 0
+      fi
+      echo "advance-pipeline-lock: no lock at '$LOCK', and the halt snapshot is for '$snap_dir', not '$doc_dir' — nothing halted" >&2
+      exit 1
+    fi
+    echo "advance-pipeline-lock: no lock at '$LOCK' and no halt snapshot for '$doc_dir' — nothing to halt" >&2
+    exit 1
+  fi
+  require_parsable_lock
+  lock_dir=$(jq -r '.task_or_story_directory // ""' "$LOCK")
+  if [ -n "$lock_dir" ] && [ "$(canon "$lock_dir")" != "$(canon "$doc_dir")" ]; then
+    echo "advance-pipeline-lock: the lock at '$LOCK' is for '$lock_dir', not '$doc_dir' — nothing halted" >&2
+    exit 1
+  fi
+  [ -n "$step" ] || step=$(jq -r '.current_step // "?"' "$LOCK")
+  ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  tmp=$(mktemp "$(dirname "$LOCK")/.advance-pipeline-lock.XXXXXX") || {
+    echo "advance-pipeline-lock: could not create temp file beside '$LOCK' — nothing halted" >&2
+    exit 1
+  }
+  if ! jq --arg reason "$reason" --arg step "$step" --arg ts "$ts" \
+          '. + {halted_at: $ts, halt_reason: $reason, halt_step: $step}' "$LOCK" > "$tmp"; then
+    rm -f "$tmp"
+    echo "advance-pipeline-lock: jq write failed — nothing halted, lock kept" >&2
+    exit 1
+  fi
+  mv "$tmp" "$SNAPSHOT"
+  rm -f "$LOCK"
+  # `find -delete`, not a glob in the rm: an unmatched glob aborts the whole command under zsh
+  # (the rule in docs/reference/anti-patterns.md).
+  find "$(dirname "$LOCK")" -maxdepth 1 -name 'test-output-*.log' -delete 2>/dev/null || true
+  # The post-condition the HALT checklist asserts, checked here so no caller has to: lock absent,
+  # snapshot present and carrying the reason.
+  if [ -e "$LOCK" ] || ! jq -e '.halt_reason' "$SNAPSHOT" >/dev/null 2>&1; then
+    echo "advance-pipeline-lock: halt post-condition failed (lock present, or snapshot unreadable at '$SNAPSHOT')" >&2
+    exit 1
+  fi
+  echo "advance-pipeline-lock: halted at step $step — snapshot $SNAPSHOT written, lock removed"
+  exit 0
+}
+
 NEXT=""
 DOD_ARG=""
 DOD_FLAG=""
 case "$1" in
+  --halt)
+    shift
+    HALT_REASON=""; HALT_STEP=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --reason) [ $# -ge 2 ] || usage; HALT_REASON="$2"; shift 2 ;;
+        --step) [ $# -ge 2 ] || usage; HALT_STEP="$2"; shift 2 ;;
+        --*) echo "advance-pipeline-lock: unknown --halt flag '$1'" >&2; usage ;;
+        *) break ;;
+      esac
+    done
+    [ -n "$HALT_REASON" ] || { echo "advance-pipeline-lock: --halt needs --reason <text>" >&2; usage; }
+    [ $# -eq 1 ] || { echo "advance-pipeline-lock: --halt takes its flags BEFORE the <doc-dir>, and exactly one <doc-dir>; got: $*" >&2; usage; }
+    case "$HALT_STEP" in ''|[1-8]) ;; *) echo "advance-pipeline-lock: --step must be 1..8, got '$HALT_STEP'" >&2; exit 1 ;; esac
+    halt_lock "$1" "$HALT_REASON" "$HALT_STEP"
+    ;;
   # --complete and `--skill commit-changes` are handled above the jq gate.
   --restore)
     shift
@@ -571,6 +718,7 @@ case "$1" in
       case "$1" in
         --which) WHICH=1; shift ;;
         --accept-legacy) ACCEPT_LEGACY=1; shift ;;
+        --allow-dod-gaps) ALLOW_DOD_GAPS=1; shift ;;
         --*) echo "advance-pipeline-lock: unknown --restore flag '$1'" >&2; usage ;;
         *) break ;;
       esac

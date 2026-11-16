@@ -1,0 +1,43 @@
+[
+  {
+    "id": "resume-step.5a-pending",
+    "sink": "path",
+    "input": "5a",
+    "direction": "legitimate",
+    "why": "The highest gate in the fixture is 2, so cycle 3 of 5a is not complete.",
+    "correct": "proceed (exit 0).",
+    "spec_ref": "shared/resources/resume-prompt-check.sh:23"
+  },
+  {
+    "id": "resume-step.out-of-range",
+    "sink": "path",
+    "input": "9",
+    "direction": "hostile",
+    "why": "A step outside 1..8 and 5a/5b/5c.",
+    "correct": "Usage error (exit 2).",
+    "spec_ref": "shared/resources/resume-prompt-check.sh:4"
+  },
+  {
+    "id": "resume-step.bad-substep",
+    "sink": "path",
+    "input": "5d",
+    "direction": "hostile",
+    "why": "Not a QA sub-step.",
+    "correct": "Usage error.",
+    "spec_ref": "shared/resources/resume-prompt-check.sh:4"
+  },
+  {
+    "id": "resume-step.injection",
+    "sink": "path",
+    "input": "5a; touch PWNED",
+    "direction": "hostile",
+    "why": "Shell metacharacters in the step.",
+    "correct": "Usage error, and no PWNED file.",
+    "spec_ref": "shared/resources/resume-prompt-check.sh:4",
+    "expected": {
+      "absent": [
+        "PWNED"
+      ]
+    }
+  }
+]

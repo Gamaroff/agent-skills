@@ -152,6 +152,17 @@ expect_refusal "document-only fix (committed + uncommitted, inside the work-item
 mkrepo live-lock; codefix; printf '{"current_step":7}\n' > "$L"
 expect_refusal "a live lock" lock-present
 [ "$(jq -c . "$L")" = '{"current_step":7}' ] && pass "lock-present leaves the live lock untouched" || fail "live lock untouched" "$(cat "$L")"
+# task.276: a live lock at step 7 over a GAPS DoD names the way back (--halt, then this script) and
+# never routes to step 7; a live lock at any other step keeps the plain message (control).
+ERR=$(run 2>&1 >/dev/null)
+if printf '%s' "$ERR" | grep -q -- '--halt --reason dod-gaps-code-fix --step 7' && printf '%s' "$ERR" | grep -q 'Never resume at step 7'; then
+  pass "a live step-7 lock over a GAPS DoD names --halt then this script (never step 7)"
+else fail "live step-7 lock message" "err=$ERR"; fi
+mkrepo live-lock-5; codefix; printf '{"current_step":5}\n' > "$L"
+ERR=$(run 2>&1 >/dev/null)
+if printf '%s' "$ERR" | grep -q 'already resumed' && ! printf '%s' "$ERR" | grep -q -- '--halt'; then
+  pass "control: a live lock at step 5 keeps the plain already-resumed message"
+else fail "live step-5 lock message" "err=$ERR"; fi
 
 # ── Accept ───────────────────────────────────────────────────────────────────
 # accept NAME [report-arg] — expects exit 0 and the full re-entry shape; WANT_MAX is the budget.
@@ -172,8 +183,26 @@ WANT_HEADLEN=40
 
 mkrepo committed; codefix
 WANT_MAX=5; accept "committed code fix (existing budget 5 > base 2 + 2 is kept)"
+# task.276: the remedy the live step-7 lock message names works end to end — --halt on the stale lock
+# (which writes the snapshot), then the re-entry restores it and lowers it to 5a.
+mkrepo live-lock-remedy; codefix; jq -c '{current_step: 7, skill, task_or_story_directory, branch, qa_max_cycles}' "$S" > "$L"; rm -f "$S"
+(cd "$R" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$(dirname "$SCRIPT")/advance-pipeline-lock.sh" --halt --reason dod-gaps-code-fix --step 7 "$DOC" >/dev/null 2>&1)
+WANT_MAX=5; accept "the named remedy works: --halt on the stale step-7 lock, then the re-entry restores and lowers it"
 [ "$(jq -r '.qa_reentry.gate_head' "$L")" = "$(git -C "$R" rev-parse HEAD~2)" ] && pass "qa_reentry.gate_head is the gate's head" || fail "gate_head recorded" "$(jq -c .qa_reentry "$L")"
 [ "$(jq -r '.branch' "$L")" = "feature/x" ] && pass "pipeline fields carried over from the snapshot" || fail "fields carried" "$(cat "$L")"
+
+# task.276 criterion 2 (obs #46): the two in order, on ONE snapshot. The plain --restore a resume
+# reaches for first is refused and leaves the snapshot where it was; the re-entry then succeeds from
+# that same snapshot. Run apart, each half passes while the pair can still be broken: a refusal that
+# consumed the snapshot first would pass the refusal test and fail the re-entry's (task.203).
+mkrepo ordered; codefix
+ROUT=$(cd "$R" && PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$(dirname "$SCRIPT")/advance-pipeline-lock.sh" --restore "$DOC" 2>&1); RRC=$?
+SNAP_BEFORE=$(cat "$S" 2>/dev/null)
+if [ "$RRC" -ne 0 ] && [ -f "$S" ] && [ ! -f "$L" ] && printf '%s' "$ROUT" | grep -q 'reenter-qa-after-finalise.sh'; then
+  pass "ordered 1/2: a plain --restore of the gaps snapshot is refused, names the re-entry script, writes no lock, keeps the snapshot"
+else fail "ordered 1/2: refusal" "rc=$RRC lock=$([ -f "$L" ] && echo yes || echo no) snapshot=$([ -f "$S" ] && echo yes || echo no) out=$ROUT"; fi
+WANT_MAX=5; accept "ordered 2/2: the re-entry then succeeds from the snapshot the refusal left"
+[ -n "$SNAP_BEFORE" ] && [ "$(jq -r '.halt_step' <<<"$SNAP_BEFORE")" = "7" ] && pass "ordered: the snapshot the refusal left is the untouched step-7 halt" || fail "ordered: snapshot intact" "$SNAP_BEFORE"
 
 # ── Observation #44: documentation OUTSIDE the work item is not movement ──────
 # A DoD gap closed by a CHANGELOG entry or a standards page is a document-only fix. "Documentation"
@@ -249,6 +278,33 @@ WANT_MAX=5; accept "a committed fix beside an untracked held-aside file re-enter
 mkrepo untracked-warn; codefix; echo held > "$R/src/held-aside.sh"
 ERR=$(run 2>&1 >/dev/null)
 printf '%s' "$ERR" | grep -q 'held-aside.sh' && pass "the untracked file is named on stderr" || fail "untracked listed" "err=$ERR"
+
+# ── task.276 (obs #75): one ORDERED route per no-code-moved message ──────────
+# The step-7 restore consumes the snapshot this script reads, so a message that offered "resume at
+# step 7" before "commit it and run this script again" offered two remedies whose order destroys the
+# second. Clean tree → the step-7 route alone, with the flag the DoD-gaps guard requires. With
+# untracked files → the commit-and-re-run route FIRST, the step-7 route after "Otherwise".
+mkrepo route-clean
+echo "re-scoped criterion" >> "$R/$DOC/task.42.example.md"; git -C "$R" commit -qam "doc fix"
+ERR=$(run 2>&1 >/dev/null)
+if printf '%s' "$ERR" | grep -q -- "--restore --allow-dod-gaps" && ! printf '%s' "$ERR" | grep -q 'run this script again'; then
+  pass "a clean-tree no-code-moved names the step-7 route alone, with --allow-dod-gaps (obs #75)"
+else fail "clean-tree route" "err=$ERR"; fi
+mkrepo route-untracked; echo new > "$R/src/new-fix.sh"
+ERR=$(run 2>&1 >/dev/null)
+A=$(printf '%s' "$ERR" | grep -ob 'run this script again' | head -1 | cut -d: -f1)
+B=$(printf '%s' "$ERR" | grep -ob -- '--restore --allow-dod-gaps' | head -1 | cut -d: -f1)
+if [ -n "$A" ] && [ -n "$B" ] && [ "$A" -lt "$B" ] && printf '%s' "$ERR" | grep -q 'nothing was consumed' && printf '%s' "$ERR" | grep -q 'Otherwise'; then
+  pass "with untracked files the commit-and-re-run route comes BEFORE the step-7 route (the order that does not destroy the snapshot)"
+else fail "untracked route order" "A=$A B=$B err=$ERR"; fi
+
+# ── task.276 (obs #135): the budget base counts DISTINCT cycles, not heading lines ──
+# A report carries each cycle's `### QA Cycle N` heading in the Decisions Log AND the QA Iteration
+# History; the old `grep -c` read four cycles as eight (qa_max_cycles 10 on task.246).
+mkrepo budget-doubled; codefix
+jq 'del(.qa_max_cycles)' "$S" > "$S.n" && mv "$S.n" "$S"
+printf '%s\n' '## Decisions Log' '### QA Cycle 1 — d' '### QA Cycle 2 — d' '### QA Cycle 3 — d' '### QA Cycle 4 — d' '## QA Iteration History' '### QA Cycle 1 — h' '### QA Cycle 2 — h' '### QA Cycle 3 — h' '### QA Cycle 4 — h' > "$R/$DOC/report-doubled.md"
+WANT_MAX=6; accept "a report whose four cycles carry eight headings: base 4 + 2 = 6, not 8 + 2 = 10 (obs #135)" "$DOC/report-doubled.md"
 
 mkrepo budget; codefix
 jq 'del(.qa_max_cycles)' "$S" > "$S.n" && mv "$S.n" "$S"

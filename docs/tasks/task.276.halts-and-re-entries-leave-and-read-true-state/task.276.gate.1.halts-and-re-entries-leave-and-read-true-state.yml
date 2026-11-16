@@ -1,0 +1,92 @@
+schema: 2
+task: 'task.276.halts-and-re-entries-leave-and-read-true-state'
+task_title: 'Halts and re-entries leave and read true state'
+gate: CONCERNS
+status_reason: 'Four phases built and mutation-proven; CI-parity suite green (8501 pass, 0 fail). Three medium findings remain: resume-prompt-check reads a lock for another document, no CHANGELOG entry cites task 276, and the wall-time success criterion is unmeasured.'
+reviewer: 'QA Engineer'
+head: '61fabf9f49818acec8948886cb840833e69633e7'
+updated: '2026-11-15T19:51:08Z'
+
+top_issues:
+  - id: 'T276-QA-1'
+    severity: medium
+    file: 'shared/resources/resume-prompt-check.sh'
+    finding: 'The live lock is compared only on current_step, never on task_or_story_directory. A lock for another document at a later step makes a prompt for this document read "already complete" (exit 1), so the caller reports done and stops. Reproduced: lock {current_step:6, task_or_story_directory:"/other/dir"} with prompt "step 1" for a different doc dir prints "already complete: 1", rc=1. (origin: code-review CR-1, reproduced by QA; reviewer confidence medium, recorded unchanged.)'
+    suggested_action: 'Canonicalise the lock directory and compare with the doc-dir as advance-pipeline-lock.sh does; ignore a lock for another document (fall through to the artefact checks), and add a test with a foreign lock.'
+    suggested_owner: dev
+    status: open
+  - id: 'T276-QA-2'
+    severity: medium
+    file: 'CHANGELOG.md'
+    finding: 'No [Unreleased] entry cites task 276. changelog-cites.sh task.276 prints "missing (task 276)", rc=1; /finalise 6d HALTs on it.'
+    suggested_action: 'Add a Fixed entry under [Unreleased] citing (task 276): the HALT helper, the DoD-gaps restore guard, the distinct-cycle budget base, the resume-prompt check.'
+    suggested_owner: dev
+    status: open
+  - id: 'T276-QA-3'
+    severity: medium
+    file: 'docs/tasks/task.276.halts-and-re-entries-leave-and-read-true-state/task.276.halts-and-re-entries-leave-and-read-true-state.md'
+    finding: 'Success criterion "CI=true npm test wall time within 10% of develop, median of five alternating runs" is unverified: no measurement exists. The only datum is one remote run of 934 s with no develop counterpart.'
+    suggested_action: 'Run the protocol (five alternating develop/branch runs on the LAN server, uptime beside each) and record the medians in the QA report, or escalate for an approver to amend the criterion.'
+    suggested_owner: dev
+    status: open
+  - id: 'T276-QA-4'
+    severity: low
+    file: 'shared/resources/resume-prompt-check.sh'
+    finding: 'The step-5 row pattern holds a multibyte en dash inside a bracket expression. Under LC_ALL=C the class matches single bytes and the row is not found: the check exits 3 "no Pipeline Progress row" where the default locale exits 1 "already complete". Reproduced by execution; control (default locale) finds the row. (origin: code-review CR-3, reproduced by QA; reviewer confidence low, recorded unchanged.)'
+    suggested_action: 'Use a grep -E alternation, 5(–|-)6, which is byte-safe in every locale; add an LC_ALL=C case to resume-prompt-check.test.sh.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 8504
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: ['refuses']
+    boundary: internal
+    boundary_reason: 'The criteria word "refuses" describes the lock-restore guard and the re-entry refusals. Their only inputs are artefacts this pipeline writes (lock, halt snapshot, DoD, implementation report, gate files); no corpus sink models them. Behaviour was exercised by five committed mutation proofs and the suites instead.'
+    notes: 'No new external input surface. --halt writes the snapshot before removing the lock and refuses another document''s lock.'
+  performance:
+    status: CONCERNS
+    notes: 'Wall-time criterion unmeasured (T276-QA-3). Remote CI-parity run 934 s, 8501 pass.'
+  reliability:
+    status: PASS
+    notes: 'Snapshot-before-remove, post-condition check, idempotent --halt; restore guard refuses before any write. T276-QA-1 is a stale-lock misread in the advisory resume check.'
+  maintainability:
+    status: PASS
+    notes: 'One definition of the cycle count (qa-report-cycles.sh) and of newest-DoD (--newest-dod). Header of reenter-qa-after-finalise.sh is stale (advisory).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T276-QA-1 to T276-QA-4 in /qa-fix.'
+      refs: ['shared/resources/resume-prompt-check.sh', 'CHANGELOG.md']
+  future:
+    - action: 'Reword the reenter-qa-after-finalise.sh header: a plain --restore of a DoD-gaps halt is now refused, this script is the door (CR-4).'
+      refs: ['shared/resources/reenter-qa-after-finalise.sh']
+      remedy: unverified
+    - action: 'Add a test that grant-qa-cycles.sh and accept-qa-residual.sh relay the new DoD-gaps refusal on a halt_step 7 snapshot (CR-2).'
+      refs: ['shared/resources/grant-qa-cycles.sh', 'shared/resources/accept-qa-residual.sh']
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T276-QA-1', 'T276-QA-2', 'T276-QA-3']

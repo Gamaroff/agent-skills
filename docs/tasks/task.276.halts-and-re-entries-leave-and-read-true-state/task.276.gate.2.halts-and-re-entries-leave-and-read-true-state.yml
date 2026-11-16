@@ -1,0 +1,83 @@
+schema: 2
+task: 'task.276.halts-and-re-entries-leave-and-read-true-state'
+task_title: 'Halts and re-entries leave and read true state'
+gate: CONCERNS
+status_reason: 'Cycle-1 findings T276-QA-1, QA-2 and QA-4 are fixed and mutation-proven; the refute pass found one low issue in the fix (a relative lock directory is read as another document from a different cwd). The wall-time criterion remains unmeasured.'
+reviewer: 'QA Engineer'
+head: '1858f76fb29a3d2df6aa089a1b0a2d8c08613f98'
+updated: '2026-11-15T20:16:18Z'
+
+top_issues:
+  - id: 'T276-QA-3'
+    severity: medium
+    file: 'docs/tasks/task.276.halts-and-re-entries-leave-and-read-true-state/task.276.halts-and-re-entries-leave-and-read-true-state.md'
+    finding: 'Success criterion "CI=true npm test wall time within 10% of develop, median of five alternating runs" is still unverified: no measurement exists. qa-fix does not edit criteria, so it was left open. The only datum is one remote run of 934 s with no develop counterpart.'
+    suggested_action: 'Run the protocol (five alternating develop/branch runs on the LAN server, uptime beside each) and record the medians in the QA report, or escalate for an approver to amend the criterion with "approved by <name>".'
+    suggested_owner: po
+    status: open
+  - id: 'T276-QA-5'
+    severity: low
+    file: 'shared/resources/resume-prompt-check.sh'
+    finding: 'The new canon() falls back to the raw string when cd fails, and unlike advance-pipeline-lock.sh it does not strip ./ or trailing slashes. A lock holding a relative task_or_story_directory, read from another cwd, compares unequal to the absolute document directory, is taken for another document''s lock, and a step the run is already past gets "proceed". Reproduced: lock {current_step:7, task_or_story_directory:"docs/t"}, prompt "step 5" with the absolute document dir, cwd /, prints "proceed: 5"; from the repository root, with the relative dir, it prints "already complete: 5" (the control). (origin: code-review CR-1, reproduced by QA; reviewer severity low and confidence low, recorded unchanged.)'
+    suggested_action: 'Strip ./ and trailing slashes as advance-pipeline-lock.sh does, and when the lock''s directory cannot be resolved with cd return exit 3 "cannot tell" instead of treating the lock as foreign; add a test for a relative lock directory read from another cwd.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 85
+
+evidence:
+  tests_reviewed: 8504
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: ['refuses']
+    boundary: internal
+    boundary_reason: 'The criteria word "refuses" describes the lock-restore guard and the re-entry refusals. Their only inputs are artefacts this pipeline writes (lock, halt snapshot, DoD, implementation report, gate files); no corpus sink models them. Behaviour is held by committed suites and mutation proofs instead.'
+    notes: 'No new external input surface. The lock-directory comparison reads a value the pipeline wrote.'
+  performance:
+    status: CONCERNS
+    notes: 'Wall-time criterion unmeasured (T276-QA-3). Remote CI-parity run 934 s, 8501 pass.'
+  reliability:
+    status: PASS
+    notes: 'Snapshot-before-remove and idempotent --halt hold. T276-QA-5 affects only the advisory resume check, and only when run from outside the repository root.'
+  maintainability:
+    status: PASS
+    notes: 'canon() now exists in two scripts with slightly different behaviour (T276-QA-5).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T276-QA-5 in /qa-fix; decide T276-QA-3 (measure or amend with an approver).'
+      refs: ['shared/resources/resume-prompt-check.sh']
+  future:
+    - action: 'Add a test that grant-qa-cycles.sh and accept-qa-residual.sh relay the new DoD-gaps refusal on a halt_step 7 snapshot (cycle 1, CR-2).'
+      refs: ['shared/resources/grant-qa-cycles.sh', 'shared/resources/accept-qa-residual.sh']
+      remedy: unverified
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 2
+  fix_date: '2026-11-15'
+  total_iterations: 1
+  verification_method: 'Committed tests, mutation proofs, remote CI-parity suite'
+  closed: ['T276-QA-1', 'T276-QA-2', 'T276-QA-4']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T276-QA-3', 'T276-QA-5']

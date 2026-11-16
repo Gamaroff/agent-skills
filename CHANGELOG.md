@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **Halts and re-entries leave and read true state (task 276).** A HALT is now one call,
+  `advance-pipeline-lock.sh --halt`, which writes the snapshot before it removes the lock and checks
+  the result, instead of a fence of separate steps. `--restore` refuses a step-7 halt over a DoD that
+  reads `GAPS` unless `--allow-dod-gaps` is given, so a plain resume cannot re-run `/finalise` over a
+  head no QA gate has read; `reenter-qa-after-finalise.sh` is the door. The re-entry and
+  `grant-qa-cycles.sh` count distinct QA cycles through the new `qa-report-cycles.sh`, so four cycles
+  no longer read as eight. The new `resume-prompt-check.sh` tells a resume prompt that names a step
+  already done to stop instead of re-running it. Resolves observations #46, #49, #75, #95 and #135.
 - **A PASS gate comment no longer says "found no problems" beside open minor points (task 275).**
   The plain-language lead for `qa-gate` and `qa-cycle` takes an `open_count` slot, counted from the
   gate's open `top_issues:` entries by the new `gate-open-count.js` (never a grep, which counts

@@ -1,0 +1,61 @@
+[
+  {
+    "id": "allow-gaps.same-doc",
+    "sink": "path",
+    "input": "docs/tasks/task.42.example",
+    "direction": "legitimate",
+    "why": "The document-only route to step 7 must still work.",
+    "correct": "Restore the lock from the snapshot and exit 0.",
+    "spec_ref": "docs/tasks/task.276.halts-and-re-entries-leave-and-read-true-state/task.276.halts-and-re-entries-leave-and-read-true-state.md:62"
+  },
+  {
+    "id": "allow-gaps.same-doc-slash",
+    "sink": "path",
+    "input": "docs/tasks/task.42.example/",
+    "direction": "legitimate",
+    "why": "The same directory spelled with a trailing slash is the same document.",
+    "correct": "Restore and exit 0.",
+    "spec_ref": "shared/resources/advance-pipeline-lock.sh:116"
+  },
+  {
+    "id": "allow-gaps.other-doc",
+    "sink": "path",
+    "input": "docs/tasks/task.99.other",
+    "direction": "hostile",
+    "why": "The flag must not lift the document-match check. The snapshot belongs to task.42, so restoring it for task.99 is a wrong-document restore.",
+    "correct": "Refuse, write nothing, leave the snapshot.",
+    "spec_ref": "shared/resources/advance-pipeline-lock.sh:116"
+  },
+  {
+    "id": "allow-gaps.command-substitution-dir",
+    "sink": "path",
+    "input": "docs/tasks/$(touch PWNED)",
+    "direction": "hostile",
+    "why": "A directory whose name is a command substitution must be refused as another document without the name ever being evaluated.",
+    "correct": "Refuse as another document, and create no PWNED file.",
+    "spec_ref": "shared/resources/advance-pipeline-lock.sh:116",
+    "expected": {
+      "absent": [
+        "PWNED"
+      ]
+    }
+  },
+  {
+    "id": "allow-gaps.leading-dash-dir",
+    "sink": "path",
+    "input": "-n",
+    "direction": "hostile",
+    "why": "A leading-dash name is read as a flag.",
+    "correct": "Refuse and write nothing.",
+    "spec_ref": "shared/resources/advance-pipeline-lock.sh:177"
+  },
+  {
+    "id": "allow-gaps.absent-dir",
+    "sink": "path",
+    "input": "docs/tasks/nope",
+    "direction": "hostile",
+    "why": "An absent directory is not a match.",
+    "correct": "Refuse, never restore by absence.",
+    "spec_ref": "shared/resources/advance-pipeline-lock.sh:116"
+  }
+]
