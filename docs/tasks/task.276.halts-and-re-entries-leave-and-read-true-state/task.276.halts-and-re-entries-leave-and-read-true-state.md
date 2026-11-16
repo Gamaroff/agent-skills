@@ -344,26 +344,22 @@ The five gaps from the first `/finalise` run are closed with committed evidence:
 
 **Status:** IN PROGRESS
 
-QA gate 3 is PASS (92/100) and the security probes held (44 executed, 0 reproduced). The gaps below are evidence and documentation gaps; behaviour is not in doubt.
+QA gate 4 is PASS (92/100), the PR review is APPROVE and the security probes held (44 executed, 0 reproduced). Run 1's five gaps are closed (run 1 is historical, superseded). Run 2 found two evidence gaps; behaviour is not in doubt.
 
 ### Missing Criteria:
 
-- [ ] Criterion 2: no single test runs the `--restore` refusal and the re-entry in order, and no QA report names one
-- [ ] Criterion 5: no named mutation proof in a QA report for `--halt`, `--newest-dod`, the HALT fences or the step-8 checklist test change
-- [ ] Criterion 7: shellcheck was not run on the cycle 2 and 3 edits to `resume-prompt-check.sh`
-- [ ] Criterion 8: the `--restore` caller list has stale line numbers and omits three message sites (`set-qa-phase.sh`, `set-waiting-on.sh`, `develop-pipeline-on-precompact.sh`)
-- [ ] Docs: `pipeline-resume-detector-prompt.md:121` still counts cycles with `grep -c '^### QA Cycle'`; `develop-pipeline-pause.md:84` and `develop-pipeline-hooks.md:115` describe the old restore and HALT behaviour
+- [ ] Criterion 4: the wall-time measurement (+0.8%) was taken on `fb9b6bce4`, not on head; code changed since, so it needs a re-measure on head, recorded in a committed QA report
+- [ ] Criterion 5: no committed QA report names a mutation proof (with the red test) for the `no-code-moved` ordered route
 
 ### Next Steps:
 
-- [ ] Add the ordered refusal-then-re-entry test (code change, so it re-enters QA)
-- [ ] Run the mutation proofs and record them in a QA report
-- [ ] Run `command npm run lint:shell` in the CI-parity container and record the result
-- [ ] Fix the caller list and the three behaviour-doc lines
+- [ ] Re-measure `CI=true command npm test` wall time against `develop` on head (median of five alternating pairs, about 2.5 hours on the LAN server) and record it
+- [ ] Mutate the `no-code-moved` route ordering, name the test that goes red, restore, and record it in a QA report
+- [ ] Re-enter QA, then run `/finalise` run 3
 
-**Estimated Effort:** Small to Medium (about 2 to 3 hours)
+**Estimated Effort:** Small (a few minutes of work, plus about 2.5 hours of measurement)
 
-**Detailed Verification Log:** See `task.276.dod.1.halts-and-re-entries-leave-and-read-true-state.md`.
+**Detailed Verification Log:** See `task.276.dod.2.halts-and-re-entries-leave-and-read-true-state.md` (run 1: `task.276.dod.1.halts-and-re-entries-leave-and-read-true-state.md`).
 
 <!-- change-log-start -->
 ## Change Log
@@ -380,6 +376,7 @@ QA gate 3 is PASS (92/100) and the security probes held (44 executed, 0 reproduc
 | 2026-11-15 |         | QA findings fixed, iteration 2 — T276-QA-5 closed; wall-time criterion left open | qa-fix      |
 | 2026-11-16 |         | QA gate PASS (92/100) — 2 findings; wall-time criterion measured, +0.8% | qa-task     |
 | 2026-11-16 |  | DoD incomplete — 5 gaps identified | finalise |
+| 2026-11-16 |  | DoD incomplete — 2 gaps identified (run 2) | finalise |
 | 2026-11-16 |  | QA gate PASS (92/100) — 0 findings; the 5 DoD gaps closed with committed evidence | qa-task |
 <!-- change-log-end -->
 

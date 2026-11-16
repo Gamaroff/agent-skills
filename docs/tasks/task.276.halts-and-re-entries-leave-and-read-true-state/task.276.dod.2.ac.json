@@ -1,0 +1,190 @@
+{
+  "schema": 1,
+  "dod_n": 2,
+  "head": "5bab7611dd5e2b8947cc233118bbd9ae33f894af",
+  "dirty_paths": [],
+  "document": "docs/tasks/task.276.halts-and-re-entries-leave-and-read-true-state/task.276.halts-and-re-entries-leave-and-read-true-state.md",
+  "result": {
+    "bytes": 9212,
+    "sha256": "b59a25f20b02a153db46d92a0b7e32c0ad69484cac2874b536d486ba70072263",
+    "verified": true
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 8,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "0743c5ebc55038d024607f03e382b927fce6d3c0e9c8910155fb2427315a50df",
+      "status": "PASS",
+      "description": "After each HALT path lock absent and snapshot present; --halt test and fence-extraction test",
+      "code_citation": "shared/resources/advance-pipeline-lock.sh:643",
+      "test_citation": "shared/resources/advance-pipeline-lock.test.sh:1097",
+      "members": [
+        {
+          "member": "--halt mode (snapshot written, lock removed, idempotent)",
+          "evidence": "shared/resources/advance-pipeline-lock.test.sh:1097",
+          "status": "PASS"
+        },
+        {
+          "member": "develop-story SKILL.md HALT fence",
+          "evidence": "tests/halt-fence.test.js:49",
+          "status": "PASS"
+        },
+        {
+          "member": "develop-task SKILL.md HALT fence",
+          "evidence": "tests/halt-fence.test.js:49",
+          "status": "PASS"
+        },
+        {
+          "member": "develop-bug SKILL.md HALT fence",
+          "evidence": "tests/halt-fence.test.js:49",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "advance-pipeline-lock.test.sh is in package.json test:suite; tests/halt-fence.test.js runs under the node test glob. Both tests are named in qa.4 mutation proofs (task.276.qa.4...md:143 onward), where each went red."
+    },
+    {
+      "id": "#2",
+      "text_hash": "be31f516c09f2482fc76744211314ab84dcd6e476576bf854309ec745a21df08",
+      "status": "PASS",
+      "description": "--restore refuses gaps snapshot, re-entry succeeds from it, test runs both in order",
+      "code_citation": "shared/resources/advance-pipeline-lock.sh:502",
+      "test_citation": "shared/resources/reenter-qa-after-finalise.test.sh:198",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Block 'ordered 1/2' (refusal, lock absent, snapshot kept), 'ordered 2/2' (re-entry succeeds) and 'ordered: snapshot intact' (lines 198-205) share one fixture and run in order. Recorded in qa.4 Success Criteria row 2 (line ~90) and mutation-proven (guard disabled, 3 tests red). reenter-qa-after-finalise.test.sh is in test:suite."
+    },
+    {
+      "id": "#3",
+      "text_hash": "92ca875a2ae10aa35337f1f54180924b1375c06a047919e6b3e2f2c0ffa73664",
+      "status": "PASS",
+      "description": "Budget base equals distinct QA cycles on a report with both heading sets",
+      "code_citation": "shared/resources/qa-report-cycles.sh:14",
+      "test_citation": "shared/resources/qa-report-cycles.test.sh:50",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Test 'both heading sets count 4, not 8'. grant-qa-cycles.test.sh:267 covers the base through the grant script (4+2=6, not 10). Both suites are in test:suite."
+    },
+    {
+      "id": "#4",
+      "text_hash": "546f8d2e546317c6fe9a55fd0f609c8fefcc1c0cc809d62ee9ee5cda06496d54",
+      "status": "FAIL",
+      "description": "npm test wall time within 10% of develop, median of five alternating runs with uptime",
+      "code_citation": "docs/tasks/task.276.halts-and-re-entries-leave-and-read-true-state/task.276.qa.3.halts-and-re-entries-leave-and-read-true-state.md:65",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": "measurement taken on fb9b6bce4, not on head; finalise-delta docs-only fb9b6bce4..HEAD returns reason code-changed",
+      "note": "re-measure. The measurement itself is well formed: median of five alternating pairs, +0.8% against a 10% bound, uptime recorded per run, command named (qa.3 lines 72-83). It was taken on fb9b6bce4 plus an uncommitted report. finalise-delta.js docs-only --base fb9b6bce4 --head HEAD --json returns code-changed (exit 0) because shared/resources/set-qa-phase.sh, set-waiting-on.sh, reenter-qa-after-finalise.test.sh, the bundled references copies and three behaviour docs changed since. Only tree-equivalent counts. The delta is two message strings plus a test block, so the figure will almost certainly hold, but the rule requires a re-measure on head."
+    },
+    {
+      "id": "#5",
+      "text_hash": "768632a9bd478c26fcca42074f89d0beff1eb4630ea7770ba35c25e6d4bbb45d",
+      "status": "FAIL",
+      "description": "Each change has a mutation proof in the QA report",
+      "code_citation": "docs/tasks/task.276.halts-and-re-entries-leave-and-read-true-state/task.276.qa.4.halts-and-re-entries-leave-and-read-true-state.md:143",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "--restore DoD-gaps guard",
+          "evidence": "task.276.qa.4...md:143",
+          "status": "PASS"
+        },
+        {
+          "member": "--halt snapshot-and-remove",
+          "evidence": "task.276.qa.4...md:145",
+          "status": "PASS"
+        },
+        {
+          "member": "--newest-dod",
+          "evidence": "task.276.qa.4...md:147",
+          "status": "PASS"
+        },
+        {
+          "member": "SKILL.md HALT fences",
+          "evidence": "task.276.qa.4...md:149",
+          "status": "PASS"
+        },
+        {
+          "member": "step-8 checklist test change",
+          "evidence": "task.276.qa.4...md:151 (measured earlier, not re-run, but the red test is named)",
+          "status": "PASS"
+        },
+        {
+          "member": "re-entry passes --allow-dod-gaps",
+          "evidence": "task.276.qa.1...md:123",
+          "status": "PASS"
+        },
+        {
+          "member": "lock-present step-7 routing",
+          "evidence": "task.276.qa.1...md:124",
+          "status": "PASS"
+        },
+        {
+          "member": "budget base, distinct count (qa-report-cycles.sh and grant-qa-cycles.sh)",
+          "evidence": "task.276.qa.1...md:126-127",
+          "status": "PASS"
+        },
+        {
+          "member": "resume-prompt-check.sh 5b complete test, foreign lock, locale, relative lock guard",
+          "evidence": "task.276.qa.1...md:125; qa.2...md:126-127; qa.3...md:141",
+          "status": "PASS"
+        },
+        {
+          "member": "no-code-moved ordered route (Phase 2: untracked file names commit-and-re-run route before step-7 route; clean tree prints step-7 route only)",
+          "evidence": null,
+          "status": "FAIL"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "No committed QA report names a mutation proof with a red test for the no-code-moved ordered-route change. qa.1:46 says 'route mutation-proven' in a table cell but the five named proofs at qa.1:123-127 cover the lock-present branch, not no-code-moved. The behaviour code is right, so low severity. The qa.3 'canon() strip' proof reads no-red-dead, which is not a proof and is not counted against this criterion."
+    },
+    {
+      "id": "#6",
+      "text_hash": "4ebe7eb0e4844e0df815176b7f42d776b2bc0cf3440c8435836dd542207af2de",
+      "status": "DEFERRED-CI",
+      "description": "bundle --check reports 0 problems; CI=true npm test passes",
+      "code_citation": ".github/workflows/test.yml:1",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Bundle half checked here: `npm run bundle -- --check` printed '129 skill(s) checked, 0 problems'. The npm test half is CI state, left for Step 6 to grade from the CI reading (qa.4 records CI green on 5abb1c99ccee)."
+    },
+    {
+      "id": "#7",
+      "text_hash": "dc09abe3b1056564696c57f4e345cf3e1b96c4726bd551d059b2d5a78ee2eeb1",
+      "status": "PASS",
+      "description": "shellcheck clean on changed scripts (npm run lint:shell)",
+      "code_citation": "docs/tasks/task.276.halts-and-re-entries-leave-and-read-true-state/task.276.qa.4.halts-and-re-entries-leave-and-read-true-state.md:91",
+      "test_citation": "scripts/lint-shell.sh:1",
+      "members": [],
+      "non_member_fail": null,
+      "note": "qa.4 line 91 records the command `CI=true npm run test:remote -- --run lint:shell` -> 'linting 145 source shell scripts', 'shellcheck: clean', exit 0. It was run after the cycle 2 and 3 edits, on 5abb1c99c. Later commits are documentation only (DoD, QA, review reports). The same lint runs per PR in .github/workflows/shellcheck.yml (on: pull_request)."
+    },
+    {
+      "id": "#8",
+      "text_hash": "4adcbcda13242f21eef1ab5db62e06d93b3f681f2f1363aca95db13e72ae297c",
+      "status": "PASS",
+      "description": "Every --restore caller listed with git grep, each correct under the guard",
+      "code_citation": "docs/tasks/task.276.halts-and-re-entries-leave-and-read-true-state/task.276.halts-and-re-entries-leave-and-read-true-state.md:101",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Read line 101. It names the git grep command and lists reenter-qa-after-finalise.sh:291 (passes --allow-dod-gaps), grant-qa-cycles.sh:225, accept-qa-residual.sh:101, the --which calls at reenter:152 and grant:199, and the three message sites set-qa-phase.sh:62, set-waiting-on.sh:103 and develop-pipeline-on-precompact.sh:640. I re-ran the grep against the tree and every line number matches. Each caller's treatment under the guard is stated. qa.4 line 92 records the re-measure. No test pins the list."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#8",
+      "note": "qa.4 'Short-term' item 2 records that no test pins grant-qa-cycles.sh and accept-qa-residual.sh relaying the DoD-gaps refusal. Both restore plainly, and the doc says they only handle step-5 snapshots. The claim is reasoned, not tested."
+    },
+    {
+      "ac_id": "#5",
+      "note": "The step-8 checklist proof in qa.4 is an earlier measurement ('step8-mut.log', not re-run this cycle) and the log is not committed. The red test is named, so it is accepted."
+    }
+  ]
+}
