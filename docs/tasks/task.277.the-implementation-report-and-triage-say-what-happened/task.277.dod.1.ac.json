@@ -1,0 +1,138 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "d1ff877c890208390a4fe50aeef3c783ad863001",
+  "dirty_paths": [
+    "docs/tasks/task.277.the-implementation-report-and-triage-say-what-happened/task.277.implementation.1.the-implementation-report-and-triage-say-what-happened-initial-run.md",
+    "docs/tasks/task.277.the-implementation-report-and-triage-say-what-happened/task.277.pr-review.1.the-implementation-report-and-triage-say-what-happened.md"
+  ],
+  "document": "docs/tasks/task.277.the-implementation-report-and-triage-say-what-happened/task.277.the-implementation-report-and-triage-say-what-happened.md",
+  "result": {
+    "bytes": 6882,
+    "sha256": "286e4ef475afb71f9c3085c94283e71151d98f67918be0e5a2027fe4efedcb8c",
+    "verified": true
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 8,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "272bd82d8b80a932ede047eb720857d92642af92d789ae4a24d7c50bb613087a",
+      "status": "PASS",
+      "description": "Lint flags task.230 heading shape and missing Traceability row, via named tests in QA report",
+      "code_citation": "shared/resources/report-lint.js:278",
+      "test_citation": "shared/resources/tests/report-lint.test.mjs:441",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Heading code at report-lint.js:278; traceability-missing at :352. Tests at :441 (heading, with H4 control) and :482 (traceability). QA report 1 lines 75 and 169-172 name them with mutation proofs. The suite runs under `npm test` in .github/workflows/test.yml:58 on pull_request."
+    },
+    {
+      "id": "#2",
+      "text_hash": "c07c5e55267edc19d7f2342c3b7b1a96d4634dc28824a54e1156a3ced6cd38e3",
+      "status": "PASS",
+      "description": "Two prose rules present in their docs; greps in QA report",
+      "code_citation": "shared/resources/develop-pipeline-autonomous-defaults.md:81",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Read autonomous-defaults lines 78-86: the measured-times rule is stated for Notes cells and the Decisions Log. The triage rule is in develop-pipeline-step-3-develop-loop.md (324-334). The QA report records both greps at qa.1.md:76-77."
+    },
+    {
+      "id": "#3",
+      "text_hash": "cb3916cc1297c4018e64e44a965c633d507e0f7bb3b173a5ea679bf72729102d",
+      "status": "PASS",
+      "description": "Triage rule names the justification exception (binder line or placeholder); grep and line in QA report",
+      "code_citation": "shared/resources/develop-pipeline-step-3-develop-loop.md:334",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Read lines 330-336: the allow-list is extended only when the justification names the line, or the `{placeholder}`, that binds the value. QA report 1 line 77 records the grep and line. The fixture rehearsal is expressly not a gate."
+    },
+    {
+      "id": "#4",
+      "text_hash": "546f8d2e546317c6fe9a55fd0f609c8fefcc1c0cc809d62ee9ee5cda06496d54",
+      "status": "PASS",
+      "description": "npm test wall time within 10% of develop; amended: bound waived, recorded proxy reported",
+      "code_citation": "docs/tasks/task.277.the-implementation-report-and-triage-say-what-happened/task.277.qa.1.the-implementation-report-and-triage-say-what-happened.md:83",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Judged as amended. criteria-drift.js exited 0 and reported #4 as reworded with approved: true and approver Lorien Gamaroff, so the amendment rule does not fail it. Both named sources are committed and exist. QA report 1:83 records the proxy, five alternating runs of the report-lint suite (base median 757 ms, head median 902 ms, load 2.5) and the 679 s full run. Gate 3 task.277.gate.3...yml:14 records finding T277-4, repeating the proxy and the 679 s run. The criterion now says the 10% bound is waived and the proxy is reported, not held to the bound, so I did not grade whether the proxy meets 10%."
+    },
+    {
+      "id": "#5",
+      "text_hash": "4d6e25190491acf76a0d213fa7a39f5477cfdae1f96fcb8b1784ce11304d53b7",
+      "status": "PASS",
+      "description": "Each lint code has a mutation proof in the QA report",
+      "code_citation": "docs/tasks/task.277.the-implementation-report-and-triage-say-what-happened/task.277.qa.1.the-implementation-report-and-triage-say-what-happened.md:169",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "qa-cycle-heading-suffix",
+          "evidence": "task.277.qa.1...md:169 (QA_HEADING_SUFFIX never-matching, named test red, 1 red 18 pass)",
+          "status": "PASS"
+        },
+        {
+          "member": "traceability-missing",
+          "evidence": "task.277.qa.1...md:170 (if (marked) disabled, 4 red)",
+          "status": "PASS"
+        },
+        {
+          "member": "traceability-reason-missing",
+          "evidence": "task.277.qa.1...md:171 (reason check disabled, named test red)",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Each line records the mutation and the test that went red. Later cycles re-prove the follow-up fixes: qa.2.md:95-96 and qa.3.md:89-90."
+    },
+    {
+      "id": "#6",
+      "text_hash": "4ebe7eb0e4844e0df815176b7f42d776b2bc0cf3440c8435836dd542207af2de",
+      "status": "PASS",
+      "description": "bundle --check reports 0 problems; npm test passes",
+      "code_citation": ".github/workflows/test.yml:58",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ d1ff877c890208390a4fe50aeef3c783ad863001 — The evidence is command and CI state. test.yml runs `npm test` on pull_request. QA report 1:90 and qa.3.md:53 record bundle --check at 0 problems and 8510 tests with 0 failed. Left for /finalise Step 6 to grade from CI reading 1.",
+      "ci_reading": "CI reading 1: SUCCESS @ d1ff877c890208390a4fe50aeef3c783ad863001"
+    },
+    {
+      "id": "#7",
+      "text_hash": "84cc5bef114a42db99d535cf0949c60299be2717945a1821410e0e67b5a99351",
+      "status": "PASS",
+      "description": "report-lint over every accepted report reports no new problem; counts in QA report",
+      "code_citation": "docs/tasks/task.277.the-implementation-report-and-triage-say-what-happened/task.277.qa.2.the-implementation-report-and-triage-say-what-happened.md:38",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Bound is zero new problems. qa.2.md:38 records the sweep over 320 reports: 72 problems in 23 reports before and after, 0 reports with a new code. qa.3.md:59 confirms the counts equal develop's. The T277-2 fix is held by the test at report-lint.test.mjs:583. The cycle 1 failure at qa.1.md:91 is superseded by this."
+    },
+    {
+      "id": "#8",
+      "text_hash": "dba4dd1c1ea911d83e529a323ad47e9d6a927d29ba34d5541cc7253446380ee7",
+      "status": "PASS",
+      "description": "Marker stated in template and report-lint.js header; pre-change reports lint as before",
+      "code_citation": "shared/resources/implementation-report-template.md:31",
+      "test_citation": "shared/resources/tests/report-lint.test.mjs:583",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Marker is stated at template:31, 57 and 156 and in the report-lint.js header at lines 53-54 (REPORT_FORMAT_MARKER at :84). The test at :583 (an unmarked report lints as before) and :562 (template writes the marker) run per PR via test.yml:58. Counts equal develop's per qa.2.md:38, :61 and qa.3.md:59."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#4",
+      "note": "The amendment is approved per criteria-drift.js (exit 0, approver Lorien Gamaroff). qa.1.md:83 still labels the row UNVERIFIED and gate 3 T277-4 still lists it as awaiting an owner decision. Both predate the amendment, so they now read as stale. This is not a failure."
+    },
+    {
+      "ac_id": "#6",
+      "note": "Returned DEFERRED-CI, so it counts as not met until Step 6 reads CI."
+    }
+  ]
+}

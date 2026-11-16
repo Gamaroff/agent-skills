@@ -5,16 +5,18 @@ type: task
 description: "Close four develop-pipeline honesty gaps: a guard allow-list entry is not a fix for new code, report times are measured, qa-fix records are H4 under their cycle, and the traceability mapper decision is a required line."
 tags: [develop-task, develop-story, develop-bug, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-16
+completed_date: 2026-11-16
+pr_number: 914
 estimated_effort_hours: 8
 ---
 
 # Task 277: The implementation report and triage say what happened
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 ---
 
@@ -201,7 +203,7 @@ Triage and time rules are prose; evidence is a fresh develop-loop session on a f
 
 ### Performance
 
-- [ ] `CI=true command npm test` wall time is within 10% of `develop`, as the median of five alternating runs with `uptime` beside each, recorded in the QA report.
+- [ ] `CI=true command npm test` wall time is within 10% of `develop`, as the median of five alternating runs with `uptime` beside each, recorded in the QA report. Amended 2026-11-16: the 10% bound is waived and was not measured as written. The evidence is the recorded proxy, which is reported and not held to the bound: the report-lint suite alone runs in 0.5-1.1 s on `develop` and on the branch head, and one full run takes about 679 s (QA gate 3, finding T277-4, and QA report 1); the change adds only a flag and a few conditions to one lint pass; approved by Lorien Gamaroff.
 
 ### Code Quality
 
@@ -305,11 +307,36 @@ None identified.
 ### Key Findings
 Cycle 2's two fixes hold and are mutation-proven. One low finding is open: T277-4, the performance criterion, needs an owner decision.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.277.qa.3.the-implementation-report-and-triage-say-what-happened.md`
+**Gate File**: `task.277.gate.3.the-implementation-report-and-triage-say-what-happened.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100
+**PR review**: `task.277.pr-review.1.the-implementation-report-and-triage-say-what-happened.md`, verdict ✅ APPROVE (the host requires no review, so this report satisfies the review column)
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 8 of 8 PASS. Criterion 4 (performance) is judged as amended on 2026-11-16: the owner waived the 10% bound, and the recorded proxy is reported and not held to it (approved by Lorien Gamaroff). Criterion 6 was graded from CI reading 1 (SUCCESS on `d1ff877c8`).
+✅ **Tests:** the lint suite passes 23 of 23; `ci:fast` on the LAN server passed 8514 tests, 0 failed, 3 skipped; every lint code has a mutation proof in the QA reports.
+✅ **Documentation:** CHANGELOG entry (task 277), pipeline docs, template and bundled copies updated; `bundle --check` reports 0 problems.
+✅ **Security Review:** PASS. `lintReport` is a boundary; the probe plan ran 15 cases, 0 reproduced, 0 escapes.
+✅ **Compliance Review:** not applicable (an internal lint, tests and documentation).
+
+**Open item carried to the owner, not blocking:** QA gate 3 still lists T277-4 as open. The criterion was amended after that gate; the gate is a historical record and is not edited.
+
+**Task marked as ACCEPTED on:** 2026-11-16
+
+**Detailed Verification Log:** See `task.277.dod.1.the-implementation-report-and-triage-say-what-happened.md` for the evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                                | Author      |
-| ---------- | ------- | ---------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #5, #6, #92, #124    | create-task |
 | 2026-11-16 | 1.1     | Review passed (8/10) — QA Cycle template location corrected, marker made a header line, count-mismatch code dropped, writers and AC scoped | review-task |
 | 2026-11-16 |         | Status → ready-for-development                             | review-task |
@@ -319,6 +346,7 @@ Cycle 2's two fixes hold and are mutation-proven. One low finding is open: T277-
 | 2026-11-16 |         | QA gate PASS (95/100) — 3 low findings                     | qa-task     |
 | 2026-11-16 |         | QA findings fixed — T277-5, T277-6, 1 iteration (cycle 2); T277-4 awaits an owner decision | qa-fix      |
 | 2026-11-16 |         | QA gate PASS (95/100) — 1 low finding (T277-4, owner decision) | qa-task     |
+| 2026-11-16 | 1.2 | DoD passed — accepted (PR #914) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -357,4 +385,4 @@ None.
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
