@@ -1716,7 +1716,7 @@ printf '# review: %s\n' "$PR_REVIEW" > "$ELIGIBLE"
 # parse" must not look alike (task.173 QA-1, CR-2). An empty `findings: []` is a clean zero.
 command node -e '
   const fs = require("fs");
-  const { readConfig, isDocsPath } = require("./.agents/skills/{develop-story|develop-task}/references/ci-tree-equivalence.js");
+  const { readConfig, isDocsPath, fixPathTarget } = require("./.agents/skills/{develop-story|develop-task}/references/ci-tree-equivalence.js");
   const patterns = readConfig(process.cwd()).patterns;
   const text = fs.readFileSync(process.argv[1], "utf8");
   const fence = String.fromCharCode(96).repeat(3);   // no literal fence inside a fenced block
@@ -1734,15 +1734,12 @@ command node -e '
   const lines = body.slice(0, close).split("\n");
   const entries = lines.filter((l) => /^\s*-\s+\S/.test(l)).length;
   // `fix_path` (task.278, obs #141): the file the fix EDITS, when `ref` anchors where the behaviour
-  // lives. It counts only when it is a `.md` directly inside the work item directory (the directory
-  // of the review report) and a docs path; anything else is read as if it were absent, so the
-  // finding classifies on `ref` exactly as before. "Clean against HEAD" is the second test below.
-  const posix = require("path").posix;
-  const workItemDir = posix.dirname(process.argv[1]);
-  const fixTarget = (raw) => {
-    const f = posix.normalize(raw.replace(/^["\x27]|["\x27]$/g, ""));
-    return f.endsWith(".md") && posix.dirname(f) === workItemDir && isDocsPath(f, patterns) ? f : null;
-  };
+  // lives. `fixPathTarget` (ci-tree-equivalence.js, where the probe engine can reach it) answers the
+  // file only when it is a `.md` directly inside the work item directory (the directory of the review
+  // report) and a docs path; anything else answers null, read as if absent, so the finding classifies
+  // on `ref` exactly as before. "Clean against HEAD" is the second test below.
+  const workItemDir = require("path").posix.dirname(process.argv[1]);
+  const fixTarget = (raw) => fixPathTarget(raw, workItemDir, patterns);
   let cur = null, printed = 0;
   const flush = () => {
     if (cur && cur.ref !== null) {

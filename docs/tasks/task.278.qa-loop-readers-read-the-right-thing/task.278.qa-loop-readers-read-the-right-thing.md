@@ -290,6 +290,27 @@ None identified.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-16
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.278.qa.1.qa-loop-readers-read-the-right-thing.md](./task.278.qa.1.qa-loop-readers-read-the-right-thing.md)
+- **Gate File**: [task.278.gate.1.qa-loop-readers-read-the-right-thing.yml](./task.278.gate.1.qa-loop-readers-read-the-right-thing.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 8531
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+Four MEDIUM gaps: no CHANGELOG entry, one existing consumer fixture changed against criterion 3, the globs wiring has no committed test, and the `fix_path` boundary has no engine probe.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -299,6 +320,8 @@ None identified.
 | 2026-11-16 | 1.1     | Review 7/10 → fixes applied (Phase 1 rewritten to the in-line defect, `readKeysInto` consumers corrected, `fix_path` producer added, Phase 2 path mapping stated, migration criterion re-defined) — ready for development | review-task |
 | 2026-11-16 |         | Status → ready-for-development                           | review-task |
 | 2026-11-16 | 1.2     | Implemented: gate reader keys at key position, residue fold, `fix_path` carry | develop     |
+| 2026-11-16 |         | QA gate CONCERNS (90/100) — 4 MEDIUM findings            | qa-task     |
+| 2026-11-16 |         | QA findings fixed — 3 of 4 closed, T278-QA-2 escalated (1 iteration) | qa-fix      |
 <!-- change-log-end -->
 
 ---
@@ -332,6 +355,18 @@ None identified.
 ### Important Reminders
 
 Do not reuse the ingester's `suggested_fix_path` name; it holds a description, not a path.
+
+### Deviation from success criterion 3 (QA cycle 1, T278-QA-2)
+
+Criterion 3 says every other consumer of `readTopIssues` passes its existing fixtures unchanged. One
+pinned expectation changed: in `shared/resources/tests/accept-qa-residual.test.mjs`, the case
+`{id: X, a: {status: open}}` moved from the "refuses a flow entry the extent scanner cannot read" list
+to the "edits a flow entry the scanner reads" list. The old expectation encoded the defect this task
+fixes: it refused because the shared reader took the nested `status: open` as the entry's own status
+(the writer's read-back then disagreed with its edit). With the reader fixed, the writer appends a
+top-level `status: waived` and the read-back confirms it. Every other consumer fixture is unchanged.
+The criterion text is not edited. **An approver must accept this deviation** (`approved by <name>`);
+until then T278-QA-2 stays open.
 
 ### Future Improvements
 

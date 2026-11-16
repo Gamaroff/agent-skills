@@ -6,6 +6,13 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The QA-loop readers read the right thing (task 278).** The gate reader no longer takes `status`
+  or `category` from text quoted inside a finding or from a nested flow map, so only a real key at
+  the top of an entry counts. The narrowing-residue file count folds a production file and its own
+  test into one subject when `qa.testArtifactGlobs` is set, and counts them as before when it is not.
+  The 5c carry classifier reads an optional `fix_path` on a review finding, accepted only for a `.md`
+  directly in the work-item directory. Over the 1021 committed gates, 14 read differently, all of them
+  the old reader taking a value from quoted prose. Resolves observations #151, #120 and #141.
 - **The implementation report and triage say what happened (task 277).** A guard's allow-list entry
   is no longer taken as the fix for new code unless a binder line or `{placeholder}` justifies it,
   and every time the report states comes from `date -u` or a completion notice's `duration_ms`, else
