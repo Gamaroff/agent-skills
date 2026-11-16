@@ -1,0 +1,191 @@
+{
+  "schema": 1,
+  "dod_n": 3,
+  "head": "72c2b49f9b6da05aaf82d41b59ceb6d7e62f65ea",
+  "dirty_paths": [],
+  "document": "docs/tasks/task.276.halts-and-re-entries-leave-and-read-true-state/task.276.halts-and-re-entries-leave-and-read-true-state.md",
+  "result": {
+    "bytes": 8855,
+    "sha256": "35a73cc8f55cd18c425f973c100f7b300a51989aa358166d34827e9561cadd18",
+    "verified": true
+  },
+  "scope": {
+    "mode": "scoped",
+    "reason": "prior-record",
+    "rejudged": 4,
+    "carried": 4
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "0743c5ebc55038d024607f03e382b927fce6d3c0e9c8910155fb2427315a50df",
+      "status": "PASS",
+      "description": "After each HALT path lock absent and snapshot present; --halt test and fence-extraction test",
+      "code_citation": "shared/resources/advance-pipeline-lock.sh:643",
+      "test_citation": "shared/resources/advance-pipeline-lock.test.sh:1097",
+      "members": [
+        {
+          "member": "--halt mode (snapshot written, lock removed, idempotent)",
+          "evidence": "shared/resources/advance-pipeline-lock.test.sh:1097",
+          "status": "PASS"
+        },
+        {
+          "member": "develop-story SKILL.md HALT fence",
+          "evidence": "tests/halt-fence.test.js:49",
+          "status": "PASS"
+        },
+        {
+          "member": "develop-task SKILL.md HALT fence",
+          "evidence": "tests/halt-fence.test.js:49",
+          "status": "PASS"
+        },
+        {
+          "member": "develop-bug SKILL.md HALT fence",
+          "evidence": "tests/halt-fence.test.js:49",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "advance-pipeline-lock.test.sh is in package.json test:suite; tests/halt-fence.test.js runs under the node test glob. Both tests are named in qa.4 mutation proofs (task.276.qa.4...md:143 onward), where each went red."
+    },
+    {
+      "id": "#2",
+      "text_hash": "be31f516c09f2482fc76744211314ab84dcd6e476576bf854309ec745a21df08",
+      "status": "PASS",
+      "description": "--restore refuses gaps snapshot, re-entry succeeds from it, test runs both in order",
+      "code_citation": "shared/resources/advance-pipeline-lock.sh:502",
+      "test_citation": "shared/resources/reenter-qa-after-finalise.test.sh:198",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Block 'ordered 1/2' (refusal, lock absent, snapshot kept), 'ordered 2/2' (re-entry succeeds) and 'ordered: snapshot intact' (lines 198-205) share one fixture and run in order. Recorded in qa.4 Success Criteria row 2 (line ~90) and mutation-proven (guard disabled, 3 tests red). reenter-qa-after-finalise.test.sh is in test:suite."
+    },
+    {
+      "id": "#3",
+      "text_hash": "92ca875a2ae10aa35337f1f54180924b1375c06a047919e6b3e2f2c0ffa73664",
+      "status": "PASS",
+      "description": "Budget base equals distinct QA cycles on a report with both heading sets",
+      "code_citation": "shared/resources/qa-report-cycles.sh:14",
+      "test_citation": "shared/resources/qa-report-cycles.test.sh:50",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Test 'both heading sets count 4, not 8'. grant-qa-cycles.test.sh:267 covers the base through the grant script (4+2=6, not 10). Both suites are in test:suite."
+    },
+    {
+      "id": "#4",
+      "text_hash": "546f8d2e546317c6fe9a55fd0f609c8fefcc1c0cc809d62ee9ee5cda06496d54",
+      "status": "PASS",
+      "description": "npm test wall time within 10% of develop, median of five alternating runs with uptime",
+      "code_citation": "docs/tasks/task.276.halts-and-re-entries-leave-and-read-true-state/task.276.qa.5.halts-and-re-entries-leave-and-read-true-state.md:69",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Bound: within 10% of develop. Measured: median of five alternating develop/branch pairs, develop 770 s vs branch 796 s, +3.4% wall, and -1.7% on suite duration_ms. Command: `CI=true npm run test:remote -- --run test` on the CI-parity host, with server uptime recorded before each run. Measured on 948f5f6e9, tree-equivalent to head: `finalise-delta.js docs-only --base 948f5f6e9 --head HEAD --json` returned reason tree-equivalent, exit 0. It changed only 4 task-directory documents. I recomputed the medians from the raw log walltime3.tsv. Develop wall runs 720, 727, 770, 804, 1136 have median 770. Branch wall runs 724, 729, 796, 836, 1264 have median 796. Develop duration_ms median 645309 and branch 634539 give -1.7%. All ten runs exited 0 and each row carries its uptime. Two of the five pairs, 2 and 5, are outliers under server load near 20 and sit on opposite sides of the median."
+    },
+    {
+      "id": "#5",
+      "text_hash": "768632a9bd478c26fcca42074f89d0beff1eb4630ea7770ba35c25e6d4bbb45d",
+      "status": "PASS",
+      "description": "Each change has a mutation proof in the QA report",
+      "code_citation": "docs/tasks/task.276.halts-and-re-entries-leave-and-read-true-state/task.276.qa.5.halts-and-re-entries-leave-and-read-true-state.md:91",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "--restore DoD-gaps guard",
+          "evidence": "task.276.qa.4...md:143",
+          "status": "PASS"
+        },
+        {
+          "member": "--halt snapshot-and-remove",
+          "evidence": "task.276.qa.4...md:145",
+          "status": "PASS"
+        },
+        {
+          "member": "--newest-dod",
+          "evidence": "task.276.qa.4...md:147",
+          "status": "PASS"
+        },
+        {
+          "member": "SKILL.md HALT fences",
+          "evidence": "task.276.qa.4...md:149",
+          "status": "PASS"
+        },
+        {
+          "member": "step-8 checklist test change",
+          "evidence": "task.276.qa.4...md:151 (red test named; measured earlier, not re-run)",
+          "status": "PASS"
+        },
+        {
+          "member": "re-entry passes --allow-dod-gaps",
+          "evidence": "task.276.qa.1...md:123",
+          "status": "PASS"
+        },
+        {
+          "member": "lock-present step-7 routing",
+          "evidence": "task.276.qa.1...md:124",
+          "status": "PASS"
+        },
+        {
+          "member": "budget base, distinct count (qa-report-cycles.sh and grant-qa-cycles.sh)",
+          "evidence": "task.276.qa.1...md:126-127",
+          "status": "PASS"
+        },
+        {
+          "member": "resume-prompt-check.sh 5b complete test, foreign lock, locale, relative lock guard",
+          "evidence": "task.276.qa.1...md:125; qa.2...md:126-127; qa.3...md:141",
+          "status": "PASS"
+        },
+        {
+          "member": "no-code-moved ordered route (Phase 2: untracked file names commit-and-re-run route before step-7 route; clean tree prints step-7 route only)",
+          "evidence": "task.276.qa.5...md:91 (swapped the order of the two remedies in no_code_moved() -> 'untracked route order' red, 82 passed 1 failed; restored, cmp clean, 83/0). The test is at shared/resources/reenter-qa-after-finalise.test.sh:299, with the clean-tree case at the block just above it",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "PASS from merged members (10 counted)"
+    },
+    {
+      "id": "#6",
+      "text_hash": "4ebe7eb0e4844e0df815176b7f42d776b2bc0cf3440c8435836dd542207af2de",
+      "status": "PASS",
+      "description": "bundle --check reports 0 problems; CI=true npm test passes",
+      "code_citation": ".github/workflows/test.yml:1",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 72c2b49f9b6d — Bundle half: `command npm run bundle -- --check` printed 'bundle freshness: 129 skill(s) checked, 0 problems'. The npm test half is CI state, left for /finalise Step 6 to grade. qa.5 records the six PR checks as passing on 948f5f6e9.",
+      "ci_reading": "CI reading 1: SUCCESS @ 72c2b49f9b6d"
+    },
+    {
+      "id": "#7",
+      "text_hash": "dc09abe3b1056564696c57f4e345cf3e1b96c4726bd551d059b2d5a78ee2eeb1",
+      "status": "PASS",
+      "description": "shellcheck clean on changed scripts (npm run lint:shell)",
+      "code_citation": "docs/tasks/task.276.halts-and-re-entries-leave-and-read-true-state/task.276.qa.4.halts-and-re-entries-leave-and-read-true-state.md:91",
+      "test_citation": "scripts/lint-shell.sh:1",
+      "members": [],
+      "non_member_fail": null,
+      "note": "qa.4 line 91 records the command `CI=true npm run test:remote -- --run lint:shell` -> 'linting 145 source shell scripts', 'shellcheck: clean', exit 0. It was run after the cycle 2 and 3 edits, on 5abb1c99c. Later commits are documentation only (DoD, QA, review reports). The same lint runs per PR in .github/workflows/shellcheck.yml (on: pull_request)."
+    },
+    {
+      "id": "#8",
+      "text_hash": "4adcbcda13242f21eef1ab5db62e06d93b3f681f2f1363aca95db13e72ae297c",
+      "status": "PASS",
+      "description": "Every --restore caller listed with git grep, each correct under the guard",
+      "code_citation": "docs/tasks/task.276.halts-and-re-entries-leave-and-read-true-state/task.276.halts-and-re-entries-leave-and-read-true-state.md:101",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Line 101 still names the git grep and lists each caller. I re-read every cited line in the tree and each matches. reenter-qa-after-finalise.sh:291 passes --allow-dod-gaps. reenter:152 and grant-qa-cycles.sh:199 are `--restore --which`. grant-qa-cycles.sh:225 and accept-qa-residual.sh:101 are plain --restore on step-5 snapshots. set-qa-phase.sh:62 and set-waiting-on.sh:103 are message sites. develop-pipeline-on-precompact.sh:640 is prose. The treatment of each under the guard is stated. No test pins the list."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#8",
+      "note": "Outside the criterion: task document line 62 says the re-entry passes --allow-dod-gaps 'at its restore step (`:276`)'. In the tree, reenter-qa-after-finalise.sh:276 is the no_code_moved docs-only call and the --allow-dod-gaps restore call is at :291. Line 101, which is the caller list the criterion needs, has :291 right. This is a stale line number in prose, low severity."
+    },
+    {
+      "ac_id": "#4",
+      "note": "The raw log walltime3.tsv has one row per run (10 runs and a 'done' marker). It carries server uptime and the suite duration_ms, and I confirmed it matches the qa.5 table. qa.5 discloses earlier aborted attempts, and none of their data is used."
+    }
+  ]
+}

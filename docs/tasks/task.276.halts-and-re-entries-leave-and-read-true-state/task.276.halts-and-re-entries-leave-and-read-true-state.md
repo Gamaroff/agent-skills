@@ -5,16 +5,18 @@ type: task
 description: "Make every pipeline HALT snapshot and clear its lock mechanically, stop a restore consuming the snapshot a re-entry needs, give the re-entry refusal one remedy, count QA cycles once, and check a resume prompt against run state."
 tags: [develop-task, finalise, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-16
+completed_date: 2026-11-16
+pr_number: 913
 estimated_effort_hours: 16
 ---
 
 # Task 276: Halts and re-entries leave and read true state
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.276.review.1.halts-and-re-entries.md` implemented 2026-11-15
 
 ---
@@ -199,14 +201,14 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 **Scope**: each change and its control.
 
 **Actions**:
-- [ ] `--restore` on a `finalise-dod-gaps` snapshot refuses and leaves the snapshot; **control**: a `not-converging` snapshot restores as before.
-- [ ] `--halt` leaves no lock and one snapshot; a second call is idempotent.
-- [ ] `no-code-moved` on a clean tree prints the step-7 route (`--restore --allow-dod-gaps`) and no commit-and-re-run note; with an untracked file it names the file and prints the commit-and-re-run route before the step-7 route, which is introduced by "Otherwise". **Control**: the held-aside untracked case still reads `no-code-moved`, never `uncommitted-fix` (the existing test).
-- [ ] A report holding both heading sets gives base 4 after four cycles, not 8; **controls**: a report with one heading set keeps its base, and a gate ahead of the report keeps the gate's number (the max rule).
-- [ ] The re-entry script itself still restores from a DoD-gaps snapshot (it passes `--allow-dod-gaps`), and `--restore --which` still prints the candidate.
-- [ ] Each of the three SKILL.md HALT fences, extracted by a test, calls `advance-pipeline-lock.sh --halt`; **mutation**: revert one to the old `jq`/`rm` fence and the test goes red.
-- [ ] `resume-prompt-check.sh` on a finished cycle prints `already complete` and exits 1; on the next cycle it exits 0.
-- [ ] Mutation proofs for each.
+- [x] `--restore` on a `finalise-dod-gaps` snapshot refuses and leaves the snapshot; **control**: a `not-converging` snapshot restores as before.
+- [x] `--halt` leaves no lock and one snapshot; a second call is idempotent.
+- [x] `no-code-moved` on a clean tree prints the step-7 route (`--restore --allow-dod-gaps`) and no commit-and-re-run note; with an untracked file it names the file and prints the commit-and-re-run route before the step-7 route, which is introduced by "Otherwise". **Control**: the held-aside untracked case still reads `no-code-moved`, never `uncommitted-fix` (the existing test).
+- [x] A report holding both heading sets gives base 4 after four cycles, not 8; **controls**: a report with one heading set keeps its base, and a gate ahead of the report keeps the gate's number (the max rule).
+- [x] The re-entry script itself still restores from a DoD-gaps snapshot (it passes `--allow-dod-gaps`), and `--restore --which` still prints the candidate.
+- [x] Each of the three SKILL.md HALT fences, extracted by a test, calls `advance-pipeline-lock.sh --halt`; **mutation**: revert one to the old `jq`/`rm` fence and the test goes red.
+- [x] `resume-prompt-check.sh` on a finished cycle prints `already complete` and exits 1; on the next cycle it exits 0.
+- [x] Mutation proofs for each.
 
 **Command**: `bash shared/resources/advance-pipeline-lock.test.sh` and the two siblings.
 
@@ -220,23 +222,23 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 
 ### Functional
 
-- [ ] After each HALT path the lock is absent and the snapshot present, shown by the `--halt` test and by the fence-extraction test over the three SKILL.md files, both named in the QA report.
-- [ ] `--restore` refuses a gaps snapshot and the re-entry script succeeds from it, shown by a test that runs the two in order and recorded in the QA report.
-- [ ] The budget base equals the number of distinct QA cycles on a report with both heading sets, shown by a test.
+- [x] After each HALT path the lock is absent and the snapshot present, shown by the `--halt` test and by the fence-extraction test over the three SKILL.md files, both named in the QA report.
+- [x] `--restore` refuses a gaps snapshot and the re-entry script succeeds from it, shown by a test that runs the two in order and recorded in the QA report.
+- [x] The budget base equals the number of distinct QA cycles on a report with both heading sets, shown by a test.
 
 ### Performance
 
-- [ ] `CI=true command npm test` wall time is within 10% of `develop`, as the median of five alternating runs with `uptime` beside each, recorded in the QA report.
+- [x] `CI=true command npm test` wall time is within 10% of `develop`, as the median of five alternating runs with `uptime` beside each, recorded in the QA report.
 
 ### Code Quality
 
-- [ ] Each change has a mutation proof in the QA report.
-- [ ] `command npm run bundle -- --check` reports 0 problems; `CI=true command npm test` passes.
-- [ ] `shellcheck` is clean on the changed scripts (`command npm run lint:shell`).
+- [x] Each change has a mutation proof in the QA report.
+- [x] `command npm run bundle -- --check` reports 0 problems; `CI=true command npm test` passes.
+- [x] `shellcheck` is clean on the changed scripts (`command npm run lint:shell`).
 
 ### Migration
 
-- [ ] Every caller of `--restore` is listed with its `git grep` and each is correct under the guard.
+- [x] Every caller of `--restore` is listed with its `git grep` and each is correct under the guard.
 
 ---
 
@@ -342,26 +344,43 @@ Cycle 5 closes the two evidence gaps from `/finalise` run 2, with no code change
 - **T276-QA-6** (LOW) — carried to gate 3 `recommendations.future` (route 2b, cycle 3): a `./` lock directory is called unresolvable by the relative-lock guard in `resume-prompt-check.sh`; no writer emits it
 - **T276-QA-7** (LOW) — carried to gate 3 `recommendations.future` (route 2b, cycle 3): a stale relative lock directory answers `cannot tell` with a message that blames the cwd; the strip expression is written twice
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified (runs 1 and 2, historical, superseded)
 
-**Status:** IN PROGRESS
+**Status:** CLOSED — both runs' gaps are closed; run 3 accepts (see the section below).
 
-QA gate 4 is PASS (92/100), the PR review is APPROVE and the security probes held (44 executed, 0 reproduced). Run 1's five gaps are closed (run 1 is historical, superseded). Run 2 found two evidence gaps; behaviour is not in doubt.
+Run 1 found five gaps and run 2 found two evidence gaps; behaviour was never in doubt. Run 1's gaps were closed in QA cycle 4. Run 2's were closed in QA cycle 5 (`task.276.qa.5`): the wall time re-measured on head (+3.4% wall, -1.7% suite time, median of five alternating pairs) and a named mutation proof for the `no-code-moved` ordered route.
 
-### Missing Criteria:
+### Missing Criteria (closed):
 
-- [ ] Criterion 4: the wall-time measurement (+0.8%) was taken on `fb9b6bce4`, not on head; code changed since, so it needs a re-measure on head, recorded in a committed QA report
-- [ ] Criterion 5: no committed QA report names a mutation proof (with the red test) for the `no-code-moved` ordered route
+- [x] Criterion 4: wall time re-measured on head, recorded in `task.276.qa.5`
+- [x] Criterion 5: mutation proof for the `no-code-moved` ordered route, recorded in `task.276.qa.5`
 
-### Next Steps:
+**Detailed Verification Logs:** `task.276.dod.2.halts-and-re-entries-leave-and-read-true-state.md` (run 1: `task.276.dod.1.halts-and-re-entries-leave-and-read-true-state.md`).
 
-- [ ] Re-measure `CI=true command npm test` wall time against `develop` on head (median of five alternating pairs, about 2.5 hours on the LAN server) and record it
-- [ ] Mutate the `no-code-moved` route ordering, name the test that goes red, restore, and record it in a QA report
-- [ ] Re-enter QA, then run `/finalise` run 3
+## Definition of Done - PASSED ✅
 
-**Estimated Effort:** Small (a few minutes of work, plus about 2.5 hours of measurement)
+**Status:** ACCEPTED
 
-**Detailed Verification Log:** See `task.276.dod.2.halts-and-re-entries-leave-and-read-true-state.md` (run 1: `task.276.dod.1.halts-and-re-entries-leave-and-read-true-state.md`).
+### QA Report Summary
+
+**QA Report**: `task.276.qa.5.halts-and-re-entries-leave-and-read-true-state.md`
+**Gate File**: `task.276.gate.5.halts-and-re-entries-leave-and-read-true-state.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 92/100
+**PR Review**: ✅ APPROVE (`task.276.pr-review.2`)
+
+All Definition of Done criteria have been verified (run 3, scoped: four criteria re-judged, four carried from run 2):
+
+✅ **Acceptance Criteria:** 8 of 8 met. #4 wall time +3.4% (median of five alternating pairs, bound 10%); #5 all ten changes have a named mutation proof; #6 `bundle --check` 0 problems and CI `test` SUCCESS on head `72c2b49f9`; #8 caller list re-read line by line.
+✅ **Security Review:** PASS, 44 probes executed, 0 reproduced.
+✅ **Compliance Review:** not applicable (pipeline shell scripts and docs only).
+✅ **Documentation:** behaviour docs and CHANGELOG (`(task 276)`) agree with the shipped scripts.
+
+**Advisory (not a gap):** line 62 of this document cites `:276` for the `--allow-dod-gaps` restore call in `reenter-qa-after-finalise.sh`; it is at `:291` (the caller list at line 101 is right).
+
+**Task marked as ACCEPTED on:** 2026-11-16
+
+**Detailed Verification Log:** See `task.276.dod.3.halts-and-re-entries-leave-and-read-true-state.md`.
 
 <!-- change-log-start -->
 ## Change Log
@@ -381,6 +400,7 @@ QA gate 4 is PASS (92/100), the PR review is APPROVE and the security probes hel
 | 2026-11-16 |  | DoD incomplete — 2 gaps identified (run 2) | finalise |
 | 2026-11-16 |  | QA gate PASS (92/100) — 0 findings; the 5 DoD gaps closed with committed evidence | qa-task |
 | 2026-11-16 |  | QA gate PASS (92/100) — 0 findings; the 2 run 2 DoD gaps closed (wall time +3.4% on head, mutation proof for the ordered route) | qa-task |
+| 2026-11-16 | 1.2 | DoD passed — accepted (PR #913) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -388,16 +408,16 @@ QA gate 4 is PASS (92/100), the PR review is APPROVE and the security probes hel
 ## Progress Tracking
 
 ### Phase 1: HALT helper and the restore guard
-- [ ] `--halt`, restore refusal
+- [x] `--halt`, restore refusal
 
 ### Phase 2: The re-entry script
-- [ ] Refusal order, base, routing
+- [x] Refusal order, base, routing
 
 ### Phase 3: The resume-prompt check
-- [ ] Contract text
+- [x] Contract text
 
 ### Phase 4: Tests, bundle and sweep
-- [ ] Mutation proofs, bundle clean
+- [x] Mutation proofs, bundle clean
 
 ---
 
@@ -423,4 +443,4 @@ None.
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
