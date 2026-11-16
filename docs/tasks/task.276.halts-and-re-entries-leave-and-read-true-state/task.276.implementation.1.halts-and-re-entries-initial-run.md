@@ -3,7 +3,7 @@
 **Task**: `task.276.halts-and-re-entries-leave-and-read-true-state.md`
 **Run Number**: 1
 **Started**: 2026-11-15 00:00
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -36,8 +36,8 @@ First automated run of task 276 (develop-next, `--defaults`): HALT helper and re
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | 4 phases built inline; remote CI-parity suite 8497 pass / 0 fail; mutation proofs: guard, distinct base, --halt | —                    | 2026-11-15T19:24Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #913 → develop (no tracker issue, so no issue comment) | —                    | 2026-11-15T19:40Z |
 | 5–6. qa-task / qa-fix loop | ✅ Done | `task.276.qa.{N}.*.md`; `task.276.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 4 gates: CONCERNS 80, CONCERNS 85, PASS 92, PASS 92 (cycle 4 re-entered after DoD run 1 gaps); 5c CONCERNS at cycle 3, 0 open coverage; wall time +0.8% | —                    | 2026-11-16T06:17Z |
-| 7. finalise                | 🛑 Halted | `task.276.dod.{N}.*.md`; task `status: accepted`                       | dod.1: GAPS — 5 gaps (criteria 2, 5, 7, 8 and one stale behaviour-doc line); security 44 probes / 0 reproduced; head CI test job still running | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 7. finalise                | ✅ Done | `task.276.dod.{N}.*.md`; task `status: accepted`                       | dod.1: GAPS (5 gaps, closed in cycle 4); dod.2: GAPS (2 evidence gaps, closed in cycle 5); dod.3: ACCEPTED — 8 of 8, security 44 probes / 0 reproduced; CI reading 1 SUCCESS @ `72c2b49f9b6d`; CI reading 2 SUCCESS (tree-equivalent to `948f5f6e96fe`) @ `7b510fdc3bfe` | —                    | 2026-11-16T13:12Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | final report commit | —                    | 2026-11-16T13:13Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -132,10 +132,16 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-11-16 13:13
+**Final Status**: Completed
 **Branch**: feature/task.276.halts-and-re-entries-leave-and-read-true-state
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**PR**: #913 (https://github.com/Gamaroff/agent-skills/pull/913)
+**QA Iterations**: 5 gates (CONCERNS 80, CONCERNS 85, PASS 92, PASS 92, PASS 92); 3 `/finalise` runs
+**DoD Summary**: `task.276.dod.3.halts-and-re-entries-leave-and-read-true-state.md` — ACCEPTED (run 1 GAPS 5, run 2 GAPS 2, run 3 accepted); CI reading 1 SUCCESS @ `72c2b49f9b6d`; CI reading 2 SUCCESS (tree-equivalent to `948f5f6e96fe`) @ `7b510fdc3bfe`
+**Tracker debt**: none (no tracker issue linked)
+
+### Completion Summary
+
+Implemented one checked HALT call (`advance-pipeline-lock.sh --halt`), a restore guard that refuses a step-7 halt over a GAPS DoD (`--allow-dod-gaps` is the one bypass, used by the re-entry script), an ordered `no-code-moved` refusal, a single distinct-cycle count (`qa-report-cycles.sh`) for the re-entry and grant scripts, and `resume-prompt-check.sh`. Resolves observations #46, #49, #75, #95 and #135. Five QA cycles and three DoD runs: run 1 found five evidence gaps and run 2 two; both were closed with committed evidence and no new defect. The final run measured wall time on head at +3.4% (bound 10%) and mutation-proved the ordered route.
+
+Notable decisions: the obs #75 amendment (an ordered route instead of an untracked-file refusal), and the independent-review gaps: cycle 2's reviewer read only part of the patch, shellcheck was skipped in cycle 3 and run clean afterwards, and cycles 4 and 5 were reviewed inline or not at all (no code delta), so independent review did not run.
