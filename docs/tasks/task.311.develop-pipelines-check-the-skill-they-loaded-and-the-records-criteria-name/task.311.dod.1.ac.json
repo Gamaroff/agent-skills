@@ -1,0 +1,211 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "2dbeee182014a97ef7e6060fa66a80535d287d8c",
+  "dirty_paths": [
+    "docs/tasks/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name.md",
+    "docs/tasks/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name/task.311.implementation.1.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name-initial-run.md",
+    "docs/tasks/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name/task.311.pr-review.1.develop-pipelines-identity-check-and-record-handoff.md"
+  ],
+  "document": "docs/tasks/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name.md",
+  "result": {
+    "bytes": 10610,
+    "sha256": "7cd58cdecce7dc3f97f9e0e2e1e22d40ea1a5a8b25e425b101643061c95944c4",
+    "verified": true
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 9,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "51558d073681a76289883075f4054231a8db435e448b0f040db4777932d2d51d",
+      "status": "PASS",
+      "description": "check classifies synced dir as shadowed and repo path as repo; test per case, mutation-proved",
+      "code_citation": "shared/resources/skill-resolution.js:58",
+      "test_citation": "shared/resources/tests/skill-resolution.test.mjs:59",
+      "members": [
+        {
+          "member": "repo case: a repository path classifies as repo (test)",
+          "evidence": "shared/resources/tests/skill-resolution.test.mjs:59",
+          "status": "PASS"
+        },
+        {
+          "member": "shadowed case: a synced user-level path classifies as shadowed (test)",
+          "evidence": "shared/resources/tests/skill-resolution.test.mjs:80",
+          "status": "PASS"
+        },
+        {
+          "member": "mutation record, shadowed case: accept-any mutation, red tests named (QA report line 131)",
+          "evidence": "docs/tasks/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name/task.311.qa.1.develop-pipelines-identity-check-and-record-handoff.md:131",
+          "status": "PASS"
+        },
+        {
+          "member": "mutation record, repo case: if (false && homes.includes(real)), red test 'a repository path classifies as repo' (QA report line 135)",
+          "evidence": "docs/tasks/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name/task.311.qa.1.develop-pipelines-identity-check-and-record-handoff.md:135",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Both tests are in shared/resources/tests/*.test.mjs, which test:suite in package.json runs under npm test, and .github/workflows/test.yml:58 runs that on every PR. The QA report at lines 131 and 135 names the mutation, the red tests and the restore for each case. The line-135 repo-case record is staged and not yet in a commit; it is committed with the QA report."
+    },
+    {
+      "id": "#2",
+      "text_hash": "db0fc38f9bfaf2ccf71dc38fa6f5af4ab46b1c0671fbe742058a1d5bc7f3d79b",
+      "status": "PASS",
+      "description": "Three orchestrators' step 4 cites the rule; test runs the cited command from each",
+      "code_citation": "skills/develop-bug/SKILL.md:176",
+      "test_citation": "shared/resources/tests/skill-resolution-reach.test.mjs:52",
+      "members": [
+        {
+          "member": "develop-task",
+          "evidence": "shared/resources/tests/skill-resolution-reach.test.mjs:52 (ORCHESTRATORS loop, line 27)",
+          "status": "PASS"
+        },
+        {
+          "member": "develop-story",
+          "evidence": "shared/resources/tests/skill-resolution-reach.test.mjs:52 (ORCHESTRATORS loop, line 27)",
+          "status": "PASS"
+        },
+        {
+          "member": "develop-bug",
+          "evidence": "shared/resources/tests/skill-resolution-reach.test.mjs:52 (ORCHESTRATORS loop, line 27)",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "The test extracts the cited command from each orchestrator's bundled rule and runs it against real directories, so it checks behaviour and not the string. It also asserts the link target, not the link text. The lane is shared/resources/tests/*.test.mjs, run by npm test."
+    },
+    {
+      "id": "#3",
+      "text_hash": "d12f665ba37bdddd7357565fd086e6794c6eae52b1ca64a5c41fb70d9d805b91",
+      "status": "PASS",
+      "description": "QA-step dispatch passes record_criteria; test asserts listing matches the preflight engine",
+      "code_citation": "shared/resources/develop-pipeline-step-5-6-qa-loop.md:306",
+      "test_citation": "shared/resources/tests/record-criteria-dispatch.test.mjs:103",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The test runs the step doc's fenced preflight block in a git fixture. It then deep-equals the written listing with a direct run of finalise-record-preflight.js check --doc --json. Line 160 of the same file asserts that both task dispatch forms carry the token (step doc lines 323 and 329). Lane: shared/resources/tests/*.test.mjs."
+    },
+    {
+      "id": "#4",
+      "text_hash": "69626e29ee5a1268b3a87012930698913244c9fe9dea320b4119de078522478d",
+      "status": "PASS",
+      "description": "qa-task lists record_criteria in args and instructs writing records; dispatch test; mutation; QA Findings table",
+      "code_citation": "skills/qa-task/SKILL.md:46",
+      "test_citation": "shared/resources/tests/record-criteria-dispatch.test.mjs:160",
+      "members": [
+        {
+          "member": "qa-task args list carries the token (test at line 185)",
+          "evidence": "shared/resources/tests/record-criteria-dispatch.test.mjs:185",
+          "status": "PASS"
+        },
+        {
+          "member": "both task-variant dispatch forms carry the token and neither story dispatch does (test at line 160)",
+          "evidence": "shared/resources/tests/record-criteria-dispatch.test.mjs:160",
+          "status": "PASS"
+        },
+        {
+          "member": "mutation: drop the token from one form, red test named",
+          "evidence": "docs/tasks/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name/task.311.qa.1.develop-pipelines-identity-check-and-record-handoff.md:111",
+          "status": "PASS"
+        },
+        {
+          "member": "recorded in the QA report Findings table (Record 1)",
+          "evidence": "docs/tasks/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name/task.311.qa.1.develop-pipelines-identity-check-and-record-handoff.md:105",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "qa-task SKILL.md:46 carries the token in its args example and :50 documents it. The QA report's Record 1 gives the mutation command and names the red test 'both task-variant dispatches carry record_criteria and no story dispatch does'."
+    },
+    {
+      "id": "#5",
+      "text_hash": "90f377f643aefaa0c927608e75fe41e360cc4ace8dce546745fe46988f42a49d",
+      "status": "PASS",
+      "description": "Identity check adds at most 1 s per load; median of five with uptime; recorded in QA report",
+      "code_citation": "docs/tasks/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name/task.311.qa.1.develop-pipelines-identity-check-and-record-handoff.md:119",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Bound 1000 ms. Measured median 117 ms from five runs of 114, 106, 119, 126 and 117 ms. The load average (2.91, 3.39, 3.11) is recorded beside each run, at lines 119-127. The command is skill-resolution.js check --name qa-task --base-dir ... --json. The figure was measured on 6dfde99e9. `finalise-delta.js docs-only --base 6dfde99e9 --head HEAD --json` returned reason tree-equivalent (exit 0, 5 docs-only paths). So this was measured on 6dfde99e9, tree-equivalent to head. Outliers are reported as none, with the range given."
+    },
+    {
+      "id": "#6",
+      "text_hash": "761522d2439f134aba18687c3ef55f10333f6bf434a0aeb7cc06a76af2cbfe35",
+      "status": "PASS",
+      "description": "bundle:check, format:check, lint:shell, ci:fast pass under CI=true",
+      "code_citation": ".github/workflows/test.yml:55",
+      "test_citation": ".github/workflows/test.yml:58",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Graded PASS from CI state on head 2dbeee182, per the caller's instruction. `gh pr view 916 --json statusCheckRollup` shows test, validate, link-check, shellcheck, secret-scan and the branch-policy check all SUCCESS. Each command maps to a per-PR job. format:check is test.yml:55 and npm test is :58. bundle:check is bundle_skill.py --check at validate.yml:128. lint:shell is covered by shellcheck.yml, the local twin of scripts/lint-shell.sh. I also ran bundle_skill.py --check locally: 129 skills, 0 problems."
+    },
+    {
+      "id": "#7",
+      "text_hash": "1867a5fead756e8ae5868dadb1ffc583495ad081aa9575fa3f6cbf4588aade03",
+      "status": "PASS",
+      "description": "quick_validate.py passes for develop-task, develop-story, develop-bug, qa-task",
+      "code_citation": ".github/workflows/validate.yml:72",
+      "test_citation": ".github/workflows/validate.yml:67",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The 'Validate all skills' step loops skills/*/ and runs quick_validate.py on each, so it covers all four. The validate job is SUCCESS on head 2dbeee182. The QA report row 7 also records a manual run of all four."
+    },
+    {
+      "id": "#8",
+      "text_hash": "841f1c993c83dd9aa3d9885c7bbf5052fb17dea416f112b53224d945be06e824",
+      "status": "PASS",
+      "description": "CHANGELOG.md entry citing task 311",
+      "code_citation": "CHANGELOG.md:9",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Line 9 reads '(task 311)' in an Unreleased/Added entry describing the identity check and the record_criteria hand-off, so it cites the work item. The repository has the changelog-cites.sh guard. The QA report records its result for this entry as 'cites (task 311)'."
+    },
+    {
+      "id": "#9",
+      "text_hash": "1507a514c7b33335089259d614f1c52d41484ac6999d55a3368402101bff1388",
+      "status": "PASS",
+      "description": "Bundled copies regenerated and UNREACHED-free",
+      "code_citation": "skills/develop-task/references/skill-resolution.js:1",
+      "test_citation": "shared/resources/tests/skill-resolution-reach.test.mjs:110",
+      "members": [
+        {
+          "member": "develop-task bundled skill-resolution.js and .md",
+          "evidence": "shared/resources/tests/skill-resolution-reach.test.mjs:110",
+          "status": "PASS"
+        },
+        {
+          "member": "develop-story bundled skill-resolution.js and .md",
+          "evidence": "shared/resources/tests/skill-resolution-reach.test.mjs:110",
+          "status": "PASS"
+        },
+        {
+          "member": "develop-bug bundled skill-resolution.js and .md",
+          "evidence": "shared/resources/tests/skill-resolution-reach.test.mjs:110",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "The test at :110 asserts each orchestrator's engine matches the source apart from the generated header. I ran bundle_skill.py --check: 129 skills, 0 problems, and validate.yml:128 runs it per PR. The UNREACHED string occurs in no new file except the bundled skill-resolution files; the other hits are the existing change-log doc text."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#1",
+      "note": "The repo-case mutation record (QA report line 135) is staged, not in a commit, at the time of this check. It must go in with the QA report commit, and the committed-record condition holds only once it does."
+    },
+    {
+      "ac_id": "#6",
+      "note": "The prompt would return a pure CI-state criterion as DEFERRED-CI. It is graded PASS here on the caller's explicit instruction, from the SUCCESS rollup on head 2dbeee182. Finalise Step 6 may re-read CI."
+    },
+    {
+      "ac_id": "#4",
+      "note": "The QA report's low advisory (an absent Base directory line reads usage, shared/resources/skill-resolution.md:29) is not part of any criterion."
+    }
+  ]
+}

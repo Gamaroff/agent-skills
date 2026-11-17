@@ -1,0 +1,65 @@
+[
+  {
+    "id": "legit-repo-skills",
+    "input": "/home/gamaroff/Development/agent-skills/skills/qa-task",
+    "direction": "legitimate",
+    "correct": "accepted (exit 0, reason repo): the source-tree home for the skill",
+    "spec_ref": "docs/tasks/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name.md:59"
+  },
+  {
+    "id": "legit-repo-agents",
+    "input": "/home/gamaroff/Development/agent-skills/.agents/skills/qa-task",
+    "direction": "legitimate",
+    "correct": "accepted (exit 0): the consumer-install home",
+    "spec_ref": "docs/tasks/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name.md:59"
+  },
+  {
+    "id": "legit-repo-claude-symlink",
+    "input": "/home/gamaroff/Development/agent-skills/.claude/skills/qa-task",
+    "direction": "legitimate",
+    "correct": "accepted (exit 0): .claude/skills is a symlink to ../.agents/skills and still resolves inside the repository",
+    "spec_ref": "docs/tasks/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name.md:59"
+  },
+  {
+    "id": "hostile-synced-copy",
+    "input": "/home/gamaroff/.claude/skills/synced/qa-task",
+    "direction": "hostile",
+    "correct": "rejected (non-zero, shadowed or unreadable): a user-level synced copy is not this repository's copy",
+    "spec_ref": "docs/tasks/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name.md:198"
+  },
+  {
+    "id": "hostile-traversal-out",
+    "input": "/home/gamaroff/Development/agent-skills/skills/qa-task/../../../../tmp",
+    "direction": "hostile",
+    "correct": "rejected: realpath resolves the traversal to a path outside the repository homes",
+    "spec_ref": "docs/tasks/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name.md:59"
+  },
+  {
+    "id": "hostile-other-skill-in-repo",
+    "input": "/home/gamaroff/Development/agent-skills/skills/finalise",
+    "direction": "hostile",
+    "correct": "rejected (shadowed): a repository path for a different skill name is not the home of qa-task",
+    "spec_ref": "docs/tasks/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name.md:59"
+  },
+  {
+    "id": "hostile-prefix-sibling",
+    "input": "/home/gamaroff/Development/agent-skills/skills/qa-task-evil",
+    "direction": "hostile",
+    "correct": "rejected: a path that only shares a name prefix with the home is not the home",
+    "spec_ref": "docs/tasks/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name.md:59"
+  },
+  {
+    "id": "hostile-missing-path",
+    "input": "/home/gamaroff/Development/agent-skills/skills/does-not-exist-zz",
+    "direction": "hostile",
+    "correct": "rejected (unreadable): identity unknown fails safe and never reads as repo",
+    "spec_ref": "docs/tasks/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name.md:102"
+  },
+  {
+    "id": "hostile-repo-parent",
+    "input": "/home/gamaroff/Development/agent-skills/skills",
+    "direction": "hostile",
+    "correct": "rejected: the skills directory itself is not a single skill's base directory",
+    "spec_ref": "docs/tasks/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name.md:59"
+  }
+]

@@ -173,7 +173,7 @@ Every step ends with the same four actions, executed _in order, with no text out
    ```
 
    The status block is **required at every transition**, not optional garnish — it is what makes pipeline position legible after compaction and to a user reading the log later. Canonical format, the other firing points (each continuing develop-loop iteration, each QA/verify cycle, every HALT) and the "Remaining fix phases" middle block that shows while Step 3 is open: [`references/develop-pipeline-remaining-work-banner.md`](references/develop-pipeline-remaining-work-banner.md).
-4. **Invoke the next sub-skill** via the Skill tool in the same assistant turn. Do NOT pause for user acknowledgement, do NOT summarise progress, do NOT print "Returning to orchestrator".
+4. **Invoke the next sub-skill** via the Skill tool in the same assistant turn. Do NOT pause for user acknowledgement, do NOT summarise progress, do NOT print "Returning to orchestrator". **Then check what loaded**: the Skill result's `Base directory for this skill:` line must name this repository's copy. Run `references/skill-resolution.js` as [`references/skill-resolution.md#after-every-load`](references/skill-resolution.md#after-every-load) sets out, before acting on the loaded text; on `shadowed`, follow `.agents/skills/<name>/SKILL.md` instead and log it.
 
 Two structural defences back this up: each pipeline sub-skill self-advances the lock as its last inline action; and the `Stop` hook re-prompts the orchestrator if it tries to stop mid-pipeline.
 

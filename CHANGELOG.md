@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **The develop pipelines check the skill they loaded, and QA gets the records criteria name (task 311).**
+  After every sub-skill load, `skill-resolution.js check` compares the `Base directory for this skill:`
+  line the Skill tool reports with this repository's homes for that name (`skills/`, `.agents/skills/`,
+  `.claude/skills/`, each resolved through symlinks) and reports `repo`, `shadowed` or `unreadable`; on
+  `shadowed` the orchestrator follows the repository's `SKILL.md` and logs the substitution. The rule is
+  stated once in `skill-resolution.md` and cited from the three orchestrators' step 4. At the QA step
+  `develop-task` now saves `finalise-record-preflight.js check --json` and passes it to `qa-task` as
+  `record_criteria=`, so a criterion that says "recorded in the QA report" has its record written there
+  by QA instead of being graded at `/finalise` three passes later. `qa-story` is unchanged. Resolves
+  observations #69 and #160.
+
 ### Fixed
 
 - **The QA-loop readers read the right thing (task 278).** The gate reader no longer takes `status`
