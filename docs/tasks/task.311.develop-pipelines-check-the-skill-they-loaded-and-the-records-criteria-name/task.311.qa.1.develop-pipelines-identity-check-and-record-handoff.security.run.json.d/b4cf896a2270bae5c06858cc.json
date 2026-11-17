@@ -1,0 +1,42 @@
+{
+  "sink": "path",
+  "entry": "cli:shared/resources/skill-resolution.js",
+  "name": null,
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 8,
+  "passed": 8,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 1,
+  "declined_cases": [
+    {
+      "id": "hostile-null-byte",
+      "reason": "case-errored",
+      "detail": "fixture: cannot materialise \"/home/gamaroff/Development/agent-skills/skills/qa-task\u0000/../../../tmp\": input carries a NUL"
+    }
+  ],
+  "escaped": 0,
+  "observation_limits": [
+    "effects-after-accept"
+  ],
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": [
+    "check",
+    "--name",
+    "qa-task",
+    "--base-dir",
+    "{input}",
+    "--root",
+    "/home/gamaroff/Development/agent-skills",
+    "--json"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "fixture_copy": null,
+  "ran_at": "2026-11-17T12:04:19.704Z"
+}

@@ -1,0 +1,57 @@
+schema: 2
+task: 'task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name'
+task_title: 'Develop pipelines check the skill they loaded and the records criteria name'
+gate: PASS
+status_reason: 'All 9 success criteria verified; the 3 mutation proofs went red on named committed tests; the identity check measures 117 ms median; no blocking code-review finding. CI on the PR was still running when read.'
+reviewer: 'QA Engineer'
+head: '6dfde99e9e47d2b006bbd63062998a43b0ec5b63'
+updated: '2026-11-17T12:03:39Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 18
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 8
+    escaped: 0
+    boundary_signals: []
+    notes: 'skill-resolution.js classify is an accept/reject boundary (repo vs shadowed). Probed through the cli form with 9 authored cases: 3 legitimate accepted, 5 hostile rejected, 1 NUL-byte case errored (argv cannot carry NUL; classify run in process returns unreadable, never repo). 0 reproduced, 0 escaped.'
+  performance:
+    status: PASS
+    notes: 'Identity check median 117 ms of five runs (106-126 ms) against a 1 s limit; load average 2.91 for all five.'
+  reliability:
+    status: PASS
+    notes: 'A failing preflight omits the record_criteria token rather than blocking the dispatch; an unresolvable base directory reads unreadable, never repo.'
+  maintainability:
+    status: PASS
+    notes: 'One engine, one rule document cited from three orchestrators; bundled copies match the source and a test asserts it.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'skill-resolution.md: say what to do when the Skill result carries no Base directory line (the empty --base-dir reads usage, exit 2, which the table reads as a call error). Treat an absent line like unreadable: log it and proceed.'
+      refs: ['shared/resources/skill-resolution.md']
+      remedy: unverified
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
