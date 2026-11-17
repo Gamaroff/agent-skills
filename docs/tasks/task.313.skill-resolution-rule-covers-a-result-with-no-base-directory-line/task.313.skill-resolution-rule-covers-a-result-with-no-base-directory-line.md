@@ -5,16 +5,18 @@ type: task
 description: "The rule every develop pipeline follows after a Skill load says nothing about a result that has no Base directory line, so the check returns usage and the table reads that as a call error; this task adds the missing case."
 tags: [develop-task, develop-story, develop-bug, skill-resolution, documentation]
 category: documentation
-status: ready-for-review
+status: accepted
 priority: Low
 created: 2026-11-17
 updated: 2026-11-17
+completed_date: 2026-11-17
+pr_number: 917
 estimated_effort_hours: 1
 ---
 
 # Technical Task: The skill-resolution rule covers a Skill result with no Base directory line
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 ---
 
@@ -143,18 +145,18 @@ Consumer Tests: not applicable.
 ## 9. Success Criteria
 
 FUNCTIONAL:
-- [ ] `shared/resources/skill-resolution.md` states what the orchestrator does when the Skill result has no `Base directory` line, and the statement does not tell the reader to fix a call.
-- [ ] The three bundled copies carry the same paragraph (`npm run bundle:check` reports 0 problems).
+- [x] `shared/resources/skill-resolution.md` states what the orchestrator does when the Skill result has no `Base directory` line, and the statement does not tell the reader to fix a call.
+- [x] The three bundled copies carry the same paragraph (`npm run bundle:check` reports 0 problems).
 
 PERFORMANCE:
 - Not applicable.
 
 CODE QUALITY:
-- [ ] `npm run format:check` passes on the changed files.
-- [ ] The fast gate passes: `CI=true npm run test:remote`, run on the LAN server and recorded in the QA report.
+- [x] `npm run format:check` passes on the changed files. (Vacuous for Markdown, as recorded in the Implementation Summary.)
+- [x] The fast gate passes: `CI=true npm run test:remote`, run on the LAN server and recorded in the QA report.
 
 MIGRATION:
-- [ ] CHANGELOG.md cites task 313.
+- [x] CHANGELOG.md cites task 313.
 
 ---
 
@@ -232,10 +234,23 @@ ROLLBACK TRIGGERS:
 
 ### Key Findings
 No open findings. Cycle 1's MEDIUM (QA313-1, the `format:check` criterion cannot fail on Markdown) is fixed: the Implementation Summary names the checks that do reach the changed files.
+## Definition of Done - PASSED ✅
 
-## Change Log
+**Status:** ACCEPTED
+
+**QA Report**: `task.313.qa.2.*.md` — **Gate**: `task.313.gate.2.*.yml` — ✅ PASS (95/100)
+
+✅ **Success Criteria:** all 5 met (the `format:check` one is vacuous for Markdown; the checks that do reach the files are recorded above)
+✅ **PR #917:** APPROVE from the conformance review (`task.313.pr-review.1.*.md`); CI green on head `6a87a74c7a1c` (all six checks)
+✅ **Documentation:** CHANGELOG cites task 313; bundled copies match the source (`bundle:check` 0 problems)
+⚠️ **Security and compliance:** not applicable (documentation only)
+
+**Task marked as ACCEPTED on:** 2026-11-17
+
+**Detailed Verification Log:** See `task.313.dod.1.skill-resolution-rule-covers-a-result-with-no-base-directory-line.md`.
 
 <!-- change-log-start -->
+## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
@@ -246,6 +261,7 @@ No open findings. Cycle 1's MEDIUM (QA313-1, the `format:check` criterion cannot
 | 2026-11-17 |  | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-11-17 |  | QA findings fixed — QA313-1 evidence recorded, 1 iteration | qa-fix |
 | 2026-11-17 |  | QA gate PASS (95/100) — 0 findings | qa-task |
+| 2026-11-17 | 1.2 | DoD verified — accepted (PR #917) | finalise |
 <!-- change-log-end -->
 
 ---
