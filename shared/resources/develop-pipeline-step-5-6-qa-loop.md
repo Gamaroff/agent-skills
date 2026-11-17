@@ -292,6 +292,25 @@ If the subagent fails, or that block prints a `⚠️` line (no well-formed mark
 
 Skip this pre-step when `PIPELINE_MODE=lite` OR `HAS_SUCCESS_CRITERIA_TABLE=false`. Tasks with no Success Criteria table (e.g. pure infra cleanup) gain nothing from the mapper.
 
+**Hand the record criteria to QA (task variant only — `qa-story` does not read this token).**
+A success criterion that says where its record lives ("recorded in the QA report") is otherwise
+graded at `/finalise`, which is three passes too late to write the record. List those criteria now,
+with the engine `/finalise` Step 3a already runs, and pass the listing to `/qa-task`:
+
+```bash
+TASK_FILE="{task-file}"
+TASK_DIR="{task-directory}"
+mkdir -p "$TASK_DIR/.summaries"
+command node .agents/skills/develop-task/references/finalise-record-preflight.js check \
+  --doc "$TASK_FILE" --json > "$TASK_DIR/.summaries/record-criteria.json" \
+  || { echo "⚠️ record-criteria preflight failed — omit the record_criteria token from the dispatch"; rm -f "$TASK_DIR/.summaries/record-criteria.json"; }
+```
+
+At QA time a criterion that names the QA report reads `state: location-absent`: that is the normal
+state, because `/qa-task` is what writes that report. It is not a finding. An empty `listed` is fine.
+`/qa-task` writes each listed record, with its command and output, into the report the criterion
+names, and never edits the criterion's wording.
+
 **Invoke `/qa-task`**
 
 Invoke the `/qa-task` skill with the task file path. If the run's mode is `lite` or `fast`, or `--skip qa-depth` is in force (the lock's `answers.mode` / `answers.skips`, resolved in §0d), prefix the invocation with explicit context: "Use **direct tools only** for this review — skip parallel agents regardless of the adaptive strategy decision. This task is running in lite mode." When the lock carries a `waiver`, also prefix the waiver directive from the lite-mode contract (§"Directive Passed to the QA Skill").
@@ -301,14 +320,16 @@ Invoke the `/qa-task` skill with the task file path. If the run's mode is `lite`
 Pass args as space-separated `key=value` tokens. When the traceability matrix was generated:
 
 ```
-Skill(qa-task, args="traceability_matrix={task-directory}/.summaries/qa-traceability-matrix.md code_review_blocking=true")
+Skill(qa-task, args="traceability_matrix={task-directory}/.summaries/qa-traceability-matrix.md code_review_blocking=true record_criteria={task-directory}/.summaries/record-criteria.json")
 ```
 
 If the matrix was not generated (lite mode, no Success Criteria table, or mapper failure), omit only the `traceability_matrix` token — still pass `code_review_blocking=true` so the code-review-and-fix loop stays active:
 
 ```
-Skill(qa-task, args="code_review_blocking=true")
+Skill(qa-task, args="code_review_blocking=true record_criteria={task-directory}/.summaries/record-criteria.json")
 ```
+
+Both forms carry `record_criteria` (drop only that token when the preflight above failed). The story variant's two `qa-story` dispatches above do not.
 
 ### Change Log (shared — who writes what)
 

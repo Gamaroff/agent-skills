@@ -55,11 +55,14 @@ The step-4 text gains a citation, not a restatement: after the Skill tool return
 **Exact changes:**
 
 ```bash
+# Bind both inputs in THIS block (tests/unbound-default-reads.test.js scans develop-pipeline-*.md fences).
+TASK_FILE="{task-file}"; TASK_DIR="{task-directory}"
+mkdir -p "$TASK_DIR/.summaries"
 command node .agents/skills/develop-task/references/finalise-record-preflight.js check \
   --doc "$TASK_FILE" --json > "$TASK_DIR/.summaries/record-criteria.json"
 ```
 
-Dispatch with `record_criteria={task-directory}/.summaries/record-criteria.json`. In `qa-task`, a step reads the file and, for each `listed` entry, writes the record into the report its `location` names, with the command and output. Never edit the criterion text; the evidence moves.
+Task variant only: the step doc is shared with `develop-story` (`qa-story`, out of scope). Add the token to both task-variant dispatch forms. At QA time a criterion naming the QA report reads `location-absent`; that is expected. The dispatch test extracts this fenced block. Dispatch with `record_criteria={task-directory}/.summaries/record-criteria.json`. In `qa-task`, a step reads the file and, for each `listed` entry, writes the record into the report its `location` names, with the command and output. Never edit the criterion text; the evidence moves.
 
 ## Key Patterns and References
 

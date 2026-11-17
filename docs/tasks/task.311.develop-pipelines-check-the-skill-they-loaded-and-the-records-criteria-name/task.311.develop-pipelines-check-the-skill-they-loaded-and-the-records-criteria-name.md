@@ -5,7 +5,7 @@ type: task
 description: "The develop pipelines trust the Skill tool to load this repository's copy of a sub-skill, and leave a criterion's named record location to be discovered by /finalise; this task makes the orchestrator verify the first and hand the second to QA."
 tags: [develop-task, develop-story, develop-bug, qa-task, observation]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-11-17
 updated: 2026-11-17
@@ -14,7 +14,8 @@ estimated_effort_hours: 4
 
 # Technical Task: Develop pipelines check the skill they loaded and the records criteria name
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.311.review.1.develop-pipelines-identity-check-and-record-handoff.md` implemented 2026-11-17
 
 ---
 
@@ -97,10 +98,10 @@ None - API stable. Both additions are new steps that pass on today's correct run
 
 **Changes**:
 - [ ] Measure first: record in the QA report the base directory each of the 5 sub-skills the pipeline invokes reports on this machine, with the command (`ls -la` of the load path), so the classification rests on real paths and not on the observation's wording.
-- [ ] Write the engine with `check`, classifying through `fs.realpathSync` and failing safe to `unreadable`.
-- [ ] Write the shared rule: after every Skill-tool load, run `check` with the reported base directory; on `shadowed` read the repository `SKILL.md` and follow it, and log the substitution.
-- [ ] Cite the rule from the three step-4 paragraphs, by citation (`#section`) so the orchestrators do not inherit the closure.
-- [ ] Tests over real shapes: a repository path, a `~/.claude/skills/synced/…` path, a symlink into the repository, a missing path.
+- [x] Write the engine with `check`, classifying through `fs.realpathSync` and failing safe to `unreadable`.
+- [x] Write the shared rule: after every Skill-tool load, run `check` with the reported base directory; on `shadowed` read the repository `SKILL.md` and follow it, and log the substitution.
+- [x] Cite the rule from the three step-4 paragraphs, by citation (`#section`) so the orchestrators do not inherit the closure.
+- [x] Tests over real shapes: a repository path, a `~/.claude/skills/synced/…` path, a symlink into the repository, a missing path.
 
 **Dependencies**: none.
 
@@ -116,10 +117,12 @@ None - API stable. Both additions are new steps that pass on today's correct run
 - `shared/resources/tests/` (a test over the dispatch argument)
 
 **Changes**:
-- [ ] Before the `qa-task` dispatch run `finalise-record-preflight.js check --doc "$TASK_FILE" --json` and pass `record_criteria=<path to the saved listing>`.
-- [ ] `qa-task`: read `record_criteria`; for each entry write the record into the named report with its command and output as the step runs.
-- [ ] `qa-task`: a mutation-proof record names the test that went red.
-- [ ] State that a criterion's wording is never edited to fit the evidence.
+- [x] Before the `qa-task` dispatch run `finalise-record-preflight.js check --doc "$TASK_FILE" --json` and pass `record_criteria=<path to the saved listing>`. The call goes in a **fenced bash block that binds every variable it reads** (`TASK_FILE`, `TASK_DIR`), so a test can extract and run it (obs #258) and `tests/unbound-default-reads.test.js`, which scans every `shared/resources/develop-pipeline-*.md`, stays green.
+- [x] **Task variant only.** `develop-pipeline-step-5-6-qa-loop.md` is shared with `develop-story`, whose QA skill is `qa-story`, and `qa-story` is out of scope. Add the token to **both** task-variant dispatch forms (with and without the traceability matrix) and to neither story dispatch. Locate the sites with `git grep -n "Skill(qa-task" shared/resources/develop-pipeline-step-5-6-qa-loop.md`.
+- [x] Note in the step doc that at QA time a criterion naming the QA report reads `state: location-absent` — the normal state, since QA writes that report; it is not a finding.
+- [x] `qa-task`: read `record_criteria` (add it to the "Pipeline Skill args" list beside `traceability_matrix` and `code_review_blocking`); for each entry write the record into the named report with its command and output as the step runs.
+- [x] `qa-task`: a mutation-proof record names the test that went red.
+- [x] State that a criterion's wording is never edited to fit the evidence.
 
 **Dependencies**: independent of Phase 1.
 
@@ -130,8 +133,8 @@ None - API stable. Both additions are new steps that pass on today's correct run
 **Risk Level**: Low
 
 **Changes**:
-- [ ] `npm run bundle`, `npm run generate-catalog`, a `CHANGELOG.md` entry citing this task.
-- [ ] Run the fast gate under `CI=true`.
+- [x] `npm run bundle`, `npm run generate-catalog`, a `CHANGELOG.md` entry citing this task.
+- [x] Run the fast gate under `CI=true`.
 
 **Dependencies**: Phases 1 and 2.
 
@@ -151,6 +154,13 @@ None - API stable. Both additions are new steps that pass on today's correct run
 
 6. ✅ `shared/resources/tests/skill-resolution.test.mjs` (new)
 7. ✅ a dispatch-argument test beside it
+
+**Existing tests that enumerate the classes these files belong to** (found with `git grep -nE "readdirSync|git ls-files" -- 'tests/*.test.*'`; each must stay green and is named so the developer expects it):
+
+- `tests/unbound-default-reads.test.js` — scans every `skills/*/SKILL.md` and `shared/resources/develop-pipeline-*.md`; the new fenced block and the three `SKILL.md` citations must bind what they read.
+- `tests/fenced-bash-optional-file-globs.test.js` — scans every file in `shared/resources/`, so `skill-resolution.md` is in scope.
+- `tests/bundle-citation.test.js`, `tests/bundle-comment-origin.test.js` and `bundle:check` — the new shared files, the citation form (`skill-resolution.md#after-every-load`) and the bundled `finalise-record-preflight.js` copy in `develop-task` (it has none today: `git ls-files skills/develop-task/references | grep -c finalise-record-preflight` → 0; the new step-doc call makes it a dependency, so the bundler adds it).
+- `tests/test-runner-reach.test.js` — `shared/resources/tests/*.test.mjs` is already a `test:suite` glob, so the two new test files are reached; confirm with this test.
 
 ### Files to Modify (Documentation)
 
@@ -187,7 +197,7 @@ The existing `finalise-record-preflight.test.mjs` and the transition-protocol pa
 - [ ] `skill-resolution.js check` classifies a `~/.claude/skills/synced/…/finalise` base directory as `shadowed` and a repository path as `repo`; a test per case, each mutation-proved with the red test named.
 - [ ] The three orchestrators' step 4 cites the rule, and a test asserts the engine is reached from each (behaviour: the cited command runs and exits as specified, not a grep for the string).
 - [ ] The QA-step dispatch passes `record_criteria`, and a test asserts the listing it passes matches `finalise-record-preflight.js check` on a fixture task.
-- [ ] `qa-task` writes each named record, with command and output, into the report the criterion names; recorded in the QA report's Findings table.
+- [ ] `skills/qa-task/SKILL.md` lists `record_criteria` among its Pipeline Skill args and instructs the step that writes each named record, with command and output, into the report the criterion names — held by the dispatch-argument test, which asserts the token appears in `qa-task`'s args list and in both task-variant dispatch forms and in neither story dispatch (mutation: drop the token from one form and name the red test). Recorded in the QA report's Findings table.
 
 ### Performance
 
@@ -244,6 +254,9 @@ None.
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-11-17 | 1.0 | Initial draft — cut from observations #69, #160 (#5 and #6, reviewed with them, were already in the tree) | create-task |
+| 2026-11-17 | 1.1 | Review passed (8/10) — 5 Important fixes applied (task-variant-only dispatch, test for the qa-task criterion, executable fenced block, enumerating tests named, bundle dependency) | review-task |
+|  |  | Status → ready-for-development | review-task |
+| 2026-11-17 |  | Implemented — 20 files outside docs, 3 test files (18 tests), fast gate 8554 tests green | develop |
 <!-- change-log-end -->
 
 ---
@@ -251,8 +264,8 @@ None.
 ## Progress Tracking
 
 - [ ] Phase 1: The identity check
-- [ ] Phase 2: The record hand-off
-- [ ] Phase 3: Bundle, docs and gate
+- [x] Phase 2: The record hand-off
+- [x] Phase 3: Bundle, docs and gate
 
 ---
 
