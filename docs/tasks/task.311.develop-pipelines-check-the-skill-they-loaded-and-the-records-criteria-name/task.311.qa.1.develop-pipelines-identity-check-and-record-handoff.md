@@ -132,6 +132,8 @@ mutation-proven: engine accepts any path (`if (true || homes.includes(real))`) �
 
 mutation-proven: develop-bug citation target changed (`#after-every-load` to `#after-load`) → develop-bug: cites the rule, bundles the engine, and the cited command runs → covered
 
+mutation-proven (repo case, added at /finalise after the DoD AC agent found criterion 1 had a mutation record for the shadowed case only): engine rejects every repository path (`if (homes.includes(real)) {` became `if (false && homes.includes(real)) {` in `shared/resources/skill-resolution.js`) → red tests: **a repository path classifies as repo**, the harness path, a symlink into the repository, classifies as repo, a user-level symlink that points into the repository is the repository's copy, and CLI: the exit code and the JSON reason agree for repo, shadowed and unreadable → covered. Command: `node --test --test-reporter=spec shared/resources/tests/skill-resolution.test.mjs` (exit 1 under the mutation). Restored from a `cp` snapshot, `cmp` clean, the file's 10 tests green again (`ℹ pass 10`, `ℹ fail 0`) and `git status` clean in `shared/` and `skills/`.
+
 Each file was restored from a snapshot and checked with `cmp`; `git status` showed no change in `shared/` or `skills/` afterwards.
 
 ---

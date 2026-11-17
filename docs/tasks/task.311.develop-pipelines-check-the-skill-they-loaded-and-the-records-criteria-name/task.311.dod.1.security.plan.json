@@ -1,0 +1,16 @@
+[
+  {
+    "argv": [
+      "--sink",
+      "path",
+      "--entry",
+      "cli:shared/resources/skill-resolution.js",
+      "--argv",
+      "[\"check\",\"--name\",\"qa-task\",\"--base-dir\",\"{input}\",\"--root\",\"/home/gamaroff/Development/agent-skills\",\"--json\"]",
+      "--name",
+      "skill-resolution check --base-dir"
+    ],
+    "cases_file": "task.311.dod.1.security.cases.json",
+    "cases_sha256": "f57f8f1e1f019d4f3a499fdddfec83266fb3f71d366ceecdf03c00cf9ce6bc4d"
+  }
+]

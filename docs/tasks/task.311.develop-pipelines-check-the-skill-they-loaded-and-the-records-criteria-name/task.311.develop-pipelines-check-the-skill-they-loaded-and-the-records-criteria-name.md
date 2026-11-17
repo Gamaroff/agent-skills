@@ -5,10 +5,12 @@ type: task
 description: "The develop pipelines trust the Skill tool to load this repository's copy of a sub-skill, and leave a criterion's named record location to be discovered by /finalise; this task makes the orchestrator verify the first and hand the second to QA."
 tags: [develop-task, develop-story, develop-bug, qa-task, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
+pr_number: 916
 priority: Medium
 created: 2026-11-17
 updated: 2026-11-17
+completed_date: 2026-11-17
 estimated_effort_hours: 4
 ---
 
@@ -97,7 +99,7 @@ None - API stable. Both additions are new steps that pass on today's correct run
 - `skills/develop-task/SKILL.md`, `skills/develop-story/SKILL.md`, `skills/develop-bug/SKILL.md`
 
 **Changes**:
-- [ ] Measure first: record in the QA report the base directory each of the 5 sub-skills the pipeline invokes reports on this machine, with the command (`ls -la` of the load path), so the classification rests on real paths and not on the observation's wording.
+- [x] Measure first: record in the QA report the base directory each of the 5 sub-skills the pipeline invokes reports on this machine, with the command (`ls -la` of the load path), so the classification rests on real paths and not on the observation's wording.
 - [x] Write the engine with `check`, classifying through `fs.realpathSync` and failing safe to `unreadable`.
 - [x] Write the shared rule: after every Skill-tool load, run `check` with the reported base directory; on `shadowed` read the repository `SKILL.md` and follow it, and log the substitution.
 - [x] Cite the rule from the three step-4 paragraphs, by citation (`#section`) so the orchestrators do not inherit the closure.
@@ -268,6 +270,26 @@ None.
 ### Key Findings
 No critical issues identified. One low advisory item: the rule document does not say what to do when the Skill result has no Base directory line.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report**: `task.311.qa.1.develop-pipelines-identity-check-and-record-handoff.md`
+**Gate File**: `task.311.gate.1.develop-pipelines-identity-check-and-record-handoff.yml`
+**Gate Status**: ✅ PASS (100/100)
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 9 of 9 met; #6 and #7 graded from CI reading 1 (`SUCCESS` @ `2dbeee182014`)
+✅ **Tests and PR:** PR #916; `task.311.pr-review.1.*` reads APPROVE; fast gate 8554 tests, 0 failed
+✅ **Documentation:** CHANGELOG entry cites task 311; the rule document and four `SKILL.md` files updated
+✅ **Security Review:** PASS — 9 probes, 0 reproduced, 0 escapes
+⚠️ **Compliance Review:** NOT_APPLICABLE
+
+**Detailed Verification Log:** See `task.311.dod.1.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name.md` for the evidence and the disclosed deviations.
+
+**Task marked as ACCEPTED on:** 2026-11-17
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -279,6 +301,7 @@ No critical issues identified. One low advisory item: the rule document does not
 |  |  | Status → ready-for-development | review-task |
 | 2026-11-17 |  | Implemented — 20 files outside docs, 3 test files (18 tests), fast gate 8554 tests green | develop |
 | 2026-11-17 |  | QA gate PASS (100/100) — 0 findings gated, 1 low advisory | qa-task |
+| 2026-11-17 | 1.2 | DoD passed — accepted (PR #916) | finalise |
 <!-- change-log-end -->
 
 ---
