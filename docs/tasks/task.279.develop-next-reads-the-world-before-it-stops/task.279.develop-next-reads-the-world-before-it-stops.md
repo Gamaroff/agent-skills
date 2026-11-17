@@ -5,16 +5,18 @@ type: task
 description: "Stop develop-next halting on a recorded HALT the evidence has superseded, name where its quality-gate worktree goes, and run the observe-work Session Start Protocol as a Step 0 line in the long orchestrators."
 tags: [develop-next, develop-task, develop-story, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-17
+completed_date: 2026-11-17
+pr_number: 918
 estimated_effort_hours: 8
 ---
 
 # Task 279: develop-next reads the world before it stops
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 ---
 
@@ -310,6 +312,31 @@ Step 3 and Step 0 lines are prose; evidence is a fresh session on each, with a c
 ### Key Findings
 No critical issues identified. The cycle 1 medium finding (missing CHANGELOG citation) is closed. One low advisory cleanup remains: the unread `--json` flag in `halt-evidence.mjs`.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.279.qa.2.develop-next-reads-the-world-before-it-stops.md`
+**Gate File**: `task.279.gate.2.develop-next-reads-the-world-before-it-stops.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR review**: ✅ APPROVE (`task.279.pr-review.1.develop-next-reads-the-world-before-it-stops.md`)
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** all 8 success criteria met, each cited in the DoD summary
+✅ **Tests:** `halt-evidence.test.mjs` (13) and `observe-work-start-line.test.mjs` (6), both in the per-PR run
+✅ **CI:** `SUCCESS` over 6 checks on `1f3a27dad`
+✅ **Documentation:** Step 0.1a and the Step 3 gate-worktree rule in `skills/develop-next/SKILL.md`; Session Start line in four orchestrators; CHANGELOG entry citing task 279
+✅ **Security Review:** ✅ PASS — `halt-evidence.mjs#decide` recorded as an internal boundary (no corpus sink models it)
+✅ **Compliance Review:** ⚠️ NOT_APPLICABLE — internal tooling change
+
+**Detailed Verification Log:** See `task.279.dod.1.develop-next-reads-the-world-before-it-stops.md` for complete verification evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-11-17
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -322,6 +349,7 @@ No critical issues identified. The cycle 1 medium finding (missing CHANGELOG cit
 | 2026-11-17 |         | QA gate CONCERNS (90/100) — 1 finding (CHANGELOG citation missing) | qa-task |
 | 2026-11-17 |         | QA findings fixed — CHANGELOG entry citing task 279 added, 1 iteration | qa-fix |
 | 2026-11-17 |         | QA gate PASS (100/100) — 0 findings open (T279-001 closed) | qa-task |
+| 2026-11-17 | 1.2     | DoD passed — accepted (PR #918)                               | finalise    |
 <!-- change-log-end -->
 
 ---
@@ -363,4 +391,4 @@ None.
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
