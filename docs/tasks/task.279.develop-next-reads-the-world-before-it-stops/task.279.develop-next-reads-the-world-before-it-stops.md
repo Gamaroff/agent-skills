@@ -291,15 +291,15 @@ Step 3 and Step 0 lines are prose; evidence is a fresh session on each, with a c
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-17
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.279.qa.1.develop-next-reads-the-world-before-it-stops.md](./task.279.qa.1.develop-next-reads-the-world-before-it-stops.md)
-- **Gate File**: [task.279.gate.1.develop-next-reads-the-world-before-it-stops.yml](./task.279.gate.1.develop-next-reads-the-world-before-it-stops.yml)
+- **Full Report**: [task.279.qa.2.develop-next-reads-the-world-before-it-stops.md](./task.279.qa.2.develop-next-reads-the-world-before-it-stops.md)
+- **Gate File**: [task.279.gate.2.develop-next-reads-the-world-before-it-stops.yml](./task.279.gate.2.develop-next-reads-the-world-before-it-stops.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 19
@@ -308,7 +308,7 @@ Step 3 and Step 0 lines are prose; evidence is a fresh session on each, with a c
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-All eight success criteria are verified and both mutation proofs went red on named tests. One medium finding: `CHANGELOG.md` has no `[Unreleased]` entry citing task 279, which `/finalise` 6d HALTs on; it goes to the fix loop.
+No critical issues identified. The cycle 1 medium finding (missing CHANGELOG citation) is closed. One low advisory cleanup remains: the unread `--json` flag in `halt-evidence.mjs`.
 
 <!-- change-log-start -->
 ## Change Log
@@ -321,6 +321,7 @@ All eight success criteria are verified and both mutation proofs went red on nam
 | 2026-11-17 |         | Developed: halt-evidence.mjs + unit test, 0.1a evidence read, Step 3 gate-worktree rule, Session Start line in four orchestrators + test; status → ready-for-review | develop-task |
 | 2026-11-17 |         | QA gate CONCERNS (90/100) — 1 finding (CHANGELOG citation missing) | qa-task |
 | 2026-11-17 |         | QA findings fixed — CHANGELOG entry citing task 279 added, 1 iteration | qa-fix |
+| 2026-11-17 |         | QA gate PASS (100/100) — 0 findings open (T279-001 closed) | qa-task |
 <!-- change-log-end -->
 
 ---
