@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-11-17
-**Next Available Task Number:** **313**
+**Next Available Task Number:** **314**
 
 ## How to use
 
@@ -429,3 +429,4 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 310 | [The finalise 6c poll block guards its inputs](task.310.finalise-6c-poll-block-guards-its-inputs/task.310.finalise-6c-poll-block-guards-its-inputs.md) | accepted | testing | Low | 2026-11-15 | task.309 | task 309 5c finding CR-1: the 6c poll block reads `CI_HEAD_2` and `PR_NUMBER` unbound; open it with a named-HALT guard and test the shipped line · three phases |
 | 311 | [Develop pipelines check the skill they loaded and the records criteria name](task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name.md) | accepted | refactoring | Medium | 2026-11-17 | — | observations #69 and #160: a sub-skill identity check after every load, and the record-demanding criteria handed to qa-task · three phases · PR #916 merged |
 | 312 | [Allow-list and timing criteria name what they need](task.312.allow-list-and-timing-criteria-name-what-they-need/task.312.allow-list-and-timing-criteria-name-what-they-need.md) | planned | refactoring | Medium | 2026-11-17 | — | observations #159 and #171: a review-task check that an allow-list covers its whole set, and a timing-statistic rule in create-task and review-task · three phases |
+| 313 | [The skill-resolution rule covers a Skill result with no Base directory line](task.313.skill-resolution-rule-covers-a-result-with-no-base-directory-line/task.313.skill-resolution-rule-covers-a-result-with-no-base-directory-line.md) | planned | documentation | Low | 2026-11-17 | — | task 311 advisory CR-1: one rule paragraph and a re-bundle · independent |
