@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **The skill-resolution rule covers a Skill result with no `Base directory` line (task 313).**
+  The rule now says what a pipeline does when there is no identity to check: skip the check, treat the
+  load as `unreadable`, log it and proceed with the loaded copy, instead of reading the empty
+  `--base-dir`'s `usage` as a call to fix.
 - **The develop pipelines check the skill they loaded, and QA gets the records criteria name (task 311).**
   After every sub-skill load, `skill-resolution.js check` compares the `Base directory for this skill:`
   line the Skill tool reports with this repository's homes for that name (`skills/`, `.agents/skills/`,

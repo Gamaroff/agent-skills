@@ -28,6 +28,8 @@ command node .agents/skills/{develop-story|develop-task|develop-bug}/references/
 | `unreadable` | 1 | The base directory does not resolve, so identity is unknown | Log a warning in the Issues Log and proceed with the loaded copy, as before this check existed. It never reads as `repo` |
 | `usage` | 2 | The call is wrong (missing flag, bad name, root not a directory) | Fix the call; this says nothing about the skill |
 
+**No `Base directory` line.** If the Skill result carries no `Base directory for this skill:` line, there is no identity to check, and an empty `--base-dir` only returns `usage`. Do not run the check. Treat the load as `unreadable`: log "skill `{skill-name}` loaded with no Base directory line — identity unchecked" in the Issues Log and proceed with the loaded copy.
+
 A Skill call that returns "Unknown skill" is the same situation from the other side: read `.agents/skills/{skill-name}/SKILL.md` and follow it.
 
 **Why not just prefer the repository's copy every time?** Reading and following a second file for every load costs a turn each. The check costs one command, and only a `shadowed` result pays for the read.
