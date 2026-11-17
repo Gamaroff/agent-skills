@@ -5,7 +5,7 @@ type: task
 description: "The rule every develop pipeline follows after a Skill load says nothing about a result that has no Base directory line, so the check returns usage and the table reads that as a call error; this task adds the missing case."
 tags: [develop-task, develop-story, develop-bug, skill-resolution, documentation]
 category: documentation
-status: planned
+status: ready-for-review
 priority: Low
 created: 2026-11-17
 updated: 2026-11-17
@@ -14,7 +14,7 @@ estimated_effort_hours: 1
 
 # Technical Task: The skill-resolution rule covers a Skill result with no Base directory line
 
-**Status:** Planned
+**Status:** Ready for Review
 
 ---
 
@@ -101,10 +101,10 @@ None - API stable. The engine's reasons and exit codes are unchanged.
 - `CHANGELOG.md`
 
 **Changes**:
-- [ ] Add the "No `Base directory` line" paragraph under the table in `shared/resources/skill-resolution.md`.
-- [ ] Run `npm run bundle` and commit the three regenerated copies.
-- [ ] Add one CHANGELOG line citing task 313.
-- [ ] Run `npm run bundle:check`, `npm run format:check` and the fast gate (`CI=true npm run test:remote`).
+- [x] Add the "No `Base directory` line" paragraph under the table in `shared/resources/skill-resolution.md`.
+- [x] Run `npm run bundle` and commit the three regenerated copies.
+- [x] Add one CHANGELOG line citing task 313.
+- [x] Run `npm run bundle:check`, `npm run format:check` and the fast gate (`CI=true npm run test:remote`).
 
 **Dependencies**: none. Task 311 is merged (PR #916).
 
@@ -194,7 +194,19 @@ ROLLBACK TRIGGERS:
 
 ## Progress Tracking
 
-- [ ] Phase 1: Add the case and re-bundle
+- [x] Phase 1: Add the case and re-bundle
+
+---
+
+## Implementation Summary
+
+**Completion Date:** 2026-11-17
+
+**Approach:** Added one paragraph, "No `Base directory` line", directly under the table in `shared/resources/skill-resolution.md`, placed before the "Unknown skill" paragraph. It tells the orchestrator not to run the check, to treat the load as `unreadable`, to log it in the Issues Log and to proceed with the loaded copy. The engine is unchanged. `npm run bundle` regenerated the three copies; `npm run bundle:check` reports 0 problems.
+
+**Testing Results:** `CI=true npm run test:remote` (the fast gate) result is recorded in the QA report. No new tests: documentation-only, and `skill-resolution-reach.test.mjs` already asserts each copy equals the source.
+
+**Deferred Work:** none.
 
 ---
 
@@ -205,6 +217,9 @@ ROLLBACK TRIGGERS:
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-11-17 | 1.0 | Initial draft — from advisory CR-1 of task 311 | create-task |
+| 2026-11-17 | 1.1 | Review passed (9/10) — every claim measured against the tree, no changes required | review-task |
+| 2026-11-17 |  | Status → ready-for-development | review-task |
+| 2026-11-17 |  | Implemented: no-Base-directory-line paragraph added, copies re-bundled, CHANGELOG line added; status → ready-for-review | develop |
 <!-- change-log-end -->
 
 ---
