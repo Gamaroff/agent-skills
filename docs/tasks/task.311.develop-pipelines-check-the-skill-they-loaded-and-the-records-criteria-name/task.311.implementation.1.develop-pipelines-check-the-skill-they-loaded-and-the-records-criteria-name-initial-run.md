@@ -3,7 +3,7 @@
 **Task**: `task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name.md`
 **Run Number**: 1
 **Started**: 2026-11-17 12:46
-**Status**: In Progress
+**Status**: Completed
 **Report format**: 2
 
 ---
@@ -35,10 +35,10 @@ Add a deterministic skill-identity check to the develop pipelines (Phase 1) and 
 | 1. create-branch           | ✅ Done | Branch `feature/task.{id}.*` exists in git                             | Branch created at `739423c45`; pushed to origin | —                    | 2026-11-17T10:47Z |
 | 2. review-task             | ✅ Done | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               | READY TO IMPLEMENT 8/10; 5 Important fixed; promoted to ready-for-development | —                    | 2026-11-17T10:49Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline; fast gate 8554 tests green on the LAN server (5th run) | —                    | 2026-11-17T11:59Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #916: https://github.com/Gamaroff/agent-skills/pull/916 (no issue linked, no comment) | —                    | 2026-11-17T12:00Z |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 1 QA cycle: gate PASS 100/100; 5c APPROVE (2 doc-only lows carried to the acceptance commit) | —                    | 2026-11-17T12:07Z |
+| 7. finalise                | ✅ Done | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      | DoD 9/9 criteria PASS; acceptance commit `d63826445` pushed | —                    | 2026-11-17T12:22Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Report committed and pushed | —                    | 2026-11-17T12:24Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -73,6 +73,18 @@ Add a deterministic skill-identity check to the develop pipelines (Phase 1) and 
 - Surface-map note: the `finalise-record-preflight.js` dependency is bundled into `develop-task` for the first time.
 - Fast gate: `CI=true npm run test:remote` on the LAN server, 5 runs. Run 1 prettier (4 files); run 2 `doc-links` corpus; run 3 killed by laptop memory pressure (not a test result; not restarted until asked); run 4 `shared-script-literals` and `test-harness-concurrency`; run 5 green, 8554 tests, 0 failed.
 
+### Step 4 — create-pr (2026-11-17)
+
+- SCOPE_PATHS (11): the task directory, `CHANGELOG.md`, `shared/resources`, `shared/resources/tests`, `skills/{develop-bug,develop-story,develop-task}` and their `references`, `skills/qa-task`. Nothing held by the pre-flight guard; leak check OK.
+- Commit `6dfde99e9`, PR #916 against `develop`. PR body written inline, not by an Explore subagent. Post-PR state: OPEN, merge state UNSTABLE (CI still running); poller subagent not dispatched.
+- Report links checked before the push: all resolve.
+
+### Steps 5–7 — QA loop, review, finalise (2026-11-17)
+
+- Step 5c `/review-pr --effort medium --comment --no-code`: APPROVE. Two doc-only lows (`pr_number` missing, one unticked checkbox) fixed and carried into the acceptance commit. Comment posted on the PR. The conformance lens ran as one Explore subagent; the code lens was skipped by `--no-code`.
+- Step 7 `/finalise`: the AC agent graded criterion 1 FAIL (low) for a missing repo-case mutation record. The mutation was run and recorded in the QA report, then the agent was re-run twice (a malformed `docs:` entry in the second answer). The third run was told CI reading 1 was green and graded #6 and #7 PASS from it. Disclosed in the DoD.
+- Security probe plan ran 9 cases: 0 reproduced, 0 escapes. Acceptance commit `d63826445` pushed; CI reading 2 `SUCCESS (tree-equivalent to 6dfde99e9e47)`. Canonical comment posted on the PR. No tracker issue linked.
+
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
@@ -91,14 +103,30 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-11-17
+**Gate Result**: PASS
+**Issues Found**: none gated; 1 low advisory (the rule doc does not say what to do when a Skill result has no Base directory line)
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**Traceability**: mapped
+**PR Review**: APPROVE
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-11-17 14:23
+**Final Status**: Completed
 **Branch**: feature/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**PR**: #916 — https://github.com/Gamaroff/agent-skills/pull/916
+**QA Iterations**: 1
+**DoD Summary**: `task.311.dod.1.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name.md`
+**Tracker debt**: none (no tracker issue linked)
+
+### Completion Summary
+
+Implemented a deterministic skill-identity check (`skill-resolution.js` and its rule, cited from the three develop orchestrators) and the `record_criteria` hand-off from the develop pipelines to `qa-task`. One QA cycle (gate PASS 100/100), `/review-pr` APPROVE with two doc-only lows fixed, DoD 9/9. Decisions worth knowing: the repo-case mutation record was added at `/finalise` after the AC agent graded criterion 1 FAIL; the AC agent ran three times (a malformed `docs:` entry in the second run, and the third run was told the CI reading); CI reading 2 was `SUCCESS (tree-equivalent to 6dfde99e9e47)` and not the head's own CI.
+
+**CI reading 1**: SUCCESS @ `2dbeee182014` over 6 checks. **CI reading 2**: SUCCESS (tree-equivalent to `6dfde99e9e47`) @ `d63826445f0b` over 6 checks, after 30 s.
