@@ -8,7 +8,7 @@ category: refactoring
 status: ready-for-review
 priority: Medium
 created: 2026-11-06
-updated: 2026-11-16
+updated: 2026-11-17
 estimated_effort_hours: 8
 ---
 
@@ -196,7 +196,7 @@ None - each change only moves a wrong classification to the right one; absent `f
 
 - [ ] The three motivating shapes classify correctly, shown by named tests in the QA report.
 - [ ] Each control keeps its old result, shown by the same tests.
-- [ ] Every other consumer of `readTopIssues` (`accept-qa-residual.js` and the five suites named in § 3) passes its existing fixtures unchanged.
+- [ ] Every other consumer of `readTopIssues` (`accept-qa-residual.js` and the five suites named in § 3) passes its existing fixtures unchanged, except the one expectation in `accept-qa-residual.test.mjs` that encoded the defect (see Notes, "Deviation from success criterion 3"). Amended 2026-11-17, approved by Lorien Gamaroff.
 
 ### Performance
 
@@ -325,6 +325,7 @@ Cycle 2's findings QA-5 and QA-6 are closed. One MEDIUM remains: the criterion-3
 | 2026-11-16 |         | QA gate CONCERNS (90/100) — 3 MEDIUM findings            | qa-task     |
 | 2026-11-16 |         | QA findings fixed — QA-5 and QA-6 closed, T278-QA-2 still needs an approver (2 iterations) | qa-fix      |
 | 2026-11-16 |         | QA gate CONCERNS (90/100) — 1 MEDIUM finding             | qa-task     |
+| 2026-11-17 |         | Success criterion 3 amended to name the one moved expectation, approved by Lorien Gamaroff (resolves T278-QA-2) | owner      |
 <!-- change-log-end -->
 
 ---
@@ -368,8 +369,8 @@ to the "edits a flow entry the scanner reads" list. The old expectation encoded 
 fixes: it refused because the shared reader took the nested `status: open` as the entry's own status
 (the writer's read-back then disagreed with its edit). With the reader fixed, the writer appends a
 top-level `status: waived` and the read-back confirms it. Every other consumer fixture is unchanged.
-The criterion text is not edited. **An approver must accept this deviation** (`approved by <name>`);
-until then T278-QA-2 stays open.
+The criterion text was not edited by QA. **Accepted 2026-11-17: approved by Lorien Gamaroff**, who
+amended criterion 3 to name this one expectation. T278-QA-2 is resolved by that amendment.
 
 ### Future Improvements
 
