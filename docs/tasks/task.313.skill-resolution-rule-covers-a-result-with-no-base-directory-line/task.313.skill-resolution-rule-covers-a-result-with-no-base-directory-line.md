@@ -214,15 +214,15 @@ ROLLBACK TRIGGERS:
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-17
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 95/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.313.qa.1.skill-resolution-rule-covers-a-result-with-no-base-directory-line.md](./task.313.qa.1.skill-resolution-rule-covers-a-result-with-no-base-directory-line.md)
-- **Gate File**: [task.313.gate.1.skill-resolution-rule-covers-a-result-with-no-base-directory-line.yml](./task.313.gate.1.skill-resolution-rule-covers-a-result-with-no-base-directory-line.yml)
+- **Full Report**: [task.313.qa.2.skill-resolution-rule-covers-a-result-with-no-base-directory-line.md](./task.313.qa.2.skill-resolution-rule-covers-a-result-with-no-base-directory-line.md)
+- **Gate File**: [task.313.gate.2.skill-resolution-rule-covers-a-result-with-no-base-directory-line.yml](./task.313.gate.2.skill-resolution-rule-covers-a-result-with-no-base-directory-line.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 8555
@@ -231,7 +231,7 @@ ROLLBACK TRIGGERS:
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-One MEDIUM finding (QA313-1): the `format:check` criterion cannot fail on Markdown, because `.prettierignore` excludes it. The change itself is correct.
+No open findings. Cycle 1's MEDIUM (QA313-1, the `format:check` criterion cannot fail on Markdown) is fixed: the Implementation Summary names the checks that do reach the changed files.
 
 ## Change Log
 
@@ -245,6 +245,7 @@ One MEDIUM finding (QA313-1): the `format:check` criterion cannot fail on Markdo
 | 2026-11-17 |  | Implemented: no-Base-directory-line paragraph added, copies re-bundled, CHANGELOG line added; status → ready-for-review | develop |
 | 2026-11-17 |  | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-11-17 |  | QA findings fixed — QA313-1 evidence recorded, 1 iteration | qa-fix |
+| 2026-11-17 |  | QA gate PASS (95/100) — 0 findings | qa-task |
 <!-- change-log-end -->
 
 ---
