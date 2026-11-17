@@ -1,0 +1,16 @@
+[
+  {
+    "argv": [
+      "--sink",
+      "filename",
+      "--entry",
+      "shared/resources/ci-tree-equivalence.js#fixPathTarget",
+      "--args-json",
+      "[\"docs/tasks/task.9.x\",[\"**/*.md\",\"docs/**\"]]",
+      "--name",
+      "fixPathTarget"
+    ],
+    "cases_file": "task.278.dod.1.security.cases.json",
+    "cases_sha256": "403e48474fc5625e6824358537b99e8dd14eb7993b83747f0601e61cd924a274"
+  }
+]

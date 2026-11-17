@@ -5,16 +5,18 @@ type: task
 description: "Fix three QA-loop readers that classify on the wrong input: the narrowing-residue file count that splits a production file from its test, the 5c carry that keys on the finding's anchor not the file the fix edits, and the gate reader that takes a status from quoted finding text."
 tags: [develop-task, qa-fix, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
+pr_number: 915
 created: 2026-11-06
 updated: 2026-11-17
+completed_date: 2026-11-17
 estimated_effort_hours: 8
 ---
 
 # Task 278: QA loop readers read the right thing
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.278.review.1.qa-loop-readers-read-the-right-thing.md` implemented 2026-11-16
 
 ---
@@ -311,11 +313,31 @@ None identified.
 ### Key Findings
 No open findings. The criterion 3 deviation (T278-QA-2) is resolved by the owner's amendment.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report**: `task.278.qa.4.qa-loop-readers-read-the-right-thing.md`
+**Gate File**: `task.278.gate.4.qa-loop-readers-read-the-right-thing.yml`
+**Gate Status**: ✅ PASS (95/100)
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** all 8 met. #4 was re-measured at the head on the LAN server: median 770 s against develop's 722 s (+6.6%, within 10%).
+✅ **Tests:** 8533 pass on the cycle 2 tree (tree-equivalent to the head); hosted CI `test` SUCCESS at `ce14eebb6c72`.
+✅ **PR Review:** PR #915, `task.278.pr-review.1` APPROVE (conformance lens).
+✅ **Documentation:** CHANGELOG `[Unreleased]` cites task 278; step 5-6 doc, ingester prompt and `review-pr/SKILL.md` updated.
+✅ **Security Review:** PASS, boundary `fixPathTarget` probed with 12 candidates, none reproduced.
+⚠️ **Compliance Review:** NOT_APPLICABLE (internal QA-loop tooling).
+
+**Detailed Verification Log:** See `task.278.dod.1.qa-loop-readers-read-the-right-thing.md` for the complete verification evidence.
+
+**Task marked as ACCEPTED on:** 2026-11-17
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                              | Author      |
-| ---------- | ------- | -------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #120, #141, #151   | create-task |
 | 2026-11-16 | 1.1     | Review 7/10 → fixes applied (Phase 1 rewritten to the in-line defect, `readKeysInto` consumers corrected, `fix_path` producer added, Phase 2 path mapping stated, migration criterion re-defined) — ready for development | review-task |
 | 2026-11-16 |         | Status → ready-for-development                           | review-task |
@@ -327,6 +349,7 @@ No open findings. The criterion 3 deviation (T278-QA-2) is resolved by the owner
 | 2026-11-16 |         | QA gate CONCERNS (90/100) — 1 MEDIUM finding             | qa-task     |
 | 2026-11-17 |         | Success criterion 3 amended to name the one moved expectation, approved by Lorien Gamaroff (resolves T278-QA-2) | owner      |
 | 2026-11-17 |         | QA gate PASS (95/100) — 0 findings                       | qa-task     |
+| 2026-11-17 | 1.3 | DoD passed — accepted (PR #915) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -379,4 +402,4 @@ None.
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
