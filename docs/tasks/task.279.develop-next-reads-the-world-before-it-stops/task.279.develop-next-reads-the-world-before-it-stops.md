@@ -289,6 +289,27 @@ Step 3 and Step 0 lines are prose; evidence is a fresh session on each, with a c
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-17
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.279.qa.1.develop-next-reads-the-world-before-it-stops.md](./task.279.qa.1.develop-next-reads-the-world-before-it-stops.md)
+- **Gate File**: [task.279.gate.1.develop-next-reads-the-world-before-it-stops.yml](./task.279.gate.1.develop-next-reads-the-world-before-it-stops.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 19
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+All eight success criteria are verified and both mutation proofs went red on named tests. One medium finding: `CHANGELOG.md` has no `[Unreleased]` entry citing task 279, which `/finalise` 6d HALTs on; it goes to the fix loop.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -298,6 +319,8 @@ Step 3 and Step 0 lines are prose; evidence is a fresh session on each, with a c
 | 2026-11-17 | 1.1     | Review passed (8/10): evidence reader made a script with a named test path, existing 0.1a pin named, sibling worktree verified non-ephemeral, develop-bug added to the activation line, reconstruction states listed | review-task |
 | 2026-11-17 |         | Status → ready-for-development                                | review-task |
 | 2026-11-17 |         | Developed: halt-evidence.mjs + unit test, 0.1a evidence read, Step 3 gate-worktree rule, Session Start line in four orchestrators + test; status → ready-for-review | develop-task |
+| 2026-11-17 |         | QA gate CONCERNS (90/100) — 1 finding (CHANGELOG citation missing) | qa-task |
+| 2026-11-17 |         | QA findings fixed — CHANGELOG entry citing task 279 added, 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---
