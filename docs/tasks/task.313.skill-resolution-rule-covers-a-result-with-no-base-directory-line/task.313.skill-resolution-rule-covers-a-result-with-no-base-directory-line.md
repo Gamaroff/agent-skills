@@ -206,9 +206,32 @@ ROLLBACK TRIGGERS:
 
 **Testing Results:** `CI=true npm run test:remote` (the fast gate) result is recorded in the QA report. No new tests: documentation-only, and `skill-resolution-reach.test.mjs` already asserts each copy equals the source.
 
+**Evidence for the Markdown files (QA313-1):** `npm run format:check` is not evidence for this change: `.prettierignore` excludes `*.md`, so `prettier --check` reads none of the changed files. The checks that do reach them, run on 2026-11-17: `doc-links.js` exit 0 on this document, the implementation report, the QA report, `shared/resources/skill-resolution.md`, the `develop-task` copy and `CHANGELOG.md`; `npm run bundle:check` "129 skill(s) checked, 0 problems"; and `skill-resolution-reach.test.mjs` in the fast gate. The criterion's wording is unchanged.
+
 **Deferred Work:** none.
 
 ---
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-17
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.313.qa.1.skill-resolution-rule-covers-a-result-with-no-base-directory-line.md](./task.313.qa.1.skill-resolution-rule-covers-a-result-with-no-base-directory-line.md)
+- **Gate File**: [task.313.gate.1.skill-resolution-rule-covers-a-result-with-no-base-directory-line.yml](./task.313.gate.1.skill-resolution-rule-covers-a-result-with-no-base-directory-line.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 8555
+- **Phases Verified**: 1/1
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+One MEDIUM finding (QA313-1): the `format:check` criterion cannot fail on Markdown, because `.prettierignore` excludes it. The change itself is correct.
 
 ## Change Log
 
@@ -220,6 +243,8 @@ ROLLBACK TRIGGERS:
 | 2026-11-17 | 1.1 | Review passed (9/10) — every claim measured against the tree, no changes required | review-task |
 | 2026-11-17 |  | Status → ready-for-development | review-task |
 | 2026-11-17 |  | Implemented: no-Base-directory-line paragraph added, copies re-bundled, CHANGELOG line added; status → ready-for-review | develop |
+| 2026-11-17 |  | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-11-17 |  | QA findings fixed — QA313-1 evidence recorded, 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

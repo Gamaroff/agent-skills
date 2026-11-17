@@ -1,0 +1,60 @@
+schema: 2
+task: 'task.313.skill-resolution-rule-covers-a-result-with-no-base-directory-line'
+task_title: 'The skill-resolution rule covers a Skill result with no Base directory line'
+gate: CONCERNS
+status_reason: 'The change is correct and every claim in it was measured. One success criterion (format:check on the changed files) is vacuous: .prettierignore excludes every file type the change touches.'
+reviewer: 'QA Engineer'
+head: 'd794ca45d11400e2eb9a115d6e9132d780a1ac88'
+updated: '2026-11-17T16:08:09Z'
+
+top_issues:
+  - id: 'QA313-1'
+    severity: medium
+    file: 'docs/tasks/task.313.skill-resolution-rule-covers-a-result-with-no-base-directory-line/task.313.skill-resolution-rule-covers-a-result-with-no-base-directory-line.md'
+    finding: 'Success criterion "npm run format:check passes on the changed files" cannot fail: .prettierignore excludes *.md, and every changed file is Markdown. A deliberately malformed Markdown copy also passed prettier --check, so the tool reads none of the changed files.'
+    suggested_action: 'Record the checks that do reach the changed files (doc-links.js exit 0 on each changed doc, npm run bundle:check, the fast gate link corpus) in the QA report and the task, and say format:check is not evidence for Markdown. Do not reword the criterion without an approver.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 8555
+  phases_verified: '1/1'
+  trace:
+    phases_covered: [1]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    escaped: 0
+    boundary_signals: []
+    notes: 'Documentation-only change. No boundary: nothing accepts or rejects an input.'
+  performance:
+    status: PASS
+    notes: 'Not applicable.'
+  reliability:
+    status: PASS
+    notes: 'The new rule makes a previously undefined case deterministic: proceed with the loaded copy and log it.'
+  maintainability:
+    status: PASS
+    notes: 'One paragraph beside the unreadable row; three bundled copies regenerated, bundle:check 0 problems.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future: []
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
