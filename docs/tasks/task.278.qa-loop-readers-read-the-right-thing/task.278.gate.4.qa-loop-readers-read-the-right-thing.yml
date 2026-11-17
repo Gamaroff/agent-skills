@@ -1,0 +1,75 @@
+schema: 2
+task: 'task.278.qa-loop-readers-read-the-right-thing'
+task_title: 'QA loop readers read the right thing'
+gate: PASS
+status_reason: 'The only open entry, T278-QA-2, is resolved: the owner amended success criterion 3 to name the one moved expectation and recorded the approval. No code has moved since gate 3 (code-moved-since-gate reads 0), and every cycle 1-3 finding is closed or advisory.'
+reviewer: 'QA Engineer'
+head: 'c059d3dc2a0dec9527ab6b6deb0e9807b9d58f5c'
+updated: '2026-11-17T03:45:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 144
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 12
+    escaped: 0
+    boundary: true
+    boundary_signals: []
+    boundary_reason: 'The criteria carry no boundary signal phrase; fixPathTarget is a boundary because it decides which file the 5c carry may stage (repo-state signal).'
+    notes: 'fixPathTarget re-probed at this head (filename sink, --args-json work-item directory and patterns, 12-case corpus): engages, 12 executed, 0 escaped. The code is unchanged since gate 3.'
+  performance:
+    status: PASS
+    notes: 'Cycle 1 measurement stands (median develop 770 s vs branch 743 s, -3.5%); no code changed since.'
+  reliability:
+    status: PASS
+    notes: 'An unparseable or non-array testArtifactGlobs reads as no-fold without a message (cycle 2 CR-3, low); carried as an advisory recommendation, not a reliability defect in the shipped behaviour.'
+  maintainability:
+    status: PASS
+    notes: 'The fix_path predicate lives once in ci-tree-equivalence.js and the fold rule once in qa-diminishing-returns.js; bundled copies in sync.'
+
+criteria_drift:
+  reason: drift
+  base: review-commit
+  changed:
+    - id: '#3'
+      kind: reworded
+      approved: true
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'A real module whose name ends in a test-kind word still folds when only its test and a same-stem production file are among the MEDIUMs; accept as the documented trade-off of a name-based fold, or lower-case the suffix before the lookup (cycle 3 CR-1, low).'
+      refs: ['shared/resources/qa-diminishing-returns.js']
+      remedy: unverified
+    - action: 'Add fixture rows for a multi-suffix stem and a production name ending in a kind word; both behave correctly when executed but are untested (cycle 3 CR-3, low).'
+      refs: ['shared/resources/tests/qa-narrowing-residue.test.mjs']
+      remedy: unverified
+    - action: 'Report an unparseable or non-array testArtifactGlobs as a could-not-look reason in the narrowing block, as the HIGH-sequence path does (cycle 2 CR-3, low).'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+      remedy: unverified
+    - action: 'A multi-dot production file (foo.d.ts) is keyed foo.d and never folds with tests/foo.test.mjs; failing to fold is the conservative direction (cycle 3 CR-2, low).'
+      refs: ['shared/resources/qa-diminishing-returns.js']
+      remedy: unverified
+    - action: 'A tracked symlink named *.md that points at code classifies as doc-only in the 5c carry; the base logic is the same for ref (no symlink check), so it is not introduced here.'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+      provenance: pre-existing
+      remedy: unverified
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
