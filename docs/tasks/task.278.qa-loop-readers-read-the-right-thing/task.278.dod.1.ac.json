@@ -1,0 +1,216 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "ce14eebb6c7231a77dee2f46e988a73935bb3ca5",
+  "dirty_paths": [
+    "docs/tasks/task.278.qa-loop-readers-read-the-right-thing/task.278.implementation.1.qa-loop-readers-read-the-right-thing-initial-run.md",
+    "docs/tasks/task.278.qa-loop-readers-read-the-right-thing/task.278.pr-review.1.qa-loop-readers-read-the-right-thing.md",
+    "docs/tasks/task.278.qa-loop-readers-read-the-right-thing/task.278.qa-loop-readers-read-the-right-thing.md"
+  ],
+  "document": "docs/tasks/task.278.qa-loop-readers-read-the-right-thing/task.278.qa-loop-readers-read-the-right-thing.md",
+  "result": {
+    "bytes": 11152,
+    "sha256": "5428494b7d4948b604d0fe0b08afdc91e8d1e31b72c10891039dfe7bd3436254",
+    "verified": false
+  },
+  "scope": {
+    "mode": "scoped",
+    "reason": "prior-record",
+    "rejudged": 1,
+    "carried": 7
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "124b010239d23ce0f20506f9737179071deba1bf65e0edb7d78dc9e59caf999c",
+      "status": "PASS",
+      "description": "Three motivating shapes classify correctly, shown by named tests in the QA report",
+      "code_citation": "shared/resources/qa-diminishing-returns.js:276",
+      "test_citation": "shared/resources/tests/qa-gate-reader-top-level.test.mjs:37",
+      "members": [
+        {
+          "member": "gate reader: block entry quoting `status:` reads its own status (shape 1)",
+          "evidence": "shared/resources/tests/qa-gate-reader-top-level.test.mjs:37",
+          "status": "PASS"
+        },
+        {
+          "member": "residue fold: code file plus its test file is one subject (shape 2)",
+          "evidence": "shared/resources/tests/qa-narrowing-residue.test.mjs (rows 17-21, named in task.278.qa.1 line 66 and task.278.qa.3 line 27)",
+          "status": "PASS"
+        },
+        {
+          "member": "5c fix_path on a clean co-located .md clears a code-anchored finding (shape 3)",
+          "evidence": "shared/resources/tests/acceptance-commit-carries-5c.test.mjs:195",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Named in task.278.qa.1 line 66. All three test files are under the shared/resources/tests tree that the per-PR `npm test` job runs (.github/workflows/test.yml:58). QA reports record 8533 pass on the cycle 2 fix tree."
+    },
+    {
+      "id": "#2",
+      "text_hash": "efb944e0730059d2f8e358a34d07f433ecf9d02769b7e0a6ca3e2fb599d61285",
+      "status": "PASS",
+      "description": "Each control keeps its old result, shown by the same tests",
+      "code_citation": "shared/resources/tests/qa-gate-reader-top-level.test.mjs:50",
+      "test_citation": "shared/resources/tests/qa-gate-reader-top-level.test.mjs:50",
+      "members": [
+        {
+          "member": "gate reader control: real top-level `status: waived` reads waived",
+          "evidence": "shared/resources/tests/qa-gate-reader-top-level.test.mjs:50",
+          "status": "PASS"
+        },
+        {
+          "member": "fold control: two genuinely different production files stay two subjects (row 21, user-service vs user)",
+          "evidence": "shared/resources/tests/qa-narrowing-residue.test.mjs (row 21, task.278.qa.3 line 27)",
+          "status": "PASS"
+        },
+        {
+          "member": "fix_path controls: each control keeps its old answer",
+          "evidence": "shared/resources/tests/acceptance-commit-carries-5c.test.mjs:195",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "task.278.qa.1 line 67 records each case paired with a control in the same file."
+    },
+    {
+      "id": "#3",
+      "text_hash": "ec0f65a0f85cb1ec5c0caeea9ac1650672f6be4c57586576ec62af2b0db0afcf",
+      "status": "PASS",
+      "description": "Other readTopIssues consumers pass existing fixtures unchanged, except the one amended expectation",
+      "code_citation": "docs/tasks/task.278.qa-loop-readers-read-the-right-thing/task.278.qa.4.qa-loop-readers-read-the-right-thing.md:72",
+      "test_citation": "shared/resources/tests/accept-qa-residual.test.mjs:698",
+      "members": [
+        {
+          "member": "accept-qa-residual.js (accept-qa-residual.test.mjs)",
+          "evidence": "task.278.qa.1 Regression Testing, consumer suites pass",
+          "status": "PASS"
+        },
+        {
+          "member": "qa-diminishing-returns suite",
+          "evidence": "task.278.qa.1 Regression Testing, consumer suites pass",
+          "status": "PASS"
+        },
+        {
+          "member": "qa-narrowing-residue suite",
+          "evidence": "task.278.qa.1 Regression Testing, consumer suites pass",
+          "status": "PASS"
+        },
+        {
+          "member": "qa-loop-route suite",
+          "evidence": "task.278.qa.1 Regression Testing, consumer suites pass",
+          "status": "PASS"
+        },
+        {
+          "member": "qa-narrowing-offer-wiring suite",
+          "evidence": "task.278.qa.1 Regression Testing, consumer suites pass",
+          "status": "PASS"
+        },
+        {
+          "member": "accept-qa-residual-merge-rule suite",
+          "evidence": "task.278.qa.1 Regression Testing, consumer suites pass",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "criteria-drift.js exit 0 reports #3 as reworded with approved true and approver Lorien Gamaroff, so the amendment rule does not fail it. The one moved expectation (nested map case) is the exception the criterion now names, and the task Notes section 'Deviation from success criterion 3' records it. The members above rest on the cycle 1 QA report line (Regression Testing) and the CI run in cycles 2-4 (8533 pass). I did not re-run the suites."
+    },
+    {
+      "id": "#4",
+      "text_hash": "546f8d2e546317c6fe9a55fd0f609c8fefcc1c0cc809d62ee9ee5cda06496d54",
+      "status": "PASS",
+      "description": "CI=true npm test wall time within 10% of develop, median of five alternating runs",
+      "code_citation": "docs/tasks/task.278.qa-loop-readers-read-the-right-thing/task.278.dod.1.qa-loop-readers-read-the-right-thing.md:39-52",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Re-measured on the LAN server at head ce14eebb6c72 (clean checkout, no later code change): five alternating runs, develop first, uptime beside each, the same docker invocation as scripts/remote-test/run.sh. Median branch 770 s vs develop 722 s = +6.6%, within the 10% limit. Recorded in this run's DoD file (lines 39-52). Superseded note: the cycle 1 figure task.278.qa.1:77 records five alternating runs with load average per run and a median of 743 s on the branch against 770 s on develop (-3.5%), measured with `CI=true npm run test:remote -- --run test`. The record does not name the measured commit M. The nearest candidates are 97b45a535 and 25325d21e446 (the cycle 1 review head). `finalise-delta.js docs-only --base 25325d21e446 --head HEAD --json` returns reason `code-changed` (exit 1), and so does `--base 97b45a535`. Cycle 2 changed code (the fixPathTarget normalise in ci-tree-equivalence.js and the fold's kind allow-list in qa-diminishing-returns.js), and the QA reports 2-4 carry the -3.5% figure forward as 'no hot path changed' without re-measuring. The figure no longer counts, so it needs a fresh median of five runs on the head, with load recorded."
+    },
+    {
+      "id": "#5",
+      "text_hash": "768632a9bd478c26fcca42074f89d0beff1eb4630ea7770ba35c25e6d4bbb45d",
+      "status": "PASS",
+      "description": "Each change has a mutation proof in the QA report",
+      "code_citation": "docs/tasks/task.278.qa-loop-readers-read-the-right-thing/task.278.qa.1.qa-loop-readers-read-the-right-thing.md:149",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "Phase 1 keyStartPositions gate",
+          "evidence": "task.278.qa.1:149 (gate disabled, qa-gate-reader-top-level red, 8 of 11 in develop-phase run, then restored byte-identical)",
+          "status": "PASS"
+        },
+        {
+          "member": "Phase 2 residue fold",
+          "evidence": "task.278.qa.1:150 (fold disabled, qa-narrowing-residue row 17 red)",
+          "status": "PASS"
+        },
+        {
+          "member": "Phase 3 fix_path branch",
+          "evidence": "task.278.qa.1:151 (branch disabled, acceptance-commit-carries-5c fix_path case red, bash and zsh, 2 fail)",
+          "status": "PASS"
+        },
+        {
+          "member": "Cycle 2 fixPathTarget directory check / globs argv read",
+          "evidence": "task.278.qa.2:146-147 (ci-tree-equivalence test 1 fail and probe present-but-inert; qa-narrowing-offer-wiring 2 fail)",
+          "status": "PASS"
+        },
+        {
+          "member": "Cycle 2 fix: fixPathTarget directory normalisation",
+          "evidence": "task.278.qa.3:137 (normalisation removed, ci-tree-equivalence spelling test 1 fail)",
+          "status": "PASS"
+        },
+        {
+          "member": "Cycle 2 fix: fold kind allow-list",
+          "evidence": "task.278.qa.3:138 (allow-list removed, qa-narrowing-residue row 21 1 fail)",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Each unit has a committed record naming the revert and the test that went red. Cycle 4 (qa.4:128) records no code change since cycle 3."
+    },
+    {
+      "id": "#6",
+      "text_hash": "4ebe7eb0e4844e0df815176b7f42d776b2bc0cf3440c8435836dd542207af2de",
+      "status": "PASS",
+      "description": "bundle --check reports 0 problems; CI=true npm test passes",
+      "code_citation": "docs/tasks/task.278.qa-loop-readers-read-the-right-thing/task.278.qa.4.qa-loop-readers-read-the-right-thing.md:134",
+      "test_citation": "package.json:26 (npm test runs the full per-PR suite; .github/workflows/test.yml:58)",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Command-result criterion, graded on the committed record and not re-run. task.278.qa.4:134 records `ci:fast` on the LAN server at the cycle 2 fix tree 203e8456e: 8533 pass, 0 fail, 3 skipped. task.278.qa.3:66 records bundle 0 problems for the same tree, and task.278.qa.1:74 and qa.2:82 record bundle 0 problems earlier. `finalise-delta.js docs-only --base 203e8456e --head HEAD` returns `tree-equivalent`, so that tree equals the head apart from docs. The criterion's own hosted CI state is not read here."
+    },
+    {
+      "id": "#7",
+      "text_hash": "776e391ae42bf36cdb28c15c1ba0aa3828cf93f705d741be0a74a079b7d7766e",
+      "status": "PASS",
+      "description": "qa-narrowing-residue.test.mjs passes under node --test",
+      "code_citation": "docs/tasks/task.278.qa-loop-readers-read-the-right-thing/task.278.qa.1.qa-loop-readers-read-the-right-thing.md:74",
+      "test_citation": "shared/resources/tests/qa-narrowing-residue.test.mjs:298",
+      "members": [],
+      "non_member_fail": null,
+      "note": "task.278.qa.1:74 records '26 pass' at cycle 1. Cycle 2 added row 21 and the prefix fixture, and the 8533-pass `npm test` run on the cycle 2 tree (qa.4:134) includes this suite. That tree is tree-equivalent to the head. The file is under shared/resources/tests, which the per-PR npm test runs. The post-cycle-2 count for this file alone is not stated in any report, which is a recording gap only."
+    },
+    {
+      "id": "#8",
+      "text_hash": "a9ebf021f68d69f7936654200fd9807ca52c3e232eff7d1e6cd1d0c06a68bee3",
+      "status": "PASS",
+      "description": "Pre-change gate files read the same status for every entry, per-entry diff recorded in the QA report",
+      "code_citation": "docs/tasks/task.278.qa-loop-readers-read-the-right-thing/task.278.qa.1.qa-loop-readers-read-the-right-thing.md:155",
+      "test_citation": "shared/resources/tests/qa-gate-reader-top-level.test.mjs:63",
+      "members": [],
+      "non_member_fail": null,
+      "note": "task.278.qa.1:155 records the sweep of `readTopIssues` over all 1021 committed gates (2202 entries), develop reader against branch reader. 14 gates differ, all because the old reader took status or category from text quoted inside a finding, with three entries quoted old and new. None lost a correct reading, so every difference is explained. The record sits under the report's Code Review section, not one headed Findings, which is a placement variance and not an evidence gap. Cycle 2 did not touch the reader."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#8",
+      "note": "The migration record is under Code Review in task.278.qa.1 and not under a 'Findings' heading as the criterion words it."
+    },
+    {
+      "ac_id": "#6",
+      "note": "The head's own CI run was not read here. The QA reports show 'CI on ...: pending' for every cycle, so the CI-state reading is left to /finalise Step 6."
+    }
+  ]
+}

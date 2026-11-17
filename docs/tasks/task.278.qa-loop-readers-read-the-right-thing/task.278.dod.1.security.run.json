@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "filename",
+      "entry": "shared/resources/ci-tree-equivalence.js#fixPathTarget",
+      "name": "fixPathTarget",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 12,
+      "passed": 12,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "observation_limits": [
+        "effects-after-accept"
+      ],
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": [
+        "docs/tasks/task.9.x",
+        [
+          "**/*.md",
+          "docs/**"
+        ]
+      ],
+      "slot": null,
+      "fixture_setup": null,
+      "fixture_copy": null,
+      "ran_at": "2026-11-17T03:46:51.651Z"
+    }
+  ],
+  "totals": {
+    "executed": 12,
+    "reproduced": 0,
+    "escaped": 0
+  },
+  "updated_at": "2026-11-17T03:46:51.651Z"
+}

@@ -261,11 +261,66 @@ const KEY_RE =
 // population that never exercises the behaviour in the first place.
 const CASE_INSENSITIVE_KEYS = new Set(["severity", "category", "status"]);
 
+// Which positions of `text` may start one of the entry's own keys (task.278,
+// obs #151). The caller already keeps deeper-indented lines out, so the defect
+// this answers is INSIDE one line: KEY_RE scans the whole text, and a finding
+// that quotes `status: waived` produced a status — FIRST wins, so the quoted
+// text beat the entry's real `status: open` after it.
+//
+// A position is not a key start when it sits inside a quoted scalar, or inside
+// a flow collection nested below the entry's own mapping. A quote only OPENS a
+// scalar where YAML allows one (at the start of the text, or after `:`, `,`, `{`,
+// `[` or `-`), so an apostrophe in plain prose (`it's`) is not read as one.
+// A `"…"` scalar honours `\` escapes and a `'…'` scalar honours `''`; an
+// unterminated quote runs to the end of the text, which fails safe (the keys it
+// swallows are not read).
+function keyStartPositions(text) {
+  const ok = new Array(text.length).fill(true);
+  let depth = 0;
+  let prev = ""; // last non-blank character seen outside a quoted scalar
+  let i = 0;
+  while (i < text.length) {
+    const c = text[i];
+    if ((c === '"' || c === "'") && (prev === "" || ":,{[-".includes(prev))) {
+      let j = i + 1;
+      while (j < text.length) {
+        if (c === '"' && text[j] === "\\") {
+          j += 2;
+          continue;
+        }
+        if (text[j] === c) {
+          if (c === "'" && text[j + 1] === "'") {
+            j += 2;
+            continue;
+          }
+          break;
+        }
+        j++;
+      }
+      const end = Math.min(j, text.length - 1);
+      for (let k = i; k <= end; k++) ok[k] = false;
+      prev = c;
+      i = end + 1;
+      continue;
+    }
+    if (c === "{" || c === "[") depth++;
+    else if (c === "}" || c === "]") depth--;
+    if (depth >= 2) ok[i] = false;
+    if (c !== " " && c !== "\t") prev = c;
+    i++;
+  }
+  return ok;
+}
+
 function readKeysInto(entry, text) {
   KEY_RE.lastIndex = 0;
+  const keyStart = keyStartPositions(text);
   let m;
   while ((m = KEY_RE.exec(text)) !== null) {
     const key = m[1] || m[2];
+    // The key's own position: the match's prefix (`{`, `,` or blanks) holds no
+    // key text, so the first occurrence of the key in the match is the key.
+    if (!keyStart[m.index + m[0].indexOf(key)]) continue;
     // FIRST wins, as in review-report-freshness.js: a later stray occurrence
     // should not override the real field, and "later" is the half an author is
     // least likely to be looking at.
@@ -683,6 +738,62 @@ function classifyLoopRoute(input) {
 
 const NARROWING_WINDOW = 2; // gates compared: cycle N's and cycle N-1's (task.148 Open Question 3)
 
+// task.278 / obs #120. A production file and the test that exercises it are one
+// subject, and a MEDIUM on each is one mechanism seen from two files. task.240's
+// loop ran seven cycles at HIGH 0 with every cycle's MEDIUMs naming a production
+// file and its differential-test generator; the file count read two, so the
+// offer never fired and the structural move came only in the escalation.
+//
+// A path folds only when ALL hold: `testArtifactGlobs` is configured and matches
+// it (an unconfigured consumer folds nothing, as the diminishing-returns exit
+// stays off); it is `<dir>/tests/<stem>.test.<ext>`; and a production file that
+// matches no glob sits at `<dir>/<stem'>` (any extension) among the SAME
+// MEDIUMs, where `<stem'>` is `<stem>` or `<stem>` with trailing `-<kind>`
+// segments removed, each `<kind>` one of TEST_KIND_SUFFIXES. The longest such
+// stem wins. A test whose production file is not among the MEDIUMs stays as it
+// is, so the fold never hides a second, different subject.
+//
+// The suffix list is an allow-list on purpose (T278-QA-6). A cut at ANY dash
+// folded `src/tests/user-service.test.ts` onto `src/user.ts`, two subjects, into
+// a false "one mechanism" offer. A name alone cannot tell `open-coverage` +
+// `-differential` (a test kind) from `user` + `-service` (another module), so
+// only a named kind is cut and everything else stays a separate subject.
+const TEST_KIND_SUFFIXES = new Set([
+  "differential",
+  "property",
+  "fuzz",
+  "integration",
+  "unit",
+  "e2e",
+  "regression",
+  "contract",
+  "snapshot",
+]);
+
+function foldTestFilesIntoSubjects(files, globs) {
+  if (!Array.isArray(globs) || globs.length === 0) return files;
+  const noExt = (p) => p.replace(/\.[^./]+$/, "");
+  const production = new Map();
+  for (const f of files) {
+    if (!matchesAnyGlob(f, globs)) production.set(noExt(f), f);
+  }
+  if (production.size === 0) return files;
+  return files.map((f) => {
+    if (!matchesAnyGlob(f, globs)) return f;
+    const m = f.match(/^(?:(.*)\/)?tests\/([^/]+)\.test\.[^./]+$/);
+    if (!m) return f;
+    const dir = m[1] ? `${m[1]}/` : "";
+    let stem = m[2];
+    for (;;) {
+      const hit = production.get(dir + stem);
+      if (hit) return hit;
+      const cut = stem.lastIndexOf("-");
+      if (cut <= 0 || !TEST_KIND_SUFFIXES.has(stem.slice(cut + 1))) return f;
+      stem = stem.slice(0, cut);
+    }
+  });
+}
+
 function narrowing(signal, reason, detail, extra) {
   return Object.assign(
     { signal, reason, detail, file: null, ids: [], cycles: [] },
@@ -726,11 +837,13 @@ function classifyNarrowingResidue(input) {
   let highCounts;
   let latestGateContent;
   let previousGateContent;
+  let testArtifactGlobs;
   try {
     cycle = input && input.cycle;
     highCounts = input && input.highCounts;
     latestGateContent = input && input.latestGateContent;
     previousGateContent = input && input.previousGateContent;
+    testArtifactGlobs = input && input.testArtifactGlobs;
   } catch {
     return narrowing(false, "input-unreadable", "the inputs could not be read");
   }
@@ -810,7 +923,14 @@ function classifyNarrowingResidue(input) {
       { cycles },
     );
   }
-  const files = [...new Set(all.map((e) => normalisePath(e.file)))];
+  const files = [
+    ...new Set(
+      foldTestFilesIntoSubjects(
+        all.map((e) => normalisePath(e.file)),
+        testArtifactGlobs,
+      ),
+    ),
+  ];
   if (files.length !== 1) {
     return narrowing(
       false,

@@ -703,13 +703,9 @@ for (const [name, entry] of [
     "  - {id: X, # note }\n     status: open}",
   ],
   ["junk after the close", "  - {id: X, status: open} trailing"],
-  // The edit itself is right (a top-level status is appended), but the shared reader would still
-  // read the nested `status: open` as the entry's status, so the writer's own read-back refuses
-  // and nothing is written. Safe direction.
-  [
-    "a status only inside a nested map (the shared reader would still read it as open)",
-    "  - {id: X, a: {status: open}}",
-  ],
+  // A status only inside a nested map moved to the edited list below (task.278): the shared reader
+  // no longer reads a nested `status: open` as the entry's status, so the writer's read-back agrees
+  // with the edit it made.
 ]) {
   test(`refuses a flow entry the extent scanner cannot read: ${name}`, () => {
     const fx = fixture(
@@ -741,6 +737,14 @@ for (const [name, entry, want] of [
     "a trailing comment is kept",
     "  - {id: X, status: open} # keep",
     "  - {id: X, status: waived} # keep\n",
+  ],
+  // task.278 (obs #151): a status only inside a nested map is not the entry's own. The writer
+  // appends a top-level one, and the shared reader, which no longer reads the nested key, confirms
+  // it. This case was a refusal while the reader read the nested `status: open` as the entry's.
+  [
+    "a status only inside a nested map gets a top-level status appended",
+    "  - {id: X, a: {status: open}}",
+    "  - {id: X, a: {status: open}, status: waived }\n",
   ],
 ]) {
   test(`edits a flow entry the scanner reads: ${name}`, () => {

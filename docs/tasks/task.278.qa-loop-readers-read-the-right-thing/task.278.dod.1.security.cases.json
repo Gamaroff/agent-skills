@@ -1,0 +1,110 @@
+[
+  {
+    "id": "fix-path.traversal-out",
+    "sink": "filename",
+    "input": "docs/tasks/task.9.x/../../../README.md",
+    "direction": "hostile",
+    "why": "A `..` that climbs out of the work item directory names a file the review never owned.",
+    "correct": "Refused: the path is normalised first, and a normalised path outside the work item directory is not its own file.",
+    "spec_ref": "docs/tasks/task.278.qa-loop-readers-read-the-right-thing/task.278.implementation.1.qa-loop-readers-read-the-right-thing-initial-run.md:66"
+  },
+  {
+    "id": "fix-path.sibling-directory",
+    "sink": "filename",
+    "input": "docs/tasks/task.8.y/task.8.y.md",
+    "direction": "hostile",
+    "why": "A document in another work item's directory is a docs path but not this work item's file.",
+    "correct": "Refused: the file's directory must equal the work item directory exactly.",
+    "spec_ref": "docs/tasks/task.278.qa-loop-readers-read-the-right-thing/task.278.implementation.1.qa-loop-readers-read-the-right-thing-initial-run.md:66"
+  },
+  {
+    "id": "fix-path.nested-below",
+    "sink": "filename",
+    "input": "docs/tasks/task.9.x/sub/deeper.md",
+    "direction": "hostile",
+    "why": "A prefix match on the directory accepts every descendant.",
+    "correct": "Refused: directly inside the directory, not below it.",
+    "spec_ref": "docs/tasks/task.278.qa-loop-readers-read-the-right-thing/task.278.implementation.1.qa-loop-readers-read-the-right-thing-initial-run.md:66"
+  },
+  {
+    "id": "fix-path.absolute",
+    "sink": "filename",
+    "input": "/etc/hosts.md",
+    "direction": "hostile",
+    "why": "An absolute path leaves the repository.",
+    "correct": "Refused: its directory is not the work item directory.",
+    "spec_ref": "docs/tasks/task.278.qa-loop-readers-read-the-right-thing/task.278.implementation.1.qa-loop-readers-read-the-right-thing-initial-run.md:66"
+  },
+  {
+    "id": "fix-path.code-file",
+    "sink": "filename",
+    "input": "docs/tasks/task.9.x/handler.js",
+    "direction": "hostile",
+    "why": "A code file would let a review edit executable code through the docs-only carry.",
+    "correct": "Refused: only a `.md` counts.",
+    "spec_ref": "docs/tasks/task.278.qa-loop-readers-read-the-right-thing/task.278.implementation.1.qa-loop-readers-read-the-right-thing-initial-run.md:66"
+  },
+  {
+    "id": "fix-path.directory",
+    "sink": "filename",
+    "input": "docs/tasks/task.9.x/",
+    "direction": "hostile",
+    "why": "A bare directory would stage every file under it.",
+    "correct": "Refused: it does not end in `.md`.",
+    "spec_ref": "docs/tasks/task.278.qa-loop-readers-read-the-right-thing/task.278.implementation.1.qa-loop-readers-read-the-right-thing-initial-run.md:66"
+  },
+  {
+    "id": "fix-path.empty",
+    "sink": "filename",
+    "input": "",
+    "direction": "hostile",
+    "why": "An empty value normalises to `.`, a directory, not a file.",
+    "correct": "Refused: reads as absent.",
+    "spec_ref": "docs/tasks/task.278.qa-loop-readers-read-the-right-thing/task.278.implementation.1.qa-loop-readers-read-the-right-thing-initial-run.md:66"
+  },
+  {
+    "id": "fix-path.nul-suffix",
+    "sink": "filename",
+    "input": "docs/tasks/task.9.x/a.md\u0000.js",
+    "direction": "hostile",
+    "why": "A NUL ends the name for a C consumer, so the checked name and the used name differ.",
+    "correct": "Refused: a control character is never documentation.",
+    "spec_ref": "docs/tasks/task.278.qa-loop-readers-read-the-right-thing/task.278.implementation.1.qa-loop-readers-read-the-right-thing-initial-run.md:66"
+  },
+  {
+    "id": "fix-path.dot-git-segment",
+    "sink": "filename",
+    "input": "docs/tasks/task.9.x/.git/config.md",
+    "direction": "hostile",
+    "why": "A path through the repository's own internals.",
+    "correct": "Refused: not directly in the directory, and a `.git` segment is never documentation.",
+    "spec_ref": "docs/tasks/task.278.qa-loop-readers-read-the-right-thing/task.278.implementation.1.qa-loop-readers-read-the-right-thing-initial-run.md:66"
+  },
+  {
+    "id": "fix-path.sibling-file-in-dir",
+    "sink": "filename",
+    "input": "docs/tasks/task.9.x/task.9.x.md",
+    "direction": "legitimate",
+    "why": "The work item's own document is the file a review fix edits.",
+    "correct": "Accepted: a `.md` directly in the work item directory.",
+    "spec_ref": "docs/tasks/task.278.qa-loop-readers-read-the-right-thing/task.278.implementation.1.qa-loop-readers-read-the-right-thing-initial-run.md:66"
+  },
+  {
+    "id": "fix-path.single-quoted",
+    "sink": "filename",
+    "input": "'docs/tasks/task.9.x/task.9.x.md'",
+    "direction": "legitimate",
+    "why": "YAML lets a value be single-quoted; the review writes it that way when it holds a colon.",
+    "correct": "Accepted: one surrounding quote pair is removed first.",
+    "spec_ref": "docs/tasks/task.278.qa-loop-readers-read-the-right-thing/task.278.implementation.1.qa-loop-readers-read-the-right-thing-initial-run.md:66"
+  },
+  {
+    "id": "fix-path.dot-slash",
+    "sink": "filename",
+    "input": "./docs/tasks/task.9.x/notes.md",
+    "direction": "legitimate",
+    "why": "A leading `./` names the same file.",
+    "correct": "Accepted: the path is normalised first.",
+    "spec_ref": "docs/tasks/task.278.qa-loop-readers-read-the-right-thing/task.278.implementation.1.qa-loop-readers-read-the-right-thing-initial-run.md:66"
+  }
+]

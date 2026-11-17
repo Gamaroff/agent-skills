@@ -790,6 +790,7 @@ findings:
     severity: {low|medium|high}
     confidence: {low|medium|high}
     ref: {the same ref rendered after the em-dash, quoted}
+    fix_path: {OPTIONAL: the .md the fix edits, quoted — omit unless it differs from ref's file}
     anchor_check: {ok|unchecked-text|no-line|no-such-file|out-of-range|text-mismatch|unparseable}
     finding: "{one sentence: what is wrong}"
     suggested_action: "{one sentence: the fix approach}"
@@ -819,6 +820,11 @@ sections above it are for humans. Seven rules, each of which has a way of going 
 - **`anchor_check` beside every `ref`**, the checker's verdict from Step 6. The `ref` keeps the
   reviewer's value even when it is wrong, so `anchor_check` is what tells `/qa-fix` a verified
   location from an unverified one.
+- **`fix_path` is optional and names a file, not a fix.** Emit it only when `ref` anchors where the
+  behaviour lives (code) but the fix edits the work item's own document or another `.md` in its
+  directory; the conformance prompt's rules state the form. Otherwise leave the key out — an absent
+  `fix_path` is today's behaviour, and the orchestrator's Step 5c carry reads it and nothing else
+  does. It is unrelated to the ingester's `suggested_fix_path`, which holds a description.
 - **Double-quote `finding` and `suggested_action`**, each on its key's line, escaping only `\"` and
   `\\`. They are free text, and a bare sentence holding `: ` reads as a key: Step 5c's reader
   (`open-coverage.js`) refuses the whole block, and the develop pipeline halts at **Review failed**

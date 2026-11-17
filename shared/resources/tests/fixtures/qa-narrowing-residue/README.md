@@ -24,3 +24,6 @@ the originals at any time.
 | `medium-no-file.yml` | a MEDIUM with no `file:` — must not fire (`medium-file-missing`) |
 | `medium-closed.yml` | two MEDIUMs on one file, both `status: closed` — must fire: raised, not open, is what counts |
 | `medium-two-files.yml` | two MEDIUMs on two files — must not fire (`medium-files-differ`) |
+| `medium-code-and-test.yml` | a production file and its own differential-test generator (obs #120, task.278) — fires when `testArtifactGlobs` covers the test, reads `medium-files-differ` when no globs are configured |
+| `medium-code-and-prefix-test.yml` | a production file and the test of a *different* module whose name only shares a dash-prefix with it (`user` vs `user-service`, T278-QA-6) — must not fire even with globs set: only a named test kind (`-differential`, `-property`, …) is cut from a test's name |
+| `medium-test-and-other.yml` | a test file whose production file is **not** among the MEDIUMs, plus an unrelated production file — must not fire: the fold never hides a second subject |

@@ -189,6 +189,51 @@ for (const shell of SHELLS) {
     );
   });
 
+  // task.278 (obs #141): a finding anchors `ref` where the behaviour lives (code) while its fix edits
+  // the work item's own document. `fix_path` names the file the fix edits; only a co-located `.md`
+  // that is clean against HEAD clears, and absent it nothing changes.
+  test(`[${shell}] 5c classify: fix_path on a clean co-located .md clears a code-anchored finding; every control keeps its old answer (task.278 obs #141)`, () => {
+    const { root, g, write } = fiveCRepo();
+    write("docs/other/o.md", "# Other\n");
+    g("add", "--", "docs/other/o.md");
+    g("commit", "-q", "-m", "other doc");
+    const fixEntry = (id, ref, fix, fixFirst = false) =>
+      fixFirst
+        ? `  - id: ${id}\n    category: scope\n    severity: low\n    confidence: high\n    fix_path: ${fix}\n    ref: ${ref}\n    anchor_check: ok\n    finding: "x"\n    suggested_action: "y"\n`
+        : `  - id: ${id}\n    category: scope\n    severity: low\n    confidence: high\n    ref: ${ref}\n    fix_path: ${fix}\n    anchor_check: ok\n    finding: "x"\n    suggested_action: "y"\n`;
+    const CODE = '"skills/x/SKILL.md:40"';
+    write(
+      REVIEW_PATH,
+      reviewBody(
+        [
+          fixEntry("PC-1", CODE, '"docs/tasks/task.9.x/task.9.x.md"'),
+          fixEntry("PC-2", CODE, '"docs/tasks/task.9.x/task.9.notes.md"', true),
+          fixEntry("PC-3", CODE, '"docs/tasks/task.9.x/task.9.dirty.md"'),
+          fixEntry("PC-4", CODE, '"skills/x/SKILL.md"'),
+          fixEntry("PC-5", CODE, '"docs/other/o.md"'),
+          fixEntry("PC-6", CODE, `"${IMPL_PATH}"`),
+          entry("PC-7", CODE),
+        ].join(""),
+      ),
+    );
+    g("add", "--", REVIEW_PATH);
+    const r = run(shell, root, classifyBlock());
+    assert.equal(r.status, 0, r.stderr + r.stdout);
+    assert.deepEqual(r.stdout.trim().split("\n"), [
+      "doc-only PC-1 docs/tasks/task.9.x/task.9.x.md",
+      "doc-only PC-2 docs/tasks/task.9.x/task.9.notes.md",
+      "record PC-3 docs/tasks/task.9.x/task.9.dirty.md (untracked, or holds uncommitted work — not fixed at 5c)",
+      `record PC-4 ${CODE}`,
+      `record PC-5 ${CODE}`,
+      `record PC-6 ${IMPL_PATH} (the implementation report is Step 8's)`,
+      `record PC-7 ${CODE}`,
+    ]);
+    assert.equal(
+      readFileSync(join(root, ".claude/state/5c-carry-eligible.txt"), "utf8"),
+      `# review: ${REVIEW_PATH}\ndocs/tasks/task.9.x/task.9.x.md\ndocs/tasks/task.9.x/task.9.notes.md\n`,
+    );
+  });
+
   test(`[${shell}] 5c classify: a ref carrying a NUL is recorded, never cleared — even when git would read it as a tracked file (task.173 DoD run 3)`, () => {
     const { root, g, write } = fiveCRepo();
     // The consumer default patterns: under them `src/a.js<NUL>.md` matches the markdown glob. This

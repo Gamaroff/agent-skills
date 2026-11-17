@@ -1,0 +1,92 @@
+schema: 2
+task: 'task.278.qa-loop-readers-read-the-right-thing'
+task_title: 'QA loop readers read the right thing'
+gate: CONCERNS
+status_reason: 'The three readers are fixed and every fix is mutation-proven (ci:fast green, 8528 pass). Four MEDIUM gaps remain: no CHANGELOG entry, one existing consumer fixture was changed against criterion 3, the new globs wiring has no committed test, and the fix_path boundary has no engine probe.'
+reviewer: 'QA Engineer'
+head: '25325d21e446f03bc9de987d643a336938062fcf'
+updated: '2026-11-16T20:33:13Z'
+
+top_issues:
+  - id: 'T278-QA-1'
+    severity: medium
+    file: 'CHANGELOG.md'
+    finding: 'No [Unreleased] entry cites (task 278); changelog-cites.sh answers "missing (task 278)", and /finalise 6d HALTs on exactly that.'
+    suggested_action: 'Add an [Unreleased] entry under Fixed that cites (task 278) and names the three readers.'
+    suggested_owner: dev
+    status: open
+  - id: 'T278-QA-2'
+    severity: medium
+    file: 'shared/resources/tests/accept-qa-residual.test.mjs'
+    finding: 'Success criterion 3 says every other consumer passes its existing fixtures unchanged, but one pinned expectation changed (the nested-map case moved from the refuses list to the edits list), because the old expectation encoded the defect.'
+    suggested_action: 'Record the changed expectation as a deliberate, evidenced deviation in the task Notes and the implementation report, and escalate for an approver; do not reword the criterion.'
+    suggested_owner: dev
+    status: open
+  - id: 'T278-QA-3'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'The changed narrowing call-site block (the testArtifactGlobs argv read) is executed by no committed test with globs; the wiring test never passes globs, so the fold reaching real runs rests on a QA hand run in bash and zsh.'
+    suggested_action: 'Add a case to evals/shared/tests/qa-narrowing-offer-wiring.test.mjs that runs the block with $TEST_ARTIFACT_GLOBS_JSON set (fires), empty, and unparseable (both read as no fold), in bash and zsh.'
+    suggested_owner: dev
+    status: open
+  - id: 'T278-QA-4'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'The fix_path predicate in the 5c classify block decides which file the carry may stage, so it is a boundary, but no probe-engine form reaches it (the fence form needs placeholders the block does not have); probes_executed is 0 and the by-hand probe of 16 hostile shapes does not count.'
+    suggested_action: 'Extract the classify node script into a shared/resources script with an exported fixTarget and probe it with the corpus (filename sink), or make the block reachable by the fence form; failing that, record that the DoD needs an override.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 91
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: true
+    boundary_signals: []
+    notes: 'fix_path is a boundary. A by-hand scratch probe of 16 shapes (traversal, glob, pathspec magic, absolute, directory, NUL, trailing comment, line suffix, quoting, empty, duplicate key, .MD, symlink) cleared nothing unsafe. No engine form reaches the block, so nothing is counted as executed (T278-QA-4).'
+  performance:
+    status: PASS
+    notes: 'Median of five alternating npm test runs on the LAN server: develop 770 s, branch 743 s (-3.5%), within the 10% bound; the two quiet-server pairs agree within 2 s.'
+  reliability:
+    status: PASS
+    notes: 'An unparseable or absent globs value folds nothing, so the check reads as before; an absent fix_path classifies on ref as before.'
+  maintainability:
+    status: PASS
+    notes: 'One reader, one fold helper, one parse of fix_path; bundled copies in sync (0 problems). One low-confidence cleanup (CR-1, extension collision in the fold map) is harmless because two production files stay two subjects either way.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T278-QA-1 to T278-QA-4.'
+      refs: ['CHANGELOG.md', 'shared/resources/tests/accept-qa-residual.test.mjs', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+  future:
+    - action: 'A tracked symlink named *.md that points at code classifies as doc-only in the 5c carry; the base logic is the same for ref (no symlink check), so it is not introduced here.'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+      provenance: pre-existing
+      remedy: unverified
+    - action: 'CR-1 (low, cleanup): key the fold map per extension so the target does not depend on MEDIUM order.'
+      refs: ['shared/resources/qa-diminishing-returns.js']
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T278-QA-1 to T278-QA-4 fixed and re-verified']

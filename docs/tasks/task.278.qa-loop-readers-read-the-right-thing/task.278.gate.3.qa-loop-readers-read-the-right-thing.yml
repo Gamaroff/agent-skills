@@ -1,0 +1,81 @@
+schema: 2
+task: 'task.278.qa-loop-readers-read-the-right-thing'
+task_title: 'QA loop readers read the right thing'
+gate: CONCERNS
+status_reason: 'Cycle 2 findings QA-5 and QA-6 are closed and mutation-proven; the refute-scoped review of the two fixes found no bug. One MEDIUM remains: the criterion-3 deviation needs an approver, which no fix cycle can supply.'
+reviewer: 'QA Engineer'
+head: '203e8456e5253953df52ab5410cdd158355b07a9'
+updated: '2026-11-16T21:15:56Z'
+
+top_issues:
+  - id: 'T278-QA-2'
+    severity: medium
+    file: 'shared/resources/tests/accept-qa-residual.test.mjs'
+    finding: 'Success criterion 3 says every other consumer passes its existing fixtures unchanged, but one pinned expectation changed (the nested-map case moved from the refuses list to the edits list) because the old expectation encoded the defect. The deviation is recorded in the task Notes and the implementation report; no approver has accepted it, so the criterion is unmet as written.'
+    suggested_action: 'Escalate for an approver (approved by <name>) on the recorded deviation. Do not reword the criterion and do not revert the test.'
+    suggested_owner: po
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 144
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 12
+    escaped: 0
+    boundary: true
+    boundary_signals: []
+    boundary_reason: 'The criteria carry no boundary signal phrase; fix_path is a boundary because it decides which file the 5c carry may stage (repo-state signal).'
+    notes: 'fixPathTarget probed by security-probe.mjs (filename sink, --args-json work-item directory and patterns, 12-case corpus): engages, 12 executed, 0 escaped. Removing the directory comparison or the directory normalisation each turns a committed test red.'
+  performance:
+    status: PASS
+    notes: 'Cycle 1 measurement stands: median develop 770 s vs branch 743 s (-3.5%). Cycles 2 and 3 add a Set lookup and a path normalisation per finding; no hot path changed.'
+  reliability:
+    status: CONCERNS
+    notes: 'An unparseable or non-array testArtifactGlobs reads as "no fold" with no message, where the HIGH-sequence input in the same block reports could-not-look as an error (cycle 2 CR-3, low, advisory).'
+  maintainability:
+    status: PASS
+    notes: 'The fix_path predicate lives once in ci-tree-equivalence.js; the fold rule is stated once in qa-diminishing-returns.js and in one row of the step document; bundled copies in sync (bundle --check 0 problems).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Obtain an approver for the T278-QA-2 deviation.'
+      refs: ['shared/resources/tests/accept-qa-residual.test.mjs']
+  future:
+    - action: 'A real module whose name ends in a test-kind word (user-unit.js with tests/user-unit.test.mjs is fine; user.js with tests/user-unit.test.mjs folds) still reads as one subject; accept it as the documented trade-off of a name-based fold, or lower-case the suffix before the lookup (cycle 3 CR-1, low).'
+      refs: ['shared/resources/qa-diminishing-returns.js']
+      remedy: unverified
+    - action: 'Add fixture rows for a multi-suffix stem and a production name ending in a kind word; both behave correctly when executed but are untested (cycle 3 CR-3, low).'
+      refs: ['shared/resources/tests/qa-narrowing-residue.test.mjs']
+      remedy: unverified
+    - action: 'Report an unparseable or non-array testArtifactGlobs as a could-not-look reason in the narrowing block, as the HIGH-sequence path does (cycle 2 CR-3, low).'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+      remedy: unverified
+    - action: 'A multi-dot production file (foo.d.ts) is keyed foo.d and never folds with tests/foo.test.mjs; failing to fold is the conservative direction (cycle 3 CR-2, low; the fold map is new in this task).'
+      refs: ['shared/resources/qa-diminishing-returns.js']
+      remedy: unverified
+    - action: 'A tracked symlink named *.md that points at code classifies as doc-only in the 5c carry; the base logic is the same for ref (no symlink check), so it is not introduced here.'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+      provenance: pre-existing
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T278-QA-2 deviation approved']

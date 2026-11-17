@@ -3472,3 +3472,61 @@ test("SEC-4: a path with a dot or empty segment is never documentation", () => {
     assert.equal(eng.isDocsPath(ok, globs), true, ok);
   }
 });
+
+// ── fixPathTarget (task.278, T278-QA-4): the 5c carry's `fix_path` boundary ──
+//
+// `fix_path` decides which file the carry may stage, so it is held by the same corpus the probe engine
+// runs (tests/fixtures/probe/fix-path-target.cases.json). Each hostile case must answer null, each
+// legitimate case must answer the normalised file, and the corpus must hold both kinds so a
+// truncated file cannot pass vacuously.
+
+test("fixPathTarget: the probe corpus's hostile cases answer null and its legitimate cases answer a file", () => {
+  const cases = JSON.parse(
+    readFileSync(
+      join(
+        __dirname,
+        "..",
+        "..",
+        "..",
+        "tests/fixtures/probe/fix-path-target.cases.json",
+      ),
+      "utf8",
+    ),
+  );
+  const dir = "docs/tasks/task.9.x";
+  const globs = eng.DEFAULT_PATTERNS;
+  const hostile = cases.filter((c) => c.direction === "hostile");
+  const legit = cases.filter((c) => c.direction === "legitimate");
+  assert.ok(hostile.length >= 8 && legit.length >= 3, "corpus floor");
+  for (const c of hostile) {
+    assert.equal(eng.fixPathTarget(c.input, dir, globs), null, c.id);
+  }
+  for (const c of legit) {
+    const got = eng.fixPathTarget(c.input, dir, globs);
+    assert.equal(typeof got, "string", c.id);
+    assert.equal(got.startsWith(`${dir}/`), true, c.id);
+  }
+  // A non-string reads as absent, never throws.
+  for (const v of [undefined, null, 7, {}]) {
+    assert.equal(eng.fixPathTarget(v, dir, globs), null);
+  }
+});
+
+// T278-QA-5: the work-item directory is normalised like the file, so one directory spelled four ways
+// still matches its own file, and a different directory still does not (both directions).
+test("fixPathTarget: every spelling of the work-item directory matches its own file, and only its own", () => {
+  const globs = eng.DEFAULT_PATTERNS;
+  const file = "docs/tasks/t/a.md";
+  for (const dir of [
+    "docs/tasks/t",
+    "./docs/tasks/t",
+    "docs/tasks//t",
+    "docs/tasks/t/",
+    "docs/tasks/x/../t",
+  ]) {
+    assert.equal(eng.fixPathTarget(file, dir, globs), file, dir);
+  }
+  for (const dir of ["docs/tasks/u", "docs/tasks", "docs/tasks/t/sub", "."]) {
+    assert.equal(eng.fixPathTarget(file, dir, globs), null, dir);
+  }
+});

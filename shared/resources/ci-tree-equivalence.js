@@ -163,6 +163,31 @@ function isDocsPath(file, globs) {
 }
 
 /**
+ * The file a review finding's `fix_path` names, or `null` (task.278, obs #141, T278-QA-4).
+ *
+ * `fix_path` is the file the fix EDITS when `ref` anchors where the behaviour lives. It decides which
+ * file the 5c carry may stage, so it is a boundary, and it lives here (not inline in the step doc's
+ * classify block) so the probe engine can reach it. It counts only when the value, after one pair of
+ * surrounding quotes is removed and the path normalised, is a `.md` directly inside `workItemDir`
+ * (the directory of the review report) and a docs path. Anything else answers `null`, which the
+ * caller reads as "no fix_path", so the finding classifies on `ref` exactly as before. "Tracked and
+ * clean against HEAD" stays the second test, in the shell where git is.
+ */
+function fixPathTarget(raw, workItemDir, globs) {
+  if (typeof raw !== "string" || typeof workItemDir !== "string") return null;
+  const f = path.posix.normalize(raw.replace(/^["']|["']$/g, ""));
+  // Both sides are normalised: `./docs/tasks/t`, `docs/tasks//t` and `docs/tasks/t/` name the same
+  // directory as `docs/tasks/t`, and comparing one spelling to another dropped a legitimate
+  // fix_path (T278-QA-5). `normalize` keeps a trailing slash, so it is removed.
+  const dir = path.posix.normalize(workItemDir).replace(/\/+$/, "");
+  return f.endsWith(".md") &&
+    path.posix.dirname(f) === dir &&
+    isDocsPath(f, globs)
+    ? f
+    : null;
+}
+
+/**
  * Pure apart from the thunks it is handed. `ancestors` is first-parent order, nearest first:
  *
  *   [{ sha, changed: string[] | null | () => …, rollup: "SUCCESS"|… | () => … }]
@@ -1131,6 +1156,7 @@ module.exports = {
   USAGE,
   classifyTreeEquivalence,
   isDocsPath,
+  fixPathTarget,
   exitCodeFor,
   reduceChecks,
   reduceBitbucketStatuses,
