@@ -1,8 +1,8 @@
 # Task Registry
 
 **Purpose:** Central tracking for all task numbers in this repo.
-**Last Updated:** 2026-11-15
-**Next Available Task Number:** **311**
+**Last Updated:** 2026-11-17
+**Next Available Task Number:** **313**
 
 ## How to use
 
@@ -399,6 +399,8 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 
 - **Tasks 279–282 were cut from the same 2026-11-06 review (cluster 8, engine group)**. One shippable unit each and all independent: 279 is develop-next, 280 is skill and test tooling, 281 is the observation engine, 282 is review-task. 279 edits the orchestrator that runs it, so land it alone. 282 and 275 both touch `tracker-comment.js`; land one, then rebase the other.
 
+- **Tasks 311–312 were cut from the 2026-11-17 observation review**. Two independent units, one shippable outcome each: 311 is the develop pipelines (sub-skill identity check, record hand-off to QA), 312 is review-task and create-task (allow-list coverage, timing statistic). Neither depends on the other.
+
 - Filenames follow `task.[N].[kebab-case-name].md` per [AGENTS.md](../../AGENTS.md#file-naming).
 | 286 | [qa-fix Step 4 guard looks beneath gitlinks](task.286.qa-fix-step4-guard-looks-beneath-gitlinks/task.286.qa-fix-step4-guard-looks-beneath-gitlinks.md) | planned | refactoring | Medium | 2026-11-07 | 285 | — task 285 QA gate 5 residual: a directory above a gitlink with an untracked file reads clean (CR-1), plus two advisories (CR-2, CR-3) · four phases |
 | 287 | [cases_file accepts only engine-shaped names](task.287.cases-file-accepts-only-engine-shaped-names/task.287.cases-file-accepts-only-engine-shaped-names.md) | planned | refactoring | Low | 2026-11-07 | — | — task 269 gate.4 recommendation: refuse a `cases_file` not named `*.security.cases[.n].json`; no committed plan affected · three phases |
@@ -425,3 +427,5 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 308 | [Pause commits cancel the step 7 CI poll](task.308.pause-commits-cancel-the-step-7-ci-poll/task.308.pause-commits-cancel-the-step-7-ci-poll.md) | accepted | refactoring | Medium | 2026-11-14 | — | follow-up to task 303: the PreCompact hook still pushes its pause commit at step 7, which cancels the CI run finalise is polling (tinker-city bug.144, PR #1257) · three phases |
 | 309 | [Pin the 6c head writer position and clear the stale head file](task.309.pin-6c-head-writer-position-and-clear-stale-head-file/task.309.pin-6c-head-writer-position-and-clear-stale-head-file.md) | accepted | testing | Low | 2026-11-15 | — | task 308 advisory follow-up: a test pins the 6c head writer before the poll launch, and 6c clears the head file beside the result and pid files · three phases |
 | 310 | [The finalise 6c poll block guards its inputs](task.310.finalise-6c-poll-block-guards-its-inputs/task.310.finalise-6c-poll-block-guards-its-inputs.md) | accepted | testing | Low | 2026-11-15 | task.309 | task 309 5c finding CR-1: the 6c poll block reads `CI_HEAD_2` and `PR_NUMBER` unbound; open it with a named-HALT guard and test the shipped line · three phases |
+| 311 | [Develop pipelines check the skill they loaded and the records criteria name](task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name/task.311.develop-pipelines-check-the-skill-they-loaded-and-the-records-criteria-name.md) | planned | refactoring | Medium | 2026-11-17 | — | observations #69 and #160: a sub-skill identity check after every load, and the record-demanding criteria handed to qa-task · three phases |
+| 312 | [Allow-list and timing criteria name what they need](task.312.allow-list-and-timing-criteria-name-what-they-need/task.312.allow-list-and-timing-criteria-name-what-they-need.md) | planned | refactoring | Medium | 2026-11-17 | — | observations #159 and #171: a review-task check that an allow-list covers its whole set, and a timing-statistic rule in create-task and review-task · three phases |
