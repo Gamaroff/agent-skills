@@ -298,6 +298,7 @@ Three medium findings. The new resolver wraps an over-long digit string to a wro
 | 2026-11-18 |         | Implemented: numbered review stages, Step 2 skip rule, task-id-first bare-number resolution; `ci:fast` green | develop |
 | 2026-11-18 |         | Status → ready-for-review                           | develop |
 | 2026-11-18 |         | QA gate CONCERNS (90/100) — 3 medium findings       | qa-task |
+| 2026-11-18 |         | QA findings fixed — resolver digit cap, document reconciled, wall time measured (-0.3%), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

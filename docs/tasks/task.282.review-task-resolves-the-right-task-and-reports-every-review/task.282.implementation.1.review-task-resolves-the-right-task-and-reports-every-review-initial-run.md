@@ -95,6 +95,25 @@ _Track each QA review/fix cycle._
 **Loop exit**: n/a — this exit not taken
 **Action**: Running qa-fix (cycle 1 of 5)
 
+#### qa-fix cycle 1 — 2026-11-18
+
+Fix commit `ce96e4744`; the findings were read from the gate directly (the ingester was not dispatched, so no independent ingest ran).
+
+- **T282-QA-1 fixed.** `resolve-bare-task.sh` strips leading zeros with string operations and refuses more than nine digits (exit 2). New test `a digit string too long to be a task id…` with controls (`999999999`, fifteen digits with leading zeros, `000`); restoring `$((10#$n))` turns it red. Probe: population of `resolve-bare-task` = 2 executed documents (step-0 doc, `review-task/SKILL.md`); step 0 now says what exit 2 means, the SKILL only cites it (unaffected). Which direction did the fix move: it narrows the accepted set, so the test carries both sides.
+- **T282-QA-3 fixed.** The task document's Marker bullet, Breaking Changes line and Phase 1 checkbox now describe the shipped design (`review-<kind>-N` always; `-1` read as the bare marker). No Success Criteria line was edited.
+- **T282-QA-2 measured, criterion met.** Five alternating `CI=true npm run test:remote -- --run test` pairs on the LAN server, develop `e6636d97d` against the branch head `ce96e4744`:
+
+  | Pair | develop wall (s) | branch wall (s) | server load before develop / branch |
+  | --- | --- | --- | --- |
+  | 1 | 1312 | 728 | 17.23 / 0.29 |
+  | 2 | 727 | 726 | 0.47 / 0.17 |
+  | 3 | 726 | 727 | 0.95 / 0.74 |
+  | 4 | 730 | 770 | 0.21 / 5.79 |
+  | 5 | 999 | 1051 | 1.51 / 2.04 |
+
+  Median wall time: develop 730 s, branch 728 s (-0.3%). Median `# duration_ms` of the test run: 611.4 s against 609.2 s (-0.4%). All ten runs exited 0, which also covers the fast gate's `npm test` half on the branch head. Load values are the first figure of `uptime`'s one-minute average, read over ssh beside each run; pairs 1 and 5 ran under load on the develop side, and the median ignores both.
+- Not run this cycle: `format:check` on the server (run locally, clean). The rest-of-CI lane ran in QA cycle 1, before this change; re-run it in cycle 2.
+
 ---
 
 ## Completion
