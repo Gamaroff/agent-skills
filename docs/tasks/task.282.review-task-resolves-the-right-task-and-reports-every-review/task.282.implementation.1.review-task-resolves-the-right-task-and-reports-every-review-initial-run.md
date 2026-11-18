@@ -35,7 +35,7 @@ Resolve an all-digits `/review-task` argument as a task id before an issue numbe
 | 1. create-branch           | ✅ Done | Branch `feature/task.{id}.*` exists in git                             | Branch created at `e6636d97d` | —                    | 2026-11-18T20:20Z |
 | 2. review-task             | ✅ Done | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               | READY TO IMPLEMENT 8/10, 0 critical, 7 important fixed; promoted to ready-for-development | —                    | 2026-11-18T20:55Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline; `ci:fast` green on LAN server (8611 tests, 0 fail) | —                    | 2026-11-18T20:58Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
+| 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #921 → develop; no issue linked, so no comment; body written inline (no Explore summariser) | —                    | 2026-11-18T20:59Z |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
