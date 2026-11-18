@@ -215,7 +215,11 @@ are unaffected.
 
 `doctor` reports it as a `status-legal` check (`ok: false`, naming the files)
 and `healthy` follows it. `reason` and the exit code are unchanged: an illegal
-status is a finding about the log, not a guard that stops a write.
+status is a finding about the log, not a guard that stops a write. When the
+queue could not read any status (`scan-broken`: files present, none parsed) the
+check also fails, with a `detail` that says so: no list of illegal statuses
+exists to be empty, and an unreadable log must not read as "every status is
+legal".
 
 An entry that reads an illegal status is repaired with
 `set-status --id N --status <legal> --repair --expect-status <the literal it reads>`.

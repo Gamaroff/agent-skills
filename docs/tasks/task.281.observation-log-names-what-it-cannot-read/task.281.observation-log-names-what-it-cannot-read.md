@@ -291,17 +291,17 @@ None identified.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.281.qa.1.observation-log-names-what-it-cannot-read.md](./task.281.qa.1.observation-log-names-what-it-cannot-read.md)
-- **Gate File**: [task.281.gate.1.observation-log-names-what-it-cannot-read.yml](./task.281.gate.1.observation-log-names-what-it-cannot-read.yml)
+- **Full Report**: [task.281.qa.2.observation-log-names-what-it-cannot-read.md](./task.281.qa.2.observation-log-names-what-it-cannot-read.md)
+- **Gate File**: [task.281.gate.2.observation-log-names-what-it-cannot-read.yml](./task.281.gate.2.observation-log-names-what-it-cannot-read.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 96
+- **Tests Executed**: 8600 (remote ci:fast, 8597 pass, 0 fail)
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Two medium findings: no CHANGELOG `[Unreleased]` entry citing task 281 (T281-QA-1), and the suite wall-time criterion was never measured (T281-QA-2). One advisory code-review note (CR-1, reopen leaves a stale `resolved:` date).
+Cycle 1's two findings are closed. The cycle-2 refute pass found one medium defect, T281-QA-3: `doctor` status-legal reports "every status is legal" on a log it could not read.
 
 <!-- change-log-start -->
 ## Change Log
@@ -314,6 +314,8 @@ Two medium findings: no CHANGELOG `[Unreleased]` entry citing task 281 (T281-QA-
 | 2026-11-18 |         | Implemented — 10 files, 7 engine tests + 3 skill tests; repair route changed from a relaxed `--expect-status` to a `--repair` flag because an existing test pins the usage error | develop |
 | 2026-11-18 |         | QA gate CONCERNS (90/100) — 2 medium findings (CHANGELOG entry, wall-time criterion unmeasured) | qa-task |
 | 2026-11-18 |         | QA findings fixed — CHANGELOG entry added, wall time measured (741 s develop vs 735 s branch); 1 iteration | qa-fix |
+| 2026-11-18 |         | QA gate CONCERNS (90/100) — 1 medium finding (doctor status-legal passes an unreadable log) | qa-task |
+| 2026-11-18 |         | QA findings fixed — doctor status-legal fails on an unreadable log; 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

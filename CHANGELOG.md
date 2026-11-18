@@ -9,7 +9,7 @@ All notable changes to this project will be documented in this file. Format foll
 - **The observation log names what it cannot read (task 281).** `queue` and `scan` return
   `invalidStatus`, the file names of entries whose `status:` is outside
   `open | actioned | declined | superseded | parked`; they are still counted open, and `doctor`
-  reports them as a `status-legal` check. `set-status --repair --expect-status <the illegal literal>`
+  reports them as a `status-legal` check, which also fails on a log where no status could be read. `set-status --repair --expect-status <the illegal literal>`
   repairs one (a legal literal or a missing guard is a usage error). `set-status --status open` is now
   accepted only with `--expect-status parked` (it clears `parked_until:`) or `--repair`; before this
   it was accepted from any status with no guard. The review cycle gains a fifth decision, "propose a

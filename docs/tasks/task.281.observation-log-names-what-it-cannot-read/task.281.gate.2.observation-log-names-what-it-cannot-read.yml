@@ -1,0 +1,76 @@
+schema: 2
+task: 'task.281.observation-log-names-what-it-cannot-read'
+task_title: 'The observation log names what it cannot read'
+gate: CONCERNS
+status_reason: 'Cycle 1 findings are closed (CHANGELOG entry added; wall time measured at 735 s branch vs 741 s develop). The cycle-2 refute pass found one new medium defect that reproduces: doctor status-legal reports "every status is legal" on a log it could not read, the same could-not-look-reads-as-clean failure this task exists to remove.'
+reviewer: 'QA Engineer'
+head: '7ecdc673c3dc974cfa6af8ceeadb0cd288d9f668'
+updated: '2026-11-18T11:48:48Z'
+
+top_issues:
+  - id: 'T281-QA-3'
+    severity: medium
+    file: 'shared/resources/observation-log.js'
+    finding: 'When every log file is unparseable, cmdQueue returns the scan-broken result, which has no invalidStatus field; doctor status-legal falls back to [] (q.invalidStatus || []) and reports ok:true, "every status is legal". Reproduced on a log of two frontmatter-less files; a legal log (control) still passes. Origin: code-review CR-1, reproduced by QA.'
+    suggested_action: 'Make status-legal fail (naming scan-broken) when the queue reason is scan-broken instead of defaulting to an empty list. A red test that reproduces it is held at the scratchpad patch cr1-red-test.patch and was run red before this gate.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 96
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary: false
+    boundary_reason: 'No criterion carries a boundary signal. Candidates named: isInvalidStatus (reports, refuses nothing); the set-status --status open and --repair guards (refuse a flag combination from a small enumerated set, not hostile string input; each refusal and its control is a committed test). No new path, shell or network input.'
+    notes: 'No new input surface. --repair needs an exact literal match against the file being written.'
+  performance:
+    status: PASS
+    notes: 'Measured: five alternating CI=true npm test runs on the LAN server, median 741 s develop vs 735 s branch (-0.8%), all exit 0; uptime recorded in the QA report.'
+  reliability:
+    status: CONCERNS
+    notes: 'doctor status-legal passes a log whose statuses could not be read (T281-QA-3). Otherwise the status-changed guard checks the file being written and a mistyped --repair literal writes nothing.'
+  maintainability:
+    status: PASS
+    notes: 'The illegal-status rule is defined once (isInvalidStatus). Contract, SKILL.md row and review-cycle.md updated; bundled copies match (bundle:check 0 problems).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Make doctor status-legal fail on a scan-broken queue result, with a test over an all-unparseable log (T281-QA-3).'
+      refs: ['shared/resources/observation-log.js', 'shared/resources/tests/observation-log.test.mjs']
+  future:
+    - action: 'CR-1 (cycle 1, advisory): a status reopened by --repair from an illegal status keeps any resolved: date or resolution: it carried. Harmless today; clear them on open, or document it.'
+      refs: ['shared/resources/observation-log.js']
+      remedy: unverified
+    - action: 'CR-2: the duplicate and sibling check skips entries whose status is outside the enum, while scan, queue and doctor now count them open. Present on develop unchanged (provenance: pre-existing); decide deliberately whether invalid-status entries take part in duplicate matching.'
+      refs: ['shared/resources/observation-log.js']
+      provenance: pre-existing
+      remedy: unverified
+    - action: 'CR-3: set-status compares --expect-status untrimmed while statusOf trims the file value, so a padded guard is a status-changed refusal. Fails closed (exit 1, no write); present on develop unchanged (provenance: pre-existing). Trim the flag at parse if padded guards should work.'
+      refs: ['shared/resources/observation-log.js']
+      provenance: pre-existing
+      remedy: unverified
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions: ['T281-QA-3 fixed before merge']

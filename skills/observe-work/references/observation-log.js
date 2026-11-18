@@ -1502,14 +1502,25 @@ function cmdDoctor(P, args) {
   // exists; a missing one is `workspace-exists`' finding, not this check's.
   if (exists && fs.existsSync(P.logDir)) {
     const q = cmdQueue(P);
-    const bad = q.invalidStatus || [];
-    checks.push({
-      check: "status-legal",
-      ok: bad.length === 0,
-      detail: bad.length
-        ? `${bad.length} entr${bad.length === 1 ? "y" : "ies"} with a status outside open|actioned|declined|superseded|parked (counted open): ${bad.join(", ")} — repair with set-status --repair --expect-status <that status>`
-        : "every status is legal",
-    });
+    if (q.reason === "scan-broken") {
+      // The queue could not read a single status, so it has no `invalidStatus`
+      // to report. An empty list here would read as "every status is legal":
+      // the instrument could not look, and must not say it had.
+      checks.push({
+        check: "status-legal",
+        ok: false,
+        detail: `could not read any status (queue reason scan-broken: ${q.files} file${q.files === 1 ? "" : "s"}, none parsed)`,
+      });
+    } else {
+      const bad = q.invalidStatus || [];
+      checks.push({
+        check: "status-legal",
+        ok: bad.length === 0,
+        detail: bad.length
+          ? `${bad.length} entr${bad.length === 1 ? "y" : "ies"} with a status outside open|actioned|declined|superseded|parked (counted open): ${bad.join(", ")} — repair with set-status --repair --expect-status <that status>`
+          : "every status is legal",
+      });
+    }
   }
 
   const failed = checks.filter((c) => !c.ok);

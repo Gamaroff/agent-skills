@@ -94,6 +94,29 @@ _Track each QA review/fix cycle._
 - Probe: no executed document was edited this cycle (CHANGELOG and task artifacts only), so the documentation probe has no population to check.
 - Fix cycle 1 touched no code, so no mutation proof applies.
 
+### QA Cycle 2 — 2026-11-18
+**Gate Result**: CONCERNS (90/100)
+**Issues Found**: 1 medium (T281-QA-3): `doctor` status-legal reports "every status is legal" on a log it could not read (scan-broken). Reproduced by QA; cycle 1's two findings are closed
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**Traceability**: skipped (mapper not dispatched — QA ran inline)
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+
+#### qa-fix (5b)
+
+- **T281-QA-3** (medium, `shared/resources/observation-log.js`): `cmdDoctor` now fails `status-legal` with a `scan-broken` detail when the queue could not read any status, instead of defaulting a missing `invalidStatus` to an empty list. Move: patch (a distinct defect in the new check, not a repeat subject; gate 1 named other files).
+- Test: `doctor's status-legal check does not pass a log whose statuses it could not read`, run red against the committed code before the fix, green after. Mutation proof: with the new branch disabled (`false && …`) it went red again; the file was restored from a `cp` snapshot and `cmp` printed nothing.
+- Probe: `git grep -l -F -i 'status-legal'` over `skills/*/SKILL.md`, `skills/*/references/*.md`, `shared/resources/*.md`, minus generated copies.
+  - `shared/resources/observation-log-contract.md` — updated (an unreadable log also fails the check)
+  - `skills/observe-work/SKILL.md` — updated (the doctor-table row says what a `scan-broken` detail means)
+  - `CHANGELOG.md` and the task document — updated / unaffected (the entry now names the unreadable case; the task criteria cite the check by name only)
+  - Population: 2 executed documents, restating one rule at two sites. Move: patch — the second site is a table row that points at the contract, and consolidating them would not shorten either.
+- Generated copies regenerated with `npm run bundle`; `bundle:check` 0 problems.
+- Validation: local engine and skill suites 97/97; remote `ci:fast` exit 0 (8601 tests, 8598 pass, 0 fail).
+- CR-2 and CR-3 (pre-existing on `develop`) are not changed; they stay under `recommendations.future`.
+
 ---
 
 ## Completion

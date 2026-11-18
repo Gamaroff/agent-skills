@@ -1090,6 +1090,32 @@ test("doctor fails its status-legal check naming the file, and passes it on a le
   }
 });
 
+test("doctor's status-legal check does not pass a log whose statuses it could not read", () => {
+  // MUTATION: in cmdDoctor, restore `const bad = q.invalidStatus || [];` and
+  // drop the scan-broken branch. An all-unparseable log then reads "every
+  // status is legal": the instrument could not look, and said it had.
+  const broken = initWs("doctor-status-broken");
+  const other = ws("doctor-status-broken-root");
+  const home = tempHome("doctor-status-broken");
+  try {
+    writeFileSync(join(broken.P.logDir, "0001-junk.md"), "no frontmatter\n");
+    writeFileSync(join(broken.P.logDir, "0002-junk.md"), "nor here\n");
+    const r = cli(
+      ["doctor", "--workspace", broken.dir, "--audit-root", other, "--json"],
+      { env: isolatedEnv(home) },
+    );
+    const c = r.json.checks.find((x) => x.check === "status-legal");
+    assert.equal(c.ok, false, "could not read is not 'every status is legal'");
+    assert.doesNotMatch(c.detail, /every status is legal/);
+    assert.match(c.detail, /scan-broken/);
+    assert.equal(r.json.healthy, false);
+  } finally {
+    cleanup(broken.dir);
+    cleanup(other);
+    cleanup(home);
+  }
+});
+
 test("set-status --repair --expect-status <illegal> repairs the entry; a mistyped guard writes nothing", () => {
   // MUTATION: restore the enum check on --expect-status for --repair (drop the
   // `if (args.repair)` branch) — the first call then exits 2 and the entry
