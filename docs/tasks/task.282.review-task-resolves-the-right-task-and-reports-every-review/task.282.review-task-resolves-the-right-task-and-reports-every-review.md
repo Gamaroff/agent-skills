@@ -54,7 +54,7 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 ### Target Architecture
 
 - **Resolution**: an all-digits argument resolves as a task id first: `docs/tasks/task.{N}.*/task.{N}.*.md`, then the registry row, then `git worktree list` / `git log --all -- 'docs/tasks/task.{N}.*'` to name the branch or worktree holding it; only then as an issue number. A document found elsewhere is reported and the review runs there. `#297` and URLs stay the unambiguous issue forms (obs #128).
-- **Marker**: `review-task`, `review-story` and `review-bug` join `CYCLE_SCOPED_STAGES` (`tracker-comment.js`) and `CYCLE_SCOPED_LEAD_STAGES` (`stakeholder-summary.js`), so `review-task-N` is a known stage. **Review 1 keeps the bare key** (`--stage review-task`) so an existing marker on a live issue still reads `already`; review N>=2 passes `review-task-N`, where N is the review report number (`next_numbered`, Step 8). A standalone action-plan-only review writes no report, so it passes the bare key and a second one dedupes. The Step 2 skip rule treats `already` as posted only for the key this run's report number produced (obs #129).
+- **Marker**: `review-task`, `review-story` and `review-bug` join `CYCLE_SCOPED_STAGES` (`tracker-comment.js`) and `CYCLE_SCOPED_LEAD_STAGES` (`stakeholder-summary.js`), so `review-task-N` is a known stage. **Call sites always pass `review-task-N`**, where N is the review report number (`next_numbered`, Step 8), and the engine's `canonicalStage()` reads `-1` as the bare marker (`FIRST_ROUND_IS_BARE_STAGES`), so review 1 keeps the bare key an existing marker on a live issue carries and still reads `already`. Passing `-N` everywhere is what lets the call-site guard hold with no exception for review 1. A standalone action-plan-only review writes no report, so it passes the next unused N and a second one reuses that N and dedupes. The Step 2 skip rule treats `already` as posted only for the key this run's report number produced (obs #129).
 
 ### Important Clarifications
 
@@ -81,7 +81,7 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 
 ## 5. Breaking Changes
 
-None - review 1 keeps the bare stage key, so an existing marker on a live issue still reads `already` for review 1 (held by a fixture, § 9 Migration). Only review N>=2 uses the new `review-task-N` form.
+None - the engine reads `review-<kind>-1` as the bare stage key, so an existing marker on a live issue still reads `already` for review 1 (held by a test, § 9 Migration). Only review N>=2 gets a marker of its own.
 
 ---
 
@@ -100,7 +100,7 @@ None - review 1 keeps the bare stage key, so an existing marker on a live issue 
 - prose that states the old rule: the `CYCLE_SCOPED_STAGES` doc comment (`tracker-comment.js`, "Every other stage fires at most once per run") and the `tracker-comment-contract.md` table row for once-per-issue stages (it says a suffix is exit 2 for `review-story` / `review-task`)
 
 **Changes**:
-- [x] Add `review-task`, `review-story`, `review-bug` to `CYCLE_SCOPED_STAGES` and `CYCLE_SCOPED_LEAD_STAGES`; review 1 keeps the bare key, review N>=2 passes `review-task-N`; call sites pass the report number from `next_numbered`.
+- [x] Add `review-task`, `review-story`, `review-bug` to `CYCLE_SCOPED_STAGES` and `CYCLE_SCOPED_LEAD_STAGES`; call sites always pass `review-task-N` with the report number from `next_numbered`, and `canonicalStage()` maps `-1` to the bare key.
 
 **Dependencies**: none.
 
@@ -266,6 +266,27 @@ None identified.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-18
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.282.qa.1.review-task-resolves-the-right-task-and-reports-every-review.md](./task.282.qa.1.review-task-resolves-the-right-task-and-reports-every-review.md)
+- **Gate File**: [task.282.gate.1.review-task-resolves-the-right-task-and-reports-every-review.yml](./task.282.gate.1.review-task-resolves-the-right-task-and-reports-every-review.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 8611 (fast gate, LAN server), plus 22 security probes
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+Three medium findings. The new resolver wraps an over-long digit string to a wrong task id (T282-QA-1, reproduced). The wall-time criterion has no measurement (T282-QA-2). This document still describes the earlier marker design (T282-QA-3).
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -276,6 +297,7 @@ None identified.
 | 2026-11-18 |         | Status → ready-for-development                      | review-task |
 | 2026-11-18 |         | Implemented: numbered review stages, Step 2 skip rule, task-id-first bare-number resolution; `ci:fast` green | develop |
 | 2026-11-18 |         | Status → ready-for-review                           | develop |
+| 2026-11-18 |         | QA gate CONCERNS (90/100) — 3 medium findings       | qa-task |
 <!-- change-log-end -->
 
 ---

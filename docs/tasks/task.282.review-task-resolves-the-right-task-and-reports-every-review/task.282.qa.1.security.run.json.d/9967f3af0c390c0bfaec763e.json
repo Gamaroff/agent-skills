@@ -1,0 +1,32 @@
+{
+  "sink": null,
+  "entry": "shell-argv:shared/resources/resolve-bare-task.sh",
+  "name": null,
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 22,
+  "passed": 22,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "observation_limits": [
+    "effects-after-accept"
+  ],
+  "shells": [
+    "bash",
+    "zsh"
+  ],
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": [
+    "{input}"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": "/home/gamaroff/Development/agent-skills/.claude/state/t282-probe-setup.sh",
+  "fixture_copy": null,
+  "ran_at": "2026-11-18T21:01:11.865Z"
+}

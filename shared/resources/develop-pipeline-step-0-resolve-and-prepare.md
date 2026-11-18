@@ -128,7 +128,9 @@ Read the first field of the one line it prints (it exits 0 for all four answers)
 | `none` | No task carries the number. Continue as a **GitHub issue number**, exactly as below, and say which route was taken. `none` `registry` means the registry lists the task but no document or branch holds it: say that too. |
 
 A script exit of 1 (a git failure, or two documents claiming one number) is a HALT with its stderr:
-a guess would anchor the run on whichever document came first.
+a guess would anchor the run on whichever document came first. An exit of 2 means the argument is
+not a usable number: more than nine digits after leading zeros is refused rather than read as a
+smaller number (T282-QA-1), so it is a HALT too, never a fall-through to the issue route.
 
 ### Inline Resolution — Shared Logic
 

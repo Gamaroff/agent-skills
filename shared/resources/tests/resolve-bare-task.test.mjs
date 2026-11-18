@@ -148,6 +148,31 @@ test("usage: a non-digit argument exits 2 and `#5` is not a bare number", () => 
   });
 });
 
+test("a digit string too long to be a task id is refused, never wrapped to another task (T282-QA-1)", () => {
+  withFixture((dir) => {
+    // 2^64 + 1 wrapped to 1 under `$((10#$n))`; 2^63 wrapped negative. Task 1 exists here too, so a
+    // wrap would resolve to a real document and read as a correct answer.
+    writeTask(dir, 1, "one");
+    for (const long of [
+      "18446744073709551617",
+      "9223372036854775808",
+      "1000000000",
+    ]) {
+      const r = run(dir, long);
+      assert.equal(r.status, 2, `${long} must be refused`);
+      assert.equal(r.out, "");
+    }
+    // Controls: the longest accepted value, and leading zeros that do not count toward the cap.
+    assert.equal(run(dir, "999999999").out, "none");
+    assert.equal(run(dir, "000000000000005").out, run(dir, "5").out);
+    assert.equal(
+      run(dir, "000").out,
+      "none",
+      "all zeros is task 0, which has no document",
+    );
+  });
+});
+
 test("two documents claiming one number is an error, never a guess", () => {
   withFixture((dir) => {
     writeTask(dir, 5, "duplicate");

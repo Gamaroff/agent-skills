@@ -35,7 +35,16 @@ case "$n" in
     exit 2
     ;;
 esac
-n=$((10#$n)) # leading zeros: 007 is task 7
+# Leading zeros: 007 is task 7. String operations, never `$((10#$n))`: bash arithmetic wraps
+# silently past 19 digits (18446744073709551617 reads as 1), which resolved a different task
+# (T282-QA-1). Nine digits is the cap qa-cycle.sh applies to a cycle number, and far past any
+# task id; a longer value is refused, never read as a smaller number.
+n=${n#"${n%%[!0]*}"}
+[ -n "$n" ] || n=0
+if [ "${#n}" -gt 9 ]; then
+  echo "usage: resolve-bare-task.sh takes at most 9 digits after leading zeros" >&2
+  exit 2
+fi
 
 root=$(git rev-parse --show-toplevel 2>/dev/null) || {
   echo "resolve-bare-task: not inside a git repository" >&2

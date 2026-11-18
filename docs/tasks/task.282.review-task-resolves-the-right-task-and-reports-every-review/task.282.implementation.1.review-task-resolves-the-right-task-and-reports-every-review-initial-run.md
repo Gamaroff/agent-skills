@@ -85,6 +85,16 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-11-18
+**Gate Result**: CONCERNS (90/100)
+**Issues Found**: 3 medium. T282-QA-1 the resolver wraps an over-long digit string to a wrong task id (reproduced); T282-QA-2 wall-time criterion unmeasured; T282-QA-3 task document still describes the superseded marker design.
+**HIGH findings**: 0
+**MEDIUM findings**: 3
+**Traceability**: skipped (no Success Criteria table)
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+
 ---
 
 ## Completion
