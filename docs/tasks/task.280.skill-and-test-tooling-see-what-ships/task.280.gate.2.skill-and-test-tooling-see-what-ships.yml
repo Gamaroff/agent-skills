@@ -1,0 +1,74 @@
+schema: 2
+task: 'task.280.skill-and-test-tooling-see-what-ships'
+task_title: 'Skill and test tooling see what ships'
+gate: CONCERNS
+status_reason: 'Cycle 1 finding T280-CR-1 is fixed and mutation-proven; the refute pass found one new reproduced defect in the fix (an all-dots capture such as an ellipsis is kept, so the check reports UNVENDORED for it). 8589 tests pass on the server.'
+reviewer: 'QA Engineer'
+head: 'f2547a6a7dad541799757b5fa701e8b29e385cbe'
+updated: '2026-11-18T04:47:59Z'
+
+top_issues:
+  - id: 'T280-CR-2'
+    severity: medium
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: 'invoked_name keeps an all-dots capture, but only `..` is refused by name. A prose ellipsis ".agents/skills/s/references/..." captures `...`; skill_owned_invocations returns it (QA reproduced: ("references/own.md", "...") beside a control that returns "helper.sh"), and the reviewer reproduced the end-to-end result: --check reports UNVENDORED references/... and a full bundle does not clear it. origin: code-review, reproduced by QA; new code from the cycle 1 fix.'
+    suggested_action: 'Have invoked_name return None for an all-dots capture and skip it in both callers (skill_owned_invocations and discover_needed), keeping the `..` refusal test intact; add a `...` fixture test with its control.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 92
+
+evidence:
+  tests_reviewed: 64
+  phases_verified: '4/4 (phase 4 dropped)'
+  trace:
+    phases_covered: [1, 2, 3, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    boundary_signals: []
+    boundary_reason: 'Candidates named: invoked_name, skill_owned_invocations (new this cycle), fenceProblems, quotedGuardWords, holdsFenceRegex. Each is a lint or discovery helper whose result fails a test or bundle:check; none accepts or rejects untrusted input to prevent an action.'
+    notes: 'No input boundary; the helpers read tracked repository files only.'
+  performance:
+    status: PASS
+    notes: 'Unchanged from gate 1: the new tests add about 0.5 s to a 757.9 s suite.'
+  reliability:
+    status: PASS
+    notes: 'bundle:check clean on the real tree (129 skills, 0 problems); fast gate on the server 8589 tests, 0 failed.'
+  maintainability:
+    status: PASS
+    notes: 'One fence walk serves extractBlocks and fenceProblems; invoked_name is one helper used at both INVOKE_REF_RE sites.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T280-CR-2 (all-dots capture).'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+  future:
+    - action: 'UNVENDORED fires on any invocation-form mention of a missing file, including an example or a deleted script; consider restricting it to an invocation shape (gate 1 CR-2, low, not reproduced).'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+      remedy: unverified
+    - action: 'skill_owned_invocations skips a nested doc whose bare name equals a shared file (gate 1 CR-3, low, not reproduced).'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+      remedy: unverified
+    - action: 'The ratchet detector misses a regex with a slash inside a character class and a new RegExp reader (gate 1 CR-4, low).'
+      refs: ['tests/fence-reader-ratchet.test.js']
+      remedy: unverified
+    - action: 'The quote lint flags any unescaped quote in a guard word, not only an unbalanced one (gate 1 CR-5, cleanup).'
+      refs: ['tests/unbound-default-reads.test.js']
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['Fix T280-CR-2']

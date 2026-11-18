@@ -631,6 +631,10 @@ def skill_owned_invocations(skill_path, shared_dir):
                 who, invoked = m.group(1), invoked_name(m.group(2))
                 if line[m.end():m.end() + 1] == '#':
                     continue
+                if not invoked.strip('.'):
+                    # `...` is an ellipsis in prose and `..` a path, never a script name; reported
+                    # as UNVENDORED, a bundle run could not clear it (task.280 QA cycle 2, CR-2).
+                    continue
                 names = who.strip('{}').split('|') if who.startswith('{') else [who]
                 if skill_path.name in names:
                     found.append((rel, invoked))

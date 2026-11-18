@@ -472,6 +472,30 @@ for (const [label, tail] of [
   });
 }
 
+// task.280 QA cycle 2 CR-2: an ellipsis after the references/ path is prose, not a script name. A
+// bundle run cannot clear an UNVENDORED finding, so reporting one for it would be unfixable.
+for (const [label, tail, expected] of [
+  ["an ellipsis (the defect)", "...", []],
+  ["a real script name (the control)", "helper.sh", []],
+]) {
+  test(`an invocation naming ${label} leaves --check clean once bundled (task.280)`, (t) => {
+    const fx = makeFixture(
+      {
+        skillFiles: {
+          "SKILL.md": "---\nname: fixture-skill\ndescription: x\n---\n\n# F\n",
+        },
+        sharedFiles: { "helper.sh": "#!/bin/sh\necho ok\n" },
+        refsFiles: {
+          "own-notes.md": `# Own\n\nSee .agents/skills/fixture-skill/references/${tail} in the bundle\n`,
+        },
+      },
+      t,
+    );
+    fx.bundle();
+    assert.deepEqual(fx.check().classesFound, expected);
+  });
+}
+
 test("a skill-owned reference doc that invokes a shared script gets it vendored, and --check reports it MISSING before the bundle", (t) => {
   const fx = makeFixture(
     {

@@ -304,21 +304,21 @@ None identified. (The scratch-location risk went with Phase 4.)
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-18
-**Quality Score**: 90/100
+**Quality Score**: 92/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.280.qa.1.skill-and-test-tooling-see-what-ships.md](./task.280.qa.1.skill-and-test-tooling-see-what-ships.md)
-- **Gate File**: [task.280.gate.1.skill-and-test-tooling-see-what-ships.yml](./task.280.gate.1.skill-and-test-tooling-see-what-ships.yml)
+- **Full Report**: [task.280.qa.2.skill-and-test-tooling-see-what-ships.md](./task.280.qa.2.skill-and-test-tooling-see-what-ships.md)
+- **Gate File**: [task.280.gate.2.skill-and-test-tooling-see-what-ships.yml](./task.280.gate.2.skill-and-test-tooling-see-what-ships.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 8587 on the server (0 failed)
+- **Tests Executed**: 8589 on the server (0 failed)
 - **Phases Verified**: 4/4 live phases
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-One medium bug, reproduced: `skill_owned_invocations` keeps the trailing sentence dot of an invocation, so the script is not vendored (T280-CR-1).
+Cycle 1's finding is fixed. The refute pass found one new defect in the fix, reproduced by QA: an all-dots capture such as an ellipsis is kept and reported UNVENDORED (T280-CR-2).
 
 <!-- change-log-start -->
 ## Change Log
@@ -331,6 +331,8 @@ One medium bug, reproduced: `skill_owned_invocations` keeps the trailing sentenc
 | 2026-11-18 |         | Implemented — 24 files (7 regenerated copies), 3 new test files, 9 new tests; phases 1–3 and 5 | develop |
 | 2026-11-18 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-11-18 |         | QA findings fixed — T280-CR-1 (trailing dot in invocation name), 1 iteration | qa-fix |
+| 2026-11-18 |         | QA gate CONCERNS (92/100) — 1 finding | qa-task |
+| 2026-11-18 |         | QA findings fixed — T280-CR-2 (all-dots capture reported UNVENDORED), 2 iterations | qa-fix |
 <!-- change-log-end -->
 
 ---
