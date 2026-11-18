@@ -443,6 +443,90 @@ test("MISSING: a discovered reference with no bundled copy is reported", (t) => 
   assert.deepEqual(res.relsFound, ["contract.md"]);
 });
 
+// task.280 (obs #112): a skill's OWN reference doc that runs a sibling script. The bundler read only
+// files outside references/, so the script was never vendored (task.238's fast-gate-outcome.sh).
+const OWN_DOC_INVOKES = (script) =>
+  `# Own reference\n\nRun it:\n\n\`bash .agents/skills/fixture-skill/references/${script}\`\n`;
+
+test("a skill-owned reference doc that invokes a shared script gets it vendored, and --check reports it MISSING before the bundle", (t) => {
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": "---\nname: fixture-skill\ndescription: x\n---\n\n# F\n",
+      },
+      sharedFiles: { "fast-gate-outcome.sh": "#!/bin/sh\necho ok\n" },
+      refsFiles: { "own-notes.md": OWN_DOC_INVOKES("fast-gate-outcome.sh") },
+    },
+    t,
+  );
+  const before = fx.check();
+  assert.deepEqual(before.classesFound, ["MISSING"]);
+  assert.deepEqual(before.relsFound, ["fast-gate-outcome.sh"]);
+  fx.bundle();
+  assert.deepEqual(
+    fx.check().classesFound,
+    [],
+    "the bundle vendored it and the check is clean",
+  );
+  assert.ok(
+    fs.existsSync(path.join(fx.skillDir, "references", "fast-gate-outcome.sh")),
+    "the script is in references/",
+  );
+});
+
+test("UNVENDORED: an invocation in a skill-owned reference doc of a script that exists nowhere fails the check, and a bundle run does not clear it", (t) => {
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": "---\nname: fixture-skill\ndescription: x\n---\n\n# F\n",
+      },
+      refsFiles: { "own-notes.md": OWN_DOC_INVOKES("no-such-script.sh") },
+    },
+    t,
+  );
+  const res = fx.check();
+  assert.deepEqual(res.classesFound, ["UNVENDORED"]);
+  assert.deepEqual(res.relsFound, ["no-such-script.sh"]);
+  fx.bundleRaw();
+  assert.deepEqual(fx.check().classesFound, ["UNVENDORED"]);
+});
+
+test("controls: a fragment citation, a cite comment, another skill's name and a generated copy vendor nothing and report nothing", (t) => {
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": "---\nname: fixture-skill\ndescription: x\n---\n\n# F\n",
+      },
+      sharedFiles: {
+        "helper.sh": "#!/bin/sh\necho ok\n",
+        "generated.md":
+          "Run .agents/skills/fixture-skill/references/helper.sh\n",
+      },
+      refsFiles: {
+        "fragment.md":
+          "See .agents/skills/fixture-skill/references/helper.sh#usage for the usage.\n",
+        "cited.md":
+          "<!-- cite: .agents/skills/fixture-skill/references/helper.sh -->\n",
+        "other.md":
+          "Run .agents/skills/some-other-skill/references/helper.sh\n",
+        "generated.md":
+          "<!-- AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/generated.md. -->\n\n" +
+          "Run .agents/skills/fixture-skill/references/helper.sh\n",
+      },
+    },
+    t,
+  );
+  // The generated copy is a source-backed copy nothing reaches: UNREACHED is its own, unrelated finding.
+  // The controls are that nothing else is reported and helper.sh is not vendored.
+  fx.bundleRaw(); // refreshes the generated copy, so STALE does not muddy the class set
+  assert.deepEqual(fx.check().classesFound, ["UNREACHED"]);
+  assert.equal(
+    fs.existsSync(path.join(fx.skillDir, "references", "helper.sh")),
+    false,
+    "none of the four controls vendors helper.sh",
+  );
+});
+
 test("WRONG MODE: drift is detected in BOTH directions, keyed on the source's mode", (t) => {
   // Executable source, non-executable copy.
   const fxA = makeFixture(

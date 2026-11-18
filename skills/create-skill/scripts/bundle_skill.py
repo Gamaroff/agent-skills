@@ -582,6 +582,51 @@ def _symlinked_component(dst, name):
     return None
 
 
+def skill_owned_invocations(skill_path, shared_dir):
+    """Scripts a skill's OWN reference docs invoke, as `[(doc_rel, name)]` (task.280, obs #112).
+
+    `discover_needed` seeds from files outside `references/`, because `references/` holds generated
+    copies. A hand-written `references/*.md` or `.sh` is not generated, and it can run a sibling
+    script with the invocation spelling `.agents/skills/<this skill>/references/X`. Nothing read it,
+    so the script was never vendored and the skill shipped a call to a file that was not there
+    (task.238's `fast-gate-outcome.sh`).
+
+    A doc is skill-owned when it carries no `AUTO-GENERATED` banner and has no same-named file in
+    `shared/resources/` (a generated copy always has one). Only the invocation form counts, scoped to
+    this skill's name exactly as it is for shared text; a fragment citation (`…/X.md#anchor`) and a
+    mention inside a `<!-- cite: … -->` comment stay citations and are skipped.
+    """
+    found = []
+    refs = skill_path / 'references'
+    if not refs.is_dir():
+        return found
+    for doc in sorted(refs.rglob('*')):
+        if doc.suffix not in ('.md', '.sh') or not doc.is_file() or doc.is_symlink():
+            continue
+        if any(p in EXCLUDE_DIRS for p in doc.parts):
+            continue
+        try:
+            text = doc.read_text()
+        except (UnicodeDecodeError, OSError):
+            continue
+        if AUTOGEN_MARKER in '\n'.join(text.splitlines()[:6]):
+            continue
+        if (shared_dir / doc.name).is_file():
+            continue
+        rel = doc.relative_to(skill_path).as_posix()
+        for line in text.splitlines():
+            if 'cite:' in line:
+                continue
+            for m in INVOKE_REF_RE.finditer(line):
+                who, invoked = m.group(1), m.group(2)
+                if line[m.end():m.end() + 1] == '#':
+                    continue
+                names = who.strip('{}').split('|') if who.startswith('{') else [who]
+                if skill_path.name in names:
+                    found.append((rel, invoked))
+    return found
+
+
 def discover_needed(skill_path, shared_dir, refs_dir):
     """Resolve the transitive set of shared resources a skill reaches.
 
@@ -640,6 +685,10 @@ def discover_needed(skill_path, shared_dir, refs_dir):
         pending.extend((n, (rel_f, ln), k) for ln, n, k in parse_shared_refs(text))
         warn_comment_only_refs(f, text, repo_root)
         pending_quiet.extend(refs_refs_with_kind(text))
+
+    # A script the skill's own reference docs invoke is a dependency (task.280, obs #112).
+    for _doc, invoked in skill_owned_invocations(skill_path, shared_dir):
+        pending_quiet.append((invoked, DEP))
 
     # name -> the strongest kind it has been processed as. A name first reached
     # as a CITE and later as a DEP is processed again, as a DEP, so its closure
@@ -1077,6 +1126,11 @@ REMEDIES = {
         '.agents/skills/<this-skill>/references/X invocation in shared text), or '
         'delete the copy'
     ),
+    # Not regenerable either: no source exists to copy, so a bundle run changes nothing (task.280).
+    'UNVENDORED': (
+        'a skill-owned reference doc invokes this script and it is neither in the skill nor in '
+        'shared/resources/ — add the script, or correct the invocation'
+    ),
 }
 
 # The banner's declared source, WITHOUT requiring it to match the file's own
@@ -1195,6 +1249,18 @@ def check_skill(skill_path):
     # `expected`, so a copy that is both unreached and stale reports both.
     for rel in sorted(reconcilable):
         report(rel, 'UNREACHED', 'source-backed copy that no discovery rule reaches')
+
+    # A skill-owned reference doc that invokes a script which is neither in this skill's references/
+    # nor vendorable from shared/resources/ ships a call to a file that is not there (task.280, obs
+    # #112). A script with a shared source is in `expected` and reported MISSING below if absent.
+    for doc_rel, invoked in skill_owned_invocations(skill_path, shared_dir):
+        if invoked in expected or (refs_dir / invoked).exists():
+            continue
+        report(
+            invoked,
+            'UNVENDORED',
+            f'{doc_rel} invokes it, and it is neither present nor in shared/resources/',
+        )
 
     for rel in sorted(expected):
         src = expected[rel]

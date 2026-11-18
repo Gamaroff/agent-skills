@@ -2,27 +2,28 @@
 id: task.280
 title: "Skill and test tooling see what ships"
 type: task
-description: "Make four checks look at what actually ships: flag a quote inside a ${NAME:?message} guard, require executed-block tests to use the one fence reader, have bundle:check scan skill-owned reference docs for unvendored scripts, and keep probe mutants out of the tree other tests walk."
+description: "Make three checks look at what actually ships: flag a quote inside a ${NAME:?message} guard, require executed-block tests to use the one fence reader (with a fence-balance check), and have bundle:check scan skill-owned reference docs for unvendored scripts."
 tags: [create-skill, observation]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-11-06
-updated: 2026-11-06
-estimated_effort_hours: 8
+updated: 2026-11-18
+estimated_effort_hours: 12
 ---
 
 # Task 280: Skill and test tooling see what ships
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.280.review.1.skill-and-test-tooling-see-what-ships.md` implemented 2026-11-18
 
 ---
 
 ## 1. Overview
 
-Four checks pass while looking at the wrong thing: a block whose `${NAME:?message}` guard holds an apostrophe parses only when a test runs it; tests that run skill blocks find them with a hand-written regex; `bundle:check` skips skill-owned reference docs; and one test's scratch directories sit in the tree another test walks (obs #47, #48, #112, #102).
+Three checks pass while looking at the wrong thing: a block whose `${NAME:?message}` guard holds an apostrophe parses only when a test runs it; tests that run skill blocks find them with a hand-written regex; and `bundle:check` skips skill-owned reference docs (obs #47, #48, #112). A fourth, probe scratch directories in a walked tree (obs #102), was fixed on `develop` before this task started; see §2.
 
-**Scope**: one lint, one test-helper rule with a repository-wide count check, one discovery change in `bundle_skill.py`, and a scratch location.
+**Scope**: one lint, one test-helper rule with a repository-wide fence-balance check and a ratchet over the hand-written fence readers in `tests/`, and one discovery change in `bundle_skill.py`.
 
 ---
 
@@ -30,10 +31,10 @@ Four checks pass while looking at the wrong thing: a block whose `${NAME:?messag
 
 ### Current Problems
 
-1. **An apostrophe inside a `:?` word breaks the block** (obs #47). On task.205 `skills/create-epic/SKILL.md` failed `bash -n` (`unexpected EOF while looking for matching '"'`) because of `: "${DOMAIN:?bind DOMAIN to the epic's domain directory}"`; it was caught only because a test ran the block.
-2. **A hand-written fence regex passes on blocks no engine sees** (obs #48). `tests/epic-numbering-retirement.test.js` used `/^([ \t]*)```bash\n([\s\S]*?)^\1```/gm`, which ignores fence nesting. A stray four-backtick fence at `skills/create-epics-from-shards/SKILL.md:334` (on develop since `0260bd17b`, 2026-05-28) put Steps 6–7 inside a code block; the test still passed for five QA cycles.
-3. **`bundle:check` misses an invocation in a skill-owned reference** (obs #112). On task.238 `skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md` gained `bash .agents/skills/develop-bug/references/fast-gate-outcome.sh`; `npm run bundle` did not vendor the script and `bundle:check` returned rc 0.
-4. **Probe mutants race the live-tree scan** (obs #102). `npm run ci` on task.233 failed 1 of 6,340 tests: `tests/bundle-comment-origin.test.js` §2 threw ENOENT on `shared/resources/tests/.t131-mutant-vv92na/change-log.js` while the probe test deleted it.
+1. **An apostrophe inside a `:?` word breaks the block** (obs #47). On task.205 `skills/create-epic/SKILL.md` failed `bash -n` (`unexpected EOF while looking for matching '"'`) because of `: "${DOMAIN:?bind DOMAIN to the epic's domain directory}"`; it was caught only because a test ran the block. **Status at `develop` `ce2fed589` (2026-11-18): the instance is fixed** (`skills/create-epic/SKILL.md:109` now reads `${DOMAIN:?bind DOMAIN to the domain directory of the epic}`), and a search for a `'` inside a `${NAME:?…}` word over `skills/**/*.md` and `shared/resources/*.md` finds none. The lint therefore starts with no offenders and needs a fixture to show it is not vacuous.
+2. **A hand-written fence regex passes on blocks no engine sees** (obs #48). `tests/epic-numbering-retirement.test.js` used `/^([ \t]*)```bash\n([\s\S]*?)^\1```/gm`, which ignores fence nesting. A stray four-backtick fence in `skills/create-epics-from-shards/SKILL.md` put Steps 6–7 inside a code block; the test still passed for five QA cycles. **Status: both instances are fixed** by `6b33e2985` (task.205 qa-fix cycle 6, 2026-10-15): the stray fence is gone (the file's remaining fences at `:302`/`:348` and `:442`/`:470` pair up) and `tests/epic-numbering-retirement.test.js` imports `extractBlocks`. **The class is not fixed**: 43 lines in 20 tracked files under `tests/` (excluding `tests/fixtures`) still mention a ` ```bash ` / ` ```sh ` fence, and about a dozen of them hold a hand-written block extractor (listed in Phase 2).
+3. **`bundle:check` misses an invocation in a skill-owned reference** (obs #112). On task.238 `skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md` gained `bash .agents/skills/develop-bug/references/fast-gate-outcome.sh`; `npm run bundle` did not vendor the script and `bundle:check` returned rc 0. **Status: open** — `bundle_skill.py:622` still skips every file under `references/`.
+4. **Probe mutants race the live-tree scan** (obs #102). `npm run ci` on task.233 failed 1 of 6,340 tests: `tests/bundle-comment-origin.test.js` §2 threw ENOENT on `shared/resources/tests/.t131-mutant-vv92na/change-log.js` while the probe test deleted it. **Status: fixed, out of scope.** Both halves landed before this task: `bundle-comment-origin` §2 lists git-tracked files only (`tests/bundle-comment-origin.test.js:126`, `git ls-files`; CHANGELOG, obs #145), and `security-probe.test.mjs` builds every scratch root with `fenceRoot()` under `tmpdir()`, refusing a root inside the repository (`:4729` for the `t131-mutant-` case; static guard at `:8555`). The race can still show as a flake only if that guard is bypassed, which its own test covers.
 
 ### Benefits
 
@@ -47,24 +48,25 @@ Four checks pass while looking at the wrong thing: a block whose `${NAME:?messag
 
 ### Current Architecture
 
-Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
+Re-verified by `grep` on 2026-11-18 at `develop` `ce2fed589` (the first measurement was 2026-11-06 at `bdd755c7`).
 
 - `skills/create-skill/scripts/bundle_skill.py:585` `def discover_needed(skill_path, shared_dir, refs_dir)`; `:622` filters scanned files with `'references' not in f.relative_to(skill_path).parts`, so a skill-owned reference doc is never scanned.
-- `tests/unbound-default-reads.test.js` scans every `${NAME:?}` read (obs #47); `tests/epic-numbering-retirement.test.js` and `tests/bundle-comment-origin.test.js` exist.
-- `shared/resources/qa-execute-snippets.mjs:70` `export function extractBlocks(markdown)` is the one fence reader.
-- `shared/resources/tests/security-probe.test.mjs:4517` passes `prefix: "t131-mutant-"` to a mutant-root helper; earlier `mkdtempSync(join(tmpdir(), "probe-…"))` calls (`:337`, `:1121`, `:1227`, `:1524`) already use `os.tmpdir()`. Whether the `t131-mutant-` root still lands under `shared/resources/tests` is `(unverified: the plan opens :4505–:4530)`.
+- `tests/unbound-default-reads.test.js` scans every `${NAME:-…}` / `${NAME:?…}` read inside a ` ```bash ` / ` ```sh ` fence (obs #47); it finds the fences with its own regex (`:192`). `tests/bundle-comment-origin.test.js` exists.
+- `shared/resources/qa-execute-snippets.mjs:70` `export function extractBlocks(markdown)` is the one fence reader; its header states it reads only the `bash` info string. Today only `tests/epic-numbering-retirement.test.js` and the executed-prose helper (`shared/resources/tests/lib/executed-prose.mjs`) call it from `tests/` and the shared helper tests.
+- The bundle script's tests are `tests/bundle-*.test.js` (`bundle-check-mode`, `bundle-citation`, `bundle-transitive`, `bundle-missing-source`, …). There is no `skills/create-skill/tests/` directory.
+- `shared/resources/tests/security-probe.test.mjs` is already isolated: `fenceRoot()` (under `tmpdir()`) builds every scratch root, and `tests/bundle-comment-origin.test.js:126` lists tracked files only. Scratch location is not part of this task.
 
 ### Target Architecture
 
-- **Lint** (obs #47): flag a `'` (or any unescaped quote) inside the word of a `"${NAME:?word}"`, in `unbound-default-reads.test.js` or the existing fenced-block lint; the convention is stated beside the loud-failure-guard rule in `create-skill`.
-- **Fence reader** (obs #48): a test that executes blocks from a `SKILL.md` or shared resource uses `extractBlocks`; a repository-wide check asserts the reader's bash-block count equals the raw ` ```bash ` line count per file, so an unbalanced fence fails when it is authored.
+- **Lint** (obs #47): flag a `'` (or any unescaped quote) inside the word of a `"${NAME:?word}"`, in `unbound-default-reads.test.js`; the convention is stated beside the loud-failure-guard rule in `create-skill`. The lint has no current offender, so its test is a fixture pair (flagged, and the control that is not).
+- **Fence reader** (obs #48): a test that executes or lints a ` ```bash ` / ` ```sh ` block from a `SKILL.md` or shared resource gets its blocks from `extractBlocks`. A repository-wide **fence-balance** check fails a file that ends with a fence still open, or that closes a fence that was never opened, so an unbalanced fence fails when it is authored. **The check is a balance check, not a count equality** (review finding, measured 2026-11-18): comparing `extractBlocks`' bash-block count with the raw ` ^\s*```bash ` line count fails five balanced files, because an example ` ```bash ` fence nested inside a ` ````markdown ` wrapper is a raw line but correctly not a block (`shared/resources/security-review-prompt.md` 1 vs 2, `skills/create-parallel-stories/SKILL.md` 10 vs 14, `skills/mermaid-architect/SKILL.md` 0 vs 1, `skills/qa-story/SKILL.md` 24 vs 25, `skills/qa-task/SKILL.md` 26 vs 27). The balance walk lives beside `extractBlocks` in `qa-execute-snippets.mjs` as one new export that shares its line walk, so there is one fence definition; `extractBlocks`' output does not change.
+- **Hand-written fence readers in `tests/`** are held by a ratchet: a guard test fails on a regex literal or `matchAll`/`match` over a triple backtick fence in `tests/` that is not in an allowlist. Each allowlist entry carries a reason (a non-bash language such as `yaml`/`mermaid`/`markdown`, which `extractBlocks` does not read; a scanner that tracks fence state line by line and extracts no body; a fixture string). Extractors of ` ```bash ` / ` ```sh ` bodies are migrated to `extractBlocks`, not allowlisted.
 - **Discovery** (obs #112): `discover_needed` (or `bundle:check`) scans skill-owned `references/*.md` for the invocation form and fails when the named script is neither present nor vendorable.
-- **Scratch** (obs #102): probe tests create mutants under `os.tmpdir()` (or a gitignored directory the scanners skip), so no test scans a tree another test writes into.
 
 ### Important Clarifications
 
-- The stray four-backtick fence at `skills/create-epics-from-shards/SKILL.md:334` is a live defect the count check will find; it is fixed in this task.
-- Scanning skill-owned reference docs must not pick up examples in prose; the plan uses the same invocation-form rule discovery already uses for `SKILL.md`.
+- **No known fence defect remains in `skills/create-epics-from-shards/SKILL.md`** (fixed by `6b33e2985`); the balance check is expected to find none today. If it finds one, it is fixed here and named in the QA report.
+- Scanning skill-owned reference docs must not pick up examples in prose; the plan uses the same invocation-form rule discovery already uses for `SKILL.md`. A skill-owned reference doc is one without the `AUTO-GENERATED — DO NOT EDIT` marker line the bundler writes into generated copies. An invocation in a skill-owned doc becomes a **dependency** (it bundles the script); a fragment citation (`X.md#section`) and a bare mention inside `<!-- cite: … -->` stay citations, per the cite-or-depend rule in `create-skill`.
 
 ---
 
@@ -72,14 +74,16 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 
 ### In Scope
 
-✅ **The four checks** and their tests.
-✅ **The stray fence** and any other the count check finds.
-✅ **A convention sentence** in `create-skill`.
+✅ **The three checks** (quote lint, fence balance plus the `tests/` ratchet, skill-owned reference discovery) and their tests.
+✅ **Any fence defect the balance check finds** (none is known).
+✅ **Migrating the ` ```bash ` / ` ```sh ` extractors in `tests/`** the Phase 2 grep lists to `extractBlocks`.
+✅ **A convention sentence** in `create-skill` for each of the quote rule and the fence reader.
 
 ### Out of Scope
 
-❌ **Rewriting every executed-block test** beyond the ones using a hand regex (the plan lists them).
-❌ **Changing the fence reader.**
+❌ **Rewriting tests that read non-bash fences** (`yaml`, `mermaid`, `markdown`) or scan fence state without extracting a body; they go in the ratchet allowlist with a reason.
+❌ **Changing what `extractBlocks` returns.** The balance export shares its walk; `extractBlocks`' existing tests pin its output.
+❌ **The probe scratch location** (obs #102): fixed before this task, see §2 problem 4.
 
 ---
 
@@ -93,17 +97,18 @@ None - the checks start failing on defects already present; Phase 1 to 3 fix tho
 
 > Detailed implementation guide: [task.280.plan.skill-and-test-tooling-see-what-ships.md](task.280.plan.skill-and-test-tooling-see-what-ships.md)
 
-### Phase 1: The quote lint and the fence count
+### Phase 1: The quote lint and the fence-balance check
 
 **Risk Level**: Medium
 
 **Files**:
 - `tests/unbound-default-reads.test.js`
-- a new fence-count check beside it
+- `shared/resources/qa-execute-snippets.mjs` (one new export beside `extractBlocks`; no change to its output)
+- a new `tests/fence-balance.test.js`
 - `skills/create-skill/SKILL.md`
 
 **Changes**:
-- [ ] `:?` word lint; fence-count check; fix each defect they find (the known four-backtick fence and `create-epic`).
+- [x] `:?` word lint with its flagged fixture and control fixture; fence-balance export and check over every tracked `skills/*/SKILL.md` and `shared/resources/*.md`, with a control: the five balanced files with a nested example fence (named in §3) pass, an unclosed fence and a stray closer fail. Fix each defect they find (none is known).
 
 **Dependencies**: none.
 
@@ -114,10 +119,11 @@ None - the checks start failing on defects already present; Phase 1 to 3 fix tho
 **Risk Level**: Medium
 
 **Files**:
-- `tests/epic-numbering-retirement.test.js` and any other hand-regex block extractor (the plan lists them with a grep)
+- the ` ```bash ` / ` ```sh ` body extractors in `tests/` found by the plan's grep: at least `tests/unbound-default-reads.test.js` (`:192`), `tests/key-lookup-single-statement.test.js` (`:311`), `tests/qa-fix-structural-move.test.js` (`:78`), `tests/worktree-root-coverage.test.js` (`:154`), `tests/fenced-bash-optional-file-globs.test.js` (`:58`), `tests/ensure-bug-label-tolerance.test.js`, `tests/gh-labels.test.js` and `tests/qa-cycle.test.js` (each a line-state scanner at `:49`/`:188`/`:242`), `tests/doc-link-branch-sites-execute.test.js`, `tests/identity-rule-probe.test.js`
+- a new ratchet test beside `tests/fence-balance.test.js`
 
 **Changes**:
-- [ ] Switch to `extractBlocks`; a rule in `create-skill` and a test that fails on a new hand-written fence regex in `tests/`.
+- [x] Switch each bash/sh extractor to `extractBlocks` (a scanner that must keep a line number may keep its walk and say why in the allowlist); a rule in `create-skill`; a ratchet test that fails on a hand-written fence reader in `tests/` that is not allowlisted, with a non-vacuity fixture (a regex literal the ratchet must flag) and the allowlist's count recorded.
 
 **Dependencies**: Phase 1.
 
@@ -128,26 +134,19 @@ None - the checks start failing on defects already present; Phase 1 to 3 fix tho
 **Risk Level**: Medium
 
 **Files**:
-- `skills/create-skill/scripts/bundle_skill.py`, its tests
+- `skills/create-skill/scripts/bundle_skill.py`
+- `tests/bundle-check-mode.test.js` and/or `tests/bundle-transitive.test.js` (where the existing discovery cases live), plus a fixture skill
 
 **Changes**:
-- [ ] Scan skill-owned `references/*.md`; fail on an unresolved invocation; vendor what is vendorable.
+- [x] Scan skill-owned `references/*.md`; fail on an unresolved invocation; vendor what is vendorable. Before the change, `git grep -n "'references' not in"` and read every test that pins the old filter (removed-literal sweep).
 
 **Dependencies**: none.
 
 ---
 
-### Phase 4: Scratch location
+### Phase 4: (dropped)
 
-**Risk Level**: Low
-
-**Files**:
-- `shared/resources/tests/security-probe.test.mjs`
-
-**Changes**:
-- [ ] Mutant roots under `os.tmpdir()`.
-
-**Dependencies**: none.
+The probe-scratch change is already on `develop` (§2 problem 4). No edit. The two racing files are still run ten times in parallel in Phase 5 as regression evidence.
 
 ---
 
@@ -156,9 +155,9 @@ None - the checks start failing on defects already present; Phase 1 to 3 fix tho
 **Risk Level**: Low
 
 **Changes**:
-- [ ] `command npm run bundle`, `command npm run bundle -- --check`; mutation proofs.
+- [x] `command npm run bundle`, `command npm run bundle -- --check`; mutation proofs.
 
-**Dependencies**: Phases 1 to 4.
+**Dependencies**: Phases 1 to 3.
 
 ---
 
@@ -168,17 +167,18 @@ None - the checks start failing on defects already present; Phase 1 to 3 fix tho
 
 1. ✅ `skills/create-skill/scripts/bundle_skill.py` - discovery
 2. ✅ `skills/create-skill/SKILL.md` - two convention sentences
-3. ✅ `skills/create-epic/SKILL.md`, `skills/create-epics-from-shards/SKILL.md` - the defects found
+3. ✅ `shared/resources/qa-execute-snippets.mjs` - one new fence-balance export beside `extractBlocks`
+4. ✅ any file the fence-balance check finds unbalanced (none known)
 
 ### Files to Modify (Tests)
 
-4. ✅ `tests/unbound-default-reads.test.js`, `tests/epic-numbering-retirement.test.js`, a new fence-count test
-5. ✅ the bundle script's test file under `skills/create-skill/tests/`
-6. ✅ `shared/resources/tests/security-probe.test.mjs`
+5. ✅ `tests/unbound-default-reads.test.js` (the `:?` lint, and its own switch to `extractBlocks`), a new `tests/fence-balance.test.js`, the new ratchet test, and the extractor tests Phase 2 lists
+6. ✅ `tests/bundle-check-mode.test.js` and/or `tests/bundle-transitive.test.js`, plus a fixture skill (the bundle script has no `skills/create-skill/tests/`)
+7. ✅ `package.json` only if `test-runner-reach.test.js` shows a new test file is not reached by `test:suite` (the `tests/*.test.js` glob already reaches `tests/`)
 
 ### Files to Modify (Generated)
 
-7. ✅ bundled copies under `skills/*/references/`
+8. ✅ bundled copies under `skills/*/references/` (`npm run bundle`; edit sources only)
 
 ---
 
@@ -190,9 +190,11 @@ None - the checks start failing on defects already present; Phase 1 to 3 fix tho
 
 **Actions**:
 - [ ] A block with an apostrophe in a `:?` word is flagged; **control**: the same message without it, and an apostrophe in a `:-` default of a single-quoted context that parses, are not.
-- [ ] A file with an unbalanced four-backtick fence fails the count check; a balanced one passes.
-- [ ] A skill-owned reference doc invoking an unvendored script fails `bundle:check`; one naming a vendored script passes; an example in prose does not trip it.
-- [ ] The probe suite and `bundle-comment-origin.test.js` run in parallel 10 times without the ENOENT.
+- [ ] A file with an unclosed fence, and one with a stray closer, fail the fence-balance check; a balanced file passes, including each of the five files with a nested example fence named in §3 (the control).
+- [ ] The `:?` lint flags `"${X:?bind X to the epic's directory}"` and passes `"${X:?bind X to the epic directory}"`.
+- [ ] The ratchet flags a hand-written ` ```bash ` body regex in a fixture file and passes an allowlisted entry; removing a reason from an allowlist entry fails it.
+- [ ] A skill-owned reference doc invoking an unvendored script fails `bundle:check`; one naming a vendored script passes; an example in prose, a fragment citation and a generated (`AUTO-GENERATED`) copy do not trip it.
+- [ ] The probe suite and `bundle-comment-origin.test.js` run in parallel 10 times without the ENOENT (regression evidence for the already-landed fix).
 - [ ] Mutation proofs for each.
 
 **Command**: `CI=true command node --test` on the named files; the Python tests via the repository's runner.
@@ -208,7 +210,7 @@ None - the checks start failing on defects already present; Phase 1 to 3 fix tho
 ### Functional
 
 - [ ] Each check fails on its defect and passes its control, shown by named tests recorded in the QA report.
-- [ ] The repository has no unbalanced fence (the count check passes on the whole tree).
+- [ ] The repository has no unbalanced fence (`tests/fence-balance.test.js` passes on every tracked `skills/*/SKILL.md` and `shared/resources/*.md`).
 - [ ] `bundle:check` fails on the task.238 shape, shown by a test that recreates it.
 
 ### Performance
@@ -219,11 +221,11 @@ None - the checks start failing on defects already present; Phase 1 to 3 fix tho
 
 - [ ] Each check has a mutation proof in the QA report.
 - [ ] `command npm run bundle -- --check` reports 0 problems; `CI=true command npm test` passes.
-- [ ] Ten parallel runs of the two racing test files pass, command and exit codes in the QA report.
+- [ ] Ten parallel runs of the two racing test files pass (regression evidence for the already-landed isolation), command and exit codes in the QA report.
 
 ### Migration
 
-- [ ] No hand-written fence regex remains in `tests/` (`git grep` count 0, recorded).
+- [ ] No un-allowlisted hand-written fence reader remains in `tests/`: the ratchet test passes, and the QA report's migration table lists, per file the Phase 2 grep (`git grep -nE '```(bash|sh)' -- tests ':!tests/fixtures'`, 43 lines in 20 files at `ce2fed589`) returned, its disposition (migrated to `extractBlocks`, or allowlisted with the reason) and the final allowlist size.
 
 ---
 
@@ -236,10 +238,10 @@ None identified.
 ### Medium Risk Areas
 
 **1. The new checks find more than the known defects**
-- **Risk**: several existing files fail.
+- **Risk**: several existing files fail. Measured 2026-11-18: the fence-balance check finds no defect today, and about a dozen `tests/` files hold a hand-written bash/sh extractor.
 - **Probability**: Medium
 - **Impact**: Minor
-- **Mitigation**: Phase 1 measures first; each is fixed here, or a stated exception is added with a reason.
+- **Mitigation**: Phase 1 measures first; each is fixed here, or a stated exception is added with a reason. The ratchet allowlist is the exception list, and every entry has a reason.
 - **Rollback**: revert the check.
 
 **2. Discovery vendors the wrong script**
@@ -251,12 +253,7 @@ None identified.
 
 ### Low Risk Areas
 
-**1. Scratch under tmpdir changes a mutant test**
-- **Risk**: a path assumption breaks.
-- **Probability**: Low
-- **Impact**: Minor
-- **Mitigation**: the suite runs before and after.
-- **Rollback**: revert Phase 4.
+None identified. (The scratch-location risk went with Phase 4.)
 
 ---
 
@@ -308,26 +305,29 @@ None identified.
 | Date       | Version | Description                                                 | Author      |
 | ---------- | ------- | ----------------------------------------------------------- | ----------- |
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #47, #48, #102, #112  | create-task |
+| 2026-11-18 | 1.1     | Review fixes: fence check is a balance check (count equality falsely failed 5 files); obs #47 and #48 instances and obs #102 already fixed on develop, Phase 4 dropped; Phase 2 population measured (43 lines, 20 files) and ratcheted; Phase 3 test path corrected; effort 8h → 12h | review-task |
+| 2026-11-18 |         | Status → ready-for-development                              | review-task |
+| 2026-11-18 |         | Implemented — 24 files (7 regenerated copies), 3 new test files, 9 new tests; phases 1–3 and 5 | develop |
 <!-- change-log-end -->
 
 ---
 
 ## Progress Tracking
 
-### Phase 1: The quote lint and the fence count
-- [ ] Lint, count, defects fixed
+### Phase 1: The quote lint and the fence-balance check
+- [x] Lint, balance check, defects fixed (none known; none found)
 
 ### Phase 2: Executed-block tests use the one reader
-- [ ] Switched, guarded
+- [x] Switched (2 migrated; 17 allowlisted with reasons), ratcheted
 
 ### Phase 3: bundle discovery
-- [ ] Reference docs scanned
+- [x] Reference docs scanned
 
-### Phase 4: Scratch location
-- [ ] Mutants under tmpdir
+### Phase 4: (dropped)
+- [x] Already on `develop` (§2 problem 4)
 
 ### Phase 5: Bundle and sweep
-- [ ] Mutation proofs, bundle clean
+- [x] Mutation proofs, bundle clean; ten parallel runs of the two racing files: 20 runs, all exit 0, no ENOENT
 
 ---
 
@@ -346,10 +346,16 @@ None identified.
 
 `create-skill` is the home of the cite-or-depend rule; Phase 3 must not turn a citation into a dependency.
 
+### Implementation Summary
+
+Phases 1–3 and 5 are done (2026-11-18). One fence walk now serves `extractBlocks` and the new `fenceProblems`; `tests/fence-balance.test.js` checks every tracked `SKILL.md` and shared resource (193 files, none unbalanced). The `:?` quote lint is in `tests/unbound-default-reads.test.js`. The ratchet `tests/fence-reader-ratchet.test.js` pins 17 hand-written readers with reasons; `halt-fence` and `worktree-root-coverage` migrated. `bundle_skill.py` vendors scripts that skill-owned reference docs invoke and reports an unresolvable one as `UNVENDORED`. Server gate: 8587 tests, 0 failed.
+
+Deferred to QA: the wall-time criterion (within 10% of `develop`, five alternating runs) and the migration table.
+
 ### Future Improvements
 
 None.
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review

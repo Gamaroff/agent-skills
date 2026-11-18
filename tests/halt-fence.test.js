@@ -34,12 +34,12 @@ const SKILLS = [
 ];
 
 /** Every ```bash fence in a Markdown file, with its text. */
+// task.280: read by the one fence reader the engines use (the fence text now has no trailing newline).
+const {
+  extractBlocks,
+} = require("../shared/resources/qa-execute-snippets.mjs");
 function bashFences(md) {
-  const out = [];
-  const re = /^[ \t]*```bash\n([\s\S]*?)^[ \t]*```/gm;
-  let m;
-  while ((m = re.exec(md))) out.push(m[1]);
-  return out;
+  return extractBlocks(md).map((b) => b.code);
 }
 
 for (const { skill, dirPlaceholder } of SKILLS) {

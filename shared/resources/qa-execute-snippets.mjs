@@ -68,8 +68,30 @@ import { fileURLToPath } from "node:url";
  * Only the `bash` info string is in scope — see the detection rule §1.
  */
 export function extractBlocks(markdown) {
+  return scanFences(markdown).blocks;
+}
+
+/**
+ * Fences left open at the end of the document, as `[{ line, kind }]` (the 1-based line of
+ * the opening fence; `kind` is always `"unclosed-fence"`). Same walk as `extractBlocks`
+ * (task.280): there is one definition of where a fence opens and closes, so a test that
+ * reads blocks and a check that a document's fences balance cannot disagree about it.
+ *
+ * A STRAY CLOSER surfaces here too. Without an open fence a bare ``` line is read as an
+ * opener, so one stray fence leaves the walk open at the end of the file (an even number
+ * of strays pair up and are invisible, as they are to any CommonMark reader). A ```bash
+ * example nested in a ````markdown wrapper is content, not a fence, and balances; that is
+ * why this is a balance check and not a comparison of block counts with raw ```bash lines.
+ */
+export function fenceProblems(markdown) {
+  return scanFences(markdown).problems;
+}
+
+/** The one fence walk behind `extractBlocks` and `fenceProblems`. */
+function scanFences(markdown) {
   const lines = markdown.split("\n");
   const blocks = [];
+  const problems = [];
   let open = null;
 
   for (let i = 0; i < lines.length; i++) {
@@ -120,7 +142,10 @@ export function extractBlocks(markdown) {
   }
 
   // An unterminated fence is not a block — we never execute what we cannot delimit.
-  return blocks;
+  if (open !== null) {
+    problems.push({ line: open.start + 1, kind: "unclosed-fence" });
+  }
+  return { blocks, problems };
 }
 
 // ── Table-cell extraction ─────────────────────────────────────────────────────

@@ -6,6 +6,13 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **Skill and test tooling see what ships (task 280).** `bundle:check` now reads a skill's own
+  `references/*.md` and `.sh` for `.agents/skills/<skill>/references/X` invocations: a script with a
+  shared source is vendored, and one that exists nowhere is the new `UNVENDORED` finding. The fence
+  reader gains `fenceProblems`, and `tests/fence-balance.test.js` fails a `SKILL.md` or shared
+  resource that ends with a fence open. `tests/unbound-default-reads.test.js` flags a quote inside a
+  `${NAME:?message}` guard, and `tests/fence-reader-ratchet.test.js` holds hand-written fence readers
+  in `tests/` to a reasoned allowlist.
 - **develop-next reads the world before it stops (task 279).** Step 0.1a now runs
   `skills/develop-next/scripts/halt-evidence.mjs` before it stops on a recorded HALT: when the
   document reads `accepted` (a bug: `closed`) and its PR is `MERGED`, the halt is cleared and the run
