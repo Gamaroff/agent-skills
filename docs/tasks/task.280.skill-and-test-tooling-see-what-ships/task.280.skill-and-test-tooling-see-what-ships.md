@@ -309,8 +309,8 @@ None identified. (The scratch-location risk went with Phase 4.)
 **Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.280.qa.3.skill-and-test-tooling-see-what-ships.md](./task.280.qa.3.skill-and-test-tooling-see-what-ships.md)
-- **Gate File**: [task.280.gate.3.skill-and-test-tooling-see-what-ships.yml](./task.280.gate.3.skill-and-test-tooling-see-what-ships.yml)
+- **Full Report**: [task.280.qa.4.skill-and-test-tooling-see-what-ships.md](./task.280.qa.4.skill-and-test-tooling-see-what-ships.md)
+- **Gate File**: [task.280.gate.4.skill-and-test-tooling-see-what-ships.yml](./task.280.gate.4.skill-and-test-tooling-see-what-ships.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 8591 on the server (0 failed)
@@ -319,7 +319,7 @@ None identified. (The scratch-location risk went with Phase 4.)
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-No open finding. The two defects the fix cycles found in the bundler discovery are fixed and mutation-proven. Five low or cleanup follow-ups are recorded in the gate.
+No open finding. The PR review's three findings (Phase 2 wording, `pr_number`, report Summary) are fixed and each claim was checked against the code. Five low or cleanup follow-ups are recorded in the gate.
 
 <!-- change-log-start -->
 ## Change Log
@@ -336,6 +336,7 @@ No open finding. The two defects the fix cycles found in the bundler discovery a
 | 2026-11-18 |         | QA findings fixed — T280-CR-2 (all-dots capture reported UNVENDORED), 2 iterations | qa-fix |
 | 2026-11-18 |         | QA gate PASS (95/100) — 0 findings | qa-task |
 | 2026-11-18 |         | QA findings fixed — PR review PC-1..PC-3 (Phase 2 / §7 wording, pr_number, report Summary), 3 iterations | qa-fix |
+| 2026-11-18 |         | QA gate PASS (95/100) — 0 findings | qa-task |
 <!-- change-log-end -->
 
 ---
