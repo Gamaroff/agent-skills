@@ -198,6 +198,42 @@ the files that most belong in the queue.
 without naming them would make the queue correct and the reason for its size
 invisible.
 
+### A status outside the enum (`invalidStatus`)
+
+The enum is `open | actioned | declined | superseded | parked`. A hand edit can
+leave an entry reading something else (`resolved`, `Open`, `done`); the engine's
+own writers refuse such a value, so the hole is only ever a hand edit.
+
+`queue` and `scan` each carry a top-level `invalidStatus` list — the **file
+names** of entries whose `status:` is present, non-empty and outside the enum
+(absent or blank is `statusless`, a different fact). Such an entry is still
+**counted as OPEN**, for the reason `statusless` is: an unknown value is not
+`parked` and not resolved. `scan`'s `--status` filter narrows `entries`, never
+`invalidStatus`. The list is additive: existing consumers that read named fields
+are unaffected.
+
+`doctor` reports it as a `status-legal` check (`ok: false`, naming the files)
+and `healthy` follows it. `reason` and the exit code are unchanged: an illegal
+status is a finding about the log, not a guard that stops a write. When the
+queue could not read any status (`scan-broken`: files present, none parsed) the
+check also fails, with a `detail` that says so: no list of illegal statuses
+exists to be empty, and an unreadable log must not read as "every status is
+legal".
+
+An entry that reads an illegal status is repaired with
+`set-status --id N --status <legal> --repair --expect-status <the literal it reads>`.
+`--repair` is the only way to name an illegal literal as the guard, and it
+refuses a legal one; without it an unknown `--expect-status` is `usage` (exit 2)
+as before. The guard still compares against the file being written, so a
+mistyped literal is `status-changed` and writes nothing.
+
+### Reopening a parked entry
+
+`set-status --status open` is accepted only with `--expect-status parked` (a
+parked entry whose condition has cleared returning to the queue; `parked_until:`
+is cleared) or with `--repair`. Any other use is `usage`, exit 2. Before task 281
+the engine accepted `open` from any status with no guard.
+
 ---
 
 ## An empty result is a claim about the instrument

@@ -1,0 +1,72 @@
+[
+  {
+    "id": "repair-legal-open",
+    "sink": "shell-exec",
+    "input": "open",
+    "why": "--repair must not bypass the guard on a legal status",
+    "correct": "exit 2 usage",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.281.observation-log-names-what-it-cannot-read/task.281.observation-log-names-what-it-cannot-read.md:180",
+    "fixture": {
+      "files": {
+        "skill-observations/observation-log/1-probe-entry.md": "---\nid: 1\ntitle: probe\nstatus: open\nparked_until: \"\"\nresolved: \"\"\nskill: [observe-work]\n---\nbody\n"
+      }
+    }
+  },
+  {
+    "id": "repair-legal-parked",
+    "sink": "shell-exec",
+    "input": "parked",
+    "why": "--repair must not bypass the guard on a legal status",
+    "correct": "exit 2 usage",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.281.observation-log-names-what-it-cannot-read/task.281.observation-log-names-what-it-cannot-read.md:180",
+    "fixture": {
+      "files": {
+        "skill-observations/observation-log/1-probe-entry.md": "---\nid: 1\ntitle: probe\nstatus: parked\nparked_until: \"2027-01-01\"\nresolved: \"\"\nskill: [observe-work]\n---\nbody\n"
+      }
+    }
+  },
+  {
+    "id": "repair-mistyped",
+    "sink": "shell-exec",
+    "input": "resolvd",
+    "why": "mistyped literal must write nothing",
+    "correct": "exit 1 status-changed",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.281.observation-log-names-what-it-cannot-read/task.281.observation-log-names-what-it-cannot-read.md:180",
+    "fixture": {
+      "files": {
+        "skill-observations/observation-log/1-probe-entry.md": "---\nid: 1\ntitle: probe\nstatus: resolved\nparked_until: \"\"\nresolved: \"\"\nskill: [observe-work]\n---\nbody\n"
+      }
+    }
+  },
+  {
+    "id": "repair-resolved",
+    "sink": "shell-exec",
+    "input": "resolved",
+    "why": "the #44 shape must be repairable",
+    "correct": "accepted, exit 0 (dry-run)",
+    "direction": "legitimate",
+    "spec_ref": "docs/tasks/task.281.observation-log-names-what-it-cannot-read/task.281.observation-log-names-what-it-cannot-read.md:180",
+    "fixture": {
+      "files": {
+        "skill-observations/observation-log/1-probe-entry.md": "---\nid: 1\ntitle: probe\nstatus: resolved\nparked_until: \"\"\nresolved: \"\"\nskill: [observe-work]\n---\nbody\n"
+      }
+    }
+  },
+  {
+    "id": "repair-Open",
+    "sink": "shell-exec",
+    "input": "Open",
+    "why": "hand-edited capitalised status is illegal and repairable",
+    "correct": "accepted, exit 0 (dry-run)",
+    "direction": "legitimate",
+    "spec_ref": "docs/tasks/task.281.observation-log-names-what-it-cannot-read/task.281.observation-log-names-what-it-cannot-read.md:180",
+    "fixture": {
+      "files": {
+        "skill-observations/observation-log/1-probe-entry.md": "---\nid: 1\ntitle: probe\nstatus: Open\nparked_until: \"\"\nresolved: \"\"\nskill: [observe-work]\n---\nbody\n"
+      }
+    }
+  }
+]

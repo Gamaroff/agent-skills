@@ -6,6 +6,15 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **The observation log names what it cannot read (task 281).** `queue` and `scan` return
+  `invalidStatus`, the file names of entries whose `status:` is outside
+  `open | actioned | declined | superseded | parked`; they are still counted open, and `doctor`
+  reports them as a `status-legal` check, which also fails on a log where no status could be read. `set-status --repair --expect-status <the illegal literal>`
+  repairs one (a legal literal or a missing guard is a usage error). `set-status --status open` is now
+  accepted only with `--expect-status parked` (it clears `parked_until:`) or `--repair`; before this
+  it was accepted from any status with no guard. The review cycle gains a fifth decision, "propose a
+  task" (the entries stay open and `/create-task` runs only on the user's yes), and states the scope
+  of a review that stamps the date.
 - **Skill and test tooling see what ships (task 280).** `bundle:check` now reads a skill's own
   `references/*.md` and `.sh` for `.agents/skills/<skill>/references/X` invocations: a script with a
   shared source is vendored, and one that exists nowhere is the new `UNVENDORED` finding. The fence

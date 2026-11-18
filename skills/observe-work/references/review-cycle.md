@@ -45,11 +45,23 @@ optional and its absence means `open`, so a grep drops exactly the files that mo
 queue. The engine does this for you; the rule is stated so you do not "optimise" it back.
 
 The payload names `statusless` files explicitly as well as counting them. Counting without naming
-would make the queue's size correct and the reason for it invisible.
+would make the queue's size correct and the reason for it invisible. It names `invalidStatus` files
+the same way: an entry whose `status:` is outside `open | actioned | declined | superseded | parked`
+(a hand edit wrote `resolved`) is counted open, and a non-empty `invalidStatus` is the reason the
+queue is larger than the real open count. Repair each before clustering:
+
+```bash
+command node references/observation-log.js set-status \
+  --id N --status actioned --resolution "…" --repair --expect-status resolved --json
+```
+
+`--repair --expect-status` takes the literal the entry **reads**, and refuses a legal status.
 
 `parked` entries are **not** in the queue and **never archive**. They are decided-but-blocked, and
 each carries a `parked_until:` condition. Re-check those conditions during this review — that is the
-only moment anything looks at them.
+only moment anything looks at them. A parked entry whose condition has cleared returns to the queue
+with `set-status --id N --status open --expect-status parked`: `open` is accepted from `parked` and
+from nowhere else, and it clears `parked_until:`.
 
 > **Never stamp a `resolved:` date onto a parked entry to tidy it away.** It archives, its condition
 > is never re-checked, and it is lost rather than deferred. That is the same bug wearing a date.
@@ -87,7 +99,13 @@ For each cluster, decide one of:
 - **apply** — the change is clear and belongs in the named skills;
 - **decline** — with a reason recorded in `resolution:`; a declined observation is a resolved one;
 - **park** — the decision is made but an external precondition is not met. Requires `parked_until:`;
-- **carry** — see below.
+- **carry** — see below;
+- **propose a task** — the change needs an engine, a script or a multi-file edit, not a staged skill
+  update, so apply cannot hold it. Park cannot either: it needs a `parked_until:` that names a
+  condition, and none exists before the task does. The entries **stay open**. The summary names the
+  cut (which entries, why they belong together) and their ids, and `/create-task --from-observation
+  <ids>` runs **only on the user's yes**: creating a task also creates a tracker issue, which is an
+  outward-facing action. Once the task exists, `create-task` parks the entries on it.
 
 ### The carrier pattern
 
@@ -187,8 +205,9 @@ session resolved the entry since you read it. `ambiguous-id` means two files sha
 write nothing: report them, and do not retry them. Use the status you actually read (`parked`
 for a parked entry you are now actioning), not a fixed `open`.
 
-`--status` is one of `actioned`, `declined`, `superseded`, `parked`. A `parked` write without
-`--parked-until` trips `parked-without-condition` and exits 1.
+`--status` is one of `actioned`, `declined`, `superseded`, `parked`, or `open` (only with
+`--expect-status parked`, or `--repair`; any other `open` is `usage`, exit 2). A `parked` write
+without `--parked-until` trips `parked-without-condition` and exits 1.
 
 ---
 
@@ -196,6 +215,12 @@ for a parked entry you are now actioning), not a fixed `open`.
 
 Write today's date to `$OBS_WORKSPACE/skill-observations/last-review-date.txt`. This is what the
 Session Start review trigger reads. A review that skips this step re-offers itself every session.
+
+**A review scoped to one skill, or to one cluster, still stamps today's date — and the trigger then
+reads that as "reviewed", while the rest of the queue stays open.** So state the scope in the
+summary's first line (`Scope: {skill or cluster} — {K} of {M} open entries worked`), and when
+`K < M` say that the Session Start offer is now quiet for entries nobody reviewed. The engine keeps
+one date and does not separate the two; the summary is where the difference is recorded.
 
 ---
 
@@ -227,7 +252,8 @@ under it, and one of those is a finding.
 ```
 ## Skill review — {date}
 
-Worked {N} observations: {A} actioned, {D} declined, {P} parked, {C} carried.
+Scope: {all open entries | skill or cluster} — {K} of {M} open entries worked.
+Worked {N} observations: {A} actioned, {D} declined, {P} parked, {C} carried, {T} proposed as a task.
 
 ### Staged
 - `<skill>` — {what changed, one line}. Install: {path}

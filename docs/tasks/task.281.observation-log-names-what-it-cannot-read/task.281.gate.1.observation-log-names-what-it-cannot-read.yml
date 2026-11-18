@@ -1,0 +1,77 @@
+schema: 2
+task: 'task.281.observation-log-names-what-it-cannot-read'
+task_title: 'The observation log names what it cannot read'
+gate: CONCERNS
+status_reason: 'Implementation and tests hold: every change has a committed test with controls, and each reverted guard turns its test red. Two medium findings: CHANGELOG.md has no [Unreleased] entry citing task 281 (/finalise 6d halts on it), and the suite wall-time criterion is unmeasured.'
+reviewer: 'QA Engineer'
+head: '4260b493246e361a81f51a6f9707e502d55818e3'
+updated: '2026-11-18T08:30:37Z'
+
+top_issues:
+  - id: 'T281-QA-1'
+    severity: medium
+    file: 'CHANGELOG.md'
+    finding: 'No [Unreleased] entry cites (task 281); changelog-cites.sh answers "missing (task 281)", and /finalise 6d halts without one.'
+    suggested_action: 'Add an [Unreleased] entry describing invalidStatus, the status-legal doctor check, set-status --repair, the parked-only open transition and the propose-a-task decision, citing (task 281).'
+    suggested_owner: dev
+    status: open
+  - id: 'T281-QA-2'
+    severity: medium
+    file: 'docs/tasks/task.281.observation-log-names-what-it-cannot-read/task.281.observation-log-names-what-it-cannot-read.md'
+    finding: 'Success criterion "CI=true command npm test wall time is within 10% of develop, median of five alternating runs with uptime beside each" has no measurement: nothing in the QA evidence or the implementation report records it, so it is unverified.'
+    suggested_action: 'Run the five alternating develop/branch runs on the LAN server (npm run test:remote), record the medians and uptime in the QA report, or have the owner amend the criterion.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 96
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary: false
+    boundary_reason: 'No criterion carries a boundary signal. Candidates named: isInvalidStatus (reports, refuses nothing); the set-status --status open and --repair guards (refuse a flag combination from a small enumerated set, not hostile string input; each refusal and its control is a committed test). The engine already refuses ephemeral workspaces and takes no new path, shell or network input.'
+    notes: 'No new input surface: no path, shell or network input added. --repair needs an exact literal match against the file being written.'
+  performance:
+    status: PASS
+    notes: 'Reasoned only: one extra enum check per entry in scan and queue; doctor adds one queue pass. The task criterion on suite wall time is not measured (T281-QA-2).'
+  reliability:
+    status: PASS
+    notes: 'status-changed guard is checked on the file written; a mistyped --repair literal writes nothing (tested). doctor reason and exit code unchanged. Additive JSON fields only.'
+  maintainability:
+    status: PASS
+    notes: 'The illegal-status rule is defined once (isInvalidStatus) and read by scan, queue and doctor. Contract, SKILL.md row and review-cycle.md updated; bundled copies match (bundle:check 0 problems).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Add the CHANGELOG [Unreleased] entry citing (task 281).'
+      refs: ['CHANGELOG.md']
+    - action: 'Measure the suite wall-time criterion (five alternating runs on the LAN server) or have the owner amend it.'
+      refs: ['docs/tasks/task.281.observation-log-names-what-it-cannot-read/task.281.observation-log-names-what-it-cannot-read.md']
+  future:
+    - action: 'CR-1 (advisory, low confidence): a status reopened by --repair from an illegal status keeps any resolved: date or resolution: it carried. Harmless today (the archive gate needs a resolved-set status, and a later resolve overwrites the date); clear them on open, or document it, if the log ever reads resolved: on open entries.'
+      refs: ['shared/resources/observation-log.js']
+      remedy: unverified
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions: ['CHANGELOG entry added before merge']

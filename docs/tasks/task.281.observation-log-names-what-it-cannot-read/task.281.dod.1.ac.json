@@ -1,0 +1,169 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "0d31a4f9b96ef4a8b82f56d3ef5b38fa79d56f10",
+  "dirty_paths": [],
+  "document": "docs/tasks/task.281.observation-log-names-what-it-cannot-read/task.281.observation-log-names-what-it-cannot-read.md",
+  "result": {
+    "bytes": 10126,
+    "sha256": "305fd8708d37c09500d3a656a1b8cfe446992e799765ad4fb9a9f3cb7d486d17",
+    "verified": true
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 8,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "77beaeba52d7a441e1db74e988da54f5c8a717e3097c4dfb202f6f4413def5d6",
+      "status": "PASS",
+      "description": "The #44 illegal-status shape is named and repairable, shown by named tests",
+      "code_citation": "shared/resources/observation-log.js:325",
+      "test_citation": "shared/resources/tests/observation-log.test.mjs:1013",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Code covers isInvalidStatus (:325), the queue/scan lists (:702, :775), the doctor status-legal check (:1509-1522) and the --repair path (:1066-1088). Tests at :1013 (queue and scan name the entry, still counted open), :1048 (legal-log control), :1064 (doctor fails naming the file, passes on a legal log), :1093 (unreadable log), :1119 (repair works; mistyped literal writes nothing) and :1167 (legal literal or no guard exits 2). Lane: shared/resources/tests/*.test.mjs is in the npm test:suite glob (package.json), which .github/workflows/test.yml runs on every pull_request. I ran both suites on this head: 97/97 pass. QA report 1 names the tests in its table."
+    },
+    {
+      "id": "#2",
+      "text_hash": "e161c5f07ced28e964439ea6ac172eb02c6fff5acd279e84dc84b74dc3a2b15d",
+      "status": "PASS",
+      "description": "A parked entry returns to open, and no other status does, shown by named tests",
+      "code_citation": "shared/resources/observation-log.js:1092-1103",
+      "test_citation": "shared/resources/tests/observation-log.test.mjs:1203",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The guard refuses `--status open` unless `--expect-status parked` or `--repair`. The test at :1203 covers parked to open with parked_until cleared, and the controls (actioned, open, no guard) each exit 2. Same per-PR lane as #1. See the advisory on the `--repair` carve-out."
+    },
+    {
+      "id": "#3",
+      "text_hash": "c3bdc3d2055e32732a12a8fe7693389916448fa8e26940239c2e9cf31741d667",
+      "status": "PASS",
+      "description": "review-cycle.md lists five decisions (grep in the QA report)",
+      "code_citation": "skills/observe-work/references/review-cycle.md:99-103",
+      "test_citation": "skills/observe-work/tests/observe-work.test.js:1001",
+      "members": [],
+      "non_member_fail": null,
+      "note": "This is a documentation criterion, though a test pins it. Lines 99-103 list apply, decline, park, carry and propose a task. The test at :1001 asserts exactly those five bullets in order, plus the 'only on the user's yes' gate; :1024 pins the Step 7 scoped-review note. The skills/observe-work/tests/*.test.js glob is in npm test:suite, which runs per PR. I ran it: pass."
+    },
+    {
+      "id": "#4",
+      "text_hash": "546f8d2e546317c6fe9a55fd0f609c8fefcc1c0cc809d62ee9ee5cda06496d54",
+      "status": "PASS",
+      "description": "CI=true npm test wall time within 10% of develop, median of five alternating runs, uptime beside each",
+      "code_citation": "docs/tasks/task.281.observation-log-names-what-it-cannot-read/task.281.qa.3.observation-log-names-what-it-cannot-read.md:49-61",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Bound: <=10% over develop. Command: five alternating `CI=true npm run test:remote -- --run test` runs per side on the LAN server, with `uptime` load averages recorded before each run. Measured on ee0e0a9e3, the PR code head, against origin/develop e092cf6eb. My median check from the table: develop 725, 725, 729, 809, 811 gives 729 s; head 724, 725, 737, 1201, 1296 gives 737 s. That is +1.1%, as the report states. The earlier commit M is named, and the run is 'measured on ee0e0a9e3, tree-equivalent to head': `finalise-delta.js docs-only --base ee0e0a9e3 --head HEAD --json` returned reason `tree-equivalent`, exit 0, with only the qa.3 report changed. The report does not hide the two high-load head runs; the median is not carried by them."
+    },
+    {
+      "id": "#5",
+      "text_hash": "768632a9bd478c26fcca42074f89d0beff1eb4630ea7770ba35c25e6d4bbb45d",
+      "status": "PASS",
+      "description": "Each change has a mutation proof in the QA report",
+      "code_citation": "docs/tasks/task.281.observation-log-names-what-it-cannot-read/task.281.qa.1.observation-log-names-what-it-cannot-read.md:107-115",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "isInvalidStatus forced false",
+          "evidence": "qa.1.md:107",
+          "status": "PASS"
+        },
+        {
+          "member": "scan-side invalidStatus push",
+          "evidence": "qa.1.md:108",
+          "status": "PASS"
+        },
+        {
+          "member": "--repair legal-literal refusal",
+          "evidence": "qa.1.md:109",
+          "status": "PASS"
+        },
+        {
+          "member": "--repair rejection on non-set-status commands",
+          "evidence": "qa.1.md:110",
+          "status": "PASS"
+        },
+        {
+          "member": "enum check under --repair",
+          "evidence": "qa.1.md:111",
+          "status": "PASS"
+        },
+        {
+          "member": "open-requires-parked guard",
+          "evidence": "qa.1.md:112",
+          "status": "PASS"
+        },
+        {
+          "member": "doctor status-legal forced ok",
+          "evidence": "qa.1.md:113",
+          "status": "PASS"
+        },
+        {
+          "member": "SKILL.md status-legal row",
+          "evidence": "qa.1.md:114",
+          "status": "PASS"
+        },
+        {
+          "member": "review-cycle fifth-decision bullet",
+          "evidence": "qa.1.md:115",
+          "status": "PASS"
+        },
+        {
+          "member": "doctor scan-broken branch (cycle 2 fix)",
+          "evidence": "qa.3.md:116",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Units: isInvalidStatus; the scan-side list; the --repair legal-literal refusal; the --repair rejection on non-set-status commands; the enum check under --repair; the parked-only `open` guard; the doctor check; the SKILL.md status-legal row; the review-cycle fifth decision; and the scan-broken branch added in cycle 2. Each has a record naming the mutation and the test that went red: qa.1:107-115 covers the first nine, and qa.3:116 covers the scan-broken branch (mutated with `false && ...`, red on the named test, restored with `cmp` clean). I read each line. The two --repair guards share one test; the report says so and says each goes red for its own assertion."
+    },
+    {
+      "id": "#6",
+      "text_hash": "16719bc5ebe9aef9f9d866fc87c7c80d795a0c8b633dcfff4a03258540d29775",
+      "status": "PASS",
+      "description": "bundle:check reports 0 problems; CI=true npm test passes",
+      "code_citation": "docs/tasks/task.281.observation-log-names-what-it-cannot-read/task.281.qa.3.observation-log-names-what-it-cannot-read.md:139-142",
+      "test_citation": "shared/resources/tests/observation-log.test.mjs:1013",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The bundle:check half I ran on this head: 'bundle freshness: 129 skill(s) checked, 0 problems', matching qa.3. The npm test half is a full-suite run. The committed evidence is qa.3: remote ci:fast exit 0 with 8601 tests, 8598 pass, 0 fail, on the tree the wall-time table measured. I ran the two changed suites here: 97/97 pass. The CI run on the PR head is not graded here; test.yml runs `npm test` on pull_request, and /finalise reads that state. If /finalise treats the npm test half as whole-CI-state, it should defer that half only."
+    },
+    {
+      "id": "#7",
+      "text_hash": "cefa0dc57829af884ff13e3dbf263064cebd09d31f58fe9a4bb45e36795516c5",
+      "status": "PASS",
+      "description": "observation-log.js doctor --json runs clean against the live log",
+      "code_citation": "shared/resources/observation-log.js:1509",
+      "test_citation": "shared/resources/tests/observation-log.test.mjs:1064",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Re-run on this head (HEAD 0d31a4f9b) with the workspace resolved through resolve-observation-workspace.sh: `doctor --json` returned reason ok, healthy true, exit 0, all five checks ok, with status-legal 'every status is legal'. A bare run without the workspace exits 2 `usage`; that is a lost shell variable, not a failure. The committed record is qa.1.md:56 (status-legal ok, invalidStatus empty). The per-PR test at :1064 pins the engine's clean-log behaviour. The live log itself is local state, not in the repo."
+    },
+    {
+      "id": "#8",
+      "text_hash": "a94f04fd57eeaa2e3ec22b35ae538570ca86b527bf8692c24ea521e89d7b8634",
+      "status": "PASS",
+      "description": "Existing --json consumers still parse the output; existing engine tests pass unchanged",
+      "code_citation": "shared/resources/observation-log.js:702",
+      "test_citation": "shared/resources/tests/observation-log.test.mjs:1048",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The diff against origin/develop adds 254 lines to the engine test and 58 lines to the skill test. I counted 0 removed or modified lines in the engine test file, so no existing test was edited. The new fields are additive: invalidStatus on scan and queue, and a status-legal check. The pre-existing doctor reason and exit code are unchanged. qa.1.md:55 records the engine suite passing, and I ran both suites: 97/97. criteria-drift.js returned `clean` (exit 0)."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#2",
+      "note": "The task's Target Architecture says `--status open` is accepted only with `--expect-status parked`, and any other use exits 2. The code at observation-log.js:1098 also accepts `--repair` with an illegal-literal guard (the header comment at :34 says so). Repairing a hand-edited illegal status straight to open is therefore possible. This is narrow, the guard still names the literal, and a test covers it. It is a small deviation from the prose 'no other status does'. The task and contract text should say it."
+    },
+    {
+      "ac_id": "#6",
+      "note": "The doctor and test evidence above was run locally on HEAD 0d31a4f9b. The CI result on the PR head was not read by this agent."
+    }
+  ]
+}

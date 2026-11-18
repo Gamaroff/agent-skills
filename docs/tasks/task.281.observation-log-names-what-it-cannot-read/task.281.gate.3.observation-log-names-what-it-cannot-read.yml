@@ -1,0 +1,70 @@
+schema: 2
+task: 'task.281.observation-log-names-what-it-cannot-read'
+task_title: 'The observation log names what it cannot read'
+gate: PASS
+status_reason: 'T281-QA-3 is closed: doctor status-legal now fails, naming scan-broken, on a log whose statuses could not be read; a test holds it (red before the fix, red again with the branch disabled). The cycle-3 review of the fix found no code defect and one low doc cleanup, recorded as a follow-up. Remote ci:fast passed on the fixed tree (8601 tests, 8598 pass, 0 fail).'
+reviewer: 'QA Engineer'
+head: 'd7b0b6123205ed18f22288b7ff0624ea81ef43a8'
+updated: '2026-11-18T12:13:17Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 97
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary: false
+    boundary_reason: 'No criterion carries a boundary signal. Candidates named: isInvalidStatus (reports, refuses nothing); the set-status --status open and --repair guards (refuse a flag combination from a small enumerated set, not hostile string input; each refusal and its control is a committed test). No new path, shell or network input; this cycle only changed what doctor reports.'
+    notes: 'No new input surface.'
+  performance:
+    status: PASS
+    notes: 'Measured in cycle 1 (median 735 s branch vs 741 s develop); this cycle adds one branch in doctor, which runs once.'
+  reliability:
+    status: PASS
+    notes: 'doctor status-legal no longer reports a pass for an unreadable log. Every cmdQueue return path was walked by the reviewer: scan-broken fails the check, empty and ok read invalidStatus.'
+  maintainability:
+    status: PASS
+    notes: 'The illegal-status rule is still defined once (isInvalidStatus). The contract, SKILL.md row and CHANGELOG entry say what an unreadable log does; bundled copies match (bundle:check 0 problems).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (cycle 3, cleanup): the observe-work SKILL.md status-legal row opens with "Note it and continue" and now also says to run scan first for a scan-broken detail, two actions in one row. Split the scan-broken case into its own row, or reword it.'
+      refs: ['skills/observe-work/SKILL.md']
+      remedy: unverified
+    - action: 'CR-1 (cycle 1, advisory): a status reopened by --repair from an illegal status keeps any resolved: date or resolution: it carried. Harmless today; clear them on open, or document it.'
+      refs: ['shared/resources/observation-log.js']
+      remedy: unverified
+    - action: 'CR-2 (cycle 2): the duplicate and sibling check skips entries whose status is outside the enum, while scan, queue and doctor count them open. Present on develop unchanged (provenance: pre-existing).'
+      refs: ['shared/resources/observation-log.js']
+      provenance: pre-existing
+      remedy: unverified
+    - action: 'CR-3 (cycle 2): set-status compares --expect-status untrimmed while statusOf trims the file value, so a padded guard is a status-changed refusal. Fails closed; present on develop unchanged (provenance: pre-existing).'
+      refs: ['shared/resources/observation-log.js']
+      provenance: pre-existing
+      remedy: unverified
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
