@@ -5,17 +5,18 @@ type: task
 description: "Make three checks look at what actually ships: flag a quote inside a ${NAME:?message} guard, require executed-block tests to use the one fence reader (with a fence-balance check), and have bundle:check scan skill-owned reference docs for unvendored scripts."
 tags: [create-skill, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 pr_number: 919
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-18
+completed_date: 2026-11-18
 estimated_effort_hours: 12
 ---
 
 # Task 280: Skill and test tooling see what ships
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.280.review.1.skill-and-test-tooling-see-what-ships.md` implemented 2026-11-18
 
 ---
@@ -62,7 +63,7 @@ Re-verified by `grep` on 2026-11-18 at `develop` `ce2fed589` (the first measurem
 - **Lint** (obs #47): flag a `'` (or any unescaped quote) inside the word of a `"${NAME:?word}"`, in `unbound-default-reads.test.js`; the convention is stated beside the loud-failure-guard rule in `create-skill`. The lint has no current offender, so its test is a fixture pair (flagged, and the control that is not).
 - **Fence reader** (obs #48): a test that executes or lints a ` ```bash ` / ` ```sh ` block from a `SKILL.md` or shared resource gets its blocks from `extractBlocks`. A repository-wide **fence-balance** check fails a file that ends with a fence still open, or that closes a fence that was never opened, so an unbalanced fence fails when it is authored. **The check is a balance check, not a count equality** (review finding, measured 2026-11-18): comparing `extractBlocks`' bash-block count with the raw ` ^\s*```bash ` line count fails five balanced files, because an example ` ```bash ` fence nested inside a ` ````markdown ` wrapper is a raw line but correctly not a block (`shared/resources/security-review-prompt.md` 1 vs 2, `skills/create-parallel-stories/SKILL.md` 10 vs 14, `skills/mermaid-architect/SKILL.md` 0 vs 1, `skills/qa-story/SKILL.md` 24 vs 25, `skills/qa-task/SKILL.md` 26 vs 27). The balance walk lives beside `extractBlocks` in `qa-execute-snippets.mjs` as one new export that shares its line walk, so there is one fence definition; `extractBlocks`' output does not change.
 - **Hand-written fence readers in `tests/`** are held by a ratchet: a guard test fails on a regex literal or `matchAll`/`match` over a triple backtick fence in `tests/` that is not in an allowlist. Each allowlist entry carries a reason (a non-bash language such as `yaml`/`mermaid`/`markdown`, which `extractBlocks` does not read; a scanner that tracks fence state line by line and extracts no body; a fixture string). Extractors of ` ```bash ` bodies are migrated to `extractBlocks`, not allowlisted; a reader of ` ```sh ` fences stays allowlisted with the reason that `extractBlocks` returns `bash` only.
-- **Discovery** (obs #112): `discover_needed` (or `bundle:check`) scans skill-owned `references/*.md` for the invocation form and fails when the named script is neither present nor vendorable.
+- **Discovery** (obs #112): `discover_needed` (or `bundle:check`) scans skill-owned `references/**/*.md` and `references/**/*.sh` for the invocation form and fails when the named script is neither present nor vendorable.
 
 ### Important Clarifications
 
@@ -139,7 +140,7 @@ None - the checks start failing on defects already present; Phase 1 to 3 fix tho
 - `tests/bundle-check-mode.test.js` and/or `tests/bundle-transitive.test.js` (where the existing discovery cases live), plus a fixture skill
 
 **Changes**:
-- [x] Scan skill-owned `references/*.md`; fail on an unresolved invocation; vendor what is vendorable. Before the change, `git grep -n "'references' not in"` and read every test that pins the old filter (removed-literal sweep).
+- [x] Scan skill-owned `references/**/*.md` and `references/**/*.sh`; fail on an unresolved invocation; vendor what is vendorable. Before the change, `git grep -n "'references' not in"` and read every test that pins the old filter (removed-literal sweep).
 
 **Dependencies**: none.
 
@@ -216,7 +217,7 @@ The probe-scratch change is already on `develop` (§2 problem 4). No edit. The t
 
 ### Performance
 
-- [ ] `CI=true command npm test` wall time is within 10% of `develop`, as the median of five alternating runs with `uptime` beside each, recorded in the QA report.
+- [ ] `CI=true command npm test` wall time is within 10% of `develop`, shown by a stated bound recorded in the QA report: the added tests' own run time as a share of the suite (amended at `/finalise` from "median of five alternating runs", which was not run; approved by Lorien Gamaroff, 2026-11-18; see Change Log).
 
 ### Code Quality
 
@@ -321,6 +322,22 @@ None identified. (The scratch-location risk went with Phase 4.)
 ### Key Findings
 No open finding. The PR review's three findings (Phase 2 wording, `pr_number`, report Summary) are fixed and each claim was checked against the code. Five low or cleanup follow-ups are recorded in the gate.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**Gate**: `task.280.gate.4.skill-and-test-tooling-see-what-ships.yml` PASS (95/100). **PR review**: `task.280.pr-review.2.skill-and-test-tooling-see-what-ships.md` APPROVE.
+
+✅ **Acceptance Criteria:** 8/8 (the wall-time criterion was amended to a stated bound, approved by Lorien Gamaroff)
+✅ **Tests:** 8591 tests, 0 failed on the server; CI `test`, `validate`, `link-check`, `shellcheck`, `secret-scan` green
+✅ **Security:** PASS, no boundary gated on untrusted input
+✅ **Compliance:** not applicable
+✅ **Documentation:** `CHANGELOG.md` cites task 280; `skills/create-skill/SKILL.md` carries the two new rules
+
+**Detailed Verification Log:** See `task.280.dod.2.skill-and-test-tooling-see-what-ships.md` (run 1, `task.280.dod.1…`, found two low gaps that run 2 closed).
+
+**Task marked as ACCEPTED on:** 2026-11-18
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -337,6 +354,8 @@ No open finding. The PR review's three findings (Phase 2 wording, `pr_number`, r
 | 2026-11-18 |         | QA gate PASS (95/100) — 0 findings | qa-task |
 | 2026-11-18 |         | QA findings fixed — PR review PC-1..PC-3 (Phase 2 / §7 wording, pr_number, report Summary), 3 iterations | qa-fix |
 | 2026-11-18 |         | QA gate PASS (95/100) — 0 findings | qa-task |
+| 2026-11-18 | 1.2     | DoD gap fix, approved by the user: wall-time criterion amended from five alternating runs to a stated bound (new tests about 0.5 s of a 757.9 s suite); ten-parallel-run command recorded in QA report 1 | finalise |
+| 2026-11-18 | 1.3     | DoD passed — accepted (PR #919) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -377,9 +396,9 @@ No open finding. The PR review's three findings (Phase 2 wording, `pr_number`, r
 
 ### Implementation Summary
 
-Phases 1–3 and 5 are done (2026-11-18). One fence walk now serves `extractBlocks` and the new `fenceProblems`; `tests/fence-balance.test.js` checks every tracked `SKILL.md` and shared resource (193 files, none unbalanced). The `:?` quote lint is in `tests/unbound-default-reads.test.js`. The ratchet `tests/fence-reader-ratchet.test.js` pins 17 hand-written readers with reasons; `halt-fence` and `worktree-root-coverage` migrated. `bundle_skill.py` vendors scripts that skill-owned reference docs invoke and reports an unresolvable one as `UNVENDORED`. Server gate: 8587 tests, 0 failed.
+Phases 1–3 and 5 are done (2026-11-18). One fence walk now serves `extractBlocks` and the new `fenceProblems`; `tests/fence-balance.test.js` checks every tracked `SKILL.md` and shared resource (193 files, none unbalanced). The `:?` quote lint is in `tests/unbound-default-reads.test.js`. The ratchet `tests/fence-reader-ratchet.test.js` pins 17 hand-written readers with reasons; `halt-fence` and `worktree-root-coverage` migrated. `bundle_skill.py` vendors scripts that skill-owned reference docs invoke and reports an unresolvable one as `UNVENDORED`. Server gate at the end of QA: 8591 tests, 0 failed.
 
-Deferred to QA: the wall-time criterion (within 10% of `develop`, five alternating runs) and the migration table.
+Delivered by QA (report 1): the migration table, and the wall-time criterion by a stated bound (new tests about 0.5 s of a 757.9 s suite) rather than five alternating runs.
 
 ### Future Improvements
 
@@ -387,4 +406,4 @@ None.
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted

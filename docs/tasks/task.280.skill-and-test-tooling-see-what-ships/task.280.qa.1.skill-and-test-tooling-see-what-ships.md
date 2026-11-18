@@ -106,6 +106,14 @@ Suite 757.9 s on the server, new tests about 0.5 s.
 ### Reliability — PASS
 Ten parallel runs of the two racing files: 20 exits of 0, no ENOENT.
 
+Command, re-run by `/finalise` on 2026-11-18 at head `50b002fa1` because the original record omitted it (20 background jobs, one `wait`; logs scanned for ENOENT; result: 20 exits of 0, 0 logs with ENOENT):
+
+```text
+for i in 1..10: CI=true command node --test tests/bundle-comment-origin.test.js &
+                CI=true command node --test shared/resources/tests/security-probe.test.mjs &
+wait
+```
+
 ### Security — PASS
 - **Status**: PASS
 - **Evidence**: reasoned
