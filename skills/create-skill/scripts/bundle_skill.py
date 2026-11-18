@@ -81,6 +81,16 @@ REFS_REF_RE = re.compile(
 INVOKE_REF_RE = re.compile(
     r'\.agents/skills/(\{[A-Za-z0-9|-]+\}|[A-Za-z0-9-]+)/references/([A-Za-z0-9._-]+)'
 )
+
+
+def invoked_name(raw):
+    """The script name an invocation match names, without a sentence-final dot (task.280 CR-1).
+
+    The name class holds `.`, so "run .../helper.sh." captured `helper.sh.` and the script was not
+    vendored. An all-dots capture (`..`) is returned unchanged: `writable_ref_leaf` refuses it by
+    name, and stripping it to nothing would hide that refusal.
+    """
+    return raw.rstrip('.') if raw.strip('.') else raw
 # Sibling require/import in JS — `require("./foo.js")` — used to follow transitive
 # deps inside bundled shared .js files.
 JS_SIBLING_RE = re.compile(r'require\(["\']\./([A-Za-z0-9._/-]+\.js)["\']\)')
@@ -618,7 +628,7 @@ def skill_owned_invocations(skill_path, shared_dir):
             if 'cite:' in line:
                 continue
             for m in INVOKE_REF_RE.finditer(line):
-                who, invoked = m.group(1), m.group(2)
+                who, invoked = m.group(1), invoked_name(m.group(2))
                 if line[m.end():m.end() + 1] == '#':
                     continue
                 names = who.strip('{}').split('|') if who.startswith('{') else [who]
@@ -745,7 +755,7 @@ def discover_needed(skill_path, shared_dir, refs_dir):
             # authoring error worth a warning — it is a skill-native script that
             # happens to be invoked by its bundled path.
             for m in INVOKE_REF_RE.finditer(text):
-                who, invoked = m.group(1), m.group(2)
+                who, invoked = m.group(1), invoked_name(m.group(2))
                 names = who.strip('{}').split('|') if who.startswith('{') else [who]
                 if skill_path.name in names:
                     pending_quiet.append((invoked, DEP))

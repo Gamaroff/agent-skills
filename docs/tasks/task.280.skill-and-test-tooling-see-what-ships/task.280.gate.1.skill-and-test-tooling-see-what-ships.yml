@@ -1,0 +1,74 @@
+schema: 2
+task: 'task.280.skill-and-test-tooling-see-what-ships'
+task_title: 'Skill and test tooling see what ships'
+gate: CONCERNS
+status_reason: 'One reproduced correctness bug in the new bundler discovery (a sentence-final invocation captures a trailing dot, so the script is not vendored); everything else passes, including 8587 tests on the server and four mutation proofs.'
+reviewer: 'QA Engineer'
+head: '56444d372007517fed3e8c4cabe71e3374ab2b46'
+updated: '2026-11-18T04:27:48Z'
+
+top_issues:
+  - id: 'T280-CR-1'
+    severity: medium
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: 'skill_owned_invocations keeps the trailing sentence dot that INVOKE_REF_RE captures: "run .agents/skills/x/references/helper.sh." yields helper.sh. (QA reproduced it, control without the dot yields helper.sh). The script is then not vendored and a spurious UNVENDORED can be reported. Reviewer anchor :158 was wrong; the line is :620. origin: code-review, reproduced by QA; new code in this PR, so not pre-existing.'
+    suggested_action: 'Strip trailing sentence punctuation (. , ; :) from the captured name before it is appended or compared, and add a test with a sentence-final invocation and its control.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 62
+  phases_verified: '4/4 (phase 4 dropped)'
+  trace:
+    phases_covered: [1, 2, 3, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    boundary_signals: []
+    boundary_reason: 'Candidates named: fenceProblems, quotedGuardWords, holdsFenceRegex, skill_owned_invocations. Each is a lint or discovery helper whose result fails a test or bundle:check; none accepts or rejects untrusted input to prevent an action.'
+    notes: 'No input boundary; the lints read tracked repository files only.'
+  performance:
+    status: PASS
+    notes: 'Full suite 757.9 s on the server; the new tests add about 0.5 s (0.07%). The five-alternating-run method was not used; the share was bounded from one suite duration and the new tests own timings.'
+  reliability:
+    status: PASS
+    notes: 'bundle:check clean on the real tree; ten parallel runs of the two racing test files all exit 0, no ENOENT.'
+  maintainability:
+    status: PASS
+    notes: 'One fence walk now serves extractBlocks and fenceProblems; extractBlocks output compared old vs new over 4834 tracked markdown files by the reviewer, unchanged.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T280-CR-1 (trailing punctuation in skill_owned_invocations).'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+  future:
+    - action: 'UNVENDORED fires on any invocation-form mention of a missing file, including an example or a deleted script; consider restricting it to an invocation shape (reviewer CR-2, low, not reproduced).'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+      remedy: unverified
+    - action: 'skill_owned_invocations skips a nested doc whose bare name equals a shared file (CR-3, low, not reproduced).'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+      remedy: unverified
+    - action: 'The ratchet detector misses a regex with a slash inside a character class and a new RegExp reader (CR-4, low).'
+      refs: ['tests/fence-reader-ratchet.test.js']
+      remedy: unverified
+    - action: 'The quote lint flags any unescaped quote in a guard word, not only an unbalanced one (CR-5, cleanup).'
+      refs: ['tests/unbound-default-reads.test.js']
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['Fix T280-CR-1']

@@ -448,6 +448,30 @@ test("MISSING: a discovered reference with no bundled copy is reported", (t) => 
 const OWN_DOC_INVOKES = (script) =>
   `# Own reference\n\nRun it:\n\n\`bash .agents/skills/fixture-skill/references/${script}\`\n`;
 
+// task.280 QA CR-1: a sentence-final dot is punctuation, not part of the script name.
+for (const [label, tail] of [
+  ["sentence-final dot (the defect)", "."],
+  ["followed by a space (the control)", " and stop."],
+]) {
+  test(`an invocation with a ${label} still vendors the shared script (task.280)`, (t) => {
+    const fx = makeFixture(
+      {
+        skillFiles: {
+          "SKILL.md": "---\nname: fixture-skill\ndescription: x\n---\n\n# F\n",
+        },
+        sharedFiles: { "helper.sh": "#!/bin/sh\necho ok\n" },
+        refsFiles: {
+          "own-notes.md": `# Own\n\nThen run .agents/skills/fixture-skill/references/helper.sh${tail}\n`,
+        },
+      },
+      t,
+    );
+    assert.deepEqual(fx.check().relsFound, ["helper.sh"]);
+    fx.bundle();
+    assert.deepEqual(fx.check().classesFound, [], "vendored, no UNVENDORED");
+  });
+}
+
 test("a skill-owned reference doc that invokes a shared script gets it vendored, and --check reports it MISSING before the bundle", (t) => {
   const fx = makeFixture(
     {
