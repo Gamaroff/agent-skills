@@ -65,7 +65,21 @@ Searched: the 118-line scoped diff in full; the reviewer walked every return pat
 
 ## Success Criteria Verification
 
-All criteria are as recorded in QA reports 1 and 2; the wall-time criterion stays PASS (median 735 s branch vs 741 s develop). Criteria drift: clean.
+All criteria are as recorded in QA reports 1 and 2. Criteria drift: clean.
+
+### Wall-time measurement on the PR head (finalise re-measure, T281-QA-2)
+
+The cycle-1 figure was taken on `4260b4932`; the later engine fix made the delta to the head `code-changed`, so it was re-measured on the head `ee0e0a9e3` (worktree detached at that commit) against `origin/develop` `e092cf6eb`. Five alternating `CI=true npm run test:remote -- --run test` runs per side on the LAN server `ci@192.168.1.249`, `uptime` read before each run (load average 1, 5, 15 min). The server is shared, so load varies.
+
+| Run | develop (s) | develop load before | head (s) | head load before |
+| --- | --- | --- | --- | --- |
+| 1 | 809 | 7.74, 6.06, 4.66 | 1296 | 12.37, 11.13, 7.90 |
+| 2 | 725 | 0.72, 10.29, 14.17 | 737 | 0.58, 2.02, 7.38 |
+| 3 | 811 | 3.59, 4.27, 5.75 | 1201 | 8.44, 11.87, 9.73 |
+| 4 | 729 | 13.15, 19.41, 17.71 | 724 | 0.26, 2.66, 8.91 |
+| 5 | 725 | 0.34, 1.22, 4.95 | 725 | 0.41, 1.13, 3.13 |
+
+All ten runs exited 0. **Median develop 729 s, median head 737 s: +1.1%**, inside the criterion's 10% bound. Head runs 1 and 3 ran 1201 to 1296 s with the server's one-minute load at 8 to 12; the other three head runs (724 to 737 s) match develop's 725 to 729 s at low load, so the median is not carried by the outliers. Two earlier attempts were discarded without results: one lost the server mid-run (SSH dropped), one was killed for laptop memory pressure and left stale locks that refused the next ten runs in 1 to 2 s.
 
 ---
 
