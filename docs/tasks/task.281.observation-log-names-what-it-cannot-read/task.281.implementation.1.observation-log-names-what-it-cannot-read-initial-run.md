@@ -117,6 +117,16 @@ _Track each QA review/fix cycle._
 - Validation: local engine and skill suites 97/97; remote `ci:fast` exit 0 (8601 tests, 8598 pass, 0 fail).
 - CR-2 and CR-3 (pre-existing on `develop`) are not changed; they stay under `recommendations.future`.
 
+### QA Cycle 3 — 2026-11-18
+**Gate Result**: PASS (100/100)
+**Issues Found**: none blocking; 1 advisory cleanup (SKILL.md status-legal row gives two actions) recorded under `recommendations.future`
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**Traceability**: skipped (mapper not dispatched — QA ran inline)
+**PR Review**: pending (Step 5c)
+**Loop exit**: PASS gate with no open entries — exit to Step 5c
+**Action**: Running review-pr (5c)
+
 ---
 
 ## Completion

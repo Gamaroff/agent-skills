@@ -284,24 +284,24 @@ None identified.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-18
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.281.qa.2.observation-log-names-what-it-cannot-read.md](./task.281.qa.2.observation-log-names-what-it-cannot-read.md)
-- **Gate File**: [task.281.gate.2.observation-log-names-what-it-cannot-read.yml](./task.281.gate.2.observation-log-names-what-it-cannot-read.yml)
+- **Full Report**: [task.281.qa.3.observation-log-names-what-it-cannot-read.md](./task.281.qa.3.observation-log-names-what-it-cannot-read.md)
+- **Gate File**: [task.281.gate.3.observation-log-names-what-it-cannot-read.yml](./task.281.gate.3.observation-log-names-what-it-cannot-read.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 8600 (remote ci:fast, 8597 pass, 0 fail)
+- **Tests Executed**: 8601 (remote ci:fast, 8598 pass, 0 fail)
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle 1's two findings are closed. The cycle-2 refute pass found one medium defect, T281-QA-3: `doctor` status-legal reports "every status is legal" on a log it could not read.
+No blocking findings. The cycle-2 finding is closed; one low doc cleanup is recorded as a follow-up.
 
 <!-- change-log-start -->
 ## Change Log
@@ -316,6 +316,7 @@ Cycle 1's two findings are closed. The cycle-2 refute pass found one medium defe
 | 2026-11-18 |         | QA findings fixed — CHANGELOG entry added, wall time measured (741 s develop vs 735 s branch); 1 iteration | qa-fix |
 | 2026-11-18 |         | QA gate CONCERNS (90/100) — 1 medium finding (doctor status-legal passes an unreadable log) | qa-task |
 | 2026-11-18 |         | QA findings fixed — doctor status-legal fails on an unreadable log; 1 iteration | qa-fix |
+| 2026-11-18 |         | QA gate PASS (100/100) — 0 findings; 1 advisory cleanup recorded | qa-task |
 <!-- change-log-end -->
 
 ---
