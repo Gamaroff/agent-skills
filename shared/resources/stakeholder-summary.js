@@ -317,11 +317,17 @@ const CYCLE_SUFFIX = /-\d+$/;
 // and the second notice must not be suppressed by the first one's marker.
 // `qa-gate` recurs once per QA cycle (task.121) — the same lead renders for
 // `qa-gate-3` as for `qa-gate`, the suffix only keys the marker.
+// `review-story`, `review-task` and `review-bug` recur once per review (task.282):
+// `review-task-2` renders the same lead as `review-task`, the suffix only keys
+// the marker.
 const CYCLE_SCOPED_LEAD_STAGES = Object.freeze([
   "qa-gate",
   "qa-cycle",
   "qa-fix",
   "pipeline-paused",
+  "review-story",
+  "review-task",
+  "review-bug",
 ]);
 
 function stripCycleSuffix(stage) {

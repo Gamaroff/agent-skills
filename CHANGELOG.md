@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **review-task resolves the right task and reports every review (task 282).** `tracker-comment.js`
+  keys the `review-story`, `review-task` and `review-bug` stages by the review report's number
+  (`review-task-2`), so a second review's verdict reaches the tracker instead of reading `already`
+  against the first review's marker. Round 1 is still the bare marker (`FIRST_ROUND_IS_BARE_STAGES`),
+  so a comment already on a live issue still dedupes for review 1. The develop pipelines' Step 2 skip
+  rule counts `already` only for this run's own number. An all-digits argument to `/review-task` and
+  `/develop-task` resolves as a task id first, through `resolve-bare-task.sh`, and names the worktree
+  or branch that holds a task found elsewhere; `#N`, an issue URL and a Jira key stay the issue forms.
 - **The observation log names what it cannot read (task 281).** `queue` and `scan` return
   `invalidStatus`, the file names of entries whose `status:` is outside
   `open | actioned | declined | superseded | parked`; they are still counted open, and `doctor`

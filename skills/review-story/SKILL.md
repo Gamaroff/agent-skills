@@ -2619,9 +2619,17 @@ stale by design**: Step 2 then reviews it again.
 {CHANGES_SECTION}
 EOF
 
+   # REVIEW_N: this review's number — the `{n}` of the report just written
+   # (`story.{prd}.{epic}.{story}.review.{n}.…`); for a standalone validate, which
+   # writes no numbered report, the next unused number in the story directory.
+   # Bound here because this block is its own shell. Review 1 reads the bare
+   # marker already on a live issue, so `-1` is safe on an issue that predates this.
+   REVIEW_N="{n}"
+   case "$REVIEW_N" in ''|*[!0-9]*|0|0[0-9]*) echo "HALT: REVIEW_N must be this review's report number (got '$REVIEW_N')"; exit 1 ;; esac
+
    node .agents/skills/review-story/references/tracker-comment.js \
      --issue "$REVIEW_ISSUE" --body-file .claude/state/comment-body.md \
-     --stage review-story \
+     --stage "review-story-${REVIEW_N}" \
      --slot outcome="{plain-language outcome — see the table below}" \
      --slot blocking="${CRITICAL}" \
      --json \

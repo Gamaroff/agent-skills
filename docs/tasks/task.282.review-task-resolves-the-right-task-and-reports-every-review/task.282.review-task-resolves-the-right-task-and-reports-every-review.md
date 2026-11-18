@@ -5,16 +5,17 @@ type: task
 description: "Resolve an all-digits review argument as a task id before a GitHub issue number, and key the review-task tracker comment by review number so a second review's verdict reaches the tracker."
 tags: [review-task, review-story, tracker-comment, observation]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-11-06
-updated: 2026-11-06
+updated: 2026-11-18
 estimated_effort_hours: 8
 ---
 
 # Task 282: review-task resolves the right task and reports every review
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.282.review.1.review-task-resolves-the-right-task-and-reports-every-review.md` implemented 2026-11-18
 
 ---
 
@@ -22,7 +23,7 @@ estimated_effort_hours: 8
 
 Two defects in `review-task` (obs #128, #129): a bare number is read as a GitHub issue, not a task; and a second review's comment is swallowed by the first review's marker, reported as success.
 
-**Scope**: `review-task` (and siblings that take a bare number) Input Resolution, and the `review-task`/`review-story` stage key in `tracker-comment.js`.
+**Scope**: `review-task` and `develop-task` Step 0a (the two that take a bare task number) Input Resolution, and the `review-task`/`review-story`/`review-bug` stage key in `tracker-comment.js`.
 
 ---
 
@@ -53,12 +54,13 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 ### Target Architecture
 
 - **Resolution**: an all-digits argument resolves as a task id first: `docs/tasks/task.{N}.*/task.{N}.*.md`, then the registry row, then `git worktree list` / `git log --all -- 'docs/tasks/task.{N}.*'` to name the branch or worktree holding it; only then as an issue number. A document found elsewhere is reported and the review runs there. `#297` and URLs stay the unambiguous issue forms (obs #128).
-- **Marker**: the `review-task` (and `review-story`) stage takes the review report number as its suffix, like the cycle-scoped stages; the Step 2 skip rule treats `already` as posted only when the marker it hit belongs to this run's report (obs #129).
+- **Marker**: `review-task`, `review-story` and `review-bug` join `CYCLE_SCOPED_STAGES` (`tracker-comment.js`) and `CYCLE_SCOPED_LEAD_STAGES` (`stakeholder-summary.js`), so `review-task-N` is a known stage. **Review 1 keeps the bare key** (`--stage review-task`) so an existing marker on a live issue still reads `already`; review N>=2 passes `review-task-N`, where N is the review report number (`next_numbered`, Step 8). A standalone action-plan-only review writes no report, so it passes the bare key and a second one dedupes. The Step 2 skip rule treats `already` as posted only for the key this run's report number produced (obs #129).
 
 ### Important Clarifications
 
 - The stage list in `tracker-comment.js` is validated and has a lead-catalogue peer (`stakeholder-summary.js`); the new suffix form must be registered in both so the lead test stays green.
-- Whether `review-story`, `review-bug` and `review-epic` have the same defect is `(unverified: the plan greps their stage use)`.
+- Verified 2026-11-18 (`call-sites.js --engine tracker-comment.js`): `review-story` (`skills/review-story/SKILL.md:2624`) and `review-bug` (`skills/review-bug/SKILL.md:201`) have the same defect; `review-epic` posts no review comment stage. A bare marker does not match a suffixed one (the marker ends at `-->`), so `review-task-2` cannot hit review 1's marker.
+- **Bare-number sites**, defined by `git grep -n -i "bare issue number\|all digits" -- shared/resources skills ':!*/references/*'`: in scope `skills/review-task/SKILL.md:91` and `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md:99` (develop-task Step 0a). Out of scope: story (ids are `P.E.S`, no flat number), epic (refuses a bare number), PR (a bare number is a PR number by contract).
 
 ---
 
@@ -66,8 +68,8 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 
 ### In Scope
 
-✅ **Bare-number resolution** in `review-task` and the siblings that share the wording.
-✅ **Numbered review stage** and the Step 2 skip rule.
+✅ **Bare-number resolution** in `review-task` and `develop-task` Step 0a.
+✅ **Numbered review stage** for `review-task`, `review-story` and `review-bug`, and the Step 2 skip rule.
 ✅ **Tests** for both.
 
 ### Out of Scope
@@ -79,7 +81,7 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 
 ## 5. Breaking Changes
 
-None - the first review's stage key may change shape; the plan checks that an existing marker on a live issue still reads `already` for review 1.
+None - review 1 keeps the bare stage key, so an existing marker on a live issue still reads `already` for review 1 (held by a fixture, § 9 Migration). Only review N>=2 uses the new `review-task-N` form.
 
 ---
 
@@ -94,10 +96,11 @@ None - the first review's stage key may change shape; the plan checks that an ex
 **Files**:
 - `shared/resources/tracker-comment.js`, its tests
 - `shared/resources/stakeholder-summary.js`, `tracker-comment-contract.md`
-- the `review-task` and `review-story` comment call sites
+- the comment call sites: `skills/review-task/SKILL.md` (two, Jira and GitHub arms), `skills/review-story/SKILL.md`, `skills/review-bug/SKILL.md`
+- prose that states the old rule: the `CYCLE_SCOPED_STAGES` doc comment (`tracker-comment.js`, "Every other stage fires at most once per run") and the `tracker-comment-contract.md` table row for once-per-issue stages (it says a suffix is exit 2 for `review-story` / `review-task`)
 
 **Changes**:
-- [ ] Stage suffix; lead catalogue entry; call sites pass the report number.
+- [x] Add `review-task`, `review-story`, `review-bug` to `CYCLE_SCOPED_STAGES` and `CYCLE_SCOPED_LEAD_STAGES`; review 1 keeps the bare key, review N>=2 passes `review-task-N`; call sites pass the report number from `next_numbered`.
 
 **Dependencies**: none.
 
@@ -108,11 +111,12 @@ None - the first review's stage key may change shape; the plan checks that an ex
 **Risk Level**: Medium
 
 **Files**:
-- `shared/resources/develop-pipeline-step-2-review.md` (or the file `git grep -n "reported .posted. or .already."` names)
+- `shared/resources/develop-pipeline-step-2-review.md` (the paragraph found by `git grep -n "one event, one writer" -- shared`; edit the shared source only, never a bundled copy)
 - `skills/review-task/SKILL.md` Input Resolution
+- `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` develop-task Step 0a (bare issue number)
 
 **Changes**:
-- [ ] Skip rule keyed to this run's report; task-id-first resolution.
+- [x] Skip rule keyed to this run's report; task-id-first resolution in both `review-task` and develop-task Step 0a.
 
 **Dependencies**: Phase 1.
 
@@ -123,7 +127,7 @@ None - the first review's stage key may change shape; the plan checks that an ex
 **Risk Level**: Low
 
 **Changes**:
-- [ ] Tests with controls (§ 8); `command npm run bundle`, `command npm run bundle -- --check`.
+- [x] Tests with controls (§ 8); `command npm run bundle`, `command npm run bundle -- --check`.
 
 **Dependencies**: Phases 1 and 2.
 
@@ -135,11 +139,11 @@ None - the first review's stage key may change shape; the plan checks that an ex
 
 1. ✅ `shared/resources/tracker-comment.js`, `stakeholder-summary.js`, `tracker-comment-contract.md`
 2. ✅ `skills/review-task/SKILL.md` and the pipeline Step 2 doc
-3. ✅ `review-story` call site
+3. ✅ `review-story` and `review-bug` call sites; develop-task Step 0a (`develop-pipeline-step-0-resolve-and-prepare.md`)
 
 ### Files to Modify (Tests)
 
-4. ✅ `shared/resources/tests/comment-slot-coverage.test.mjs` and the `tracker-comment` tests
+4. ✅ Tests that enumerate or pin the stage list, by name: `shared/resources/tests/tracker-comment.test.mjs` (`isKnownStage` and the exact `CYCLE_SCOPED_STAGES` list assertion, near `:1623`–`:1642`), `shared/resources/tests/stakeholder-summary.test.mjs` (the two-lists-one-rule test, near `:594`), `shared/resources/tests/comment-slot-coverage.test.mjs` (derives from the list; must stay green), `evals/shared/tests/transition-protocol-parity.test.mjs` (marker helper parity, near `:807`). New tests go under `shared/resources/tests/`, which `test:suite` globs; `skills/review-task/tests/` is not in the `test:suite` list and a suite there would run nowhere.
 
 ### Files to Modify (Generated)
 
@@ -154,9 +158,9 @@ None - the first review's stage key may change shape; the plan checks that an ex
 **Scope**: each change and its control.
 
 **Actions**:
-- [ ] Two reviews on one issue post two comments; the first review's re-run reads `already`; **control**: before the change the second read `already` (mutation proof).
-- [ ] `243` resolves to `task.243` when a task document exists, and to an issue only when none does; **control**: `#243` and a URL stay issue forms.
-- [ ] A task present only on another branch is named with that branch.
+- [x] Two reviews on one issue post two comments; the first review's re-run reads `already`; **control**: before the change the second read `already` (mutation proof).
+- [x] `243` resolves to `task.243` when a task document exists, and to an issue only when none does; **control**: `#243` and a URL stay issue forms.
+- [x] A task present only on another branch is named with that branch.
 
 **Command**: `CI=true command node --test` on the named files.
 
@@ -268,6 +272,10 @@ None identified.
 | Date       | Version | Description                                         | Author      |
 | ---------- | ------- | --------------------------------------------------- | ----------- |
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #128, #129    | create-task |
+| 2026-11-18 | 1.1     | Review passed (8/10) — review-1 key pinned, siblings and tests named, skip-rule grep corrected, review-bug added | review-task |
+| 2026-11-18 |         | Status → ready-for-development                      | review-task |
+| 2026-11-18 |         | Implemented: numbered review stages, Step 2 skip rule, task-id-first bare-number resolution; `ci:fast` green | develop |
+| 2026-11-18 |         | Status → ready-for-review                           | develop |
 <!-- change-log-end -->
 
 ---
@@ -275,13 +283,13 @@ None identified.
 ## Progress Tracking
 
 ### Phase 1: Numbered review stage
-- [ ] Stage, lead, call sites
+- [x] Stage, lead, call sites
 
 ### Phase 2: Skip rule and bare-number resolution
-- [ ] Both rules
+- [x] Both rules
 
 ### Phase 3: Tests, bundle and sweep
-- [ ] Bundle clean
+- [x] Bundle clean
 
 ---
 
@@ -304,4 +312,4 @@ None.
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review

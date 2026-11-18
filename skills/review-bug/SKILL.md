@@ -196,9 +196,16 @@ cat > .claude/state/comment-body.md <<EOF
 **Review artifact**: \`${REVIEW_FILE}\`
 EOF
 
+# REVIEW_N: this review's number — the `{N}` of the report written above, or the
+# number computed above when no report was written. Bound here: this block is its
+# own shell. Review 1 reads the bare marker already on a live issue, so `-1` is
+# safe on an issue that predates this.
+REVIEW_N="{N}"
+case "$REVIEW_N" in ''|*[!0-9]*|0|0[0-9]*) echo "HALT: REVIEW_N must be this review's report number (got '$REVIEW_N')"; exit 1 ;; esac
+
 node .agents/skills/review-bug/references/tracker-comment.js \
   --issue "${TRACKER_ISSUE}" --body-file .claude/state/comment-body.md \
-  --stage review-bug \
+  --stage "review-bug-${REVIEW_N}" \
   --slot outcome="{plain-language outcome — see below}" \
   --slot blocking="${CRITICAL}" \
   --json
