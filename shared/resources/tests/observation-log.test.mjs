@@ -1008,6 +1008,234 @@ test("queue reconciles: every file lands in exactly one bucket", () => {
   }
 });
 
+// ── a status outside the enum is named, counted open, and repairable (task 281)
+
+test("queue and scan name an entry whose status is outside the enum, and still count it open", () => {
+  // MUTATION: make isInvalidStatus() return false (or drop the invalidStatus
+  // push in cmdQueue / cmdScan).
+  //
+  // The 2026-10-23 review found entry #44 reading `status: resolved`: `queue`
+  // counted it open (78 = 77 + 1) and nothing said why (obs #93). CONTROL: the
+  // legal and the statusless entries beside it are NOT in the list — a list
+  // that named every entry would pass a presence check and mean nothing.
+  const { dir, P } = initWs("invalid-status");
+  try {
+    obs(P, "0001-legal.md", { id: 1, status: "open" });
+    obs(P, "0002-parked.md", { id: 2, status: "parked", parked_until: '"x"' });
+    obs(P, "0003-nostatus.md", { id: 3 });
+    obs(P, "0004-bad.md", { id: 4, status: "resolved" });
+    obs(P, "0005-case.md", { id: 5, status: "Open" });
+    const q = cli(["queue", "--workspace", dir, "--json"]);
+    assert.deepEqual(q.json.invalidStatus, ["0004-bad.md", "0005-case.md"]);
+    assert.ok(q.json.open.includes("0004-bad.md"), "still counted open");
+    assert.deepEqual(
+      q.json.statusless,
+      ["0003-nostatus.md"],
+      "statusless is another fact",
+    );
+    assert.equal(q.json.reconciled, true);
+    const s = cli(["scan", "--workspace", dir, "--json"]);
+    assert.deepEqual(s.json.invalidStatus, ["0004-bad.md", "0005-case.md"]);
+    // The `--status` filter narrows entries, not what is wrong with the log.
+    const f = cli(["scan", "--workspace", dir, "--status", "parked", "--json"]);
+    assert.deepEqual(f.json.invalidStatus, ["0004-bad.md", "0005-case.md"]);
+    assert.equal(f.json.entries.length, 1);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("queue and scan report an empty invalidStatus list on a log with only legal statuses", () => {
+  // CONTROL for the test above: the lists are present and empty, not absent.
+  const { dir, P } = initWs("legal-status");
+  try {
+    obs(P, "0001-a.md", { id: 1, status: "open" });
+    obs(P, "0002-b.md", { id: 2 });
+    obs(P, "0003-c.md", { id: 3, status: "actioned", resolved: "2026-09-08" });
+    const q = cli(["queue", "--workspace", dir, "--json"]);
+    assert.deepEqual(q.json.invalidStatus, []);
+    const s = cli(["scan", "--workspace", dir, "--json"]);
+    assert.deepEqual(s.json.invalidStatus, []);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("doctor fails its status-legal check naming the file, and passes it on a legal log", () => {
+  // MUTATION: delete the status-legal push in cmdDoctor.
+  const bad = initWs("doctor-bad-status");
+  const good = initWs("doctor-good-status");
+  const other = ws("doctor-status-root");
+  const home = tempHome("doctor-status");
+  try {
+    obs(bad.P, "0044-resolved.md", { id: 44, status: "resolved" });
+    obs(good.P, "0001-ok.md", { id: 1, status: "open" });
+    const run = (dir) =>
+      cli(["doctor", "--workspace", dir, "--audit-root", other, "--json"], {
+        env: isolatedEnv(home),
+      });
+    const rb = run(bad.dir).json;
+    const cb = rb.checks.find((c) => c.check === "status-legal");
+    assert.equal(cb.ok, false);
+    assert.match(cb.detail, /0044-resolved\.md/);
+    assert.equal(rb.healthy, false);
+    assert.equal(rb.reason, "ok", "reason and exit code are unchanged");
+    const rg = run(good.dir).json;
+    assert.equal(rg.checks.find((c) => c.check === "status-legal").ok, true);
+  } finally {
+    cleanup(bad.dir);
+    cleanup(good.dir);
+    cleanup(other);
+    cleanup(home);
+  }
+});
+
+test("set-status --repair --expect-status <illegal> repairs the entry; a mistyped guard writes nothing", () => {
+  // MUTATION: restore the enum check on --expect-status for --repair (drop the
+  // `if (args.repair)` branch) — the first call then exits 2 and the entry
+  // keeps reading `resolved`.
+  const { dir, P } = initWs("repair");
+  try {
+    obs(P, "0044-x.md", { id: 44, status: "resolved" });
+    const call = (expect, extra = []) =>
+      cli([
+        "set-status",
+        "--workspace",
+        dir,
+        "--id",
+        "44",
+        "--status",
+        "actioned",
+        "--resolution",
+        "repaired",
+        "--repair",
+        "--expect-status",
+        expect,
+        ...extra,
+        "--json",
+      ]);
+    const wrong = call("resolvd");
+    assert.equal(wrong.json.reason, "status-changed");
+    assert.equal(wrong.code, 1);
+    assert.match(
+      readFileSync(join(P.logDir, "0044-x.md"), "utf8"),
+      /status: resolved/,
+    );
+    const ok = call("resolved");
+    assert.equal(ok.json.reason, "ok", JSON.stringify(ok.json));
+    const text = readFileSync(join(P.logDir, "0044-x.md"), "utf8");
+    assert.match(text, /status: "?actioned/);
+    assert.match(text, /resolution: "repaired"/);
+    const q = cli(["queue", "--workspace", dir, "--json"]);
+    assert.deepEqual(q.json.invalidStatus, [], "no longer invalid");
+    assert.deepEqual(
+      q.json.resolved,
+      ["0044-x.md"],
+      "now resolved, so it archives",
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("set-status --repair cannot be used to skip the guard on a legal status or without a guard", () => {
+  // CONTROL for the repair: it applies only to an ILLEGAL literal. Without
+  // --repair, an unknown --expect-status is still a usage error (unchanged).
+  const { dir, P } = initWs("repair-controls");
+  try {
+    obs(P, "0001-x.md", { id: 1, status: "open" });
+    const base = [
+      "set-status",
+      "--workspace",
+      dir,
+      "--id",
+      "1",
+      "--status",
+      "actioned",
+      "--json",
+    ];
+    const legal = cli([...base, "--repair", "--expect-status", "open"]);
+    assert.equal(legal.code, 2);
+    assert.match(legal.json.error, /legal status/);
+    const bare = cli([...base, "--repair"]);
+    assert.equal(bare.code, 2);
+    assert.match(bare.json.error, /requires --expect-status/);
+    const unrepaired = cli([...base, "--expect-status", "opn"]);
+    assert.equal(unrepaired.code, 2);
+    const scan = cli(["scan", "--workspace", dir, "--repair", "--json"]);
+    assert.equal(scan.code, 2);
+    assert.match(scan.json.error, /does not accept --repair/);
+    assert.match(
+      readFileSync(join(P.logDir, "0001-x.md"), "utf8"),
+      /status: open/,
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("set-status --status open returns a parked entry to open and clears parked_until; every other source refuses", () => {
+  // MUTATION: drop the `args.status === "open"` guard in cmdSetStatus. The
+  // CONTROL cases below then succeed and the entry changes: before task 281
+  // the engine accepted `open` from any status with no guard.
+  const { dir, P } = initWs("reopen");
+  try {
+    obs(P, "0001-p.md", {
+      id: 1,
+      status: "parked",
+      parked_until: '"task.9 merged"',
+    });
+    obs(P, "0002-a.md", { id: 2, status: "actioned", resolved: "2026-09-08" });
+    obs(P, "0003-o.md", { id: 3, status: "open" });
+    const open = (id, extra) =>
+      cli([
+        "set-status",
+        "--workspace",
+        dir,
+        "--id",
+        String(id),
+        "--status",
+        "open",
+        ...extra,
+        "--json",
+      ]);
+    // No guard: refused, nothing written.
+    for (const id of [1, 2, 3]) {
+      const r = open(id, []);
+      assert.equal(r.code, 2, `id ${id}`);
+      assert.match(r.json.error, /expect-status parked/);
+    }
+    // A guard naming the wrong status is refused too (actioned is not parked).
+    const wrong = open(2, ["--expect-status", "actioned"]);
+    assert.equal(wrong.code, 2);
+    assert.match(
+      readFileSync(join(P.logDir, "0002-a.md"), "utf8"),
+      /status: actioned/,
+    );
+    assert.match(
+      readFileSync(join(P.logDir, "0001-p.md"), "utf8"),
+      /status: parked/,
+    );
+    // The parked entry returns, with the guard checked on the file written.
+    const stale = open(3, ["--expect-status", "parked"]);
+    assert.equal(
+      stale.json.reason,
+      "status-changed",
+      "an open entry is not parked",
+    );
+    const ok = open(1, ["--expect-status", "parked"]);
+    assert.equal(ok.json.reason, "ok", JSON.stringify(ok.json));
+    const text = readFileSync(join(P.logDir, "0001-p.md"), "utf8");
+    assert.match(text, /status: "?open/);
+    assert.match(text, /^parked_until:\s*$/m, "parked_until is cleared");
+    const q = cli(["queue", "--workspace", dir, "--json"]);
+    assert.ok(q.json.open.includes("0001-p.md"));
+    assert.deepEqual(q.json.parked, []);
+  } finally {
+    cleanup(dir);
+  }
+});
+
 // ── doctor ───────────────────────────────────────────────────────────────────
 
 test("doctor reports fork-detected when a second skill-observations/ exists", () => {

@@ -5,16 +5,16 @@ type: task
 description: "Make the observation engine report out-of-enum statuses instead of counting them open, let set-status repair them, give the review cycle a propose-a-task decision, and let a parked entry return to open."
 tags: [observe-work, observation]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-11-06
-updated: 2026-11-06
+updated: 2026-11-18
 estimated_effort_hours: 8
 ---
 
 # Task 281: The observation log names what it cannot read
 
-**Status:** Planned
+**Status:** Ready for Review
 
 ---
 
@@ -22,7 +22,7 @@ estimated_effort_hours: 8
 
 The observation engine and its review cycle have two silent gaps and one missing decision (obs #93, #155). An entry with an illegal status counts as open with no warning and cannot be repaired through the engine. The review cycle has no decision for a cluster that needs an engine change, and a parked entry cannot return to open.
 
-**Scope**: `shared/resources/observation-log.js` (`scan`, `queue`, `doctor`, `set-status`), `review-cycle.md`, their tests and the contract.
+**Scope**: `shared/resources/observation-log.js` (`scan`, `queue`, `doctor`, `set-status`), `skills/observe-work/references/review-cycle.md` and `skills/observe-work/SKILL.md`, their tests and the contract.
 
 ---
 
@@ -47,18 +47,19 @@ The observation engine and its review cycle have two silent gaps and one missing
 
 ### Current Architecture
 
-Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
+Verified by `grep` and by running the engine on 2026-11-18 at `develop` `e092cf6eb` (review 1 corrected the 2026-11-06 reading).
 
-- `shared/resources/observation-log.js:742`–`:781`: `scan` builds a `statusless` list (`:742`, `:752`, `:781`) from entries with no `status` key; there is no list for a present-but-illegal value `(unverified: the plan reads :735–:790 for how queue classifies)`.
-- `set-status` accepts four statuses and `--expect-status`; `write` and `set-status` refuse illegal values (obs #93), so the hole is a hand edit.
-- `skills/observe-work/references/review-cycle.md` offers apply, decline, park and carry (obs #155); `grep -n -i "propose" shared/resources/review-cycle.md` is the plan's first read.
+- `shared/resources/observation-log.js:733`–`:790` (`cmdQueue`): builds the `statusless` list (`:742`, `:752`, `:781`) from entries with no `status` key. A present-but-illegal value (`status: resolved`) goes to `open` through `statusOf` (`:310`) with no list. `cmdScan` (`:669`) has no `statusless` list; it returns each entry's raw `status`, so an illegal value shows there with nothing flagging it.
+- `STATUS_VALUES` (`:98`) holds five values, **including `open`**. `set-status` therefore already accepts `--status open` from any current status with no guard (a dry run on `actioned` and on `parked` entries returns `dry-run`), so "a parked entry cannot return to open" is true only of the prose: `review-cycle.md` and the docs list four statuses. `--expect-status` is validated against the same five values (`:1032`), which is what blocks `--expect-status resolved`.
+- `write` and `set-status --status` refuse illegal values (obs #93), so the hole is a hand edit.
+- `skills/observe-work/references/review-cycle.md` is an **authored** reference (tracked there; `skills/observe-work/tests/observe-work.test.js` lists it among the five authored references). `shared/resources/review-cycle.md` does not exist. It offers four decisions: apply, decline, park and carry (obs #155).
 
 ### Target Architecture
 
-- `scan` and `queue` return an `invalidStatus` list beside `statusless`; they still count the entry open; `doctor` reports its count (obs #93 items 1 and 3).
-- `set-status` accepts `--expect-status` with any literal when the current value is outside the enum, or a `--repair` flag (obs #93 item 2).
-- `set-status` accepts `open` from `parked` (obs #155), recorded with the same `--expect-status` guard.
-- `review-cycle.md` gains a fifth decision, "propose a task": the entry stays open, the summary names the cut and its ids, and `/create-task --from-observation` runs only on the user's yes; Step 7 says a scoped review records its scope (obs #155).
+- `queue` and `scan` return a top-level `invalidStatus` list (entry file names) beside `statusless` (in `queue`); the entry is still counted open; `doctor` gains a `status-legal` check that fails, naming the files, when the list is not empty (obs #93 items 1 and 3).
+- `set-status` gains a `--repair` flag (obs #93 item 2): `--repair --expect-status <the illegal literal>` repairs an entry reading `resolved`. `--repair` refuses a legal literal and a missing guard (exit 2), and without it an unknown `--expect-status` stays a usage error — the existing test `set-status --expect-status refuses when the entry changed…` pins that, so relaxing `--expect-status` was not an option (review 1 first chose it, then the develop step found the pin). A mistyped literal under `--repair` writes nothing (`status-changed`, exit 1).
+- `set-status --status open` is accepted only with `--expect-status parked`; any other use exits 2 `usage`, naming the rule (obs #155). This tightens a transition the engine accepts today without a guard; no existing caller uses it (`git grep -- '--status open'` finds none). No new `reason` value.
+- `skills/observe-work/references/review-cycle.md` gains a fifth decision, "propose a task": the entry stays open, the summary names the cut and its ids, and `/create-task --from-observation` runs only on the user's yes; Step 7 says a scoped review records its scope (obs #155). `skills/observe-work/SKILL.md`'s Session Start `doctor` table gains a `status-legal` row.
 
 ### Important Clarifications
 
@@ -102,7 +103,7 @@ None - new fields and a newly accepted transition.
 - `shared/resources/observation-log-contract.md`
 
 **Changes**:
-- [ ] `invalidStatus` in `scan`/`queue`; `doctor` count.
+- [x] `invalidStatus` in `scan`/`queue`; `doctor` count.
 
 **Dependencies**: none.
 
@@ -116,7 +117,7 @@ None - new fields and a newly accepted transition.
 - `shared/resources/observation-log.js`, its tests
 
 **Changes**:
-- [ ] Repair path; `parked → open`.
+- [x] Repair path (`--repair --expect-status <illegal literal>`); `open` only from `parked`.
 
 **Dependencies**: none.
 
@@ -127,10 +128,11 @@ None - new fields and a newly accepted transition.
 **Risk Level**: Low
 
 **Files**:
-- `shared/resources/review-cycle.md`
+- `skills/observe-work/references/review-cycle.md` (authored in place; not a bundled copy)
+- `skills/observe-work/SKILL.md` (the Session Start `doctor` table)
 
 **Changes**:
-- [ ] Propose-a-task decision; scoped-review note.
+- [x] Propose-a-task decision; scoped-review note; `status-legal` row.
 
 **Dependencies**: none.
 
@@ -141,7 +143,7 @@ None - new fields and a newly accepted transition.
 **Risk Level**: Low
 
 **Changes**:
-- [ ] `command npm run bundle`, `command npm run bundle -- --check`; mutation proofs.
+- [x] `command npm run bundle`, `command npm run bundle:check`; mutation proofs.
 
 **Dependencies**: Phases 1 to 3.
 
@@ -153,11 +155,12 @@ None - new fields and a newly accepted transition.
 
 1. ✅ `shared/resources/observation-log.js` - lists, repair, reopen
 2. ✅ `shared/resources/observation-log-contract.md` - new fields
-3. ✅ `shared/resources/review-cycle.md` - fifth decision
+3. ✅ `skills/observe-work/references/review-cycle.md` - fifth decision, scoped-review note
+4. ✅ `skills/observe-work/SKILL.md` - `status-legal` row in the Session Start `doctor` table
 
 ### Files to Modify (Tests)
 
-4. ✅ the observation-log engine tests under `shared/resources/tests/`
+5. ✅ the observation-log engine tests: `shared/resources/tests/observation-log.test.mjs`
 
 ### Files to Modify (Generated)
 
@@ -172,16 +175,17 @@ None - new fields and a newly accepted transition.
 **Scope**: each engine change and its control.
 
 **Actions**:
-- [ ] An entry with `status: resolved` appears in `invalidStatus` and is counted open; **control**: a legal-status log has an empty list.
-- [ ] `set-status` repairs it with the guard; **control**: without the guard or on a legal entry it refuses as before.
-- [ ] `parked → open` succeeds with `--expect-status parked`; **control**: `actioned → open` still refuses.
-- [ ] Mutation proofs for each.
+- [x] An entry with `status: resolved` appears in `invalidStatus` in `queue` and in `scan`, is still counted open, and makes `doctor`'s `status-legal` check fail naming the file; **control**: a legal-status log has an empty list and a passing check (including an entry with no `status:`, which is `statusless`, not invalid).
+- [x] `set-status --repair --expect-status resolved --status actioned` repairs it; **control**: a mistyped literal under `--repair` (`resolvd`) exits 1 `status-changed` and writes nothing; `--repair` with a legal literal or with no guard exits 2; and without `--repair` an unknown `--expect-status` is still exit 2.
+- [x] `set-status --status open --expect-status parked` returns the entry to open and clears `parked_until`; **control**: `--status open` on an `actioned` entry, on an `open` entry, and with no guard each exit 2 `usage`, and nothing is written.
+- [x] Mutation proofs for each: make `isInvalidStatus` return false, apply the enum check under `--repair`, drop the `parked` requirement on `open`, make the doctor check always pass; each turns its named test red.
+- [x] `skills/observe-work/tests/observe-work.test.js` asserts `review-cycle.md` names the fifth decision and the scoped-review rule (a documentation criterion, held by a test that reads the file).
 
 **Command**: `CI=true command node --test` on the named files.
 
 ### Regression
 
-**Command**: `CI=true command npm test`; `command npm run bundle -- --check`.
+**Command**: `CI=true command npm test`; `command npm run bundle:check`.
 
 ---
 
@@ -190,8 +194,8 @@ None - new fields and a newly accepted transition.
 ### Functional
 
 - [ ] The #44 shape is named and repairable, shown by named tests in the QA report.
-- [ ] A parked entry returns to open, shown by a named test.
-- [ ] `review-cycle.md` lists five decisions (grep in the QA report).
+- [ ] A parked entry returns to open, and no other status does, shown by named tests in the QA report.
+- [ ] `skills/observe-work/references/review-cycle.md` lists five decisions (grep in the QA report).
 
 ### Performance
 
@@ -200,7 +204,7 @@ None - new fields and a newly accepted transition.
 ### Code Quality
 
 - [ ] Each change has a mutation proof in the QA report.
-- [ ] `command npm run bundle -- --check` reports 0 problems; `CI=true command npm test` passes.
+- [ ] `command npm run bundle:check` reports 0 problems; `CI=true command npm test` passes.
 - [ ] `command node shared/resources/observation-log.js doctor --json` runs clean against the live log.
 
 ### Migration
@@ -230,7 +234,7 @@ None identified.
 - **Risk**: parked work reopened by habit.
 - **Probability**: Low
 - **Impact**: Minor
-- **Mitigation**: the guard and a resolution note.
+- **Mitigation**: the `--expect-status parked` guard; `open` is refused from every other status.
 - **Rollback**: remove the transition.
 
 ---
@@ -245,7 +249,7 @@ None identified.
 
 **Steps**:
 1. `git revert` the merge commit.
-2. `command npm run bundle -- --check`.
+2. `command npm run bundle:check`.
 
 **Verification**: `CI=true command npm test` is green.
 
@@ -284,6 +288,9 @@ None identified.
 | Date       | Version | Description                                         | Author      |
 | ---------- | ------- | --------------------------------------------------- | ----------- |
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #93, #155     | create-task |
+| 2026-11-18 | 1.1     | Review passed (8/10) after fixes: review-cycle.md path corrected to the skill's authored reference; line anchors moved to cmdQueue; `open` already accepted by set-status, so the task now tightens it to parked-only; repair via relaxed `--expect-status`; `status-legal` doctor check and SKILL.md row added | review-task |
+|            |         | Status → ready-for-development                      | review-task |
+| 2026-11-18 |         | Implemented — 10 files, 7 engine tests + 3 skill tests; repair route changed from a relaxed `--expect-status` to a `--repair` flag because an existing test pins the usage error | develop |
 <!-- change-log-end -->
 
 ---
@@ -291,16 +298,16 @@ None identified.
 ## Progress Tracking
 
 ### Phase 1: Invalid status is named
-- [ ] Lists and doctor
+- [x] Lists and doctor
 
 ### Phase 2: set-status repair and reopen
-- [ ] Both transitions
+- [x] Both transitions
 
 ### Phase 3: The review cycle
-- [ ] Fifth decision
+- [x] Fifth decision
 
 ### Phase 4: Bundle and sweep
-- [ ] Bundle clean
+- [x] Bundle clean
 
 ---
 
@@ -323,4 +330,4 @@ None.
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review
