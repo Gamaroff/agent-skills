@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **develop-next reads the world before it stops (task 279).** Step 0.1a now runs
+  `skills/develop-next/scripts/halt-evidence.mjs` before it stops on a recorded HALT: when the
+  document reads `accepted` (a bug: `closed`) and its PR is `MERGED`, the halt is cleared and the run
+  carries on; any other state, a failed PR query or a missing `prNumber` still stops. Step 3 says
+  where the quality-gate worktree goes (beside the checkout, never under `/tmp`, `/var/tmp` or
+  `.claude/worktrees/`), and `develop-next`, `develop-task`, `develop-story` and `develop-bug` open
+  with a Session Start line that runs the observe-work protocol once when the skill is installed.
+  Resolves observations #138 and #157.
 - **The skill-resolution rule covers a Skill result with no `Base directory` line (task 313).**
   The rule now says what a pipeline does when there is no identity to check: skip the check, treat the
   load as `unreadable`, log it and proceed with the loaded copy, instead of reading the empty

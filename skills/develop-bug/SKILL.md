@@ -51,6 +51,8 @@ Resolution order: `references/develop-bug-step-0-resolve-bug.md` §0d. The engin
 
 ## Phase 0: Resolve & Prepare
 
+**Session Start (obs #157).** If the `observe-work` skill is installed and its Session Start Protocol has not run this session, run it now, once, before the first tool call below. Skip silently when the skill is not installed.
+
 See [`references/develop-bug-step-0-resolve-bug.md`](references/develop-bug-step-0-resolve-bug.md) for the full resolve-and-prepare protocol: bug-file resolution across the three modes (0a), pipeline lock state check (0b), upfront context reading — severity/priority/status/related/reproduction, plus lite-mode detection (0c), upfront prompts via AskUserQuestion (0d — **Q1 branch model** bugfix-vs-hotfix, **Q2 base branch**, **Q3 PR target**, each with an auto-derived recommended option), implementation report creation (0e), and pre-flight summary (0f).
 
 > The bug's **severity/priority** drives lite-mode detection and fix urgency; the bug's **mode** (story/task/general) drives where the fix record and parent linkage are written. Both are resolved here, once.
