@@ -6,6 +6,7 @@ description: "Make the observation engine report out-of-enum statuses instead of
 tags: [observe-work, observation]
 category: refactoring
 status: ready-for-review
+pr_number: 920
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-18

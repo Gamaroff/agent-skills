@@ -123,9 +123,9 @@ _Track each QA review/fix cycle._
 **HIGH findings**: 0
 **MEDIUM findings**: 0
 **Traceability**: skipped (mapper not dispatched — QA ran inline)
-**PR Review**: pending (Step 5c)
+**PR Review**: APPROVE
 **Loop exit**: PASS gate with no open entries — exit to Step 5c
-**Action**: Running review-pr (5c)
+**Action**: Proceeding to 5c — review-pr APPROVE, proceeding to finalise
 
 ---
 
