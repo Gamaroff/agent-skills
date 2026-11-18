@@ -6,6 +6,7 @@ description: "Make three checks look at what actually ships: flag a quote inside
 tags: [create-skill, observation]
 category: refactoring
 status: ready-for-review
+pr_number: 919
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-18
@@ -60,7 +61,7 @@ Re-verified by `grep` on 2026-11-18 at `develop` `ce2fed589` (the first measurem
 
 - **Lint** (obs #47): flag a `'` (or any unescaped quote) inside the word of a `"${NAME:?word}"`, in `unbound-default-reads.test.js`; the convention is stated beside the loud-failure-guard rule in `create-skill`. The lint has no current offender, so its test is a fixture pair (flagged, and the control that is not).
 - **Fence reader** (obs #48): a test that executes or lints a ` ```bash ` / ` ```sh ` block from a `SKILL.md` or shared resource gets its blocks from `extractBlocks`. A repository-wide **fence-balance** check fails a file that ends with a fence still open, or that closes a fence that was never opened, so an unbalanced fence fails when it is authored. **The check is a balance check, not a count equality** (review finding, measured 2026-11-18): comparing `extractBlocks`' bash-block count with the raw ` ^\s*```bash ` line count fails five balanced files, because an example ` ```bash ` fence nested inside a ` ````markdown ` wrapper is a raw line but correctly not a block (`shared/resources/security-review-prompt.md` 1 vs 2, `skills/create-parallel-stories/SKILL.md` 10 vs 14, `skills/mermaid-architect/SKILL.md` 0 vs 1, `skills/qa-story/SKILL.md` 24 vs 25, `skills/qa-task/SKILL.md` 26 vs 27). The balance walk lives beside `extractBlocks` in `qa-execute-snippets.mjs` as one new export that shares its line walk, so there is one fence definition; `extractBlocks`' output does not change.
-- **Hand-written fence readers in `tests/`** are held by a ratchet: a guard test fails on a regex literal or `matchAll`/`match` over a triple backtick fence in `tests/` that is not in an allowlist. Each allowlist entry carries a reason (a non-bash language such as `yaml`/`mermaid`/`markdown`, which `extractBlocks` does not read; a scanner that tracks fence state line by line and extracts no body; a fixture string). Extractors of ` ```bash ` / ` ```sh ` bodies are migrated to `extractBlocks`, not allowlisted.
+- **Hand-written fence readers in `tests/`** are held by a ratchet: a guard test fails on a regex literal or `matchAll`/`match` over a triple backtick fence in `tests/` that is not in an allowlist. Each allowlist entry carries a reason (a non-bash language such as `yaml`/`mermaid`/`markdown`, which `extractBlocks` does not read; a scanner that tracks fence state line by line and extracts no body; a fixture string). Extractors of ` ```bash ` bodies are migrated to `extractBlocks`, not allowlisted; a reader of ` ```sh ` fences stays allowlisted with the reason that `extractBlocks` returns `bash` only.
 - **Discovery** (obs #112): `discover_needed` (or `bundle:check`) scans skill-owned `references/*.md` for the invocation form and fails when the named script is neither present nor vendorable.
 
 ### Important Clarifications
@@ -123,7 +124,7 @@ None - the checks start failing on defects already present; Phase 1 to 3 fix tho
 - a new ratchet test beside `tests/fence-balance.test.js`
 
 **Changes**:
-- [x] Switch each bash/sh extractor to `extractBlocks` (a scanner that must keep a line number may keep its walk and say why in the allowlist); a rule in `create-skill`; a ratchet test that fails on a hand-written fence reader in `tests/` that is not allowlisted, with a non-vacuity fixture (a regex literal the ratchet must flag) and the allowlist's count recorded.
+- [x] Switch each bash/sh extractor to `extractBlocks` (a scanner that must keep a line number may keep its walk and say why in the allowlist); a rule in `create-skill`; **delivered as 2 migrated (`halt-fence`, `worktree-root-coverage`) and 17 allowlisted with a stated reason, of which two (`tests/unbound-default-reads.test.js` and `tests/fenced-bash-optional-file-globs.test.js`) stay on their own reader because they read `sh` fences too and `extractBlocks` returns `bash` only (the `SH_TOO` reason); the rest are line-state scanners or section slices, or read a non-bash language**; a ratchet test that fails on a hand-written fence reader in `tests/` that is not allowlisted, with a non-vacuity fixture (a regex literal the ratchet must flag) and the allowlist's count recorded.
 
 **Dependencies**: Phase 1.
 
@@ -172,7 +173,7 @@ The probe-scratch change is already on `develop` (§2 problem 4). No edit. The t
 
 ### Files to Modify (Tests)
 
-5. ✅ `tests/unbound-default-reads.test.js` (the `:?` lint, and its own switch to `extractBlocks`), a new `tests/fence-balance.test.js`, the new ratchet test, and the extractor tests Phase 2 lists
+5. ✅ `tests/unbound-default-reads.test.js` (the `:?` lint; its own reader stays, allowlisted as `SH_TOO` because it reads `sh` fences and `extractBlocks` returns `bash` only), a new `tests/fence-balance.test.js`, the new ratchet test, and the extractor tests Phase 2 lists
 6. ✅ `tests/bundle-check-mode.test.js` and/or `tests/bundle-transitive.test.js`, plus a fixture skill (the bundle script has no `skills/create-skill/tests/`)
 7. ✅ `package.json` only if `test-runner-reach.test.js` shows a new test file is not reached by `test:suite` (the `tests/*.test.js` glob already reaches `tests/`)
 
@@ -334,6 +335,7 @@ No open finding. The two defects the fix cycles found in the bundler discovery a
 | 2026-11-18 |         | QA gate CONCERNS (92/100) — 1 finding | qa-task |
 | 2026-11-18 |         | QA findings fixed — T280-CR-2 (all-dots capture reported UNVENDORED), 2 iterations | qa-fix |
 | 2026-11-18 |         | QA gate PASS (95/100) — 0 findings | qa-task |
+| 2026-11-18 |         | QA findings fixed — PR review PC-1..PC-3 (Phase 2 / §7 wording, pr_number, report Summary), 3 iterations | qa-fix |
 <!-- change-log-end -->
 
 ---
