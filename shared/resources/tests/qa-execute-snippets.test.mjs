@@ -4636,7 +4636,7 @@ const MARKDOWN = "reads Markdown or a table cell, not bash input";
 const NORMALISED =
   "reads bash input after NOT_A_BASH_BLANK has turned every non-blank whitespace character into a word character, so `\\s` can only match space, tab or newline";
 const WHITESPACE_ALLOWLIST = {
-  extractBlocks: MARKDOWN,
+  scanFences: MARKDOWN, // the walk behind extractBlocks and fenceProblems (task.280)
   isDelimiterRow: MARKDOWN,
   looksLikeCommand: MARKDOWN,
   fenceMask: MARKDOWN,

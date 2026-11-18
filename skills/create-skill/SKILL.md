@@ -301,6 +301,31 @@ crosses blocks crosses through a file the blocks themselves write and read. Any 
 must supply to make a block pass is the finding. task.147's tests prepended `HALT() { exit 1; }`
 and a `SCOPE_PATHS` array; both hid defects that only the QA gates found (obs #185).
 
+### A `${NAME:?message}` guard's message holds no quote
+
+**The rule.** The word of a loud-failure guard — `: "${NAME:?message}"` — contains no apostrophe or
+unescaped double quote. Inside the guard's double quotes bash reads an apostrophe as the start of a
+quote it never sees closed, so `: "${DOMAIN:?bind DOMAIN to the epic's domain directory}"` fails
+`bash -n` with `unexpected EOF while looking for matching`. Reword the message (`the domain directory
+of the epic`). Guard: `tests/unbound-default-reads.test.js`, which flags the quote in every fenced
+block of a `SKILL.md` or pipeline step doc, and whose fixture shows the apostrophe form failing
+`bash -n` (obs #47: it was found on task.205 only because a test happened to run the block).
+
+### A test that reads a bash block from a skill document uses `extractBlocks`
+
+**The rule.** A test that executes or lints the fenced `bash` blocks of a `SKILL.md` or a shared
+resource takes them from `extractBlocks` in `qa-execute-snippets.mjs`, never from a regex of its own.
+A hand-written fence regex ignores fence nesting and drops the blocks the real reader sees, so the
+test passes on a document the engines read differently: a stray four-backtick fence put two steps of
+a skill inside a code block and `tests/epic-numbering-retirement.test.js`, reading with its own regex,
+passed for five QA cycles (obs #48). Two guards hold the rule. `tests/fence-balance.test.js` fails a
+tracked `SKILL.md` or shared resource that ends with a fence still open (the check shares
+`extractBlocks`' own walk, `fenceProblems`; it is not a comparison of block counts with raw
+` ```bash ` lines, which fails documents that nest an example fence in a longer wrapper). The
+ratchet `tests/fence-reader-ratchet.test.js` fails a hand-written fence reader in `tests/` that is
+not in its allowlist; an entry carries its reason (a non-bash language, which `extractBlocks` does not
+read, or a scanner that needs state it does not return).
+
 ### Inside `shared/resources/`, a `shared/resources/` literal is a bundling instruction
 
 **The rule.** In any file under `shared/resources/` — `.md` as much as `.js` — cite a sibling by

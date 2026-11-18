@@ -194,6 +194,19 @@ function fencedBash(text) {
     .join("\n");
 }
 
+/**
+ * The `${NAME:?word}` reads whose word holds an unescaped quote (task.280, obs #47). Inside the
+ * double quotes of `"${NAME:?word}"` an apostrophe in the word opens a quote bash never sees
+ * closed: `: "${DOMAIN:?bind DOMAIN to the epic's domain directory}"` fails `bash -n` with
+ * `unexpected EOF while looking for matching`. It was caught on task.205 only because a test ran the
+ * block. The fix is wording, so the message avoids the apostrophe.
+ */
+function quotedGuardWords(fences) {
+  return [...fences.matchAll(/\$\{[A-Za-z_][A-Za-z0-9_]*:\?([^}]*)\}/g)]
+    .filter((m) => /(^|[^\\])['"]/.test(m[1]))
+    .map((m) => m[0]);
+}
+
 function filesInScope() {
   const skills = fs
     .readdirSync(path.join(REPO_ROOT, "skills"))
@@ -250,6 +263,49 @@ test("every ${NAME:-default} / ${NAME:?} read in fenced bash has a writer in its
     [],
     `KNOWN_UNBOUND pins whose name is now bound — the defect was fixed; delete the pin:\n  ${stalePins.join("\n  ")}`,
   );
+});
+
+test("no ${NAME:?word} guard word holds a quote (task.280, obs #47)", () => {
+  const offenders = [];
+  let guards = 0;
+  for (const rel of filesInScope()) {
+    const fences = fencedBash(
+      fs.readFileSync(path.join(REPO_ROOT, rel), "utf8"),
+    );
+    guards += [...fences.matchAll(/\$\{[A-Za-z_][A-Za-z0-9_]*:\?/g)].length;
+    for (const w of quotedGuardWords(fences)) offenders.push(`${rel}: ${w}`);
+  }
+  assert.ok(
+    guards >= 20,
+    `non-vacuity floor: expected ≥ 20 :? guards in scope, found ${guards}`,
+  );
+  assert.deepEqual(
+    offenders,
+    [],
+    `a quote inside a \${NAME:?word} guard breaks the block's bash parse — reword the message without it:\n  ${offenders.join("\n  ")}`,
+  );
+});
+
+test("the quote lint flags the apostrophe fixture, passes its control, and the fixture really fails bash -n (task.280)", () => {
+  const bad = `: "\${DOMAIN:?bind DOMAIN to the epic's domain directory}"`;
+  const good = `: "\${DOMAIN:?bind DOMAIN to the domain directory of the epic}"`;
+  assert.deepEqual(quotedGuardWords(bad), [
+    `\${DOMAIN:?bind DOMAIN to the epic's domain directory}`,
+  ]);
+  assert.deepEqual(quotedGuardWords(good), []);
+  // A lint is only worth trusting once the defect it names has been reproduced: the flagged
+  // fixture must fail to parse, and the control must parse.
+  const parse = (src) =>
+    require("node:child_process").spawnSync("bash", ["-n"], { input: src });
+  assert.notEqual(
+    parse(bad).status,
+    0,
+    "the apostrophe fixture must not parse",
+  );
+  assert.equal(parse(good).status, 0, "the control must parse");
+  // An apostrophe outside a :? word, and a quote the writer escaped, are not this rule's business.
+  assert.deepEqual(quotedGuardWords(`echo "it's fine"; : "\${X:-it}"`), []);
+  assert.deepEqual(quotedGuardWords(`: "\${X:?say \\"hi\\" first}"`), []);
 });
 
 test("the lists are reasoned, not wildcards — every entry names a real file#NAME that the scan reaches", () => {

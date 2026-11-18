@@ -1,0 +1,69 @@
+schema: 2
+task: 'task.280.skill-and-test-tooling-see-what-ships'
+task_title: 'Skill and test tooling see what ships'
+gate: PASS
+status_reason: 'Cycle 3 changed documentation only (PR review PC-1 to PC-3). Every claim the new task text makes was checked against the code and holds; no code moved since gate 3. No open finding; 8591 tests pass on the server.'
+reviewer: 'QA Engineer'
+head: '38bcec82df7846f9d6d28ed4ded62c5a683ccdb6'
+updated: '2026-11-18T05:41:40Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 66
+  phases_verified: '4/4 (phase 4 dropped)'
+  trace:
+    phases_covered: [1, 2, 3, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    boundary_signals: []
+    boundary_reason: 'No code changed since gate 3 (code-moved-since-gate: 0); the change set is task documentation. Gate 3 named the candidates (invoked_name, skill_owned_invocations, fenceProblems, quotedGuardWords, holdsFenceRegex) and none is a gate on untrusted input.'
+    notes: 'No input boundary; documentation-only change set.'
+  performance:
+    status: PASS
+    notes: 'Unchanged since gate 3: the new tests add about 0.5 s to a 757.9 s suite.'
+  reliability:
+    status: PASS
+    notes: 'Fast gate on the server at head 38bcec82d: 8591 tests, 0 failed.'
+  maintainability:
+    status: PASS
+    notes: 'The task now states what Phase 2 delivered (2 migrated, 17 allowlisted, why the two sh-reading readers stay), so the document and tests/fence-reader-ratchet.test.js agree.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'INVOKE_REF_RE excludes `/`, so a nested invocation path (.agents/skills/s/references/sub/x.sh) captures `sub`, and the existence check passes on the directory. QA reproduced the capture at gate 3; no document in the repository uses a nested invocation path (0 hits), and the regex is unchanged by this PR, so this is a follow-up, not a defect of this change.'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+      provenance: pre-existing
+      remedy: unverified
+    - action: 'UNVENDORED fires on any invocation-form mention of a missing file, including an example or a deleted script; consider restricting it to an invocation shape (gate 1 CR-2, low, not reproduced).'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+      remedy: unverified
+    - action: 'skill_owned_invocations skips a nested doc whose bare name equals a shared file (gate 1 CR-3, low, not reproduced).'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+      remedy: unverified
+    - action: 'The ratchet detector misses a regex with a slash inside a character class and a new RegExp reader (gate 1 CR-4, low).'
+      refs: ['tests/fence-reader-ratchet.test.js']
+      remedy: unverified
+    - action: 'The quote lint flags any unescaped quote in a guard word, not only an unbalanced one (gate 1 CR-5, cleanup).'
+      refs: ['tests/unbound-default-reads.test.js']
+      remedy: unverified
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

@@ -1,0 +1,69 @@
+schema: 2
+task: 'task.280.skill-and-test-tooling-see-what-ships'
+task_title: 'Skill and test tooling see what ships'
+gate: PASS
+status_reason: 'Cycle 2 finding T280-CR-2 is fixed and mutation-proven. The scoped review of the fix found one low-confidence edge that is the unchanged regex''s long-standing limit, recorded as a follow-up. No open finding; 8591 tests pass on the server.'
+reviewer: 'QA Engineer'
+head: '0f17b3e62d7098245c5ae9a31dcbd1c91031e367'
+updated: '2026-11-18T05:06:52Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 66
+  phases_verified: '4/4 (phase 4 dropped)'
+  trace:
+    phases_covered: [1, 2, 3, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    boundary_signals: []
+    boundary_reason: 'Candidates named: invoked_name, skill_owned_invocations, fenceProblems, quotedGuardWords, holdsFenceRegex. Each is a lint or discovery helper whose result fails a test or bundle:check; none accepts or rejects untrusted input to prevent an action.'
+    notes: 'No input boundary; the helpers read tracked repository files only.'
+  performance:
+    status: PASS
+    notes: 'The new tests add about 0.5 s to a 757.9 s suite (measured at gate 1).'
+  reliability:
+    status: PASS
+    notes: 'bundle:check clean on the real tree (129 skills, 0 problems); fast gate on the server 8591 tests, 0 failed.'
+  maintainability:
+    status: PASS
+    notes: 'One fence walk serves extractBlocks and fenceProblems; invoked_name is one helper used at both INVOKE_REF_RE sites.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'INVOKE_REF_RE excludes `/`, so a nested invocation path (.agents/skills/s/references/sub/x.sh) captures `sub`, and the existence check passes on the directory. QA reproduced the capture; no document in the repository uses a nested invocation path (0 hits), and the regex is unchanged by this PR, so this is a follow-up, not a defect of this change (gate 3 CR-1, low confidence).'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+      provenance: pre-existing
+      remedy: unverified
+    - action: 'UNVENDORED fires on any invocation-form mention of a missing file, including an example or a deleted script; consider restricting it to an invocation shape (gate 1 CR-2, low, not reproduced).'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+      remedy: unverified
+    - action: 'skill_owned_invocations skips a nested doc whose bare name equals a shared file (gate 1 CR-3, low, not reproduced).'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+      remedy: unverified
+    - action: 'The ratchet detector misses a regex with a slash inside a character class and a new RegExp reader (gate 1 CR-4, low).'
+      refs: ['tests/fence-reader-ratchet.test.js']
+      remedy: unverified
+    - action: 'The quote lint flags any unescaped quote in a guard word, not only an unbalanced one (gate 1 CR-5, cleanup).'
+      refs: ['tests/unbound-default-reads.test.js']
+      remedy: unverified
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
