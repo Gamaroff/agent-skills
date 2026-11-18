@@ -301,24 +301,24 @@ None identified. (The scratch-location risk went with Phase 4.)
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-18
-**Quality Score**: 92/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 95/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.280.qa.2.skill-and-test-tooling-see-what-ships.md](./task.280.qa.2.skill-and-test-tooling-see-what-ships.md)
-- **Gate File**: [task.280.gate.2.skill-and-test-tooling-see-what-ships.yml](./task.280.gate.2.skill-and-test-tooling-see-what-ships.yml)
+- **Full Report**: [task.280.qa.3.skill-and-test-tooling-see-what-ships.md](./task.280.qa.3.skill-and-test-tooling-see-what-ships.md)
+- **Gate File**: [task.280.gate.3.skill-and-test-tooling-see-what-ships.yml](./task.280.gate.3.skill-and-test-tooling-see-what-ships.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 8589 on the server (0 failed)
+- **Tests Executed**: 8591 on the server (0 failed)
 - **Phases Verified**: 4/4 live phases
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle 1's finding is fixed. The refute pass found one new defect in the fix, reproduced by QA: an all-dots capture such as an ellipsis is kept and reported UNVENDORED (T280-CR-2).
+No open finding. The two defects the fix cycles found in the bundler discovery are fixed and mutation-proven. Five low or cleanup follow-ups are recorded in the gate.
 
 <!-- change-log-start -->
 ## Change Log
@@ -333,6 +333,7 @@ Cycle 1's finding is fixed. The refute pass found one new defect in the fix, rep
 | 2026-11-18 |         | QA findings fixed — T280-CR-1 (trailing dot in invocation name), 1 iteration | qa-fix |
 | 2026-11-18 |         | QA gate CONCERNS (92/100) — 1 finding | qa-task |
 | 2026-11-18 |         | QA findings fixed — T280-CR-2 (all-dots capture reported UNVENDORED), 2 iterations | qa-fix |
+| 2026-11-18 |         | QA gate PASS (95/100) — 0 findings | qa-task |
 <!-- change-log-end -->
 
 ---
