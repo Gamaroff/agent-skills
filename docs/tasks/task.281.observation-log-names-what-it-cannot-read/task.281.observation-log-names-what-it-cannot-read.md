@@ -5,17 +5,18 @@ type: task
 description: "Make the observation engine report out-of-enum statuses instead of counting them open, let set-status repair them, give the review cycle a propose-a-task decision, and let a parked entry return to open."
 tags: [observe-work, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 pr_number: 920
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-18
+completed_date: 2026-11-18
 estimated_effort_hours: 8
 ---
 
 # Task 281: The observation log names what it cannot read
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 ---
 
@@ -304,11 +305,34 @@ None identified.
 ### Key Findings
 No blocking findings. The cycle-2 finding is closed; one low doc cleanup is recorded as a follow-up.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.281.qa.3.observation-log-names-what-it-cannot-read.md`
+**Gate File**: `task.281.gate.3.observation-log-names-what-it-cannot-read.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** all 8 criteria met. The wall-time criterion was re-measured on the PR head: median 729 s on `develop`, 737 s on the branch (+1.1%, bound 10%), recorded in QA report 3.
+✅ **Tests:** 97 of 97 in the two changed suites; remote `ci:fast` 8601 tests, 8598 pass, 0 fail. CI green on the PR head.
+✅ **PR Review:** PR #920, `/review-pr` verdict APPROVE with no findings.
+✅ **Documentation:** the contract, `SKILL.md`, `review-cycle.md` and the CHANGELOG entry (task 281) are updated.
+✅ **Security Review:** PASS. The `set-status` guards were probed with 10 cases, 0 reproduced.
+✅ **Compliance Review:** not applicable (internal tooling).
+
+**Task marked as ACCEPTED on:** 2026-11-18
+
+**Detailed Verification Log:** See `task.281.dod.1.observation-log-names-what-it-cannot-read.md` for the verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                         | Author      |
-| ---------- | ------- | --------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #93, #155     | create-task |
 | 2026-11-18 | 1.1     | Review passed (8/10) after fixes: review-cycle.md path corrected to the skill's authored reference; line anchors moved to cmdQueue; `open` already accepted by set-status, so the task now tightens it to parked-only; repair via relaxed `--expect-status`; `status-legal` doctor check and SKILL.md row added | review-task |
 |            |         | Status → ready-for-development                      | review-task |
@@ -318,6 +342,7 @@ No blocking findings. The cycle-2 finding is closed; one low doc cleanup is reco
 | 2026-11-18 |         | QA gate CONCERNS (90/100) — 1 medium finding (doctor status-legal passes an unreadable log) | qa-task |
 | 2026-11-18 |         | QA findings fixed — doctor status-legal fails on an unreadable log; 1 iteration | qa-fix |
 | 2026-11-18 |         | QA gate PASS (100/100) — 0 findings; 1 advisory cleanup recorded | qa-task |
+| 2026-11-18 | 1.2 | DoD verified, accepted (PR #920); wall time re-measured on the head (+1.1%) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -357,4 +382,4 @@ None.
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
