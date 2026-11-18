@@ -35,7 +35,7 @@ Run task 281 end to end: report out-of-enum observation statuses, let `set-statu
 | 1. create-branch           | ✅ Done | Branch `feature/task.{id}.*` exists in git                             | Branch created at `e092cf6eb` |  —                    | 2026-11-18T07:58Z |
 | 2. review-task             | ✅ Done | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               | Review 1: READY TO IMPLEMENT 8/10; 1 Critical + 4 Important fixed in the doc (wrong review-cycle.md path, wrong anchors, false reopen premise). Pre-pass agents not dispatched (inline review) |  —                    | 2026-11-18T08:25Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline; 10 files, 7 engine + 3 skill tests, 6 mutation proofs red; remote `ci:fast` green on rerun (first run: Prettier on my test file, fixed) | —                    | 2026-11-18T08:28Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
+| 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #920 (https://github.com/Gamaroff/agent-skills/pull/920) into develop; no tracker issue linked, so no comment | —                    | 2026-11-18T08:28Z |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
@@ -75,6 +75,24 @@ _Problems encountered and how they were resolved or escalated._
 ## QA Iteration History
 
 _Track each QA review/fix cycle._
+
+### QA Cycle 1 — 2026-11-18
+**Gate Result**: CONCERNS (90/100)
+**Issues Found**: 2 medium: no CHANGELOG `[Unreleased]` entry citing task 281; the suite wall-time criterion is unmeasured. One advisory code-review note (CR-1, stale `resolved:` on reopen)
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**Traceability**: skipped (mapper not dispatched — QA ran inline)
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+
+#### qa-fix (5b)
+
+- **T281-QA-1**: added the `[Unreleased]` CHANGELOG entry citing (task 281); `changelog-cites.sh task.281` now answers `cites (task 281)`.
+- **T281-QA-2**: measured on the LAN server, five alternating `npm test` runs, `uptime` beside each. Median 741 s on `develop`, 735 s on the branch (-0.8%), all exit 0. Table in the QA report. The criterion was met as written, so it was not edited.
+- **CR-1** (advisory): not changed; stays under `recommendations.future`.
+- Probe: no executed document was edited this cycle (CHANGELOG and task artifacts only), so the documentation probe has no population to check.
+- Fix cycle 1 touched no code, so no mutation proof applies.
 
 ---
 

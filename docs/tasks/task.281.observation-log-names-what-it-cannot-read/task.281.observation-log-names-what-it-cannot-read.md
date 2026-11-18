@@ -282,6 +282,27 @@ None identified.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-18
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.281.qa.1.observation-log-names-what-it-cannot-read.md](./task.281.qa.1.observation-log-names-what-it-cannot-read.md)
+- **Gate File**: [task.281.gate.1.observation-log-names-what-it-cannot-read.yml](./task.281.gate.1.observation-log-names-what-it-cannot-read.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 96
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+Two medium findings: no CHANGELOG `[Unreleased]` entry citing task 281 (T281-QA-1), and the suite wall-time criterion was never measured (T281-QA-2). One advisory code-review note (CR-1, reopen leaves a stale `resolved:` date).
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -291,6 +312,8 @@ None identified.
 | 2026-11-18 | 1.1     | Review passed (8/10) after fixes: review-cycle.md path corrected to the skill's authored reference; line anchors moved to cmdQueue; `open` already accepted by set-status, so the task now tightens it to parked-only; repair via relaxed `--expect-status`; `status-legal` doctor check and SKILL.md row added | review-task |
 |            |         | Status → ready-for-development                      | review-task |
 | 2026-11-18 |         | Implemented — 10 files, 7 engine tests + 3 skill tests; repair route changed from a relaxed `--expect-status` to a `--repair` flag because an existing test pins the usage error | develop |
+| 2026-11-18 |         | QA gate CONCERNS (90/100) — 2 medium findings (CHANGELOG entry, wall-time criterion unmeasured) | qa-task |
+| 2026-11-18 |         | QA findings fixed — CHANGELOG entry added, wall time measured (741 s develop vs 735 s branch); 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---
