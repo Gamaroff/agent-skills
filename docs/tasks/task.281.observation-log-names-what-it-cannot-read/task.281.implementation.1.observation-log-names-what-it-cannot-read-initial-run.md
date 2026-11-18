@@ -3,7 +3,7 @@
 **Task**: `task.281.observation-log-names-what-it-cannot-read.md`
 **Run Number**: 1
 **Started**: 2026-11-18 09:55
-**Status**: In Progress
+**Status**: Completed
 **Report format**: 2
 
 ---
@@ -36,9 +36,9 @@ Run task 281 end to end: report out-of-enum observation statuses, let `set-statu
 | 2. review-task             | ✅ Done | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               | Review 1: READY TO IMPLEMENT 8/10; 1 Critical + 4 Important fixed in the doc (wrong review-cycle.md path, wrong anchors, false reopen premise). Pre-pass agents not dispatched (inline review) |  —                    | 2026-11-18T08:25Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline; 10 files, 7 engine + 3 skill tests, 6 mutation proofs red; remote `ci:fast` green on rerun (first run: Prettier on my test file, fixed) | —                    | 2026-11-18T08:28Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #920 (https://github.com/Gamaroff/agent-skills/pull/920) into develop; no tracker issue linked, so no comment | —                    | 2026-11-18T08:28Z |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 3 gates (CONCERNS 90, CONCERNS 90, PASS 100); 5c review-pr APPROVE, no findings | —                    | 2026-11-18T12:20Z |
+| 7. finalise                | ✅ Done | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      | DoD 1: 8 of 8 criteria PASS; security probes 10 executed, 0 reproduced; CI green on both readings; acceptance commit 8e9230811 | —                    | 2026-11-18T19:48Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Implementation report committed with this row | —                    | 2026-11-18T19:50Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -129,7 +129,21 @@ _Track each QA review/fix cycle._
 
 ---
 
+### Finalise — 2026-11-18
+
+- CI reading 1: SUCCESS @ 0d31a4f9b (six checks); CI reading 2: SUCCESS (tree-equivalent to ee0e0a9e3194) @ 8e9230811 over 6 checks.
+- The first DoD run failed acceptance criterion 4: the wall-time figure was measured on 4260b4932, and the later engine fix made the delta to the head `code-changed`. The criterion's wording was not edited. The wall time was re-measured on the head: five alternating runs on the LAN server, median 729 s develop vs 737 s branch (+1.1%), recorded in QA report 3.
+- Two measurement attempts were lost before it completed: an SSH drop, and a laptop low-memory stop that left stale server locks which refused the next ten runs. The stale locks were cleared with the script's own `--unlock` once they expired.
+- The first run of the security probe plan read three legitimate cases as rejected, because the probe's sandbox sat under `/tmp` and the engine refuses an ephemeral workspace. A control showed the same case passes in a repository-local workspace; the plan was re-run with `TMPDIR` inside the repository: 10 executed, 0 reproduced.
+- Canonical PR comment posted (#issuecomment-6989672642). No tracker issue is linked.
+
+---
+
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-11-18T19:50Z
+**Final Status**: Completed
+
+**QA Iterations**: 3 gates, 2 fix cycles.
+
+**Completion Summary**: Implemented engine reporting for out-of-enum observation statuses (`invalidStatus` in queue and scan, a `doctor` `status-legal` check that also fails on an unreadable log), `set-status --repair`, reopening a parked entry, and a fifth review-cycle decision (propose a task), with tests, contract and skill documentation. Two QA fix cycles closed a missing CHANGELOG entry, an unmeasured wall-time criterion and a `doctor` check that passed an unreadable log. Review decision D2 (relax `--expect-status`) was reversed during development because an existing test pins that usage error.
