@@ -38,9 +38,14 @@ nfr_validation:
     notes: 'One definition of the stage lists, held equal by a test. The delivered block is extracted from the document and run by the test, so the prose and the test cannot drift apart silently.'
 
 criteria_drift:
-  reason: clean
+  reason: drift
   base: review-commit
-  changed: []
+  changed:
+    - id: '#4'
+      kind: reworded
+      approved: true
+      relaxes: true
+      relaxes_reason: 'A prose-only edit that no test can fail on is now named as unprovable instead of mutation-proven; the owner approved the amendment (Lorien Gamaroff, 2026-11-19), recorded after this gate was written.'
 
 recommendations:
   immediate: []

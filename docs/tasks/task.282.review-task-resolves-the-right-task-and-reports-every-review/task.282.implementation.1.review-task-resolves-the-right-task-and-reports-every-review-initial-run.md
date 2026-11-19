@@ -3,7 +3,7 @@
 **Task**: `task.282.review-task-resolves-the-right-task-and-reports-every-review.md`
 **Run Number**: 1
 **Started**: 2026-11-18 20:15
-**Status**: In Progress
+**Status**: Completed
 **Report format**: 2
 
 ---
@@ -36,9 +36,9 @@ Resolve an all-digits `/review-task` argument as a task id before an issue numbe
 | 2. review-task             | ✅ Done | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               | READY TO IMPLEMENT 8/10, 0 critical, 7 important fixed; promoted to ready-for-development | —                    | 2026-11-18T20:55Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline; `ci:fast` green on LAN server (8611 tests, 0 fail) | —                    | 2026-11-18T20:58Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #921 → develop; no issue linked, so no comment; body written inline (no Explore summariser) | —                    | 2026-11-18T20:59Z |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | Gate PASS 96/100 at cycle 3; PR review CONCERNS, no open coverage finding  —                    | 2026-11-19 |
+| 7. finalise                | ✅ Done | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      | AC 7/7, security PASS, docs PASS; CI green on two readings | —                    | 2026-11-19T14:28Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Implementation report and gate drift record committed | —                    | 2026-11-19T14:28Z |
 
 ---
 
@@ -156,14 +156,25 @@ Move: patch — one distinct defect in the delivered prose, not a restated-rule 
 
 Scoped re-review of the files changed since gate 2. T282-QA-4 reads FIXED. Full CI on `10aa9d0b4` on the LAN server: exit 0, 8614 tests, 0 fail; the secrets lane was skipped (gitleaks absent) and the hosted CI check reads green. Mutation proof of the T282-QA-4 guard: block reverted, 2 tests red, restored byte-identical. Step 4b executed no block (the changed block carries a `{a|b}` placeholder); the delivered-block tests cover it. One reviewer ran; independent review beyond that did not.
 
+### Step 7 — finalise (2026-11-19)
+
+- **CI reading 1** (acceptance decision): SUCCESS @ `d8a36f3cf660` over six checks.
+- **CI reading 2** (acceptance head): SUCCESS @ `3e931fc46a71` over 6 checks, tree-equivalent to `2a1b215362ac` (the commit changed documents only).
+- **Criterion #4 amended with the owner's approval** (Lorien Gamaroff): the first AC pass failed #3 and #4 as written. #4 now names a prose-only edit that no test can fail on as unprovable. Gate 3's `criteria_drift` block was written before the amendment and read `clean`; `qa-read-back.js` halted on it, so the engine's result (`#4` reworded, approved, relaxes) was recorded in the gate.
+- **Wall time re-measured** on the final code head: median wall 807 s against 841 s (+4.2%), five alternating pairs.
+- **Three DoD mutation proofs added**: `CYCLE_SCOPED_LEAD_STAGES`, the review-story call site, the review-bug call site. Each red on revert, restored byte-identical.
+- **Security**: 22 probe executions, 0 reproduced; the plan holds hostile cases only, so the legitimate direction rests on the committed fixture tests.
+- **Canonical PR comment posted** on #921. No tracker issue linked, so no tracker comment, close or board move.
+- Registry row for task 282 ticked `planned` → `accepted`.
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-11-19
+**Final Status**: Completed
 **Branch**: feature/task.282.review-task-resolves-the-right-task-and-reports-every-review
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**PR**: #921 — https://github.com/Gamaroff/agent-skills/pull/921
+**QA Iterations**: 3
+**DoD Summary**: `task.282.dod.1.review-task-resolves-the-right-task-and-reports-every-review.md` — ACCEPTED
+**Tracker debt**: none (no tracker issue linked)
