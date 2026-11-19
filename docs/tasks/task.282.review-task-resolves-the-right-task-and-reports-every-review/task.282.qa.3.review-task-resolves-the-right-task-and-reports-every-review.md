@@ -79,7 +79,7 @@ None gating. One advisory item, CR-1 (low severity, low confidence), recorded in
 | --- | --- | --- |
 | A second review's verdict is posted, shown by a named test | unchanged since cycle 2; passes inside the full run | PASS |
 | A bare task number resolves to the task, shown by the fixture session | `resolve-bare-task.test.mjs`: 10 tests, pass 10, fail 0 (8 resolver tests plus the two T282-QA-4 block tests) | PASS |
-| `CI=true npm test` wall time within 10% of `develop` | measured in cycle 1: median 730 s against 728 s (-0.3%); no engine file changed since | PASS |
+| `CI=true npm test` wall time within 10% of `develop` | re-measured on the final code head at the DoD (table below): median wall 807 s against 841 s (+4.2%), median test duration +2.8%; cycle 1 had measured -0.3% | PASS |
 | Each change has a mutation proof | cycles 1 and 2 recorded the earlier proofs; this cycle re-proves the T282-QA-4 guard | PASS |
 | `bundle:check` 0 problems; `CI=true npm test` passes | `bundle:check` 0 problems; `# tests 8614 / pass 8611 / fail 0` (3 skipped) | PASS |
 | `comment-slot-coverage.test.mjs` passes with the new stage form | passes inside the full run | PASS |
@@ -87,11 +87,35 @@ None gating. One advisory item, CR-1 (low severity, low confidence), recorded in
 
 ### Wall time on the final head (T282-QA-2, recorded at DoD)
 
-The five-pair median above was taken on `ce96e4744`. Since then three non-document files changed: `shared/resources/resolve-bare-task.sh` (header and comments, 5 lines), the bare-number block in `develop-pipeline-step-0-resolve-and-prepare.md`, and `shared/resources/tests/resolve-bare-task.test.mjs` (+70 lines, two tests). Only the test file adds suite time: `CI=true command node --test shared/resources/tests/resolve-bare-task.test.mjs` runs in 1.19 s, about +0.2% of the 609 s median test duration, against a bound of 10%. The full run on the head (`10aa9d0b4`) reports 662.6 s on a shared server, which is a load reading and not a paired measurement. The pairs were not re-run.
+The five-pair median above was taken on `ce96e4744`, and code changed after it (`resolve-bare-task.sh`, the step-0 block, `resolve-bare-task.test.mjs`). The pairs were therefore re-run on the final code head. Five alternating pairs of `CI=true npm run test:remote -- --run test` on the LAN server, develop `e6636d97d` against the branch at `2a1b21536` (code identical to `028efc28c`; only documents differ). Load is the first figure of the one-minute `uptime` average, read over ssh before each run. The harness wrote `.claude/state/t282-walltime-head.tsv`.
 
-### Unprovable prose edits (named, not proved)
+| Pair | develop wall (s) | branch wall (s) | load before develop / branch |
+| --- | --- | --- | --- |
+| 1 | 807 | 1014 | 6.30 / 1.19 |
+| 2 | 868 | 944 | 10.91 / 24.05 |
+| 3 | 1271 | 841 | 3.65 / 6.16 |
+| 4 | 791 | 735 | 1.89 / 0.31 |
+| 5 | 742 | 737 | 0.98 / 9.33 |
 
-The Step 2 skip-rule edit in `develop-pipeline-step-2-review.md` (the `N` in the stage must equal this run's report number) is orchestrator prose; no test can go red when it is reverted. It has no mutation proof. The success criterion was amended at the DoD, with the owner's approval, to name such edits as unprovable instead.
+Median wall: develop 807 s, branch 841 s (+4.2%). Median test duration (`# duration_ms`): 652.0 s against 670.1 s (+2.8%). Both are inside the 10% bound. All ten runs exited 0. The server is shared and its load varied from 0.3 to 24 across the runs; the median ignores the extremes (pair 3's develop run at 1271 s, pair 1's branch run at 1014 s), and the sign of the difference flips between pairs.
+
+### Mutation proofs added at the DoD (members cycle 1 did not record)
+
+Each was taken from a `cp` snapshot, run against `comment-slot-coverage`, `stakeholder-summary` and `tracker-comment` tests (baseline: 156 pass, 0 fail), restored, and `cmp`-checked.
+
+mutation-proven: `shared/resources/stakeholder-summary.js` `CYCLE_SCOPED_LEAD_STAGES` loses `review-story`, `review-task`, `review-bug` → `the catalogue and the comment engine agree on which stages take a suffix`, `review-task-N is keyed per review: a second review reaches the issue, review 1 keeps its bare marker` and `the numeric suffix is legal for the review stages, and only as a positive round (task.282)` went red (153 pass, 3 fail) → covered
+
+mutation-proven: `skills/review-story/SKILL.md` call site `--stage "review-story-${REVIEW_N}"` → `--stage "review-story"` → `a cycle-scoped stage is never passed bare (SITES)` went red (155 pass, 1 fail) → covered
+
+mutation-proven: `skills/review-bug/SKILL.md` call site `--stage "review-bug-${REVIEW_N}"` → `--stage "review-bug"` → `a cycle-scoped stage is never passed bare (SITES)` went red (15 pass, 1 fail, `comment-slot-coverage` alone) → covered
+
+### Unprovable edits (named, not proved)
+
+- The Step 2 skip-rule edit in `develop-pipeline-step-2-review.md` (the `N` in the stage must equal this run's report number) is orchestrator prose; no test can go red when it is reverted.
+- The `REVIEW_N` guard lines (`case "$REVIEW_N" in … HALT`) in the review-task, review-story and review-bug call sites are shell inside prose that no test executes.
+- The five-line comment-only header edit to `resolve-bare-task.sh` changes no behaviour.
+
+The success criterion was amended at the DoD, with the owner's approval, to name such edits as unprovable instead.
 
 ---
 
