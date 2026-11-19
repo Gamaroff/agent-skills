@@ -150,8 +150,9 @@ Move: patch — one distinct defect in the delivered prose, not a restated-rule 
 **HIGH findings**: 0
 **MEDIUM findings**: 0
 **Traceability**: skipped (no Success Criteria table)
-**PR Review**: not reached — Step 5c runs next
-**Loop exit**: n/a — this exit not taken
+**PR Review**: CONCERNS (conformance lens only; PC-2 medium, 3 low; no coverage finding open). PC-1, PC-2 and PC-4 fixed in documents; PC-3 a false positive (the cycle 3 Change Log row exists). Report: `task.282.pr-review.1.review-task-resolves-the-right-task-and-reports-every-review.md`
+**Loop exit**: Step 5c — CONCERNS with no open coverage finding, exit to Step 7
+**Action**: Proceeding to 5c
 
 Scoped re-review of the files changed since gate 2. T282-QA-4 reads FIXED. Full CI on `10aa9d0b4` on the LAN server: exit 0, 8614 tests, 0 fail; the secrets lane was skipped (gitleaks absent) and the hosted CI check reads green. Mutation proof of the T282-QA-4 guard: block reverted, 2 tests red, restored byte-identical. Step 4b executed no block (the changed block carries a `{a|b}` placeholder); the delivered-block tests cover it. One reviewer ran; independent review beyond that did not.
 

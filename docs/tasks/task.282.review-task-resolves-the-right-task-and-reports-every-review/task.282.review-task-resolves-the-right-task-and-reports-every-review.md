@@ -6,6 +6,7 @@ description: "Resolve an all-digits review argument as a task id before a GitHub
 tags: [review-task, review-story, tracker-comment, observation]
 category: refactoring
 status: ready-for-review
+pr_number: 921
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-19
@@ -141,6 +142,10 @@ None - the engine reads `review-<kind>-1` as the bare stage key, so an existing 
 2. ✅ `skills/review-task/SKILL.md` and the pipeline Step 2 doc
 3. ✅ `review-story` and `review-bug` call sites; develop-task Step 0a (`develop-pipeline-step-0-resolve-and-prepare.md`)
 
+### Files to Create
+
+3a. ✅ `shared/resources/resolve-bare-task.sh` (the task-id-first resolver the bare-number block runs) and `shared/resources/tests/resolve-bare-task.test.mjs` (resolver and delivered-block tests). Added during implementation and hardened in QA cycles 1 and 2.
+
 ### Files to Modify (Tests)
 
 4. ✅ Tests that enumerate or pin the stage list, by name: `shared/resources/tests/tracker-comment.test.mjs` (`isKnownStage` and the exact `CYCLE_SCOPED_STAGES` list assertion, near `:1623`–`:1642`), `shared/resources/tests/stakeholder-summary.test.mjs` (the two-lists-one-rule test, near `:594`), `shared/resources/tests/comment-slot-coverage.test.mjs` (derives from the list; must stay green), `evals/shared/tests/transition-protocol-parity.test.mjs` (marker helper parity, near `:807`). New tests go under `shared/resources/tests/`, which `test:suite` globs; `skills/review-task/tests/` is not in the `test:suite` list and a suite there would run nowhere.
@@ -187,7 +192,7 @@ The resolution rule is prose; evidence is a fresh `/review-task 243`-shaped sess
 
 ### Code Quality
 
-- [ ] Each change has a mutation proof in the QA report.
+- [ ] Each code change has a mutation proof in the QA report; a prose-only edit that no test can fail on (the Step 2 skip rule) is named in the report as unprovable instead — amended 2026-11-19, approved by Lorien Gamaroff.
 - [ ] `command npm run bundle -- --check` reports 0 problems; `CI=true command npm test` passes.
 - [ ] `comment-slot-coverage.test.mjs` passes with the new stage form.
 
@@ -302,6 +307,7 @@ The cycle 2 finding (T282-QA-4, the bare-number block's script path) is fixed an
 | 2026-11-18 |         | QA gate CONCERNS (90/100) — 1 medium finding (cycle 2, refute pass) | qa-task |
 | 2026-11-18 |         | QA finding fixed — the bare-number block runs the script by its installed path, 1 iteration | qa-fix |
 | 2026-11-19 |         | QA gate PASS (96/100) — no gating findings (cycle 3, scoped re-review) | qa-task |
+| 2026-11-19 |         | Success criterion "each change has a mutation proof" amended to "each code change", prose-only edits named as unprovable — approved by Lorien Gamaroff (DoD run 1, AC #4) | finalise |
 <!-- change-log-end -->
 
 ---

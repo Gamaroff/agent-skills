@@ -85,6 +85,14 @@ None gating. One advisory item, CR-1 (low severity, low confidence), recorded in
 | `comment-slot-coverage.test.mjs` passes with the new stage form | passes inside the full run | PASS |
 | An existing review marker on a live issue still reads `already` for review 1 | unchanged since cycle 2 | PASS |
 
+### Wall time on the final head (T282-QA-2, recorded at DoD)
+
+The five-pair median above was taken on `ce96e4744`. Since then three non-document files changed: `shared/resources/resolve-bare-task.sh` (header and comments, 5 lines), the bare-number block in `develop-pipeline-step-0-resolve-and-prepare.md`, and `shared/resources/tests/resolve-bare-task.test.mjs` (+70 lines, two tests). Only the test file adds suite time: `CI=true command node --test shared/resources/tests/resolve-bare-task.test.mjs` runs in 1.19 s, about +0.2% of the 609 s median test duration, against a bound of 10%. The full run on the head (`10aa9d0b4`) reports 662.6 s on a shared server, which is a load reading and not a paired measurement. The pairs were not re-run.
+
+### Unprovable prose edits (named, not proved)
+
+The Step 2 skip-rule edit in `develop-pipeline-step-2-review.md` (the `N` in the stage must equal this run's report number) is orchestrator prose; no test can go red when it is reverted. It has no mutation proof. The success criterion was amended at the DoD, with the owner's approval, to name such edits as unprovable instead.
+
 ---
 
 ## Breaking Changes Validation
