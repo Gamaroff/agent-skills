@@ -123,7 +123,12 @@ If anything changed, run:
 
 ```bash
 mkdir -p .claude/state
-printf '%s' "$NEW_BODY" > .claude/state/issue-body.md
+# Rendered, never hand-built (task.283, obs #34): the same script `ensure-task-github-issue` runs on
+# create, so create→update stays diff-stable and relative links resolve against DOC_URL.
+command node references/render-task-issue-body.js \
+  --file "${TASK_RELATIVE_PATH}" --doc-url "${DOC_URL}" --rel-path "${TASK_RELATIVE_PATH}" \
+  > .claude/state/issue-body.md \
+  || { echo "HALT: no issue body rendered — run card-preflight.js on ${TASK_RELATIVE_PATH}"; exit 1; }
 
 # A label the repository does not define fails the WHOLE edit; the shared
 # helper drops it with a warning instead (task.125, TASK-125-BUG-3).

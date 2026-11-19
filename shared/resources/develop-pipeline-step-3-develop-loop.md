@@ -362,6 +362,35 @@ catches it. (obs #38)
 
 Update Pipeline Progress: ✅ develop.
 
+#### CHANGELOG placement for a new entry (obs #30)
+
+Run this once on exit, before the Change Log row. A bullet added to `CHANGELOG.md` below the first
+release heading sits inside a shipped release. The 5c review can only record it (`CHANGELOG.md` is
+outside `ci.docsOnly.patterns`), and `/finalise` then halts on a one-line move: task.184 halted at AC10
+over exactly that. Only a **pure insertion** counts as a new entry. An edit to an existing entry
+replaces a line, so it is never blocked here, and a project with no `CHANGELOG.md` skips the block.
+
+```bash
+# CHANGELOG placement for NEW entries (obs #30). INPUT, substituted into THIS block: {base} — the
+# branch this run's PR targets (Phase 0d's Q2 answer). A new bullet must sit above the first release
+# heading (## [v…), which is inside [Unreleased].
+CL=CHANGELOG.md
+if [ -f "$CL" ] && ! git diff --quiet "origin/{base}" -- "$CL"; then
+  FIRST_RELEASE=$(grep -n '^## \[v' "$CL" | head -1 | cut -d: -f1)
+  [ -n "$FIRST_RELEASE" ] || FIRST_RELEASE=999999999
+  MISPLACED=$(git diff -U0 "origin/{base}" -- "$CL" | awk -v first="$FIRST_RELEASE" '
+    /^@@/ { split($2, o, ","); old = (o[2] == "" ? 1 : o[2] + 0); split($3, a, ","); line = substr(a[1], 2) + 0; next }
+    /^\+\+\+/ { next }
+    /^\+/ { if (old == 0 && line >= first && $0 ~ /^\+- /) print line; line++ }')
+  if [ -n "$MISPLACED" ]; then
+    echo "HALT: CHANGELOG.md has a new entry below the first release heading (line $FIRST_RELEASE), inside a shipped release, at line(s): $(printf '%s' "$MISPLACED" | tr '\n' ' ') — move it under ## [Unreleased]"
+    exit 1
+  fi
+fi
+```
+
+A HALT here is fixed by moving the bullet and re-running the block; it is not a loop stall.
+
 #### Change Log
 
 On **exiting** the develop loop — not per iteration — `/develop` appends **one** row to the work
