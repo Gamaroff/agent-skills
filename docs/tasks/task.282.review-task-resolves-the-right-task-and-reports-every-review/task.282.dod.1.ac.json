@@ -1,0 +1,174 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "d8a36f3cf66068fbae9ec4b8bf3c313b41988653",
+  "dirty_paths": [],
+  "document": "docs/tasks/task.282.review-task-resolves-the-right-task-and-reports-every-review/task.282.review-task-resolves-the-right-task-and-reports-every-review.md",
+  "result": {
+    "bytes": 8901,
+    "sha256": "342c80b82d39d7be035de490e5f6a077ca9d8aa951a9e6af6e5cb1ec0008ee19",
+    "verified": true
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 7,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "23e14f587979ec28de1a136217138fa21e58f1a282c8be05052a753c2a22b26b",
+      "status": "PASS",
+      "description": "A second review's verdict is posted, shown by a named test in the QA report.",
+      "code_citation": "shared/resources/tracker-comment.js:145",
+      "test_citation": "shared/resources/tests/tracker-comment.test.mjs:2216",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Test 'review-task-N is keyed per review' asserts review-N (N>=2) reads 'posted' against a review-1 marker, for the task, story and bug families. It is named in QA report 3 and cycle 1, and has mutation proofs. It lives in shared/resources/tests/*.test.mjs, which test:suite globs, and .github/workflows/test.yml runs on every pull_request."
+    },
+    {
+      "id": "#2",
+      "text_hash": "6cc96e3844ab4a1384a03c6ea6a66a1717a07d32562f5d26f9f1fe05f16febf0",
+      "status": "PASS",
+      "description": "A bare task number resolves to the task, shown by the fixture session in the QA report.",
+      "code_citation": "shared/resources/resolve-bare-task.sh:1",
+      "test_citation": "shared/resources/tests/resolve-bare-task.test.mjs:68",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Fixture tests cover the working tree, a linked worktree, a branch-only task, none, usage, the digit cap, the delivered block from a consumer checkout (line 212), and two documents claiming one number. The QA 3 table records 10 tests, 10 pass. The file is in the shared/resources/tests/*.test.mjs glob, which runs per PR."
+    },
+    {
+      "id": "#3",
+      "text_hash": "546f8d2e546317c6fe9a55fd0f609c8fefcc1c0cc809d62ee9ee5cda06496d54",
+      "status": "PASS",
+      "description": "CI=true npm test wall time within 10% of develop, median of five alternating runs, uptime recorded.",
+      "code_citation": "docs/tasks/task.282.review-task-resolves-the-right-task-and-reports-every-review/task.282.qa.3.review-task-resolves-the-right-task-and-reports-every-review.md:100",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Bound is 10%. Five alternating pairs were run (QA 3 lines 88-100) with the load before each run recorded. Median wall is develop 807 s against branch 841 s (+4.2%); test duration median is +2.8%; all ten runs exit 0. The command is `CI=true npm run test:remote -- --run test`. Measured on M=2a1b21536. I ran `finalise-delta.js docs-only --base 2a1b21536 --head HEAD`: reason tree-equivalent, exit 0, only the QA 3 report changed. So measured on 2a1b21536, tree-equivalent to head. The recomputed medians match: develop 742/791/807/868/1271 gives 807; branch 735/737/841/944/1014 gives 841."
+    },
+    {
+      "id": "#4",
+      "text_hash": "07653211d9e3251f59bbf1dc20c2770f917d778e6d01ad44433eb5fdbf72efb0",
+      "status": "PASS",
+      "description": "Each code change has a mutation proof; prose-only edits no test can fail on are named unprovable.",
+      "code_citation": "docs/tasks/task.282.review-task-resolves-the-right-task-and-reports-every-review/task.282.qa.3.review-task-resolves-the-right-task-and-reports-every-review.md:106",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "tracker-comment.js alias call in run() (canonicalStage)",
+          "evidence": "task.282.qa.1.review-task-resolves-the-right-task-and-reports-every-review.md:130",
+          "status": "PASS"
+        },
+        {
+          "member": "tracker-comment.js CYCLE_SCOPED_STAGES / stage list",
+          "evidence": "task.282.qa.1.review-task-resolves-the-right-task-and-reports-every-review.md:131",
+          "status": "PASS"
+        },
+        {
+          "member": "stakeholder-summary.js CYCLE_SCOPED_LEAD_STAGES",
+          "evidence": "task.282.qa.3.review-task-resolves-the-right-task-and-reports-every-review.md:106",
+          "status": "PASS"
+        },
+        {
+          "member": "resolve-bare-task.sh literal dot after the number",
+          "evidence": "task.282.qa.1.review-task-resolves-the-right-task-and-reports-every-review.md:132",
+          "status": "PASS"
+        },
+        {
+          "member": "resolve-bare-task.sh linked-worktree step",
+          "evidence": "task.282.qa.1.review-task-resolves-the-right-task-and-reports-every-review.md:133",
+          "status": "PASS"
+        },
+        {
+          "member": "resolve-bare-task.sh digit cap (T282-QA-1)",
+          "evidence": "task.282.qa.2.review-task-resolves-the-right-task-and-reports-every-review.md:159",
+          "status": "PASS"
+        },
+        {
+          "member": "step-0 bare-number block path (T282-QA-4)",
+          "evidence": "task.282.qa.3.review-task-resolves-the-right-task-and-reports-every-review.md:162",
+          "status": "PASS"
+        },
+        {
+          "member": "review-task SKILL.md call site",
+          "evidence": "task.282.qa.1.review-task-resolves-the-right-task-and-reports-every-review.md:134",
+          "status": "PASS"
+        },
+        {
+          "member": "review-story SKILL.md call site",
+          "evidence": "task.282.qa.3.review-task-resolves-the-right-task-and-reports-every-review.md:108",
+          "status": "PASS"
+        },
+        {
+          "member": "review-bug SKILL.md call site",
+          "evidence": "task.282.qa.3.review-task-resolves-the-right-task-and-reports-every-review.md:110",
+          "status": "PASS"
+        },
+        {
+          "member": "Step 2 skip-rule prose (develop-pipeline-step-2-review.md)",
+          "evidence": "task.282.qa.3.review-task-resolves-the-right-task-and-reports-every-review.md:114",
+          "status": "PASS"
+        },
+        {
+          "member": "REVIEW_N guard lines in the three call sites",
+          "evidence": "task.282.qa.3.review-task-resolves-the-right-task-and-reports-every-review.md:115",
+          "status": "PASS"
+        },
+        {
+          "member": "resolve-bare-task.sh comment-only header edit",
+          "evidence": "task.282.qa.3.review-task-resolves-the-right-task-and-reports-every-review.md:116",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Every code member has a committed mutation line that names the test that went red. The Step 2 skip rule, the REVIEW_N guards and the comment-only header are named unprovable in the QA 3 section 'Unprovable edits', as the amended criterion allows. criteria-drift.js exit 0: #4 is reworded and approved by Lorien Gamaroff, so the amendment rule is satisfied. Regenerated skills/*/references copies are byte copies held by bundle:check. tracker-comment-contract.md is documentation."
+    },
+    {
+      "id": "#5",
+      "text_hash": "4ebe7eb0e4844e0df815176b7f42d776b2bc0cf3440c8435836dd542207af2de",
+      "status": "PASS",
+      "description": "bundle --check reports 0 problems; CI=true npm test passes.",
+      "code_citation": ".github/workflows/test.yml:1",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ d8a36f3cf66068fbae9ec4b8bf3c313b41988653 — Asks that the bundle check and the full test suite are green on the PR head. QA 3 records bundle:check at 129 skills with 0 problems, and tests at 8611 pass, 0 fail. The grade comes from /finalise Step 6 reading CI.",
+      "ci_reading": "CI reading 1: SUCCESS @ d8a36f3cf66068fbae9ec4b8bf3c313b41988653"
+    },
+    {
+      "id": "#6",
+      "text_hash": "cc20e13fa6f269d172c05c2e3c8eb5015741d826e4defda089cd2290a8e34518",
+      "status": "PASS",
+      "description": "comment-slot-coverage.test.mjs passes with the new stage form.",
+      "code_citation": "shared/resources/tests/comment-slot-coverage.test.mjs:85",
+      "test_citation": "shared/resources/tests/comment-slot-coverage.test.mjs:185",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The test derives its suffix regex from CYCLE_SCOPED_STAGES, which now includes the review stages, and asserts no cycle-scoped call site passes a bare stage. It goes red under the call-site and stage-list mutations (QA 1 and QA 3). It runs per PR through the shared/resources/tests/*.test.mjs glob and .github/workflows/test.yml on pull_request."
+    },
+    {
+      "id": "#7",
+      "text_hash": "56a9717ed64232f350f259e86d229cbd2b39b577dd53c3df4b71ea764e1383b5",
+      "status": "PASS",
+      "description": "An existing review marker on a live issue still reads already for review 1 (fixture).",
+      "code_citation": "shared/resources/tracker-comment.js:145",
+      "test_citation": "shared/resources/tests/tracker-comment.test.mjs:2245",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The fixture seeds a bare marker for each of the task, story and bug families. Both the bare stage and the review-N-1 form read 'already', and N=2 posts. This is the same test as #1, run per PR through the shared/resources/tests/*.test.mjs glob."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#3",
+      "note": "Load varied from 0.3 to 24 across the runs on the shared server, and pair 3 develop (1271 s) and pair 1 branch (1014 s) are outliers. The median handles both, and QA 3 says so."
+    },
+    {
+      "ac_id": "#4",
+      "note": "QA 3 CR-1 (low, advisory, unverified anchor) records that nothing ties skills carrying the bare-number block to shipping resolve-bare-task.sh. It is not a criterion failure."
+    }
+  ]
+}

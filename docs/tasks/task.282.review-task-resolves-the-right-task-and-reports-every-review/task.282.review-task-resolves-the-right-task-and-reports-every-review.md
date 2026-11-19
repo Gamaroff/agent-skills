@@ -5,17 +5,18 @@ type: task
 description: "Resolve an all-digits review argument as a task id before a GitHub issue number, and key the review-task tracker comment by review number so a second review's verdict reaches the tracker."
 tags: [review-task, review-story, tracker-comment, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 pr_number: 921
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-19
+completed_date: 2026-11-19
 estimated_effort_hours: 8
 ---
 
 # Task 282: review-task resolves the right task and reports every review
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.282.review.1.review-task-resolves-the-right-task-and-reports-every-review.md` implemented 2026-11-18
 
 ---
@@ -292,11 +293,34 @@ None identified.
 ### Key Findings
 The cycle 2 finding (T282-QA-4, the bare-number block's script path) is fixed and verified: two tests run the delivered block from a consumer-shaped checkout and go red when the fix is reverted. No new gating findings; one low advisory item is recorded for later.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.282.qa.3.review-task-resolves-the-right-task-and-reports-every-review.md`
+**Gate File**: `task.282.gate.3.review-task-resolves-the-right-task-and-reports-every-review.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 96/100
+**PR Review**: CONCERNS (conformance lens, no open coverage finding) — `task.282.pr-review.1.review-task-resolves-the-right-task-and-reports-every-review.md`
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** all 7 met. #1, #2, #6 and #7 are held by named tests that run per PR; #3 is the wall-time median re-measured on the final code head (807 s against 841 s, +4.2%, five alternating pairs on the LAN server); #4 holds under the criterion as amended and approved by Lorien Gamaroff (each code change has a mutation proof, prose-only edits are named as unprovable); #5 is graded from CI reading 1 (SUCCESS on `d8a36f3cf`, six checks).
+✅ **Tests:** `resolve-bare-task.test.mjs` (10 tests), the keying and slot-coverage tests; the full run reports 8614 tests, 0 failed.
+✅ **Documentation:** CHANGELOG cites (task 282); the tracker comment contract, the three review skills and the step 0 and step 2 pipeline documents carry the new behaviour.
+✅ **Security Review:** PASS — 22 probe executions, 0 reproduced, 0 escaped. The plan is hostile cases only; the legitimate direction rests on the committed fixture tests.
+✅ **Compliance Review:** not applicable (no personal data, payments, UI or health data).
+
+**Detailed Verification Log:** See `task.282.dod.1.review-task-resolves-the-right-task-and-reports-every-review.md` for the complete verification evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-11-19
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                         | Author      |
-| ---------- | ------- | --------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #128, #129    | create-task |
 | 2026-11-18 | 1.1     | Review passed (8/10) — review-1 key pinned, siblings and tests named, skip-rule grep corrected, review-bug added | review-task |
 | 2026-11-18 |         | Status → ready-for-development                      | review-task |
@@ -308,6 +332,7 @@ The cycle 2 finding (T282-QA-4, the bare-number block's script path) is fixed an
 | 2026-11-18 |         | QA finding fixed — the bare-number block runs the script by its installed path, 1 iteration | qa-fix |
 | 2026-11-19 |         | QA gate PASS (96/100) — no gating findings (cycle 3, scoped re-review) | qa-task |
 | 2026-11-19 |         | Success criterion "each change has a mutation proof" amended to "each code change", prose-only edits named as unprovable — approved by Lorien Gamaroff (DoD run 1, AC #4) | finalise |
+| 2026-11-19 | 1.2 | DoD passed — accepted (PR #921) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -344,4 +369,4 @@ None.
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
