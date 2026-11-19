@@ -126,6 +126,24 @@ Fix commit `ce96e4744`; the findings were read from the gate directly (the inges
 
 Cycle 1's three findings read FIXED. Full CI run on `3d57b20b1`: 8612 tests, 0 fail; the secrets lane was skipped (gitleaks absent). One independent reviewer ran (refute pass, 75 s). Advisory items CR-2 and CR-3 went to `recommendations.future`.
 
+#### qa-fix cycle 2 — 2026-11-19
+
+Fix commit `8a77fe361`.
+
+- **T282-QA-4 fixed.** The bare-number block in the step-0 doc ran the script by a skill-relative path, which does not exist from the repository root in a consumer repository (exit 127, HALT). It now runs `.agents/skills/{develop-task|review-task}/references/resolve-bare-task.sh`, the spelling the same file already uses elsewhere. Exit 126/127 is its own HALT ("did not run"), separate from a resolver refusal (exit 1/2). The script header shows the installed invocation.
+- **Tests.** Two new tests extract the block from the document itself and run it from a consumer-shaped checkout, for both skills. Controls: script not installed (rc 127 message) and a 20-digit number (rc 2 message, not mistaken for "did not run"). Restoring the old path turns both red; the restore is byte-identical.
+- **Bundle.** Copies regenerated; the script copies in develop-bug, develop-story and review-pr were `git rm`'d (UNREACHED). `bundle:check`: 129 skills, 0 problems.
+- **Gate.** `CI=true npm run test:remote` on the LAN server: exit 0, 8316 `ok`, 0 `not ok`. A first attempt was killed by the harness for laptop memory pressure and re-run on the server.
+
+Probe:
+```
+Probe: comm -23 <(git grep --full-name -l -F -i -e 'resolve-bare-task' -- executed docs) <(generated copies)
+  shared/resources/develop-pipeline-step-0-resolve-and-prepare.md — updated
+  skills/review-task/SKILL.md — unaffected — cites the rule and names the script file, restates no path
+Population: 2
+Move: patch — one distinct defect in the delivered prose, not a restated-rule family
+```
+
 ---
 
 ## Completion
