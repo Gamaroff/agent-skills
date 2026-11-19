@@ -8,7 +8,7 @@ category: refactoring
 status: ready-for-review
 priority: Medium
 created: 2026-11-06
-updated: 2026-11-18
+updated: 2026-11-19
 estimated_effort_hours: 8
 ---
 
@@ -268,24 +268,24 @@ None identified.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
-**Testing Date**: 2026-11-18
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Testing Date**: 2026-11-19
+**Quality Score**: 96/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.282.qa.2.review-task-resolves-the-right-task-and-reports-every-review.md](./task.282.qa.2.review-task-resolves-the-right-task-and-reports-every-review.md)
-- **Gate File**: [task.282.gate.2.review-task-resolves-the-right-task-and-reports-every-review.yml](./task.282.gate.2.review-task-resolves-the-right-task-and-reports-every-review.yml)
+- **Full Report**: [task.282.qa.3.review-task-resolves-the-right-task-and-reports-every-review.md](./task.282.qa.3.review-task-resolves-the-right-task-and-reports-every-review.md)
+- **Gate File**: [task.282.gate.3.review-task-resolves-the-right-task-and-reports-every-review.yml](./task.282.gate.3.review-task-resolves-the-right-task-and-reports-every-review.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 8612 (full CI run, LAN server; 8609 pass, 0 fail, 3 skipped), plus 32 security probes
+- **Tests Executed**: 8614 (full CI run, LAN server; 8611 pass, 0 fail, 3 skipped)
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-The three cycle 1 findings are fixed and verified. One new medium finding: the bare-number block this change adds names a script path that does not exist from the repository root in a consumer repository, so it exits 127 and HALTs (T282-QA-4, reproduced).
+The cycle 2 finding (T282-QA-4, the bare-number block's script path) is fixed and verified: two tests run the delivered block from a consumer-shaped checkout and go red when the fix is reverted. No new gating findings; one low advisory item is recorded for later.
 
 <!-- change-log-start -->
 ## Change Log
@@ -301,6 +301,7 @@ The three cycle 1 findings are fixed and verified. One new medium finding: the b
 | 2026-11-18 |         | QA findings fixed — resolver digit cap, document reconciled, wall time measured (-0.3%), 1 iteration | qa-fix |
 | 2026-11-18 |         | QA gate CONCERNS (90/100) — 1 medium finding (cycle 2, refute pass) | qa-task |
 | 2026-11-18 |         | QA finding fixed — the bare-number block runs the script by its installed path, 1 iteration | qa-fix |
+| 2026-11-19 |         | QA gate PASS (96/100) — no gating findings (cycle 3, scoped re-review) | qa-task |
 <!-- change-log-end -->
 
 ---

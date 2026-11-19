@@ -1,0 +1,68 @@
+schema: 2
+task: 'task.282.review-task-resolves-the-right-task-and-reports-every-review'
+task_title: 'review-task resolves the right task and reports every review'
+gate: PASS
+status_reason: 'The one cycle 2 finding (T282-QA-4) is fixed and verified: the bare-number block runs the script by its installed path, two new tests run the delivered block from a consumer-shaped checkout, and reverting the block turns both red. The full CI run on the final tree is green (8614 tests, 0 fail) and the hosted CI check reads green. The reviewer raised one low-severity advisory item, which does not gate.'
+reviewer: 'QA Engineer'
+head: '10aa9d0b444bb7edc61aef3f04fa7632a63b1ef1'
+updated: '2026-11-19T06:49:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 96
+
+evidence:
+  tests_reviewed: 8614
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    boundary: false
+    boundary_reason: 'probe-boundary-signals.mjs on the task document found no boundary phrase. This cycle changed the step-0 block (a call path and an exit-code split) and its tests, not the resolver, which cycle 2 probed (32 cases, 0 escaped, record task.282.qa.2.security.run.json). The block passes its digits to the script as one quoted argument, as before.'
+  performance:
+    status: PASS
+    notes: 'Unchanged since cycle 2: median wall -0.3% against develop. The full run this cycle reports a test duration of 662.6 s on a shared server, within the load noise recorded in cycle 1.'
+  reliability:
+    status: PASS
+    notes: 'T282-QA-4 closed: a script that did not run (exit 126/127) is its own HALT, separate from a resolver refusal, and the block resolves from a consumer-shaped checkout for both skills.'
+  maintainability:
+    status: PASS
+    notes: 'One definition of the stage lists, held equal by a test. The delivered block is extracted from the document and run by the test, so the prose and the test cannot drift apart silently.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'develop-bug, develop-story, review-story and review-pr carry the step-0 document, and with it the bare-number block, but not resolve-bare-task.sh. The document scopes the block to task pipelines and /review-task, and no other skill runs it, so nothing is wrong today; but no check enforces that every skill carrying the block ships the script or stays out of scope (CR-1, low severity, low confidence; anchor off by one, so unverified). Add a population check over skills/*/references, or move the block into the two skills that ship the script.'
+      refs: ['shared/resources/develop-pipeline-step-0-resolve-and-prepare.md']
+      remedy: unverified
+    - action: 'Review-<kind> comments with no numbered report (an action-plan-only review in review-task and review-bug, a validate run in review-story) pass the next unused N, which nothing consumes, so a second such review of the same item computes the same N and its comment reads `already` (carried from cycle 2, CR-2). Key report-less reviews to a number that advances, or skip the comment when no report exists.'
+      refs: ['skills/review-task/SKILL.md', 'skills/review-story/SKILL.md', 'skills/review-bug/SKILL.md']
+      remedy: unverified
+    - action: 'The `--json` output of tracker-comment.js reports the canonical stage, so a call with `review-task-1` reports `review-task` (carried from cycle 2, CR-3). Say so beside the `already` rule, or emit the stage as passed.'
+      refs: ['shared/resources/tracker-comment.js', 'shared/resources/develop-pipeline-step-2-review.md']
+      remedy: unverified
+    - action: 'canonicalStage folds only `-1`, `-01` and `-001` to the bare marker; `review-task-02` and `review-task-2` give different markers. The same holds on develop for `qa-gate-02` vs `qa-gate-2`, and the call sites reject leading zeros. Normalise every numeric suffix in the engine.'
+      refs: ['shared/resources/tracker-comment.js']
+      provenance: pre-existing
+      remedy: unverified
+    - action: 'resolve-bare-task.sh step 3 uses `git log --all`, which also sees tags and stashes, then `git branch --contains`, which lists branches only: a task reachable only from a tag reads `none`; the newest commit touching the path may be a deletion. Neither was reproduced. Check the exit status of `git branch --contains` and add `--diff-filter=AM`.'
+      refs: ['shared/resources/resolve-bare-task.sh']
+      remedy: unverified
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []

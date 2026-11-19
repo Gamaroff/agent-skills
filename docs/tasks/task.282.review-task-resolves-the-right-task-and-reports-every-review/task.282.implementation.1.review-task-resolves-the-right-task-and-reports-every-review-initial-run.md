@@ -144,6 +144,17 @@ Population: 2
 Move: patch — one distinct defect in the delivered prose, not a restated-rule family
 ```
 
+### QA Cycle 3 — 2026-11-19
+**Gate Result**: PASS (96/100)
+**Issues Found**: none gating. One low advisory item (CR-1: nothing checks that every skill carrying the bare-number block also ships `resolve-bare-task.sh`) went to `recommendations.future`.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**Traceability**: skipped (no Success Criteria table)
+**PR Review**: not reached — Step 5c runs next
+**Loop exit**: n/a — this exit not taken
+
+Scoped re-review of the files changed since gate 2. T282-QA-4 reads FIXED. Full CI on `10aa9d0b4` on the LAN server: exit 0, 8614 tests, 0 fail; the secrets lane was skipped (gitleaks absent) and the hosted CI check reads green. Mutation proof of the T282-QA-4 guard: block reverted, 2 tests red, restored byte-identical. Step 4b executed no block (the changed block carries a `{a|b}` placeholder); the delivered-block tests cover it. One reviewer ran; independent review beyond that did not.
+
 ---
 
 ## Completion
