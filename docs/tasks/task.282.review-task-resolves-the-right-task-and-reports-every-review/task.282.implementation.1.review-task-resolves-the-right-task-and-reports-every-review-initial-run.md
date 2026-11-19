@@ -114,6 +114,18 @@ Fix commit `ce96e4744`; the findings were read from the gate directly (the inges
   Median wall time: develop 730 s, branch 728 s (-0.3%). Median `# duration_ms` of the test run: 611.4 s against 609.2 s (-0.4%). All ten runs exited 0, which also covers the fast gate's `npm test` half on the branch head. Load values are the first figure of `uptime`'s one-minute average, read over ssh beside each run; pairs 1 and 5 ran under load on the develop side, and the median ignores both.
 - Not run this cycle: `format:check` on the server (run locally, clean). The rest-of-CI lane ran in QA cycle 1, before this change; re-run it in cycle 2.
 
+### QA Cycle 2 — 2026-11-18
+**Gate Result**: CONCERNS (90/100)
+**Issues Found**: 1 medium. T282-QA-4 the bare-number block in the step-0 doc names a script path that does not exist from the repository root in a consumer repository, so it exits 127 and HALTs (reproduced by QA from a consumer-shaped directory).
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**Traceability**: skipped (no Success Criteria table)
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+
+Cycle 1's three findings read FIXED. Full CI run on `3d57b20b1`: 8612 tests, 0 fail; the secrets lane was skipped (gitleaks absent). One independent reviewer ran (refute pass, 75 s). Advisory items CR-2 and CR-3 went to `recommendations.future`.
+
 ---
 
 ## Completion

@@ -275,17 +275,17 @@ None identified.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.282.qa.1.review-task-resolves-the-right-task-and-reports-every-review.md](./task.282.qa.1.review-task-resolves-the-right-task-and-reports-every-review.md)
-- **Gate File**: [task.282.gate.1.review-task-resolves-the-right-task-and-reports-every-review.yml](./task.282.gate.1.review-task-resolves-the-right-task-and-reports-every-review.yml)
+- **Full Report**: [task.282.qa.2.review-task-resolves-the-right-task-and-reports-every-review.md](./task.282.qa.2.review-task-resolves-the-right-task-and-reports-every-review.md)
+- **Gate File**: [task.282.gate.2.review-task-resolves-the-right-task-and-reports-every-review.yml](./task.282.gate.2.review-task-resolves-the-right-task-and-reports-every-review.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 8611 (fast gate, LAN server), plus 22 security probes
+- **Tests Executed**: 8612 (full CI run, LAN server; 8609 pass, 0 fail, 3 skipped), plus 32 security probes
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Three medium findings. The new resolver wraps an over-long digit string to a wrong task id (T282-QA-1, reproduced). The wall-time criterion has no measurement (T282-QA-2). This document still describes the earlier marker design (T282-QA-3).
+The three cycle 1 findings are fixed and verified. One new medium finding: the bare-number block this change adds names a script path that does not exist from the repository root in a consumer repository, so it exits 127 and HALTs (T282-QA-4, reproduced).
 
 <!-- change-log-start -->
 ## Change Log
@@ -299,6 +299,8 @@ Three medium findings. The new resolver wraps an over-long digit string to a wro
 | 2026-11-18 |         | Status → ready-for-review                           | develop |
 | 2026-11-18 |         | QA gate CONCERNS (90/100) — 3 medium findings       | qa-task |
 | 2026-11-18 |         | QA findings fixed — resolver digit cap, document reconciled, wall time measured (-0.3%), 1 iteration | qa-fix |
+| 2026-11-18 |         | QA gate CONCERNS (90/100) — 1 medium finding (cycle 2, refute pass) | qa-task |
+| 2026-11-18 |         | QA finding fixed — the bare-number block runs the script by its installed path, 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

@@ -4,7 +4,10 @@
 #
 # Run it from a fenced block by the path the skill states, from the repository root:
 #
-#   ANSWER=$(bash references/resolve-bare-task.sh 243) || exit 1
+#   ANSWER=$(bash .agents/skills/review-task/references/resolve-bare-task.sh 243) || exit 1
+#
+# (the installed path, `.agents/skills/<skill>/references/`: a path relative to the skill does
+# not exist from the repository root in a consumer repository — T282-QA-4)
 #
 # `/review-task 243` and `/develop-task 243` used to read 243 as a GitHub issue number.
 # Issue #243 here was an unrelated merged PR, the lookup found no document and the run

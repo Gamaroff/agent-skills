@@ -112,11 +112,18 @@ Extract `{task_id}` from the pattern `task.{id}.{name}.md`.
 Applies to **task** pipelines and `/review-task`, whose documents carry a flat number (`task.243`).
 A story id is `P.E.S` and an epic refuses a bare number, so neither takes this rule. `#297`, an issue
 URL and a Jira key never reach it: they are the unambiguous issue forms and keep their route below
-(task.282, obs #128). When the argument is all digits, run, from the repository root:
+(task.282, obs #128). When the argument is all digits, run, from the repository root, the script by
+the path it is installed at, with `{develop-task|review-task}` replaced by the skill you are running
+as. A bundled-relative path does not resolve from the repository root in a consumer repository
+(T282-QA-4):
 
 ```bash
-ANSWER=$(bash https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/resolve-bare-task.sh "<digits>") || { echo "HALT: could not resolve '<digits>' as a task id (see above)"; exit 1; }
-printf '%s\n' "$ANSWER"
+ANSWER=$(bash .agents/skills/{develop-task|review-task}/references/resolve-bare-task.sh "<digits>"); rc=$?
+case "$rc" in
+  0) printf '%s\n' "$ANSWER" ;;
+  126|127) echo "HALT: resolve-bare-task.sh did not run (rc=$rc) — check the path; this is not a resolver answer"; exit 1 ;;
+  *) echo "HALT: could not resolve '<digits>' as a task id (rc=$rc, see above)"; exit 1 ;;
+esac
 ```
 
 Read the first field of the one line it prints (it exits 0 for all four answers):
@@ -128,7 +135,8 @@ Read the first field of the one line it prints (it exits 0 for all four answers)
 | `elsewhere` `<branch>` `branch` | Only a branch holds it, no worktree. **HALT** naming `<branch>` and the command that gives it a worktree (`git worktree add .worktrees/<name> <branch>`, inside the repository). The wrong message here is the defect this section exists to remove: never "No local document found". |
 | `none` | No task carries the number. Continue as a **GitHub issue number**, exactly as below, and say which route was taken. `none` `registry` means the registry lists the task but no document or branch holds it: say that too. |
 
-A script exit of 1 (a git failure, or two documents claiming one number) is a HALT with its stderr:
+A script exit of 126 or 127 means the script itself did not run (a wrong path), which the block HALTs
+on under its own message, so a missing file is never read as a resolver answer. A script exit of 1 (a git failure, or two documents claiming one number) is a HALT with its stderr:
 a guess would anchor the run on whichever document came first. An exit of 2 means the argument is
 not a usable number: more than nine digits after leading zeros is refused rather than read as a
 smaller number (T282-QA-1), so it is a HALT too, never a fall-through to the issue route.

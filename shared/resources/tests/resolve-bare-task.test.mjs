@@ -173,6 +173,76 @@ test("a digit string too long to be a task id is refused, never wrapped to anoth
   });
 });
 
+// The block the step-0 document tells an agent to run, taken from the document itself and run
+// from the repository root of a consumer-shaped checkout: the script is installed under
+// `.agents/skills/<skill>/references/`, not beside the cwd (T282-QA-4). Every other test here
+// calls the script by an absolute path, which cannot see a path that does not resolve.
+const STEP0 = path.join(
+  HERE,
+  "..",
+  "develop-pipeline-step-0-resolve-and-prepare.md",
+);
+
+function deliveredBlock() {
+  const lines = fs.readFileSync(STEP0, "utf8").split("\n");
+  const at = lines.findIndex((l) => l === "### Bare number — a task id first");
+  assert.ok(at >= 0, "the Bare number section exists");
+  const open = lines.findIndex((l, i) => i > at && l === "```bash");
+  const close = lines.findIndex((l, i) => i > open && l === "```");
+  assert.ok(open > at && close > open, "the section holds a bash block");
+  const block = lines.slice(open + 1, close).join("\n");
+  assert.match(block, /resolve-bare-task\.sh/, "the block runs the script");
+  return block;
+}
+
+/** Run the delivered block for `digits` as `skill`, from `dir`, with the script installed or not. */
+function runBlock(dir, { digits, skill = "develop-task", install = true }) {
+  if (install) {
+    const refs = path.join(dir, ".agents", "skills", skill, "references");
+    fs.mkdirSync(refs, { recursive: true });
+    fs.copyFileSync(SCRIPT, path.join(refs, "resolve-bare-task.sh"));
+  }
+  const block = deliveredBlock()
+    .replaceAll("{develop-task|review-task}", skill)
+    .replaceAll("<digits>", digits);
+  const r = spawnSync("bash", ["-c", block], { cwd: dir, encoding: "utf8" });
+  return { status: r.status, out: r.stdout.trim(), err: r.stderr.trim() };
+}
+
+test("the delivered block resolves a bare number from the repository root of a consumer checkout (T282-QA-4)", () => {
+  withFixture((dir) => {
+    for (const skill of ["develop-task", "review-task"]) {
+      const r = runBlock(dir, { digits: "5", skill });
+      assert.equal(r.status, 0, `${skill}: ${r.out} ${r.err}`);
+      assert.equal(
+        r.out,
+        "found\tdocs/tasks/task.5.on-develop/task.5.on-develop.md",
+      );
+    }
+  });
+});
+
+test("controls: a script that did not run is its own HALT, and a resolver refusal is not mistaken for it", () => {
+  withFixture((dir) => {
+    // The script is not installed where the block points: exit 126/127, never a resolver answer.
+    const missing = runBlock(dir, { digits: "5", install: false });
+    assert.equal(missing.status, 1);
+    assert.match(
+      missing.out,
+      /HALT: resolve-bare-task\.sh did not run \(rc=127\)/,
+    );
+    assert.doesNotMatch(missing.out, /could not resolve/);
+    // Installed, and the resolver itself refuses an over-long number (exit 2): the other HALT.
+    const refused = runBlock(dir, { digits: "18446744073709551617" });
+    assert.equal(refused.status, 1);
+    assert.match(
+      refused.out,
+      /HALT: could not resolve '18446744073709551617' as a task id \(rc=2/,
+    );
+    assert.doesNotMatch(refused.out, /did not run/);
+  });
+});
+
 test("two documents claiming one number is an error, never a guess", () => {
   withFixture((dir) => {
     writeTask(dir, 5, "duplicate");
