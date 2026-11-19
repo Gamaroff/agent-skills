@@ -1,0 +1,32 @@
+{
+  "sink": "filename",
+  "entry": "shell-argv:shared/resources/resolve-bare-task.sh",
+  "name": "resolve-bare-task digits gate",
+  "call_site": null,
+  "verdict": "unverifiable",
+  "reason": "no-legitimate-evidence",
+  "executed": 22,
+  "passed": 22,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "observation_limits": [
+    "effects-after-accept"
+  ],
+  "shells": [
+    "bash",
+    "zsh"
+  ],
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": [
+    "{input}"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "fixture_copy": null,
+  "ran_at": "2026-11-19T07:09:14.624Z"
+}

@@ -96,11 +96,12 @@ not interchangeable:
 
 | Stage class | Fires | Marker | `--stage` as passed |
 |---|---|---|---|
-| Every stage not in `CYCLE_SCOPED_STAGES` — `work-started`, `in-review`, `develop-complete`, `review`, `review-story` / `review-task`, `done`, … | once per issue | `agent-skills-comment:{stage}` | the bare name; a suffix is exit 2 |
+| Every stage not in `CYCLE_SCOPED_STAGES` — `work-started`, `in-review`, `develop-complete`, `review`, `done`, … | once per issue | `agent-skills-comment:{stage}` | the bare name; a suffix is exit 2 |
+| `review-story`, `review-task`, `review-bug` | once per review | `agent-skills-comment:{stage}-{N}`, except round 1, which is the bare `agent-skills-comment:{stage}` | `{stage}-{N}` — `N` is the review report's number. The engine reads `{stage}-1` as the bare marker (`FIRST_ROUND_IS_BARE_STAGES`), so a marker already on a live issue still reads `already` for review 1 and a second review's verdict reaches the tracker (task.282, obs #129) |
 | `qa-gate`, `qa-cycle`, `qa-fix` | once per QA cycle | `agent-skills-comment:{stage}-{N}` | `{stage}-{N}` — the suffix is **required by convention**: the engine accepts the bare name too, and it is `comment-slot-coverage.test.mjs` that fails a shipped call without one |
 | `pipeline-paused` | once per pause | `agent-skills-comment:pipeline-paused-{step}` | `pipeline-paused-{step}` — the step it paused at |
 
-The second and third rows are `CYCLE_SCOPED_STAGES` in `tracker-comment.js`,
+The second to fourth rows are `CYCLE_SCOPED_STAGES` in `tracker-comment.js`,
 and that list wins: this table describes it, and a stage added there without a
 row here is still cycle-scoped. It is not restated as a second list anywhere —
 `comment-slot-coverage.test.mjs` imports it, and the marker rule in the *Marker*

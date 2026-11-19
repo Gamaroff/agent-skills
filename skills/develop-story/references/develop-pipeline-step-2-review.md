@@ -471,8 +471,12 @@ deliverable is executed by a reader; a gap in it is a branch, not an omission.
 After detecting outcomes and handling findings (non-blocking — skip if `TRACKER_ISSUE` is empty):
 
 **Skip this comment when the review skill already reported the review.** `/review-story` and
-`/review-task` post their own outcome comment (stages `review-story` / `review-task`). When that call
-read `posted` or `already` in this run, do not post here: one event, one writer. The two stages are
+`/review-task` post their own outcome comment (stages `review-story-{N}` / `review-task-{N}`, where `N`
+is the review report's number; review 1 is the bare marker). When that call read `posted` or `already`
+in this run, do not post here: one event, one writer. **`already` counts only for this run's own key:**
+the `N` in the stage the review skill passed must equal the `{N}` of the report path recorded just above
+(task.282, obs #129). An `already` for any other number is an earlier review's comment and says nothing
+about this one, so post here. The two stages are
 different markers, so idempotency cannot collapse them, and the issue shows the same review twice
 (obs #277). Log `Review outcome comment skipped — {review skill} reported {reason}` in the Decisions
 Log. Post here only when the review skill skipped its comment or its call failed.

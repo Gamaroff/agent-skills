@@ -1,0 +1,90 @@
+[
+  {
+    "id": "nondigit-alpha",
+    "input": "abc",
+    "direction": "hostile",
+    "why": "non-numeric argument",
+    "correct": "refused with exit 2",
+    "spec_ref": "shared/resources/resolve-bare-task.sh:35"
+  },
+  {
+    "id": "hash-prefix",
+    "input": "#243",
+    "direction": "hostile",
+    "why": "the issue form is not a bare number",
+    "correct": "refused with exit 2",
+    "spec_ref": "shared/resources/resolve-bare-task.sh:15"
+  },
+  {
+    "id": "glob-star",
+    "input": "2*",
+    "direction": "hostile",
+    "why": "glob metacharacter reaching the task.N.* pattern",
+    "correct": "refused with exit 2",
+    "spec_ref": "shared/resources/resolve-bare-task.sh:35"
+  },
+  {
+    "id": "regex-dot",
+    "input": "1.5",
+    "direction": "hostile",
+    "why": "regex metacharacter reaching the registry grep",
+    "correct": "refused with exit 2",
+    "spec_ref": "shared/resources/resolve-bare-task.sh:35"
+  },
+  {
+    "id": "cmd-subst",
+    "input": "1$(id)",
+    "direction": "hostile",
+    "why": "command substitution",
+    "correct": "refused with exit 2",
+    "spec_ref": "shared/resources/resolve-bare-task.sh:35"
+  },
+  {
+    "id": "newline-suffix",
+    "input": "12\n",
+    "direction": "hostile",
+    "why": "trailing newline passes naive digit regexes",
+    "correct": "refused with exit 2",
+    "spec_ref": "shared/resources/resolve-bare-task.sh:35"
+  },
+  {
+    "id": "leading-space",
+    "input": " 12",
+    "direction": "hostile",
+    "why": "whitespace padding",
+    "correct": "refused with exit 2",
+    "spec_ref": "shared/resources/resolve-bare-task.sh:35"
+  },
+  {
+    "id": "negative",
+    "input": "-1",
+    "direction": "hostile",
+    "why": "flag-shaped or negative value",
+    "correct": "refused with exit 2",
+    "spec_ref": "shared/resources/resolve-bare-task.sh:35"
+  },
+  {
+    "id": "unicode-digit",
+    "input": "٣",
+    "direction": "hostile",
+    "why": "non-ASCII digit",
+    "correct": "refused with exit 2",
+    "spec_ref": "shared/resources/resolve-bare-task.sh:35"
+  },
+  {
+    "id": "overflow-wrap",
+    "input": "18446744073709551617",
+    "direction": "hostile",
+    "why": "arithmetic wrap would resolve to task 1",
+    "correct": "refused with exit 2, never read as task 1",
+    "spec_ref": "shared/resources/resolve-bare-task.sh:44"
+  },
+  {
+    "id": "ten-digits",
+    "input": "1234567890",
+    "direction": "hostile",
+    "why": "over the 9-digit cap",
+    "correct": "refused with exit 2",
+    "spec_ref": "shared/resources/resolve-bare-task.sh:48"
+  }
+]
