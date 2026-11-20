@@ -229,8 +229,9 @@ function postGuardOf(skill, heading) {
   );
   assert.equal(fences.length, 1, `${skill}: exactly one PR comment body block`);
   const body = fences[0][2];
-  const cut = body.indexOf("mkdir -p .claude/state");
-  assert.ok(cut > 0, `${skill}: the body block has no guard before it writes`);
+  // The guard is everything before the block binds the body file it posts.
+  const cut = body.indexOf("BODY_FILE=.claude/state/qa-comment-body.md");
+  assert.ok(cut > 0, `${skill}: the post block has no guard before it posts`);
   return body.slice(0, cut);
 }
 

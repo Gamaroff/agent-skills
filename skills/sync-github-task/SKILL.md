@@ -150,6 +150,8 @@ node references/tracker-issue.js --kind edit --issue ${ISSUE_NUM} \
   "${REMOVE_ARGS[@]}"
 ```
 
+Write the body file with the **file tool** and run the edit in a later call (`references/file-write-rules.md#fresh-body-post`).
+
 If the priority label changed, also re-mirror the board's Priority field:
 
 ```bash

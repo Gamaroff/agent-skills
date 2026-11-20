@@ -18,8 +18,8 @@ Repository files and body payloads are written with the file tool, not the shell
 - **A block an agent runs verbatim carries no payload heredoc.** The only exception is an agent with
   no file tool.
 
-`payload-heredoc-ratchet.test.mjs` (beside the other shared tests) counts the payload heredocs that
-remain in shipped prose and fails when a new one appears.
+`payload-heredoc-ratchet.test.mjs` (beside the other shared tests) fails when a payload heredoc
+appears in shipped prose. It carries no allow-list: every site was moved to the file tool (task 284).
 
 ## Recipes
 
@@ -48,3 +48,7 @@ A post can republish last cycle's body if the write failed and the post ran anyw
 1. Write the body in one call, and post it in a **later** call. Never both in one parallel batch.
 2. Before the post, assert a line only this cycle's body carries (the commit sha, the cycle number)
    and stop without posting when it is absent.
+3. A body file at a fixed path is single-use. `tracker-comment.js` removes it once the comment is
+   posted, already there or deferred into the journal (a deferral whose journal write failed keeps it), so a call with no new write fails (exit 2, missing file)
+   instead of re-posting. A block that posts a body file by another route (`gh pr comment
+   --body-file`) removes it itself after the post attempt, and stops when it is missing or empty.

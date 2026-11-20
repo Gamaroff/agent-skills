@@ -1,0 +1,71 @@
+schema: 2
+task: 'task.284.migrate-payload-heredocs-to-file-tool'
+task_title: 'Migrate shipped payload heredocs to the file tool'
+gate: CONCERNS
+status_reason: 'The PR review fixes for pr_number, the footer status and the Out of Scope note hold. The citation added to review-code is wrong: that block builds a fresh mktemp body in the block that posts it, so the recipe does not apply and the sentence contradicts the code. observe-work is cited correctly.'
+reviewer: 'QA Engineer'
+head: 'a4e6dba8a1b62a3bc130b8dc9fe88f6a64a36a24'
+updated: '2026-11-20T11:24:33Z'
+
+top_issues:
+  - id: 'TASK-284-C4-CR-1'
+    severity: medium
+    file: 'skills/review-code/SKILL.md'
+    finding: 'The cycle-3 sentence tells the reader to write PR_COMMENT_BODY_FILE with the file tool in one call and post it in a later one. The block creates the file with mktemp and fills it in the block that posts it (lines 244-248), so a stale body cannot be posted and the fixed-path recipe does not apply. Origin: claim check, reproduced by reading the block.'
+    suggested_action: 'Remove the sentence and its bundled file-write-rules.md copy from review-code, and list review-code as an excluded site (fresh mktemp body) in the QA report.'
+    suggested_owner: dev
+    bug_ref: 'task.284.bug.4.review-code-citation-tells-a-fresh-mktemp-body-to-use-the-split-write.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 8670
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    boundary_signals: []
+    notes: 'Prose only. No boundary is added; the criteria carry no boundary signal.'
+  performance:
+    status: PASS
+    notes: 'Measured in cycle 1; cycles 2 to 4 changed one file removal, a boolean guard and prose.'
+  reliability:
+    status: PASS
+    notes: 'No behaviour changed in this cycle.'
+  maintainability:
+    status: CONCERNS
+    notes: 'A documented instruction contradicts the block it sits in (TASK-284-C4-CR-1).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 1
+  fix_date: '2026-11-20'
+  verification_method: 'Claim check of the cycle-3 fix against the blocks it edits, a population search of body-file sites, and the full CI-parity gate on the LAN server (exit 0)'
+
+recommendations:
+  immediate:
+    - action: 'Remove the review-code sentence and list review-code as an exclusion (TASK-284-C4-CR-1).'
+      refs: ['skills/review-code/SKILL.md']
+  future:
+    - action: 'Residuals carried from gates 2 and 3: reword the stale comment above CONSUMING_REASONS; say a kept body file relies on the pre-post assertion; fold the lead into a copy in the qa-task and qa-story post blocks.'
+      refs: ['shared/resources/tracker-comment.js', 'shared/resources/tracker-comment-contract.md', 'skills/qa-task/SKILL.md']
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['Fix TASK-284-C4-CR-1 before merge']

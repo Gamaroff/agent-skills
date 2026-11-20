@@ -31,17 +31,19 @@ later block in this section reads that file. A block that names a file no step w
 that runs on nothing (task.130 QA cycle 3, bug 7); a fence that names a variable no fence assigns
 HALTs at its own guard (cycle 2, bug 5). **Bind once, here:**
 
+First write the JSON object the detector returned, verbatim and unedited, to
+`{doc-directory}/.summaries/step-0a-resume-detector.json` with the **file tool**, after
+`mkdir -p "{doc-directory}/.summaries"`. A shell heredoc is not used: the JSON carries quotes and
+`$`, and a heredoc ends early on a payload line equal to its delimiter
+(`file-write-rules.md#the-rule`). Then run the validation block:
+
 ```bash
-# 1. Persist the JSON the Explore dispatch RETURNED — verbatim, from the tool result, into the
-#    pipeline's summary directory. The quoted heredoc keeps the JSON's own quotes and $ intact.
+# 1. The JSON the Explore dispatch RETURNED was written verbatim, with the file tool, to
+#    {doc-directory}/.summaries/step-0a-resume-detector.json (see the paragraph above this block).
 # Every {doc-directory} substitution in THIS section's two blocks is QUOTED — a document
 # directory with a space splits into two words otherwise (task.130 gate 5 CR-7; task.133).
 # The contract's other fences (the --restore command, the grant call) are not yet quoted;
 # quoting them is a recorded follow-up (task.133 gate 1 CR-2), not a claim made here.
-mkdir -p "{doc-directory}/.summaries"
-cat > "{doc-directory}/.summaries/step-0a-resume-detector.json" <<'DETECTOR_EOF'
-{the JSON object the detector returned, pasted verbatim}
-DETECTOR_EOF
 # 2. Bind and validate. `deltas_since_pause` must be an ARRAY OF OBJECTS here, because the
 #    delete block below reads it as one — the detector's notes ("stale snapshot for <other dir>
 #    ignored", both `stale-snapshot check skipped — …` notes) are delta objects too, never bare

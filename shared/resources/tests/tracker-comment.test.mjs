@@ -215,6 +215,9 @@ test("two different bodies on the same issue produce two records; the same body 
   const b = bodyFile(dir, "Second, different body", "b.md");
   const ids = [];
   for (const f of [a, b, a]) {
+    // The engine consumes a body file once it is done with it (task 284), so
+    // each call is preceded by its own write, as every call site does.
+    writeFileSync(f, f === a ? "First body" : "Second, different body", "utf8");
     const r = await cli.run({
       argv: [
         "node",
@@ -336,6 +339,125 @@ test("exactly one marker match → reason 'already', nothing posted twice", asyn
   assert.ok(
     !gh.calls.some((c) => c.argv[1] === "comment"),
     "no second comment posted",
+  );
+});
+
+// ── A body file is single-use (task 284, QA bugs 1 and 2) ──────────────────
+// The fixed path .claude/state/comment-body.md is shared by every call site, so
+// a copy left behind is what a later run posts when its own write is skipped.
+
+async function runConsuming(comments, extraArgs = []) {
+  const dir = withRepo();
+  const f = bodyFile(dir, "body for this run");
+  const gh = stubGh({ comments });
+  const r = await cli.run({
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+      ...extraArgs,
+    ],
+    execImpl: gh.execImpl,
+    repoRoot: dir,
+    env: { ...baseEnv },
+  });
+  return { r, f };
+}
+
+test("a posted body file is removed, so a later run cannot re-post it", async () => {
+  const { r, f } = await runConsuming([]);
+  assert.equal(r.reason, "posted");
+  assert.equal(existsSync(f), false, "the body file is gone after a post");
+});
+
+test("an 'already' outcome also removes the body file", async () => {
+  const { r, f } = await runConsuming([
+    { body: `${cli.markerHtml("done")}\nearlier run` },
+  ]);
+  assert.equal(r.reason, "already");
+  assert.equal(existsSync(f), false, "nothing more will read the file");
+});
+
+async function runDeferred(breakJournal) {
+  const dir = withRepo();
+  const state = join(dir, ".claude", "state");
+  mkdirSync(state, { recursive: true });
+  // A directory where the journal file belongs makes the append throw.
+  if (breakJournal) mkdirSync(join(state, "tracker-actions.jsonl"));
+  const f = bodyFile(dir, "the only copy of this comment");
+  const gh = stubGh({ comments: [] });
+  const r = await cli.run({
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
+    execImpl: gh.execImpl,
+    repoRoot: dir,
+    env: { ...baseEnv, ACCESS_TRACKER: "manual" },
+  });
+  return { r, f };
+}
+
+test("a deferred outcome with a journal record removes the body file", async () => {
+  const { r, f } = await runDeferred(false);
+  assert.equal(r.reason, "deferred");
+  assert.ok(r.record, "the journal holds the body");
+  assert.equal(existsSync(f), false);
+});
+
+test("a deferred outcome whose journal write failed keeps the body file", async () => {
+  const { r, f } = await runDeferred(true);
+  assert.equal(r.reason, "deferred");
+  assert.equal(r.record, undefined, "nothing was recorded");
+  assert.equal(existsSync(f), true, "the file is the body's only copy");
+});
+
+test("two marker matches keep the body file: the outcome is unverifiable, a retry needs it", async () => {
+  const marker = cli.markerHtml("done");
+  const { r, f } = await runConsuming([
+    { body: `${marker}\none` },
+    { body: `${marker}\ntwo` },
+  ]);
+  assert.equal(r.reason, "unverifiable");
+  assert.equal(existsSync(f), true, "the body survives a refusal");
+});
+
+test("a second call with no new write is refused, not answered from the old file", async () => {
+  const { f } = await runConsuming([]);
+  const gh = stubGh({ comments: [] });
+  const r = await cli.run({
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
+    execImpl: gh.execImpl,
+    repoRoot: dirname(f),
+    env: { ...baseEnv },
+  });
+  assert.equal(r.exitCode, 2, "a missing body file is a usage error");
+  assert.ok(
+    !gh.calls.some((c) => c.argv[1] === "comment"),
+    "no stale comment posted",
   );
 });
 
@@ -810,8 +932,9 @@ test("qa-gate-N is keyed per cycle: the same cycle is `already`, the next cycle 
     cli.markerHtml("qa-gate-2"),
     "<!-- agent-skills-comment:qa-gate-2 -->",
   );
-  const run = (stage, gh) =>
-    cli.run({
+  const run = (stage, gh) => {
+    writeFileSync(f, "body", "utf8"); // a body file is single-use (task 284)
+    return cli.run({
       argv: [
         "node",
         "x",
@@ -827,6 +950,7 @@ test("qa-gate-N is keyed per cycle: the same cycle is `already`, the next cycle 
       repoRoot: dir,
       env: { ...baseEnv },
     });
+  };
   const empty = stubGh({ comments: [] });
   assert.equal((await run("qa-gate-2", empty)).reason, "posted");
   const withCycle2 = stubGh({
@@ -1808,6 +1932,7 @@ test("--json reports which route produced the lead", async () => {
     [["--summary-file", leadFile], "summary-file"],
   ]) {
     const gh = stubGh();
+    writeFileSync(f, "body", "utf8"); // a body file is single-use (task 284)
     const lines = [];
     const real = process.stdout.write.bind(process.stdout);
     process.stdout.write = (chunk, ...rest) => {
@@ -2221,8 +2346,9 @@ test("review-task-N is keyed per review: a second review reaches the issue, revi
   // review 1 (no duplicate across the change) and only N>=2 mints a new one.
   const dir = withRepo();
   const f = bodyFile(dir, "body");
-  const run = (stage, gh) =>
-    cli.run({
+  const run = (stage, gh) => {
+    writeFileSync(f, "body", "utf8"); // a body file is single-use (task 284)
+    return cli.run({
       argv: [
         "node",
         "x",
@@ -2238,6 +2364,7 @@ test("review-task-N is keyed per review: a second review reaches the issue, revi
       repoRoot: dir,
       env: { ...baseEnv },
     });
+  };
   for (const family of ["review-task", "review-story", "review-bug"]) {
     const review1 = stubGh({
       comments: [{ body: `${cli.markerHtml(family)}\nreview one` }],

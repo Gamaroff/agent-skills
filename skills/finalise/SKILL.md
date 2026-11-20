@@ -2812,16 +2812,10 @@ standalone.
 
         Use ✅ PASS, ❌ FAIL, ⚠️ CONCERNS, or — N/A for each status cell. `{pr_status}` is APPROVED or NOT_APPROVED from the AC agent result.
 
-        ```bash
-        mkdir -p .claude/state
-        # Terminator at COLUMN 0 — an indented terminator does not close an
-        # unquoted heredoc; bash swallows everything after it into the body,
-        # so the call below would never run. Body lines are unindented for
-        # the same reason: leading spaces are written verbatim.
-        cat > .claude/state/comment-body.md <<EOF
-{the body rendered above}
-EOF
+        Run `mkdir -p .claude/state` and write the body rendered above to `.claude/state/comment-body.md`
+        with the **file tool**, and post it in a later call (`references/file-write-rules.md#fresh-body-post`):
 
+        ```bash
         node .agents/skills/finalise/references/tracker-comment.js \
           --issue {jira_key} --body-file .claude/state/comment-body.md \
           --stage done \
@@ -2908,18 +2902,12 @@ EOF
 
    - Close the issue and verify closure:
 
+   Run `mkdir -p .claude/state` and write `.claude/state/comment-body.md` with the **file tool** (one
+   line: `Story/task development complete — PR: {PR_URL}. Status: accepted. All DoD criteria verified.`,
+   URL substituted). Post it in a later call (`references/file-write-rules.md#fresh-body-post`):
+
    ```bash
    # Post completion comment — always --body-file, never an inline --body.
-   #
-   # The heredoc terminator sits at COLUMN 0 even though this block is indented
-   # inside a numbered list. Bash does not accept an indented terminator for an
-   # unquoted heredoc: it warns "here-document delimited by end-of-file" and
-   # swallows everything after it INTO THE BODY, so the close below would never
-   # run and the issue would be neither commented nor closed — silently.
-   mkdir -p .claude/state
-   cat > .claude/state/comment-body.md <<EOF
-Story/task development complete — PR: {PR_URL}. Status: accepted. All DoD criteria verified.
-EOF
    node references/tracker-comment.js --issue {github_issue} \
      --body-file .claude/state/comment-body.md --stage done \
      --slot pr="{PR_URL}" \
@@ -3409,9 +3397,11 @@ reading 2 (6c) is taken exactly as before.
 this point — the fix does not exist yet — and the evaluator is run a **third** time after the commit
 with `--git-base` so both are re-read from git before anything is pushed (step 2b):
 
-```bash
-mkdir -p .claude/state
-cat > .claude/state/finalise-fix-finding.json <<'JSON'
+Run `mkdir -p .claude/state`, then write `.claude/state/finalise-fix-finding.json` with the **file
+tool** (`references/file-write-rules.md#the-rule`): the finding text is typed once, in the file, and
+never passes through a shell. Replace every `{…}` below with its value, then run the evaluator:
+
+```json
 {
   "severity": "{the finding's severity, from the agent YAML — copy it; leave the key out if the agent gave none. Every DoD agent grades its FAILs (AC, docs, security, compliance, fix-evidence), so an absent grade means an ungraded finding and halts}",
   "commits": 1,
@@ -3422,7 +3412,9 @@ cat > .claude/state/finalise-fix-finding.json <<'JSON'
   "mutationProof": { "test": "{the test that must go red on revert}", "redOnRevert": false, "run": ".claude/state/finalise-mutation-proof.log" },
   "otherFindingsOpen": [{every medium-or-higher finding in any section, and every other section that is FAIL — as strings; [] when none}]
 }
-JSON
+```
+
+```bash
 node references/finalise-fix-and-recheck.mjs --finding .claude/state/finalise-fix-finding.json --json
 ```
 

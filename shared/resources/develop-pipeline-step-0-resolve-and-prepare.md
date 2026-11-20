@@ -490,12 +490,17 @@ The comment is the same on either tracker, so it is **one** call — `tracker-co
 > Engine source: `tracker-comment.js` (bundled into each skill that runs it as `references/tracker-comment.js`). Contract: `shared/resources/tracker-comment-contract.md`.
 
 
-```bash
-mkdir -p .claude/state
-cat > .claude/state/comment-body.md <<EOF
-Pipeline started — branch: \`{branch-name}\`
-EOF
+Run `mkdir -p .claude/state`, then write `.claude/state/comment-body.md` with the **file tool** in one
+call (`file-write-rules.md#fresh-body-post`: write now, post in a later call, never both in one batch).
+Substitute the branch name before writing. The body is one line:
 
+```text
+Pipeline started — branch: `{branch-name}`
+```
+
+Then run the post:
+
+```bash
 node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
   --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
   --stage work-started \

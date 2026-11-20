@@ -57,17 +57,18 @@ function prCommentStep(src) {
 }
 
 /**
- * The comment body only — the lines between the single-quoted heredoc opener
- * and its terminator. Everything in here is written VERBATIM: no expansion,
+ * The comment body only — the lines of the fenced markdown block the file tool
+ * writes to the body file (a shell heredoc is no longer used: task 284,
+ * file-write-rules.md). Everything in here is written VERBATIM: no expansion,
  * no command substitution.
  */
 function bodyHeredoc(src) {
   const step = prCommentStep(src);
-  const start = step.indexOf("cat > \"$BODY_FILE\" <<'EOF'");
-  assert.notEqual(start, -1, "body heredoc not found");
+  const start = step.indexOf("```markdown\n## QA Review:");
+  assert.notEqual(start, -1, "body block not found");
   const from = step.indexOf("\n", start) + 1;
-  const end = step.indexOf("\nEOF\n", from);
-  assert.notEqual(end, -1, "body heredoc terminator not found");
+  const end = step.indexOf("\n```\n", from);
+  assert.notEqual(end, -1, "body block closing fence not found");
   return step.slice(from, end);
 }
 
@@ -137,13 +138,18 @@ test("the body is written to a file before posting", () => {
   );
   assert.match(
     step,
-    /cat > "\$BODY_FILE" <<'EOF'/,
-    "body must be written via a quoted heredoc",
+    /write `\.claude\/state\/qa-comment-body\.md` with the \*\*file tool\*\*/,
+    "body must be written with the file tool",
+  );
+  assert.doesNotMatch(
+    step,
+    /cat > "\$BODY_FILE" <</,
+    "the body must not be written through a shell heredoc",
   );
 });
 
-test("the quoted heredoc body carries no shell variables", () => {
-  // The body is written with <<'EOF' — single-quoted, so NOTHING expands.
+test("the file-tool body carries no shell variables", () => {
+  // The body is written with the file tool — NOTHING expands.
   // A `$PR_NUMBER` in here is emitted literally and the comment ships with
   // placeholder text where PR metadata belongs. It posts successfully, so the
   // step's own BLOCKING exit-code check passes and the fault is silent.
