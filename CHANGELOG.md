@@ -20,6 +20,18 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **The security probe engine loads a TypeScript entry (task 314).** `--entry <path>.ts#export` (also
+  `.mts`, `.cts`, `.tsx`) now loads and scores a boundary written in TypeScript, where it used to be
+  declined `entry-not-probeable` and left `/finalise`'s zero-guard failing on every TypeScript
+  consumer. The child is started with a bundled loader hook, `security-probe-ts-hook.mjs`, that
+  resolves and transpiles through the **target repository's own** `typescript` package, so `tsconfig`
+  `paths`, `index.ts`, extensionless and NodeNext `./x.js` imports resolve as the project resolves
+  them. It never type-checks and writes nothing. A repository with no resolvable compiler is declined
+  `typescript-unavailable`, and a Node before 22.15.0 `typescript-hook-unavailable`, each by name and
+  before any child is spawned. No dependency is added to a consumer; this repository pins
+  `typescript` as a devDependency for its own tests. A plan that was overridden because its
+  boundary was TypeScript can now report a reproduced case. That is the engine telling the truth, not
+  a break.
 - **Authoring and fix steps state the rules they keep missing (task 283).** The Step 3 develop loop
   runs a tested CHANGELOG placement block that fails a new entry below the first release heading, and
   `review-task` checks an "under `[Unreleased]`" claim against the file. `render-task-issue-body.js`

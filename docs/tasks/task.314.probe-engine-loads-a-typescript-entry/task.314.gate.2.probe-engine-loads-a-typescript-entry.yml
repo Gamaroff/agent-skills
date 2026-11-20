@@ -1,0 +1,97 @@
+schema: 2
+task: 'task.314.probe-engine-loads-a-typescript-entry'
+task_title: 'The security probe engine loads a TypeScript entry'
+gate: CONCERNS
+status_reason: 'Cycle 1 fix T314-CR-1 verified (mutation proof covered). The refute pass found three new defects, each reproduced by QA: the load hook defaults to ES5 when no target is set, so a thrown Error subclass fails instanceof; the tsconfig lookup climbs past the repo root; and the repo-root bound fails for a root of /.'
+reviewer: 'QA Engineer'
+head: '3dc1df67dd4a9ccdbdce97b3a7ea5f5dea5e08d6'
+updated: '2026-11-20T17:12:00Z'
+
+top_issues:
+  - id: 'T314-CR2-1'
+    origin: 'code-review, reproduced by QA'
+    severity: medium
+    file: 'shared/resources/security-probe-ts-hook.mjs'
+    finding: 'The hook never sets `target`, and the no-tsconfig default sets none either, so TypeScript defaults to ES5 and downlevels classes. Reproduced: transpileModule with module ESNext only, then importing the output, gives `e instanceof E` false for `class E extends Error`; control with target ES2022 gives true. A guard that tests instanceof on its own error type is scored on altered code. The fixture tsconfig sets a target, so no committed test sees this. Reviewer confidence high, recorded unchanged.'
+    suggested_action: 'Default target to ES2022 whenever the options leave it unset (both the no-tsconfig default and a tsconfig without a target) and add a fixture asserting instanceof on a thrown Error subclass, with one tsconfig that sets no target.'
+    suggested_owner: dev
+    status: open
+  - id: 'T314-CR2-2'
+    origin: 'code-review, reproduced by QA'
+    severity: medium
+    file: 'shared/resources/security-probe-ts-hook.mjs'
+    finding: 'ts.findConfigFile climbs to the filesystem root, so a repository without its own tsconfig inherits one from an ancestor. Reproduced: a tsconfig.json placed in the parent of the repo root is returned for an entry under the repo. Same class as cycle 1 T314-CR-1, for the config instead of the compiler. Reviewer confidence medium, recorded unchanged.'
+    suggested_action: 'Bind the repo root for the child (a second fixed binding set by the engine) and treat a config found outside it as no config; add a test with the tsconfig only in a parent, and a control with it inside.'
+    suggested_owner: dev
+    status: open
+  - id: 'T314-CR2-3'
+    origin: 'code-review, reproduced by QA'
+    severity: low
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'The bound `dir.startsWith(root + sep)` is false for every directory when the repo root is `/`, because root + sep is `//` (checked: "/a".startsWith("//") is false). A container repo rooted at / is declined typescript-unavailable although it has the compiler. Reproduced at the primitive, not through the engine; reviewer confidence medium.'
+    suggested_action: 'Use isWithin(root, dir), which resolveEntry already uses, and add a root-of-/ case to the unit test of the helper.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 23
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: ['never']
+    boundary_reason: 'Unchanged from cycle 1: the criteria word "never" describes what the committed argv, binding and no-write tests hold. None of the functions the diff adds accepts or rejects external input; checkTypeScriptRuntime is an environment preflight and the hook is a loader. Containment stays with resolveEntry.'
+    notes: 'The config lookup is not bounded to the repo root (T314-CR2-2); the escape check is green and the hook writes nothing.'
+  performance:
+    status: PASS
+    notes: 'Unchanged since cycle 1: median 363 ms per child, 59 children about 21 s. The fix adds a bounded directory walk in the parent.'
+  reliability:
+    status: CONCERNS
+    notes: 'ES5 downlevel changes the code under test (T314-CR2-1); a tsconfig that fails to parse is read as no options with no decline (advisory, not reproduced).'
+  maintainability:
+    status: PASS
+    notes: 'One hook, one engine definition of the entry extensions; the hook accepts two extensions the engine does not (advisory).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 3
+  fix_date: '2026-11-20'
+  total_iterations: 1
+  verification_method: 'Committed test (compiler only above the repo root) plus mutation proof: removing the bound turned that test red (22 pass, 1 fail)'
+
+recommendations:
+  immediate:
+    - action: 'Fix T314-CR2-1, T314-CR2-2 and T314-CR2-3.'
+      refs: ['shared/resources/security-probe-ts-hook.mjs', 'shared/resources/security-probe.mjs']
+  future:
+    - action: 'Have the hook throw a named decline when readConfigFile or parseJsonConfigFileContent report errors, instead of reading a broken tsconfig as no options (review CR-3, medium confidence, not reproduced).'
+      refs: ['shared/resources/security-probe-ts-hook.mjs']
+      remedy: unverified
+    - action: 'Realpath the repo root inside checkTypeScriptRuntime or assert the precondition (review CR-5, low confidence).'
+      refs: ['shared/resources/security-probe.mjs']
+      remedy: unverified
+    - action: 'Memoise ts.findConfigFile per directory (review CR-6, low); derive the hook TS_SOURCE from the engine four-extension list and test the pair (review CR-7).'
+      refs: ['shared/resources/security-probe-ts-hook.mjs']
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T314-CR2-1 and T314-CR2-2 fixed']

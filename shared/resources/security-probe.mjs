@@ -5,6 +5,7 @@
  *
  * Usage:
  *   node <this-file> --sink <name> --entry <path#exportName> [options]
+ *       (<path> may be a TypeScript file: .ts, .mts, .cts or .tsx — task.314)
  *   node <this-file> --sink <name> --entry shell:<path>     [options]
  *   node <this-file> --sink <name> --entry shell-fn:<path>#<function> [--fake-gh <dir>] [options]
  *   node <this-file> --sink <name> --entry cli:<path> --argv '<JSON array>' [options]
@@ -106,6 +107,23 @@
  * argument, and the limits of what this engine can honestly claim, are stated
  * once in `probe-boundary-rule.md`, which sits beside this file. Read that
  * first; this file is the mechanism, not the argument.
+ *
+ * THE TYPESCRIPT MODULE ENTRY (task.314). `--entry <path>.ts#<export>` (also
+ * `.mts`, `.cts`, `.tsx`) is the module form above for a boundary written in
+ * TypeScript. Node's strip-only mode cannot load a real TypeScript library — an
+ * enum, a namespace or a parameter property is not erasable; a value import in a
+ * `.ts` file under a `"type": "commonjs"` package is "Cannot use import statement
+ * outside a module"; extensionless imports and `tsconfig` `paths` aliases do not
+ * resolve — so the child is started with `--import security-probe-ts-hook.mjs`,
+ * which resolves and transpiles through the TARGET repository's own `typescript`
+ * package (found between the entry's directory and the repo root, in the
+ * parent, before the spawn). It never type-checks and writes nothing. The hook path is a constant
+ * and the compiler path is the engine's own binding: nothing a plan or case
+ * supplies reaches the child's argv. A repository with no resolvable compiler is
+ * declined `typescript-unavailable`, and a Node without `module.registerHooks`
+ * (before 22.15.0) `typescript-hook-unavailable`, each by name, with the fix in
+ * the detail — never a raw import error and never an override. The `cli:` form
+ * has no TypeScript interpreter in this release.
  *
  * THE SHELL ENTRY FORM (task.128). A boundary delivered as a bash script has no
  * export to import, and until this form existed the engine could only decline
@@ -307,6 +325,10 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
+// A namespace import, not `{ registerHooks }`: on a Node without the export a
+// named import is a link-time SyntaxError that would kill the engine itself.
+import * as nodeModule from "node:module";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import {
   basename,
@@ -762,6 +784,76 @@ const CLI_INTERPRETERS = Object.freeze({
   ".py": "python3",
 });
 const CLI_EXTENSIONS = Object.freeze(Object.keys(CLI_INTERPRETERS));
+
+/** The module-entry extensions the TypeScript form loads (task.314). */
+export const TS_ENTRY_EXTENSION = /\.(?:ts|mts|cts|tsx)$/;
+// The hook is loaded by the child through `--import <absolute path>`, so no import
+// statement names it and the bundler cannot see it. This declaration copies it
+// beside the engine into every skill that bundles the engine:
+// bundle-dependency: shared/resources/security-probe-ts-hook.mjs
+/**
+ * The loader hook that sits beside this file, passed to the child by absolute
+ * path (task.314). A constant: no input reaches it.
+ */
+const TS_HOOK_PATH = join(__dirname, "security-probe-ts-hook.mjs");
+
+/**
+ * Whether a TypeScript module entry can be loaded on this host (task.314): the
+ * running Node must have the synchronous `module.registerHooks` (Node 22.15.0
+ * onward), and a `typescript` package must be installed between the entry's
+ * directory and the repo root, inclusive — the target repository's own
+ * compiler, never one this repository ships and never one above the root.
+ * Checked in the parent so a miss is a NAMED decline carrying what to
+ * do, not a crash inside the child's `--import` hook. `nodeApi` is a seam for
+ * the test that stands in an older Node.
+ *
+ * @returns {{ok: true, compiler: string} | {ok: false, reason: string, detail: string}}
+ */
+export function checkTypeScriptRuntime(
+  repoRoot,
+  entryPath,
+  nodeApi = nodeModule,
+) {
+  if (typeof nodeApi.registerHooks !== "function") {
+    return {
+      ok: false,
+      reason: "typescript-hook-unavailable",
+      detail: `a TypeScript entry needs module.registerHooks, which this Node (${process.version}) lacks — use Node 22.15.0 or later`,
+    };
+  }
+  try {
+    // Walk from the entry's directory up to the repo root and no further, and
+    // take the first directory that holds a `typescript` package. A plain
+    // `createRequire(entryPath).resolve` keeps climbing past the root and also
+    // reads the parent process's NODE_PATH and global folders, so a compiler
+    // above the repository, or an ambient one, would be borrowed (QA cycle 1,
+    // T314-CR-1). The directory is vetted here, lexically; a symlinked install
+    // inside the repository is the repository's own choice and resolves fine.
+    const root = resolve(repoRoot);
+    // isWithin, not startsWith(root + sep): for a root of `/` that is `//`,
+    // which no path starts with (QA cycle 2, T314-CR2-3).
+    for (
+      let dir = dirname(entryPath);
+      isWithin(root, dir);
+      dir = dirname(dir)
+    ) {
+      if (existsSync(join(dir, "node_modules", "typescript", "package.json"))) {
+        return {
+          ok: true,
+          compiler: createRequire(join(dir, "noop.js")).resolve("typescript"),
+        };
+      }
+      if (dir === root || dirname(dir) === dir) break;
+    }
+    throw new Error("no typescript inside the repository root");
+  } catch {
+    return {
+      ok: false,
+      reason: "typescript-unavailable",
+      detail: `no \`typescript\` package resolves from ${dirname(entryPath)} (repo root ${repoRoot}) — install the repository's dependencies there and re-run; the probe borrows the repository's own compiler, so no override is needed`,
+    };
+  }
+}
 /**
  * How a `.py` entry is run: `python3 -E -s -B -c PYTHON_BOOTSTRAP <entry>
  * ...argv` (task.215). `-E` ignores every PYTHON* variable (a second line:
@@ -1794,6 +1886,20 @@ export function runProbeSpec({
       );
     }
   }
+  // The TypeScript module entry (task.314). A `.ts`/`.mts`/`.cts`/`.tsx` entry is
+  // loaded through the bundled hook and the target repository's own compiler.
+  // Both prerequisites are checked HERE, in the parent, and declined once by
+  // name: a throw inside the `--import` hook kills `node` before the runner can
+  // report anything, so the child must never be the place they are discovered.
+  // The root is the realpath'd one resolveEntry's containment check just used.
+  let tsCompiler = null;
+  let tsRoot = null;
+  if (resolved.kind === "js" && TS_ENTRY_EXTENSION.test(resolved.entryPath)) {
+    tsRoot = realpathSafe(resolve(repoRoot));
+    const runtime = checkTypeScriptRuntime(tsRoot, resolved.entryPath);
+    if (!runtime.ok) return decline(runtime.reason, runtime.detail);
+    tsCompiler = runtime.compiler;
+  }
   // The cli: child's interpreter (task.215). A `.py` entry needs the host's
   // python3; without one it is declined once, by name — every case would
   // otherwise fail to spawn and read as N identical errors.
@@ -2229,10 +2335,29 @@ export function runProbeSpec({
       }
       const before = snapshotTree(sandboxRoot, workDirName);
 
+      // The argv is a fixed list: the hook path is a constant beside this file
+      // and the compiler path was resolved in the parent. Neither comes from a
+      // case or a plan (task.314).
       const leash = leashed(
         process.execPath,
-        ["--input-type=module", "-e", RUNNER],
-        { env: sandboxEnv({ cwd: workDir }), cwd: workDir },
+        tsCompiler === null
+          ? ["--input-type=module", "-e", RUNNER]
+          : ["--import", TS_HOOK_PATH, "--input-type=module", "-e", RUNNER],
+        {
+          env: sandboxEnv({
+            cwd: workDir,
+            bindings:
+              tsCompiler === null
+                ? {}
+                : {
+                    PROBE_TS_COMPILER: tsCompiler,
+                    // The hook looks for a tsconfig no higher than this (QA
+                    // cycle 2, T314-CR2-2); the engine's own value, never a case's.
+                    PROBE_TS_ROOT: tsRoot,
+                  },
+          }),
+          cwd: workDir,
+        },
       );
       const child = spawnSync(leash.command, leash.args, {
         input: JSON.stringify({

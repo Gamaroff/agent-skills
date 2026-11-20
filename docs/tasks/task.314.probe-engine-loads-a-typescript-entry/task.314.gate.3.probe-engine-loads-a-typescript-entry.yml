@@ -1,0 +1,81 @@
+schema: 2
+task: 'task.314.probe-engine-loads-a-typescript-entry'
+task_title: 'The security probe engine loads a TypeScript entry'
+gate: CONCERNS
+status_reason: 'The three cycle 2 fixes hold (each mutation proof covered). One new medium finding, reproduced by QA: the tsconfig bound checks only the located file, so an in-repo tsconfig whose extends points above the repo root still inherits options (target, jsx, paths) from outside it.'
+reviewer: 'QA Engineer'
+head: '56d55f4c4c8d6b4698272c531347a098ca4b6c54'
+updated: '2026-11-20T17:36:00Z'
+
+top_issues:
+  - id: 'T314-CR3-1'
+    origin: 'code-review, reproduced by QA'
+    severity: medium
+    file: 'shared/resources/security-probe-ts-hook.mjs'
+    finding: 'The hook bounds the located tsconfig path to PROBE_TS_ROOT, but ts.parseJsonConfigFileContent also follows that config''s extends chain, so a tsconfig inside the repo that extends a file above the root inherits its options. Reproduced with the compiler API: a repo tsconfig extending ../outer.json (target ES5) parses to target 1 (ES5); control: the same config extending a file inside the repo gives the same result, as it should. Same class as T314-CR-1 and T314-CR2-2, for the extended file. Reviewer confidence medium, recorded unchanged.'
+    suggested_action: 'Parse with a ParseConfigHost whose readFile and fileExists refuse paths outside the root (or check the extended file list against the root and drop the config), and add a test with a repo tsconfig extending a file in the parent of the repo root, plus a control extending a file inside it.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 28
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: ['never']
+    boundary_reason: 'Unchanged from cycles 1 and 2: the criteria word "never" describes what the committed argv, binding and no-write tests hold. None of the functions the diff adds accepts or rejects external input; checkTypeScriptRuntime is an environment preflight and the hook is a loader. Containment stays with resolveEntry.'
+    notes: 'The extended tsconfig is not bounded to the repo root (T314-CR3-1); the escape check is green and the hook writes nothing.'
+  performance:
+    status: PASS
+    notes: 'Unchanged: median 363 ms per child; the config lookup is now memoised per directory.'
+  reliability:
+    status: PASS
+    notes: 'The ES5 default is fixed (cycle 2 tests hold); both prerequisites decline by name.'
+  maintainability:
+    status: PASS
+    notes: 'Advisory: the hook carries a third copy of the containment test (review CR-4).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 1
+  fix_date: '2026-11-20'
+  total_iterations: 2
+  verification_method: 'Committed tests plus mutation proofs re-run this cycle: target default removed (3 red), config bound removed (1 red), root-of-/ bound reverted (1 red); Node 22 gate 8695 pass, 0 fail at the fix commit'
+
+recommendations:
+  immediate:
+    - action: 'Fix T314-CR3-1.'
+      refs: ['shared/resources/security-probe-ts-hook.mjs']
+  future:
+    - action: 'Tighten the T314-CR2-2 control to assert declined is empty and the ES5 crash signature (QA measured: verdict absent, 0 declined, 2 executed, hostile case accepted), so it cannot pass on an unrelated non-engages outcome (review CR-3).'
+      refs: ['shared/resources/tests/security-probe-typescript-entry.test.mjs']
+      remedy: unverified
+    - action: 'Realpath the root and the located config before comparing, with a test for an in-repo symlinked import dir (review CR-2, low confidence, not reproduced).'
+      refs: ['shared/resources/security-probe-ts-hook.mjs']
+      remedy: unverified
+    - action: 'Share the containment test with isWithin or comment the copy (review CR-4); named decline for an unreadable tsconfig; derive the hook extension list from the engine list.'
+      refs: ['shared/resources/security-probe-ts-hook.mjs']
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T314-CR3-1 fixed']

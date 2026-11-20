@@ -76,8 +76,10 @@ registerHooks({
 
 **Review the prototype before building on it:**
 
-- The `require` of `typescript` throws a raw error when absent: wrap it and exit with a marker the engine
-  maps to the named decline (Phase 2), never a raw import error.
+- The `require` of `typescript` throws a raw error when absent, and a throw inside an `--import` hook kills
+  `node` before `RUNNER` runs. So the engine resolves `typescript` from the root **in the parent**, before
+  it spawns, and declines by name (Phase 2); the hook may assume the compiler resolves. The same
+  parent-side check covers a Node without `registerHooks` (review 1, I1).
 - The entry itself (the first module) has no `parentURL`, so `resolve` falls through to Node, which can
   load a `.ts` file only if `load` handles it. Check the entry path loads, not only its imports.
 - Check each fixture shape from the task: parameter property, `enum`, `namespace`, value import under
@@ -125,6 +127,9 @@ Place a new suite beside `security-probe.test.mjs` (`shared/resources/tests/`).
 - `npm run bundle`, then `npm run bundle:check`. Confirm the hook appears under every skill that
   ships `security-probe.mjs` (the engine must reference it by bare filename or the bundler will not copy it;
   verify with `git ls-files 'skills/*/references/<hook>'`).
+- After the doc edits run the tests that pin them: `evals/shared/tests/finalise-dod-prompt-contract.test.mjs`,
+  `evals/shared/tests/probes-executed-population.test.mjs`, `evals/shared/tests/qa-gate-preconditions-parity.test.mjs`,
+  `tests/shared-script-literals.test.js`, and `tests/bundled-links.test.js` (review 1, I2 and I3).
 - Docs: engine header; `probe-boundary-rule.md` (the "six entry forms" paragraph, declines table);
   `skills/finalise/SKILL.md` step 3b.1 item 6 (zero-guard) so a TypeScript entry is reachable and the
   override stays the exception.

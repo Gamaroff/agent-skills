@@ -172,6 +172,8 @@ Declining conditions, each reported with its reason:
 | `bad-cases` | A supplied case is not an object, its `direction` is not `hostile` or `legitimate`, or its `sink` is set and is not a known sink. A `null` sink counts as absent. The CLI refuses the same input with exit 2. |
 | `entry-not-probeable` | The module would not import, the export is absent, or it is not a function. An **absent** export is a module-private predicate: export it and re-run — never a reason for `boundary: false` (obs #156). For `fence:`: the heading is not in the doc, appears twice, or has no ```` ```bash ```` block under it. |
 | `entry-not-probeable`, the uniform-failure shape | Every case failed before reaching the control (task 256). At least one hostile and one legitimate case ran, every hostile case read `accepted`, every legitimate case read `rejected`, and within each shell they share one non-zero exit (not 126 or 127) and one non-empty stderr, after removing the sandbox path, `fixture-XXXXXX` and `fence-N.sh`. The usual cause is a wrong entry form: a multi-flag script under `shell:`, which passes the fixture as one positional argument. Use `shell-argv:` with an `--argv` template. A run that reached `gh` stays `needs-fake-gh`. **Four shapes stay scored, and these are limits, not guarantees:** a usage error quoting the input, a corpus with hostile cases only, exit 126 or 127, and a failure with no stderr. |
+| `typescript-unavailable` | A `.ts`/`.mts`/`.cts`/`.tsx` module entry, and no `typescript` package is installed between the entry's directory and the repo root (one above the root is never borrowed). The detail names the directory and the repo root searched; install the repository's dependencies and re-run. Declined by the parent before any child is spawned, so nothing ran. |
+| `typescript-hook-unavailable` | A TypeScript module entry on a Node without the synchronous `module.registerHooks` (before 22.15.0). The detail names the running version. |
 | `case-errored` | One case timed out or its child never ran. |
 | `bad-args` | `--args-json` is not a JSON array, or was given with a `shell:` / `shell-fn:` / `cli:` / `shell-argv:` / `fence:` entry, which cannot append an argument to a call. |
 | `bad-slot` | A `fence:` entry with no `--slot`, a `--slot` the block does not contain (a slot that substitutes nothing tests nothing), or a `--slot` given with any other form. |
@@ -280,7 +282,16 @@ takes it.
   that appears between the containment check and the readable-file check, a race
   nothing here defends against.
 - **The engine reaches six entry forms, and "not importable" is not a decline.**
-  `path#export` imports a JS module; `shell:path` runs a **shell script that
+  `path#export` imports a JS module — **or a TypeScript one** (`.ts`, `.mts`,
+  `.cts`, `.tsx`; task.314): the engine starts the child with a bundled loader
+  hook that resolves and transpiles through the **target repository's own**
+  `typescript` package, so `tsconfig` `paths`, `index.ts`, extensionless and
+  NodeNext `./x.js` imports resolve the way the project resolves them. It never
+  type-checks and writes nothing, and the hook is a fixed file passed by path:
+  nothing a plan or case supplies reaches the child's argv. A repository with no
+  resolvable compiler is declined `typescript-unavailable` (the fix is the
+  repository's install, not an override). The `cli:` form has no TypeScript
+  interpreter. `shell:path` runs a **shell script that
   takes one positional argument** — `bash <script> <fixture-dir>` per case, under
   bash and (when the host has it) zsh, with the script and directory passed as
   argv, never as a string, stdin closed, `sandboxEnv()` plus `LC_ALL=C`. A sink

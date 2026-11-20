@@ -1,0 +1,14 @@
+[
+  {
+    "argv": [
+      "--sink",
+      "path",
+      "--entry",
+      "shared/resources/security-probe.mjs#resolveEntry",
+      "--name",
+      "resolveEntry TypeScript-entry containment"
+    ],
+    "cases_file": "task.314.dod.1.security.cases.json",
+    "cases_sha256": "79500ada5d4a4834d86baf63a6333c43d382ffdd85faf42107635d35ac5e7672"
+  }
+]
