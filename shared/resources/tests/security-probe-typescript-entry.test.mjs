@@ -28,6 +28,7 @@ import {
   realpathSync,
   rmSync,
   symlinkSync,
+  writeFileSync,
 } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
@@ -166,6 +167,64 @@ test("loads and scores an entry with no tsconfig, mapping a .js specifier to its
   const r = probe(`${FX_NO_CONFIG}/guard.ts#validateHost`, BASIC);
   assert.deepEqual(r.declined, [], JSON.stringify(r.declined));
   assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+});
+
+// ── QA cycle 2: target default, tsconfig bound, root of `/` ──────────────────
+
+const FX_NO_TARGET =
+  "shared/resources/tests/fixtures/security-probe-ts-notarget";
+const OWN_TS = dirname(
+  createRequire(resolve(HERE, "..", "..", "..", "package.json")).resolve(
+    "typescript/package.json",
+  ),
+);
+
+test("T314-CR2-1: a tsconfig with no target still loads a thrown Error subclass so instanceof holds", () => {
+  const r = probe(`${FX_NO_TARGET}/errguard.ts#validateHost`, BASIC);
+  assert.deepEqual(r.declined, [], JSON.stringify(r.declined));
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+});
+
+test("T314-CR2-1: with no tsconfig at all the same subclass holds", () => {
+  const r = probe(`${FX_NO_CONFIG}/errguard.ts#validateHost`, BASIC);
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+});
+
+/** A repo with its own compiler and a copy of the no-tsconfig fixture; a tsconfig that asks for ES5 is placed where `at` says. */
+function repoWithEs5Config(t, at) {
+  const parent = realpathSync(mkdtempSync(join(tmpdir(), "probe-ts-cfg-")));
+  t.after(() => rmSync(parent, { recursive: true, force: true }));
+  const repo = join(parent, "repo");
+  mkdirSync(join(repo, "node_modules"), { recursive: true });
+  symlinkSync(OWN_TS, join(repo, "node_modules", "typescript"));
+  cpSync(resolve(FX_NO_CONFIG), join(repo, "fx"), { recursive: true });
+  const dir = at === "parent" ? parent : repo;
+  writeFileSync(
+    join(dir, "tsconfig.json"),
+    JSON.stringify({ compilerOptions: { target: "ES5" } }),
+  );
+  return repo;
+}
+
+test("T314-CR2-2: a tsconfig that exists only ABOVE the repo root is never inherited", (t) => {
+  const repo = repoWithEs5Config(t, "parent");
+  const r = probe("fx/errguard.ts#validateHost", BASIC, { repoRoot: repo });
+  assert.deepEqual(r.declined, [], JSON.stringify(r.declined));
+  // The parent's ES5 config is ignored, so the default target applies and instanceof holds.
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+});
+
+test("T314-CR2-2 control: the same tsconfig INSIDE the repo root is applied", (t) => {
+  const repo = repoWithEs5Config(t, "inside");
+  const r = probe("fx/errguard.ts#validateHost", BASIC, { repoRoot: repo });
+  // ES5 downlevels the subclass, so the refusal reads as a crash: proof the config was read.
+  assert.notEqual(r.verdict, "engages", JSON.stringify(r.cases));
+});
+
+test("T314-CR2-3: a repo root of / finds the compiler between the entry and the root", () => {
+  const entry = resolve(FX, "guard.ts");
+  const r = checkTypeScriptRuntime("/", entry);
+  assert.equal(r.ok, true, JSON.stringify(r));
 });
 
 // ── calibration ──────────────────────────────────────────────────────────────

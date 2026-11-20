@@ -445,21 +445,21 @@ None.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-20
-**Quality Score**: 90/100
+**Quality Score**: 80/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.314.qa.1.probe-engine-loads-a-typescript-entry.md](./task.314.qa.1.probe-engine-loads-a-typescript-entry.md)
-- **Gate File**: [task.314.gate.1.probe-engine-loads-a-typescript-entry.yml](./task.314.gate.1.probe-engine-loads-a-typescript-entry.yml)
+- **Full Report**: [task.314.qa.2.probe-engine-loads-a-typescript-entry.md](./task.314.qa.2.probe-engine-loads-a-typescript-entry.md)
+- **Gate File**: [task.314.gate.2.probe-engine-loads-a-typescript-entry.yml](./task.314.gate.2.probe-engine-loads-a-typescript-entry.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 21
+- **Tests Executed**: 23
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-One medium finding, reproduced by QA: the TypeScript compiler is resolved by walking up past the repo root, so a `typescript` in a parent directory is accepted where a repository with no compiler of its own should be declined (T314-CR-1).
+The cycle 1 fix holds. The refute pass found three more defects, each reproduced by QA: the hook compiles to ES5 when no `target` is set (T314-CR2-1), its tsconfig lookup climbs past the repo root (T314-CR2-2), and the root bound fails for a root of `/` (T314-CR2-3).
 
 <!-- change-log-start -->
 ## Change Log
@@ -472,6 +472,8 @@ One medium finding, reproduced by QA: the TypeScript compiler is resolved by wal
 | 2026-11-20 |         | Implemented: hook, engine wiring, fixture family and suite, docs, bundle; status → ready-for-review | develop-task |
 | 2026-11-20 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-11-20 |         | QA findings fixed — compiler bounded to the repo root (T314-CR-1), 1 iteration | qa-fix |
+| 2026-11-20 |  | QA gate CONCERNS (80/100) — 3 findings | qa-task |
+| 2026-11-20 |         | QA findings fixed — ES2022 default target, tsconfig lookup bounded to the repo root, root-of-/ bound (T314-CR2-1 to -3), 2 iterations | qa-fix |
 <!-- change-log-end -->
 
 ---
@@ -523,7 +525,8 @@ report), so a 59-case plan adds about 18 s against `ENGINE_TIMEOUT_MS` of 20 min
 
 - The parent finds `typescript` (from the **entry's directory** up to the repo root, never above it:
   QA cycle 1, T314-CR-1) and the engine binds that
-  absolute path into the child as `PROBE_TS_COMPILER`; the hook does not receive the repo root. A throw
+  absolute path into the child as `PROBE_TS_COMPILER`, with the repo root as `PROBE_TS_ROOT` so the hook's tsconfig lookup stops there
+  (QA cycle 2, T314-CR2-2); the hook compiles to ES2022 when the config sets no `target` (T314-CR2-1). A throw
   inside an `--import` hook kills `node` before `RUNNER` can report anything (review 1, I1), so both
   prerequisites are checked in the parent and declined by name: `typescript-unavailable`
   (carries the entry directory and the repo root) and `typescript-hook-unavailable` (Node before

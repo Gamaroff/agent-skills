@@ -830,9 +830,11 @@ export function checkTypeScriptRuntime(
     // T314-CR-1). The directory is vetted here, lexically; a symlinked install
     // inside the repository is the repository's own choice and resolves fine.
     const root = resolve(repoRoot);
+    // isWithin, not startsWith(root + sep): for a root of `/` that is `//`,
+    // which no path starts with (QA cycle 2, T314-CR2-3).
     for (
       let dir = dirname(entryPath);
-      dir === root || dir.startsWith(root + sep);
+      isWithin(root, dir);
       dir = dirname(dir)
     ) {
       if (existsSync(join(dir, "node_modules", "typescript", "package.json"))) {
@@ -1891,11 +1893,10 @@ export function runProbeSpec({
   // report anything, so the child must never be the place they are discovered.
   // The root is the realpath'd one resolveEntry's containment check just used.
   let tsCompiler = null;
+  let tsRoot = null;
   if (resolved.kind === "js" && TS_ENTRY_EXTENSION.test(resolved.entryPath)) {
-    const runtime = checkTypeScriptRuntime(
-      realpathSafe(resolve(repoRoot)),
-      resolved.entryPath,
-    );
+    tsRoot = realpathSafe(resolve(repoRoot));
+    const runtime = checkTypeScriptRuntime(tsRoot, resolved.entryPath);
     if (!runtime.ok) return decline(runtime.reason, runtime.detail);
     tsCompiler = runtime.compiler;
   }
@@ -2346,7 +2347,14 @@ export function runProbeSpec({
           env: sandboxEnv({
             cwd: workDir,
             bindings:
-              tsCompiler === null ? {} : { PROBE_TS_COMPILER: tsCompiler },
+              tsCompiler === null
+                ? {}
+                : {
+                    PROBE_TS_COMPILER: tsCompiler,
+                    // The hook looks for a tsconfig no higher than this (QA
+                    // cycle 2, T314-CR2-2); the engine's own value, never a case's.
+                    PROBE_TS_ROOT: tsRoot,
+                  },
           }),
           cwd: workDir,
         },
