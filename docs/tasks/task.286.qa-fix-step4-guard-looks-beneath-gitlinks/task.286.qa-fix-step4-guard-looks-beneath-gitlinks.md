@@ -235,6 +235,27 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-20
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.286.qa.1.qa-fix-step4-guard-looks-beneath-gitlinks.md](./task.286.qa.1.qa-fix-step4-guard-looks-beneath-gitlinks.md)
+- **Gate File**: [task.286.gate.1.qa-fix-step4-guard-looks-beneath-gitlinks.yml](./task.286.gate.1.qa-fix-step4-guard-looks-beneath-gitlinks.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 47 (bash and zsh) and 36 boundary probes
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No blocking issues. Two low findings reproduced and are recorded as future work: a gitlink nested inside a gitlink is not looked into (pre-existing), and a non-ASCII gitlink path is refused for the wrong reason (new, safe side).
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -244,6 +265,7 @@ None.
 | 2026-11-20 | 1.1     | Review passed (8/10) — re-anchored five drifted SKILL.md line numbers, named the probe cases file, added the INSIDE_LINE mutant-literal update to Phase 4 | review-task |
 | 2026-11-20 |         | Status → ready-for-development | review-task |
 | 2026-11-20 |         | Implemented CR-1 (gitlink look), CR-2 (root top level), CR-3 documented; status → ready-for-review | develop |
+| 2026-11-20 |         | QA gate PASS (95/100) — 2 low findings, advisory | qa-task |
 <!-- change-log-end -->
 
 ---
