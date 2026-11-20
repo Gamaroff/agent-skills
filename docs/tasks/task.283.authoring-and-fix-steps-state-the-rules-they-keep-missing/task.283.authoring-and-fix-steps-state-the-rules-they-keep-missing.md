@@ -10,6 +10,7 @@ priority: Medium
 created: 2026-11-06
 updated: 2026-11-20
 estimated_effort_hours: 16
+pr_number: 922
 ---
 
 # Task 283: Authoring and fix steps state the rules they keep missing
@@ -182,6 +183,7 @@ None - each phase adds a rule or a script.
 2. ✅ `skills/ensure-task-github-issue/SKILL.md`, `skills/sync-github-task/SKILL.md` (if carried) and a new renderer script
 3. ✅ `docs/contributing/traps.md`
 4. ✅ `shared/resources/develop-pipeline-step-3-develop-loop.md`
+8. ✅ `CHANGELOG.md` (an `[Unreleased]` entry for this task, which the repository convention and the task's own CHANGELOG rule require)
 
 ### Files to Modify (Tests)
 

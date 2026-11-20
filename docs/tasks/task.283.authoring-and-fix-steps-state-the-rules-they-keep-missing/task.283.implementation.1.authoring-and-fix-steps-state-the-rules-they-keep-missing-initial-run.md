@@ -223,9 +223,9 @@ Importer audit: no shared parser widened; skipped.
 **HIGH findings**: 0
 **MEDIUM findings**: 0
 **Traceability**: skipped (no Acceptance Criteria section)
-**PR Review**: pending — Step 5c runs next
+**PR Review**: CONCERNS — task.283.pr-review.1.authoring-and-fix-steps-state-the-rules-they-keep-missing.md (1 medium trail, 5 low; no coverage finding)
 **Loop exit**: PASS — exit taken after a sixth gate allowed by the owner
-**Action**: Proceeding to Step 5c (/review-pr)
+**Action**: Proceeding to Step 7 (finalise). PC-3, PC-4 and PC-6 fixed in the 5c step; PC-1, PC-2 and PC-5 go to /finalise
 
 ---
 
@@ -234,7 +234,7 @@ Importer audit: no shared parser widened; skipped.
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: feature/task.283.authoring-and-fix-steps-state-the-rules-they-keep-missing
-**PR**: {populated after Step 4}
+**PR**: #922 (https://github.com/Gamaroff/agent-skills/pull/922)
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
