@@ -5,17 +5,18 @@ type: task
 description: "Add four missing rules: verify a plan's CHANGELOG placement claim, a documented multi-task path for create-task, an importer audit when a fix widens a shared parser, and the command-node-under-wrapper trap."
 tags: [create-task, review-task, develop-bug, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-20
+completed_date: 2026-11-20
 estimated_effort_hours: 16
 pr_number: 922
 ---
 
 # Task 283: Authoring and fix steps state the rules they keep missing
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.283.review.1.authoring-and-fix-steps-state-the-rules-they-keep-missing.md` implemented 2026-11-19
 
 ---
@@ -108,9 +109,9 @@ None - each phase adds a rule or a script.
 - a test under `shared/resources/tests/` that extracts the block and runs it
 
 **Changes**:
-- [ ] Placement check in review-task Step 3 check 2: a claim that a bullet sits "under `[Unreleased]`" is verified with `grep -n "^## \[" CHANGELOG.md`.
-- [ ] Fix point (decided 2026-11-06): a fenced shell block in the Step 3 doc fails when a new CHANGELOG entry lands below the first `## [v` heading. No 5c CHANGELOG exception: it would widen the docs-only gate.
-- [ ] The block is held by a test that extracts it and runs it on a fixture CHANGELOG (a released-section entry fails; **control**: an `[Unreleased]` entry passes). Use the fenced-block extractor the existing evals use (`git grep -n "function fencedBlocks" -- 'evals/shared/tests/*.mjs'`).
+- [x] Placement check in review-task Step 3 check 2: a claim that a bullet sits "under `[Unreleased]`" is verified with `grep -n "^## \[" CHANGELOG.md`.
+- [x] Fix point (decided 2026-11-06): a fenced shell block in the Step 3 doc fails when a new CHANGELOG entry lands below the first `## [v` heading. No 5c CHANGELOG exception: it would widen the docs-only gate.
+- [x] The block is held by a test that extracts it and runs it on a fixture CHANGELOG (a released-section entry fails; **control**: an `[Unreleased]` entry passes). Use the fenced-block extractor the existing evals use (`git grep -n "function fencedBlocks" -- 'evals/shared/tests/*.mjs'`).
 
 **Dependencies**: none (fix point decided).
 
@@ -128,9 +129,9 @@ None - each phase adds a rule or a script.
 - `shared/resources/tests/payload-heredoc-ratchet.test.mjs` (its pinned `issue-body.md` heredoc count drops by one)
 
 **Changes**:
-- [ ] Documented path; renderer; `ensure-task-github-issue` calls it.
-- [ ] The renderer calls `jira-sync.js` `buildCardSections` and `parseFrontmatter`; it carries no cap, heading list or frontmatter regex of its own (one definition of the card contract).
-- [ ] The new `shared/resources/*.js` file passes the tests that scan every shared resource: `shared/resources/tests/pipeline-answers-generic.test.mjs` (generic text, no branch or consumer literals) and `command npm run bundle -- --check`.
+- [x] Documented path; renderer; `ensure-task-github-issue` calls it.
+- [x] The renderer calls `jira-sync.js` `buildCardSections` and `parseFrontmatter`; it carries no cap, heading list or frontmatter regex of its own (one definition of the card contract).
+- [x] The new `shared/resources/*.js` file passes the tests that scan every shared resource: `shared/resources/tests/pipeline-answers-generic.test.mjs` (generic text, no branch or consumer literals) and `command npm run bundle -- --check`.
 
 **Dependencies**: none.
 
@@ -144,7 +145,7 @@ None - each phase adds a rule or a script.
 - `skills/develop-bug/SKILL.md` Step 3 (Investigate & Fix), `skills/qa-fix/SKILL.md` Step 3 (Apply Changes)
 
 **Changes**:
-- [ ] The importer-audit rule: when a fix widens what a shared parser or validator accepts, `git grep -l "<function>"` lists the importers, those that write based on its output are named, and each gets a line on why newly accepted input is safe.
+- [x] The importer-audit rule: when a fix widens what a shared parser or validator accepts, `git grep -l "<function>"` lists the importers, those that write based on its output are named, and each gets a line on why newly accepted input is safe.
 
 **Dependencies**: none.
 
@@ -158,7 +159,7 @@ None - each phase adds a rule or a script.
 - `docs/contributing/traps.md`
 
 **Changes**:
-- [ ] One line and the `NODE=$(command -v node)` form beside the `command node` rule (`docs/contributing/traps.md:25`), with the reason: `timeout`, `xargs`, `env`, `nice` and `nohup` exec their first argument as a program, and `command` is a shell builtin.
+- [x] One line and the `NODE=$(command -v node)` form beside the `command node` rule (`docs/contributing/traps.md:25`), with the reason: `timeout`, `xargs`, `env`, `nice` and `nohup` exec their first argument as a program, and `command` is a shell builtin.
 
 **Dependencies**: none.
 
@@ -169,7 +170,7 @@ None - each phase adds a rule or a script.
 **Risk Level**: Low
 
 **Changes**:
-- [ ] `command npm run bundle`, `command npm run bundle -- --check`; mutation proofs.
+- [x] `command npm run bundle`, `command npm run bundle -- --check`; mutation proofs.
 
 **Dependencies**: Phases 1 to 4.
 
@@ -203,10 +204,10 @@ None - each phase adds a rule or a script.
 **Scope**: the renderer and the Step 3 CHANGELOG block.
 
 **Actions**:
-- [ ] The renderer keeps `estimated_effort_hours` and absolute links on a fixture task whose frontmatter has a multi-line `description`; **control**: the old `\s*` pattern drops the field on the same fixture (mutation proof).
-- [ ] The first 5 criteria and an exact "+N more" for a task with 8; **control**: a task with 5 gets no "+N more" line.
-- [ ] The renderer's caps come from `buildCardSections`: a test asserts the renderer file holds no cap constant of its own.
-- [ ] The Step 3 CHANGELOG block, extracted from the doc and run on a fixture CHANGELOG, fails for a new entry below the first `## [v` heading (the task.184 shape); **control**: an `[Unreleased]` entry passes.
+- [x] The renderer keeps `estimated_effort_hours` and absolute links on a fixture task whose frontmatter has a multi-line `description`; **control**: the old `\s*` pattern drops the field on the same fixture (mutation proof).
+- [x] The first 5 criteria and an exact "+N more" for a task with 8; **control**: a task with 5 gets no "+N more" line.
+- [x] The renderer's caps come from `buildCardSections`: a test asserts the renderer file holds no cap constant of its own.
+- [x] The Step 3 CHANGELOG block, extracted from the doc and run on a fixture CHANGELOG, fails for a new entry below the first `## [v` heading (the task.184 shape); **control**: an `[Unreleased]` entry passes.
 
 **Command**: `CI=true command node --test` on the named files.
 
@@ -224,9 +225,9 @@ The prose rules of Phases 1 (review-task claim check), 3 and 4: a fresh session 
 
 ### Functional
 
-- [ ] The renderer output for the task.202 shape keeps effort and absolute links, shown by a named test in the QA report.
-- [ ] The four rules are present in their files (greps in the QA report).
-- [ ] The Step 3 CHANGELOG block fails the task.184 shape and passes its control, shown by the named test in the QA report; review-task's placement claim check flags the same shape in the fixture session recorded in the QA report.
+- [x] The renderer output for the task.202 shape keeps effort and absolute links, shown by a named test in the QA report.
+- [x] The four rules are present in their files (greps in the QA report).
+- [x] The Step 3 CHANGELOG block fails the task.184 shape and passes its control, shown by the named test in the QA report; review-task's placement claim check flags the same shape in the fixture session recorded in the QA report.
 
 ### Performance
 
@@ -234,13 +235,13 @@ The prose rules of Phases 1 (review-task claim check), 3 and 4: a fresh session 
 
 ### Code Quality
 
-- [ ] The renderer has a mutation proof in the QA report.
-- [ ] `command npm run bundle -- --check` reports 0 problems; `CI=true command npm test` passes.
-- [ ] `shellcheck` is clean if the renderer is shell (`command npm run lint:shell`).
+- [x] The renderer has a mutation proof in the QA report.
+- [x] `command npm run bundle -- --check` reports 0 problems; `CI=true command npm test` passes.
+- [x] `shellcheck` is clean if the renderer is shell (`command npm run lint:shell`).
 
 ### Migration
 
-- [ ] No existing issue body changes: the renderer is called only on `ensure-task-github-issue`'s create path, shown by a grep of its call sites in the QA report.
+- [x] No existing issue body changes: the renderer is called only on `ensure-task-github-issue`'s create path, shown by a grep of its call sites in the QA report.
 
 ---
 
@@ -340,12 +341,29 @@ None identified.
 
 ### Key Findings
 T283-QA-12 is fixed and mutation-proven. The wall-time criterion is met (median +1.7%, QA report 5). One low advisory remains (T283-QA-13): the added-bullet list in the HALT message can be empty or missing; the block still fails closed. This was the sixth gate, allowed by the owner after the five-gate budget was spent.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report**: `task.283.qa.6.authoring-and-fix-steps-state-the-rules-they-keep-missing.md`
+**Gate File**: `task.283.gate.6.authoring-and-fix-steps-state-the-rules-they-keep-missing.yml`
+**Gate Status**: ✅ PASS (95/100)
+
+✅ **Success criteria:** 8 criteria traced to code and tests. Two record gaps were closed at finalise: the post-fix call-site grep (criterion 8) is in QA report 6, and the wall-time figure (criterion 4, +1.7%) is accepted by owner override because it predates a doc/test-only change.
+✅ **Tests and CI:** PR #922, all six checks green on `ce81da05e` (CI reading 1).
+✅ **Documentation:** CHANGELOG entry `(task 283)`, traps.md, and the five skill files updated.
+✅ **Security:** PASS. The probe plan ran 4 cases against the CHANGELOG guard; none reproduced.
+✅ **Compliance:** not applicable.
+
+**Detailed Verification Log:** See `task.283.dod.1.authoring-and-fix-steps-state-the-rules-they-keep-missing.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-20
 
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                              | Author      |
-| ---------- | ------- | -------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #30, #34, #36, #146 | create-task |
 | 2026-11-19 | 1.1     | Review 1 (8/10): renderer reuses `jira-sync.js` card builder; Step 3 CHANGELOG check is a tested block; `sync-github-task`, payload-heredoc ratchet and shared-resource tests named; memory-note edit dropped; Phase 3 steps named | review-task |
 | 2026-11-19 |         | Status → ready-for-development                            | review-task |
@@ -361,6 +379,7 @@ T283-QA-12 is fixed and mutation-proven. The wall-time criterion is met (median 
 | 2026-11-20 |         | QA gate CONCERNS (88/100) — wall time met (+1.7%), 1 medium open (set -e on an empty region), gate budget spent | qa-task     |
 | 2026-11-20 |         | QA findings fixed — awk counts, base read before the pipe, ENVIRON; sixth gate allowed by the owner, 5 iterations | qa-fix      |
 | 2026-11-20 |         | QA gate PASS (95/100) — 1 low advisory (HALT message list), sixth gate | qa-task     |
+| 2026-11-20 | 1.2 | DoD passed — accepted (PR #922); wall-time criterion accepted by owner override | finalise |
 <!-- change-log-end -->
 
 ---
@@ -368,19 +387,19 @@ T283-QA-12 is fixed and mutation-proven. The wall-time criterion is met (median 
 ## Progress Tracking
 
 ### Phase 1: CHANGELOG placement
-- [ ] Check and fix point
+- [x] Check and fix point
 
 ### Phase 2: Multi-task path and renderer
-- [ ] Path, script, tests
+- [x] Path, script, tests
 
 ### Phase 3: Parser-widening audit
-- [ ] Rule
+- [x] Rule
 
 ### Phase 4: The wrapper trap
-- [ ] Line
+- [x] Line
 
 ### Phase 5: Bundle and sweep
-- [ ] Bundle clean
+- [x] Bundle clean
 
 ---
 

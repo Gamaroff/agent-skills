@@ -1,0 +1,16 @@
+[
+  {
+    "argv": [
+      "--sink",
+      "filename",
+      "--entry",
+      "fence:shared/resources/develop-pipeline-step-3-develop-loop.md#CHANGELOG placement for a new entry (obs #30)",
+      "--slot",
+      "{base}",
+      "--name",
+      "changelog-placement-guard"
+    ],
+    "cases_file": "task.283.dod.1.security.cases.json",
+    "cases_sha256": "04afba495f6c68f53e09673f3870cda0ffddff490d28ac550e0cf6cd179ea175"
+  }
+]
