@@ -887,7 +887,15 @@ reports "could not look" (T285-CR-3). The second question is asked of git: the p
 directory (the path itself when it is a directory) must report the repository's top level, and
 another top level means a nested repository, which covers a submodule or nested root named as the
 path itself and anything below it (T285-QA-6). A directory git cannot report on, such as `.git`,
-is not refused. A path that is not on disk is skipped here, because the
+is not refused. A changed **directory** is asked a third question, because its own top level is the
+repository's and so tells nothing about a nested repository further down: the index is listed for
+gitlinks (mode `160000`) at or beneath it, and each is looked into. A gitlink that is not its own
+top level (not checked out) or that holds an untracked file refuses the directory, naming it; a
+clean checked-out gitlink is admitted (T286-CR-1). An absolute path that reaches the repository
+through a symlink **outside** it is refused by git itself ("could not look"), and that is intended:
+the route through the repository's own path is the one the guard judges (T286-CR-3). The inside test
+strips a trailing `/` from the top level first, so a repository rooted at `/` still judges paths
+(T286-CR-2). A path that is not on disk is skipped here, because the
 check above already accepted it as tracked and there is nothing on disk to look through:
 
 ```bash
@@ -916,7 +924,7 @@ if [ -n "$TOP" ]; then
     | while IFS= read -r p; do
         [ -e "$p" ] || continue
         case "$p" in /*) LEX=$(printf '%s\n' "$p" | norm) ;; *) LEX=$(printf '%s\n' "$CWD_PHYS/$p" | norm) ;; esac
-        case "$LEX/" in "$TOP"/*) INSIDE=1 ;; *) INSIDE="" ;; esac
+        TOPP=${TOP%/}; case "$LEX/" in "$TOPP"/*) INSIDE=1 ;; *) INSIDE="" ;; esac
         if [ -d "$p" ]; then
           DIR=$p; PHYS=$(cd -P -- "$p" 2>/dev/null && pwd -P) || PHYS=""
         else
@@ -927,6 +935,18 @@ if [ -n "$TOP" ]; then
         NEST=$(git -C "$DIR" rev-parse --show-toplevel 2>/dev/null) || NEST=""
         [ -z "$NEST" ] || NEST=$(cd -P -- "$NEST" 2>/dev/null && pwd -P) || NEST=""
         if [ -n "$INSIDE" ] && [ -n "$NEST" ] && [ "$NEST" != "$TOP" ]; then printf '%s\n' "$p"; fi
+        if [ -n "$INSIDE" ] && [ -d "$p" ] && [ "$NEST" = "$TOP" ]; then
+          GLIST=$(git --literal-pathspecs ls-files -s -- "$p") || { printf '%s\n' "$p"; continue; }
+          GLBAD=$(printf '%s\n' "$GLIST" | grep -E '^160000 ' | cut -f2- \
+            | while IFS= read -r g; do
+                GP=$(cd -P -- "$g" 2>/dev/null && pwd -P) || GP=""
+                GT=$(cd -P -- "$g" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null) || GT=""
+                if [ -z "$GP" ] || [ "$GT" != "$GP" ]; then echo 1; break; fi
+                GU=$(git -C "$g" ls-files --others --exclude-standard 2>/dev/null) || { echo 1; break; }
+                if [ -n "$GU" ]; then echo 1; break; fi
+              done)
+          [ -z "$GLBAD" ] || printf '%s\n' "$p"
+        fi
       done)
 fi
 [ -z "$BOUNDARY" ] \

@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **`qa-fix` Step 4 guard looks beneath gitlinks (task 286).** A changed directory whose subtree
+  holds a gitlink with an untracked file read clean; the guard now lists the gitlinks at or beneath
+  each changed directory and refuses one that is not checked out or holds an untracked file, and
+  admits a clean one. A repository rooted at `/` no longer disables the inside test, and an absolute
+  path through an external symlink is documented as refused by git on purpose.
+
 ## [v0.68.0] - 2026-11-20
 
 ### Changed
