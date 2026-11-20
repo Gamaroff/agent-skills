@@ -256,6 +256,24 @@ None.
 ### Key Findings
 No blocking issues. Two low findings reproduced and are recorded as future work: a gitlink nested inside a gitlink is not looked into (pre-existing), and a non-ASCII gitlink path is refused for the wrong reason (new, safe side).
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+QA gate PASS (95/100) and the security boundary held (36 executed, 0 reproduced). One criterion is open.
+
+### Missing Criteria:
+
+- ⚠️ Success Criteria #5 ("No performance criterion; the block runs once per fix cycle.") is a non-requirement: it states no bound, nothing a test could assert, and its checkbox is unticked.
+
+### Next Steps:
+
+- [ ] Owner decides: tick #5 as not applicable, or reword it; then re-run `/finalise` (document-only, no code change).
+
+**Estimated Effort:** Small (one line).
+
+**Detailed Verification Log:** See `task.286.dod.2.qa-fix-step4-guard-looks-beneath-gitlinks.md`.
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -266,6 +284,7 @@ No blocking issues. Two low findings reproduced and are recorded as future work:
 | 2026-11-20 |         | Status → ready-for-development | review-task |
 | 2026-11-20 |         | Implemented CR-1 (gitlink look), CR-2 (root top level), CR-3 documented; status → ready-for-review | develop |
 | 2026-11-20 |         | QA gate PASS (95/100) — 2 low findings, advisory | qa-task |
+| 2026-11-20 |         | DoD incomplete — 1 gap identified (Success Criteria #5) | finalise |
 <!-- change-log-end -->
 
 ---

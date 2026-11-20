@@ -35,9 +35,9 @@ Close the qa-fix Step 4 guard's false clean for a directory above a gitlink hold
 | 1. create-branch           | ✅ Done | Branch `feature/task.286.*` exists in git                              | Branch created at `abbfc1878` |  —                    | 2026-11-20T21:16Z |
 | 2. review-task             | ✅ Done | `task.286.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT 8/10; 0 critical, 2 important, 1 optional; all fixed | —                    | 2026-11-20T21:18Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Implemented inline (plan + surface map); 47 tests pass; `ci:fast` exit 0 on LAN server | —                    | 2026-11-20T21:50Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.286.qa.{N}.*.md`; `task.286.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.286.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
+| 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #927: https://github.com/Gamaroff/agent-skills/pull/927 (no tracker issue linked; no comment) | —                    | 2026-11-20T21:51Z |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.286.qa.{N}.*.md`; `task.286.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 1 QA cycle: gate PASS 95; 5c APPROVE (PC-1 low: task lacks `pr_number`, left to /finalise) | —                    | 2026-11-20T21:57Z |
+| 7. finalise                | ⚠️ HALT | `task.286.dod.{N}.*.md`; task `status: accepted`                       | DoD run 2: 1 gap — Success Criteria #5 (non-requirement, unticked); security 36/0 held; CI reading deferred | —                    | 2026-11-20T21:59Z |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
 ---
@@ -69,6 +69,7 @@ _Problems encountered and how they were resolved or escalated._
 - Step 3: `"${TOP%/}"/*` in a `case` pattern does not match in bash (it does in zsh); fixed by assigning `TOPP=${TOP%/}` first. Found by the CR-2 test, not by reading.
 - Step 3: first remote `ci:fast` failed on `prettier --check` of the new test code; fixed with `prettier --write`, re-run green.
 - The probe corpus fixture holds text files only, so it cannot hold a true gitlink (index mode 160000); the corpus case added is the nearest shape, and the Node scenarios hold the real one.
+- Step 7 HALT: `/finalise` (DoD run 2) found one gap. Success Criteria #5, "No performance criterion; the block runs once per fix cycle.", states no bound and has nothing to test, and its checkbox was left `- [ ]`. The AC rules fail a criterion with no bound and no test. Resolving it is the owner's call (tick as N/A or reword); an unapproved reword reads as an amendment. Nothing else is open: gate PASS 95, security 36 executed / 0 reproduced, docs PASS.
 - Observation of process: I typed a Completed (UTC) time from memory once (21:30Z); caught against `date -u` and corrected.
 
 ---
@@ -77,14 +78,24 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-11-20
+**Gate Result**: PASS
+**Issues Found**: none gating; 2 low findings reproduced and routed to future work (nested gitlink not looked into, pre-existing; non-ASCII gitlink path over-refused, new, safe side)
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**Traceability**: skipped (no Success Criteria table)
+**PR Review**: APPROVE
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
 
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
-**Branch**: {populated after Step 1}
-**PR**: {populated after Step 4}
+**Branch**: feature/task.286.qa-fix-step4-guard-looks-beneath-gitlinks
+**PR**: https://github.com/Gamaroff/agent-skills/pull/927
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}
