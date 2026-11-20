@@ -175,7 +175,7 @@ Population commands: `git grep -nE "(cat|tee)[^|]*<<-?['\"]?[A-Za-z_]+['\"]?" --
 
 ### Functional
 - [x] The ratchet's allowlist is empty and the test fails on any added payload heredoc (mutation-proven).
-- [x] Every changed block still runs under `qa-execute-snippets.mjs`.
+- [x] Every changed block that `qa-execute-snippets.mjs` classes as runnable still runs clean (1 of about 30 changed blocks; the rest are tracker or `gh` posts and placeholders, held by the test suites instead).
 
 ### Performance
 - [x] `CI=true npm test` wall time is within 10% of `develop`, measured with `uptime; time CI=true npm test` on the PR head and on `develop` on the same machine (the LAN server), the two figures and their `uptime` load recorded in the QA report's Findings section.
@@ -249,6 +249,7 @@ All four bugs are fixed and closed. The citation criterion holds: every body-fil
 | 2026-11-20 |         | QA gate CONCERNS (90/100) — 1 finding (review-code citation wrong)          | qa-task |
 | 2026-11-20 |         | QA findings fixed — 1 bug Ready for QA, 1 iteration                         | qa-fix |
 | 2026-11-20 |         | QA gate PASS (100/100) — 0 findings (bug 4 closed)                          | qa-task |
+| 2026-11-20 |         | Success criterion 2 narrowed by the owner to the blocks `qa-execute-snippets` classes runnable (finalise DoD found the original wording unmet for 29 of about 30 blocks); head wall time re-measured in QA report 1 | finalise |
 <!-- change-log-end -->
 
 ---

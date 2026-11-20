@@ -71,6 +71,16 @@ Not applicable (first review).
 | PR head `f5cde943f` | 610,751 ms | 0.13 (`uptime`, 11:30) |
 | `develop` `850985da3` | 631,771 ms | 1.44 (`uptime`, 11:48) |
 
+**Re-measured on later heads (added at `/finalise`, 2026-11-20).** The `f5cde943f` figure predates the QA fixes, so the full suite's duration was read again from the three later LAN-server gate runs (`npm run test:remote`, same runner; `# duration_ms` from the TAP summary; server load before each run was not captured, so it is not recorded):
+
+| Head | `npm test` duration | Against `develop` (631,771 ms) |
+| --- | --- | --- |
+| `9cbd6f57a` (qa-fix cycle 2, the engine change) | 608,289 ms | −3.7% |
+| `a4e6dba8a` (qa-fix cycle 3) | 673,707 ms | +6.6% |
+| `a64324245` (qa-fix cycle 4, the final code) | 669,085 ms | +5.9% |
+
+The latest head is 5.9% slower than the one `develop` run, inside the 10% bound. The spread across the four head runs (608,289 to 673,707 ms) is wider than the 10% bound, so a single pair of runs cannot settle this on its own; the median of the four head runs is 639,918 ms (+1.3%).
+
 The head is 3.3% faster. The loads differ, which flatters neither side by more than noise; either way it is inside the 10% bound. The `develop` run also failed one test, `SEC-1b` in `ci-tree-equivalence.test.mjs`, which is load-sensitive and untouched here; it is recorded as a pre-existing future item in the gate. The head's run had 8,661 of 8,664 passing with 0 failing (3 skipped).
 
 **Step 4b, honest reading.** The engine reported zero failures on any block this change touched. Of the changed blocks (about 30), only 1 is classed `runnable`; the others are `mutating` (tracker or `gh` posts, skipped by design) or `placeholder`. The five `execution-failure` records are on blocks the change did not touch, and each fails for an environmental reason (no lock file or no git repository in the temp copy). So "every changed block still runs" is true only for the runnable subset; the rest are held by the test suites, not by execution. The criterion is recorded as met for what the engine can run and not stronger.
