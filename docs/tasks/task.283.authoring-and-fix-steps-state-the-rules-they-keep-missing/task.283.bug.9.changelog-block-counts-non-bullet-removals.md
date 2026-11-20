@@ -4,7 +4,7 @@
 **Bug ID**: TASK-283-BUG-9
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (code-review CR-1, reproduced; CR-2 and CR-3 folded in)
 **Date Found**: 2026-11-20
 
@@ -31,3 +31,9 @@ Tests: three non-bullet-replacement shapes (heading plus blank, blank line, pros
 
 ## Recommendation
 Replace the hunk heuristic: compare the bullet count from the first release heading to the end of the file, merge-base copy against working copy, and HALT when the working copy has more. List the added bullets from a diff of the two regions. Tests for the three non-bullet-replacement shapes and a moved base; mutation-prove.
+
+## Status History
+
+| Date | Status | Changed By | Notes |
+| --- | --- | --- | --- |
+| 2026-11-20 | Closed | qa-task | Verified by task.283.qa.4 |

@@ -323,21 +323,21 @@ None identified.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-20
-**Quality Score**: 80/100
+**Quality Score**: 82/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.283.qa.3.authoring-and-fix-steps-state-the-rules-they-keep-missing.md](./task.283.qa.3.authoring-and-fix-steps-state-the-rules-they-keep-missing.md)
-- **Gate File**: [task.283.gate.3.authoring-and-fix-steps-state-the-rules-they-keep-missing.yml](./task.283.gate.3.authoring-and-fix-steps-state-the-rules-they-keep-missing.yml)
+- **Full Report**: [task.283.qa.4.authoring-and-fix-steps-state-the-rules-they-keep-missing.md](./task.283.qa.4.authoring-and-fix-steps-state-the-rules-they-keep-missing.md)
+- **Gate File**: [task.283.gate.4.authoring-and-fix-steps-state-the-rules-they-keep-missing.yml](./task.283.gate.4.authoring-and-fix-steps-state-the-rules-they-keep-missing.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 28 in this cycle's files (21 CHANGELOG-placement, 7 renderer); CI-parity run on the server: 8642 tests, 8639 pass, 0 fail
+- **Tests Executed**: 30 CHANGELOG-placement tests in this cycle's files; CI-parity run on the server at an earlier tree: 8642 tests, 8639 pass
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Cycle 2's fixes hold (QA-8, QA-9 closed). The scoped review reproduced one more medium defect in the CHANGELOG block: the per-hunk rule counts every removed line, so a bullet replacing a heading, blank or prose line passes (T283-QA-10). It is the third consecutive gate to name that block. The wall-time criterion is still unrecorded; a measurement is running (T283-QA-3).
+The cycle 3 rewrite holds: QA-10 closed. The scoped review reproduced one more medium defect in the rewritten block: a failed `mktemp` reads as a pass (T283-QA-11). The wall-time criterion is still unrecorded (T283-QA-3).
 
 <!-- change-log-start -->
 ## Change Log
@@ -354,6 +354,8 @@ Cycle 2's fixes hold (QA-8, QA-9 closed). The scoped review reproduced one more 
 | 2026-11-20 |         | QA findings fixed — 3 of 3 new medium; wall-time criterion left open, 2 iterations | qa-fix      |
 | 2026-11-20 |         | QA gate CONCERNS (80/100) — 1 new medium (CHANGELOG block), wall time recording | qa-task     |
 | 2026-11-20 |         | QA findings fixed — CHANGELOG block mechanism replaced; wall-time measurement pending, 3 iterations | qa-fix      |
+| 2026-11-20 |         | QA gate CONCERNS (82/100) — 1 new medium (mktemp failure reads as a pass), wall time recording | qa-task     |
+| 2026-11-20 |         | QA findings fixed — temp files removed, set -e safe, remedy named; wall-time measurement pending, 4 iterations | qa-fix      |
 <!-- change-log-end -->
 
 ---

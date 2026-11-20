@@ -388,8 +388,8 @@ if [ -f "$CL" ]; then
     || { echo "HALT: origin/{base} is not a ref in this checkout — run git fetch origin {base}, then re-run (the CHANGELOG check cannot look without it)"; exit 1; }
   # The merge base, not the base tip: a base that has moved on must not count as this branch's change.
   MB=$(git merge-base HEAD "origin/{base}") \
-    || { echo "HALT: no merge base between HEAD and origin/{base} — the CHANGELOG check cannot look"; exit 1; }
-  git diff --quiet "$MB" -- "$CL"; DIFF_RC=$?
+    || { echo "HALT: no merge base between HEAD and origin/{base} (a shallow clone or unrelated history) — run git fetch --unshallow origin, or fetch more of {base}, then re-run (the CHANGELOG check cannot look)"; exit 1; }
+  DIFF_RC=0; git diff --quiet "$MB" -- "$CL" || DIFF_RC=$?
   [ "$DIFF_RC" -le 1 ] || { echo "HALT: git diff against the merge base failed (exit $DIFF_RC) — the CHANGELOG check cannot look"; exit 1; }
 fi
 if [ -f "$CL" ] && [ "${DIFF_RC:-0}" -eq 1 ]; then
@@ -405,23 +405,25 @@ if [ -f "$CL" ] && [ "${DIFF_RC:-0}" -eq 1 ]; then
     # heading to the end of the file hold more bullets ("-" or "*", indented or not) than the same
     # region at the merge base? A one-for-one edit keeps the count; an added bullet raises it, whatever
     # line it replaced. A removal that offsets an addition is not seen: that is the stated limit.
-    BASE_BULLETS=$(mktemp "${TMPDIR:-/tmp}/cl-base.XXXXXX"); NEW_BULLETS=$(mktemp "${TMPDIR:-/tmp}/cl-new.XXXXXX")
+    # No temp files: a failed mktemp read as "could not look" and passed (QA cycle 4, CR-1).
     REGION='/^## \[(v|[0-9])/ { f = 1 } f && /^[[:space:]]*[-*] / { print }'
-    git show "$MB:$CL" | awk "$REGION" > "$BASE_BULLETS"
-    awk "$REGION" "$CL" > "$NEW_BULLETS"
-    BASE_N=$(wc -l < "$BASE_BULLETS" | tr -d ' '); NEW_N=$(wc -l < "$NEW_BULLETS" | tr -d ' ')
+    BASE_B=$(git show "$MB:$CL" | awk "$REGION") \
+      || { echo "HALT: could not read $CL at the merge base — the CHANGELOG check cannot look"; exit 1; }
+    NEW_B=$(awk "$REGION" "$CL") \
+      || { echo "HALT: could not read $CL — the CHANGELOG check cannot look"; exit 1; }
+    BASE_N=$(printf '%s' "$BASE_B" | grep -c .); NEW_N=$(printf '%s' "$NEW_B" | grep -c .)
     if [ "$NEW_N" -gt "$BASE_N" ]; then
-      ADDED=$(diff "$BASE_BULLETS" "$NEW_BULLETS" | sed -n 's/^> //p' | head -5 | tr '\n' '|')
-      rm -f "$BASE_BULLETS" "$NEW_BULLETS"
+      ADDED=$(printf '%s\n' "$NEW_B" | awk -v base="$BASE_B" 'BEGIN { n = split(base, a, "\n"); for (i = 1; i <= n; i++) s[a[i]] = 1 } !($0 in s)' | head -5 | tr '\n' '|')
       echo "HALT: CHANGELOG.md has $((NEW_N - BASE_N)) more bullet(s) below the first release heading (line $FIRST_RELEASE) than the merge base, inside a shipped release; added or changed: $ADDED — move the new entry under ## [Unreleased]"
       exit 1
     fi
-    rm -f "$BASE_BULLETS" "$NEW_BULLETS"
   fi
 fi
 ```
 
-A HALT here is fixed by moving the bullet and re-running the block; it is not a loop stall.
+A HALT about a misplaced bullet is fixed by moving it and re-running the block; a HALT that says the
+check "cannot look" is fixed by what it names (fetch the base, deepen a shallow clone). Neither is a
+loop stall.
 
 #### Change Log
 

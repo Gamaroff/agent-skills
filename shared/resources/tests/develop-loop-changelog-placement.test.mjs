@@ -299,3 +299,78 @@ for (const shell of SHELLS) {
     }
   });
 }
+
+// Stated limits and failure paths (QA cycle 4, CR-1..CR-4). Each pins a behaviour the block claims.
+for (const shell of SHELLS) {
+  const misplaced = (t) =>
+    insertAfter(t, "- **Shipped fix.**", "- **Misplaced new entry.**");
+
+  test(`${shell}: an unusable TMPDIR does not turn a misplaced entry into a pass`, () => {
+    const { dir, work } = scenario(misplaced);
+    try {
+      const r = run(shell, block, {
+        cwd: work,
+        env: { TMPDIR: "/nonexistent/dir" },
+      });
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.match(r.stdout, /Misplaced new entry/);
+    } finally {
+      cleanup(dir);
+    }
+  });
+
+  test(`${shell}: a caller running under set -e still gets the answer`, () => {
+    const { dir, work } = scenario(misplaced);
+    try {
+      const r = run(shell, `set -e\n${block}`, { cwd: work });
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.match(r.stdout, /1 more bullet\(s\)/);
+    } finally {
+      cleanup(dir);
+    }
+  });
+
+  test(`${shell}: a shallow clone with no merge base HALTs and names the remedy`, () => {
+    const { dir, work } = scenario(misplaced);
+    try {
+      // An unrelated root commit: HEAD and origin/develop share no ancestor.
+      git(work, "checkout", "-q", "--orphan", "unrelated");
+      git(work, "commit", "-q", "-m", "orphan", "--allow-empty");
+      const r = run(shell, block, { cwd: work });
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.match(r.stdout, /no merge base/);
+      assert.match(r.stdout, /unshallow/);
+    } finally {
+      cleanup(dir);
+    }
+  });
+
+  test(`${shell}: a release cut HALTs (stated limit)`, () => {
+    const { dir, work } = scenario((t) =>
+      t.replace(
+        "## [v1.0.0]",
+        "## [v1.0.1] - 2026-02-01\n\n- **Cut release entry.**\n\n## [v1.0.0]",
+      ),
+    );
+    try {
+      const r = run(shell, block, { cwd: work });
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+    } finally {
+      cleanup(dir);
+    }
+  });
+
+  test(`${shell}: an added bullet offset by a removed one passes (stated limit)`, () => {
+    const { dir, work } = scenario((t) =>
+      t
+        .replace("- **Shipped fix.**\n", "- **Shipped fix.**\n- **Added.**\n")
+        .replace("- **First release.**\n", ""),
+    );
+    try {
+      const r = run(shell, block, { cwd: work });
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+    } finally {
+      cleanup(dir);
+    }
+  });
+}

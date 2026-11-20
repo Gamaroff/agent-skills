@@ -4,7 +4,7 @@
 **Bug ID**: TASK-283-BUG-6
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (code-review CR-1, reproduced)
 **Date Found**: 2026-11-20
 
@@ -39,3 +39,4 @@ Judge each added line on its own, for example a line at or below the first relea
 | Date | Status | Changed By | Notes |
 | --- | --- | --- | --- |
 | 2026-11-20 | Reopened | qa-task | Partial: see bug 9, same heuristic on a neighbouring shape |
+| 2026-11-20 | Closed | qa-task | Verified by task.283.qa.4 |

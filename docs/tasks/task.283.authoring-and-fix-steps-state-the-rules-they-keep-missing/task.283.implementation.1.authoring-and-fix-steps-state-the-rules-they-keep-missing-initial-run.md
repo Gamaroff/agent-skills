@@ -166,6 +166,31 @@ Probe: `git grep -F -i -e 'first release heading' -e 'more bullets'` over SKILL.
 Population: 2
 Importer audit: no shared parser widened; skipped.
 
+### QA Cycle 4 — 2026-11-20
+**Gate Result**: CONCERNS (82/100)
+**Issues Found**: 1 new medium (a failed mktemp reads as a pass in the rewritten CHANGELOG block), 1 medium carried (wall time recording), 3 low folded in
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**Traceability**: skipped (no Acceptance Criteria section)
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 4 of 5)
+
+#### qa-fix (5b)
+
+Narrowing residue: shared/resources/develop-pipeline-step-3-develop-loop.md, the CHANGELOG block (trigger: repeat subject)
+Move: patch: the contract is already narrowed; this removes the temp files that were the new failure path.
+
+| Finding | Fix | Held by |
+| ------- | --- | ------- |
+| T283-QA-11 | no temp files; HALT on a failed read; set -e safe diff code; shallow-clone remedy named; prose separates the two HALT kinds | 5 new tests ×2 shells; three mutations red |
+| T283-QA-3 | measurement running on the server; not yet recorded | left `open` |
+
+Probe: `git grep -F -i -e 'mktemp' -e 'cannot look'` over SKILL.md, shared resources and hand-authored references
+  shared/resources/develop-pipeline-step-3-develop-loop.md — updated
+Population: 1
+Importer audit: no shared parser widened; skipped.
+
 ---
 
 ## Completion
