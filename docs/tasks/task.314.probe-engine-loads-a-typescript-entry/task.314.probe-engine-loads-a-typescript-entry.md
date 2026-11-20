@@ -5,17 +5,19 @@ type: task
 description: "Teach the security probe engine's module entry form to load .ts, .mts, .cts and .tsx boundaries through the target repository's own TypeScript compiler, so /finalise's zero-guard stops failing on every TypeScript consumer."
 tags: [security-probe, finalise, typescript, entry-forms]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
+pr_number: 925
 created: 2026-11-20
 updated: 2026-11-20
+completed_date: 2026-11-20
 assignee:
 estimated_effort_hours: 16
 ---
 
 # Technical Task: The security probe engine loads a TypeScript entry
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.314.review.1.probe-engine-loads-a-typescript-entry.md` implemented 2026-11-20
 
 ---
@@ -362,7 +364,7 @@ None.
 
 ### Performance
 
-- [ ] The per-child cost with the hook, against a bare `.mjs` entry, is recorded in the QA report's
+- [x] The per-child cost with the hook, against a bare `.mjs` entry, is recorded in the QA report's
   Findings section: the median of at least five runs of each, `uptime` recorded beside every run, a
   load ceiling named for a valid run, and outliers reported rather than dropped. The decision from
   Phase 0 (transpile once or one hook per child) cites it. `ENGINE_TIMEOUT_MS` is not exceeded by a
@@ -373,14 +375,14 @@ None.
 - [x] `npm run bundle -- --check` reports 0 problems, and the hook file ships in every skill that ships
   `security-probe.mjs`.
 - [x] `npm run validate -- skills/<skill>/` passes for each changed skill.
-- [ ] `CI=true npm run test:remote` is green on the PR head.
+- [x] `CI=true npm run test:remote` is green on the PR head. (CI reading 1: SUCCESS @ `d0daf814a`, all six checks; the Node 22 container gate was green at `4d2d5939c`, 8697 pass, 0 fail.)
 
 ### Migration
 
 - [x] The engine header, `probe-boundary-rule.md` and the `/finalise` zero-guard text name the
   TypeScript entry, and none still says a TypeScript boundary is not probeable.
 - [x] `CHANGELOG.md` has an `[Unreleased]` entry citing (task 314).
-- [ ] The QA report says which previously overridden plans now report a reproduced case, if any are known.
+- [x] The QA report says which previously overridden plans now report a reproduced case, if any are known.
 
 ---
 
@@ -461,11 +463,32 @@ None.
 ### Key Findings
 The cycle 3 fix holds. No open findings; three low-severity advisories are recorded in the gate for follow-up.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report**: `task.314.qa.4.probe-engine-loads-a-typescript-entry.md`
+**Gate File**: `task.314.gate.4.probe-engine-loads-a-typescript-entry.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 12 of 12 met, each with a committed test or QA record
+✅ **PR Review:** PR #925; `task.314.pr-review.1.*.md` CONCERNS, four document findings cleared
+✅ **CI:** all six checks SUCCESS on `d0daf814a`
+✅ **Documentation:** entry-form and decline-reason docs, CHANGELOG entry citing (task 314)
+✅ **Security Review:** 10 candidates probed on `resolveEntry` containment, 0 reproduced, 0 escapes
+⚠️ **Compliance Review:** not applicable (internal tooling)
+
+**Detailed Verification Log:** See `task.314.dod.1.probe-engine-loads-a-typescript-entry.md` for the evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-11-20
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-20 | 1.0     | Initial draft | create-task |
 | 2026-11-20 | 1.1     | Review passed (8/10) — parent-side compiler and hook-API check, tests that pin the probe documents named, bundling and runner reach confirmed, tsconfig-less fixture added | review-task |
 | 2026-11-20 |         | Status → ready-for-development | review-task |
@@ -477,6 +500,8 @@ The cycle 3 fix holds. No open findings; three low-severity advisories are recor
 | 2026-11-20 |  | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-11-20 |         | QA findings fixed — every compiler filesystem read goes through one root-bound host, so a tsconfig `extends` above the repo root is not inherited (T314-CR3-1), 1 iteration | qa-fix |
 | 2026-11-20 |  | QA gate PASS (95/100) — 0 findings | qa-task |
+| 2026-11-20 |         | PR review (5c) doc findings cleared — pr_number added, two criteria ticked with their QA evidence | review-pr |
+| 2026-11-20 | 1.2 | DoD verified, 12 of 12 criteria — accepted (PR #925) | finalise |
 <!-- change-log-end -->
 
 ---
