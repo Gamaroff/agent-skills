@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.68.0] - 2026-11-20
+
 ### Changed
 
 - **Shipped skill prose writes payloads with the file tool, not a heredoc (task 284).** All 31
