@@ -4,7 +4,7 @@
 **Bug ID**: TASK-283-BUG-2
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-11-19
 
@@ -29,3 +29,9 @@ Restored `skills/sync-github-task/SKILL.md` to `origin/develop` and added one se
 
 ## Recommendation
 Revert the `sync-github-task` hunk and the bundled copies it caused (`npm run bundle` removes none; `git rm` them), and state in that skill that the renderer is out of scope for the update path. A criterion edit needs a named approver.
+
+## Status History
+
+| Date | Status | Changed By | Notes |
+| --- | --- | --- | --- |
+| 2026-11-20 | Closed | qa-task | Verified by task.283.qa.2 |

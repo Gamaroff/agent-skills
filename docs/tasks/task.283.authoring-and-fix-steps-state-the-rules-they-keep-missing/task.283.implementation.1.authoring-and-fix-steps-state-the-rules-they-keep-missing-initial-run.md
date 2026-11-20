@@ -114,6 +114,32 @@ Population: 1 source (3 generated copies)
 Move: patch: the findings are distinct defects in the deliverable itself.
 Importer audit: no shared parser widened; skipped.
 
+### QA Cycle 2 — 2026-11-20
+**Gate Result**: CONCERNS (80/100)
+**Issues Found**: 3 new medium (CHANGELOG block passes a mixed hunk; passes a non-`v` heading style and a `*` bullet; renderer prints the priority un-normalised), 1 medium carried (wall time unmeasured), 3 low advisory
+**HIGH findings**: 0
+**MEDIUM findings**: 4
+**Traceability**: skipped (no Acceptance Criteria section)
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+
+#### qa-fix (5b)
+
+| Finding | Fix | Held by |
+| ------- | --- | ------- |
+| T283-QA-7 | per-hunk rule: a hunk adding more bullets than it removes holds new entries | mixed-hunk test ×2 shells; mutation (old `old == 0` rule) red |
+| T283-QA-8 | heading `## [v` or `## [<digit>`; bullet `-` or `*`; explicit note when no release heading | three tests ×2 shells; three mutations red |
+| T283-QA-9 | `priorityCell`: lowercase, default `medium` | renderer tests; mutation (raw cell) red |
+| T283-QA-3 | **Not fixed.** Unmeasured; a criterion edit needs a named approver | left `open` |
+
+Probe: `git grep -F -i -e 'first release heading' -e '## [v'` over SKILL.md, shared resources and hand-authored references
+  shared/resources/develop-pipeline-step-3-develop-loop.md — updated
+  skills/review-task/SKILL.md — updated (restated the heading rule)
+Population: 2 (first phrase `pure insertion` returned 0 after the edit removed it, so the probe was re-run on the observable that changed)
+Move: patch: three distinct defects in the deliverable itself; the rule is stated once in the shared source.
+Importer audit: no shared parser widened; skipped.
+
 ---
 
 ## Completion

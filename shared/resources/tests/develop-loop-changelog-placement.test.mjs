@@ -52,16 +52,20 @@ const BASE_CHANGELOG = [
 const block = bind(blockBy(readDoc(STEP3), ANCHOR), { "{base}": "develop" });
 
 /** A repo whose origin/develop holds BASE_CHANGELOG, then `edit(text) -> text` applied in the work tree. */
-function scenario(edit) {
+function scenario(edit, base = BASE_CHANGELOG) {
   const { dir, work } = fixtureRepo();
-  write(work, "CHANGELOG.md", BASE_CHANGELOG);
+  write(work, "CHANGELOG.md", base);
   git(work, "add", "-A");
   git(work, "commit", "-q", "-m", "changelog base");
   git(work, "push", "-q", "origin", "HEAD:develop");
   git(work, "fetch", "-q", "origin");
-  write(work, "CHANGELOG.md", edit(BASE_CHANGELOG));
+  write(work, "CHANGELOG.md", edit(base));
   return { dir, work };
 }
+
+// The same document under a "## [1.x.y]" heading style (no "v"), and one with no release heading.
+const DIGIT_STYLE = BASE_CHANGELOG.replaceAll("## [v", "## [");
+const NO_RELEASE = BASE_CHANGELOG.split("## [v1.1.0]")[0];
 
 const insertAfter = (text, anchor, line) =>
   text.replace(anchor, `${anchor}\n${line}`);
@@ -104,6 +108,63 @@ for (const shell of SHELLS) {
     try {
       const r = run(shell, block, { cwd: work });
       assert.equal(r.status, 0, r.stdout + r.stderr);
+    } finally {
+      cleanup(dir);
+    }
+  });
+
+  test(`${shell}: an edit beside a new entry in one hunk still fails the new entry (mixed hunk)`, () => {
+    const { dir, work } = scenario((t) =>
+      t.replace(
+        "- **Shipped fix.**",
+        "- **Shipped fix, reworded.**\n- **Misplaced new entry.**",
+      ),
+    );
+    try {
+      const r = run(shell, block, { cwd: work });
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.match(r.stdout, /below the first release heading/);
+    } finally {
+      cleanup(dir);
+    }
+  });
+
+  test(`${shell}: a "* " bullet below the first release heading fails`, () => {
+    const { dir, work } = scenario((t) =>
+      insertAfter(t, "- **Shipped fix.**", "* **Misplaced star bullet.**"),
+    );
+    try {
+      const r = run(shell, block, { cwd: work });
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+    } finally {
+      cleanup(dir);
+    }
+  });
+
+  test(`${shell}: a "## [1.1.0]" heading style (no v) is found and fails a misplaced entry`, () => {
+    const { dir, work } = scenario(
+      (t) => insertAfter(t, "- **Shipped fix.**", "- **Misplaced new entry.**"),
+      DIGIT_STYLE,
+    );
+    try {
+      const r = run(shell, block, { cwd: work });
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.match(r.stdout, /below the first release heading/);
+    } finally {
+      cleanup(dir);
+    }
+  });
+
+  test(`${shell}: no release heading at all passes, and says placement was not checked`, () => {
+    const { dir, work } = scenario(
+      (t) =>
+        insertAfter(t, "- **Existing unreleased entry.**", "- **New entry.**"),
+      NO_RELEASE,
+    );
+    try {
+      const r = run(shell, block, { cwd: work });
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      assert.match(r.stdout, /no release heading .* placement is not checked/);
     } finally {
       cleanup(dir);
     }

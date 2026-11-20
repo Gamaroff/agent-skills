@@ -4,7 +4,7 @@
 **Bug ID**: TASK-283-BUG-5
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (code-review CR-3, reproduced)
 **Date Found**: 2026-11-19
 
@@ -29,3 +29,9 @@ The Step 3 block now verifies `origin/{base}^0` and HALTs when it is missing, an
 
 ## Recommendation
 Verify the ref with `git rev-parse --verify --quiet` and HALT when it fails; add the case to `develop-loop-changelog-placement.test.mjs` and mutation-prove it. Run the probe engine's `fence:` form over the block, or record that the DoD needs an override.
+
+## Status History
+
+| Date | Status | Changed By | Notes |
+| --- | --- | --- | --- |
+| 2026-11-20 | Closed | qa-task | Verified by task.283.qa.2 |

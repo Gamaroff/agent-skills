@@ -322,22 +322,22 @@ None identified.
 
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
-**Testing Date**: 2026-11-19
-**Quality Score**: 90/100
+**Testing Date**: 2026-11-20
+**Quality Score**: 80/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.283.qa.1.authoring-and-fix-steps-state-the-rules-they-keep-missing.md](./task.283.qa.1.authoring-and-fix-steps-state-the-rules-they-keep-missing.md)
-- **Gate File**: [task.283.gate.1.authoring-and-fix-steps-state-the-rules-they-keep-missing.yml](./task.283.gate.1.authoring-and-fix-steps-state-the-rules-they-keep-missing.yml)
+- **Full Report**: [task.283.qa.2.authoring-and-fix-steps-state-the-rules-they-keep-missing.md](./task.283.qa.2.authoring-and-fix-steps-state-the-rules-they-keep-missing.md)
+- **Gate File**: [task.283.gate.2.authoring-and-fix-steps-state-the-rules-they-keep-missing.yml](./task.283.gate.2.authoring-and-fix-steps-state-the-rules-they-keep-missing.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 15 new (full run 8629 tests, 0 failed)
+- **Tests Executed**: 17 (13 CHANGELOG-placement, 6 renderer in this cycle's files, plus the full CI-parity run at the pre-fix tree: 8629 of 8633 pass)
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Five medium findings: no CHANGELOG entry citing task 283, `sync-github-task` calls the renderer against the Migration criterion, wall time unmeasured, the render block leaves its inputs unbound, and the CHANGELOG block fails open on an unfetched base.
+Cycle 1's fixes hold (QA-1, 2, 4, 5, 6 closed). The cycle 2 refute pass reproduced three medium defects: the CHANGELOG block passes a mixed hunk (T283-QA-7), a non-`v` heading style and a `*` bullet (T283-QA-8), and the renderer prints the priority un-normalised (T283-QA-9). The wall-time criterion is still unmeasured (T283-QA-3).
 
 <!-- change-log-start -->
 ## Change Log
@@ -350,6 +350,8 @@ Five medium findings: no CHANGELOG entry citing task 283, `sync-github-task` cal
 | 2026-11-19 |         | Implemented — 4 rules, 1 renderer script, 2 new test files (15 tests) | develop     |
 | 2026-11-19 |         | QA gate CONCERNS (90/100) — 5 medium findings, 1 low | qa-task     |
 | 2026-11-20 |         | QA findings fixed — 4 of 5 medium and the low; wall-time criterion left open, 1 iteration | qa-fix      |
+| 2026-11-20 |         | QA gate CONCERNS (80/100) — 3 new medium findings, wall time still open | qa-task     |
+| 2026-11-20 |         | QA findings fixed — 3 of 3 new medium; wall-time criterion left open, 2 iterations | qa-fix      |
 <!-- change-log-end -->
 
 ---

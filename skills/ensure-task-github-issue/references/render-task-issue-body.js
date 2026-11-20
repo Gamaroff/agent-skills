@@ -72,6 +72,14 @@ function cell(value) {
   return s === "" ? "—" : s;
 }
 
+// The priority the issue's label and board field carry: lowercase, `medium` when absent
+// (ensure-task-github-issue Step T1). The Metadata cell shows the same value, so the body
+// agrees with the label beside it.
+function priorityCell(value) {
+  const s = cell(value);
+  return s === "—" ? "medium" : s.toLowerCase();
+}
+
 function effortCell(value) {
   const s = cell(value);
   return /^\d+(\.\d+)?$/.test(s) ? `${s}h` : s;
@@ -117,7 +125,7 @@ function renderTaskIssueBody({ content, docUrl, relPath }) {
       "",
       "| Field | Value |",
       "|-------|-------|",
-      `| Priority | ${cell(frontmatter.priority)} |`,
+      `| Priority | ${priorityCell(frontmatter.priority)} |`,
       `| Effort | ${effortCell(frontmatter.estimated_effort_hours)} |`,
       `| Category | ${cell(frontmatter.category)} |`,
       `| Depends on | ${cell(frontmatter.depends_on)} |`,

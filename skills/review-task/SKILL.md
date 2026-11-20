@@ -859,7 +859,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
      When the plan says to edit or add an entry "in `[Unreleased]`" (or under a named release),
      list the headings with `grep -n "^## \[" CHANGELOG.md` and the bullet's line with
      `grep -n "<bullet text>" CHANGELOG.md`; the claim holds only if the bullet's line is above the
-     first `## [v` heading (for `[Unreleased]`) or between the named release's heading and the next.
+     first release heading (`## [v…` or `## [1.…`, for `[Unreleased]`) or between the named release's heading and the next.
      Report a wrong placement as **Important**, with the heading it really sits under: `CHANGELOG.md`
      is outside `ci.docsOnly.patterns`, so the 5c review can only record it, and `/finalise` then
      halts on a one-line move (task.184, 2026-10-13). The develop loop's Step 3 holds the matching

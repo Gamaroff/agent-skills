@@ -4,7 +4,7 @@
 **Bug ID**: TASK-283-BUG-1
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-11-19
 
@@ -29,3 +29,9 @@ Added the `[Unreleased]` entry citing task 283 to `CHANGELOG.md`. `changelog-cit
 
 ## Recommendation
 Add the entry under `## [Unreleased]`, then run the Step 3 CHANGELOG block against it.
+
+## Status History
+
+| Date | Status | Changed By | Notes |
+| --- | --- | --- | --- |
+| 2026-11-20 | Closed | qa-task | Verified by task.283.qa.2 |

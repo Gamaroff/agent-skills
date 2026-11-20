@@ -4,7 +4,7 @@
 **Bug ID**: TASK-283-BUG-4
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (code-review CR-2)
 **Date Found**: 2026-11-19
 
@@ -29,3 +29,9 @@ The render block in `skills/ensure-task-github-issue/SKILL.md` now starts with t
 
 ## Recommendation
 Re-bind both inside the block, with a `:` guard (`: "${DOC_URL:?...}"`) that names the variable.
+
+## Status History
+
+| Date | Status | Changed By | Notes |
+| --- | --- | --- | --- |
+| 2026-11-20 | Closed | qa-task | Verified by task.283.qa.2 |

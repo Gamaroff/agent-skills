@@ -367,8 +367,10 @@ Update Pipeline Progress: ✅ develop.
 Run this once on exit, before the Change Log row. A bullet added to `CHANGELOG.md` below the first
 release heading sits inside a shipped release. The 5c review can only record it (`CHANGELOG.md` is
 outside `ci.docsOnly.patterns`), and `/finalise` then halts on a one-line move: task.184 halted at AC10
-over exactly that. Only a **pure insertion** counts as a new entry. An edit to an existing entry
-replaces a line, so it is never blocked here, and a project with no `CHANGELOG.md` skips the block.
+over exactly that. A hunk counts as holding a new entry only when it **adds more bullets than it
+removes**, so a one-for-one edit of an existing entry is never blocked here. Within a hunk the
+trailing surplus lines are taken as the new ones, which is a heuristic, not an identity. A project with no `CHANGELOG.md` skips the block, and a
+file with no release heading says so instead of passing silently.
 
 ```bash
 # CHANGELOG placement for NEW entries (obs #30). INPUT, substituted into THIS block: {base} — the
@@ -384,12 +386,26 @@ if [ -f "$CL" ]; then
   [ "$DIFF_RC" -le 1 ] || { echo "HALT: git diff against origin/{base} failed (exit $DIFF_RC) — the CHANGELOG check cannot look"; exit 1; }
 fi
 if [ -f "$CL" ] && [ "${DIFF_RC:-0}" -eq 1 ]; then
-  FIRST_RELEASE=$(grep -n '^## \[v' "$CL" | head -1 | cut -d: -f1)
-  [ -n "$FIRST_RELEASE" ] || FIRST_RELEASE=999999999
+  # A release heading is "## [v…" or "## [<digit>…" (## [1.0.0]); a file with neither has nothing to
+  # be placed above, which is said out loud, never read as a pass by default.
+  FIRST_RELEASE=$(grep -nE '^## \[(v|[0-9])' "$CL" | head -1 | cut -d: -f1)
+  if [ -z "$FIRST_RELEASE" ]; then
+    echo "note: $CL has no release heading (## [v… or ## [1.…): every entry is in [Unreleased], so placement is not checked"
+    FIRST_RELEASE=999999999
+  fi
+  # Per hunk: a hunk that ADDS more bullets ("-" or "*", indented or not) than it REMOVES holds new
+  # entries; a one-for-one edit of a shipped bullet does not. The trailing surplus lines are the
+  # new ones, and only those at or below the first release heading are misplaced.
   MISPLACED=$(git diff -U0 "origin/{base}" -- "$CL" | awk -v first="$FIRST_RELEASE" '
-    /^@@/ { split($2, o, ","); old = (o[2] == "" ? 1 : o[2] + 0); split($3, a, ","); line = substr(a[1], 2) + 0; next }
+    function flush(   extra, i) {
+      extra = nb - old
+      for (i = nb - extra + 1; i <= nb; i++) if (extra > 0 && al[i] >= first) print al[i]
+      nb = 0
+    }
+    /^@@/ { flush(); split($2, o, ","); old = (o[2] == "" ? 1 : o[2] + 0); split($3, a, ","); line = substr(a[1], 2) + 0; next }
     /^\+\+\+/ { next }
-    /^\+/ { if (old == 0 && line >= first && $0 ~ /^\+- /) print line; line++ }')
+    /^\+/ { if ($0 ~ /^\+[[:space:]]*[-*] /) al[++nb] = line; line++ }
+    END { flush() }')
   if [ -n "$MISPLACED" ]; then
     echo "HALT: CHANGELOG.md has a new entry below the first release heading (line $FIRST_RELEASE), inside a shipped release, at line(s): $(printf '%s' "$MISPLACED" | tr '\n' ' ') — move it under ## [Unreleased]"
     exit 1

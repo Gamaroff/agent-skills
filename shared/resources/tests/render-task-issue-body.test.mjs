@@ -52,7 +52,7 @@ test("keeps effort and metadata when the description spans lines (task.202 shape
   const { reason, body } = render(["a", "b"]);
   assert.equal(reason, "ok");
   assert.match(body, /\| Effort \| 12h \|/);
-  assert.match(body, /\| Priority \| High \|/);
+  assert.match(body, /\| Priority \| high \|/);
   assert.match(body, /\| Category \| refactoring \|/);
   assert.match(body, /\| Depends on \| — \|/);
 });
@@ -69,7 +69,23 @@ test("an empty-valued key directly above the effort does not swallow it (the `\\
     relPath: "p",
   });
   assert.match(body, /\| Effort \| 12h \|/);
-  assert.match(body, /\| Priority \| High \|/);
+  assert.match(body, /\| Priority \| high \|/);
+});
+
+test("priority is lowercase and defaults to medium, as the issue label does", () => {
+  const upper = renderTaskIssueBody({
+    content: doc(["a"]),
+    docUrl: URL_,
+    relPath: "p",
+  });
+  assert.match(upper.body, /\| Priority \| high \|/);
+  assert.doesNotMatch(upper.body, /\| Priority \| High \|/);
+  const none = renderTaskIssueBody({
+    content: doc(["a"]).replace("priority: High\n", ""),
+    docUrl: URL_,
+    relPath: "p",
+  });
+  assert.match(none.body, /\| Priority \| medium \|/);
 });
 
 test("relative links become absolute against the document URL; anchors are kept", () => {
