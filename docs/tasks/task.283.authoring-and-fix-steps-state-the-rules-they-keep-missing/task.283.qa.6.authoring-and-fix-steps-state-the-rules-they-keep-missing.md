@@ -47,6 +47,14 @@ Not held by a test: the `git show` read-before-pipe guard. `git cat-file -e` run
 
 ---
 
+## Records added at finalise (2026-11-20, head 1a3d7f56c)
+
+**Renderer call sites, after the fix** (criterion 8): `git grep -n 'render-task-issue-body' -- 'skills/*/SKILL.md'` lists one invocation, `skills/ensure-task-github-issue/SKILL.md:175`, ahead of `tracker-issue.js --kind create`. `skills/ensure-task-github-issue/SKILL.md:164` and `skills/sync-github-task/SKILL.md:120` are prose only; the second says the renderer is deliberately not used on the update path. QA report 1's grep listed `sync-github-task:128` and predates the fix.
+
+**Wall-time figure** (criterion 4): the five alternating pairs in QA report 5 (develop median 750 s, branch median 763 s, +1.7%) were taken before cycle-5 commit `d59aa0410` and the doc commits since, and no commit is named for them that is tree-equivalent to the head. The owner approved recording this as an override, not re-measuring: the later code change adds tests to one test file and edits one fenced block, and the margin to the 10% bound is 8.3 points. Recorded in the DoD as an override.
+
+---
+
 ## Final Assessment
 
 **Gate Status**: PASS
