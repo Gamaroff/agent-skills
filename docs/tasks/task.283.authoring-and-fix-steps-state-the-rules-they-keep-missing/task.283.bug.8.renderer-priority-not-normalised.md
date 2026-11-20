@@ -4,7 +4,7 @@
 **Bug ID**: TASK-283-BUG-8
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (code-review CR-3 and CR-5, reproduced)
 **Date Found**: 2026-11-20
 
@@ -29,3 +29,9 @@ The create path no longer matches the update path's rebuilt body, so the "create
 
 ## Recommendation
 Lowercase the priority and default it to `medium` in the renderer. Assert both in the test. Check the effort cell against the old template the same way.
+
+## Status History
+
+| Date | Status | Changed By | Notes |
+| --- | --- | --- | --- |
+| 2026-11-20 | Closed | qa-task | Verified by task.283.qa.3 |

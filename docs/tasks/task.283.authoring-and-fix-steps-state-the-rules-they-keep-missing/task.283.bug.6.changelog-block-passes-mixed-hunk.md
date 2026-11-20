@@ -27,5 +27,15 @@ The guard misses the case where a shipped entry is edited in the same change, wh
 
 The block now judges each hunk: one that adds more bullets than it removes holds new entries, and its trailing surplus lines are the ones checked. A one-for-one edit still passes. New test (bash and zsh): an edit beside a new entry fails. Mutation proof: replacing the surplus rule with the old `old == 0` rule turns that test red.
 
+## Developer Fix Cycle (qa-fix cycle 3)
+
+Reopened because bug 9 showed the per-hunk rule failing on a neighbouring shape. The per-hunk rule is gone: the block compares the bullet count below the first release heading with the merge base. The mixed-hunk test still passes, now through that rule. See bug 9.
+
 ## Recommendation
 Judge each added line on its own, for example a line at or below the first release heading whose text is absent from the base file. Add a mixed-hunk test under bash and zsh and mutation-prove it.
+
+## Status History
+
+| Date | Status | Changed By | Notes |
+| --- | --- | --- | --- |
+| 2026-11-20 | Reopened | qa-task | Partial: see bug 9, same heuristic on a neighbouring shape |

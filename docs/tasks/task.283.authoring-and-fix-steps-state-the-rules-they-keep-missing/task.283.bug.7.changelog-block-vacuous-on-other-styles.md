@@ -4,7 +4,7 @@
 **Bug ID**: TASK-283-BUG-7
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (code-review CR-2, reproduced)
 **Date Found**: 2026-11-20
 
@@ -29,3 +29,9 @@ The heading match is now `## [` followed by `v` or a digit, the bullet match cov
 
 ## Recommendation
 Match `## [` followed by `v` or a digit. Widen the bullet match to `^+[[:space:]]*[-*] `. Print a note when `## [Unreleased]` exists and no release heading follows. One test per case, mutation-proven.
+
+## Status History
+
+| Date | Status | Changed By | Notes |
+| --- | --- | --- | --- |
+| 2026-11-20 | Closed | qa-task | Verified by task.283.qa.3 |

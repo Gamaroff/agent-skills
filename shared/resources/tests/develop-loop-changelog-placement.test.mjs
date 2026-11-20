@@ -95,7 +95,8 @@ for (const shell of SHELLS) {
       const r = run(shell, block, { cwd: work });
       assert.equal(r.status, 1, r.stdout + r.stderr);
       assert.match(r.stdout, /below the first release heading \(line 9\)/);
-      assert.match(r.stdout, /at line\(s\): 14 — move it/);
+      assert.match(r.stdout, /1 more bullet\(s\) below the first release/);
+      assert.match(r.stdout, /Misplaced new entry/);
     } finally {
       cleanup(dir);
     }
@@ -194,7 +195,7 @@ for (const shell of SHELLS) {
       fs.writeFileSync(path.join(work, ".git", "index"), "not an index");
       const r = run(shell, block, { cwd: work });
       assert.equal(r.status, 1, r.stdout + r.stderr);
-      assert.match(r.stdout, /git diff against origin\/develop failed/);
+      assert.match(r.stdout, /git diff against the merge base failed/);
     } finally {
       cleanup(dir);
     }
@@ -212,6 +213,89 @@ for (const shell of SHELLS) {
   });
 }
 
-test("non-vacuity: the block is found and {base} was bound to a remote ref", () => {
-  assert.ok(block.includes("origin/develop"), "{base} was bound");
-});
+// A new bullet that REPLACES a non-bullet line is still one more bullet (T283-QA-10). Each shape
+// below defeated the per-hunk rule; the section bullet count sees all three.
+const REPLACEMENTS = {
+  "a heading and the blank line under it": (t) =>
+    t.replace("### Fixed\n\n", "- **Misplaced new entry.**\n"),
+  "a blank line": (t) =>
+    t.replace(
+      "- **Shipped fix.**\n\n## [v1.0.0]",
+      "- **Shipped fix.**\n- **Misplaced new entry.**\n## [v1.0.0]",
+    ),
+};
+const WITH_PROSE = BASE_CHANGELOG.replace(
+  "- **Shipped fix.**\n",
+  "- **Shipped fix.**\nProse line.\n",
+);
+
+for (const shell of SHELLS) {
+  for (const [name, edit] of Object.entries(REPLACEMENTS)) {
+    test(`${shell}: a new bullet replacing ${name} fails`, () => {
+      const { dir, work } = scenario(edit);
+      try {
+        const r = run(shell, block, { cwd: work });
+        assert.equal(r.status, 1, r.stdout + r.stderr);
+        assert.match(r.stdout, /1 more bullet\(s\) below the first release/);
+      } finally {
+        cleanup(dir);
+      }
+    });
+  }
+
+  test(`${shell}: a new bullet replacing a prose line fails`, () => {
+    const { dir, work } = scenario(
+      (t) => t.replace("Prose line.\n", "- **Misplaced new entry.**\n"),
+      WITH_PROSE,
+    );
+    try {
+      const r = run(shell, block, { cwd: work });
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+    } finally {
+      cleanup(dir);
+    }
+  });
+
+  test(`${shell}: a base that moved on is not counted against the branch (merge base)`, () => {
+    const { dir, work } = scenario((t) =>
+      insertAfter(t, "- **Shipped fix.**", "- **Misplaced new entry.**"),
+    );
+    try {
+      // origin/develop gains a shipped bullet this branch never saw. Against the base TIP the branch
+      // would look one bullet short and the misplaced entry would be masked.
+      const other = path.join(dir, "other");
+      git(dir, "clone", "-q", path.join(dir, "origin.git"), other);
+      git(other, "config", "user.email", "t@example.com");
+      git(other, "config", "user.name", "t");
+      write(
+        other,
+        "CHANGELOG.md",
+        insertAfter(
+          BASE_CHANGELOG,
+          "- **Shipped fix.**",
+          "- **Shipped later on the base.**",
+        ),
+      );
+      git(other, "commit", "-q", "-am", "base moves on");
+      git(other, "push", "-q", "origin", "HEAD:develop");
+      git(work, "fetch", "-q", "origin");
+      const r = run(shell, block, { cwd: work });
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+    } finally {
+      cleanup(dir);
+    }
+  });
+
+  test(`${shell}: a CHANGELOG new in this branch is not compared, and says so`, () => {
+    const { dir, work } = fixtureRepo();
+    try {
+      write(work, "CHANGELOG.md", BASE_CHANGELOG);
+      git(work, "add", "CHANGELOG.md");
+      const r = run(shell, block, { cwd: work });
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      assert.match(r.stdout, /does not exist at the merge base/);
+    } finally {
+      cleanup(dir);
+    }
+  });
+}

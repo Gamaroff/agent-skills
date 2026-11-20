@@ -140,6 +140,32 @@ Population: 2 (first phrase `pure insertion` returned 0 after the edit removed i
 Move: patch: three distinct defects in the deliverable itself; the rule is stated once in the shared source.
 Importer audit: no shared parser widened; skipped.
 
+### QA Cycle 3 — 2026-11-20
+**Gate Result**: CONCERNS (80/100)
+**Issues Found**: 1 new medium (the CHANGELOG block's per-hunk rule counts non-bullet removals), 1 medium carried (wall time recording), 2 low folded in
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**Traceability**: skipped (no Acceptance Criteria section)
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 3 of 5)
+
+#### qa-fix (5b)
+
+Narrowing residue: shared/resources/develop-pipeline-step-3-develop-loop.md, the CHANGELOG block (trigger: repeat subject; `repeat-subject.mjs` named it between gates 2 and 3, after QA-5, QA-7, QA-8)
+Move: narrow the contract: the block stops deciding which diff lines are new and answers one question, whether the region below the first release heading holds more bullets than at the merge base. Stated limits: an offsetting removal is not seen; a release cut will HALT.
+
+| Finding | Fix | Held by |
+| ------- | --- | ------- |
+| T283-QA-10 | section bullet-count comparison against the merge base; CR-2 and CR-3 folded in | 9 new/changed tests ×2 shells; five mutations red (merge base, count, bullet class, heading class, new-file branch) |
+| T283-QA-3 | measurement running on the server; not yet recorded | left `open` |
+
+Probe: `git grep -F -i -e 'first release heading' -e 'more bullets'` over SKILL.md, shared resources and hand-authored references
+  shared/resources/develop-pipeline-step-3-develop-loop.md — updated
+  skills/review-task/SKILL.md — unaffected — restates only which heading counts as a release heading, already updated in cycle 2
+Population: 2
+Importer audit: no shared parser widened; skipped.
+
 ---
 
 ## Completion
