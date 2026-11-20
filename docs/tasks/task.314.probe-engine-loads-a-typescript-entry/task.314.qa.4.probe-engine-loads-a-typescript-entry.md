@@ -124,6 +124,12 @@ Median bare 45 ms, median hook 400 ms: the hook adds **355 ms per child**, again
 
 ---
 
+## Mutation (a) re-run, with the decline reason
+
+The task criterion asks that unregistering the hook turn the fixture test red **with `entry-not-probeable`**; QA 1 named the red tests but not the reason. Re-run on head: `"--import", TS_HOOK_PATH,` removed from the spawn argv at `security-probe.mjs:2345`, then `command node --test shared/resources/tests/security-probe-typescript-entry.test.mjs` → 18 fail, 12 pass. The red carries the decline: `loads and scores guard.ts` fails with `reason: 'entry-not-probeable'`, detail `import: TypeScript enum is not supported in strip-only mode`; `loads and scores alias.ts` fails with `reason: 'entry-not-probeable'`, detail `import: Cannot use import statement outside a module`. Restored from a `cp` snapshot, `cmp` identical, 30 pass 0 fail after.
+
+---
+
 ## Regression Testing
 
 `security-probe-typescript-entry.test.mjs` 30 pass, 0 fail (Node 26.13.0) after restore. Remote container gate on Node 22 with `CI=true`: 8697 pass, 0 fail, 3 skipped.
