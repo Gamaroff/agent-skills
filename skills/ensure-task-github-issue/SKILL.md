@@ -156,7 +156,9 @@ is not told they are seeing part of something believes they saw all of it.
 Write the body to a file first. **Always `--body-file`, never an inline `--body`**:
 the body carries backticks, `$(…)` and newlines, and an inline `--body` is a
 shell injection waiting for the first task whose success criteria contain one.
-The file is also what carries the body into the deferred record's `command.stdin`.
+The file is also what carries the body into the deferred record's `command.stdin`. Post it in a call
+after the one that wrote it, once a line only this run's body carries is asserted
+(`references/file-write-rules.md#fresh-body-post`).
 
 **The body is rendered by a script, not a heredoc** (task.283, obs #34). A hand-filled unquoted
 heredoc executes any `$(…)` in the document's text, and the ad-hoc scripts that replaced it for

@@ -168,11 +168,16 @@ After the story branch is created:
 
 Enables the PreCompact graceful-pause hook from this point onward. Collision was already checked above; the lock should not exist here.
 
+Write the lock with the **file tool**, not a shell heredoc (`file-write-rules.md#the-rule`). Run
+`mkdir -p .claude/state` and `date -u +%Y-%m-%dT%H:%M:%SZ` first, and put the printed timestamp in
+`started_at`: the file tool does not expand `$(…)`, so the value is written in, never left as a
+command.
+
 #### develop-story
 
-```bash
-mkdir -p .claude/state
-cat > .claude/state/develop-pipeline.lock <<EOF
+Write `.claude/state/develop-pipeline.lock` with this content (substitute every `{…}`):
+
+```json
 {
   "skill": "develop-story",
   "report_path": "{implementation-report-path}",
@@ -183,9 +188,8 @@ cat > .claude/state/develop-pipeline.lock <<EOF
   "tracker": "{TRACKER}",
   "tracker_issue": "{TRACKER_ISSUE}",
   "current_step": 2,
-  "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  "started_at": "{the timestamp printed by date -u}"
 }
-EOF
 ```
 
 The lock file is read by `.agents/skills/develop-story/scripts/on-precompact.sh` if compaction fires.
@@ -200,9 +204,9 @@ The lock file is read by `.agents/skills/develop-story/scripts/on-precompact.sh`
 
 #### develop-task
 
-```bash
-mkdir -p .claude/state
-cat > .claude/state/develop-pipeline.lock <<EOF
+Write `.claude/state/develop-pipeline.lock` with this content (substitute every `{…}`):
+
+```json
 {
   "skill": "develop-task",
   "report_path": "{implementation-report-path}",
@@ -213,9 +217,8 @@ cat > .claude/state/develop-pipeline.lock <<EOF
   "tracker": "{TRACKER}",
   "tracker_issue": "{TRACKER_ISSUE}",
   "current_step": 2,
-  "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  "started_at": "{the timestamp printed by date -u}"
 }
-EOF
 ```
 
 The lock file is read by `.agents/skills/develop-task/scripts/on-precompact.sh` if compaction fires.

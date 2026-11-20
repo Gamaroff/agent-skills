@@ -672,15 +672,15 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
    **Check every anchor before the findings go anywhere** (task.194). A reviewer's `file_line` is a
    claim, not a fact: on PR #594 the shared reviewer reported every finding at a patch-file line
    number, and the number was rendered as if it were real. Right after the `code_review:` block is
-   read, write it to a JSON file and run the shared checker, from the repository root:
+   read, write it to a JSON file and run the shared checker, from the repository root. First get a
+   scratch path with `mktemp "${TMPDIR:-/tmp}/qa-findings.XXXXXX"`, then write the parsed block to that
+   path with the **file tool** (`references/file-write-rules.md#the-rule`): `line_text` quotes source,
+   and source carries `'` and `$`, which a shell heredoc would mangle. Then run:
 
    ```bash
-   # The parsed code_review: block as JSON — {"code_review":{…}}. Items 5 and 6 read this same file.
-   FINDINGS_JSON=$(mktemp "${TMPDIR:-/tmp}/qa-findings.XXXXXX")
-   # A quoted heredoc: line_text quotes source, and source carries ' and $.
-   cat > "$FINDINGS_JSON" <<'JSON'
-{findings-json}
-JSON
+   # {findings-json}: the scratch path above, holding the parsed code_review: block as JSON —
+   # {"code_review":{…}}. Items 5 and 6 read this same file.
+   FINDINGS_JSON="{findings-json}"
    # --rev HEAD: the diff under review is $BASE...HEAD, so uncommitted edits are not what was reviewed.
    # Decide on the checker's `reason`, never on its exit code: `node` also exits 1 when the script
    # cannot load, and that must not read as "malformed anchors — mark and continue" (task.195).
@@ -1917,8 +1917,14 @@ fi
 TARGET=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo develop)
 command node .agents/skills/qa-task/references/qa-read-back.js --doc "{task-file}" --target "$TARGET" >/dev/null || { echo "HALT: read-back not clean — not posting"; exit 1; }
 mkdir -p .claude/state
-BODY_FILE=.claude/state/qa-comment-body.md
-cat > "$BODY_FILE" <<'EOF'
+echo "body file: .claude/state/qa-comment-body.md"
+```
+
+Now write `.claude/state/qa-comment-body.md` with the **file tool**, in one call, with every `{…}`
+placeholder filled in textually. Nothing expands here: the file tool writes the text as given, so a
+`$` or a backtick in a finding is safe. Then run the block after it, in a later call. Body:
+
+```markdown
 ## QA Review: {GATE_DECISION}
 
 **Gate Decision**: {PASS/CONCERNS/FAIL}
@@ -1961,7 +1967,18 @@ cat > "$BODY_FILE" <<'EOF'
 2. {Step 2}
 
 ---
-EOF
+```
+
+```bash
+# Re-checked immediately before the post: the body was written in an earlier call, and the
+# read-back can have gone stale since (obs #226).
+TARGET=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo develop)
+command node .agents/skills/qa-task/references/qa-read-back.js --doc "{task-file}" --target "$TARGET" >/dev/null || { echo "HALT: read-back not clean — not posting"; exit 1; }
+# A new shell: re-bind the body file the file tool wrote above.
+BODY_FILE=.claude/state/qa-comment-body.md
+# The path is fixed, so a missing file means the write above did not happen. The file is removed
+# after the post attempt below, so a file found here was written for THIS post.
+[ -s "$BODY_FILE" ] || { echo "HALT: $BODY_FILE is missing or empty — write it with the file tool first"; exit 1; }
 
 # The plain-language lead, obtained ONCE and folded into $BODY_FILE — ABOVE the
 # arm split below, so the GitHub and Bitbucket arms post the same bytes and
@@ -1969,8 +1986,8 @@ EOF
 # moment uses; a pull-request comment about a moment that also exists on the
 # tracker reuses that stage rather than inventing a second vocabulary.
 #
-# GATE_DECISION is bound HERE, deliberately. The heredoc above is quoted
-# (`<<'EOF'`), so its [GATE_DECISION] placeholder is filled in textually when
+# GATE_DECISION is bound HERE, deliberately. The body above was written with the
+# file tool, so its {GATE_DECISION} placeholder is filled in textually when
 # the body is written — it never becomes a shell variable. Set this to the same
 # verdict you wrote into the body: PASS, CONCERNS, FAIL or WAIVED.
 GATE_DECISION="{PASS|CONCERNS|FAIL|WAIVED — the same verdict written into the body above}"
@@ -2035,6 +2052,7 @@ fi
 if [ "$COMMENT_RC" -ne 0 ]; then
   echo "⚠️ PR comment failed — non-blocking. Final canonical summary will be posted by /finalise."
 fi
+rm -f "$BODY_FILE"   # single-use: a later cycle that skips its write must not re-post this body
 ```
 
 **The two arms are not symmetric on retry, deliberately.** `tracker_call_with_retry` wraps `gh`

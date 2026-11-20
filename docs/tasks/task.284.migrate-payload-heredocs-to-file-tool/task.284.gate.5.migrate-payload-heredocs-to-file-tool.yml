@@ -1,0 +1,65 @@
+schema: 2
+task: 'task.284.migrate-payload-heredocs-to-file-tool'
+task_title: 'Migrate shipped payload heredocs to the file tool'
+gate: PASS
+status_reason: 'Bug 4 is fixed and verified: review-code is identical to develop again and the bundled copy is gone. All four bugs are closed, the citation criterion holds (every body-file site is cited or listed as excluded with a reason), and the CI-parity gate on the LAN server exited 0 for the fix commit. PR CI on the head was still pending when read.'
+reviewer: 'QA Engineer'
+head: 'a643242451e55efed74b69c85af01f61be4fdb7d'
+updated: '2026-11-20T11:41:51Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 8670
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    boundary_signals: []
+    notes: 'Prose only in this cycle. No boundary is added; the criteria carry no boundary signal.'
+  performance:
+    status: PASS
+    notes: 'Measured in cycle 1 (head 610,751 ms against develop 631,771 ms). Later cycles added a file removal, a boolean test and prose.'
+  reliability:
+    status: PASS
+    notes: 'No behaviour changed in this cycle. Bugs 1 to 3 were verified in earlier cycles.'
+  maintainability:
+    status: PASS
+    notes: 'The contradicting review-code sentence is gone. Bundle check: 129 skills, 0 problems.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 0
+  fix_date: '2026-11-20'
+  verification_method: 'git diff against develop for review-code (0 lines), bundle check, a population search of body-file sites, and the full CI-parity gate on the LAN server (exit 0)'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'review-pr Step 8 builds its body with mktemp in the posting block, while its prose says to write the file with the file tool and post later. The same sentence is in qa-task, qa-story and qa-fix. All four match develop, so they predate this PR (task 265 wording). Check each block and correct the ones whose body is built in-block.'
+      refs: ['skills/review-pr/SKILL.md', 'skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md', 'skills/qa-fix/SKILL.md']
+      provenance: pre-existing
+      remedy: unverified
+    - action: 'Residuals from gates 2 and 3: reword the stale comment above CONSUMING_REASONS in tracker-comment.js; say in the contract that a kept body file relies on the pre-post assertion; fold the lead into a copy in the qa-task and qa-story post blocks.'
+      refs: ['shared/resources/tracker-comment.js', 'shared/resources/tracker-comment-contract.md', 'skills/qa-task/SKILL.md']
+      remedy: unverified
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

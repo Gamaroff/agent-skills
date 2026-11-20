@@ -1,0 +1,16 @@
+[
+  {
+    "argv": [
+      "--sink",
+      "filename",
+      "--entry",
+      "fence:skills/create-issue/SKILL.md#Step 3: Create Issue in Remote Tracker",
+      "--slot",
+      "{issue-file-name}",
+      "--name",
+      "create-issue pre-flight"
+    ],
+    "cases_file": "task.284.dod.1.security.cases.json",
+    "cases_sha256": "686ad05b9445d2cc257a5b5f4b4c077c0c11a4cc2d7064813259e8da355ab239"
+  }
+]

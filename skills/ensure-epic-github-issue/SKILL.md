@@ -113,26 +113,22 @@ template.
 Write the body to a file first. **Always `--body-file`, never an inline `--body`**:
 the body carries backticks, `$(…)` and newlines, and an inline `--body` is a
 shell injection waiting for the first epic whose description contains one. The
-file is also what carries the body into the deferred record's `command.stdin`.
+file is also what carries the body into the deferred record's `command.stdin`. Post it in a call
+after the one that wrote it, once a line only this run's body carries is asserted
+(`references/file-write-rules.md#fresh-body-post`).
 
-> **The heredoc below is unquoted, and that is a real residual risk — not a
-> solved problem.** `<<EOF` still performs command substitution, so a `$(…)` or a
-> backticked span in the document's own text is executed while the body is being
-> written. `--body-file` removes the *argv* injection surface, which is the larger
-> one; it does not remove this. Where the source text is untrusted, write the file
-> with the editor tool instead of a heredoc. `<<'EOF'` is not the fix here — it
-> would also stop the `${…}` values below from being substituted, which the body
-> needs.
+> **Write the body with the file tool, not a shell heredoc.** An unquoted heredoc
+> performs command substitution, so a `$(…)` or a backticked span in the document's
+> own text would be executed while the body is written, and a quoted one would stop
+> the values below from being substituted. The file tool expands nothing: run
+> `mkdir -p .claude/state`, write the text with each `{NAME}` replaced by its value
+> (`references/file-write-rules.md#the-rule`), then run the create block, which
+> derives the epic id, title and milestone itself.
 
-```bash
-# The epic's id, title and milestone, derived in THIS block from the epic document (QA cycle 3, CR-2).
-: "${EPIC_FILE_PATH:?bind EPIC_FILE_PATH to the epic document}"
-META=$(command node .agents/skills/ensure-epic-github-issue/references/doc-id.js epic-meta "$EPIC_FILE_PATH" --json) || exit 1
-EPIC_ID=$(printf '%s' "$META" | jq -r '.id')
-EPIC_TITLE=$(printf '%s' "$META" | jq -r '.title')
-MILESTONE_TITLE=$(printf '%s' "$META" | jq -r '.milestone')
-mkdir -p .claude/state
-cat > .claude/state/issue-body.md <<EOF
+Write `.claude/state/issue-body.md` with the **file tool**, in one call, with this content (`{EPIC_STATUS}`,
+`{EPIC_PRIORITY}`, `{DOC_URL}`, `{EPIC_RELATIVE_PATH}` and `{PRD_LINE}` are the values bound earlier in this step):
+
+```markdown
 ## Summary
 
 {First paragraph of the epic's Epic Goal — or its Epic Description if it has no goal — capped at 4 sentences}
@@ -141,15 +137,25 @@ cat > .claude/state/issue-body.md <<EOF
 
 | Field | Value |
 |-------|-------|
-| Status | ${EPIC_STATUS} |
-| Priority | ${EPIC_PRIORITY} |
+| Status | {EPIC_STATUS} |
+| Priority | {EPIC_PRIORITY} |
 
 ## Document
 
-📄 [Epic Document](${DOC_URL})
-📁 \`${EPIC_RELATIVE_PATH}\`${PRD_LINE}
-EOF
+📄 [Epic Document]({DOC_URL})
+📁 `{EPIC_RELATIVE_PATH}`{PRD_LINE}
+```
 
+Then create the issue, in a later call. This block is its own shell, so it derives the epic id, title
+and milestone itself:
+
+```bash
+# The epic's id, title and milestone, derived in THIS block from the epic document (QA cycle 3, CR-2).
+: "${EPIC_FILE_PATH:?bind EPIC_FILE_PATH to the epic document}"
+META=$(command node .agents/skills/ensure-epic-github-issue/references/doc-id.js epic-meta "$EPIC_FILE_PATH" --json) || exit 1
+EPIC_ID=$(printf '%s' "$META" | jq -r '.id')
+EPIC_TITLE=$(printf '%s' "$META" | jq -r '.title')
+MILESTONE_TITLE=$(printf '%s' "$META" | jq -r '.milestone')
 # Even a FIXED label reaches gh through the helper: a repository without an
 # `epic` label fails the whole create otherwise (task.125, TASK-125-BUG-11).
 source .agents/skills/ensure-epic-github-issue/references/gh-labels.sh || exit 1

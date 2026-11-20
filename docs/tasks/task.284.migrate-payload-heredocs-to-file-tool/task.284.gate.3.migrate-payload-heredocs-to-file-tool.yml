@@ -1,0 +1,70 @@
+schema: 2
+task: 'task.284.migrate-payload-heredocs-to-file-tool'
+task_title: 'Migrate shipped payload heredocs to the file tool'
+gate: PASS
+status_reason: 'Bug 3 is fixed and verified against the committed head: a deferred outcome with no journal record now keeps the body file, and one with a record removes it. All three bugs are closed. The scoped review found only low advisories. PR CI on the head was still pending when read.'
+reviewer: 'QA Engineer'
+head: '9cbd6f57ae174626e56032bdfcd07930ddd6e141'
+updated: '2026-11-20T11:06:10Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 8670
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    boundary_signals: []
+    notes: 'Prose, tests and a guard on a file removal. No input gate is added; the criteria carry no boundary signal.'
+  performance:
+    status: PASS
+    notes: 'Measured in cycle 1 (head 610,751 ms against develop 631,771 ms). Cycles 1 and 2 added an unlink and a boolean test; not re-measured.'
+  reliability:
+    status: PASS
+    notes: 'The deferred-no-record path keeps its only copy. Reproduction on the head: journal works, record set, file removed; journal write fails, no record, file kept. Engine test file 86 pass under TMPDIR=/tmp.'
+  maintainability:
+    status: PASS
+    notes: 'The rule lives once, in the engine, and is stated in the contract, file-write-rules and the CHANGELOG. One stale comment in the engine remains (advisory).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 0
+  fix_date: '2026-11-20'
+  verification_method: 'Reproduction against the committed head with a control, the engine test file, and a read-only review of the cycle-2 fix commit'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'The comment above CONSUMING_REASONS in tracker-comment.js still says any deferred outcome consumes the file; reword it to say deferred consumes only when a journal record carries the body (reviewer CR-2, cleanup).'
+      refs: ['shared/resources/tracker-comment.js']
+      remedy: unverified
+    - action: 'Rewrap the file-write-rules.md item and use one phrase for the deferred rule in the contract and file-write-rules (reviewer CR-3, cleanup).'
+      refs: ['shared/resources/file-write-rules.md', 'shared/resources/tracker-comment-contract.md']
+      remedy: unverified
+    - action: 'Residual: a kept body file at the fixed path can be re-posted by a later call that skips its write; the QA and qa-fix blocks re-check a cycle-specific line first. Say in the contract that a kept file relies on that assertion (reviewer CR-1, low confidence; also raised in cycle 2).'
+      refs: ['shared/resources/tracker-comment-contract.md']
+      remedy: unverified
+    - action: 'The qa-task and qa-story post block folds the lead into the body file in place; fold into a copy so a re-run cannot prepend a second lead (cycle 2, low).'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+      remedy: unverified
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

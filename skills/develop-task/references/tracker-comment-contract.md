@@ -55,12 +55,12 @@ description: How every pipeline step and skill posts a comment to a tracker issu
 One call covers both trackers — `tracker-comment.js` resolves `TRACKER` itself,
 so a step doc never branches on it for a comment:
 
-```bash
-mkdir -p .claude/state
-cat > .claude/state/comment-body.md <<'EOF'
-{the markdown body}
-EOF
+Run `mkdir -p .claude/state`, then write `.claude/state/comment-body.md` with the **file tool** in one
+call (the markdown body, unedited), and post it in a **later** call. Never both in one parallel batch,
+and assert a line only this body carries before the post (`file-write-rules.md#fresh-body-post`).
+Then:
 
+```bash
 node .agents/skills/{skill}/references/tracker-comment.js \
   --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
   --stage {moment} \
@@ -82,6 +82,12 @@ injection waiting for the first comment that contains one. The file also means
 the body reaches the deferred-mutation record through `command.stdin`, which is
 what makes two different comments on the same issue hash to two different
 records instead of collapsing into one.
+
+**A body file is single-use.** The engine removes `--body-file` once the outcome is `posted`,
+`already` or `deferred` with a record id (the record carries the body on stdin). A `deferred` outcome
+with no record, because the journal write failed, keeps the file: it is then the body's only copy.
+Every other outcome keeps it, so a retry still has its body, and a call with no fresh write fails with exit 2 (missing
+file) rather than posting the previous comment. Write the body again before each call.
 
 **`--stage` is the comment's identity**, not a board column. It is what builds
 the idempotency marker, so a resumed pipeline does not comment twice — and, since

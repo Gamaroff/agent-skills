@@ -1,0 +1,175 @@
+[
+  {
+    "id": "ci.stale-other-doc",
+    "sink": "filename",
+    "input": "story.1.5.3.issue.1.a.md",
+    "why": "leftover body naming another issue",
+    "correct": "HALT, nothing posted",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".claude/state/issue-body.md": "## Source\n\n- **Local Doc**: `x/story.9.9.9.issue.9.z.md`\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: .claude/state/issue-body.md does not name story.1.5.3.issue.1.a.md — it is a leftover from an earlier run, not this issue's body\n"
+    },
+    "spec_ref": "skills/create-issue/SKILL.md:228"
+  },
+  {
+    "id": "ci.missing-file",
+    "sink": "filename",
+    "input": "story.1.5.3.issue.1.a.md",
+    "why": "file-tool write skipped, no body file",
+    "correct": "HALT",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        "unrelated.txt": "x"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: .claude/state/issue-body.md is missing or empty — write the body with the file tool first\n"
+    },
+    "spec_ref": "skills/create-issue/SKILL.md:227"
+  },
+  {
+    "id": "ci.empty-file",
+    "sink": "filename",
+    "input": "story.1.5.3.issue.1.a.md",
+    "why": "empty body file",
+    "correct": "HALT",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".claude/state/issue-body.md": ""
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: .claude/state/issue-body.md is missing or empty — write the body with the file tool first\n"
+    },
+    "spec_ref": "skills/create-issue/SKILL.md:227"
+  },
+  {
+    "id": "ci.slot-unsubstituted",
+    "sink": "filename",
+    "input": "{issue-file-name}",
+    "why": "slot left as written",
+    "correct": "HALT",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".claude/state/issue-body.md": "## Source\n\n- **Local Doc**: `x/story.1.5.3.issue.1.a.md`\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: ISSUE_DOC_NAME is empty or still holds a brace — substitute this issue's document file name\n"
+    },
+    "spec_ref": "skills/create-issue/SKILL.md:224"
+  },
+  {
+    "id": "ci.brace-in-name",
+    "sink": "filename",
+    "input": "a{b}.md",
+    "why": "brace inside the name",
+    "correct": "HALT",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".claude/state/issue-body.md": "a{b}.md\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stdout": "HALT: ISSUE_DOC_NAME is empty or still holds a brace — substitute this issue's document file name\n"
+    },
+    "spec_ref": "skills/create-issue/SKILL.md:224"
+  },
+  {
+    "id": "ci.token-left",
+    "sink": "filename",
+    "input": "a.md",
+    "why": "lowercase token survived substitution",
+    "correct": "exit 1 with the token listed",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".claude/state/issue-body.md": "Local Doc: a.md\n{pr_number}\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stderr": "ERROR: unsubstituted tokens in issue body:\n2:{pr_number}\n"
+    },
+    "spec_ref": "skills/create-issue/SKILL.md:230"
+  },
+  {
+    "id": "ci.placeholder-left",
+    "sink": "filename",
+    "input": "a.md",
+    "why": "_PLACEHOLDER survived",
+    "correct": "exit 1 with the line listed",
+    "direction": "hostile",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".claude/state/issue-body.md": "Local Doc: a.md\nTITLE_PLACEHOLDER\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "stderr": "ERROR: unsubstituted tokens in issue body:\n2:TITLE_PLACEHOLDER\n"
+    },
+    "spec_ref": "skills/create-issue/SKILL.md:230"
+  },
+  {
+    "id": "ci.legit-correct",
+    "sink": "filename",
+    "input": "story.1.5.3.issue.1.a.md",
+    "why": "correct body naming this issue",
+    "correct": "accepted",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".claude/state/issue-body.md": "## Source\n\n- **Local Doc**: `x/story.1.5.3.issue.1.a.md`\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "spec_ref": "skills/create-issue/SKILL.md:222"
+  },
+  {
+    "id": "ci.legit-dash-name",
+    "sink": "filename",
+    "input": "-x.md",
+    "why": "name starting with a dash, grep -F --",
+    "correct": "accepted",
+    "direction": "legitimate",
+    "fixture": {
+      "env": {},
+      "files": {
+        ".claude/state/issue-body.md": "Local Doc: -x.md\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "spec_ref": "skills/create-issue/SKILL.md:228"
+  }
+]

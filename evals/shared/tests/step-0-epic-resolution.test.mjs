@@ -419,7 +419,7 @@ for (const shell of SHELLS) {
       );
       assert.match(ms.stdout, /^M=Epic 1\.2 — Payments$/m, ms.stderr);
       const create = alone(
-        upTo(ENSURE_CREATE, "mkdir -p .claude/state"),
+        upTo(ENSURE_CREATE, "source references/gh-labels.sh"),
         'echo "ID=$STORY_ID M=$MILESTONE_TITLE"',
       );
       assert.match(

@@ -2303,28 +2303,28 @@ fi
 
 2. Post the comment through the CLI:
 
+   Run `mkdir -p .claude/state`, then write `.claude/state/comment-body.md` with the **file tool**, with
+   each `{NAME}` replaced by its value (the file tool expands nothing), and post it in a later call
+   (`references/file-write-rules.md#fresh-body-post`). Body:
+
+   ```markdown
+   ## Task Review Complete
+
+   **Recommendation**: {RECOMMENDATION}
+   **Readiness Score**: {SCORE}/10
+
+   | Severity | Count |
+   |---|---|
+   | Critical 🚨 | {CRITICAL} |
+   | Important ⚠️ | {IMPORTANT} |
+   | Optional 💡 | {OPTIONAL} |
+
+   **Review artifact**: `{REVIEW_FILE}`
+   {CHANGES_SECTION}
+   ```
+
    ```bash
-   # Terminator at COLUMN 0 — an indented terminator does not close an unquoted
-   # heredoc, and bash would swallow the invocation below into the comment body.
-   # Body lines are unindented for the same reason: leading spaces would be
-   # written into the comment verbatim.
-   mkdir -p .claude/state
-   cat > .claude/state/comment-body.md <<EOF
-## Task Review Complete
-
-**Recommendation**: ${RECOMMENDATION}
-**Readiness Score**: ${SCORE}/10
-
-| Severity | Count |
-|---|---|
-| Critical 🚨 | ${CRITICAL} |
-| Important ⚠️ | ${IMPORTANT} |
-| Optional 💡 | ${OPTIONAL} |
-
-**Review artifact**: \`${REVIEW_FILE}\`
-${CHANGES_SECTION}
-EOF
-
+   CRITICAL={the critical-issue count written into the body above}   # a new shell: re-bind it
    # REVIEW_N: this review's number — the `{N}` of the report Step 8 wrote
    # (`task.{n}.review.{N}.…`), or the number Step 8 computed when no report
    # was written. Re-bound here: this block is its own shell, and an unbound
@@ -2380,30 +2380,29 @@ EOF
 
 3. **Build and post the comment**:
 
+   Run `mkdir -p .claude/state`, then write `.claude/state/comment-body.md` with the **file tool**, with
+   each `{NAME}` replaced by its value, and post it in a later call
+   (`references/file-write-rules.md#fresh-body-post`). Body:
+
+   ```markdown
+   ## Task Review Complete
+
+   **Recommendation**: {RECOMMENDATION}
+   **Readiness Score**: {SCORE}/10
+
+   | Severity | Count |
+   |----------|-------|
+   | Critical 🚨 | {CRITICAL} |
+   | Important ⚠️ | {IMPORTANT} |
+   | Optional 💡 | {OPTIONAL} |
+
+   **Review artifact**: `{REVIEW_FILE}`
+   {CHANGES_SECTION}
+   ```
+
    ```bash
    GITHUB_ISSUE={github_issue from frontmatter}
-
-   # The heredoc terminator sits at COLUMN 0 even though this block is indented
-   # inside a numbered list — an indented terminator does not close an unquoted
-   # heredoc, and bash would swallow the invocation below into the body.
-   # The body lines are unindented for the same reason: leading spaces would be
-   # written into the comment verbatim.
-   mkdir -p .claude/state
-   cat > .claude/state/comment-body.md <<EOF
-## Task Review Complete
-
-**Recommendation**: ${RECOMMENDATION}
-**Readiness Score**: ${SCORE}/10
-
-| Severity | Count |
-|----------|-------|
-| Critical 🚨 | ${CRITICAL} |
-| Important ⚠️ | ${IMPORTANT} |
-| Optional 💡 | ${OPTIONAL} |
-
-**Review artifact**: \`${REVIEW_FILE}\`
-${CHANGES_SECTION}
-EOF
+   CRITICAL={the critical-issue count written into the body above}
 
    # REVIEW_N: bound as in the Jira arm above (this block is its own shell).
    REVIEW_N="{N}"

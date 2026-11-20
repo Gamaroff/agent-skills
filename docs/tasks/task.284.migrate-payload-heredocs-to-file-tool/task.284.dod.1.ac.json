@@ -1,0 +1,144 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "50fab41c164e37b91ebc5d0725a63c92cad0104c",
+  "dirty_paths": [
+    "docs/tasks/task.284.migrate-payload-heredocs-to-file-tool/task.284.implementation.1.migrate-payload-heredocs-to-file-tool-initial-run.md"
+  ],
+  "document": "docs/tasks/task.284.migrate-payload-heredocs-to-file-tool/task.284.migrate-payload-heredocs-to-file-tool.md",
+  "result": {
+    "bytes": 7832,
+    "sha256": "f0102357f4c02e47e44fe0ada5f6d28709d74ed7ae280d5c90d7a765ca617460",
+    "verified": true
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 6,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "4dd89413d29778b86486c3e5e67fe73c09b0d183815f05b6d7986f68594b7f04",
+      "status": "PASS",
+      "description": "Ratchet allowlist empty; test fails on any added payload heredoc (mutation-proven)",
+      "code_citation": "shared/resources/tests/payload-heredoc-ratchet.test.mjs:9",
+      "test_citation": "shared/resources/tests/payload-heredoc-ratchet.test.mjs:124",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Line 9 states the allow-list is gone. The test at 124 asserts measure() deepEquals []. Mutation proof recorded in qa.1 line 101 (heredoc appended to file-write-rules.md, test went red 5 pass 1 fail, restored, cmp clean). Runs under `npm test` in .github/workflows/test.yml:58 (the lane that runs it per PR)."
+    },
+    {
+      "id": "#2",
+      "text_hash": "f7812afa17bb6c66b723f8690b71cd654313271d87f8770e36ee9c25bfe79908",
+      "status": "PASS",
+      "description": "Every changed block classed runnable by qa-execute-snippets still runs clean",
+      "code_citation": "docs/tasks/task.284.migrate-payload-heredocs-to-file-tool/task.284.qa.1.migrate-payload-heredocs-to-file-tool.md:99",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "the one changed block classed runnable (of about 30 changed blocks)",
+          "evidence": "docs/tasks/task.284.migrate-payload-heredocs-to-file-tool/task.284.qa.1.migrate-payload-heredocs-to-file-tool.md:99",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "criteria-drift.js exit 0: #2 is 'reworded', approved true, approver 'the repository owner on 2026-11-20', so the amendment rule does not fail it. qa.1:99 records the qa-execute-snippets run over 24 changed files with zero failures on any touched block, 1 runnable. The five execution-failure records are on untouched blocks. The report does not name the single runnable block, so the member is identified by count only. The rest are held by the test suites, which the narrowed criterion text says."
+    },
+    {
+      "id": "#3",
+      "text_hash": "2b5c03a35ca1f0041f3fdcebbedd9b7edfbce9e2a30feccf50a0d83fef3993a4",
+      "status": "PASS",
+      "description": "CI=true npm test wall time within 10% of develop, uptime load recorded",
+      "code_citation": "docs/tasks/task.284.migrate-payload-heredocs-to-file-tool/task.284.qa.1.migrate-payload-heredocs-to-file-tool.md:84-95",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Bound 10%. qa.1 section 'Five-and-five measurement' holds ten interleaved runs with uptime before each, head 91f1a9fc3 and base 850985da3, all exit 0, command `CI=true npm run test:remote -- --run test` on the LAN server. I recomputed the medians from the scratchpad perf/results.tsv: head 618157 ms (sorted 609895, 617850, 618157, 618584, 619820), base 618433 ms (609477, 617717, 618433, 618656, 622843), a 0.04% difference. Measured on 91f1a9fc3, tree-equivalent to HEAD: finalise-delta.js docs-only --base 91f1a9fc3 --head HEAD returned reason tree-equivalent, exit 0, changed only qa.1. The command is the test:remote form of `npm test`, run on the LAN server as the criterion specifies."
+    },
+    {
+      "id": "#4",
+      "text_hash": "af7244847b8799fe57689b9d4e5b834a35200c54cbc14849f9f1ac5474b3b853",
+      "status": "PASS",
+      "description": "bundle --check reports 0 problems; validate passes for each changed skill",
+      "code_citation": "docs/tasks/task.284.migrate-payload-heredocs-to-file-tool/task.284.qa.5.migrate-payload-heredocs-to-file-tool.md:114",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Bound is 0 problems and every changed skill passing. qa.5:114 records quick_validate.py for 26 skills (26 passed, 0 failed) and bundle:check with 129 skills, 0 problems. I re-ran quick_validate.py on create-issue, qa-task and sync-github-bug (all passed). I re-ran `npm run bundle -- --check` on HEAD: 129 skills, 0 problems. `git diff --name-only 850985da3...HEAD -- skills` touches 26 distinct skills, matching the report. The record was taken on 50fab41c1, tree-equivalent to HEAD (finalise-delta.js docs-only --base 50fab41c1 --head HEAD returned tree-equivalent, changed docs/tasks/task.284.* only)."
+    },
+    {
+      "id": "#5",
+      "text_hash": "970051bfcae89cd7ef0334c333eaf72f77b2bdfc185c8d99b0bcb53c52f93d30",
+      "status": "PASS",
+      "description": "CHANGELOG.md [Unreleased] entry citing (task 284)",
+      "code_citation": "CHANGELOG.md:9",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Line 9, under [Unreleased] / Changed, reads 'Shipped skill prose writes payloads with the file tool, not a heredoc (task 284)', which meets the criterion. I did not locate a changelog corpus guard to name, so the test citation is not applicable."
+    },
+    {
+      "id": "#6",
+      "text_hash": "61988ef9b2814082ed4e83aa3a2de5e06351759b64bf0f71f460c82204af9499",
+      "status": "PASS",
+      "description": "Each remaining --body-file site cites fresh-body-post recipe or is listed as excluded",
+      "code_citation": "docs/tasks/task.284.migrate-payload-heredocs-to-file-tool/task.284.qa.5.migrate-payload-heredocs-to-file-tool.md:39-46",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "skills/review-code/SKILL.md",
+          "evidence": "qa.5 excluded table: fresh mktemp body written in the same block that posts it",
+          "status": "PASS"
+        },
+        {
+          "member": "shared/resources/develop-pipeline-hooks.md",
+          "evidence": "qa.5 excluded table: PreCompact hook script writes and posts the body in the same shell",
+          "status": "PASS"
+        },
+        {
+          "member": "shared/resources/develop-pipeline-pause.md",
+          "evidence": "qa.5 excluded table: same reason as develop-pipeline-hooks.md",
+          "status": "PASS"
+        },
+        {
+          "member": "shared/resources/observation-log-contract.md",
+          "evidence": "qa.5 excluded table: contract text describing a flag, posts nothing",
+          "status": "PASS"
+        },
+        {
+          "member": "shared/resources/tracker-access-record.md",
+          "evidence": "qa.5 excluded table: contract text, posts nothing",
+          "status": "PASS"
+        },
+        {
+          "member": "shared/resources/tracker-issue-cli.md",
+          "evidence": "qa.5 excluded table: contract text, posts nothing",
+          "status": "PASS"
+        },
+        {
+          "member": "shared/resources/file-write-rules.md",
+          "evidence": "qa.5 excluded table: the recipe itself",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "I recomputed the uncited set with `git grep -l -e '--body-file' -- 'skills/**/SKILL.md' 'shared/resources/*.md' | xargs grep -L fresh-body-post`. It returns exactly those seven files, and all seven are listed with a reason in qa.5. Every other site cites the recipe by construction, since it is not in the uncited set."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#2",
+      "note": "The qa.1 report never names the single runnable block, so the 'every runnable block runs clean' claim rests on the engine's zero-failure report, not on a named member."
+    },
+    {
+      "ac_id": "#3",
+      "note": "The measurement command is `npm run test:remote -- --run test` on the LAN server, not the literal `time CI=true npm test`. The load is recorded per run from uptime, and the figures sit in qa.1 section 'Five-and-five measurement' as the criterion asks."
+    },
+    {
+      "ac_id": "#1-6",
+      "note": "The named DIFF_FILE .claude/state/pr-diff-1795179378.diff does not exist on disk. I used `git diff 850985da3...HEAD` (133 files) as the code diff instead. All verdicts above rest on that substitute and on direct reads, greps and re-runs."
+    }
+  ]
+}

@@ -570,7 +570,28 @@ async function run({
   // resolved" rather than throwing on the temporal dead zone.
   let leadKind = null;
 
+  // A body file is single-use. Once the comment is posted, already there, or
+  // deferred (the record carries the body on stdin), nothing more will read the
+  // file, and a copy left behind is what a later run would post if its own
+  // write were skipped: the fixed path .claude/state/comment-body.md is shared
+  // by every call site (task 284, QA bugs 1 and 2). Any other outcome keeps the
+  // file, so a retry has its body. Removal is best-effort and never changes the
+  // exit code.
+  const CONSUMING_REASONS = new Set(["posted", "already", "deferred"]);
   const emit = (payload, exitCode) => {
+    // "deferred" consumes only when a journal record carries the body. A deferred
+    // outcome whose journal write failed has no record, and the file is then the
+    // body's only copy (task 284, QA cycle 2, bug 3).
+    const delivered =
+      CONSUMING_REASONS.has(payload.reason) &&
+      (payload.reason !== "deferred" || Boolean(payload.record));
+    if (delivered && args.bodyFile) {
+      try {
+        fs.unlinkSync(args.bodyFile);
+      } catch (_) {
+        /* already gone, or not ours to remove */
+      }
+    }
     if (args.json)
       output.emit({ ...payload, stage: args.stage, lead: leadKind, exitCode });
     return { exitCode, ...payload };

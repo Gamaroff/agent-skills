@@ -306,16 +306,11 @@ After extracting the PR URL from `create-pr`'s output:
 
 1. **Post PR-opened comment** — one call, both trackers:
 
-   ```bash
-   mkdir -p .claude/state
-   # Terminator at COLUMN 0 — an indented terminator does not close an
-   # unquoted heredoc; bash swallows everything after it into the body,
-   # so the call below would never run. Body lines are unindented for
-   # the same reason: leading spaces are written verbatim.
-   cat > .claude/state/comment-body.md <<EOF
-PR opened — {PR_URL}
-EOF
+   Run `mkdir -p .claude/state`, then write `.claude/state/comment-body.md` with the **file tool**
+   (one line: `PR opened — {PR_URL}`, URL substituted), and post it in a later call
+   (`file-write-rules.md#fresh-body-post`):
 
+   ```bash
    node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
      --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
      --stage in-review \
