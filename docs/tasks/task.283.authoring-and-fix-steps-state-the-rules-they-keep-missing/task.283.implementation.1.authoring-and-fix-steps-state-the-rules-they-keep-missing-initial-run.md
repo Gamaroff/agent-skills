@@ -231,10 +231,12 @@ Importer audit: no shared parser widened; skipped.
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-11-20
+**Final Status**: Completed
 **Branch**: feature/task.283.authoring-and-fix-steps-state-the-rules-they-keep-missing
 **PR**: #922 (https://github.com/Gamaroff/agent-skills/pull/922)
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 5 fix cycles, 6 gates (sixth allowed by the owner); last gate PASS 95
+**DoD Summary**: `task.283.dod.1.authoring-and-fix-steps-state-the-rules-they-keep-missing.md` — ACCEPTED
+**CI readings**: reading 1 SUCCESS @ `ce81da05e` (6 checks); reading 2 SUCCESS @ `265525aa9` (6 checks, the pushed acceptance head)
+**Override**: the wall-time criterion was accepted by owner override at finalise (the figure predates the last doc/test-only commits); recorded in QA report 6 and the DoD
+**Tracker debt**: none (the task has no linked issue)
