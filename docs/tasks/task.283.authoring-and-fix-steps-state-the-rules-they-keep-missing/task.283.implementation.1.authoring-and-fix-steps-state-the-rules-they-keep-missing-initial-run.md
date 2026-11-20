@@ -199,7 +199,23 @@ Importer audit: no shared parser widened; skipped.
 **Traceability**: skipped (no Acceptance Criteria section)
 **PR Review**: not reached — gate did not exit the loop
 **Loop exit**: budget — 5 of 5 gates used; the fix is not applied, because an ungated fix is never handed over
-**Action**: Escalated to the owner (fix with a sixth gate, or accept the limit)
+**Action**: Escalated to the owner (fix with a sixth gate, or accept the limit); the owner allowed a sixth gate
+
+#### qa-fix (5b)
+
+Narrowing residue: shared/resources/develop-pipeline-step-3-develop-loop.md, the CHANGELOG block (trigger: repeat subject)
+Move: patch: three small failure-path defects in the new code; the contract stays as narrowed in cycle 3.
+
+| Finding | Fix | Held by |
+| ------- | --- | ------- |
+| T283-QA-12 | awk counts (exit 0 on zero); base read before the pipe; base through ENVIRON; release-cut test asserts the HALT text | 4 new/changed tests ×2 shells; two mutations red (`grep -c .`, `awk -v`) |
+| git show guard | read into a variable before awk | not held by a test (`cat-file -e` runs first); reasoned only |
+
+Probe: `git grep -F -e 'grep -c .' -e 'more bullets'` over SKILL.md, shared resources and hand-authored references
+  shared/resources/develop-pipeline-step-3-develop-loop.md — updated
+  shared/resources/develop-pipeline-step-0-resolve-and-prepare.md (2 sites), skills/create-epic/SKILL.md, skills/ensure-task-github-issue/SKILL.md, skills/review-epic/SKILL.md — unaffected by this change, but each holds the same `printf | grep -c .` count that exits 1 on zero matches; pre-existing, outside task 283, left for a follow-up (they would abort silently under a `set -e` caller on an empty list)
+Population: 6 sites (1 updated, 5 pre-existing, out of scope)
+Importer audit: no shared parser widened; skipped.
 
 ---
 

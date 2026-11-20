@@ -355,6 +355,7 @@ for (const shell of SHELLS) {
     try {
       const r = run(shell, block, { cwd: work });
       assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.match(r.stdout, /more bullet\(s\)/);
     } finally {
       cleanup(dir);
     }
@@ -369,6 +370,59 @@ for (const shell of SHELLS) {
     try {
       const r = run(shell, block, { cwd: work });
       assert.equal(r.status, 0, r.stdout + r.stderr);
+    } finally {
+      cleanup(dir);
+    }
+  });
+}
+
+// QA cycle 5: the empty released region, and a bullet with backslash text.
+const NO_RELEASED_BULLETS = [
+  "# Changelog",
+  "",
+  "## [Unreleased]",
+  "",
+  "- **Existing unreleased entry.**",
+  "",
+  "## [v1.0.0] - 2026-10-01",
+  "",
+  "Prose only, no bullets.",
+  "",
+].join("\n");
+
+for (const shell of SHELLS) {
+  test(`${shell}: a valid edit passes under set -e when the released region has no bullets`, () => {
+    const { dir, work } = scenario(
+      (t) =>
+        t.replace(
+          "- **Existing unreleased entry.**\n",
+          "- **Existing unreleased entry.**\n- **A second unreleased entry.**\n",
+        ),
+      NO_RELEASED_BULLETS,
+    );
+    try {
+      const r = run(shell, `set -e\n${block}`, { cwd: work });
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+    } finally {
+      cleanup(dir);
+    }
+  });
+
+  test(`${shell}: the HALT message lists the real addition beside bullets with backslash text`, () => {
+    const withEscapes = BASE_CHANGELOG.replace(
+      "- **Shipped fix.**\n",
+      "- **Shipped fix.**\n- **Path C:\\new\\table.**\n",
+    );
+    const { dir, work } = scenario(
+      (t) =>
+        insertAfter(t, "- **First release.**", "- **Misplaced new entry.**"),
+      withEscapes,
+    );
+    try {
+      const r = run(shell, block, { cwd: work });
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.match(r.stdout, /Misplaced new entry/);
+      assert.doesNotMatch(r.stdout, /new\\table/);
     } finally {
       cleanup(dir);
     }

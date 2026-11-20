@@ -407,13 +407,19 @@ if [ -f "$CL" ] && [ "${DIFF_RC:-0}" -eq 1 ]; then
     # line it replaced. A removal that offsets an addition is not seen: that is the stated limit.
     # No temp files: a failed mktemp read as "could not look" and passed (QA cycle 4, CR-1).
     REGION='/^## \[(v|[0-9])/ { f = 1 } f && /^[[:space:]]*[-*] / { print }'
-    BASE_B=$(git show "$MB:$CL" | awk "$REGION") \
+    # Read git's output into a variable BEFORE the pipe: a failed `git show` on the left of a pipe
+    # is invisible without pipefail. Count with awk, not `grep -c .`, which exits 1 on zero matches
+    # and kills a caller running under set -e (QA cycle 5).
+    BASE_RAW=$(git show "$MB:$CL") \
       || { echo "HALT: could not read $CL at the merge base — the CHANGELOG check cannot look"; exit 1; }
+    BASE_B=$(printf '%s\n' "$BASE_RAW" | awk "$REGION")
     NEW_B=$(awk "$REGION" "$CL") \
       || { echo "HALT: could not read $CL — the CHANGELOG check cannot look"; exit 1; }
-    BASE_N=$(printf '%s' "$BASE_B" | grep -c .); NEW_N=$(printf '%s' "$NEW_B" | grep -c .)
+    BASE_N=$(printf '%s\n' "$BASE_B" | awk 'NF { n++ } END { print n + 0 }')
+    NEW_N=$(printf '%s\n' "$NEW_B" | awk 'NF { n++ } END { print n + 0 }')
     if [ "$NEW_N" -gt "$BASE_N" ]; then
-      ADDED=$(printf '%s\n' "$NEW_B" | awk -v base="$BASE_B" 'BEGIN { n = split(base, a, "\n"); for (i = 1; i <= n; i++) s[a[i]] = 1 } !($0 in s)' | head -5 | tr '\n' '|')
+      # The base goes in through the environment: awk -v would process backslash escapes in a bullet.
+      ADDED=$(printf '%s\n' "$NEW_B" | BASE_B="$BASE_B" awk 'BEGIN { n = split(ENVIRON["BASE_B"], a, "\n"); for (i = 1; i <= n; i++) s[a[i]] = 1 } !($0 in s)' | head -5 | tr '\n' '|')
       echo "HALT: CHANGELOG.md has $((NEW_N - BASE_N)) more bullet(s) below the first release heading (line $FIRST_RELEASE) than the merge base, inside a shipped release; added or changed: $ADDED — move the new entry under ## [Unreleased]"
       exit 1
     fi

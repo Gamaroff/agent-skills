@@ -357,6 +357,7 @@ The wall-time criterion is met: median of five alternating runs, develop 750 s a
 | 2026-11-20 |         | QA gate CONCERNS (82/100) — 1 new medium (mktemp failure reads as a pass), wall time recording | qa-task     |
 | 2026-11-20 |         | QA findings fixed — temp files removed, set -e safe, remedy named; wall-time measurement pending, 4 iterations | qa-fix      |
 | 2026-11-20 |         | QA gate CONCERNS (88/100) — wall time met (+1.7%), 1 medium open (set -e on an empty region), gate budget spent | qa-task     |
+| 2026-11-20 |         | QA findings fixed — awk counts, base read before the pipe, ENVIRON; sixth gate allowed by the owner, 5 iterations | qa-fix      |
 <!-- change-log-end -->
 
 ---
