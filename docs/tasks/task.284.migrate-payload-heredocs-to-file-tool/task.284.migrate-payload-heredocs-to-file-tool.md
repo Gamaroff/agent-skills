@@ -5,10 +5,11 @@ type: task
 description: "Move each payload heredoc in shipped skill prose to the file-edit tool plus --body-file or --findings-file, deleting one ratchet allowlist entry per site, and cite the fresh-body-post recipe at the other body-file posting sites."
 tags: [qa-task, qa-story, finalise, create-pr, ensure-task-github-issue, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-11-06
 updated: 2026-11-20
+completed_date: 2026-11-20
 depends_on: [265]
 pr_number: 923
 estimated_effort_hours: 16
@@ -16,7 +17,7 @@ estimated_effort_hours: 16
 
 # Task 284: Migrate shipped payload heredocs to the file tool
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 ---
 
@@ -231,6 +232,30 @@ Population commands: `git grep -nE "(cat|tee)[^|]*<<-?['\"]?[A-Za-z_]+['\"]?" --
 ### Key Findings
 All four bugs are fixed and closed. The citation criterion holds: every body-file site is cited or listed as excluded with a reason in the QA report. PR CI on the head was pending when read.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.284.qa.5.migrate-payload-heredocs-to-file-tool.md`
+**Gate File**: `task.284.gate.5.migrate-payload-heredocs-to-file-tool.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** all 6 success criteria met. Criterion 2 was narrowed by the repository owner on 2026-11-20 and reads as approved.
+✅ **Tests:** the ratchet test asserts an empty result and was mutation-proven; the full suite wall time is within 10% of `develop` (head median 618,157 ms, base median 618,433 ms, ten runs, QA report 1).
+✅ **PR Review:** PR #923, review verdict APPROVE (`task.284.pr-review.1.migrate-payload-heredocs-to-file-tool.md`); CI green on the head.
+✅ **Documentation:** `CHANGELOG.md` `[Unreleased]` cites (task 284); bundled copies regenerated, `bundle:check` 129 skills, 0 problems.
+✅ **Security Review:** PASS — 18 probe candidates executed, none reproduced; one spec challenge left for the owner.
+✅ **Compliance Review:** not applicable (no data, payments, UI or health data).
+
+**Detailed Verification Log:** See `task.284.dod.1.migrate-payload-heredocs-to-file-tool.md` for the complete verification evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-11-20
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -250,6 +275,7 @@ All four bugs are fixed and closed. The citation criterion holds: every body-fil
 | 2026-11-20 |         | QA findings fixed — 1 bug Ready for QA, 1 iteration                         | qa-fix |
 | 2026-11-20 |         | QA gate PASS (100/100) — 0 findings (bug 4 closed)                          | qa-task |
 | 2026-11-20 |         | Success criterion 2 narrowed by the owner to the blocks `qa-execute-snippets` classes runnable (finalise DoD found the original wording unmet for 29 of about 30 blocks); head wall time re-measured in QA report 1 | finalise |
+| 2026-11-20 | 1.2     | Accepted — all six criteria met, wall time re-measured (PR #923)            | finalise    |
 <!-- change-log-end -->
 
 ---
