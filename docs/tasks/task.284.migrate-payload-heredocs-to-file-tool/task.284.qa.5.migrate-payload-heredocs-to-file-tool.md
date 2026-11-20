@@ -111,6 +111,8 @@ Route: docs-only claim check. Boundary: false; no code is added in this cycle.
 
 The full CI-parity gate on the LAN server for commit a64324245 exited 0 (tmp-leak ratchet ok). Bundle check: 129 skills, 0 problems.
 
+**Validate record (added at `/finalise`, 2026-11-20, head `50fab41c1`).** `python skills/create-skill/scripts/quick_validate.py skills/<name>` was run for each of the 26 skills the PR changes (`create-issue`, `create-pr`, `develop`, `develop-bug`, `develop-story`, `develop-task`, `double-check`, `ensure-{bug,epic,story,task}-github-issue`, `finalise`, `observe-work`, `qa-fix`, `qa-story`, `qa-task`, `review-{bug,pr,security,story,task}`, `sync-github-{bug,epic,story,task}`, `tracker-reconcile`): 26 passed, 0 failed. `npm run bundle:check` on the same head: 129 skills, 0 problems.
+
 Disclosure: during the cycle-4 fix I appended the bug 4 fix record with a quoted heredoc and changed its status line with `sed -i`, against the project's file-edit rule. The heredoc held no live expansion and the result is correct; later edits used the file tools.
 
 ---

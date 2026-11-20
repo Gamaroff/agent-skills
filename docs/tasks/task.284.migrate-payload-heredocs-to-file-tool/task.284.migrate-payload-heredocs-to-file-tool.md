@@ -175,7 +175,7 @@ Population commands: `git grep -nE "(cat|tee)[^|]*<<-?['\"]?[A-Za-z_]+['\"]?" --
 
 ### Functional
 - [x] The ratchet's allowlist is empty and the test fails on any added payload heredoc (mutation-proven).
-- [x] Every changed block that `qa-execute-snippets.mjs` classes as runnable still runs clean (1 of about 30 changed blocks; the rest are tracker or `gh` posts and placeholders, held by the test suites instead).
+- [x] Every changed block that `qa-execute-snippets.mjs` classes as runnable still runs clean (1 of about 30 changed blocks; the rest are tracker or `gh` posts and placeholders, held by the test suites instead), approved by the repository owner on 2026-11-20.
 
 ### Performance
 - [x] `CI=true npm test` wall time is within 10% of `develop`, measured with `uptime; time CI=true npm test` on the PR head and on `develop` on the same machine (the LAN server), the two figures and their `uptime` load recorded in the QA report's Findings section.
