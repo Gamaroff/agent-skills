@@ -213,8 +213,20 @@ Related to: story.1.180.3.quick-re-search
 
 2. **Pre-flight validation — MANDATORY.** Abort if any template token survived substitution:
 
+The same block also proves the file is **this issue's** body, because the path is fixed and a leftover
+from an earlier run would otherwise be posted. `{issue-file-name}` is a slot: substitute the file name
+of this issue's document, the one the body's `Local Doc` line ends with. A missing or empty file
+stops here too (`grep` on a missing file exits 2, which `if` reads as "no tokens").
+
 ```bash
 body_file=.claude/state/issue-body.md
+ISSUE_DOC_NAME="{issue-file-name}"
+case "$ISSUE_DOC_NAME" in
+  ''|*"{"*|*"}"*) echo "HALT: ISSUE_DOC_NAME is empty or still holds a brace — substitute this issue's document file name"; exit 1 ;;
+esac
+[ -s "$body_file" ] || { echo "HALT: $body_file is missing or empty — write the body with the file tool first"; exit 1; }
+grep -qF -- "$ISSUE_DOC_NAME" "$body_file" \
+  || { echo "HALT: $body_file does not name $ISSUE_DOC_NAME — it is a leftover from an earlier run, not this issue's body"; exit 1; }
 if grep -Eq '(_PLACEHOLDER|\{[a-z_]+\})' "$body_file"; then
   echo "ERROR: unsubstituted tokens in issue body:" >&2
   grep -nE '(_PLACEHOLDER|\{[a-z_]+\})' "$body_file" >&2

@@ -177,7 +177,7 @@ Population commands: `git grep -nE "(cat|tee)[^|]*<<-?['\"]?[A-Za-z_]+['\"]?" --
 - [x] Every changed block still runs under `qa-execute-snippets.mjs`.
 
 ### Performance
-- [ ] `CI=true npm test` wall time is within 10% of `develop`, measured with `uptime; time CI=true npm test` on the PR head and on `develop` on the same machine (the LAN server), the two figures and their `uptime` load recorded in the QA report's Findings section.
+- [x] `CI=true npm test` wall time is within 10% of `develop`, measured with `uptime; time CI=true npm test` on the PR head and on `develop` on the same machine (the LAN server), the two figures and their `uptime` load recorded in the QA report's Findings section.
 
 ### Code Quality
 - [x] `npm run bundle -- --check` reports 0 problems and `npm run validate -- skills/<changed-skill>/` passes for each changed skill.
@@ -209,6 +209,27 @@ Population commands: `git grep -nE "(cat|tee)[^|]*<<-?['\"]?[A-Za-z_]+['\"]?" --
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-20
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.284.qa.1.migrate-payload-heredocs-to-file-tool.md](./task.284.qa.1.migrate-payload-heredocs-to-file-tool.md)
+- **Gate File**: [task.284.gate.1.migrate-payload-heredocs-to-file-tool.yml](./task.284.gate.1.migrate-payload-heredocs-to-file-tool.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 8664
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+Two medium findings: `create-issue` and the tracker-comment post blocks no longer guarantee that the posted body was written in the same run (bug reports 1 and 2). Performance is within bound (head 610,751 ms against 631,771 ms on `develop`).
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -218,6 +239,8 @@ Population commands: `git grep -nE "(cat|tee)[^|]*<<-?['\"]?[A-Za-z_]+['\"]?" --
 | 2026-11-20 | 1.1     | Review passed (8/10) — added resume-contract site, lock-heredoc expansion note, qa-fix/ensure-task scope corrections, removed-literal sweep, measured perf criterion | review-task |
 | 2026-11-20 |         | Status → ready-for-development                                              | review-task |
 | 2026-11-20 |         | All 31 payload heredocs migrated, allowlist emptied, CI-parity gate green; status → ready-for-review | develop-task |
+| 2026-11-20 |         | QA gate CONCERNS (90/100) — 2 findings                                      | qa-task |
+| 2026-11-20 |         | QA findings fixed — 2 bugs Ready for QA, 1 iteration                        | qa-fix |
 <!-- change-log-end -->
 
 ---

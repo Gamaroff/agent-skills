@@ -1,0 +1,77 @@
+schema: 2
+task: 'task.284.migrate-payload-heredocs-to-file-tool'
+task_title: 'Migrate shipped payload heredocs to the file tool'
+gate: CONCERNS
+status_reason: 'All 31 payload heredocs are migrated, the ratchet is empty and mutation-proven, CI-parity and PR CI are green, and the performance criterion is met. Two medium findings remain: the migration removed the guarantee that a posted body was written in the same run (create-issue and the tracker-comment post blocks).'
+reviewer: 'QA Engineer'
+head: 'f5cde943fef6539e7b8461cde44b5e35eaca4702'
+updated: '2026-11-20T10:20:00Z'
+
+top_issues:
+  - id: 'TASK-284-CR-1'
+    severity: medium
+    file: 'skills/create-issue/SKILL.md'
+    finding: 'The issue body moved from a fresh mktemp file written in the same block to the fixed path .claude/state/issue-body.md, written by the file tool in an earlier call. If that write is skipped or fails, the pre-flight token grep passes on the previous run''s body and the create posts it. The rm -f cleanup at line 382 runs only if a run reaches it.'
+    suggested_action: 'HALT in the pre-flight block when the body file is absent or lacks the issue title, and delete it after the create.'
+    suggested_owner: dev
+    bug_ref: 'task.284.bug.1.create-issue-posts-a-stale-body.md'
+    status: open
+  - id: 'TASK-284-CR-2'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-4-create-pr.md'
+    finding: 'Every tracker-comment post block (pipeline steps 0, 2, 3, 4, 7; create-pr; finalise; review-bug, review-story, review-task) now posts .claude/state/comment-body.md in a later call than the write and cites fresh-body-post, but none asserts the body is this run''s. The old heredoc guaranteed it. A skipped write re-posts the previous comment.'
+    suggested_action: 'In each post block, HALT when the body file is missing or empty, and remove it after the post.'
+    suggested_owner: dev
+    bug_ref: 'task.284.bug.2.tracker-comment-sites-post-a-stale-body.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 8664
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    boundary_signals: []
+    notes: 'The change is prose and tests. The motive is a security one (an unquoted heredoc executes backticks), and the ratchet now blocks any return. No boundary is added: the ratchet is a repository guard, not an input gate. The criteria carry no boundary signal.'
+  performance:
+    status: PASS
+    notes: 'npm test on the LAN server: head 610,751 ms at load 0.13; develop 631,771 ms at load 1.44 (same host, same runner). Head is 3.3% faster, inside the 10% bound.'
+  reliability:
+    status: CONCERNS
+    notes: 'The stale-body regression above: the old single-block heredoc could not post a body from an earlier run, the file-tool split can.'
+  maintainability:
+    status: PASS
+    notes: 'The ratchet carries no allowlist, fresh-body-post is cited at the other posting sites, bundled copies match their sources (bundle --check: 0 problems).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Add the stale-body guard to create-issue and to each tracker-comment post block (TASK-284-CR-1, TASK-284-CR-2).'
+      refs: ['skills/create-issue/SKILL.md', 'shared/resources/develop-pipeline-step-4-create-pr.md']
+  future:
+    - action: 'Reduce the first qa-task and qa-story block to the mkdir; its read-back guard is repeated before the post (CR-3, cleanup, advisory).'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+      remedy: unverified
+    - action: 'tests/ci-tree-equivalence SEC-1b (external SIGTERM kills the check process group) failed once on the develop baseline run under load 1.44 and passed on the head run; a load-sensitive test, pre-existing, not touched by this change.'
+      refs: ['shared/resources/tests/ci-tree-equivalence.test.mjs']
+      provenance: pre-existing
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['Fix TASK-284-CR-1 and TASK-284-CR-2 before merge']

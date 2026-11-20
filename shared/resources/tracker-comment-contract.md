@@ -82,6 +82,11 @@ the body reaches the deferred-mutation record through `command.stdin`, which is
 what makes two different comments on the same issue hash to two different
 records instead of collapsing into one.
 
+**A body file is single-use.** The engine removes `--body-file` once the outcome is `posted`,
+`already` or `deferred` (the deferred record already carries the body on stdin). Every other outcome
+keeps it, so a retry still has its body, and a call with no fresh write fails with exit 2 (missing
+file) rather than posting the previous comment. Write the body again before each call.
+
 **`--stage` is the comment's identity**, not a board column. It is what builds
 the idempotency marker, so a resumed pipeline does not comment twice — and, since
 the plain-language lead was added, it is also what selects the lead. A comment

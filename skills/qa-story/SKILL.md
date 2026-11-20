@@ -2519,6 +2519,9 @@ TARGET=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo devel
 command node .agents/skills/qa-story/references/qa-read-back.js --doc "{story-file}" --target "$TARGET" >/dev/null || { echo "HALT: read-back not clean — not posting"; exit 1; }
 # A new shell: re-bind the body file the file tool wrote above.
 BODY_FILE=.claude/state/qa-comment-body.md
+# The path is fixed, so a missing file means the write above did not happen. The file is removed
+# after the post attempt below, so a file found here was written for THIS post.
+[ -s "$BODY_FILE" ] || { echo "HALT: $BODY_FILE is missing or empty — write it with the file tool first"; exit 1; }
 
 # The plain-language lead, obtained ONCE and folded into $BODY_FILE — ABOVE the
 # arm split below, so the GitHub and Bitbucket arms post the same bytes and
@@ -2592,6 +2595,7 @@ fi
 if [ "$COMMENT_RC" -ne 0 ]; then
   echo "⚠️ PR comment failed — non-blocking. Final canonical summary will be posted by /finalise."
 fi
+rm -f "$BODY_FILE"   # single-use: a later cycle that skips its write must not re-post this body
 ```
 
    **The two arms are not symmetric on retry, deliberately.** `tracker_call_with_retry` wraps `gh` only, so the GitHub arm retries 3× with exponential backoff and the **Bitbucket arm is single-shot** — the same asymmetry `qa-fix` ships and states. A `bitbucket_call_with_retry` helper would close the gap across every Bitbucket call site in the repo and is worth its own task — do not smuggle one in here.
