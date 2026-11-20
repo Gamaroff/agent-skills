@@ -212,24 +212,24 @@ Population commands: `git grep -nE "(cat|tee)[^|]*<<-?['\"]?[A-Za-z_]+['\"]?" --
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-20
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.284.qa.4.migrate-payload-heredocs-to-file-tool.md](./task.284.qa.4.migrate-payload-heredocs-to-file-tool.md)
-- **Gate File**: [task.284.gate.4.migrate-payload-heredocs-to-file-tool.yml](./task.284.gate.4.migrate-payload-heredocs-to-file-tool.yml)
+- **Full Report**: [task.284.qa.5.migrate-payload-heredocs-to-file-tool.md](./task.284.qa.5.migrate-payload-heredocs-to-file-tool.md)
+- **Gate File**: [task.284.gate.5.migrate-payload-heredocs-to-file-tool.yml](./task.284.gate.5.migrate-payload-heredocs-to-file-tool.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 8670
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-The PR review fixes for `pr_number`, the footer status and the Out of Scope note hold. One medium finding: the citation added to `review-code` contradicts that block, which builds a fresh `mktemp` body (bug 4). The excluded-site list is recorded in the QA report.
+All four bugs are fixed and closed. The citation criterion holds: every body-file site is cited or listed as excluded with a reason in the QA report. PR CI on the head was pending when read.
 
 <!-- change-log-start -->
 ## Change Log
@@ -248,6 +248,7 @@ The PR review fixes for `pr_number`, the footer status and the Out of Scope note
 | 2026-11-20 |         | PR review findings fixed — citation sweep completed, pr_number, scope note, footer status; 1 iteration | qa-fix |
 | 2026-11-20 |         | QA gate CONCERNS (90/100) — 1 finding (review-code citation wrong)          | qa-task |
 | 2026-11-20 |         | QA findings fixed — 1 bug Ready for QA, 1 iteration                         | qa-fix |
+| 2026-11-20 |         | QA gate PASS (100/100) — 0 findings (bug 4 closed)                          | qa-task |
 <!-- change-log-end -->
 
 ---

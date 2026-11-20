@@ -4,7 +4,7 @@
 **Bug ID**: TASK-284-BUG-4
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 4, claim check of the cycle-3 fix, reproduced by reading the block)
 **Date Found**: 2026-11-20
 
@@ -69,3 +69,4 @@ for the base, not fixed here.
 | --- | --- | --- | --- |
 | 2026-11-20 | New | qa-task | Found in QA cycle 4 |
 | 2026-11-20 | Ready for QA | qa-fix | Fix applied in QA cycle 4; verification in the next gate |
+| 2026-11-20 | Closed | qa-task | Verified by task.284.qa.5.migrate-payload-heredocs-to-file-tool.md |
