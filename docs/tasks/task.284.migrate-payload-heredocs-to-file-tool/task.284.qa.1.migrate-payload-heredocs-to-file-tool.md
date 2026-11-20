@@ -81,6 +81,19 @@ Not applicable (first review).
 
 The latest head is 5.9% slower than the one `develop` run, inside the 10% bound. The spread across the four head runs (608,289 to 673,707 ms) is wider than the 10% bound, so a single pair of runs cannot settle this on its own; the median of the four head runs is 639,918 ms (+1.3%).
 
+**Five-and-five measurement (added at `/finalise`, 2026-11-20).** Ten serial runs of `CI=true npm run test:remote -- --run test` on the LAN server, interleaved head then base, five each, each run's duration read from its TAP `# duration_ms`. Head is `91f1a9fc3` and base is `850985da3` (`develop`). All ten exited 0. `uptime` was read before each run; every run started with a 1-minute load of 1.01 or lower (head 0.29 to 0.79, base 0.34 to 1.02) and a 15-minute load of 1.93 or lower, so none was a loaded-host run and none was dropped.
+
+| Run | Head (ms) | Load before | Base (ms) | Load before |
+| --- | --- | --- | --- | --- |
+| 1 | 617,850 | 0.47, 0.97, 1.20 | 617,717 | 1.01, 1.81, 1.93 |
+| 2 | 619,820 | 0.79, 1.24, 1.85 | 618,433 | 0.80, 1.23, 1.77 |
+| 3 | 618,157 | 0.29, 1.18, 1.74 | 618,656 | 1.02, 1.25, 1.71 |
+| 4 | 618,584 | 0.49, 1.14, 1.70 | 609,477 | 0.78, 1.33, 1.79 |
+| 5 | 609,895 | 0.69, 1.29, 1.82 | 622,843 | 0.34, 1.17, 1.73 |
+| Median | **618,157** | | **618,433** | |
+
+The head median is 0.04% faster than the base median, inside the 10% bound. The head range is 609,895 to 619,820 ms and the base range is 609,477 to 622,843 ms; the spread is 1.7% and 2.2%, so no run is an outlier. This replaces the single-run comparison above as the evidence for the wall-time criterion.
+
 The head is 3.3% faster. The loads differ, which flatters neither side by more than noise; either way it is inside the 10% bound. The `develop` run also failed one test, `SEC-1b` in `ci-tree-equivalence.test.mjs`, which is load-sensitive and untouched here; it is recorded as a pre-existing future item in the gate. The head's run had 8,661 of 8,664 passing with 0 failing (3 skipped).
 
 **Step 4b, honest reading.** The engine reported zero failures on any block this change touched. Of the changed blocks (about 30), only 1 is classed `runnable`; the others are `mutating` (tracker or `gh` posts, skipped by design) or `placeholder`. The five `execution-failure` records are on blocks the change did not touch, and each fails for an environmental reason (no lock file or no git repository in the temp copy). So "every changed block still runs" is true only for the runnable subset; the rest are held by the test suites, not by execution. The criterion is recorded as met for what the engine can run and not stronger.
