@@ -104,6 +104,26 @@ Restored byte-identical (`cmp` against the snapshot clean); 30 pass after. The s
 
 ---
 
+## Per-child cost, re-measured on head
+
+Cycles 2 to 4 changed the hook, so the QA 1 figure (`qa.1`, +363 ms) was measured again on head `67473fd44` (the code is unchanged since `4d2d5939c`). Nine interleaved runs, a bare module child against the same child with `--import` of the hook and the engine's two env bindings, Node v26.13.0, load1 at most 1.10 (ceiling 4). Raw runs, nothing dropped:
+
+| Run | load1 | bare | hook |
+| --- | --- | --- | --- |
+| 1 | 1.10 | 43 ms | 300 ms |
+| 2 | 1.10 | 38 ms | 296 ms |
+| 3 | 1.10 | 45 ms | 400 ms |
+| 4 | 1.09 | 40 ms | 396 ms |
+| 5 | 1.09 | 65 ms | 402 ms |
+| 6 | 1.09 | 48 ms | 398 ms |
+| 7 | 1.09 | 51 ms | 410 ms |
+| 8 | 1.09 | 55 ms | 420 ms |
+| 9 | 1.09 | 45 ms | 415 ms |
+
+Median bare 45 ms, median hook 400 ms: the hook adds **355 ms per child**, against 363 ms in QA 1. At one child per case, 59 cases add about 21 s against `ENGINE_TIMEOUT_MS` of 20 minutes, about 1.7 percent. The one-hook-per-child decision stands. Script: the scratchpad `t314-cost.mjs`, which spawns exactly the engine's argv shape.
+
+---
+
 ## Regression Testing
 
 `security-probe-typescript-entry.test.mjs` 30 pass, 0 fail (Node 26.13.0) after restore. Remote container gate on Node 22 with `CI=true`: 8697 pass, 0 fail, 3 skipped.
