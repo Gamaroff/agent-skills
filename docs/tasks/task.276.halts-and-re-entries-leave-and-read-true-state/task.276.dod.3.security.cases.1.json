@@ -1,0 +1,38 @@
+[
+  {
+    "id": "restore-gaps.plain",
+    "sink": "path",
+    "input": "docs/tasks/task.42.example",
+    "direction": "hostile",
+    "why": "The halt snapshot is halt_step 7 and the newest DoD reads GAPS, so a plain --restore would consume the snapshot a re-entry needs.",
+    "correct": "Refuse, name reenter-qa-after-finalise.sh, keep the snapshot.",
+    "spec_ref": "docs/tasks/task.276.halts-and-re-entries-leave-and-read-true-state/task.276.halts-and-re-entries-leave-and-read-true-state.md:62"
+  },
+  {
+    "id": "restore-gaps.trailing-slash",
+    "sink": "path",
+    "input": "docs/tasks/task.42.example/",
+    "direction": "hostile",
+    "why": "A trailing slash is another spelling of the same directory; a guard comparing raw strings would miss it and restore.",
+    "correct": "Canonicalise, then refuse.",
+    "spec_ref": "docs/tasks/task.276.halts-and-re-entries-leave-and-read-true-state/task.276.halts-and-re-entries-leave-and-read-true-state.md:62"
+  },
+  {
+    "id": "restore-gaps.dot-prefix",
+    "sink": "path",
+    "input": "./docs/tasks/task.42.example",
+    "direction": "hostile",
+    "why": "A ./ prefix names the same directory.",
+    "correct": "Canonicalise, then refuse.",
+    "spec_ref": "docs/tasks/task.276.halts-and-re-entries-leave-and-read-true-state/task.276.halts-and-re-entries-leave-and-read-true-state.md:62"
+  },
+  {
+    "id": "restore-gaps.dotdot",
+    "sink": "path",
+    "input": "docs/tasks/../tasks/task.42.example",
+    "direction": "hostile",
+    "why": "A .. segment resolves to the same directory.",
+    "correct": "Canonicalise, then refuse.",
+    "spec_ref": "docs/tasks/task.276.halts-and-re-entries-leave-and-read-true-state/task.276.halts-and-re-entries-leave-and-read-true-state.md:62"
+  }
+]

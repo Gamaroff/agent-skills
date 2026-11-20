@@ -1,0 +1,61 @@
+[
+  {
+    "id": "grant-k.zero",
+    "sink": "path",
+    "input": "0",
+    "direction": "hostile",
+    "why": "k must be a positive integer.",
+    "correct": "Usage error, nothing written.",
+    "spec_ref": "shared/resources/grant-qa-cycles.sh:45"
+  },
+  {
+    "id": "grant-k.leading-zero",
+    "sink": "path",
+    "input": "010",
+    "direction": "hostile",
+    "why": "Octal to the shell, decimal to jq.",
+    "correct": "Usage error.",
+    "spec_ref": "shared/resources/grant-qa-cycles.sh:45"
+  },
+  {
+    "id": "grant-k.negative",
+    "sink": "path",
+    "input": "-3",
+    "direction": "hostile",
+    "why": "A negative k.",
+    "correct": "Usage error.",
+    "spec_ref": "shared/resources/grant-qa-cycles.sh:45"
+  },
+  {
+    "id": "grant-k.decimal",
+    "sink": "path",
+    "input": "1.5",
+    "direction": "hostile",
+    "why": "A non-integer k.",
+    "correct": "Usage error.",
+    "spec_ref": "shared/resources/grant-qa-cycles.sh:45"
+  },
+  {
+    "id": "grant-k.injection",
+    "sink": "path",
+    "input": "2; touch PWNED",
+    "direction": "hostile",
+    "why": "Shell metacharacters in k.",
+    "correct": "Usage error, and no PWNED file.",
+    "spec_ref": "shared/resources/grant-qa-cycles.sh:45",
+    "expected": {
+      "absent": [
+        "PWNED"
+      ]
+    }
+  },
+  {
+    "id": "grant-k.empty",
+    "sink": "path",
+    "input": "",
+    "direction": "hostile",
+    "why": "An empty k.",
+    "correct": "Usage error.",
+    "spec_ref": "shared/resources/grant-qa-cycles.sh:45"
+  }
+]

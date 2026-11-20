@@ -64,9 +64,33 @@ reads on a resume — the work-item path alone cannot say which arm applies. Thi
 
 ## Step 0 — Preflight
 
+**Session Start (obs #157).** If the `observe-work` skill is installed and its Session Start Protocol has not run this session, run it now, once, before the first tool call below. Skip silently when the skill is not installed.
+
 1. **Run-state check.** If `.claude/state/develop-next.state.json` exists, a prior develop-next run did not finish — do **not** select a new item. Three things happen, in this order: the halt check, the reconciliation, the routing. In `--dry-run`: report the pending run (and any recorded HALT) and stop, before reconciling — reconciliation writes the run-state file.
 
-   **a. A recorded HALT first.** `halted: true` → surface the HALT and **STOP**: never route a halted run, and never to Step 3. Surface, verbatim: `halt_step` and `halt_reason` from `.claude/state/develop-pipeline.last-halt.json` when it exists; then the implementation report's QA-loop escalation entry when the loop wrote one (only loop-limit and not-converging halts do), otherwise the report's newest Issues Log entry and its `**Final Status**:` line. Send a push notification. **To clear it:** fix the cause, then set `halted: false` in the run-state file to resume this item (routing below sends it back through Step 2, whose pipeline offers its own resume option), or delete the file to drop the item and select afresh.
+   **a. A recorded HALT first.** `halted: true` → read the evidence before stopping (task.279, obs #53, #66): the operator may have finished the item by hand and left the flag. `halt-evidence.mjs` resolves the halt only when the item's document reads `accepted` (bug: `closed`) **and** its `prNumber` is `MERGED`. Anything else — the PR not merged, the document not done, no `prNumber` recorded, a PR query that failed — leaves the halt standing.
+
+   ```bash
+   # Step 0.1a evidence read. Its own shell: resolve the platform and the PR state HERE, as 0.1b does.
+   source .agents/skills/develop-next/references/resolve-platform.sh || exit 1
+   STATE_FILE=.claude/state/develop-next.state.json
+   PR_NUMBER=$(jq -r '.prNumber // empty' "$STATE_FILE")
+   PR_STATE=unknown                                  # a failed or skipped query never resolves a halt
+   if [ -n "$PR_NUMBER" ]; then
+     if [ "$VCS" = "bitbucket" ]; then
+       BB_PATH=$(git remote get-url origin | sed -E 's|.*bitbucket\.org[:/]||; s|\.git$||')
+       source .agents/skills/develop-next/references/bitbucket-auth.sh \
+         && PR_STATE=$(curl -sf "${BB_CURL_AUTH[@]}" \
+           "https://api.bitbucket.org/2.0/repositories/${BB_PATH}/pullrequests/${PR_NUMBER}" | jq -r '.state // "unknown"')
+     else
+       PR_STATE=$(gh pr view "$PR_NUMBER" --json state -q .state 2>/dev/null || echo unknown)
+     fi
+   fi
+   command node .agents/skills/develop-next/scripts/halt-evidence.mjs \
+     --state "$STATE_FILE" --pr-state "${PR_STATE:-unknown}" --apply --json
+   ```
+
+   Exit **0** → the halt was resolved out of band: the script has written `halted: false`, `merged: true` and the evidence (`haltResolvedBy`) to the run state, advancing flags exactly as 0.1b does and never clearing a flag the evidence does not back. Log "HALT resolved out of band: {evidence}" and continue to **b**. **Any other exit** → surface the HALT and **STOP**: never route a halted run, and never to Step 3. Surface, verbatim: `halt_step` and `halt_reason` from `.claude/state/develop-pipeline.last-halt.json` when it exists; then the implementation report's QA-loop escalation entry when the loop wrote one (only loop-limit and not-converging halts do), otherwise the report's newest Issues Log entry and its `**Final Status**:` line. Send a push notification. **To clear it:** fix the cause, then set `halted: false` in the run-state file to resume this item (routing below sends it back through Step 2, whose pipeline offers its own resume option), or delete the file to drop the item and select afresh.
 
    **b. Reconcile the flags against the evidence** (obs #180). The flags summarise facts that live on the platform and on `origin`; a crash between an action and its flag write leaves them behind. Reconciliation only ever **advances** a flag — it never clears one, and a PR query that fails leaves the flags as recorded (on GitHub, Step 3's state verdict makes the re-run merge safe; on Bitbucket, Step 3's parsing note requires a `.state` re-query before any retry). The tick check is the exception: its `unknown` is a **HALT**, because Step 4's roadmap arm is not idempotent — a re-tick adds a second Change Log row. Each block below resolves what it needs **itself**: every fenced block runs as its own shell, so item 6's platform binding does not reach it:
 
@@ -463,6 +487,22 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
      > which the develop loop verifies resolves before its first iteration), run per iteration, per
      > qa-fix cycle and per `develop-bug` verify cycle; paying the eval tier on every iteration is
      > what would make the correct fix feel expensive enough to be reverted.
+     >
+     > **Where the gate runs (task.279, obs #138).** Run it on the PR branch in the checkout. When a
+     > scratch worktree is needed (another session holds the tree), put it **beside** the checkout,
+     > never under `/tmp`, `/var/tmp` or `.claude/worktrees/`: `from-observation.test.js` and
+     > `test-clean-checkout.test.js` refuse an ephemeral checkout, and the gate then exits 1 for a reason
+     > that says nothing about the code. Create, link and remove it as one unit:
+     >
+     > ```bash
+     > QG=../.qg-<id>                      # <id>: the item id; a sibling of the checkout
+     > git worktree add --detach "$QG" <pr-head> && ln -s "$PWD/node_modules" "$QG/node_modules"
+     > # …run <qualityGateCommand> inside "$QG", note its exit status, then:
+     > git worktree remove --force "$QG"  # removes the symlink, not the node_modules it points at
+     > ```
+     >
+     > A red whose failing tests are exactly those two, from a gate run in an ephemeral worktree, is an
+     > **environment failure, not a code verdict**: re-run beside the checkout before reading it.
    - Any failure other than the tolerated 403 → **HALT**: report the failing command's output, do not merge, do not tick.
 
 2. **Merge** with the configured strategy.

@@ -1,0 +1,75 @@
+schema: 2
+task: 'task.283.authoring-and-fix-steps-state-the-rules-they-keep-missing'
+task_title: 'Authoring and fix steps state the rules they keep missing'
+gate: PASS
+status_reason: 'T283-QA-12 is fixed and mutation-proven, the wall-time criterion is met, and the full CI-parity run is green (8662 pass, 0 fail). The scoped review found two low defects in the new code, both reproduced, both failing closed; they are advisory.'
+reviewer: 'QA Engineer'
+head: 'd59aa04102e79e7db7f0e7cf6c85291e10a36f99'
+updated: '2026-11-20T07:52:25Z'
+
+top_issues:
+  - id: 'T283-QA-13'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-3-develop-loop.md'
+    finding: 'The ADDED list, built only for the HALT message, has two gaps. (a) When the new bullet text is identical to a bullet already in the base, the set-membership filter lists nothing, so the message ends "added or changed:  — move…"; the count and the HALT are right. (b) Under `set -eo pipefail`, with thousands of added bullets, `head -5` closes the pipe early and the assignment fails with exit 141 and no message (reproduced with 3000 bullets); the block still exits non-zero, so it fails closed. A base over the single-environment-string limit would also break the ENVIRON pass; reasoned by the reviewer, not run by QA.'
+    suggested_action: 'Make the ADDED assignment unable to fail (`|| true`), and track multiplicity per line instead of set membership.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 44
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: true
+    boundary_signals: []
+    notes: 'The CHANGELOG block is a repository-state boundary; the engine refuses it as mutating, so committed tests under bash and zsh are the evidence and the DoD needs an override for probes_executed: 0.'
+  performance:
+    status: PASS
+    notes: 'Median of five alternating runs: develop 750 s, branch 763 s (+1.7%); see QA report 5.'
+  reliability:
+    status: PASS
+    notes: 'Every path in the CHANGELOG block fails closed; the two low gaps affect only the HALT message or an exotic pipefail caller.'
+  maintainability:
+    status: PASS
+    notes: 'Stated limits and failure paths are pinned by tests under bash and zsh.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Fix T283-QA-13 (message-only), and the same `printf | grep -c .` count in five other blocks (step-0 doc twice, create-epic, ensure-task-github-issue, review-epic), which exits 1 on an empty list under set -e.'
+      refs: ['shared/resources/develop-pipeline-step-3-develop-loop.md']
+      remedy: unverified
+    - action: 'absolutizeLinks: skip fenced and inline-code spans, accept an optional link title, resolve root-relative targets against the repository root.'
+      refs: ['shared/resources/render-task-issue-body.js']
+      remedy: unverified
+
+bug_resolution:
+  bugs_fixed: 8
+  bugs_remaining: 0
+  fix_date: '2026-11-20'
+  total_iterations: 5
+  verification_method: 'CI-parity run at d59aa0410: 8662 pass, 0 fail, 3 skipped; 44 CHANGELOG-placement tests; two mutations red; every earlier reproduction re-run'
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []

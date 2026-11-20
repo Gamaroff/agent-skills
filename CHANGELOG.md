@@ -4,6 +4,164 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.68.0] - 2026-11-20
+
+### Changed
+
+- **Shipped skill prose writes payloads with the file tool, not a heredoc (task 284).** All 31
+  payload heredocs in `skills/*/SKILL.md` and `shared/resources/*.md` (tracker and PR comment bodies,
+  findings JSON, issue bodies, the pipeline lock, the resume-detector JSON) are now a file-tool write
+  followed by a call that passes the path. Values a heredoc used to expand are printed first and typed
+  into the file. `payload-heredoc-ratchet.test.mjs` lost its allowlist: any payload heredoc in shipped
+  prose now fails it. The `--body-file` posting sites cite `file-write-rules.md#fresh-body-post`, and
+  the QA posting blocks re-check the read-back immediately before they post. A body file is now
+  single-use: `tracker-comment.js` removes `--body-file` once the comment is posted, already there or
+  deferred into the journal (a deferral whose journal write failed keeps the file, its only copy), so a
+  skipped write fails instead of re-posting the previous comment, and `create-issue`
+  stops on a missing body or one that does not name its own document.
+
+### Added
+
+- **The security probe engine loads a TypeScript entry (task 314).** `--entry <path>.ts#export` (also
+  `.mts`, `.cts`, `.tsx`) now loads and scores a boundary written in TypeScript, where it used to be
+  declined `entry-not-probeable` and left `/finalise`'s zero-guard failing on every TypeScript
+  consumer. The child is started with a bundled loader hook, `security-probe-ts-hook.mjs`, that
+  resolves and transpiles through the **target repository's own** `typescript` package, so `tsconfig`
+  `paths`, `index.ts`, extensionless and NodeNext `./x.js` imports resolve as the project resolves
+  them. It never type-checks and writes nothing. A repository with no resolvable compiler is declined
+  `typescript-unavailable`, and a Node before 22.15.0 `typescript-hook-unavailable`, each by name and
+  before any child is spawned. No dependency is added to a consumer; this repository pins
+  `typescript` as a devDependency for its own tests. A plan that was overridden because its
+  boundary was TypeScript can now report a reproduced case. That is the engine telling the truth, not
+  a break.
+- **Authoring and fix steps state the rules they keep missing (task 283).** The Step 3 develop loop
+  runs a tested CHANGELOG placement block that fails a new entry below the first release heading, and
+  `review-task` checks an "under `[Unreleased]`" claim against the file. `render-task-issue-body.js`
+  renders the GitHub task issue body from the one card definition in `jira-sync.js` (effort kept,
+  relative links made absolute, an exact "+N more"), and `ensure-task-github-issue` calls it in place
+  of a hand-filled heredoc; `sync-github-task` is unchanged. `create-task` § 1.2 gains the multi-task
+  path (pre-allocated numbers, one writer per directory, one registry pass), `develop-bug` and
+  `qa-fix` audit importers when a fix widens a shared parser, and `traps.md` says to resolve a path
+  once under an exec-wrapper.
+- **review-task resolves the right task and reports every review (task 282).** `tracker-comment.js`
+  keys the `review-story`, `review-task` and `review-bug` stages by the review report's number
+  (`review-task-2`), so a second review's verdict reaches the tracker instead of reading `already`
+  against the first review's marker. Round 1 is still the bare marker (`FIRST_ROUND_IS_BARE_STAGES`),
+  so a comment already on a live issue still dedupes for review 1. The develop pipelines' Step 2 skip
+  rule counts `already` only for this run's own number. An all-digits argument to `/review-task` and
+  `/develop-task` resolves as a task id first, through `resolve-bare-task.sh`, and names the worktree
+  or branch that holds a task found elsewhere; `#N`, an issue URL and a Jira key stay the issue forms.
+- **The observation log names what it cannot read (task 281).** `queue` and `scan` return
+  `invalidStatus`, the file names of entries whose `status:` is outside
+  `open | actioned | declined | superseded | parked`; they are still counted open, and `doctor`
+  reports them as a `status-legal` check, which also fails on a log where no status could be read. `set-status --repair --expect-status <the illegal literal>`
+  repairs one (a legal literal or a missing guard is a usage error). `set-status --status open` is now
+  accepted only with `--expect-status parked` (it clears `parked_until:`) or `--repair`; before this
+  it was accepted from any status with no guard. The review cycle gains a fifth decision, "propose a
+  task" (the entries stay open and `/create-task` runs only on the user's yes), and states the scope
+  of a review that stamps the date.
+- **Skill and test tooling see what ships (task 280).** `bundle:check` now reads a skill's own
+  `references/*.md` and `.sh` for `.agents/skills/<skill>/references/X` invocations: a script with a
+  shared source is vendored, and one that exists nowhere is the new `UNVENDORED` finding. The fence
+  reader gains `fenceProblems`, and `tests/fence-balance.test.js` fails a `SKILL.md` or shared
+  resource that ends with a fence open. `tests/unbound-default-reads.test.js` flags a quote inside a
+  `${NAME:?message}` guard, and `tests/fence-reader-ratchet.test.js` holds hand-written fence readers
+  in `tests/` to a reasoned allowlist.
+- **develop-next reads the world before it stops (task 279).** Step 0.1a now runs
+  `skills/develop-next/scripts/halt-evidence.mjs` before it stops on a recorded HALT: when the
+  document reads `accepted` (a bug: `closed`) and its PR is `MERGED`, the halt is cleared and the run
+  carries on; any other state, a failed PR query or a missing `prNumber` still stops. Step 3 says
+  where the quality-gate worktree goes (beside the checkout, never under `/tmp`, `/var/tmp` or
+  `.claude/worktrees/`), and `develop-next`, `develop-task`, `develop-story` and `develop-bug` open
+  with a Session Start line that runs the observe-work protocol once when the skill is installed.
+  Resolves observations #138 and #157.
+- **The skill-resolution rule covers a Skill result with no `Base directory` line (task 313).**
+  The rule now says what a pipeline does when there is no identity to check: skip the check, treat the
+  load as `unreadable`, log it and proceed with the loaded copy, instead of reading the empty
+  `--base-dir`'s `usage` as a call to fix.
+- **The develop pipelines check the skill they loaded, and QA gets the records criteria name (task 311).**
+  After every sub-skill load, `skill-resolution.js check` compares the `Base directory for this skill:`
+  line the Skill tool reports with this repository's homes for that name (`skills/`, `.agents/skills/`,
+  `.claude/skills/`, each resolved through symlinks) and reports `repo`, `shadowed` or `unreadable`; on
+  `shadowed` the orchestrator follows the repository's `SKILL.md` and logs the substitution. The rule is
+  stated once in `skill-resolution.md` and cited from the three orchestrators' step 4. At the QA step
+  `develop-task` now saves `finalise-record-preflight.js check --json` and passes it to `qa-task` as
+  `record_criteria=`, so a criterion that says "recorded in the QA report" has its record written there
+  by QA instead of being graded at `/finalise` three passes later. `qa-story` is unchanged. Resolves
+  observations #69 and #160.
+
+### Fixed
+
+- **The QA-loop readers read the right thing (task 278).** The gate reader no longer takes `status`
+  or `category` from text quoted inside a finding or from a nested flow map, so only a real key at
+  the top of an entry counts. The narrowing-residue file count folds a production file and its own
+  test into one subject when `qa.testArtifactGlobs` is set, and counts them as before when it is not.
+  The 5c carry classifier reads an optional `fix_path` on a review finding, accepted only for a `.md`
+  directly in the work-item directory. Over the 1021 committed gates, 14 read differently, all of them
+  the old reader taking a value from quoted prose. Resolves observations #151, #120 and #141.
+- **The implementation report and triage say what happened (task 277).** A guard's allow-list entry
+  is no longer taken as the fix for new code unless a binder line or `{placeholder}` justifies it,
+  and every time the report states comes from `date -u` or a completion notice's `duration_ms`, else
+  `(not measured)`. A qa-fix record is an H4 under its cycle, and each QA Cycle entry carries a
+  `**Traceability**: mapped | skipped (reason)` row. `report-lint.js` gains `qa-cycle-heading-suffix`,
+  `traceability-missing` and `traceability-reason-missing`, applied only to a report carrying the new
+  `**Report format**: 2` header line, so reports written earlier lint as before (the problem counts
+  over the 320 tracked reports are identical before and after). Resolves observations #5, #6, #92
+  and #124.
+- **Halts and re-entries leave and read true state (task 276).** A HALT is now one call,
+  `advance-pipeline-lock.sh --halt`, which writes the snapshot before it removes the lock and checks
+  the result, instead of a fence of separate steps. `--restore` refuses a step-7 halt over a DoD that
+  reads `GAPS` unless `--allow-dod-gaps` is given, so a plain resume cannot re-run `/finalise` over a
+  head no QA gate has read; `reenter-qa-after-finalise.sh` is the door. The re-entry and
+  `grant-qa-cycles.sh` count distinct QA cycles through the new `qa-report-cycles.sh`, so four cycles
+  no longer read as eight. The new `resume-prompt-check.sh` tells a resume prompt that names a step
+  already done to stop instead of re-running it. Resolves observations #46, #49, #75, #95 and #135.
+- **A PASS gate comment no longer says "found no problems" beside open minor points (task 275).**
+  The plain-language lead for `qa-gate` and `qa-cycle` takes an `open_count` slot, counted from the
+  gate's open `top_issues:` entries by the new `gate-open-count.js` (never a grep, which counts
+  closed entries), and reads "The checks passed, with N minor points recorded below." A test fails
+  on any shipped site that does not feed the count. Gate `recommendations.future` actions now carry
+  `remedy: verified | unverified` (with `verified_by:`), and `create-task` treats an unverified one
+  as a claim to run before the plan builds on it.
+- **`/finalise` 6c halts by name when `CI_HEAD_2` or `PR_NUMBER` is not bound (task 310).** The poll
+  block opens with a `${VAR:?}` guard, so a fresh shell that carries neither value stops before the
+  block compares, records or launches anything, and the message says which step binds it. A test runs
+  the shipped guard line with each name unbound and with both bound, and the order assertion now
+  places the guard before the clear.
+- **`/finalise` 6c clears the previous run's recorded head, and a test holds where it is written
+  (task 309).** The poll block now removes `.claude/state/finalise-ci-head-2.txt` with the result and
+  pid files before it records the new head, so a run that aborts in between leaves none and the later
+  turn HALTs "not recorded" instead of reading a previous run's head. A test pins the order: clear,
+  record, then launch the poll.
+- **A pause commit at step 7 is no longer pushed (task 308).** `/finalise` polls CI on the acceptance
+  head for the whole of step 7, and a PreCompact pause during that wait pushed a docs-only commit,
+  which made a new PR head and cancelled the run finalise was waiting on (a consumer using
+  `cancel-in-progress` lost about an hour of CI, then needed a second full run). The hook now holds
+  the push at steps 7 and 8; the next commit pushed carries the held pause commit (`/finalise`'s
+  acceptance or gaps commit for a pause before 6a, Step 8's commit for one during the CI wait). A held commit leaves local `HEAD` ahead of the PR head, so `/finalise` 6c now
+  records the head its poll was started on in `.claude/state/finalise-ci-head-2.txt` and reads it
+  back on the later turn, where it used to re-derive it from `git rev-parse HEAD` (a HALT when the
+  file is missing, never a fall back to local `HEAD`). Scenarios 17h and 17i hold the hook side (a
+  step-7 pause is committed and not pushed; the next push carries it), 17g is now the control
+  at step 5 (the lock never reads 6), and two `finalise-publish-boundary` tests run the shipped
+  later-turn lines against a repository whose local `HEAD` is ahead of the recorded head.
+- **`qa-next`'s `excludedPrds` now excludes a PRD named by its own folder in a domain-grouped tree (bug 22).**
+  `scanStories` tested only the first path segment under the stories root, which in
+  `docs/prd/<domain>/prd.{P}.{slug}/…` is the domain, so an entry such as `prd.1.multi-game-web-portal`
+  never excluded anything and its stories showed as uncovered in `--coverage`. A segment that doc-id
+  reads as a PRD folder (`prd.{P}.{slug}`, or the legacy `prd.{slug}`) now matches too; the first-segment
+  match is kept, so flat trees and a domain-name entry behave as before. Held by a domain-grouped
+  fixture in `evals/qa-next/unit/uat-status.test.mjs`, mutation-proved.
+
+- **The instrument-read guard masks a glued single quote and treats `&>` and `1>` as redirects (task 307).**
+  Task 299's guard missed `cmd; echo foo'bar; baz' $?` (a single quote glued to a word or a closing
+  quote never opened a quote, so the `;` inside it split the echo) and flagged `cmd; echo "rc=$?" &> log`
+  and `1> log`, the corrected form it exists to teach. A glued single quote now opens when a partner `'`
+  follows on the line, so an apostrophe in prose still does not; two apostrophes on one line pair up, a
+  shape the header names. `&>`, `&>>`, `1>` and `1>>` are redirects; `2>&1` is not. A status captured in
+  `$( … )` stays flagged, recorded as a choice. Held by fixtures in
+  `tests/orchestration-instrument-reads.test.js`, mutation-proved per fix.
+
 ## [v0.67.0] - 2026-11-13
 
 ### Fixed

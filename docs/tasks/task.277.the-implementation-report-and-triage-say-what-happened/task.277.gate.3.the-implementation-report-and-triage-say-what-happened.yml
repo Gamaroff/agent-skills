@@ -1,0 +1,72 @@
+schema: 2
+task: 'task.277.the-implementation-report-and-triage-say-what-happened'
+task_title: 'The implementation report and triage say what happened'
+gate: PASS
+status_reason: 'Cycle 2 fixes verified and mutation-proven again by QA in a scratch worktree: the suffix rule reads only QA Iteration History, and the marker counts only in the header block (the template puts it at header line 8, before the first heading). The one reviewer cleanup is advisory. Only the performance criterion (T277-4) is open, and it needs an owner decision.'
+reviewer: 'QA Engineer'
+head: '303c29885e94a37dbffd9515c36de432f587aa3f'
+updated: '2026-11-16T15:42:30Z'
+
+top_issues:
+  - id: 'T277-4'
+    severity: low
+    file: 'docs/tasks/task.277.the-implementation-report-and-triage-say-what-happened/task.277.the-implementation-report-and-triage-say-what-happened.md'
+    finding: 'Still open from gate 1. The performance criterion (CI=true npm test wall time within 10% of develop, median of five alternating runs) was not measured as written; one full run takes about 679 s on the LAN server. Proxy: the report-lint suite alone is 0.5-1.1 s on base and head, and cycles 1 and 2 added only a flag and two conditions to the lint, so the proxy still stands.'
+    suggested_action: 'Owner decides: waive or amend the criterion with an approver (the proxy supports waiving), or run the ten-run measurement.'
+    suggested_owner: po
+    status: waived
+    waived_by: 'Lorien Gamaroff, 2026-11-16: criterion 4 amended in the task document, 10% bound waived, proxy reported'
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 23
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 15
+    escaped: 0
+    boundary: true
+    boundary_signals: []
+    notes: 'The probe run record from cycle 1 stands (lintReport, markdown-structure corpus, 15 cases, 0 escaped). Cycles 1 and 2 changed which headings two rules read and where the marker counts, with no new input path.'
+  performance:
+    status: PASS
+    notes: 'Proxy only; see T277-4.'
+  reliability:
+    status: PASS
+    notes: 'Full ci:fast on the fixed tree (LAN server, CI=true): 8514 tests, 0 failed, 3 skipped. CI on the PR head was not read to a verdict this cycle; it changes nothing here.'
+  maintainability:
+    status: PASS
+    notes: 'bundle --check reports 0 problems over 129 skills; prettier clean. One advisory cleanup on a test comment.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Step 4b reports file-level findings on develop-pipeline-step-3-develop-loop.md (1) and develop-pipeline-resume-contract.md (2) in blocks this change did not touch; look at them in a separate pass.'
+      refs: ['shared/resources/develop-pipeline-step-3-develop-loop.md', 'shared/resources/develop-pipeline-resume-contract.md']
+      remedy: unverified
+      provenance: pre-existing
+    - action: 'qa-cycle-duplicated fires on a `### QA Cycle N` heading outside QA Iteration History (a Decisions Log note repeating an N). The code is older than this change; scope it to the history section in a follow-up.'
+      refs: ['shared/resources/report-lint.js']
+      remedy: unverified
+      provenance: pre-existing
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions:
+    - 'T277-4 (performance criterion) needs an owner decision before acceptance'

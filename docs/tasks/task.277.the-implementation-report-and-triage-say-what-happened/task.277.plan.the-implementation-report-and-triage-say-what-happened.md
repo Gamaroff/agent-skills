@@ -22,9 +22,11 @@ Edit `shared/resources/` sources with the Edit tool, one hunk per call; never a 
 
 ### Phase 2
 
-- Run the task.230 shape through `report-lint.js` first (a scratch report with `### QA Cycle 2 — qa-fix (5b)` beside `### QA Cycle 2 — {date}`) and record which code fires today.
-- Add codes `qa-cycle-heading-suffix` and `qa-cycle-count-mismatch` beside `qa-cycle-duplicated` (`:242`); document the H4 rule at the qa-fix record step in `develop-pipeline-step-5-6-qa-loop.md`.
-- Template: add `**Traceability**: mapped | skipped ({reason})` to the `### QA Cycle {N}` block in `implementation-report-template.md`; add `traceability-missing` for standard-mode reports; exempt older reports by a template marker the plan names (for example a `report_format:` frontmatter value).
+- Measured 2026-11-16: a scratch report with `### QA Cycle 2 — qa-fix (5b)` beside `### QA Cycle 2 — {date}` fires `qa-cycle-duplicated` today. Re-run it as the before-state of the new test.
+- Add `qa-cycle-heading-suffix` beside `qa-cycle-duplicated` (`report-lint.js:234-246`): an H3 `### QA Cycle N` whose remainder matches `/qa-fix|\(5[abc]\)/i`. No count-mismatch code (redundant with `qa-cycle-duplicated`). Document the H4 rule at the `Invoke qa-fix` step in `develop-pipeline-step-5-6-qa-loop.md`.
+- Template: the `### QA Cycle {N}` entry template is the fenced block at `develop-pipeline-step-5-6-qa-loop.md:487`, not `implementation-report-template.md`. Add `**Traceability**: mapped | skipped ({reason})` there, and a line in the prose below it saying the row is written on every cycle (lite and the bypasses write `skipped (…)`).
+- Marker: add `**Report format**: 2` to the header block of the task and story variants in `implementation-report-template.md` (the bug variant has frontmatter and no mapper; leave it). In `report-lint.js` apply `traceability-missing` / `traceability-reason-missing` only when the report carries that line. State the marker in the linter's header comment.
+- Writers: add `**Traceability**: skipped (run outside the loop)` wherever `accept-qa-residual`, `grant-qa-cycles.sh`, `reenter-qa-after-finalise.sh` or the resume contract's back-fill create an entry, and run each writer's own test. Do not change entries these scripts only read.
 
 ### Phase 3
 

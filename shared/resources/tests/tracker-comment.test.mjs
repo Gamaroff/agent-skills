@@ -215,6 +215,9 @@ test("two different bodies on the same issue produce two records; the same body 
   const b = bodyFile(dir, "Second, different body", "b.md");
   const ids = [];
   for (const f of [a, b, a]) {
+    // The engine consumes a body file once it is done with it (task 284), so
+    // each call is preceded by its own write, as every call site does.
+    writeFileSync(f, f === a ? "First body" : "Second, different body", "utf8");
     const r = await cli.run({
       argv: [
         "node",
@@ -336,6 +339,125 @@ test("exactly one marker match → reason 'already', nothing posted twice", asyn
   assert.ok(
     !gh.calls.some((c) => c.argv[1] === "comment"),
     "no second comment posted",
+  );
+});
+
+// ── A body file is single-use (task 284, QA bugs 1 and 2) ──────────────────
+// The fixed path .claude/state/comment-body.md is shared by every call site, so
+// a copy left behind is what a later run posts when its own write is skipped.
+
+async function runConsuming(comments, extraArgs = []) {
+  const dir = withRepo();
+  const f = bodyFile(dir, "body for this run");
+  const gh = stubGh({ comments });
+  const r = await cli.run({
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+      ...extraArgs,
+    ],
+    execImpl: gh.execImpl,
+    repoRoot: dir,
+    env: { ...baseEnv },
+  });
+  return { r, f };
+}
+
+test("a posted body file is removed, so a later run cannot re-post it", async () => {
+  const { r, f } = await runConsuming([]);
+  assert.equal(r.reason, "posted");
+  assert.equal(existsSync(f), false, "the body file is gone after a post");
+});
+
+test("an 'already' outcome also removes the body file", async () => {
+  const { r, f } = await runConsuming([
+    { body: `${cli.markerHtml("done")}\nearlier run` },
+  ]);
+  assert.equal(r.reason, "already");
+  assert.equal(existsSync(f), false, "nothing more will read the file");
+});
+
+async function runDeferred(breakJournal) {
+  const dir = withRepo();
+  const state = join(dir, ".claude", "state");
+  mkdirSync(state, { recursive: true });
+  // A directory where the journal file belongs makes the append throw.
+  if (breakJournal) mkdirSync(join(state, "tracker-actions.jsonl"));
+  const f = bodyFile(dir, "the only copy of this comment");
+  const gh = stubGh({ comments: [] });
+  const r = await cli.run({
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
+    execImpl: gh.execImpl,
+    repoRoot: dir,
+    env: { ...baseEnv, ACCESS_TRACKER: "manual" },
+  });
+  return { r, f };
+}
+
+test("a deferred outcome with a journal record removes the body file", async () => {
+  const { r, f } = await runDeferred(false);
+  assert.equal(r.reason, "deferred");
+  assert.ok(r.record, "the journal holds the body");
+  assert.equal(existsSync(f), false);
+});
+
+test("a deferred outcome whose journal write failed keeps the body file", async () => {
+  const { r, f } = await runDeferred(true);
+  assert.equal(r.reason, "deferred");
+  assert.equal(r.record, undefined, "nothing was recorded");
+  assert.equal(existsSync(f), true, "the file is the body's only copy");
+});
+
+test("two marker matches keep the body file: the outcome is unverifiable, a retry needs it", async () => {
+  const marker = cli.markerHtml("done");
+  const { r, f } = await runConsuming([
+    { body: `${marker}\none` },
+    { body: `${marker}\ntwo` },
+  ]);
+  assert.equal(r.reason, "unverifiable");
+  assert.equal(existsSync(f), true, "the body survives a refusal");
+});
+
+test("a second call with no new write is refused, not answered from the old file", async () => {
+  const { f } = await runConsuming([]);
+  const gh = stubGh({ comments: [] });
+  const r = await cli.run({
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
+    execImpl: gh.execImpl,
+    repoRoot: dirname(f),
+    env: { ...baseEnv },
+  });
+  assert.equal(r.exitCode, 2, "a missing body file is a usage error");
+  assert.ok(
+    !gh.calls.some((c) => c.argv[1] === "comment"),
+    "no stale comment posted",
   );
 });
 
@@ -810,8 +932,9 @@ test("qa-gate-N is keyed per cycle: the same cycle is `already`, the next cycle 
     cli.markerHtml("qa-gate-2"),
     "<!-- agent-skills-comment:qa-gate-2 -->",
   );
-  const run = (stage, gh) =>
-    cli.run({
+  const run = (stage, gh) => {
+    writeFileSync(f, "body", "utf8"); // a body file is single-use (task 284)
+    return cli.run({
       argv: [
         "node",
         "x",
@@ -827,6 +950,7 @@ test("qa-gate-N is keyed per cycle: the same cycle is `already`, the next cycle 
       repoRoot: dir,
       env: { ...baseEnv },
     });
+  };
   const empty = stubGh({ comments: [] });
   assert.equal((await run("qa-gate-2", empty)).reason, "posted");
   const withCycle2 = stubGh({
@@ -1640,7 +1764,15 @@ test("the numeric suffix is legal only for cycle-scoped stages (NEW-6)", () => {
   assert.equal(cli.isKnownStage("in-review-2"), false);
   assert.deepEqual(
     [...cli.CYCLE_SCOPED_STAGES],
-    ["qa-gate", "qa-cycle", "qa-fix", "pipeline-paused"],
+    [
+      "qa-gate",
+      "qa-cycle",
+      "qa-fix",
+      "pipeline-paused",
+      "review-story",
+      "review-task",
+      "review-bug",
+    ],
   );
 });
 
@@ -1800,6 +1932,7 @@ test("--json reports which route produced the lead", async () => {
     [["--summary-file", leadFile], "summary-file"],
   ]) {
     const gh = stubGh();
+    writeFileSync(f, "body", "utf8"); // a body file is single-use (task 284)
     const lines = [];
     const real = process.stdout.write.bind(process.stdout);
     process.stdout.write = (chunk, ...rest) => {
@@ -2201,4 +2334,92 @@ test("github: a literal \\u0000 in a comment body is sent as U+0000", async () =
   );
   assert.match(sent.input, /the path held U\+0000/);
   assert.doesNotMatch(sent.input, /\\u0000/);
+});
+
+// ── Review stages are keyed per review (task.282, obs #129) ────────────────
+
+test("review-task-N is keyed per review: a second review reaches the issue, review 1 keeps its bare marker", async () => {
+  // Before task.282 `review-task` was once-per-issue: review 2 hit review 1's
+  // marker, answered `already` (exit 0) and its verdict never reached the
+  // tracker. Call sites now always pass `review-task-${N}`; round 1 is the BARE
+  // marker, so a marker already on a live issue still reads `already` for
+  // review 1 (no duplicate across the change) and only N>=2 mints a new one.
+  const dir = withRepo();
+  const f = bodyFile(dir, "body");
+  const run = (stage, gh) => {
+    writeFileSync(f, "body", "utf8"); // a body file is single-use (task 284)
+    return cli.run({
+      argv: [
+        "node",
+        "x",
+        "--issue",
+        "42",
+        "--body-file",
+        f,
+        "--stage",
+        stage,
+        "--quiet",
+      ],
+      execImpl: gh.execImpl,
+      repoRoot: dir,
+      env: { ...baseEnv },
+    });
+  };
+  for (const family of ["review-task", "review-story", "review-bug"]) {
+    const review1 = stubGh({
+      comments: [{ body: `${cli.markerHtml(family)}\nreview one` }],
+    });
+    // Control: review 1's own re-run dedupes against the bare marker, whether
+    // the caller passes the bare name or the numbered form.
+    assert.equal((await run(family, review1)).reason, "already", family);
+    assert.equal(
+      (await run(`${family}-1`, review1)).reason,
+      "already",
+      `${family}-1 must read the live bare marker`,
+    );
+    // The defect: review 2 used to be swallowed by review 1's marker.
+    const r2 = await run(`${family}-2`, review1);
+    assert.equal(r2.reason, "posted", `${family}-2 must post`);
+    // …and a resume of review 2 dedupes against review 2's own marker only.
+    const review2 = stubGh({
+      comments: [
+        { body: `${cli.markerHtml(family)}\none` },
+        { body: `${cli.markerHtml(`${family}-2`)}\ntwo` },
+      ],
+    });
+    assert.equal((await run(`${family}-2`, review2)).reason, "already");
+    assert.equal((await run(`${family}-3`, review2)).reason, "posted");
+  }
+});
+
+test("the numeric suffix is legal for the review stages, and only as a positive round (task.282)", () => {
+  for (const family of ["review-task", "review-story", "review-bug"]) {
+    assert.equal(cli.isKnownStage(family), true, family);
+    assert.equal(cli.isKnownStage(`${family}-2`), true, `${family}-2`);
+    assert.equal(cli.isKnownStage(`${family}-0`), false, `${family}-0`);
+    assert.equal(cli.isKnownStage(`${family}-x`), false, `${family}-x`);
+    assert.equal(
+      renderLead(`${family}-2`, {}),
+      renderLead(family, {}),
+      `${family}: the lead for review 2 is the lead for review 1`,
+    );
+  }
+  // A stage that is not a review family stays once-per-issue.
+  assert.equal(cli.isKnownStage("review-2"), false);
+  assert.equal(cli.isKnownStage("review-epic-2"), false);
+});
+
+test("round 1 of a review stage is its bare marker; no other stage is aliased (task.282)", () => {
+  assert.equal(cli.canonicalStage("review-task-1"), "review-task");
+  assert.equal(cli.canonicalStage("review-task-01"), "review-task");
+  assert.equal(cli.canonicalStage("review-task-2"), "review-task-2");
+  assert.equal(cli.canonicalStage("review-task"), "review-task");
+  // `qa-gate-1` keeps its own marker: its call sites have carried a suffix
+  // since task.121, so no bare marker is waiting for it.
+  assert.equal(cli.canonicalStage("qa-gate-1"), "qa-gate-1");
+  // The alias list is a subset of the scoped list (non-vacuous: three members).
+  assert.ok(cli.FIRST_ROUND_IS_BARE_STAGES.length >= 3);
+  for (const s of cli.FIRST_ROUND_IS_BARE_STAGES) {
+    assert.ok(cli.CYCLE_SCOPED_STAGES.includes(s), `${s} is cycle-scoped`);
+  }
 });

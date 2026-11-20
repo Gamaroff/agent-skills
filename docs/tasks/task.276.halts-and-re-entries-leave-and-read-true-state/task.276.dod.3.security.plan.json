@@ -1,0 +1,72 @@
+[
+  {
+    "argv": [
+      "--entry",
+      "shell-argv:shared/resources/advance-pipeline-lock.sh",
+      "--argv",
+      "[\"--restore\",\"{input}\"]",
+      "--fixture-setup",
+      "shared/resources/tests/fixtures/shell-argv/reenter-qa-setup.sh",
+      "--name",
+      "restore-refuses-dod-gaps-snapshot"
+    ],
+    "cases_file": "task.276.dod.3.security.cases.1.json",
+    "cases_sha256": "3e3eaa8bdc1f59d7b3efe89531f8c68a967aafc7812c46017219740d890ac513"
+  },
+  {
+    "argv": [
+      "--entry",
+      "shell-argv:shared/resources/advance-pipeline-lock.sh",
+      "--argv",
+      "[\"--restore\",\"--allow-dod-gaps\",\"{input}\"]",
+      "--fixture-setup",
+      "shared/resources/tests/fixtures/shell-argv/reenter-qa-setup.sh",
+      "--name",
+      "restore-allow-dod-gaps-document-match"
+    ],
+    "cases_file": "task.276.dod.3.security.cases.2.json",
+    "cases_sha256": "ef59573366fc4b36d5ec5c033bc8fd4172e279ef5f0e98128be6c54731a35ac2"
+  },
+  {
+    "argv": [
+      "--entry",
+      "shell-argv:shared/resources/reenter-qa-after-finalise.sh",
+      "--argv",
+      "[\"{input}\",\"docs/tasks/task.42.example/report.md\"]",
+      "--fixture-setup",
+      "shared/resources/tests/fixtures/shell-argv/reenter-qa-setup.sh",
+      "--name",
+      "reenter-qa-refusals"
+    ],
+    "cases_file": "task.276.dod.3.security.cases.3.json",
+    "cases_sha256": "2c1c53f4608859049370dd38893098aca8f79f72d59d9621d5bef75aa295feec"
+  },
+  {
+    "argv": [
+      "--entry",
+      "shell-argv:shared/resources/grant-qa-cycles.sh",
+      "--argv",
+      "[\"docs/tasks/task.42.example\",\"{input}\"]",
+      "--fixture-setup",
+      "shared/resources/tests/fixtures/shell-argv/reenter-qa-setup.sh",
+      "--name",
+      "grant-k-validation"
+    ],
+    "cases_file": "task.276.dod.3.security.cases.4.json",
+    "cases_sha256": "e70689f1c89fa212a97f02444a9dfbdaaecf55c1eac7f9ce77a5b8d415a87c80"
+  },
+  {
+    "argv": [
+      "--entry",
+      "shell-argv:shared/resources/resume-prompt-check.sh",
+      "--argv",
+      "[\"docs/tasks/task.42.example\",\"{input}\",\"3\"]",
+      "--fixture-setup",
+      "shared/resources/tests/fixtures/shell-argv/reenter-qa-setup.sh",
+      "--name",
+      "resume-prompt-step-validation"
+    ],
+    "cases_file": "task.276.dod.3.security.cases.5.json",
+    "cases_sha256": "0041108d60c118cd3a26f3c3da7a5dee0465cd2cacd91b817c8cd24f4f147029"
+  }
+]

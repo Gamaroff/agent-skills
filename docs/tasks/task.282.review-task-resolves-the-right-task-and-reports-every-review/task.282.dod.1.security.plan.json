@@ -1,0 +1,16 @@
+[
+  {
+    "argv": [
+      "--sink",
+      "filename",
+      "--entry",
+      "shell-argv:shared/resources/resolve-bare-task.sh",
+      "--argv",
+      "[\"{input}\"]",
+      "--name",
+      "resolve-bare-task digits gate"
+    ],
+    "cases_file": "task.282.dod.1.security.cases.json",
+    "cases_sha256": "f993efa5f1d8b9a67baadaf157f842ad2b3f47e95c66f50ccc4a2c256c285cf4"
+  }
+]

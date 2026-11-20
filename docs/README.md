@@ -14,6 +14,7 @@ Each area of the docs has its own index page with full contents and intro:
 - [Standards](./standards/README.md) — document schemas and conventions
 - [Contributing](./contributing/README.md) — authoring, packaging, evals, releases
 - [Operations](./operations/README.md) — running the library day-to-day
+- [Recipes](./development/recipes/README.md) — short, copy-and-run setups for tools used alongside these skills
 
 ## I want to use these skills in my project
 

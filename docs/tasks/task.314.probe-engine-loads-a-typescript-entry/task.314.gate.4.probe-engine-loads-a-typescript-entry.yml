@@ -1,0 +1,71 @@
+schema: 2
+task: 'task.314.probe-engine-loads-a-typescript-entry'
+task_title: 'The security probe engine loads a TypeScript entry'
+gate: PASS
+status_reason: 'T314-CR3-1 is fixed and held by a committed test (mutation proof covered). The cycle 4 review found no defect it could reproduce; three low-severity advisories are recorded for follow-up. Remote gate on Node 22 with CI=true: 8697 pass, 0 fail.'
+reviewer: 'QA Engineer'
+head: '4d2d5939c7424f224d12bf3436a428399768be27'
+updated: '2026-11-20T17:55:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 30
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: ['never']
+    boundary_reason: 'Unchanged from cycles 1 to 3: the criteria word "never" describes what the committed argv, binding and no-write tests hold. None of the functions the diff adds accepts or rejects external input; checkTypeScriptRuntime is an environment preflight and the hook is a loader. Containment stays with resolveEntry.'
+    notes: 'Every compiler filesystem read now goes through one root-bound host: the compiler, the tsconfig lookup and its extends chain are all bounded to the repo root. Escape check green; the hook writes nothing.'
+  performance:
+    status: PASS
+    notes: 'Unchanged: the config lookup is memoised per directory.'
+  reliability:
+    status: PASS
+    notes: 'ES2022 default target held by tests; both prerequisites decline by name.'
+  maintainability:
+    status: PASS
+    notes: 'One root-bound host replaces three one-at-a-time bounds. Advisory: a third copy of the containment test (cycle 3 review CR-4).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 0
+  fix_date: '2026-11-20'
+  total_iterations: 3
+  verification_method: 'Committed tests plus the cycle 3 mutation proof re-run this cycle (parse with ts.sys instead of the root-bound host: the extends test red, 29 pass 1 fail, restored byte-identical, 30 pass); remote gate on Node 22 CI=true 8697 pass, 0 fail'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Surface a named decline (or a warning) when a tsconfig extends target is missing or lies outside the root, instead of silently falling back to the hook defaults; the diagnostics are in parseJsonConfigFileContent().errors and are discarded. Reviewer reproduced: an @tsconfig preset hoisted into a parent node_modules reads as missing and target goes from 6 to undefined. Consistent with the design that one above the root is never borrowed, so advisory.'
+      refs: ['shared/resources/security-probe-ts-hook.mjs']
+      remedy: unverified
+    - action: 'Add tests for an out-of-root extends given as an npm package name and for a paths alias or sibling import resolved through the root-bound host, each with an inside-root control.'
+      refs: ['shared/resources/tests/security-probe-typescript-entry.test.mjs']
+      remedy: unverified
+    - action: 'Check a symlinked in-root source directory whose realpath lies outside the root (rooted.realpath returns the real path, which the host then refuses); not reproduced, low confidence. Also realpath the root and located config before comparing, share the containment test with isWithin, and derive the hook extension list from the engine list.'
+      refs: ['shared/resources/security-probe-ts-hook.mjs']
+      remedy: unverified
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

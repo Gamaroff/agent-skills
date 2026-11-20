@@ -1,0 +1,56 @@
+schema: 2
+task: 'task.279.develop-next-reads-the-world-before-it-stops'
+task_title: 'develop-next reads the world before it stops'
+gate: PASS
+status_reason: 'T279-001 closed: CHANGELOG.md now cites task 279 (changelog-cites.sh prints "cites (task 279)"). The fix commit changed CHANGELOG.md and the task directory only, so cycle 1 evidence stands: 8 of 8 criteria verified, both mutation proofs red on named tests, npm test -0.3% against develop.'
+reviewer: 'QA Engineer'
+head: '35e6323f737634ec45b37e3c8b99788533852d95'
+updated: '2026-11-17T21:56:20Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 19
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    boundary_signals: []
+    boundary_reason: 'The criteria classifier matched nothing. The one predicate the diff adds, halt-evidence.mjs#decide, takes a run-state file the pipeline writes and a PR-state token compared by exact equality with a closed set, so any other value reads unknown and the halt stands. Nine CLI cases were run by hand in cycle 1 (one accepting control, eight rejected); by-hand runs are not counted as probes.'
+    notes: 'boundary: false, unchanged from cycle 1.'
+  performance:
+    status: PASS
+    notes: 'Cycle 1: median 732 s on the PR head against 734 s on develop (-0.3%). No code changed since.'
+  reliability:
+    status: PASS
+    notes: 'Unchanged: a failed PR query, an unreadable document or a missing prNumber keeps the halt.'
+  maintainability:
+    status: PASS
+    notes: 'bundle --check reports 0 problems.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'halt-evidence.mjs: the --json flag is parsed at line 91 and never read; drop it or document it as accepted for symmetry.'
+      refs: ['skills/develop-next/scripts/halt-evidence.mjs']
+      remedy: unverified
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

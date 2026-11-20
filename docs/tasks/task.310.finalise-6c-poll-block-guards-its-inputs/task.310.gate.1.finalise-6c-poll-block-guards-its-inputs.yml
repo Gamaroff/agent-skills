@@ -1,0 +1,60 @@
+schema: 2
+task: 'task.310.finalise-6c-poll-block-guards-its-inputs'
+task_title: 'The finalise 6c poll block guards its inputs'
+gate: PASS
+status_reason: 'The guard line is present, ordered before the clear, and held by a behaviour test that went red under mutation. Fast gate green (8475 pass, 0 fail). No blocking finding.'
+reviewer: 'QA Engineer'
+head: '2ad26946a37e78d641b248179f8217f60648356f'
+updated: '2026-11-15T15:36:36Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 49
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary: false
+    boundary_reason: 'The guard checks that two shell variables are bound. Its inputs are not hostile data and not repository state. The committed test already runs the shipped line unbound and bound under bash. Candidate considered: the `${VAR:?}` line itself; it lacks the accept-or-reject-data signal.'
+    notes: 'No new input surface. The change makes a fresh shell halt instead of running on empty values.'
+  performance:
+    status: PASS
+    notes: 'One `:` line in an existing block. No timing criterion.'
+  reliability:
+    status: PASS
+    notes: 'Guard halts by name under bash (exit 127) and zsh (exit 1). The test asserts non-zero, so both shells hold.'
+  maintainability:
+    status: PASS
+    notes: 'Order assertion now includes the guard; a rename reads as a missing line. Other unguarded PR_NUMBER reads are recorded as a future item.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Other fenced blocks in finalise read PR_NUMBER without a guard (around lines 1338, 1360 and the Bitbucket comment block near 2668). Guard them the same way if a fresh-shell run of those blocks is plausible.'
+      refs: ['skills/finalise/SKILL.md']
+    - action: 'The task records `gh pr view ""` only for a branch with no open PR. The case with an open PR was not run.'
+      refs: ['docs/tasks/task.310.finalise-6c-poll-block-guards-its-inputs/task.310.finalise-6c-poll-block-guards-its-inputs.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

@@ -1,0 +1,25 @@
+schema: 1
+task: "task.SYNTH.medium-test-and-other"
+gate: CONCERNS
+status_reason: "A MEDIUM on a test file whose production file is NOT among the MEDIUMs, and one on an unrelated production file. Two subjects: the fold must not hide it."
+reviewer: "QA Engineer"
+updated: "2026-11-16T12:00:00Z"
+
+top_issues:
+  - id: "TO-001"
+    severity: medium
+    file: "shared/resources/tests/open-coverage-differential.test.mjs"
+    finding: "The differential generator does not produce that shape."
+    suggested_owner: dev
+    status: open
+  - id: "TO-002"
+    severity: medium
+    file: "shared/resources/other-engine.js"
+    finding: "A different engine mishandles an empty input."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80

@@ -699,6 +699,7 @@ Use this summary to ensure fixes follow existing patterns rather than introducin
   - Keep imports centralized where the project enforces platform separation (client/server entry points)
   - Follow DI boundaries and existing patterns
 - Maintain test co-location (.spec.ts files next to source)
+- **A fix that widens what a shared parser, validator or resolver accepts audits its importers** (obs #36). List them with `git grep -l "<function name>"`, name each one that writes based on the result, and record one line per writer on why newly accepted input is safe for it (in the Step 7 PR summary's Verification section). Example: bug.19 widened `parseRegistry`, and `registry-tick.js --annotate`, which imports it, would have written prose into the path cell. A fix that narrows or changes no accepted input skips this and says so.
 - **Pattern before change**: Before modifying each file, spend one Read() to confirm the existing pattern in that file — do not assume from memory. After implementing each fix, summarize what changed in 2-3 lines and move on; do not retain the full file content.
 
 ### Step 3.5: Adversarial pass over the fixes themselves

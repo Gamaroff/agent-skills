@@ -29,6 +29,9 @@
  *        --siblings-checked … --body-file … [--not-duplicate-of 12,34]
  *   set-status --id N --status s [--parked-until …] [--resolution …]
  *              [--expect-status s]  refuse unless the entry currently reads s
+ *              [--repair]           with --expect-status <illegal s>: repair an
+ *                                   entry whose status is outside the enum.
+ *              --status open        only with --expect-status parked, or --repair
  *   archive                     standalone stale sweep
  *   families [--audit]          read skill-families.md; audit shared rules
  *   checkpoint --note …         append an acknowledgement marker
@@ -310,6 +313,18 @@ function readFrontmatter(file) {
 function statusOf(fm) {
   const s = fm && fm.status != null ? String(fm.status).trim() : "";
   return s === "" ? "open" : s;
+}
+
+/**
+ * A `status:` that is PRESENT and outside STATUS_VALUES (a hand edit wrote
+ * `resolved`, `Open`, `done`). Absent or blank is `statusless`, a different
+ * fact. Such an entry is still counted open — `statusOf` returns the raw value
+ * and every classifier treats an unknown value as open — so without a list of
+ * its own the queue is the right size for a reason nobody can see (obs #93).
+ */
+function isInvalidStatus(fm) {
+  const s = fm && fm.status != null ? String(fm.status).trim() : "";
+  return s !== "" && !STATUS_VALUES.has(s);
 }
 
 /** `skill:` is always a list, even with one entry and even with none. */
@@ -676,6 +691,7 @@ function cmdScan(P, args) {
   const files = listMarkdown(P.logDir);
   const entries = [];
   const unparseable = [];
+  const invalidStatus = [];
 
   for (const name of files) {
     const fm = readFrontmatter(path.join(P.logDir, name));
@@ -683,6 +699,7 @@ function cmdScan(P, args) {
       unparseable.push(name);
       continue;
     }
+    if (isInvalidStatus(fm)) invalidStatus.push(name);
     entries.push({
       file: name,
       id: fm.id != null ? parseInt(String(fm.id), 10) : null,
@@ -724,6 +741,10 @@ function cmdScan(P, args) {
     files: files.length,
     parsed: entries.length,
     unparseable,
+    // Names of entries whose `status:` is outside the enum. Independent of the
+    // `--status` filter: the filter narrows `entries`, not what is wrong with
+    // the log. Each is still reported in `entries` with its raw status.
+    invalidStatus,
     count: out.length,
     entries: out,
     exitCode: 0,
@@ -740,6 +761,7 @@ function cmdQueue(P) {
   const parked = [];
   const resolved = [];
   const statusless = [];
+  const invalidStatus = [];
   const unparseable = [];
 
   for (const name of files) {
@@ -750,6 +772,7 @@ function cmdQueue(P) {
     }
     const hasStatus = fm.status != null && String(fm.status).trim() !== "";
     if (!hasStatus) statusless.push(name);
+    if (isInvalidStatus(fm)) invalidStatus.push(name);
 
     const s = statusOf(fm);
     if (s === "parked") parked.push(name);
@@ -779,6 +802,11 @@ function cmdQueue(P) {
     // Named explicitly, and counted as OPEN. Counting them without naming
     // them would make the queue correct and the reason for its size invisible.
     statusless,
+    // Also counted as OPEN and named, for the same reason: an entry reading
+    // `resolved` (not a legal status) lands in `open` by default, and a queue
+    // that is the right size for an invisible reason is one nobody questions.
+    // Repair with `set-status --repair --expect-status <that literal>`.
+    invalidStatus,
     unparseable,
     reconciled: total === classified,
     exitCode: 0,
@@ -1029,10 +1057,50 @@ function cmdSetStatus(P, args) {
       exitCode: 2,
     };
   }
-  if (args.expectStatus != null && !STATUS_VALUES.has(args.expectStatus)) {
+  // `--repair` is the one way to name a status outside the enum as the guard:
+  // an entry a hand edit left reading `resolved` cannot otherwise be addressed,
+  // because every other call validates --expect-status against the enum (obs
+  // #93). It is deliberately narrow — the literal must be ILLEGAL, so `--repair`
+  // can never be used to skip the guard on a legal entry, and without it a
+  // mistyped guard is still a usage error rather than a silent mismatch.
+  if (args.repair) {
+    if (args.expectStatus == null || args.expectStatus.trim() === "") {
+      return {
+        reason: "usage",
+        error:
+          "--repair requires --expect-status <the illegal status the entry reads>",
+        exitCode: 2,
+      };
+    }
+    if (STATUS_VALUES.has(args.expectStatus)) {
+      return {
+        reason: "usage",
+        error: `--repair is for an entry whose status is outside the enum; ${args.expectStatus} is a legal status — drop --repair`,
+        exitCode: 2,
+      };
+    }
+  } else if (
+    args.expectStatus != null &&
+    !STATUS_VALUES.has(args.expectStatus)
+  ) {
     return {
       reason: "usage",
-      error: `unknown --expect-status ${args.expectStatus}; expected one of ${[...STATUS_VALUES].join(", ")}`,
+      error: `unknown --expect-status ${args.expectStatus}; expected one of ${[...STATUS_VALUES].join(", ")} (an entry that reads a status outside that set is repaired with --repair)`,
+      exitCode: 2,
+    };
+  }
+  // `open` is a return from `parked`, or the end of a repair. It was accepted
+  // from any status with no guard before (STATUS_VALUES holds it), which let a
+  // resolved entry be reopened by habit; the guard names what is being undone.
+  if (
+    args.status === "open" &&
+    args.expectStatus !== "parked" &&
+    !args.repair
+  ) {
+    return {
+      reason: "usage",
+      error:
+        "--status open is only for returning a parked entry: pass --expect-status parked (or --repair --expect-status <illegal status> to repair a hand-edited one)",
       exitCode: 2,
     };
   }
@@ -1427,6 +1495,33 @@ function cmdDoctor(P, args) {
     detail: activationDetail,
   });
 
+  // Legal statuses: an entry a hand edit left outside the enum is counted open
+  // by `queue` and reads as a healthy log. Named here so the instrument that
+  // says "healthy" has looked (obs #93). Only evaluated when the log directory
+  // exists; a missing one is `workspace-exists`' finding, not this check's.
+  if (exists && fs.existsSync(P.logDir)) {
+    const q = cmdQueue(P);
+    if (q.reason === "scan-broken") {
+      // The queue could not read a single status, so it has no `invalidStatus`
+      // to report. An empty list here would read as "every status is legal":
+      // the instrument could not look, and must not say it had.
+      checks.push({
+        check: "status-legal",
+        ok: false,
+        detail: `could not read any status (queue reason scan-broken: ${q.files} file${q.files === 1 ? "" : "s"}, none parsed)`,
+      });
+    } else {
+      const bad = q.invalidStatus || [];
+      checks.push({
+        check: "status-legal",
+        ok: bad.length === 0,
+        detail: bad.length
+          ? `${bad.length} entr${bad.length === 1 ? "y" : "ies"} with a status outside open|actioned|declined|superseded|parked (counted open): ${bad.join(", ")} — repair with set-status --repair --expect-status <that status>`
+          : "every status is legal",
+      });
+    }
+  }
+
   const failed = checks.filter((c) => !c.ok);
   let reason = "ok";
   let exitCode = 0;
@@ -1476,6 +1571,7 @@ function parseArgs(argv) {
     resolution: "",
     resolved: "",
     note: "",
+    repair: false,
     audit: false,
     auditRoot: "",
     now: "",
@@ -1582,6 +1678,9 @@ function parseArgs(argv) {
         args.expectStatus = value(i, a);
         i++;
         break;
+      case "--repair":
+        args.repair = true;
+        break;
       case "--resolved":
         args.resolved = value(i, a);
         i++;
@@ -1621,6 +1720,11 @@ function parseArgs(argv) {
   if (args.subcommand !== "set-status" && args.expectStatus != null) {
     throw new UsageError(
       `${args.subcommand} does not accept --expect-status: only set-status checks the current status before writing.`,
+    );
+  }
+  if (args.subcommand !== "set-status" && args.repair) {
+    throw new UsageError(
+      `${args.subcommand} does not accept --repair: only set-status repairs an entry's status.`,
     );
   }
   if (args.subcommand === "write" && args.id != null) {

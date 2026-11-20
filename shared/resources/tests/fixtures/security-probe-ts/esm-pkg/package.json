@@ -1,0 +1,5 @@
+{
+  "name": "security-probe-ts-fixture-esm",
+  "private": true,
+  "type": "module"
+}

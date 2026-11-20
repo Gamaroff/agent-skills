@@ -1,0 +1,78 @@
+schema: 2
+task: 'task.276.halts-and-re-entries-leave-and-read-true-state'
+task_title: 'Halts and re-entries leave and read true state'
+gate: PASS
+status_reason: 'The two /finalise run 2 gaps are closed with committed evidence: the wall time is re-measured on head (median of five alternating pairs, +3.4% wall and -1.7% suite time against a 10% bound) and the no-code-moved ordered route has a named mutation proof (test "untracked route order" goes red). No code changed; CI is green on the head.'
+reviewer: 'QA Engineer'
+head: '948f5f6e96fe0c0c5654f4171f52df55def86ddf'
+updated: '2026-11-16T12:00:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 92
+
+evidence:
+  tests_reviewed: 8506
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: ['refuses']
+    boundary: internal
+    boundary_reason: 'The criteria word "refuses" describes the lock-restore guard and the re-entry refusals. Their only inputs are artefacts this pipeline writes (lock, halt snapshot, DoD, implementation report, gate files); no corpus sink models them. This cycle changes no code. The /finalise run 2 probe plan (44 executed, 0 reproduced) covered the boundary.'
+    notes: 'No new external input surface. No code changed this cycle.'
+  performance:
+    status: PASS
+    notes: 'Measured on head 948f5f6e9: median of five alternating develop/branch pairs on the LAN server, develop 770 s, branch 796 s (+3.4%); suite duration_ms median -1.7%. Bound 10%. All ten runs exited 0; pairs 2 and 5 are load outliers on opposite sides of the median.'
+  reliability:
+    status: PASS
+    notes: 'The ordered no-code-moved route is held by a committed test that goes red when the order flips.'
+  maintainability:
+    status: PASS
+    notes: 'T276-QA-6 and T276-QA-7 stay advisory.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Add a test that grant-qa-cycles.sh and accept-qa-residual.sh relay the new DoD-gaps refusal on a halt_step 7 snapshot (cycle 1, CR-2).'
+      refs: ['shared/resources/grant-qa-cycles.sh', 'shared/resources/accept-qa-residual.sh']
+      remedy: unverified
+    - action: 'Run the relative-lock "cannot tell" test from a fresh temporary cwd rather than /, and add cases for "./", a leading dash, a space in the path and a deleted relative directory (cycle 3, CR-4).'
+      refs: ['shared/resources/resume-prompt-check.test.sh']
+      remedy: unverified
+    - action: 'T276-QA-6: a "./" lock directory strips to an empty string and is called unresolvable; map an empty strip result to "." in the guard and in canon(), through one norm() helper. No writer emits "./".'
+      refs: ['shared/resources/resume-prompt-check.sh']
+      remedy: unverified
+      carried_from: 'gate 3 recommendations.future (route 2b)'
+    - action: 'T276-QA-7: a stale lock naming a deleted relative directory answers "cannot tell" with a message that blames the cwd; say the directory may be gone and the lock stale, naming the lock file. Fold the duplicated strip expression into norm() (the canon() change is inert under the guard).'
+      refs: ['shared/resources/resume-prompt-check.sh']
+      remedy: unverified
+      carried_from: 'gate 3 recommendations.future (route 2b)'
+
+bug_resolution:
+  bugs_fixed: 5
+  bugs_remaining: 2
+  fix_date: '2026-11-16'
+  total_iterations: 3
+  verification_method: 'Committed tests, named mutation proofs, remote CI-parity wall-time measurement on head, green CI on the head'
+  closed: ['T276-QA-1', 'T276-QA-2', 'T276-QA-3', 'T276-QA-4', 'T276-QA-5']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

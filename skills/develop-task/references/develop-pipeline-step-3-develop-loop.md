@@ -322,6 +322,20 @@ Dispatch the Agent tool with `subagent_type="Explore"` using the prompt from `re
 
 Main reads only the triage summary (counts + ≤10 failure bullets + `next_file` hint). Never read `$TEST_LOG` directly.
 
+### A guard's allow-list is not the fix for new code (obs #5)
+
+When the triage result is a guard test failing on code **this change added** (an unbound-read guard, a
+banned-name scan, a population test) and the cheapest fix is to add a name, path or pattern to the
+guard's allow-list, that is a design question about the new code, not a triage outcome. Fix the code.
+On task.201 (PR #632) triage greened `tests/unbound-default-reads.test.js` by adding two names to its
+INPUTS allow-list, and QA cycle 1 then found the reads genuinely unbound (gate 1, QA-1, high); task.188
+did it again (`skills/develop-next/SKILL.md#VCS`).
+
+Extend a guard's allow-list **only** when the entry's justification names the line, or the
+`{placeholder}`, that binds the value in that same block. If such a binder exists the guard would not
+have fired, so an entry with no binder to name is the guard working. Record the justification beside
+the entry (the guard's own comment convention) and in the implementation report's Decisions Log.
+
 ### Log Cleanup
 
 The cleanup is the last statement of each block above — `[ "$TEST_EXIT" -eq 0 ] && rm -f "$TEST_LOG"`
@@ -349,6 +363,75 @@ catches it. (obs #38)
 
 Update Pipeline Progress: ✅ develop.
 
+#### CHANGELOG placement for a new entry (obs #30)
+
+Run this once on exit, before the Change Log row. A bullet added to `CHANGELOG.md` below the first
+release heading sits inside a shipped release. The 5c review can only record it (`CHANGELOG.md` is
+outside `ci.docsOnly.patterns`), and `/finalise` then halts on a one-line move: task.184 halted at AC10
+over exactly that. The block asks one question and does not guess which diff lines are new: does the
+region from the first release heading to the end of the file hold **more bullets** than the same
+region at the merge base? A one-for-one edit of an existing entry keeps the count and is never
+blocked; an added bullet raises it, whatever line it replaced. The limit is stated, not hidden: a
+removal that offsets an addition is not seen, and a change that cuts a release moves bullets under
+a new heading and will HALT (record the override in the Decisions Log). A project with no
+`CHANGELOG.md` skips the block, and a file with no release heading, or one new in this branch, says
+so instead of passing silently.
+
+```bash
+# CHANGELOG placement for NEW entries (obs #30). INPUT, substituted into THIS block: {base} — the
+# branch this run's PR targets (Phase 0d's Q2 answer). A new bullet must sit above the first release
+# heading (## [v…), which is inside [Unreleased].
+CL=CHANGELOG.md
+if [ -f "$CL" ]; then
+  # "Could not look" is a HALT, never a pass: with the base unfetched, git diff exits 128, which a
+  # bare `!` reads as "changed"; the pipeline below then reads nothing and the block exits 0.
+  git rev-parse --verify --quiet "origin/{base}^0" >/dev/null \
+    || { echo "HALT: origin/{base} is not a ref in this checkout — run git fetch origin {base}, then re-run (the CHANGELOG check cannot look without it)"; exit 1; }
+  # The merge base, not the base tip: a base that has moved on must not count as this branch's change.
+  MB=$(git merge-base HEAD "origin/{base}") \
+    || { echo "HALT: no merge base between HEAD and origin/{base} (a shallow clone or unrelated history) — run git fetch --unshallow origin, or fetch more of {base}, then re-run (the CHANGELOG check cannot look)"; exit 1; }
+  DIFF_RC=0; git diff --quiet "$MB" -- "$CL" || DIFF_RC=$?
+  [ "$DIFF_RC" -le 1 ] || { echo "HALT: git diff against the merge base failed (exit $DIFF_RC) — the CHANGELOG check cannot look"; exit 1; }
+fi
+if [ -f "$CL" ] && [ "${DIFF_RC:-0}" -eq 1 ]; then
+  # A release heading is "## [v…" or "## [<digit>…" (## [1.0.0]); a file with neither has nothing to
+  # be placed above, which is said out loud, never read as a pass by default.
+  FIRST_RELEASE=$(grep -nE '^## \[(v|[0-9])' "$CL" | head -1 | cut -d: -f1)
+  if [ -z "$FIRST_RELEASE" ]; then
+    echo "note: $CL has no release heading (## [v… or ## [1.…): every entry is in [Unreleased], so placement is not checked"
+  elif ! git cat-file -e "$MB:$CL" 2>/dev/null; then
+    echo "note: $CL does not exist at the merge base: a new file has no shipped releases to compare, so placement is not checked"
+  else
+    # ONE question, not a guess about which diff lines are new: does the region from the first release
+    # heading to the end of the file hold more bullets ("-" or "*", indented or not) than the same
+    # region at the merge base? A one-for-one edit keeps the count; an added bullet raises it, whatever
+    # line it replaced. A removal that offsets an addition is not seen: that is the stated limit.
+    # No temp files: a failed mktemp read as "could not look" and passed (QA cycle 4, CR-1).
+    REGION='/^## \[(v|[0-9])/ { f = 1 } f && /^[[:space:]]*[-*] / { print }'
+    # Read git's output into a variable BEFORE the pipe: a failed `git show` on the left of a pipe
+    # is invisible without pipefail. Count with awk, not `grep -c .`, which exits 1 on zero matches
+    # and kills a caller running under set -e (QA cycle 5).
+    BASE_RAW=$(git show "$MB:$CL") \
+      || { echo "HALT: could not read $CL at the merge base — the CHANGELOG check cannot look"; exit 1; }
+    BASE_B=$(printf '%s\n' "$BASE_RAW" | awk "$REGION")
+    NEW_B=$(awk "$REGION" "$CL") \
+      || { echo "HALT: could not read $CL — the CHANGELOG check cannot look"; exit 1; }
+    BASE_N=$(printf '%s\n' "$BASE_B" | awk 'NF { n++ } END { print n + 0 }')
+    NEW_N=$(printf '%s\n' "$NEW_B" | awk 'NF { n++ } END { print n + 0 }')
+    if [ "$NEW_N" -gt "$BASE_N" ]; then
+      # The base goes in through the environment: awk -v would process backslash escapes in a bullet.
+      ADDED=$(printf '%s\n' "$NEW_B" | BASE_B="$BASE_B" awk 'BEGIN { n = split(ENVIRON["BASE_B"], a, "\n"); for (i = 1; i <= n; i++) s[a[i]] = 1 } !($0 in s)' | head -5 | tr '\n' '|')
+      echo "HALT: CHANGELOG.md has $((NEW_N - BASE_N)) more bullet(s) below the first release heading (line $FIRST_RELEASE) than the merge base, inside a shipped release; added or changed: $ADDED — move the new entry under ## [Unreleased]"
+      exit 1
+    fi
+  fi
+fi
+```
+
+A HALT about a misplaced bullet is fixed by moving it and re-running the block; a HALT that says the
+check "cannot look" is fixed by what it names (fetch the base, deepen a shallow clone). Neither is a
+loop stall.
+
 #### Change Log
 
 On **exiting** the develop loop — not per iteration — `/develop` appends **one** row to the work
@@ -370,17 +453,19 @@ orchestrator writes this row, because `/develop` did not run. It is still exactl
 
 #### develop-story
 
-```bash
-mkdir -p .claude/state
-cat > .claude/state/comment-body.md <<'EOF'
+Run `mkdir -p .claude/state`, then write `.claude/state/comment-body.md` with the **file tool**, and
+post it in a later call (`file-write-rules.md#fresh-body-post`). Body:
+
+```markdown
 ## 🛠️ Development Complete — Step 3/8
 
 **Status**: Ready for Review
 **Tasks completed**: {audit.completed}/{audit.total}
 **Tests**: {all passing / {N} failures — see implementation report}
 **Branch**: {branch}
-EOF
+```
 
+```bash
 node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
   --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
   --stage develop-complete \
@@ -395,17 +480,19 @@ Read `reason` and act per the table in [`references/tracker-comment-contract.md`
 
 #### develop-task
 
-```bash
-mkdir -p .claude/state
-cat > .claude/state/comment-body.md <<'EOF'
+Run `mkdir -p .claude/state`, then write `.claude/state/comment-body.md` with the **file tool**, and
+post it in a later call (`file-write-rules.md#fresh-body-post`). Body:
+
+```markdown
 ## 🛠️ Development Complete — Step 3/8
 
 **Status**: Ready for Review
 **Phases completed**: {audit.completed}/{audit.total}
 **Tests**: {all passing / {N} failures — see implementation report}
 **Branch**: {branch}
-EOF
+```
 
+```bash
 node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
   --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
   --stage develop-complete \

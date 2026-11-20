@@ -144,6 +144,7 @@ pr_conformance:
       severity: high           # low | medium | high
       confidence: high         # low | medium | high
       ref: "AC-3"              # criterion id, artifact path, frontmatter field, or path:line
+      fix_path: "<path>"       # OPTIONAL — omit unless the fix edits a different file than `ref` anchors
       finding: "<one sentence: what is wrong>"
       suggested_action: "<one sentence: what would resolve it>"
   truncated_count: 0           # >0 if real findings exceeded 20 (report the top 20 by severity)
@@ -151,6 +152,7 @@ pr_conformance:
 Rules:
 - Sort findings: coverage, then trail, then consistency, then scope; within each, high → medium → low.
 - `id` is PC-{n}. `finding`/`suggested_action` are single sentences.
+- `fix_path` is optional and is a **path**, not a description (`suggested_action` is the description). Emit it only when `ref` anchors where the behaviour lives but the fix edits another file, and that file is the work item's own document or another `.md` in the work item's directory: `ref: "skills/finalise/SKILL.md:1995"` with `fix_path: "docs/tasks/task.9.x/task.9.x.md"`. Otherwise omit it. It is read by the orchestrator's 5c carry, which fixes the finding only when that file is clean against HEAD.
 - One location per finding. `ref` is exactly ONE of the four forms — never prose, never two paths,
   never a path followed by commentary. A finding that applies to several files is emitted once per
   file, each with the same `finding` text and its own `ref`. The develop pipelines' 5c carry fixes

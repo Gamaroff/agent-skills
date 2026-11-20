@@ -271,20 +271,18 @@ which is the worked example.
 
 #### develop-story
 
+First, run `mkdir -p .claude/state`, then write `.claude/state/comment-body.md` with the **file tool**
+(`file-write-rules.md#fresh-body-post`: write now, post in a later call). Body, with the PR URL and
+report path substituted:
+
+```markdown
+Story development complete. PR: {PR_URL}. Story status: accepted. All DoD criteria verified.
+Implementation report: {report-path}
+```
+
 ```bash
 # 1. Post the completion comment — marked, idempotent, and rendered with a lead
 #    on both trackers. Always --body-file: the body carries backticks and newlines.
-#
-#    The heredoc terminator sits at COLUMN 0. Bash does not accept an indented
-#    terminator for an unquoted heredoc — it swallows everything after it into
-#    the body, so the close below would never run and the issue would be neither
-#    commented nor closed, silently.
-mkdir -p .claude/state
-cat > .claude/state/comment-body.md <<EOF
-Story development complete. PR: {PR_URL}. Story status: accepted. All DoD criteria verified.
-Implementation report: {report-path}
-EOF
-
 node .agents/skills/develop-story/references/tracker-comment.js \
   --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
   --stage done \
@@ -301,13 +299,15 @@ tracker_call_with_retry node .agents/skills/develop-story/references/tracker-iss
 
 #### develop-task
 
-```bash
-mkdir -p .claude/state
-cat > .claude/state/comment-body.md <<EOF
+Run `mkdir -p .claude/state`, then write `.claude/state/comment-body.md` with the **file tool**, and
+post it in a later call (`file-write-rules.md#fresh-body-post`). Body:
+
+```markdown
 Task development complete. PR: {PR_URL}. Task status: accepted. All DoD criteria verified.
 Implementation report: {report-path}
-EOF
+```
 
+```bash
 node .agents/skills/develop-task/references/tracker-comment.js \
   --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
   --stage done \
@@ -367,23 +367,26 @@ If `TRACKER_ISSUE` is set, post the completion comment and confirm the Done tran
    FINAL_GATE=""
    [ -n "$FINAL_GATE_FILE" ] && FINAL_GATE=$(grep '^gate:' "$FINAL_GATE_FILE" 2>/dev/null | awk '{print $2}')
    FINAL_GATE=${FINAL_GATE:-N/A}
-
    mkdir -p .claude/state
-   # Terminator at COLUMN 0 — an indented terminator does not close an
-   # unquoted heredoc; bash swallows everything after it into the body,
-   # so the call below would never run. Body lines are unindented for
-   # the same reason: leading spaces are written verbatim.
-   cat > .claude/state/comment-body.md <<EOF
-## ✅ Story Accepted — Definition of Done Verified
+   echo "FINAL_GATE=${FINAL_GATE} DOD_PATH=${DOD_PATH}"   # the two values the body below carries
+   ```
 
-**PR**: {PR_URL}
-**QA Gate**: ${FINAL_GATE}
-**Accepted**: {YYYY-MM-DD}
-**DoD Summary**: \`${DOD_PATH}\`
+   Then write `.claude/state/comment-body.md` with the **file tool**, substituting the two values the
+   block printed (the file tool does not expand `${…}`), and post it in a later call
+   (`file-write-rules.md#fresh-body-post`). Body:
 
-All Definition of Done criteria verified. Story accepted and transitioning to Done.
-EOF
+   ```markdown
+   ## ✅ Story Accepted — Definition of Done Verified
 
+   **PR**: {PR_URL}
+   **QA Gate**: {FINAL_GATE}
+   **Accepted**: {YYYY-MM-DD}
+   **DoD Summary**: `{DOD_PATH}`
+
+   All Definition of Done criteria verified. Story accepted and transitioning to Done.
+   ```
+
+   ```bash
    node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
      --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
      --stage done \

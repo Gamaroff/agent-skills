@@ -1,0 +1,174 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "67473fd446e588f586702867f0b3ddca3bd8dcae",
+  "dirty_paths": [
+    "docs/tasks/task.314.probe-engine-loads-a-typescript-entry/task.314.implementation.1.probe-engine-loads-a-typescript-entry-initial-run.md",
+    "docs/tasks/task.314.probe-engine-loads-a-typescript-entry/task.314.pr-review.1.probe-engine-loads-a-typescript-entry.md",
+    "docs/tasks/task.314.probe-engine-loads-a-typescript-entry/task.314.probe-engine-loads-a-typescript-entry.md"
+  ],
+  "document": "docs/tasks/task.314.probe-engine-loads-a-typescript-entry/task.314.probe-engine-loads-a-typescript-entry.md",
+  "result": {
+    "bytes": 7481,
+    "sha256": "7e91db9902b7cfbabf9a88c442aa565e0e220983f99d9966565409f2865f54af",
+    "verified": true
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 12,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "4d8e3ad5117cebb752088fb30b2e629dcad3e5cbd79dc000e9dcb73e984466f6",
+      "status": "PASS",
+      "description": "Fixture library (param property, enum, value import, extensionless, paths alias) loads and is scored, never declined",
+      "code_citation": "shared/resources/security-probe.mjs:2345",
+      "test_citation": "shared/resources/tests/security-probe-typescript-entry.test.mjs:158",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Lane: shared/resources/tests/*.test.mjs is in package.json test:suite, run by npm test in test.yml per PR. Each shape has a named test."
+    },
+    {
+      "id": "#2",
+      "text_hash": "60bffc55fffe7ecbc0769837177622ff8b4794a74e5f8be6f088447259917b6e",
+      "status": "PASS",
+      "description": "Calibration: refusing control held, accept-everything control reproduced",
+      "code_citation": "shared/resources/security-probe.mjs:2345",
+      "test_citation": "shared/resources/tests/security-probe-typescript-entry.test.mjs:264",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Same lane as #1."
+    },
+    {
+      "id": "#3",
+      "text_hash": "2f9fa38a30017154541b2d7e42b22031e21ab9e6662da70984c0bcd256ce3cc6",
+      "status": "PASS",
+      "description": "Mutation proof: unregistering hook red with entry-not-probeable; removing paths turns only alias red",
+      "code_citation": "docs/tasks/task.314.probe-engine-loads-a-typescript-entry/task.314.qa.4.probe-engine-loads-a-typescript-entry.md:129",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "mutation (a): hook unregistered (--import removed)",
+          "evidence": "docs/tasks/task.314.probe-engine-loads-a-typescript-entry/task.314.qa.4.probe-engine-loads-a-typescript-entry.md:129",
+          "status": "PASS"
+        },
+        {
+          "member": "mutation (b): paths handling removed, only alias case red",
+          "evidence": "docs/tasks/task.314.probe-engine-loads-a-typescript-entry/task.314.qa.1.probe-engine-loads-a-typescript-entry.md:158",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "QA 4 line 129 re-runs mutation (a) on head with 18 red tests and names guard.ts and alias.ts failing with reason entry-not-probeable, then restores and runs 30 pass. QA 1 lines 157-158 name the red tests for both mutations, with (b) exactly one red (alias.ts). Both units have a committed record naming what went red."
+    },
+    {
+      "id": "#4",
+      "text_hash": "0a5613e1d32b9859af6704c2ad2ee32279208c1524e3c313fde7e416669ab8c1",
+      "status": "PASS",
+      "description": "No typescript resolvable: entry declined with named reason and searched root",
+      "code_citation": "shared/resources/security-probe.mjs:852",
+      "test_citation": "shared/resources/tests/security-probe-typescript-entry.test.mjs:297",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Same lane as #1. Companion tests at :315 and :337 cover the above-root case and its control."
+    },
+    {
+      "id": "#5",
+      "text_hash": "64adce2c0da498d8e27e3ae599d7d7e87723f3ea237831389a7cbabef7caf9d0",
+      "status": "PASS",
+      "description": "Hook writes nothing, escape check green, nothing caller-supplied interpolated into child",
+      "code_citation": "shared/resources/security-probe.mjs:2345",
+      "test_citation": "shared/resources/tests/security-probe-typescript-entry.test.mjs:289",
+      "members": [],
+      "non_member_fail": null,
+      "note": "A test for each: writes-nothing at :289, escape still reported at :280, fixed argv at :389, ambient binding blocked at :408."
+    },
+    {
+      "id": "#6",
+      "text_hash": "e83550c6c7cc169365fa8a765fef77ff7cf2eacf14fcb19ea34a286c03298499",
+      "status": "PASS",
+      "description": "Per-child cost recorded: median of 5+ runs, uptime beside runs, outliers reported, 59 cases within timeout",
+      "code_citation": "docs/tasks/task.314.probe-engine-loads-a-typescript-entry/task.314.qa.4.probe-engine-loads-a-typescript-entry.md:107",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "QA 4 re-measured on head: 9 interleaved runs, load1 at most 1.10 against a ceiling of 4, raw runs shown, median hook cost 355 ms per child, about 21 s for 59 cases against a 20 min ENGINE_TIMEOUT_MS. The command shape is named. Unchanged from the previous run."
+    },
+    {
+      "id": "#7",
+      "text_hash": "0174b6e8876fdabb2163ffb0db2618aee8ca016b4d945f8d4292a31c94885cbc",
+      "status": "PASS",
+      "description": "bundle --check reports 0 problems and hook ships in every skill shipping the engine",
+      "code_citation": "skills/finalise/references/security-probe-ts-hook.mjs:1",
+      "test_citation": ".github/workflows/validate.yml:128",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Four skills (finalise, qa-story, qa-task, review-security) carry both security-probe.mjs and the hook in the diff. I re-ran bundle_skill.py --check: 129 skills, 0 problems. validate.yml runs it per PR (path-filtered to shared/resources/**, which this PR changes)."
+    },
+    {
+      "id": "#8",
+      "text_hash": "c3cd0fca1a21fa2404dd49c14743f8503fc122b8b6adb676692bd70c02858746",
+      "status": "PASS",
+      "description": "npm run validate passes for each changed skill",
+      "code_citation": "skills/finalise/SKILL.md:914",
+      "test_citation": ".github/workflows/validate.yml:73",
+      "members": [],
+      "non_member_fail": null,
+      "note": "validate.yml runs quick_validate.py on skills per PR. QA 1 line 78 records the developer ran it for all four changed skills."
+    },
+    {
+      "id": "#9",
+      "text_hash": "965e2d62ca2b90b06c0954200827a59ded8a92b39c5196f51444d49e1884b61a",
+      "status": "PASS",
+      "description": "CI=true npm run test:remote is green on the PR head",
+      "code_citation": ".github/workflows/test.yml:58",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ d0daf814a — Asks that the PR-head CI run, including npm test, is green. Graded from CI reading 1 in finalise Step 6.",
+      "ci_reading": "CI reading 1: SUCCESS @ d0daf814a"
+    },
+    {
+      "id": "#10",
+      "text_hash": "7f41322fae91b046caa369f9d3fb5fceed9176c4fe1ce3296ece8f3702e46a40",
+      "status": "PASS",
+      "description": "Engine header, probe-boundary-rule.md and /finalise zero-guard text name TypeScript entry, none says not probeable",
+      "code_citation": "shared/resources/probe-boundary-rule.md:285",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Read: engine header security-probe.mjs:123, rule md :175-176 and :285-293 (typescript-unavailable and typescript-hook-unavailable), and finalise SKILL.md :914-916 (a TypeScript module entry, the fix is the repository's install). Each names the TypeScript entry. No test pins the three documents."
+    },
+    {
+      "id": "#11",
+      "text_hash": "703c1ff608912ea01bc3d0f5e8b84d073d2937b0a17aa4547bdd78f4458335ab",
+      "status": "PASS",
+      "description": "CHANGELOG.md has Unreleased entry citing (task 314)",
+      "code_citation": "CHANGELOG.md:23",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Line 23 reads 'The security probe engine loads a TypeScript entry (task 314)' under Added, and QA 1 records the changelog-cites check."
+    },
+    {
+      "id": "#12",
+      "text_hash": "e67c327ddaffff243bdf7af9c777b3154636aa411ffb03cb7cfa27ca81e801e2",
+      "status": "PASS",
+      "description": "QA report says which previously overridden plans now report a reproduced case, if any known",
+      "code_citation": "docs/tasks/task.314.probe-engine-loads-a-typescript-entry/task.314.qa.1.probe-engine-loads-a-typescript-entry.md:82",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Line 82 states none are known, based on a search of docs/ for entry-not-probeable finding only shell and bug records. This meets the 'if any are known' wording."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#7",
+      "note": "The committed QA record for #7 and #8 only says the developer ran the commands. The evidence I relied on is validate.yml running them per PR and my own re-run of bundle --check (0 problems). No committed artifact carries the command output."
+    }
+  ]
+}

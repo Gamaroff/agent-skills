@@ -399,12 +399,12 @@ Branch on `PLATFORM` and tracker detection:
 
 If `GITHUB_ISSUE` is set (from Step 0), post a comment linking the PR:
 
+When `GITHUB_ISSUE` is set, run `mkdir -p .claude/state` and write `.claude/state/comment-body.md`
+with the **file tool** (one line: `PR opened — #{PR_NUMBER}: {PR_URL}`, both values substituted; the
+file tool does not expand `${…}`). Post it in a later call (`references/file-write-rules.md#fresh-body-post`):
+
 ```bash
 if [ -n "$GITHUB_ISSUE" ]; then
-  mkdir -p .claude/state
-  cat > .claude/state/comment-body.md <<EOF
-PR opened — #${PR_NUMBER}: ${PR_URL}
-EOF
   node references/tracker-comment.js --issue "$GITHUB_ISSUE" \
     --body-file .claude/state/comment-body.md --stage in-review \
     --slot pr="$PR_URL" \
@@ -437,16 +437,11 @@ Bitbucket Issues are disabled for this project — do NOT use the Bitbucket Issu
    - Read `jira_key` from its YAML frontmatter (e.g. `PROJ-12`)
 2. If `jira_key` is found, post the comment through the CLI:
 
-   ```bash
-   mkdir -p .claude/state
-   # Terminator at COLUMN 0 — an indented terminator does not close an
-   # unquoted heredoc; bash swallows everything after it into the body,
-   # so the call below would never run. Body lines are unindented for
-   # the same reason: leading spaces are written verbatim.
-   cat > .claude/state/comment-body.md <<EOF
-PR opened — [PR #{PR_ID}]({PR_URL})
-EOF
+   Run `mkdir -p .claude/state` and write `.claude/state/comment-body.md` with the **file tool**
+   (one line: `PR opened — [PR #{PR_ID}]({PR_URL})`, substituted), and post it in a later call
+   (`references/file-write-rules.md#fresh-body-post`):
 
+   ```bash
    node .agents/skills/create-pr/references/tracker-comment.js \
      --issue {jira_key} --body-file .claude/state/comment-body.md \
      --stage in-review \

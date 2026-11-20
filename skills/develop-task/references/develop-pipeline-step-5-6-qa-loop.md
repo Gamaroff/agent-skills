@@ -293,6 +293,25 @@ If the subagent fails, or that block prints a `⚠️` line (no well-formed mark
 
 Skip this pre-step when `PIPELINE_MODE=lite` OR `HAS_SUCCESS_CRITERIA_TABLE=false`. Tasks with no Success Criteria table (e.g. pure infra cleanup) gain nothing from the mapper.
 
+**Hand the record criteria to QA (task variant only — `qa-story` does not read this token).**
+A success criterion that says where its record lives ("recorded in the QA report") is otherwise
+graded at `/finalise`, which is three passes too late to write the record. List those criteria now,
+with the engine `/finalise` Step 3a already runs, and pass the listing to `/qa-task`:
+
+```bash
+TASK_FILE="{task-file}"
+TASK_DIR="{task-directory}"
+mkdir -p "$TASK_DIR/.summaries"
+command node .agents/skills/develop-task/references/finalise-record-preflight.js check \
+  --doc "$TASK_FILE" --json > "$TASK_DIR/.summaries/record-criteria.json" \
+  || { echo "⚠️ record-criteria preflight failed — omit the record_criteria token from the dispatch"; rm -f "$TASK_DIR/.summaries/record-criteria.json"; }
+```
+
+At QA time a criterion that names the QA report reads `state: location-absent`: that is the normal
+state, because `/qa-task` is what writes that report. It is not a finding. An empty `listed` is fine.
+`/qa-task` writes each listed record, with its command and output, into the report the criterion
+names, and never edits the criterion's wording.
+
 **Invoke `/qa-task`**
 
 Invoke the `/qa-task` skill with the task file path. If the run's mode is `lite` or `fast`, or `--skip qa-depth` is in force (the lock's `answers.mode` / `answers.skips`, resolved in §0d), prefix the invocation with explicit context: "Use **direct tools only** for this review — skip parallel agents regardless of the adaptive strategy decision. This task is running in lite mode." When the lock carries a `waiver`, also prefix the waiver directive from the lite-mode contract (§"Directive Passed to the QA Skill").
@@ -302,14 +321,16 @@ Invoke the `/qa-task` skill with the task file path. If the run's mode is `lite`
 Pass args as space-separated `key=value` tokens. When the traceability matrix was generated:
 
 ```
-Skill(qa-task, args="traceability_matrix={task-directory}/.summaries/qa-traceability-matrix.md code_review_blocking=true")
+Skill(qa-task, args="traceability_matrix={task-directory}/.summaries/qa-traceability-matrix.md code_review_blocking=true record_criteria={task-directory}/.summaries/record-criteria.json")
 ```
 
 If the matrix was not generated (lite mode, no Success Criteria table, or mapper failure), omit only the `traceability_matrix` token — still pass `code_review_blocking=true` so the code-review-and-fix loop stays active:
 
 ```
-Skill(qa-task, args="code_review_blocking=true")
+Skill(qa-task, args="code_review_blocking=true record_criteria={task-directory}/.summaries/record-criteria.json")
 ```
+
+Both forms carry `record_criteria` (drop only that token when the preflight above failed). The story variant's two `qa-story` dispatches above do not.
 
 ### Change Log (shared — who writes what)
 
@@ -490,6 +511,7 @@ Log the result in the QA Iteration History section:
 **Issues Found**: {count and brief descriptions, or "none"}
 **HIGH findings**: {HIGH_N}
 **MEDIUM findings**: {MEDIUM_N}
+**Traceability**: {mapped / skipped ({reason})}
 **PR Review**: {pending — 5c not yet run / APPROVE / CONCERNS / REQUEST CHANGES / review failed / not reached — gate did not exit the loop}
 **Loop exit**: {n/a — this exit not taken / the `describeLoopRoute()` message verbatim / residual accepted by {approver} on {date} (accept-qa-residual)}
 **Action**: {Proceeding to 5c (PR conformance review) / Running qa-fix (cycle N of {QA_MAX_CYCLES}) / Escalating — loop not converging / Escalating — loop limit reached}
@@ -504,6 +526,16 @@ The `**HIGH findings**` line is not decoration: it is the persisted sequence the
 check** below compares across cycles, and the only place a resumed run can read the earlier counts
 back from. Write it on every cycle, including one that found none (`0`). `**MEDIUM findings**` is
 the engine's count (`countRaised()`, Convergence check step 2), written every cycle, `0` included.
+
+`**Traceability**` records what the pre-step above did, and it is written on **every** cycle of a
+report carrying `**Report format**: 2`, whatever the mode: `mapped` when the mapper's matrix was
+written, otherwise `skipped (reason)` — `skipped (lite mode)`, `skipped (no Acceptance Criteria
+section)`, `skipped (two or fewer ACs)`, `skipped (no Success Criteria table)`, `skipped (mapper
+failed)`, or `skipped (run outside the loop)` for an entry a script or a resume back-fills. On cycle
+2 and later the mapper is not re-run; write `mapped` only when this cycle's pre-step produced a matrix,
+else `skipped (not re-run — cycle {N})`. `report-lint.js` reports `traceability-missing` and
+`traceability-reason-missing` on a marked report (task.277, obs #124): on task.242 cycles 1 to 5 ran
+without the mapper while both dispatch conditions held, and nothing in the report said so.
 
 `**PR Review**` follows the same rule for the same reason, but note **who writes it and when**: 5a
 writes the row when it writes the entry, and at that moment no 5c verdict exists. On any gate that
@@ -929,6 +961,17 @@ Log in Decisions Log, once per cycle: "QA Cycle {N} — changes-requested: {land
 
 Invoke the `/qa-fix` skill with the path to the most recent **gate file** (the `.yml` file located using the sort command above). The gate file is the authoritative source of issues for qa-fix.
 
+**A qa-fix record is an H4 under its cycle's H3 — never a second H3 and never a suffix on the cycle's
+heading (obs #92).** When this cycle's fix result goes into QA Iteration History, write it as
+`#### qa-fix (5b)` directly under that cycle's `### QA Cycle {N} — {YYYY-MM-DD}` entry. On task.230
+each qa-fix pass was logged as `### QA Cycle {N} — qa-fix (5b)`, and
+`grep -cE '^### (QA|Verify) Cycle'` returned 7 for four cycles; it returned 4 once they were H4s.
+Finalise's PR comment and the resume contract both count the H3 cycle headings, so the number of
+`### QA Cycle` headings must equal the number of cycles run. `report-lint.js` reports a suffixed H3
+(`qa-cycle-heading-suffix`, under `## QA Iteration History` of a report carrying the
+`**Report format**: 2` marker in its header block, so a report written before it lints as before)
+and a repeated N (`qa-cycle-duplicated`, on any report); it does not read the H4's text.
+
 #### Third-strike rule — replace, do not patch again
 
 > **A gate carries only its OWN cycle's findings.** This is a precondition of the rule below, not a
@@ -1045,10 +1088,11 @@ before it writes another correction.
 re-entry, skip it: there the review's findings are the work, and the gate's residue has already been
 routed. A gate-derived offer would reopen what route 2 or 2b declined.
 
-Its four inputs come from the table below. None is assigned inside the block, and none is bound
-where this section sits: `$CYCLE` is the Loop Setup counter, `$HIGH_SEQUENCE_JSON` is the value the
-Diminishing-returns exit's table defines, and the third-strike snippet above reads `$GATE_N` /
-`$GATE_N1` without binding them. Substitute each from its row before running the block:
+Its five inputs come from the table below. None is assigned inside the block, and none is bound
+where this section sits: `$CYCLE` is the Loop Setup counter, `$HIGH_SEQUENCE_JSON` and
+`$TEST_ARTIFACT_GLOBS_JSON` are the values the Diminishing-returns exit's table defines, and the
+third-strike snippet above reads `$GATE_N` / `$GATE_N1` without binding them. Substitute each from
+its row before running the block:
 
 | Variable | Where it comes from |
 | :--- | :--- |
@@ -1056,6 +1100,7 @@ Diminishing-returns exit's table defines, and the third-strike snippet above rea
 | `$HIGH_SEQUENCE_JSON` | the `**HIGH findings**` rows of the `### QA Cycle {N}` entries in QA Iteration History, oldest first, as a JSON array — the same value the Diminishing-returns exit reads; do **not** recount it from the gates |
 | `$GATE_N` | cycle `N`'s gate — the path **Finding the Latest Gate File** resolves (`…gate.{N}.{name}.yml`); the same path the Diminishing-returns exit's table names `$LATEST_GATE` |
 | `$GATE_N1` | cycle `N-1`'s gate (`…gate.{N-1}.{name}.yml`, same directory). **Empty at cycle 1**, which the engine reads as `below-cycle-floor` — do not substitute another gate |
+| `$TEST_ARTIFACT_GLOBS_JSON` | `qa.testArtifactGlobs` as a JSON array, the same value the Diminishing-returns exit reads (**absent ⇒ `[]`**). It lets the engine count a production file and its own test (`<dir>/tests/<stem>.test.<ext>`, or `<stem>-<kind>.test.<ext>` for a named kind such as `differential`, `property` or `fuzz`) as one subject, so a MEDIUM on each is one mechanism, not two files; with `[]` nothing folds and the check reads exactly as before (task.278, obs #120) |
 
 ```bash
 NARROWING_JSON=$(command node -e '
@@ -1067,14 +1112,18 @@ NARROWING_JSON=$(command node -e '
   // which the case below reports as error. A throw here would print nothing at all.
   let highCounts;
   try { highCounts = JSON.parse(process.argv[2]); } catch { highCounts = process.argv[2]; }
+  // A globs value that does not parse folds nothing: the check reads as it did before the fold.
+  let testArtifactGlobs;
+  try { testArtifactGlobs = JSON.parse(process.argv[5] || "[]"); } catch { testArtifactGlobs = []; }
   const r = classifyNarrowingResidue({
     cycle:               Number(process.argv[1]),
     highCounts,
     latestGateContent:   read(process.argv[3]),
     previousGateContent: read(process.argv[4]),
+    testArtifactGlobs,
   });
   console.log(JSON.stringify({ ...r, message: describeNarrowingResidue(r) }));
-' "$CYCLE" "$HIGH_SEQUENCE_JSON" "$GATE_N" "$GATE_N1")
+' "$CYCLE" "$HIGH_SEQUENCE_JSON" "$GATE_N" "$GATE_N1" "$TEST_ARTIFACT_GLOBS_JSON")
 if [ -n "$NARROWING_JSON" ]; then
   NARROWING_SIGNAL=$(printf '%s' "$NARROWING_JSON" | jq -r '.signal')
   # Reasons that mean the check could not look are not verdicts: an unbound or malformed input,
@@ -1619,7 +1668,11 @@ it. That is the behaviour before this change: the set is review evidence, and no
 **A finding is doc-only when the path in its `ref` matches `ci.docsOnly.patterns`** — task.172's
 set, read through its own reader (`readConfig` + `isDocsPath` in `ci-tree-equivalence.js`), so
 there is one definition of "documentation" and its default lives in the configuration reference, not
-here. **It may be fixed here only when the path names exactly one tracked file, read literally, that is
+here. **When a finding carries an optional `fix_path`** — the file its fix edits, emitted by `/review-pr`
+when `ref` anchors where the behaviour lives but the fix lands elsewhere (task.278, obs #141) — **that
+path is the one judged and carried, in place of `ref`'s**, and it counts only when it is a `.md` directly
+in the work item's own directory and a docs path. A `fix_path` that is code, or outside that directory,
+is read as absent, and the finding classifies on `ref` as before. **It may be fixed here only when the path names exactly one tracked file, read literally, that is
 clean against `HEAD` and is neither an implementation report nor this review report.** Git reads a
 path argument as a pathspec, so a `ref` such as `:!*.md`, a glob or a directory would otherwise
 name many files at once (task.173 QA-8). The implementation report is uncommitted
@@ -1684,7 +1737,7 @@ printf '# review: %s\n' "$PR_REVIEW" > "$ELIGIBLE"
 # parse" must not look alike (task.173 QA-1, CR-2). An empty `findings: []` is a clean zero.
 command node -e '
   const fs = require("fs");
-  const { readConfig, isDocsPath } = require("./.agents/skills/{develop-story|develop-task}/references/ci-tree-equivalence.js");
+  const { readConfig, isDocsPath, fixPathTarget } = require("./.agents/skills/{develop-story|develop-task}/references/ci-tree-equivalence.js");
   const patterns = readConfig(process.cwd()).patterns;
   const text = fs.readFileSync(process.argv[1], "utf8");
   const fence = String.fromCharCode(96).repeat(3);   // no literal fence inside a fenced block
@@ -1701,17 +1754,33 @@ command node -e '
   if (close < 0) { console.error("the yaml fence under ## Machine-Readable Findings never closes"); process.exit(1); }
   const lines = body.slice(0, close).split("\n");
   const entries = lines.filter((l) => /^\s*-\s+\S/.test(l)).length;
-  let id = null, printed = 0;
+  // `fix_path` (task.278, obs #141): the file the fix EDITS, when `ref` anchors where the behaviour
+  // lives. `fixPathTarget` (ci-tree-equivalence.js, where the probe engine can reach it) answers the
+  // file only when it is a `.md` directly inside the work item directory (the directory of the review
+  // report) and a docs path; anything else answers null, read as if absent, so the finding classifies
+  // on `ref` exactly as before. "Clean against HEAD" is the second test below.
+  const workItemDir = require("path").posix.dirname(process.argv[1]);
+  const fixTarget = (raw) => fixPathTarget(raw, workItemDir, patterns);
+  let cur = null, printed = 0;
+  const flush = () => {
+    if (cur && cur.ref !== null) {
+      const p = cur.ref.replace(/^["\x27]|["\x27]$/g, "").replace(/:\d+(-\d+)?$/, "");
+      const f = cur.fix === null ? null : fixTarget(cur.fix);
+      if (f !== null) console.log(`doc-only ${cur.id} ${f}`);
+      else console.log(isDocsPath(p, patterns) ? `doc-only ${cur.id} ${p}` : `record ${cur.id} ${cur.ref}`);
+      printed++;
+    }
+    cur = null;
+  };
   for (const line of lines) {
     const m = line.match(/^\s*-\s+id:\s*(\S+)/);
-    if (m) { id = m[1]; continue; }
+    if (m) { flush(); cur = { id: m[1], ref: null, fix: null }; continue; }
     const r = line.match(/^\s+ref:\s*(.+?)\s*$/);
-    if (r && id) {
-      const p = r[1].replace(/^["\x27]|["\x27]$/g, "").replace(/:\d+(-\d+)?$/, "");
-      console.log(isDocsPath(p, patterns) ? `doc-only ${id} ${p}` : `record ${id} ${r[1]}`);
-      printed++; id = null;
-    }
+    if (r && cur && cur.ref === null) { cur.ref = r[1]; continue; }
+    const fx = line.match(/^\s+fix_path:\s*(.+?)\s*$/);
+    if (fx && cur && cur.fix === null) cur.fix = fx[1];
   }
+  flush();
   if (printed !== entries) { console.error(`${entries} finding entries, ${printed} classified — an entry has no id: first or no ref:`); process.exit(1); }
 ' "$PR_REVIEW" > "$CLASSIFIED" || { printf '%s\n' "HALT: cannot classify $PR_REVIEW — the findings are neither fixed nor recorded"; exit 1; }
 # Second test, in the shell where git is: tracked, clean against HEAD, not Step 8's report, not the review.

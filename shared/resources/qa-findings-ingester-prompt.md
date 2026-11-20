@@ -73,6 +73,7 @@ field arrives somewhere the schema does not define:
 | `finding` | `description` | Verbatim. |
 | `suggested_action` | `suggested_fix_path` | Verbatim. Despite the field's name it holds a description of the fix approach, not a path. |
 | `ref` | `file` | Conditional — see below. |
+| `fix_path` | — | **Dropped.** Optional. It names the `.md` a 5c finding's fix edits, and only the orchestrator's Step 5c carry reads it. It is a path, not a description: do not fold it into `suggested_fix_path` (which holds the fix approach) or into `file`. |
 | `category` | `category` | **Carried** (task.238). qa-fix's priority ladder works a `coverage` finding at any severity, and it can only do that if the category survives this summary. Emit it on `pr-review` entries only; other sources have no category. |
 | `provenance` | — | **An entry with `provenance: pre-existing` is skipped, not emitted.** `/review-pr` found it identical on the PR base and left it out of its verdict, so it is a follow-up for the base, not work for this branch. |
 | `confidence` | — | **Dropped.** The output schema carries no confidence. Do not fold it into `severity` — a `high`/`medium` finding stays `high`/`medium` whatever its confidence. |

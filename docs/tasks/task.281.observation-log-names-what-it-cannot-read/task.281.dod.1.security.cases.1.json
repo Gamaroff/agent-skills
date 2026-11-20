@@ -1,0 +1,72 @@
+[
+  {
+    "id": "open-guard-actioned",
+    "sink": "shell-exec",
+    "input": "actioned",
+    "why": "reopening a resolved entry by habit",
+    "correct": "exit 2 usage, nothing written",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.281.observation-log-names-what-it-cannot-read/task.281.observation-log-names-what-it-cannot-read.md:181",
+    "fixture": {
+      "files": {
+        "skill-observations/observation-log/1-probe-entry.md": "---\nid: 1\ntitle: probe\nstatus: actioned\nparked_until: \"\"\nresolved: \"\"\nskill: [observe-work]\n---\nbody\n"
+      }
+    }
+  },
+  {
+    "id": "open-guard-declined",
+    "sink": "shell-exec",
+    "input": "declined",
+    "why": "reopening a resolved entry by habit",
+    "correct": "exit 2 usage",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.281.observation-log-names-what-it-cannot-read/task.281.observation-log-names-what-it-cannot-read.md:181",
+    "fixture": {
+      "files": {
+        "skill-observations/observation-log/1-probe-entry.md": "---\nid: 1\ntitle: probe\nstatus: declined\nparked_until: \"\"\nresolved: \"\"\nskill: [observe-work]\n---\nbody\n"
+      }
+    }
+  },
+  {
+    "id": "open-guard-open",
+    "sink": "shell-exec",
+    "input": "open",
+    "why": "open-from-open is not a return from parked",
+    "correct": "exit 2 usage",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.281.observation-log-names-what-it-cannot-read/task.281.observation-log-names-what-it-cannot-read.md:181",
+    "fixture": {
+      "files": {
+        "skill-observations/observation-log/1-probe-entry.md": "---\nid: 1\ntitle: probe\nstatus: open\nparked_until: \"\"\nresolved: \"\"\nskill: [observe-work]\n---\nbody\n"
+      }
+    }
+  },
+  {
+    "id": "open-guard-illegal-noflag",
+    "sink": "shell-exec",
+    "input": "resolved",
+    "why": "illegal literal without --repair stays usage error",
+    "correct": "exit 2 usage",
+    "direction": "hostile",
+    "spec_ref": "docs/tasks/task.281.observation-log-names-what-it-cannot-read/task.281.observation-log-names-what-it-cannot-read.md:180",
+    "fixture": {
+      "files": {
+        "skill-observations/observation-log/1-probe-entry.md": "---\nid: 1\ntitle: probe\nstatus: resolved\nparked_until: \"\"\nresolved: \"\"\nskill: [observe-work]\n---\nbody\n"
+      }
+    }
+  },
+  {
+    "id": "open-guard-parked",
+    "sink": "shell-exec",
+    "input": "parked",
+    "why": "parked to open is the one allowed return",
+    "correct": "accepted, exit 0 (dry-run)",
+    "direction": "legitimate",
+    "spec_ref": "docs/tasks/task.281.observation-log-names-what-it-cannot-read/task.281.observation-log-names-what-it-cannot-read.md:181",
+    "fixture": {
+      "files": {
+        "skill-observations/observation-log/1-probe-entry.md": "---\nid: 1\ntitle: probe\nstatus: parked\nparked_until: \"2027-01-01\"\nresolved: \"\"\nskill: [observe-work]\n---\nbody\n"
+      }
+    }
+  }
+]

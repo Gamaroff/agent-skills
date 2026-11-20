@@ -20,7 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. Phase 20 is open (opened 2026-11-09): T289 (accepted), T290 (merged with an owner waiver), T292 (accepted), T293 (accepted), T294 (accepted), B21 (fixed), T304 (accepted), T291 (accepted), T295 (accepted). Phase 21 is open (opened 2026-11-10): T301 (accepted), T303 (accepted), T302 (accepted), T296 (accepted). Phase 22 is open (opened 2026-11-10): T297 (accepted), T300 (accepted), T298 (accepted), T299.
+chain, a human gate. Phase 20 is open (opened 2026-11-09): T289 (accepted), T290 (merged with an owner waiver), T292 (accepted), T293 (accepted), T294 (accepted), B21 (fixed), T304 (accepted), T291 (accepted), T295 (accepted). Phase 21 is open (opened 2026-11-10): T301 (accepted), T303 (accepted), T302 (accepted), T296 (accepted). Phase 22 is open (opened 2026-11-10): T297 (accepted), T300 (accepted), T298 (accepted), T299. Phase 23 is open (opened 2026-11-15): T310.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -128,7 +128,17 @@ close.**
 - [x] **T298** review-task runs a plan's command and checks CI parity · deps: none · touches: review-skills~, templates~, bundles~ · /develop-task docs/tasks/task.298.review-task-runs-plan-command-and-ci-parity/task.298.review-task-runs-plan-command-and-ci-parity.md
 - [x] **T299** Orchestration reads status and time from the instrument · deps: none · touches: pipeline-steps~, test-harness~, bundles~ · /develop-task docs/tasks/task.299.orchestration-status-and-timestamp-from-the-instrument/task.299.orchestration-status-and-timestamp-from-the-instrument.md · ✅ **accepted + merged** ([PR #899](https://github.com/Gamaroff/agent-skills/pull/899), QA PASS 95/100)
 - [x] **T306** Probe sandbox HOME shared across cases · deps: T300 · touches: finalise~, bundles~ · /develop-task docs/tasks/task.306.probe-sandbox-home-shared-across-cases/task.306.probe-sandbox-home-shared-across-cases.md
-- [ ] **T307** Instrument-read guard quote and redirect edges · deps: T299 · touches: test-harness~ · /develop-task docs/tasks/task.307.instrument-read-guard-quote-and-redirect-edges/task.307.instrument-read-guard-quote-and-redirect-edges.md
+- [x] **T307** Instrument-read guard quote and redirect edges · deps: T299 · touches: test-harness~ · /develop-task docs/tasks/task.307.instrument-read-guard-quote-and-redirect-edges/task.307.instrument-read-guard-quote-and-redirect-edges.md
+
+## PHASE 23 — follow-up to the 6c CI poll block (opened 2026-11-15)
+
+An **override**: without it the registry fallback selects the lowest-numbered planned task, which is
+T275 or older work, ahead of this. T310 closes finding CR-1 of the task 309 5c review (the 6c poll
+block reads `CI_HEAD_2` and `PR_NUMBER` without binding them), and the owner asked for it to be queued.
+It edits the block task 309 just changed, so it carries `deps: T309` (merged). **Tick the row `[x]`
+when T310 is accepted, and archive the phase at close.**
+
+- [x] **T310** The finalise 6c poll block guards its inputs · deps: T309 · touches: finalise~, test-harness~, bundles~ · /develop-task docs/tasks/task.310.finalise-6c-poll-block-guards-its-inputs/task.310.finalise-6c-poll-block-guards-its-inputs.md
 
 ## Deferred / human-gated
 
@@ -309,3 +319,6 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-11-13 | **T299 accepted + merged — PR #899** (`c682182f`); row ticked. Pipeline prose no longer teaches a wrapped command's exit code as a background step's status or a typed time of day: the step-3 and step-5-6 docs say the notification's code is the wrapper's and the status is read from the file, and 12 time placeholders now name `date -u`. `tests/orchestration-instrument-reads.test.js` guards both over 192 files, with a bounded fixture table and named unseen shapes. 4 QA gates (CONCERNS 70, 80, 90, then PASS 95), 3 fixes, the guard's quote handling being the repeat subject; 5c CONCERNS with no coverage finding; DoD 6/6 after two low record gaps were closed before the decision. Merged with T299-QA-7 (a glued single quote is not masked) and CR-2 (`&>` and `1>` redirects) open as low future items. Run inline, so independent review did not run. |
 | 2026-11-13 | **T307 added** to Phase 22 (task 307, filed from task 299 gate 4 `recommendations.future`): closes the instrument-read guard's glued-single-quote miss (T299-QA-7) and its `&>` / `1>` redirect false positives (CR-2). Low priority, placed last, `deps: T299` (merged), touches only `tests/orchestration-instrument-reads.test.js`. |
 | 2026-11-13 | **T306 accepted + merged — PR #900** (`4cbfcf98`); row ticked. Each (case, shell) run of the `/finalise` security probe now gets its own `HOME` and `TMPDIR` (`shell:`, `shell-fn:`, `shell-argv:`, `fence:` arms), so a legitimate case on a state-changing control is no longer read as a defect; a hostile run's write under its own home is still an escape. The task.296 plan with legitimate `take` entries reads 32 executed, 0 reproduced, 0 escaped. QA gates PASS 95 twice, PR review APPROVE. The wall-time criterion was amended by the owner to a paired-ratio bound (measured 1.07). |
+| 2026-11-14 | **T307 accepted + merged — PR #902** (`b57bf050`); row ticked. The instrument-read guard now masks a single quote glued to a word or closing quote when a partner quote follows, and treats `&>`, `&>>`, `1>` and `1>>` as redirects; a status captured in `$( … )` stays flagged by choice and is named in the header, as is two apostrophes on one line pairing up. Four mutation proofs, each red on a named fixture; QA gate PASS 95, PR review APPROVE; remote `ci` gate 8469 pass, 0 fail. |
+| 2026-11-15 | **T310 added** as Phase 23 (task 310, filed from the task 309 5c review, finding CR-1): the `/finalise` 6c poll block reads `CI_HEAD_2` and `PR_NUMBER` without binding them. Low priority, `deps: T309` (merged), touches `skills/finalise/SKILL.md` and `finalise-publish-boundary.test.mjs`. |
+| 2026-11-15 | **T310 accepted + merged — PR #910** (`9658a797`); row ticked. The first `/finalise` 6c poll block now halts by name when `CI_HEAD_2` or `PR_NUMBER` is unbound, and a behaviour test runs the shipped guard line with each input unbound. Mutation proof: weakening the guard turned two tests red. QA gate PASS 95, PR review APPROVE; remote `ci` gate green. |

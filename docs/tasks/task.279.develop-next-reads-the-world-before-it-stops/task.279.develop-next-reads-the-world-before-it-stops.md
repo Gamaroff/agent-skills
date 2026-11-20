@@ -5,16 +5,18 @@ type: task
 description: "Stop develop-next halting on a recorded HALT the evidence has superseded, name where its quality-gate worktree goes, and run the observe-work Session Start Protocol as a Step 0 line in the long orchestrators."
 tags: [develop-next, develop-task, develop-story, observation]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 created: 2026-11-06
-updated: 2026-11-06
+updated: 2026-11-17
+completed_date: 2026-11-17
+pr_number: 918
 estimated_effort_hours: 8
 ---
 
 # Task 279: develop-next reads the world before it stops
 
-**Status:** Planned
+**Status:** Accepted
 
 ---
 
@@ -22,7 +24,7 @@ estimated_effort_hours: 8
 
 `/develop-next` stops on state it could have checked, runs its merge gate where two tests refuse to run, and relies on a project instruction to start observation (obs #53, #66, #138, #157). Each is a stated rule plus, for the first, a small check.
 
-**Scope**: `skills/develop-next/SKILL.md` Steps 0 and 3, and a Step 0 line in `develop-next`, `develop-task` and `develop-story`.
+**Scope**: `skills/develop-next/SKILL.md` Steps 0 and 3, and a Step 0 / Phase 0 line in `develop-next`, `develop-task`, `develop-story` and `develop-bug`. `develop-batch` is excluded on purpose: it fans each item into a per-item pipeline whose own Phase 0 carries the line.
 
 ---
 
@@ -57,13 +59,16 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 
 - **0.1a** checks the same evidence 0.1b reads before stopping: document `accepted` (bug: `closed`) AND `prNumber` MERGED. When both hold, report the halt as resolved out of band and route as `halted: false`; keep STOP for any halt the evidence does not contradict (obs #66).
 - **Step 3**: the gate worktree goes beside the checkout (for example `../.qg-<id>`), not under `/tmp`, with `node_modules` linked in and removed afterwards; a red from a test that refuses an ephemeral checkout is an environment failure, not a code verdict (obs #138).
-- **Step 0** of `develop-next`, `develop-task` and `develop-story` carries a line that runs the observe-work Session Start Protocol once if it has not run this session (obs #157).
+- **Step 0** of `develop-next`, and **Phase 0** of `develop-task`, `develop-story` and `develop-bug`, carry a line that runs the observe-work Session Start Protocol once if it has not run this session (obs #157).
 
 ### Important Clarifications
 
 - Reconciliation "only ever advances a flag" (`:71`); the 0.1a change must keep that: it routes as if cleared and writes `halted: false` only through the same advance path, with the evidence recorded.
 - A merged PR plus an `accepted` document can still coexist with a different unresolved halt on another item; the check is per item.
 - The Step 0 line cannot assume the skill is installed; it is conditional on the skill's presence.
+- **The sibling worktree is not ephemeral** (verified in review, 2026-11-17): `git worktree add --detach ../.qg-probe HEAD` in this checkout, then `ephemeralReason` (`shared/resources/observation-log.js:584`) on its real path, returned `null`; the same call on `/tmp/x/y` returned "inside a temporary directory". The refused locations are exactly `/tmp`, `/var/tmp` and `.claude/worktrees/` (`EPHEMERAL_PATTERNS`, `:578`), so the rule must also never name a path under `.claude/worktrees/`. The probe worktree was removed afterwards.
+- **An existing test pins the 0.1a wording.** `evals/develop-next/protocol/skill-shape.test.mjs:515-528` slices the text between the `**a. A recorded HALT first.**` and `**b. Reconcile the flags` markers and asserts `never route a halted run, and never to Step 3`, `develop-pipeline.last-halt.json` and `set \`halted: false\``. The rewritten 0.1a keeps all three in that slice (they still describe the case the evidence does not contradict), or the plan updates the test in the same edit.
+- **Reconstruction states for 0.1a** (the evidence reader must hold in each): halted with document `accepted` and PR `MERGED` (route); halted, document `accepted`, PR `OPEN` (stop); halted, document not `accepted`, PR `MERGED` (stop); halted with no `prNumber` recorded (stop: no evidence); the PR query fails (stop); a bug item (document `closed` replaces `accepted`); `halted: false` (the reader is not consulted).
 
 ---
 
@@ -73,7 +78,7 @@ Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 
 ✅ **0.1a evidence check** and its tests.
 ✅ **Step 3 worktree rule.**
-✅ **Step 0 activation line** in three orchestrators.
+✅ **Step 0 / Phase 0 activation line** in four orchestrators (`develop-next`, `develop-task`, `develop-story`, `develop-bug`).
 
 ### Out of Scope
 
@@ -98,10 +103,11 @@ None - a halt the evidence does not contradict still stops.
 
 **Files**:
 - `skills/develop-next/SKILL.md` Step 0.1a
-- `skills/develop-next/scripts/` or `shared/resources/` (a small evidence reader, if the prose needs one) and its test
+- `skills/develop-next/scripts/halt-evidence.mjs` (the evidence reader: required, not optional, because § 8 names unit tests of its decision; `--json`, a `reason`, exit 0 only for "resolved out of band") and its test `evals/develop-next/unit/halt-evidence.test.mjs` (reached by the `eval:develop-next` glob `evals/develop-next/unit/*.test.mjs`)
+- `evals/develop-next/protocol/skill-shape.test.mjs` (the pin on the 0.1a wording, `:515-528`; kept passing or updated in the same edit)
 
 **Changes**:
-- [ ] Evidence check before STOP; resolved → route; otherwise STOP with the one-line clear instruction.
+- [x] Evidence check before STOP; resolved → route; otherwise STOP with the one-line clear instruction.
 
 **Dependencies**: none.
 
@@ -115,7 +121,7 @@ None - a halt the evidence does not contradict still stops.
 - `skills/develop-next/SKILL.md` Step 3
 
 **Changes**:
-- [ ] Where the worktree goes, how it is cleaned up, and how a refusal red is read.
+- [x] Where the worktree goes, how it is cleaned up, and how a refusal red is read.
 
 **Dependencies**: none.
 
@@ -126,10 +132,10 @@ None - a halt the evidence does not contradict still stops.
 **Risk Level**: Low
 
 **Files**:
-- `skills/develop-next/SKILL.md`, `skills/develop-task/SKILL.md`, `skills/develop-story/SKILL.md`
+- `skills/develop-next/SKILL.md`, `skills/develop-task/SKILL.md`, `skills/develop-story/SKILL.md`, `skills/develop-bug/SKILL.md`
 
 **Changes**:
-- [ ] One conditional line each.
+- [x] One conditional line each (`develop-batch` excluded, see Scope).
 
 **Dependencies**: none.
 
@@ -140,7 +146,7 @@ None - a halt the evidence does not contradict still stops.
 **Risk Level**: Low
 
 **Changes**:
-- [ ] Fixtures with controls (§ 8); `command npm run bundle`, `command npm run bundle -- --check`.
+- [x] Fixtures with controls (§ 8); `command npm run bundle`, `command npm run bundle -- --check`.
 
 **Dependencies**: Phases 1 to 3.
 
@@ -151,12 +157,12 @@ None - a halt the evidence does not contradict still stops.
 ### Files to Modify (Core Implementation)
 
 1. ✅ `skills/develop-next/SKILL.md` - 0.1a, Step 3, Step 0
-2. ✅ `skills/develop-task/SKILL.md`, `skills/develop-story/SKILL.md` - Step 0 line
+2. ✅ `skills/develop-task/SKILL.md`, `skills/develop-story/SKILL.md`, `skills/develop-bug/SKILL.md` - Phase 0 line; and `evals/shared/tests/observe-work-start-line.test.mjs` (new) holding all four lines
 3. ✅ an evidence reader under `skills/develop-next/scripts/`, if the plan needs one
 
 ### Files to Modify (Tests)
 
-4. ✅ a test beside the reader, and the develop-next eval/unit fixtures (`evals/develop-next/`)
+4. ✅ `evals/develop-next/unit/halt-evidence.test.mjs`, and `evals/develop-next/protocol/skill-shape.test.mjs` for the pinned 0.1a wording
 
 ### Files to Modify (Generated)
 
@@ -193,7 +199,7 @@ Step 3 and Step 0 lines are prose; evidence is a fresh session on each, with a c
 
 - [ ] A halt with both pieces of evidence routes and a halt with either missing stops, shown by named tests recorded in the QA report.
 - [ ] A quality gate run in a worktree beside the checkout passes `from-observation.test.js` and `test-clean-checkout.test.js`, shown by the command and exit codes in the QA report.
-- [ ] The Step 0 line is present in the three orchestrators (greps in the QA report).
+- [ ] The Step 0 / Phase 0 line is present in the four orchestrators, all four held by one test, `evals/shared/tests/observe-work-start-line.test.mjs` (reached by the `evals/shared/tests/*.test.mjs` glob in `package.json`), which reads each `SKILL.md` and fails when its line is removed (the greps and the mutation proof are in the QA report).
 
 ### Performance
 
@@ -207,7 +213,7 @@ Step 3 and Step 0 lines are prose; evidence is a fresh session on each, with a c
 
 ### Migration
 
-- [ ] An existing run-state file with `halted: true` and no merged PR still stops (an existing fixture passes unchanged).
+- [ ] A run-state file with `halted: true` and no merged PR still stops: the `halt-evidence.test.mjs` case for it passes, and the existing 0.1a pin in `evals/develop-next/protocol/skill-shape.test.mjs` passes unchanged (both named in the QA report).
 
 ---
 
@@ -285,12 +291,65 @@ Step 3 and Step 0 lines are prose; evidence is a fresh session on each, with a c
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-17
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.279.qa.2.develop-next-reads-the-world-before-it-stops.md](./task.279.qa.2.develop-next-reads-the-world-before-it-stops.md)
+- **Gate File**: [task.279.gate.2.develop-next-reads-the-world-before-it-stops.yml](./task.279.gate.2.develop-next-reads-the-world-before-it-stops.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 19
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues identified. The cycle 1 medium finding (missing CHANGELOG citation) is closed. One low advisory cleanup remains: the unread `--json` flag in `halt-evidence.mjs`.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.279.qa.2.develop-next-reads-the-world-before-it-stops.md`
+**Gate File**: `task.279.gate.2.develop-next-reads-the-world-before-it-stops.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR review**: ✅ APPROVE (`task.279.pr-review.1.develop-next-reads-the-world-before-it-stops.md`)
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** all 8 success criteria met, each cited in the DoD summary
+✅ **Tests:** `halt-evidence.test.mjs` (13) and `observe-work-start-line.test.mjs` (6), both in the per-PR run
+✅ **CI:** `SUCCESS` over 6 checks on `1f3a27dad`
+✅ **Documentation:** Step 0.1a and the Step 3 gate-worktree rule in `skills/develop-next/SKILL.md`; Session Start line in four orchestrators; CHANGELOG entry citing task 279
+✅ **Security Review:** ✅ PASS — `halt-evidence.mjs#decide` recorded as an internal boundary (no corpus sink models it)
+✅ **Compliance Review:** ⚠️ NOT_APPLICABLE — internal tooling change
+
+**Detailed Verification Log:** See `task.279.dod.1.develop-next-reads-the-world-before-it-stops.md` for complete verification evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-11-17
+
 <!-- change-log-start -->
 ## Change Log
 
 | Date       | Version | Description                                                   | Author      |
 | ---------- | ------- | ------------------------------------------------------------- | ----------- |
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #53, #66, #138, #157    | create-task |
+| 2026-11-17 | 1.1     | Review passed (8/10): evidence reader made a script with a named test path, existing 0.1a pin named, sibling worktree verified non-ephemeral, develop-bug added to the activation line, reconstruction states listed | review-task |
+| 2026-11-17 |         | Status → ready-for-development                                | review-task |
+| 2026-11-17 |         | Developed: halt-evidence.mjs + unit test, 0.1a evidence read, Step 3 gate-worktree rule, Session Start line in four orchestrators + test; status → ready-for-review | develop-task |
+| 2026-11-17 |         | QA gate CONCERNS (90/100) — 1 finding (CHANGELOG citation missing) | qa-task |
+| 2026-11-17 |         | QA findings fixed — CHANGELOG entry citing task 279 added, 1 iteration | qa-fix |
+| 2026-11-17 |         | QA gate PASS (100/100) — 0 findings open (T279-001 closed) | qa-task |
+| 2026-11-17 | 1.2     | DoD passed — accepted (PR #918)                               | finalise    |
 <!-- change-log-end -->
 
 ---
@@ -298,16 +357,16 @@ Step 3 and Step 0 lines are prose; evidence is a fresh session on each, with a c
 ## Progress Tracking
 
 ### Phase 1: The 0.1a check
-- [ ] Evidence check and tests
+- [x] Evidence check and tests
 
 ### Phase 2: The Step 3 worktree rule
-- [ ] Rule written
+- [x] Rule written
 
 ### Phase 3: The Step 0 activation line
-- [ ] Three lines
+- [x] Four lines
 
 ### Phase 4: Evidence, bundle and sweep
-- [ ] Bundle clean
+- [x] Bundle clean
 
 ---
 
@@ -332,4 +391,4 @@ None.
 
 ---
 
-**Status:** Planned
+**Status:** Accepted

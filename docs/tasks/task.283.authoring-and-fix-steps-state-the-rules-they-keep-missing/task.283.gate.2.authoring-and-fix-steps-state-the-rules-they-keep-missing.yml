@@ -1,0 +1,98 @@
+schema: 2
+task: 'task.283.authoring-and-fix-steps-state-the-rules-they-keep-missing'
+task_title: 'Authoring and fix steps state the rules they keep missing'
+gate: CONCERNS
+status_reason: 'Cycle 1 fixed QA-1, QA-2, QA-4, QA-5 and QA-6 (guards mutation-proven; full CI had one failure, a Change Log date, since fixed). The cycle 2 refute pass reproduced three new medium defects: the CHANGELOG block passes a mixed hunk, a non-v heading style and a * bullet, and the renderer prints the priority un-normalised. The wall-time criterion is still unmeasured.'
+reviewer: 'QA Engineer'
+head: '2065f0929cdee99fd6326f5c0ffbbe2d7cfd18f9'
+updated: '2026-11-20T04:10:00Z'
+
+top_issues:
+  - id: 'T283-QA-7'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-3-develop-loop.md'
+    finding: 'The CHANGELOG placement block flags a new bullet only when its whole -U0 hunk is a pure insertion (old == 0). Editing a shipped bullet and adding a new one next to it makes one hunk with old = 1, so the misplaced entry passes. Reproduced by execution: control (pure insertion below the first release heading) exits 1 with the HALT; the mixed hunk exits 0 with no output. Origin: code-review CR-1 (high confidence), reproduced by QA.'
+    suggested_action: 'Judge each added line on its own (for example, a line added at or below the first release heading whose text does not appear in the base file) instead of requiring a pure-insertion hunk. Add a mixed-hunk test under bash and zsh and mutation-prove it.'
+    suggested_owner: dev
+    status: open
+  - id: 'T283-QA-8'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-3-develop-loop.md'
+    finding: 'Two states report one value in the CHANGELOG block: a file with no "## [v" heading (a "## [1.0.0]" style) and a file whose heading was not found both set the threshold to 999999999, so the scan passes vacuously; and the bullet filter "^+- " ignores "* " bullets. Reproduced by execution: a misplaced entry under "## [1.0.0]" exits 0, and a misplaced "* " bullet under "## [v1.0]" exits 0. This block ships to consumer repositories, which may use either style. Origin: code-review CR-2 (high confidence), reproduced by QA.'
+    suggested_action: 'When the file has a "## [Unreleased]" heading and no later "## [" release heading of either style, say so and exit 0 explicitly; match "## [" followed by v or a digit; widen the bullet match to "^+[[:space:]]*[-*] ". One test per case, mutation-proven.'
+    suggested_owner: dev
+    status: open
+  - id: 'T283-QA-9'
+    severity: medium
+    file: 'shared/resources/render-task-issue-body.js'
+    finding: 'The Metadata table prints the raw frontmatter priority (High) and an em dash when it is absent, where the replaced ensure-task-github-issue template printed ${priority}, which the skill defines as lowercase with a default of medium. Reproduced by execution: priority: High gives "| Priority | High |"; no priority gives "| Priority | — |". The create path therefore no longer matches the shape the sync-github-task update path rebuilds, so the "create to update is diff-stable" sentence there is false. The test at render-task-issue-body.test.mjs:55 asserts the un-normalised value and locks the divergence in. Origin: code-review CR-3 (high confidence) and CR-5, reproduced by QA.'
+    suggested_action: 'Lowercase the priority and default it to medium in the renderer, matching ensure-task-github-issue SKILL.md:32; assert both in the test. Check the effort cell the same way against the old template.'
+    suggested_owner: dev
+    status: open
+  - id: 'T283-QA-3'
+    severity: medium
+    file: 'docs/tasks/task.283.authoring-and-fix-steps-state-the-rules-they-keep-missing/task.283.authoring-and-fix-steps-state-the-rules-they-keep-missing.md'
+    finding: 'Carried from gate 1, still true: the performance criterion (CI=true npm test wall time within 10% of develop, median of five alternating runs with uptime beside each, LAN server) has not been measured. Three full runs on the branch alone exist.'
+    suggested_action: 'Run five alternating develop/branch pairs of CI=true npm run test:remote -- --run test with uptime beside each and record the table and median, or obtain an owner-approved criterion amendment (approved by <name>).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 17
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: true
+    boundary_signals: []
+    notes: 'The renderer reads a local file and writes stdout; no network or shell. The CHANGELOG block is a repository-state boundary. The engine refuses it as mutating, so it is probed by committed tests under bash and zsh, not by the probe engine; the DoD will need an override for probes_executed: 0.'
+  performance:
+    status: CONCERNS
+    notes: 'Wall-time criterion still unmeasured (T283-QA-3).'
+  reliability:
+    status: CONCERNS
+    notes: 'The CHANGELOG block still passes three shapes a misplaced entry can take (T283-QA-7, T283-QA-8); the unfetched-base and failed-diff cases now HALT.'
+  maintainability:
+    status: PASS
+    notes: 'The renderer defines no card contract of its own. Low advisories: links inside code fences and titled links are not handled by absolutizeLinks (CR-6); the render block guard converts an unbound input into a failure but has no writer of its own (CR-7).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T283-QA-7, T283-QA-8 and T283-QA-9 in one qa-fix cycle, and resolve T283-QA-3 by measurement or an approved amendment.'
+      refs: ['shared/resources/develop-pipeline-step-3-develop-loop.md', 'shared/resources/render-task-issue-body.js', 'shared/resources/tests/render-task-issue-body.test.mjs']
+  future:
+    - action: 'absolutizeLinks: skip fenced and inline-code spans, accept an optional link title, resolve root-relative targets against the repository root (CR-6).'
+      refs: ['shared/resources/render-task-issue-body.js']
+      remedy: unverified
+    - action: 'Bundling the renderer copies jira-sync.js, change-log.js and tracker-workflow.js into the create-path skill; consider a smaller card-builder entry point if more skills need it.'
+      refs: ['shared/resources/render-task-issue-body.js']
+      remedy: unverified
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 1
+  fix_date: '2026-11-20'
+  total_iterations: 1
+  verification_method: 'Committed tests (13 and 6 pass), mutation proofs of both new guards, rebundle check, CI-parity run at the pre-fix tree'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T283-QA-7, T283-QA-8, T283-QA-9 resolved', 'T283-QA-3 measured or amended by an approver']

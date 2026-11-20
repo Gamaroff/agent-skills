@@ -1,0 +1,92 @@
+schema: 2
+task: 'task.278.qa-loop-readers-read-the-right-thing'
+task_title: 'QA loop readers read the right thing'
+gate: CONCERNS
+status_reason: 'Cycle 1 findings QA-1, QA-3 and QA-4 are closed and mutation-proven; the fix_path boundary is now probed (12 executed, 0 escaped). Three MEDIUM findings remain: the criterion-3 deviation still needs an approver, a ./ or trailing-slash work-item directory drops a legitimate fix_path, and a dash-prefix test stem folds onto an unrelated production file.'
+reviewer: 'QA Engineer'
+head: '7c038234f6c2b4720841ac79a6ffc382f53fae2c'
+updated: '2026-11-16T20:56:57Z'
+
+top_issues:
+  - id: 'T278-QA-2'
+    severity: medium
+    file: 'shared/resources/tests/accept-qa-residual.test.mjs'
+    finding: 'Success criterion 3 says every other consumer passes its existing fixtures unchanged, but one pinned expectation changed (the nested-map case moved from the refuses list to the edits list). Cycle 1 recorded the deviation in the task Notes and the report; no approver has accepted it, so the criterion is still unmet as written.'
+    suggested_action: 'Escalate for an approver (approved by <name>) on the recorded deviation. Do not reword the criterion and do not revert the test: the old expectation encoded the defect.'
+    suggested_owner: po
+    status: open
+  - id: 'T278-QA-5'
+    severity: medium
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'fixPathTarget compares the normalised fix_path directory with workItemDir, which it never normalises. fixPathTarget("docs/tasks/t/a.md", "./docs/tasks/t"), "docs/tasks//t" and "docs/tasks/t/" all return null while "docs/tasks/t" returns the file (reproduced by QA). A legitimate fix_path is then silently dropped and the finding classifies on ref, the behaviour this feature replaces. The corpus and test only pass the canonical directory. Origin: code-review CR-2, reproduced by QA.'
+    suggested_action: 'Normalise workItemDir with path.posix.normalize (and strip a trailing slash) inside fixPathTarget; add legitimate corpus cases with a ./-prefixed, a doubled-slash and a trailing-slash directory, and a unit assertion for each.'
+    suggested_owner: dev
+    status: open
+  - id: 'T278-QA-6'
+    severity: medium
+    file: 'shared/resources/qa-diminishing-returns.js'
+    finding: 'foldTestFilesIntoSubjects cuts a test stem back at every dash with no floor, so src/tests/user-service.test.ts folds onto src/user.ts. With globs [src/tests/**] and MEDIUMs on those two files QA got narrowing-residue ("every MEDIUM names src/user.ts") where the files are different subjects; the same pair with no globs reads medium-files-differ. The result is a false structural-move offer (advisory, never a route). Origin: code-review CR-1, reproduced by QA.'
+    suggested_action: 'Fold only on the exact stem, or on a cut the fixtures document as a boundary (the motivating pair is open-coverage-differential onto open-coverage). Add a pair that must stay two subjects (a dash-prefix test stem sharing only a prefix with an unrelated production file) beside the pair that must fold.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 129
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 12
+    escaped: 0
+    boundary: true
+    boundary_signals: []
+    boundary_reason: 'The criteria carry no boundary signal phrase; fix_path is a boundary because it decides which file the 5c carry may stage (repo-state signal).'
+    notes: 'fixPathTarget is probed by security-probe.mjs (filename sink, --args-json work-item directory and patterns, 12-case corpus): engages, 12 executed, 0 escaped. Mutation: removing the directory check made the committed test fail and the probe read present-but-inert. The probe passes one canonical work-item directory, which is why T278-QA-5 was not seen by it.'
+  performance:
+    status: PASS
+    notes: 'Cycle 1 measurement stands: median develop 770 s vs branch 743 s (-3.5%). Cycle 1 changes add one small function and tests; no hot path changed.'
+  reliability:
+    status: CONCERNS
+    notes: 'An unparseable or non-array testArtifactGlobs reads as "no fold" with no message, where the HIGH-sequence input in the same block reports could-not-look as an error (code-review CR-3, low; advisory).'
+  maintainability:
+    status: PASS
+    notes: 'The fix_path predicate now lives once, in ci-tree-equivalence.js, with a test and a probe corpus; bundled copies in sync (bundle --check 0 problems).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T278-QA-5 and T278-QA-6; obtain an approver for the T278-QA-2 deviation.'
+      refs: ['shared/resources/ci-tree-equivalence.js', 'shared/resources/qa-diminishing-returns.js', 'shared/resources/tests/accept-qa-residual.test.mjs']
+  future:
+    - action: 'Report an unparseable or non-array testArtifactGlobs as a could-not-look reason in the narrowing block, as the HIGH-sequence path does (CR-3, low).'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+      remedy: unverified
+    - action: 'Record the --args-json the fix-path corpus needs beside it and add one test that runs it through security-probe.mjs; several hostile cases are refused by the directory check alone, so their "why" text overstates (CR-4, low).'
+      refs: ['tests/fixtures/probe/fix-path-target.cases.json', 'shared/resources/tests/ci-tree-equivalence.test.mjs']
+      remedy: unverified
+    - action: 'A test only folds from a literal tests/ directory; document that in the globs variable row, or accept any directory the configured glob matches (CR-5, low).'
+      refs: ['shared/resources/qa-diminishing-returns.js']
+      remedy: unverified
+    - action: 'A tracked symlink named *.md that points at code classifies as doc-only in the 5c carry; the base logic is the same for ref (no symlink check), so it is not introduced here.'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+      provenance: pre-existing
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T278-QA-5 and T278-QA-6 fixed and re-verified; T278-QA-2 deviation approved']

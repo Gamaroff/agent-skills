@@ -80,7 +80,7 @@ reports a missing log.**
 
 So:
 
-`healthy` is `false` when **any** of four checks fails, and they do not all mean the same thing.
+`healthy` is `false` when **any** of five checks fails, and they do not all mean the same thing.
 Act on the check, never on `healthy` alone:
 
 | Failing check | Do this |
@@ -89,6 +89,7 @@ Act on the check, never on `healthy` alone:
 | `activation-configured` | **Note it and continue.** Step 4 owns this. It must never stop a write. **Until bug 15 lands, this check (and `families --audit`) anchors at the cwd**: run both from the repository root, or pass `--audit-root "$(git rev-parse --show-toplevel)"`, or a configured project reads as unconfigured and a family as `member-not-found` |
 | `anchor-durable` | Also reported as `reason` `ephemeral-workspace` — see below |
 | `no-fork` | Also reported as `reason` `fork-detected` — see below |
+| `status-legal` | **Note it and continue.** The `detail` names entries whose `status:` is outside `open \| actioned \| declined \| superseded \| parked`; `queue` counts them open. Writes are unaffected. Repair each in the next review: `set-status --id N --status <legal> --repair --expect-status <the literal it reads>`. A `detail` saying it could not read any status (`scan-broken`) names no entries: no file has parseable frontmatter, so run `scan` and fix that first |
 
 Then act on `reason`:
 
@@ -199,6 +200,9 @@ One call. There is no other way to write to the log:
 command node references/observation-log.js write \
   --title "…" --skill "…" --siblings-checked "…" --body-file "$BODY" --json
 ```
+
+Write `$BODY` with the file tool in one call and run the command in a later one; a body left over from an
+earlier observation would be logged again (`references/file-write-rules.md#fresh-body-post`).
 
 The body is Issue → Improvement → Principle. `--siblings-checked` is **mandatory and never blank** —
 the literal `none` is correct where the target belongs to no family, and it is a recorded judgement

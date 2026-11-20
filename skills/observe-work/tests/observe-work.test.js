@@ -970,3 +970,61 @@ test("resolver: the CONTRACT's stated precedence matches the resolver's implemen
       "contract assertion above is now measuring against the wrong baseline",
   );
 });
+
+// ── task 281: the doctor table and the review cycle's decisions ──────────────
+
+test("SKILL.md's Session Start table has a row for every check the engine's doctor emits", () => {
+  // MUTATION: delete the `status-legal` row from SKILL.md's table. A check the
+  // engine reports with no row is a failing check a reader has no instruction
+  // for — and Session Start says to act on the check, never on `healthy`.
+  const engine = readOutside("shared", "resources", "observation-log.js");
+  if (engine === null) return; // consumer install: nothing to compare against
+  const doctor = engine.slice(engine.indexOf("function cmdDoctor"));
+  const checks = [
+    ...doctor
+      .slice(0, doctor.indexOf("// ── CLI"))
+      .matchAll(/check: "([a-z-]+)"/g),
+  ].map((m) => m[1]);
+  assert.ok(
+    checks.length >= 5,
+    `expected the engine to emit at least 5 doctor checks, found ${checks.length}: the extraction is broken`,
+  );
+  for (const c of new Set(checks)) {
+    assert.match(
+      BODY,
+      new RegExp("^\\| `" + c + "` \\|", "m"),
+      `SKILL.md has no Session Start row for the engine's \`${c}\` check`,
+    );
+  }
+});
+
+test("review-cycle.md lists five decisions, and the fifth is propose-a-task", () => {
+  // MUTATION: remove the "propose a task" bullet from Step 3. The count is
+  // taken from the decision list itself (the bullets between "decide one of"
+  // and the carrier section), so a sixth added later is a deliberate edit to
+  // this number, not a silent drift.
+  const text = read("references/review-cycle.md");
+  const start = text.indexOf("For each cluster, decide one of:");
+  const end = text.indexOf("### The carrier pattern");
+  assert.ok(start !== -1 && end > start, "the decision list was not found");
+  const bullets = text
+    .slice(start, end)
+    .split("\n")
+    .filter((l) => /^- \*\*[a-z ]+\*\*/.test(l));
+  assert.deepEqual(
+    bullets.map((l) => l.match(/^- \*\*([a-z ]+)\*\*/)[1]),
+    ["apply", "decline", "park", "carry", "propose a task"],
+  );
+  // The decision's one outward-facing step is gated on the user.
+  assert.match(text, /only on the user's yes/);
+});
+
+test("review-cycle.md's Step 7 states the scope of a review that stamps the date", () => {
+  const text = read("references/review-cycle.md");
+  const step7 = text.slice(
+    text.indexOf("## Step 7"),
+    text.indexOf("## Step 8"),
+  );
+  assert.match(step7, /scoped to one skill/);
+  assert.match(step7, /Scope:/);
+});

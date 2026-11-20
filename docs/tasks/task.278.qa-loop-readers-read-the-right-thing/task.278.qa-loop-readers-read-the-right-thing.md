@@ -5,16 +5,19 @@ type: task
 description: "Fix three QA-loop readers that classify on the wrong input: the narrowing-residue file count that splits a production file from its test, the 5c carry that keys on the finding's anchor not the file the fix edits, and the gate reader that takes a status from quoted finding text."
 tags: [develop-task, qa-fix, observation]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
+pr_number: 915
 created: 2026-11-06
-updated: 2026-11-06
+updated: 2026-11-17
+completed_date: 2026-11-17
 estimated_effort_hours: 8
 ---
 
 # Task 278: QA loop readers read the right thing
 
-**Status:** Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.278.review.1.qa-loop-readers-read-the-right-thing.md` implemented 2026-11-16
 
 ---
 
@@ -49,19 +52,19 @@ Three readers in the QA loop take a decision from an input that is not the one t
 Verified by `grep` on 2026-11-06 at `develop` `bdd755c7`.
 
 - `shared/resources/qa-diminishing-returns.js:810`–`:816` returns `medium-files-differ` when `new Set(all.map((e) => normalisePath(e.file))).size !== 1`; `:805` is the sibling `medium-file-missing`. `qa.testArtifactGlobs` is the key route 2 already reads `(unverified: the plan greps its reader)`.
-- `shared/resources/qa-diminishing-returns.js:263` `function readKeysInto(entry, text)` runs `KEY_RE` over free text; the comment at its head says FIRST wins and that `severity`, `category` and `status` fold case (`CASE_INSENSITIVE_KEYS`). `:217` and `:226` call it per line of an entry.
+- `shared/resources/qa-diminishing-returns.js:263` `function readKeysInto(entry, text)` runs `KEY_RE` over free text; the comment at its head says FIRST wins and that `severity`, `category` and `status` fold case (`CASE_INSENSITIVE_KEYS`). `:217` (a dash line's remainder) and `:226` (a key line at the entry's own key indent, `ind === base + 2`) call it. **The indent filter at `:223`–`:227` already keeps deeper lines out, so the defect is inside one line**: `KEY_RE` scans the whole line, so a quoted value holding `status: waived` yields a status. Measured on 2026-11-16 with `readTopIssues` (the reader's export): a block entry `finding: "the writer read status: waived from this text"` followed by a real `status: open` reads `status: 'waived from this text"'` (FIRST wins, so the quoted text beats the real key); a flow entry `{…, finding: "quotes status: waived", status: open}` reads `status: 'waived"'`.
 - The 5c carry files are `5c-carry-eligible.txt` and `5c-carry-classified.txt` (`shared/resources/advance-pipeline-lock.sh:18`, `:141`); the classifier fence is at `shared/resources/develop-pipeline-step-5-6-qa-loop.md:1630`–`:1687` (`console.error(... classified — an entry has no id: first or no ref:)`) and reads only `ref`. Tests: `shared/resources/tests/acceptance-commit-carries-5c.test.mjs`.
 - `shared/resources/qa-findings-ingester-prompt.md:74` already uses `suggested_fix_path` for a description of the fix approach, not a path; a new field must not reuse that name (the observation's `fix_path` is distinct).
 
 ### Target Architecture
 
-- **Residue**: fold a test file (matched by `qa.testArtifactGlobs`) into the production file it tests before counting files, or ignore test-file MEDIUMs when another MEDIUM names a production file. Fixture row: MEDIUMs on `X.js` and `tests/X-differential.test.mjs` in consecutive cycles must signal (obs #120).
-- **Carry**: an optional `fix_path` on a finding; when it names the work item's own document or a co-located `.md` artifact and that file is clean against HEAD, the classifier answers `fix` even when `ref` points at code; absent, today's behaviour (obs #141).
-- **Reader**: take `status` only from a real key at the entry's top level (or the extent `flowSpan` already defines for flow entries), never from text inside a quoted or free-text value (obs #151).
+- **Residue**: fold a test file (matched by `qa.testArtifactGlobs`) into the production file it tests before counting files. The mapping is stated, not left to the developer: the test's directory is a `tests/` child of the production file's directory (`shared/resources/tests/X-differential.test.mjs` tests `shared/resources/X.js`), so strip the `tests/` segment, drop `.test.<ext>` and any `-<suffix>`, and compare the stem ignoring the extension. Fold only when that production file is itself among the other MEDIUMs. `qa.testArtifactGlobs` is set in this repository (`skills-config.yaml:45`) and `[]` in an unconfigured consumer, where nothing folds, exactly as the exit itself stays off. Fixture row: MEDIUMs on `shared/resources/X.js` and `shared/resources/tests/X-differential.test.mjs` in consecutive cycles must signal (obs #120).
+- **Carry**: an optional `fix_path` on a finding; when it names the work item's own document or a co-located `.md` artifact and that file is clean against HEAD, the classifier answers `fix` even when `ref` points at code; absent, today's behaviour (obs #141). The producer of a 5c finding is `/review-pr`, so the field is added where `ref` is emitted (the conformance prompt's findings block and `skills/review-pr/SKILL.md`'s record), and the ingester prompt maps or drops it.
+- **Reader**: take `status` only from a real key: for a block line, the key at the start of the line; for a flow entry, a key at the top level of the mapping (the extent `flowSpan` in `accept-qa-residual.js:150` defines); never from text inside a quoted value (obs #151).
 
 ### Important Clarifications
 
-- `readKeysInto` is shared with other readers (`review-report-freshness.js` is named in its comment); the change is tested against their fixtures too.
+- `readKeysInto` is private to `qa-diminishing-returns.js` (`git grep -n readKeysInto -- shared skills ':!skills/*/references'` finds only that file); `review-report-freshness.js` is named in a comment as the source of the FIRST-wins rule, not as a caller. What is shared is the gate reader's export, `readTopIssues`, whose other consumers are `accept-qa-residual.js` (its read-back) and the suites `accept-qa-residual.test.mjs`, `qa-loop-route.test.mjs`, `qa-narrowing-residue.test.mjs`, `evals/shared/tests/qa-narrowing-offer-wiring.test.mjs` and `evals/develop-next/unit/accept-qa-residual-merge-rule.test.mjs`. The change is tested against all of them.
 - The ingester's `suggested_fix_path` is a different thing; the plan chooses the new field's name to avoid confusion and updates the ingester prompt's table.
 
 ---
@@ -99,7 +102,7 @@ None - each change only moves a wrong classification to the right one; absent `f
 - `shared/resources/qa-diminishing-returns.js` (`readKeysInto`), its tests
 
 **Changes**:
-- [ ] Top-level keys only; a planted quoted `status` on an open entry reads `open`.
+- [ ] Read keys at the key position within a line (the line start for a block line, the top level of the mapping for a flow entry), skipping quoted values; the line-level indent filter at `:223`–`:227` already exists and is not the change. A planted quoted `status` on an open entry reads `open`, in a block entry and in a flow entry.
 
 **Dependencies**: none.
 
@@ -125,11 +128,12 @@ None - each change only moves a wrong classification to the right one; absent `f
 
 **Files**:
 - `shared/resources/develop-pipeline-step-5-6-qa-loop.md` (classifier fence)
+- `shared/resources/pr-conformance-prompt.md` and `skills/review-pr/SKILL.md` (the producer: the findings block that emits `ref`; bundled copies in `review-pr` and `review-code` regenerate)
 - `shared/resources/qa-findings-ingester-prompt.md`
-- `shared/resources/tests/acceptance-commit-carries-5c.test.mjs`
+- `shared/resources/tests/acceptance-commit-carries-5c.test.mjs`, `skills/review-pr/tests/review-pr.test.js`, `skills/review-code/tests/review-code.test.js` (both read the conformance prompt)
 
 **Changes**:
-- [ ] Optional `fix_path`; classification rule; ingester row.
+- [ ] Optional `fix_path`; classification rule; producer rows; ingester row.
 
 **Dependencies**: none.
 
@@ -141,6 +145,8 @@ None - each change only moves a wrong classification to the right one; absent `f
 
 **Changes**:
 - [ ] Mutation proofs; `command npm run bundle`, `command npm run bundle -- --check`.
+- [ ] Doc sweep. Population: `git grep -ln 'medium-files-differ\|narrowing-residue\|5c-carry' -- shared skills docs ':!skills/*/references' ':!docs/tasks'`; update any that restate the classifier's rule.
+- [ ] Run the suites that pin the step document: `git grep -ln 'develop-pipeline-step-5-6-qa-loop' -- '*.test.*' tests evals`.
 
 **Dependencies**: Phases 1 to 3.
 
@@ -192,7 +198,7 @@ None - each change only moves a wrong classification to the right one; absent `f
 
 - [ ] The three motivating shapes classify correctly, shown by named tests in the QA report.
 - [ ] Each control keeps its old result, shown by the same tests.
-- [ ] Every other reader of `readKeysInto` passes its existing fixtures unchanged.
+- [ ] Every other consumer of `readTopIssues` (`accept-qa-residual.js` and the five suites named in § 3) passes its existing fixtures unchanged, except the one expectation in `accept-qa-residual.test.mjs` that encoded the defect (see Notes, "Deviation from success criterion 3"). Amended 2026-11-17, approved by Lorien Gamaroff.
 
 ### Performance
 
@@ -206,7 +212,7 @@ None - each change only moves a wrong classification to the right one; absent `f
 
 ### Migration
 
-- [ ] A gate file written before the change reads the same status for every entry (a before/after `git grep` count over `docs/**/*.gate.*.yml` in the QA report).
+- [ ] A gate file written before the change reads the same status for every entry: run `readTopIssues` over every committed `docs/**/*.gate.*.yml` on `develop` and on the branch, and record the per-entry diff (expected empty, or each difference explained) in the QA report's Findings section.
 
 ---
 
@@ -286,12 +292,64 @@ None identified.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-17
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.278.qa.4.qa-loop-readers-read-the-right-thing.md](./task.278.qa.4.qa-loop-readers-read-the-right-thing.md)
+- **Gate File**: [task.278.gate.4.qa-loop-readers-read-the-right-thing.yml](./task.278.gate.4.qa-loop-readers-read-the-right-thing.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 8533
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No open findings. The criterion 3 deviation (T278-QA-2) is resolved by the owner's amendment.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report**: `task.278.qa.4.qa-loop-readers-read-the-right-thing.md`
+**Gate File**: `task.278.gate.4.qa-loop-readers-read-the-right-thing.yml`
+**Gate Status**: ✅ PASS (95/100)
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** all 8 met. #4 was re-measured at the head on the LAN server: median 770 s against develop's 722 s (+6.6%, within 10%).
+✅ **Tests:** 8533 pass on the cycle 2 tree (tree-equivalent to the head); hosted CI `test` SUCCESS at `ce14eebb6c72`.
+✅ **PR Review:** PR #915, `task.278.pr-review.1` APPROVE (conformance lens).
+✅ **Documentation:** CHANGELOG `[Unreleased]` cites task 278; step 5-6 doc, ingester prompt and `review-pr/SKILL.md` updated.
+✅ **Security Review:** PASS, boundary `fixPathTarget` probed with 12 candidates, none reproduced.
+⚠️ **Compliance Review:** NOT_APPLICABLE (internal QA-loop tooling).
+
+**Detailed Verification Log:** See `task.278.dod.1.qa-loop-readers-read-the-right-thing.md` for the complete verification evidence.
+
+**Task marked as ACCEPTED on:** 2026-11-17
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                              | Author      |
-| ---------- | ------- | -------------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-06 | 1.0     | Initial draft — cut from observations #120, #141, #151   | create-task |
+| 2026-11-16 | 1.1     | Review 7/10 → fixes applied (Phase 1 rewritten to the in-line defect, `readKeysInto` consumers corrected, `fix_path` producer added, Phase 2 path mapping stated, migration criterion re-defined) — ready for development | review-task |
+| 2026-11-16 |         | Status → ready-for-development                           | review-task |
+| 2026-11-16 | 1.2     | Implemented: gate reader keys at key position, residue fold, `fix_path` carry | develop     |
+| 2026-11-16 |         | QA gate CONCERNS (90/100) — 4 MEDIUM findings            | qa-task     |
+| 2026-11-16 |         | QA findings fixed — 3 of 4 closed, T278-QA-2 escalated (1 iteration) | qa-fix      |
+| 2026-11-16 |         | QA gate CONCERNS (90/100) — 3 MEDIUM findings            | qa-task     |
+| 2026-11-16 |         | QA findings fixed — QA-5 and QA-6 closed, T278-QA-2 still needs an approver (2 iterations) | qa-fix      |
+| 2026-11-16 |         | QA gate CONCERNS (90/100) — 1 MEDIUM finding             | qa-task     |
+| 2026-11-17 |         | Success criterion 3 amended to name the one moved expectation, approved by Lorien Gamaroff (resolves T278-QA-2) | owner      |
+| 2026-11-17 |         | QA gate PASS (95/100) — 0 findings                       | qa-task     |
+| 2026-11-17 | 1.3 | DoD passed — accepted (PR #915) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -299,16 +357,16 @@ None identified.
 ## Progress Tracking
 
 ### Phase 1: The gate reader
-- [ ] Top-level keys only
+- [x] Top-level keys only
 
 ### Phase 2: The residue classifier
-- [ ] Test files folded
+- [x] Test files folded
 
 ### Phase 3: The 5c carry
-- [ ] `fix_path`
+- [x] `fix_path`
 
 ### Phase 4: Tests, bundle and sweep
-- [ ] Mutation proofs, bundle clean
+- [x] Mutation proofs, bundle clean
 
 ---
 
@@ -326,10 +384,22 @@ None identified.
 
 Do not reuse the ingester's `suggested_fix_path` name; it holds a description, not a path.
 
+### Deviation from success criterion 3 (QA cycle 1, T278-QA-2)
+
+Criterion 3 says every other consumer of `readTopIssues` passes its existing fixtures unchanged. One
+pinned expectation changed: in `shared/resources/tests/accept-qa-residual.test.mjs`, the case
+`{id: X, a: {status: open}}` moved from the "refuses a flow entry the extent scanner cannot read" list
+to the "edits a flow entry the scanner reads" list. The old expectation encoded the defect this task
+fixes: it refused because the shared reader took the nested `status: open` as the entry's own status
+(the writer's read-back then disagreed with its edit). With the reader fixed, the writer appends a
+top-level `status: waived` and the read-back confirms it. Every other consumer fixture is unchanged.
+The criterion text was not edited by QA. **Accepted 2026-11-17: approved by Lorien Gamaroff**, who
+amended criterion 3 to name this one expectation. T278-QA-2 is resolved by that amendment.
+
 ### Future Improvements
 
 None.
 
 ---
 
-**Status:** Planned
+**Status:** Accepted

@@ -227,6 +227,28 @@ function frontmatter(text) {
   return fm;
 }
 
+// A path segment that names a PRD folder: `prd.{P}.{slug}`, or the legacy `prd.{slug}`.
+// Recognised through doc-id, never a hand-written id regex (the chokepoint test forbids one).
+function isPrdFolder(segment) {
+  const cur = docId.parse(segment);
+  if (cur.ok) return cur.kind === "prd";
+  const old = docId.parseLegacy(segment);
+  return old.ok && old.kind === "prd";
+}
+
+/**
+ * Does `excluded` name the PRD that `relPath` (relative to the stories root) belongs to?
+ * The first segment always matches (a flat tree, or a domain name in a domain-grouped one);
+ * any directory segment that is a PRD folder matches too, because in a domain-grouped tree
+ * (`<domain>/prd.{P}.{slug}/…`) the first segment is the domain, not the PRD (bug.22).
+ */
+function isExcluded(relPath, excluded) {
+  const dirs = relPath.split("/").slice(0, -1);
+  return dirs.some(
+    (seg, i) => excluded.has(seg) && (i === 0 || isPrdFolder(seg)),
+  );
+}
+
 /**
  * Pure apart from the reads: `{ stories, warnings }`. `warnings` names every
  * `story.*.md` under the stories root that doc-id could not read.
@@ -241,8 +263,7 @@ export function scanStories(opts, cfg) {
     const f = storyFile(file);
     if (f.skip) continue;
     const rel = relative(opts.root, file);
-    const prd = relative(base, file).split("/")[0];
-    if (excluded.has(prd)) continue;
+    if (isExcluded(relative(base, file), excluded)) continue;
     if (f.bad) {
       warnings.push(
         `${rel}: not a story id doc-id can read (${f.bad}) — story.{P}.{E}.{S}.{slug}.md; a legacy story.{E}.{S} is migrated with migrate-doc-numbering`,

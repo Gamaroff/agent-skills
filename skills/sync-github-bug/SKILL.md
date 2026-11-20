@@ -152,6 +152,8 @@ node references/tracker-issue.js --kind edit --issue ${ISSUE_NUM} \
   "${REMOVE_ARGS[@]}"
 ```
 
+Write the body file with the **file tool** and run the edit in a later call (`references/file-write-rules.md#fresh-body-post`).
+
 **Always `--body-file`, never an inline `--body`** — a bug report's reproduction steps and expected/actual values are exactly the text most likely to contain backticks and `$(…)`.
 
 Re-attempt the sub-issue link on every update, not only on create: a bug is frequently filed before its parent has an issue, and the link API is idempotent, so a re-sync is how the link eventually lands.

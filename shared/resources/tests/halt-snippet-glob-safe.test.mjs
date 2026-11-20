@@ -42,10 +42,8 @@ const SHELLS = hasZsh ? ["bash", "zsh"] : ["bash"];
 
 function haltSnippet(file) {
   const md = fs.readFileSync(file, "utf8");
-  const blocks = extractBlocks(md).filter(
-    (b) =>
-      /develop-pipeline\.last-halt\.json/.test(b.code) &&
-      /rm -f \.claude\/state\/develop-pipeline\.lock/.test(b.code),
+  const blocks = extractBlocks(md).filter((b) =>
+    /advance-pipeline-lock\.sh --halt\b/.test(b.code),
   );
   assert.equal(
     blocks.length,
@@ -68,9 +66,22 @@ function runIn(shell, code, { withLog }) {
       "x\n",
     );
   // The snippet's `{placeholders}` are prose; bind them so jq gets strings.
-  const script = code
+  let script = code
     .replace(/\{halt_reason\}/g, "test")
-    .replace(/\{halt_step\}/g, "5");
+    .replace(/\{halt_step\}/g, "5")
+    .replace(/\{(task|story|bug)-directory\}/g, "docs/item.1.x");
+  // Since task.276 the snippet is one call to the bundled lock helper: install it where the
+  // snippet names it, as a consumer checkout has it.
+  const m = /\.agents\/skills\/([a-z-]+)\/references\//.exec(script);
+  if (m) {
+    const refs = path.join(dir, ".agents", "skills", m[1], "references");
+    fs.mkdirSync(refs, { recursive: true });
+    fs.copyFileSync(
+      path.join(ROOT, "shared", "resources", "advance-pipeline-lock.sh"),
+      path.join(refs, "advance-pipeline-lock.sh"),
+    );
+    fs.mkdirSync(path.join(dir, "docs", "item.1.x"), { recursive: true });
+  }
   const r = spawnSync(shell, ["-c", script], { cwd: dir, encoding: "utf8" });
   const state = path.join(dir, ".claude", "state");
   const out = {
@@ -114,15 +125,10 @@ test(
   "C — the pre-fix one-argv form fails under zsh (the test would have been red before task.124)",
   { skip: !hasZsh && "zsh not on this host" },
   () => {
-    const code = haltSnippet(SKILLS[0]).replace(
-      /rm -f \.claude\/state\/develop-pipeline\.lock\n\s*find [^\n]+$/,
-      "rm -f .claude/state/develop-pipeline.lock .claude/state/test-output-*.log\n",
-    );
-    assert.match(
-      code,
-      /rm -f \.claude\/state\/develop-pipeline\.lock \.claude\/state\/test-output-\*\.log/,
-      "reconstruction of the one-argv form failed",
-    );
+    // The pre-fix fence, written out: since task.276 no SKILL.md carries it (the HALT is one
+    // `--halt` call), so the mutation proof is a literal rather than a rewrite of a shipped fence.
+    const code =
+      "rm -f .claude/state/develop-pipeline.lock .claude/state/test-output-*.log\n";
     const r = runIn("zsh", code, { withLog: false });
     assert.equal(
       r.lock,
@@ -272,11 +278,22 @@ test("D — no canonical source puts the test-output glob in an `rm` argv", () =
       `${path.relative(ROOT, file)} still globs the logs through ls`,
     );
   }
-  // …and each uses the find form.
-  for (const file of [...SKILLS, STEP8]) {
+  // …and the sweep uses the find form: in step 8, and in the helper every HALT fence now calls.
+  const helper = path.join(
+    ROOT,
+    "shared",
+    "resources",
+    "advance-pipeline-lock.sh",
+  );
+  assert.doesNotMatch(
+    fs.readFileSync(helper, "utf8"),
+    /rm -f[^\n]*test-output-\*\.log/,
+    "the lock helper spells the glob inside an rm argv",
+  );
+  for (const file of [helper, STEP8]) {
     assert.match(
       fs.readFileSync(file, "utf8"),
-      /find \.claude\/state -maxdepth 1 -name 'test-output-\*\.log'/,
+      /find [^\n]*-maxdepth 1 -name 'test-output-\*\.log'/,
       `${path.relative(ROOT, file)} must sweep with find`,
     );
   }

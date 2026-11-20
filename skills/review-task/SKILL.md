@@ -71,7 +71,7 @@ required:
       - GitHub issue URL (direct):       https://github.com/{owner}/{repo}/issues/297
       - GitHub project board URL:        https://github.com/orgs/.../projects/...?...issue=...
       - Issue hash notation:             #297
-      - Bare issue number:               297
+      - Bare number:                     243 (the task id first; an issue number only when no task carries it)
 
 optional:
   - review_depth: "quick" | "standard" | "thorough" (default: "standard")
@@ -88,7 +88,9 @@ Before loading the task document, resolve the input to a local file path:
 | Matches `[A-Z]+-[0-9]+` (e.g. `PROJ-45`) | Jira issue key |
 | Contains `github.com` | GitHub URL (direct issue or project board) |
 | Starts with `#` followed by digits | Hash notation |
-| All digits | Bare issue number |
+| All digits | Bare number — **a task id first**, an issue number only when no task carries it |
+
+**A bare number is `task.{N}` before it is an issue.** Run [§0a Bare number — a task id first](references/develop-pipeline-step-0-resolve-and-prepare.md#bare-number--a-task-id-first) on it, cited and not restated: its script, `references/resolve-bare-task.sh` (a dependency of this skill, so it is bundled beside it), finds `docs/tasks/task.{N}.*/task.{N}.*.md` in this tree, then in another linked worktree, then on a branch, and says **which**. `found` / `elsewhere` end Input Resolution with a document (or a HALT that names where the task is); only `none` falls through to Steps 2–3 below as an issue number. Say which route was taken. `#297`, an issue URL and a Jira key skip this and stay the unambiguous issue forms (obs #128).
 
 **Step 2 — Extract the issue number / key** from whichever pattern matched:
 
@@ -138,7 +140,7 @@ ISSUE_NUM=$(echo "$INPUT" | grep -oE '(?<=/issues/)[0-9]+')
 
 # Project board URL:  ...issue=owner%7Crepo%7C297  (last digits after %7C or |)
 # Hash notation:      #297
-# Bare number:        297
+# Bare number:        297  (reached only after the task-id lookup above answered `none`)
 # Generic fallback — last group of digits in the input:
 [ -z "$ISSUE_NUM" ] && ISSUE_NUM=$(echo "$INPUT" | grep -oE '[0-9]+' | tail -1)
 ```
@@ -853,6 +855,15 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
      Measured on task.82: five anchors, every path right, every line number wrong within seven days.
      Report a drifted anchor as **Optional** with the corrected number — the claim is true, the
      coordinate moved. (obs #22)
+   - **A structural claim about where a CHANGELOG entry sits is verified against the file** (obs #30).
+     When the plan says to edit or add an entry "in `[Unreleased]`" (or under a named release),
+     list the headings with `grep -n "^## \[" CHANGELOG.md` and the bullet's line with
+     `grep -n "<bullet text>" CHANGELOG.md`; the claim holds only if the bullet's line is above the
+     first release heading (`## [v…` or `## [1.…`, for `[Unreleased]`) or between the named release's heading and the next.
+     Report a wrong placement as **Important**, with the heading it really sits under: `CHANGELOG.md`
+     is outside `ci.docsOnly.patterns`, so the 5c review can only record it, and `/finalise` then
+     halts on a one-line move (task.184, 2026-10-13). The develop loop's Step 3 holds the matching
+     block for a *new* entry.
    - **Relative Markdown links resolve from the document's own directory, not from wherever the
      text was copied.** A path check asks "does the cited file exist somewhere"; a link check asks "does the
      link target resolve from *this* file's directory", and only the second is what CI's
@@ -2292,31 +2303,39 @@ fi
 
 2. Post the comment through the CLI:
 
+   Run `mkdir -p .claude/state`, then write `.claude/state/comment-body.md` with the **file tool**, with
+   each `{NAME}` replaced by its value (the file tool expands nothing), and post it in a later call
+   (`references/file-write-rules.md#fresh-body-post`). Body:
+
+   ```markdown
+   ## Task Review Complete
+
+   **Recommendation**: {RECOMMENDATION}
+   **Readiness Score**: {SCORE}/10
+
+   | Severity | Count |
+   |---|---|
+   | Critical 🚨 | {CRITICAL} |
+   | Important ⚠️ | {IMPORTANT} |
+   | Optional 💡 | {OPTIONAL} |
+
+   **Review artifact**: `{REVIEW_FILE}`
+   {CHANGES_SECTION}
+   ```
+
    ```bash
-   # Terminator at COLUMN 0 — an indented terminator does not close an unquoted
-   # heredoc, and bash would swallow the invocation below into the comment body.
-   # Body lines are unindented for the same reason: leading spaces would be
-   # written into the comment verbatim.
-   mkdir -p .claude/state
-   cat > .claude/state/comment-body.md <<EOF
-## Task Review Complete
-
-**Recommendation**: ${RECOMMENDATION}
-**Readiness Score**: ${SCORE}/10
-
-| Severity | Count |
-|---|---|
-| Critical 🚨 | ${CRITICAL} |
-| Important ⚠️ | ${IMPORTANT} |
-| Optional 💡 | ${OPTIONAL} |
-
-**Review artifact**: \`${REVIEW_FILE}\`
-${CHANGES_SECTION}
-EOF
+   CRITICAL={the critical-issue count written into the body above}   # a new shell: re-bind it
+   # REVIEW_N: this review's number — the `{N}` of the report Step 8 wrote
+   # (`task.{n}.review.{N}.…`), or the number Step 8 computed when no report
+   # was written. Re-bound here: this block is its own shell, and an unbound
+   # value would key the comment to the wrong review. Review 1 reads the bare
+   # marker on a live issue, so `-1` is safe on an issue that predates this.
+   REVIEW_N="{N}"
+   case "$REVIEW_N" in ''|*[!0-9]*|0|0[0-9]*) echo "HALT: REVIEW_N must be this review's report number (got '$REVIEW_N')"; exit 1 ;; esac
 
    node .agents/skills/review-task/references/tracker-comment.js \
      --issue "{jira_key from frontmatter}" --body-file .claude/state/comment-body.md \
-     --stage review-task \
+     --stage "review-task-${REVIEW_N}" \
      --slot outcome="{plain-language outcome — see the GitHub arm's note}" \
      --slot blocking="${CRITICAL}" \
      --json
@@ -2361,33 +2380,36 @@ EOF
 
 3. **Build and post the comment**:
 
+   Run `mkdir -p .claude/state`, then write `.claude/state/comment-body.md` with the **file tool**, with
+   each `{NAME}` replaced by its value, and post it in a later call
+   (`references/file-write-rules.md#fresh-body-post`). Body:
+
+   ```markdown
+   ## Task Review Complete
+
+   **Recommendation**: {RECOMMENDATION}
+   **Readiness Score**: {SCORE}/10
+
+   | Severity | Count |
+   |----------|-------|
+   | Critical 🚨 | {CRITICAL} |
+   | Important ⚠️ | {IMPORTANT} |
+   | Optional 💡 | {OPTIONAL} |
+
+   **Review artifact**: `{REVIEW_FILE}`
+   {CHANGES_SECTION}
+   ```
+
    ```bash
    GITHUB_ISSUE={github_issue from frontmatter}
+   CRITICAL={the critical-issue count written into the body above}
 
-   # The heredoc terminator sits at COLUMN 0 even though this block is indented
-   # inside a numbered list — an indented terminator does not close an unquoted
-   # heredoc, and bash would swallow the invocation below into the body.
-   # The body lines are unindented for the same reason: leading spaces would be
-   # written into the comment verbatim.
-   mkdir -p .claude/state
-   cat > .claude/state/comment-body.md <<EOF
-## Task Review Complete
-
-**Recommendation**: ${RECOMMENDATION}
-**Readiness Score**: ${SCORE}/10
-
-| Severity | Count |
-|----------|-------|
-| Critical 🚨 | ${CRITICAL} |
-| Important ⚠️ | ${IMPORTANT} |
-| Optional 💡 | ${OPTIONAL} |
-
-**Review artifact**: \`${REVIEW_FILE}\`
-${CHANGES_SECTION}
-EOF
+   # REVIEW_N: bound as in the Jira arm above (this block is its own shell).
+   REVIEW_N="{N}"
+   case "$REVIEW_N" in ''|*[!0-9]*|0|0[0-9]*) echo "HALT: REVIEW_N must be this review's report number (got '$REVIEW_N')"; exit 1 ;; esac
 
    node references/tracker-comment.js --issue "$GITHUB_ISSUE" \
-     --body-file .claude/state/comment-body.md --stage review-task \
+     --body-file .claude/state/comment-body.md --stage "review-task-${REVIEW_N}" \
      --slot outcome="{plain-language outcome — see below}" \
      --slot blocking="${CRITICAL}" \
      --json \

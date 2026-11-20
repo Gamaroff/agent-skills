@@ -18,17 +18,18 @@ Edit `shared/resources/` sources with the Edit tool, one hunk per call; never a 
 ### Phase 1
 
 - `advance-pipeline-lock.sh`: read how the Loop Escalation fence and the DoD-gaps HALT build the snapshot today (`develop-pipeline-step-5-6-qa-loop.md`, `develop-pipeline-step-7-finalise.md`; `git grep -n "last-halt.json"`), then add `--halt <doc-dir> --reason <r> [--step N]` that writes `.claude/state/develop-pipeline.last-halt.json` then removes the lock, idempotent on a second call. Replace the fences with the call; add the checklist assertion.
-- `--restore`: after resolving the candidate snapshot (the `--which` path), `jq -r .halt_reason`; if `finalise-dod-gaps`, print the re-entry script's path and exit 1 without consuming. Audit callers: `git grep -n -- "--restore" -- shared skills ':!docs'`.
+- HALT fences: edit the three SKILL.md sources found by `git grep -n 'halted_at: \$ts' -- 'skills/*/SKILL.md'`; add a test that extracts each fence and asserts the `--halt` call.
+- `--restore`: after resolving the candidate snapshot (the `--which` path, which stays unguarded), treat it as a DoD-gaps halt when `jq -r .halt_step | tostring` is `7` and the newest DoD file for the work item reads `**Final Status:** ❌ GAPS` (the test `reenter-qa-after-finalise.sh:149`–`:165` already applies). Not on `halt_reason`: no writer emits `finalise-dod-gaps`. On a match without `--allow-dod-gaps`, print the re-entry script's path and exit 1 without consuming. `reenter-qa-after-finalise.sh:276` passes `--allow-dod-gaps`. Audit callers: `git grep -n -- "--restore" -- shared skills ':!docs'`.
 
 ### Phase 2
 
-- `reenter-qa-after-finalise.sh:262`–`:266`: test `$UNTRACKED` first; non-empty → `refuse uncommitted-fix` with the commit-then-re-run text only; else the existing `no-code-moved` step-7 route with no appended note. Update the reason table in the header comment (`:29`) and in `develop-pipeline-resume-contract.md`.
+- `reenter-qa-after-finalise.sh:260`–`:266`: **as built (amended at develop time — the earlier "refuse `uncommitted-fix` on untracked files" contradicts task.170 QA cycle 4 CR-2, which pins untracked files as named, never refused on):** keep the `no-code-moved` reason and give each message one ordered route. Clean tree → the step-7 remedy alone (`advance-pipeline-lock.sh --restore --allow-dod-gaps`); untracked files → the commit-and-re-run route first ("nothing was consumed"), step 7 only after "Otherwise" (the step-7 restore consumes the snapshot this script reads). First list tests pinning the old text: `git grep -n 'resume at step 7' -- '*.test.*' evals tests`. Update the reason table in the header comment (`:29`) and in `develop-pipeline-resume-contract.md`.
 - `:271` and `grant-qa-cycles.sh:163`: replace `grep -c '^### QA Cycle'` with the count of distinct N in the QA Iteration History section (awk from the section heading to the next H2, `sort -u` on N). Keep `max(highest gate, count)`.
 - `lock-present` at step 7: when the newest DoD reads GAPS and `code-moved-since-gate.sh` prints a positive number, do not route to step 7.
 
 ### Phase 3
 
-Add to the resume contract: a received resume instruction names a step and cycle; compare with the run-state file, `qa-cycle.sh`'s highest gate, and the report's QA Cycle heading; if complete, print "already complete: {step} {cycle}" and stop.
+Add `shared/resources/resume-prompt-check.sh <doc-dir> <step> <cycle>` (executable, so a test can hold it): compare with the lock, `qa-cycle.sh`'s highest gate, and the report's distinct QA Cycle numbers; if complete, print "already complete: {step} {cycle}" and exit 1. Add its `.test.sh` to the hand-kept list in `package.json` (`tests/test-runner-reach.test.js` is the backstop). The resume contract tells the orchestrator to run it first and stop on exit 1.
 
 ### Phase 4
 

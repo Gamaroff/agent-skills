@@ -2921,6 +2921,59 @@ test("scanStories reads story.P.E.S through doc-id: id 1.2.3, epicSurface keyed 
   rmSync(root, { recursive: true, force: true });
 });
 
+test("scanStories excludes a PRD named by its own folder in a domain-grouped tree, and keeps the flat-tree and domain-name matches (bug.22)", () => {
+  const root = scratchDir("qa-next-bug22-");
+  const put = (rel, title) => {
+    mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
+    writeFileSync(
+      path.join(root, rel),
+      `---\ntitle: "${title}"\nstatus: accepted\n---\n`,
+    );
+  };
+  const story = (prdDir, p) =>
+    `${prdDir}/epics/epic.${p}.1.e/stories/story.${p}.1.1.s/story.${p}.1.1.s.md`;
+  // domain-grouped: docs/prd/<domain>/prd.{P}.{slug}/…, two PRDs in ONE domain
+  put(story("docs/prd/portal/prd.1.multi-game-web-portal", 1), "one");
+  put(story("docs/prd/portal/prd.2.developer-toolkit", 2), "two");
+  // a different domain, to show a domain-name entry still works
+  put(story("docs/prd/studio/prd.3.editor", 3), "three");
+  // flat tree (today's layout): the first segment IS the PRD folder
+  put(story("flat/prd.4.old", 4), "four");
+  const ids = (excludedPrds, stories) =>
+    scanStories(
+      { root, stories },
+      {
+        excludedPrds,
+        defaultSurface: "Z",
+        epicSurface: {},
+        storySurface: {},
+        storyNa: {},
+      },
+    ).stories.map((s) => s.id);
+
+  assert.deepEqual(
+    ids(["prd.1.multi-game-web-portal"], "docs/prd"),
+    ["2.1.1", "3.1.1"],
+    "a PRD-folder entry excludes that PRD only — not its sibling in the same domain",
+  );
+  assert.deepEqual(
+    ids(["portal"], "docs/prd"),
+    ["3.1.1"],
+    "a domain-name entry still excludes the whole domain",
+  );
+  assert.deepEqual(
+    ids(["prd.4.old"], "flat"),
+    [],
+    "a flat tree keeps its first-segment match",
+  );
+  assert.deepEqual(
+    ids([], "docs/prd"),
+    ["1.1.1", "2.1.1", "3.1.1"],
+    "no entry excludes nothing",
+  );
+  rmSync(root, { recursive: true, force: true });
+});
+
 test("surfaceKeyWarnings reports a bare-number epicSurface key and a two-number story key, and accepts P.E / P.E.S (task 206)", () => {
   assert.deepEqual(
     surfaceKeyWarnings({

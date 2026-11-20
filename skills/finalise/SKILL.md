@@ -911,7 +911,9 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
 6. **The zero-guard still applies — now to this run.** `boundary: true` with `probes_executed: 0`
    (an empty plan, every entry refused or declined) adds the `probe mode executed no candidates`
    FAIL check; a zero from this run **still takes the zero-guard**, because then the engine declined
-   the entry, which is the guard's real case. Recompute `overall`: FAIL if any check or general
+   the entry, which is the guard's real case. A TypeScript module entry (`.ts`, `.mts`, `.cts`,
+   `.tsx`) is probeable: a zero on one means a decline named in the record, and
+   `typescript-unavailable` says the fix is the repository's own install, not an override. Recompute `overall`: FAIL if any check or general
    check FAILs or any probe reproduced and still in `probes[]` (a probe item 5a moved to
    `deferred_probes[]` does not count), otherwise PASS.
 7. **Say so.** Add `- Probe run by /finalise from the security agent's plan — {N} control(s), record
@@ -2239,6 +2241,11 @@ standalone.
    whatever it staged.
 
    ```bash
+   # INPUTS, bound in an earlier step and not in this block: CI_HEAD_2 is 6a's `git rev-parse HEAD`
+   # after the push, PR_NUMBER is Step 3a's resolver result. A fresh shell has neither, and an empty
+   # value here would run the comparison, the writer and the poll launch on nothing (task.310).
+   : "${CI_HEAD_2:?HALT: bind CI_HEAD_2 from 6a (the commit just pushed) — never git rev-parse HEAD here}" "${PR_NUMBER:?HALT: bind PR_NUMBER from Step 3a}"
+
    # Confirm the PR head IS the commit just pushed — never gate one commit and read another.
    PR_HEAD=$(gh pr view "$PR_NUMBER" --json headRefOid -q '.headRefOid' 2>/dev/null)   # Bitbucket: .source.commit.hash
    [ "${PR_HEAD:0:12}" = "${CI_HEAD_2:0:12}" ] \
@@ -2266,7 +2273,15 @@ standalone.
    [ -f "$POLL" ] || { echo "HALT: $POLL is missing — re-run the bundler (npm run bundle)"; exit 1; }
    RESULT=.claude/state/finalise-ci-result.txt
    PIDFILE=.claude/state/finalise-ci-poll.pid
-   rm -f "$RESULT" "$PIDFILE"
+   rm -f "$RESULT" "$PIDFILE" .claude/state/finalise-ci-head-2.txt
+   # The head file is cleared with the result and pid files, so a run that aborts before the writer
+   # below leaves none: the later turn then HALTs "not recorded" instead of reading a previous run's
+   # head (task.309).
+   # Record the acceptance head this poll runs on, for the later turn that reads $RESULT. A later
+   # turn is a fresh shell, and local HEAD is not a safe source for it: a PreCompact pause during
+   # the wait commits the report and holds the push (task.308), which leaves local HEAD one commit
+   # ahead of the PR head the poll samples.
+   printf '%s\n' "$CI_HEAD_2" > .claude/state/finalise-ci-head-2.txt
    # CI_CHECKS_1 is the check count reading 1 was green over (Step 6 records it beside CI_ROLLUP).
    nohup bash "$POLL" "$PR_NUMBER" "$CI_HEAD_2" "${FINALISE_CI_MAX_WAIT:-1500}" "$RESULT" "${CI_CHECKS_1:-0}" \
      .agents/skills/finalise/references/ci-tree-equivalence.js \
@@ -2285,10 +2300,13 @@ standalone.
    ```bash
    RESULT=.claude/state/finalise-ci-result.txt
    PIDFILE=.claude/state/finalise-ci-poll.pid
-   # A later turn is a fresh shell: CI_HEAD_2 from 6a is gone. HEAD has not moved since the
-   # acceptance push (nothing between 6a and here commits), so re-derive it rather than compare
-   # against an empty string.
-   CI_HEAD_2=${CI_HEAD_2:-$(git rev-parse HEAD)}
+   # A later turn is a fresh shell: CI_HEAD_2 from 6a is gone. Read the head the poll was started
+   # on from the file the poll block recorded. Never `git rev-parse HEAD`: a pause commit held
+   # since the push (task.308) puts local HEAD ahead of the PR head, and the comparison below
+   # would HALT on a commit CI never saw.
+   CI_HEAD_2=${CI_HEAD_2:-$(cat .claude/state/finalise-ci-head-2.txt 2>/dev/null)}
+   [ -n "$CI_HEAD_2" ] \
+     || { echo "HALT: the acceptance head this poll was started on is not recorded (.claude/state/finalise-ci-head-2.txt) — re-run 6c"; exit 1; }
    if [ ! -f "$RESULT" ]; then
      # No result yet. "Still polling" is only true while the poll is alive — a dead poll with no
      # result (killed, never started, log will say) must HALT, not report progress forever.
@@ -2796,16 +2814,10 @@ standalone.
 
         Use ✅ PASS, ❌ FAIL, ⚠️ CONCERNS, or — N/A for each status cell. `{pr_status}` is APPROVED or NOT_APPROVED from the AC agent result.
 
-        ```bash
-        mkdir -p .claude/state
-        # Terminator at COLUMN 0 — an indented terminator does not close an
-        # unquoted heredoc; bash swallows everything after it into the body,
-        # so the call below would never run. Body lines are unindented for
-        # the same reason: leading spaces are written verbatim.
-        cat > .claude/state/comment-body.md <<EOF
-{the body rendered above}
-EOF
+        Run `mkdir -p .claude/state` and write the body rendered above to `.claude/state/comment-body.md`
+        with the **file tool**, and post it in a later call (`references/file-write-rules.md#fresh-body-post`):
 
+        ```bash
         node .agents/skills/finalise/references/tracker-comment.js \
           --issue {jira_key} --body-file .claude/state/comment-body.md \
           --stage done \
@@ -2892,18 +2904,12 @@ EOF
 
    - Close the issue and verify closure:
 
+   Run `mkdir -p .claude/state` and write `.claude/state/comment-body.md` with the **file tool** (one
+   line: `Story/task development complete — PR: {PR_URL}. Status: accepted. All DoD criteria verified.`,
+   URL substituted). Post it in a later call (`references/file-write-rules.md#fresh-body-post`):
+
    ```bash
    # Post completion comment — always --body-file, never an inline --body.
-   #
-   # The heredoc terminator sits at COLUMN 0 even though this block is indented
-   # inside a numbered list. Bash does not accept an indented terminator for an
-   # unquoted heredoc: it warns "here-document delimited by end-of-file" and
-   # swallows everything after it INTO THE BODY, so the close below would never
-   # run and the issue would be neither commented nor closed — silently.
-   mkdir -p .claude/state
-   cat > .claude/state/comment-body.md <<EOF
-Story/task development complete — PR: {PR_URL}. Status: accepted. All DoD criteria verified.
-EOF
    node references/tracker-comment.js --issue {github_issue} \
      --body-file .claude/state/comment-body.md --stage done \
      --slot pr="{PR_URL}" \
@@ -3393,9 +3399,11 @@ reading 2 (6c) is taken exactly as before.
 this point — the fix does not exist yet — and the evaluator is run a **third** time after the commit
 with `--git-base` so both are re-read from git before anything is pushed (step 2b):
 
-```bash
-mkdir -p .claude/state
-cat > .claude/state/finalise-fix-finding.json <<'JSON'
+Run `mkdir -p .claude/state`, then write `.claude/state/finalise-fix-finding.json` with the **file
+tool** (`references/file-write-rules.md#the-rule`): the finding text is typed once, in the file, and
+never passes through a shell. Replace every `{…}` below with its value, then run the evaluator:
+
+```json
 {
   "severity": "{the finding's severity, from the agent YAML — copy it; leave the key out if the agent gave none. Every DoD agent grades its FAILs (AC, docs, security, compliance, fix-evidence), so an absent grade means an ungraded finding and halts}",
   "commits": 1,
@@ -3406,7 +3414,9 @@ cat > .claude/state/finalise-fix-finding.json <<'JSON'
   "mutationProof": { "test": "{the test that must go red on revert}", "redOnRevert": false, "run": ".claude/state/finalise-mutation-proof.log" },
   "otherFindingsOpen": [{every medium-or-higher finding in any section, and every other section that is FAIL — as strings; [] when none}]
 }
-JSON
+```
+
+```bash
 node references/finalise-fix-and-recheck.mjs --finding .claude/state/finalise-fix-finding.json --json
 ```
 

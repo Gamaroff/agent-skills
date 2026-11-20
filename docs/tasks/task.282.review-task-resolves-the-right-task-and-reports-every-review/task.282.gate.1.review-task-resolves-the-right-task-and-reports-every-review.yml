@@ -1,0 +1,85 @@
+schema: 2
+task: 'task.282.review-task-resolves-the-right-task-and-reports-every-review'
+task_title: 'review-task resolves the right task and reports every review'
+gate: CONCERNS
+status_reason: 'Both behaviours work and every change has a committed test with a control that goes red when reverted. Three medium findings: resolve-bare-task.sh wraps an over-long digit string to a wrong task id (reproduced), the wall-time success criterion has no measurement, and the task document still describes the earlier marker design.'
+reviewer: 'QA Engineer'
+head: '92a259573bb83f889fe93027460aebabc69987cb'
+updated: '2026-11-18T21:02:30Z'
+
+top_issues:
+  - id: 'T282-QA-1'
+    severity: medium
+    file: 'shared/resources/resolve-bare-task.sh'
+    finding: 'The all-digits check does not bound the value, and `n=$((10#$n))` wraps. Reproduced: `resolve-bare-task.sh 18446744073709551617` prints `found docs/tasks/task.1.*` (exit 0), and 9223372036854775808 reads as negative and returns `none`, which sends the run down the issue-number route. Control: 5 and 0005 both resolve to task 5. Origin: code review CR-1, reproduced by QA (rule 5d); the script is new in this PR, so it is not pre-existing.'
+    suggested_action: 'Strip leading zeros with string operations (keeping 0 when nothing is left) and refuse more than 9 digits with exit 2, instead of arithmetic. Add a test with both over-long inputs and the 5 / 0005 control.'
+    suggested_owner: dev
+    status: open
+  - id: 'T282-QA-2'
+    severity: medium
+    file: 'docs/tasks/task.282.review-task-resolves-the-right-task-and-reports-every-review/task.282.qa.2.review-task-resolves-the-right-task-and-reports-every-review.md'
+    finding: 'The success criterion "CI=true npm test wall time is within 10% of develop, median of five alternating runs with uptime beside each" has no measurement. Nothing in the evidence so far compares the branch with develop.'
+    suggested_action: 'Run five alternating develop/branch runs of `CI=true npm run test:remote -- --run test` on the LAN server, record both medians and the uptime beside each in the next QA report, or have the owner amend the criterion.'
+    suggested_owner: dev
+    status: open
+  - id: 'T282-QA-3'
+    severity: medium
+    file: 'docs/tasks/task.282.review-task-resolves-the-right-task-and-reports-every-review/task.282.review-task-resolves-the-right-task-and-reports-every-review.md'
+    finding: 'The Target Architecture "Marker" bullet, the Phase 1 checkbox and the Breaking Changes line still say review 1 passes the bare key and only N>=2 passes `review-task-N`. The shipped design always passes `review-<kind>-N` and the engine maps `-1` to the bare marker (canonicalStage). A reader of the document gets the wrong call-site contract.'
+    suggested_action: 'Reconcile those three places to the shipped design. Leave every Success Criteria line as it is: none of them depends on the old wording.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 8
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 22
+    escaped: 0
+    boundary: true
+    boundary_signals: []
+    notes: 'The probe ran resolve-bare-task.sh through the shell-argv form under bash and zsh: 10 hostile inputs (letter suffix, path traversal, command substitution, semicolon, negative, newline, hash, empty, Arabic-Indic digit, glob) all rejected, the legitimate input accepted, nothing escaped the sandbox. The over-long digit string in T282-QA-1 is a correctness defect, not an escape: it reads a different task, never writes.'
+  performance:
+    status: CONCERNS
+    notes: 'The wall-time criterion is unmeasured (T282-QA-2). The change adds one 7-test file of about half a second and no work on a hot path.'
+  reliability:
+    status: PASS
+    notes: 'The resolver answers all five cases, fails with exit 1 and a reason on a git failure or a duplicate, and never guesses. Round 1 of each review stage keeps its live bare marker.'
+  maintainability:
+    status: PASS
+    notes: 'One definition of the stage lists, held equal by a test; call sites always pass -N, so the call-site guard needs no exception.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T282-QA-1, T282-QA-2 and T282-QA-3 in qa-fix cycle 1.'
+      refs: ['shared/resources/resolve-bare-task.sh']
+  future:
+    - action: 'canonicalStage folds only `-1`, `-01` and `-001` to the bare marker. `review-task-02` and `review-task-2` give different markers (CR-3). The same holds on develop for `qa-gate-02` vs `qa-gate-2`, and the call sites reject leading zeros, so this is not new to this change. Normalise every numeric suffix in the engine.'
+      refs: ['shared/resources/tracker-comment.js']
+      provenance: pre-existing
+      remedy: unverified
+    - action: 'resolve-bare-task.sh step 3 uses `git log --all`, which also sees tags and stashes, then `git branch --contains`, which lists branches only: a task reachable only from a tag reads `none` (CR-2); the newest commit touching the path may be a deletion, which reports a branch that no longer holds the document (CR-4). Neither was reproduced. Check the exit status of `git branch --contains` and add `--diff-filter=AM`.'
+      refs: ['shared/resources/resolve-bare-task.sh']
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T282-QA-1', 'T282-QA-2', 'T282-QA-3']

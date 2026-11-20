@@ -150,8 +150,12 @@ function fixture() {
   return dir;
 }
 
+// task.280: the bash blocks come from the one fence reader the engines use, not a regex of this file's own.
+const {
+  extractBlocks,
+} = require("../shared/resources/qa-execute-snippets.mjs");
 function fencedBash(text) {
-  return [...text.matchAll(/```bash\n([\s\S]*?)\n```/g)].map((m) => m[1]);
+  return extractBlocks(text).map((b) => b.code);
 }
 
 // Every command that carries a .worktrees exclusion, read from where it ships.

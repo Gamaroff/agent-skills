@@ -1,0 +1,53 @@
+schema: 2
+task: 'task.313.skill-resolution-rule-covers-a-result-with-no-base-directory-line'
+task_title: 'The skill-resolution rule covers a Skill result with no Base directory line'
+gate: PASS
+status_reason: 'QA313-1 is fixed: the Implementation Summary now names the checks that reach Markdown (doc-links.js, bundle:check, skill-resolution-reach.test.mjs) and says format:check does not. The refute pass found no false claim in the change.'
+reviewer: 'QA Engineer'
+head: 'c713320b5d81be1fa1feefde90ab8cbb92a74bf5'
+updated: '2026-11-17T16:10:40Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 8555
+  phases_verified: '1/1'
+  trace:
+    phases_covered: [1]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    escaped: 0
+    boundary_signals: []
+    notes: 'Documentation-only change. No boundary: nothing accepts or rejects an input.'
+  performance:
+    status: PASS
+    notes: 'Not applicable.'
+  reliability:
+    status: PASS
+    notes: 'The new rule makes a previously undefined case deterministic: proceed with the loaded copy and log it.'
+  maintainability:
+    status: PASS
+    notes: 'One paragraph beside the unreadable row; the three orchestrator SKILL.md files cite the rule and restate nothing; bundle:check 0 problems.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future: []
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

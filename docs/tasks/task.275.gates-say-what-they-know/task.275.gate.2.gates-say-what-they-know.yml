@@ -1,0 +1,71 @@
+schema: 2
+task: 'task.275.gates-say-what-they-know'
+task_title: 'Gates say what they know'
+gate: PASS
+status_reason: 'Refute pass found one overclaim in the helper header (fixed in 9181242e7); the only open point is the wall-time criterion, whose method is unmet and whose bound is met by every available measure.'
+reviewer: 'QA Engineer'
+head: '9181242e7074549a123280433630170e7ac89b16'
+updated: '2026-11-15T16:57:52Z'
+
+top_issues:
+  - id: 'T275-QA-1'
+    severity: low
+    file: 'docs/tasks/task.275.gates-say-what-they-know/task.275.gates-say-what-they-know.md'
+    finding: 'Performance criterion (five alternating CI=true npm test runs within 10% of develop) was not run as specified. Evidence now recorded in the implementation report Issues Log: five alternating develop/branch pairs over the touched test files, median difference +31 ms under load 19 to 22; added tests about 0.4 s of a 685 s suite.'
+    suggested_action: 'An owner accepts the bound (amend the criterion with approved by), or asks for the full runs on the LAN server.'
+    suggested_owner: po
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 26
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: internal
+    boundary_signals: ['never']
+    boundary_reason: 'The criteria word "never" governs rendered lead text, not an input gate. gate-open-count.js reads only a gate file this pipeline writes and refuses an unreadable one; no corpus sink models a QA gate (boundary: internal).'
+    notes: 'No new input surface. The helper reads one local path argument and executes nothing.'
+  performance:
+    status: PASS
+    notes: 'Added tests 0.4 s; helper is one linear pass over a gate file.'
+  reliability:
+    status: PASS
+    notes: 'Unreadable or unrecognised gates exit 1 with no stdout, and the call sites stop on it; no path defaults a count to 0.'
+  maintainability:
+    status: PASS
+    notes: 'One definition of open (the helper, whose header now says exactly how it differs from the develop-next gate), one definition of which stages read the count (the templates).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'T275-QA-1 — the wall-time criterion was bounded and measured on the touched test files, not run as five alternating full-suite runs; an owner accepts the bound (amend the criterion with approved by) or asks for the full runs on the LAN server.'
+      refs: ['docs/tasks/task.275.gates-say-what-they-know/task.275.implementation.1.gates-say-what-they-know-initial-run.md']
+      remedy: unverified
+      carried_from: 'top_issues (route 2b, cycle 2)'
+    - action: 'Qa-planning also writes gates and may want the remedy field; the task scoped it out.'
+      refs: ['skills/qa-planning/SKILL.md']
+      remedy: unverified
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

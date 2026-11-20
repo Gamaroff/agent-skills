@@ -2596,32 +2596,39 @@ stale by design**: Step 2 then reviews it again.
 
    Post the comment through the CLI:
 
+   Run `mkdir -p .claude/state`, then write `.claude/state/comment-body.md` with the **file tool**, with
+   each `{NAME}` replaced by its value, and post it in a later call
+   (`references/file-write-rules.md#fresh-body-post`). Body:
+
+   ```markdown
+   ## Story Review Complete
+
+   **Recommendation**: {RECOMMENDATION}
+   **Readiness Score**: {SCORE}/10
+
+   | Severity | Count |
+   |---|---|
+   | Critical 🚨 | {CRITICAL} |
+   | Important ⚠️ | {IMPORTANT} |
+   | Optional 💡 | {OPTIONAL} |
+
+   **Review artifact**: `{REVIEW_FILE}`
+   {CHANGES_SECTION}
+   ```
+
    ```bash
-   # Terminator at COLUMN 0 — a QUOTED heredoc needs an unindented terminator
-   # just as an unquoted one does; bash otherwise swallows the call below into
-   # the body. Body lines are unindented too: leading spaces are written
-   # verbatim, and the inconsistent 3/5-space mix here would have shown up as
-   # a stray indented block inside the posted comment.
-   mkdir -p .claude/state
-   cat > .claude/state/comment-body.md <<'EOF'
-## Story Review Complete
-
-**Recommendation**: {RECOMMENDATION}
-**Readiness Score**: {SCORE}/10
-
-| Severity | Count |
-|---|---|
-| Critical 🚨 | {CRITICAL} |
-| Important ⚠️ | {IMPORTANT} |
-| Optional 💡 | {OPTIONAL} |
-
-**Review artifact**: `{REVIEW_FILE}`
-{CHANGES_SECTION}
-EOF
+   CRITICAL={the critical-issue count written into the body above}   # a new shell: re-bind it
+   # REVIEW_N: this review's number — the `{n}` of the report just written
+   # (`story.{prd}.{epic}.{story}.review.{n}.…`); for a standalone validate, which
+   # writes no numbered report, the next unused number in the story directory.
+   # Bound here because this block is its own shell. Review 1 reads the bare
+   # marker already on a live issue, so `-1` is safe on an issue that predates this.
+   REVIEW_N="{n}"
+   case "$REVIEW_N" in ''|*[!0-9]*|0|0[0-9]*) echo "HALT: REVIEW_N must be this review's report number (got '$REVIEW_N')"; exit 1 ;; esac
 
    node .agents/skills/review-story/references/tracker-comment.js \
      --issue "$REVIEW_ISSUE" --body-file .claude/state/comment-body.md \
-     --stage review-story \
+     --stage "review-story-${REVIEW_N}" \
      --slot outcome="{plain-language outcome — see the table below}" \
      --slot blocking="${CRITICAL}" \
      --json \

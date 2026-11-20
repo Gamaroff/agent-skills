@@ -1,0 +1,39 @@
+{
+  "sink": "shell-exec",
+  "entry": "cli:shared/resources/observation-log.js",
+  "name": "set-status open guard",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 5,
+  "passed": 5,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "observation_limits": [
+    "effects-after-accept"
+  ],
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": [
+    "set-status",
+    "--id",
+    "1",
+    "--status",
+    "open",
+    "--expect-status",
+    "{input}",
+    "--workspace",
+    "{fixture}",
+    "--dry-run",
+    "--json"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "fixture_copy": null,
+  "ran_at": "2026-11-18T19:00:44.670Z"
+}

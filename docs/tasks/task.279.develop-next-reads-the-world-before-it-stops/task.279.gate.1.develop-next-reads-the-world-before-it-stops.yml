@@ -1,0 +1,66 @@
+schema: 2
+task: 'task.279.develop-next-reads-the-world-before-it-stops'
+task_title: 'develop-next reads the world before it stops'
+gate: CONCERNS
+status_reason: 'All 8 success criteria verified; both mutation proofs went red on named tests; npm test median 732 s against 734 s on develop (-0.3%). One medium finding: CHANGELOG.md has no [Unreleased] entry citing task 279, which /finalise 6d HALTs on.'
+reviewer: 'QA Engineer'
+head: '013d77e7ec300455b0892c0284172f96cde2d23b'
+updated: '2026-11-17T21:54:15Z'
+
+top_issues:
+  - id: 'T279-001'
+    severity: medium
+    file: 'CHANGELOG.md'
+    finding: 'changelog-cites.sh task.279 printed "missing (task 279)": no [Unreleased] entry cites the task, and /finalise 6d HALTs without it.'
+    suggested_action: 'Add an [Unreleased] entry under ### Added that cites (task 279) and observations #138 and #157.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 19
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    boundary_signals: []
+    boundary_reason: 'The criteria classifier matched nothing. The one predicate the diff adds, halt-evidence.mjs#decide, takes a run-state file the pipeline writes and a PR-state token compared by exact equality with a closed set, so any other value reads unknown and the halt stands. Nine CLI cases were run by hand (one accepting control, eight rejected) but by-hand runs are not counted as probes.'
+    notes: 'boundary: false. Reasoned from the code and nine hand-run CLI cases; decide is probed at /finalise if that step classes it a boundary.'
+  performance:
+    status: PASS
+    notes: 'Median 732 s on the PR head against 734 s on develop (-0.3%) over five alternating pairs on the LAN server; limit +10%. Server 1-minute load stayed under 1.3 before every run.'
+  reliability:
+    status: PASS
+    notes: 'A failed PR query, an unreadable document or a missing prNumber keeps the halt; the state write is a tmp-file rename.'
+  maintainability:
+    status: PASS
+    notes: 'One engine, one step-doc block, one test per orchestrator line; bundle --check reports 0 problems.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Add the CHANGELOG.md [Unreleased] entry citing (task 279).'
+      refs: ['CHANGELOG.md']
+  future:
+    - action: 'halt-evidence.mjs: the --json flag is parsed at line 91 and never read; drop it or document it as accepted for symmetry.'
+      refs: ['skills/develop-next/scripts/halt-evidence.mjs']
+      remedy: unverified
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions:
+    - 'CHANGELOG.md entry citing task 279 lands first.'

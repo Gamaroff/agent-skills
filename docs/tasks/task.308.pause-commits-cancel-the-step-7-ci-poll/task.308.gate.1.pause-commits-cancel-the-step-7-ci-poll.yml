@@ -1,0 +1,68 @@
+schema: 2
+task: 'task.308.pause-commits-cancel-the-step-7-ci-poll'
+task_title: 'Pause commits cancel the step 7 CI poll'
+gate: CONCERNS
+status_reason: 'Hook hold and CI_HEAD_2 fix work and are mutation-proved, but the new writer line in finalise 6c is held by no test, and the docs misstate which commit carries a pause made during the 6c wait.'
+reviewer: 'QA Engineer'
+head: '33c3c867bd72cc1bc6673cf1c952820c9267d5ee'
+updated: '2026-11-14T18:08:46Z'
+
+top_issues:
+  - id: 'T308-QA-1'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The 6c poll block line that records the acceptance head (finalise-ci-head-2.txt, SKILL.md:2274) is held by no test. Deleting it leaves every test green; the finalise-publish-boundary tests write the file themselves. Reproduced by deletion; control: reverting the later-turn reader does go red. Origin: reviewer CR-1 (medium) reframed, reproduced by QA.'
+    suggested_action: 'Add a test that extracts the poll block lines and asserts they write the recorded head from CI_HEAD_2, then mutation-prove it by deleting the writer.'
+    suggested_owner: dev
+    status: open
+  - id: 'T308-QA-2'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-on-precompact.sh'
+    finding: 'The hook comment, develop-pipeline-hooks.md, CHANGELOG and 17i say finalise''s acceptance or gaps commit carries a held step-7 pause commit. A pause during the 6c wait (the motivating case) comes after the acceptance push, so only Step 8''s commit pushes it. Origin: reviewer CR-2 (low/medium), confirmed by reading the 6a/6c order.'
+    suggested_action: 'Correct the wording in the hook comment, hooks.md, CHANGELOG and 17i to name both carriers (finalise for a pause before 6a, Step 8 for a pause during the 6c wait).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 4
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    boundary_signals: []
+    notes: 'No input boundary: a hold/push decision in a hook and a state-file read. boundary: false (no accept/reject predicate over untrusted input).'
+  performance:
+    status: PASS
+    notes: 'Saves a cancelled CI run per step-7 pause; no added work.'
+  reliability:
+    status: PASS
+    notes: 'A missing recorded head HALTs rather than passing or falling back to local HEAD.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Writer line untested and a doc claim inexact (T308-QA-1, T308-QA-2).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T308-QA-1 and T308-QA-2'
+      refs: ['skills/finalise/SKILL.md', 'shared/resources/develop-pipeline-on-precompact.sh']
+  future: []
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T308-QA-1 and T308-QA-2 fixed']

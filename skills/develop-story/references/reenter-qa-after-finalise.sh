@@ -5,8 +5,9 @@
 #
 # Sibling of grant-qa-cycles.sh. A /finalise run that finds Definition of Done gaps HALTs the
 # develop pipeline at Step 7 and leaves a halt snapshot with halt_step 7. When the gaps are closed
-# by a CODE change, the plain resume (`advance-pipeline-lock.sh --restore`) brings the lock back at
-# step 7 and /finalise re-runs over a head no QA gate has read — and the obvious backward move,
+# by a CODE change, a plain resume (`advance-pipeline-lock.sh --restore`) would bring the lock back at
+# step 7 and /finalise would re-run over a head no QA gate has read, so --restore now REFUSES that
+# halt (task.276); this script is the door, and calls it with --allow-dod-gaps. The obvious backward move,
 # `advance-pipeline-lock.sh 5`, is a silent no-op on a step-7 lock (that helper is monotonic, and
 # stays so). This script is the ONE writer that may lower current_step, and only on this path:
 #
@@ -93,8 +94,8 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ADVANCE="$HERE/advance-pipeline-lock.sh"
 # bundle-dependency: shared/resources/qa-cycle.sh
 QA_CYCLE_SH="$HERE/qa-cycle.sh"
-# bundle-dependency: shared/resources/newest-numbered.sh
-NEWEST_SH="$HERE/newest-numbered.sh"
+# bundle-dependency: shared/resources/qa-report-cycles.sh
+QA_REPORT_CYCLES_SH="$HERE/qa-report-cycles.sh"
 # bundle-dependency: shared/resources/ci-tree-equivalence.js
 TREE_EQ="$HERE/ci-tree-equivalence.js"
 
@@ -119,7 +120,7 @@ if [ ! -f "$REPORT" ]; then
 fi
 command -v jq >/dev/null 2>&1 || { echo "reenter-qa: jq not found — the re-entry cannot be recorded" >&2; exit 1; }
 command -v git >/dev/null 2>&1 || { echo "reenter-qa: git not found — code movement cannot be measured" >&2; exit 1; }
-for f in "$ADVANCE" "$QA_CYCLE_SH" "$NEWEST_SH" "$TREE_EQ"; do
+for f in "$ADVANCE" "$QA_CYCLE_SH" "$QA_REPORT_CYCLES_SH" "$TREE_EQ"; do
   [ -f "$f" ] || { echo "reenter-qa: $(basename "$f") not found beside this script ($f) — re-bundle the skill" >&2; exit 1; }
 done
 # A <doc-dir> at the repository root makes ":(exclude)$DOC_DIR" exclude the whole tree, and the
@@ -136,7 +137,17 @@ CWD_PREFIX=$(git rev-parse --show-prefix 2>/dev/null) || CWD_PREFIX="?"
   || { echo "reenter-qa: run from the root of the repository that holds '$DOC_DIR' ($DOC_TOP), not '$PWD'" >&2; usage; }
 
 # ── 1. Refusals — every one before any write ─────────────────────────────────
-[ -f "$LOCK" ] && refuse lock-present "a live lock exists at '$LOCK'; this re-entry starts from a halt snapshot, and a live lock means the run is already resumed"
+if [ -f "$LOCK" ]; then
+  # A live lock normally means the run is already resumed. The one state that is not: the lock sits at
+  # step 7 over a newest DoD that reads GAPS, i.e. a resume at step 7 happened where a code fix needed
+  # the QA loop (task.246, obs #135). The message then names the way back — it never routes to step 7.
+  LIVE_STEP=$(jq -r '.current_step // empty | tostring' "$LOCK" 2>/dev/null)
+  LIVE_DOD=$(bash "$ADVANCE" --newest-dod "$DOC_DIR" 2>/dev/null)
+  if [ "$LIVE_STEP" = "7" ] && [ -n "$LIVE_DOD" ] && [ -f "$LIVE_DOD" ] && grep -q '^\*\*Final Status:\*\* ❌ GAPS' "$LIVE_DOD"; then
+    refuse lock-present "a live lock at step 7 exists at '$LOCK' over a DoD that reads ❌ GAPS. If a CODE change closed the gaps, that lock sits over a head no gate has read: run advance-pipeline-lock.sh --halt --reason dod-gaps-code-fix --step 7 '$DOC_DIR' to turn it into a halt snapshot, then run this script again. Never resume at step 7 over code no review has read. If the fix is document-only, the lock is right: continue the run."
+  fi
+  refuse lock-present "a live lock exists at '$LOCK'; this re-entry starts from a halt snapshot, and a live lock means the run is already resumed"
+fi
 
 WHICH_ERR=$(mktemp) || exit 1
 CAND=$(bash "$ADVANCE" --restore --which "$DOC_DIR" 2>"$WHICH_ERR"); rc=$?
@@ -150,26 +161,14 @@ fi
 HALT_STEP=$(jq -r '.halt_step // empty | tostring' "$CAND" 2>/dev/null)
 [ "$HALT_STEP" = "7" ] || refuse not-a-finalise-halt "the snapshot '$CAND' records halt_step '${HALT_STEP:-none}', not 7 — resume it with advance-pipeline-lock.sh --restore"
 
-# shellcheck source=newest-numbered.sh
-source "$NEWEST_SH" || { echo "reenter-qa: could not source newest-numbered.sh" >&2; exit 1; }
-# Keyed on the work item's own STEM, never the directory: a co-located bug writes its own
-# {bug-prefix}.dod.{N}.*.md beside the parent's, and a directory-wide pattern read a higher-numbered
-# bug DoD as the task's verdict (task.170 QA cycle 1, CR-1 — the same reason finalise keys its own
-# lookup on the stem, TASK-125-BUG-8). The stem is READ from the DoD files themselves rather than
-# parsed from the directory name: a regex over the name has to know every numbering shape — a
-# parallel story.305.1-1, a sub-story story.309.2.3A — and cycles 2 and 3 each found one it missed.
-# A DoD's stem is the text before its first .dod.; it is the work item's when the directory name
-# continues it with a "." — so task.42 never matches task.420.*, and a co-located bug's stem
-# (task.42.bug.3) is never one the parent's directory name continues. The longest such stem wins.
-STEM=$(find "$DOC_DIR" -maxdepth 1 -type f -name '*.dod.*.md' 2>/dev/null | while IFS= read -r f; do
-  b=${f##*/}; p=${b%%.dod.*}
-  # The leading ( is load-bearing: bash 3.2 (macOS /bin/bash) cannot parse an unparenthesised
-  # case pattern inside $(...) and fails at ";;" (task.170 finalise, DoD gap 1).
-  case "$(basename "$DOC_DIR")." in ("$p".*) printf '%s\n' "$p" ;; esac
-done | awk '{ print length, $0 }' | sort -rn | head -1 | cut -d' ' -f2-)
-[ -n "$STEM" ] || refuse no-dod "no DoD file in '$DOC_DIR' whose stem the directory name continues (bug DoDs excluded) — a step-7 halt with no DoD file is not a DoD-gaps halt"
-DOD=$(newest_numbered "$DOC_DIR" dod -name "${STEM}.dod.*.md")
-[ -n "$DOD" ] && [ -f "$DOD" ] || refuse no-dod "no ${STEM}.dod.{N}.*.md in '$DOC_DIR' — a step-7 halt with no DoD file is not a DoD-gaps halt"
+# The work item's newest DoD comes from the ONE definition, advance-pipeline-lock.sh --newest-dod —
+# the same one --restore's DoD-gaps guard reads, so the two cannot disagree about which halt is a
+# DoD-gaps halt (task.276). It is keyed on the work item's own STEM, never the directory: a co-located
+# bug writes its own {bug-prefix}.dod.{N}.*.md beside the parent's, and a directory-wide pattern read
+# a higher-numbered bug DoD as the task's verdict (task.170 QA cycle 1, CR-1). The rule and its
+# history are in that script.
+DOD=$(bash "$ADVANCE" --newest-dod "$DOC_DIR" 2>/dev/null) || DOD=""
+[ -n "$DOD" ] && [ -f "$DOD" ] || refuse no-dod "no {stem}.dod.{N}.*.md in '$DOC_DIR' whose stem the directory name continues (a co-located bug's DoD is excluded) — a step-7 halt with no DoD file is not a DoD-gaps halt"
 grep -q '^\*\*Final Status:\*\* ❌ GAPS' "$DOD" || refuse dod-not-gaps "the newest DoD file '$DOD' does not carry **Final Status:** ❌ GAPS"
 
 # The gate and its cycle number come from the ONE definition, qa-cycle.sh, and are refused together.
@@ -260,21 +259,37 @@ fi
 # restores the files it held aside, so an untracked file is the normal state of a branch, and nothing
 # here can tell one of those from a new fix file. Naming them on both outcomes hands that one
 # judgement to the operator, who can make it, instead of a rule that is wrong in one direction.
-UNTRACKED_NOTE=""
-[ -z "$UNTRACKED" ] || UNTRACKED_NOTE=" Untracked files outside '$DOC_DIR' (not read by any review — if one is part of the fix, commit it and run this script again): $(printf '%s' "$UNTRACKED" | tr '\n' ' ')"
-[ "$DOCS_ONLY" -eq 0 ] || refuse no-code-moved "only documentation changed outside '$DOC_DIR' since the gate's head ${GATE_HEAD:0:12} (ci.docsOnly.patterns: $DOCS_NOTE) — a document-only fix; resume at step 7 with advance-pipeline-lock.sh --restore and re-run /finalise.$UNTRACKED_NOTE"
-[ "$MOVED" -gt 0 ] 2>/dev/null || refuse no-code-moved "nothing outside '$DOC_DIR' was committed since the gate's head ${GATE_HEAD:0:12} — a document-only fix; resume at step 7 with advance-pipeline-lock.sh --restore and re-run /finalise.$UNTRACKED_NOTE"
-[ -z "$UNTRACKED_NOTE" ] || echo "reenter-qa:$UNTRACKED_NOTE" >&2
+#
+# One ORDERED route per message (task.276, obs #75). The step-7 restore CONSUMES the snapshot, and
+# this script reads that snapshot: a message offering "resume at step 7" and then "commit it and run
+# this script again" offered two remedies whose order destroys the second. Nothing is consumed on a
+# refusal, so the safe order is: with untracked files, the commit-and-re-run route first ("if one is
+# part of the fix"), the step-7 route second ("Otherwise"); on a clean tree, the step-7 route alone.
+UNTRACKED_LIST=""
+[ -z "$UNTRACKED" ] || UNTRACKED_LIST="$(printf '%s' "$UNTRACKED" | tr '\n' ' ')"
+STEP7_ROUTE="resume at step 7 with advance-pipeline-lock.sh --restore --allow-dod-gaps '$DOC_DIR' and re-run /finalise"
+no_code_moved() { # $1 = what was measured
+  if [ -z "$UNTRACKED_LIST" ]; then
+    refuse no-code-moved "$1 — a document-only fix; $STEP7_ROUTE."
+  fi
+  refuse no-code-moved "$1 — a document-only fix, unless one of these untracked files outside '$DOC_DIR' is part of the fix (no review reads them): $UNTRACKED_LIST. If one is, commit it and run this script again — nothing was consumed. Otherwise $STEP7_ROUTE."
+}
+[ "$DOCS_ONLY" -eq 0 ] || no_code_moved "only documentation changed outside '$DOC_DIR' since the gate's head ${GATE_HEAD:0:12} (ci.docsOnly.patterns: $DOCS_NOTE)"
+[ "$MOVED" -gt 0 ] 2>/dev/null || no_code_moved "nothing outside '$DOC_DIR' was committed since the gate's head ${GATE_HEAD:0:12}"
+[ -z "$UNTRACKED_LIST" ] || echo "reenter-qa: Untracked files outside '$DOC_DIR' (not read by any review — if one is part of the fix, commit it and run this script again): $UNTRACKED_LIST" >&2
 
 # ── 3. Budget base, as grant-qa-cycles.sh reconstructs it ────────────────────
-# max(highest gate — BASE, read above — , `### QA Cycle` entries in the report).
-# `|| true`, not `|| echo 0`: grep -c prints 0 AND exits 1 on no match.
-DONE=$(grep -c '^### QA Cycle' "$REPORT" 2>/dev/null || true)
-DONE=${DONE:-0}
+# max(highest gate — BASE, read above — , the report's DISTINCT cycle numbers). Counted by
+# qa-report-cycles.sh, the one definition: a `grep -c '^### QA Cycle'` counted the Decisions Log's
+# headings and the QA Iteration History's, so four cycles read as eight (task.276, obs #135).
+DONE=$(bash "$QA_REPORT_CYCLES_SH" "$REPORT" 2>/dev/null) || DONE=0
+case "$DONE" in ''|*[!0-9]*) DONE=0 ;; esac
 [ "$DONE" -gt "$BASE" ] 2>/dev/null && BASE="$DONE"
 
 # ── 4. Restore, then lower — one atomic write ────────────────────────────────
-if ! RESTORE_OUT=$(bash "$ADVANCE" --restore "$DOC_DIR" 2>&1); then
+# --allow-dod-gaps: this script IS the door a DoD-gaps snapshot is entered through, so it is the one
+# caller the --restore guard lets through without ceremony (task.276, obs #46).
+if ! RESTORE_OUT=$(bash "$ADVANCE" --restore --allow-dod-gaps "$DOC_DIR" 2>&1); then
   printf '%s\n' "$RESTORE_OUT" | sed 's/^advance-pipeline-lock:/reenter-qa:/' >&2
   exit 1
 fi

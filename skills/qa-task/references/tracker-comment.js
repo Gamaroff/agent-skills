@@ -107,6 +107,7 @@ const COMMENT_MARKER_PREFIX = "agent-skills-comment:";
  * The stages that may carry a numeric suffix (`qa-cycle-2`, `qa-fix-3`),
  * because each cycle must post its own comment rather than being suppressed by
  * the previous cycle's marker. Every other stage fires at most once per run.
+ * (The review stages are scoped too, since task.282: see the list below.)
  */
 // `pipeline-paused` takes the STEP it paused at as its suffix (`pipeline-paused-4`),
 // for the same reason: one pipeline can pause more than once, and each pause is
@@ -114,12 +115,45 @@ const COMMENT_MARKER_PREFIX = "agent-skills-comment:";
 // stakeholder-summary.js, which a test holds equal to this list.
 // `qa-gate` is what qa-task / qa-story post at Step 13b, once per QA cycle
 // (task.121): bare, its marker suppressed every gate after the first.
+// `review-story`, `review-task` and `review-bug` are keyed by the review report
+// number (task.282, obs #129): a second review on one issue answered `already`
+// against the first review's marker and its verdict never reached the tracker.
+// Round 1 of these three is the BARE marker (see FIRST_ROUND_IS_BARE_STAGES).
 const CYCLE_SCOPED_STAGES = Object.freeze([
   "qa-gate",
   "qa-cycle",
   "qa-fix",
   "pipeline-paused",
+  "review-story",
+  "review-task",
+  "review-bug",
 ]);
+
+// Stages whose round 1 IS the bare marker (task.282). Every review comment
+// posted before the numbered form existed carries `agent-skills-comment:review-task`
+// (and -story, -bug); a call site now always passes `review-task-${N}`, and
+// round 1 must still read `already` against that live marker rather than post a
+// second comment under `review-task-1`. Held a subset of CYCLE_SCOPED_STAGES by
+// tracker-comment.test.mjs. `qa-gate` and friends are NOT here: their call sites
+// have passed a suffix since task.121, so no bare marker is waiting for them.
+const FIRST_ROUND_IS_BARE_STAGES = Object.freeze([
+  "review-story",
+  "review-task",
+  "review-bug",
+]);
+
+/**
+ * The stage a marker is built from: `review-task-1` is `review-task`, every
+ * other stage is itself. Applied once, where --stage is validated, so every
+ * marker the engine writes or searches for agrees.
+ */
+function canonicalStage(stage) {
+  const m = /^(.+)-(\d+)$/.exec(String(stage));
+  if (m && FIRST_ROUND_IS_BARE_STAGES.includes(m[1]) && Number(m[2]) === 1) {
+    return m[1];
+  }
+  return stage;
+}
 
 const COMMENT_STAGES = Object.freeze([
   "work-started",
@@ -536,7 +570,28 @@ async function run({
   // resolved" rather than throwing on the temporal dead zone.
   let leadKind = null;
 
+  // A body file is single-use. Once the comment is posted, already there, or
+  // deferred (the record carries the body on stdin), nothing more will read the
+  // file, and a copy left behind is what a later run would post if its own
+  // write were skipped: the fixed path .claude/state/comment-body.md is shared
+  // by every call site (task 284, QA bugs 1 and 2). Any other outcome keeps the
+  // file, so a retry has its body. Removal is best-effort and never changes the
+  // exit code.
+  const CONSUMING_REASONS = new Set(["posted", "already", "deferred"]);
   const emit = (payload, exitCode) => {
+    // "deferred" consumes only when a journal record carries the body. A deferred
+    // outcome whose journal write failed has no record, and the file is then the
+    // body's only copy (task 284, QA cycle 2, bug 3).
+    const delivered =
+      CONSUMING_REASONS.has(payload.reason) &&
+      (payload.reason !== "deferred" || Boolean(payload.record));
+    if (delivered && args.bodyFile) {
+      try {
+        fs.unlinkSync(args.bodyFile);
+      } catch (_) {
+        /* already gone, or not ours to remove */
+      }
+    }
     if (args.json)
       output.emit({ ...payload, stage: args.stage, lead: leadKind, exitCode });
     return { exitCode, ...payload };
@@ -612,6 +667,8 @@ async function run({
     );
     return { exitCode: 2 };
   }
+  // task.282: round 1 of a review stage is the bare marker already on live issues.
+  if (args.stage) args.stage = canonicalStage(args.stage);
 
   // ── THE PLAIN-LANGUAGE LEAD ───────────────────────────────────────────────
   // Standard and catalogue: stakeholder-summary.md. The engine renders the lead
@@ -1089,11 +1146,13 @@ module.exports = {
   markerHtml,
   markerText,
   isKnownStage,
+  canonicalStage,
   firstLineOf,
   loadDotEnv,
   COMMENT_MARKER_PREFIX,
   COMMENT_STAGES,
   CYCLE_SCOPED_STAGES,
+  FIRST_ROUND_IS_BARE_STAGES,
   USAGE,
 };
 

@@ -1,0 +1,78 @@
+schema: 2
+task: 'task.283.authoring-and-fix-steps-state-the-rules-they-keep-missing'
+task_title: 'Authoring and fix steps state the rules they keep missing'
+gate: CONCERNS
+status_reason: 'The cycle 3 rewrite closed QA-10 (every earlier reproduction now HALTs). The scoped cycle 4 review reproduced one medium defect in the rewritten block: a failed mktemp is read as a pass. Wall-time criterion still unrecorded.'
+reviewer: 'QA Engineer'
+head: 'c558550961ffd9e3a85cde7a6e061e879e9c2d62'
+updated: '2026-11-20T04:38:58Z'
+
+top_issues:
+  - id: 'T283-QA-11'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-3-develop-loop.md'
+    finding: 'The rewritten CHANGELOG block creates two temp files with mktemp. With TMPDIR=/nonexistent/dir both variables are empty, the redirects and the numeric test only print errors, and the block exits 0 on a branch that holds a misplaced bullet. Reproduced by execution: control exits 1 with the HALT; the bad-TMPDIR run exits 0. "Could not look" is read as a pass, the same defect class as QA-5. Origin: code-review CR-1 (high confidence), reproduced by QA. Low advisories: CR-2 (shallow-clone HALT gives no remedy; closing prose wrong for it), CR-3 (under set -e the diff line exits silently), CR-4 (stated limits and cleanup untested).'
+    suggested_action: 'Remove the temp files (hold both bullet lists in variables), HALT when either read fails, capture the diff exit code in a set -e safe form, name the shallow-clone remedy, and test each: bad TMPDIR, set -e, shallow, release cut, offsetting removal.'
+    suggested_owner: dev
+    status: open
+  - id: 'T283-QA-3'
+    severity: medium
+    file: 'docs/tasks/task.283.authoring-and-fix-steps-state-the-rules-they-keep-missing/task.283.authoring-and-fix-steps-state-the-rules-they-keep-missing.md'
+    finding: 'Carried: the performance criterion (CI=true npm test wall time within 10% of develop, median of five alternating runs with uptime beside each, LAN server) is not yet recorded. The measurement is running and .claude/state/walltime-283.tsv has no rows yet.'
+    suggested_action: 'Record the table and median when the run finishes, or obtain an owner-approved criterion amendment (approved by <name>).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 82
+
+evidence:
+  tests_reviewed: 30
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: true
+    boundary_signals: []
+    notes: 'The CHANGELOG block is a repository-state boundary; the engine refuses it as mutating, so committed tests under bash and zsh are the evidence and the DoD needs an override for probes_executed: 0.'
+  performance:
+    status: CONCERNS
+    notes: 'Wall-time criterion not yet recorded (T283-QA-3).'
+  reliability:
+    status: CONCERNS
+    notes: 'A failed mktemp reads as a pass (T283-QA-11).'
+  maintainability:
+    status: PASS
+    notes: 'Stated limits (offsetting removal, release cut) were untested; folded into QA-11.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T283-QA-11 and record the wall-time measurement.'
+      refs: ['shared/resources/develop-pipeline-step-3-develop-loop.md', 'shared/resources/tests/develop-loop-changelog-placement.test.mjs']
+  future: []
+
+bug_resolution:
+  bugs_fixed: 5
+  bugs_remaining: 1
+  fix_date: '2026-11-20'
+  total_iterations: 3
+  verification_method: 'Committed tests (30 pass), mutation proofs, rebundle check, reproductions of bugs 6, 7, 9 all HALT'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T283-QA-11 resolved', 'T283-QA-3 recorded or amended by an approver']

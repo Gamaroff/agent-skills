@@ -134,7 +134,7 @@ fi
 
 # (d) The helper is missing beside the script → 5a with a warning, never 5b on a gate that may be stale.
 D="$T/ev-d"; L="$D/state/lock.json"; S="$D/state/last-halt.json"; mkdir -p "$D/state" "$D/bin"; mkgitdoc "$D/repo" 3
-for f in grant-qa-cycles.sh qa-cycle.sh advance-pipeline-lock.sh; do cp "$(dirname "$SCRIPT")/$f" "$D/bin/$f"; done
+for f in grant-qa-cycles.sh qa-cycle.sh qa-report-cycles.sh advance-pipeline-lock.sh; do cp "$(dirname "$SCRIPT")/$f" "$D/bin/$f"; done
 snap "$S" "$D/repo/docs/t" "not-converging" 5a
 OUT=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$S" bash "$D/bin/grant-qa-cycles.sh" "$D/repo/docs/t" 2 2>"$D/err"); RC=$?
 if [ "$RC" -eq 0 ] && [ "$(jq -r '.qa_phase' "$L")" = "5a" ] && grep -q "code-moved-since-gate.sh not found" "$D/err"; then
@@ -259,6 +259,12 @@ OUT=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$D/none" bash "$SCRIPT" "$D/doc
 printf '### QA Cycle 1\n' > "$D/report.md"; printf '{"current_step":5}\n' > "$L"
 PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$D/none" bash "$SCRIPT" "$D/doc" 2 "$D/report.md" >/dev/null 2>&1
 [ "$(jq -r '.qa_max_cycles' "$L")" = "5" ] && pass "disk ahead of the report (gate.3, 1 entry): base is the gate → 3 + 2 = 5" || fail "disk ahead" "$(cat "$L")"
+# task.276 (obs #135): the base counts DISTINCT cycles. The Decisions Log and the QA Iteration History
+# each carry a `### QA Cycle N` heading per cycle, and `grep -c` read four cycles as eight.
+printf '%s\n' '## Decisions Log' '### QA Cycle 1' '### QA Cycle 2' '### QA Cycle 3' '### QA Cycle 4' '## QA Iteration History' '### QA Cycle 1' '### QA Cycle 2' '### QA Cycle 3' '### QA Cycle 4' > "$D/report.md"
+printf '{"current_step":5}\n' > "$L"
+PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$D/none" bash "$SCRIPT" "$D/doc" 2 "$D/report.md" >/dev/null 2>&1
+[ "$(jq -r '.qa_max_cycles' "$L")" = "6" ] && pass "four cycles under eight headings: base 4 + 2 = 6, not 8 + 2 = 10 (obs #135)" || fail "doubled headings" "$(cat "$L")"
 # A missing report path is refused, not ignored.
 PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$D/none" bash "$SCRIPT" "$D/doc" 2 "$D/no-such-report.md" >/dev/null 2>&1; RC=$?
 [ "$RC" -ne 0 ] && pass "missing report path refused" || fail "missing report path" "exit 0"
@@ -369,6 +375,12 @@ D="$T/lonely"; L="$D/lock.json"; mkdir -p "$D/bin"; mkdoc "$D/doc" 3; printf '{"
 cp "$SCRIPT" "$D/bin/grant-qa-cycles.sh"
 ERR=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$D/none.json" bash "$D/bin/grant-qa-cycles.sh" "$D/doc" 2 2>&1 >/dev/null); RC=$?
 [ "$RC" -ne 0 ] && echo "$ERR" | grep -q "qa-cycle.sh not found" && [ "$(jq -r '.qa_max_cycles // "absent"' "$L")" = "absent" ] && pass "qa-cycle.sh missing beside the script → named refusal, nothing written" || fail "missing qa-cycle.sh sibling" "rc=$RC err=$ERR"
+# task.276: a missing qa-report-cycles.sh must not read as "the report records no cycle" — that would
+# silently LOWER the budget base. It refuses by name instead.
+D="$T/lonely2"; L="$D/lock.json"; mkdir -p "$D/bin"; mkdoc "$D/doc" 3; printf '{"current_step":5}\n' > "$L"
+cp "$SCRIPT" "$D/bin/grant-qa-cycles.sh"; cp "$(dirname "$SCRIPT")/qa-cycle.sh" "$D/bin/qa-cycle.sh"
+ERR=$(PIPELINE_LOCK="$L" PIPELINE_HALT_SNAPSHOT="$D/none.json" bash "$D/bin/grant-qa-cycles.sh" "$D/doc" 2 2>&1 >/dev/null); RC=$?
+[ "$RC" -ne 0 ] && echo "$ERR" | grep -q "qa-report-cycles.sh not found" && [ "$(jq -r '.qa_max_cycles // "absent"' "$L")" = "absent" ] && pass "qa-report-cycles.sh missing beside the script → named refusal, budget never silently lowered" || fail "report-cycles sibling missing" "rc=$RC err=$ERR"
 
 # ── refusals ─────────────────────────────────────────────────────────────────
 D="$T/refuse"; L="$D/lock.json"; mkdir -p "$D"; mkdoc "$D/doc" 5; printf '{"current_step":5}\n' > "$L"

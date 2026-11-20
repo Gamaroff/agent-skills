@@ -43,10 +43,11 @@ QA Skill".
 When invoked from the `/develop-task` orchestrator, the Skill `args` field may carry `key=value` tokens:
 
 ```
-Skill(qa-task, args="traceability_matrix=<path> code_review_blocking=true")
+Skill(qa-task, args="traceability_matrix=<path> code_review_blocking=true record_criteria=<path>")
 ```
 
 - `traceability_matrix=<path>` — a pre-built traceability matrix (see Step 5 / traceability handling); absent → internal mapping.
+- `record_criteria=<path>` — the listing the orchestrator saved from `finalise-record-preflight.js check --json`: every success criterion that says where its record lives, with `index`, `criterion`, `location` and `state`. Absent or empty `listed` → nothing extra to write. For each `listed` entry, write the record **into the report its `location` names** (`qa-report` is this run's QA report) as the step that produces the evidence runs, with the command and its output, and cite it from the Findings table. A `state` of `location-absent` for `qa-report` is expected while the report is being written. **Never edit a criterion's wording to fit the evidence**: the evidence moves, the criterion does not. A mutation-proof record names the **test that went red**, not only that one did.
 - `code_review_blocking=true` — run-level override. Set `CODE_REVIEW_BLOCKING_ARG` from this token (default empty when absent). It feeds the canonical resolution in **Step 3b step 6 (Gate mapping)** so high-confidence code-review bugs gate the build (and thus get fixed in the qa-fix loop) without needing per-task frontmatter. A task still opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch). Absent for standalone runs → code review stays advisory unless the task opts in via frontmatter, except a bug QA reproduces by execution (step 5d).
 
 ## When to Use This Skill
@@ -671,15 +672,15 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
    **Check every anchor before the findings go anywhere** (task.194). A reviewer's `file_line` is a
    claim, not a fact: on PR #594 the shared reviewer reported every finding at a patch-file line
    number, and the number was rendered as if it were real. Right after the `code_review:` block is
-   read, write it to a JSON file and run the shared checker, from the repository root:
+   read, write it to a JSON file and run the shared checker, from the repository root. First get a
+   scratch path with `mktemp "${TMPDIR:-/tmp}/qa-findings.XXXXXX"`, then write the parsed block to that
+   path with the **file tool** (`references/file-write-rules.md#the-rule`): `line_text` quotes source,
+   and source carries `'` and `$`, which a shell heredoc would mangle. Then run:
 
    ```bash
-   # The parsed code_review: block as JSON — {"code_review":{…}}. Items 5 and 6 read this same file.
-   FINDINGS_JSON=$(mktemp "${TMPDIR:-/tmp}/qa-findings.XXXXXX")
-   # A quoted heredoc: line_text quotes source, and source carries ' and $.
-   cat > "$FINDINGS_JSON" <<'JSON'
-{findings-json}
-JSON
+   # {findings-json}: the scratch path above, holding the parsed code_review: block as JSON —
+   # {"code_review":{…}}. Items 5 and 6 read this same file.
+   FINDINGS_JSON="{findings-json}"
    # --rev HEAD: the diff under review is $BASE...HEAD, so uncommitted edits are not what was reviewed.
    # Decide on the checker's `reason`, never on its exit code: `node` also exits 1 when the script
    # cannot load, and that must not read as "malformed anchors — mark and continue" (task.195).
@@ -1433,12 +1434,22 @@ recommendations:
   future: # Non-blocking — address later
     - action: '{Description}'
       refs: ['{file.ts}']
+      remedy: unverified # verified | unverified — see the note below the schema
+      # verified_by: '{the command or test that showed the remedy working}' # required when remedy: verified
 
 deployment_readiness:
   staging: APPROVED|CONDITIONAL|BLOCKED
   production: APPROVED|CONDITIONAL|BLOCKED
   conditions: [] # List conditions if CONDITIONAL
 ```
+
+> **`remedy:` on a `recommendations.future` action says whether its fix was run** (task 275, obs #86).
+> `verified` means someone ran it and it worked, and `verified_by:` names the command or test that
+> showed it — a `verified` with no `verified_by:` reads as `unverified`. `unverified` (also what an
+> entry with no `remedy:` reads as) means the action is a claim: a task cut from this gate runs the
+> remedy before the plan builds on it (`create-task` § 3.5). Mark an action `verified` only when this
+> run executed it; never because it looks right. Task.224's CR-1 prescribed "drop the cache entry and
+> resolve once more", and on Node v26.8.2 that fix failed.
 
 > **`file:` is required on every `top_issues[]` entry**, and it must be a repo-relative path that
 > appears in the change set — not a description, not a module name, not `unknown`. The develop-task
@@ -1906,8 +1917,14 @@ fi
 TARGET=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo develop)
 command node .agents/skills/qa-task/references/qa-read-back.js --doc "{task-file}" --target "$TARGET" >/dev/null || { echo "HALT: read-back not clean — not posting"; exit 1; }
 mkdir -p .claude/state
-BODY_FILE=.claude/state/qa-comment-body.md
-cat > "$BODY_FILE" <<'EOF'
+echo "body file: .claude/state/qa-comment-body.md"
+```
+
+Now write `.claude/state/qa-comment-body.md` with the **file tool**, in one call, with every `{…}`
+placeholder filled in textually. Nothing expands here: the file tool writes the text as given, so a
+`$` or a backtick in a finding is safe. Then run the block after it, in a later call. Body:
+
+```markdown
 ## QA Review: {GATE_DECISION}
 
 **Gate Decision**: {PASS/CONCERNS/FAIL}
@@ -1950,7 +1967,18 @@ cat > "$BODY_FILE" <<'EOF'
 2. {Step 2}
 
 ---
-EOF
+```
+
+```bash
+# Re-checked immediately before the post: the body was written in an earlier call, and the
+# read-back can have gone stale since (obs #226).
+TARGET=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo develop)
+command node .agents/skills/qa-task/references/qa-read-back.js --doc "{task-file}" --target "$TARGET" >/dev/null || { echo "HALT: read-back not clean — not posting"; exit 1; }
+# A new shell: re-bind the body file the file tool wrote above.
+BODY_FILE=.claude/state/qa-comment-body.md
+# The path is fixed, so a missing file means the write above did not happen. The file is removed
+# after the post attempt below, so a file found here was written for THIS post.
+[ -s "$BODY_FILE" ] || { echo "HALT: $BODY_FILE is missing or empty — write it with the file tool first"; exit 1; }
 
 # The plain-language lead, obtained ONCE and folded into $BODY_FILE — ABOVE the
 # arm split below, so the GitHub and Bitbucket arms post the same bytes and
@@ -1958,8 +1986,8 @@ EOF
 # moment uses; a pull-request comment about a moment that also exists on the
 # tracker reuses that stage rather than inventing a second vocabulary.
 #
-# GATE_DECISION is bound HERE, deliberately. The heredoc above is quoted
-# (`<<'EOF'`), so its [GATE_DECISION] placeholder is filled in textually when
+# GATE_DECISION is bound HERE, deliberately. The body above was written with the
+# file tool, so its {GATE_DECISION} placeholder is filled in textually when
 # the body is written — it never becomes a shell variable. Set this to the same
 # verdict you wrote into the body: PASS, CONCERNS, FAIL or WAIVED.
 GATE_DECISION="{PASS|CONCERNS|FAIL|WAIVED — the same verdict written into the body above}"
@@ -1994,8 +2022,14 @@ QA_CYCLE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR"); rc=$
 # it must not wear a refusal's clothes — that is how BUG-4 hid for a cycle.
 [ "$rc" -le 1 ] || { echo "⚠️  qa-cycle.sh not runnable (rc=$rc) — check the path" >&2; exit 1; }
 if [ -n "$QA_CYCLE" ]; then
+  # open_count: the gate's OPEN top_issues entries, so a PASS lead never says "no problems"
+  # beside open lows (task 275, obs #84). Read from the gate this cycle wrote, by the one
+  # helper the issue-comment arm below also calls — never a grep over the file, which counts
+  # closed entries too. A gate it cannot read stops here: no count must never render as zero.
+  THIS_GATE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR" --path gate) || exit 1
+  OPEN_COUNT=$(node .agents/skills/qa-task/references/gate-open-count.js "$THIS_GATE") || exit 1
   LEAD=$(node .agents/skills/qa-task/references/stakeholder-summary-cli.js --stage "qa-gate-${QA_CYCLE}" \
-    --slot verdict="$GATE_DECISION") || exit 1
+    --slot verdict="$GATE_DECISION" --slot open_count="$OPEN_COUNT") || exit 1
   printf '%s\n\n---\n\n%s\n' "$LEAD" "$(cat "$BODY_FILE")" > "${BODY_FILE}.tmp" \
     && mv "${BODY_FILE}.tmp" "$BODY_FILE"
 else
@@ -2018,6 +2052,7 @@ fi
 if [ "$COMMENT_RC" -ne 0 ]; then
   echo "⚠️ PR comment failed — non-blocking. Final canonical summary will be posted by /finalise."
 fi
+rm -f "$BODY_FILE"   # single-use: a later cycle that skips its write must not re-post this body
 ```
 
 **The two arms are not symmetric on retry, deliberately.** `tracker_call_with_retry` wraps `gh`
@@ -2097,11 +2132,16 @@ if [ -n "$QA_ISSUE" ]; then
   BLOCKING_COUNT=${BLOCKING_COUNT:-0}
 
   if [ -n "$QA_CYCLE" ]; then
+    # open_count — the open top_issues entries, from the one helper (task 275). Unlike
+    # BLOCKING_COUNT above there is no `|| true` default: a gate the helper cannot read
+    # stops the post, because a defaulted 0 renders "no problems".
+    OPEN_COUNT=$(node .agents/skills/qa-task/references/gate-open-count.js "$THIS_GATE") || exit 1
     node .agents/skills/qa-task/references/tracker-comment.js \
       --issue "$QA_ISSUE" --body-file .claude/state/comment-body.md \
       --stage "qa-gate-${QA_CYCLE}" \
       --slot verdict="$GATE_DECISION" \
       --slot blocking_count="$BLOCKING_COUNT" \
+      --slot open_count="$OPEN_COUNT" \
       --json \
       || echo "⚠️  Tracker issue comment failed — continuing"
   else

@@ -1,0 +1,150 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "554bda3d758b5bef48a6b01a224289af07998feb",
+  "dirty_paths": [
+    "docs/tasks/task.310.finalise-6c-poll-block-guards-its-inputs/task.310.implementation.1.finalise-6c-poll-block-guards-its-inputs-initial-run.md",
+    "docs/tasks/task.310.finalise-6c-poll-block-guards-its-inputs/task.310.pr-review.1.finalise-6c-poll-block-guards-its-inputs.md"
+  ],
+  "document": "docs/tasks/task.310.finalise-6c-poll-block-guards-its-inputs/task.310.finalise-6c-poll-block-guards-its-inputs.md",
+  "result": {
+    "bytes": 4011,
+    "sha256": "e8737da877369a6179b0b10a112373231829f53c391ba789dc9606b347e53e98",
+    "verified": false
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 11,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "ca3ba4673683a1be0daa76b9f109cfd0b89b13769d43416b43fb8f13a0d6805a",
+      "status": "PASS",
+      "description": "Guard with CI_HEAD_2 unbound exits non-zero and names it",
+      "code_citation": "skills/finalise/SKILL.md:2245",
+      "test_citation": "evals/shared/tests/finalise-publish-boundary.test.mjs:756",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#2",
+      "text_hash": "f06d96d647f3fd4866b982bb8857980ead25dc55ea77178d58f95b5ab39f19ce",
+      "status": "PASS",
+      "description": "Guard with PR_NUMBER unbound exits non-zero and names it",
+      "code_citation": "skills/finalise/SKILL.md:2245",
+      "test_citation": "evals/shared/tests/finalise-publish-boundary.test.mjs:783",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#3",
+      "text_hash": "ac4d364a1de3c56aeb4f62e5d486d479b0f909926bb9175f7d864e8a751bce75",
+      "status": "PASS",
+      "description": "Guard with both bound exits 0",
+      "code_citation": "skills/finalise/SKILL.md:2245",
+      "test_citation": "evals/shared/tests/finalise-publish-boundary.test.mjs:786",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#4",
+      "text_hash": "de575569346cf8415f670196069c3374f221056f74ee24ece08daa021b26dfce",
+      "status": "PASS",
+      "description": "Guard precedes rm -f; deleting it turns the test red",
+      "code_citation": "skills/finalise/SKILL.md:2245",
+      "test_citation": "evals/shared/tests/finalise-publish-boundary.test.mjs:663",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Mutation proof recorded in task.310.qa.1 (:? to :- gave 2 red, 49 to 47 pass)."
+    },
+    {
+      "id": "#5",
+      "text_hash": "2d904b55352ebed4f8310e05e276e304bdff9ff785fe76cbcd2d79d0f84bc25b",
+      "status": "PASS",
+      "description": "Later-turn reader unchanged, existing tests green",
+      "code_citation": "skills/finalise/SKILL.md:2245",
+      "test_citation": "evals/shared/tests/finalise-publish-boundary.test.mjs:515",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The diff adds 5 lines to SKILL.md, all in the first 6c block; the reader block is untouched."
+    },
+    {
+      "id": "#6",
+      "text_hash": "f1efb9e16e3207667176621c5576a5895a2a9dc7bf087cffc27975c2e0ef5cfb",
+      "status": "PASS",
+      "description": "No timing criterion",
+      "code_citation": "skills/finalise/SKILL.md:2245",
+      "test_citation": "NOT_APPLICABLE: no timing criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "One ':' line added to an existing block."
+    },
+    {
+      "id": "#7",
+      "text_hash": "f9146bd74a939fa2c7ca823c6fc33c4869b92300f6c7f791f37064edf7c12e64",
+      "status": "PASS",
+      "description": "bundle:check is clean",
+      "code_citation": "docs/tasks/task.310.finalise-6c-poll-block-guards-its-inputs/task.310.qa.1.finalise-6c-poll-block-guards-its-inputs.md:62",
+      "test_citation": "NOT_APPLICABLE: tooling check, re-run in this /finalise run: 129 skills, 0 problems",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#8",
+      "text_hash": "3b833f7301300d97da412a72a4e0c07d990ecafb48670e84cb97b754f0401939",
+      "status": "PASS",
+      "description": "Fast gate 0 not ok; figure recorded in QA report",
+      "code_citation": "docs/tasks/task.310.finalise-6c-poll-block-guards-its-inputs/task.310.qa.1.finalise-6c-poll-block-guards-its-inputs.md:64",
+      "test_citation": "NOT_APPLICABLE: CI test job on the PR head is SUCCESS (CI reading 1)",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#9",
+      "text_hash": "6d4d1a948b9e7942ccbd4f5844eb55e09ec4db6a0cd249ead15eaec7554a5d5f",
+      "status": "PASS",
+      "description": "validate skills/finalise passes",
+      "code_citation": "docs/tasks/task.310.finalise-6c-poll-block-guards-its-inputs/task.310.qa.1.finalise-6c-poll-block-guards-its-inputs.md:63",
+      "test_citation": "NOT_APPLICABLE: tooling check, re-run in this /finalise run: finalise passes",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#10",
+      "text_hash": "708dfbfe0d41e8a6c96610ed9e34882c5cad9172a450c61e2495dceaadc55d50",
+      "status": "PASS",
+      "description": "CHANGELOG cites (task 310)",
+      "code_citation": "CHANGELOG.md:9",
+      "test_citation": "NOT_APPLICABLE: changelog-cites.sh reports cites (task 310)",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    },
+    {
+      "id": "#11",
+      "text_hash": "a660b927a591939033939388ddeecc4489c3db7fa9008bfde61a5c9caf550228",
+      "status": "PASS",
+      "description": "No consumer change needed",
+      "code_citation": "skills/finalise/SKILL.md:2245",
+      "test_citation": "NOT_APPLICABLE: the diff touches no consumer-facing surface beyond the skill prose",
+      "members": [],
+      "non_member_fail": null,
+      "note": null
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "QA-future-1",
+      "note": "Other unguarded PR_NUMBER reads remain in SKILL.md (around lines 1338, 1360, 2668); recorded as out of scope and a future item."
+    }
+  ]
+}

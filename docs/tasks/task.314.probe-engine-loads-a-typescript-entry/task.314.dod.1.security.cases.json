@@ -1,0 +1,72 @@
+[
+  {
+    "id": "h-parent-escape-ts",
+    "input": "../outside.ts#fn",
+    "direction": "hostile",
+    "correct": "REJECT: the resolved path lies outside the repository root (reason outside-repo-root), before anything imports it.",
+    "spec_ref": "shared/resources/probe-boundary-rule.md:222"
+  },
+  {
+    "id": "h-embedded-dotdot-mts",
+    "input": "shared/../../outside.mts#fn",
+    "direction": "hostile",
+    "correct": "REJECT: the escape is visible only after resolution; the check is on the resolved path.",
+    "spec_ref": "shared/resources/probe-boundary-rule.md:222"
+  },
+  {
+    "id": "h-absolute-etc-cts",
+    "input": "/etc/probe-escape.cts#fn",
+    "direction": "hostile",
+    "correct": "REJECT: an absolute path outside the repository root.",
+    "spec_ref": "shared/resources/probe-boundary-rule.md:222"
+  },
+  {
+    "id": "h-absolute-tmp-tsx",
+    "input": "/tmp/probe-escape.tsx#fn",
+    "direction": "hostile",
+    "correct": "REJECT: an absolute .tsx path outside the repository root.",
+    "spec_ref": "shared/resources/probe-boundary-rule.md:222"
+  },
+  {
+    "id": "l-fixture-ts-entry",
+    "input": "shared/resources/tests/fixtures/security-probe-ts-notsconfig/guard.ts#validateHost",
+    "direction": "legitimate",
+    "correct": "ACCEPT: an existing TypeScript entry inside the repository root.",
+    "spec_ref": "shared/resources/probe-boundary-rule.md:285"
+  },
+  {
+    "id": "l-inside-dotdot-ts",
+    "input": "shared/resources/../resources/tests/fixtures/security-probe-ts-notsconfig/guard.ts#validateHost",
+    "direction": "legitimate",
+    "correct": "ACCEPT: a relative path containing .. that stays inside the root is not refused for looking suspicious.",
+    "spec_ref": "shared/resources/probe-boundary-rule.md:223"
+  },
+  {
+    "id": "l-inside-mts",
+    "input": "src/probe-inside.mts#fn",
+    "direction": "legitimate",
+    "correct": "ACCEPT: a .mts entry inside the root; containment does not require the file to exist.",
+    "spec_ref": "shared/resources/probe-boundary-rule.md:285"
+  },
+  {
+    "id": "l-inside-cts",
+    "input": "src/probe-inside.cts#fn",
+    "direction": "legitimate",
+    "correct": "ACCEPT: a .cts entry inside the root.",
+    "spec_ref": "shared/resources/probe-boundary-rule.md:285"
+  },
+  {
+    "id": "l-inside-tsx",
+    "input": "src/probe-inside.tsx#fn",
+    "direction": "legitimate",
+    "correct": "ACCEPT: a .tsx entry inside the root.",
+    "spec_ref": "shared/resources/probe-boundary-rule.md:285"
+  },
+  {
+    "id": "l-symlink-inside-ts",
+    "input": ".agents/skills/finalise/probe-inside.ts#fn",
+    "direction": "legitimate",
+    "correct": "ACCEPT: .agents/skills is a symlink to ../skills, which stays inside the root; real-path comparison must not refuse it.",
+    "spec_ref": "shared/resources/probe-boundary-rule.md:225"
+  }
+]

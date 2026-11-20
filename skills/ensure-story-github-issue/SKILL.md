@@ -146,20 +146,52 @@ is not told they are seeing part of something believes they saw all of it.
 Write the body to a file first. **Always `--body-file`, never an inline `--body`**:
 the body carries backticks, `$(…)` and newlines, and an inline `--body` is a
 shell injection waiting for the first story whose acceptance criteria contain one.
-The file is also what carries the body into the deferred record's `command.stdin`.
+The file is also what carries the body into the deferred record's `command.stdin`. Post it in a call
+after the one that wrote it, once a line only this run's body carries is asserted
+(`references/file-write-rules.md#fresh-body-post`).
 
-> **The heredoc below is unquoted, and that is a real residual risk — not a
-> solved problem.** `<<EOF` still performs command substitution, so a `$(…)` or a
-> backticked span in the document's own text is executed while the body is being
-> written. `--body-file` removes the *argv* injection surface, which is the larger
-> one; it does not remove this. Where the source text is untrusted, write the file
-> with the editor tool instead of a heredoc. `<<'EOF'` is not the fix here — it
-> would also stop the `${…}` values below from being substituted, which the body
-> needs.
+> **Write the body with the file tool, not a shell heredoc.** An unquoted heredoc
+> performs command substitution, so a `$(…)` or a backticked span in the document's
+> own text would be executed while the body is written, and a quoted one would stop
+> the values below from being substituted. The file tool expands nothing: run
+> `mkdir -p .claude/state`, write the text with each `{NAME}` replaced by its value
+> (`references/file-write-rules.md#the-rule`), then run the create block, which
+> derives the story id and milestone itself.
+
+Write `.claude/state/issue-body.md` with the **file tool**, in one call, with this content (`{priority}`,
+`{estimated_effort_hours}` — `—` when unset —, `{DOC_URL}` and `{STORY_RELATIVE_PATH}` are the values bound
+earlier in this step):
+
+```markdown
+## Summary
+
+{First 2-4 sentences from the story's User Story / Story / Story Statement — or its Description if it has none}
+
+## Acceptance Criteria
+
+{The first 5 acceptance criteria as a GitHub checkbox list. If more remain, add a
+final line: '+N more in the [story document]({DOC_URL})' with N the exact number
+omitted. If 5 or fewer, list them all and add no such line.}
+
+## Metadata
+
+| Field | Value |
+|-------|-------|
+| Priority | {priority} |
+| Effort | {estimated_effort_hours}h |
+
+## Document
+
+📄 [Story Document]({DOC_URL})
+📁 `{STORY_RELATIVE_PATH}`
+```
+
+Then create the issue, in a later call. This block is its own shell, so it derives the story id and
+milestone itself:
 
 ```bash
-# The story id and its epic's milestone, derived HERE — Step S1's block is another shell, and an
-# unbound MILESTONE_TITLE reads exactly like the deliberate "no epic" branch (task.206 QA cycle 1, CR-2).
+# The story id and its epic's milestone, derived HERE — the block that wrote the body is another shell,
+# and an unbound MILESTONE_TITLE reads exactly like the deliberate "no epic" branch (task.206 QA cycle 1, CR-2).
 : "${STORY_FILE_PATH:?bind STORY_FILE_PATH to the story document}"
 DOC_ID=.agents/skills/ensure-story-github-issue/references/doc-id.js
 STORY_JSON=$(command node "$DOC_ID" parse "$(basename "$STORY_FILE_PATH")" --json \
@@ -169,31 +201,6 @@ STORY_ID=$(printf '%s' "$STORY_JSON" | jq -r '.id | sub("^story\\."; "")')
 EPIC_DIR=$(dirname "$(dirname "$(dirname "$STORY_FILE_PATH")")")
 MILESTONE_TITLE=$(command node "$DOC_ID" epic-meta "${EPIC_DIR}/$(basename "$EPIC_DIR").md" --json 2>/dev/null \
   | jq -r --arg e "$(printf '%s' "$STORY_JSON" | jq -r '"\(.prd).\(.epic)"')" 'select(.id == $e) | .milestone // empty')
-mkdir -p .claude/state
-cat > .claude/state/issue-body.md <<EOF
-## Summary
-
-{First 2-4 sentences from the story's User Story / Story / Story Statement — or its Description if it has none}
-
-## Acceptance Criteria
-
-{The first 5 acceptance criteria as a GitHub checkbox list. If more remain, add a
-final line: '+N more in the [story document](${DOC_URL})' with N the exact number
-omitted. If 5 or fewer, list them all and add no such line.}
-
-## Metadata
-
-| Field | Value |
-|-------|-------|
-| Priority | ${priority} |
-| Effort | ${estimated_effort_hours:-—}h |
-
-## Document
-
-📄 [Story Document](${DOC_URL})
-📁 \`${STORY_RELATIVE_PATH}\`
-EOF
-
 # A label the repository does not define fails the WHOLE create; the shared
 # helper drops it with a warning instead (task.125, TASK-125-BUG-3).
 source references/gh-labels.sh || exit 1

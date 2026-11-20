@@ -54,12 +54,12 @@ description: How every pipeline step and skill posts a comment to a tracker issu
 One call covers both trackers — `tracker-comment.js` resolves `TRACKER` itself,
 so a step doc never branches on it for a comment:
 
-```bash
-mkdir -p .claude/state
-cat > .claude/state/comment-body.md <<'EOF'
-{the markdown body}
-EOF
+Run `mkdir -p .claude/state`, then write `.claude/state/comment-body.md` with the **file tool** in one
+call (the markdown body, unedited), and post it in a **later** call. Never both in one parallel batch,
+and assert a line only this body carries before the post (`file-write-rules.md#fresh-body-post`).
+Then:
 
+```bash
 node .agents/skills/{skill}/references/tracker-comment.js \
   --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
   --stage {moment} \
@@ -82,6 +82,12 @@ the body reaches the deferred-mutation record through `command.stdin`, which is
 what makes two different comments on the same issue hash to two different
 records instead of collapsing into one.
 
+**A body file is single-use.** The engine removes `--body-file` once the outcome is `posted`,
+`already` or `deferred` with a record id (the record carries the body on stdin). A `deferred` outcome
+with no record, because the journal write failed, keeps the file: it is then the body's only copy.
+Every other outcome keeps it, so a retry still has its body, and a call with no fresh write fails with exit 2 (missing
+file) rather than posting the previous comment. Write the body again before each call.
+
 **`--stage` is the comment's identity**, not a board column. It is what builds
 the idempotency marker, so a resumed pipeline does not comment twice — and, since
 the plain-language lead was added, it is also what selects the lead. A comment
@@ -95,11 +101,12 @@ not interchangeable:
 
 | Stage class | Fires | Marker | `--stage` as passed |
 |---|---|---|---|
-| Every stage not in `CYCLE_SCOPED_STAGES` — `work-started`, `in-review`, `develop-complete`, `review`, `review-story` / `review-task`, `done`, … | once per issue | `agent-skills-comment:{stage}` | the bare name; a suffix is exit 2 |
+| Every stage not in `CYCLE_SCOPED_STAGES` — `work-started`, `in-review`, `develop-complete`, `review`, `done`, … | once per issue | `agent-skills-comment:{stage}` | the bare name; a suffix is exit 2 |
+| `review-story`, `review-task`, `review-bug` | once per review | `agent-skills-comment:{stage}-{N}`, except round 1, which is the bare `agent-skills-comment:{stage}` | `{stage}-{N}` — `N` is the review report's number. The engine reads `{stage}-1` as the bare marker (`FIRST_ROUND_IS_BARE_STAGES`), so a marker already on a live issue still reads `already` for review 1 and a second review's verdict reaches the tracker (task.282, obs #129) |
 | `qa-gate`, `qa-cycle`, `qa-fix` | once per QA cycle | `agent-skills-comment:{stage}-{N}` | `{stage}-{N}` — the suffix is **required by convention**: the engine accepts the bare name too, and it is `comment-slot-coverage.test.mjs` that fails a shipped call without one |
 | `pipeline-paused` | once per pause | `agent-skills-comment:pipeline-paused-{step}` | `pipeline-paused-{step}` — the step it paused at |
 
-The second and third rows are `CYCLE_SCOPED_STAGES` in `tracker-comment.js`,
+The second to fourth rows are `CYCLE_SCOPED_STAGES` in `tracker-comment.js`,
 and that list wins: this table describes it, and a stage added there without a
 row here is still cycle-scoped. It is not restated as a second list anywhere —
 `comment-slot-coverage.test.mjs` imports it, and the marker rule in the *Marker*

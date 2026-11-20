@@ -97,7 +97,7 @@ Accept any of:
 - **Bare filename**: `task.2.home-page-content-realignment.md`
 - **GitHub issue URL** (direct or project board): `https://github.com/.../issues/297` or URL containing `issue=`
 - **Issue hash notation**: `#297`
-- **Bare issue number**: `297`
+- **Bare number**: `297` — a **task id first**, an issue number only when no task carries it ([§ Bare number — a task id first](#bare-number--a-task-id-first))
 
 Jira key inline resolution: run [§ Key → document lookup](#key--document-lookup) with `KEY_FIELD=jira_key`, `KEY_VALUE=${JIRA_KEY}`. Not found → HALT: "No local document found for Jira issue ${JIRA_KEY}. Run `/create-task` first to link it, or provide the file path directly."
 
@@ -106,6 +106,40 @@ GitHub issue inline resolution: extract `ISSUE_NUM`, fetch body, parse `DOC_URL`
 Explore subagent (file/directory/bare-filename inputs): find file matching `task.{id}.*.md` that does NOT contain `.qa.`, `.gate.`, `.bug.`, or `.implementation.` in its name. Return absolute file path and task directory path.
 
 Extract `{task_id}` from the pattern `task.{id}.{name}.md`.
+
+### Bare number — a task id first
+
+Applies to **task** pipelines and `/review-task`, whose documents carry a flat number (`task.243`).
+A story id is `P.E.S` and an epic refuses a bare number, so neither takes this rule. `#297`, an issue
+URL and a Jira key never reach it: they are the unambiguous issue forms and keep their route below
+(task.282, obs #128). When the argument is all digits, run, from the repository root, the script by
+the path it is installed at, with `{develop-task|review-task}` replaced by the skill you are running
+as. A bundled-relative path does not resolve from the repository root in a consumer repository
+(T282-QA-4):
+
+```bash
+ANSWER=$(bash .agents/skills/{develop-task|review-task}/references/resolve-bare-task.sh "<digits>"); rc=$?
+case "$rc" in
+  0) printf '%s\n' "$ANSWER" ;;
+  126|127) echo "HALT: resolve-bare-task.sh did not run (rc=$rc) — check the path; this is not a resolver answer"; exit 1 ;;
+  *) echo "HALT: could not resolve '<digits>' as a task id (rc=$rc, see above)"; exit 1 ;;
+esac
+```
+
+Read the first field of the one line it prints (it exits 0 for all four answers):
+
+| Answer | Do |
+| --- | --- |
+| `found` `<path>` | The task is in this tree. Use `<path>` as the document and **say so**: "resolved `<digits>` as task.`<digits>` (a bare number is a task id first)". Do not look at issue numbers. |
+| `elsewhere` `<path>` `worktree` | Another linked worktree holds it. Report that worktree and run from there with `<path>`; never copy the document into this tree. |
+| `elsewhere` `<branch>` `branch` | Only a branch holds it, no worktree. **HALT** naming `<branch>` and the command that gives it a worktree (`git worktree add .worktrees/<name> <branch>`, inside the repository). The wrong message here is the defect this section exists to remove: never "No local document found". |
+| `none` | No task carries the number. Continue as a **GitHub issue number**, exactly as below, and say which route was taken. `none` `registry` means the registry lists the task but no document or branch holds it: say that too. |
+
+A script exit of 126 or 127 means the script itself did not run (a wrong path), which the block HALTs
+on under its own message, so a missing file is never read as a resolver answer. A script exit of 1 (a git failure, or two documents claiming one number) is a HALT with its stderr:
+a guess would anchor the run on whichever document came first. An exit of 2 means the argument is
+not a usable number: more than nine digits after leading zeros is refused rather than read as a
+smaller number (T282-QA-1), so it is a HALT too, never a fall-through to the issue route.
 
 ### Inline Resolution — Shared Logic
 
@@ -457,12 +491,17 @@ The comment is the same on either tracker, so it is **one** call — `tracker-co
 > Engine source: `tracker-comment.js` (bundled into each skill that runs it as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
 
 
-```bash
-mkdir -p .claude/state
-cat > .claude/state/comment-body.md <<EOF
-Pipeline started — branch: \`{branch-name}\`
-EOF
+Run `mkdir -p .claude/state`, then write `.claude/state/comment-body.md` with the **file tool** in one
+call (`file-write-rules.md#fresh-body-post`: write now, post in a later call, never both in one batch).
+Substitute the branch name before writing. The body is one line:
 
+```text
+Pipeline started — branch: `{branch-name}`
+```
+
+Then run the post:
+
+```bash
 node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
   --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
   --stage work-started \

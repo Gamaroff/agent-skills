@@ -1,0 +1,25 @@
+schema: 1
+task: "task.SYNTH.medium-code-and-prefix-test"
+gate: CONCERNS
+status_reason: "Two MEDIUMs on a production file and on the test of a different module whose name only shares a dash-prefix with it (T278-QA-6). Two subjects."
+reviewer: "QA Engineer"
+updated: "2026-11-16T12:00:00Z"
+
+top_issues:
+  - id: "CP-001"
+    severity: medium
+    file: "shared/resources/user.js"
+    finding: "The user reader mishandles an empty name."
+    suggested_owner: dev
+    status: open
+  - id: "CP-002"
+    severity: medium
+    file: "shared/resources/tests/user-service.test.mjs"
+    finding: "The service test never exercises a timeout."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80

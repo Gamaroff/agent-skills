@@ -102,11 +102,15 @@ The body is a **summary**, not a copy of the bug file — the caps are the contr
 
 Write the body to a file first. **Always `--body-file`, never an inline `--body`**: a bug report's reproduction steps and expected/actual values are exactly the text most likely to contain backticks, `$(…)` and newlines, and an inline `--body` is a shell injection waiting for the first one.
 
-> **The heredoc below is unquoted, and that is a real residual risk — not a solved problem.** `<<EOF` still performs command substitution, so a `$(…)` or a backticked span in the document's own text is executed while the body is being written. `--body-file` removes the *argv* injection surface, which is the larger one; it does not remove this. A bug report quoting a failing shell command is a realistic instance, so where the source text is untrusted, write the file with the editor tool instead of a heredoc. `<<'EOF'` is not the fix — it would also stop the `${…}` values below from being substituted.
+> **Write the body with the file tool, not a shell heredoc.** An unquoted heredoc performs command substitution, so a `$(…)` or a backticked span in the document's own text would be executed while the body is written, and a quoted one would stop the values below from being substituted. A bug report quoting a failing shell command is a realistic instance. The file tool does not expand anything: substitute each `{NAME}` below with the value of the shell variable of that name (`echo` it from the block above if unsure), and write the text as given (`references/file-write-rules.md#the-rule`).
 
 ```bash
 mkdir -p .claude/state
-cat > .claude/state/issue-body.md <<EOF
+```
+
+Write `.claude/state/issue-body.md` with the **file tool**, in one call, with this content:
+
+```markdown
 ## Summary
 
 {First paragraph of the bug's Bug Description section — up to 4 sentences}
@@ -114,7 +118,7 @@ cat > .claude/state/issue-body.md <<EOF
 ## Reproduction
 
 {The first 5 reproduction steps as an ordered list. If more remain, add a final
-line: '+N more in the [bug report](${DOC_URL})' with N the exact number omitted.}
+line: '+N more in the [bug report]({DOC_URL})' with N the exact number omitted.}
 
 ## Impact
 
@@ -126,21 +130,25 @@ line: '+N more in the [bug report](${DOC_URL})' with N the exact number omitted.
 
 | Field | Value |
 |-------|-------|
-| Severity | ${SEVERITY} |
-| Priority | ${PRIORITY} |
-| Status | ${BUG_STATUS} |
-| Created | ${CREATED} |
-| Related | ${RELATED} |
+| Severity | {SEVERITY} |
+| Priority | {PRIORITY} |
+| Status | {BUG_STATUS} |
+| Created | {CREATED} |
+| Related | {RELATED} |
 
 ## Source Documents
 
-📄 [Bug report](${DOC_URL})
-{story/task modes: 📄 [Parent \${MODE} document](\${PARENT_DOC_URL})}
-{when PARENT_ISSUE_NUM is set: 🎫 Parent issue #\${PARENT_ISSUE_NUM}}
-{general mode: 📄 [Bug registry](\${BASE}/docs/bugs/bug-registry.md)}
-📁 \`${BUG_RELATIVE_PATH}\`
-EOF
+📄 [Bug report]({DOC_URL})
+{story/task modes: 📄 [Parent {MODE} document]({PARENT_DOC_URL})}
+{when PARENT_ISSUE_NUM is set: 🎫 Parent issue #{PARENT_ISSUE_NUM}}
+{general mode: 📄 [Bug registry]({BASE}/docs/bugs/bug-registry.md)}
+📁 `{BUG_RELATIVE_PATH}`
+```
 
+Then create the issue, in a **later** call, once a line only this run's body carries is asserted
+(`references/file-write-rules.md#fresh-body-post`):
+
+```bash
 # Labels follow the REPO's convention, not the frontmatter's case, and a label
 # the repo does not have is dropped with a warning — never allowed to fail the
 # create. `gh issue create` rejects the WHOLE create on one unknown label, and

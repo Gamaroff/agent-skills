@@ -32,17 +32,19 @@ later block in this section reads that file. A block that names a file no step w
 that runs on nothing (task.130 QA cycle 3, bug 7); a fence that names a variable no fence assigns
 HALTs at its own guard (cycle 2, bug 5). **Bind once, here:**
 
+First write the JSON object the detector returned, verbatim and unedited, to
+`{doc-directory}/.summaries/step-0a-resume-detector.json` with the **file tool**, after
+`mkdir -p "{doc-directory}/.summaries"`. A shell heredoc is not used: the JSON carries quotes and
+`$`, and a heredoc ends early on a payload line equal to its delimiter
+(`file-write-rules.md#the-rule`). Then run the validation block:
+
 ```bash
-# 1. Persist the JSON the Explore dispatch RETURNED — verbatim, from the tool result, into the
-#    pipeline's summary directory. The quoted heredoc keeps the JSON's own quotes and $ intact.
+# 1. The JSON the Explore dispatch RETURNED was written verbatim, with the file tool, to
+#    {doc-directory}/.summaries/step-0a-resume-detector.json (see the paragraph above this block).
 # Every {doc-directory} substitution in THIS section's two blocks is QUOTED — a document
 # directory with a space splits into two words otherwise (task.130 gate 5 CR-7; task.133).
 # The contract's other fences (the --restore command, the grant call) are not yet quoted;
 # quoting them is a recorded follow-up (task.133 gate 1 CR-2), not a claim made here.
-mkdir -p "{doc-directory}/.summaries"
-cat > "{doc-directory}/.summaries/step-0a-resume-detector.json" <<'DETECTOR_EOF'
-{the JSON object the detector returned, pasted verbatim}
-DETECTOR_EOF
 # 2. Bind and validate. `deltas_since_pause` must be an ARRAY OF OBJECTS here, because the
 #    delete block below reads it as one — the detector's notes ("stale snapshot for <other dir>
 #    ignored", both `stale-snapshot check skipped — …` notes) are delta objects too, never bare
@@ -221,6 +223,12 @@ Step 7 halt, on what the fix changed** (task.170):
   `advance-pipeline-lock.sh --restore {doc-directory}` **here**, before Phase 0b, on the
   re-invocation path exactly as the in-session continuation does (QA cycle 2, CR-2; the step-0
   doc's Shared Resume Logic states the call).
+  **Except a `/finalise` DoD-gaps snapshot** (`halt_step` 7 and the newest DoD at `❌ GAPS`): the
+  helper **refuses** it — nothing restored, snapshot kept — and names both doors. Code closed the
+  gaps → `reenter-qa-after-finalise.sh` (it restores for itself). A document-only fix →
+  `--restore --allow-dod-gaps {doc-directory}`, the one bypass (task.276, obs #46: a plain restore
+  used to consume the snapshot the re-entry script reads, leaving a step-7 lock over a head no gate
+  had read). `--restore --which` is read-only and is never refused.
 
 <!-- restore: in-place --> **On the in-place path the same bullets decide, read from disk.** A
 session that continues in place after a pause or a HALT has no detector run and no Resume prompt,
@@ -640,7 +648,7 @@ This convention ensures the cycle budget is respected across resumes.
    entry to QA Iteration History, in cycle order, so the Convergence check and the route classifier
    read a complete sequence: the gate verdict, `**HIGH findings**` (the Convergence check's awk over
    that gate), `**MEDIUM findings**` (`countRaised`), `**PR Review**: not reached — gate did not
-   exit the loop`, `**Loop exit**: n/a — this exit not taken`, `**Action**` from the gate's queue by
+   exit the loop`, `**Traceability**: skipped (run outside the loop)`, `**Loop exit**: n/a — this exit not taken`, `**Action**` from the gate's queue by
    the Outcome branching's arms, and — directly under the heading — `**Origin**: run outside the
    loop (operator)`. The back-filled entry is a record of a cycle that ran, not a claim that the
    pipeline ran it.
@@ -658,8 +666,9 @@ This convention ensures the cycle budget is respected across resumes.
    Source: `grant-qa-cycles.sh`; suite: `grant-qa-cycles.test.sh`. Everything it
    does was a defect when the prose left it to the caller (task.123 QA cycles 2 and 3):
 
-   - It **reconstructs the base** as `max(highest gate on disk, `### QA Cycle` entries in the
-     report)` — the same number step 1 resumes from on either of its paths — and never from a
+   - It **reconstructs the base** as `max(highest gate on disk, distinct `### QA Cycle` numbers in
+     the report)` (`qa-report-cycles.sh` — a heading count read four cycles as eight, obs #135) —
+     the same number step 1 resumes from on either of its paths — and never from a
      `$QA_CYCLE` bound in a neighbouring fenced block, which does not exist in this one.
    - It **restores the lock from the halt snapshot when no lock exists** — through
      `advance-pipeline-lock.sh --restore`, the one restore path since task.124, which also
@@ -784,7 +793,7 @@ It is the **only** writer that may lower `current_step`, and only from 7 to 5. E
 Each reason carries its **route** — this list is that route's one statement; the halt-7 bullet above
 and both SKILL.md Phase 0b paragraphs cite it.
 
-- `lock-present` — a live lock exists; the run is already resumed. **Route:** continue the live run.
+- `lock-present` — a live lock exists; the run is already resumed. **Route:** continue the live run. **Exception (task.276):** a live lock at step 7 over a newest DoD at `❌ GAPS` sits over a head no gate may have read; the refusal then says to run `advance-pipeline-lock.sh --halt --reason dod-gaps-code-fix --step 7 {doc-directory}` (which turns the lock into a snapshot) and this script again, and never to resume at step 7. A document-only fix keeps the lock.
 - `no-snapshot` — `advance-pipeline-lock.sh --restore --which` chose no candidate for this document. **Route:** the resume's other paths (nothing to re-enter from).
 - `not-a-finalise-halt` — the snapshot's `halt_step` is not 7 (compared as text: the HALT snippet writes it with `jq --arg`). **Route:** the next bullet (an ordinary restore).
 - `no-dod` — no `{stem}.dod.{N}.*.md` beside the document, keyed on the work item's own stem — read from the DoD files whose stem the directory name continues, never from a bug's — so a co-located bug's DoD is never read as its verdict. **Route:** the next bullet.
@@ -792,7 +801,7 @@ and both SKILL.md Phase 0b paragraphs cite it.
 - `no-gate` — `qa-cycle.sh` found no single current gate. Its own reason is relayed above the refusal as a `reenter-qa:` line — no gate file, gate files with no cycle number, or two files claiming one cycle (task.182). **Route:** back to the operator — resolve the gate files the relayed line names and run the script again; **never** step 7, which would accept a head no gate has read (a step-7 halt had a gate, so a missing or ambiguous one is a state to repair, not a document-only fix).
 - `git-unreadable` — `git status` exited non-zero, so the movement measure cannot run; git's own error is printed with it (task.182). **Route:** back to the operator — repair the repository and run the script again; **never** step 7, which an unread tree would otherwise reach through `no-code-moved`.
 - `uncommitted-fix` — a **tracked** change outside the work item's directory is uncommitted. **Route:** back to the operator — commit the fix and run the script again; **never** step 7, which would accept a head no review has read.
-- `no-code-moved` — no commit outside the work item's directory since the gate's `head:`, or every path those commits changed is documentation under `ci.docsOnly.patterns` (a CHANGELOG entry, a standards page — observation #44): a document-only fix. **Route:** the next bullet — `/finalise` re-runs at 7. Untracked files outside the directory are named in this refusal, never a reason of their own: after Step 4 restores the files it held aside, nothing can tell one of those from a new fix file, so the operator who can decides — commit any that belong to the fix and run the script again.
+- `no-code-moved` — no commit outside the work item's directory since the gate's `head:`, or every path those commits changed is documentation under `ci.docsOnly.patterns` (a CHANGELOG entry, a standards page — observation #44): a document-only fix. **Route:** resume at step 7 with `advance-pipeline-lock.sh --restore --allow-dod-gaps {doc-directory}` and re-run `/finalise` — the one remedy for a clean tree; the plain `--restore` of the next bullet **refuses** a DoD-gaps snapshot (task.276). Untracked files outside the directory are named in this refusal, never a reason of their own: after Step 4 restores the files it held aside, nothing can tell one of those from a new fix file, so the operator who can decides. **The order is the point, because the step-7 restore consumes the snapshot this script reads:** with untracked files the message offers the commit-and-run-again route **first** ("if one is part of the fix … nothing was consumed") and step 7 only after "Otherwise"; on a clean tree it offers step 7 alone (obs #75).
 <!-- reenter-qa-refusals: end -->
 
 **Movement is measured as committed history**, because that is what the re-entered review reads
@@ -814,11 +823,38 @@ then writes, in one `mktemp` + `mv`: `current_step: 5`, `qa_phase: 5a`,
 (**Re-entry after a QA loop escalation**, step 3), `2` being the grant prompt's recommended `k` — and
 `qa_reentry: {from_step: 7, reason: "dod-gaps-code-fix", at, gate_head, report_entries}`, which explains a
 lowered step to a later reader and gives the **Second precedence** its `report_entries` (the report's
-`### QA Cycle` heading count at re-entry, as the back-fill leaves it: `max(highest gate, headings)` — the script therefore requires the report). A write that fails after the restore keeps the restored step-7 lock
+distinct `### QA Cycle` count at re-entry (`qa-report-cycles.sh`), as the back-fill leaves it: `max(highest gate, distinct cycles)` — the script therefore requires the report). A write that fails after the restore keeps the restored step-7 lock
 (the snapshot is gone, and a lock at 7 is resumable). The loop then runs from 5a, numbered from the gates;
 5c's APPROVE advances the lock `5 → 7` as on any run, and `/finalise` re-runs over a gated head.
 The Stop hook needs nothing new: a step-5 lock at `qa_phase: 5a` already names `/qa-task` /
 `/qa-story`. `develop-bug` has no re-entry — its verify loop does not use the step-5 lock shape.
+
+## Resume prompts that name a step already done (task.276, obs #95)
+
+A resume prompt — "resume qa-fix cycle 2" — is written at one moment and read at another, so it can
+arrive after the work it names has finished: on task.217 it arrived twice after cycle 2 completed, and
+nothing marked the step it had been issued for. **Before acting on a prompt that names a step**, compare
+it with the artefacts:
+
+```bash
+bash .agents/skills/{develop-story|develop-task}/references/resume-prompt-check.sh {doc-directory} {5a|5b|5c|1..8} [{cycle}] [{implementation-report-path}]
+```
+
+| Exit | Output | Do |
+| :-- | :-- | :-- |
+| 0 | `proceed: {step} {cycle}` | the step is not complete — act on the prompt |
+| 1 | `already complete: {step} {cycle}` | report that and **stop**; never re-run the step |
+| 2 | usage | fix the call |
+| 3 | `cannot tell: …` | an artefact could not be read — do not act on the prompt, report why |
+
+"Complete" is read from artefacts only: `5a` N → the highest gate on disk is ≥ N; `5b` N → it is > N;
+`5c` N → the report's cycle-N entry holds a `**PR Review**` verdict (the pending template lists every
+verdict word and is not one); a pipeline step → its row in the report's progress table starts `✅` or reads
+`⏭️ Skipped`; and a live lock past the named step is complete whatever else is on disk. Source:
+`resume-prompt-check.sh`; suite: `resume-prompt-check.test.sh`. The report's cycle count — here and in
+the budget reconstruction — is `qa-report-cycles.sh`: the **distinct** `### QA Cycle {N}` numbers of
+the QA Iteration History, because the Decisions Log carries the same headings and `grep -c` read four
+cycles as eight (obs #135).
 
 ## Branch and PR Cross-Check
 

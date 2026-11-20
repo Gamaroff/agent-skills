@@ -300,6 +300,18 @@ the first is untested and the second tests nothing. Split by **outcome delivered
 diff lands. If two candidate tasks would each leave the tree in a state nobody would merge alone, they
 are one task.
 
+**Multi-task path: allocate once, write in parallel, register once** (obs #35). When the answer is N > 1
+and the documents are written concurrently (parallel forks or sessions), the single-writer rule of the
+registry still holds, and a fork that allocates its own number collides with its siblings:
+
+1. **Pre-allocate the range** before any document is written: read **Next Available Task Number** once
+   and reserve `N … N+k−1` for the k documents, naming each unit against its number.
+2. **One writer per task directory.** Each document is written by exactly one author, into
+   `docs/tasks/task.{n}.{name}/` for its own reserved number, and touches nothing outside it.
+3. **One registry pass, at the end,** by whoever holds the whole batch: append the k rows, increment the
+   counter by k, add the ordering note this section requires, and commit it atomically with the
+   documents. A fork never edits `task-registry.md`.
+
 **A blocker in another repository is never written `task.N`.** The registry reads `task.N` in the
 `Depends on` cell as a task in *this* registry, so another repository's task.127 binds to this
 repository's unrelated task.127. Write it as free text after ` — `, naming the repository
@@ -574,6 +586,7 @@ Most tasks draw nothing. A task that does — it migrates a screen onto shared c
 - **Planned temp directories** (obs #137; review-task check 28): when planned test code creates a temp directory, name its removal (a `finally`, a `t.after` or a shared helper). `scripts/test-tmpdir.mjs` rejects any new leaking prefix, so copying a grandfathered example is not safe.
 - **A criterion that names a tool on a file type its ignore file excludes** (obs #78; review-task check 30): when a success criterion says a tool passes on a file type (`prettier --check` on Markdown), read the tool's ignore file or config and confirm the type is not excluded; a tool run over files it ignores exits 0 having read nothing. If it is excluded, name a check that reaches the files (`doc-links.js`, `markdown-link-check`, a schema validator).
 - **CI scripts run in a new environment** (obs #163; review-task check 31): when a task runs CI scripts somewhere new (a container, a remote host, a new runner), the Technical Background carries a **parity line** comparing that environment with the CI workflow on user, base image, shells, awk variants and tool versions, and says how each was read (`id`, `awk --version`, the workflow's `runs-on` or `container:`). Every difference is a defect the new route has until it is named. This compares *environments*; review-task check 23 compares a sibling *mechanism's guards*. task.295's container ran as a different user and lacked tools CI has, and each difference cost a QA gate.
+- **A remedy seeded from a gate that nobody ran** (obs #86, task 275): when the task is cut from a QA gate's `recommendations.future` action marked `remedy: unverified` (or carrying no `remedy:`, which reads as unverified), the action is a claim, not a fix. Run it once, in a safe form, and record the command and its result in the Technical Background **before** the plan builds on it; an action marked `verified` with a `verified_by:` may be built on, and one marked `verified` without it is unverified. Task.224's CR-1 remedy failed on Node v26.8.2 only after task.225 was cut from it.
 - **Uncovered test scenarios**: Does the Testing Strategy cover regression risks, not just happy paths?
 - **Scope creep risk**: Are any implementation steps implicitly larger than stated?
 

@@ -185,20 +185,31 @@ stale by design**: Step 2 then reviews it again.
 
 Only if the bug has `github_issue`/`jira_key` in frontmatter (skip silently otherwise — most bugs have none). Post a short review-outcome comment (recommendation, score, issue counts, review-file path) — one call, both trackers:
 
-```bash
-mkdir -p .claude/state
-cat > .claude/state/comment-body.md <<EOF
+Run `mkdir -p .claude/state`, then write `.claude/state/comment-body.md` with the **file tool**, with
+each `{NAME}` replaced by its value (the file tool expands nothing), and post it in a later call
+(`references/file-write-rules.md#fresh-body-post`). Body:
+
+```markdown
 ## Bug Review Complete
 
-**Recommendation**: ${RECOMMENDATION}
-**Fix-readiness**: ${SCORE}/10
-**Issues**: Critical ${CRITICAL} · Important ${IMPORTANT} · Optional ${OPTIONAL}
-**Review artifact**: \`${REVIEW_FILE}\`
-EOF
+**Recommendation**: {RECOMMENDATION}
+**Fix-readiness**: {SCORE}/10
+**Issues**: Critical {CRITICAL} · Important {IMPORTANT} · Optional {OPTIONAL}
+**Review artifact**: `{REVIEW_FILE}`
+```
+
+```bash
+CRITICAL={the critical-issue count written into the body above}   # a new shell: re-bind it
+# REVIEW_N: this review's number — the `{N}` of the report written above, or the
+# number computed above when no report was written. Bound here: this block is its
+# own shell. Review 1 reads the bare marker already on a live issue, so `-1` is
+# safe on an issue that predates this.
+REVIEW_N="{N}"
+case "$REVIEW_N" in ''|*[!0-9]*|0|0[0-9]*) echo "HALT: REVIEW_N must be this review's report number (got '$REVIEW_N')"; exit 1 ;; esac
 
 node .agents/skills/review-bug/references/tracker-comment.js \
   --issue "${TRACKER_ISSUE}" --body-file .claude/state/comment-body.md \
-  --stage review-bug \
+  --stage "review-bug-${REVIEW_N}" \
   --slot outcome="{plain-language outcome — see below}" \
   --slot blocking="${CRITICAL}" \
   --json

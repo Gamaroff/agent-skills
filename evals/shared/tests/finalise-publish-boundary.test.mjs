@@ -540,10 +540,256 @@ test("6c head-binds the second reading: the poll records the sampled PR head and
   );
   assert.ok(
     codeLines(sixC).some((l) =>
-      /CI_HEAD_2=\$\{CI_HEAD_2:-\$\(git rev-parse HEAD\)\}/.test(l),
+      /CI_HEAD_2=\$\{CI_HEAD_2:-\$\(cat \.claude\/state\/finalise-ci-head-2\.txt 2>\/dev\/null\)\}/.test(
+        l,
+      ),
     ),
-    "the later-turn read must re-derive CI_HEAD_2 — a fresh shell has no earlier variable",
+    "the later-turn read must re-derive CI_HEAD_2 from the head the poll recorded — a fresh shell has no earlier variable",
   );
+});
+
+// task.308: a PreCompact pause during the 6c wait commits the report and holds the push, so local
+// HEAD is one commit ahead of the PR head the poll sampled. The later turn must take the acceptance
+// head from what the poll block recorded, never from local HEAD. This runs the shipped lines.
+function laterTurnHeadLines() {
+  const sixC = between(
+    finalise,
+    "6c. **Second CI reading",
+    "6d. **CHANGELOG citation check",
+    FINALISE,
+  );
+  const lines = sixC.split("\n");
+  const start = lines.findIndex((l) => /^\s*CI_HEAD_2=\$\{CI_HEAD_2:-/.test(l));
+  assert.ok(start >= 0, "the later-turn CI_HEAD_2 line exists in 6c");
+  // the assignment line plus the unset guard that follows it (two physical lines + its HALT line)
+  return lines
+    .slice(start, start + 3)
+    .map((l) => l.replace(/^\s+/, ""))
+    .join("\n");
+}
+
+function runLaterTurn({ recorded }) {
+  const dir = mkdtempSync(path.join(tmpdir(), "t308-head-"));
+  try {
+    const sh = (cmd) =>
+      spawnSync("bash", ["-c", cmd], { cwd: dir, encoding: "utf8" });
+    sh(
+      "git init -q . && git config user.email t@t && git config user.name t && git commit -q --allow-empty -m acceptance && mkdir -p .claude/state",
+    );
+    const accepted = sh("git rev-parse HEAD").stdout.trim();
+    // the held pause commit: local HEAD moves, the PR head (recorded) does not
+    sh("git commit -q --allow-empty -m held-pause");
+    const local = sh("git rev-parse HEAD").stdout.trim();
+    if (recorded)
+      sh(`printf '%s\\n' ${accepted} > .claude/state/finalise-ci-head-2.txt`);
+    const r = spawnSync(
+      "bash",
+      ["-c", `${laterTurnHeadLines()}\nprintf 'HEAD2=%s\\n' "$CI_HEAD_2"`],
+      { cwd: dir, encoding: "utf8" },
+    );
+    return { accepted, local, ...r };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("6c later turn: with a held pause commit ahead of the PR head, CI_HEAD_2 is the recorded acceptance head, not local HEAD", () => {
+  const r = runLaterTurn({ recorded: true });
+  assert.equal(r.status, 0, `later-turn lines exited ${r.status}: ${r.stderr}`);
+  assert.notEqual(r.accepted, r.local, "the fixture must put local HEAD ahead");
+  assert.equal(
+    /HEAD2=(\w+)/.exec(r.stdout)?.[1],
+    r.accepted,
+    "CI_HEAD_2 must be the head the poll was started on",
+  );
+});
+
+test("6c later turn: no recorded head is a HALT, never a fall back to local HEAD", () => {
+  const r = runLaterTurn({ recorded: false });
+  assert.notEqual(r.status, 0, "an unrecorded acceptance head must not pass");
+  assert.match(
+    r.stdout + r.stderr,
+    /HALT: the acceptance head this poll was started on is not recorded/,
+  );
+});
+
+// task.308 QA-1: the writer is what the later turn reads. The two tests above write the file
+// themselves, so without this one the writer line can be deleted with every test green. It runs the
+// shipped line (the one the poll block carries), in a scratch repository with no state directory
+// content, and asserts the file holds the head the poll was started on.
+test("6c poll block records the acceptance head it starts on, for the later turn to read", () => {
+  const sixC = between(
+    finalise,
+    "6c. **Second CI reading",
+    "6d. **CHANGELOG citation check",
+    FINALISE,
+  );
+  const writers = codeLines(sixC).filter((l) =>
+    /^\s*printf '%s\\n' "\$CI_HEAD_2" > \.claude\/state\/finalise-ci-head-2\.txt\s*$/.test(
+      l,
+    ),
+  );
+  assert.equal(
+    writers.length,
+    1,
+    "the 6c poll block must carry exactly one line that records CI_HEAD_2 to finalise-ci-head-2.txt",
+  );
+  // task.309: where the writer sits. A poll that is running with no head recorded is a window in
+  // which a later turn HALTs "not recorded" on a run that is in fact healthy, so the order is
+  // clear, then record, then launch. Each line is found by its own pattern, and a missing one is
+  // named, so a rename reads as a missing line rather than as a wrong order.
+  const lines = codeLines(sixC);
+  const at = (re) => lines.findIndex((l) => re.test(l));
+  const guardAt = at(/^\s*: "\$\{CI_HEAD_2:\?/);
+  const rmAt = at(/^\s*rm -f "\$RESULT" "\$PIDFILE"/);
+  const writeAt = at(
+    /^\s*printf '%s\\n' "\$CI_HEAD_2" > \.claude\/state\/finalise-ci-head-2\.txt\s*$/,
+  );
+  const launchAt = at(/^\s*nohup bash "\$POLL"/);
+  assert.ok(
+    guardAt >= 0,
+    "6c poll block: the CI_HEAD_2 / PR_NUMBER guard line is missing",
+  );
+  assert.ok(
+    rmAt >= 0,
+    '6c poll block: the `rm -f "$RESULT" "$PIDFILE"` line is missing',
+  );
+  assert.ok(writeAt >= 0, "6c poll block: the head writer line is missing");
+  assert.ok(
+    launchAt >= 0,
+    '6c poll block: the `nohup bash "$POLL"` line is missing',
+  );
+  assert.ok(
+    guardAt < rmAt && rmAt < writeAt && writeAt < launchAt,
+    `6c poll block must guard its inputs (line ${guardAt}), clear (line ${rmAt}), then record the head (line ${writeAt}), then launch the poll (line ${launchAt})`,
+  );
+  const dir = mkdtempSync(path.join(tmpdir(), "t308-writer-"));
+  try {
+    mkdirSync(path.join(dir, ".claude", "state"), { recursive: true });
+    const head = "0123456789abcdef0123456789abcdef01234567";
+    const r = spawnSync(
+      "bash",
+      ["-c", `CI_HEAD_2=${head}\n${writers[0].trim()}`],
+      { cwd: dir, encoding: "utf8" },
+    );
+    assert.equal(r.status, 0, `writer exited ${r.status}: ${r.stderr}`);
+    assert.equal(
+      readFileSync(
+        path.join(dir, ".claude", "state", "finalise-ci-head-2.txt"),
+        "utf8",
+      ).trim(),
+      head,
+      "the file must hold the head the poll was started on",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// task.309: a head file left by a previous run must not survive into this one. It runs the shipped
+// `rm` line over a stale file, then the shipped writer line, so it holds the clear and the record
+// together: a stale file that survives the clear would still read as the new head's predecessor.
+test("6c poll block clears a previous run's head file, then records the new head", () => {
+  const sixC = between(
+    finalise,
+    "6c. **Second CI reading",
+    "6d. **CHANGELOG citation check",
+    FINALISE,
+  );
+  const lines = codeLines(sixC);
+  const rmLine = lines.find((l) => /^\s*rm -f "\$RESULT" "\$PIDFILE"/.test(l));
+  const writeLine = lines.find((l) =>
+    /^\s*printf '%s\\n' "\$CI_HEAD_2" > \.claude\/state\/finalise-ci-head-2\.txt\s*$/.test(
+      l,
+    ),
+  );
+  assert.ok(rmLine, "6c poll block: the rm line is missing");
+  assert.ok(writeLine, "6c poll block: the head writer line is missing");
+  const dir = mkdtempSync(path.join(tmpdir(), "t309-clear-"));
+  try {
+    const state = path.join(dir, ".claude", "state");
+    mkdirSync(state, { recursive: true });
+    const headFile = path.join(state, "finalise-ci-head-2.txt");
+    const stale = "ffffffffffffffffffffffffffffffffffffffff";
+    writeFileSync(headFile, `${stale}\n`);
+    writeFileSync(path.join(state, "finalise-ci-result.txt"), "old result\n");
+    writeFileSync(path.join(state, "finalise-ci-poll.pid"), "1\n");
+    const shell = (script) =>
+      spawnSync("bash", ["-c", script], { cwd: dir, encoding: "utf8" });
+    const vars =
+      "RESULT=.claude/state/finalise-ci-result.txt\nPIDFILE=.claude/state/finalise-ci-poll.pid\n";
+
+    // The clear alone: the run aborts before the writer, so no head is recorded.
+    const cleared = shell(`${vars}${rmLine.trim()}`);
+    assert.equal(
+      cleared.status,
+      0,
+      `rm line exited ${cleared.status}: ${cleared.stderr}`,
+    );
+    assert.equal(
+      existsSync(headFile),
+      false,
+      "a previous run's head file must be gone after the clear",
+    );
+
+    // The clear, then the writer: the file holds the new head and not the stale one.
+    writeFileSync(headFile, `${stale}\n`);
+    const head = "0123456789abcdef0123456789abcdef01234567";
+    const rerun = shell(
+      `${vars}CI_HEAD_2=${head}\n${rmLine.trim()}\n${writeLine.trim()}`,
+    );
+    assert.equal(
+      rerun.status,
+      0,
+      `clear + writer exited ${rerun.status}: ${rerun.stderr}`,
+    );
+    assert.equal(readFileSync(headFile, "utf8").trim(), head);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// task.310: the 6c poll block reads CI_HEAD_2 and PR_NUMBER, which earlier steps bind and a fresh
+// shell does not carry. The block opens with a named HALT instead of running on empty values. It
+// runs the shipped guard line under a minimal environment, so a value exported in the developer's
+// own shell cannot make an unbound case pass.
+test("6c poll block guards CI_HEAD_2 and PR_NUMBER with a named HALT", () => {
+  const sixC = between(
+    finalise,
+    "6c. **Second CI reading",
+    "6d. **CHANGELOG citation check",
+    FINALISE,
+  );
+  const guards = codeLines(sixC).filter((l) =>
+    /^\s*: "\$\{CI_HEAD_2:\?/.test(l),
+  );
+  assert.equal(
+    guards.length,
+    1,
+    "6c poll block: exactly one CI_HEAD_2 / PR_NUMBER guard line is required",
+  );
+  const run = (env) =>
+    spawnSync("bash", ["-c", guards[0].trim()], {
+      encoding: "utf8",
+      env: { PATH: process.env.PATH, ...env },
+    });
+  const head = "0123456789abcdef0123456789abcdef01234567";
+
+  const noHead = run({ PR_NUMBER: "909" });
+  assert.notEqual(noHead.status, 0, "CI_HEAD_2 unbound must not exit 0");
+  assert.match(noHead.stderr, /CI_HEAD_2/, "the HALT must name CI_HEAD_2");
+
+  const noPr = run({ CI_HEAD_2: head });
+  assert.notEqual(noPr.status, 0, "PR_NUMBER unbound must not exit 0");
+  assert.match(noPr.stderr, /PR_NUMBER/, "the HALT must name PR_NUMBER");
+
+  const both = run({ CI_HEAD_2: head, PR_NUMBER: "909" });
+  assert.equal(
+    both.status,
+    0,
+    `both bound exited ${both.status}: ${both.stderr}`,
+  );
+  assert.equal(both.stderr, "", "both bound must print nothing");
 });
 
 // ---------------------------------------------------------------------------

@@ -182,6 +182,57 @@ for (const shell of ["bash", "zsh"]) {
   });
 }
 
+// ── task.278 (T278-QA-3): the globs reach the engine through argv[5] ────────
+//
+// A production file and its own test are one subject only when the consumer's
+// `qa.testArtifactGlobs` is passed in. The block reads it from argv, so a wiring
+// slip (a dropped argument, a changed index) leaves every unit test green while
+// no real run ever folds. These cases run the block itself.
+
+const CODE_AND_TEST_GATE = join(FIXTURES, "medium-code-and-test.yml");
+
+for (const shell of ["bash", "zsh"]) {
+  test(`configured globs fold a production file and its test into one subject — ${shell}`, (t) => {
+    if (shell === "zsh" && !zshAvailable())
+      return t.skip("zsh not installed on this host");
+    const env = {
+      CYCLE: "3",
+      HIGH_SEQUENCE_JSON: "[0,0,0]",
+      GATE_N: CODE_AND_TEST_GATE,
+      GATE_N1: CODE_AND_TEST_GATE,
+    };
+    const fired = runSnippet(
+      { ...env, TEST_ARTIFACT_GLOBS_JSON: '["shared/resources/tests/**"]' },
+      { shell },
+    );
+    assert.equal(fired.status, 0, `snippet failed: ${fired.stderr}`);
+    const [jsonLine, signalLine] = fired.stdout.trim().split("\n");
+    const out = JSON.parse(jsonLine);
+    assert.equal(out.signal, true, jsonLine);
+    assert.equal(out.file, "shared/resources/open-coverage.js");
+    assert.equal(signalLine, "SIGNAL=true");
+
+    // Controls: no globs, an empty list and an unparseable value all read as
+    // "no fold" — two files, a quiet cycle, and never an error.
+    for (const globs of [undefined, "[]", "", "not json", "[{"]) {
+      const quiet = runSnippet(
+        globs === undefined
+          ? { ...env, TEST_ARTIFACT_GLOBS_JSON: undefined }
+          : { ...env, TEST_ARTIFACT_GLOBS_JSON: globs },
+        { shell },
+      );
+      assert.equal(quiet.status, 0, `snippet failed: ${quiet.stderr}`);
+      const [qJson, qSignal] = quiet.stdout.trim().split("\n");
+      assert.equal(
+        JSON.parse(qJson).reason,
+        "medium-files-differ",
+        `globs=${JSON.stringify(globs)}: ${qJson}`,
+      );
+      assert.equal(qSignal, "SIGNAL=false", `globs=${JSON.stringify(globs)}`);
+    }
+  });
+}
+
 // ── CR-2: a check that could not look must not read as a quiet cycle ────────
 
 test("a blank or malformed HIGH sequence reaches the engine, and could-not-look reports as error", () => {

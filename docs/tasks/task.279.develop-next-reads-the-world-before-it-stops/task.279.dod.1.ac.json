@@ -1,0 +1,208 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "1f3a27dad3fa357816d4ef03a6916d58d6102c51",
+  "dirty_paths": [
+    "docs/tasks/task.279.develop-next-reads-the-world-before-it-stops/task.279.implementation.1.develop-next-reads-the-world-before-it-stops-initial-run.md",
+    "docs/tasks/task.279.develop-next-reads-the-world-before-it-stops/task.279.pr-review.1.develop-next-reads-the-world-before-it-stops.md"
+  ],
+  "document": "docs/tasks/task.279.develop-next-reads-the-world-before-it-stops/task.279.develop-next-reads-the-world-before-it-stops.md",
+  "result": {
+    "bytes": 9703,
+    "sha256": "5007c45e8f056d6e9099feb9bc599fec355e78250abad6c52faa9d79ce64bac7",
+    "verified": true
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 8,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "300c2a98139bf3ed14993e70e92e5087b12c6377c8775e8913c31671d6266bb9",
+      "status": "PASS",
+      "description": "Halt with both evidence pieces routes; either missing stops, via named tests in QA report",
+      "code_citation": "skills/develop-next/scripts/halt-evidence.mjs:8",
+      "test_citation": "evals/develop-next/unit/halt-evidence.test.mjs:26",
+      "members": [
+        {
+          "member": "both pieces present (document accepted, PR MERGED) routes",
+          "evidence": "evals/develop-next/unit/halt-evidence.test.mjs:26",
+          "status": "PASS"
+        },
+        {
+          "member": "PR evidence missing or not merged (OPEN, query failed, no prNumber) stops",
+          "evidence": "evals/develop-next/unit/halt-evidence.test.mjs:37",
+          "status": "PASS"
+        },
+        {
+          "member": "document evidence missing (in-progress, unreadable) stops",
+          "evidence": "evals/develop-next/unit/halt-evidence.test.mjs:48",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Tests recorded by name in docs/tasks/task.279.develop-next-reads-the-world-before-it-stops/task.279.qa.1.develop-next-reads-the-world-before-it-stops.md Record 1 (line 94). The test file lives under evals/develop-next/unit and is included in the 8570-test per-PR run recorded in the QA report. The criteria-drift check was clean (reason: clean, no changed entries)."
+    },
+    {
+      "id": "#2",
+      "text_hash": "9d1407737f24bc458c71910bba7ccb007aa523e3eaf0c46a26a9033ad4713283",
+      "status": "PASS",
+      "description": "Gate in worktree beside checkout passes from-observation and test-clean-checkout tests; command and exit codes in QA report",
+      "code_citation": "docs/tasks/task.279.develop-next-reads-the-world-before-it-stops/task.279.qa.1.develop-next-reads-the-world-before-it-stops.md:118",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "tests/test-clean-checkout.test.js in sibling worktree ../.qg-t279",
+          "evidence": "docs/tasks/task.279.develop-next-reads-the-world-before-it-stops/task.279.qa.1.develop-next-reads-the-world-before-it-stops.md:118",
+          "status": "PASS"
+        },
+        {
+          "member": "skills/create-task/tests/from-observation.test.js in sibling worktree ../.qg-t279",
+          "evidence": "docs/tasks/task.279.develop-next-reads-the-world-before-it-stops/task.279.qa.1.develop-next-reads-the-world-before-it-stops.md:118",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Process criterion: Record 2 names the command (CI=true node --test on both files) and the exit codes. Sibling worktree exits 0; the /tmp control exits 1, so the green is not vacuous. The Step 3 'Where the gate runs' rule is at skills/develop-next/SKILL.md:491."
+    },
+    {
+      "id": "#3",
+      "text_hash": "e6feef373c25c2bf1df69bf1de7e203a96901ce0de9d75e5d7d8c81bb8ac7002",
+      "status": "PASS",
+      "description": "Step 0/Phase 0 Session Start line in four orchestrators, all held by one test",
+      "code_citation": "skills/develop-next/SKILL.md:67",
+      "test_citation": "evals/shared/tests/observe-work-start-line.test.mjs:40",
+      "members": [
+        {
+          "member": "skills/develop-next/SKILL.md",
+          "evidence": "skills/develop-next/SKILL.md:67",
+          "status": "PASS"
+        },
+        {
+          "member": "skills/develop-task/SKILL.md",
+          "evidence": "skills/develop-task/SKILL.md:52",
+          "status": "PASS"
+        },
+        {
+          "member": "skills/develop-story/SKILL.md",
+          "evidence": "skills/develop-story/SKILL.md:54",
+          "status": "PASS"
+        },
+        {
+          "member": "skills/develop-bug/SKILL.md",
+          "evidence": "skills/develop-bug/SKILL.md:54",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "One parameterised test per orchestrator at observe-work-start-line.test.mjs:40, plus a non-vacuity fixture at :51. The mutation proof that deleting the develop-bug line turns the test red is in QA Record 5 (line 159). The test runs through the evals/shared/tests/*.test.mjs glob, inside the 8570 per-PR run."
+    },
+    {
+      "id": "#4",
+      "text_hash": "546f8d2e546317c6fe9a55fd0f609c8fefcc1c0cc809d62ee9ee5cda06496d54",
+      "status": "PASS",
+      "description": "CI=true npm test wall time within 10% of develop, median of five alternating runs, uptime recorded",
+      "code_citation": "docs/tasks/task.279.develop-next-reads-the-world-before-it-stops/task.279.qa.1.develop-next-reads-the-world-before-it-stops.md:137",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Bound: +10%. Measured: median 734 s on develop vs 732 s on PR head, -0.3%, from five alternating pairs with the load (uptime) recorded before each run (Record 4, lines 137-147). Command: docker run of the test:remote image with CI=true timeout 40m npm test, script .claude/state/t279-perf-server.sh. Measured on M=013d77e7e, not HEAD (1f3a27dad). finalise-delta.js docs-only --base 013d77e7e --head HEAD returned reason tree-equivalent (exit 0): only CHANGELOG.md and task-directory files changed. Measured on 013d77e7e, tree-equivalent to head."
+    },
+    {
+      "id": "#5",
+      "text_hash": "f652938ebe99c9e5d58b2e20bc6dd67de3029f9c94b3c9fb408abbcaaf9e759e",
+      "status": "PASS",
+      "description": "The 0.1a check has a mutation proof in the QA report",
+      "code_citation": "docs/tasks/task.279.develop-next-reads-the-world-before-it-stops/task.279.qa.1.develop-next-reads-the-world-before-it-stops.md:157",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "0.1a decision (halt-evidence.mjs merged check), the unit named in Testing Strategy",
+          "evidence": "docs/tasks/task.279.develop-next-reads-the-world-before-it-stops/task.279.qa.1.develop-next-reads-the-world-before-it-stops.md:157",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Record 5 states the mutation (if (false && pr !== \\\"MERGED\\\")), the red tests (control: PR OPEN keeps the halt; CLI: a halt the evidence does not contradict exits 1 and writes nothing; 11 pass / 2 fail), and the restore verified by cmp with 13 tests green. This matches the Testing Strategy line 'drop the merged check; the PR-open control turns red'."
+    },
+    {
+      "id": "#6",
+      "text_hash": "4ebe7eb0e4844e0df815176b7f42d776b2bc0cf3440c8435836dd542207af2de",
+      "status": "PASS",
+      "description": "bundle --check reports 0 problems; CI=true npm test passes",
+      "code_citation": ".github/workflows/test.yml:39",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 1f3a27dad3fa357816d4ef03a6916d58d6102c51 — The criterion asks that the bundle check and the full npm test pass, which is CI state. QA Record evidence at qa.1.md:84 reports 'bundle freshness: 129 skill(s) checked, 0 problems' and 10 of 10 container runs with 0 failed, and CI on 013d77e7ec30 green (qa.1.md:49). Step 6 grades it from CI reading 1 on the current head.",
+      "ci_reading": "CI reading 1: SUCCESS @ 1f3a27dad3fa357816d4ef03a6916d58d6102c51"
+    },
+    {
+      "id": "#7",
+      "text_hash": "f33a193b1ba7a06e2739d5b29c9ad75e845ac1adeb478380f48d1827fc36b421",
+      "status": "PASS",
+      "description": "quick_validate.py passes for the three skills",
+      "code_citation": "docs/tasks/task.279.develop-next-reads-the-world-before-it-stops/task.279.qa.1.develop-next-reads-the-world-before-it-stops.md:85",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "develop-next",
+          "evidence": "docs/tasks/task.279.develop-next-reads-the-world-before-it-stops/task.279.qa.1.develop-next-reads-the-world-before-it-stops.md:85",
+          "status": "PASS"
+        },
+        {
+          "member": "develop-task",
+          "evidence": "docs/tasks/task.279.develop-next-reads-the-world-before-it-stops/task.279.qa.1.develop-next-reads-the-world-before-it-stops.md:85",
+          "status": "PASS"
+        },
+        {
+          "member": "develop-story",
+          "evidence": "docs/tasks/task.279.develop-next-reads-the-world-before-it-stops/task.279.qa.1.develop-next-reads-the-world-before-it-stops.md:85",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Process criterion: the committed QA report records the validator passing for develop-next, develop-task, develop-story and develop-bug (four, a superset of the three the criterion names). The command is listed under Test Commands Executed in the QA report. The per-skill result line is terse, with no exit code."
+    },
+    {
+      "id": "#8",
+      "text_hash": "9c6d42506c7ff9947944c4dd4d161302103f8bf21ab2eee2c0cacbc137b1eb67",
+      "status": "PASS",
+      "description": "halted:true with no merged PR still stops; halt-evidence case and 0.1a skill-shape pin pass unchanged",
+      "code_citation": "skills/develop-next/scripts/halt-evidence.mjs:31",
+      "test_citation": "evals/develop-next/unit/halt-evidence.test.mjs:37",
+      "members": [
+        {
+          "member": "halt-evidence case: PR OPEN keeps the halt",
+          "evidence": "evals/develop-next/unit/halt-evidence.test.mjs:37",
+          "status": "PASS"
+        },
+        {
+          "member": "halt-evidence case: no prNumber recorded has no evidence",
+          "evidence": "evals/develop-next/unit/halt-evidence.test.mjs:72",
+          "status": "PASS"
+        },
+        {
+          "member": "skill-shape 0.1a pin passes unchanged",
+          "evidence": "evals/develop-next/protocol/skill-shape.test.mjs",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Record 6 (qa.1.md:163) names both. It records skill-shape.test.mjs as 34 tests with 0 failed and an empty git diff develop...HEAD over the file. The file sits under evals/ and runs in the per-PR npm test."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#7",
+      "note": "The criterion names three skills but the QA record lists four, so the QA report records a superset. The criterion text is unchanged per criteria-drift (clean)."
+    },
+    {
+      "ac_id": "#4",
+      "note": "The measured run is on 013d77e7e. HEAD 1f3a27dad differs only in docs-only paths, confirmed by finalise-delta.js tree-equivalent."
+    }
+  ]
+}
