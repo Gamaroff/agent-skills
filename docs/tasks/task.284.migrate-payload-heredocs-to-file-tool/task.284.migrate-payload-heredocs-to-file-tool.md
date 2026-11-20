@@ -212,24 +212,24 @@ Population commands: `git grep -nE "(cat|tee)[^|]*<<-?['\"]?[A-Za-z_]+['\"]?" --
 
 ## QA Testing Results
 
-**QA Status**: PASS
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-20
-**Quality Score**: 100/100
-**Gate Decision**: PASS
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.284.qa.3.migrate-payload-heredocs-to-file-tool.md](./task.284.qa.3.migrate-payload-heredocs-to-file-tool.md)
-- **Gate File**: [task.284.gate.3.migrate-payload-heredocs-to-file-tool.yml](./task.284.gate.3.migrate-payload-heredocs-to-file-tool.yml)
+- **Full Report**: [task.284.qa.4.migrate-payload-heredocs-to-file-tool.md](./task.284.qa.4.migrate-payload-heredocs-to-file-tool.md)
+- **Gate File**: [task.284.gate.4.migrate-payload-heredocs-to-file-tool.yml](./task.284.gate.4.migrate-payload-heredocs-to-file-tool.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 8670
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-All three bugs are fixed and closed. Bug 3 (a deferred comment losing its body when the journal write fails) is verified on the head. Three low advisories are recorded in the gate. PR CI on the head was pending when read.
+The PR review fixes for `pr_number`, the footer status and the Out of Scope note hold. One medium finding: the citation added to `review-code` contradicts that block, which builds a fresh `mktemp` body (bug 4). The excluded-site list is recorded in the QA report.
 
 <!-- change-log-start -->
 ## Change Log
@@ -246,6 +246,8 @@ All three bugs are fixed and closed. Bug 3 (a deferred comment losing its body w
 | 2026-11-20 |         | QA findings fixed — 1 bug Ready for QA, 1 iteration                         | qa-fix |
 | 2026-11-20 |         | QA gate PASS (100/100) — 0 findings (bug 3 closed)                          | qa-task |
 | 2026-11-20 |         | PR review findings fixed — citation sweep completed, pr_number, scope note, footer status; 1 iteration | qa-fix |
+| 2026-11-20 |         | QA gate CONCERNS (90/100) — 1 finding (review-code citation wrong)          | qa-task |
+| 2026-11-20 |         | QA findings fixed — 1 bug Ready for QA, 1 iteration                         | qa-fix |
 <!-- change-log-end -->
 
 ---
