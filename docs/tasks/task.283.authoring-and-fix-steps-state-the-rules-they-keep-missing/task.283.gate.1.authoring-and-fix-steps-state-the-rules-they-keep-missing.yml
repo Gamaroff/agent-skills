@@ -1,0 +1,102 @@
+schema: 2
+task: 'task.283.authoring-and-fix-steps-state-the-rules-they-keep-missing'
+task_title: 'Authoring and fix steps state the rules they keep missing'
+gate: CONCERNS
+status_reason: 'Both new artefacts work and are mutation-proven (15 tests; full CI 8629 pass), but five medium findings stand: no CHANGELOG entry for task 283, sync-github-task calls the renderer against the Migration criterion, wall time is unmeasured, the issue-body block leaves its inputs unbound, and the CHANGELOG block fails open on an unfetched base.'
+reviewer: 'QA Engineer'
+head: '3c4054aef1541c022f9f006f3aa6b87d2180477d'
+updated: '2026-11-19T22:38:13Z'
+
+top_issues:
+  - id: 'T283-QA-1'
+    severity: medium
+    file: 'CHANGELOG.md'
+    finding: 'No [Unreleased] entry cites task 283; changelog-cites.sh answers "missing (task 283)" and /finalise 6d HALTs on it. The new Step 3 CHANGELOG block would also flag this repository only once an entry exists, so the entry is the first real use of it.'
+    suggested_action: 'Add an entry under ## [Unreleased] citing (task 283) and run the Step 3 block against it.'
+    suggested_owner: dev
+    status: open
+  - id: 'T283-QA-2'
+    severity: medium
+    file: 'skills/sync-github-task/SKILL.md'
+    finding: 'The Migration criterion says the renderer is called only on ensure-task-github-issue''s create path, so no existing issue body changes. sync-github-task (the update path) now calls it too, which rewrites existing bodies on the next sync. The call site grep in the QA report shows both skills.'
+    suggested_action: 'Revert the sync-github-task hunk and the bundled references it caused, and state in that skill that the renderer is out of scope for the update path. (A criterion edit needs a named approver; the pipeline has none.)'
+    suggested_owner: dev
+    status: open
+  - id: 'T283-QA-3'
+    severity: medium
+    file: 'docs/tasks/task.283.authoring-and-fix-steps-state-the-rules-they-keep-missing/task.283.authoring-and-fix-steps-state-the-rules-they-keep-missing.md'
+    finding: 'Performance criterion unverified: CI=true npm test wall time within 10% of develop (median of five alternating runs, uptime beside each, LAN server) has not been measured. Three full runs on the branch alone exist; none is paired with develop.'
+    suggested_action: 'Run five alternating develop/branch pairs of CI=true npm run test:remote -- --run test with uptime beside each, record the table and median in the QA report (the task.282 QA-2 procedure).'
+    suggested_owner: dev
+    status: open
+  - id: 'T283-QA-4'
+    severity: medium
+    file: 'skills/ensure-task-github-issue/SKILL.md'
+    finding: 'The render block reads TASK_RELATIVE_PATH and DOC_URL, which an earlier fenced block assigns. A block is its own shell, so run alone the call exits 2 (usage) before any issue is created. Origin: code-review CR-2 (high confidence). The same shape in sync-github-task (CR-1) goes away with T283-QA-2.'
+    suggested_action: 'Re-bind both inside the block, with a ":" guard that HALTs naming the variable.'
+    suggested_owner: dev
+    status: open
+  - id: 'T283-QA-5'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-3-develop-loop.md'
+    finding: 'The CHANGELOG placement block fails open: when origin/{base} is not fetched, "git diff --quiet" exits 128, the "!" reads it as changed, awk reads nothing and the block exits 0. Reproduced by execution: base "nonexistent" gives rc 0 with no output; the control (base develop) gives rc 1 on the same misplaced entry. Origin: code-review CR-3 (medium), reproduced by QA (5d). The block is a boundary (it HALTs on repository state) and is covered by committed tests but was not run through the security-probe engine (probes_executed 0).'
+    suggested_action: 'Verify the ref first and HALT when it is missing (distinguish exit 1 from exit above 1); add the unfetched-base case to the test; mutation-prove it. Run the fence probe, or record that the DoD needs an override.'
+    suggested_owner: dev
+    status: open
+  - id: 'T283-QA-6'
+    severity: low
+    file: 'shared/resources/tests/render-task-issue-body.test.mjs'
+    finding: 'The "control: the old \s* pattern" test exercises a regex defined inside the test and never calls the renderer, so it cannot fail on a renderer defect. Origin: code-review CR-4 (cleanup).'
+    suggested_action: 'Replace it with a real control that renders a document whose description spans lines and asserts the 12h effort.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 15
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: true
+    boundary_signals: []
+    notes: 'The renderer reads a local file and writes stdout; no network or shell. The CHANGELOG block is a repository-state boundary, probed by committed tests under bash and zsh but not by the probe engine (T283-QA-5).'
+  performance:
+    status: CONCERNS
+    notes: 'Wall-time criterion unmeasured (T283-QA-3). The change adds two test files that run in about 1.2 s and 0.3 s.'
+  reliability:
+    status: CONCERNS
+    notes: 'The CHANGELOG block fails open on an unfetched base (T283-QA-5).'
+  maintainability:
+    status: PASS
+    notes: 'The renderer defines no card contract of its own (CARD_SECTIONS_BY_KIND), and the ratchet floor moved with the removed heredoc.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T283-QA-1 to T283-QA-5 in one qa-fix cycle.'
+      refs: ['CHANGELOG.md', 'skills/sync-github-task/SKILL.md', 'skills/ensure-task-github-issue/SKILL.md', 'shared/resources/develop-pipeline-step-3-develop-loop.md']
+  future:
+    - action: 'Bundling the renderer copies jira-sync.js, change-log.js and tracker-workflow.js into the create-path skill; consider a smaller card-builder entry point if more skills need it.'
+      refs: ['shared/resources/render-task-issue-body.js']
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T283-QA-1 to T283-QA-5 resolved']

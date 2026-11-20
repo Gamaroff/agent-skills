@@ -25,6 +25,13 @@ captured JSON is corrupted**, which is exactly how `select-next.mjs` output gets
 `command node`, `command npm`, `command npx`.** (`/usr/local/bin/node` also works but is less
 portable.)
 
+**Under an exec-wrapper, resolve the path once.** `timeout`, `xargs`, `env`, `nice` and `nohup` run
+their first argument as a *program*, and `command` is a shell builtin, so `timeout 5 command node …`
+fails with `timeout: failed to run command 'command'` and exit 127. Measured 2026-11-19:
+`timeout 5 command node -e 1` exits 127; `NODE=$(command -v node); timeout 5 "$NODE" -e 1` exits 0.
+Bind `NODE` (and `NPM`, `NPX`) once with `command -v` in the same block, then pass the resolved path
+to the wrapper. Hit on task.249 and again on task.256 (obs #146).
+
 An earlier handoff said "`npm` is fine". It is not; it was never checked.
 
 ### `.agents/skills` is a symlink to `../skills`

@@ -1,0 +1,81 @@
+schema: 2
+task: 'task.283.authoring-and-fix-steps-state-the-rules-they-keep-missing'
+task_title: 'Authoring and fix steps state the rules they keep missing'
+gate: CONCERNS
+status_reason: 'Cycle 2 fixed QA-7, QA-8 and QA-9 (mutation-proven; full CI green, 8639 of 8642). The scoped cycle 3 review reproduced one more medium defect in the same CHANGELOG block: the per-hunk rule counts every removed line, so a bullet that replaces a heading, blank or prose line passes. The wall-time criterion measurement is running and not yet recorded.'
+reviewer: 'QA Engineer'
+head: 'bbe0a3709197e8cf293bdce5ab66e3e0a5f6db02'
+updated: '2026-11-20T04:30:55Z'
+
+top_issues:
+  - id: 'T283-QA-10'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-3-develop-loop.md'
+    finding: 'The CHANGELOG block takes `old` from the hunk header, which counts every removed line (heading, blank, prose), not only bullets. A new bullet that replaces a non-bullet line gets extra <= 0 and passes. Reproduced by execution: control (pure insertion below the first release heading) exits 1 with the HALT; replacing "### Fixed" plus the blank line with a bullet exits 0, and replacing a prose line with a bullet exits 0, both with no output. This is the third consecutive gate to name this block (QA-5, then QA-7 and QA-8, now this one): each fix to the hunk heuristic exposed the next edge. Origin: code-review CR-1 (high confidence), CR-2 and CR-3 (low), reproduced by QA.'
+    suggested_action: 'Replace the hunk heuristic rather than patching it a fourth time: compare the number of bullets from the first release heading to the end of the file in the merge-base copy against the working copy, and HALT when the working copy has more, listing the added bullets from a diff of the two regions. A one-for-one edit keeps the count; any added bullet raises it, whatever lines it replaced. Diff against the merge-base so a base that has moved is not counted. Add tests for the three non-bullet-replacement shapes and a moved base; drop the string-presence "non-vacuity" test or make it assert behaviour; mutation-prove.'
+    suggested_owner: dev
+    status: open
+  - id: 'T283-QA-3'
+    severity: medium
+    file: 'docs/tasks/task.283.authoring-and-fix-steps-state-the-rules-they-keep-missing/task.283.authoring-and-fix-steps-state-the-rules-they-keep-missing.md'
+    finding: 'Carried from gates 1 and 2: the performance criterion (CI=true npm test wall time within 10% of develop, median of five alternating runs with uptime beside each, LAN server) is not yet recorded. A measurement (two warm-ups, then five alternating pairs from clean worktrees of develop and bbe0a3709) was started at 04:29Z and is writing .claude/state/walltime-283.tsv.'
+    suggested_action: 'Record the table and median in the QA report when the run finishes, or obtain an owner-approved criterion amendment (approved by <name>).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 28
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: true
+    boundary_signals: []
+    notes: 'The renderer reads a local file and writes stdout. The CHANGELOG block is a repository-state boundary; the engine refuses it as mutating, so committed tests under bash and zsh are the evidence and the DoD needs an override for probes_executed: 0.'
+  performance:
+    status: CONCERNS
+    notes: 'Wall-time criterion not yet recorded (T283-QA-3); a measurement is in progress.'
+  reliability:
+    status: CONCERNS
+    notes: 'The CHANGELOG block still passes a bullet that replaces a non-bullet line (T283-QA-10).'
+  maintainability:
+    status: PASS
+    notes: 'Low advisories: the diff is taken against the base tip rather than the merge-base (CR-2, folded into QA-10); a string-presence test asserts nothing about behaviour (CR-3, folded into QA-10).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T283-QA-10 by replacing the hunk heuristic with a section bullet-count comparison, and close T283-QA-3 by recording the measurement.'
+      refs: ['shared/resources/develop-pipeline-step-3-develop-loop.md', 'shared/resources/tests/develop-loop-changelog-placement.test.mjs']
+  future:
+    - action: 'absolutizeLinks: skip fenced and inline-code spans, accept an optional link title, resolve root-relative targets against the repository root.'
+      refs: ['shared/resources/render-task-issue-body.js']
+      remedy: unverified
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 1
+  fix_date: '2026-11-20'
+  total_iterations: 2
+  verification_method: 'Committed tests (21 and 7 pass), mutation proofs of each new behaviour, rebundle check, CI-parity run (8642 tests, 8639 pass, 0 fail)'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T283-QA-10 resolved', 'T283-QA-3 recorded or amended by an approver']

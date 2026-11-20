@@ -1,0 +1,34 @@
+[
+  {
+    "id": "cl.no-origin-ref-halts",
+    "sink": "filename",
+    "input": "develop",
+    "direction": "hostile",
+    "why": "CHANGELOG.md exists but the checkout has no origin/develop. The guard must report that it cannot look and exit 1. It must not pass by default, because a bare `!` on `git diff` exit 128 once read as 'changed' and the block then exited 0.",
+    "correct": "Print a HALT line naming the missing ref and exit non-zero.",
+    "spec_ref": "shared/resources/develop-pipeline-step-3-develop-loop.md:385",
+    "fixture": {
+      "files": {
+        "CHANGELOG.md": "# Changelog\n\n## [Unreleased]\n\n- **Entry.**\n\n## [v1.0.0] - 2026-10-01\n\n- **Shipped.**\n"
+      }
+    },
+    "expected": {
+      "stdout": "HALT: origin/develop is not a ref in this checkout — run git fetch origin develop, then re-run (the CHANGELOG check cannot look without it)\n",
+      "exit": 1
+    }
+  },
+  {
+    "id": "cl.no-changelog-skips",
+    "sink": "filename",
+    "input": "develop",
+    "direction": "legitimate",
+    "why": "A project with no CHANGELOG.md skips the block. Refusing here would be over-blocking.",
+    "correct": "Exit 0 and print nothing.",
+    "spec_ref": "shared/resources/develop-pipeline-step-3-develop-loop.md:376",
+    "fixture": {
+      "files": {
+        "README.md": "x\n"
+      }
+    }
+  }
+]

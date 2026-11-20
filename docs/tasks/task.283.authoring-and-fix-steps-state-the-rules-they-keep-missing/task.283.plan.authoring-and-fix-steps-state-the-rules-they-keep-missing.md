@@ -17,19 +17,19 @@ Edit sources with the Edit tool, one hunk per call; never a bundled copy. Four i
 
 ### Phase 1
 
-`git grep -n "anchors resolve" -- skills/review-task` finds check 2; add the placement claim ("under `[Unreleased]`" verified with `grep -n "^## \[" CHANGELOG.md`). Ask the owner which fix point (5c CHANGELOG-only relocation vs a Step 3 check) before editing the QA-loop doc.
+`git grep -n "Line anchors resolve" -- skills/review-task` finds the bullet in Step 3 check 2; add the placement claim ("under `[Unreleased]`" verified with `grep -n "^## \[" CHANGELOG.md`). The fix point is decided: add a fenced shell block to `shared/resources/develop-pipeline-step-3-develop-loop.md` that fails when a new CHANGELOG entry sits below the first `## [v` heading, and a test under `shared/resources/tests/` that extracts and runs it (released-section entry fails, `[Unreleased]` entry passes). No 5c exception. Re-bundle afterwards.
 
 ### Phase 2
 
-Add a "Multi-task path" subsection after `skills/create-task/SKILL.md:268`'s procedure: allocate the range from the registry, one writer per directory, one registry pass at the end. Write the renderer as a script (node, parses frontmatter with the repository's parser, not a regex), test first against a fixture whose description spans lines; point `ensure-task-github-issue` at it.
+Add a "Multi-task path" subsection after `skills/create-task/SKILL.md:268`'s procedure: allocate the range from the registry, one writer per directory, one registry pass at the end. Write the renderer as a node script under `shared/resources/` that imports `jira-sync.js` (`parseFrontmatter`, `buildCardSections`) and holds no cap or regex of its own. Test first against a fixture whose description spans lines. Point `ensure-task-github-issue` at it, decide `sync-github-task` (carried or out of scope, said in the skill), and lower the pinned `issue-body.md` heredoc count in `shared/resources/tests/payload-heredoc-ratchet.test.mjs`. Run `pipeline-answers-generic.test.mjs` and `bundle --check` on the new file.
 
 ### Phase 3
 
-Add the importer-audit rule to `develop-bug`'s fix step and `qa-fix`: `git grep -l "<function>"` for importers, list the writers, state why newly accepted input is safe for each.
+Add the importer-audit rule to `develop-bug`'s Step 3 (Investigate & Fix) and `qa-fix`'s Step 3 (Apply Changes): `git grep -l "<function>"` for importers, list the writers, state why newly accepted input is safe for each.
 
 ### Phase 4
 
-Add the wrapper line to `docs/contributing/traps.md` beside the `command node` rule, and update the project memory note.
+Add the wrapper line to `docs/contributing/traps.md` beside the `command node` rule. The project memory note is outside the repository and not part of this change.
 
 ### Phase 5
 

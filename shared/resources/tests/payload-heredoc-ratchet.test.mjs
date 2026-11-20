@@ -6,9 +6,9 @@
  * holds its own delimiter line (obs #15, #88, #106). The rule and its replacements are in
  * file-write-rules.md.
  *
- * This is a ratchet, not a ban: 32 sites remain today and are allow-listed by file and line text.
+ * This is a ratchet, not a ban: 31 sites remain today and are allow-listed by file and line text.
  * A new heredoc fails the test; so does an allow-list entry whose line has gone, which makes each
- * removal a visible deletion here. Moving the 32 sites off is a separate task.
+ * removal a visible deletion here. Moving the 31 sites off is a separate task.
  *
  * Definition (the same one the task measured): a line holding `cat` or `tee`, then a `<<` or `<<-`
  * redirect with a word delimiter, with no pipe between them. Population: tracked
@@ -82,7 +82,6 @@ const ALLOWLIST = [
   ["skills/ensure-bug-github-issue/SKILL.md", ISSUE, 1],
   ["skills/ensure-epic-github-issue/SKILL.md", ISSUE, 1],
   ["skills/ensure-story-github-issue/SKILL.md", ISSUE, 1],
-  ["skills/ensure-task-github-issue/SKILL.md", ISSUE, 1],
   ["skills/finalise/SKILL.md", A, 2],
   [
     "skills/finalise/SKILL.md",
@@ -189,16 +188,16 @@ test("the allow-list diff reports a new site and a stale entry", () => {
   assert.equal(r.stale.length, 1);
 });
 
-test("non-vacuity: the population is read and the allow-list holds 32 sites", () => {
+test("non-vacuity: the population is read and the allow-list holds 31 sites", () => {
   assert.ok(
     trackedPopulation().length > 100,
     "the tracked population looks too small to be the prose set",
   );
   assert.equal(
     [...allowed.values()].reduce((a, b) => a + b, 0),
-    32,
+    31,
   );
-  assert.equal(total(measure()), 32);
+  assert.equal(total(measure()), 31);
 });
 
 test("no payload heredoc is added to shipped prose, and none is left allow-listed after removal", () => {

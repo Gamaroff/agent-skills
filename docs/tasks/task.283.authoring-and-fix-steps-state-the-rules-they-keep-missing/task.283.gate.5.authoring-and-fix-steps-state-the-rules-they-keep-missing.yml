@@ -1,0 +1,71 @@
+schema: 2
+task: 'task.283.authoring-and-fix-steps-state-the-rules-they-keep-missing'
+task_title: 'Authoring and fix steps state the rules they keep missing'
+gate: CONCERNS
+status_reason: 'The wall-time criterion is now measured and met (median +1.7%), the cycle 4 fix holds, and the full CI-parity run is green (8658 pass, 0 fail). One reproduced medium remains in the CHANGELOG block (a valid edit aborts silently under set -e when the released region holds no bullets). This is the fifth gate: the budget is spent, so the fix is not applied here.'
+reviewer: 'QA Engineer'
+head: '5584edb75c7f3805d4e29c67e7e2139a83a4fc0d'
+updated: '2026-11-20T07:28:48Z'
+
+top_issues:
+  - id: 'T283-QA-12'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-3-develop-loop.md'
+    finding: 'The bullet counts use `grep -c .`, which prints 0 but exits 1 on an empty region. Under a `set -e` caller a valid edit that touches only [Unreleased], against a base whose released region has no bullets, aborts with exit 1 and no output. Reproduced by execution in bash and zsh (no set -e: rc 0; set -e: rc 1, silent). The existing set -e test uses a base with a non-empty released region, so it never reaches this. Lower risk: a failed `git show` inside the pipe is not detected (no pipefail), though `git cat-file -e` has already confirmed the object; an `awk -v` escape garbles the added-bullet list in the HALT message only; the release-cut test asserts only exit 1.'
+    suggested_action: 'Count with awk (`awk "END{print NR}"`) or append `|| true`; read the base into a variable before awk so a git failure HALTs; pass the base through ENVIRON, not -v; assert the HALT text in the release-cut test; add a set -e case with an empty released region.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 88
+
+evidence:
+  tests_reviewed: 40
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: true
+    boundary_signals: []
+    notes: 'The CHANGELOG block is a repository-state boundary; the engine refuses it as mutating, so committed tests under bash and zsh are the evidence and the DoD needs an override for probes_executed: 0.'
+  performance:
+    status: PASS
+    notes: 'Median of five alternating runs on the LAN server: develop 750 s, branch 763 s (+1.7%). Two branch runs and one develop run were slowed by other tenants on the shared server (load 8 to 19); the median does not depend on them.'
+  reliability:
+    status: CONCERNS
+    notes: 'A valid edit can abort silently under set -e in one narrow shape (T283-QA-12).'
+  maintainability:
+    status: PASS
+    notes: 'Stated limits are now pinned by tests.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T283-QA-12 (needs an owner decision: the gate budget is spent).'
+      refs: ['shared/resources/develop-pipeline-step-3-develop-loop.md', 'shared/resources/tests/develop-loop-changelog-placement.test.mjs']
+  future: []
+
+bug_resolution:
+  bugs_fixed: 7
+  bugs_remaining: 1
+  fix_date: '2026-11-20'
+  total_iterations: 4
+  verification_method: 'CI-parity run at 5584edb75: 8658 pass, 0 fail, 3 skipped; 40 CHANGELOG-placement tests pass; five-pair wall-time table'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T283-QA-12 fixed, or accepted by the owner as a documented limit']

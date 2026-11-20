@@ -158,48 +158,24 @@ the body carries backticks, `$(…)` and newlines, and an inline `--body` is a
 shell injection waiting for the first task whose success criteria contain one.
 The file is also what carries the body into the deferred record's `command.stdin`.
 
-> **The heredoc below is unquoted, and that is a real residual risk — not a
-> solved problem.** `<<EOF` still performs command substitution, so a `$(…)` or a
-> backticked span in the document's own text is executed while the body is being
-> written. `--body-file` removes the *argv* injection surface, which is the larger
-> one; it does not remove this. Where the source text is untrusted, write the file
-> with the editor tool instead of a heredoc. `<<'EOF'` is not the fix here — it
-> would also stop the `${…}` values below from being substituted, which the body
-> needs.
+**The body is rendered by a script, not a heredoc** (task.283, obs #34). A hand-filled unquoted
+heredoc executes any `$(…)` in the document's text, and the ad-hoc scripts that replaced it for
+tasks 202–207 dropped `estimated_effort_hours` and left `../../../` links that 404 in an issue.
+`render-task-issue-body.js` reads the document with the repository's own parsers, takes the sections
+and caps from the one card definition (`CARD_SECTIONS_BY_KIND.task`), makes relative links absolute
+against `DOC_URL`, and counts "+N more" exactly. Exit 1 means no Summary or Success Criteria
+resolved: run `card-preflight.js` on the document and fix it there, never hand-write a body.
 
 ```bash
 mkdir -p .claude/state
-cat > .claude/state/issue-body.md <<EOF
-## Summary
-
-{First paragraph of the task's Overview section — 2-4 sentences}
-
-## Success Criteria
-
-{The first 5 success criteria as a GitHub checkbox list. If more remain, add a
-final line: '+N more in the [task document](${DOC_URL})' with N the exact number
-omitted. If 5 or fewer, list them all and add no such line.}
-
-## Breaking Changes
-
-{The first 3 items from the task's Breaking Changes section. OMIT THIS HEADING
-ENTIRELY when the task has no Breaking Changes section or it is empty — which is
-the common case. Never leave an empty heading behind.}
-
-## Metadata
-
-| Field | Value |
-|-------|-------|
-| Priority | ${priority} |
-| Effort | {estimated_effort_hours or —}h |
-| Category | {category or —} |
-| Depends on | {depends_on or —} |
-
-## Document
-
-📄 [Task Document](${DOC_URL})
-📁 \`${TASK_RELATIVE_PATH}\`
-EOF
+# INPUTS, bound in THIS block (each fenced block is its own shell): TASK_RELATIVE_PATH and DOC_URL,
+# the values Step T5's first block computes. Unbound, the script would exit 2 on a usage error.
+: "${TASK_RELATIVE_PATH:?bind TASK_RELATIVE_PATH (the task file, relative to the repo root) in this block}"
+: "${DOC_URL:?bind DOC_URL (the https blob URL of the task file) in this block}"
+command node references/render-task-issue-body.js \
+  --file "${TASK_RELATIVE_PATH}" --doc-url "${DOC_URL}" --rel-path "${TASK_RELATIVE_PATH}" \
+  > .claude/state/issue-body.md \
+  || { echo "HALT: no issue body rendered — run card-preflight.js on ${TASK_RELATIVE_PATH}"; exit 1; }
 
 # A label the repository does not define fails the WHOLE create; the shared
 # helper drops it with a warning instead (task.125, TASK-125-BUG-3).

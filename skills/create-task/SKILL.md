@@ -300,6 +300,18 @@ the first is untested and the second tests nothing. Split by **outcome delivered
 diff lands. If two candidate tasks would each leave the tree in a state nobody would merge alone, they
 are one task.
 
+**Multi-task path: allocate once, write in parallel, register once** (obs #35). When the answer is N > 1
+and the documents are written concurrently (parallel forks or sessions), the single-writer rule of the
+registry still holds, and a fork that allocates its own number collides with its siblings:
+
+1. **Pre-allocate the range** before any document is written: read **Next Available Task Number** once
+   and reserve `N … N+k−1` for the k documents, naming each unit against its number.
+2. **One writer per task directory.** Each document is written by exactly one author, into
+   `docs/tasks/task.{n}.{name}/` for its own reserved number, and touches nothing outside it.
+3. **One registry pass, at the end,** by whoever holds the whole batch: append the k rows, increment the
+   counter by k, add the ordering note this section requires, and commit it atomically with the
+   documents. A fork never edits `task-registry.md`.
+
 **A blocker in another repository is never written `task.N`.** The registry reads `task.N` in the
 `Depends on` cell as a task in *this* registry, so another repository's task.127 binds to this
 repository's unrelated task.127. Write it as free text after ` — `, naming the repository
